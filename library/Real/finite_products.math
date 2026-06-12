@@ -1,0 +1,141 @@
+-- Real/finite_products.math
+--
+-- Finite products Π_{k<n} s(k), mirroring the partial-sum toolkit:
+-- nonnegativity, splitting at a cut, and pulling out a constant
+-- factor (which exits as its n-th power).
+
+module Real.finite_products
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.archimedean
+import Set.basics
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.series
+import Real.power
+
+definition Real.partialProduct (s : Natural → Real) : Natural → Real
+  | zero => Real.one
+  | successor(n) => Real.partialProduct(s, n) * s(n)
+
+-- Products of nonnegative terms are nonnegative.
+theorem Real.partialProduct_nonneg (s : Natural → Real) (n : Natural)
+        (termsNonneg : (j : Natural) → Real.zero ≤ s(j))
+        : Real.zero ≤ Real.partialProduct(s, n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim Rational.zero < Rational.one;
+        claim Real.zero < (Rational.one : Real)
+            since Rational.to_real.positive_preserves;
+        claim Real.zero ≤ (Rational.one : Real)
+            since Real.LessThan.weaken;
+        done
+      }
+    case successor(predecessor): {
+        claim Real.zero ≤ s(predecessor) by termsNonneg(predecessor);
+        claim Real.IsNonneg(Real.partialProduct(s, predecessor))
+            since Real.IsNonneg_of_LessOrEqual_zero;
+        claim Real.IsNonneg(s(predecessor))
+            since Real.IsNonneg_of_LessOrEqual_zero;
+        claim Real.IsNonneg(
+                  Real.partialProduct(s, predecessor) * s(predecessor))
+            since Real.IsNonneg.multiply;
+        claim Real.zero
+                ≤ Real.partialProduct(s, predecessor) * s(predecessor)
+            since Real.LessOrEqual_zero_of_IsNonneg;
+        done
+      }
+  }
+
+-- Splitting a product at a cut.
+theorem Real.partialProduct_split (s : Natural → Real) (n k : Natural)
+        : Real.partialProduct(s, k + n)
+          = Real.partialProduct(s, n)
+            * Real.partialProduct((j : Natural) ↦ s(n + j), k) :=
+  by_induction on k with IH {
+    case zero:
+        calc Real.partialProduct(s, 0 + n)
+           = Real.partialProduct(s, n)
+           = Real.partialProduct(s, n) * Real.one    by ring
+           = Real.partialProduct(s, n)
+             * Real.partialProduct((j : Natural) ↦ s(n + j), 0)
+    case successor(predecessor):
+        calc Real.partialProduct(s, successor(predecessor) + n)
+           = Real.partialProduct(s, predecessor + n) * s(predecessor + n)
+           = (Real.partialProduct(s, n)
+              * Real.partialProduct((j : Natural) ↦ s(n + j), predecessor))
+             * s(predecessor + n)
+                 since IH
+           = (Real.partialProduct(s, n)
+              * Real.partialProduct((j : Natural) ↦ s(n + j), predecessor))
+             * s(n + predecessor)
+                 by (predecessor + n = n + predecessor)
+           = Real.partialProduct(s, n)
+             * Real.partialProduct(
+                   (j : Natural) ↦ s(n + j), successor(predecessor))
+  }
+
+-- A constant factor exits as its n-th power.
+theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural)
+        : Real.partialProduct((k : Natural) ↦ c * s(k), n)
+          = Real.power(c, n) * Real.partialProduct(s, n) :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.partialProduct((k : Natural) ↦ c * s(k), 0)
+           = Real.one
+           = Real.power(c, 0) * Real.partialProduct(s, 0)
+    case successor(predecessor): {
+        claim powerUnfold
+              : Real.power(c, successor(predecessor))
+                = c * Real.power(c, predecessor);
+        calc Real.partialProduct((k : Natural) ↦ c * s(k), successor(predecessor))
+           = Real.partialProduct((k : Natural) ↦ c * s(k), predecessor)
+             * (c * s(predecessor))
+           = (Real.power(c, predecessor) * Real.partialProduct(s, predecessor))
+             * (c * s(predecessor))
+                 since IH
+           = (c * Real.power(c, predecessor))
+             * (Real.partialProduct(s, predecessor) * s(predecessor))
+                 by ring
+           = Real.power(c, successor(predecessor))
+             * (Real.partialProduct(s, predecessor) * s(predecessor))
+                 by powerUnfold
+      }
+  }

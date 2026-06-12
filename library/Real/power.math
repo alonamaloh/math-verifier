@@ -56,6 +56,7 @@ import Real.absolute_value_order
 import Real.apartness
 import Real.reciprocal
 import Real.field
+import Real.order_field
 import Real.density
 import Real.convergence
 
@@ -256,4 +257,90 @@ theorem Real.power_converges_zero
                           since Real.absolute_value_when_nonneg;
           done by substituting absEqual
         }
+  }
+
+-- ----------------------------------------------------------------------
+-- The exponent laws and order facts the means inequality runs on.
+
+theorem Real.power_add (x : Real) (exponent1 exponent2 : Natural)
+        : Real.power(x, exponent1 + exponent2)
+          = Real.power(x, exponent1) * Real.power(x, exponent2) :=
+  by_induction on exponent1 with IH {
+    case zero:
+        calc Real.power(x, 0 + exponent2)
+           = Real.power(x, exponent2)
+           = Real.power(x, 0) * Real.power(x, exponent2)
+    case successor(predecessor):
+        calc Real.power(x, successor(predecessor) + exponent2)
+           = x * Real.power(x, predecessor + exponent2)
+           = x * (Real.power(x, predecessor) * Real.power(x, exponent2))
+                 since IH
+           = (x * Real.power(x, predecessor)) * Real.power(x, exponent2)
+                 by ring
+           = Real.power(x, successor(predecessor)) * Real.power(x, exponent2)
+  }
+
+theorem Real.power_product (x y : Real) (n : Natural)
+        : Real.power(x * y, n) = Real.power(x, n) * Real.power(y, n) :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.power(x * y, 0)
+           = Real.one
+           = Real.power(x, 0) * Real.power(y, 0)
+    case successor(predecessor):
+        calc Real.power(x * y, successor(predecessor))
+           = (x * y) * Real.power(x * y, predecessor)
+           = (x * y) * (Real.power(x, predecessor) * Real.power(y, predecessor))
+                 since IH
+           = (x * Real.power(x, predecessor)) * (y * Real.power(y, predecessor))
+                 by ring
+           = Real.power(x, successor(predecessor))
+             * Real.power(y, successor(predecessor))
+  }
+
+-- Powers preserve the order between nonnegative bases.
+theorem Real.power_monotone (u v : Real) (n : Natural)
+        (uNonneg : Real.zero ≤ u) (uLeqV : u ≤ v)
+        : Real.power(u, n) ≤ Real.power(v, n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim Real.one ≤ Real.one since Real.LessOrEqual.reflexive;
+        done
+      }
+    case successor(predecessor): {
+        calc Real.zero ≤ u ≤ v   as vNonneg;
+        claim Real.zero ≤ Real.power(u, predecessor)
+            since Real.power_nonneg;
+        claim Real.IsNonneg(Real.power(u, predecessor))
+            since Real.IsNonneg_of_LessOrEqual_zero;
+        claim Real.IsNonneg(v) since Real.IsNonneg_of_LessOrEqual_zero;
+        calc Real.power(u, successor(predecessor))
+           = u * Real.power(u, predecessor)
+           ≤ v * Real.power(u, predecessor)
+                 since Real.LessOrEqual.multiply_by_nonneg_right
+           = Real.power(u, predecessor) * v
+                 by ring
+           ≤ Real.power(v, predecessor) * v
+                 since Real.LessOrEqual.multiply_by_nonneg_right
+           = v * Real.power(v, predecessor)
+                 by ring
+           = Real.power(v, successor(predecessor))
+      }
+  }
+
+theorem Real.power_positive (x : Real) (n : Natural)
+        (xPositive : Real.zero < x)
+        : Real.zero < Real.power(x, n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim Rational.zero < Rational.one;
+        claim Real.zero < (Rational.one : Real)
+            since Rational.to_real.positive_preserves;
+        done
+      }
+    case successor(predecessor): {
+        claim Real.zero < x * Real.power(x, predecessor)
+            since Real.multiply_positive;
+        done
+      }
   }
