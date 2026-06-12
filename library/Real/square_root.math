@@ -1,0 +1,120 @@
+-- Real/square_root.math
+--
+-- Square roots exist: every nonnegative real is the square of a
+-- nonnegative real. The intermediate value theorem does the work —
+-- t ↦ t·t − c is continuous, starts at −c ≤ 0, and at t = c + 1 has
+-- climbed to c² + c + 1 > 0, so it crosses zero on [0, c + 1].
+
+module Real.square_root
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+import Real.intermediate_value
+
+theorem Real.square_root_exists (c : Real) (cNonneg : Real.zero ≤ c)
+        : ∃ (r : Real). And(Real.zero ≤ r, r * r = c) := {
+  -- t ↦ t² − c is continuous everywhere on the interval.
+  claim squareContinuousOn
+        : Real.ContinuousOn((t : Real) ↦ t * t - c, Real.zero, c + Real.one)
+      since (t : Real) (_ : Real.zero ≤ t) (_ : t ≤ c + Real.one) ↦ {
+           claim identityContinuous : Real.ContinuousAt((u : Real) ↦ u, t)
+               by Real.ContinuousAt.identity(t);
+           claim squareContinuous : Real.ContinuousAt((u : Real) ↦ u * u, t)
+               by Real.ContinuousAt.multiply(
+                      (u : Real) ↦ u, (u : Real) ↦ u, t,
+                      identityContinuous, identityContinuous);
+           claim constantContinuous : Real.ContinuousAt((u : Real) ↦ c, t)
+               by Real.ContinuousAt.constant(c, t);
+           done by Real.ContinuousAt.subtract(
+                       (u : Real) ↦ u * u, (u : Real) ↦ c, t,
+                       squareContinuous, constantContinuous)
+         };
+  -- The interval is honest, and the endpoint values straddle zero.
+  claim Rational.zero < Rational.one;
+  claim Real.zero < (Rational.one : Real)
+      since Rational.to_real.positive_preserves;
+  claim Real.zero ≤ Real.one since Real.LessThan.weaken;
+  claim intervalOrdered : Real.zero ≤ c + Real.one
+      by calc Real.zero
+            ≤ c                  by cNonneg
+            = c + Real.zero
+            ≤ c + Real.one       since Real.add_preserves_LessOrEqual_left;
+  claim startNonpositive : Real.zero * Real.zero - c ≤ Real.zero
+      by calc Real.zero * Real.zero - c
+            = Real.zero + -c
+            ≤ c + -c             by Real.add_preserves_LessOrEqual
+            = Real.zero          by ring;
+  claim Real.IsNonneg(c * c) since Real.square_IsNonneg;
+  claim Real.zero ≤ c * c since Real.LessOrEqual_zero_of_IsNonneg;
+  claim endNonneg : Real.zero ≤ (c + Real.one) * (c + Real.one) - c
+      by calc Real.zero
+            = Real.zero + Real.zero      by ring
+            ≤ c * c + Real.zero          by Real.add_preserves_LessOrEqual
+            ≤ c * c + (c + Real.one)     since Real.add_preserves_LessOrEqual_left
+            = (c + Real.one) * (c + Real.one) - c
+                  by ring;
+  obtain ⟨r, rData⟩
+      from Real.intermediate_value(
+               (t : Real) ↦ t * t - c, Real.zero, c + Real.one,
+               intervalOrdered, squareContinuousOn,
+               startNonpositive, endNonneg);
+  obtain ⟨zeroLeqR, rRest⟩ from rData;
+  obtain ⟨_, rootEquation⟩ from rRest;
+  claim valueZero : r * r - c = Real.zero by rootEquation;
+  witness r with
+      And.introduction(
+          zeroLeqR,
+          calc r * r
+             = (r * r - c) + c    by ring
+             = Real.zero + c      since valueZero
+             = c                  by ring)
+}

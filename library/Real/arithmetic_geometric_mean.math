@@ -1,0 +1,219 @@
+-- Real/arithmetic_geometric_mean.math
+--
+-- The two-variable arithmetic/geometric mean inequality (toward Freek
+-- #38): a nonnegative g with g² = x·y sits below the arithmetic mean
+-- (x + y)/2 — and such a g always exists, by the square-root theorem.
+--
+-- The algebra is the classic square gap:
+--   ((x + y)/2)² − x·y = ((x − y)/2)² ≥ 0,
+-- so g² is bounded by the mean's square, and squares compare like
+-- their nonnegative roots.
+
+module Real.arithmetic_geometric_mean
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+import Real.intermediate_value
+import Real.square_root
+
+-- Any nonnegative square root of x·y is at most the arithmetic mean.
+theorem Real.geometric_mean_le_arithmetic_mean
+        (x y g : Real)
+        (xNonneg : Real.zero ≤ x) (yNonneg : Real.zero ≤ y)
+        (gNonneg : Real.zero ≤ g)
+        (gSquare : g * g = x * y)
+        : g ≤ (x + y) * (Rational.one_half : Real) := {
+  claim halfSum
+        : (Rational.one_half : Real) + (Rational.one_half : Real)
+          = (Rational.one : Real)
+      by calc (Rational.one_half : Real) + (Rational.one_half : Real)
+            = ((Rational.one_half + Rational.one_half : Rational) : Real)
+                  since Rational.to_real.add_preserves
+            = (Rational.one : Real)
+                  by Rational.one_half_doubled;
+  claim Rational.zero < Rational.one_half since Rational.one_half_positive;
+  claim Real.zero < (Rational.one_half : Real)
+      since Rational.to_real.positive_preserves;
+  claim Real.zero ≤ (Rational.one_half : Real) since Real.LessThan.weaken;
+  -- The mean is nonnegative.
+  claim sumNonneg : Real.zero ≤ x + y
+      by calc Real.zero
+            = Real.zero + Real.zero
+            ≤ x + Real.zero            by Real.add_preserves_LessOrEqual
+            ≤ x + y                    since Real.add_preserves_LessOrEqual_left;
+  claim Real.IsNonneg(x + y) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg((Rational.one_half : Real))
+      since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg((x + y) * (Rational.one_half : Real))
+      since Real.IsNonneg.multiply;
+  claim meanNonneg : Real.zero ≤ (x + y) * (Rational.one_half : Real)
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  -- The square gap: mean² − x·y = ((x − y)/2)².
+  claim gapIdentity
+        : ((x + y) * (Rational.one_half : Real))
+              * ((x + y) * (Rational.one_half : Real))
+          - x * y
+          = ((x - y) * (Rational.one_half : Real))
+            * ((x - y) * (Rational.one_half : Real))
+      by linear_combination(
+             x * y
+             * ((Rational.one_half : Real) + (Rational.one_half : Real)
+                + Real.one)
+             * halfSum);
+  claim Real.IsNonneg(
+            ((x - y) * (Rational.one_half : Real))
+            * ((x - y) * (Rational.one_half : Real)))
+      since Real.square_IsNonneg;
+  claim gapNonneg
+        : Real.zero
+          ≤ ((x - y) * (Rational.one_half : Real))
+            * ((x - y) * (Rational.one_half : Real))
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  -- g² ≤ mean².
+  claim productValue
+        : x * y
+          = ((x + y) * (Rational.one_half : Real))
+                * ((x + y) * (Rational.one_half : Real))
+            - ((x - y) * (Rational.one_half : Real))
+                * ((x - y) * (Rational.one_half : Real))
+      by linear_combination(Real.zero - gapIdentity);
+  claim negatedGapNonpositive
+        : -(((x - y) * (Rational.one_half : Real))
+            * ((x - y) * (Rational.one_half : Real)))
+          ≤ Real.zero
+      by calc -(((x - y) * (Rational.one_half : Real))
+                * ((x - y) * (Rational.one_half : Real)))
+            = Real.zero
+              - ((x - y) * (Rational.one_half : Real))
+                  * ((x - y) * (Rational.one_half : Real))
+                  by ring
+            ≤ ((x - y) * (Rational.one_half : Real))
+                  * ((x - y) * (Rational.one_half : Real))
+              - ((x - y) * (Rational.one_half : Real))
+                  * ((x - y) * (Rational.one_half : Real))
+                  by Real.add_preserves_LessOrEqual
+            = Real.zero
+                  by ring;
+  claim squareComparison
+        : g * g
+          ≤ ((x + y) * (Rational.one_half : Real))
+            * ((x + y) * (Rational.one_half : Real))
+      by calc g * g
+            = x * y
+                  by gSquare
+            = ((x + y) * (Rational.one_half : Real))
+                  * ((x + y) * (Rational.one_half : Real))
+              + -(((x - y) * (Rational.one_half : Real))
+                  * ((x - y) * (Rational.one_half : Real)))
+                  since productValue
+            ≤ ((x + y) * (Rational.one_half : Real))
+                  * ((x + y) * (Rational.one_half : Real))
+              + Real.zero
+                  since Real.add_preserves_LessOrEqual_left
+            = ((x + y) * (Rational.one_half : Real))
+                  * ((x + y) * (Rational.one_half : Real))
+                  by ring;
+  -- Nonnegative numbers compare like their squares.
+  decide g ≤ (x + y) * (Rational.one_half : Real) {
+    | yes below => below
+    | no notBelow => {
+        claim meanLessG : (x + y) * (Rational.one_half : Real) < g
+            since Real.LessThan_of_not_LessOrEqual;
+        claim gPositive : Real.zero < g
+            since Real.LessThan.transitive_left;
+        claim meanLeqG : (x + y) * (Rational.one_half : Real) ≤ g
+            since Real.LessThan.weaken;
+        claim squaresFlip
+              : ((x + y) * (Rational.one_half : Real))
+                    * ((x + y) * (Rational.one_half : Real))
+                < g * g
+            by calc ((x + y) * (Rational.one_half : Real))
+                        * ((x + y) * (Rational.one_half : Real))
+                  ≤ g * ((x + y) * (Rational.one_half : Real))
+                        since Real.LessOrEqual.multiply_by_nonneg_right
+                  = ((x + y) * (Rational.one_half : Real)) * g
+                        by ring
+                  < g * g
+                        since Real.LessThan.multiply_by_positive_right;
+        claim g * g < g * g
+            since Real.LessThan.transitive_left;
+        claim notSelfEqual : ¬(g * g = g * g)
+            since Real.LessThan.distinct;
+        absurd(notSelfEqual(reflexivity(Real, g * g)))
+      }
+  }
+}
+
+-- The geometric mean exists, and the inequality holds for it: the
+-- two-variable arithmetic/geometric mean inequality.
+theorem Real.arithmetic_geometric_mean_two
+        (x y : Real)
+        (xNonneg : Real.zero ≤ x) (yNonneg : Real.zero ≤ y)
+        : ∃ (g : Real).
+            And(Real.zero ≤ g,
+                And(g * g = x * y,
+                    g ≤ (x + y) * (Rational.one_half : Real))) := {
+  claim Real.IsNonneg(x) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(y) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(x * y) since Real.IsNonneg.multiply;
+  claim productNonneg : Real.zero ≤ x * y
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  obtain ⟨g, gData⟩ from Real.square_root_exists(x * y, productNonneg);
+  obtain ⟨gNonneg, gSquare⟩ from gData;
+  witness g with
+      And.introduction(
+          gNonneg,
+          And.introduction(
+              gSquare,
+              Real.geometric_mean_le_arithmetic_mean(
+                  x, y, g, xNonneg, yNonneg, gNonneg, gSquare)))
+}
