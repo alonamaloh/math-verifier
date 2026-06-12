@@ -1078,6 +1078,59 @@ bool Elaborator::matchAgainstPatternWithDeferredProjections(
                     makeConstant(entry->second);
             }
         }
+        // Second-chance resolution: a slot pinned ONLY by non-carrier
+        // projections (`Ring.zero(r)`, `Ring.multiply(r, …)` — the
+        // structure argument occurring nowhere outside projections, e.g.
+        // citing Ring.zero_multiply_left at a concrete carrier) gets no
+        // binding above. Try each registered bundle of the structure and
+        // accept a UNIQUE candidate under which every deferred
+        // projection for the slot verifies definitionally; reject on
+        // ambiguity (two distinct bundles both verifying).
+        for (const auto& deferredMatch : deferred) {
+            if (bindings[deferredMatch.slot]) continue;
+            auto* projection = std::get_if<Constant>(
+                &deferredMatch.projectionHead->node);
+            if (!projection) continue;
+            std::size_t lastDot = projection->name.rfind('.');
+            if (lastDot == std::string::npos) continue;
+            std::string structure = projection->name.substr(0, lastDot);
+            std::string uniqueBundle;
+            bool ambiguous = false;
+            std::set<std::string> tried;
+            for (const auto& [registryKey, bundleName] :
+                 environment_.canonicalBundleRegistry) {
+                if (std::get<0>(registryKey) != structure) continue;
+                if (!tried.insert(bundleName).second) continue;
+                ExpressionPointer trial = makeConstant(bundleName);
+                bool verifies = true;
+                for (const auto& other : deferred) {
+                    if (other.slot != deferredMatch.slot) continue;
+                    ExpressionPointer substituted = makeApplication(
+                        other.projectionHead, trial);
+                    try {
+                        if (!isDefinitionallyEqual(environment_, Context{},
+                                substituted, other.subject)) {
+                            verifies = false;
+                            break;
+                        }
+                    } catch (const TypeError&) {
+                        verifies = false;
+                        break;
+                    }
+                }
+                if (verifies) {
+                    if (!uniqueBundle.empty()
+                        && uniqueBundle != bundleName) {
+                        ambiguous = true;
+                        break;
+                    }
+                    uniqueBundle = bundleName;
+                }
+            }
+            if (!ambiguous && !uniqueBundle.empty()) {
+                bindings[deferredMatch.slot] = makeConstant(uniqueBundle);
+            }
+        }
         // Verification pass: every deferred projection must now reduce to
         // the subject it was provisionally matched against.
         for (const auto& deferredMatch : deferred) {
