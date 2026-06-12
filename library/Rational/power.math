@@ -1,0 +1,251 @@
+-- Rational/power.math
+--
+-- Rational powers with a natural exponent, and the geometric decay
+-- estimate: for 0 ≤ c < 1 and any ε > 0 some power of c drops below ε.
+-- The decay runs reciprocal-free on the Bernoulli-style product bound
+--   cⁿ · (1 + n·h) ≤ 1        (h := 1 − c),
+-- where the linear factor is built by recursion (linearGrowth) so the
+-- induction never juggles natural-to-rational casts; the closed form
+-- 1 + (n : ℚ)·h is recovered once, at the end, where the Archimedean
+-- property needs it.
+
+module Rational.power
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.triangle
+import Rational.triangle_more
+import Rational.positive
+import Rational.linearity
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+
+-- ----------------------------------------------------------------------
+-- cⁿ, by recursion on the exponent.
+definition Rational.power (base : Rational) : Natural → Rational
+  | zero => Rational.one
+  | successor(n) => base * Rational.power(base, n)
+
+-- Powers of a nonnegative base are nonnegative.
+theorem Rational.power_nonneg
+        (base : Rational) (baseNonneg : Rational.zero ≤ base) (n : Natural)
+        : Rational.zero ≤ Rational.power(base, n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim Rational.zero < Rational.one by Rational.zero_less_one;
+        done since Rational.LessThan.weaken
+      }
+    case successor(predecessor): {
+        claim Rational.IsNonneg(base)
+            since Rational.IsNonneg_of_LessOrEqual_zero;
+        claim Rational.IsNonneg(Rational.power(base, predecessor))
+            since Rational.IsNonneg_of_LessOrEqual_zero;
+        claim Rational.IsNonneg(base * Rational.power(base, predecessor))
+            since Rational.IsNonneg.multiply;
+        claim Rational.zero ≤ base * Rational.power(base, predecessor)
+            since Rational.LessOrEqual_zero_of_IsNonneg;
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- 1 + n·step, by recursion — the Bernoulli linear factor.
+definition Rational.linearGrowth (step : Rational) : Natural → Rational
+  | zero => Rational.one
+  | successor(n) => Rational.linearGrowth(step, n) + step
+
+-- The linear factor never drops below 1 (nonnegative step).
+theorem Rational.linearGrowth_at_least_one
+        (step : Rational) (stepNonneg : Rational.zero ≤ step) (n : Natural)
+        : Rational.one ≤ Rational.linearGrowth(step, n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim Rational.one ≤ Rational.one
+            since Rational.LessOrEqual.reflexive;
+        done
+      }
+    case successor(predecessor):
+        calc Rational.one
+           ≤ Rational.linearGrowth(step, predecessor)      by IH
+           = Rational.linearGrowth(step, predecessor) + Rational.zero
+           ≤ Rational.linearGrowth(step, predecessor) + step
+                 since Rational.add_general_LessOrEqual_left
+  }
+
+-- The closed form, recovered through the successor cast.
+theorem Rational.linearGrowth_closed_form
+        (step : Rational) (n : Natural)
+        : Rational.linearGrowth(step, n)
+          = Rational.one + (n : Rational) * step :=
+  by_induction on n with IH {
+    case zero:
+        calc Rational.linearGrowth(step, 0)
+           = Rational.one
+           = Rational.one + (0 : Rational) * step
+    case successor(predecessor):
+        calc Rational.linearGrowth(step, successor(predecessor))
+           = Rational.linearGrowth(step, predecessor) + step
+           = (Rational.one + (predecessor : Rational) * step) + step
+                 by IH
+           = Rational.one + (successor(predecessor) : Rational) * step
+                 by linear_combination(
+                        step - step * Rational.successor_cast(predecessor))
+  }
+
+-- ----------------------------------------------------------------------
+-- The Bernoulli product bound: cⁿ·(1 + n·h) ≤ 1 when c + h = 1 with
+-- both parts nonnegative. Per step, c·(L + h) ≤ L for any L ≥ 1 —
+-- the difference is h·(L − c) ≥ 0 — and the power factor carries it.
+theorem Rational.power_bernoulli
+        (c h : Rational)
+        (cNonneg : Rational.zero ≤ c) (hNonneg : Rational.zero ≤ h)
+        (partition : c + h = Rational.one)
+        (n : Natural)
+        : Rational.power(c, n) * Rational.linearGrowth(h, n)
+          ≤ Rational.one :=
+  by_induction on n with IH {
+    case zero: {
+        claim oneLeqOne : Rational.one ≤ Rational.one
+            since Rational.LessOrEqual.reflexive;
+        calc Rational.power(c, 0) * Rational.linearGrowth(h, 0)
+           = Rational.one
+           ≤ Rational.one    by oneLeqOne
+      }
+    case successor(predecessor): {
+        -- c ≤ 1 ≤ L, so L − c ≥ 0.
+        calc c
+           = c + Rational.zero
+           ≤ c + h            since Rational.add_general_LessOrEqual_left
+           = Rational.one     by partition   as cLeqOne;
+        claim Rational.one ≤ Rational.linearGrowth(h, predecessor)
+            since Rational.linearGrowth_at_least_one;
+        calc c
+           ≤ Rational.one
+           ≤ Rational.linearGrowth(h, predecessor)   as cLeqLg;
+        claim Rational.IsNonneg(Rational.linearGrowth(h, predecessor) - c);
+        claim Rational.IsNonneg(h)
+            since Rational.IsNonneg_of_LessOrEqual_zero;
+        claim Rational.IsNonneg(
+                  h * (Rational.linearGrowth(h, predecessor) - c))
+            since Rational.IsNonneg.multiply;
+        -- The per-step inequality, via its difference form.
+        claim keyEquation
+              : Rational.linearGrowth(h, predecessor)
+                - c * (Rational.linearGrowth(h, predecessor) + h)
+                = h * (Rational.linearGrowth(h, predecessor) - c)
+            by linear_combination(
+                   Rational.linearGrowth(h, predecessor)
+                   - Rational.linearGrowth(h, predecessor) * partition);
+        claim stepBound
+              : c * (Rational.linearGrowth(h, predecessor) + h)
+                ≤ Rational.linearGrowth(h, predecessor)
+            by substituting keyEquation;
+        claim Rational.zero ≤ Rational.power(c, predecessor)
+            since Rational.power_nonneg;
+        calc Rational.power(c, successor(predecessor))
+                 * Rational.linearGrowth(h, successor(predecessor))
+           = (c * Rational.power(c, predecessor))
+                 * (Rational.linearGrowth(h, predecessor) + h)
+           = (c * (Rational.linearGrowth(h, predecessor) + h))
+                 * Rational.power(c, predecessor)
+                 by ring
+           ≤ Rational.linearGrowth(h, predecessor)
+                 * Rational.power(c, predecessor)
+                 since Rational.LessOrEqual.multiply_by_nonneg_right
+           = Rational.power(c, predecessor)
+                 * Rational.linearGrowth(h, predecessor)
+           ≤ Rational.one    by IH
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Geometric decay: some power of c drops below any positive ε.
+theorem Rational.power_decay_witness
+        (c epsilon : Rational)
+        (cNonneg : Rational.zero ≤ c) (cBelowOne : c < Rational.one)
+        (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (N : Natural). Rational.power(c, N) < epsilon := {
+  -- The gap h := 1 − c is positive.
+  claim hPositive : Rational.zero < Rational.one - c
+      by calc Rational.zero
+            = c - c               by ring
+            < Rational.one - c    by Rational.add_preserves_LessThan;
+  claim hNonneg : Rational.zero ≤ Rational.one - c
+      since Rational.LessThan.weaken;
+  claim partition : c + (Rational.one - c) = Rational.one;
+  claim productPositive : Rational.zero < epsilon * (Rational.one - c)
+      since Rational.multiply_positive_positive;
+  -- Archimedes: some multiple of ε·h reaches 1 …
+  claim Rational.zero < Rational.one by Rational.zero_less_one;
+  claim Rational.zero ≤ Rational.one since Rational.LessThan.weaken;
+  claim oneIsNonneg : Rational.IsNonneg(Rational.one)
+      since Rational.IsNonneg_of_LessOrEqual_zero;
+  obtain ⟨K, archBound⟩
+      from Rational.archimedean_for_positives(
+               Rational.one, epsilon * (Rational.one - c),
+               oneIsNonneg, productPositive);
+  -- … so at N = K+1 the scaled linear factor exceeds 1 strictly.
+  claim lgClosed
+        : Rational.linearGrowth(Rational.one - c, successor(K))
+          = Rational.one + (successor(K) : Rational) * (Rational.one - c)
+      by Rational.linearGrowth_closed_form;
+  claim epsilonTimesLgBig
+        : Rational.one
+          < epsilon * Rational.linearGrowth(Rational.one - c, successor(K))
+      by calc Rational.one
+            = Rational.one + Rational.zero
+            < Rational.one + epsilon
+                  by Rational.add_left_preserves_LessThan
+            ≤ (successor(K) : Rational) * (epsilon * (Rational.one - c))
+                  + epsilon
+                  by Rational.add_preserves_LessOrEqual
+            = epsilon * Rational.linearGrowth(Rational.one - c, successor(K))
+                  by linear_combination(epsilon - epsilon * lgClosed);
+  -- Bernoulli at N, then cancel the (positive) linear factor.
+  claim bernoulliAtN
+        : Rational.power(c, successor(K))
+              * Rational.linearGrowth(Rational.one - c, successor(K))
+          ≤ Rational.one
+      since Rational.power_bernoulli;
+  claim Rational.one ≤ Rational.linearGrowth(Rational.one - c, successor(K))
+      since Rational.linearGrowth_at_least_one;
+  claim lgPositive
+        : Rational.zero < Rational.linearGrowth(Rational.one - c, successor(K))
+      since Rational.LessThan.transitive_right;
+  claim chained
+        : Rational.power(c, successor(K))
+              * Rational.linearGrowth(Rational.one - c, successor(K))
+          < epsilon * Rational.linearGrowth(Rational.one - c, successor(K))
+      since Rational.LessThan.transitive_left;
+  claim powerBelow : Rational.power(c, successor(K)) < epsilon
+      since Rational.LessThan.multiply_cancel_right_positive;
+  witness successor(K) with powerBelow
+}
