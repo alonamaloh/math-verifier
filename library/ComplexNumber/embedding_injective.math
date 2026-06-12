@@ -45,13 +45,13 @@ import RingModulo.operations
 import RingModulo.ring
 import RingModulo.instances
 import ComplexNumber.basics
-import ComplexNumber.modulus
+import ComplexNumber.defining_polynomial
 import ComplexNumber.embedding
 
 -- A polynomial divisible by the modulus but of degree < 2 is zero.
-theorem Complex.divides_modulus_low_degree_zero
+theorem Complex.divides_definingPolynomial_low_degree_zero
         (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
-        (modulusDivides : Ring.divides(Real.polynomial_ring, Complex.modulus, p))
+        (modulusDivides : Ring.divides(Real.polynomial_ring, Complex.definingPolynomial, p))
         (pLow : Polynomial.DegreeLessThan(Real.ring, p, 2))
         : p = Polynomial.zero(Real.ring) :=
   decide p = Polynomial.zero(Real.ring) {
@@ -64,10 +64,10 @@ theorem Complex.divides_modulus_low_degree_zero
             by (quotientZero : quotient = Polynomial.zero(Real.ring)) ↦
                  pNonzero(
                      calc p
-                        = (Complex.modulus * quotient)
-                        = (Complex.modulus * Polynomial.zero(Real.ring))
+                        = (Complex.definingPolynomial * quotient)
+                        = (Complex.definingPolynomial * Polynomial.zero(Real.ring))
                         = Polynomial.zero(Real.ring)
-                              by Ring.multiply_zero_right(Real.polynomial_ring, Complex.modulus));
+                              by Ring.multiply_zero_right(Real.polynomial_ring, Complex.definingPolynomial));
         obtain ⟨degreeQuotient, quotientBound, quotientLeadingNonzero⟩
             from Polynomial.exists_degree_of_nonzero(Real.ring, quotient, quotientNonzero);
         claim degreePEquation : degreeP = 2 + degreeQuotient
@@ -75,8 +75,8 @@ theorem Complex.divides_modulus_low_degree_zero
                    And.introduction(pBound, pLeadingNonzero),
                    rewrite(Equality.symmetry(pEqualsModulusQuotient),
                        Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
-                           Real.reciprocal_exists_for_nonzero, Complex.modulus, quotient,
-                           2, degreeQuotient, Complex.modulus_HasDegree_two,
+                           Real.reciprocal_exists_for_nonzero, Complex.definingPolynomial, quotient,
+                           2, degreeQuotient, Complex.definingPolynomial_HasDegree_two,
                            And.introduction(quotientBound, quotientLeadingNonzero))));
         absurd(pLeadingNonzero(
             pLow(degreeP,
@@ -95,12 +95,12 @@ theorem ComplexNumber.from_real_injective (a b : Real)
   let difference : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)) := (monomialA + Polynomial.negate(monomialB));
   -- Equal classes: the modulus divides monomial(a,0) − monomial(b,0).
   claim modulusDividesDifference
-      : Ring.divides(Real.polynomial_ring, Complex.modulus,
+      : Ring.divides(Real.polynomial_ring, Complex.definingPolynomial,
             difference)
       by Quotient.exact(
              Ring.carrier(Real.polynomial_ring),
-             Ring.CongruentModulo(Real.polynomial_ring, Complex.modulus),
-             RingModulo.equivalence(Real.polynomial_ring, Complex.modulus),
+             Ring.CongruentModulo(Real.polynomial_ring, Complex.definingPolynomial),
+             RingModulo.equivalence(Real.polynomial_ring, Complex.definingPolynomial),
              monomialA, monomialB,
              equalImages);
   -- That difference has degree < 2.
@@ -122,7 +122,7 @@ theorem ComplexNumber.from_real_injective (a b : Real)
                              absurd(rewrite(iZero, twoLessOrEqualI)))));
   -- Hence the difference is zero.
   note difference = Polynomial.zero(Real.ring)
-      by Complex.divides_modulus_low_degree_zero(
+      by Complex.divides_definingPolynomial_low_degree_zero(
              difference,
              modulusDividesDifference, differenceLow);
   -- Read off the constant coefficient: a − b = 0.

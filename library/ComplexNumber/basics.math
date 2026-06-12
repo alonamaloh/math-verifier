@@ -39,13 +39,17 @@ definition Real.ring : Ring :=
   Ring.make(Real, Real.add, Real.zero, Real.negate, Real.multiply, Real.one,
       Real.is_ring)
 
--- The polynomial x (the monomial 1·x¹) over ℝ.
+-- The polynomial x (the monomial 1·x¹) over ℝ. Deliberately `x`, not
+-- `i`: in ℝ[x] this indeterminate does NOT square to −1 — only its
+-- image in the quotient does, and that image is `ComplexNumber.i`.
 definition Complex.x : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)) :=
   Polynomial.monomial(Real.ring, Real.one, 1)
 
--- The modulus x²+1, written so that x·x + 1 is its literal form (this is
--- what makes i²+1 = 0 hold definitionally up to the quotient relation).
-definition Complex.modulus : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)) :=
+-- The defining polynomial x²+1 of the extension (the "modulus" in
+-- RingModulo's sense), written so that x·x + 1 is its literal form
+-- (this is what makes i²+1 = 0 hold definitionally up to the quotient
+-- relation).
+definition Complex.definingPolynomial : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)) :=
   ((Complex.x * Complex.x) + Polynomial.one(Real.ring))
 
 -- ℝ[x], the polynomials over ℝ, as a bundled ring — the base ring of
@@ -65,15 +69,15 @@ definition Real.polynomial_commutative_ring : CommutativeRing :=
 
 -- The complex numbers: ℝ[x] modulo (x²+1).
 definition ComplexNumber : Type(0) :=
-  RingModulo(Real.polynomial_commutative_ring, Complex.modulus)
+  RingModulo(Real.polynomial_commutative_ring, Complex.definingPolynomial)
 
 -- ℂ is a commutative ring (inherited from ℝ[x] being commutative).
 theorem ComplexNumber.is_commutative_ring
         : IsCommutativeRing(
               ComplexNumber,
               RingModulo.add,
-              RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus),
+              RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial),
               RingModulo.negate,
               RingModulo.multiply,
-              RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus)) :=
+              RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)) :=
   { done by RingModulo.is_commutative_ring }

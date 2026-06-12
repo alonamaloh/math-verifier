@@ -46,7 +46,7 @@ import Polynomial.irreducible
 import Polynomial.degree_product
 import Polynomial.units
 import ComplexNumber.basics
-import ComplexNumber.modulus
+import ComplexNumber.defining_polynomial
 import ComplexNumber.real_positivity
 
 -- Two positive naturals summing to 2 are both 1.
@@ -89,7 +89,7 @@ theorem Complex.no_degree_one_factorization
         (aDegree : Polynomial.HasDegree(Real.ring, a, 1))
         (bDegree : Polynomial.HasDegree(Real.ring, b, 1))
         (factorEquation
-            : Complex.modulus = (a * b))
+            : Complex.definingPolynomial = (a * b))
         : False := {
   let ⟨aBound, _⟩ := aDegree;
   let ⟨bBound, _⟩ := bDegree;
@@ -103,14 +103,14 @@ theorem Complex.no_degree_one_factorization
             = Polynomial.coefficientOf(Real.ring, (a * b), 2)
                   by Polynomial.coefficientOf_product_at_sum(Real.ring, a, b, 1, 1,
                              aBound, bBound)
-            = Polynomial.coefficientOf(Real.ring, Complex.modulus, 2)
+            = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
             = Real.one as coefficientEquationTwo;
   -- df = 1 (coefficient at 0).
   calc (aZero * bZero)
             = (aZero * Polynomial.coefficientOf(Real.ring, b, Natural.monus(0, 0)))
             = Polynomial.coefficientOf(Real.ring, (a * b), 0)
                   by Polynomial.coefficientOf_multiply(Real.ring, a, b, 0)
-            = Polynomial.coefficientOf(Real.ring, Complex.modulus, 0)
+            = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 0)
             = Real.one as coefficientEquationZero;
   -- de + cf = 0 (coefficient at 1).
   calc Polynomial.coefficientOf(Real.ring, (a * b), 1)
@@ -120,7 +120,7 @@ theorem Complex.no_degree_one_factorization
             = ((aZero * bOne) + (aOne * bZero));
   calc ((aZero * bOne) + (aOne * bZero))
             = Polynomial.coefficientOf(Real.ring, (a * b), 1)
-            = Polynomial.coefficientOf(Real.ring, Complex.modulus, 1)
+            = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 1)
             = Real.zero as coefficientEquationOne;
   -- de = −cf (subtract cf from both sides of de + cf = 0).
   claim deNegateCf
@@ -146,17 +146,17 @@ theorem Complex.no_degree_one_factorization
 }
 
 -- x²+1 is not a unit (it has degree 2).
-theorem Complex.modulus_not_unit
-        : ¬(Polynomial.IsUnit(Real.ring, Complex.modulus)) :=
-  (isUnit : Polynomial.IsUnit(Real.ring, Complex.modulus)) ↦ {
+theorem Complex.definingPolynomial_not_unit
+        : ¬(Polynomial.IsUnit(Real.ring, Complex.definingPolynomial)) :=
+  (isUnit : Polynomial.IsUnit(Real.ring, Complex.definingPolynomial)) ↦ {
     obtain ⟨g, oneEquation⟩ from isUnit;
     decide g = Polynomial.zero(Real.ring) {
       | yes gZero => {
           calc Polynomial.one(Real.ring)
-                    = (Complex.modulus * g)
-                    = (Complex.modulus * Polynomial.zero(Real.ring))
+                    = (Complex.definingPolynomial * g)
+                    = (Complex.definingPolynomial * Polynomial.zero(Real.ring))
                     = Polynomial.zero(Real.ring)
-                          by Ring.multiply_zero_right(Real.polynomial_ring, Complex.modulus);
+                          by Ring.multiply_zero_right(Real.polynomial_ring, Complex.definingPolynomial);
           Real.zero_not_equal_one(
               calc Real.one
                      = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 0)
@@ -168,12 +168,12 @@ theorem Complex.modulus_not_unit
               from Polynomial.exists_degree_of_nonzero(Real.ring, g, gNonzero);
           let ⟨_, productLeadingNonzero⟩
               := Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
-                     Real.reciprocal_exists_for_nonzero, Complex.modulus, g, 2, degreeG,
-                     Complex.modulus_HasDegree_two,
+                     Real.reciprocal_exists_for_nonzero, Complex.definingPolynomial, g, 2, degreeG,
+                     Complex.definingPolynomial_HasDegree_two,
                      And.introduction(gBound, gLeadingNonzero));
           productLeadingNonzero(
               calc Polynomial.coefficientOf(Real.ring,
-                       (Complex.modulus * g), 2 + degreeG)
+                       (Complex.definingPolynomial * g), 2 + degreeG)
                  = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2 + degreeG)
                  = Real.zero)
         }
@@ -181,12 +181,12 @@ theorem Complex.modulus_not_unit
   }
 
 -- x²+1 is irreducible over ℝ.
-theorem Complex.modulus_irreducible
-        : Polynomial.IsIrreducible(Real.ring, Complex.modulus) :=
+theorem Complex.definingPolynomial_irreducible
+        : Polynomial.IsIrreducible(Real.ring, Complex.definingPolynomial) :=
   And.introduction(
-      Complex.modulus_not_unit,
+      Complex.definingPolynomial_not_unit,
       (a b : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
-               (factorEquation : Complex.modulus = (a * b)) ↦
+               (factorEquation : Complex.definingPolynomial = (a * b)) ↦
           decide Polynomial.IsUnit(Real.ring, a) {
             | yes aUnit => Or.introduceLeft(aUnit)
             | no aNotUnit =>
@@ -198,7 +198,7 @@ theorem Complex.modulus_irreducible
                           by (aZero : a = Polynomial.zero(Real.ring)) ↦
                                Real.zero_not_equal_one(
                                    calc Real.one
-                                          = Polynomial.coefficientOf(Real.ring, Complex.modulus, 2)
+                                          = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
                                           = Polynomial.coefficientOf(Real.ring,
                                                 (Polynomial.zero(Real.ring) * b), 2)
                                                 by aZero
@@ -210,7 +210,7 @@ theorem Complex.modulus_irreducible
                           by (bZero : b = Polynomial.zero(Real.ring)) ↦
                                Real.zero_not_equal_one(
                                    calc Real.one
-                                          = Polynomial.coefficientOf(Real.ring, Complex.modulus, 2)
+                                          = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
                                           = Polynomial.coefficientOf(Real.ring,
                                                 (a * Polynomial.zero(Real.ring)), 2)
                                                 by bZero
@@ -257,10 +257,10 @@ theorem Complex.modulus_irreducible
                           by Polynomial.HasDegree_product
                               recalling Real.multiply_commutative,
                                   Real.reciprocal_exists_for_nonzero;
-                      claim Polynomial.HasDegree(Real.ring, Complex.modulus, degreeA + degreeB)
+                      claim Polynomial.HasDegree(Real.ring, Complex.definingPolynomial, degreeA + degreeB)
                           by substituting factorEquation;
                       claim sumIsTwo : degreeA + degreeB = 2
-                          by Polynomial.HasDegree_unique recalling Complex.modulus_HasDegree_two;
+                          by Polynomial.HasDegree_unique recalling Complex.definingPolynomial_HasDegree_two;
                       let ⟨degreeAOne, degreeBOne⟩
                           := Natural.both_one_of_add_two(degreeA, degreeB,
                                  degreeAPositive, degreeBPositive, sumIsTwo);
