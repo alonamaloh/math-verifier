@@ -85,12 +85,12 @@ theorem GaussianInteger.x_times_make
 -- The Gaussian integer of a coefficient list: the class of its polynomial.
 definition GaussianInteger.classOf
         (a : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle))) : GaussianInteger :=
-  RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+  RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial,
       Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle), a))
 
 -- The integer a as a Gaussian integer (the constant polynomial a).
 definition GaussianInteger.embedInteger (a : Ring.carrier(Integer.ring_bundle)) : GaussianInteger :=
-  RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+  RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial,
       Polynomial.monomial(Integer.ring_bundle, a, 0))
 
 -- i · classOf(rest) = classOf(shift(rest)): multiplying the class by i
@@ -100,7 +100,7 @@ theorem GaussianInteger.i_times_classOf
         : GaussianInteger.i * GaussianInteger.classOf(rest)
           = GaussianInteger.classOf(Polynomial.Coefficients.shift(Integer.ring_bundle, rest)) :=
   calc GaussianInteger.i * GaussianInteger.classOf(rest)
-     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial,
            GaussianInteger.x
              * Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle), rest))
      = GaussianInteger.classOf(Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
@@ -134,7 +134,7 @@ theorem GaussianInteger.classOf_cons
 -- (cons(0, nil) agrees with nil at every coefficient).
 theorem GaussianInteger.embed_zero
         : GaussianInteger.embedInteger(Ring.zero(Integer.ring_bundle))
-          = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus) := {
+          = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial) := {
   claim Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
             Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
                 Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))),
@@ -152,39 +152,39 @@ theorem GaussianInteger.embed_zero
             Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))
       by Polynomial.make_equal_of_coefficients_equal;
   calc GaussianInteger.embedInteger(Ring.zero(Integer.ring_bundle))
-     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial,
            Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
                Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
                    Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))))
-     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial,
            Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
                Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))))
            by substituting polyEqual
-     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
 }
 
 definition GaussianInteger.ring_bundle : Ring :=
   Ring.make(GaussianInteger, RingModulo.add,
-      RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus),
+      RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial),
       RingModulo.negate, RingModulo.multiply,
-      RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus),
-      RingModulo.is_ring(Integer.polynomial_commutative_ring, GaussianInteger.modulus))
+      RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial),
+      RingModulo.is_ring(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial))
 
 -- (−1)·w = −w in ℤ[i] (the one ring fact the cons-step needs beyond the
 -- RingModulo add/multiply lemmas; via the bundle and `negate_multiply_left`).
 theorem GaussianInteger.negate_one_multiply (w : GaussianInteger)
         : RingModulo.negate(
-              RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) * w
+              RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)) * w
           = RingModulo.negate(w) :=
   calc RingModulo.negate(
-           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) * w
+           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)) * w
      = RingModulo.negate(
-           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus) * w)
+           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial) * w)
            by Ring.negate_multiply_left(GaussianInteger.ring_bundle,
-                  RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus), w)
+                  RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial), w)
      = RingModulo.negate(w)
            by substituting RingModulo.multiply_identity_left(
-                  Integer.polynomial_commutative_ring, GaussianInteger.modulus, w)
+                  Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial, w)
 
 -- i·(i·w) = −w.
 theorem GaussianInteger.i_squared_multiply (w : GaussianInteger)
@@ -193,7 +193,7 @@ theorem GaussianInteger.i_squared_multiply (w : GaussianInteger)
      = (GaussianInteger.i * GaussianInteger.i) * w
            by RingModulo.multiply_associative
      = RingModulo.negate(
-           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) * w
+           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)) * w
            by substituting GaussianInteger.i_squared
      = RingModulo.negate(w)
            by GaussianInteger.negate_one_multiply
@@ -253,8 +253,8 @@ theorem GaussianInteger.reconstruct_coeffs
       -- coords(nil) = (0,0); classOf(nil) = 0 = embed(0) + i·0
       -- (embed(0)=0 found via embed_zero; i·0=0 here).
       claim GaussianInteger.i
-              * RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
-            = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+              * RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
+            = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
           by Ring.multiply_zero_right(GaussianInteger.ring_bundle, GaussianInteger.i);
       done
     }
@@ -297,14 +297,14 @@ theorem GaussianInteger.eq_zero_of_coordinates_zero (z : GaussianInteger)
         (coordinatesZero
             : GaussianInteger.coordinates(z)
               = Product.make(Integer.zero, Integer.zero))
-        : z = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus) := {
+        : z = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial) := {
   claim embedZero
       : GaussianInteger.embedInteger(Integer.zero)
-        = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+        = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
       by GaussianInteger.embed_zero;
   claim iTimesZero
       : GaussianInteger.i * GaussianInteger.embedInteger(Integer.zero)
-        = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+        = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
       by substituting embedZero;
   calc z
      = GaussianInteger.embedInteger(Product.first(GaussianInteger.coordinates(z)))
@@ -315,10 +315,10 @@ theorem GaussianInteger.eq_zero_of_coordinates_zero (z : GaussianInteger)
          + GaussianInteger.i * GaussianInteger.embedInteger(Integer.zero)
            by substituting coordinatesZero
      = GaussianInteger.embedInteger(Integer.zero)
-         + RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+         + RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
            by substituting iTimesZero
      = GaussianInteger.embedInteger(Integer.zero)
            by RingModulo.add_identity_right
-     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
            by substituting embedZero
 }

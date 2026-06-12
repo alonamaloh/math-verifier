@@ -1,7 +1,7 @@
 -- GaussianInteger/coordinate_map.math
 --
 -- The coordinate map descends to ℤ[i]: combining additivity with the
--- modulus-vanishing, `coordinatesOfPolynomial` respects the (x²+1)-
+-- vanishing on multiples of x²+1, `coordinatesOfPolynomial` respects the (x²+1)-
 -- congruence, so it lifts to a genuine function `coordinates : ℤ[i] →
 -- ℤ×ℤ` reading the (re, im) of a Gaussian integer a + bi.
 
@@ -30,7 +30,7 @@ import RingModulo.basics
 import GaussianInteger.basics
 import GaussianInteger.coordinates
 import GaussianInteger.coordinate_homomorphism
-import GaussianInteger.modulus_vanishes
+import GaussianInteger.definingPolynomial_vanishes
 
 -- ----------------------------------------------------------------------
 -- coordinatesOfPolynomial respects congruence modulo x²+1.
@@ -39,7 +39,7 @@ import GaussianInteger.modulus_vanishes
 -- additivity coords(p) = coords(p') ⊕ coords((x²+1)·cofactor) = coords(p').
 theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
         (p p' : Polynomial(Integer, Integer.zero))
-        (congruent : Ring.CongruentModulo(Integer.polynomial_ring, GaussianInteger.modulus, p, p'))
+        (congruent : Ring.CongruentModulo(Integer.polynomial_ring, GaussianInteger.definingPolynomial, p, p'))
         : GaussianInteger.coordinatesOfPolynomial(p)
           = GaussianInteger.coordinatesOfPolynomial(p') := {
   obtain ⟨cofactor, differenceEquation⟩ from congruent;
@@ -53,29 +53,29 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
                   since Polynomial.add_negate_left
             = (p + (-p')) + p'
                   since Polynomial.add_associative
-            = GaussianInteger.modulus * cofactor + p'
+            = GaussianInteger.definingPolynomial * cofactor + p'
                   since differenceEquation
-            = p' + GaussianInteger.modulus * cofactor
+            = p' + GaussianInteger.definingPolynomial * cofactor
                   since Polynomial.add_commutative as pEquation;
   -- coords of the (x²+1)-multiple vanish.
   claim modCoordinates
-      : coords(GaussianInteger.modulus * cofactor) = Product.make(Integer.zero, Integer.zero)
-      since GaussianInteger.coordinatesOfPolynomial_modulus_multiply(cofactor);
+      : coords(GaussianInteger.definingPolynomial * cofactor) = Product.make(Integer.zero, Integer.zero)
+      since GaussianInteger.coordinatesOfPolynomial_definingPolynomial_multiply(cofactor);
   -- coords(p) = coords(p' + (x²+1)·cofactor) = coords(p') ⊕ (0,0) = coords(p').
   calc coords(p)
-     = coords(p' + GaussianInteger.modulus * cofactor)
+     = coords(p' + GaussianInteger.definingPolynomial * cofactor)
            since pEquation
      = Product.make(
-           Product.first(coords(p')) + Product.first(coords(GaussianInteger.modulus * cofactor)),
-           Product.second(coords(p')) + Product.second(coords(GaussianInteger.modulus * cofactor)))
-           since GaussianInteger.coordinatesOfPolynomial_add(p', GaussianInteger.modulus * cofactor)
+           Product.first(coords(p')) + Product.first(coords(GaussianInteger.definingPolynomial * cofactor)),
+           Product.second(coords(p')) + Product.second(coords(GaussianInteger.definingPolynomial * cofactor)))
+           since GaussianInteger.coordinatesOfPolynomial_add(p', GaussianInteger.definingPolynomial * cofactor)
      = Product.make(Product.first(coords(p')), Product.second(coords(p')))
            by {
              -- each coordinate gains 0 from the vanishing multiple
-             calc Product.first(coords(p')) + Product.first(coords(GaussianInteger.modulus * cofactor))
+             calc Product.first(coords(p')) + Product.first(coords(GaussianInteger.definingPolynomial * cofactor))
                 = Product.first(coords(p')) + Integer.zero   by modCoordinates
                 = Product.first(coords(p'));
-             calc Product.second(coords(p')) + Product.second(coords(GaussianInteger.modulus * cofactor))
+             calc Product.second(coords(p')) + Product.second(coords(GaussianInteger.definingPolynomial * cofactor))
                 = Product.second(coords(p')) + Integer.zero   by modCoordinates
                 = Product.second(coords(p'));
              done
