@@ -1,0 +1,1022 @@
+-- ComplexNumber/exponential.math
+--
+-- The complex exponential: exp(z) = Σ zᵏ/k!, as the limit of the
+-- partial sums. The series is dominated in modulus by the REAL
+-- exponential series at |z|, so its partial sums are Cauchy, and ℂ is
+-- complete; the limit function comes from definite description through
+-- uniqueness of limits.
+
+module ComplexNumber.exponential
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.factorial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+import Real.intermediate_value
+import Real.square_root
+import Real.power
+import Real.series
+import Real.cauchy_complete
+import Real.exponential
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.coordinate_negate
+import ComplexNumber.embedding
+import ComplexNumber.modulus
+import ComplexNumber.modulus_multiplicative
+import ComplexNumber.triangle_inequality
+import ComplexNumber.modulus_bounds
+import ComplexNumber.completeness
+
+-- ----------------------------------------------------------------------
+-- Coordinates of the embedding and of zero (all definitional through
+-- the coordinate recursion, up to a trailing −0).
+
+theorem ComplexNumber.realPart_from_real (r : Real)
+        : ComplexNumber.realPart(ComplexNumber.from_real(r)) = r :=
+  calc ComplexNumber.realPart(ComplexNumber.from_real(r))
+     = r - Real.zero
+     = r
+
+theorem ComplexNumber.imaginaryPart_from_real (r : Real)
+        : ComplexNumber.imaginaryPart(ComplexNumber.from_real(r)) = Real.zero := {
+  done
+}
+
+theorem ComplexNumber.realPart_zero
+        : ComplexNumber.realPart(
+              RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial))
+          = Real.zero := {
+  done
+}
+
+theorem ComplexNumber.imaginaryPart_zero
+        : ComplexNumber.imaginaryPart(
+              RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial))
+          = Real.zero := {
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Moduli computed through the coordinates: equal coordinates give equal
+-- moduli, and the embedding carries |·| to the real absolute value.
+
+theorem ComplexNumber.modulus_zero
+        : ComplexNumber.modulus(
+              RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial))
+          = Real.zero := {
+  claim realCoordinate
+      : ComplexNumber.realPart(
+            RingModulo.zero(Real.polynomial_commutative_ring,
+                Complex.definingPolynomial))
+        = Real.zero
+      by ComplexNumber.realPart_zero;
+  claim squaresVanish
+      : ComplexNumber.modulus(
+            RingModulo.zero(Real.polynomial_commutative_ring,
+                Complex.definingPolynomial))
+        * ComplexNumber.modulus(
+              RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial))
+        = Real.zero
+      by calc ComplexNumber.modulus(
+                  RingModulo.zero(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial))
+              * ComplexNumber.modulus(
+                    RingModulo.zero(Real.polynomial_commutative_ring,
+                        Complex.definingPolynomial))
+            = ComplexNumber.realPart(
+                  RingModulo.zero(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial))
+                  * ComplexNumber.realPart(
+                        RingModulo.zero(Real.polynomial_commutative_ring,
+                            Complex.definingPolynomial))
+              + ComplexNumber.imaginaryPart(
+                    RingModulo.zero(Real.polynomial_commutative_ring,
+                        Complex.definingPolynomial))
+                    * ComplexNumber.imaginaryPart(
+                          RingModulo.zero(Real.polynomial_commutative_ring,
+                              Complex.definingPolynomial))
+                  since ComplexNumber.modulus_squares
+            = Real.zero * Real.zero + Real.zero * Real.zero
+                  since realCoordinate
+            = Real.zero
+                  by ring;
+  claim Real.zero
+        ≤ ComplexNumber.modulus(
+              RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial))
+      since ComplexNumber.modulus_nonneg;
+  claim Real.zero ≤ Real.zero since Real.LessOrEqual.reflexive;
+  claim Real.zero * Real.zero = Real.zero by ring;
+  done by Real.square_root_unique(
+              Real.zero,
+              ComplexNumber.modulus(
+                  RingModulo.zero(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial)),
+              Real.zero,
+              (Real.zero
+                   ≤ ComplexNumber.modulus(
+                         RingModulo.zero(Real.polynomial_commutative_ring,
+                             Complex.definingPolynomial))),
+              (Real.zero ≤ Real.zero),
+              squaresVanish,
+              (Real.zero * Real.zero = Real.zero))
+}
+
+theorem ComplexNumber.modulus_from_real (r : Real)
+        : ComplexNumber.modulus(ComplexNumber.from_real(r)) = abs(r) := {
+  claim realCoordinate
+      : ComplexNumber.realPart(ComplexNumber.from_real(r)) = r
+      by ComplexNumber.realPart_from_real(r);
+  claim modulusSquares
+      : ComplexNumber.modulus(ComplexNumber.from_real(r))
+            * ComplexNumber.modulus(ComplexNumber.from_real(r))
+        = r * r
+      by calc ComplexNumber.modulus(ComplexNumber.from_real(r))
+                  * ComplexNumber.modulus(ComplexNumber.from_real(r))
+            = ComplexNumber.realPart(ComplexNumber.from_real(r))
+                  * ComplexNumber.realPart(ComplexNumber.from_real(r))
+              + ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
+                    * ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
+                  since ComplexNumber.modulus_squares
+            = r * r + Real.zero * Real.zero
+                  since realCoordinate
+            = r * r
+                  by ring;
+  claim absSquares : abs(r) * abs(r) = r * r
+      since Real.absolute_value_square;
+  claim Real.zero ≤ ComplexNumber.modulus(ComplexNumber.from_real(r))
+      since ComplexNumber.modulus_nonneg;
+  claim Real.zero ≤ abs(r) since Real.absolute_value_nonneg;
+  done by Real.square_root_unique(
+              r * r,
+              ComplexNumber.modulus(ComplexNumber.from_real(r)),
+              abs(r),
+              (Real.zero ≤ ComplexNumber.modulus(ComplexNumber.from_real(r))),
+              (Real.zero ≤ abs(r)),
+              modulusSquares,
+              absSquares)
+}
+
+-- Swapping the operands of a difference does not change the modulus
+-- (the coordinate squares agree).
+theorem ComplexNumber.modulus_subtract_swap (z w : ComplexNumber)
+        : ComplexNumber.modulus(z - w) = ComplexNumber.modulus(w - z) := {
+  claim zwReal
+      : ComplexNumber.realPart(z - w)
+        = ComplexNumber.realPart(z) - ComplexNumber.realPart(w)
+      since ComplexNumber.realPart_subtract;
+  claim zwImaginary
+      : ComplexNumber.imaginaryPart(z - w)
+        = ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w)
+      since ComplexNumber.imaginaryPart_subtract;
+  claim wzReal
+      : ComplexNumber.realPart(w - z)
+        = ComplexNumber.realPart(w) - ComplexNumber.realPart(z)
+      since ComplexNumber.realPart_subtract;
+  claim wzImaginary
+      : ComplexNumber.imaginaryPart(w - z)
+        = ComplexNumber.imaginaryPart(w) - ComplexNumber.imaginaryPart(z)
+      since ComplexNumber.imaginaryPart_subtract;
+  claim commonSquares
+      : ComplexNumber.modulus(z - w) * ComplexNumber.modulus(z - w)
+        = ComplexNumber.realPart(w - z) * ComplexNumber.realPart(w - z)
+          + ComplexNumber.imaginaryPart(w - z) * ComplexNumber.imaginaryPart(w - z)
+      by calc ComplexNumber.modulus(z - w) * ComplexNumber.modulus(z - w)
+            = ComplexNumber.realPart(z - w) * ComplexNumber.realPart(z - w)
+              + ComplexNumber.imaginaryPart(z - w)
+                    * ComplexNumber.imaginaryPart(z - w)
+                  since ComplexNumber.modulus_squares
+            = (ComplexNumber.realPart(z) - ComplexNumber.realPart(w))
+                  * (ComplexNumber.realPart(z) - ComplexNumber.realPart(w))
+              + ComplexNumber.imaginaryPart(z - w)
+                    * ComplexNumber.imaginaryPart(z - w)
+                  since zwReal
+            = (ComplexNumber.realPart(z) - ComplexNumber.realPart(w))
+                  * (ComplexNumber.realPart(z) - ComplexNumber.realPart(w))
+              + (ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w))
+                    * (ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w))
+                  since zwImaginary
+            = (ComplexNumber.realPart(w) - ComplexNumber.realPart(z))
+                  * (ComplexNumber.realPart(w) - ComplexNumber.realPart(z))
+              + (ComplexNumber.imaginaryPart(w) - ComplexNumber.imaginaryPart(z))
+                    * (ComplexNumber.imaginaryPart(w) - ComplexNumber.imaginaryPart(z))
+                  by ring
+            = ComplexNumber.realPart(w - z) * ComplexNumber.realPart(w - z)
+              + (ComplexNumber.imaginaryPart(w) - ComplexNumber.imaginaryPart(z))
+                    * (ComplexNumber.imaginaryPart(w) - ComplexNumber.imaginaryPart(z))
+                  since wzReal
+            = ComplexNumber.realPart(w - z) * ComplexNumber.realPart(w - z)
+              + ComplexNumber.imaginaryPart(w - z)
+                    * ComplexNumber.imaginaryPart(w - z)
+                  since wzImaginary;
+  claim otherSquares
+      : ComplexNumber.modulus(w - z) * ComplexNumber.modulus(w - z)
+        = ComplexNumber.realPart(w - z) * ComplexNumber.realPart(w - z)
+          + ComplexNumber.imaginaryPart(w - z) * ComplexNumber.imaginaryPart(w - z)
+      since ComplexNumber.modulus_squares;
+  claim Real.zero ≤ ComplexNumber.modulus(z - w) since ComplexNumber.modulus_nonneg;
+  claim Real.zero ≤ ComplexNumber.modulus(w - z) since ComplexNumber.modulus_nonneg;
+  done by Real.square_root_unique(
+              ComplexNumber.realPart(w - z) * ComplexNumber.realPart(w - z)
+                  + ComplexNumber.imaginaryPart(w - z)
+                        * ComplexNumber.imaginaryPart(w - z),
+              ComplexNumber.modulus(z - w),
+              ComplexNumber.modulus(w - z),
+              (Real.zero ≤ ComplexNumber.modulus(z - w)),
+              (Real.zero ≤ ComplexNumber.modulus(w - z)),
+              commonSquares,
+              otherSquares)
+}
+
+-- ----------------------------------------------------------------------
+-- Partial sums in ℂ, and their coordinates.
+
+definition ComplexNumber.partialSum (s : Natural → ComplexNumber)
+        : Natural → ComplexNumber
+  | zero =>
+      RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+  | successor(n) => RingModulo.add(ComplexNumber.partialSum(s, n), s(n))
+
+theorem ComplexNumber.realPart_partialSum (s : Natural → ComplexNumber)
+        : (n : Natural)
+          → ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
+            = Real.partialSum(
+                  (k : Natural) ↦ ComplexNumber.realPart(s(k)), n)
+  | zero => done
+  | successor(n) =>
+      calc ComplexNumber.realPart(ComplexNumber.partialSum(s, n) + s(n))
+         = ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
+           + ComplexNumber.realPart(s(n))
+               by ComplexNumber.realPart_add(ComplexNumber.partialSum(s, n), s(n))
+         = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), n)
+           + ComplexNumber.realPart(s(n))
+               by ComplexNumber.realPart_partialSum(s, n)
+
+theorem ComplexNumber.imaginaryPart_partialSum (s : Natural → ComplexNumber)
+        : (n : Natural)
+          → ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
+            = Real.partialSum(
+                  (k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n)
+  | zero => done
+  | successor(n) =>
+      calc ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n) + s(n))
+         = ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
+           + ComplexNumber.imaginaryPart(s(n))
+               by ComplexNumber.imaginaryPart_add(
+                      ComplexNumber.partialSum(s, n), s(n))
+         = Real.partialSum((k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n)
+           + ComplexNumber.imaginaryPart(s(n))
+               by ComplexNumber.imaginaryPart_partialSum(s, n)
+
+-- Splitting a ℂ partial sum at a cut, through the coordinates.
+theorem ComplexNumber.partialSum_split (s : Natural → ComplexNumber)
+        (n c : Natural)
+        : ComplexNumber.partialSum(s, c + n)
+          = ComplexNumber.partialSum(s, n)
+            + ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c) := {
+  claim realSide
+      : ComplexNumber.realPart(ComplexNumber.partialSum(s, c + n))
+        = ComplexNumber.realPart(
+              ComplexNumber.partialSum(s, n)
+              + ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c))
+      by calc ComplexNumber.realPart(ComplexNumber.partialSum(s, c + n))
+            = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), c + n)
+                  by ComplexNumber.realPart_partialSum(s, c + n)
+            = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), n)
+              + Real.partialSum(
+                    (j : Natural) ↦ ComplexNumber.realPart(s(n + j)), c)
+                  by Real.partialSum_split(
+                         (k : Natural) ↦ ComplexNumber.realPart(s(k)), n, c)
+            = ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
+              + Real.partialSum(
+                    (j : Natural) ↦ ComplexNumber.realPart(s(n + j)), c)
+                  by ComplexNumber.realPart_partialSum(s, n)
+            = ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
+              + ComplexNumber.realPart(
+                    ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c))
+                  by ComplexNumber.realPart_partialSum((j : Natural) ↦ s(n + j), c)
+            = ComplexNumber.realPart(
+                  ComplexNumber.partialSum(s, n)
+                  + ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c))
+                  by ComplexNumber.realPart_add(
+                         ComplexNumber.partialSum(s, n),
+                         ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c));
+  claim imaginarySide
+      : ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, c + n))
+        = ComplexNumber.imaginaryPart(
+              ComplexNumber.partialSum(s, n)
+              + ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c))
+      by calc ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, c + n))
+            = Real.partialSum(
+                  (k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), c + n)
+                  by ComplexNumber.imaginaryPart_partialSum(s, c + n)
+            = Real.partialSum((k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n)
+              + Real.partialSum(
+                    (j : Natural) ↦ ComplexNumber.imaginaryPart(s(n + j)), c)
+                  by Real.partialSum_split(
+                         (k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n, c)
+            = ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
+              + Real.partialSum(
+                    (j : Natural) ↦ ComplexNumber.imaginaryPart(s(n + j)), c)
+                  by ComplexNumber.imaginaryPart_partialSum(s, n)
+            = ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
+              + ComplexNumber.imaginaryPart(
+                    ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c))
+                  by ComplexNumber.imaginaryPart_partialSum(
+                         (j : Natural) ↦ s(n + j), c)
+            = ComplexNumber.imaginaryPart(
+                  ComplexNumber.partialSum(s, n)
+                  + ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c))
+                  by ComplexNumber.imaginaryPart_add(
+                         ComplexNumber.partialSum(s, n),
+                         ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c));
+  done by ComplexNumber.eq_of_coordinates(
+              ComplexNumber.partialSum(s, c + n),
+              ComplexNumber.partialSum(s, n)
+                  + ComplexNumber.partialSum((j : Natural) ↦ s(n + j), c),
+              realSide, imaginarySide)
+}
+
+-- Adding then subtracting cancels (the additive cancellation, through
+-- the coordinates).
+theorem ComplexNumber.add_cancel_left (u v : ComplexNumber)
+        : (u + v) - u = v := {
+  claim realSide
+      : ComplexNumber.realPart((u + v) - u) = ComplexNumber.realPart(v)
+      by calc ComplexNumber.realPart((u + v) - u)
+            = ComplexNumber.realPart(u + v) - ComplexNumber.realPart(u)
+                  by ComplexNumber.realPart_subtract(u + v, u)
+            = (ComplexNumber.realPart(u) + ComplexNumber.realPart(v))
+              - ComplexNumber.realPart(u)
+                  by ComplexNumber.realPart_add(u, v)
+            = ComplexNumber.realPart(v)
+                  by ring;
+  claim imaginarySide
+      : ComplexNumber.imaginaryPart((u + v) - u) = ComplexNumber.imaginaryPart(v)
+      by calc ComplexNumber.imaginaryPart((u + v) - u)
+            = ComplexNumber.imaginaryPart(u + v) - ComplexNumber.imaginaryPart(u)
+                  by ComplexNumber.imaginaryPart_subtract(u + v, u)
+            = (ComplexNumber.imaginaryPart(u) + ComplexNumber.imaginaryPart(v))
+              - ComplexNumber.imaginaryPart(u)
+                  by ComplexNumber.imaginaryPart_add(u, v)
+            = ComplexNumber.imaginaryPart(v)
+                  by ring;
+  done by ComplexNumber.eq_of_coordinates((u + v) - u, v, realSide, imaginarySide)
+}
+
+-- The modulus of a partial sum is at most the real partial sum of the
+-- moduli (the triangle inequality, summed).
+theorem ComplexNumber.modulus_partialSum_le (s : Natural → ComplexNumber)
+        : (n : Natural)
+          → ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
+            ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
+  | zero => {
+      claim ComplexNumber.modulus(ComplexNumber.partialSum(s, 0)) = Real.zero
+          by ComplexNumber.modulus_zero;
+      claim Real.zero ≤ Real.zero since Real.LessOrEqual.reflexive;
+      done
+    }
+  | successor(n) => {
+      claim ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
+            ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
+          by ComplexNumber.modulus_partialSum_le(s, n);
+      calc ComplexNumber.modulus(ComplexNumber.partialSum(s, n) + s(n))
+         ≤ ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
+           + ComplexNumber.modulus(s(n))
+               by ComplexNumber.modulus_triangle(
+                      ComplexNumber.partialSum(s, n), s(n))
+         ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
+           + ComplexNumber.modulus(s(n))
+               since Real.add_preserves_LessOrEqual
+    }
+
+-- ----------------------------------------------------------------------
+-- A series dominated in modulus by a real series with Cauchy partial
+-- sums has Cauchy partial sums (any window is squeezed below the
+-- matching real window).
+theorem ComplexNumber.series_dominated_cauchy
+        (t : Natural → ComplexNumber) (b : Natural → Real)
+        (domination : (k : Natural) → ComplexNumber.modulus(t(k)) ≤ b(k))
+        (boundCauchy : Real.SequenceIsCauchy(Real.partialSum(b)))
+        : ComplexNumber.SequenceIsCauchy(ComplexNumber.partialSum(t)) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨N, tailClose⟩ from boundCauchy(epsilon, epsilonPositive);
+    claim oneSided
+          : (i j : Natural) → N ≤ i → N ≤ j → i ≤ j
+            → ComplexNumber.modulus(
+                  ComplexNumber.partialSum(t, j) - ComplexNumber.partialSum(t, i))
+              < (epsilon : Real)
+        by {
+          take i : Natural; take j : Natural;
+          take iInTail : N ≤ i; take jInTail : N ≤ j;
+          take iLeqJ : i ≤ j;
+          obtain ⟨c, splitEquation⟩
+              from Natural.subtraction_witness(i, j, iLeqJ);
+          claim jAsSum : j = c + i
+              by calc j
+                    = i + c    by splitEquation
+                    = c + i;
+          claim splitT
+                : ComplexNumber.partialSum(t, j)
+                  = ComplexNumber.partialSum(t, i)
+                    + ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c)
+              by calc ComplexNumber.partialSum(t, j)
+                    = ComplexNumber.partialSum(t, c + i)    by jAsSum
+                    = ComplexNumber.partialSum(t, i)
+                      + ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c)
+                          by ComplexNumber.partialSum_split(t, i, c);
+          claim splitB
+                : Real.partialSum(b, j)
+                  = Real.partialSum(b, i)
+                    + Real.partialSum((k : Natural) ↦ b(i + k), c)
+              by calc Real.partialSum(b, j)
+                    = Real.partialSum(b, c + i)    by jAsSum
+                    = Real.partialSum(b, i)
+                      + Real.partialSum((k : Natural) ↦ b(i + k), c)
+                          by Real.partialSum_split(b, i, c);
+          claim tWindowValue
+                : ComplexNumber.partialSum(t, j) - ComplexNumber.partialSum(t, i)
+                  = ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c)
+              by calc ComplexNumber.partialSum(t, j) - ComplexNumber.partialSum(t, i)
+                    = (ComplexNumber.partialSum(t, i)
+                       + ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c))
+                      - ComplexNumber.partialSum(t, i)
+                          since splitT
+                    = ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c)
+                          by ComplexNumber.add_cancel_left(
+                                 ComplexNumber.partialSum(t, i),
+                                 ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c));
+          claim bWindowValue
+                : Real.partialSum((k : Natural) ↦ b(i + k), c)
+                  = Real.partialSum(b, j) - Real.partialSum(b, i)
+              by calc Real.partialSum((k : Natural) ↦ b(i + k), c)
+                    = (Real.partialSum(b, i)
+                       + Real.partialSum((k : Natural) ↦ b(i + k), c))
+                      - Real.partialSum(b, i)
+                          by ring
+                    = Real.partialSum(b, j) - Real.partialSum(b, i)
+                          since splitB;
+          claim tWindowBound
+                : ComplexNumber.modulus(
+                      ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c))
+                  ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+              by calc ComplexNumber.modulus(
+                          ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c))
+                    ≤ Real.partialSum(
+                          (k : Natural) ↦ ComplexNumber.modulus(t(i + k)), c)
+                          by ComplexNumber.modulus_partialSum_le(
+                                 (k : Natural) ↦ t(i + k), c)
+                    ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+                          by Real.partialSum_le_pointwise(
+                                 (k : Natural) ↦ ComplexNumber.modulus(t(i + k)),
+                                 (k : Natural) ↦ b(i + k), c,
+                                 (k : Natural) (_ : successor(k) ≤ c) ↦
+                                   domination(i + k));
+          claim bWindowBelow
+                : Real.partialSum(b, j) - Real.partialSum(b, i)
+                  < (epsilon : Real)
+              by calc Real.partialSum(b, j) - Real.partialSum(b, i)
+                    ≤ abs(Real.partialSum(b, j) - Real.partialSum(b, i))
+                          by Real.LessOrEqual_absolute_value
+                    < (epsilon : Real)
+                          by tailClose(j, i, jInTail, iInTail);
+          calc ComplexNumber.modulus(
+                   ComplexNumber.partialSum(t, j) - ComplexNumber.partialSum(t, i))
+             = ComplexNumber.modulus(
+                   ComplexNumber.partialSum((k : Natural) ↦ t(i + k), c))
+                   by tWindowValue
+             ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+                   by tWindowBound
+             = Real.partialSum(b, j) - Real.partialSum(b, i)
+                   by bWindowValue
+             < (epsilon : Real)
+                   by bWindowBelow
+        };
+    witness N with
+        (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦
+          cases Natural.compare_strict(m, n) {
+            | Natural.StrictComparison.below(mStrictlyBelowN) => {
+                claim m ≤ n;
+                claim ComplexNumber.modulus(
+                            ComplexNumber.partialSum(t, n)
+                            - ComplexNumber.partialSum(t, m))
+                        < (epsilon : Real)
+                    by oneSided(m, n, mInTail, nInTail, (m ≤ n));
+                claim swapped
+                      : ComplexNumber.modulus(
+                            ComplexNumber.partialSum(t, m)
+                            - ComplexNumber.partialSum(t, n))
+                        = ComplexNumber.modulus(
+                              ComplexNumber.partialSum(t, n)
+                              - ComplexNumber.partialSum(t, m))
+                    since ComplexNumber.modulus_subtract_swap;
+                done by substituting swapped
+              }
+            | Natural.StrictComparison.atLeast(nLeqM) =>
+                oneSided(n, m, nInTail, mInTail, nLeqM)
+          }
+  }
+
+-- ----------------------------------------------------------------------
+-- Uniqueness of limits in ℂ, and the limit function.
+
+-- Two complex numbers whose difference vanishes are equal.
+theorem ComplexNumber.eq_of_subtract_zero (z w : ComplexNumber)
+        (differenceZero
+            : z - w = RingModulo.zero(Real.polynomial_commutative_ring,
+                          Complex.definingPolynomial))
+        : z = w := {
+  claim realDifference
+      : ComplexNumber.realPart(z - w)
+        = ComplexNumber.realPart(z) - ComplexNumber.realPart(w)
+      since ComplexNumber.realPart_subtract;
+  claim imaginaryDifference
+      : ComplexNumber.imaginaryPart(z - w)
+        = ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w)
+      since ComplexNumber.imaginaryPart_subtract;
+  claim ComplexNumber.realPart(z) - ComplexNumber.realPart(w) = Real.zero
+      by calc ComplexNumber.realPart(z) - ComplexNumber.realPart(w)
+            = ComplexNumber.realPart(z - w)         since realDifference
+            = ComplexNumber.realPart(
+                  RingModulo.zero(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial))  by differenceZero
+            = Real.zero;
+  claim ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w) = Real.zero
+      by calc ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w)
+            = ComplexNumber.imaginaryPart(z - w)    since imaginaryDifference
+            = ComplexNumber.imaginaryPart(
+                  RingModulo.zero(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial))  by differenceZero
+            = Real.zero;
+  claim ComplexNumber.realPart(z) = ComplexNumber.realPart(w)
+      since Real.eq_of_sub_eq_zero;
+  claim ComplexNumber.imaginaryPart(z) = ComplexNumber.imaginaryPart(w)
+      since Real.eq_of_sub_eq_zero;
+  done since ComplexNumber.eq_of_coordinates
+}
+
+-- A complex number with arbitrarily small modulus is zero.
+theorem ComplexNumber.eq_zero_of_modulus_less_than_all_positive
+        (u : ComplexNumber)
+        (hypothesis : (epsilon : Rational) → Rational.zero < epsilon →
+                          ComplexNumber.modulus(u) < (epsilon : Real))
+        : u = RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial) := {
+  claim realSmall
+      : (epsilon : Rational) → Rational.zero < epsilon
+        → abs(ComplexNumber.realPart(u)) < (epsilon : Real)
+      by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+           claim abs(ComplexNumber.realPart(u)) ≤ ComplexNumber.modulus(u)
+               since ComplexNumber.realPart_bound;
+           claim ComplexNumber.modulus(u) < (epsilon : Real)
+               by hypothesis(epsilon, epsilonPositive);
+           done since Real.LessThan.transitive_left
+         };
+  claim imaginarySmall
+      : (epsilon : Rational) → Rational.zero < epsilon
+        → abs(ComplexNumber.imaginaryPart(u)) < (epsilon : Real)
+      by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+           claim abs(ComplexNumber.imaginaryPart(u)) ≤ ComplexNumber.modulus(u)
+               since ComplexNumber.imaginaryPart_bound;
+           claim ComplexNumber.modulus(u) < (epsilon : Real)
+               by hypothesis(epsilon, epsilonPositive);
+           done since Real.LessThan.transitive_left
+         };
+  claim ComplexNumber.realPart(u) = Real.zero
+      by Real.eq_of_absolute_value_less_than_all_positive(
+             ComplexNumber.realPart(u), realSmall);
+  claim ComplexNumber.imaginaryPart(u) = Real.zero
+      by Real.eq_of_absolute_value_less_than_all_positive(
+             ComplexNumber.imaginaryPart(u), imaginarySmall);
+  claim ComplexNumber.realPart(
+            RingModulo.zero(Real.polynomial_commutative_ring,
+                Complex.definingPolynomial))
+        = Real.zero
+      by ComplexNumber.realPart_zero;
+  claim ComplexNumber.imaginaryPart(
+            RingModulo.zero(Real.polynomial_commutative_ring,
+                Complex.definingPolynomial))
+        = Real.zero
+      by ComplexNumber.imaginaryPart_zero;
+  done since ComplexNumber.eq_of_coordinates
+}
+
+theorem ComplexNumber.SequenceConverges.unique
+        (s : Natural → ComplexNumber)
+        (limit1 limit2 : ComplexNumber)
+        (converges1 : ComplexNumber.SequenceConverges(s, limit1))
+        (converges2 : ComplexNumber.SequenceConverges(s, limit2))
+        : limit1 = limit2 := {
+  claim differenceSmall
+      : (epsilon : Rational) → Rational.zero < epsilon
+        → ComplexNumber.modulus(limit1 - limit2) < (epsilon : Real)
+      by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+           claim halfPositive : Rational.zero < Rational.halve(epsilon)
+               since Rational.halve_positive;
+           obtain ⟨threshold1, close1⟩
+               from converges1(Rational.halve(epsilon), halfPositive);
+           obtain ⟨threshold2, close2⟩
+               from converges2(Rational.halve(epsilon), halfPositive);
+           claim threshold1 ≤ Natural.maximum(threshold1, threshold2)
+               since Natural.left_le_max;
+           claim threshold2 ≤ Natural.maximum(threshold1, threshold2)
+               since Natural.right_le_max;
+           claim ComplexNumber.modulus(
+                     s(Natural.maximum(threshold1, threshold2)) - limit1)
+                 < (Rational.halve(epsilon) : Real)
+               by close1(Natural.maximum(threshold1, threshold2),
+                      (threshold1 ≤ Natural.maximum(threshold1, threshold2)));
+           claim ComplexNumber.modulus(
+                     s(Natural.maximum(threshold1, threshold2)) - limit2)
+                 < (Rational.halve(epsilon) : Real)
+               by close2(Natural.maximum(threshold1, threshold2),
+                      (threshold2 ≤ Natural.maximum(threshold1, threshold2)));
+           -- L1 − L2 = (L1 − s(M)) + (s(M) − L2), through the coordinates.
+           claim differenceSplits
+               : limit1 - limit2
+                 = (limit1 - s(Natural.maximum(threshold1, threshold2)))
+                   + (s(Natural.maximum(threshold1, threshold2)) - limit2)
+               by {
+                 claim realSide
+                     : ComplexNumber.realPart(limit1 - limit2)
+                       = ComplexNumber.realPart(
+                             (limit1 - s(Natural.maximum(threshold1, threshold2)))
+                             + (s(Natural.maximum(threshold1, threshold2)) - limit2))
+                     by calc ComplexNumber.realPart(limit1 - limit2)
+                           = ComplexNumber.realPart(limit1)
+                             - ComplexNumber.realPart(limit2)
+                                 by ComplexNumber.realPart_subtract(limit1, limit2)
+                           = (ComplexNumber.realPart(limit1)
+                              - ComplexNumber.realPart(
+                                    s(Natural.maximum(threshold1, threshold2))))
+                             + (ComplexNumber.realPart(
+                                    s(Natural.maximum(threshold1, threshold2)))
+                                - ComplexNumber.realPart(limit2))
+                                 by ring
+                           = ComplexNumber.realPart(
+                                 limit1 - s(Natural.maximum(threshold1, threshold2)))
+                             + (ComplexNumber.realPart(
+                                    s(Natural.maximum(threshold1, threshold2)))
+                                - ComplexNumber.realPart(limit2))
+                                 by ComplexNumber.realPart_subtract(
+                                        limit1,
+                                        s(Natural.maximum(threshold1, threshold2)))
+                           = ComplexNumber.realPart(
+                                 limit1 - s(Natural.maximum(threshold1, threshold2)))
+                             + ComplexNumber.realPart(
+                                   s(Natural.maximum(threshold1, threshold2)) - limit2)
+                                 by ComplexNumber.realPart_subtract(
+                                        s(Natural.maximum(threshold1, threshold2)),
+                                        limit2)
+                           = ComplexNumber.realPart(
+                                 (limit1 - s(Natural.maximum(threshold1, threshold2)))
+                                 + (s(Natural.maximum(threshold1, threshold2)) - limit2))
+                                 by ComplexNumber.realPart_add(
+                                        limit1 - s(Natural.maximum(threshold1, threshold2)),
+                                        s(Natural.maximum(threshold1, threshold2)) - limit2);
+                 claim imaginarySide
+                     : ComplexNumber.imaginaryPart(limit1 - limit2)
+                       = ComplexNumber.imaginaryPart(
+                             (limit1 - s(Natural.maximum(threshold1, threshold2)))
+                             + (s(Natural.maximum(threshold1, threshold2)) - limit2))
+                     by calc ComplexNumber.imaginaryPart(limit1 - limit2)
+                           = ComplexNumber.imaginaryPart(limit1)
+                             - ComplexNumber.imaginaryPart(limit2)
+                                 by ComplexNumber.imaginaryPart_subtract(limit1, limit2)
+                           = (ComplexNumber.imaginaryPart(limit1)
+                              - ComplexNumber.imaginaryPart(
+                                    s(Natural.maximum(threshold1, threshold2))))
+                             + (ComplexNumber.imaginaryPart(
+                                    s(Natural.maximum(threshold1, threshold2)))
+                                - ComplexNumber.imaginaryPart(limit2))
+                                 by ring
+                           = ComplexNumber.imaginaryPart(
+                                 limit1 - s(Natural.maximum(threshold1, threshold2)))
+                             + (ComplexNumber.imaginaryPart(
+                                    s(Natural.maximum(threshold1, threshold2)))
+                                - ComplexNumber.imaginaryPart(limit2))
+                                 by ComplexNumber.imaginaryPart_subtract(
+                                        limit1,
+                                        s(Natural.maximum(threshold1, threshold2)))
+                           = ComplexNumber.imaginaryPart(
+                                 limit1 - s(Natural.maximum(threshold1, threshold2)))
+                             + ComplexNumber.imaginaryPart(
+                                   s(Natural.maximum(threshold1, threshold2)) - limit2)
+                                 by ComplexNumber.imaginaryPart_subtract(
+                                        s(Natural.maximum(threshold1, threshold2)),
+                                        limit2)
+                           = ComplexNumber.imaginaryPart(
+                                 (limit1 - s(Natural.maximum(threshold1, threshold2)))
+                                 + (s(Natural.maximum(threshold1, threshold2)) - limit2))
+                                 by ComplexNumber.imaginaryPart_add(
+                                        limit1 - s(Natural.maximum(threshold1, threshold2)),
+                                        s(Natural.maximum(threshold1, threshold2)) - limit2);
+                 done by ComplexNumber.eq_of_coordinates(
+                             limit1 - limit2,
+                             (limit1 - s(Natural.maximum(threshold1, threshold2)))
+                                 + (s(Natural.maximum(threshold1, threshold2)) - limit2),
+                             realSide, imaginarySide)
+               };
+           claim swapFirst
+               : ComplexNumber.modulus(
+                     limit1 - s(Natural.maximum(threshold1, threshold2)))
+                 = ComplexNumber.modulus(
+                       s(Natural.maximum(threshold1, threshold2)) - limit1)
+               since ComplexNumber.modulus_subtract_swap;
+           calc ComplexNumber.modulus(limit1 - limit2)
+              = ComplexNumber.modulus(
+                    (limit1 - s(Natural.maximum(threshold1, threshold2)))
+                    + (s(Natural.maximum(threshold1, threshold2)) - limit2))
+                    by differenceSplits
+              ≤ ComplexNumber.modulus(
+                    limit1 - s(Natural.maximum(threshold1, threshold2)))
+                + ComplexNumber.modulus(
+                      s(Natural.maximum(threshold1, threshold2)) - limit2)
+                    by ComplexNumber.modulus_triangle(
+                           limit1 - s(Natural.maximum(threshold1, threshold2)),
+                           s(Natural.maximum(threshold1, threshold2)) - limit2)
+              = ComplexNumber.modulus(
+                    s(Natural.maximum(threshold1, threshold2)) - limit1)
+                + ComplexNumber.modulus(
+                      s(Natural.maximum(threshold1, threshold2)) - limit2)
+                    since swapFirst
+              < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
+                    since Real.LessThan.add_strict_strict
+              = ((Rational.halve(epsilon) + Rational.halve(epsilon)) : Real)
+                    by Rational.to_real.add_preserves(
+                           Rational.halve(epsilon), Rational.halve(epsilon))
+              = (epsilon : Real)
+                    by Rational.halve_doubled(epsilon)
+         };
+  claim limit1 - limit2
+        = RingModulo.zero(Real.polynomial_commutative_ring,
+              Complex.definingPolynomial)
+      by ComplexNumber.eq_zero_of_modulus_less_than_all_positive(
+             limit1 - limit2, differenceSmall);
+  done since ComplexNumber.eq_of_subtract_zero
+}
+
+-- THE limit of a convergent ℂ-sequence, by definite description.
+definition ComplexNumber.limit (s : Natural → ComplexNumber)
+        (convergent : ComplexNumber.SequenceConvergent(s)) : ComplexNumber :=
+  Logic.the(
+      ComplexNumber,
+      (candidate : ComplexNumber) ↦ ComplexNumber.SequenceConverges(s, candidate),
+      convergent,
+      (a b : ComplexNumber)
+      (aIsLimit : ComplexNumber.SequenceConverges(s, a))
+      (bIsLimit : ComplexNumber.SequenceConverges(s, b)) ↦
+        ComplexNumber.SequenceConverges.unique(s, a, b, aIsLimit, bIsLimit))
+
+theorem ComplexNumber.limit_converges (s : Natural → ComplexNumber)
+        (convergent : ComplexNumber.SequenceConvergent(s))
+        : ComplexNumber.SequenceConverges(s, ComplexNumber.limit(s, convergent)) :=
+  Logic.the_satisfies(
+      ComplexNumber,
+      (candidate : ComplexNumber) ↦ ComplexNumber.SequenceConverges(s, candidate),
+      convergent,
+      (a b : ComplexNumber)
+      (aIsLimit : ComplexNumber.SequenceConverges(s, a))
+      (bIsLimit : ComplexNumber.SequenceConverges(s, b)) ↦
+        ComplexNumber.SequenceConverges.unique(s, a, b, aIsLimit, bIsLimit))
+
+-- ----------------------------------------------------------------------
+-- Powers and the exponential series in ℂ.
+
+definition ComplexNumber.power (base : ComplexNumber) : Natural → ComplexNumber
+  | zero =>
+      RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+  | successor(n) => RingModulo.multiply(base, ComplexNumber.power(base, n))
+
+theorem ComplexNumber.modulus_one
+        : ComplexNumber.modulus(
+              RingModulo.one(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial))
+          = Real.one := {
+  claim embeddedOne
+      : ComplexNumber.from_real(Real.one)
+        = RingModulo.one(Real.polynomial_commutative_ring,
+              Complex.definingPolynomial)
+      by ComplexNumber.from_real_one;
+  claim Rational.zero < Rational.one;
+  claim Real.zero < (Rational.one : Real)
+      since Rational.to_real.positive_preserves;
+  claim Real.zero ≤ Real.one since Real.LessThan.weaken;
+  claim Real.IsNonneg(Real.one) since Real.IsNonneg_of_LessOrEqual_zero;
+  calc ComplexNumber.modulus(
+           RingModulo.one(Real.polynomial_commutative_ring,
+               Complex.definingPolynomial))
+     = ComplexNumber.modulus(ComplexNumber.from_real(Real.one))
+           by embeddedOne
+     = abs(Real.one)
+           by ComplexNumber.modulus_from_real(Real.one)
+     = Real.one
+           by Real.absolute_value_when_nonneg(Real.one, (Real.IsNonneg(Real.one)))
+}
+
+-- |zⁿ| = |z|ⁿ.
+theorem ComplexNumber.modulus_power (z : ComplexNumber)
+        : (n : Natural)
+          → ComplexNumber.modulus(ComplexNumber.power(z, n))
+            = Real.power(ComplexNumber.modulus(z), n)
+  | zero => {
+      claim ComplexNumber.modulus(ComplexNumber.power(z, 0)) = Real.one
+          by ComplexNumber.modulus_one;
+      done
+    }
+  | successor(n) =>
+      calc ComplexNumber.modulus(z * ComplexNumber.power(z, n))
+         = ComplexNumber.modulus(z)
+           * ComplexNumber.modulus(ComplexNumber.power(z, n))
+               by ComplexNumber.modulus_multiplicative(z, ComplexNumber.power(z, n))
+         = ComplexNumber.modulus(z) * Real.power(ComplexNumber.modulus(z), n)
+               by ComplexNumber.modulus_power(z, n)
+
+-- The k-th term of the exponential series at z: (1/k!) · zᵏ, with the
+-- real coefficient embedded.
+definition ComplexNumber.exponentialTerm (z : ComplexNumber) (k : Natural)
+        : ComplexNumber :=
+  ComplexNumber.from_real(
+      (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
+  * ComplexNumber.power(z, k)
+
+-- Its modulus is exactly the real exponential term at |z|.
+theorem ComplexNumber.modulus_exponentialTerm (z : ComplexNumber) (k : Natural)
+        : ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
+          = Real.exponentialTerm(ComplexNumber.modulus(z), k) := {
+  claim Rational.zero < (Natural.factorial(k) : Rational)
+      since Rational.factorial_cast_positive;
+  claim Rational.zero
+        < Rational.reciprocal_function((Natural.factorial(k) : Rational))
+      since Rational.reciprocal_function_positive_of_positive;
+  claim Real.zero
+        < (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+      since Rational.to_real.positive_preserves;
+  claim Real.zero
+        ≤ (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+      since Real.LessThan.weaken;
+  claim coefficientNonneg
+      : Real.IsNonneg(
+            (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
+      since Real.IsNonneg_of_LessOrEqual_zero;
+  calc ComplexNumber.modulus(
+           ComplexNumber.from_real(
+               (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
+           * ComplexNumber.power(z, k))
+     = ComplexNumber.modulus(
+           ComplexNumber.from_real(
+               (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)))
+       * ComplexNumber.modulus(ComplexNumber.power(z, k))
+           by ComplexNumber.modulus_multiplicative(
+                  ComplexNumber.from_real(
+                      (Rational.reciprocal_function(
+                           (Natural.factorial(k) : Rational)) : Real)),
+                  ComplexNumber.power(z, k))
+     = abs((Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
+       * ComplexNumber.modulus(ComplexNumber.power(z, k))
+           by ComplexNumber.modulus_from_real(
+                  (Rational.reciprocal_function(
+                       (Natural.factorial(k) : Rational)) : Real))
+     = (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+       * ComplexNumber.modulus(ComplexNumber.power(z, k))
+           by Real.absolute_value_when_nonneg(
+                  (Rational.reciprocal_function(
+                       (Natural.factorial(k) : Rational)) : Real),
+                  coefficientNonneg)
+     = (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+       * Real.power(ComplexNumber.modulus(z), k)
+           by ComplexNumber.modulus_power(z, k)
+}
+
+-- ----------------------------------------------------------------------
+-- Convergence: the series at z is dominated in modulus by the real
+-- exponential series at |z|, which converges; ℂ is complete.
+theorem ComplexNumber.exponential_series_convergent (z : ComplexNumber)
+        : ComplexNumber.SequenceConvergent(
+              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z))) := {
+  claim realSeriesConvergent
+      : Real.SequenceConvergent(
+            Real.partialSum(Real.exponentialTerm(ComplexNumber.modulus(z))))
+      by Real.exponential_series_convergent(ComplexNumber.modulus(z));
+  claim realSeriesCauchy
+      : Real.SequenceIsCauchy(
+            Real.partialSum(Real.exponentialTerm(ComplexNumber.modulus(z))))
+      by Real.converges_implies_cauchy(
+             Real.partialSum(Real.exponentialTerm(ComplexNumber.modulus(z))),
+             realSeriesConvergent);
+  claim domination
+      : (k : Natural)
+        → ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
+          ≤ Real.exponentialTerm(ComplexNumber.modulus(z), k)
+      by (k : Natural) ↦ {
+           claim sameValue
+               : ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
+                 = Real.exponentialTerm(ComplexNumber.modulus(z), k)
+               by ComplexNumber.modulus_exponentialTerm(z, k);
+           claim ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
+                 ≤ ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
+               since Real.LessOrEqual.reflexive;
+           done by substituting sameValue
+         };
+  claim seriesCauchy
+      : ComplexNumber.SequenceIsCauchy(
+            ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)))
+      by ComplexNumber.series_dominated_cauchy(
+             ComplexNumber.exponentialTerm(z),
+             Real.exponentialTerm(ComplexNumber.modulus(z)),
+             domination, realSeriesCauchy);
+  done by ComplexNumber.cauchy_sequence_converges(
+              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)),
+              seriesCauchy)
+}
+
+-- ----------------------------------------------------------------------
+-- The complex exponential, and its defining convergence.
+definition ComplexNumber.exponential (z : ComplexNumber) : ComplexNumber :=
+  ComplexNumber.limit(
+      ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)),
+      ComplexNumber.exponential_series_convergent(z))
+
+theorem ComplexNumber.exponential_converges (z : ComplexNumber)
+        : ComplexNumber.SequenceConverges(
+              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)),
+              ComplexNumber.exponential(z)) :=
+  ComplexNumber.limit_converges(
+      ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)),
+      ComplexNumber.exponential_series_convergent(z))
