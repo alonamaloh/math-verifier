@@ -18,6 +18,46 @@ Keep entries here only until triaged — the corpus is the durable record.
 
 <!-- captures are appended below this line -->
 
+### (performance, not message) `by substituting <name>` re-runs the full prover per direction — 2026-06-12 (ℂ polish)
+note: a calc step `= Product.make(x, y - Real.zero) by substituting firstZero`
+(with `firstZero : x - Real.zero = x` in context) tripped the
+expensive-by-less warning at ~77K kernel-steps. MATH_PROFILE_AUTOPROVER
+showed TWO armed top-level autoProveClaim calls per such step, each
+sweeping contextFactMatch over ~400 candidates (~1.2 s) before
+equalityBattery closed via `ComplexNumber.product_eta`. The narrowed
+`by substituting` path (claim.cpp, tryCloseAndBuild) re-proves each
+rewritten-goal candidate with the auto-prover, and the warning
+attributes the cost to the step line as if it were by-less. The SAME
+step as `since firstZero` closes in microseconds via the
+context-fact-plus-congruence bridge. Two asks: (a) `by substituting`
+with a DIRECTLY-supplied equality whose rewrite makes the endpoints
+structurally equal should not need a prover call at all; (b) the
+expensive-step warning should say which HINT path burned the steps
+rather than calling a hinted step "by-less".
+diagnosis: understood (see note); fix is an elaborator change, not made
+during the polish pass. Workaround applied throughout: prefer
+`since <fact>` for single-fact rewrites.
+rubric (0/1): cause 0 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
+
+### Citation boundary: ring argument only under projections — 2026-06-12 (ℂ polish)
+note: `= Real.zero since Ring.zero_multiply_left` on a step
+`Real.zero * coeff(…) = Real.zero` fails: the lemma is
+`(r : Ring) → (x : Ring.carrier(r)) → Ring.multiply(r, Ring.zero(r), x) = Ring.zero(r)`,
+and `r` occurs ONLY under projections in the conclusion — the
+deferred-projection matcher (corpus #13) never gets a binding for the
+slot, and the carrier-registry last resort only fires for `.carrier`
+heads. The error message itself is the GOOD side-by-side relation
+print. Possible extension if this recurs: resolve an unbound deferred
+slot by trying each registered bundle of the structure and accepting a
+unique defeq-verified candidate (reject-on-ambiguity). For now such
+steps go bare (the prover closes them) or cite positionally.
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
+
+
 ### library/ErrorTest/probe_obtain_arity.math — 2026-06-07 22:28:55 (exit 1)
 note: obtain with too many components (∃q.n=d*q has 2, gave 3)
 ```

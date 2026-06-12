@@ -352,8 +352,13 @@ each improvement is measured and protected against regression.
     with — the canonical-bundle registry is the mechanism there.
     RESOLVED at the library level: `instance Real.ring`
     (ComplexNumber/basics.math), pinned by
-    `Test/real_ring_dispatch_test`. Full finding in
-    PLAN_ELABORATOR_SEAMS.md Item C.
+    `Test/real_ring_dispatch_test`. (The full dispatch trace lived in
+    PLAN_ELABORATOR_SEAMS.md, executed and retired 2026-06-12 — see git
+    history. Short version: operator target resolution is symmetric;
+    the asymmetry was filling the implicit `{r : Ring}`, where the
+    canonical-bundle registry is the only mechanism, and on a registry
+    miss the single-filler fallback knowingly hands the kernel a junk
+    argument for it to reject.)
 
 ### 14. Unknown lemma in a calc-step citation against a stale cache — RESOLVED
 
