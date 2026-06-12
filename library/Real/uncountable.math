@@ -337,7 +337,7 @@ theorem Real.avoidingIntervals_ordered (f : Natural → Real) (n : Natural)
   by_induction on n with IH {
     case zero: {
         -- I₀ = [0, 1].
-        claim Rational.zero < Rational.one by Rational.zero_less_one;
+        claim Rational.zero < Rational.one;
         claim Real.zero < (Rational.one : Real)
             since Rational.to_real.positive_preserves;
         done
@@ -364,9 +364,9 @@ theorem Real.avoidingLeft_le_subsequent
                      f(predecessor + N),
                      Real.avoidingIntervals_ordered(f, predecessor + N));
         calc Real.avoidingLeft(f, N)
-           ≤ Real.avoidingLeft(f, predecessor + N)        by IH
+           ≤ Real.avoidingLeft(f, predecessor + N)        since IH
            ≤ Real.avoidingLeft(f, successor(predecessor) + N)
-                 by leftGrows
+                 since leftGrows
       }
   }
 
@@ -387,8 +387,8 @@ theorem Real.avoidingRight_le_subsequent
                      f(predecessor + N),
                      Real.avoidingIntervals_ordered(f, predecessor + N));
         calc Real.avoidingRight(f, successor(predecessor) + N)
-           ≤ Real.avoidingRight(f, predecessor + N)       by rightShrinks
-           ≤ Real.avoidingRight(f, N)                     by IH
+           ≤ Real.avoidingRight(f, predecessor + N)       since rightShrinks
+           ≤ Real.avoidingRight(f, N)                     since IH
       }
   }
 
@@ -396,8 +396,7 @@ theorem Real.avoidingLeft_le_at_le
         (f : Natural → Real) (N m : Natural) (NLeqM : N ≤ m)
         : Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, m) := {
   obtain ⟨k, mEq⟩ by Natural.le_to_add;
-  claim Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, k + N)
-      by Real.avoidingLeft_le_subsequent(f, N, k);
+  claim Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, k + N);
   claim by substitution
 }
 
@@ -405,8 +404,7 @@ theorem Real.avoidingRight_le_at_le
         (f : Natural → Real) (N m : Natural) (NLeqM : N ≤ m)
         : Real.avoidingRight(f, m) ≤ Real.avoidingRight(f, N) := {
   obtain ⟨k, mEq⟩ by Natural.le_to_add;
-  claim Real.avoidingRight(f, k + N) ≤ Real.avoidingRight(f, N)
-      by Real.avoidingRight_le_subsequent(f, N, k);
+  claim Real.avoidingRight(f, k + N) ≤ Real.avoidingRight(f, N);
   claim by substitution
 }
 
@@ -415,24 +413,19 @@ theorem Real.avoidingRight_le_at_le
 theorem Real.avoidingLeft_le_avoidingRight
         (f : Natural → Real) (m n : Natural)
         : Real.avoidingLeft(f, m) ≤ Real.avoidingRight(f, n) := {
-  claim mBelow : m ≤ Natural.maximum(m, n) by Natural.left_le_max(m, n);
-  claim nBelow : n ≤ Natural.maximum(m, n) by Natural.right_le_max(m, n);
-  claim leftRises
-        : Real.avoidingLeft(f, m)
-          ≤ Real.avoidingLeft(f, Natural.maximum(m, n))
-      by Real.avoidingLeft_le_at_le(f, m, Natural.maximum(m, n), mBelow);
-  claim orderedAtMaximum
-        : Real.avoidingLeft(f, Natural.maximum(m, n))
+  claim m ≤ Natural.maximum(m, n);
+  claim n ≤ Natural.maximum(m, n);
+  claim Real.avoidingLeft(f, m)
+          ≤ Real.avoidingLeft(f, Natural.maximum(m, n));
+  claim Real.avoidingLeft(f, Natural.maximum(m, n))
           ≤ Real.avoidingRight(f, Natural.maximum(m, n))
       since Real.LessThan.weaken;
-  claim rightFalls
-        : Real.avoidingRight(f, Natural.maximum(m, n))
-          ≤ Real.avoidingRight(f, n)
-      by Real.avoidingRight_le_at_le(f, n, Natural.maximum(m, n), nBelow);
+  claim Real.avoidingRight(f, Natural.maximum(m, n))
+          ≤ Real.avoidingRight(f, n);
   calc Real.avoidingLeft(f, m)
-     ≤ Real.avoidingLeft(f, Natural.maximum(m, n))    by leftRises
-     ≤ Real.avoidingRight(f, Natural.maximum(m, n))   by orderedAtMaximum
-     ≤ Real.avoidingRight(f, n)                       by rightFalls
+     ≤ Real.avoidingLeft(f, Natural.maximum(m, n))
+     ≤ Real.avoidingRight(f, Natural.maximum(m, n))
+     ≤ Real.avoidingRight(f, n)
 }
 
 -- The step at index n throws f(n) out of interval n+1.
