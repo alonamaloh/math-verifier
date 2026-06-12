@@ -1,0 +1,291 @@
+-- ComplexNumber/reconstruction.math
+--
+-- Reconstruction: every complex number equals re(z) + im(z)·i, where
+-- (re, im) = coords(z). This is the inverse direction of the coordinate
+-- map — the one fact the homomorphism modules don't give — and it makes
+-- `coords` injective, hence |z| determines z = 0.
+--
+-- The engine is an induction on the coefficient list using the
+-- structural identity [c, rest] = c + x·[rest] together with i² = −1.
+-- (Mirrors GaussianInteger/reconstruction.math over ℝ.)
+
+module ComplexNumber.reconstruction
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.group
+import Algebra.group_lemmas
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import ComplexNumber.basics
+import ComplexNumber.embedding
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+
+-- Multiplying a polynomial (given by a coefficient list) by x prepends a
+-- zero coefficient: x · make(rest) = make(shift(rest)). Same coefficient
+-- chain as `coordinatesOfPolynomial_times_x`, transported by
+-- `make_equal_of_coefficients_equal` instead of through `coords`.
+theorem ComplexNumber.x_times_make
+        (rest : Polynomial.Coefficients(Ring.carrier(Real.ring)))
+        : Complex.x
+            * Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring), rest)
+          = Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring),
+                Polynomial.Coefficients.shift(Real.ring, rest)) := {
+  let oneList : Polynomial.Coefficients(Ring.carrier(Real.ring)) :=
+      Polynomial.Coefficients.cons(Ring.carrier(Real.ring), Ring.one(Real.ring),
+          Polynomial.Coefficients.nil(Ring.carrier(Real.ring)));
+  -- multiply(shift([1]), rest) ~ shift(multiply([1], rest)) ~ shift(rest).
+  claim multiplyOneRest
+      : Polynomial.ExtensionallyEqual(Ring.carrier(Real.ring), Ring.zero(Real.ring),
+            Polynomial.Coefficients.multiply(Real.ring, oneList, rest), rest)
+      by Polynomial.Coefficients.multiply_one_left(Real.ring, rest);
+  claim Polynomial.ExtensionallyEqual(Ring.carrier(Real.ring), Ring.zero(Real.ring),
+            Polynomial.Coefficients.multiply(Real.ring,
+                Polynomial.Coefficients.shift(Real.ring, oneList), rest),
+            Polynomial.Coefficients.shift(Real.ring,
+                Polynomial.Coefficients.multiply(Real.ring, oneList, rest)))
+      by Polynomial.Coefficients.shift_multiply(Real.ring, oneList, rest);
+  claim Polynomial.ExtensionallyEqual(Ring.carrier(Real.ring), Ring.zero(Real.ring),
+            Polynomial.Coefficients.shift(Real.ring,
+                Polynomial.Coefficients.multiply(Real.ring, oneList, rest)),
+            Polynomial.Coefficients.shift(Real.ring, rest))
+      by Polynomial.Coefficients.shift_respects(Real.ring,
+             Polynomial.Coefficients.multiply(Real.ring, oneList, rest), rest,
+             multiplyOneRest);
+  calc Complex.x
+         * Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring), rest)
+     = Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring),
+           Polynomial.Coefficients.multiply(Real.ring,
+               Polynomial.Coefficients.shift(Real.ring, oneList), rest))
+     = Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring),
+           Polynomial.Coefficients.shift(Real.ring,
+               Polynomial.Coefficients.multiply(Real.ring, oneList, rest)))
+           by Polynomial.make_equal_of_coefficients_equal
+     = Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring),
+           Polynomial.Coefficients.shift(Real.ring, rest))
+           by Polynomial.make_equal_of_coefficients_equal
+}
+
+-- The complex number of a coefficient list: the class of its polynomial.
+definition ComplexNumber.classOf
+        (a : Polynomial.Coefficients(Ring.carrier(Real.ring))) : ComplexNumber :=
+  RingModulo.make(Real.polynomial_commutative_ring, Complex.definingPolynomial,
+      Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring), a))
+
+-- i · classOf(rest) = classOf(shift(rest)): multiplying the class by i
+-- prepends a zero coefficient (x_times_make lifted into ℂ).
+theorem ComplexNumber.i_times_classOf
+        (rest : Polynomial.Coefficients(Ring.carrier(Real.ring)))
+        : ComplexNumber.i * ComplexNumber.classOf(rest)
+          = ComplexNumber.classOf(Polynomial.Coefficients.shift(Real.ring, rest)) :=
+  calc ComplexNumber.i * ComplexNumber.classOf(rest)
+     = RingModulo.make(Real.polynomial_commutative_ring, Complex.definingPolynomial,
+           Complex.x
+             * Polynomial.make(Ring.carrier(Real.ring), Ring.zero(Real.ring), rest))
+     = ComplexNumber.classOf(Polynomial.Coefficients.shift(Real.ring, rest))
+           by substitution
+
+-- Structural identity: classOf([c, rest]) = c + i·classOf(rest).
+theorem ComplexNumber.classOf_cons
+        (c : Ring.carrier(Real.ring))
+        (rest : Polynomial.Coefficients(Ring.carrier(Real.ring)))
+        : ComplexNumber.classOf(
+              Polynomial.Coefficients.cons(Ring.carrier(Real.ring), c, rest))
+          = ComplexNumber.from_real(c)
+            + ComplexNumber.i * ComplexNumber.classOf(rest) := {
+  claim addZero
+      : Ring.add(Real.ring, c, Ring.zero(Real.ring)) = c
+      by Ring.add_zero;
+  calc ComplexNumber.classOf(
+           Polynomial.Coefficients.cons(Ring.carrier(Real.ring), c, rest))
+     = ComplexNumber.classOf(
+           Polynomial.Coefficients.cons(Ring.carrier(Real.ring),
+               Ring.add(Real.ring, c, Ring.zero(Real.ring)), rest))
+           by substituting addZero
+     = ComplexNumber.from_real(c)
+         + ComplexNumber.classOf(Polynomial.Coefficients.shift(Real.ring, rest))
+     = ComplexNumber.from_real(c)
+         + ComplexNumber.i * ComplexNumber.classOf(rest)
+           by substitution
+}
+
+definition ComplexNumber.ring_bundle : Ring :=
+  Ring.make(ComplexNumber, RingModulo.add,
+      RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial),
+      RingModulo.negate, RingModulo.multiply,
+      RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial),
+      RingModulo.is_ring(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+
+-- (−1)·w = −w in ℂ (the one ring fact the cons-step needs beyond the
+-- RingModulo add/multiply lemmas; via the bundle and `negate_multiply_left`).
+theorem ComplexNumber.negate_one_multiply (w : ComplexNumber)
+        : RingModulo.negate(
+              RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)) * w
+          = RingModulo.negate(w) :=
+  calc RingModulo.negate(
+           RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)) * w
+     = RingModulo.negate(
+           RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial) * w)
+           by Ring.negate_multiply_left(ComplexNumber.ring_bundle,
+                  RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial), w)
+     = RingModulo.negate(w)
+           by substituting RingModulo.multiply_identity_left(
+                  Real.polynomial_commutative_ring, Complex.definingPolynomial, w)
+
+-- i·(i·w) = −w.
+theorem ComplexNumber.i_squared_multiply (w : ComplexNumber)
+        : ComplexNumber.i * (ComplexNumber.i * w) = RingModulo.negate(w) :=
+  calc ComplexNumber.i * (ComplexNumber.i * w)
+     = (ComplexNumber.i * ComplexNumber.i) * w
+           by RingModulo.multiply_associative
+     = RingModulo.negate(
+           RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)) * w
+           by substituting ComplexNumber.i_squared
+     = RingModulo.negate(w)
+           by ComplexNumber.negate_one_multiply
+
+-- i·(re + i·im) = −im + i·re  (the Horner rotation).
+theorem ComplexNumber.inner_horner
+        (re im : Ring.carrier(Real.ring))
+        : ComplexNumber.i
+            * (ComplexNumber.from_real(re) + ComplexNumber.i * ComplexNumber.from_real(im))
+          = RingModulo.negate(ComplexNumber.from_real(im))
+            + ComplexNumber.i * ComplexNumber.from_real(re) :=
+  calc ComplexNumber.i
+         * (ComplexNumber.from_real(re) + ComplexNumber.i * ComplexNumber.from_real(im))
+     = ComplexNumber.i * ComplexNumber.from_real(re)
+         + ComplexNumber.i * (ComplexNumber.i * ComplexNumber.from_real(im))
+           by RingModulo.distributivity_left
+     = ComplexNumber.i * ComplexNumber.from_real(re)
+         + RingModulo.negate(ComplexNumber.from_real(im))
+           by substitution
+     = RingModulo.negate(ComplexNumber.from_real(im))
+         + ComplexNumber.i * ComplexNumber.from_real(re)
+           by RingModulo.add_commutative
+
+-- The full cons-step algebra: c + i·(re + i·im) = (c − im) + i·re.
+theorem ComplexNumber.complex_horner
+        (c re im : Ring.carrier(Real.ring))
+        : ComplexNumber.from_real(c)
+            + ComplexNumber.i
+              * (ComplexNumber.from_real(re) + ComplexNumber.i * ComplexNumber.from_real(im))
+          = ComplexNumber.from_real(c - im)
+            + ComplexNumber.i * ComplexNumber.from_real(re) :=
+  calc ComplexNumber.from_real(c)
+         + ComplexNumber.i
+           * (ComplexNumber.from_real(re) + ComplexNumber.i * ComplexNumber.from_real(im))
+     = ComplexNumber.from_real(c)
+         + (RingModulo.negate(ComplexNumber.from_real(im))
+            + ComplexNumber.i * ComplexNumber.from_real(re))
+           by substituting ComplexNumber.inner_horner(re, im)
+     = (ComplexNumber.from_real(c) + RingModulo.negate(ComplexNumber.from_real(im)))
+         + ComplexNumber.i * ComplexNumber.from_real(re)
+           by RingModulo.add_associative
+     = ComplexNumber.from_real(c - im)
+         + ComplexNumber.i * ComplexNumber.from_real(re)
+
+-- Reconstruction at the coefficient level: classOf(a) = re + i·im, where
+-- (re, im) = coords(a). Induction on the coefficient list; the cons step
+-- is classOf_cons + IH + complex_horner.
+theorem ComplexNumber.reconstruct_coeffs
+        : (a : Polynomial.Coefficients(Ring.carrier(Real.ring)))
+          → ComplexNumber.classOf(a)
+            = ComplexNumber.from_real(
+                  Product.first(ComplexNumber.coordinatesOfCoefficients(a)))
+              + ComplexNumber.i
+                * ComplexNumber.from_real(
+                      Product.second(ComplexNumber.coordinatesOfCoefficients(a)))
+  | Polynomial.Coefficients.nil => {
+      -- coords(nil) = (0,0); classOf(nil) = 0 = from_real(0) + i·0
+      -- (from_real(0)=0 via from_real_zero; i·0=0 here).
+      claim ComplexNumber.i
+              * RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+            = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+          by Ring.multiply_zero_right(ComplexNumber.ring_bundle, ComplexNumber.i);
+      done
+    }
+  | Polynomial.Coefficients.cons(c, rest) =>
+      calc ComplexNumber.classOf(
+               Polynomial.Coefficients.cons(Ring.carrier(Real.ring), c, rest))
+         = ComplexNumber.from_real(c) + ComplexNumber.i * ComplexNumber.classOf(rest)
+               by ComplexNumber.classOf_cons
+         = ComplexNumber.from_real(c)
+             + ComplexNumber.i
+               * (ComplexNumber.from_real(
+                      Product.first(ComplexNumber.coordinatesOfCoefficients(rest)))
+                  + ComplexNumber.i
+                    * ComplexNumber.from_real(
+                          Product.second(ComplexNumber.coordinatesOfCoefficients(rest))))
+               by substitution
+         = ComplexNumber.from_real(
+               c - Product.second(ComplexNumber.coordinatesOfCoefficients(rest)))
+             + ComplexNumber.i
+               * ComplexNumber.from_real(
+                     Product.first(ComplexNumber.coordinatesOfCoefficients(rest)))
+               by ComplexNumber.complex_horner
+
+-- Reconstruction on ℂ: z = re(z) + i·im(z). Double representatives
+-- reduce z to classOf(a) and coords(z) to coordsOfCoefficients(a).
+theorem ComplexNumber.reconstruct (z : ComplexNumber)
+        : z = ComplexNumber.from_real(ComplexNumber.realPart(z))
+              + ComplexNumber.i
+                * ComplexNumber.from_real(ComplexNumber.imaginaryPart(z)) :=
+  cases z { | p =>
+    cases p { | a =>
+      ComplexNumber.reconstruct_coeffs(a)
+    }
+  }
+
+-- Injectivity at 0: a complex number with both coordinates 0 is 0.
+theorem ComplexNumber.eq_zero_of_coordinates_zero (z : ComplexNumber)
+        (coordinatesZero
+            : ComplexNumber.coordinates(z)
+              = Product.make(Real.zero, Real.zero))
+        : z = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial) := {
+  claim fromRealZero
+      : ComplexNumber.from_real(Real.zero)
+        = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      by ComplexNumber.from_real_zero;
+  claim iTimesZero
+      : ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+        = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      by substituting fromRealZero;
+  calc z
+     = ComplexNumber.from_real(Product.first(ComplexNumber.coordinates(z)))
+         + ComplexNumber.i
+           * ComplexNumber.from_real(Product.second(ComplexNumber.coordinates(z)))
+           by ComplexNumber.reconstruct
+     = ComplexNumber.from_real(Real.zero)
+         + ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+           by substituting coordinatesZero
+     = ComplexNumber.from_real(Real.zero)
+         + RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+           by substituting iTimesZero
+     = ComplexNumber.from_real(Real.zero)
+           by RingModulo.add_identity_right
+     = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+           by substituting fromRealZero
+}

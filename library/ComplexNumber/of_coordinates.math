@@ -1,0 +1,77 @@
+-- ComplexNumber/of_coordinates.math
+--
+-- The inverse of the coordinate map, and the coordinate laws at the
+-- level of ℂ itself: `ofCoordinates(x, y)` is the complex number
+-- x + y·i with coordinates exactly (x, y), and `coords` carries
+-- addition and multiplication of complex numbers to the componentwise
+-- sum and the complex product on pairs.
+-- (Extends GaussianInteger/of_coordinates.math over ℝ.)
+
+module ComplexNumber.of_coordinates
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+
+-- `coords` is additive on ℂ (lifted from `coordinatesOfPolynomial_add`).
+theorem ComplexNumber.coordinates_add (z w : ComplexNumber)
+        : coords(RingModulo.add(z, w))
+          = Product.make(
+                Product.first(coords(z)) + Product.first(coords(w)),
+                Product.second(coords(z)) + Product.second(coords(w))) :=
+  cases z { | p =>
+    cases w { | q =>
+      ComplexNumber.coordinatesOfPolynomial_add(p, q)
+    }
+  }
+
+-- `coords` is multiplicative on ℂ (lifted from
+-- `coordinatesOfPolynomial_multiply`).
+theorem ComplexNumber.coordinates_multiply (z w : ComplexNumber)
+        : coords(RingModulo.multiply(z, w))
+          = ComplexNumber.coordinateProduct(coords(z), coords(w)) :=
+  cases z { | p =>
+    cases w { | q =>
+      ComplexNumber.coordinatesOfPolynomial_multiply(p, q)
+    }
+  }
+
+-- The complex number with coordinates (x, y): the class of [x, y].
+definition ComplexNumber.ofCoordinates (x y : Ring.carrier(Real.ring)) : ComplexNumber :=
+  ComplexNumber.classOf(
+      Polynomial.Coefficients.cons(Ring.carrier(Real.ring), x,
+          Polynomial.Coefficients.cons(Ring.carrier(Real.ring), y,
+              Polynomial.Coefficients.nil(Ring.carrier(Real.ring)))))
+
+-- Its coordinates are (x, y) — the reim recursion gives (x − 0, y − 0).
+theorem ComplexNumber.coordinates_ofCoordinates (x y : Real)
+        : coords(ComplexNumber.ofCoordinates(x, y)) = Product.make(x, y) := {
+  claim firstZero : x - Real.zero = x by ring;
+  claim secondZero : y - Real.zero = y by ring;
+  calc coords(ComplexNumber.ofCoordinates(x, y))
+     = Product.make(x - Real.zero, y - Real.zero)
+     = Product.make(x, y - Real.zero)   by substituting firstZero
+     = Product.make(x, y)               by substituting secondZero
+}

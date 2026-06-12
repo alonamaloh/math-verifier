@@ -1,0 +1,219 @@
+-- ComplexNumber/coordinate_multiplicative.math
+--
+-- The coordinate map is multiplicative: coords(p·q) = coords(p) ⊗ coords(q),
+-- where ⊗ is the complex product (a,b)⊗(c,d) = (ac−bd, ad+bc) on pairs —
+-- i.e. "evaluation at i is a ring homomorphism". This is what will make
+-- the modulus multiplicative. Proved by induction on the first
+-- coefficient list, using additivity, the shift (×x) rotation, and a
+-- scale (×constant) lemma.
+-- (Mirrors GaussianInteger/coordinate_multiplicative.math over ℝ.)
+
+module ComplexNumber.coordinate_multiplicative
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+
+-- ----------------------------------------------------------------------
+-- The complex product on coordinate pairs.
+definition ComplexNumber.coordinateProduct (u v : Pair(Real, Real))
+        : Pair(Real, Real) :=
+  Product.make(
+      Product.first(u) * Product.first(v) - Product.second(u) * Product.second(v),
+      Product.first(u) * Product.second(v) + Product.second(u) * Product.first(v))
+
+-- ----------------------------------------------------------------------
+-- Scaling a coefficient list by a constant scales both coordinates.
+theorem ComplexNumber.coordinatesOfCoefficients_scale (a : Real)
+        : (k : Polynomial.Coefficients(Real))
+          → coords(
+                Polynomial.Coefficients.scale(Real.ring, a, k))
+            = Product.make(
+                  a * Product.first(coords(k)),
+                  a * Product.second(coords(k)))
+  | Polynomial.Coefficients.nil => {
+      -- coords(scale(a, [])) = (0, 0) = (a·0, a·0).
+      claim Real.zero = a * Real.zero;
+      done
+    }
+  | Polynomial.Coefficients.cons(c, rest) => {
+      -- scale(a, c :: rest) = (a·c) :: scale(a, rest); the induction
+      -- hypothesis gives the coordinates of the scaled tail.
+      claim tail
+          : coords(
+                Polynomial.Coefficients.scale(Real.ring, a, rest))
+            = Product.make(
+                  a * Product.first(coords(rest)),
+                  a * Product.second(coords(rest)));
+      -- real part
+      calc a * c - Product.second(coords(
+               Polynomial.Coefficients.scale(Real.ring, a, rest)))
+         = a * c - a * Product.second(coords(rest))
+               by tail
+         = a * (c - Product.second(coords(rest)));
+      -- imaginary part
+      claim Product.first(coords(
+                Polynomial.Coefficients.scale(Real.ring, a, rest)))
+            = a * Product.first(coords(rest))
+          by tail;
+      done
+    }
+
+-- ----------------------------------------------------------------------
+-- Multiplicativity on coefficient lists: coords(p·q) = coords(p) ⊗ coords(q).
+-- Induction on p. On cons(a, restA): p·q = scale(a, q) + shift(restA·q), so
+-- coords(p·q) = a·coords(q) ⊕ i·(coords(restA)⊗coords(q)), which is the
+-- complex product coords(cons(a,restA)) ⊗ coords(q) by ring.
+theorem ComplexNumber.coordinatesOfCoefficients_multiply
+        : (p q : Polynomial.Coefficients(Real))
+          → coords(
+                Polynomial.Coefficients.multiply(Real.ring, p, q))
+            = ComplexNumber.coordinateProduct(
+                  coords(p),
+                  coords(q))
+  | Polynomial.Coefficients.nil, q => {
+      -- coords(nil·q) = coords(nil) = (0,0) = (0,0) ⊗ coords(q).
+      claim Real.zero
+          = Real.zero * Product.first(coords(q))
+                - Real.zero * Product.second(coords(q));
+      claim Real.zero
+          = Real.zero * Product.second(coords(q))
+                + Real.zero * Product.first(coords(q));
+      done
+    }
+  | Polynomial.Coefficients.cons(a, restA), q => {
+      -- multiply(a :: restA, q) = scale(a, q) + shift(restA · q). The
+      -- induction hypothesis evaluates coords(restA · q) as the complex
+      -- product; `scaleCoordinates` and `shiftCoordinates` evaluate the two
+      -- summands. Additivity splits coords of the sum; then each coordinate
+      -- is a `ring` rearrangement into the complex product of the cons.
+      -- induction hypothesis on the tail
+      claim ihMultiply
+          : coords(
+                Polynomial.Coefficients.multiply(Real.ring, restA, q))
+            = ComplexNumber.coordinateProduct(
+                  coords(restA),
+                  coords(q))
+          by ComplexNumber.coordinatesOfCoefficients_multiply(restA, q);
+      claim scaleCoordinates
+          : coords(
+                Polynomial.Coefficients.scale(Real.ring, a, q))
+            = Product.make(
+                  a * Product.first(coords(q)),
+                  a * Product.second(coords(q)));
+      claim shiftCoordinates
+          : coords(
+                Polynomial.Coefficients.shift(Real.ring,
+                    Polynomial.Coefficients.multiply(Real.ring, restA, q)))
+            = Product.make(
+                  -Product.second(coords(
+                      Polynomial.Coefficients.multiply(Real.ring, restA, q))),
+                  Product.first(coords(
+                      Polynomial.Coefficients.multiply(Real.ring, restA, q))));
+      -- The real part: a·re(q) − [re(restA)·im(q) + im(restA)·re(q)].
+      calc Product.first(coords(
+               Polynomial.Coefficients.scale(Real.ring, a, q)))
+               + Product.first(coords(
+                     Polynomial.Coefficients.shift(Real.ring,
+                         Polynomial.Coefficients.multiply(Real.ring, restA, q))))
+                 = a * Product.first(coords(q))
+                       + Product.first(coords(
+                             Polynomial.Coefficients.shift(Real.ring,
+                                 Polynomial.Coefficients.multiply(Real.ring, restA, q))))
+                       by scaleCoordinates
+                 = a * Product.first(coords(q))
+                       + -Product.second(coords(
+                             Polynomial.Coefficients.multiply(Real.ring, restA, q)))
+                       by shiftCoordinates
+                 = a * Product.first(coords(q))
+                       + -(Product.first(coords(restA))
+                                 * Product.second(coords(q))
+                             + Product.second(coords(restA))
+                                 * Product.first(coords(q)))
+                       by ihMultiply
+                 = (a - Product.second(coords(restA)))
+                       * Product.first(coords(q))
+                       - Product.first(coords(restA))
+                         * Product.second(coords(q));
+      -- The imaginary part: a·im(q) + [re(restA)·re(q) − im(restA)·im(q)].
+      calc Product.second(coords(
+               Polynomial.Coefficients.scale(Real.ring, a, q)))
+               + Product.second(coords(
+                     Polynomial.Coefficients.shift(Real.ring,
+                         Polynomial.Coefficients.multiply(Real.ring, restA, q))))
+                 = a * Product.second(coords(q))
+                       + Product.second(coords(
+                             Polynomial.Coefficients.shift(Real.ring,
+                                 Polynomial.Coefficients.multiply(Real.ring, restA, q))))
+                       by scaleCoordinates
+                 = a * Product.second(coords(q))
+                       + Product.first(coords(
+                             Polynomial.Coefficients.multiply(Real.ring, restA, q)))
+                       since shiftCoordinates
+                 = a * Product.second(coords(q))
+                       + (Product.first(coords(restA))
+                              * Product.first(coords(q))
+                          - Product.second(coords(restA))
+                              * Product.second(coords(q)))
+                       by ihMultiply
+                 = (a - Product.second(coords(restA)))
+                       * Product.second(coords(q))
+                       + Product.first(coords(restA))
+                         * Product.first(coords(q));
+      -- coords(scale(a,q) + shift(restA·q)) splits componentwise (additivity);
+      -- the two claims are exactly its real and imaginary parts.
+      calc coords(
+               Polynomial.Coefficients.add(Real.ring,
+                   Polynomial.Coefficients.scale(Real.ring, a, q),
+                   Polynomial.Coefficients.shift(Real.ring,
+                       Polynomial.Coefficients.multiply(Real.ring, restA, q))))
+         = Product.make(
+               Product.first(coords(
+                   Polynomial.Coefficients.scale(Real.ring, a, q)))
+                   + Product.first(coords(
+                         Polynomial.Coefficients.shift(Real.ring,
+                             Polynomial.Coefficients.multiply(Real.ring, restA, q)))),
+               Product.second(coords(
+                   Polynomial.Coefficients.scale(Real.ring, a, q)))
+                   + Product.second(coords(
+                         Polynomial.Coefficients.shift(Real.ring,
+                             Polynomial.Coefficients.multiply(Real.ring, restA, q)))))
+             since ComplexNumber.coordinatesOfCoefficients_add
+         = ComplexNumber.coordinateProduct(
+               coords(
+                   Polynomial.Coefficients.cons(Real, a, restA)),
+               coords(q));
+    }
+
+-- ----------------------------------------------------------------------
+-- Lifted to ℝ[x]: coords(p·q) = coords(p) ⊗ coords(q).
+theorem ComplexNumber.coordinatesOfPolynomial_multiply
+        (p q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        : coords(
+              (p * q))
+          = ComplexNumber.coordinateProduct(
+                coords(p),
+                coords(q)) :=
+  cases p { | a =>
+    cases q { | b =>
+      ComplexNumber.coordinatesOfCoefficients_multiply(a, b)
+    }
+  }
