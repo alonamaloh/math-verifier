@@ -1,0 +1,126 @@
+-- ComplexNumber/coordinate_homomorphism.math
+--
+-- The coordinate map is an ℝ-module homomorphism: it carries polynomial
+-- addition to componentwise real addition on the (re, im) pair. This is
+-- the first half of what makes it descend through the (x²+1)-congruence
+-- (the other half is that it kills multiples of x²+1).
+--
+-- Proved at the coefficient-list level by induction, then lifted to
+-- ℝ[x]. (Mirrors GaussianInteger/coordinate_homomorphism.math.)
+
+module ComplexNumber.coordinate_homomorphism
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+
+-- ----------------------------------------------------------------------
+-- A pair equals the pairing of its projections.
+theorem ComplexNumber.product_eta (a : Pair(Real, Real))
+        : a = Product.make(Product.first(a), Product.second(a)) :=
+  cases a { | Product.make(x, y) =>
+    reflexivity(Pair(Real, Real), Product.make(x, y)) }
+
+-- ----------------------------------------------------------------------
+-- Additivity on coefficient lists: coordinates of a sum are the
+-- componentwise sums of the coordinates.
+theorem ComplexNumber.coordinatesOfCoefficients_add
+        : (a b : Polynomial.Coefficients(Real))
+          → coords(Polynomial.Coefficients.add(Real.ring, a, b))
+            = Product.make(
+                  Product.first(coords(a))
+                      + Product.first(coords(b)),
+                  Product.second(coords(a))
+                      + Product.second(coords(b)))
+  | Polynomial.Coefficients.nil =>
+      (b : Polynomial.Coefficients(Real)) ↦ {
+        -- add(nil, b) = b and coords(nil) = (0, 0), so each coordinate gains 0.
+        claim Product.first(coords(b))
+            = Real.zero + Product.first(coords(b));
+        claim Product.second(coords(b))
+            = Real.zero + Product.second(coords(b));
+        calc coords(b)
+           = Product.make(
+                 Product.first(coords(b)),
+                 Product.second(coords(b)))
+           = Product.make(
+                 Real.zero + Product.first(coords(b)),
+                 Real.zero + Product.second(coords(b)));
+      }
+  | Polynomial.Coefficients.cons(a, restA) =>
+      (b : Polynomial.Coefficients(Real)) ↦
+        cases b {
+          | Polynomial.Coefficients.nil => {
+              -- add(cons, nil) = cons and coords(nil) = (0, 0); each coordinate gains 0.
+              claim Product.first(coords(
+                        Polynomial.Coefficients.cons(Real, a, restA)))
+                  = Product.first(coords(
+                        Polynomial.Coefficients.cons(Real, a, restA))) + Real.zero;
+              claim Product.second(coords(
+                        Polynomial.Coefficients.cons(Real, a, restA)))
+                  = Product.second(coords(
+                        Polynomial.Coefficients.cons(Real, a, restA))) + Real.zero;
+              done
+            }
+          | Polynomial.Coefficients.cons(bb, restB) => {
+              -- add(a :: restA, bb :: restB) = (a+bb) :: add(restA, restB).
+              claim ih
+                  : coords(
+                        Polynomial.Coefficients.add(Real.ring, restA, restB))
+                    = Product.make(
+                          Product.first(coords(restA))
+                              + Product.first(coords(restB)),
+                          Product.second(coords(restA))
+                              + Product.second(coords(restB)))
+                  by ComplexNumber.coordinatesOfCoefficients_add(restA, restB);
+              -- real part: (a+bb) − (im(restA) + im(restB))
+              calc (a + bb)
+                       - Product.second(coords(
+                             Polynomial.Coefficients.add(Real.ring, restA, restB)))
+                 = (a + bb)
+                       - (Product.second(coords(restA))
+                          + Product.second(coords(restB)))
+                       by ih
+                 = (a - Product.second(coords(restA)))
+                       + (bb - Product.second(coords(restB)));
+              -- imaginary part: re(restA) + re(restB)
+              claim Product.first(coords(
+                        Polynomial.Coefficients.add(Real.ring, restA, restB)))
+                  = Product.first(coords(restA))
+                      + Product.first(coords(restB))
+                  by ih;
+              done
+            }
+        }
+
+-- ----------------------------------------------------------------------
+-- Multiplying by x rotates the coordinates. At the coefficient level
+-- `shift K = cons(0, K)`, and coords(cons(0, K)) = (−im K, re K).
+theorem ComplexNumber.coordinatesOfCoefficients_shift
+        (k : Polynomial.Coefficients(Real))
+        : coords(
+              Polynomial.Coefficients.shift(Real.ring, k))
+          = Product.make(
+                -Product.second(coords(k)),
+                Product.first(coords(k))) := {
+  -- shift k = 0 :: k, so coords(shift k) = (0 − im k, re k); 0 − im k = −im k.
+  claim Real.zero - Product.second(coords(k))
+      = -Product.second(coords(k));
+  done
+}

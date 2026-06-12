@@ -1,0 +1,106 @@
+-- ComplexNumber/coordinate_map.math
+--
+-- The coordinate map descends to ℂ: combining additivity with the
+-- vanishing on multiples of x²+1, `coordinatesOfPolynomial` respects
+-- the (x²+1)-congruence, so it lifts to a genuine function
+-- `coordinates : ℂ → ℝ×ℝ` reading the (re, im) of a complex number
+-- a + bi. (Mirrors GaussianInteger/coordinate_map.math over ℝ.)
+
+module ComplexNumber.coordinate_map
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.ring_divisibility
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.instances
+import RingModulo.basics
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+
+-- ----------------------------------------------------------------------
+-- coordinatesOfPolynomial respects congruence modulo x²+1.
+--
+-- From p − p' = (x²+1)·cofactor we get p = p' + (x²+1)·cofactor, so by
+-- additivity coords(p) = coords(p') ⊕ coords((x²+1)·cofactor) = coords(p').
+theorem ComplexNumber.coordinatesOfPolynomial_respects_congruence
+        (p p' : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        (congruent : Ring.CongruentModulo(Real.polynomial_ring, Complex.definingPolynomial, p, p'))
+        : ComplexNumber.coordinatesOfPolynomial(p)
+          = ComplexNumber.coordinatesOfPolynomial(p') := {
+  obtain ⟨cofactor, differenceEquation⟩ from congruent;
+  -- differenceEquation : p + (−p') = (x²+1)·cofactor. Rearrange to
+  -- p = p' + (x²+1)·cofactor (a group rearrangement; the reversed steps
+  -- name the law they undo).
+  calc p
+            = p + Polynomial.zero(Real.ring)
+                  since Polynomial.add_identity_right
+            = p + ((-p') + p')
+                  since Polynomial.add_negate_left
+            = (p + (-p')) + p'
+                  since Polynomial.add_associative
+            = Complex.definingPolynomial * cofactor + p'
+                  since differenceEquation
+            = p' + Complex.definingPolynomial * cofactor
+                  since Polynomial.add_commutative as pEquation;
+  -- coords of the (x²+1)-multiple vanish.
+  claim modCoordinates
+      : coords(Complex.definingPolynomial * cofactor) = Product.make(Real.zero, Real.zero)
+      since ComplexNumber.coordinatesOfPolynomial_definingPolynomial_multiply(cofactor);
+  -- coords(p) = coords(p' + (x²+1)·cofactor) = coords(p') ⊕ (0,0) = coords(p').
+  calc coords(p)
+     = coords(p' + Complex.definingPolynomial * cofactor)
+           since pEquation
+     = Product.make(
+           Product.first(coords(p')) + Product.first(coords(Complex.definingPolynomial * cofactor)),
+           Product.second(coords(p')) + Product.second(coords(Complex.definingPolynomial * cofactor)))
+           since ComplexNumber.coordinatesOfPolynomial_add(p', Complex.definingPolynomial * cofactor)
+     = Product.make(Product.first(coords(p')), Product.second(coords(p')))
+           by {
+             -- each coordinate gains 0 from the vanishing multiple
+             calc Product.first(coords(p')) + Product.first(coords(Complex.definingPolynomial * cofactor))
+                = Product.first(coords(p')) + Real.zero   by modCoordinates
+                = Product.first(coords(p'));
+             calc Product.second(coords(p')) + Product.second(coords(Complex.definingPolynomial * cofactor))
+                = Product.second(coords(p')) + Real.zero   by modCoordinates
+                = Product.second(coords(p'));
+             done
+           }
+     = coords(p')
+           since ComplexNumber.product_eta(coords(p'))
+}
+
+-- ----------------------------------------------------------------------
+-- The coordinate map on ℂ: (re, im) of a complex number.
+definition ComplexNumber.coordinates : ComplexNumber → Pair(Real, Real)
+  by representatives p ↦ ComplexNumber.coordinatesOfPolynomial(p)
+  well_defined by ComplexNumber.coordinatesOfPolynomial_respects_congruence
+
+overload coords := ComplexNumber.coordinates
+
+-- ----------------------------------------------------------------------
+-- The named projections: the real and imaginary parts of a complex
+-- number.
+definition ComplexNumber.realPart (z : ComplexNumber) : Real :=
+  Product.first(ComplexNumber.coordinates(z))
+
+definition ComplexNumber.imaginaryPart (z : ComplexNumber) : Real :=
+  Product.second(ComplexNumber.coordinates(z))

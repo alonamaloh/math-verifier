@@ -1,0 +1,156 @@
+-- ComplexNumber/coordinates.math
+--
+-- The coordinate bridge out of the quotient: a total function reading
+-- the pair (re, im) of real coordinates off a complex number a + bi.
+--
+-- A function OUT of ℂ = ℝ[x]/(x²+1) cannot extract a representative
+-- (the quotient is opaque), so we build it the only sound way: a
+-- function on coefficient lists that respects both quotient relations,
+-- then lift. The recursion uses x·q ≡ i·q, i.e. re(x·q) = −im(q),
+-- im(x·q) = re(q):
+--   reim(nil)         = (0, 0)
+--   reim(cons(c, q))  = (c − im(q), re(q))      [the class is c + x·q]
+-- This module lifts it through the polynomial quotient (trailing
+-- zeros); the lift through the (x²+1)-congruence is in the sibling
+-- module. (Mirrors GaussianInteger/coordinates.math over ℝ.)
+
+module ComplexNumber.coordinates
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import ComplexNumber.basics
+
+-- ----------------------------------------------------------------------
+-- The coordinate recursion on raw coefficient lists.
+
+-- (re, im) of the class of a coefficient list, reading c + x·(rest).
+definition ComplexNumber.coordinatesOfCoefficients
+        : Polynomial.Coefficients(Real) → Pair(Real, Real)
+  | Polynomial.Coefficients.nil => Product.make(Real.zero, Real.zero)
+  | Polynomial.Coefficients.cons(c, rest) =>
+      Product.make(
+          c - Product.second(ComplexNumber.coordinatesOfCoefficients(rest)),
+          Product.first(ComplexNumber.coordinatesOfCoefficients(rest)))
+
+-- `coords` abbreviates the coordinate map for the whole ComplexNumber
+-- cluster (importers inherit the overload); resolved by argument type —
+-- a coefficient list here, a polynomial once that map is defined below.
+overload coords := ComplexNumber.coordinatesOfCoefficients
+
+-- ----------------------------------------------------------------------
+-- An all-zero coefficient list has coordinates (0, 0).
+theorem ComplexNumber.coordinatesOfCoefficients_all_zero
+        : (a : Polynomial.Coefficients(Real))
+          → ((i : Natural) → Polynomial.nth(Real, Real.zero, a, i) = Real.zero)
+          → ComplexNumber.coordinatesOfCoefficients(a)
+            = Product.make(Real.zero, Real.zero)
+  | Polynomial.Coefficients.nil =>
+      (allZero
+          : (i : Natural) → Polynomial.nth(Real, Real.zero,
+                Polynomial.Coefficients.nil(Real), i) = Real.zero) ↦
+        reflexivity(Pair(Real, Real), Product.make(Real.zero, Real.zero))
+  | Polynomial.Coefficients.cons(c, rest) =>
+      (allZero
+          : (i : Natural) → Polynomial.nth(Real, Real.zero,
+                Polynomial.Coefficients.cons(Real, c, rest), i) = Real.zero) ↦ {
+        claim cIsZero : c = Real.zero by allZero(0);
+        claim restCoordinates
+            : coords(rest) = Product.make(Real.zero, Real.zero)
+            by ComplexNumber.coordinatesOfCoefficients_all_zero(rest,
+                   (i : Natural) ↦ allZero(successor(i)));
+        -- coords(c :: rest) = (c − im(rest), re(rest)) = (0, 0).
+        -- real coordinate
+        calc c - Product.second(coords(rest))
+           = c - Product.second(Product.make(Real.zero, Real.zero))
+                 since restCoordinates
+           = Real.zero
+                 since cIsZero;
+        -- imaginary coordinate
+        claim Product.first(coords(rest)) = Real.zero by restCoordinates;
+        done
+      }
+
+-- ----------------------------------------------------------------------
+-- Coordinates respect extensional equality of coefficient lists: two
+-- lists with the same coefficient at every index have equal coordinates.
+-- Each branch returns an explicit term checked against the goal by
+-- definitional unfolding of `coordinatesOfCoefficients` on a `cons`/`nil`.
+theorem ComplexNumber.coordinatesOfCoefficients_respects
+        : (a b : Polynomial.Coefficients(Real))
+          → Polynomial.ExtensionallyEqual(Real, Real.zero, a, b)
+          → ComplexNumber.coordinatesOfCoefficients(a)
+            = ComplexNumber.coordinatesOfCoefficients(b)
+  | Polynomial.Coefficients.nil =>
+      (b : Polynomial.Coefficients(Real))
+      (extensionallyEqual : Polynomial.ExtensionallyEqual(Real, Real.zero,
+          Polynomial.Coefficients.nil(Real), b)) ↦ {
+        -- b agrees with the empty list at every index, so b is all-zero too.
+        claim bAllZero
+            : (i : Natural) → Polynomial.nth(Real, Real.zero, b, i) = Real.zero
+            by (i : Natural) ↦
+                 calc Polynomial.nth(Real, Real.zero, b, i)
+                    = Real.zero   since extensionallyEqual(i);
+        calc coords(Polynomial.Coefficients.nil(Real))
+           = Product.make(Real.zero, Real.zero)
+           = coords(b)
+                 since ComplexNumber.coordinatesOfCoefficients_all_zero(b, bAllZero)
+      }
+  | Polynomial.Coefficients.cons(c, rest) =>
+      (b : Polynomial.Coefficients(Real))
+      (extensionallyEqual : Polynomial.ExtensionallyEqual(Real, Real.zero,
+          Polynomial.Coefficients.cons(Real, c, rest), b)) ↦
+        cases b {
+          | Polynomial.Coefficients.nil =>
+              ComplexNumber.coordinatesOfCoefficients_all_zero(
+                  Polynomial.Coefficients.cons(Real, c, rest),
+                  (i : Natural) ↦ extensionallyEqual(i))
+          | Polynomial.Coefficients.cons(d, restB) => {
+              claim headsEqual : c = d by extensionallyEqual(0);
+              claim tailCoordinates
+                  : coords(rest) = coords(restB)
+                  by ComplexNumber.coordinatesOfCoefficients_respects(rest, restB,
+                         (i : Natural) ↦ extensionallyEqual(successor(i)));
+              -- coords(c :: rest) = (c − im(rest), re(rest)), likewise for d :: restB.
+              -- real coordinate: c − im(rest) = d − im(restB)
+              calc c - Product.second(coords(rest))
+                 = d - Product.second(coords(rest))   by headsEqual
+                 = d - Product.second(coords(restB))  by tailCoordinates;
+              -- imaginary coordinate: re(rest) = re(restB)
+              claim Product.first(coords(rest)) = Product.first(coords(restB))
+                  by tailCoordinates;
+              -- assemble through the explicit pair forms (keeps both endpoints
+              -- cheap make(…) so the prover never unfolds the recursive coords)
+              calc coords(Polynomial.Coefficients.cons(Real, c, rest))
+                 = Product.make(
+                       c - Product.second(coords(rest)), Product.first(coords(rest)))
+                 = Product.make(
+                       d - Product.second(coords(restB)), Product.first(coords(restB)))
+                 = coords(Polynomial.Coefficients.cons(Real, d, restB))
+            }
+        }
+
+-- ----------------------------------------------------------------------
+-- The coordinate map on ℝ[x] (lifting over the polynomial quotient).
+definition ComplexNumber.coordinatesOfPolynomial
+        : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))
+          → Pair(Real, Real)
+  by representatives a ↦ ComplexNumber.coordinatesOfCoefficients(a)
+  well_defined by ComplexNumber.coordinatesOfCoefficients_respects
+
+-- `coords` also abbreviates the polynomial-level coordinate map.
+overload coords := ComplexNumber.coordinatesOfPolynomial

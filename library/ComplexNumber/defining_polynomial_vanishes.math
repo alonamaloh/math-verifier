@@ -1,0 +1,147 @@
+-- ComplexNumber/defining_polynomial_vanishes.math
+--
+-- The coordinate map kills multiples of the defining polynomial x²+1 —
+-- the second half (with additivity) of what makes it descend through
+-- the (x²+1)-congruence. The engine is `coords(x·p)`: multiplying by x
+-- rotates the coordinates, (re, im) ↦ (−im, re). Multiplying by x twice
+-- negates, so coords((x²+1)·q) = coords(x²·q) ⊕ coords(q)
+-- = −coords(q) ⊕ coords(q) = 0.
+-- (Mirrors GaussianInteger/modulus_vanishes.math over ℝ.)
+
+module ComplexNumber.defining_polynomial_vanishes
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.monomial
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+
+-- ----------------------------------------------------------------------
+-- Multiplying by x rotates the coordinates: coords(x·p) = (−im p, re p).
+--
+-- x's coefficient list is shift([1]), so multiplying by x is, up to the
+-- equivalence, a shift: x·k ~ shift(1·k) ~ shift(k). `coords` transports
+-- through the equivalence (coordinatesOfCoefficients_respects), and a
+-- shift rotates the coordinates (coordinatesOfCoefficients_shift).
+theorem ComplexNumber.coordinatesOfPolynomial_times_x
+        (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        : coords(Complex.x * p)
+          = Product.make(
+                -Product.second(coords(p)),
+                Product.first(coords(p))) :=
+  cases p { | k => {
+    let one : Polynomial.Coefficients(Real) :=
+        Polynomial.Coefficients.cons(Real, Real.one,
+            Polynomial.Coefficients.nil(Real));
+    -- The two coefficient-level equivalences behind "x· is a shift".
+    claim Polynomial.ExtensionallyEqual(Real, Real.zero,
+              Polynomial.Coefficients.multiply(Real.ring, one, k), k);
+    claim Polynomial.ExtensionallyEqual(Real, Real.zero,
+              Polynomial.Coefficients.multiply(Real.ring,
+                  Polynomial.Coefficients.shift(Real.ring, one), k),
+              Polynomial.Coefficients.shift(Real.ring,
+                  Polynomial.Coefficients.multiply(Real.ring, one, k)));
+    claim Polynomial.ExtensionallyEqual(Real, Real.zero,
+              Polynomial.Coefficients.shift(Real.ring,
+                  Polynomial.Coefficients.multiply(Real.ring, one, k)),
+              Polynomial.Coefficients.shift(Real.ring, k));
+    -- Transport `coords` along each equivalence in turn, then rotate.
+    calc coords(Polynomial.Coefficients.multiply(Real.ring,
+                 Polynomial.Coefficients.shift(Real.ring, one), k))
+       = coords(Polynomial.Coefficients.shift(Real.ring,
+                 Polynomial.Coefficients.multiply(Real.ring, one, k)))
+       = coords(Polynomial.Coefficients.shift(Real.ring, k))
+       = Product.make(
+             -Product.second(coords(k)),
+             Product.first(coords(k)))
+  } }
+
+
+-- ----------------------------------------------------------------------
+-- Additivity lifted to ℝ[x] (polynomial add lifts coefficient-list add).
+theorem ComplexNumber.coordinatesOfPolynomial_add
+        (p q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        : coords(p + q)
+          = Product.make(
+                Product.first(coords(p)) + Product.first(coords(q)),
+                Product.second(coords(p)) + Product.second(coords(q))) :=
+  cases p { | a =>
+    cases q { | b =>
+      ComplexNumber.coordinatesOfCoefficients_add(a, b)
+    }
+  }
+
+-- ----------------------------------------------------------------------
+-- Multiplying by x twice negates both coordinates: coords(x·(x·q)) = −coords(q).
+theorem ComplexNumber.coordinatesOfPolynomial_times_x_squared
+        (q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        : coords(Complex.x * (Complex.x * q))
+          = Product.make(
+                -Product.first(coords(q)),
+                -Product.second(coords(q))) :=
+  calc coords(Complex.x * (Complex.x * q))
+     = Product.make(
+           -Product.second(coords(Complex.x * q)),
+           Product.first(coords(Complex.x * q)))
+           by ComplexNumber.coordinatesOfPolynomial_times_x
+     = Product.make(
+           -Product.first(coords(q)),
+           -Product.second(coords(q)))
+           by substituting ComplexNumber.coordinatesOfPolynomial_times_x(q)
+
+-- ----------------------------------------------------------------------
+-- (x²+1)·q = x·(x·q) + q, by distributivity / associativity / 1·q = q.
+theorem ComplexNumber.multiply_definingPolynomial
+        (q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        : Complex.definingPolynomial * q
+          = Complex.x * (Complex.x * q) + q :=
+  calc Complex.definingPolynomial * q
+     = Complex.x * Complex.x * q + Polynomial.one(Real.ring) * q
+           by Polynomial.multiply_distributivity_right
+     = Complex.x * (Complex.x * q) + Polynomial.one(Real.ring) * q
+           by Polynomial.multiply_associative
+     = Complex.x * (Complex.x * q) + q
+           by Polynomial.multiply_one_left
+
+-- ----------------------------------------------------------------------
+-- The payoff: coords((x²+1)·q) = (0, 0).
+theorem ComplexNumber.coordinatesOfPolynomial_definingPolynomial_multiply
+        (q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        : coords(Complex.definingPolynomial * q)
+          = Product.make(Real.zero, Real.zero) :=
+  calc coords(Complex.definingPolynomial * q)
+     = coords(Complex.x * (Complex.x * q) + q)
+           by ComplexNumber.multiply_definingPolynomial
+     = Product.make(
+           Product.first(coords(Complex.x * (Complex.x * q))) + Product.first(coords(q)),
+           Product.second(coords(Complex.x * (Complex.x * q))) + Product.second(coords(q)))
+           by ComplexNumber.coordinatesOfPolynomial_add
+     = Product.make(
+           -Product.first(coords(q)) + Product.first(coords(q)),
+           -Product.second(coords(q)) + Product.second(coords(q)))
+           by substituting ComplexNumber.coordinatesOfPolynomial_times_x_squared(q)
+     = Product.make(Real.zero, Real.zero)
+           by {
+             -- each coordinate is −a + a = 0
+             claim -Product.first(coords(q)) + Product.first(coords(q)) = Real.zero;
+             claim -Product.second(coords(q)) + Product.second(coords(q)) = Real.zero;
+             done
+           }
