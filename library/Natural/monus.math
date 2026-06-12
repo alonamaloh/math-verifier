@@ -72,6 +72,19 @@ theorem Natural.monus_self : (a : Natural) → Natural.monus(a, a) = 0
 -- All access to monus is via the characterising lemmas above —
 -- monus_zero_left for the b=0 / a=0 corners, monus_succ_succ to
 -- peel both sides in the recursive case.
+-- Subtracting a summand recovers the other: (b + c) − b = c.
+theorem Natural.monus_add_left
+        : (b c : Natural) → Natural.monus(b + c, b) = c
+  | zero =>
+      (c : Natural) ↦ Natural.monus_zero(c)
+  | successor(bPredecessor) =>
+      (c : Natural) ↦
+        calc Natural.monus(successor(bPredecessor) + c, successor(bPredecessor))
+           = Natural.monus(bPredecessor + c, bPredecessor)
+                 by Natural.monus_succ_succ(bPredecessor + c, bPredecessor)
+           = c
+                 by Natural.monus_add_left(bPredecessor, c)
+
 theorem Natural.le_implies_monus_zero (b : Natural)
         : (a : Natural) → a ≤ b → Natural.monus(a, b) = 0 :=
   by_induction on b with IH {

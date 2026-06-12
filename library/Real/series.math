@@ -120,7 +120,7 @@ theorem Real.geometric_series_converges
     claim absRNonneg : Real.zero ≤ abs(r)
         since Real.absolute_value_nonneg;
     -- A positive rational roof over |L|.
-    claim absLNonneg : Real.zero ≤ abs(L)
+    claim Real.zero ≤ abs(L)
         since Real.absolute_value_nonneg;
     obtain ⟨B, LRoof⟩ from Real.exists_rational_above(abs(L));
     claim castStep : ((B + Rational.one) : Real)
@@ -134,13 +134,12 @@ theorem Real.geometric_series_converges
        ≤ (B : Real)
        = (B : Real) + Real.zero
        < (B : Real) + (Rational.one : Real)
-             by Real.add_left_preserves_LessThan   as roofPositiveReal;
-    claim castRoofPositive
-          : (Rational.zero : Real) < ((B + Rational.one) : Real)
+             by Real.add_left_preserves_LessThan;
+    claim (Rational.zero : Real) < ((B + Rational.one) : Real)
         by substituting castStep;
-    claim roofPositive : Rational.zero < B + Rational.one
+    claim Rational.zero < B + Rational.one
         since Rational.to_real.LessThan_reflects;
-    claim extendedRoof : abs(L) ≤ ((B + Rational.one) : Real)
+    claim abs(L) ≤ ((B + Rational.one) : Real)
         by { claim abs(L) < (B : Real) + (Rational.one : Real)
                  by calc abs(L)
                        ≤ (B : Real)        by LRoof
@@ -151,8 +150,7 @@ theorem Real.geometric_series_converges
                  since Real.LessThan.weaken;
              done by substituting castStep };
     -- The scaled tolerance ε/(B+1), and the decay tail at it.
-    claim recipPositive
-          : Rational.zero < Rational.reciprocal_function(B + Rational.one)
+    claim Rational.zero < Rational.reciprocal_function(B + Rational.one)
         since Rational.reciprocal_function_positive_of_positive;
     claim scaledPositive
           : Rational.zero
@@ -183,8 +181,7 @@ theorem Real.geometric_series_converges
               = epsilon                   by ring;
     witness N with
         (m : Natural) (NLeqM : N ≤ m) ↦ {
-          claim powerSmall
-                : Real.power(abs(r), m)
+          claim Real.power(abs(r), m)
                   < ((epsilon * Rational.reciprocal_function(B + Rational.one))
                      : Real)
               by tailBelow(m, NLeqM);
@@ -265,8 +262,8 @@ theorem Real.geometric_series (r : Real) (rSmall : abs(r) < Real.one)
             And((Real.one - r) * L = Real.one,
                 Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L)) := {
   claim r ≤ abs(r) since Real.LessOrEqual_absolute_value;
-  claim rBelowOne : r < Real.one since Real.LessThan.transitive_left;
-  claim gapPositive : Real.zero < Real.one - r
+  claim r < Real.one since Real.LessThan.transitive_left;
+  claim Real.zero < Real.one - r
       by calc Real.zero
             = r - r             by ring
             < Real.one - r      by Real.add_preserves_LessThan;
@@ -301,6 +298,45 @@ theorem Real.partialSum_pointwise
              + sequencePrime(predecessor)
                  by pointwiseEqual(predecessor)
   }
+
+-- The bounded variant: agreement below the cut is enough (the terms at
+-- or above n are never read). What the unbounded version cannot give
+-- when the identity genuinely fails past the cut — e.g. binomial
+-- coefficients that overflow to zero.
+theorem Real.partialSum_pointwise_below
+        (s sequencePrime : Natural → Real)
+        : (n : Natural)
+          → ((k : Natural) → successor(k) ≤ n → s(k) = sequencePrime(k))
+          → Real.partialSum(s, n) = Real.partialSum(sequencePrime, n)
+  | zero =>
+      (pointwiseEqual : (k : Natural) → successor(k) ≤ 0
+           → s(k) = sequencePrime(k)) ↦
+        done
+  | successor(predecessor) =>
+      (pointwiseEqual : (k : Natural) → successor(k) ≤ successor(predecessor)
+           → s(k) = sequencePrime(k)) ↦ {
+        claim tailEqual
+            : Real.partialSum(s, predecessor)
+              = Real.partialSum(sequencePrime, predecessor)
+            by Real.partialSum_pointwise_below(s, sequencePrime, predecessor,
+                   (k : Natural) (kBelow : successor(k) ≤ predecessor) ↦ {
+                     claim predecessor ≤ successor(predecessor)
+                         since Natural.le_successor;
+                     claim successor(k) ≤ successor(predecessor)
+                         since LessOrEqual.transitive;
+                     done by pointwiseEqual(k, (successor(k) ≤ successor(predecessor)))
+                   });
+        claim successor(predecessor) ≤ successor(predecessor);
+        claim headEqual : s(predecessor) = sequencePrime(predecessor)
+            by pointwiseEqual(predecessor,
+                   (successor(predecessor) ≤ successor(predecessor)));
+        calc Real.partialSum(s, successor(predecessor))
+           = Real.partialSum(s, predecessor) + s(predecessor)
+           = Real.partialSum(sequencePrime, predecessor) + s(predecessor)
+                 since tailEqual
+           = Real.partialSum(sequencePrime, predecessor) + sequencePrime(predecessor)
+                 since headEqual
+      }
 
 -- A telescoping sum collapses to its boundary terms.
 theorem Real.telescoping_partialSum
@@ -367,11 +403,10 @@ theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
             by (j : Natural) (jBelow : successor(j) ≤ predecessor) ↦
                  termsBounded(
                      j, LessOrEqual.step(successor(j), predecessor, jBelow));
-        claim prefixSum
-              : Real.partialSum(s, predecessor) ≤ Real.partialSum(t, predecessor)
+        claim Real.partialSum(s, predecessor) ≤ Real.partialSum(t, predecessor)
             by IH(prefixBounded);
         claim successor(predecessor) ≤ successor(predecessor);
-        claim topBounded : s(predecessor) ≤ t(predecessor)
+        claim s(predecessor) ≤ t(predecessor)
             by termsBounded(predecessor, (successor(predecessor) ≤ successor(predecessor)));
         calc Real.partialSum(s, successor(predecessor))
            = Real.partialSum(s, predecessor) + s(predecessor)
@@ -408,8 +443,7 @@ theorem Real.partialSum_monotone_of_nonneg (s : Natural → Real)
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.partialSum(s, N) ≤ Real.partialSum(s, m) := {
   obtain ⟨k, mEq⟩ by Natural.le_to_add;
-  claim blockNonneg
-        : Real.zero ≤ Real.partialSum((j : Natural) ↦ s(N + j), k)
+  claim Real.zero ≤ Real.partialSum((j : Natural) ↦ s(N + j), k)
       by Real.partialSum_nonneg(
              (j : Natural) ↦ s(N + j), k,
              (j : Natural) ↦ termsNonneg(N + j));
@@ -524,7 +558,7 @@ theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
   claim tailBound : Real.partialSum(s, successor(j)) ≤ Real.partialSum(s, n)
       by Real.partialSum_monotone_of_nonneg(
              s, termsNonneg, successor(j), n, jBelow);
-  claim termBelowZero : s(j) ≤ Real.zero
+  claim s(j) ≤ Real.zero
       by calc s(j)
             ≤ Real.partialSum(s, successor(j))    by headBound
             ≤ Real.partialSum(s, n)               by tailBound
