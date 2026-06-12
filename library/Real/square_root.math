@@ -11,6 +11,7 @@ import Logic.basics
 import Logic.exists
 import Logic.quotient
 import Logic.excluded_middle
+import Logic.description
 import Equality.basics
 import Natural.basics
 import Natural.order
@@ -117,4 +118,96 @@ theorem Real.square_root_exists (c : Real) (cNonneg : Real.zero ≤ c)
              = (r * r - c) + c    by ring
              = Real.zero + c      since valueZero
              = c                  by ring)
+}
+
+-- ----------------------------------------------------------------------
+-- Nonnegative square roots are unique: two of them differ by a factor
+-- of (r − s)(r + s) = c − c = 0, and if the sum vanishes both numbers
+-- were zero anyway.
+theorem Real.square_root_unique
+        (c r s : Real)
+        (rNonneg : Real.zero ≤ r) (sNonneg : Real.zero ≤ s)
+        (rSquares : r * r = c) (sSquares : s * s = c)
+        : r = s := {
+  claim differenceProduct : (r - s) * (r + s) = Real.zero
+      by calc (r - s) * (r + s)
+            = r * r - s * s    by ring
+            = c - s * s        by rSquares
+            = c - c            by sSquares
+            = Real.zero        by ring;
+  decide r - s = Real.zero {
+    | yes differenceZero =>
+        Real.eq_of_sub_eq_zero(r, s, differenceZero)
+    | no differenceNonzero => {
+        claim sumZero : r + s = Real.zero
+            by Real.right_factor_zero_of_product_zero(
+                   r - s, r + s, differenceProduct, differenceNonzero);
+        claim rBelowZero : r ≤ Real.zero
+            by calc r
+                  = r + Real.zero
+                  ≤ r + s          since Real.add_preserves_LessOrEqual_left
+                  = Real.zero      by sumZero;
+        claim rIsZero : r = Real.zero
+            since Real.LessOrEqual.antisymmetric;
+        claim sBelowZero : s ≤ Real.zero
+            by calc s
+                  = Real.zero + s
+                  ≤ r + s          since Real.add_preserves_LessOrEqual
+                  = Real.zero      by sumZero;
+        claim sIsZero : s = Real.zero
+            since Real.LessOrEqual.antisymmetric;
+        calc r
+           = Real.zero    by rIsZero
+           = s            by sIsZero
+      }
+  }
+}
+
+-- The uniqueness above, repackaged in the shape definite description
+-- expects (bundled And-witnesses).
+theorem Real.square_root_property_unique (c : Real)
+        : (a b : Real)
+          → And(Real.zero ≤ a, a * a = c)
+          → And(Real.zero ≤ b, b * b = c)
+          → a = b :=
+  (a b : Real)
+  (aData : And(Real.zero ≤ a, a * a = c))
+  (bData : And(Real.zero ≤ b, b * b = c)) ↦ {
+    obtain ⟨aNonneg, aSquares⟩ from aData;
+    obtain ⟨bNonneg, bSquares⟩ from bData;
+    done by Real.square_root_unique(
+                c, a, b, aNonneg, bNonneg, aSquares, bSquares)
+  }
+
+-- ----------------------------------------------------------------------
+-- THE square root, by definite description: existence from the
+-- intermediate value theorem, uniqueness from the lemma above. √ is
+-- now an honest function of (c, proof that 0 ≤ c).
+definition Real.square_root (c : Real) (cNonneg : Real.zero ≤ c) : Real :=
+  Logic.the(
+      Real,
+      (r : Real) ↦ And(Real.zero ≤ r, r * r = c),
+      Real.square_root_exists(c, cNonneg),
+      Real.square_root_property_unique(c))
+
+theorem Real.square_root_satisfies (c : Real) (cNonneg : Real.zero ≤ c)
+        : And(Real.zero ≤ Real.square_root(c, cNonneg),
+              Real.square_root(c, cNonneg)
+              * Real.square_root(c, cNonneg) = c) :=
+  Logic.the_satisfies(
+      Real,
+      (r : Real) ↦ And(Real.zero ≤ r, r * r = c),
+      Real.square_root_exists(c, cNonneg),
+      Real.square_root_property_unique(c))
+
+theorem Real.square_root_nonneg (c : Real) (cNonneg : Real.zero ≤ c)
+        : Real.zero ≤ Real.square_root(c, cNonneg) := {
+  obtain ⟨nonneg, _⟩ from Real.square_root_satisfies(c, cNonneg);
+  nonneg
+}
+
+theorem Real.square_root_squares (c : Real) (cNonneg : Real.zero ≤ c)
+        : Real.square_root(c, cNonneg) * Real.square_root(c, cNonneg) = c := {
+  obtain ⟨_, squares⟩ from Real.square_root_satisfies(c, cNonneg);
+  squares
 }

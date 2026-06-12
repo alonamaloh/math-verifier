@@ -132,3 +132,35 @@ redundant" (a finding of the GOOD kind, or silence) and continue.
 rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
 
 ---
+### Citation against a stale dependency cache reports "arguments could not be inferred" — 2026-06-12 (exp push)
+verbatim (Real/cauchy_complete.math citing brand-new Real.abs_partialSum_le with explicit arguments):
+```
+the `by` hint citation does not prove this goal
+  goal:        Real.absolute_value (Real.partialSum (λ(k : Natural). t (i + k)) c) ≤ …
+the hint's arguments could not be inferred from the goal or discharged from context, …
+```
+diagnosis: the lemma did not exist in the (stale) build/…/series.mathv the
+verify run loaded — the same situation in a scratch probe file reported the
+honest `unknown identifier 'Real.abs_partialSum_le'`. Inside a calc-step
+citation the unknown name instead surfaces as an argument-inference
+failure, which sent me hunting a unification bug (β-redexes under binders)
+for two iterations. Wanted: unknown-lemma detection BEFORE unification, with
+the same "unknown identifier … (check the spelling)" text everywhere; bonus
+points for "(the module cache for X may be stale — rebuild with make)".
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+---
+### (good message) `since FACT` on a calc step that needs FACT + a congruence — 2026-06-12 (exp push)
+note: writing `≤ pS(abs∘s, pred) + abs(s(pred))   since IH` (IH plus an
+add-congruence) failed with a model error message:
+```
+this step's justification proves a different relation than the step claims
+  this step claims:    A + c ≤ B + c
+  but its proof shows: A ≤ B
+```
+both relations printed side by side made the fix (`by
+Real.add_preserves_LessOrEqual`, IH consumed from context) obvious in one
+read. This is the shape more hint errors should have.
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
