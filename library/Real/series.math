@@ -463,3 +463,84 @@ theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
                  by stepUnfold
       }
   }
+
+-- ----------------------------------------------------------------------
+-- Linearity of partial sums: they split over termwise sums and pull
+-- out constant factors.
+theorem Real.partialSum_add (s t : Natural → Real) (n : Natural)
+        : Real.partialSum((k : Natural) ↦ s(k) + t(k), n)
+          = Real.partialSum(s, n) + Real.partialSum(t, n) :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.partialSum((k : Natural) ↦ s(k) + t(k), 0)
+           = Real.zero
+           = Real.zero + Real.zero
+    case successor(predecessor):
+        calc Real.partialSum((k : Natural) ↦ s(k) + t(k), successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ s(k) + t(k), predecessor)
+             + (s(predecessor) + t(predecessor))
+           = (Real.partialSum(s, predecessor) + Real.partialSum(t, predecessor))
+             + (s(predecessor) + t(predecessor))
+                 since IH
+           = (Real.partialSum(s, predecessor) + s(predecessor))
+             + (Real.partialSum(t, predecessor) + t(predecessor))
+                 by ring
+  }
+
+theorem Real.partialSum_scale (c : Real) (s : Natural → Real) (n : Natural)
+        : Real.partialSum((k : Natural) ↦ c * s(k), n)
+          = c * Real.partialSum(s, n) :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.partialSum((k : Natural) ↦ c * s(k), 0)
+           = Real.zero
+           = c * Real.zero    by ring
+    case successor(predecessor):
+        calc Real.partialSum((k : Natural) ↦ c * s(k), successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ c * s(k), predecessor)
+             + c * s(predecessor)
+           = c * Real.partialSum(s, predecessor) + c * s(predecessor)
+                 since IH
+           = c * (Real.partialSum(s, predecessor) + s(predecessor))
+                 by ring
+  }
+
+-- A sum of nonnegative terms vanishes only if every term below the cut
+-- does: each term is squeezed between zero and the whole sum.
+theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
+        (termsNonneg : (j : Natural) → Real.zero ≤ s(j))
+        (sumZero : Real.partialSum(s, n) = Real.zero)
+        (j : Natural) (jBelow : successor(j) ≤ n)
+        : s(j) = Real.zero := {
+  obtain ⟨k, splitEquation⟩ by Natural.le_to_add;
+  -- s(j) ≤ Σ_{i < j+1} s(i) ≤ Σ_{i < n} s(i) = 0.
+  claim Real.zero ≤ Real.partialSum(s, j)
+      by Real.partialSum_nonneg(s, j, termsNonneg);
+  claim headBound : s(j) ≤ Real.partialSum(s, successor(j))
+      by calc s(j)
+            = Real.zero + s(j)                       by ring
+            ≤ Real.partialSum(s, j) + s(j)
+                  by Real.add_preserves_LessOrEqual;
+  claim tailBound : Real.partialSum(s, successor(j)) ≤ Real.partialSum(s, n)
+      by Real.partialSum_monotone_of_nonneg(
+             s, termsNonneg, successor(j), n, jBelow);
+  claim termBelowZero : s(j) ≤ Real.zero
+      by calc s(j)
+            ≤ Real.partialSum(s, successor(j))    by headBound
+            ≤ Real.partialSum(s, n)               by tailBound
+            = Real.zero                           by sumZero;
+  claim Real.zero ≤ s(j) by termsNonneg(j);
+  done since Real.LessOrEqual.antisymmetric
+}
+
+-- The zero series sums to zero.
+theorem Real.partialSum_zero (n : Natural)
+        : Real.partialSum((k : Natural) ↦ Real.zero, n) = Real.zero :=
+  by_induction on n with IH {
+    case zero: done
+    case successor(predecessor):
+        calc Real.partialSum((k : Natural) ↦ Real.zero, successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ Real.zero, predecessor) + Real.zero
+           = Real.zero + Real.zero    since IH
+           = Real.zero
+  }

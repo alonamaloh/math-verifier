@@ -1,0 +1,378 @@
+-- Real/cauchy_schwarz.math
+--
+-- The Cauchy–Schwarz inequality for finite sums (Freek #78):
+--   (Σ aₖbₖ)² ≤ (Σ aₖ²)(Σ bₖ²).
+--
+-- The division-free quadratic argument. Write A, B, C for the three
+-- sums. For any scalars X, Y the sum Σ (X·aₖ − Y·bₖ)² is nonnegative
+-- and expands to X²A − 2XY·B + Y²C; at X := C, Y := B it collapses to
+-- C·(CA − B²). When C > 0 the factor cancels, giving B² ≤ AC; when
+-- C = 0 every bₖ below the cut vanishes (a zero sum of squares), so
+-- B = 0 and both sides are zero.
+
+module Real.cauchy_schwarz
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.triangle
+import Rational.triangle_more
+import Rational.positive
+import Rational.linearity
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Rational.power
+import Algebra.ring_lemmas
+import Set.basics
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.series
+
+-- ----------------------------------------------------------------------
+-- The quadratic form Σ (X·aₖ − Y·bₖ)², for abstract scalars: it is a
+-- sum of squares, and it expands through the linearity of partial sums.
+
+theorem Real.quadratic_form_nonneg
+        (a b : Natural → Real) (X Y : Real) (n : Natural)
+        : Real.zero
+          ≤ Real.partialSum(
+                (k : Natural) ↦
+                    (X * a(k) - Y * b(k)) * (X * a(k) - Y * b(k)),
+                n) :=
+  Real.partialSum_nonneg(
+      (k : Natural) ↦ (X * a(k) - Y * b(k)) * (X * a(k) - Y * b(k)),
+      n,
+      (j : Natural) ↦ {
+        claim Real.IsNonneg(
+                  (X * a(j) - Y * b(j)) * (X * a(j) - Y * b(j)))
+            since Real.square_IsNonneg;
+        done since Real.LessOrEqual_zero_of_IsNonneg
+      })
+
+theorem Real.quadratic_form_expansion
+        (a b : Natural → Real) (X Y : Real) (n : Natural)
+        : Real.partialSum(
+              (k : Natural) ↦
+                  (X * a(k) - Y * b(k)) * (X * a(k) - Y * b(k)),
+              n)
+          = (X * X) * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+            - (X * Y) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+            - (X * Y) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+            + (Y * Y) * Real.partialSum((k : Natural) ↦ b(k) * b(k), n) :=
+  calc Real.partialSum(
+           (k : Natural) ↦
+               (X * a(k) - Y * b(k)) * (X * a(k) - Y * b(k)),
+           n)
+     = Real.partialSum(
+           (k : Natural) ↦
+               ((X * X) * (a(k) * a(k)) + (-(X * Y)) * (a(k) * b(k)))
+               + ((-(X * Y)) * (a(k) * b(k)) + (Y * Y) * (b(k) * b(k))),
+           n)
+           by Real.partialSum_pointwise
+     = Real.partialSum(
+           (k : Natural) ↦
+               (X * X) * (a(k) * a(k)) + (-(X * Y)) * (a(k) * b(k)),
+           n)
+       + Real.partialSum(
+             (k : Natural) ↦
+                 (-(X * Y)) * (a(k) * b(k)) + (Y * Y) * (b(k) * b(k)),
+             n)
+           by Real.partialSum_add
+     = (Real.partialSum((k : Natural) ↦ (X * X) * (a(k) * a(k)), n)
+        + Real.partialSum((k : Natural) ↦ (-(X * Y)) * (a(k) * b(k)), n))
+       + Real.partialSum(
+             (k : Natural) ↦
+                 (-(X * Y)) * (a(k) * b(k)) + (Y * Y) * (b(k) * b(k)),
+             n)
+           by Real.partialSum_add(
+                  (k : Natural) ↦ (X * X) * (a(k) * a(k)),
+                  (k : Natural) ↦ (-(X * Y)) * (a(k) * b(k)),
+                  n)
+     = (Real.partialSum((k : Natural) ↦ (X * X) * (a(k) * a(k)), n)
+        + Real.partialSum((k : Natural) ↦ (-(X * Y)) * (a(k) * b(k)), n))
+       + (Real.partialSum((k : Natural) ↦ (-(X * Y)) * (a(k) * b(k)), n)
+          + Real.partialSum((k : Natural) ↦ (Y * Y) * (b(k) * b(k)), n))
+           by Real.partialSum_add(
+                  (k : Natural) ↦ (-(X * Y)) * (a(k) * b(k)),
+                  (k : Natural) ↦ (Y * Y) * (b(k) * b(k)),
+                  n)
+     = ((X * X) * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+        + Real.partialSum((k : Natural) ↦ (-(X * Y)) * (a(k) * b(k)), n))
+       + (Real.partialSum((k : Natural) ↦ (-(X * Y)) * (a(k) * b(k)), n)
+          + Real.partialSum((k : Natural) ↦ (Y * Y) * (b(k) * b(k)), n))
+           by Real.partialSum_scale(X * X, (k : Natural) ↦ a(k) * a(k), n)
+     = ((X * X) * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+        + (-(X * Y)) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+       + ((-(X * Y)) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+          + Real.partialSum((k : Natural) ↦ (Y * Y) * (b(k) * b(k)), n))
+           by Real.partialSum_scale(-(X * Y), (k : Natural) ↦ a(k) * b(k), n)
+     = ((X * X) * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+        + (-(X * Y)) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+       + ((-(X * Y)) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+          + (Y * Y) * Real.partialSum((k : Natural) ↦ b(k) * b(k), n))
+           by Real.partialSum_scale(Y * Y, (k : Natural) ↦ b(k) * b(k), n)
+     = (X * X) * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+       - (X * Y) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+       - (X * Y) * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+       + (Y * Y) * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+
+-- ----------------------------------------------------------------------
+-- Freek #78: the Cauchy–Schwarz inequality.
+theorem Real.cauchy_schwarz (a b : Natural → Real) (n : Natural)
+        : Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+              * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+          ≤ Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+            * Real.partialSum((k : Natural) ↦ b(k) * b(k), n) := {
+  -- Abbreviate in prose: A = Σa², B = Σab, C = Σb².
+  claim squareTermsNonneg : (j : Natural) → Real.zero ≤ b(j) * b(j)
+      by (j : Natural) ↦ {
+           claim Real.IsNonneg(b(j) * b(j)) since Real.square_IsNonneg;
+           done since Real.LessOrEqual_zero_of_IsNonneg
+         };
+  claim CNonneg
+        : Real.zero ≤ Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+      since Real.partialSum_nonneg(
+             (k : Natural) ↦ b(k) * b(k), n, squareTermsNonneg);
+  -- The form at X := C, Y := B is nonnegative and expands.
+  claim formNonnegRaw
+        : Real.zero
+          ≤ Real.partialSum(
+                (k : Natural) ↦
+                    (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
+                         * a(k)
+                     - Real.partialSum((k2 : Natural) ↦ a(k2) * b(k2), n)
+                         * b(k))
+                    * (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
+                           * a(k)
+                       - Real.partialSum((k2 : Natural) ↦ a(k2) * b(k2), n)
+                           * b(k)),
+                n)
+      since Real.quadratic_form_nonneg(
+             a, b,
+             Real.partialSum((k : Natural) ↦ b(k) * b(k), n),
+             Real.partialSum((k : Natural) ↦ a(k) * b(k), n),
+             n);
+  claim formValue
+        : Real.partialSum(
+              (k : Natural) ↦
+                  (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
+                       * a(k)
+                   - Real.partialSum((k2 : Natural) ↦ a(k2) * b(k2), n)
+                       * b(k))
+                  * (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
+                         * a(k)
+                     - Real.partialSum((k2 : Natural) ↦ a(k2) * b(k2), n)
+                         * b(k)),
+              n)
+          = (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                 * Real.partialSum((k : Natural) ↦ b(k) * b(k), n))
+                * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+            - (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+                * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+            - (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+                * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+            + (Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+                * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+      since Real.quadratic_form_expansion(
+             a, b,
+             Real.partialSum((k : Natural) ↦ b(k) * b(k), n),
+             Real.partialSum((k : Natural) ↦ a(k) * b(k), n),
+             n);
+  claim Real.zero
+          ≤ Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+            * (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+               - Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+      by calc Real.zero
+            ≤ Real.partialSum(
+                  (k : Natural) ↦
+                      (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
+                           * a(k)
+                       - Real.partialSum((k2 : Natural) ↦ a(k2) * b(k2), n)
+                           * b(k))
+                      * (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
+                             * a(k)
+                         - Real.partialSum((k2 : Natural) ↦ a(k2) * b(k2), n)
+                             * b(k)),
+                  n)
+                  since formNonnegRaw
+            = (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ b(k) * b(k), n))
+                  * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+              - (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                     * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+                  * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+              - (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                     * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+                  * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+              + (Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                     * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+                  * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                  since formValue
+            = Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+              * (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                     * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+                 - Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                     * Real.partialSum((k : Natural) ↦ a(k) * b(k), n));
+  decide Real.partialSum((k : Natural) ↦ b(k) * b(k), n) = Real.zero {
+    -- C = 0: every bₖ below the cut vanishes, so B does too.
+    | yes CZero => {
+        claim bPrefixZero
+              : (j : Natural) → successor(j) ≤ n → b(j) = Real.zero
+            by (j : Natural) (jBelow : successor(j) ≤ n) ↦ {
+                 claim squareZero : b(j) * b(j) = Real.zero
+                     since Real.partialSum_zero_term(
+                            (k : Natural) ↦ b(k) * b(k), n,
+                            squareTermsNonneg, CZero, j, jBelow);
+                 decide b(j) = Real.zero {
+                   | yes termZero => termZero
+                   | no termNonzero =>
+                       Real.right_factor_zero_of_product_zero(
+                           b(j), b(j), squareZero, termNonzero)
+                 }
+               };
+        -- B = 0 by squeezing it against the zero series.
+        claim Real.zero ≤ Real.zero since Real.LessOrEqual.reflexive;
+        claim abPrefixZero
+              : (j : Natural) → successor(j) ≤ n
+                → a(j) * b(j) = Real.zero
+            by (j : Natural) (jBelow : successor(j) ≤ n) ↦
+                 calc a(j) * b(j)
+                    = a(j) * Real.zero    by bPrefixZero(j, jBelow)
+                    = Real.zero;
+        claim Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                ≤ Real.partialSum((k : Natural) ↦ Real.zero, n)
+            by Real.partialSum_le_pointwise(
+                   (k : Natural) ↦ a(k) * b(k),
+                   (k : Natural) ↦ Real.zero,
+                   n,
+                   (j : Natural) (jBelow : successor(j) ≤ n) ↦
+                     calc a(j) * b(j)
+                        = Real.zero    since abPrefixZero(j, jBelow)
+                        ≤ Real.zero);
+        claim Real.partialSum((k : Natural) ↦ Real.zero, n)
+                ≤ Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+            by Real.partialSum_le_pointwise(
+                   (k : Natural) ↦ Real.zero,
+                   (k : Natural) ↦ a(k) * b(k),
+                   n,
+                   (j : Natural) (jBelow : successor(j) ≤ n) ↦
+                     calc Real.zero
+                        ≤ Real.zero
+                        = a(j) * b(j)    since abPrefixZero(j, jBelow));
+        claim BZero
+              : Real.partialSum((k : Natural) ↦ a(k) * b(k), n) = Real.zero
+            by calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                  = Real.partialSum((k : Natural) ↦ Real.zero, n)
+                        since Real.LessOrEqual.antisymmetric
+                  = Real.zero
+                        since Real.partialSum_zero;
+        -- Both sides are zero.
+        claim leftZero
+              : Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                    * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                = Real.zero
+            by calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                        * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                  = Real.zero * Real.zero    since BZero
+                  = Real.zero;
+        claim rightZero
+              : Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+                    * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                = Real.zero
+            by calc Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+                        * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                  = Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+                        * Real.zero
+                        since CZero
+                  = Real.zero;
+        calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                 * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+           = Real.zero
+                 since leftZero
+           ≤ Real.zero
+           = Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+                 * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                 since rightZero
+      }
+    -- C > 0: cancel it out of C·(CA − B²) ≥ 0.
+    | no CNonzero => {
+        claim zeroNotC
+              : ¬(Real.zero
+                  = Real.partialSum((k : Natural) ↦ b(k) * b(k), n))
+            by (zeroEqualsC
+                    : Real.zero
+                      = Real.partialSum((k : Natural) ↦ b(k) * b(k), n)) ↦
+                 CNonzero(
+                     calc Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                        = Real.zero);
+        claim Real.zero < Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+            since And.introduction(CNonneg, zeroNotC);
+        claim Real.zero
+                ≤ Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                      * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+                  - Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                      * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+            since Real.nonneg_of_multiply_nonneg;
+        calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                 * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+           = Real.zero
+             + Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+           ≤ (Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+                  * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+              - Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                  * Real.partialSum((k : Natural) ↦ a(k) * b(k), n))
+             + Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                   * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+                 since Real.add_preserves_LessOrEqual
+           = Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+                 * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+      }
+  }
+}
