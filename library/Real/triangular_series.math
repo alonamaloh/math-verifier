@@ -1,0 +1,526 @@
+-- Real/triangular_series.math
+--
+-- The sum of the reciprocals of the triangular numbers (Freek #42):
+--   Σ 1/T(k+1) = 2,   T(n) = 1 + 2 + … + n.
+--
+-- Partial fractions: 1/T(k+1) = 2/(k+1) − 2/(k+2) (from the product
+-- form 2·T(k+1) = (k+1)(k+2) and the field tactic), so the partial
+-- sums telescope to 2 − 2/(n+1), and the tail dies by the Archimedean
+-- bound. Everything analytic happens at the Rational layer; the series
+-- machinery sees only casts.
+
+module Real.triangular_series
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.triangular
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.triangle
+import Rational.triangle_more
+import Rational.positive
+import Rational.linearity
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Algebra.ring_lemmas
+import Set.basics
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.series
+
+-- ----------------------------------------------------------------------
+-- The term sequence: 1/T(k+1), embedded into the reals.
+definition Real.triangular_reciprocal_term (k : Natural) : Real :=
+  (Rational.reciprocal_function((Natural.triangular(1 + k) : Rational)) : Real)
+
+-- ----------------------------------------------------------------------
+-- Partial fractions at the Rational layer:
+-- 1/T(k+1) = 2/(k+1) − 2/(k+2).
+theorem Rational.triangular_reciprocal_split (k : Natural)
+        : Rational.reciprocal_function((Natural.triangular(1 + k) : Rational))
+          = (2 : Rational)
+                * Rational.reciprocal_function((successor(k) : Rational))
+            - (2 : Rational)
+                * Rational.reciprocal_function(
+                      (successor(successor(k)) : Rational)) := {
+  -- The product form of the doubled triangular number, cast to ℚ.
+  claim doubledCast
+        : (Natural.triangular(1 + k) : Rational) * (2 : Rational)
+          = (successor(k) : Rational) * (successor(successor(k)) : Rational)
+      by calc (Natural.triangular(1 + k) : Rational) * (2 : Rational)
+            = ((Natural.triangular(1 + k) * 2 : Natural) : Rational)
+                  by Rational.from_natural_multiply_preserves(
+                         Natural.triangular(1 + k), 2)
+            = ((successor(k) * successor(successor(k)) : Natural) : Rational)
+                  by Natural.triangular_doubled(k)
+            = (successor(k) : Rational)
+              * (successor(successor(k)) : Rational)
+                  by Rational.from_natural_multiply_preserves(
+                         successor(k), successor(successor(k)));
+  -- The three denominators are nonzero.
+  claim Rational.zero < (successor(k) : Rational)
+      since Rational.successor_cast_positive;
+  claim Rational.zero < (successor(successor(k)) : Rational)
+      since Rational.successor_cast_positive;
+  claim skNonzero : ¬((successor(k) : Rational) = Rational.zero);
+  claim sskNonzero
+        : ¬((successor(successor(k)) : Rational) = Rational.zero);
+  claim Rational.zero
+          < (successor(k) : Rational) * (successor(successor(k)) : Rational)
+      since Rational.multiply_positive_positive;
+  claim doubledPositive
+        : Rational.zero
+          < (Natural.triangular(1 + k) : Rational) * (2 : Rational)
+      by substituting doubledCast;
+  claim TNonzero
+        : ¬((Natural.triangular(1 + k) : Rational) = Rational.zero)
+      by (TZero : (Natural.triangular(1 + k) : Rational) = Rational.zero) ↦ {
+           claim doubledZero
+                 : (Natural.triangular(1 + k) : Rational) * (2 : Rational)
+                   = Rational.zero
+               by substituting TZero;
+           claim notZero
+                 : ¬(Rational.zero
+                     = (Natural.triangular(1 + k) : Rational) * (2 : Rational))
+               since Rational.LessThan.distinct;
+           notZero(calc Rational.zero
+                      = (Natural.triangular(1 + k) : Rational) * (2 : Rational)
+                            by doubledZero)
+         };
+  -- Cancellations for the three reciprocals.
+  claim TCancel
+        : (Natural.triangular(1 + k) : Rational)
+              * Rational.reciprocal_function(
+                    (Natural.triangular(1 + k) : Rational))
+          = Rational.one;
+  claim productCancel
+        : ((successor(k) : Rational) * (successor(successor(k)) : Rational))
+              * (Rational.reciprocal_function((successor(k) : Rational))
+                 * Rational.reciprocal_function(
+                       (successor(successor(k)) : Rational)))
+          = Rational.one
+      by field(skNonzero, sskNonzero);
+  -- Consecutive successors are one apart.
+  claim gapOne
+        : (successor(successor(k)) : Rational) - (successor(k) : Rational)
+          = Rational.one
+      by calc (successor(successor(k)) : Rational) - (successor(k) : Rational)
+            = ((1 : Rational) + (successor(k) : Rational))
+              - (successor(k) : Rational)
+                  by Rational.successor_cast(successor(k))
+            = Rational.one
+                  by ring;
+  -- 1/T(k+1) = 2·(1/(k+1))·(1/(k+2)): trade T for (k+1)(k+2)/2 against
+  -- the cancellations.
+  claim termIdentity
+        : Rational.reciprocal_function((Natural.triangular(1 + k) : Rational))
+          = (2 : Rational)
+            * (Rational.reciprocal_function((successor(k) : Rational))
+               * Rational.reciprocal_function(
+                     (successor(successor(k)) : Rational)))
+      by calc Rational.reciprocal_function(
+                  (Natural.triangular(1 + k) : Rational))
+            = Rational.reciprocal_function(
+                  (Natural.triangular(1 + k) : Rational))
+              * Rational.one
+                  by ring
+            = Rational.reciprocal_function(
+                  (Natural.triangular(1 + k) : Rational))
+              * (((successor(k) : Rational)
+                  * (successor(successor(k)) : Rational))
+                 * (Rational.reciprocal_function((successor(k) : Rational))
+                    * Rational.reciprocal_function(
+                          (successor(successor(k)) : Rational))))
+                  by productCancel
+            = Rational.reciprocal_function(
+                  (Natural.triangular(1 + k) : Rational))
+              * (((Natural.triangular(1 + k) : Rational) * (2 : Rational))
+                 * (Rational.reciprocal_function((successor(k) : Rational))
+                    * Rational.reciprocal_function(
+                          (successor(successor(k)) : Rational))))
+                  by doubledCast
+            = ((Natural.triangular(1 + k) : Rational)
+               * Rational.reciprocal_function(
+                     (Natural.triangular(1 + k) : Rational)))
+              * ((2 : Rational)
+                 * (Rational.reciprocal_function((successor(k) : Rational))
+                    * Rational.reciprocal_function(
+                          (successor(successor(k)) : Rational))))
+                  by ring
+            = Rational.one
+              * ((2 : Rational)
+                 * (Rational.reciprocal_function((successor(k) : Rational))
+                    * Rational.reciprocal_function(
+                          (successor(successor(k)) : Rational))))
+                  by TCancel
+            = (2 : Rational)
+              * (Rational.reciprocal_function((successor(k) : Rational))
+                 * Rational.reciprocal_function(
+                       (successor(successor(k)) : Rational)))
+                  by ring;
+  -- A difference of consecutive reciprocals is their product (the gap
+  -- between the denominators is exactly 1).
+  calc Rational.reciprocal_function((successor(k) : Rational))
+       - Rational.reciprocal_function((successor(successor(k)) : Rational))
+     = ((successor(successor(k)) : Rational) - (successor(k) : Rational))
+       * (Rational.reciprocal_function((successor(k) : Rational))
+          * Rational.reciprocal_function(
+                (successor(successor(k)) : Rational)))
+           by field(skNonzero, sskNonzero)
+     = Rational.one
+       * (Rational.reciprocal_function((successor(k) : Rational))
+          * Rational.reciprocal_function(
+                (successor(successor(k)) : Rational)))
+           by gapOne
+     = Rational.reciprocal_function((successor(k) : Rational))
+       * Rational.reciprocal_function(
+             (successor(successor(k)) : Rational))
+           by ring
+     as coreCollapsed;
+  calc Rational.reciprocal_function((Natural.triangular(1 + k) : Rational))
+     = (2 : Rational)
+       * (Rational.reciprocal_function((successor(k) : Rational))
+          * Rational.reciprocal_function(
+                (successor(successor(k)) : Rational)))
+           by termIdentity
+     = (2 : Rational)
+       * (Rational.reciprocal_function((successor(k) : Rational))
+          - Rational.reciprocal_function(
+                (successor(successor(k)) : Rational)))
+           by coreCollapsed
+     = (2 : Rational)
+           * Rational.reciprocal_function((successor(k) : Rational))
+       - (2 : Rational)
+           * Rational.reciprocal_function(
+                 (successor(successor(k)) : Rational))
+           by ring
+}
+
+-- ----------------------------------------------------------------------
+-- The same split, embedded: each term is a difference of consecutive
+-- tails 2/(n+1).
+theorem Real.triangular_term_telescopes (k : Natural)
+        : Real.triangular_reciprocal_term(k)
+          = (((2 : Rational)
+              * Rational.reciprocal_function((successor(k) : Rational)))
+             : Real)
+            - (((2 : Rational)
+                * Rational.reciprocal_function(
+                      (successor(successor(k)) : Rational)))
+               : Real) :=
+  calc Real.triangular_reciprocal_term(k)
+     = ((Rational.reciprocal_function(
+             (Natural.triangular(1 + k) : Rational))) : Real)
+     = ((((2 : Rational)
+          * Rational.reciprocal_function((successor(k) : Rational)))
+         - ((2 : Rational)
+            * Rational.reciprocal_function(
+                  (successor(successor(k)) : Rational)))) : Real)
+           by Rational.triangular_reciprocal_split(k)
+     = (((2 : Rational)
+         * Rational.reciprocal_function((successor(k) : Rational))) : Real)
+       - (((2 : Rational)
+           * Rational.reciprocal_function(
+                 (successor(successor(k)) : Rational))) : Real)
+           by Rational.to_real.subtract_preserves(
+                  (2 : Rational)
+                  * Rational.reciprocal_function((successor(k) : Rational)),
+                  (2 : Rational)
+                  * Rational.reciprocal_function(
+                        (successor(successor(k)) : Rational)))
+
+-- ----------------------------------------------------------------------
+-- The tail 2/(n+1) converges to zero.
+theorem Real.triangular_tail_converges
+        : Real.SequenceConverges(
+              (n : Natural) ↦
+                  (((2 : Rational)
+                    * Rational.reciprocal_function((successor(n) : Rational)))
+                   : Real),
+              Real.zero) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    claim Rational.IsNonneg((2 : Rational))
+        since Rational.from_natural_IsNonneg;
+    obtain ⟨N, tailBelow⟩
+        from Rational.scaled_reciprocal_successor_eventually_below(
+                 (2 : Rational), epsilon,
+                 Rational.from_natural_IsNonneg(2), epsilonPositive);
+    witness N with
+        (m : Natural) (aboveThreshold : N ≤ m) ↦ {
+          claim tailBound
+                : (2 : Rational)
+                      * Rational.reciprocal_function((successor(m) : Rational))
+                  < epsilon
+              by tailBelow(m, aboveThreshold);
+          -- The tail is nonnegative, so its cast is its own absolute value.
+          claim Rational.zero < (successor(m) : Rational)
+              since Rational.successor_cast_positive;
+          claim Rational.zero
+                  < Rational.reciprocal_function((successor(m) : Rational))
+              since Rational.reciprocal_function_positive_of_positive;
+          claim Rational.zero
+                  ≤ Rational.reciprocal_function((successor(m) : Rational))
+              since Rational.LessThan.weaken;
+          claim Rational.IsNonneg(
+                    Rational.reciprocal_function((successor(m) : Rational)))
+              since Rational.IsNonneg_of_LessOrEqual_zero;
+          claim Rational.IsNonneg(
+                    (2 : Rational)
+                    * Rational.reciprocal_function((successor(m) : Rational)))
+              since Rational.IsNonneg.multiply;
+          claim Rational.zero
+                  ≤ (2 : Rational)
+                    * Rational.reciprocal_function((successor(m) : Rational))
+              since Rational.LessOrEqual_zero_of_IsNonneg;
+          claim (Rational.zero : Real)
+                  ≤ (((2 : Rational)
+                      * Rational.reciprocal_function(
+                            (successor(m) : Rational))) : Real)
+              since Rational.to_real.LessOrEqual_preserves;
+          claim Real.IsNonneg(
+                    (((2 : Rational)
+                      * Rational.reciprocal_function(
+                            (successor(m) : Rational))) : Real))
+              since Real.IsNonneg_of_LessOrEqual_zero;
+          claim absEqual
+                : abs((((2 : Rational)
+                        * Rational.reciprocal_function(
+                              (successor(m) : Rational))) : Real)
+                      - Real.zero)
+                  = (((2 : Rational)
+                      * Rational.reciprocal_function(
+                            (successor(m) : Rational))) : Real)
+              by calc abs((((2 : Rational)
+                            * Rational.reciprocal_function(
+                                  (successor(m) : Rational))) : Real)
+                          - Real.zero)
+                    = abs((((2 : Rational)
+                            * Rational.reciprocal_function(
+                                  (successor(m) : Rational))) : Real))
+                          by ((((2 : Rational)
+                                * Rational.reciprocal_function(
+                                      (successor(m) : Rational))) : Real)
+                              - Real.zero
+                              = (((2 : Rational)
+                                  * Rational.reciprocal_function(
+                                        (successor(m) : Rational))) : Real))
+                    = (((2 : Rational)
+                        * Rational.reciprocal_function(
+                              (successor(m) : Rational))) : Real)
+                          since Real.absolute_value_when_nonneg;
+          claim (((2 : Rational)
+                  * Rational.reciprocal_function(
+                        (successor(m) : Rational))) : Real)
+                  < (epsilon : Real)
+              since Rational.to_real.LessThan_preserves;
+          done by substituting absEqual
+        }
+  }
+
+-- ----------------------------------------------------------------------
+-- Freek #42: the reciprocals of the triangular numbers sum to 2.
+theorem Real.triangular_reciprocals_sum_to_two
+        : Real.SeriesConverges(
+              Real.triangular_reciprocal_term, ((2 : Rational) : Real)) := {
+  -- The first tail is exactly 2: 2/(0+1) = 2.
+  claim s0Equation : (successor(0) : Rational) = Rational.one
+      by calc (successor(0) : Rational)
+            = (1 : Rational) + (0 : Rational)    by Rational.successor_cast(0)
+            = Rational.one                       by ring;
+  claim Rational.zero < (successor(0) : Rational)
+      since Rational.successor_cast_positive;
+  claim cancelS0
+        : (successor(0) : Rational)
+              * Rational.reciprocal_function((successor(0) : Rational))
+          = Rational.one;
+  claim recipS0
+        : Rational.reciprocal_function((successor(0) : Rational))
+          = Rational.one
+      by calc Rational.reciprocal_function((successor(0) : Rational))
+            = Rational.one
+              * Rational.reciprocal_function((successor(0) : Rational))
+                  by ring
+            = (successor(0) : Rational)
+              * Rational.reciprocal_function((successor(0) : Rational))
+                  by s0Equation
+            = Rational.one
+                  by cancelS0;
+  claim tailAtZero
+        : (2 : Rational)
+              * Rational.reciprocal_function((successor(0) : Rational))
+          = (2 : Rational)
+      by calc (2 : Rational)
+                  * Rational.reciprocal_function((successor(0) : Rational))
+            = (2 : Rational) * Rational.one
+                  by recipS0
+            = (2 : Rational)
+                  by ring;
+  -- Limit algebra: constant head plus vanishing negated tail.
+  claim negatedTailConverges
+        : Real.SequenceConverges(
+              (n : Natural) ↦
+                  -(((2 : Rational)
+                     * Rational.reciprocal_function(
+                           (successor(n) : Rational))) : Real),
+              -Real.zero)
+      by Real.SequenceConverges.negate(
+             (n : Natural) ↦
+                 (((2 : Rational)
+                   * Rational.reciprocal_function(
+                         (successor(n) : Rational))) : Real),
+             Real.zero,
+             Real.triangular_tail_converges);
+  claim combined
+        : Real.SequenceConverges(
+              (n : Natural) ↦
+                  (((2 : Rational)
+                    * Rational.reciprocal_function(
+                          (successor(0) : Rational))) : Real)
+                  + -(((2 : Rational)
+                       * Rational.reciprocal_function(
+                             (successor(n) : Rational))) : Real),
+              (((2 : Rational)
+                * Rational.reciprocal_function(
+                      (successor(0) : Rational))) : Real)
+              + -Real.zero)
+      by Real.SequenceConverges.add(
+             (n : Natural) ↦
+                 (((2 : Rational)
+                   * Rational.reciprocal_function(
+                         (successor(0) : Rational))) : Real),
+             (n : Natural) ↦
+                 -(((2 : Rational)
+                    * Rational.reciprocal_function(
+                          (successor(n) : Rational))) : Real),
+             (((2 : Rational)
+               * Rational.reciprocal_function(
+                     (successor(0) : Rational))) : Real),
+             -Real.zero,
+             Real.constant_sequence_converges(
+                 (((2 : Rational)
+                   * Rational.reciprocal_function(
+                         (successor(0) : Rational))) : Real)),
+             negatedTailConverges);
+  -- The combined limit is 2.
+  claim limitEquation
+        : ((2 : Rational) : Real)
+          = (((2 : Rational)
+              * Rational.reciprocal_function(
+                    (successor(0) : Rational))) : Real)
+            + -Real.zero
+      by calc ((2 : Rational) : Real)
+            = (((2 : Rational)
+                * Rational.reciprocal_function(
+                      (successor(0) : Rational))) : Real)
+                  by tailAtZero
+            = (((2 : Rational)
+                * Rational.reciprocal_function(
+                      (successor(0) : Rational))) : Real)
+              + -Real.zero
+                  by ring;
+  claim adjusted
+        : Real.SequenceConverges(
+              (n : Natural) ↦
+                  (((2 : Rational)
+                    * Rational.reciprocal_function(
+                          (successor(0) : Rational))) : Real)
+                  + -(((2 : Rational)
+                       * Rational.reciprocal_function(
+                             (successor(n) : Rational))) : Real),
+              ((2 : Rational) : Real))
+      by substituting limitEquation;
+  -- The partial sums are exactly that sequence, by telescoping.
+  claim pointwiseEqual
+        : (n : Natural)
+          → Real.partialSum(Real.triangular_reciprocal_term, n)
+            = (((2 : Rational)
+                * Rational.reciprocal_function(
+                      (successor(0) : Rational))) : Real)
+              + -(((2 : Rational)
+                   * Rational.reciprocal_function(
+                         (successor(n) : Rational))) : Real)
+      by (n : Natural) ↦
+           calc Real.partialSum(Real.triangular_reciprocal_term, n)
+              = Real.partialSum(
+                    (k : Natural) ↦
+                        (((2 : Rational)
+                          * Rational.reciprocal_function(
+                                (successor(k) : Rational))) : Real)
+                        - (((2 : Rational)
+                            * Rational.reciprocal_function(
+                                  (successor(1 + k) : Rational))) : Real),
+                    n)
+                    by Real.partialSum_pointwise(
+                           Real.triangular_reciprocal_term,
+                           (k : Natural) ↦
+                               (((2 : Rational)
+                                 * Rational.reciprocal_function(
+                                       (successor(k) : Rational))) : Real)
+                               - (((2 : Rational)
+                                   * Rational.reciprocal_function(
+                                         (successor(1 + k) : Rational)))
+                                  : Real),
+                           Real.triangular_term_telescopes,
+                           n)
+              = (((2 : Rational)
+                  * Rational.reciprocal_function(
+                        (successor(0) : Rational))) : Real)
+                - (((2 : Rational)
+                    * Rational.reciprocal_function(
+                          (successor(n) : Rational))) : Real)
+                    by Real.telescoping_partialSum(
+                           (j : Natural) ↦
+                               (((2 : Rational)
+                                 * Rational.reciprocal_function(
+                                       (successor(j) : Rational))) : Real),
+                           n);
+  done by Real.SequenceConverges.pointwise(
+             Real.partialSum(Real.triangular_reciprocal_term),
+             (n : Natural) ↦
+                 (((2 : Rational)
+                   * Rational.reciprocal_function(
+                         (successor(0) : Rational))) : Real)
+                 + -(((2 : Rational)
+                      * Rational.reciprocal_function(
+                            (successor(n) : Rational))) : Real),
+             ((2 : Rational) : Real),
+             pointwiseEqual,
+             adjusted)
+}
