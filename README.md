@@ -34,6 +34,14 @@ make error-tests       # error-message regression suite
 
 Always build with `-j 16`; the dependency graph is parallel.
 
+## Milestones: Freek's 100 theorems
+
+The library tracks [Freek Wiedijk's "Formalizing 100 Theorems"
+list](https://www.cs.ru.nl/~freek/100/) as a goal thread — 11 entries
+verified so far, from the irrationality of √2 to the intermediate value
+theorem and the geometric series. The index of what's done and where
+each theorem lives is **[docs/freek_100.md](docs/freek_100.md)**.
+
 ## Lemma search
 
 `./kernel search` finds library lemmas by goal shape:
