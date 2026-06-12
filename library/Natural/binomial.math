@@ -1,0 +1,75 @@
+-- Natural/binomial.math
+--
+-- Binomial coefficients by the Pascal recursion, with the overflow
+-- rule C(n, k) = 0 for k > n.
+
+module Natural.binomial
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.strong_recursion
+
+definition Natural.binomial : Natural → Natural → Natural
+  | zero, k =>
+      cases k {
+        | zero => 1
+        | successor(_) => 0
+      }
+  | successor(n), k =>
+      cases k {
+        | zero => 1
+        | successor(kPredecessor) =>
+            Natural.binomial(n, kPredecessor)
+            + Natural.binomial(n, successor(kPredecessor))
+      }
+
+-- Above the diagonal the coefficients vanish.
+theorem Natural.binomial_overflow (n : Natural)
+        : (k : Natural) → successor(n) ≤ k → Natural.binomial(n, k) = 0 :=
+  by_induction on n with IH {
+    case zero:
+        (k : Natural) (overflow : successor(0) ≤ k) ↦
+          cases k refining overflow {
+            | zero => absurd(Natural.not_less_or_equal_successor_zero(0, overflow))
+            | successor(kPredecessor) => done
+          }
+    case successor(nPredecessor):
+        (k : Natural) (overflow : successor(successor(nPredecessor)) ≤ k) ↦
+          cases k refining overflow {
+            | zero =>
+                absurd(Natural.not_less_or_equal_successor_zero(
+                           successor(nPredecessor), overflow))
+            | successor(kPredecessor) => {
+                claim innerOverflow : successor(nPredecessor) ≤ kPredecessor
+                    since Natural.successor_le_cancel;
+                claim outerOverflow
+                      : successor(nPredecessor) ≤ successor(kPredecessor);
+                claim firstZero : Natural.binomial(nPredecessor, kPredecessor) = 0
+                    by IH(kPredecessor, innerOverflow);
+                claim secondZero
+                      : Natural.binomial(nPredecessor, successor(kPredecessor)) = 0
+                    by IH(successor(kPredecessor), outerOverflow);
+                calc Natural.binomial(
+                         successor(nPredecessor), successor(kPredecessor))
+                   = Natural.binomial(nPredecessor, kPredecessor)
+                     + Natural.binomial(nPredecessor, successor(kPredecessor))
+                   = 0 + Natural.binomial(nPredecessor, successor(kPredecessor))
+                         since firstZero
+                   = 0 + 0
+                         since secondZero
+                   = 0
+              }
+          }
+  }
+
+-- The left edge of Pascal's triangle is all ones.
+theorem Natural.binomial_zero_right
+        : (n : Natural) → Natural.binomial(n, 0) = 1
+  | zero => done
+  | successor(nPredecessor) => done

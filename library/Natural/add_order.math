@@ -241,3 +241,41 @@ theorem Natural.le_to_add (smaller larger : Natural)
           congruenceOf(successor, preEq)
   }
 
+
+-- Subtracting one fewer leaves one more: for j < n,
+-- n -̇ j = 1 + (n -̇ (j + 1)).
+theorem Natural.monus_successor_shift (n : Natural)
+        : (j : Natural) → successor(j) ≤ n
+          → Natural.monus(n, j)
+            = successor(Natural.monus(n, successor(j))) :=
+  by_induction on n with IH {
+    case zero:
+        (j : Natural) (inRange : successor(j) ≤ 0) ↦
+          absurd(Natural.not_less_or_equal_successor_zero(j, inRange))
+    case successor(nPredecessor):
+        (j : Natural) (inRange : successor(j) ≤ successor(nPredecessor)) ↦
+          cases j refining inRange {
+            | zero =>
+                calc Natural.monus(successor(nPredecessor), 0)
+                   = successor(nPredecessor)
+                         since Natural.monus_succ_zero
+                   = successor(Natural.monus(nPredecessor, 0))
+                         since Natural.monus_zero
+                   = successor(
+                         Natural.monus(successor(nPredecessor), successor(0)))
+                         since Natural.monus_succ_succ
+            | successor(jPredecessor) => {
+                claim innerRange : successor(jPredecessor) ≤ nPredecessor
+                    since Natural.successor_le_cancel;
+                calc Natural.monus(successor(nPredecessor), successor(jPredecessor))
+                   = Natural.monus(nPredecessor, jPredecessor)
+                         since Natural.monus_succ_succ
+                   = successor(Natural.monus(nPredecessor, successor(jPredecessor)))
+                         by IH(jPredecessor, innerRange)
+                   = successor(
+                         Natural.monus(successor(nPredecessor),
+                                       successor(successor(jPredecessor))))
+                         since Natural.monus_succ_succ
+              }
+          }
+  }

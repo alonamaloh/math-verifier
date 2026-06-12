@@ -544,3 +544,33 @@ theorem Real.partialSum_zero (n : Natural)
            = Real.zero + Real.zero    since IH
            = Real.zero
   }
+
+-- Termwise equality below the cut gives equal partial sums.
+theorem Real.partialSum_pointwise_bounded
+        (s sequencePrime : Natural → Real) (n : Natural)
+        (termsEqual : (j : Natural) → successor(j) ≤ n
+                      → s(j) = sequencePrime(j))
+        : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
+  by_induction on n with IH refining termsEqual {
+    case zero: done
+    case successor(predecessor): {
+        claim prefixEqual
+              : (j : Natural) → successor(j) ≤ predecessor
+                → s(j) = sequencePrime(j)
+            by (j : Natural) (jBelow : successor(j) ≤ predecessor) ↦
+                 termsEqual(
+                     j, LessOrEqual.step(successor(j), predecessor, jBelow));
+        claim successor(predecessor) ≤ successor(predecessor);
+        claim topEqual : s(predecessor) = sequencePrime(predecessor)
+            by termsEqual(
+                   predecessor,
+                   (successor(predecessor) ≤ successor(predecessor)));
+        calc Real.partialSum(s, successor(predecessor))
+           = Real.partialSum(s, predecessor) + s(predecessor)
+           = Real.partialSum(sequencePrime, predecessor) + s(predecessor)
+                 by IH(prefixEqual)
+           = Real.partialSum(sequencePrime, predecessor)
+             + sequencePrime(predecessor)
+                 by topEqual
+      }
+  }

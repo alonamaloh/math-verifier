@@ -1,0 +1,1114 @@
+-- Real/binomial_theorem.math
+--
+-- The binomial theorem (Freek #44):
+--   (a + b)ⁿ = Σ_{k ≤ n} C(n, k) · aᵏ · bⁿ⁻ᵏ.
+--
+-- Induction on n. Multiplying the n-row by (a + b) splits into an
+-- a-copy and a b-copy of the sum; Pascal's rule C(n+1, k+1) =
+-- C(n, k) + C(n, k+1) splits the (n+1)-row the same way after peeling
+-- its head, the a-copy matches the first parts termwise, and the
+-- b-copy matches the second parts after shifting one slot — the
+-- overflow coefficient C(n, n+1) = 0 absorbing the loose end.
+
+module Real.binomial_theorem
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.monus
+import Natural.binomial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.archimedean
+import Set.basics
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.series
+import Real.power
+
+-- The composite ℕ → ℝ cast is additive, leg by leg.
+theorem Real.from_natural_add_preserves (m1 m2 : Natural)
+        : (((m1 + m2 : Natural) : Rational) : Real)
+          = ((m1 : Rational) : Real) + ((m2 : Rational) : Real) :=
+  calc (((m1 + m2 : Natural) : Rational) : Real)
+     = (((m1 : Rational) + (m2 : Rational)) : Real)
+           since Rational.from_natural_add_preserves
+     = ((m1 : Rational) : Real) + ((m2 : Rational) : Real)
+           since Rational.to_real.add_preserves
+
+-- The cast of the natural 1 is the real 1.
+theorem Real.from_natural_one_preserves
+        : ((successor(0) : Rational) : Real) = Real.one := {
+  claim rationalOne : (successor(0) : Rational) = Rational.one;
+  calc ((successor(0) : Rational) : Real)
+     = ((Rational.one) : Real)    since rationalOne
+     = Real.one
+}
+
+-- ----------------------------------------------------------------------
+-- Freek #44: the binomial theorem.
+theorem Real.binomial_theorem (a b : Real) (n : Natural)
+        : Real.power(a + b, n)
+          = Real.partialSum(
+                (k : Natural) ↦
+                    ((Natural.binomial(n, k) : Rational) : Real)
+                    * (Real.power(a, k)
+                       * Real.power(b, Natural.monus(n, k))),
+                1 + n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim coefficientOne
+              : ((Natural.binomial(0, 0) : Rational) : Real) = Real.one
+            since Real.from_natural_one_preserves;
+        claim monusZero : Natural.monus(0, 0) = 0
+            since Natural.monus_zero;
+        claim powerBZero : Real.power(b, Natural.monus(0, 0)) = Real.one
+            by calc Real.power(b, Natural.monus(0, 0))
+                  = Real.power(b, 0)    since monusZero
+                  = Real.one;
+        claim baseValue
+              : Real.zero
+                + ((Natural.binomial(0, 0) : Rational) : Real)
+                  * (Real.power(a, 0) * Real.power(b, Natural.monus(0, 0)))
+                = Real.one
+            by calc Real.zero
+                    + ((Natural.binomial(0, 0) : Rational) : Real)
+                      * (Real.power(a, 0)
+                         * Real.power(b, Natural.monus(0, 0)))
+                  = Real.zero
+                    + Real.one
+                      * (Real.power(a, 0)
+                         * Real.power(b, Natural.monus(0, 0)))
+                        by coefficientOne
+                  = Real.zero
+                    + Real.one * (Real.power(a, 0) * Real.one)
+                        by powerBZero
+                  = Real.zero + Real.one * (Real.one * Real.one)
+                  = Real.one
+                        by ring;
+        calc Real.power(a + b, 0)
+           = Real.one
+           = Real.zero
+             + ((Natural.binomial(0, 0) : Rational) : Real)
+               * (Real.power(a, 0) * Real.power(b, Natural.monus(0, 0)))
+                 by baseValue
+      }
+    case successor(predecessor): {
+        -- Head values: both rows start with bⁿ⁺¹-flavored heads that
+        -- agree (the edge coefficients are 1).
+        claim edgeOld
+              : ((Natural.binomial(predecessor, 0) : Rational) : Real)
+                = Real.one
+            by calc ((Natural.binomial(predecessor, 0) : Rational) : Real)
+                  = ((successor(0) : Rational) : Real)
+                        by Natural.binomial_zero_right(predecessor)
+                  = Real.one
+                        since Real.from_natural_one_preserves;
+        claim edgeNew
+              : ((Natural.binomial(successor(predecessor), 0) : Rational)
+                 : Real)
+                = Real.one
+            by calc ((Natural.binomial(successor(predecessor), 0)
+                      : Rational) : Real)
+                  = ((successor(0) : Rational) : Real)
+                  = Real.one
+                        since Real.from_natural_one_preserves;
+        claim monusOldZero : Natural.monus(predecessor, 0) = predecessor
+            since Natural.monus_zero;
+        claim monusNewZero
+              : Natural.monus(successor(predecessor), 0)
+                = successor(predecessor)
+            since Natural.monus_succ_zero;
+        claim powerBUnfoldHead
+              : Real.power(b, successor(predecessor))
+                = b * Real.power(b, predecessor);
+        claim headEquality
+              : Real.partialSum(
+                    (k : Natural) ↦
+                        b * (((Natural.binomial(predecessor, k) : Rational)
+                              : Real)
+                             * (Real.power(a, k)
+                                * Real.power(b,
+                                      Natural.monus(predecessor, k)))),
+                    1)
+                = Real.partialSum(
+                      (k : Natural) ↦
+                          ((Natural.binomial(successor(predecessor), k)
+                            : Rational) : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b,
+                                   Natural.monus(successor(predecessor), k))),
+                      1)
+            by calc Real.partialSum(
+                        (k : Natural) ↦
+                            b * (((Natural.binomial(predecessor, k)
+                                   : Rational) : Real)
+                                 * (Real.power(a, k)
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, k)))),
+                        1)
+                  = Real.zero
+                    + b * (((Natural.binomial(predecessor, 0) : Rational)
+                            : Real)
+                           * (Real.power(a, 0)
+                              * Real.power(b, Natural.monus(predecessor, 0))))
+                  = Real.zero
+                    + b * (Real.one
+                           * (Real.power(a, 0)
+                              * Real.power(b, Natural.monus(predecessor, 0))))
+                        by edgeOld
+                  = Real.zero
+                    + b * (Real.one
+                           * (Real.power(a, 0) * Real.power(b, predecessor)))
+                        by monusOldZero
+                  = Real.zero
+                    + Real.one
+                      * (Real.power(a, 0) * (b * Real.power(b, predecessor)))
+                        by ring
+                  = Real.zero
+                    + Real.one
+                      * (Real.power(a, 0)
+                         * Real.power(b, successor(predecessor)))
+                        by powerBUnfoldHead
+                  = Real.zero
+                    + Real.one
+                      * (Real.power(a, 0)
+                         * Real.power(b,
+                               Natural.monus(successor(predecessor), 0)))
+                        by monusNewZero
+                  = Real.zero
+                    + ((Natural.binomial(successor(predecessor), 0)
+                        : Rational) : Real)
+                      * (Real.power(a, 0)
+                         * Real.power(b,
+                               Natural.monus(successor(predecessor), 0)))
+                        by edgeNew;
+        -- Pascal splits the shifted new row termwise.
+        claim pascalPointwise
+              : Real.partialSum(
+                    (j : Natural) ↦
+                        ((Natural.binomial(successor(predecessor),
+                                           successor(j)) : Rational) : Real)
+                        * (Real.power(a, successor(j))
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor),
+                                               successor(j)))),
+                    successor(predecessor))
+                = Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, j) : Rational)
+                           : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(successor(predecessor),
+                                                 successor(j))))
+                          + ((Natural.binomial(predecessor, successor(j))
+                              : Rational) : Real)
+                            * (Real.power(a, successor(j))
+                               * Real.power(b,
+                                     Natural.monus(successor(predecessor),
+                                                   successor(j)))),
+                      successor(predecessor))
+            by Real.partialSum_pointwise(
+                   (j : Natural) ↦
+                       ((Natural.binomial(successor(predecessor),
+                                          successor(j)) : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b,
+                                Natural.monus(successor(predecessor),
+                                              successor(j)))),
+                   (j : Natural) ↦
+                       ((Natural.binomial(predecessor, j) : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b,
+                                Natural.monus(successor(predecessor),
+                                              successor(j))))
+                       + ((Natural.binomial(predecessor, successor(j))
+                           : Rational) : Real)
+                         * (Real.power(a, successor(j))
+                            * Real.power(b,
+                                  Natural.monus(successor(predecessor),
+                                                successor(j)))),
+                   (j : Natural) ↦ {
+                     claim castSplit
+                           : ((Natural.binomial(successor(predecessor),
+                                                successor(j)) : Rational)
+                              : Real)
+                             = ((Natural.binomial(predecessor, j)
+                                 : Rational) : Real)
+                               + ((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                         by calc ((Natural.binomial(successor(predecessor),
+                                                    successor(j))
+                                   : Rational) : Real)
+                               = (((Natural.binomial(predecessor, j)
+                                    + Natural.binomial(predecessor,
+                                                       successor(j))
+                                    : Natural) : Rational) : Real)
+                               = ((Natural.binomial(predecessor, j)
+                                   : Rational) : Real)
+                                 + ((Natural.binomial(predecessor,
+                                                      successor(j))
+                                     : Rational) : Real)
+                                     since Real.from_natural_add_preserves;
+                     claim expanded
+                           : ((Natural.binomial(successor(predecessor),
+                                                successor(j)) : Rational)
+                              : Real)
+                             * (Real.power(a, successor(j))
+                                * Real.power(b,
+                                      Natural.monus(successor(predecessor),
+                                                    successor(j))))
+                             = ((Natural.binomial(predecessor, j)
+                                 : Rational) : Real)
+                               * (Real.power(a, successor(j))
+                                  * Real.power(b,
+                                        Natural.monus(successor(predecessor),
+                                                      successor(j))))
+                               + ((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(
+                                              successor(predecessor),
+                                              successor(j))))
+                         by calc ((Natural.binomial(successor(predecessor),
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(
+                                              successor(predecessor),
+                                              successor(j))))
+                               = (((Natural.binomial(predecessor, j)
+                                    : Rational) : Real)
+                                  + ((Natural.binomial(predecessor,
+                                                       successor(j))
+                                      : Rational) : Real))
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(
+                                              successor(predecessor),
+                                              successor(j))))
+                                     by castSplit
+                               = ((Natural.binomial(predecessor, j)
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(
+                                              successor(predecessor),
+                                              successor(j))))
+                                 + ((Natural.binomial(predecessor,
+                                                      successor(j))
+                                     : Rational) : Real)
+                                   * (Real.power(a, successor(j))
+                                      * Real.power(b,
+                                            Natural.monus(
+                                                successor(predecessor),
+                                                successor(j))))
+                                     by ring;
+                     expanded
+                   },
+                   successor(predecessor));
+        -- The first Pascal parts are the a-scaled old row.
+        claim firstAlignment
+              : Real.partialSum(
+                    (j : Natural) ↦
+                        ((Natural.binomial(predecessor, j) : Rational) : Real)
+                        * (Real.power(a, successor(j))
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor),
+                                               successor(j)))),
+                    1 + predecessor)
+                = Real.partialSum(
+                      (j : Natural) ↦
+                          a * (((Natural.binomial(predecessor, j) : Rational)
+                                : Real)
+                               * (Real.power(a, j)
+                                  * Real.power(b,
+                                        Natural.monus(predecessor, j)))),
+                      1 + predecessor)
+            by Real.partialSum_pointwise(
+                   (j : Natural) ↦
+                       ((Natural.binomial(predecessor, j) : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b,
+                                Natural.monus(successor(predecessor),
+                                              successor(j)))),
+                   (j : Natural) ↦
+                       a * (((Natural.binomial(predecessor, j) : Rational)
+                             : Real)
+                            * (Real.power(a, j)
+                               * Real.power(b,
+                                     Natural.monus(predecessor, j)))),
+                   (j : Natural) ↦ {
+                     claim monusEq
+                           : Natural.monus(successor(predecessor),
+                                           successor(j))
+                             = Natural.monus(predecessor, j)
+                         since Natural.monus_succ_succ;
+                     claim powerAUnfold
+                           : Real.power(a, successor(j))
+                             = a * Real.power(a, j);
+                     claim aligned
+                           : ((Natural.binomial(predecessor, j) : Rational)
+                              : Real)
+                             * (Real.power(a, successor(j))
+                                * Real.power(b,
+                                      Natural.monus(successor(predecessor),
+                                                    successor(j))))
+                             = a * (((Natural.binomial(predecessor, j)
+                                      : Rational) : Real)
+                                    * (Real.power(a, j)
+                                       * Real.power(b,
+                                             Natural.monus(predecessor, j))))
+                         by calc ((Natural.binomial(predecessor, j)
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(
+                                              successor(predecessor),
+                                              successor(j))))
+                               = ((Natural.binomial(predecessor, j)
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, j)))
+                                     by monusEq
+                               = ((Natural.binomial(predecessor, j)
+                                   : Rational) : Real)
+                                 * ((a * Real.power(a, j))
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, j)))
+                                     by powerAUnfold
+                               = a * (((Natural.binomial(predecessor, j)
+                                        : Rational) : Real)
+                                      * (Real.power(a, j)
+                                         * Real.power(b,
+                                               Natural.monus(predecessor,
+                                                             j))))
+                                     by ring;
+                     aligned
+                   },
+                   1 + predecessor);
+        -- The second Pascal parts, with the exponent re-expressed.
+        claim secondRewrite
+              : Real.partialSum(
+                    (j : Natural) ↦
+                        ((Natural.binomial(predecessor, successor(j))
+                          : Rational) : Real)
+                        * (Real.power(a, successor(j))
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor),
+                                               successor(j)))),
+                    successor(predecessor))
+                = Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(predecessor, j))),
+                      successor(predecessor))
+            by Real.partialSum_pointwise(
+                   (j : Natural) ↦
+                       ((Natural.binomial(predecessor, successor(j))
+                         : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b,
+                                Natural.monus(successor(predecessor),
+                                              successor(j)))),
+                   (j : Natural) ↦
+                       ((Natural.binomial(predecessor, successor(j))
+                         : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b, Natural.monus(predecessor, j))),
+                   (j : Natural) ↦ {
+                     claim monusEq
+                           : Natural.monus(successor(predecessor),
+                                           successor(j))
+                             = Natural.monus(predecessor, j)
+                         since Natural.monus_succ_succ;
+                     claim rewritten
+                           : ((Natural.binomial(predecessor, successor(j))
+                               : Rational) : Real)
+                             * (Real.power(a, successor(j))
+                                * Real.power(b,
+                                      Natural.monus(successor(predecessor),
+                                                    successor(j))))
+                             = ((Natural.binomial(predecessor, successor(j))
+                                 : Rational) : Real)
+                               * (Real.power(a, successor(j))
+                                  * Real.power(b,
+                                        Natural.monus(predecessor, j)))
+                         by calc ((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(
+                                              successor(predecessor),
+                                              successor(j))))
+                               = ((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, j)))
+                                     by monusEq;
+                     rewritten
+                   },
+                   successor(predecessor));
+        -- The loose top term vanishes: C(n, n+1) = 0.
+        claim overflowZero
+              : Natural.binomial(predecessor, successor(predecessor)) = 0
+            by Natural.binomial_overflow(
+                   predecessor, successor(predecessor),
+                   LessOrEqual.reflexivity(successor(predecessor)));
+        claim topVanishes
+              : ((Natural.binomial(predecessor, successor(predecessor))
+                  : Rational) : Real)
+                * (Real.power(a, successor(predecessor))
+                   * Real.power(b,
+                         Natural.monus(predecessor, predecessor)))
+                = Real.zero
+            by calc ((Natural.binomial(predecessor, successor(predecessor))
+                      : Rational) : Real)
+                    * (Real.power(a, successor(predecessor))
+                       * Real.power(b,
+                             Natural.monus(predecessor, predecessor)))
+                  = ((0 : Rational) : Real)
+                    * (Real.power(a, successor(predecessor))
+                       * Real.power(b,
+                             Natural.monus(predecessor, predecessor)))
+                        by overflowZero
+                  = Real.zero
+                    * (Real.power(a, successor(predecessor))
+                       * Real.power(b,
+                             Natural.monus(predecessor, predecessor)))
+                  = Real.zero
+                        by ring;
+        -- The shifted second parts realign with the b-scaled old row.
+        claim tailAlignment
+              : Real.partialSum(
+                    (j : Natural) ↦
+                        ((Natural.binomial(predecessor, successor(j))
+                          : Rational) : Real)
+                        * (Real.power(a, successor(j))
+                           * Real.power(b, Natural.monus(predecessor, j))),
+                    predecessor)
+                = Real.partialSum(
+                      (j : Natural) ↦
+                          b * (((Natural.binomial(predecessor,
+                                                  successor(j))
+                                 : Rational) : Real)
+                               * (Real.power(a, successor(j))
+                                  * Real.power(b,
+                                        Natural.monus(predecessor,
+                                                      successor(j))))),
+                      predecessor)
+            by Real.partialSum_pointwise_bounded(
+                   (j : Natural) ↦
+                       ((Natural.binomial(predecessor, successor(j))
+                         : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b, Natural.monus(predecessor, j))),
+                   (j : Natural) ↦
+                       b * (((Natural.binomial(predecessor, successor(j))
+                              : Rational) : Real)
+                            * (Real.power(a, successor(j))
+                               * Real.power(b,
+                                     Natural.monus(predecessor,
+                                                   successor(j))))),
+                   predecessor,
+                   (j : Natural) (jBelow : successor(j) ≤ predecessor) ↦ {
+                     claim monusShift
+                           : Natural.monus(predecessor, j)
+                             = successor(
+                                   Natural.monus(predecessor, successor(j)))
+                         by Natural.monus_successor_shift(
+                                predecessor, j, jBelow);
+                     claim powerBUnfold
+                           : Real.power(
+                                 b,
+                                 successor(
+                                     Natural.monus(predecessor,
+                                                   successor(j))))
+                             = b * Real.power(
+                                       b,
+                                       Natural.monus(predecessor,
+                                                     successor(j)));
+                     claim shifted
+                           : ((Natural.binomial(predecessor, successor(j))
+                               : Rational) : Real)
+                             * (Real.power(a, successor(j))
+                                * Real.power(b,
+                                      Natural.monus(predecessor, j)))
+                             = b * (((Natural.binomial(predecessor,
+                                                       successor(j))
+                                      : Rational) : Real)
+                                    * (Real.power(a, successor(j))
+                                       * Real.power(b,
+                                             Natural.monus(predecessor,
+                                                           successor(j)))))
+                         by calc ((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, j)))
+                               = ((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(
+                                          b,
+                                          successor(
+                                              Natural.monus(predecessor,
+                                                            successor(j)))))
+                                     by monusShift
+                               = ((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * (b * Real.power(
+                                               b,
+                                               Natural.monus(predecessor,
+                                                             successor(j)))))
+                                     by powerBUnfold
+                               = b * (((Natural.binomial(predecessor,
+                                                         successor(j))
+                                        : Rational) : Real)
+                                      * (Real.power(a, successor(j))
+                                         * Real.power(
+                                               b,
+                                               Natural.monus(predecessor,
+                                                             successor(j)))))
+                                     by ring;
+                     shifted
+                   });
+        -- Index bookkeeping for the two splits.
+        claim oldIndex : 1 + predecessor = predecessor + 1;
+        claim newIndex
+              : 1 + successor(predecessor) = successor(predecessor) + 1;
+        -- The old b-copy splits into its head and shifted tail.
+        claim oldSplit
+              : Real.partialSum(
+                    (k : Natural) ↦
+                        b * (((Natural.binomial(predecessor, k) : Rational)
+                              : Real)
+                             * (Real.power(a, k)
+                                * Real.power(b,
+                                      Natural.monus(predecessor, k)))),
+                    1 + predecessor)
+                = Real.partialSum(
+                      (k : Natural) ↦
+                          b * (((Natural.binomial(predecessor, k)
+                                 : Rational) : Real)
+                               * (Real.power(a, k)
+                                  * Real.power(b,
+                                        Natural.monus(predecessor, k)))),
+                      1)
+                  + Real.partialSum(
+                        (j : Natural) ↦
+                            b * (((Natural.binomial(predecessor,
+                                                    successor(j))
+                                   : Rational) : Real)
+                                 * (Real.power(a, successor(j))
+                                    * Real.power(b,
+                                          Natural.monus(predecessor,
+                                                        successor(j))))),
+                        predecessor)
+            by calc Real.partialSum(
+                        (k : Natural) ↦
+                            b * (((Natural.binomial(predecessor, k)
+                                   : Rational) : Real)
+                                 * (Real.power(a, k)
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, k)))),
+                        1 + predecessor)
+                  = Real.partialSum(
+                        (k : Natural) ↦
+                            b * (((Natural.binomial(predecessor, k)
+                                   : Rational) : Real)
+                                 * (Real.power(a, k)
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, k)))),
+                        predecessor + 1)
+                        by oldIndex
+                  = Real.partialSum(
+                        (k : Natural) ↦
+                            b * (((Natural.binomial(predecessor, k)
+                                   : Rational) : Real)
+                                 * (Real.power(a, k)
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, k)))),
+                        1)
+                    + Real.partialSum(
+                          (j : Natural) ↦
+                              b * (((Natural.binomial(predecessor,
+                                                      successor(j))
+                                     : Rational) : Real)
+                                   * (Real.power(a, successor(j))
+                                      * Real.power(b,
+                                            Natural.monus(predecessor,
+                                                          successor(j))))),
+                          predecessor)
+                        by Real.partialSum_split(
+                               (k : Natural) ↦
+                                   b * (((Natural.binomial(predecessor, k)
+                                          : Rational) : Real)
+                                        * (Real.power(a, k)
+                                           * Real.power(b,
+                                                 Natural.monus(predecessor,
+                                                               k)))),
+                               1, predecessor);
+        -- Assemble.
+        calc Real.power(a + b, successor(predecessor))
+           = (a + b) * Real.power(a + b, predecessor)
+           = (a + b)
+             * Real.partialSum(
+                   (k : Natural) ↦
+                       ((Natural.binomial(predecessor, k) : Rational) : Real)
+                       * (Real.power(a, k)
+                          * Real.power(b, Natural.monus(predecessor, k))),
+                   1 + predecessor)
+                 since IH
+           = a * Real.partialSum(
+                     (k : Natural) ↦
+                         ((Natural.binomial(predecessor, k) : Rational)
+                          : Real)
+                         * (Real.power(a, k)
+                            * Real.power(b, Natural.monus(predecessor, k))),
+                     1 + predecessor)
+             + b * Real.partialSum(
+                       (k : Natural) ↦
+                           ((Natural.binomial(predecessor, k) : Rational)
+                            : Real)
+                           * (Real.power(a, k)
+                              * Real.power(b,
+                                    Natural.monus(predecessor, k))),
+                       1 + predecessor)
+                 by ring
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + b * Real.partialSum(
+                       (k : Natural) ↦
+                           ((Natural.binomial(predecessor, k) : Rational)
+                            : Real)
+                           * (Real.power(a, k)
+                              * Real.power(b,
+                                    Natural.monus(predecessor, k))),
+                       1 + predecessor)
+                 by Real.partialSum_scale(
+                        a,
+                        (k : Natural) ↦
+                            ((Natural.binomial(predecessor, k) : Rational)
+                             : Real)
+                            * (Real.power(a, k)
+                               * Real.power(b,
+                                     Natural.monus(predecessor, k))),
+                        1 + predecessor)
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + Real.partialSum(
+                   (k : Natural) ↦
+                       b * (((Natural.binomial(predecessor, k) : Rational)
+                             : Real)
+                            * (Real.power(a, k)
+                               * Real.power(b,
+                                     Natural.monus(predecessor, k)))),
+                   1 + predecessor)
+                 by Real.partialSum_scale(
+                        b,
+                        (k : Natural) ↦
+                            ((Natural.binomial(predecessor, k) : Rational)
+                             : Real)
+                            * (Real.power(a, k)
+                               * Real.power(b,
+                                     Natural.monus(predecessor, k))),
+                        1 + predecessor)
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        b * (((Natural.binomial(predecessor, k) : Rational)
+                              : Real)
+                             * (Real.power(a, k)
+                                * Real.power(b,
+                                      Natural.monus(predecessor, k)))),
+                    1)
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          b * (((Natural.binomial(predecessor,
+                                                  successor(j))
+                                 : Rational) : Real)
+                               * (Real.power(a, successor(j))
+                                  * Real.power(b,
+                                        Natural.monus(predecessor,
+                                                      successor(j))))),
+                      predecessor))
+                 by oldSplit
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        b * (((Natural.binomial(predecessor, k) : Rational)
+                              : Real)
+                             * (Real.power(a, k)
+                                * Real.power(b,
+                                      Natural.monus(predecessor, k)))),
+                    1)
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(predecessor, j))),
+                      predecessor))
+                 by tailAlignment
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        b * (((Natural.binomial(predecessor, k) : Rational)
+                              : Real)
+                             * (Real.power(a, k)
+                                * Real.power(b,
+                                      Natural.monus(predecessor, k)))),
+                    1)
+                + (Real.partialSum(
+                       (j : Natural) ↦
+                           ((Natural.binomial(predecessor, successor(j))
+                             : Rational) : Real)
+                           * (Real.power(a, successor(j))
+                              * Real.power(b,
+                                    Natural.monus(predecessor, j))),
+                       predecessor)
+                   + Real.zero))
+                 by ring
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        b * (((Natural.binomial(predecessor, k) : Rational)
+                              : Real)
+                             * (Real.power(a, k)
+                                * Real.power(b,
+                                      Natural.monus(predecessor, k)))),
+                    1)
+                + (Real.partialSum(
+                       (j : Natural) ↦
+                           ((Natural.binomial(predecessor, successor(j))
+                             : Rational) : Real)
+                           * (Real.power(a, successor(j))
+                              * Real.power(b,
+                                    Natural.monus(predecessor, j))),
+                       predecessor)
+                   + ((Natural.binomial(predecessor, successor(predecessor))
+                       : Rational) : Real)
+                     * (Real.power(a, successor(predecessor))
+                        * Real.power(b,
+                              Natural.monus(predecessor, predecessor)))))
+                 by topVanishes
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        b * (((Natural.binomial(predecessor, k) : Rational)
+                              : Real)
+                             * (Real.power(a, k)
+                                * Real.power(b,
+                                      Natural.monus(predecessor, k)))),
+                    1)
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(predecessor, j))),
+                      successor(predecessor)))
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        ((Natural.binomial(successor(predecessor), k)
+                          : Rational) : Real)
+                        * (Real.power(a, k)
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor), k))),
+                    1)
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(predecessor, j))),
+                      successor(predecessor)))
+                 by headEquality
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     a * (((Natural.binomial(predecessor, k) : Rational)
+                           : Real)
+                          * (Real.power(a, k)
+                             * Real.power(b, Natural.monus(predecessor, k)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        ((Natural.binomial(successor(predecessor), k)
+                          : Rational) : Real)
+                        * (Real.power(a, k)
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor), k))),
+                    1)
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(successor(predecessor),
+                                                 successor(j)))),
+                      successor(predecessor)))
+                 by secondRewrite
+           = Real.partialSum(
+                 (j : Natural) ↦
+                     ((Natural.binomial(predecessor, j) : Rational) : Real)
+                     * (Real.power(a, successor(j))
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor),
+                                            successor(j)))),
+                 1 + predecessor)
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        ((Natural.binomial(successor(predecessor), k)
+                          : Rational) : Real)
+                        * (Real.power(a, k)
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor), k))),
+                    1)
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(successor(predecessor),
+                                                 successor(j)))),
+                      successor(predecessor)))
+                 by firstAlignment
+           = Real.partialSum(
+                 (j : Natural) ↦
+                     ((Natural.binomial(predecessor, j) : Rational) : Real)
+                     * (Real.power(a, successor(j))
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor),
+                                            successor(j)))),
+                 successor(predecessor))
+             + (Real.partialSum(
+                    (k : Natural) ↦
+                        ((Natural.binomial(successor(predecessor), k)
+                          : Rational) : Real)
+                        * (Real.power(a, k)
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor), k))),
+                    1)
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(successor(predecessor),
+                                                 successor(j)))),
+                      successor(predecessor)))
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(successor(predecessor), k)
+                       : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor), k))),
+                 1)
+             + (Real.partialSum(
+                    (j : Natural) ↦
+                        ((Natural.binomial(predecessor, j) : Rational) : Real)
+                        * (Real.power(a, successor(j))
+                           * Real.power(b,
+                                 Natural.monus(successor(predecessor),
+                                               successor(j)))),
+                    successor(predecessor))
+                + Real.partialSum(
+                      (j : Natural) ↦
+                          ((Natural.binomial(predecessor, successor(j))
+                            : Rational) : Real)
+                          * (Real.power(a, successor(j))
+                             * Real.power(b,
+                                   Natural.monus(successor(predecessor),
+                                                 successor(j)))),
+                      successor(predecessor)))
+                 by ring
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(successor(predecessor), k)
+                       : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor), k))),
+                 1)
+             + Real.partialSum(
+                   (j : Natural) ↦
+                       ((Natural.binomial(predecessor, j) : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b,
+                                Natural.monus(successor(predecessor),
+                                              successor(j))))
+                       + ((Natural.binomial(predecessor, successor(j))
+                           : Rational) : Real)
+                         * (Real.power(a, successor(j))
+                            * Real.power(b,
+                                  Natural.monus(successor(predecessor),
+                                                successor(j)))),
+                   successor(predecessor))
+                 by Real.partialSum_add(
+                        (j : Natural) ↦
+                            ((Natural.binomial(predecessor, j) : Rational)
+                             : Real)
+                            * (Real.power(a, successor(j))
+                               * Real.power(b,
+                                     Natural.monus(successor(predecessor),
+                                                   successor(j)))),
+                        (j : Natural) ↦
+                            ((Natural.binomial(predecessor, successor(j))
+                              : Rational) : Real)
+                            * (Real.power(a, successor(j))
+                               * Real.power(b,
+                                     Natural.monus(successor(predecessor),
+                                                   successor(j)))),
+                        successor(predecessor))
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(successor(predecessor), k)
+                       : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor), k))),
+                 1)
+             + Real.partialSum(
+                   (j : Natural) ↦
+                       ((Natural.binomial(successor(predecessor),
+                                          successor(j)) : Rational) : Real)
+                       * (Real.power(a, successor(j))
+                          * Real.power(b,
+                                Natural.monus(successor(predecessor),
+                                              successor(j)))),
+                   successor(predecessor))
+                 by pascalPointwise
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(successor(predecessor), k)
+                       : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor), k))),
+                 successor(predecessor) + 1)
+                 by Real.partialSum_split(
+                        (k : Natural) ↦
+                            ((Natural.binomial(successor(predecessor), k)
+                              : Rational) : Real)
+                            * (Real.power(a, k)
+                               * Real.power(b,
+                                     Natural.monus(successor(predecessor),
+                                                   k))),
+                        1, successor(predecessor))
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(successor(predecessor), k)
+                       : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor), k))),
+                 1 + successor(predecessor))
+                 by newIndex
+      }
+  }
