@@ -735,6 +735,16 @@ ExpressionPointer Elaborator::buildCaseLambda(
                 // ^ Bound(0) is the most-recently-bound name, which is
                 // the constructor argument we just added
                 // (destructuredName).
+                // Beta-reduce the motive application so the hypothesis
+                // binder carries the DECLARED result type (e.g. the
+                // alias `ComplexNumber`), not a stuck
+                // `(λ …)(…)` redex — operator dispatch and implicit
+                // inference in the arm body match on the binder type
+                // as written. Beta only: a weak-head normalisation
+                // would also δ-unfold the alias to its underlying
+                // quotient and lose the dispatch.
+                recursionHypothesisType =
+                    deepBetaReduce(recursionHypothesisType);
                 std::string hypothesisName;
                 if (userProvidedHypothesisNames) {
                     hypothesisName =
@@ -800,8 +810,13 @@ ExpressionPointer Elaborator::buildCaseLambda(
             motiveAtCase = makeApplication(
                 std::move(motiveAtCase),
                 std::move(constructorApplication));
-            motiveAtCase = weakHeadNormalForm(
-                environment_, motiveAtCase);
+            // Beta-reduce the motive application WITHOUT delta-unfolding
+            // the result head: a declared return type like `ComplexNumber`
+            // must survive as the alias (operator dispatch and implicit
+            // inference in the arm body match on it), not as the
+            // underlying `Quotient(…)` a weak-head normalisation would
+            // expose.
+            motiveAtCase = deepBetaReduce(motiveAtCase);
         }
 
         // Peel one Pi per non-scrutinee pattern position. The Pi's

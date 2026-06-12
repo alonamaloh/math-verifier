@@ -5,6 +5,8 @@
 module Test.ring_modulo_test
 
 import Natural.basics
+import Logic.basics
+import Equality.basics
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
@@ -44,3 +46,32 @@ theorem test_quotient_is_commutative_ring (m : Integer)
               RingModulo.multiply,
               RingModulo.one(integerCommutativeRing, m)) :=
   RingModulo.is_commutative_ring(integerCommutativeRing, m)
+
+-- ----------------------------------------------------------------------
+-- The `ring` tactic at RingModulo carriers (regression: the operation
+-- recognizer used to be a `<T>.add` naming convention, which no
+-- RingModulo quotient satisfies — operations live under `RingModulo`
+-- with the base ring and modulus as leading arguments).
+
+theorem test_ring_tactic_at_quotient (m : Integer)
+        (x y : RingModulo(integerCommutativeRing, m))
+        : x * (y + x) = x * y + x * x := ring
+
+-- Subtraction and unary negation unfold (also regression for unary `-`
+-- dispatching through the alias chain to `RingModulo.negate`).
+theorem test_ring_tactic_subtract (m : Integer)
+        (x y : RingModulo(integerCommutativeRing, m))
+        : y - x = -(x - y) := ring
+
+theorem test_ring_tactic_cancel (m : Integer)
+        (x y : RingModulo(integerCommutativeRing, m))
+        : (x + y) - x = y := ring
+
+-- Operators dispatch inside a pattern-DEFINITION body (the recursive
+-- self-reference's induction-hypothesis binder used to carry a stuck
+-- motive application instead of the declared alias type).
+definition test_quotient_partial_sums (m : Integer)
+        (s : Natural → RingModulo(integerCommutativeRing, m))
+        : Natural → RingModulo(integerCommutativeRing, m)
+  | zero => RingModulo.zero(integerCommutativeRing, m)
+  | successor(n) => test_quotient_partial_sums(m, s, n) + s(n)

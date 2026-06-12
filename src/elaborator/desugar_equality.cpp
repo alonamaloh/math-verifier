@@ -193,14 +193,71 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             std::vector<std::string> rightHeads = collectHeads(rightTypeRaw);
             leftHeads.insert(leftHeads.begin(), operandTypeName);
             rightHeads.insert(rightHeads.begin(), rightTypeName);
-            for (const auto& lh : leftHeads) {
-                if (!targetFunction.empty()) break;
-                for (const auto& rh : rightHeads) {
-                    if (lh.empty() || rh.empty()) continue;
-                    std::string reg = environment_.lookupOperator(
-                        operatorSymbol, lh, rh);
-                    if (!reg.empty()) { targetFunction = reg; break; }
+            // Reverse-alias enrichment: an operand can arrive with its
+            // type ALREADY normalised (a recursive self-reference in a
+            // pattern-definition body gets the declared return type
+            // reduced, so `ComplexNumber` shows up as `Quotient(…)`).
+            // Then the forward unfold above finds nothing — so also scan
+            // bare alias definitions whose body weak-head-normalises to
+            // the operand type, and walk THEIR unfold chains (which pass
+            // through the registered head, e.g. `RingModulo`, before the
+            // quotient underneath).
+            auto reverseAliasHeads =
+                [&](ExpressionPointer typeRaw) {
+                std::vector<std::string> heads;
+                ExpressionPointer typeWHNF = weakHeadNormalForm(
+                    environment_, typeRaw);
+                for (const auto& [name, declaration]
+                     : environment_.declarations) {
+                    auto* definition =
+                        std::get_if<Definition>(&declaration);
+                    if (!definition
+                        || !definition->universeParameters.empty()) {
+                        continue;
+                    }
+                    // Bare aliases only; a parameterised definition's
+                    // body is a lambda and can never match a type.
+                    if (std::holds_alternative<Lambda>(
+                            definition->body->node)) {
+                        continue;
+                    }
+                    ExpressionPointer bodyWHNF = weakHeadNormalForm(
+                        environment_, definition->body);
+                    if (!structurallyEqual(bodyWHNF, typeWHNF)) continue;
+                    heads.push_back(name);
+                    ExpressionPointer cursor = definition->body;
+                    for (int step = 0; step < 8; ++step) {
+                        std::string head = headConstantName(cursor);
+                        if (head.empty()) break;
+                        if (heads.empty() || heads.back() != head) {
+                            heads.push_back(head);
+                        }
+                        cursor = unfoldHeadConstantOneStep(cursor);
+                        if (!cursor) break;
+                    }
                 }
+                return heads;
+            };
+            auto tryHeadPairs = [&]() {
+                for (const auto& lh : leftHeads) {
+                    if (!targetFunction.empty()) break;
+                    for (const auto& rh : rightHeads) {
+                        if (lh.empty() || rh.empty()) continue;
+                        std::string reg = environment_.lookupOperator(
+                            operatorSymbol, lh, rh);
+                        if (!reg.empty()) { targetFunction = reg; break; }
+                    }
+                }
+            };
+            tryHeadPairs();
+            if (targetFunction.empty()) {
+                for (const auto& head : reverseAliasHeads(leftTypeRaw)) {
+                    leftHeads.push_back(head);
+                }
+                for (const auto& head : reverseAliasHeads(rightTypeRaw)) {
+                    rightHeads.push_back(head);
+                }
+                tryHeadPairs();
             }
         }
         // Final registry fallback: WHNF the operand types to expose a

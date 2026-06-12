@@ -897,6 +897,44 @@ Elaborator::RingScheme Elaborator::computeRingScheme(ExpressionPointer carrierTy
                 scheme.opNamespace = "CommutativeRing";
                 scheme.structurePrefix = { app->argument };
             }
+            return scheme;
+        }
+        // The principal-ideal quotient `RingModulo(c, m)`: operations and
+        // laws live under `RingModulo` and carry BOTH the base ring and the
+        // modulus as leading arguments (RingModulo/ring.math proves the full
+        // commutative-ring law set in exactly this shape). The carrier in a
+        // goal is usually a bare ALIAS (`ComplexNumber`, `GaussianInteger`,
+        // `FiniteField(p, f)`'s base, …), so unfold head definitions a few
+        // steps until RingModulo shows — but stop BEFORE the quotient
+        // underneath (a plain weak-head normalisation would shoot past it).
+        ExpressionPointer current = carrierType;
+        for (int unfoldStep = 0; unfoldStep < 8; ++unfoldStep) {
+            ExpressionPointer head;
+            std::vector<ExpressionPointer> args;
+            peelSpine(current, head, args);
+            auto* headConstant = std::get_if<Constant>(&head->node);
+            if (!headConstant) break;
+            if (headConstant->name == "RingModulo" && args.size() == 2) {
+                scheme.opNamespace = "RingModulo";
+                scheme.structurePrefix = { args[0], args[1] };
+                break;
+            }
+            // Only a bare alias (no arguments, no universe arguments) is
+            // unfolded; an APPLIED alias would need argument substitution
+            // and no current carrier is shaped that way.
+            if (!args.empty() || !headConstant->universeArguments.empty()) {
+                break;
+            }
+            const Declaration* declaration =
+                environment_.lookup(headConstant->name);
+            if (!declaration) break;
+            auto* definition = std::get_if<Definition>(declaration);
+            if (!definition
+                || definition->opacity != Opacity::Transparent
+                || !definition->universeParameters.empty()) {
+                break;
+            }
+            current = definition->body;
         }
         return scheme;
     }

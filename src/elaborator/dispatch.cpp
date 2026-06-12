@@ -1537,6 +1537,49 @@ ExpressionPointer Elaborator::elaborateExpression(
                     }
                 }
                 if (negateFunction.empty()) {
+                    // An operand whose type is (an alias of) an applied
+                    // type former `F(args…)` with an `F.negate`: unfold
+                    // bare alias heads step by step and check each head —
+                    // `ComplexNumber` → `RingModulo(c, m)` dispatches to
+                    // `RingModulo.negate` (implicits filled by the
+                    // re-elaboration below).
+                    ExpressionPointer aliasCursor = operandType;
+                    for (int unfoldStep = 0;
+                         unfoldStep < 8 && negateFunction.empty();
+                         ++unfoldStep) {
+                        ExpressionPointer aliasHead;
+                        std::vector<ExpressionPointer> aliasArgs;
+                        peelSpine(aliasCursor, aliasHead, aliasArgs);
+                        auto* aliasConstant =
+                            std::get_if<Constant>(&aliasHead->node);
+                        if (!aliasConstant) break;
+                        if (environment_.lookup(
+                                aliasConstant->name + ".negate")
+                            != nullptr) {
+                            negateFunction =
+                                aliasConstant->name + ".negate";
+                            break;
+                        }
+                        if (!aliasArgs.empty()
+                            || !aliasConstant->universeArguments.empty()) {
+                            break;
+                        }
+                        const Declaration* aliasDeclaration =
+                            environment_.lookup(aliasConstant->name);
+                        if (!aliasDeclaration) break;
+                        auto* aliasDefinition =
+                            std::get_if<Definition>(aliasDeclaration);
+                        if (!aliasDefinition
+                            || aliasDefinition->opacity
+                                   != Opacity::Transparent
+                            || !aliasDefinition->universeParameters
+                                    .empty()) {
+                            break;
+                        }
+                        aliasCursor = aliasDefinition->body;
+                    }
+                }
+                if (negateFunction.empty()) {
                     // Fallback: search definitions whose body δ-reduces
                     // to the operand's WHNF. For each such T, check if
                     // `<T>.negate` exists; if so, dispatch there. Catches

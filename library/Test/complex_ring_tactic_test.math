@@ -1,0 +1,32 @@
+-- Regression: `ring` at the ComplexNumber carrier — an ALIAS of
+-- RingModulo(…), so the tactic must unfold the bare alias head to find
+-- the quotient's operations (and unary `-` must dispatch the same way).
+module Test.complex_ring_tactic_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Real.basics
+import Real.instances
+import Polynomial.instances
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import ComplexNumber.basics
+
+theorem Test.complex_ring_distributes (z w : ComplexNumber)
+        : z * (w + z) = z * w + z * z := ring
+
+theorem Test.complex_ring_unary_minus (z w : ComplexNumber)
+        : w - z = -(z - w) := ring
+
+theorem Test.complex_ring_cancel (u v : ComplexNumber)
+        : (u + v) - u = v := ring
+
+-- Operator dispatch inside a pattern-definition body at the alias.
+definition Test.complex_partial_sums (s : Natural → ComplexNumber)
+        : Natural → ComplexNumber
+  | zero =>
+      RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+  | successor(n) => Test.complex_partial_sums(s, n) + s(n)
