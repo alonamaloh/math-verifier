@@ -845,6 +845,104 @@ ExpressionPointer Elaborator::recoverClaimHint(
                 return coerced;
             }
         } catch (const ElaborateError&) {
+            // fall through to the symmetry-inside-Not bridge below
+        } catch (const TypeError&) {
+            // fall through to the symmetry-inside-Not bridge below
+        }
+
+        // Symmetry bridge inside Not: the goal is ¬(a = b) and the
+        // citation proves ¬(b = a). The bare-claim auto-prover already
+        // crosses this gap (it finds the lemma by index and flips the
+        // inner equality); an EXPLICIT citation of the very same lemma
+        // used to fail here, forcing authors to choose between an
+        // unexplained bare claim and a wrong-feeling error. Wrap as
+        //   (h : a = b) ↦ cited(Equality.symmetry(h)) : False.
+        try {
+            int N = static_cast<int>(localBinders.size());
+            ExpressionPointer goalOpened = openOverLocalBinders(
+                goalClosed, localBinders, N);
+            ExpressionPointer goalWhnf = weakHeadNormalForm(
+                environment_, goalOpened);
+            auto* notPi = std::get_if<Pi>(&goalWhnf->node);
+            bool codomainIsFalse = false;
+            if (notPi && !referencesBoundVariable(notPi->codomain, 0)) {
+                ExpressionPointer codomainWhnf = weakHeadNormalForm(
+                    environment_, shift(notPi->codomain, -1));
+                auto* codomainConstant =
+                    std::get_if<Constant>(&codomainWhnf->node);
+                codomainIsFalse = codomainConstant
+                    && codomainConstant->name == "False";
+            }
+            if (codomainIsFalse) {
+                EqualityComponents components = extractEqualityComponents(
+                    notPi->domain, "symmetry-inside-Not bridge", line);
+                // The flipped proposition ¬(b = a), closed over the
+                // local binders, as the citation's expected type.
+                ExpressionPointer flippedEquality = makeConstant(
+                    "Equality", {components.carrierUniverseLevel});
+                flippedEquality = makeApplication(
+                    flippedEquality, components.carrierType);
+                flippedEquality = makeApplication(
+                    flippedEquality, components.rightEndpoint);
+                flippedEquality = makeApplication(
+                    flippedEquality, components.leftEndpoint);
+                ExpressionPointer flippedNotOpened = makePi(
+                    "flipped", flippedEquality, shift(notPi->codomain, 0));
+                ExpressionPointer flippedNotClosed = closeOverLocalBinders(
+                    flippedNotOpened, localBinders, N);
+                // Cite the hint against the FLIPPED proposition with the
+                // same goal-driven engine a direct citation gets
+                // (conclusion match-and-unify + premise discharge); raw
+                // re-elaboration can't instantiate a Pi-lemma's
+                // arguments from the expected type.
+                ExpressionPointer citedAtFlipped = nullptr;
+                if (hintTerm) {
+                    ExpressionPointer hintTypeOpened =
+                        inferTypeInLocalContext(localBinders, hintTerm);
+                    ExpressionPointer hintTypeClosed = closeOverLocalBinders(
+                        hintTypeOpened, localBinders, N);
+                    try {
+                        citedAtFlipped = autoFillHintForClaim(
+                            hintTerm, hintTypeClosed, flippedNotClosed,
+                            localBinders, line);
+                    } catch (const ElaborateError&) {
+                        citedAtFlipped = nullptr;
+                    } catch (const TypeError&) {
+                        citedAtFlipped = nullptr;
+                    }
+                }
+                if (!citedAtFlipped) {
+                    citedAtFlipped = elaborateExpression(
+                        byHint, localBinders, flippedNotClosed);
+                }
+                // (h : a = b) ↦ cited(Equality.symmetry(T, a, b, h))
+                ExpressionPointer symmetric = makeConstant(
+                    "Equality.symmetry",
+                    {components.carrierUniverseLevel});
+                for (ExpressionPointer piece :
+                     {shift(components.carrierType, 1),
+                      shift(components.leftEndpoint, 1),
+                      shift(components.rightEndpoint, 1),
+                      makeBoundVariable(0)}) {
+                    symmetric = makeApplication(symmetric, piece);
+                }
+                ExpressionPointer citedOpened = openOverLocalBinders(
+                    citedAtFlipped, localBinders, N);
+                ExpressionPointer bridgedOpened = makeLambda(
+                    "flippedEquality", notPi->domain,
+                    makeApplication(shift(citedOpened, 1), symmetric));
+                ExpressionPointer bridged = closeOverLocalBinders(
+                    bridgedOpened, localBinders, N);
+                Context openedContext =
+                    buildContextFromLocalBinders(localBinders);
+                ExpressionPointer bridgedTypeOpened =
+                    inferTypeInLocalContext(localBinders, bridged);
+                if (isDefinitionallyEqual(environment_, openedContext,
+                                          bridgedTypeOpened, goalOpened)) {
+                    return bridged;
+                }
+            }
+        } catch (const ElaborateError&) {
             // fall through to the descriptive citation-failure error
         } catch (const TypeError&) {
             // fall through to the descriptive citation-failure error
