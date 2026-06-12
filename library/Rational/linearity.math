@@ -29,6 +29,8 @@ import Rational.ring
 import Rational.order
 import Rational.order_arithmetic
 import Rational.absolute_value
+import Rational.instances
+import Algebra.ring_lemmas
 
 -- ----------------------------------------------------------------------
 -- Every Rational is either non-negative or its negation is.
@@ -109,3 +111,21 @@ theorem Rational.not_LessThan_implies_LessOrEqual
         }
     case b ≤ a as bLeqA: bLeqA
   }
+
+-- A Rational square is nonnegative.
+theorem Rational.square_IsNonneg (q : Rational)
+        : Rational.IsNonneg(Rational.multiply(q, q)) :=
+  cases Rational.IsNonneg_or_negate_IsNonneg(q) {
+    | Or.introduceLeft(qIsNonneg) =>
+        Rational.IsNonneg.multiply(q, q, qIsNonneg, qIsNonneg)
+    | Or.introduceRight(negateQIsNonneg) => {
+        -- (−q)·(−q) = q·q, and the left side is a product of nonnegatives.
+        claim squareEquation
+            : Rational.multiply(Rational.negate(q), Rational.negate(q))
+              = Rational.multiply(q, q) by ring;
+        rewrite(squareEquation,
+            Rational.IsNonneg.multiply(Rational.negate(q), Rational.negate(q),
+                negateQIsNonneg, negateQIsNonneg))
+      }
+  }
+

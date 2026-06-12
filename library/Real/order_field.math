@@ -153,3 +153,45 @@ theorem Real.LessThan.multiply_by_positive_right
      < (b * c - a * c) + a * c     by Real.add_preserves_LessThan
      = b * c                       by ring
 }
+
+-- A product with an invertible factor vanishes only through the other
+-- factor (the field has no zero divisors).
+theorem Real.right_factor_zero_of_product_zero (x y : Real)
+        (productZero : x * y = Real.zero)
+        (xNonzero : ¬(x = Real.zero))
+        : y = Real.zero := {
+  obtain ⟨inverseX, inverseProperty⟩
+      from Real.reciprocal_exists_for_nonzero(x, xNonzero);
+  calc y
+     = Real.one * y
+     = (x * inverseX) * y     since inverseProperty
+     = inverseX * (x * y)     by ring
+     = inverseX * Real.zero   since productZero
+     = Real.zero
+}
+
+-- Cancelling a positive factor out of a nonnegativity: 0 ≤ c·x with
+-- 0 < c forces 0 ≤ x (else c·x would be strictly negative).
+theorem Real.nonneg_of_multiply_nonneg (c x : Real)
+        (cPositive : Real.zero < c)
+        (productNonneg : Real.zero ≤ c * x)
+        : Real.zero ≤ x :=
+  decide Real.zero ≤ x {
+    | yes nonneg => nonneg
+    | no notNonneg => {
+        claim xNegative : x < Real.zero
+            since Real.LessThan_of_not_LessOrEqual;
+        claim scaled : x * c < Real.zero * c
+            since Real.LessThan.multiply_by_positive_right;
+        claim productNegative : c * x < Real.zero
+            by calc c * x
+                  = x * c           by ring
+                  < Real.zero * c   by scaled
+                  = Real.zero       by ring;
+        claim Real.zero < Real.zero
+            since Real.LessThan.transitive_left;
+        claim notSelfEqual : ¬(Real.zero = Real.zero)
+            since Real.LessThan.distinct;
+        absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+      }
+  }

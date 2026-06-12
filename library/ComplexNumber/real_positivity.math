@@ -22,6 +22,7 @@ import Integer.ring
 import Integer.instances
 import Integer.order
 import Integer.sign
+import Integer.order_multiply
 import Integer.embedding
 import Algebra.ring
 import Algebra.ring_lemmas
@@ -42,68 +43,8 @@ import Real.ring
 import Real.algebra
 import Real.instances
 import Real.order
+import Real.order_multiplication
 import Real.field
-
--- An Integer square is nonnegative.
-theorem Integer.square_IsNonneg (x : Integer)
-        : Integer.IsNonneg(Integer.multiply(x, x)) :=
-  cases Integer.sign_split(x) {
-    | Or.introduceLeft(xIsNonneg) =>
-        Integer.IsNonneg.multiply(x, x, xIsNonneg, xIsNonneg)
-    | Or.introduceRight(negativeEvidence) => {
-        obtain ⟨k, xEqualsNegativeK⟩ from negativeEvidence;
-        claim kIsNonneg : Integer.IsNonneg((k : Integer))
-            by ⟨k, reflexivity(Integer, (k : Integer))⟩;
-        calc Integer.multiply(x, x)
-                  = Integer.multiply(-(k : Integer), x)
-                  = Integer.multiply(-(k : Integer), -(k : Integer))
-                  = Integer.multiply((k : Integer), (k : Integer)) as squareEquation;
-        rewrite(Equality.symmetry(squareEquation),
-            Integer.IsNonneg.multiply((k : Integer), (k : Integer), kIsNonneg, kIsNonneg))
-      }
-  }
-
--- A Rational square is nonnegative.
-theorem Rational.square_IsNonneg (q : Rational)
-        : Rational.IsNonneg(Rational.multiply(q, q)) :=
-  cases Rational.IsNonneg_or_negate_IsNonneg(q) {
-    | Or.introduceLeft(qIsNonneg) =>
-        Rational.IsNonneg.multiply(q, q, qIsNonneg, qIsNonneg)
-    | Or.introduceRight(negateQIsNonneg) => {
-        -- (−q)·(−q) = q·q, and the left side is a product of nonnegatives.
-        claim squareEquation
-            : Rational.multiply(Rational.negate(q), Rational.negate(q))
-              = Rational.multiply(q, q) by ring;
-        rewrite(squareEquation,
-            Rational.IsNonneg.multiply(Rational.negate(q), Rational.negate(q),
-                negateQIsNonneg, negateQIsNonneg))
-      }
-  }
-
--- A Real square is nonnegative: at a representative the squared sequence
--- is pointwise a Rational square (≥ 0), so eventually-nonnegative.
-theorem Real.square_IsNonneg (x : Real)
-        : Real.IsNonneg(Real.multiply(x, x)) :=
-  
-  (cases x { | c =>
-    (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦
-      witness 0 with
-          (m : Natural) (zeroLessOrEqualM : 0 ≤ m) ↦
-            rewrite(
-                Equality.symmetry(
-                    CauchyRationalSequence.sequenceFunction_multiply(c, c, m)),
-                Rational.LessThan.transitive_right(
-                    Rational.negate(epsilon), Rational.zero,
-                    Rational.multiply(
-                        CauchyRationalSequence.sequenceFunction(c, m),
-                        CauchyRationalSequence.sequenceFunction(c, m)),
-                    Rational.negate_LessThan_zero_of_positive(epsilon, epsilonPositive),
-                    Rational.LessOrEqual_zero_of_IsNonneg(
-                        Rational.multiply(
-                            CauchyRationalSequence.sequenceFunction(c, m),
-                            CauchyRationalSequence.sequenceFunction(c, m)),
-                        Rational.square_IsNonneg(
-                            CauchyRationalSequence.sequenceFunction(c, m))))) })
 
 -- −1 is not nonnegative in ℝ (else 1 = 0).
 theorem Real.negate_one_not_IsNonneg
