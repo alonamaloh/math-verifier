@@ -117,3 +117,18 @@ note: `claim xNotZero : …;` followed by `cases x refining xPositive, xNotZero 
   the false positive stands: a name consumed ONLY by `refining` should count.)
 
 ---
+### Redundancy checker aborts whole-file on expensive in-isolation re-proof — 2026-06-11 (#42 push)
+note: `--check-redundant-by` on Real/limits.math, Real/series.math,
+Real/negation.math errors out mid-file:
+```
+error: claim `…`: the auto-prover gave up after exhausting its effort budget …
+```
+diagnosis: the checker re-proves each hinted site WITHOUT its hint; when
+that in-isolation re-proof exceeds the budget on a pre-existing expensive
+site, the failure propagates as a hard error and the whole file's report
+is lost (sites after the expensive one are never tested). Wanted: treat
+budget-exhaustion during checking as "hint is load-bearing, not
+redundant" (a finding of the GOOD kind, or silence) and continue.
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+---

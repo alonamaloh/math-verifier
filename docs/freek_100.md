@@ -5,7 +5,7 @@ list](https://www.cs.ru.nl/~freek/100/) as a goal thread. This file is
 the index of the entries verified so far: the list number, the headline
 theorem(s) as declared, and the file where each lives.
 
-**11 of 100** as of 2026-06-11.
+**12 of 100** as of 2026-06-11.
 
 | # | Theorem | Declaration | File |
 |---|---------|-------------|------|
@@ -14,6 +14,7 @@ theorem(s) as declared, and the file where each lives.
 | 11 | The infinitude of primes | `Natural.infinitely_many_primes` | `library/Natural/euclid.math` |
 | 20 | All primes ≡ 1 mod 4 are sums of two squares | `Natural.prime_one_mod_four_sum_of_two_squares` | `library/GaussianInteger/fermat_two_squares.math` |
 | 22 | The non-denumerability of the continuum | `Real.not_enumerable`, `Real.enumeration_misses_a_real` | `library/Real/uncountable.math` |
+| 42 | Sum of the reciprocals of the triangular numbers | `Real.triangular_reciprocals_sum_to_two` | `library/Real/triangular_series.math` |
 | 51 | Wilson's theorem | `Natural.wilson` (and the converse, `Natural.prime_of_divides_factorial_plus_one`) | `library/IntegerMod/wilson.math` |
 | 63 | Cantor's theorem | `Cantor.no_surjection_onto_powerset` | `library/Set/cantor.math` |
 | 66 | Sum of a geometric series | `Real.geometric_series` | `library/Real/series.math` |
@@ -23,9 +24,8 @@ theorem(s) as declared, and the file where each lives.
 
 ## Near-term targets
 
-The series arc continues with **#42** (sum of the reciprocals of the
-triangular numbers, a telescoping sum) and **#34** (divergence of the
-harmonic series, via the 2ᵏ-block estimate) on the
+The series arc continues with **#34** (divergence of the harmonic
+series, via the 2ᵏ-block estimate) on the
 `Real.partialSum`/`Real.SeriesConverges` infrastructure
 (`library/Real/series.math`), then **#78** (Cauchy–Schwarz) on finite
 sums. **#38** (arithmetic/geometric mean) waits on a √ construction.
