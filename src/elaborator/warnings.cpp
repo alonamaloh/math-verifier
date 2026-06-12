@@ -276,6 +276,14 @@ bool Elaborator::surfaceMentionsName(
             if (cas->scrutinee
                 && surfaceMentionsName(*cas->scrutinee, name))
                 return true;
+            // A `cases … refining h1, h2 { … }` consumes the listed
+            // names — they are stored as strings, not identifier
+            // expressions, so the structural walk below misses them
+            // (false "unused name" on claims consumed only by a
+            // refining list).
+            for (const auto& refined : cas->refiningNames) {
+                if (refined == name) return true;
+            }
             for (const auto& clause : cas->clauses) {
                 if (clause.body
                     && surfaceMentionsName(*clause.body, name))
