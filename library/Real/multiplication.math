@@ -520,3 +520,41 @@ definition Real.multiply_by_integer
 
 operator (*) on (Integer, Real) := Real.from_integer_multiply
 operator (*) on (Real, Integer) := Real.multiply_by_integer
+
+-- ----------------------------------------------------------------------
+-- The embedding preserves multiplication (mirror of
+-- Rational.to_real.add_preserves): both sides are the constant
+-- sequence λn. a·b, so the pointwise difference vanishes.
+theorem Rational.to_real.multiply_preserves_equiv (a b : Rational)
+        : CauchyEquivalent(
+              Rational.to_cauchy_constant(a * b),
+              CauchyRationalSequence.multiply(
+                  Rational.to_cauchy_constant(a),
+                  Rational.to_cauchy_constant(b))) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦
+    witness 0 with
+        (m : Natural) (_ : 0 ≤ m) ↦
+          calc abs(
+                   CauchyRationalSequence.sequenceFunction(
+                       Rational.to_cauchy_constant(a * b), m)
+                   - CauchyRationalSequence.sequenceFunction(
+                         CauchyRationalSequence.multiply(
+                             Rational.to_cauchy_constant(a),
+                             Rational.to_cauchy_constant(b)),
+                         m))
+             = abs((a * b) - (a * b))
+             = Rational.zero
+             < epsilon
+
+theorem Rational.to_real.multiply_preserves (a b : Rational)
+        : Rational.to_real(a * b)
+          = Rational.to_real(a) * Rational.to_real(b) :=
+  Quotient.sound(
+      CauchyRationalSequence,
+      CauchyEquivalent,
+      Rational.to_cauchy_constant(a * b),
+      CauchyRationalSequence.multiply(
+          Rational.to_cauchy_constant(a),
+          Rational.to_cauchy_constant(b)),
+      Rational.to_real.multiply_preserves_equiv(a, b))

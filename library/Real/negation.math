@@ -90,3 +90,34 @@ definition Real.subtract (x y : Real) : Real :=
   x + Real.negate(y)
 
 operator (-) on (Real, Real) := Real.subtract
+
+-- ----------------------------------------------------------------------
+-- The embedding preserves negation (mirror of to_real.add_preserves):
+-- both sides are the constant sequence λn. −q.
+theorem Rational.to_real.negate_preserves_equiv (q : Rational)
+        : CauchyEquivalent(
+              Rational.to_cauchy_constant(-q),
+              CauchyRationalSequence.negate(Rational.to_cauchy_constant(q))) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦
+    witness 0 with
+        (m : Natural) (_ : 0 ≤ m) ↦
+          calc abs(
+                   CauchyRationalSequence.sequenceFunction(
+                       Rational.to_cauchy_constant(-q), m)
+                   - CauchyRationalSequence.sequenceFunction(
+                         CauchyRationalSequence.negate(
+                             Rational.to_cauchy_constant(q)),
+                         m))
+             = abs(-q - -q)
+             = Rational.zero
+             < epsilon
+
+theorem Rational.to_real.negate_preserves (q : Rational)
+        : Rational.to_real(-q) = -Rational.to_real(q) :=
+  Quotient.sound(
+      CauchyRationalSequence,
+      CauchyEquivalent,
+      Rational.to_cauchy_constant(-q),
+      CauchyRationalSequence.negate(Rational.to_cauchy_constant(q)),
+      Rational.to_real.negate_preserves_equiv(q))

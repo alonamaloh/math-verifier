@@ -8,6 +8,7 @@
 module Real.embedding_order
 
 import Logic.basics
+import Logic.excluded_middle
 import Logic.exists
 import Logic.quotient
 import Equality.basics
@@ -21,6 +22,7 @@ import Rational.order
 import Rational.order_arithmetic
 import Rational.absolute_value
 import Rational.triangle_more
+import Rational.linearity
 import Real.sequence
 import Real.basics
 import Real.embedding
@@ -91,3 +93,23 @@ theorem Rational.to_real.positive_preserves (epsilon : Rational)
         : Real.zero < (epsilon : Real) := {
   done since Rational.to_real.LessThan_preserves
 }
+
+-- ----------------------------------------------------------------------
+-- The embedding also REFLECTS the strict order: a strict inequality
+-- between the casts forces the rational one (classically — were b ≤ a,
+-- the cast of that would contradict the strictness).
+theorem Rational.to_real.LessThan_reflects (a b : Rational)
+        (strictAtReal : (a : Real) < (b : Real))
+        : a < b :=
+  decide a < b {
+    | yes strict => strict
+    | no notStrict => {
+        claim b ≤ a since Rational.not_LessThan_implies_LessOrEqual;
+        claim (b : Real) ≤ (a : Real)
+            since Rational.to_real.LessOrEqual_preserves;
+        claim (a : Real) < (a : Real) since Real.LessThan.transitive_right;
+        claim notSelfEqual : ¬((a : Real) = (a : Real))
+            since Real.LessThan.distinct;
+        absurd(notSelfEqual(reflexivity(Real, (a : Real))))
+      }
+  }

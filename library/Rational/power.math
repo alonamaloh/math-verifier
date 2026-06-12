@@ -20,6 +20,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.add_order
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
@@ -248,4 +249,40 @@ theorem Rational.power_decay_witness
   claim powerBelow : Rational.power(c, successor(K)) < epsilon
       since Rational.LessThan.multiply_cancel_right_positive;
   witness successor(K) with powerBelow
+}
+
+-- ----------------------------------------------------------------------
+-- Powers of a base at most 1 only shrink as the exponent grows.
+theorem Rational.power_le_subsequent
+        (c : Rational)
+        (cNonneg : Rational.zero ≤ c) (cLeqOne : c ≤ Rational.one)
+        (N k : Natural)
+        : Rational.power(c, k + N) ≤ Rational.power(c, N) :=
+  by_induction on k with IH {
+    case zero: {
+        claim Rational.power(c, N) ≤ Rational.power(c, N)
+            since Rational.LessOrEqual.reflexive;
+        done
+      }
+    case successor(predecessor): {
+        claim Rational.zero ≤ Rational.power(c, predecessor + N)
+            since Rational.power_nonneg;
+        calc Rational.power(c, successor(predecessor) + N)
+           = c * Rational.power(c, predecessor + N)
+           ≤ Rational.one * Rational.power(c, predecessor + N)
+                 since Rational.LessOrEqual.multiply_by_nonneg_right
+           = Rational.power(c, predecessor + N)
+           ≤ Rational.power(c, N)    by IH
+      }
+  }
+
+theorem Rational.power_le_at_le
+        (c : Rational)
+        (cNonneg : Rational.zero ≤ c) (cLeqOne : c ≤ Rational.one)
+        (N m : Natural) (NLeqM : N ≤ m)
+        : Rational.power(c, m) ≤ Rational.power(c, N) := {
+  obtain ⟨k, mEq⟩ by Natural.le_to_add;
+  claim Rational.power(c, k + N) ≤ Rational.power(c, N)
+      since Rational.power_le_subsequent;
+  claim by substitution
 }
