@@ -93,7 +93,7 @@ theorem Real.partialProduct_split (s : Natural → Real) (n k : Natural)
     case zero:
         calc Real.partialProduct(s, 0 + n)
            = Real.partialProduct(s, n)
-           = Real.partialProduct(s, n) * Real.one    by ring
+           = Real.partialProduct(s, n) * Real.one
            = Real.partialProduct(s, n)
              * Real.partialProduct((j : Natural) ↦ s(n + j), 0)
     case successor(predecessor):
@@ -119,7 +119,6 @@ theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural
   by_induction on n with IH {
     case zero:
         calc Real.partialProduct((k : Natural) ↦ c * s(k), 0)
-           = Real.one
            = Real.power(c, 0) * Real.partialProduct(s, 0)
     case successor(predecessor): {
         claim powerUnfold
@@ -136,6 +135,24 @@ theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural
                  by ring
            = Real.power(c, successor(predecessor))
              * (Real.partialProduct(s, predecessor) * s(predecessor))
-                 by powerUnfold
+                 since powerUnfold
       }
+  }
+
+-- Products only see the terms' values.
+theorem Real.partialProduct_pointwise
+        (s sequencePrime : Natural → Real)
+        (pointwiseEqual : (k : Natural) → s(k) = sequencePrime(k))
+        (n : Natural)
+        : Real.partialProduct(s, n) = Real.partialProduct(sequencePrime, n) :=
+  by_induction on n with IH {
+    case zero: done
+    case successor(predecessor):
+        calc Real.partialProduct(s, successor(predecessor))
+           = Real.partialProduct(s, predecessor) * s(predecessor)
+           = Real.partialProduct(sequencePrime, predecessor) * s(predecessor)
+                 since IH
+           = Real.partialProduct(sequencePrime, predecessor)
+             * sequencePrime(predecessor)
+                 by pointwiseEqual(predecessor)
   }

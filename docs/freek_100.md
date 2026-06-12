@@ -5,7 +5,7 @@ list](https://www.cs.ru.nl/~freek/100/) as a goal thread. This file is
 the index of the entries verified so far: the list number, the headline
 theorem(s) as declared, and the file where each lives.
 
-**16 of 100** as of 2026-06-11.
+**17 of 100** as of 2026-06-11.
 
 | # | Theorem | Declaration | File |
 |---|---------|-------------|------|
@@ -16,6 +16,7 @@ theorem(s) as declared, and the file where each lives.
 | 20 | All primes ≡ 1 mod 4 are sums of two squares | `Natural.prime_one_mod_four_sum_of_two_squares` | `library/GaussianInteger/fermat_two_squares.math` |
 | 22 | The non-denumerability of the continuum | `Real.not_enumerable`, `Real.enumeration_misses_a_real` | `library/Real/uncountable.math` |
 | 34 | Divergence of the harmonic series | `Real.harmonic_series_diverges` | `library/Real/harmonic_series.math` |
+| 38 | The inequality of arithmetic and geometric means | `Real.arithmetic_mean_geometric_mean` (division-free form nⁿ·Πs ≤ (Σs)ⁿ; two-variable forms in the same file) | `library/Real/arithmetic_geometric_mean.math` |
 | 42 | Sum of the reciprocals of the triangular numbers | `Real.triangular_reciprocals_sum_to_two` | `library/Real/triangular_series.math` |
 | 44 | The binomial theorem | `Real.binomial_theorem` | `library/Real/binomial_theorem.math` |
 | 51 | Wilson's theorem | `Natural.wilson` (and the converse, `Natural.prime_of_divides_factorial_plus_one`) | `library/IntegerMod/wilson.math` |
@@ -29,12 +30,9 @@ theorem(s) as declared, and the file where each lives.
 ## Near-term targets
 
 The finite-sum toolkit in `library/Real/series.math` is complete
-(split, comparison, linearity, telescoping, constant blocks). **#38** (arithmetic/geometric mean): the two-variable case and
-square-root existence are done (`library/Real/arithmetic_geometric_mean.math`,
-`library/Real/square_root.math`); the n-variable entry needs finite
-products and Cauchy's forward–backward induction.
-Also reachable: **#25** (Schröder–Bernstein — pending a design decision
-on unique choice vs. retraction-strengthened hypotheses).
+(split, comparison, linearity, telescoping, constant blocks). **#25** (Schröder–Bernstein) waits on a design decision (unique choice
+vs. retraction-strengthened hypotheses).
+
 
 When a new entry lands, add the row here and tag the theorem's file
 header with the list number.
