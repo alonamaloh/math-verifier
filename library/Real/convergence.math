@@ -11,6 +11,7 @@ module Real.convergence
 
 import Logic.basics
 import Logic.exists
+import Logic.description
 import Logic.quotient
 import Equality.basics
 import Natural.basics
@@ -253,3 +254,31 @@ theorem Real.SequenceConverges.unique
   claim differenceIsZero : L1 - L2 = Real.zero;
   Real.eq_of_sub_eq_zero(L1, L2, differenceIsZero)
 }
+
+-- ----------------------------------------------------------------------
+-- THE limit of a convergent sequence, extracted by definite
+-- description: convergence supplies existence, and uniqueness of
+-- limits supplies the rest. This is the bridge from "converges to
+-- something" to an actual value the rest of analysis can compute with.
+definition Real.limit (s : Natural → Real)
+        (convergent : Real.SequenceConvergent(s)) : Real :=
+  Logic.the(
+      Real,
+      (candidate : Real) ↦ Real.SequenceConverges(s, candidate),
+      convergent,
+      (a b : Real)
+      (aIsLimit : Real.SequenceConverges(s, a))
+      (bIsLimit : Real.SequenceConverges(s, b)) ↦
+        Real.SequenceConverges.unique(s, a, b, aIsLimit, bIsLimit))
+
+theorem Real.limit_converges (s : Natural → Real)
+        (convergent : Real.SequenceConvergent(s))
+        : Real.SequenceConverges(s, Real.limit(s, convergent)) :=
+  Logic.the_satisfies(
+      Real,
+      (candidate : Real) ↦ Real.SequenceConverges(s, candidate),
+      convergent,
+      (a b : Real)
+      (aIsLimit : Real.SequenceConverges(s, a))
+      (bIsLimit : Real.SequenceConverges(s, b)) ↦
+        Real.SequenceConverges.unique(s, a, b, aIsLimit, bIsLimit))
