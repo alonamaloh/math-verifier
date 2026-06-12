@@ -30,10 +30,14 @@ ExpressionPointer Elaborator::elaborateIdentifier(
         const Declaration* environmentDeclaration =
             environment_.lookup(identifier.qualifiedName);
         if (!isCurrentDeclaration && !environmentDeclaration) {
+            // Carry the position structurally too — without it the driver
+            // prints the error header at 1:1 and only the message text
+            // knows the real location.
             throw ElaborateError(
                 "unknown identifier '" + identifier.qualifiedName
                 + "' at line " + std::to_string(line)
-                + ", column " + std::to_string(column));
+                + ", column " + std::to_string(column),
+                line, column);
         }
         std::vector<LevelPointer> universeArguments;
         if (!identifier.universeArgs.empty()) {
