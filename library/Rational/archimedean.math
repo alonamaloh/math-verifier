@@ -1,0 +1,222 @@
+-- Rational/archimedean.math
+--
+-- The Archimedean property of the rational order, with the natural-cast
+-- and reciprocal-positivity lemmas it runs on, plus strict cancellation
+-- of a positive factor. (Originally written inside Real/supremum.math
+-- for the bisection's Cauchy modulus; moved here so Rational-level
+-- developments — powers, geometric decay — can import them without
+-- reaching into the Real layer.)
+
+module Rational.archimedean
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.triangle
+import Rational.triangle_more
+import Rational.positive
+import Rational.linearity
+import Rational.reciprocal
+import Rational.reciprocal_function
+
+-- (n : Rational) is nonneg for natural n. The cast goes
+-- Natural → Integer → Rational; the numerator at the Rational
+-- representative is Integer.from_natural(n), which is Integer.IsNonneg.
+theorem Rational.from_natural_IsNonneg (n : Natural)
+        : Rational.IsNonneg((n : Rational)) :=
+  Integer.from_natural_is_nonneg(n)
+
+-- (successor(n) : Rational) = (1 : Rational) + (n : Rational). The cast
+-- of (succ(n) : Integer) reduces definitionally to Integer.one + (n :
+-- Integer); applying Integer.to_rational.add_preserves bridges to the
+-- Rational sum.
+theorem Rational.successor_cast (n : Natural)
+        : (successor(n) : Rational) = (1 : Rational) + (n : Rational) :=
+  Integer.to_rational.add_preserves(Integer.one, (n : Integer))
+
+-- 0 < (successor(n) : Rational). 0 < 1 (strict) ≤ 1 + (n : R) = succ(n).
+theorem Rational.successor_cast_positive (n : Natural)
+        : (0 : Rational) < (successor(n) : Rational) := {
+  claim Rational.IsNonneg((n : Rational)) by Rational.from_natural_IsNonneg;
+  claim (0 : Rational) ≤ (n : Rational) by Rational.LessOrEqual_zero_of_IsNonneg;
+  calc (0 : Rational)
+     < (1 : Rational)
+     = (1 : Rational) + (0 : Rational)
+     ≤ (1 : Rational) + (n : Rational)
+          since Rational.add_general_LessOrEqual_left
+     = (successor(n) : Rational)
+}
+
+-- (successor(successor(n)) : Rational) = (1 : Rational) + (1 : Rational)
+-- + (n : Rational). Two applications of add_preserves, bridging
+-- (Integer.one + Integer.one + (n : Integer)) up to Rational.
+theorem Rational.successor_successor_cast (n : Natural)
+        : (successor(successor(n)) : Rational)
+          = (1 : Rational) + (1 : Rational) + (n : Rational) :=
+  calc (successor(successor(n)) : Rational)
+     = ((Integer.one + Integer.one : Integer) : Rational) + (n : Rational)
+            by Integer.to_rational.add_preserves
+     = (1 : Rational) + (1 : Rational) + (n : Rational)
+
+
+-- ----------------------------------------------------------------------
+-- Reciprocal positivity: 0 < x → 0 < reciprocal_function(x).
+-- Standard contradiction: if recip ≤ 0 then x * recip ≤ 0; if
+-- recip = 0 then x * recip = 0. Either contradicts x * recip = 1 > 0.
+
+theorem Rational.reciprocal_function_positive_of_positive
+        (x : Rational) (xPositive : (0 : Rational) < x)
+        : (0 : Rational) < Rational.reciprocal_function(x) := {
+  claim ¬(x = (0 : Rational));
+  claim xRecipEqOne
+        : x * Rational.reciprocal_function(x) = (1 : Rational);
+  claim (0 : Rational) ≤ x by Rational.LessThan.weaken;
+  claim Rational.IsNonneg(x) by Rational.IsNonneg_of_LessOrEqual_zero;
+  cases Rational.LessOrEqual.linear(
+            Rational.reciprocal_function(x), (0 : Rational)) {
+    | Or.introduceLeft(recipLeqZero) => {
+        -- recip ≤ 0: derive x*recip ≤ 0, contradicting x*recip = 1.
+        claim (0 : Rational) ≤ -Rational.reciprocal_function(x);
+        claim Rational.IsNonneg(-Rational.reciprocal_function(x));
+        claim Rational.IsNonneg(x * -Rational.reciprocal_function(x));
+        claim Rational.IsNonneg(-(x * Rational.reciprocal_function(x)))
+          by substituting (ring : x * -Rational.reciprocal_function(x)
+                                  = -(x * Rational.reciprocal_function(x)));
+        claim x * Rational.reciprocal_function(x) ≤ (0 : Rational)
+          by Rational.LessOrEqual_zero_of_negate_IsNonneg;
+        claim (1 : Rational) ≤ (0 : Rational) by substituting xRecipEqOne;
+        claim (0 : Rational) ≤ (1 : Rational) by Rational.LessThan.weaken;
+        claim zeroEqOne : (0 : Rational) = (1 : Rational)
+          by Rational.LessOrEqual.antisymmetric;
+        claim (0 : Rational) < (1 : Rational) by Rational.zero_less_one;
+        claim zeroNotOne : (0 : Rational) ≠ (1 : Rational) by Rational.LessThan.distinct;
+        absurd(zeroNotOne(zeroEqOne))
+      }
+    | Or.introduceRight(zeroLeqRecip) =>
+        decide (0 : Rational) = Rational.reciprocal_function(x) {
+          | yes zeroEqRecip => {
+              -- recip = 0: x*recip = x*0 = 0 ≠ 1.
+              claim x * (0 : Rational) = (1 : Rational);
+              calc (0 : Rational)
+                      = x * (0 : Rational)
+                      = (1 : Rational) as zeroEqOne;
+              claim (0 : Rational) < (1 : Rational) by Rational.zero_less_one;
+              claim zeroNotOne : (0 : Rational) ≠ (1 : Rational) by Rational.LessThan.distinct;
+              absurd(zeroNotOne(zeroEqOne))
+            }
+          | no zeroNotEqRecip =>
+              And.introduction(zeroLeqRecip, zeroNotEqRecip)
+        }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Archimedean property for two positives: given 0 ≤ c and 0 < ε, find
+-- K with c ≤ (succ(K) : R) * ε. Apply the standard Archimedean lemma
+-- to c * reciprocal(ε), which is nonneg, then multiply both sides by ε.
+
+theorem Rational.archimedean_for_positives
+        (c epsilon : Rational)
+        (cNonneg : Rational.IsNonneg(c))
+        (epsilonPositive : (0 : Rational) < epsilon)
+        : ∃ (K : Natural). c ≤ (successor(K) : Rational) * epsilon := {
+  claim (0 : Rational) < Rational.reciprocal_function(epsilon);
+  claim (0 : Rational) ≤ Rational.reciprocal_function(epsilon)
+    by Rational.LessThan.weaken;
+  claim Rational.IsNonneg(Rational.reciprocal_function(epsilon))
+    by Rational.IsNonneg_of_LessOrEqual_zero;
+  claim Rational.IsNonneg(c * Rational.reciprocal_function(epsilon));
+  claim abs(c * Rational.reciprocal_function(epsilon))
+        = c * Rational.reciprocal_function(epsilon);
+  obtain ⟨K, absBound⟩
+      from Rational.absolute_value_le_succ_natural(
+               c * Rational.reciprocal_function(epsilon));
+  calc c * Rational.reciprocal_function(epsilon)
+          = abs(c * Rational.reciprocal_function(epsilon))
+          ≤ (successor(K) : Rational);
+  claim Rational.LessOrEqual((0 : Rational), epsilon);
+  claim (c * Rational.reciprocal_function(epsilon)) * epsilon
+          ≤ (successor(K) : Rational) * epsilon;
+  claim ¬(epsilon = (0 : Rational));
+  calc (c * Rational.reciprocal_function(epsilon)) * epsilon
+          = c * (epsilon * Rational.reciprocal_function(epsilon))
+          = c * (1 : Rational)
+          = c;
+  witness K with
+      calc c
+         = (c * Rational.reciprocal_function(epsilon)) * epsilon
+         ≤ (successor(K) : Rational) * epsilon
+}
+
+-- ----------------------------------------------------------------------
+-- Strict multiplicative cancellation: from a * c < b * c and 0 < c,
+-- conclude a < b.
+
+theorem Rational.LessThan.multiply_cancel_right_positive
+        (a b c : Rational)
+        (cPositive : (0 : Rational) < c)
+        (productLessThan : a * c < b * c)
+        : a < b := {
+  cases Rational.LessOrEqual.linear(a, b) {
+    | Or.introduceLeft(aLeqB) =>
+        decide a = b {
+          | yes aEqB => {
+              claim productsEqual : a * c = b * c;
+              claim productNotEqual : a * c ≠ b * c by Rational.LessThan.distinct;
+              absurd(productNotEqual(productsEqual))
+            }
+          | no aNotEqB =>
+              And.introduction(aLeqB, aNotEqB)
+        }
+    | Or.introduceRight(bLeqA) => {
+        claim Rational.LessOrEqual((0 : Rational), c);
+        claim b * c ≤ a * c;
+        claim a * c ≤ b * c by Rational.LessThan.weaken;
+        claim productsEqual : a * c = b * c by Rational.LessOrEqual.antisymmetric;
+        claim productNotEqual : a * c ≠ b * c by Rational.LessThan.distinct;
+        absurd(productNotEqual(productsEqual))
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Strict step: succ(K) * ε < succ(succ(K)) * ε for 0 < ε.
+
+theorem Rational.succ_K_strictly_less_succ_succ_K_times_epsilon
+        (K : Natural) (epsilon : Rational)
+        (epsilonPositive : (0 : Rational) < epsilon)
+        : (successor(K) : Rational) * epsilon
+          < (successor(successor(K)) : Rational) * epsilon :=
+  calc (successor(K) : Rational) * epsilon
+     = (successor(K) : Rational) * epsilon + (0 : Rational)
+     < (successor(K) : Rational) * epsilon + epsilon
+          by Rational.add_left_preserves_LessThan
+     = ((1 : Rational) + (successor(K) : Rational)) * epsilon
+     = (successor(successor(K)) : Rational) * epsilon
+
