@@ -459,3 +459,18 @@ allocation-heavy single reduction blows memory before it trips).
 Workaround that works today: rewrite with `substituting <eq>` (syntactic,
 no defeq reduction); bridge lemma indices with `by (ring : 2 = 2*1)` since
 the citation matcher won't reduce `2*1`→`2` either.
+
+### RESOLVED 2026-06-13 (commit 071c3ee)
+Fixed at the kernel + elaborator level:
+- `isDefinitionallyEqual` now answers a conservative `false` on
+  depth/fuel exhaustion (new `KernelResourceExhausted`, a `TypeError`
+  subtype caught only by isDefEq) instead of throwing — coercion / the
+  diff-walk fall through to structural strategies rather than aborting.
+- the calc-step coercion gates and the diff-walk endpoint probes run with
+  a bounded fuel (`kDefeqProbeFuel`); the final per-step acceptance check
+  stays full-fuel as the deep-defeq backstop.
+Cold-cache `by <eq>` over a heavy subterm now succeeds / fails fast (≈1MB)
+instead of OOM/depth-error. RESIDUAL: a warm-cache, whole-file reduction
+that materialises an enormous *cached* WHNF normal form still costs GBs —
+a kernel-caching concern (cap cache by term size?), distinct from the probe
+behaviour; the `substituting` idiom avoids it.
