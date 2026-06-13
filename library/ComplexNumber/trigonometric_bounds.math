@@ -709,3 +709,50 @@ theorem Real.partialSum_nonpositive (g : Natural → Real)
            ≤ Real.zero                               by oddPaired
   }
 }
+
+-- ----------------------------------------------------------------------
+-- The mirror: partial sums stay NON-NEGATIVE when the even-indexed
+-- terms are ≥ 0 and each consecutive pair sums to ≥ 0 (apply the
+-- non-positive lemma to −g, which negates the partial sums).
+theorem Real.partialSum_nonnegative (g : Natural → Real)
+        (leadNonnegative : (j : Natural) → Real.zero ≤ g(2 * j))
+        (pairNonnegative
+            : (j : Natural) → Real.zero ≤ g(2 * j) + g(successor(2 * j)))
+        (n : Natural)
+        : Real.zero ≤ Real.partialSum(g, n) := {
+  claim negLead : (j : Natural) → -g(2 * j) ≤ Real.zero
+      by (j : Natural) ↦
+           calc -g(2 * j)
+              ≤ -Real.zero
+                    by Real.LessOrEqual.negate(Real.zero, g(2 * j), leadNonnegative(j))
+              = Real.zero
+                    by ring;
+  claim negPair
+      : (j : Natural) → -g(2 * j) + -g(successor(2 * j)) ≤ Real.zero
+      by (j : Natural) ↦
+           calc -g(2 * j) + -g(successor(2 * j))
+              = -(g(2 * j) + g(successor(2 * j)))
+                    by ring
+              ≤ -Real.zero
+                    by Real.LessOrEqual.negate(
+                           Real.zero, g(2 * j) + g(successor(2 * j)),
+                           pairNonnegative(j))
+              = Real.zero
+                    by ring;
+  claim Real.partialSum((k : Natural) ↦ -g(k), n) ≤ Real.zero
+      by Real.partialSum_nonpositive((k : Natural) ↦ -g(k), negLead, negPair, n);
+  claim negated : -Real.partialSum(g, n) ≤ Real.zero
+      by {
+        claim Real.partialSum((k : Natural) ↦ -g(k), n) = -Real.partialSum(g, n)
+            by Real.partialSum_negate(g, n);
+        done by substituting (Real.partialSum((k : Natural) ↦ -g(k), n)
+                                  = -Real.partialSum(g, n))
+      };
+  calc Real.zero
+     = -Real.zero
+           by ring
+     ≤ -(-Real.partialSum(g, n))
+           by Real.LessOrEqual.negate(-Real.partialSum(g, n), Real.zero, negated)
+     = Real.partialSum(g, n)
+           by ring
+}
