@@ -23,6 +23,7 @@ import Natural.arithmetic
 import Natural.maximum
 import Natural.compare
 import Natural.subtraction
+import Natural.multiply_bounds
 import Natural.factorial
 import Integer.basics
 import Integer.embedding
@@ -532,4 +533,45 @@ theorem Real.sine_paired_series_converges (x : Real)
                               successor(2 * m)))),
               sin(x),
               pairsCollapse, evenSubsequence)
+}
+
+-- ----------------------------------------------------------------------
+-- Factorial is monotone: a ≤ b ⟹ a! ≤ b!. Each step multiplies by a
+-- factor ≥ 1, so a! ≤ (a+1)!; the general case chains those.
+theorem Natural.factorial_le_succ (n : Natural)
+        : Natural.factorial(n) ≤ Natural.factorial(successor(n)) := {
+  claim oneLeSucc : 1 ≤ successor(n);
+  claim scaled
+      : Natural.factorial(n) * 1 ≤ Natural.factorial(n) * successor(n)
+      by Natural.multiply_monotone_left(
+             Natural.factorial(n), 1, successor(n), oneLeSucc);
+  calc Natural.factorial(n)
+     = Natural.factorial(n) * 1
+           by ring
+     ≤ Natural.factorial(n) * successor(n)
+           since scaled
+     = successor(n) * Natural.factorial(n)
+           by ring
+     = Natural.factorial(successor(n))
+}
+
+-- a! ≤ (k + a)!, by induction on the gap k (each step a factorial-le-succ).
+theorem Natural.factorial_le_add (a : Natural)
+        : (k : Natural) → Natural.factorial(a) ≤ Natural.factorial(k + a)
+  | zero => LessOrEqual.reflexivity(Natural.factorial(a))
+  | successor(p) => {
+      claim Natural.factorial(a) ≤ Natural.factorial(p + a)
+          by Natural.factorial_le_add(a, p);
+      claim Natural.factorial(p + a)
+            ≤ Natural.factorial(successor(p + a))
+          by Natural.factorial_le_succ(p + a);
+      done since LessOrEqual.transitive
+    }
+
+theorem Natural.factorial_monotone (a b : Natural) (aLeB : a ≤ b)
+        : Natural.factorial(a) ≤ Natural.factorial(b) := {
+  obtain ⟨k, bEqual⟩ from Natural.le_to_add(a, b, aLeB);
+  claim Natural.factorial(a) ≤ Natural.factorial(k + a)
+      by Natural.factorial_le_add(a, k);
+  done by substituting bEqual
 }
