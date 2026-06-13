@@ -1,0 +1,424 @@
+-- ComplexNumber/trigonometric_series.math
+--
+-- The real power series of cosine and sine, harvested from the complex
+-- exponential. Since cos x = Re(exp(ix)) and Re commutes with the
+-- (convergent) partial sums, cos x is the limit of the real series
+-- whose k-th term is Re of the k-th term of exp(ix); likewise sin x
+-- with Im. The k-th term, evaluated through the i-power 4-cycle:
+--   Re(term_{2m})   = (1/(2m)!)·(−x²)^m,   Re(term_{2m+1}) = 0,
+--   Im(term_{2m})   = 0,                   Im(term_{2m+1}) = (1/(2m+1)!)·x·(−x²)^m,
+-- i.e. cos x = Σ (−1)^m x^{2m}/(2m)! and sin x = Σ (−1)^m x^{2m+1}/(2m+1)!
+-- once the vanishing terms are dropped (done in the bracketing layer).
+
+module ComplexNumber.trigonometric_series
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.arithmetic
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.factorial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.square_root
+import Real.power
+import Real.series
+import Real.cauchy_complete
+import Real.exponential
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.coordinate_negate
+import ComplexNumber.embedding
+import ComplexNumber.modulus
+import ComplexNumber.modulus_multiplicative
+import ComplexNumber.completeness
+import ComplexNumber.limits
+import ComplexNumber.exponential
+import ComplexNumber.conjugation
+import ComplexNumber.trigonometry
+import ComplexNumber.exponential_imaginary
+
+-- ----------------------------------------------------------------------
+-- A real scalar (embedded) pulls out of the coordinates of a product.
+
+theorem ComplexNumber.realPart_from_real_multiply (r : Real) (w : ComplexNumber)
+        : ComplexNumber.realPart(ComplexNumber.from_real(r) * w)
+          = r * ComplexNumber.realPart(w) :=
+  calc ComplexNumber.realPart(ComplexNumber.from_real(r) * w)
+     = ComplexNumber.realPart(ComplexNumber.from_real(r)) * ComplexNumber.realPart(w)
+       - ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
+             * ComplexNumber.imaginaryPart(w)
+           by ComplexNumber.realPart_multiply(ComplexNumber.from_real(r), w)
+     = r * ComplexNumber.realPart(w)
+       - ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
+             * ComplexNumber.imaginaryPart(w)
+           by ComplexNumber.realPart_from_real(r)
+     = r * ComplexNumber.realPart(w) - Real.zero * ComplexNumber.imaginaryPart(w)
+           by ComplexNumber.imaginaryPart_from_real(r)
+     = r * ComplexNumber.realPart(w)
+           by ring
+
+theorem ComplexNumber.imaginaryPart_from_real_multiply (r : Real) (w : ComplexNumber)
+        : ComplexNumber.imaginaryPart(ComplexNumber.from_real(r) * w)
+          = r * ComplexNumber.imaginaryPart(w) :=
+  calc ComplexNumber.imaginaryPart(ComplexNumber.from_real(r) * w)
+     = ComplexNumber.realPart(ComplexNumber.from_real(r)) * ComplexNumber.imaginaryPart(w)
+       + ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
+             * ComplexNumber.realPart(w)
+           by ComplexNumber.imaginaryPart_multiply(ComplexNumber.from_real(r), w)
+     = r * ComplexNumber.imaginaryPart(w)
+       + ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
+             * ComplexNumber.realPart(w)
+           by ComplexNumber.realPart_from_real(r)
+     = r * ComplexNumber.imaginaryPart(w) + Real.zero * ComplexNumber.realPart(w)
+           by ComplexNumber.imaginaryPart_from_real(r)
+     = r * ComplexNumber.imaginaryPart(w)
+           by ring
+
+-- ----------------------------------------------------------------------
+-- The k-th term of the cosine/sine series: Re/Im of the k-th term of
+-- exp(ix), with the real coefficient 1/k! pulled out.
+
+-- The coefficient that the term carries (1/k!, embedded into ℝ).
+definition Real.exponentialCoefficient (k : Natural) : Real :=
+  (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+
+theorem ComplexNumber.realPart_exponentialTerm_imaginaryAxis (x : Real) (k : Natural)
+        : ComplexNumber.realPart(
+              ComplexNumber.exponentialTerm(
+                  ComplexNumber.i * ComplexNumber.from_real(x), k))
+          = Real.exponentialCoefficient(k)
+            * ComplexNumber.realPart(
+                  ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k)) :=
+  ComplexNumber.realPart_from_real_multiply(
+      Real.exponentialCoefficient(k),
+      ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+
+theorem ComplexNumber.imaginaryPart_exponentialTerm_imaginaryAxis (x : Real) (k : Natural)
+        : ComplexNumber.imaginaryPart(
+              ComplexNumber.exponentialTerm(
+                  ComplexNumber.i * ComplexNumber.from_real(x), k))
+          = Real.exponentialCoefficient(k)
+            * ComplexNumber.imaginaryPart(
+                  ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k)) :=
+  ComplexNumber.imaginaryPart_from_real_multiply(
+      Real.exponentialCoefficient(k),
+      ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+
+-- ----------------------------------------------------------------------
+-- The even/odd evaluations, from the i-power 4-cycle.
+
+-- Re(term_{2m}) = (1/(2m)!)·(−x²)^m.
+theorem Real.cosine_term_even (x : Real) (m : Natural)
+        : ComplexNumber.realPart(
+              ComplexNumber.exponentialTerm(
+                  ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+          = Real.exponentialCoefficient(2 * m) * Real.power(-(x * x), m) := {
+  obtain ⟨evenReal, _⟩
+      from ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+  calc ComplexNumber.realPart(
+           ComplexNumber.exponentialTerm(
+               ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+     = Real.exponentialCoefficient(2 * m)
+       * ComplexNumber.realPart(
+             ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+           by ComplexNumber.realPart_exponentialTerm_imaginaryAxis(x, 2 * m)
+     = Real.exponentialCoefficient(2 * m) * Real.power(-(x * x), m)
+           since evenReal
+}
+
+-- Re(term_{2m+1}) = 0.
+theorem Real.cosine_term_odd (x : Real) (m : Natural)
+        : ComplexNumber.realPart(
+              ComplexNumber.exponentialTerm(
+                  ComplexNumber.i * ComplexNumber.from_real(x), successor(2 * m)))
+          = Real.zero := {
+  obtain ⟨_, rest⟩ from ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+  obtain ⟨_, rest2⟩ from rest;
+  obtain ⟨oddReal, _⟩ from rest2;
+  calc ComplexNumber.realPart(
+           ComplexNumber.exponentialTerm(
+               ComplexNumber.i * ComplexNumber.from_real(x), successor(2 * m)))
+     = Real.exponentialCoefficient(successor(2 * m))
+       * ComplexNumber.realPart(
+             ComplexNumber.power(
+                 ComplexNumber.i * ComplexNumber.from_real(x), successor(2 * m)))
+           by ComplexNumber.realPart_exponentialTerm_imaginaryAxis(x, successor(2 * m))
+     = Real.exponentialCoefficient(successor(2 * m)) * Real.zero
+           since oddReal
+     = Real.zero
+           by ring
+}
+
+-- Im(term_{2m}) = 0.
+theorem Real.sine_term_even (x : Real) (m : Natural)
+        : ComplexNumber.imaginaryPart(
+              ComplexNumber.exponentialTerm(
+                  ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+          = Real.zero := {
+  obtain ⟨_, rest⟩ from ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+  obtain ⟨evenImaginary, _⟩ from rest;
+  calc ComplexNumber.imaginaryPart(
+           ComplexNumber.exponentialTerm(
+               ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+     = Real.exponentialCoefficient(2 * m)
+       * ComplexNumber.imaginaryPart(
+             ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+           by ComplexNumber.imaginaryPart_exponentialTerm_imaginaryAxis(x, 2 * m)
+     = Real.exponentialCoefficient(2 * m) * Real.zero
+           since evenImaginary
+     = Real.zero
+           by ring
+}
+
+-- Im(term_{2m+1}) = (1/(2m+1)!)·x·(−x²)^m.
+theorem Real.sine_term_odd (x : Real) (m : Natural)
+        : ComplexNumber.imaginaryPart(
+              ComplexNumber.exponentialTerm(
+                  ComplexNumber.i * ComplexNumber.from_real(x), successor(2 * m)))
+          = Real.exponentialCoefficient(successor(2 * m)) * (x * Real.power(-(x * x), m)) := {
+  obtain ⟨_, rest⟩ from ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+  obtain ⟨_, rest2⟩ from rest;
+  obtain ⟨_, oddImaginary⟩ from rest2;
+  calc ComplexNumber.imaginaryPart(
+           ComplexNumber.exponentialTerm(
+               ComplexNumber.i * ComplexNumber.from_real(x), successor(2 * m)))
+     = Real.exponentialCoefficient(successor(2 * m))
+       * ComplexNumber.imaginaryPart(
+             ComplexNumber.power(
+                 ComplexNumber.i * ComplexNumber.from_real(x), successor(2 * m)))
+           by ComplexNumber.imaginaryPart_exponentialTerm_imaginaryAxis(
+                  x, successor(2 * m))
+     = Real.exponentialCoefficient(successor(2 * m)) * (x * Real.power(-(x * x), m))
+           since oddImaginary
+}
+
+-- ----------------------------------------------------------------------
+-- cos and sin as the limits of their real series. Re/Im commute with
+-- the convergent partial sums of exp(ix): the real partial sums of
+-- Re(term) converge to Re(exp(ix)) = cos x.
+
+theorem Real.cosine_series_converges (x : Real)
+        : Real.SequenceConverges(
+              Real.partialSum(
+                  (k : Natural) ↦
+                      ComplexNumber.realPart(
+                          ComplexNumber.exponentialTerm(
+                              ComplexNumber.i * ComplexNumber.from_real(x), k))),
+              cos(x)) := {
+  claim complexConverges
+      : ComplexNumber.SequenceConverges(
+            ComplexNumber.partialSum(
+                ComplexNumber.exponentialTerm(
+                    ComplexNumber.i * ComplexNumber.from_real(x))),
+            ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)))
+      by ComplexNumber.exponential_converges(
+             ComplexNumber.i * ComplexNumber.from_real(x));
+  claim realPartConverges
+      : Real.SequenceConverges(
+            (n : Natural) ↦
+                ComplexNumber.realPart(
+                    ComplexNumber.partialSum(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x)),
+                        n)),
+            ComplexNumber.realPart(
+                ComplexNumber.exponential(
+                    ComplexNumber.i * ComplexNumber.from_real(x))))
+      by ComplexNumber.SequenceConverges.realPart(
+             ComplexNumber.partialSum(
+                 ComplexNumber.exponentialTerm(
+                     ComplexNumber.i * ComplexNumber.from_real(x))),
+             ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)),
+             complexConverges);
+  claim pointwise
+      : (n : Natural)
+        → ComplexNumber.realPart(
+              ComplexNumber.partialSum(
+                  ComplexNumber.exponentialTerm(
+                      ComplexNumber.i * ComplexNumber.from_real(x)),
+                  n))
+          = Real.partialSum(
+                (k : Natural) ↦
+                    ComplexNumber.realPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                n)
+      by (n : Natural) ↦
+           ComplexNumber.realPart_partialSum(
+               ComplexNumber.exponentialTerm(
+                   ComplexNumber.i * ComplexNumber.from_real(x)),
+               n);
+  -- cos x is exactly Re(exp(ix)) by definition.
+  claim Real.SequenceConverges(
+            Real.partialSum(
+                (k : Natural) ↦
+                    ComplexNumber.realPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x), k))),
+            ComplexNumber.realPart(
+                ComplexNumber.exponential(
+                    ComplexNumber.i * ComplexNumber.from_real(x))))
+      by Real.SequenceConverges.of_pointwise(
+             (n : Natural) ↦
+                 ComplexNumber.realPart(
+                     ComplexNumber.partialSum(
+                         ComplexNumber.exponentialTerm(
+                             ComplexNumber.i * ComplexNumber.from_real(x)),
+                         n)),
+             Real.partialSum(
+                 (k : Natural) ↦
+                     ComplexNumber.realPart(
+                         ComplexNumber.exponentialTerm(
+                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
+             ComplexNumber.realPart(
+                 ComplexNumber.exponential(
+                     ComplexNumber.i * ComplexNumber.from_real(x))),
+             pointwise, realPartConverges);
+  done
+}
+
+theorem Real.sine_series_converges (x : Real)
+        : Real.SequenceConverges(
+              Real.partialSum(
+                  (k : Natural) ↦
+                      ComplexNumber.imaginaryPart(
+                          ComplexNumber.exponentialTerm(
+                              ComplexNumber.i * ComplexNumber.from_real(x), k))),
+              sin(x)) := {
+  claim complexConverges
+      : ComplexNumber.SequenceConverges(
+            ComplexNumber.partialSum(
+                ComplexNumber.exponentialTerm(
+                    ComplexNumber.i * ComplexNumber.from_real(x))),
+            ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)))
+      by ComplexNumber.exponential_converges(
+             ComplexNumber.i * ComplexNumber.from_real(x));
+  claim imaginaryPartConverges
+      : Real.SequenceConverges(
+            (n : Natural) ↦
+                ComplexNumber.imaginaryPart(
+                    ComplexNumber.partialSum(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x)),
+                        n)),
+            ComplexNumber.imaginaryPart(
+                ComplexNumber.exponential(
+                    ComplexNumber.i * ComplexNumber.from_real(x))))
+      by ComplexNumber.SequenceConverges.imaginaryPart(
+             ComplexNumber.partialSum(
+                 ComplexNumber.exponentialTerm(
+                     ComplexNumber.i * ComplexNumber.from_real(x))),
+             ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)),
+             complexConverges);
+  claim pointwise
+      : (n : Natural)
+        → ComplexNumber.imaginaryPart(
+              ComplexNumber.partialSum(
+                  ComplexNumber.exponentialTerm(
+                      ComplexNumber.i * ComplexNumber.from_real(x)),
+                  n))
+          = Real.partialSum(
+                (k : Natural) ↦
+                    ComplexNumber.imaginaryPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                n)
+      by (n : Natural) ↦
+           ComplexNumber.imaginaryPart_partialSum(
+               ComplexNumber.exponentialTerm(
+                   ComplexNumber.i * ComplexNumber.from_real(x)),
+               n);
+  claim Real.SequenceConverges(
+            Real.partialSum(
+                (k : Natural) ↦
+                    ComplexNumber.imaginaryPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x), k))),
+            ComplexNumber.imaginaryPart(
+                ComplexNumber.exponential(
+                    ComplexNumber.i * ComplexNumber.from_real(x))))
+      by Real.SequenceConverges.of_pointwise(
+             (n : Natural) ↦
+                 ComplexNumber.imaginaryPart(
+                     ComplexNumber.partialSum(
+                         ComplexNumber.exponentialTerm(
+                             ComplexNumber.i * ComplexNumber.from_real(x)),
+                         n)),
+             Real.partialSum(
+                 (k : Natural) ↦
+                     ComplexNumber.imaginaryPart(
+                         ComplexNumber.exponentialTerm(
+                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
+             ComplexNumber.imaginaryPart(
+                 ComplexNumber.exponential(
+                     ComplexNumber.i * ComplexNumber.from_real(x))),
+             pointwise, imaginaryPartConverges);
+  done
+}
