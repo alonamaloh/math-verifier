@@ -4968,6 +4968,41 @@ void loadCacheRecursive(Environment& environment,
     // matches on declaration TYPES alone; nothing δ-unfolds the dropped
     // bodies. Real verification (indexMode=false) reads every body intact.
     CacheContents contents = readCacheFile(cachePath, /*skipBodies=*/indexMode);
+    // Staleness check: a cache older than its source presents OLD
+    // declarations — new lemmas/overloads come back "unknown identifier"
+    // and citations fail with misleading messages. `make` keeps the
+    // chain fresh for build-driven verification; this catches the
+    // hand-run `kernel verify` against an edited-but-not-rebuilt
+    // dependency. Skipped when the source is absent (deployed caches)
+    // and in indexMode (the suggestion index tolerates slightly stale
+    // types; failing an error-enrichment path would mask the real error).
+    bool isInterfaceCache = cachePath.size() >= 6
+        && cachePath.compare(cachePath.size() - 6, 6, ".iface") == 0;
+    // For an interface cache, compare against its sibling FULL .mathv:
+    // the iface build rule deliberately keeps the old mtime when the
+    // statements are unchanged (so a proof-only edit doesn't cascade),
+    // but make refreshes the full cache on ANY source change — so
+    // "source newer than the full sibling" is the honest staleness test
+    // for both kinds.
+    std::string freshnessWitness = isInterfaceCache
+        ? cachePath.substr(0, cachePath.size() - 6)
+        : cachePath;
+    if (!indexMode && !contents.sourcePath.empty()) {
+        std::error_code sourceError, cacheError;
+        auto sourceTime = std::filesystem::last_write_time(
+            contents.sourcePath, sourceError);
+        auto cacheTime = std::filesystem::last_write_time(
+            freshnessWitness, cacheError);
+        if (!sourceError && !cacheError && sourceTime > cacheTime) {
+            std::cerr << "stale cache " << cachePath << ":\n"
+                << "  its source " << contents.sourcePath
+                << " was modified after the cache was written —\n"
+                << "  the cached declarations are out of date. Run "
+                   "`make -j 16 library` from the project root to "
+                   "rebuild, then retry this verify.\n";
+            std::exit(1);
+        }
+    }
     // Load deps first (post-order: deps' declarations available before
     // this cache's declarations are added).
     for (const auto& dependency : contents.dependencies) {
