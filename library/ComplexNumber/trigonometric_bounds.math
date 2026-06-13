@@ -602,3 +602,110 @@ theorem Real.exponentialCoefficient_antitone (i j : Natural) (iLeqJ : i ≤ j)
               Rational.reciprocal_function((Natural.factorial(i) : Rational)),
               recipLe)
 }
+
+-- ----------------------------------------------------------------------
+-- Every natural is even or odd: n = 2j or n = 2j+1.
+theorem Natural.even_or_odd
+        : (n : Natural) → ∃ (j : Natural). Or(n = 2 * j, n = successor(2 * j))
+  | zero => {
+      claim base : (0 : Natural) = 2 * 0;
+      witness 0 with Or.introduceLeft(base)
+    }
+  | successor(p) => {
+      obtain ⟨j, disjunction⟩ from Natural.even_or_odd(p);
+      cases disjunction {
+        | Or.introduceLeft(pEven) => {
+            claim oddEq : successor(p) = successor(2 * j) by substituting pEven;
+            witness j with Or.introduceRight(oddEq)
+          }
+        | Or.introduceRight(pOdd) => {
+            claim evenEq : successor(p) = 2 * successor(j)
+                by calc successor(p)
+                      = successor(successor(2 * j))    by substituting pOdd
+                      = 2 * successor(j)               by ring;
+            witness successor(j) with Or.introduceLeft(evenEq)
+          }
+      }
+    }
+
+-- ----------------------------------------------------------------------
+-- Partial sums of an "alternating, decreasing-magnitude" series stay
+-- non-positive when the leading (even-indexed) terms are ≤ 0 and each
+-- consecutive pair sums to ≤ 0. The even and odd cuts are handled
+-- together by induction on the pair index.
+theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
+        (leadNonpositive : (j : Natural) → g(2 * j) ≤ Real.zero)
+        (pairNonpositive
+            : (j : Natural) → g(2 * j) + g(successor(2 * j)) ≤ Real.zero)
+        : (j : Natural)
+          → And(Real.partialSum(g, 2 * j) ≤ Real.zero,
+                Real.partialSum(g, successor(2 * j)) ≤ Real.zero)
+  | zero => {
+      claim evenZero : Real.partialSum(g, 2 * 0) ≤ Real.zero;
+      claim oddZero : Real.partialSum(g, successor(2 * 0)) ≤ Real.zero
+          by calc Real.partialSum(g, successor(2 * 0))
+                = Real.partialSum(g, 2 * 0) + g(2 * 0)
+                = Real.zero + g(2 * 0)
+                = g(2 * 0)
+                      by ring
+                ≤ Real.zero
+                      by leadNonpositive(0);
+      done by And.introduction(evenZero, oddZero)
+    }
+  | successor(j) => {
+      obtain ⟨evenAt, oddAt⟩
+          from Real.partialSum_nonpositive_paired(
+                   g, leadNonpositive, pairNonpositive, j);
+      claim indexEven : 2 * successor(j) = successor(successor(2 * j)) by ring;
+      claim g(2 * j) + g(successor(2 * j)) ≤ Real.zero
+          by pairNonpositive(j);
+      claim evenStep : Real.partialSum(g, 2 * successor(j)) ≤ Real.zero
+          by calc Real.partialSum(g, 2 * successor(j))
+                = Real.partialSum(g, successor(successor(2 * j)))
+                      by indexEven
+                = Real.partialSum(g, successor(2 * j)) + g(successor(2 * j))
+                = (Real.partialSum(g, 2 * j) + g(2 * j)) + g(successor(2 * j))
+                = Real.partialSum(g, 2 * j) + (g(2 * j) + g(successor(2 * j)))
+                      by ring
+                ≤ Real.zero + (g(2 * j) + g(successor(2 * j)))
+                      since Real.add_preserves_LessOrEqual
+                ≤ Real.zero + Real.zero
+                      since Real.add_preserves_LessOrEqual_left
+                = Real.zero
+                      by ring;
+      claim g(2 * successor(j)) ≤ Real.zero
+          by leadNonpositive(successor(j));
+      claim oddStep : Real.partialSum(g, successor(2 * successor(j))) ≤ Real.zero
+          by calc Real.partialSum(g, successor(2 * successor(j)))
+                = Real.partialSum(g, 2 * successor(j)) + g(2 * successor(j))
+                ≤ Real.zero + g(2 * successor(j))
+                      since Real.add_preserves_LessOrEqual
+                ≤ Real.zero + Real.zero
+                      since Real.add_preserves_LessOrEqual_left
+                = Real.zero
+                      by ring;
+      done by And.introduction(evenStep, oddStep)
+    }
+
+-- … hence non-positive at every cut (split n by parity).
+theorem Real.partialSum_nonpositive (g : Natural → Real)
+        (leadNonpositive : (j : Natural) → g(2 * j) ≤ Real.zero)
+        (pairNonpositive
+            : (j : Natural) → g(2 * j) + g(successor(2 * j)) ≤ Real.zero)
+        (n : Natural)
+        : Real.partialSum(g, n) ≤ Real.zero := {
+  obtain ⟨j, disjunction⟩ from Natural.even_or_odd(n);
+  obtain ⟨evenPaired, oddPaired⟩
+      from Real.partialSum_nonpositive_paired(
+               g, leadNonpositive, pairNonpositive, j);
+  cases disjunction {
+    | Or.introduceLeft(nEven) =>
+        calc Real.partialSum(g, n)
+           = Real.partialSum(g, 2 * j)    by nEven
+           ≤ Real.zero                    by evenPaired
+    | Or.introduceRight(nOdd) =>
+        calc Real.partialSum(g, n)
+           = Real.partialSum(g, successor(2 * j))    by nOdd
+           ≤ Real.zero                               by oddPaired
+  }
+}
