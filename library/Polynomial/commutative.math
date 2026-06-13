@@ -60,26 +60,6 @@ theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
      = i                                                by Natural.monus_add_involution
 }
 
--- ----------------------------------------------------------------------
--- Sum reflection: Σ_{i=0}^{n} f(i) = Σ_{i=0}^{n} f(n−i).
-
-theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
-        (n : Natural)
-        : Polynomial.Sum(r, f, n)
-          = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(n, i)), n) :=
-  by_induction on n with IH {
-    case zero: done by unfolding Natural.monus
-    case successor(k):
-        
-          calc Polynomial.Sum(r, f, successor(k))
-             = (Polynomial.Sum(r, f, k) + f(successor(k)))
-             = (f(successor(k)) + Polynomial.Sum(r, f, k))
-             = (f(successor(k)) + Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
-             = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(successor(k), i)), successor(k))
-                 by Polynomial.Sum.shift(r,
-                        (i : Natural) ↦ f(Natural.monus(successor(k), i)), k)
-  }
-
 -- Sum respects pointwise equality on the summation range 0..n.
 theorem Polynomial.Sum.extensional_range (r : Ring)
         (f g : Natural → Ring.carrier(r))
@@ -104,6 +84,50 @@ theorem Polynomial.Sum.extensional_range (r : Ring)
 -- step also closes from `(i) => i ≤ n => f(i) = g(i)`. The elaborator
 -- tries Sum.extensional first (fails on the 2-binder lambda) then this.
 congruence_under_binder Polynomial.Sum := Polynomial.Sum.extensional_range
+
+-- ----------------------------------------------------------------------
+-- Sum reflection: Σ_{i=0}^{n} f(i) = Σ_{i=0}^{n} f(n−i).
+
+theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
+        (n : Natural)
+        : Polynomial.Sum(r, f, n)
+          = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(n, i)), n) :=
+  by_induction on n with IH {
+    -- Base: monus(0, 0) = 0, so both sides are f(0).
+    case zero: done by substituting Natural.monus_zero_left
+    case successor(k): {
+        -- The tail reindexes by monus_succ_succ, pointwise over the range.
+        claim tailReindex
+            : Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k)
+              = Polynomial.Sum(r,
+                    (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))), k)
+          by Polynomial.Sum.extensional_range(r,
+                 (i : Natural) ↦ f(Natural.monus(k, i)),
+                 (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))),
+                 k,
+                 (i : Natural) (_ : i ≤ k) ↦
+                     calc f(Natural.monus(k, i))
+                        = f(Natural.monus(successor(k), successor(i)))
+                            by substituting Natural.monus_succ_succ);
+        -- Peel f(succ k) = f(monus(succ k, 0)) off the top, reindex the
+        -- tail, then Sum.shift re-rolls head and tail into one Σ.
+        calc Polynomial.Sum(r, f, successor(k))
+           = (Polynomial.Sum(r, f, k) + f(successor(k)))
+           = (f(successor(k)) + Polynomial.Sum(r, f, k))
+           = (f(successor(k))
+              + Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
+           = (f(Natural.monus(successor(k), 0))
+              + Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
+               by substituting Natural.monus_succ_zero
+           = (f(Natural.monus(successor(k), 0))
+              + Polynomial.Sum(r,
+                    (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))), k))
+               by substituting tailReindex
+           = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(successor(k), i)), successor(k))
+               by Polynomial.Sum.shift(r,
+                      (i : Natural) ↦ f(Natural.monus(successor(k), i)), k)
+  }
+  }
 
 -- ----------------------------------------------------------------------
 -- Commutativity of the convolution when the ring is commutative.
