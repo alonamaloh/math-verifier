@@ -4978,29 +4978,40 @@ void loadCacheRecursive(Environment& environment,
     // types; failing an error-enrichment path would mask the real error).
     bool isInterfaceCache = cachePath.size() >= 6
         && cachePath.compare(cachePath.size() - 6, 6, ".iface") == 0;
-    // For an interface cache, compare against its sibling FULL .mathv:
-    // the iface build rule deliberately keeps the old mtime when the
-    // statements are unchanged (so a proof-only edit doesn't cascade),
-    // but make refreshes the full cache on ANY source change — so
-    // "source newer than the full sibling" is the honest staleness test
-    // for both kinds.
-    std::string freshnessWitness = isInterfaceCache
-        ? cachePath.substr(0, cachePath.size() - 6)
-        : cachePath;
+    // Content-based freshness: compare the source's CURRENT hash against the
+    // hash recorded when this cache was written. This is robust where mtime is
+    // not: the iface keeps its old mtime across proof-only edits (so consumers
+    // don't cascade-rebuild), and its sibling full `.mathv` is NOT a build-
+    // prerequisite of a consumer reading the iface — so neither mtime is a
+    // sound staleness witness, and an mtime test produces phantom "stale"
+    // errors during a build. For a full cache the recorded hash is
+    // `contents.sourceHash`; for an interface cache (whose own sourceHash is
+    // zeroed to stay byte-stable) it lives in a `.srchash` sidecar written
+    // alongside the iface (always, even when the iface bytes don't change).
     if (!indexMode && !contents.sourcePath.empty()) {
-        std::error_code sourceError, cacheError;
-        auto sourceTime = std::filesystem::last_write_time(
-            contents.sourcePath, sourceError);
-        auto cacheTime = std::filesystem::last_write_time(
-            freshnessWitness, cacheError);
-        if (!sourceError && !cacheError && sourceTime > cacheTime) {
-            std::cerr << "stale cache " << cachePath << ":\n"
-                << "  its source " << contents.sourcePath
-                << " was modified after the cache was written —\n"
-                << "  the cached declarations are out of date. Run "
-                   "`make -j 16 library` from the project root to "
-                   "rebuild, then retry this verify.\n";
-            std::exit(1);
+        std::ifstream sourceStream(contents.sourcePath, std::ios::binary);
+        if (sourceStream) {
+            std::ostringstream sourceBuffer;
+            sourceBuffer << sourceStream.rdbuf();
+            uint64_t currentHash = fnv1aHash(sourceBuffer.str());
+            uint64_t recordedHash = 0;
+            bool haveRecorded = false;
+            if (isInterfaceCache) {
+                std::ifstream sidecar(cachePath + ".srchash");
+                if (sidecar) { sidecar >> recordedHash; haveRecorded = true; }
+            } else if (contents.sourceHash != 0) {
+                recordedHash = contents.sourceHash;
+                haveRecorded = true;
+            }
+            if (haveRecorded && recordedHash != currentHash) {
+                std::cerr << "stale cache " << cachePath << ":\n"
+                    << "  its source " << contents.sourcePath
+                    << " has changed since the cache was written —\n"
+                    << "  the cached declarations are out of date. Run "
+                       "`make -j 16 library` from the project root to "
+                       "rebuild, then retry this verify.\n";
+                std::exit(1);
+            }
         }
     }
     // Load deps first (post-order: deps' declarations available before
@@ -5546,6 +5557,19 @@ int verifyWithCache(const std::string& sourcePath,
             if (writeInterface) {
                 writeCacheFileIfChanged(outputCachePath + ".iface",
                                         deriveInterfaceCache(cache, environment));
+                // Source-hash sidecar for the freshness check. The iface zeroes
+                // its own sourceHash to stay byte-stable across proof-only edits
+                // (so consumers don't cascade-rebuild); record the real source
+                // hash HERE, always — this file is rewritten whenever stage 1
+                // runs, so a consumer reading the iface can verify it reflects
+                // the current source by content, never by mtime.
+                std::string sidecarPath = outputCachePath + ".iface.srchash";
+                std::string sidecarTempPath = sidecarPath + ".tmp";
+                {
+                    std::ofstream sidecar(sidecarTempPath, std::ios::binary);
+                    sidecar << cache.sourceHash;
+                }
+                std::filesystem::rename(sidecarTempPath, sidecarPath);
             }
         } catch (const SerializationError& error) {
             std::cerr << "cache write failure for " << outputCachePath

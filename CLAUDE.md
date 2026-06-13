@@ -11,6 +11,12 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 
 ## Always-apply rules
 
+- **Fix bugs; never work around them.** When something misbehaves — a build
+  flake, a tactic that "shouldn't" fail, a stale cache, a spurious error —
+  diagnose the root cause and fix it at the source (kernel, elaborator,
+  Makefile, build logic). Do not paper over it with retries, re-runs, ad-hoc
+  reorderings, or proof hacks. A workaround hides the defect and lets it bite
+  the next person; a fix removes it for everyone.
 - **Build with `make -j 16 library`** from the project root (never bare
   `make`). `make -j 16 tests` also verifies the `Test/` feature files.
   Warm rebuilds are sub-second; a change to `*.cpp`/`*.hpp` (kernel or
