@@ -119,7 +119,6 @@ theorem Polynomial.nth_multiply (r : Ring)
   | Polynomial.Coefficients.cons(a, restA), q, k =>
       cases k {
         | zero =>
-            unfold Natural.monus in
               calc Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q), 0)
                  = (Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, q), 0) + Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), 0))
                      by Polynomial.nth_add
@@ -130,6 +129,9 @@ theorem Polynomial.nth_multiply (r : Ring)
                        (i : Natural) ↦
                            (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i) * Polynomial.coefficient(r, q, Natural.monus(0, i))),
                        0)
+                     by Polynomial.Sum.convolution_zero(r,
+                            (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
+                            (m : Natural) ↦ Polynomial.coefficient(r, q, m))
         | successor(predecessor) => {
             claim Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor)
                   = Polynomial.Sum(r,
@@ -151,9 +153,9 @@ theorem Polynomial.nth_multiply (r : Ring)
                        (i : Natural) ↦
                            (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i) * Polynomial.coefficient(r, q, Natural.monus(successor(predecessor), i))),
                        successor(predecessor))
-                     by Polynomial.Sum.shift(r,
-                            (i : Natural) ↦
-                                (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i) * Polynomial.coefficient(r, q, Natural.monus(successor(predecessor), i))),
+                     by Polynomial.Sum.convolution_shift(r,
+                            (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
+                            (m : Natural) ↦ Polynomial.coefficient(r, q, m),
                             predecessor)
           }
       }

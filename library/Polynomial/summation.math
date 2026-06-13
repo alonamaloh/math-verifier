@@ -119,3 +119,59 @@ theorem Polynomial.Sum.scale_right (r : Ring)
            = (Polynomial.Sum(r, (i : Natural) ↦ (f(i) * c), k) + (f(successor(k)) * c))
            = Polynomial.Sum(r, (i : Natural) ↦ (f(i) * c), successor(k))
   }
+
+-- ----------------------------------------------------------------------
+-- Convolution peel. The summand of a polynomial product is
+-- `A(i) · B(monus(n, i))`, with the monus on the SECOND factor. These
+-- two lemmas absorb all of its monus arithmetic — Sum.shift plus
+-- monus_zero_left / monus_succ_zero / monus_succ_succ — once, so the
+-- multiplication proofs cite them and never unfold monus themselves.
+--   Σ_{i=0}^{0}   A(i)·B(monus(0, i))   = A(0)·B(0)
+--   Σ_{i=0}^{k+1} A(i)·B(monus(k+1, i)) = A(0)·B(k+1)
+--                                         + Σ_{j=0}^{k} A(j+1)·B(monus(k, j))
+
+theorem Polynomial.Sum.convolution_zero (r : Ring)
+        (A B : Natural → Ring.carrier(r))
+        : Polynomial.Sum(r, (i : Natural) ↦ (A(i) * B(Natural.monus(0, i))), 0)
+          = (A(0) * B(0)) :=
+  -- Σ over 0 is the i = 0 term, and monus(0, 0) = 0.
+  done by substituting Natural.monus_zero_left
+
+theorem Polynomial.Sum.convolution_shift (r : Ring)
+        (A B : Natural → Ring.carrier(r)) (k : Natural)
+        : Polynomial.Sum(r,
+              (i : Natural) ↦ (A(i) * B(Natural.monus(successor(k), i))), successor(k))
+          = ((A(0) * B(successor(k)))
+             + Polynomial.Sum(r,
+                   (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))), k)) := {
+    -- The tail reindexes by monus_succ_succ, pointwise under the Σ.
+    claim tailReindex
+        : Polynomial.Sum(r,
+              (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))), k)
+          = Polynomial.Sum(r,
+              (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))), k)
+      by Polynomial.Sum.extensional(r,
+             (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))),
+             (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))),
+             (j : Natural) ↦
+                 calc (A(successor(j)) * B(Natural.monus(successor(k), successor(j))))
+                    = (A(successor(j)) * B(Natural.monus(k, j)))
+                        by substituting Natural.monus_succ_succ,
+             k);
+    -- Sum.shift exposes the i = 0 head; monus_succ_zero clears its index.
+    calc Polynomial.Sum(r,
+             (i : Natural) ↦ (A(i) * B(Natural.monus(successor(k), i))), successor(k))
+       = ((A(0) * B(Natural.monus(successor(k), 0)))
+          + Polynomial.Sum(r,
+                (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))), k))
+           by Polynomial.Sum.shift(r,
+                  (i : Natural) ↦ (A(i) * B(Natural.monus(successor(k), i))), k)
+       = ((A(0) * B(successor(k)))
+          + Polynomial.Sum(r,
+                (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))), k))
+           by substituting Natural.monus_succ_zero
+       = ((A(0) * B(successor(k)))
+          + Polynomial.Sum(r,
+                (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))), k))
+           by substituting tailReindex
+  }
