@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -1424,6 +1425,27 @@ ExpressionPointer deltaReduceLetFreeVariables(ExpressionPointer expression,
     return walk(expression, 0);
 }
 
+// PROBE: external-linkage so the elaborator (normalization.cpp) can call it.
+bool isHardOpaqueConstant(const std::string& name) {
+    static const std::set<std::string> hardSet = [] {
+        std::set<std::string> result;
+        if (const char* raw = std::getenv("MATH_HARD_OPAQUE")) {
+            std::string current;
+            for (char c : std::string(raw)) {
+                if (c == ',') {
+                    if (!current.empty()) result.insert(current);
+                    current.clear();
+                } else {
+                    current.push_back(c);
+                }
+            }
+            if (!current.empty()) result.insert(current);
+        }
+        return result;
+    }();
+    return hardSet.count(name) > 0;
+}
+
 // True if any entry in `context` is a let-style binder (carries a value).
 // Used by the isDefEq cache to skip caching when ζ-reduction makes the
 // answer context-dependent.
@@ -1458,6 +1480,10 @@ ExpressionPointer unfoldOpaqueHeadOnce(const Environment& environment,
     auto* definition =
         declaration ? std::get_if<Definition>(declaration) : nullptr;
     if (!definition || definition->opacity != Opacity::Opaque) {
+        return nullptr;
+    }
+    // PROBE: a hard-opaque constant refuses even the demand-point retry.
+    if (isHardOpaqueConstant(constant->name)) {
         return nullptr;
     }
     if (definition->universeParameters.size()
