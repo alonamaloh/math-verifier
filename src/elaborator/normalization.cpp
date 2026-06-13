@@ -66,9 +66,9 @@ const Definition* Elaborator::opaqueHeadDefinition(const ExpressionPointer& whnf
         if (it == environment_.declarations.end()) return nullptr;
         auto* def = std::get_if<Definition>(&it->second);
         if (!def || def->opacity != Opacity::Opaque) return nullptr;
-        // PROBE: a hard-opaque constant is never force-unfolded by the
-        // elaborator's demand-point retries (deep-WHNF for `by substituting`,
-        // tuple/lambda intro against an opaque type) — only `unfold X in …`.
+        // Opaque is hard: never force-unfolded by the elaborator's demand-point
+        // retries (deep-WHNF for `by substituting`, cases-on-expression,
+        // tuple/lambda/Pi intro against an opaque type) — only `unfold X in …`.
         if (isHardOpaqueConstant(constant->name)) return nullptr;
         if (outConstant) *outConstant = constant;
         return def;

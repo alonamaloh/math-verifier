@@ -1425,25 +1425,16 @@ ExpressionPointer deltaReduceLetFreeVariables(ExpressionPointer expression,
     return walk(expression, 0);
 }
 
-// PROBE: external-linkage so the elaborator (normalization.cpp) can call it.
-bool isHardOpaqueConstant(const std::string& name) {
-    static const std::set<std::string> hardSet = [] {
-        std::set<std::string> result;
-        if (const char* raw = std::getenv("MATH_HARD_OPAQUE")) {
-            std::string current;
-            for (char c : std::string(raw)) {
-                if (c == ',') {
-                    if (!current.empty()) result.insert(current);
-                    current.clear();
-                } else {
-                    current.push_back(c);
-                }
-            }
-            if (!current.empty()) result.insert(current);
-        }
-        return result;
-    }();
-    return hardSet.count(name) > 0;
+// `opaque` is HARD by default: an opaque constant is never force-unfolded by
+// the kernel/elaborator demand-point bridges — the only way to see through one
+// is an explicit `unfold X in …`. (During the predictability experiment this
+// was gated per-name by the MATH_HARD_OPAQUE env var; that gate is now retired
+// and hard is the standing behaviour for every opaque definition. This remains
+// the single decision point should a future `reducible` marker want to opt a
+// specific definition back into δ-reduction.)
+// External-linkage so the elaborator (normalization.cpp) can call it.
+bool isHardOpaqueConstant(const std::string& /*name*/) {
+    return true;
 }
 
 // True if any entry in `context` is a let-style binder (carries a value).
@@ -1482,7 +1473,8 @@ ExpressionPointer unfoldOpaqueHeadOnce(const Environment& environment,
     if (!definition || definition->opacity != Opacity::Opaque) {
         return nullptr;
     }
-    // PROBE: a hard-opaque constant refuses even the demand-point retry.
+    // Opaque is hard: refuse even the demand-point retry — only an explicit
+    // `unfold X in …` may see through an opaque head.
     if (isHardOpaqueConstant(constant->name)) {
         return nullptr;
     }

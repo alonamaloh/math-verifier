@@ -21,35 +21,31 @@ through **characterising lemmas** — published equations that
 describe `Foo`'s behaviour — rather than relying on automatic
 unfolding.
 
-**`opaque` is now transparent at every demand point — `unfold` is no longer
-needed in ordinary proofs (WS2).** Opacity blocks δ-unfolding during general
-`weakHeadNormalForm`, so goal/term *shape* is preserved for `rewrite` and the
-auto-prover's syntactic matchers — but wherever the kernel or elaborator
-*genuinely demands* the unfolded head, it transparently unfolds an opaque
-constant on the spot. Five coordinated retries make this work, so a proof
-that produces or consumes `Foo`'s *unfolded* form against an expected `Foo(…)`
-type type-checks with **no `unfold`**:
-- **kernel defeq** (`unfoldOpaqueHeadOnce`, end of `isDefinitionallyEqualImpl`)
-  — a failed leaf comparison retries with the opaque head made transparent.
-  Covers leaf *construct* sites (a rep-level term checked against `Foo(…)`) and
-  reflexivity-bodied characterising lemmas.
-- **kernel inferType (Application)** — applying a value whose type is an opaque
-  definition that unfolds to a Pi (`aFoo(arg)` where `Foo` unfolds to `… → …`).
-- **elaborator anonymous tuple** — `⟨witness, proof⟩` against an opaque
-  expected type whose unfolding is an `Exists`/single-constructor inductive
-  (the constructor's parameters, e.g. the `Exists` predicate, are read from
-  the forced-unfolded head).
-- **elaborator `↦`-lambda** — a `(ε)(εpos) ↦ …` body against an opaque expected
-  type whose unfolding is a `∀`-Pi reads its binder domains through the head.
-- **elaborator `claim by substituting`** — a third, force-unfolding search form
-  (`deepWhnfForcingOpaque`) exposes a substitution target buried inside an
-  opaque recursive body (e.g. `divide_step`'s inner `cases monus(p, n)`), with
-  the equation's own endpoint heads protected from unfolding.
+**`opaque` is HARD: an opaque head is never implicitly unfolded, not even at a
+demand point.** Opacity blocks δ-unfolding during general `weakHeadNormalForm`
+(so goal/term *shape* is preserved for `rewrite` and the auto-prover's
+syntactic matchers), AND it refuses the demand-point force-unfold retries — the
+kernel defeq leaf, the inferType-application bridge, the elaborator's
+deep-WHNF (`by substituting`), cases-on-expression, and tuple/lambda/Pi intro
+all leave an opaque head stuck. `isHardOpaqueConstant` (kernel.cpp) returns
+true for every opaque constant; the two bridge entry points
+(`unfoldOpaqueHeadOnce`, `Elaborator::opaqueHeadDefinition`) bail out on it.
+(Earlier — the "WS2 soft bridges" — these retries *did* fire, gated per-name by
+the `MATH_HARD_OPAQUE` env var during the predictability experiment; that gate
+is retired and hard is now the standing behaviour.)
 
-**`unfold Foo in <body>`** remains as an explicit feature/escape hatch (it
-temporarily flips `Foo` transparent while elaborating `<body>`), but is no
-longer required at use sites — user-space `unfold` is **0**. Reach for it only
-when you deliberately want a whole block elaborated against the unfolded view.
+So the only way to see through an opaque head is to ask for it explicitly:
+
+- **`unfold Foo in <body>`** temporarily flips `Foo` transparent while
+  elaborating `<body>`. Use it where the body genuinely produces or consumes
+  `Foo`'s *unfolded* form against an expected `Foo(…)` type — e.g. an
+  arithmetic-result construct whose reduced shape is awkward to name, or a
+  constant like `Real.zero`.
+- **Boundary / characterising lemmas** — the preferred route. Prove the
+  fold/unfold *once* in a tiny named lemma (whose body is the `unfold`), and
+  have every consumer cite the name. The opacity is pierced in one place; no
+  `Quotient.lift` / unfolded view leaks into the consumers. See the IsNonneg
+  boundary pair below.
 
 ### When to mark a definition opaque
 
@@ -94,32 +90,51 @@ from the characterising lemma plus the order hypotheses in context. It
 also stops the `Quotient.lift`/`IsEventuallyNonneg` implementation from
 leaking into every order proof.
 
-Both **construct** and **destruct** sites now work with **no `unfold`** — the
-demand-point retries above cover them. For reference, the two shapes:
+**The boundary lemmas.** Each opaque `IsNonneg` publishes a fold/destruct pair,
+proved once with `unfold`, that consumers cite by name:
 
-- **construct** — the body builds the rep-level form (`(ε) ↦ witness …`
-  for Real, an `Integer.IsNonneg(n)` leaf for Rational, an `⟨witness, proof⟩`
-  tuple) where an `IsNonneg(…)` is expected. Leaf terms bridge via the kernel
-  defeq retry; structured intros (`(ε)(εpos) ↦ …`, `⟨…⟩`, `witness …`) read
-  the unfolded `∀/∃` shape via the lambda / anonymous-tuple retries.
-- **destruct** — the body consumes an `IsNonneg` value as if it were the
-  rep form: `obtain ⟨…⟩ from anIsNonneg`, applying it as `(ε)(εpos)`, or
-  handing it to a lemma that wants the unfolded type. The kernel inferType
-  retry exposes the Pi/inductive head on application.
+```math
+-- Rational/order.math
+theorem Rational.IsNonneg.of_numerator
+        (n : Integer) (d : Natural) (h : Integer.IsNonneg(n))
+        : Rational.IsNonneg(Rational.fraction(n, d)) :=
+  unfold Rational.IsNonneg in h
+theorem Rational.IsNonneg.numerator
+        (n : Integer) (d : Natural) (h : Rational.IsNonneg(Rational.fraction(n, d)))
+        : Integer.IsNonneg(n) :=
+  unfold Rational.IsNonneg in h
+```
 
-Pure **uses** (transitivity/antisymmetry citations, `cases B refining
-hyp` pass-throughs, the `claim by cases` linearity splits) operate on
-the `IsNonneg` arguments and lemmas, not the unfolded body — they always
-worked unchanged. With the demand-point retries, construct and destruct
-sites now do too: **no site needs `unfold`.**
+`Real.IsNonneg` has the analogous `of_eventually_nonneg` / `eventually_nonneg`
+pair over `CauchyRationalSequence.IsEventuallyNonneg`. The consumer rule:
 
-The `by substituting` payoff has one wrinkle: substituting only fires on
-a goal whose head it can see, so state the claim in the **`IsNonneg(diff)`
-form** (defeq to the `≤` goal but syntactically exposing `diff`) and give
-the equation as `(ring : <expanded> = <diff>)` with the subtraction
-written the same way on both sides. `claim x ≤ z by substituting …`
-reports `0 occurrences` because the `≤`/`LessOrEqual` head is never
-unfolded for the match.
+- **destruct** — route through `.numerator` / `.eventually_nonneg`. After
+  `cases x refining h { | rep => … }`, `h : IsNonneg(mk rep)`; feed it to the
+  destructor to recover the rep-level fact. Sites that *apply* an IsNonneg
+  value as the `∀ε∃N` form use `(unfold Real.IsNonneg in h)(…)`.
+- **literal / nameable-rep construct** — cite `.of_numerator` /
+  `.of_eventually_nonneg`. `by Rational.IsNonneg.of_numerator` even
+  auto-discharges the Integer/Natural-image premise (the auto-prover finds e.g.
+  `Integer.zero_is_nonneg`).
+- **arithmetic-result or constant construct** (sums, products, `Real.zero`, the
+  Real `*_at_make` ε/δ lemmas, triangle, the supremum bisection bounds) — the
+  reduced fraction/sequence is awkward to spell, so keep a goal-side
+  `unfold X in <rep-level proof>`. This is the at-representatives pattern; the
+  `unfold` is local to that one helper.
+
+Pure **uses** (transitivity/antisymmetry citations, `cases B refining hyp`
+pass-throughs, the `claim by cases` linearity splits) operate on the
+`IsNonneg` *arguments* and lemmas, not the unfolded body — they need nothing
+special, since `LessOrEqual`/`LessThan` are transparent and reduce to
+`IsNonneg(diff)` without touching the opaque head.
+
+The `by substituting` idiom (for the order transports) has one wrinkle:
+substituting only fires on a goal whose head it can see, so state the claim in
+the **`IsNonneg(diff)` form** (defeq to the `≤` goal but syntactically exposing
+`diff`) and give the equation as `(ring : <expanded> = <diff>)` with the
+subtraction written the same way on both sides. `claim x ≤ z by substituting …`
+reports `0 occurrences` because the `≤`/`LessOrEqual` head, though transparent,
+isn't what carries `diff` for the match.
 
 ### When NOT to mark opaque — the cost / benefit lesson
 
@@ -149,24 +164,23 @@ synthetic motive because two `b`s collided," revert.
 
 1. Mark `Foo` `opaque definition`.
 2. Write the **characterising lemmas** — one per defining
-   equation, all `unfold`-free. A `reflexivity`-bodied equation bridges via
-   the kernel defeq retry (the declared `Foo(constructor args)` reduces, the
-   body's `reflexivity` target is its value). An equation that case-splits on
-   a hypothesis (`claim by substituting …`) bridges via the force-unfolding
-   substitution search form, which exposes `Foo`'s inner `cases` while keeping
-   the substituted endpoint's head intact.
-   Example for `Natural.monus` (all three are `unfold`-free):
+   equation, each body an `unfold Foo in <reflexivity / substituting>`. The
+   `unfold` is what lets the declared `Foo(constructor args)` reduce to the
+   body's value; outside it the head stays stuck. An equation that case-splits
+   on a hypothesis pairs `unfold` with `claim by substituting …`, which then
+   sees `Foo`'s inner `cases` while keeping the substituted endpoint's head
+   intact. Example for `Natural.monus`:
    ```math
    theorem Natural.monus_zero_left (b : Natural)
            : Natural.monus(0, b) = 0 :=
-     reflexivity(Natural, 0)
+     unfold Natural.monus in reflexivity(Natural, 0)
    theorem Natural.monus_succ_zero (k : Natural)
            : Natural.monus(successor(k), 0) = successor(k) :=
-     reflexivity(Natural, successor(k))
+     unfold Natural.monus in reflexivity(Natural, successor(k))
    theorem Natural.monus_succ_succ (k j : Natural)
            : Natural.monus(successor(k), successor(j))
              = Natural.monus(k, j) :=
-     reflexivity(Natural, Natural.monus(k, j))
+     unfold Natural.monus in reflexivity(Natural, Natural.monus(k, j))
    ```
 3. Audit downstream proofs. Each `reflexivity` that used to close
    via `Foo`'s ι-reduction now needs a citation to a

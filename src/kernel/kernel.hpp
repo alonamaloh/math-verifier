@@ -23,12 +23,12 @@ struct TypeError : std::runtime_error {
     ExpressionPointer actualType;
 };
 
-// PROBE (predictability experiment): names listed in the MATH_HARD_OPAQUE
-// environment variable (comma-separated) are treated as "hard" opaque — the
-// demand-point force-unfold retries (kernel defeq/inferType bridge, elaborator
-// deep-WHNF) refuse to expand them, so the only way to fold/unfold them is an
-// explicit `unfold X in …`. Lets us measure the cost of fully-explicit opacity
-// one definition at a time. Empty/unset = current behaviour for all.
+// `opaque` is HARD by default: the demand-point force-unfold retries (kernel
+// defeq/inferType bridge, elaborator deep-WHNF / cases-on-expression / tuple-
+// lambda-Pi intro) refuse to expand an opaque head, so the only way to see
+// through one is an explicit `unfold X in …`. Returns true for every opaque
+// constant; kept as the single decision point for a possible future
+// `reducible` opt-in. (Formerly gated by the MATH_HARD_OPAQUE env var.)
 bool isHardOpaqueConstant(const std::string& name);
 
 // A reduction ran out of its resource budget — the recursion-depth bound

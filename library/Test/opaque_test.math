@@ -50,37 +50,39 @@ theorem mixed_unfold : myDouble(1) = myTripleT(0) + 2 :=
   unfold myDouble, myTripleT in reflexivity(2)
 
 -- ----------------------------------------------------------------------
--- (6) Opacity-tolerant bridges (WS2). Opacity blocks δ during general
--- WHNF (so goal/term SHAPE is preserved for rewrite/matchers), but the
--- kernel and elaborator transparently unfold an opaque head at the
--- points where an equality, a Pi, or an inductive head is genuinely
--- demanded. None of these need `unfold`.
+-- (6) Opacity is HARD at the demand points. Opacity blocks δ during
+-- general WHNF (so goal/term SHAPE is preserved for rewrite/matchers).
+-- Earlier the kernel/elaborator *also* transparently unfolded an opaque
+-- head at the points where an equality leaf, a Pi, or an inductive head
+-- was genuinely demanded (the WS2 "soft bridges"). Those bridges are now
+-- retired: an opaque head is never force-unfolded implicitly, so each of
+-- these demand points needs an explicit `unfold X in …`. The theorems
+-- below pin that down — each would FAIL without its `unfold`.
 
--- (6a) Kernel defeq bridge: the body's type `4 = 4` is checked against
--- the declared `myDouble(2) = 4`; the leaf `myDouble(2)` vs `4` fails
--- structurally, then bridges by unfolding the opaque head.
+-- (6a) Kernel defeq demand: `myDouble(2)` vs `4` at the equality leaf is
+-- not bridged — `unfold` is required to make the leaf reduce.
 theorem bridge_reflexivity : myDouble(2) = 4 :=
-  reflexivity(4)
+  unfold myDouble in reflexivity(4)
 
--- (6b) inferType application retry: applying a value whose type is an
--- opaque definition that unfolds to a Pi.
+-- (6b) Application demand: applying a value whose type is an opaque
+-- definition unfolding to a Pi needs the head made transparent.
 opaque definition OpaqueArrow : Proposition := True → True
 
 theorem bridge_apply (h : OpaqueArrow) : True :=
-  h(True.trivial)
+  unfold OpaqueArrow in h(True.trivial)
 
 -- (6c) Anonymous tuple against an opaque expected type whose unfolding
--- is an `Exists` inductive.
+-- is an `Exists` inductive — the inductive head is read only under `unfold`.
 opaque definition OpaqueExists : Proposition :=
   Exists(Natural, (n : Natural) ↦ n = n)
 
 theorem bridge_tuple : OpaqueExists :=
-  ⟨0, reflexivity(0)⟩
+  unfold OpaqueExists in ⟨0, reflexivity(0)⟩
 
 -- (6d) `↦`-lambda body against an opaque expected type whose unfolding
--- is a Pi — the binder domain is read through the opaque head.
+-- is a Pi — the binder domain is read only under `unfold`.
 opaque definition OpaqueForall : Proposition :=
   (n : Natural) → n = n
 
 theorem bridge_lambda : OpaqueForall :=
-  (n : Natural) ↦ reflexivity(n)
+  unfold OpaqueForall in ((n : Natural) ↦ reflexivity(n))
