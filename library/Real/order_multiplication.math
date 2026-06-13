@@ -74,7 +74,10 @@ theorem Real.IsNonneg.multiply_at_make
           → Real.IsNonneg((Quotient.mk(repX) : Real) * (Quotient.mk(repY) : Real))
   | CauchyRationalSequence.make(s, sCauchy),
     CauchyRationalSequence.make(t, tCauchy) =>
-      (sNonneg : CauchyRationalSequence.IsEventuallyNonneg(
+      -- The product's sequence is λm. s(m)·t(m); the goal reduces to its
+      -- eventual non-negativity, which the ε/δ argument below establishes.
+      unfold Real.IsNonneg in
+      ((sNonneg : CauchyRationalSequence.IsEventuallyNonneg(
            CauchyRationalSequence.make(s, sCauchy)))
       (tNonneg : CauchyRationalSequence.IsEventuallyNonneg(
            CauchyRationalSequence.make(t, tCauchy)))
@@ -157,7 +160,7 @@ theorem Real.IsNonneg.multiply_at_make
                  ≤ s(m) * t(m)
                        by productLow
             }
-      }
+      })
 
 -- ----------------------------------------------------------------------
 -- The interface fact: ℝ is an ordered field on the multiplicative side.
@@ -166,7 +169,9 @@ theorem Real.IsNonneg.multiply (x y : Real)
         : Real.IsNonneg(x * y) :=
   cases x refining xNonneg { | repX =>
       cases y refining yNonneg { | repY =>
-          Real.IsNonneg.multiply_at_make(repX, repY, xNonneg, yNonneg) } }
+          Real.IsNonneg.multiply_at_make(repX, repY,
+              Real.IsNonneg.eventually_nonneg(repX, xNonneg),
+              Real.IsNonneg.eventually_nonneg(repY, yNonneg)) } }
 
 -- Multiplying by a nonnegative factor preserves ≤ (on the right).
 theorem Real.LessOrEqual.multiply_by_nonneg_right (x y c : Real)
@@ -255,8 +260,9 @@ theorem Real.absolute_value_multiplicative (x y : Real)
 -- is pointwise a Rational square (≥ 0), so eventually-nonnegative.
 theorem Real.square_IsNonneg (x : Real)
         : Real.IsNonneg(Real.multiply(x, x)) :=
-  
-  (cases x { | c =>
+  cases x { | c =>
+    Real.IsNonneg.of_eventually_nonneg(
+        CauchyRationalSequence.multiply(c, c),
     (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦
       witness 0 with
           (m : Natural) (zeroLessOrEqualM : 0 ≤ m) ↦
@@ -274,7 +280,7 @@ theorem Real.square_IsNonneg (x : Real)
                             CauchyRationalSequence.sequenceFunction(c, m),
                             CauchyRationalSequence.sequenceFunction(c, m)),
                         Rational.square_IsNonneg(
-                            CauchyRationalSequence.sequenceFunction(c, m))))) })
+                            CauchyRationalSequence.sequenceFunction(c, m))))) ) }
 
 
 -- |x|·|x| = x·x: the square forgets the sign.
