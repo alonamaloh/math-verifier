@@ -59,11 +59,18 @@ opaque definition Natural.modulo_step
 
 -- Top-level functions with fuel = dividend (always enough since each
 -- iteration reduces dividend by at least 1 when divisor ≥ 1).
-definition Natural.divide (divisor dividend : Natural) : Natural :=
+--
+-- These are `opaque`: the fuel-threaded `*_step` machinery is an
+-- implementation detail that callers should never see. Downstream code
+-- reasons about divide/modulo only through their user-facing lemmas
+-- (`divide_modulo_decompose`, `modulo_bound`, `divides_implies_modulo_zero`,
+-- `modulo_zero_implies_divides`); the `unfold` that bridges to the `*_step`
+-- lemmas is confined to those theorems here.
+opaque definition Natural.divide (divisor dividend : Natural) : Natural :=
   Natural.divide_step(
       fuel := dividend, divisor := divisor, dividend := dividend)
 
-definition Natural.modulo (divisor dividend : Natural) : Natural :=
+opaque definition Natural.modulo (divisor dividend : Natural) : Natural :=
   Natural.modulo_step(
       fuel := dividend, divisor := divisor, dividend := dividend)
 
@@ -244,6 +251,7 @@ theorem Natural.divide_modulo_decompose (divisor dividend : Natural)
         : divisor * Natural.divide(divisor, dividend)
               + Natural.modulo(divisor, dividend)
           = dividend :=
+  unfold Natural.divide, Natural.modulo in
   { done by Natural.divide_modulo_step_decompose }
 
 -- ----------------------------------------------------------------------
@@ -400,6 +408,7 @@ theorem Natural.modulo_bound
         (divisor dividend : Natural)
         (divisorPositive : successor(0) ≤ divisor)
         : successor(Natural.modulo(divisor, dividend)) ≤ divisor :=
+  unfold Natural.modulo in
   { done by Natural.modulo_step_lt_divisor }
 
 -- ----------------------------------------------------------------------
@@ -524,7 +533,8 @@ theorem Natural.divides_implies_modulo_zero
         (divisor dividend : Natural)
         (divisorPositive : successor(0) ≤ divisor)
         (dividesProof : Natural.divides(divisor, dividend))
-        : Natural.modulo(divisor, dividend) = 0 := {
+        : Natural.modulo(divisor, dividend) = 0 :=
+  unfold Natural.modulo in {
   obtain ⟨q, dividendEq⟩ from dividesProof;
   -- Rewrite the dividend to divisor*q (dividendEq), then it's a multiple:
   -- modulo(divisor, divisor*q) ≡ modulo_step(divisor*q, divisor, divisor*q),
