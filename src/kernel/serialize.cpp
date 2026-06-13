@@ -1,10 +1,14 @@
 #include "kernel/serialize.hpp"
 
+#include "kernel/kernel.hpp"
+
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <unordered_map>
 #include <variant>
+#include <vector>
 
 namespace {
 
@@ -13,7 +17,13 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // sections at the tail of the file. Files written by version 1 readers
 // are not accepted; on cache-version mismatch the kernel rebuilds.
 // Version 5 adds the congruence-under-binder registry section.
-constexpr uint32_t cacheVersion = 6;
+// Version 7 makes expression serialization DAG-aware: tag 8 is a
+// backreference to an already-(de)serialized node, indexed in
+// post-order of completion. Before this, the in-memory expression DAG
+// was expanded to a TREE on disk — Test/ring_test.mathv was 574 MB of
+// which gzip kept 17 (every shared subterm of the ring certificate
+// written out in full at every occurrence).
+constexpr uint32_t cacheVersion = 7;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -21,6 +31,12 @@ constexpr uint32_t cacheVersion = 6;
 
 struct Writer {
     std::ofstream& stream;
+    // DAG-aware expression dedup: structural-hash buckets of already
+    // emitted nodes -> their post-order indices. Scoped to one file.
+    std::unordered_map<uint64_t,
+                       std::vector<std::pair<ExpressionPointer, uint32_t>>>
+        emittedExpressions;
+    uint32_t nextExpressionIndex = 0;
     void writeBytes(const void* data, size_t bytes) {
         stream.write(static_cast<const char*>(data),
                      static_cast<std::streamsize>(bytes));
@@ -40,6 +56,9 @@ struct Writer {
 
 struct Reader {
     std::ifstream& stream;
+    // Post-order table of every decoded expression node; backreference
+    // tags index into it. Scoped to one file.
+    std::vector<ExpressionPointer> decodedExpressions;
     void readBytes(void* data, size_t bytes) {
         stream.read(static_cast<char*>(data),
                     static_cast<std::streamsize>(bytes));
@@ -132,7 +151,37 @@ LevelPointer readLevel(Reader& reader) {
 //   6 = Constant{name, universeArguments[]}
 //   7 = Let{displayHint, type, value, body}
 
+void writeExpression(Writer& writer, ExpressionPointer expression);
+
+// One top-level expression = one dedup scope. Backreferences never
+// cross unit boundaries, so a skipping reader (skipExpression, used by
+// the lemma-index loader to avoid materialising proof bodies) stays
+// aligned: a skipped unit's internal backreferences are skipped with
+// it, and the next unit starts a fresh index space on both sides.
+void writeExpressionUnit(Writer& writer, ExpressionPointer expression) {
+    writer.emittedExpressions.clear();
+    writer.nextExpressionIndex = 0;
+    writeExpression(writer, expression);
+}
+
 void writeExpression(Writer& writer, ExpressionPointer expression) {
+    // DAG-awareness: if a structurally identical node was already
+    // written, emit a backreference instead of re-expanding the whole
+    // subtree (tag 8 + post-order index). The lookup keys on the
+    // precomputed structural hash, confirmed by structurallyEqual.
+    {
+        auto bucket = writer.emittedExpressions.find(expression->hash);
+        if (bucket != writer.emittedExpressions.end()) {
+            for (const auto& [seen, index] : bucket->second) {
+                if (seen.get() == expression.get()
+                    || structurallyEqual(seen, expression)) {
+                    writer.writeU8(8);
+                    writer.writeU32(index);
+                    return;
+                }
+            }
+        }
+    }
     if (auto* boundVar = std::get_if<BoundVariable>(&expression->node)) {
         writer.writeU8(0);
         writer.writeI32(boundVar->deBruijnIndex);
@@ -174,6 +223,10 @@ void writeExpression(Writer& writer, ExpressionPointer expression) {
     } else {
         throw SerializationError("writeExpression: unknown variant");
     }
+    // Register AFTER the children (post-order), so writer and reader
+    // assign identical indices.
+    writer.emittedExpressions[expression->hash].emplace_back(
+        expression, writer.nextExpressionIndex++);
 }
 
 // Recursion depth bound for the deserializer. A cache file with a very
@@ -183,6 +236,14 @@ void writeExpression(Writer& writer, ExpressionPointer expression) {
 // the real problem: such a file should never have been written.
 constexpr int maxReadExpressionDepth = 20000;
 thread_local int readExpressionDepth = 0;
+
+ExpressionPointer readExpression(Reader& reader);
+ExpressionPointer readExpressionNode(Reader& reader, uint8_t tag);
+
+ExpressionPointer readExpressionUnit(Reader& reader) {
+    reader.decodedExpressions.clear();
+    return readExpression(reader);
+}
 
 ExpressionPointer readExpression(Reader& reader) {
     struct DepthGuard {
@@ -200,6 +261,21 @@ ExpressionPointer readExpression(Reader& reader) {
         ~DepthGuard() { --readExpressionDepth; }
     } depthGuard;
     uint8_t tag = reader.readU8();
+    if (tag == 8) {
+        uint32_t index = reader.readU32();
+        if (index >= reader.decodedExpressions.size()) {
+            throw SerializationError(
+                "readExpression: backreference index out of range");
+        }
+        return reader.decodedExpressions[index];
+    }
+    ExpressionPointer decoded = readExpressionNode(reader, tag);
+    // Post-order registration mirrors the writer's index assignment.
+    reader.decodedExpressions.push_back(decoded);
+    return decoded;
+}
+
+ExpressionPointer readExpressionNode(Reader& reader, uint8_t tag) {
     switch (tag) {
         case 0: return makeBoundVariable(reader.readI32());
         case 1: {
@@ -280,6 +356,10 @@ ExpressionPointer readExpression(Reader& reader) {
 // Lambda / Application / Let spines.
 void skipExpression(Reader& reader) {
     uint8_t tag = reader.readU8();
+    if (tag == 8) {           // backreference: 4-byte index, no children
+        (void)reader.readU32();
+        return;
+    }
     switch (tag) {
         case 0: reader.readI32(); return;                      // BoundVariable
         case 1: reader.readString(); reader.readU8(); return;  // FreeVariable
@@ -344,12 +424,12 @@ void writeDeclaration(Writer& writer, const Declaration& declaration) {
     if (auto* axiom = std::get_if<Axiom>(&declaration)) {
         writer.writeU8(0);
         writeStringVector(writer, axiom->universeParameters);
-        writeExpression(writer, axiom->type);
+        writeExpressionUnit(writer, axiom->type);
     } else if (auto* definition = std::get_if<Definition>(&declaration)) {
         writer.writeU8(1);
         writeStringVector(writer, definition->universeParameters);
-        writeExpression(writer, definition->type);
-        writeExpression(writer, definition->body);
+        writeExpressionUnit(writer, definition->type);
+        writeExpressionUnit(writer, definition->body);
         // Cache format v4 adds an opacity byte. Readers of v3 don't
         // read this byte; we bumped cacheVersion to 4 to force a
         // rebuild for cleanliness.
@@ -357,7 +437,7 @@ void writeDeclaration(Writer& writer, const Declaration& declaration) {
     } else if (auto* inductive = std::get_if<Inductive>(&declaration)) {
         writer.writeU8(2);
         writeStringVector(writer, inductive->universeParameters);
-        writeExpression(writer, inductive->kind);
+        writeExpressionUnit(writer, inductive->kind);
         writeStringVector(writer, inductive->constructorNames);
         writer.writeI32(inductive->numParameters);
     } else if (auto* constructor = std::get_if<Constructor>(&declaration)) {
@@ -365,12 +445,12 @@ void writeDeclaration(Writer& writer, const Declaration& declaration) {
         writeStringVector(writer, constructor->universeParameters);
         writer.writeString(constructor->inductiveName);
         writer.writeI32(constructor->constructorIndex);
-        writeExpression(writer, constructor->type);
+        writeExpressionUnit(writer, constructor->type);
     } else if (auto* recursor = std::get_if<Recursor>(&declaration)) {
         writer.writeU8(4);
         writeStringVector(writer, recursor->universeParameters);
         writer.writeString(recursor->inductiveName);
-        writeExpression(writer, recursor->type);
+        writeExpressionUnit(writer, recursor->type);
         writer.writeI32(recursor->numConstructors);
         writer.writeI32(recursor->numParameters);
         writer.writeI32(recursor->numIndices);
@@ -386,13 +466,13 @@ Declaration readDeclaration(Reader& reader,
         case 0: {
             Axiom axiom;
             axiom.universeParameters = readStringVector(reader);
-            axiom.type = readExpression(reader);
+            axiom.type = readExpressionUnit(reader);
             return axiom;
         }
         case 1: {
             Definition definition;
             definition.universeParameters = readStringVector(reader);
-            definition.type = readExpression(reader);
+            definition.type = readExpressionUnit(reader);
             if (skipDefinitionBodies) {
                 // Lemma-index load: parse past the proof body without
                 // building it, then drop to a type-only Axiom. The opacity
@@ -408,7 +488,7 @@ Declaration readDeclaration(Reader& reader,
                 axiom.type = std::move(definition.type);
                 return axiom;
             }
-            definition.body = readExpression(reader);
+            definition.body = readExpressionUnit(reader);
             uint8_t opacityByte = reader.readU8();
             definition.opacity = (opacityByte == 0)
                 ? Opacity::Transparent : Opacity::Opaque;
@@ -417,7 +497,7 @@ Declaration readDeclaration(Reader& reader,
         case 2: {
             Inductive inductive;
             inductive.universeParameters = readStringVector(reader);
-            inductive.kind = readExpression(reader);
+            inductive.kind = readExpressionUnit(reader);
             inductive.constructorNames = readStringVector(reader);
             inductive.numParameters = reader.readI32();
             return inductive;
@@ -427,14 +507,14 @@ Declaration readDeclaration(Reader& reader,
             constructor.universeParameters = readStringVector(reader);
             constructor.inductiveName = reader.readString();
             constructor.constructorIndex = reader.readI32();
-            constructor.type = readExpression(reader);
+            constructor.type = readExpressionUnit(reader);
             return constructor;
         }
         case 4: {
             Recursor recursor;
             recursor.universeParameters = readStringVector(reader);
             recursor.inductiveName = reader.readString();
-            recursor.type = readExpression(reader);
+            recursor.type = readExpressionUnit(reader);
             recursor.numConstructors = reader.readI32();
             recursor.numParameters = reader.readI32();
             recursor.numIndices = reader.readI32();
@@ -455,7 +535,7 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
     if (!output) {
         throw SerializationError("cannot open for write: " + path);
     }
-    Writer writer{output};
+    Writer writer{output, {}, 0};
     writer.writeU32(cacheMagic);
     writer.writeU32(cacheVersion);
     writer.writeString(contents.sourcePath);
@@ -534,7 +614,7 @@ CacheContents readCacheFile(const std::string& path,
     if (!input) {
         throw SerializationError("cannot open for read: " + path);
     }
-    Reader reader{input};
+    Reader reader{input, {}};
     uint32_t magic = reader.readU32();
     if (magic != cacheMagic) {
         throw SerializationError("bad magic in " + path);

@@ -147,6 +147,14 @@ ifeq ($(CHECK_REDUNDANT_BY_NON_EQ),1)
 VERIFY_FLAGS := --check-redundant-by --check-redundant-by-non-eq
 endif
 
+# ring_test's Gaussian-division crux builds a giant certificate whose
+# UNSHARED construction peaks at 7.6 GB RSS / ~50 s; hash-consing drops
+# that to 545 MB / 35 s. Hash-consing stays opt-in globally (it is
+# 60-75% SLOWER on ordinary heavy files — measured 2026-06-12 on
+# arithmetic_geometric_mean/derivative/euclidean), so enable it for
+# exactly this target.
+build/library/Test/ring_test.mathv: export MATH_HASH_CONS=1
+
 # The unused-name check is always-on (the library is clean). But Test/
 # fixtures deliberately exercise named claims, unused `let`s, and local
 # abbreviations — that named/unused shape is exactly what they verify —
