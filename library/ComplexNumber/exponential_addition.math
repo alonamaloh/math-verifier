@@ -125,8 +125,7 @@ theorem ComplexNumber.exponentialTerm_binomial_split
                 1 + k) := {
   -- Each summand below the cut: fold the coefficient into the two
   -- reciprocal factorials.
-  claim termSplit
-      : (i : Natural) → successor(i) ≤ 1 + k
+  claim (i : Natural) → successor(i) ≤ 1 + k
         → ComplexNumber.from_real(
               (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
               * (ComplexNumber.binomialCoefficient(k, i)
@@ -161,27 +160,18 @@ theorem ComplexNumber.exponentialTerm_binomial_split
                            by kJoin
                      = Rational.reciprocal_function((Natural.factorial(i) : Rational))
                            * Rational.reciprocal_function((Natural.factorial(d) : Rational))
-                           by Rational.binomial_reciprocal_split(i, d);
+                           since Rational.binomial_reciprocal_split;
            claim coefficientSplitCast
                : recipK * ((Natural.binomial(k, i) : Rational) : Real)
                  = recipI * recipD
                by calc recipK * ((Natural.binomial(k, i) : Rational) : Real)
                      = ((Rational.reciprocal_function((Natural.factorial(k) : Rational))
                              * (Natural.binomial(k, i) : Rational) : Rational) : Real)
-                           by Rational.to_real.multiply_preserves(
-                                  Rational.reciprocal_function(
-                                      (Natural.factorial(k) : Rational)),
-                                  (Natural.binomial(k, i) : Rational))
                      = ((Rational.reciprocal_function((Natural.factorial(i) : Rational))
                              * Rational.reciprocal_function(
                                    (Natural.factorial(d) : Rational)) : Rational) : Real)
                            since coefficientSplit
-                     = recipI * recipD
-                           by Rational.to_real.multiply_preserves(
-                                  Rational.reciprocal_function(
-                                      (Natural.factorial(i) : Rational)),
-                                  Rational.reciprocal_function(
-                                      (Natural.factorial(d) : Rational)));
+                     = recipI * recipD;
            calc ComplexNumber.from_real(recipK)
                     * (ComplexNumber.binomialCoefficient(k, i)
                            * (ComplexNumber.power(z, i)
@@ -196,21 +186,18 @@ theorem ComplexNumber.exponentialTerm_binomial_split
               = (ComplexNumber.from_real(recipK)
                      * ComplexNumber.from_real(((Natural.binomial(k, i) : Rational) : Real)))
                     * (ComplexNumber.power(z, i) * ComplexNumber.power(w, d))
-                    by ring
               = ComplexNumber.from_real(
                     recipK * ((Natural.binomial(k, i) : Rational) : Real))
                     * (ComplexNumber.power(z, i) * ComplexNumber.power(w, d))
-                    by ComplexNumber.from_real_multiply(
-                           recipK, ((Natural.binomial(k, i) : Rational) : Real))
+                    since ComplexNumber.from_real_multiply
               = ComplexNumber.from_real(recipI * recipD)
                     * (ComplexNumber.power(z, i) * ComplexNumber.power(w, d))
                     since coefficientSplitCast
               = (ComplexNumber.from_real(recipI) * ComplexNumber.from_real(recipD))
                     * (ComplexNumber.power(z, i) * ComplexNumber.power(w, d))
-                    by ComplexNumber.from_real_multiply(recipI, recipD)
+                    since ComplexNumber.from_real_multiply
               = (ComplexNumber.from_real(recipI) * ComplexNumber.power(z, i))
                     * (ComplexNumber.from_real(recipD) * ComplexNumber.power(w, d))
-                    by ring
               = ComplexNumber.exponentialTerm(z, i) * ComplexNumber.exponentialTerm(w, d)
               = ComplexNumber.exponentialTerm(z, i)
                     * ComplexNumber.exponentialTerm(w, Natural.monus(k, i))
@@ -229,7 +216,7 @@ theorem ComplexNumber.exponentialTerm_binomial_split
                      * (ComplexNumber.power(z, i)
                         * ComplexNumber.power(w, Natural.monus(k, i))),
                  1 + k)
-           by ComplexNumber.binomial_theorem(z, w, k)
+           since ComplexNumber.binomial_theorem
      = ComplexNumber.partialSum(
            (i : Natural) ↦
                ComplexNumber.from_real(
@@ -252,19 +239,7 @@ theorem ComplexNumber.exponentialTerm_binomial_split
                ComplexNumber.exponentialTerm(z, i)
                * ComplexNumber.exponentialTerm(w, Natural.monus(k, i)),
            1 + k)
-           by ComplexNumber.partialSum_pointwise_below(
-                  (i : Natural) ↦
-                      ComplexNumber.from_real(
-                          (Rational.reciprocal_function(
-                               (Natural.factorial(k) : Rational)) : Real))
-                      * (ComplexNumber.binomialCoefficient(k, i)
-                             * (ComplexNumber.power(z, i)
-                                * ComplexNumber.power(w, Natural.monus(k, i)))),
-                  (i : Natural) ↦
-                      ComplexNumber.exponentialTerm(z, i)
-                      * ComplexNumber.exponentialTerm(w, Natural.monus(k, i)),
-                  1 + k,
-                  termSplit)
+           since ComplexNumber.partialSum_pointwise_below
 }
 
 -- ----------------------------------------------------------------------
@@ -333,12 +308,10 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ComplexNumber)
                 = ComplexNumber.partialSum(
                       (i : Natural) ↦
                           a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
-                      p)
-                      by ring;
+                      p);
       -- Below the cut, peeling the successor off n − i absorbs one
       -- diagonal term into each weight.
-      claim stepSplit
-          : (i : Natural) → successor(i) ≤ successor(p)
+      claim (i : Natural) → successor(i) ≤ successor(p)
             → a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i))
                   + a(i) * b(Natural.monus(p, i))
               = a(i) * ComplexNumber.partialSum(b, Natural.monus(successor(p), i))
@@ -347,12 +320,11 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ComplexNumber)
                claim monusStep
                    : Natural.monus(successor(p), i)
                      = successor(Natural.monus(p, i))
-                   by Natural.monus_succ_left(i, p, (i ≤ p));
+                   since Natural.monus_succ_left;
                calc a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i))
                         + a(i) * b(Natural.monus(p, i))
                   = a(i) * (ComplexNumber.partialSum(b, Natural.monus(p, i))
                                 + b(Natural.monus(p, i)))
-                        by ring
                   = a(i) * ComplexNumber.partialSum(b, successor(Natural.monus(p, i)))
                   = a(i) * ComplexNumber.partialSum(b, Natural.monus(successor(p), i))
                         since monusStep
@@ -397,15 +369,7 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ComplexNumber)
                (i : Natural) ↦
                    a(i) * ComplexNumber.partialSum(b, Natural.monus(successor(p), i)),
                successor(p))
-               by ComplexNumber.partialSum_pointwise_below(
-                      (i : Natural) ↦
-                          a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i))
-                          + a(i) * b(Natural.monus(p, i)),
-                      (i : Natural) ↦
-                          a(i) * ComplexNumber.partialSum(b,
-                              Natural.monus(successor(p), i)),
-                      successor(p),
-                      stepSplit)
+               since ComplexNumber.partialSum_pointwise_below
     }
 
 -- ----------------------------------------------------------------------
@@ -444,20 +408,19 @@ theorem ComplexNumber.cauchy_product_difference_bound
               (i : Natural) ↦
                   aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i)),
               n)
-      by Real.cauchy_product_exchange(aModulus, bModulus, n);
+      since Real.cauchy_product_exchange;
   claim signedScale
       : ComplexNumber.partialSum(
             (i : Natural) ↦ a(i) * ComplexNumber.partialSum(b, n), n)
         = ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
-      by ComplexNumber.partialSum_scale_right(a, ComplexNumber.partialSum(b, n), n);
+      since ComplexNumber.partialSum_scale_right;
   claim absScale
       : Real.partialSum(
             (i : Natural) ↦ aModulus(i) * Real.partialSum(bModulus, n), n)
         = Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
-      by Real.partialSum_scale_right(aModulus, Real.partialSum(bModulus, n), n);
+      since Real.partialSum_scale_right;
   -- Each weighted window of B is dominated by the weighted window of Babs.
-  claim termBound
-      : (i : Natural) → successor(i) ≤ n
+  claim (i : Natural) → successor(i) ≤ n
         → abs(
               a(i) * ComplexNumber.partialSum(b, n)
                   - a(i) * ComplexNumber.partialSum(b, Natural.monus(n, i)))
@@ -481,7 +444,7 @@ theorem ComplexNumber.cauchy_product_difference_bound
                            - ComplexNumber.partialSum(b, e))
                        ≤ Real.partialSum(bModulus, i + e)
                          - Real.partialSum(bModulus, e)
-                     by ComplexNumber.partialSum_window_bound(b, e, i);
+                     since ComplexNumber.partialSum_window_bound;
                  done by substituting nJoin
                };
            claim Real.zero ≤ aModulus(i) by ComplexNumber.modulus_nonneg(a(i));
@@ -504,10 +467,11 @@ theorem ComplexNumber.cauchy_product_difference_bound
               = abs(a(i))
                 * abs(
                       ComplexNumber.partialSum(b, n) - ComplexNumber.partialSum(b, e))
-                    by ComplexNumber.modulus_multiplicative(
-                           a(i),
-                           ComplexNumber.partialSum(b, n)
-                               - ComplexNumber.partialSum(b, e))
+                    since ComplexNumber.modulus_multiplicative
+              = abs(
+                    ComplexNumber.partialSum(b, n) - ComplexNumber.partialSum(b, e))
+                * abs(a(i))
+                    by ring
               = abs(
                     ComplexNumber.partialSum(b, n) - ComplexNumber.partialSum(b, e))
                 * aModulus(i)
@@ -553,37 +517,20 @@ theorem ComplexNumber.cauchy_product_difference_bound
                    a(i) * ComplexNumber.partialSum(b, n)
                    - a(i) * ComplexNumber.partialSum(b, Natural.monus(n, i))),
            n)
-           by ComplexNumber.modulus_partialSum_le(
-                  (i : Natural) ↦
-                      a(i) * ComplexNumber.partialSum(b, n)
-                      - a(i) * ComplexNumber.partialSum(b, Natural.monus(n, i)),
-                  n)
+           since ComplexNumber.modulus_partialSum_le
      ≤ Real.partialSum(
            (i : Natural) ↦
                aModulus(i) * Real.partialSum(bModulus, n)
                - aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i)),
            n)
-           by Real.partialSum_le_pointwise(
-                  (i : Natural) ↦
-                      abs(
-                          a(i) * ComplexNumber.partialSum(b, n)
-                          - a(i) * ComplexNumber.partialSum(b, Natural.monus(n, i))),
-                  (i : Natural) ↦
-                      aModulus(i) * Real.partialSum(bModulus, n)
-                      - aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i)),
-                  n,
-                  termBound)
+           by Real.partialSum_le_pointwise
      = Real.partialSum(
            (i : Natural) ↦ aModulus(i) * Real.partialSum(bModulus, n), n)
        - Real.partialSum(
              (i : Natural) ↦
                  aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i)),
              n)
-           by Real.partialSum_subtract(
-                  (i : Natural) ↦ aModulus(i) * Real.partialSum(bModulus, n),
-                  (i : Natural) ↦
-                      aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i)),
-                  n)
+           by Real.partialSum_subtract
      = Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
        - Real.partialSum(
              (i : Natural) ↦
@@ -661,11 +608,9 @@ theorem ComplexNumber.cauchy_product_converges
              aAbsoluteLimit, bAbsoluteLimit,
              aAbsolutelyConverges, bAbsolutelyConverges);
   -- The absolute triangle sums are monotone in n.
-  claim absoluteWeightNonneg
-      : (i : Natural) → Real.zero ≤ aModulus(i)
+  claim (i : Natural) → Real.zero ≤ aModulus(i)
       by (i : Natural) ↦ ComplexNumber.modulus_nonneg(a(i));
-  claim absoluteTermNonneg
-      : (i : Natural) → Real.zero ≤ bModulus(i)
+  claim (i : Natural) → Real.zero ≤ bModulus(i)
       by (i : Natural) ↦ ComplexNumber.modulus_nonneg(b(i));
   claim absoluteDiagonalNonneg
       : (k : Natural) → Real.zero ≤ absoluteDiagonal(k)
@@ -707,15 +652,13 @@ theorem ComplexNumber.cauchy_product_converges
                n,
                (m : Natural) (nLeqM : n ≤ m) ↦ {
                  claim Real.zero ≤ Real.partialSum(aModulus, n)
-                     by Real.partialSum_nonneg(aModulus, n, absoluteWeightNonneg);
+                     by Real.partialSum_nonneg;
                  claim Real.zero ≤ Real.partialSum(bModulus, n)
-                     by Real.partialSum_nonneg(bModulus, n, absoluteTermNonneg);
+                     by Real.partialSum_nonneg;
                  claim Real.partialSum(aModulus, n) ≤ Real.partialSum(aModulus, m)
-                     by Real.partialSum_monotone_of_nonneg(
-                            aModulus, absoluteWeightNonneg, n, m, nLeqM);
+                     since Real.partialSum_monotone_of_nonneg;
                  claim Real.partialSum(bModulus, n) ≤ Real.partialSum(bModulus, m)
-                     by Real.partialSum_monotone_of_nonneg(
-                            bModulus, absoluteTermNonneg, n, m, nLeqM);
+                     by Real.partialSum_monotone_of_nonneg;
                  claim Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
                        ≤ Real.partialSum(aModulus, m) * Real.partialSum(bModulus, m)
                      since Real.LessOrEqual.multiply_monotone_nonneg;
@@ -726,8 +669,7 @@ theorem ComplexNumber.cauchy_product_converges
         → Real.partialSum(absoluteDiagonal, n)
           ≤ Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
       by (n : Natural) ↦ {
-           claim weightedWindowBelow
-               : (i : Natural) → successor(i) ≤ n
+           claim (i : Natural) → successor(i) ≤ n
                  → aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i))
                    ≤ aModulus(i) * Real.partialSum(bModulus, n)
                by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
@@ -751,9 +693,7 @@ theorem ComplexNumber.cauchy_product_converges
                         };
                     claim Real.partialSum(bModulus, Natural.monus(n, i))
                           ≤ Real.partialSum(bModulus, n)
-                        by Real.partialSum_monotone_of_nonneg(
-                               bModulus, absoluteTermNonneg,
-                               Natural.monus(n, i), n, (Natural.monus(n, i) ≤ n));
+                        by Real.partialSum_monotone_of_nonneg;
                     claim Real.zero ≤ aModulus(i) by ComplexNumber.modulus_nonneg(a(i));
                     claim Real.IsNonneg(aModulus(i))
                         since Real.IsNonneg_of_LessOrEqual_zero;
@@ -772,16 +712,9 @@ theorem ComplexNumber.cauchy_product_converges
               ≤ Real.partialSum(
                     (i : Natural) ↦ aModulus(i) * Real.partialSum(bModulus, n),
                     n)
-                    by Real.partialSum_le_pointwise(
-                           (i : Natural) ↦
-                               aModulus(i)
-                               * Real.partialSum(bModulus, Natural.monus(n, i)),
-                           (i : Natural) ↦
-                               aModulus(i) * Real.partialSum(bModulus, n),
-                           n, weightedWindowBelow)
+                    by Real.partialSum_le_pointwise
               = Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
-                    by Real.partialSum_scale_right(
-                           aModulus, Real.partialSum(bModulus, n), n)
+                    since Real.partialSum_scale_right
          };
   -- The absolute triangle converges (monotone, bounded by the absolute
   -- square's limit) …
@@ -825,8 +758,7 @@ theorem ComplexNumber.cauchy_product_converges
         → Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
           ≤ Real.partialSum(absoluteDiagonal, n + n)
       by (n : Natural) ↦ {
-           claim stretchedWindow
-               : (i : Natural) → successor(i) ≤ n
+           claim (i : Natural) → successor(i) ≤ n
                  → aModulus(i) * Real.partialSum(bModulus, n)
                    ≤ aModulus(i)
                      * Real.partialSum(bModulus, Natural.monus(n + n, i))
@@ -855,10 +787,7 @@ theorem ComplexNumber.cauchy_product_converges
                         };
                     claim Real.partialSum(bModulus, n)
                           ≤ Real.partialSum(bModulus, Natural.monus(n + n, i))
-                        by Real.partialSum_monotone_of_nonneg(
-                               bModulus, absoluteTermNonneg,
-                               n, Natural.monus(n + n, i),
-                               (n ≤ Natural.monus(n + n, i)));
+                        by Real.partialSum_monotone_of_nonneg;
                     claim Real.zero ≤ aModulus(i) by ComplexNumber.modulus_nonneg(a(i));
                     claim Real.IsNonneg(aModulus(i))
                         since Real.IsNonneg_of_LessOrEqual_zero;
@@ -870,8 +799,7 @@ theorem ComplexNumber.cauchy_product_converges
                        = aModulus(i)
                          * Real.partialSum(bModulus, Natural.monus(n + n, i))
                   };
-           claim weightedStretchNonneg
-               : (i : Natural)
+           claim (i : Natural)
                  → Real.zero
                    ≤ aModulus(i)
                      * Real.partialSum(bModulus, Natural.monus(n + n, i))
@@ -879,9 +807,7 @@ theorem ComplexNumber.cauchy_product_converges
                     claim Real.zero ≤ aModulus(i) by ComplexNumber.modulus_nonneg(a(i));
                     claim Real.zero
                           ≤ Real.partialSum(bModulus, Natural.monus(n + n, i))
-                        by Real.partialSum_nonneg(
-                               bModulus, Natural.monus(n + n, i),
-                               absoluteTermNonneg);
+                        by Real.partialSum_nonneg;
                     claim Real.IsNonneg(aModulus(i))
                         since Real.IsNonneg_of_LessOrEqual_zero;
                     claim Real.IsNonneg(
@@ -898,30 +824,19 @@ theorem ComplexNumber.cauchy_product_converges
               = Real.partialSum(
                     (i : Natural) ↦ aModulus(i) * Real.partialSum(bModulus, n),
                     n)
-                    by Real.partialSum_scale_right(
-                           aModulus, Real.partialSum(bModulus, n), n)
+                    since Real.partialSum_scale_right
               ≤ Real.partialSum(
                     (i : Natural) ↦
                         aModulus(i)
                         * Real.partialSum(bModulus, Natural.monus(n + n, i)),
                     n)
-                    by Real.partialSum_le_pointwise(
-                           (i : Natural) ↦
-                               aModulus(i) * Real.partialSum(bModulus, n),
-                           (i : Natural) ↦
-                               aModulus(i)
-                               * Real.partialSum(bModulus, Natural.monus(n + n, i)),
-                           n, stretchedWindow)
+                    since Real.partialSum_le_pointwise
               ≤ Real.partialSum(
                     (i : Natural) ↦
                         aModulus(i)
                         * Real.partialSum(bModulus, Natural.monus(n + n, i)),
                     n + n)
-                    by Real.partialSum_monotone_of_nonneg(
-                           (i : Natural) ↦
-                               aModulus(i)
-                               * Real.partialSum(bModulus, Natural.monus(n + n, i)),
-                           weightedStretchNonneg, n, n + n, (n ≤ n + n))
+                    since Real.partialSum_monotone_of_nonneg
               = Real.partialSum(absoluteDiagonal, n + n)
                     by Real.cauchy_product_exchange(aModulus, bModulus, n + n)
          };
@@ -979,8 +894,7 @@ theorem ComplexNumber.cauchy_product_converges
       by calc aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit
             = triangleAbsoluteLimit + -triangleAbsoluteLimit
                   since limitsAgree
-            = Real.zero
-                  by ring;
+            = Real.zero;
   claim gapVanishes
       : Real.SequenceConverges(
             (n : Natural) ↦
@@ -1041,8 +955,7 @@ theorem ComplexNumber.cauchy_product_converges
                    - ComplexNumber.partialSum(signedDiagonal, n)),
              aLimit * bLimit, -complexZero,
              productConverges, negatedSignedGapConverges);
-  claim limitSimplifies : aLimit * bLimit = aLimit * bLimit + -complexZero
-      by ring;
+  claim limitSimplifies : aLimit * bLimit = aLimit * bLimit + -complexZero;
   claim assembledAtProduct
       : ComplexNumber.SequenceConverges(
             (n : Natural) ↦
@@ -1062,8 +975,7 @@ theorem ComplexNumber.cauchy_product_converges
                      + -(ComplexNumber.partialSum(a, n)
                              * ComplexNumber.partialSum(b, n)
                          - ComplexNumber.partialSum(signedDiagonal, n))
-                 = ComplexNumber.partialSum(signedDiagonal, n)
-               by ring;
+                 = ComplexNumber.partialSum(signedDiagonal, n);
            done
          };
   done by ComplexNumber.SequenceConverges.of_pointwise(
@@ -1107,7 +1019,7 @@ theorem ComplexNumber.exponential_add (z w : ComplexNumber)
                (k : Natural) ↦ {
                  claim abs(ComplexNumber.exponentialTerm(z, k))
                        = Real.exponentialTerm(abs(z), k)
-                     by ComplexNumber.modulus_exponentialTerm(z, k);
+                     since ComplexNumber.modulus_exponentialTerm;
                  done
                },
                n);
@@ -1126,7 +1038,7 @@ theorem ComplexNumber.exponential_add (z w : ComplexNumber)
                (k : Natural) ↦ {
                  claim abs(ComplexNumber.exponentialTerm(w, k))
                        = Real.exponentialTerm(abs(w), k)
-                     by ComplexNumber.modulus_exponentialTerm(w, k);
+                     since ComplexNumber.modulus_exponentialTerm;
                  done
                },
                n);
@@ -1211,12 +1123,11 @@ theorem ComplexNumber.exponential_add (z w : ComplexNumber)
                                  * ComplexNumber.exponentialTerm(w,
                                        Natural.monus(k, i)),
                              1 + k)
-                     by ComplexNumber.exponentialTerm_binomial_split(z, w, k);
+                     since ComplexNumber.exponentialTerm_binomial_split;
                  done
                },
                n);
-  claim seriesAtSumConverges
-      : ComplexNumber.SequenceConverges(
+  claim ComplexNumber.SequenceConverges(
             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
             ComplexNumber.exponential(z) * ComplexNumber.exponential(w))
       by ComplexNumber.SequenceConverges.of_pointwise(
@@ -1230,14 +1141,9 @@ theorem ComplexNumber.exponential_add (z w : ComplexNumber)
              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
              ComplexNumber.exponential(z) * ComplexNumber.exponential(w),
              diagonalsArePowerSeries, triangleConverges);
-  claim seriesAtSumOwnLimit
-      : ComplexNumber.SequenceConverges(
+  claim ComplexNumber.SequenceConverges(
             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
             ComplexNumber.exponential(z + w))
       by ComplexNumber.exponential_converges(z + w);
-  done by ComplexNumber.SequenceConverges.unique(
-              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
-              ComplexNumber.exponential(z + w),
-              ComplexNumber.exponential(z) * ComplexNumber.exponential(w),
-              seriesAtSumOwnLimit, seriesAtSumConverges)
+  done since ComplexNumber.SequenceConverges.unique
 }
