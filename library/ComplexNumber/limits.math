@@ -114,7 +114,7 @@ theorem ComplexNumber.SequenceConverges.realPart
           calc abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
              = abs(ComplexNumber.realPart(s(m) - limit))
                    since differencePart
-             ≤ ComplexNumber.modulus(s(m) - limit)
+             ≤ abs(s(m) - limit)
                    since ComplexNumber.realPart_bound
              < (epsilon : Real)
                    by close(m, aboveThreshold)
@@ -138,7 +138,7 @@ theorem ComplexNumber.SequenceConverges.imaginaryPart
           calc abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit))
              = abs(ComplexNumber.imaginaryPart(s(m) - limit))
                    since differencePart
-             ≤ ComplexNumber.modulus(s(m) - limit)
+             ≤ abs(s(m) - limit)
                    since ComplexNumber.imaginaryPart_bound
              < (epsilon : Real)
                    by close(m, aboveThreshold)
@@ -188,7 +188,7 @@ theorem ComplexNumber.SequenceConverges.of_coordinates
               : ComplexNumber.imaginaryPart(s(m) - limit)
                 = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit)
               since ComplexNumber.imaginaryPart_subtract;
-          calc ComplexNumber.modulus(s(m) - limit)
+          calc abs(s(m) - limit)
              ≤ abs(ComplexNumber.realPart(s(m) - limit))
                + abs(ComplexNumber.imaginaryPart(s(m) - limit))
                    since ComplexNumber.modulus_coordinate_bound
@@ -201,10 +201,8 @@ theorem ComplexNumber.SequenceConverges.of_coordinates
              < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
                    since Real.LessThan.add_strict_strict
              = ((Rational.halve(epsilon) + Rational.halve(epsilon) : Rational) : Real)
-                   by Rational.to_real.add_preserves(
-                          Rational.halve(epsilon), Rational.halve(epsilon))
              = (epsilon : Real)
-                   by Rational.halve_doubled(epsilon)
+                   since Rational.halve_doubled
         }
   }
 
@@ -219,8 +217,8 @@ theorem ComplexNumber.SequenceConverges.of_pointwise
     obtain ⟨threshold, close⟩ from sConverges(epsilon, epsilonPositive);
     witness threshold with
         (m : Natural) (aboveThreshold : threshold ≤ m) ↦
-          calc ComplexNumber.modulus(t(m) - limit)
-             = ComplexNumber.modulus(s(m) - limit)    by pointwiseEqual(m)
+          calc abs(t(m) - limit)
+             = abs(s(m) - limit)    by pointwiseEqual(m)
              < (epsilon : Real)                       by close(m, aboveThreshold)
   }
 
@@ -244,25 +242,23 @@ theorem ComplexNumber.SequenceConverges.add
         (aboveMaximum : Natural.maximum(sThreshold, tThreshold) ≤ m) ↦ {
           claim sAbove : sThreshold ≤ m since Natural.le_through_max_left;
           claim tAbove : tThreshold ≤ m since Natural.le_through_max_right;
-          claim ComplexNumber.modulus(s(m) - sLimit) < (Rational.halve(epsilon) : Real)
+          claim abs(s(m) - sLimit) < (Rational.halve(epsilon) : Real)
               by sClose(m, sAbove);
-          claim ComplexNumber.modulus(t(m) - tLimit) < (Rational.halve(epsilon) : Real)
+          claim abs(t(m) - tLimit) < (Rational.halve(epsilon) : Real)
               by tClose(m, tAbove);
-          calc ComplexNumber.modulus((s(m) + t(m)) - (sLimit + tLimit))
-             = ComplexNumber.modulus((s(m) - sLimit) + (t(m) - tLimit))
+          calc abs((s(m) + t(m)) - (sLimit + tLimit))
+             = abs((s(m) - sLimit) + (t(m) - tLimit))
                    by substituting
                        (ring : (s(m) + t(m)) - (sLimit + tLimit)
                            = (s(m) - sLimit) + (t(m) - tLimit))
-             ≤ ComplexNumber.modulus(s(m) - sLimit)
-               + ComplexNumber.modulus(t(m) - tLimit)
-                   by ComplexNumber.modulus_triangle(s(m) - sLimit, t(m) - tLimit)
+             ≤ abs(s(m) - sLimit)
+               + abs(t(m) - tLimit)
+                   since ComplexNumber.modulus_triangle
              < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
                    since Real.LessThan.add_strict_strict
              = ((Rational.halve(epsilon) + Rational.halve(epsilon) : Rational) : Real)
-                   by Rational.to_real.add_preserves(
-                          Rational.halve(epsilon), Rational.halve(epsilon))
              = (epsilon : Real)
-                   by Rational.halve_doubled(epsilon)
+                   since Rational.halve_doubled
         }
   }
 
@@ -277,12 +273,12 @@ theorem ComplexNumber.SequenceConverges.negate
       : Real.SequenceConverges(
             (n : Natural) ↦ ComplexNumber.realPart(s(n)),
             ComplexNumber.realPart(sLimit))
-      by ComplexNumber.SequenceConverges.realPart(s, sLimit, sConverges);
+      since ComplexNumber.SequenceConverges.realPart;
   claim imaginaryConverges
       : Real.SequenceConverges(
             (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
             ComplexNumber.imaginaryPart(sLimit))
-      by ComplexNumber.SequenceConverges.imaginaryPart(s, sLimit, sConverges);
+      since ComplexNumber.SequenceConverges.imaginaryPart;
   claim negatedRealConverges
       : Real.SequenceConverges(
             (n : Natural) ↦ -ComplexNumber.realPart(s(n)),
@@ -314,19 +310,9 @@ theorem ComplexNumber.SequenceConverges.negate
            done
          };
   claim limitRealPart
-      : -ComplexNumber.realPart(sLimit) = ComplexNumber.realPart(-sLimit)
-      by {
-        claim ComplexNumber.realPart(-sLimit) = -ComplexNumber.realPart(sLimit)
-            since ComplexNumber.realPart_negate;
-        done
-      };
+      : -ComplexNumber.realPart(sLimit) = ComplexNumber.realPart(-sLimit);
   claim limitImaginaryPart
-      : -ComplexNumber.imaginaryPart(sLimit) = ComplexNumber.imaginaryPart(-sLimit)
-      by {
-        claim ComplexNumber.imaginaryPart(-sLimit) = -ComplexNumber.imaginaryPart(sLimit)
-            since ComplexNumber.imaginaryPart_negate;
-        done
-      };
+      : -ComplexNumber.imaginaryPart(sLimit) = ComplexNumber.imaginaryPart(-sLimit);
   claim realSide
       : Real.SequenceConverges(
             (n : Natural) ↦ ComplexNumber.realPart(-s(n)),
@@ -533,14 +519,7 @@ theorem ComplexNumber.SequenceConverges.multiply
   claim limitImaginaryPart
       : ComplexNumber.realPart(sLimit) * ComplexNumber.imaginaryPart(tLimit)
             + ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.realPart(tLimit)
-        = ComplexNumber.imaginaryPart(sLimit * tLimit)
-      by {
-        claim ComplexNumber.imaginaryPart(sLimit * tLimit)
-              = ComplexNumber.realPart(sLimit) * ComplexNumber.imaginaryPart(tLimit)
-                + ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.realPart(tLimit)
-            since ComplexNumber.imaginaryPart_multiply;
-        done
-      };
+        = ComplexNumber.imaginaryPart(sLimit * tLimit);
   claim imaginarySide
       : Real.SequenceConverges(
             (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n) * t(n)),
@@ -570,7 +549,7 @@ theorem ComplexNumber.SequenceConverges.multiply
 -- sequence that vanishes also vanishes.
 theorem ComplexNumber.SequenceConverges.squeeze_zero
         (v : Natural → ComplexNumber) (u : Natural → Real)
-        (dominated : (n : Natural) → ComplexNumber.modulus(v(n)) ≤ u(n))
+        (dominated : (n : Natural) → abs(v(n)) ≤ u(n))
         (uVanishes : Real.SequenceConverges(u, Real.zero))
         : ComplexNumber.SequenceConverges(
               v,
@@ -584,8 +563,8 @@ theorem ComplexNumber.SequenceConverges.squeeze_zero
     witness threshold with
         (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
           claim u(m) ≤ abs(u(m)) since Real.LessOrEqual_absolute_value;
-          calc ComplexNumber.modulus(v(m) - zero)
-             = ComplexNumber.modulus(v(m))
+          calc abs(v(m) - zero)
+             = abs(v(m))
                    by substituting (ring : v(m) - zero = v(m))
              ≤ u(m)
                    by dominated(m)

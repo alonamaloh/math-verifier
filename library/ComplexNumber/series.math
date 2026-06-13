@@ -169,9 +169,7 @@ theorem ComplexNumber.partialSum_add (s t : Natural → ComplexNumber) (n : Natu
                 Complex.definingPolynomial);
         calc ComplexNumber.partialSum((k : Natural) ↦ s(k) + t(k), 0)
            = zero
-           = zero
-             + zero
-                 by ring
+           = zero + zero
       }
     case successor(predecessor):
         calc ComplexNumber.partialSum((k : Natural) ↦ s(k) + t(k), successor(predecessor))
@@ -183,7 +181,6 @@ theorem ComplexNumber.partialSum_add (s t : Natural → ComplexNumber) (n : Natu
                  since IH
            = (ComplexNumber.partialSum(s, predecessor) + s(predecessor))
              + (ComplexNumber.partialSum(t, predecessor) + t(predecessor))
-                 by ring
   }
 
 theorem ComplexNumber.partialSum_scale
@@ -198,7 +195,6 @@ theorem ComplexNumber.partialSum_scale
         calc ComplexNumber.partialSum((k : Natural) ↦ c * s(k), 0)
            = zero
            = c * zero
-                 by ring
       }
     case successor(predecessor):
         calc ComplexNumber.partialSum((k : Natural) ↦ c * s(k), successor(predecessor))
@@ -207,7 +203,6 @@ theorem ComplexNumber.partialSum_scale
            = c * ComplexNumber.partialSum(s, predecessor) + c * s(predecessor)
                  since IH
            = c * (ComplexNumber.partialSum(s, predecessor) + s(predecessor))
-                 by ring
   }
 
 -- Negating every term negates the sum.
@@ -222,7 +217,6 @@ theorem ComplexNumber.partialSum_negate (s : Natural → ComplexNumber) (n : Nat
         calc ComplexNumber.partialSum((k : Natural) ↦ -s(k), 0)
            = zero
            = -zero
-                 by ring
       }
     case successor(predecessor):
         calc ComplexNumber.partialSum((k : Natural) ↦ -s(k), successor(predecessor))
@@ -231,7 +225,6 @@ theorem ComplexNumber.partialSum_negate (s : Natural → ComplexNumber) (n : Nat
            = -ComplexNumber.partialSum(s, predecessor) + -s(predecessor)
                  since IH
            = -(ComplexNumber.partialSum(s, predecessor) + s(predecessor))
-                 by ring
   }
 
 -- Sums subtract termwise.
@@ -245,9 +238,7 @@ theorem ComplexNumber.partialSum_subtract (s t : Natural → ComplexNumber) (n :
                 Complex.definingPolynomial);
         calc ComplexNumber.partialSum((k : Natural) ↦ s(k) - t(k), 0)
            = zero
-           = zero
-             - zero
-                 by ring
+           = zero - zero
       }
     case successor(predecessor):
         calc ComplexNumber.partialSum((k : Natural) ↦ s(k) - t(k), successor(predecessor))
@@ -259,7 +250,6 @@ theorem ComplexNumber.partialSum_subtract (s t : Natural → ComplexNumber) (n :
                  since IH
            = (ComplexNumber.partialSum(s, predecessor) + s(predecessor))
              - (ComplexNumber.partialSum(t, predecessor) + t(predecessor))
-                 by ring
   }
 
 -- Scaling on the right (a common factor behind every term).
@@ -274,9 +264,7 @@ theorem ComplexNumber.partialSum_scale_right
                 Complex.definingPolynomial);
         calc ComplexNumber.partialSum((k : Natural) ↦ s(k) * c, 0)
            = zero
-           = zero
-             * c
-                 by ring
+           = zero * c
       }
     case successor(predecessor):
         calc ComplexNumber.partialSum((k : Natural) ↦ s(k) * c, successor(predecessor))
@@ -285,7 +273,6 @@ theorem ComplexNumber.partialSum_scale_right
            = ComplexNumber.partialSum(s, predecessor) * c + s(predecessor) * c
                  since IH
            = (ComplexNumber.partialSum(s, predecessor) + s(predecessor)) * c
-                 by ring
   }
 
 -- ----------------------------------------------------------------------
@@ -293,38 +280,34 @@ theorem ComplexNumber.partialSum_scale_right
 -- real series of moduli: |S(w+m) − S(m)| ≤ Sabs(w+m) − Sabs(m).
 theorem ComplexNumber.partialSum_window_bound
         (b : Natural → ComplexNumber) (m w : Natural)
-        : ComplexNumber.modulus(
+        : abs(
               ComplexNumber.partialSum(b, w + m) - ComplexNumber.partialSum(b, m))
-          ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), w + m)
-            - Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), m) := {
+          ≤ Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
+            - Real.partialSum((k : Natural) ↦ abs(b(k)), m) := {
   claim signedSplit
       : ComplexNumber.partialSum(b, w + m)
         = ComplexNumber.partialSum(b, m)
           + ComplexNumber.partialSum((j : Natural) ↦ b(m + j), w)
-      by ComplexNumber.partialSum_split(b, m, w);
+      since ComplexNumber.partialSum_split;
   claim absSplit
-      : Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), w + m)
-        = Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), m)
-          + Real.partialSum((j : Natural) ↦ ComplexNumber.modulus(b(m + j)), w)
-      by Real.partialSum_split((k : Natural) ↦ ComplexNumber.modulus(b(k)), m, w);
-  calc ComplexNumber.modulus(
+      : Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
+        = Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+          + Real.partialSum((j : Natural) ↦ abs(b(m + j)), w)
+      since Real.partialSum_split;
+  calc abs(
            ComplexNumber.partialSum(b, w + m) - ComplexNumber.partialSum(b, m))
-     = ComplexNumber.modulus(
+     = abs(
            (ComplexNumber.partialSum(b, m)
                 + ComplexNumber.partialSum((j : Natural) ↦ b(m + j), w))
            - ComplexNumber.partialSum(b, m))
            since signedSplit
-     = ComplexNumber.modulus(ComplexNumber.partialSum((j : Natural) ↦ b(m + j), w))
-           by ComplexNumber.add_cancel_left(
-                  ComplexNumber.partialSum(b, m),
-                  ComplexNumber.partialSum((j : Natural) ↦ b(m + j), w))
-     ≤ Real.partialSum((j : Natural) ↦ ComplexNumber.modulus(b(m + j)), w)
-           by ComplexNumber.modulus_partialSum_le((j : Natural) ↦ b(m + j), w)
-     = (Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), m)
-            + Real.partialSum((j : Natural) ↦ ComplexNumber.modulus(b(m + j)), w))
-       - Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), m)
-           by ring
-     = Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), w + m)
-       - Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(b(k)), m)
+     = abs(ComplexNumber.partialSum((j : Natural) ↦ b(m + j), w))
+     ≤ Real.partialSum((j : Natural) ↦ abs(b(m + j)), w)
+           since ComplexNumber.modulus_partialSum_le
+     = (Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+            + Real.partialSum((j : Natural) ↦ abs(b(m + j)), w))
+       - Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+     = Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
+       - Real.partialSum((k : Natural) ↦ abs(b(k)), m)
            since absSplit
 }
