@@ -578,6 +578,10 @@ ExpressionPointer Elaborator::elaborateLinearCombination(
             throwElaborate("`linear_combination` needs an equality goal "
                            "from context");
         }
+        // NOTE: do NOT ζ-unfold let-binders here (unlike `ring`): the cited
+        // hypotheses' types keep the let-bound spelling — unfolding only the
+        // goal would make its atoms diverge from the hypotheses' atoms (this
+        // broke ComplexNumber/irreducible.math's coefficient bookkeeping).
         size_t binderCount = localBinders.size();
         ExpressionPointer expectedOpened =
             openOverLocalBinders(expectedType, localBinders, binderCount);
@@ -679,6 +683,15 @@ ExpressionPointer Elaborator::elaborateRing(
                 "in a calc step or as the body of a theorem with a "
                 "declared equality conclusion");
         }
+        // ζ-unfold let-binders in the goal first, so a let-bound constant
+        // (`let zero := RingModulo.zero(…)`) or subterm is seen structurally
+        // by the carrier detection, the fingerprint fast-fail, and the
+        // normaliser — a let-bound ring constant would otherwise be
+        // fingerprinted as an opaque atom and the goal misreported as FALSE.
+        // The unfolded type is ζ-equal to the original, so the returned
+        // proof still discharges the stated goal (checked up to defeq).
+        // Mirrors proveAbstractRingAC's endpoint unfolding.
+        expectedType = zetaUnfoldLetBinders(expectedType, localBinders);
         // Pre-check the goal IS an equality, while the local binders are
         // at hand for a readable print (the generic extractor below only
         // sees the closed type, whose binders print as raw indices).
@@ -6234,6 +6247,10 @@ ExpressionPointer Elaborator::elaborateField(
                 "as the body of a theorem with a declared equality "
                 "conclusion");
         }
+        // NOTE: do NOT ζ-unfold let-binders here (unlike `ring`): `field`
+        // discharges hypothesis side conditions whose types keep the
+        // let-bound spelling — unfolding only the goal would make the
+        // goal's atoms diverge from the hypotheses' atoms.
         // Open the expected type over local binders so that local
         // variables appear as FreeVariables — this lets us match
         // against hypothesis types (which arrive opened).
