@@ -242,7 +242,17 @@ corpus-update: library
 # provenance gate) and the CIC leak count has not increased (Phase 0
 # ratchet). This is the "CI" entry point — run it before committing
 # elaborator/kernel changes.
-check: tests corpus-audit leak-ratchet
-	@echo "check: library + tests verified; provenance gate and leak ratchet OK"
+check: tests self-tests corpus-audit leak-ratchet
+	@echo "check: library + tests + self-tests verified; provenance gate and leak ratchet OK"
+
+# The kernel binary's built-in C++ test suite (./kernel with no args).
+# Wired into `check` 2026-06-12 after three expectation drifts sat
+# unnoticed — nothing else runs the bare suite.
+self-tests: kernel
+	@./kernel > /dev/null 2>&1 \
+	  && echo "self-tests: PASS" \
+	  || { echo "self-tests: FAIL — run ./kernel for details"; exit 1; }
+
+.PHONY: self-tests
 
 .PHONY: check

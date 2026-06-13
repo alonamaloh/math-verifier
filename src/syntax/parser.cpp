@@ -3504,13 +3504,13 @@ private:
             bool isImax = (current.kind == TokenKind::KeywordImax);
             Token token = consumeAny();
             expect(TokenKind::LeftParen,
-                   isImax ? "after 'imax'" : "after 'max'");
+                   isImax ? "after 'ImaxUniverse'" : "after 'MaxUniverse'");
             auto left = parseLevel();
             expect(TokenKind::Comma,
-                   isImax ? "in 'imax'" : "in 'max'");
+                   isImax ? "in 'ImaxUniverse'" : "in 'MaxUniverse'");
             auto right = parseLevel();
             expect(TokenKind::RightParen,
-                   isImax ? "ending 'imax'" : "ending 'max'");
+                   isImax ? "ending 'ImaxUniverse'" : "ending 'MaxUniverse'");
             if (isImax) {
                 return makeSurfaceLevelImax(std::move(left), std::move(right),
                                              token.line, token.column);

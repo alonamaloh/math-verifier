@@ -21,8 +21,12 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"in",            TokenKind::KeywordIn},
         {"Type",          TokenKind::KeywordType},
         {"Proposition",   TokenKind::KeywordProposition},
-        {"max",           TokenKind::KeywordMax},
-        {"imax",          TokenKind::KeywordImax},
+        // Universe-level operators. Deliberately NOT `max`/`imax`: those
+        // collide with everyday mathematical function names (Alvaro,
+        // 2026-06-12) — `max` is now an ordinary identifier, usable as
+        // an overload like `min`/`abs`/`exp`.
+        {"MaxUniverse",   TokenKind::KeywordMax},
+        {"ImaxUniverse",  TokenKind::KeywordImax},
         {"calc",          TokenKind::KeywordCalc},
         {"by",            TokenKind::KeywordBy},
         {"on",            TokenKind::KeywordOn},
@@ -370,8 +374,8 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordIn:            return "'in'";
         case TokenKind::KeywordType:          return "'Type'";
         case TokenKind::KeywordProposition:   return "'Proposition'";
-        case TokenKind::KeywordMax:           return "'max'";
-        case TokenKind::KeywordImax:          return "'imax'";
+        case TokenKind::KeywordMax:           return "'MaxUniverse'";
+        case TokenKind::KeywordImax:          return "'ImaxUniverse'";
         case TokenKind::KeywordCalc:          return "'calc'";
         case TokenKind::KeywordBy:            return "'by'";
         case TokenKind::KeywordOn:            return "'on'";

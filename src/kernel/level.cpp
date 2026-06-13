@@ -222,7 +222,7 @@ void writeLevel(std::ostringstream& out, LevelPointer level, int precedence) {
         return;
     }
     if (auto* m = std::get_if<LevelMax>(&level->node)) {
-        out << "max(";
+        out << "MaxUniverse(";
         writeLevel(out, m->left,  0);
         out << ", ";
         writeLevel(out, m->right, 0);
@@ -230,7 +230,7 @@ void writeLevel(std::ostringstream& out, LevelPointer level, int precedence) {
         return;
     }
     if (auto* m = std::get_if<LevelIMax>(&level->node)) {
-        out << "imax(";
+        out << "ImaxUniverse(";
         writeLevel(out, m->left,  0);
         out << ", ";
         writeLevel(out, m->right, 0);

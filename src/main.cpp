@@ -676,7 +676,7 @@ void runLevelArithmeticTests() {
         auto u = makeLevelParam("u");
         auto imaxResult = makeLevelIMax(u, makeLevelSuccessor(makeLevelParam("v")));
         // Should be max(u, successor(v)) — folded.
-        EXPECT_LEVEL_PRINTS(imaxResult, "max(u, v+1)");
+        EXPECT_LEVEL_PRINTS(imaxResult, "MaxUniverse(u, v+1)");
     }
 
     // makeLevelIMax stays symbolic when codomain is an unknown parameter.
@@ -684,7 +684,7 @@ void runLevelArithmeticTests() {
         auto u = makeLevelParam("u");
         auto v = makeLevelParam("v");
         auto imaxResult = makeLevelIMax(u, v);
-        EXPECT_LEVEL_PRINTS(imaxResult, "imax(u, v)");
+        EXPECT_LEVEL_PRINTS(imaxResult, "ImaxUniverse(u, v)");
     }
 
     // Equality of levels — concrete and symbolic.
@@ -734,7 +734,7 @@ void runLevelArithmeticTests() {
             makeLevelSuccessor(makeLevelParam("v")));
         auto substituted = substituteLevelParameter(
             level, "u", makeLevelConst(5));
-        EXPECT_LEVEL_PRINTS(substituted, "max(5, v+1)");
+        EXPECT_LEVEL_PRINTS(substituted, "MaxUniverse(5, v+1)");
     }
 
     // Substitution on a non-matching name is a no-op.
@@ -1349,7 +1349,7 @@ void runPrintingTests(const Environment& arithmetic) {
     EXPECT_PRINTS(makeType(makeLevelParam("u")), "Type u");
     EXPECT_PRINTS(makeSort(makeLevelMax(makeLevelParam("u"),
                                         makeLevelParam("v"))),
-                  "Sort max(u, v)");
+                  "Sort MaxUniverse(u, v)");
 
     EXPECT_PRINTS(makeConstant("zero"), "zero");
     EXPECT_PRINTS(makeConstant("Equality", {makeLevelConst(0)}),
@@ -1372,10 +1372,14 @@ void runPrintingTests(const Environment& arithmetic) {
                       makeApplication(makeConstant("g"), makeConstant("h"))),
                   "f (g h)");
 
-    // Pi prints with Π and a colon-typed binder.
+    // A non-dependent Pi prints as an arrow; a dependent one keeps the
+    // Π binder form.
     EXPECT_PRINTS(
         makePi("x", makeConstant("Natural"), makeConstant("Natural")),
-        "Π(x : Natural). Natural");
+        "Natural → Natural");
+    EXPECT_PRINTS(
+        makePi("x", makeConstant("Natural"), makeBoundVariable(0)),
+        "(x : Natural) → x");
 
     // Lambda prints with λ.
     EXPECT_PRINTS(
@@ -2971,11 +2975,11 @@ std::string surfaceLevelToDebugString(const SurfaceLevel& level) {
         return name->name;
     }
     if (auto* maxLevel = std::get_if<SurfaceLevelMax>(&level.node)) {
-        return "max(" + surfaceLevelToDebugString(*maxLevel->left) + ", "
+        return "MaxUniverse(" + surfaceLevelToDebugString(*maxLevel->left) + ", "
              + surfaceLevelToDebugString(*maxLevel->right) + ")";
     }
     if (auto* imaxLevel = std::get_if<SurfaceLevelImax>(&level.node)) {
-        return "imax(" + surfaceLevelToDebugString(*imaxLevel->left) + ", "
+        return "ImaxUniverse(" + surfaceLevelToDebugString(*imaxLevel->left) + ", "
              + surfaceLevelToDebugString(*imaxLevel->right) + ")";
     }
     if (auto* addLevel = std::get_if<SurfaceLevelAdd>(&level.node)) {
@@ -3337,9 +3341,9 @@ void runParserTests() {
     expectParse("Type(0)",            "Type(0)",                            __LINE__);
     expectParse("Type(u)",            "Type(u)",                            __LINE__);
     expectParse("Type(u + 1)",        "Type((u + 1))",                      __LINE__);
-    expectParse("Type(max(u, v))",    "Type(max(u, v))",                    __LINE__);
-    expectParse("Type(max(u, v + 1))","Type(max(u, (v + 1)))",              __LINE__);
-    expectParse("Type(imax(u, v))",   "Type(imax(u, v))",                   __LINE__);
+    expectParse("Type(MaxUniverse(u, v))", "Type(MaxUniverse(u, v))",       __LINE__);
+    expectParse("Type(MaxUniverse(u, v + 1))","Type(MaxUniverse(u, (v + 1)))", __LINE__);
+    expectParse("Type(ImaxUniverse(u, v))", "Type(ImaxUniverse(u, v))",     __LINE__);
 
     // Universe arguments on identifiers.
     expectParse("Equality.{u}",       "Equality.{u}",                       __LINE__);
@@ -3528,8 +3532,8 @@ theorem wrong_branch (A B : Proposition) (h : And(A, B)) : A :=
         {"case for 'And.introduction'",
          "cases expression at line",
          "theorem 'wrong_branch'",
-         "expected type: A",
-         "actual type:   B"},
+         "this case's result has the wrong type",
+         "but this case gives: B"},
         "cases-branch type mismatch",
         __LINE__);
 
@@ -3650,9 +3654,8 @@ theorem bad_call (A : Proposition) (n : Natural) : And(A, A) :=
   And.introduction(A, A, n, n)
 )",
         {"theorem 'bad_call'",
-         "kernel:",
-         "expected type: A",
-         "actual type:   Natural"},
+         "this argument has the wrong type",
+         "but this argument is: Natural"},
         "constructor argument type mismatch",
         __LINE__);
 
