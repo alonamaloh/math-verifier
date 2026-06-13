@@ -679,6 +679,33 @@ ExpressionPointer Elaborator::elaborateRing(
                 "in a calc step or as the body of a theorem with a "
                 "declared equality conclusion");
         }
+        // Pre-check the goal IS an equality, while the local binders are
+        // at hand for a readable print (the generic extractor below only
+        // sees the closed type, whose binders print as raw indices).
+        {
+            ExpressionPointer goalWhnf = weakHeadNormalForm(
+                environment_, expectedType);
+            bool isEquality = false;
+            ExpressionPointer head = goalWhnf;
+            int applicationDepth = 0;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                head = app->function;
+                ++applicationDepth;
+            }
+            if (auto* constant = std::get_if<Constant>(&head->node)) {
+                isEquality = constant->name == "Equality"
+                    && applicationDepth >= 3;
+            }
+            if (!isEquality) {
+                throwElaborate(
+                    "`ring` proves `=` goals only, and this goal is not an "
+                    "equality — it is `"
+                    + prettyPrintInLocalScope(expectedType, localBinders)
+                    + "`. For an order or other relation goal, put the "
+                      "ring rearrangement inside a calc chain whose steps "
+                      "carry the relation.");
+            }
+        }
         EqualityComponents goal =
             extractEqualityComponents(expectedType, "ring", line);
         std::string carrierName = headConstantName(goal.carrierType);
@@ -712,6 +739,28 @@ ExpressionPointer Elaborator::elaborateRing(
         // term/law builders thread `s` automatically.
         RingScheme scheme = computeRingScheme(goal.carrierType);
         RingStructurePrefixGuard prefixGuard(*this, scheme.structurePrefix);
+        // Honest failure for a carrier with NO ring structure at all: if
+        // neither `<carrier>.add` nor `<carrier>.multiply` exists (and the
+        // carrier isn't a bundled/RingModulo one, which carries a structure
+        // prefix), every operation in the goal is an opaque atom to the
+        // normaliser, and the fingerprint fast-fail below would misreport
+        // an unprovable-HERE goal as "FALSE as a polynomial identity".
+        if (scheme.structurePrefix.empty()
+            && environment_.lookup(scheme.opNamespace + ".add") == nullptr
+            && environment_.lookup(scheme.opNamespace + ".multiply")
+                   == nullptr) {
+            throwElaborate(
+                "`ring`: the goal's carrier `" + carrierName
+                + "` has no ring structure `ring` can use — no `"
+                + scheme.opNamespace + ".add` / `" + scheme.opNamespace
+                + ".multiply` operations (or registered ring laws) are in "
+                  "scope, so the goal's operations are opaque atoms here. "
+                  "`ring` works on carriers with named ring operations + "
+                  "laws (Natural, Integer, Rational, Real, PAdic, …), on "
+                  "`CommutativeRing.carrier(c)`, and on `RingModulo(c, m)` "
+                  "carriers. Prove the carrier's laws (or import them), or "
+                  "cite the relevant fact directly.");
+        }
         // Z/p numerical fast-fail. If the two sides disagree as
         // polynomials over Z/p, ring CANNOT prove them equal — bail
         // immediately without doing the expensive symbolic normalise
@@ -6199,6 +6248,28 @@ ExpressionPointer Elaborator::elaborateField(
         // ring path is exercised through `ring`.)
         RingScheme scheme = computeRingScheme(goal.carrierType);
         RingStructurePrefixGuard prefixGuard(*this, scheme.structurePrefix);
+        // Honest failure for a carrier with NO ring structure at all: if
+        // neither `<carrier>.add` nor `<carrier>.multiply` exists (and the
+        // carrier isn't a bundled/RingModulo one, which carries a structure
+        // prefix), every operation in the goal is an opaque atom to the
+        // normaliser, and the fingerprint fast-fail below would misreport
+        // an unprovable-HERE goal as "FALSE as a polynomial identity".
+        if (scheme.structurePrefix.empty()
+            && environment_.lookup(scheme.opNamespace + ".add") == nullptr
+            && environment_.lookup(scheme.opNamespace + ".multiply")
+                   == nullptr) {
+            throwElaborate(
+                "`ring`: the goal's carrier `" + carrierName
+                + "` has no ring structure `ring` can use — no `"
+                + scheme.opNamespace + ".add` / `" + scheme.opNamespace
+                + ".multiply` operations (or registered ring laws) are in "
+                  "scope, so the goal's operations are opaque atoms here. "
+                  "`ring` works on carriers with named ring operations + "
+                  "laws (Natural, Integer, Rational, Real, PAdic, …), on "
+                  "`CommutativeRing.carrier(c)`, and on `RingModulo(c, m)` "
+                  "carriers. Prove the carrier's laws (or import them), or "
+                  "cite the relevant fact directly.");
+        }
         RingNormalisationContext context;
         context.carrierName = carrierName;
         context.carrierType = goal.carrierType;

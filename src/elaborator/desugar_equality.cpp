@@ -465,30 +465,33 @@ Elaborator::EqualityComponents Elaborator::extractEqualityComponents(
         // applied-`Equality.{u}` form we expect to destructure below.
         equalityType =
             weakHeadNormalForm(environment_, equalityType);
+        auto failNotEquality = [&]() -> ElaborateError {
+            return ElaborateError(
+                std::string(contextLabel)
+                + ": the goal is not an equality — its type is `"
+                + prettyPrintForDisplay(equalityType)
+                + "` (line " + std::to_string(line) + "). "
+                + (std::string(contextLabel) == "ring"
+                       ? "`ring` proves `=` goals only; for an order or "
+                         "other relation goal, put the ring step inside a "
+                         "calc chain whose steps carry the relation."
+                       : "Expected a fully applied `Equality(T, a, b)`."));
+        };
         auto* outerApp = std::get_if<Application>(&equalityType->node);
         if (!outerApp) {
-            throw ElaborateError(
-                std::string(contextLabel)
-                + ": argument's type is not a fully applied Equality "
-                "(line " + std::to_string(line) + ")");
+            throw failNotEquality();
         }
         ExpressionPointer rightEndpoint = outerApp->argument;
         auto* middleApp =
             std::get_if<Application>(&outerApp->function->node);
         if (!middleApp) {
-            throw ElaborateError(
-                std::string(contextLabel)
-                + ": argument's type is not a fully applied Equality "
-                "(line " + std::to_string(line) + ")");
+            throw failNotEquality();
         }
         ExpressionPointer leftEndpoint = middleApp->argument;
         auto* innerApp =
             std::get_if<Application>(&middleApp->function->node);
         if (!innerApp) {
-            throw ElaborateError(
-                std::string(contextLabel)
-                + ": argument's type is not a fully applied Equality "
-                "(line " + std::to_string(line) + ")");
+            throw failNotEquality();
         }
         ExpressionPointer carrierType = innerApp->argument;
         auto* equalityConstant =
