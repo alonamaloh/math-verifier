@@ -1,0 +1,493 @@
+-- ComplexNumber/exponential_imaginary.math
+--
+-- The exponential on the imaginary axis, coordinate by coordinate. The
+-- number i·x (x real) has coordinates (0, x), so its powers follow the
+-- recurrence
+--   re((ix)^{k+1}) = −x·im((ix)^k),   im((ix)^{k+1}) = x·re((ix)^k),
+-- which solves in closed form along the i-power 4-cycle:
+--   re((ix)^{2m})   = (−x²)^m,   im((ix)^{2m})   = 0,
+--   re((ix)^{2m+1}) = 0,         im((ix)^{2m+1}) = x·(−x²)^m.
+-- These are the real and imaginary parts of the k-th term of exp(ix),
+-- and hence (summed) the power series of cosine and sine.
+
+module ComplexNumber.exponential_imaginary
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.arithmetic
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.factorial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.square_root
+import Real.power
+import Real.series
+import Real.cauchy_complete
+import Real.exponential
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.coordinate_negate
+import ComplexNumber.embedding
+import ComplexNumber.modulus
+import ComplexNumber.modulus_multiplicative
+import ComplexNumber.exponential
+import ComplexNumber.conjugation
+
+-- ----------------------------------------------------------------------
+-- The coordinates of i·x: (0, x).
+
+theorem ComplexNumber.realPart_i_from_real (x : Real)
+        : ComplexNumber.realPart(ComplexNumber.i * ComplexNumber.from_real(x))
+          = Real.zero :=
+  calc ComplexNumber.realPart(ComplexNumber.i * ComplexNumber.from_real(x))
+     = ComplexNumber.realPart(ComplexNumber.i)
+           * ComplexNumber.realPart(ComplexNumber.from_real(x))
+       - ComplexNumber.imaginaryPart(ComplexNumber.i)
+             * ComplexNumber.imaginaryPart(ComplexNumber.from_real(x))
+           by ComplexNumber.realPart_multiply(
+                  ComplexNumber.i, ComplexNumber.from_real(x))
+     = Real.zero * ComplexNumber.realPart(ComplexNumber.from_real(x))
+       - ComplexNumber.imaginaryPart(ComplexNumber.i)
+             * ComplexNumber.imaginaryPart(ComplexNumber.from_real(x))
+           by ComplexNumber.realPart_i
+     = Real.zero * ComplexNumber.realPart(ComplexNumber.from_real(x))
+       - ComplexNumber.imaginaryPart(ComplexNumber.i) * Real.zero
+           by ComplexNumber.imaginaryPart_from_real(x)
+     = Real.zero
+           by ring
+
+theorem ComplexNumber.imaginaryPart_i_from_real (x : Real)
+        : ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+          = x :=
+  calc ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+     = ComplexNumber.realPart(ComplexNumber.i)
+           * ComplexNumber.imaginaryPart(ComplexNumber.from_real(x))
+       + ComplexNumber.imaginaryPart(ComplexNumber.i)
+             * ComplexNumber.realPart(ComplexNumber.from_real(x))
+           by ComplexNumber.imaginaryPart_multiply(
+                  ComplexNumber.i, ComplexNumber.from_real(x))
+     = Real.zero
+           * ComplexNumber.imaginaryPart(ComplexNumber.from_real(x))
+       + ComplexNumber.imaginaryPart(ComplexNumber.i)
+             * ComplexNumber.realPart(ComplexNumber.from_real(x))
+           by ComplexNumber.realPart_i
+     = Real.zero
+           * ComplexNumber.imaginaryPart(ComplexNumber.from_real(x))
+       + Real.one * ComplexNumber.realPart(ComplexNumber.from_real(x))
+           by ComplexNumber.imaginaryPart_i
+     = Real.zero
+           * ComplexNumber.imaginaryPart(ComplexNumber.from_real(x))
+       + Real.one * x
+           by ComplexNumber.realPart_from_real(x)
+     = x
+           by ring
+
+-- ----------------------------------------------------------------------
+-- The one-step recurrence for the coordinates of the powers of i·x.
+
+theorem ComplexNumber.realPart_imaginaryAxis_power_successor (x : Real) (k : Natural)
+        : ComplexNumber.realPart(
+              ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x),
+                  successor(k)))
+          = -(x * ComplexNumber.imaginaryPart(
+                      ComplexNumber.power(
+                          ComplexNumber.i * ComplexNumber.from_real(x), k))) := {
+  claim reZero
+      : ComplexNumber.realPart(ComplexNumber.i * ComplexNumber.from_real(x))
+        = Real.zero
+      since ComplexNumber.realPart_i_from_real;
+  claim imX
+      : ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+        = x
+      since ComplexNumber.imaginaryPart_i_from_real;
+  calc ComplexNumber.realPart(
+           ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x),
+               successor(k)))
+     = ComplexNumber.realPart(
+           (ComplexNumber.i * ComplexNumber.from_real(x))
+           * ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+     = ComplexNumber.realPart(ComplexNumber.i * ComplexNumber.from_real(x))
+           * ComplexNumber.realPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+       - ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+             * ComplexNumber.imaginaryPart(
+                   ComplexNumber.power(
+                       ComplexNumber.i * ComplexNumber.from_real(x), k))
+           by ComplexNumber.realPart_multiply(
+                  ComplexNumber.i * ComplexNumber.from_real(x),
+                  ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+     = Real.zero
+           * ComplexNumber.realPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+       - ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+             * ComplexNumber.imaginaryPart(
+                   ComplexNumber.power(
+                       ComplexNumber.i * ComplexNumber.from_real(x), k))
+           by substituting reZero
+     = Real.zero
+           * ComplexNumber.realPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+       - x * ComplexNumber.imaginaryPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+           by substituting imX
+     = -(x * ComplexNumber.imaginaryPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k)))
+           by ring
+}
+
+theorem ComplexNumber.imaginaryPart_imaginaryAxis_power_successor
+        (x : Real) (k : Natural)
+        : ComplexNumber.imaginaryPart(
+              ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x),
+                  successor(k)))
+          = x * ComplexNumber.realPart(
+                    ComplexNumber.power(
+                        ComplexNumber.i * ComplexNumber.from_real(x), k)) := {
+  claim reZero
+      : ComplexNumber.realPart(ComplexNumber.i * ComplexNumber.from_real(x))
+        = Real.zero
+      since ComplexNumber.realPart_i_from_real;
+  claim imX
+      : ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+        = x
+      since ComplexNumber.imaginaryPart_i_from_real;
+  calc ComplexNumber.imaginaryPart(
+           ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x),
+               successor(k)))
+     = ComplexNumber.imaginaryPart(
+           (ComplexNumber.i * ComplexNumber.from_real(x))
+           * ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+     = ComplexNumber.realPart(ComplexNumber.i * ComplexNumber.from_real(x))
+           * ComplexNumber.imaginaryPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+       + ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+             * ComplexNumber.realPart(
+                   ComplexNumber.power(
+                       ComplexNumber.i * ComplexNumber.from_real(x), k))
+           by ComplexNumber.imaginaryPart_multiply(
+                  ComplexNumber.i * ComplexNumber.from_real(x),
+                  ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+     = Real.zero
+           * ComplexNumber.imaginaryPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+       + ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+             * ComplexNumber.realPart(
+                   ComplexNumber.power(
+                       ComplexNumber.i * ComplexNumber.from_real(x), k))
+           by substituting reZero
+     = Real.zero
+           * ComplexNumber.imaginaryPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+       + x * ComplexNumber.realPart(
+                 ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+           by substituting imX
+     = x * ComplexNumber.realPart(
+               ComplexNumber.power(ComplexNumber.i * ComplexNumber.from_real(x), k))
+           by ring
+}
+
+-- ----------------------------------------------------------------------
+-- The closed forms along the 4-cycle, proved together by induction on
+-- m (each step applies the recurrence twice: 2m → 2m+1 → 2m+2).
+theorem ComplexNumber.imaginaryAxis_power_coordinates (x : Real)
+        : (m : Natural)
+          → And(
+                ComplexNumber.realPart(
+                    ComplexNumber.power(
+                        ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+                  = Real.power(-(x * x), m),
+            And(
+                ComplexNumber.imaginaryPart(
+                    ComplexNumber.power(
+                        ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+                  = Real.zero,
+            And(
+                ComplexNumber.realPart(
+                    ComplexNumber.power(
+                        ComplexNumber.i * ComplexNumber.from_real(x),
+                        successor(2 * m)))
+                  = Real.zero,
+                ComplexNumber.imaginaryPart(
+                    ComplexNumber.power(
+                        ComplexNumber.i * ComplexNumber.from_real(x),
+                        successor(2 * m)))
+                  = x * Real.power(-(x * x), m))))
+  | zero => {
+      claim evenReal
+          : ComplexNumber.realPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x), 2 * 0))
+            = Real.power(-(x * x), 0)
+          by {
+            claim twoTimesZero : 2 * 0 = 0;
+            calc ComplexNumber.realPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x), 2 * 0))
+               = ComplexNumber.realPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x), 0))
+                     by twoTimesZero
+               = ComplexNumber.realPart(
+                     RingModulo.one(Real.polynomial_commutative_ring,
+                         Complex.definingPolynomial))
+               = ComplexNumber.realPart(ComplexNumber.from_real(Real.one))
+                     by ComplexNumber.from_real_one
+               = Real.one
+                     by ComplexNumber.realPart_from_real(Real.one)
+               = Real.power(-(x * x), 0)
+          };
+      claim evenImaginary
+          : ComplexNumber.imaginaryPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x), 2 * 0))
+            = Real.zero
+          by {
+            claim twoTimesZero : 2 * 0 = 0;
+            calc ComplexNumber.imaginaryPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x), 2 * 0))
+               = ComplexNumber.imaginaryPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x), 0))
+                     by twoTimesZero
+               = ComplexNumber.imaginaryPart(
+                     RingModulo.one(Real.polynomial_commutative_ring,
+                         Complex.definingPolynomial))
+               = ComplexNumber.imaginaryPart(ComplexNumber.from_real(Real.one))
+                     by ComplexNumber.from_real_one
+               = Real.zero
+                     by ComplexNumber.imaginaryPart_from_real(Real.one)
+          };
+      -- The index successor(2*0) = 1, so (ix)^1 = ix with coordinates (0, x).
+      claim oddReal
+          : ComplexNumber.realPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x),
+                    successor(2 * 0)))
+            = Real.zero
+          by {
+            claim succTwoTimesZero : successor(2 * 0) = 1;
+            calc ComplexNumber.realPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x),
+                         successor(2 * 0)))
+               = ComplexNumber.realPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x), 1))
+                     by succTwoTimesZero
+               = ComplexNumber.realPart(
+                     (ComplexNumber.i * ComplexNumber.from_real(x))
+                     * RingModulo.one(Real.polynomial_commutative_ring,
+                           Complex.definingPolynomial))
+               = ComplexNumber.realPart(ComplexNumber.i * ComplexNumber.from_real(x))
+                     by RingModulo.multiply_identity_right
+               = Real.zero
+                     by ComplexNumber.realPart_i_from_real(x)
+          };
+      claim oddImaginary
+          : ComplexNumber.imaginaryPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x),
+                    successor(2 * 0)))
+            = x * Real.power(-(x * x), 0)
+          by {
+            claim succTwoTimesZero : successor(2 * 0) = 1;
+            calc ComplexNumber.imaginaryPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x),
+                         successor(2 * 0)))
+               = ComplexNumber.imaginaryPart(
+                     ComplexNumber.power(
+                         ComplexNumber.i * ComplexNumber.from_real(x), 1))
+                     by succTwoTimesZero
+               = ComplexNumber.imaginaryPart(
+                     (ComplexNumber.i * ComplexNumber.from_real(x))
+                     * RingModulo.one(Real.polynomial_commutative_ring,
+                           Complex.definingPolynomial))
+               = ComplexNumber.imaginaryPart(ComplexNumber.i * ComplexNumber.from_real(x))
+                     by RingModulo.multiply_identity_right
+               = x
+                     by ComplexNumber.imaginaryPart_i_from_real(x)
+               = x * Real.one
+                     by ring
+               = x * Real.power(-(x * x), 0)
+          };
+      done by And.introduction(
+                  evenReal,
+                  And.introduction(
+                      evenImaginary, And.introduction(oddReal, oddImaginary)))
+    }
+  | successor(m) => {
+      obtain ⟨evenRealAt, restAt⟩
+          from ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+      obtain ⟨evenImaginaryAt, restAt2⟩ from restAt;
+      obtain ⟨oddRealAt, oddImaginaryAt⟩ from restAt2;
+      -- 2·(m+1) = (2m+1)+1 and 2·(m+1)+1 = (2m+2)+1: the two indices
+      -- this step produces, each one successor above an index already
+      -- handled.
+      claim indexEven : 2 * successor(m) = successor(successor(2 * m)) by ring;
+      -- 2m+2: realPart = −x·im((ix)^{2m+1}) = −x·(x·(−x²)^m) = (−x²)^{m+1}.
+      claim evenReal
+          : ComplexNumber.realPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x),
+                    2 * successor(m)))
+            = Real.power(-(x * x), successor(m))
+          by calc ComplexNumber.realPart(
+                      ComplexNumber.power(
+                          ComplexNumber.i * ComplexNumber.from_real(x),
+                          2 * successor(m)))
+                = ComplexNumber.realPart(
+                      ComplexNumber.power(
+                          ComplexNumber.i * ComplexNumber.from_real(x),
+                          successor(successor(2 * m))))
+                      by indexEven
+                = -(x * ComplexNumber.imaginaryPart(
+                            ComplexNumber.power(
+                                ComplexNumber.i * ComplexNumber.from_real(x),
+                                successor(2 * m))))
+                      by ComplexNumber.realPart_imaginaryAxis_power_successor(
+                             x, successor(2 * m))
+                = -(x * (x * Real.power(-(x * x), m)))
+                      since oddImaginaryAt
+                = -(x * x) * Real.power(-(x * x), m)
+                      by ring
+                = Real.power(-(x * x), successor(m));
+      -- 2m+2: imaginaryPart = x·re((ix)^{2m+1}) = x·0 = 0.
+      claim evenImaginary
+          : ComplexNumber.imaginaryPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x),
+                    2 * successor(m)))
+            = Real.zero
+          by calc ComplexNumber.imaginaryPart(
+                      ComplexNumber.power(
+                          ComplexNumber.i * ComplexNumber.from_real(x),
+                          2 * successor(m)))
+                = ComplexNumber.imaginaryPart(
+                      ComplexNumber.power(
+                          ComplexNumber.i * ComplexNumber.from_real(x),
+                          successor(successor(2 * m))))
+                      by indexEven
+                = x * ComplexNumber.realPart(
+                          ComplexNumber.power(
+                              ComplexNumber.i * ComplexNumber.from_real(x),
+                              successor(2 * m)))
+                      by ComplexNumber.imaginaryPart_imaginaryAxis_power_successor(
+                             x, successor(2 * m))
+                = x * Real.zero
+                      since oddRealAt
+                = Real.zero
+                      by ring;
+      -- 2m+3: realPart = −x·im((ix)^{2m+2}) = −x·0 = 0.
+      claim oddReal
+          : ComplexNumber.realPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x),
+                    successor(2 * successor(m))))
+            = Real.zero
+          by calc ComplexNumber.realPart(
+                      ComplexNumber.power(
+                          ComplexNumber.i * ComplexNumber.from_real(x),
+                          successor(2 * successor(m))))
+                = -(x * ComplexNumber.imaginaryPart(
+                            ComplexNumber.power(
+                                ComplexNumber.i * ComplexNumber.from_real(x),
+                                2 * successor(m))))
+                      by ComplexNumber.realPart_imaginaryAxis_power_successor(
+                             x, 2 * successor(m))
+                = -(x * Real.zero)
+                      since evenImaginary
+                = Real.zero
+                      by ring;
+      -- 2m+3: imaginaryPart = x·re((ix)^{2m+2}) = x·(−x²)^{m+1}.
+      claim oddImaginary
+          : ComplexNumber.imaginaryPart(
+                ComplexNumber.power(
+                    ComplexNumber.i * ComplexNumber.from_real(x),
+                    successor(2 * successor(m))))
+            = x * Real.power(-(x * x), successor(m))
+          by calc ComplexNumber.imaginaryPart(
+                      ComplexNumber.power(
+                          ComplexNumber.i * ComplexNumber.from_real(x),
+                          successor(2 * successor(m))))
+                = x * ComplexNumber.realPart(
+                          ComplexNumber.power(
+                              ComplexNumber.i * ComplexNumber.from_real(x),
+                              2 * successor(m)))
+                      by ComplexNumber.imaginaryPart_imaginaryAxis_power_successor(
+                             x, 2 * successor(m))
+                = x * Real.power(-(x * x), successor(m))
+                      since evenReal;
+      done by And.introduction(
+                  evenReal,
+                  And.introduction(
+                      evenImaginary, And.introduction(oddReal, oddImaginary)))
+    }
