@@ -1,0 +1,448 @@
+-- ComplexNumber/trigonometric_bounds.math
+--
+-- Regrouping the cosine and sine series onto their non-vanishing terms.
+-- The series for cos x has Re(term_{2m+1}) = 0, so summing in pairs and
+-- passing to the even subsequence collapses it to Σ_m Re(term_{2m})
+-- (and likewise sin x = Σ_m Im(term_{2m+1})). This is the bridge from
+-- the full exponential series to the alternating series of the π bounds.
+
+module ComplexNumber.trigonometric_bounds
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.arithmetic
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.factorial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.square_root
+import Real.power
+import Real.series
+import Real.cauchy_complete
+import Real.exponential
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.coordinate_negate
+import ComplexNumber.embedding
+import ComplexNumber.modulus
+import ComplexNumber.modulus_multiplicative
+import ComplexNumber.completeness
+import ComplexNumber.limits
+import ComplexNumber.exponential
+import ComplexNumber.conjugation
+import ComplexNumber.trigonometry
+import ComplexNumber.exponential_imaginary
+import ComplexNumber.trigonometric_series
+
+-- ----------------------------------------------------------------------
+-- Summing a series in pairs: the first 2N terms grouped two at a time.
+theorem Real.partialSum_pair (s : Natural → Real) (N : Natural)
+        : Real.partialSum(s, 2 * N)
+          = Real.partialSum(
+                (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), N) :=
+  by_induction on N with IH {
+    case zero: {
+        claim twoTimesZero : 2 * 0 = 0;
+        calc Real.partialSum(s, 2 * 0)
+           = Real.partialSum(s, 0)    by twoTimesZero
+           = Real.partialSum(
+                 (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), 0)
+      }
+    case successor(p): {
+        claim indexStep : 2 * successor(p) = successor(successor(2 * p)) by ring;
+        calc Real.partialSum(s, 2 * successor(p))
+           = Real.partialSum(s, successor(successor(2 * p)))
+                 by indexStep
+           = (Real.partialSum(s, 2 * p) + s(2 * p)) + s(successor(2 * p))
+           = (Real.partialSum(
+                  (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), p)
+              + s(2 * p))
+             + s(successor(2 * p))
+                 since IH
+           = Real.partialSum(
+                 (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), p)
+             + (s(2 * p) + s(successor(2 * p)))
+                 by ring
+           = Real.partialSum(
+                 (m : Natural) ↦ s(2 * m) + s(successor(2 * m)),
+                 successor(p))
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The even subsequence of a convergent sequence converges to the same
+-- limit (2N grows past any threshold, since N ≤ 2N).
+theorem Real.SequenceConverges.subsequence_double
+        (s : Natural → Real) (limit : Real)
+        (converges : Real.SequenceConverges(s, limit))
+        : Real.SequenceConverges((N : Natural) ↦ s(2 * N), limit) :=
+  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨threshold, close⟩ from converges(epsilon, epsilonPositive);
+    witness threshold with
+        (N : Natural) (aboveThreshold : threshold ≤ N) ↦ {
+          claim doubleAbove : threshold ≤ 2 * N
+              by {
+                claim N ≤ N + N since Natural.less_or_equal_add_right;
+                claim twoN : 2 * N = N + N by ring;
+                claim N ≤ 2 * N by substituting twoN;
+                done since LessOrEqual.transitive
+              };
+          done by close(2 * N, doubleAbove)
+        }
+  }
+
+-- ----------------------------------------------------------------------
+-- The cosine series, regrouped onto its even terms. The odd terms
+-- Re(term_{2m+1}) vanish, so cos x is the limit of Σ_m Re(term_{2m}).
+theorem Real.cosine_paired_series_converges (x : Real)
+        : Real.SequenceConverges(
+              Real.partialSum(
+                  (m : Natural) ↦
+                      ComplexNumber.realPart(
+                          ComplexNumber.exponentialTerm(
+                              ComplexNumber.i * ComplexNumber.from_real(x),
+                              2 * m))),
+              cos(x)) := {
+  -- The full series converges to cos x; so does its even subsequence.
+  claim fullConverges
+      : Real.SequenceConverges(
+            Real.partialSum(
+                (k : Natural) ↦
+                    ComplexNumber.realPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x), k))),
+            cos(x))
+      by Real.cosine_series_converges(x);
+  claim evenSubsequence
+      : Real.SequenceConverges(
+            (N : Natural) ↦
+                Real.partialSum(
+                    (k : Natural) ↦
+                        ComplexNumber.realPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                    2 * N),
+            cos(x))
+      by Real.SequenceConverges.subsequence_double(
+             Real.partialSum(
+                 (k : Natural) ↦
+                     ComplexNumber.realPart(
+                         ComplexNumber.exponentialTerm(
+                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
+             cos(x), fullConverges);
+  -- Each 2N-cut sums in pairs, and each pair drops to its even term.
+  claim pairsCollapse
+      : (N : Natural)
+        → Real.partialSum(
+              (k : Natural) ↦
+                  ComplexNumber.realPart(
+                      ComplexNumber.exponentialTerm(
+                          ComplexNumber.i * ComplexNumber.from_real(x), k)),
+              2 * N)
+          = Real.partialSum(
+                (m : Natural) ↦
+                    ComplexNumber.realPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x), 2 * m)),
+                N)
+      by (N : Natural) ↦
+           calc Real.partialSum(
+                    (k : Natural) ↦
+                        ComplexNumber.realPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                    2 * N)
+              = Real.partialSum(
+                    (m : Natural) ↦
+                        ComplexNumber.realPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+                        + ComplexNumber.realPart(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x),
+                                  successor(2 * m))),
+                    N)
+                    by Real.partialSum_pair(
+                           (k : Natural) ↦
+                               ComplexNumber.realPart(
+                                   ComplexNumber.exponentialTerm(
+                                       ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                           N)
+              = Real.partialSum(
+                    (m : Natural) ↦
+                        ComplexNumber.realPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x), 2 * m)),
+                    N)
+                    by Real.partialSum_pointwise(
+                           (m : Natural) ↦
+                               ComplexNumber.realPart(
+                                   ComplexNumber.exponentialTerm(
+                                       ComplexNumber.i * ComplexNumber.from_real(x),
+                                       2 * m))
+                               + ComplexNumber.realPart(
+                                     ComplexNumber.exponentialTerm(
+                                         ComplexNumber.i * ComplexNumber.from_real(x),
+                                         successor(2 * m))),
+                           (m : Natural) ↦
+                               ComplexNumber.realPart(
+                                   ComplexNumber.exponentialTerm(
+                                       ComplexNumber.i * ComplexNumber.from_real(x),
+                                       2 * m)),
+                           (m : Natural) ↦ {
+                             claim oddVanishes
+                                 : ComplexNumber.realPart(
+                                       ComplexNumber.exponentialTerm(
+                                           ComplexNumber.i * ComplexNumber.from_real(x),
+                                           successor(2 * m)))
+                                   = Real.zero
+                                 by Real.cosine_term_odd(x, m);
+                             calc ComplexNumber.realPart(
+                                      ComplexNumber.exponentialTerm(
+                                          ComplexNumber.i * ComplexNumber.from_real(x),
+                                          2 * m))
+                                  + ComplexNumber.realPart(
+                                        ComplexNumber.exponentialTerm(
+                                            ComplexNumber.i * ComplexNumber.from_real(x),
+                                            successor(2 * m)))
+                                = ComplexNumber.realPart(
+                                      ComplexNumber.exponentialTerm(
+                                          ComplexNumber.i * ComplexNumber.from_real(x),
+                                          2 * m))
+                                  + Real.zero
+                                    since oddVanishes
+                                = ComplexNumber.realPart(
+                                      ComplexNumber.exponentialTerm(
+                                          ComplexNumber.i * ComplexNumber.from_real(x),
+                                          2 * m))
+                                    by ring
+                           },
+                           N);
+  done by Real.SequenceConverges.of_pointwise(
+              (N : Natural) ↦
+                  Real.partialSum(
+                      (k : Natural) ↦
+                          ComplexNumber.realPart(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                      2 * N),
+              Real.partialSum(
+                  (m : Natural) ↦
+                      ComplexNumber.realPart(
+                          ComplexNumber.exponentialTerm(
+                              ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))),
+              cos(x),
+              pairsCollapse, evenSubsequence)
+}
+
+-- ----------------------------------------------------------------------
+-- The sine series, regrouped onto its odd terms. The even terms
+-- Im(term_{2m}) vanish, so sin x is the limit of Σ_m Im(term_{2m+1}).
+theorem Real.sine_paired_series_converges (x : Real)
+        : Real.SequenceConverges(
+              Real.partialSum(
+                  (m : Natural) ↦
+                      ComplexNumber.imaginaryPart(
+                          ComplexNumber.exponentialTerm(
+                              ComplexNumber.i * ComplexNumber.from_real(x),
+                              successor(2 * m)))),
+              sin(x)) := {
+  claim fullConverges
+      : Real.SequenceConverges(
+            Real.partialSum(
+                (k : Natural) ↦
+                    ComplexNumber.imaginaryPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x), k))),
+            sin(x))
+      by Real.sine_series_converges(x);
+  claim evenSubsequence
+      : Real.SequenceConverges(
+            (N : Natural) ↦
+                Real.partialSum(
+                    (k : Natural) ↦
+                        ComplexNumber.imaginaryPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                    2 * N),
+            sin(x))
+      by Real.SequenceConverges.subsequence_double(
+             Real.partialSum(
+                 (k : Natural) ↦
+                     ComplexNumber.imaginaryPart(
+                         ComplexNumber.exponentialTerm(
+                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
+             sin(x), fullConverges);
+  claim pairsCollapse
+      : (N : Natural)
+        → Real.partialSum(
+              (k : Natural) ↦
+                  ComplexNumber.imaginaryPart(
+                      ComplexNumber.exponentialTerm(
+                          ComplexNumber.i * ComplexNumber.from_real(x), k)),
+              2 * N)
+          = Real.partialSum(
+                (m : Natural) ↦
+                    ComplexNumber.imaginaryPart(
+                        ComplexNumber.exponentialTerm(
+                            ComplexNumber.i * ComplexNumber.from_real(x),
+                            successor(2 * m))),
+                N)
+      by (N : Natural) ↦
+           calc Real.partialSum(
+                    (k : Natural) ↦
+                        ComplexNumber.imaginaryPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                    2 * N)
+              = Real.partialSum(
+                    (m : Natural) ↦
+                        ComplexNumber.imaginaryPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+                        + ComplexNumber.imaginaryPart(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x),
+                                  successor(2 * m))),
+                    N)
+                    by Real.partialSum_pair(
+                           (k : Natural) ↦
+                               ComplexNumber.imaginaryPart(
+                                   ComplexNumber.exponentialTerm(
+                                       ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                           N)
+              = Real.partialSum(
+                    (m : Natural) ↦
+                        ComplexNumber.imaginaryPart(
+                            ComplexNumber.exponentialTerm(
+                                ComplexNumber.i * ComplexNumber.from_real(x),
+                                successor(2 * m))),
+                    N)
+                    by Real.partialSum_pointwise(
+                           (m : Natural) ↦
+                               ComplexNumber.imaginaryPart(
+                                   ComplexNumber.exponentialTerm(
+                                       ComplexNumber.i * ComplexNumber.from_real(x),
+                                       2 * m))
+                               + ComplexNumber.imaginaryPart(
+                                     ComplexNumber.exponentialTerm(
+                                         ComplexNumber.i * ComplexNumber.from_real(x),
+                                         successor(2 * m))),
+                           (m : Natural) ↦
+                               ComplexNumber.imaginaryPart(
+                                   ComplexNumber.exponentialTerm(
+                                       ComplexNumber.i * ComplexNumber.from_real(x),
+                                       successor(2 * m))),
+                           (m : Natural) ↦ {
+                             claim evenVanishes
+                                 : ComplexNumber.imaginaryPart(
+                                       ComplexNumber.exponentialTerm(
+                                           ComplexNumber.i * ComplexNumber.from_real(x),
+                                           2 * m))
+                                   = Real.zero
+                                 by Real.sine_term_even(x, m);
+                             calc ComplexNumber.imaginaryPart(
+                                      ComplexNumber.exponentialTerm(
+                                          ComplexNumber.i * ComplexNumber.from_real(x),
+                                          2 * m))
+                                  + ComplexNumber.imaginaryPart(
+                                        ComplexNumber.exponentialTerm(
+                                            ComplexNumber.i * ComplexNumber.from_real(x),
+                                            successor(2 * m)))
+                                = Real.zero
+                                  + ComplexNumber.imaginaryPart(
+                                        ComplexNumber.exponentialTerm(
+                                            ComplexNumber.i * ComplexNumber.from_real(x),
+                                            successor(2 * m)))
+                                    since evenVanishes
+                                = ComplexNumber.imaginaryPart(
+                                      ComplexNumber.exponentialTerm(
+                                          ComplexNumber.i * ComplexNumber.from_real(x),
+                                          successor(2 * m)))
+                                    by ring
+                           },
+                           N);
+  done by Real.SequenceConverges.of_pointwise(
+              (N : Natural) ↦
+                  Real.partialSum(
+                      (k : Natural) ↦
+                          ComplexNumber.imaginaryPart(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x), k)),
+                      2 * N),
+              Real.partialSum(
+                  (m : Natural) ↦
+                      ComplexNumber.imaginaryPart(
+                          ComplexNumber.exponentialTerm(
+                              ComplexNumber.i * ComplexNumber.from_real(x),
+                              successor(2 * m)))),
+              sin(x),
+              pairsCollapse, evenSubsequence)
+}
