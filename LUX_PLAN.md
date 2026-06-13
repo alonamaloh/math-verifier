@@ -26,12 +26,21 @@ Every proof obligation `O` is discharged by the **same** engine over three
 inputs:
 
 ```
-discharge(O)  =  Closure  ∪  LocalContext  ∪  Cited
+discharge(O)  =  Tactics  ∪  LocalContext  ∪  Cited
 ```
 
-- **Closure** — always on, never named:
+- **Tactics** — always on, never named. A fixed set of self-contained
+  **decision/normalization procedures**, each carrying its own axioms
+  internally; they do *not* consult the lemma database, which is exactly
+  why they cannot reopen the global search:
   - ring/field normalization,
   - congruence closure,
+  - linear arithmetic / order over an ordered field (à la
+    Fourier–Motzkin / simplex): transitivity of `≤`, antisymmetry, and
+    adding inequalities are *internal moves of the procedure*, baked in
+    the way distributivity is baked into `ring` — never citable facts.
+    Linear inequalities are in scope; **nonlinear** ones (AM-GM-shaped
+    goals) are not — they stay cited or hand-proved.
   - classical propositional reasoning incl. **negation-normal-form
     rewriting** (DNE `¬¬P → P`, and the quantifier de Morgan dualities
     `¬∀x.P ⤳ ∃x.¬P`, `¬∃x.P ⤳ ∀x.¬P`). These are directed, terminating
@@ -41,10 +50,23 @@ discharge(O)  =  Closure  ∪  LocalContext  ∪  Cited
 - **Cited** — exactly the global library lemmas named with `by L1, L2`.
   Nothing from the global imports enters automatically.
 
+**The Tactics set is extended only at the language level, never per-lemma.**
+A candidate may enter Tactics only if it is (1) a terminating decision or
+normalization *procedure* (not a fact to match against the goal), (2)
+self-contained (carries its own axioms, never reads the lemma database),
+and (3) admitted by deliberate review of the *language*, not by a library
+author tagging a declaration. There is deliberately **no `automatic`
+marker** for promoting individual lemmas: a marked-automatic lemma is a
+fact the prover must match and unify — i.e. search — and a keyword has no
+natural stopping point, so it reassembles the global auto-search one tag
+at a time. If a fact feels fundamental enough to be automatic (e.g.
+transitivity of `≤`), it belongs *inside* a built-in tactic, not on a
+markable list; everything a procedure cannot decide gets a `by`.
+
 The surface constructs differ only in **how they extend the context**
 before this one prover runs:
 
-- bare `P` (or `name : P`) — prove `P` from closure + current local context.
+- bare `P` (or `name : P`) — prove `P` from the tactics + current local context.
   **This is a "claim": stating a fact proves it and adds it.**
 - `P by L1, L2` — same, with `L1, L2` temporarily added to local context.
   The lightweight one-liner.
@@ -54,12 +76,113 @@ before this one prover runs:
 `by <lemma>` is therefore not a separate mechanism — it is "drop this named
 fact into the local context for this obligation." `by` and `{ }` compose.
 
+### Citation is a necessity claim, not a hint
+
+A cleaner way to read the model: the built-in tactics are the **engine**,
+not a third fact-set; the two fact-sources are `LocalContext` and `Cited`;
+and a step may optionally pick which procedure runs. So every obligation is
+
+```
+prove(goal  |  LocalContext, Cited, selectedTactic?)
+```
+
+**Invariant: every cited fact must actually be used.** A citation is a
+*necessity claim* — `by L` asserts "this step genuinely depends on L" — so
+the prover must find a derivation that uses `L`, or the step is ill-formed
+("`L` is unused — remove it"). Citing is never a suggestion the prover may
+ignore.
+
+**No-redundant-citation is therefore emergent, not special-cased.** It is
+not a rule we write down; it falls straight out of the invariant. `ring`
+proves a pure identity using *no* facts, so if `ring` would close a goal
+while a citation sits unused, that discharge is rejected — which is exactly
+why "`ring` does not fire once you have cited a lemma." Selecting `by ring`
+*and* citing a fact is likewise an incoherent request: a zero-fact tactic
+handed a fact. You never hardcode either case; both are the invariant
+biting. This turns the old `--check-redundant-by` linter from a post-hoc
+cleanup pass into a **typing rule**: a redundant citation is a failed proof,
+so redundant citations cannot exist.
+
+The invariant also sharpens the fact-free / fact-using split:
+
+- **`ring` (named, fact-free)** — closes a pure ring identity, takes no
+  facts; citing alongside it is an error.
+- **the general engine (no tactic selected)** — ring-normalization +
+  congruence + linear-arithmetic + propositional together; *this* is what
+  consumes facts. Given `h : a = b`, proving `a·c + 1 = b·c + 1` is the
+  engine's job (congruence consumes `h`, then ring normalizes), not bare
+  `ring`'s.
+- **fact-consuming named tactics** — `field(h₁, …)`, `linear_combination`,
+  `by induction on n` (consuming the IH): by the invariant they must use
+  *all* the facts handed to them. `linear_combination` is the archetype —
+  every term you supply is load-bearing.
+
+The deliberate cost is that this **kills shotgun citing**: you cannot list
+five lemmas and let the prover sort out which it needs; you cite exactly the
+necessary set. For this project that is the point, and the failure is
+friendly. The precise reading of "used": the prover must find a proof that
+uses *every* cited fact; if every proof ignores one, that is an error — so a
+logically-redundant cite (already implied by another) is rejected, which is
+correct, because it *is* redundant. (This keeps citation sets minimal, and
+dovetails with the fingerprint suggester, which proposes the minimal set in
+the first place.)
+
+### Two things live in the `by` slot
+
+`by <method>` is one uniform slot, but it holds two genuinely different kinds
+of method, and the difference is what keeps "Lux has user-invoked tactics"
+true without reopening tactic-soup:
+
+1. **Naming an always-on tactic** — `by ring`, `by field`. The tactic runs
+   anyway as part of every discharge, so naming it is *optional* and adds no
+   power. Two legitimate uses: a **reader annotation** of the step's reason
+   ("this is pure ring algebra"), and a **focusing directive** ("close this
+   with ring specifically — do not grind the whole context"). Omit it and the
+   step still proves.
+2. **Invoking a directive method** — `by induction on n`, `by cases on x`,
+   `by well-founded on <measure>`. These are *necessarily* named, because each
+   demands a **choice the prover refuses to guess** (which variable to induct
+   on, which measure descends) — the anchored-unification-yes,
+   term-invention-no contract. The prover never silently inducts or
+   case-splits; omit the method and the step is unprovable by the engine
+   alone.
+
+The invariant: the prover does category 1 on its own (you may still name it);
+it does category 2 only when explicitly invoked. `by <lemma>` citation is a
+third inhabitant of the same slot — a fact-consuming one, governed by the
+must-use-all rule above. This is the precise sense in which Lux rejects
+tactic-*soup* (imperative goal-state mutation as the authoring mode) while
+keeping named methods.
+
+### Pinning a cited lemma's arguments
+
+The prover anchors a cited lemma's `∀`-variables by unifying against the
+goal, and by contract **will not invent an unanchored one**. When a lemma
+has an argument the goal does not pin — classically a **pivot**, the middle
+term `b` of `∀ a b c, R a b → R b c → R a c` used to close `R a c` — supply
+it by name:
+
+```
+P by L with b := m             -- "by L, with its b taken to be m"
+P by L with b := m, k := n+1   -- pin several
+```
+
+- **Terms, not proofs.** `with` anchors `∀`-bound *variables* (`b := m` is
+  a term). L's *hypotheses* discharge as usual — from context or via further
+  citations (`by L, H with b := m`) — which keeps this clear of the
+  no-positional-proofs rule.
+- **Partial by design.** Pin only what unification cannot recover;
+  everything the goal anchors stays inferred. Spelling out *every* argument
+  is the positional-lemma-call smell the language avoids.
+- **`with` binds to one lemma.** Common case: one lemma, one pivot. To pin
+  args on more than one cited lemma, group: `by (L with b := m), N`.
+
 ### The predictability contract (write this down once, never revisit)
 
 The prover does **goal-directed resolution over a bounded fact set**
 (local context + cited lemmas), depth/step-budgeted. It does:
 
-- normalization + congruence + classical propositional/NNF closure;
+- normalization + congruence + classical propositional/NNF reasoning;
 - discharge any goal entailed propositionally by the available facts;
 - **goal-directed matching**: unify the goal against the *head* of a
   local/cited fact and propagate (so local `∀x, P x → Q x` plus `P a`
@@ -85,9 +208,22 @@ refactoring: proofs name their non-trivial dependencies, and a changed
 lemma breaks at the cite site. (A curated opt-in hint database, `by *`,
 could exist later but is never the default.)
 
+**The boundary is the module.** "Local" means the whole current module: a
+prior top-level lemma in the same file is in scope and auto-searched (it is
+small, bounded, and cannot be perturbed by anything off the page). "Global"
+means the import surface, which is large and rot-prone, so it is cite-only.
+This cite boundary deliberately *coincides* with the interface/body split
+and the incremental-rebuild unit — one module boundary serves privacy,
+recompilation, and prover scope at once.
+
 On failure, the error surfaces the local context: "couldn't close `P` from
 local context + [cited]; facts in scope were …" — telling the user whether
-to add a line or cite a lemma.
+to add a line or cite a lemma. Because global auto-search is gone, this
+failure-time suggestion is load-bearing for discoverability: it should also
+surface fingerprint-indexed "did you mean `by L`?" candidates from the
+import surface (the same goal-shape index built to color ring searches —
+see the auto-prover fingerprint plan). That index is the discovery path
+that replaces global auto-search.
 
 ---
 
@@ -95,13 +231,13 @@ to add a line or cite a lemma.
 
 - Drop `:=`. A proof is a uniform block `{ … }`.
 - A **statement** is `<proposition> <block?>`:
-  - no block ⇒ the closure prover must close it;
+  - no block ⇒ the built-in tactics must close it;
   - with a block ⇒ the block closes it.
 - **Named** local lemma: `name : P { … }`. **Anonymous**: `P { … }`.
   No new keyword needed — `name : P` already reads as "name is a proof of
   P," and dropping `:=` makes `{ … }` the proof. **`claim` disappears**;
   claiming is the default behavior of every statement.
-- A block is **closed** at `}` when the closure prover proves the block's
+- A block is **closed** at `}` when the prover proves the block's
   goal from its local context. The common case (last established fact *is*
   the goal) is the trivial/cheap call. No explicit "exact" needed.
 - Grammar rule: a statement must be a `Prop`-typed term ("prove and add"),
@@ -196,7 +332,7 @@ The elim/intro pair, both able to cross `Prop → data` via classical choice
 (see §7).
 
 - **`choose q such that <body> from <source>`** — eliminate an existential.
-  `from` accepts a *proposition*; the prover proves it (closure + context),
+  `from` accepts a *proposition*; the prover proves it (tactics + context),
   then the existential is destructed. Elaborates to
   `q := Classical.choose(h)` and hands back `Classical.choose_spec` as the
   proof of `<body>`.
@@ -266,7 +402,7 @@ statement" — the genuine mathematical lesson — not a foundations error.
 ## 7. Logic mode: classical by default, constructivity as a scoped badge
 
 - **Default everywhere: classical.** LEM, classical choice, and silent
-  DNE / `¬¬`-elimination are all part of closure. A mathematician never
+  DNE / `¬¬`-elimination are all part of the built-in tactics. A mathematician never
   writes an extra step to get `P` from `¬¬P`.
   - **`Classical.choose`** (value extraction from a `Prop`-existential) is
     available, which dissolves the `Prop`/`Type` large-elimination wall for
@@ -363,7 +499,14 @@ possible:
 - Layout/indentation rules for chain continuation lines and nested blocks.
 - The destructor-registration mechanism for opaque predicates (so `choose
   … from <opaque prop>` is uniform).
-- Depth/step budget defaults for the local-context search, and the exact
-  shape of the "facts in scope were …" failure message.
+- Depth/step budget defaults for the local-context search. The "facts in
+  scope were …" failure message should additionally surface fingerprint-
+  indexed "did you mean `by L`?" candidates from the import surface (§1) —
+  the discovery path that replaces global auto-search.
+- The concrete linear-arithmetic / order procedure and its reach:
+  ordered-field (Fourier–Motzkin / simplex) vs. integer Presburger, the
+  rational/real/natural/integer coverage, and its step budget (§1 Tactics).
 - How `by <method>` generalizes: `by <lemma>`, `by induction on n`,
   `by cases on x`, `by well-founded on <measure>` all live in the same slot.
+  (The lemma-argument form is decided — `by L with b := m`, §1; the
+  induction/cases/well-founded case-block shapes are the open part.)
