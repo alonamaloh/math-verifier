@@ -575,3 +575,30 @@ theorem Natural.factorial_monotone (a b : Natural) (aLeB : a ≤ b)
       by Natural.factorial_le_add(a, k);
   done by substituting bEqual
 }
+
+-- ----------------------------------------------------------------------
+-- The exponential coefficients 1/k! decrease: i ≤ j ⟹ 1/j! ≤ 1/i!
+-- (factorial monotone, then reciprocal antitone, carried across the
+-- ℚ → ℝ casts).
+theorem Real.exponentialCoefficient_antitone (i j : Natural) (iLeqJ : i ≤ j)
+        : Real.exponentialCoefficient(j) ≤ Real.exponentialCoefficient(i) := {
+  claim factorialLe : Natural.factorial(i) ≤ Natural.factorial(j)
+      by Natural.factorial_monotone(i, j, iLeqJ);
+  claim castLe
+      : (Natural.factorial(i) : Rational) ≤ (Natural.factorial(j) : Rational)
+      by Rational.from_natural_le_preserves(
+             Natural.factorial(i), Natural.factorial(j), factorialLe);
+  claim iPositive : Rational.zero < (Natural.factorial(i) : Rational)
+      since Rational.factorial_cast_positive;
+  claim recipLe
+      : Rational.reciprocal_function((Natural.factorial(j) : Rational))
+        ≤ Rational.reciprocal_function((Natural.factorial(i) : Rational))
+      by Rational.reciprocal_function_antitone(
+             (Natural.factorial(i) : Rational),
+             (Natural.factorial(j) : Rational),
+             iPositive, castLe);
+  done by Rational.to_real.LessOrEqual_preserves(
+              Rational.reciprocal_function((Natural.factorial(j) : Rational)),
+              Rational.reciprocal_function((Natural.factorial(i) : Rational)),
+              recipLe)
+}
