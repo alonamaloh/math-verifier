@@ -427,3 +427,35 @@ speculative environment (which apparently HAS the name) diverges from the
 real elaboration environment. The redundant-by check should run in the
 same environment the proof elaborates in, or skip recursive self-calls.
 diagnosis:
+
+---
+
+## diff-congruence defeq-check on a head-changing rewrite reduces deeply (OOM)
+(2026-06-13, found proving Real.cosine_two_negative)
+
+A calc step `… = … by <eq>` whose `<eq>` rewrites a subterm `f(args)` to a
+differently-headed `g(…)` runs `isDefinitionallyEqual(f(args), g(…))` while
+LOCATING the diff. That WHNF-reduces `f(args)`. For a thin definition over
+something heavy this runs away: `Real.cosineCoefficient(Real.one, 2)`
+unfolds to `realPart(exponentialTerm(i·1, 4))` — a degree-4 complex power
+over a RingModulo quotient — and either hits "kernel reduction recursion
+exceeded the depth bound (500)" or OOMs (7–8 GB) when the bound is higher.
+Indices 0/1 (powers 0/2) stay shallow, so the bug only fires on the deeper
+instance.
+
+Worse: when an explicit `by <hint>`/citation FAILS, the elaborator falls
+back to the full auto-prover search, and on these heavy terms THAT search
+is what OOMs — so a mis-stated hint surfaces as an OOM, not a located
+"hint does not prove goal" error. That cost a long debugging session.
+
+Wishlist: (a) cap / short-circuit the diff-locating defeq check (treat a
+head mismatch as "this is the diff" without fully reducing, or bound the
+reduction); (b) when a by-hint fails, don't fall back into an unbounded
+search on terms with non-reducing-cheaply heads — fail with the located
+error instead; (c) honor MATH_AUTOPROVE_BUDGET inside intra-step kernel
+reductions (today the budget is step-counted at the prover level and an
+allocation-heavy single reduction blows memory before it trips).
+
+Workaround that works today: rewrite with `substituting <eq>` (syntactic,
+no defeq reduction); bridge lemma indices with `by (ring : 2 = 2*1)` since
+the citation matcher won't reduce `2*1`→`2` either.
