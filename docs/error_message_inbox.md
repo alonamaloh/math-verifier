@@ -351,3 +351,29 @@ counter could turn this into a TypeError.
 rubric (0/1): cause 1 · location 0 · actionable 1 · folded-types 1 · no-jargon 1
 
 ---
+### (RESOLVED — bug-fix marathon, 2026-06-12 evening) Every open inbox bug swept
+note: one session fixed, with regressions/probes for each (commits
+8345f26..eddf60a): the cache-off SIGSEGV (pointer-identity progress
+checks in matchAgainstPattern — terminated only by cache-stabilized
+pointers; plus depth guards, 512MB worker stack, flip-guard RAII);
+`by substituting` re-proof cost (reflexivity fast path + the
+expensive-step warning now names the hint path); refining-list names
+count as uses; citation symmetry-flip inside Not (the
+exponential_algebra `since` is restored); pattern variables shadowing
+a constructor of the slot's type are rejected with a naming error;
+let-opacity in citation matching (fallback ζ-unfold pass);
+projection-only deferred slots resolve via try-each-bundle
+unique-candidate; universe keyword max -> MaxUniverse (max is an
+ordinary overload now, `overload max := Natural.maximum`); ring's
+misleading "FALSE as a polynomial" on structureless carriers and the
+non-equality-goal message both rewritten (ErrorTests added); stale
+dependency caches now fail loudly at load (mtime vs source, iface
+sibling rule); and the 574 MB ring_test cache was the serializer
+expanding the expression DAG to a tree — format v7 backreferences
+shrink it 431x (whole cache tree now 10 MB), with hash-consing enabled
+for exactly that target (7.6 GB -> 545 MB RSS). Bare C++ self-tests
+now run in `make check` (three drifted expectations fixed).
+Still open (projects, not bugs): tactic-level compact ring
+certificates; auto-prover fingerprint plan.
+
+---
