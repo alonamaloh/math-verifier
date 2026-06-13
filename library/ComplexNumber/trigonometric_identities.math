@@ -1,0 +1,351 @@
+-- ComplexNumber/trigonometric_identities.math
+--
+-- The first trigonometric identities, harvested from the functional
+-- equation of the complex exponential and conjugation:
+--
+--   exp(i·x) · conj(exp(i·x)) = exp(i·x) · exp(−i·x) = exp(0) = 1,
+--
+-- whose real part is cos²x + sin²x = 1 (the Pythagorean identity),
+-- and whose modulus form says |exp(i·x)| = 1: the exponential walks
+-- the unit circle. Splitting exp(i·(x+y)) = exp(i·x)·exp(i·y) by
+-- coordinates gives the addition formulas.
+
+module ComplexNumber.trigonometric_identities
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.factorial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+import Real.intermediate_value
+import Real.square_root
+import Real.power
+import Real.series
+import Real.cauchy_complete
+import Real.exponential
+import Real.exponential_addition
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.coordinate_negate
+import ComplexNumber.embedding
+import ComplexNumber.modulus
+import ComplexNumber.modulus_multiplicative
+import ComplexNumber.triangle_inequality
+import ComplexNumber.modulus_bounds
+import ComplexNumber.completeness
+import ComplexNumber.limits
+import ComplexNumber.exponential
+import ComplexNumber.series
+import ComplexNumber.binomial_theorem
+import ComplexNumber.exponential_addition
+import ComplexNumber.conjugation
+import ComplexNumber.trigonometry
+
+-- ----------------------------------------------------------------------
+-- exp(i·x) times its conjugate is 1: the conjugate is exp(−i·x), and
+-- the functional equation collapses the product to exp(0).
+theorem ComplexNumber.exponential_imaginary_times_conjugate (x : Real)
+        : exp(ComplexNumber.i * ComplexNumber.from_real(x))
+          * ComplexNumber.conjugate(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+          = RingModulo.one(Real.polynomial_commutative_ring,
+                Complex.definingPolynomial) := {
+  claim conjugateExponential
+      : ComplexNumber.conjugate(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+        = exp(-(ComplexNumber.i * ComplexNumber.from_real(x)))
+      by calc ComplexNumber.conjugate(
+                  exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+            = exp(ComplexNumber.conjugate(
+                      ComplexNumber.i * ComplexNumber.from_real(x)))
+                  by ComplexNumber.exponential_conjugate(
+                         ComplexNumber.i * ComplexNumber.from_real(x))
+            = exp(-(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  by ComplexNumber.conjugate_i_times_from_real(x);
+  calc exp(ComplexNumber.i * ComplexNumber.from_real(x))
+           * ComplexNumber.conjugate(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+     = exp(ComplexNumber.i * ComplexNumber.from_real(x))
+       * exp(-(ComplexNumber.i * ComplexNumber.from_real(x)))
+           since conjugateExponential
+     = exp(ComplexNumber.i * ComplexNumber.from_real(x)
+           + -(ComplexNumber.i * ComplexNumber.from_real(x)))
+           by ComplexNumber.exponential_add(
+                  ComplexNumber.i * ComplexNumber.from_real(x),
+                  -(ComplexNumber.i * ComplexNumber.from_real(x)))
+     = exp(RingModulo.zero(Real.polynomial_commutative_ring,
+               Complex.definingPolynomial))
+           by substituting
+               (ring : ComplexNumber.i * ComplexNumber.from_real(x)
+                           + -(ComplexNumber.i * ComplexNumber.from_real(x))
+                   = RingModulo.zero(Real.polynomial_commutative_ring,
+                         Complex.definingPolynomial))
+     = RingModulo.one(Real.polynomial_commutative_ring,
+           Complex.definingPolynomial)
+           by ComplexNumber.exponential_zero
+}
+
+-- ----------------------------------------------------------------------
+-- The Pythagorean identity: cos²x + sin²x = 1 — the real part of
+-- exp(i·x)·conj(exp(i·x)) = 1, computed through the coordinates.
+theorem Real.pythagorean_identity (x : Real)
+        : cos(x) * cos(x) + sin(x) * sin(x) = Real.one := {
+  claim productExpansion
+      : ComplexNumber.realPart(
+            exp(ComplexNumber.i * ComplexNumber.from_real(x))
+            * ComplexNumber.conjugate(
+                  exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+        = cos(x) * cos(x) + sin(x) * sin(x)
+      by calc ComplexNumber.realPart(
+                  exp(ComplexNumber.i * ComplexNumber.from_real(x))
+                  * ComplexNumber.conjugate(
+                        exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+            = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  * ComplexNumber.realPart(
+                        ComplexNumber.conjugate(
+                            exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+              - ComplexNumber.imaginaryPart(
+                    exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                    * ComplexNumber.imaginaryPart(
+                          ComplexNumber.conjugate(
+                              exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+                  by ComplexNumber.realPart_multiply(
+                         exp(ComplexNumber.i * ComplexNumber.from_real(x)),
+                         ComplexNumber.conjugate(
+                             exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+            = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  * ComplexNumber.realPart(
+                        exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+              - ComplexNumber.imaginaryPart(
+                    exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                    * ComplexNumber.imaginaryPart(
+                          ComplexNumber.conjugate(
+                              exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+                  by ComplexNumber.realPart_conjugate(
+                         exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+            = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  * ComplexNumber.realPart(
+                        exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+              - ComplexNumber.imaginaryPart(
+                    exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                    * (-ComplexNumber.imaginaryPart(
+                           exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+                  by ComplexNumber.imaginaryPart_conjugate(
+                         exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+            = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  * ComplexNumber.realPart(
+                        exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+              + ComplexNumber.imaginaryPart(
+                    exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                    * ComplexNumber.imaginaryPart(
+                          exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  by ring;
+  claim oneRealPart
+      : ComplexNumber.realPart(
+            RingModulo.one(Real.polynomial_commutative_ring,
+                Complex.definingPolynomial))
+        = Real.one
+      by calc ComplexNumber.realPart(
+                  RingModulo.one(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial))
+            = ComplexNumber.realPart(ComplexNumber.from_real(Real.one))
+                  by ComplexNumber.from_real_one
+            = Real.one
+                  by ComplexNumber.realPart_from_real(Real.one);
+  calc cos(x) * cos(x) + sin(x) * sin(x)
+     = ComplexNumber.realPart(
+           exp(ComplexNumber.i * ComplexNumber.from_real(x))
+           * ComplexNumber.conjugate(
+                 exp(ComplexNumber.i * ComplexNumber.from_real(x))))
+           since productExpansion
+     = ComplexNumber.realPart(
+           RingModulo.one(Real.polynomial_commutative_ring,
+               Complex.definingPolynomial))
+           by ComplexNumber.exponential_imaginary_times_conjugate(x)
+     = Real.one
+           by oneRealPart
+}
+
+-- ----------------------------------------------------------------------
+-- |exp(i·x)| = 1: the exponential of a purely imaginary number lies on
+-- the unit circle (its modulus squares to cos²x + sin²x = 1).
+theorem ComplexNumber.modulus_exponential_imaginary (x : Real)
+        : ComplexNumber.modulus(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+          = Real.one := {
+  claim modulusSquaresToOne
+      : ComplexNumber.modulus(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+            * ComplexNumber.modulus(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+        = Real.one
+      by calc ComplexNumber.modulus(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  * ComplexNumber.modulus(
+                        exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+            = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  * ComplexNumber.realPart(
+                        exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+              + ComplexNumber.imaginaryPart(
+                    exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                    * ComplexNumber.imaginaryPart(
+                          exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+                  by ComplexNumber.modulus_squares(
+                         exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+            = cos(x) * cos(x) + sin(x) * sin(x)
+            = Real.one
+                  by Real.pythagorean_identity(x);
+  claim Real.zero
+        ≤ ComplexNumber.modulus(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+      by ComplexNumber.modulus_nonneg(exp(ComplexNumber.i * ComplexNumber.from_real(x)));
+  claim Rational.zero < Rational.one;
+  claim Real.zero < (Rational.one : Real)
+      since Rational.to_real.positive_preserves;
+  claim Real.zero ≤ Real.one since Real.LessThan.weaken;
+  claim oneSquaresToOne : Real.one * Real.one = Real.one by ring;
+  done by Real.square_root_unique(
+              Real.one,
+              ComplexNumber.modulus(exp(ComplexNumber.i * ComplexNumber.from_real(x))),
+              Real.one,
+              (Real.zero
+                   ≤ ComplexNumber.modulus(
+                         exp(ComplexNumber.i * ComplexNumber.from_real(x)))),
+              (Real.zero ≤ Real.one),
+              modulusSquaresToOne,
+              oneSquaresToOne)
+}
+
+-- ----------------------------------------------------------------------
+-- The functional equation along the imaginary axis, ready for the
+-- addition formulas: exp(i·(x+y)) = exp(i·x)·exp(i·y).
+theorem ComplexNumber.exponential_imaginary_add (x y : Real)
+        : exp(ComplexNumber.i * ComplexNumber.from_real(x + y))
+          = exp(ComplexNumber.i * ComplexNumber.from_real(x))
+            * exp(ComplexNumber.i * ComplexNumber.from_real(y)) := {
+  claim imaginaryInputSplits
+      : ComplexNumber.i * ComplexNumber.from_real(x + y)
+        = ComplexNumber.i * ComplexNumber.from_real(x)
+          + ComplexNumber.i * ComplexNumber.from_real(y)
+      by calc ComplexNumber.i * ComplexNumber.from_real(x + y)
+            = ComplexNumber.i
+              * (ComplexNumber.from_real(x) + ComplexNumber.from_real(y))
+                  by ComplexNumber.from_real_add(x, y)
+            = ComplexNumber.i * ComplexNumber.from_real(x)
+              + ComplexNumber.i * ComplexNumber.from_real(y)
+                  by ring;
+  calc exp(ComplexNumber.i * ComplexNumber.from_real(x + y))
+     = exp(ComplexNumber.i * ComplexNumber.from_real(x)
+           + ComplexNumber.i * ComplexNumber.from_real(y))
+           since imaginaryInputSplits
+     = exp(ComplexNumber.i * ComplexNumber.from_real(x))
+       * exp(ComplexNumber.i * ComplexNumber.from_real(y))
+           by ComplexNumber.exponential_add(
+                  ComplexNumber.i * ComplexNumber.from_real(x),
+                  ComplexNumber.i * ComplexNumber.from_real(y))
+}
+
+-- ----------------------------------------------------------------------
+-- The addition formulas: take the coordinates of
+-- exp(i·(x+y)) = exp(i·x)·exp(i·y).
+
+theorem Real.cosine_add (x y : Real)
+        : cos(x + y) = cos(x) * cos(y) - sin(x) * sin(y) :=
+  calc cos(x + y)
+     = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x + y)))
+     = ComplexNumber.realPart(
+           exp(ComplexNumber.i * ComplexNumber.from_real(x))
+           * exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+           by ComplexNumber.exponential_imaginary_add(x, y)
+     = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+           * ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+       - ComplexNumber.imaginaryPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+             * ComplexNumber.imaginaryPart(
+                   exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+           by ComplexNumber.realPart_multiply(
+                  exp(ComplexNumber.i * ComplexNumber.from_real(x)),
+                  exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+     = cos(x) * cos(y) - sin(x) * sin(y)
+
+theorem Real.sine_add (x y : Real)
+        : sin(x + y) = sin(x) * cos(y) + cos(x) * sin(y) :=
+  calc sin(x + y)
+     = ComplexNumber.imaginaryPart(
+           exp(ComplexNumber.i * ComplexNumber.from_real(x + y)))
+     = ComplexNumber.imaginaryPart(
+           exp(ComplexNumber.i * ComplexNumber.from_real(x))
+           * exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+           by ComplexNumber.exponential_imaginary_add(x, y)
+     = ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+           * ComplexNumber.imaginaryPart(
+                 exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+       + ComplexNumber.imaginaryPart(
+             exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+             * ComplexNumber.realPart(exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+           by ComplexNumber.imaginaryPart_multiply(
+                  exp(ComplexNumber.i * ComplexNumber.from_real(x)),
+                  exp(ComplexNumber.i * ComplexNumber.from_real(y)))
+     = cos(x) * sin(y) + sin(x) * cos(y)
+     = sin(x) * cos(y) + cos(x) * sin(y)
+           by ring
