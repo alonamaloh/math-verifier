@@ -43,6 +43,7 @@ enum class TokenKind {
     KeywordOkay,            // `okay` — same as `done`. Math-professor style (Aroca).
     KeywordOpaque,          // `opaque` — modifier on `definition`; blocks δ-unfolding
     KeywordUnfold,          // `unfold X` — surface tactic to opt into δ-unfolding
+    KeywordUnfolding,       // `by unfolding X` — δ-unfold X while discharging this step
     KeywordSubstitution,    // `by substitution` — auto-find equality + body
     KeywordSubstituting,    // `by substituting <eq>` — narrow to specified equality
     KeywordRecalling,       // `by <lemma> recalling <fact>, …` — facts in discharge scope

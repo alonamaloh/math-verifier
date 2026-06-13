@@ -36,11 +36,20 @@ is retired and hard is now the standing behaviour.)
 
 So the only way to see through an opaque head is to ask for it explicitly:
 
-- **`unfold Foo in <body>`** temporarily flips `Foo` transparent while
-  elaborating `<body>`. Use it where the body genuinely produces or consumes
-  `Foo`'s *unfolded* form against an expected `Foo(…)` type — e.g. an
-  arithmetic-result construct whose reduced shape is awkward to name, or a
-  constant like `Real.zero`.
+- **`<hint> by … unfolding Foo`** — the PREFERRED form. `unfolding Foo[, …]` is
+  a postfix `by`-hint modifier (parallel to `recalling`) that discharges the
+  step with `Foo` transparent. It piles onto any hint and stands alone:
+  `done by unfolding Foo` (auto-prover), `done by <lemma> unfolding Foo`,
+  `claim P by substituting eq unfolding Foo`, `… = … by unfolding Foo` (calc
+  step). It reads "*I claim this, as you can check by unfolding the definition
+  of Foo*" — the claimed proposition stays on the page; the unfold is just the
+  cited reason. (Contrast `unfold Foo in <body>`, which silently reshapes the
+  goal you then write `<body>` against — that hidden-goal style is on the CIC
+  naughty list.)
+- **`unfold Foo in <body>`** (the wrapper) survives only as an escape hatch for
+  a body that can't sit after `by`: a multi-statement `{ … }` block, a
+  multi-arm `cases`, a `calc`, or a mid-expression term use
+  (`(unfold Foo in h)(args)`). Prefer the `by … unfolding` form everywhere else.
 - **Boundary / characterising lemmas** — the preferred route. Prove the
   fold/unfold *once* in a tiny named lemma (whose body is the `unfold`), and
   have every consumer cite the name. The opacity is pierced in one place; no
@@ -173,14 +182,14 @@ synthetic motive because two `b`s collided," revert.
    ```math
    theorem Natural.monus_zero_left (b : Natural)
            : Natural.monus(0, b) = 0 :=
-     unfold Natural.monus in reflexivity(Natural, 0)
+     done by unfolding Natural.monus
    theorem Natural.monus_succ_zero (k : Natural)
            : Natural.monus(successor(k), 0) = successor(k) :=
-     unfold Natural.monus in reflexivity(Natural, successor(k))
+     done by unfolding Natural.monus
    theorem Natural.monus_succ_succ (k j : Natural)
            : Natural.monus(successor(k), successor(j))
              = Natural.monus(k, j) :=
-     unfold Natural.monus in reflexivity(Natural, Natural.monus(k, j))
+     done by unfolding Natural.monus
    ```
 3. Audit downstream proofs. Each `reflexivity` that used to close
    via `Foo`'s ι-reduction now needs a citation to a

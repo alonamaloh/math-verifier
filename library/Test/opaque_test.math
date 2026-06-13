@@ -26,28 +26,40 @@ opaque definition myDouble : Natural → Natural
   | zero         => zero
   | successor(k) => successor(successor(myDouble(k)))
 
--- (3) `unfold myDouble in <body>` opts back in to δ-unfolding for
--- the duration of <body>. Original opacity is restored afterwards.
+-- (3) `<hint> by unfolding myDouble` discharges the step with `myDouble`
+-- transparent — the PREFERRED form, because the claimed proposition stays
+-- visible and `unfolding` is just the cited reason (vs `unfold X in <body>`,
+-- which silently reshapes the goal you then prove against). `by unfolding`
+-- piles onto any hint; standalone it runs the auto-prover.
 theorem myDouble_two : myDouble(2) = 4 :=
+  done by unfolding myDouble
+
+-- The wrapper form `unfold myDouble in <body>` still exists for the rare
+-- multi-statement / `cases` / `calc` block body that can't sit after `by`.
+theorem myDouble_two_wrapper : myDouble(2) = 4 :=
   unfold myDouble in reflexivity(4)
 
--- (4) Outside an `unfold`, `myDouble` is still opaque — so a proof
--- about it needs lemmas, not reflexivity. Verify by proving the
--- recurrence equation via `unfold` and citing it.
+-- (4) Outside an unfold, `myDouble` is opaque — a proof about it needs a
+-- characterising lemma, here proved by reducing under `unfolding`.
 theorem myDouble_succ (k : Natural)
         : myDouble(successor(k)) = successor(successor(myDouble(k))) :=
-  unfold myDouble in reflexivity(successor(successor(myDouble(k))))
+  done by unfolding myDouble
 
 theorem myDouble_zero : myDouble(zero) = zero :=
-  unfold myDouble in reflexivity(zero)
+  done by unfolding myDouble
 
--- (5) Multi-name unfold: pass a comma-separated list.
+-- (5) Multi-name: pass a comma-separated list after `unfolding`.
 opaque definition myTripleT : Natural → Natural
   | zero         => zero
   | successor(k) => successor(successor(successor(myTripleT(k))))
 
 theorem mixed_unfold : myDouble(1) = myTripleT(0) + 2 :=
-  unfold myDouble, myTripleT in reflexivity(2)
+  done by unfolding myDouble, myTripleT
+
+-- (5b) `unfolding` as a postfix modifier on an explicit proof — `by <proof>
+-- unfolding X` parallels `by <proof> recalling <fact>`.
+theorem myDouble_two_postfix : myDouble(2) = 4 :=
+  done by myDouble_two unfolding myDouble
 
 -- ----------------------------------------------------------------------
 -- (6) Opacity is HARD at the demand points. Opacity blocks δ during
@@ -57,32 +69,32 @@ theorem mixed_unfold : myDouble(1) = myTripleT(0) + 2 :=
 -- was genuinely demanded (the WS2 "soft bridges"). Those bridges are now
 -- retired: an opaque head is never force-unfolded implicitly, so each of
 -- these demand points needs an explicit `unfold X in …`. The theorems
--- below pin that down — each would FAIL without its `unfold`.
+-- below pin that down — each would FAIL without its `unfolding`.
 
 -- (6a) Kernel defeq demand: `myDouble(2)` vs `4` at the equality leaf is
--- not bridged — `unfold` is required to make the leaf reduce.
+-- not bridged — `unfolding` is required to make the leaf reduce.
 theorem bridge_reflexivity : myDouble(2) = 4 :=
-  unfold myDouble in reflexivity(4)
+  done by unfolding myDouble
 
 -- (6b) Application demand: applying a value whose type is an opaque
 -- definition unfolding to a Pi needs the head made transparent.
 opaque definition OpaqueArrow : Proposition := True → True
 
 theorem bridge_apply (h : OpaqueArrow) : True :=
-  unfold OpaqueArrow in h(True.trivial)
+  done by h(True.trivial) unfolding OpaqueArrow
 
 -- (6c) Anonymous tuple against an opaque expected type whose unfolding
--- is an `Exists` inductive — the inductive head is read only under `unfold`.
+-- is an `Exists` inductive — the inductive head is read only under unfolding.
 opaque definition OpaqueExists : Proposition :=
   Exists(Natural, (n : Natural) ↦ n = n)
 
 theorem bridge_tuple : OpaqueExists :=
-  unfold OpaqueExists in ⟨0, reflexivity(0)⟩
+  done by ⟨0, reflexivity(0)⟩ unfolding OpaqueExists
 
 -- (6d) `↦`-lambda body against an opaque expected type whose unfolding
--- is a Pi — the binder domain is read only under `unfold`.
+-- is a Pi — the binder domain is read only under unfolding.
 opaque definition OpaqueForall : Proposition :=
   (n : Natural) → n = n
 
 theorem bridge_lambda : OpaqueForall :=
-  unfold OpaqueForall in ((n : Natural) ↦ reflexivity(n))
+  done by ((n : Natural) ↦ reflexivity(n)) unfolding OpaqueForall

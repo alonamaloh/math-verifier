@@ -2795,12 +2795,16 @@ private:
         if (peek().kind == TokenKind::KeywordLet)      return parseLet();
         if (looksLikeMapsToLambda()) return parseMapsToLambda();
         Token hintToken = peek();
+        // `= P by unfolding X` standalone — auto-prover with X transparent.
+        if (peek().kind == TokenKind::KeywordUnfolding) {
+            return parseUnfoldingWrap(defaultGoalCloser(hintToken));
+        }
         if (SurfaceExpressionPointer structured = tryParseStructuredByHint(
                 hintToken, /*proposition=*/nullptr,
                 /*eqAtAdditiveLevel=*/true)) {
-            return structured;
+            return parseUnfoldingWrap(std::move(structured));
         }
-        return parseAdditive();
+        return parseUnfoldingWrap(parseAdditive());
     }
 
     // `calc <initial> R1 <next1> by <proof1> R2 <next2> by <proof2> …`.
@@ -2959,24 +2963,33 @@ private:
             // exempt from the redundant-`by` check (an explanation kept for
             // the reader). Only the plain-proof form; no cases/substitution.
             consumeAny();  // 'since'
-            byHint = parseRecallingWrap(parseExpression());
+            byHint = parseUnfoldingWrap(parseRecallingWrap(parseExpression()));
             byIsExplanation = true;
         } else if (peek().kind == TokenKind::KeywordBy) {
-            consumeAny();  // 'by'
-            // Structured-hint keywords (`cases { … }` / `cases on E …`,
-            // `substitution`, `substituting <eq>`, `induction on E …`)
-            // are parsed by the shared `tryParseStructuredByHint` — the
-            // same one a calc step uses, so the two forms can never drift.
-            // It takes `proposition` by const-ref (copies it into the node
-            // it builds), so the fallthrough plain path below still owns it.
-            if (SurfaceExpressionPointer structured =
+            Token byToken = consumeAny();  // 'by'
+            // `unfolding X[, …]` is a postfix transparency modifier that
+            // piles onto ANY hint (a plain lemma, a structured claim, or —
+            // standalone — the bare auto-prover): the hint is discharged
+            // with X transparent. Standalone form first, since `unfolding`
+            // can't start a proof expression.
+            if (peek().kind == TokenKind::KeywordUnfolding) {
+                byHint = parseUnfoldingWrap(defaultGoalCloser(byToken));
+            } else if (SurfaceExpressionPointer structured =
+                    // Structured-hint keywords (`cases { … }` / `cases on E
+                    // …`, `substitution`, `substituting <eq>`, `induction on
+                    // E …`) are parsed by the shared `tryParseStructuredByHint`
+                    // — the same one a calc step uses, so the two forms can
+                    // never drift. A trailing `unfolding X` may still modify
+                    // the structured hint.
                     tryParseStructuredByHint(
                         claimToken, proposition,
                         /*eqAtAdditiveLevel=*/false)) {
-                return structured;
+                return parseUnfoldingWrap(std::move(structured));
+            } else {
+                // Plain `by <proof> [recalling …] [unfolding X]`.
+                byHint = parseUnfoldingWrap(
+                    parseRecallingWrap(parseExpression()));
             }
-            // Plain `by <proof>`.
-            byHint = parseRecallingWrap(parseExpression());
         }
         return makeSurfaceStructuredClaim(
             std::move(proposition), std::move(label),
@@ -3010,6 +3023,48 @@ private:
                 /*fromCalcAsBinding=*/false, /*fromRecallingFact=*/true);
         }
         return body;
+    }
+
+    // Parse the comma-separated definition names after `unfolding`.
+    // Assumes `unfolding` has already been consumed; the next token must
+    // be an identifier. Mirrors the name list of `unfold X[, Y, …] in …`.
+    std::vector<std::string> parseUnfoldingNames() {
+        std::vector<std::string> names;
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a definition name after 'unfolding'");
+        }
+        names.push_back(consumeQualifiedNameString());
+        while (peek().kind == TokenKind::Comma) {
+            consumeAny();  // ','
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected another definition name after ','");
+            }
+            names.push_back(consumeQualifiedNameString());
+        }
+        return names;
+    }
+
+    // A bare auto-prover closer (`claim goal` ≡ `done`), used as the body
+    // when `by unfolding X` carries no explicit proof.
+    SurfaceExpressionPointer defaultGoalCloser(Token at) {
+        return makeSurfaceStructuredClaim(
+            makeSurfaceGoal(at.line, at.column), /*label=*/"",
+            /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
+            at.line, at.column);
+    }
+
+    // `<hint> unfolding X[, Y, …]` — the postfix transparency modifier.
+    // Wraps `hint` so it is elaborated with X (and friends) made
+    // transparent, reusing the same `SurfaceUnfold` machinery as
+    // `unfold X in <body>`. Returns the hint unchanged when no
+    // `unfolding` clause follows. Parallels `parseRecallingWrap`.
+    SurfaceExpressionPointer parseUnfoldingWrap(
+        SurfaceExpressionPointer hint) {
+        if (peek().kind != TokenKind::KeywordUnfolding) return hint;
+        Token unfoldingToken = consumeAny();  // 'unfolding'
+        return makeSurfaceUnfold(
+            parseUnfoldingNames(), std::move(hint),
+            unfoldingToken.line, unfoldingToken.column);
     }
 
     // Parses the tail of `claim P by induction on E [with ih]
