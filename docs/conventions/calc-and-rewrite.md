@@ -339,16 +339,43 @@ value abbreviations" — driven by a kernel that didn't ζ-track
 let-binders through `congruenceOf`'s motive checks — no longer
 applies.
 
-Use `let` freely for value abbreviations. The one remaining caveat:
-when constructing a term whose IMPLICIT arguments are inferred from a
-sibling expression, the elaborator may infer the implicit using the
-ζ-unfolded form rather than the let-bound name. For example,
-`Logic.Decidable.yes(midIsUpper)` inside
-`Real.bisectionStepWithDec(subset, intervals, _)` infers its implicit
-`P` from the third arg's signature (which references the unfolded
-form), not from `midIsUpper`'s declared type (which may reference a
-let-bound `midReal`). Two terms result that are kernel-equal but not
-structurally equal — fine for the kernel, but matters if the
-surface tactic does literal subterm matching. The decide elaborator
-handles this by ζ-unfolding the target up front; other code paths
-may need explicit ζ-unfold or `claim`-binding to align shapes.
+Use `let` freely for value abbreviations. `ring` also ζ-unfolds the
+goal up front (2026-06-12), so a let-bound ring constant is seen
+structurally rather than as an opaque atom — the canonical use is
+
+```math
+let zero : ComplexNumber :=
+    RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial);
+let one : ComplexNumber :=
+    RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial);
+calc ComplexNumber.partialSum((k : Natural) ↦ c * s(k), 0)
+   = zero
+   = c * zero    by ring
+```
+
+instead of spelling the full `RingModulo.zero(…, …)` wall at every
+site. This is scoped to `ring` only — `field` and `linear_combination`
+cancel the goal against cited HYPOTHESES whose types keep the let
+spelling, so ζ-unfolding only the goal there desynchronises the atoms
+(use the let-free spelling, or cite a let-typed claim, in those).
+
+Two caveats remain:
+
+- **Implicit-argument inference** may use the ζ-unfolded form rather
+  than the let-bound name. For example, `Logic.Decidable.yes(midIsUpper)`
+  inside `Real.bisectionStepWithDec(subset, intervals, _)` infers its
+  implicit `P` from the third arg's signature (the unfolded form), not
+  from `midIsUpper`'s declared type (the let-bound `midReal`). Two
+  kernel-equal-but-not-structurally-equal terms result — fine for the
+  kernel, but it matters if the surface tactic does literal subterm
+  matching. The decide elaborator ζ-unfolds the target up front; other
+  paths may need explicit ζ-unfold or `claim`-binding to align shapes.
+
+- **Function-valued `let`s are not β-reduced after ζ.** `let f := (k) ↦
+  g(k);` makes `f(i)` unfold to `(λk. g k) i`, NOT to `g(i)` — so `ring`
+  and `since`/citation matching treat `f(i)` and `g(i)` as distinct
+  atoms (the unfold substitutes the value but stops short of β). Either
+  do the algebra in the `g(i)` form and let a by-less `=` step fold to
+  `f(i)` (the full defeq path *does* β-reduce), or pass explicit
+  arguments through the let (`by lemma(g(i))`, not argument-free
+  `since`).

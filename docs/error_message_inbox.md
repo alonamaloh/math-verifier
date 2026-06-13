@@ -377,3 +377,53 @@ Still open (projects, not bugs): tactic-level compact ring
 certificates; auto-prover fingerprint plan.
 
 ---
+
+### (capability gap, not message) `ring` / citation matching don't β-reduce a function-valued `let` — 2026-06-12 (ℂ functional equation)
+note: with `let aModulus : Natural → Real := (k : Natural) ↦ abs(a(k));`
+a goal `abs(a(i)) * X = X * aModulus(i)` fails under `by ring` ("not
+equal as commutative-ring expressions") even though `aModulus(i)` is
+`(λk. abs(a k)) i` which β-reduces to `abs(a(i))`. The new ring
+ζ-unfold (zetaUnfoldLetBinders) substitutes the let VALUE but the result
+is the un-β-reduced application `(λk. abs(a k)) i`, so ring sees two
+distinct atoms and the fingerprint says FALSE. Same gap bites `since
+<lemma>` citation matching and argument inference: `since
+ComplexNumber.modulus_nonneg` can't unify `Real.zero ≤ aModulus(i)` with
+the lemma conclusion (needs the explicit `by …modulus_nonneg(a(i))`).
+Workarounds used: (a) commute in the un-let form then a by-less `=` step
+folds to the let (the by-less defeq path DOES β-reduce); (b) pass
+explicit args through a let. FIX: have zetaUnfoldLetBinders (or the ring
+normaliser's atom canonicaliser) β-normalise after substitution, so a
+function-let applied to args reduces to the body. Would make
+function-valued `let` abbreviations first-class for ring/citation.
+diagnosis:
+
+### (wrong-lemma resolution) bare `claim Real.zero ≤ aModulus(i);` proves the WRONG nonneg fact — 2026-06-12
+note: in cauchy_product_converges, two Pi-facts share the shape
+`(i : Natural) → Real.zero ≤ <modulus>(i)`: one for aModulus, one for
+bModulus. Making `claim Real.zero ≤ aModulus(j) by …modulus_nonneg(a(j));`
+into a BARE `claim Real.zero ≤ aModulus(j);` (the redundant-by checker
+said the `by` was redundant) made the build FAIL with
+  kernel: Let: value type does not match declared type
+    expected type: Real.zero ≤ (aModulus j)
+    actual type:   Real.zero ≤ (bModulus j)
+— the by-less auto-prover discharged the bare claim with the bModulus
+nonneg witness (identical shape, found first), producing a term of the
+wrong type that the surrounding `let` then rejected. Two issues: (1) the
+redundant-by checker's speculative re-proof and the in-place by-less
+proof disagree (checker false-positive), and (2) the by-less prover
+should prefer a candidate whose conclusion matches the DECLARED claim
+type exactly, not just up to the relation head. Kept the explicit hint.
+diagnosis:
+
+### (false positive) redundant-by flags a self-recursive pattern-match call — 2026-06-12
+note: inside the pattern-match definition of
+`ComplexNumber.cauchy_product_exchange`, the recursive `claim exchangeTail
+: … by ComplexNumber.cauchy_product_exchange(a, b, p);` is flagged
+"redundant `by` — auto-prover closes the goal without help". But removing
+it (or making it `since`) fails with "unknown lemma
+`ComplexNumber.cauchy_product_exchange`" — the theorem's own name is NOT
+in the by-less prover's scope during its definition. So the checker's
+speculative environment (which apparently HAS the name) diverges from the
+real elaboration environment. The redundant-by check should run in the
+same environment the proof elaborates in, or skip recursive self-calls.
+diagnosis:
