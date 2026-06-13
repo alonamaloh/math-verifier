@@ -101,6 +101,8 @@ import ComplexNumber.conjugation
 import ComplexNumber.trigonometry
 import ComplexNumber.exponential_imaginary
 import ComplexNumber.trigonometric_series
+import ComplexNumber.exponential_addition
+import ComplexNumber.trigonometric_identities
 
 -- ----------------------------------------------------------------------
 -- Summing a series in pairs: the first 2N terms grouped two at a time.
@@ -754,5 +756,88 @@ theorem Real.partialSum_nonnegative (g : Natural → Real)
      ≤ -(-Real.partialSum(g, n))
            by Real.LessOrEqual.negate(-Real.partialSum(g, n), Real.zero, negated)
      = Real.partialSum(g, n)
+           by ring
+}
+
+-- ----------------------------------------------------------------------
+-- Powers of one are one.
+theorem Real.power_one (n : Natural) : Real.power(Real.one, n) = Real.one :=
+  by_induction on n with IH {
+    case zero: done
+    case successor(p):
+        calc Real.power(Real.one, successor(p))
+           = Real.one * Real.power(Real.one, p)
+           = Real.one * Real.one    since IH
+           = Real.one               by ring
+  }
+
+-- ----------------------------------------------------------------------
+-- The cosine coefficient c_m = Re of the (2m)-th term of exp(ix): the
+-- non-vanishing terms of the cosine series.
+definition Real.cosineCoefficient (x : Real) (m : Natural) : Real :=
+  ComplexNumber.realPart(
+      ComplexNumber.exponentialTerm(
+          ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))
+
+-- At x = 1 it is ±1/(2m)!: the coefficient times (−1)^m.
+theorem Real.cosineCoefficient_one_value (m : Natural)
+        : Real.cosineCoefficient(Real.one, m)
+          = Real.exponentialCoefficient(2 * m) * Real.power(-Real.one, m) :=
+  calc Real.cosineCoefficient(Real.one, m)
+     = Real.exponentialCoefficient(2 * m) * Real.power(-(Real.one * Real.one), m)
+           by Real.cosine_term_even(Real.one, m)
+     = Real.exponentialCoefficient(2 * m) * Real.power(-Real.one, m)
+           by substituting (ring : Real.one * Real.one = Real.one)
+
+-- 1/k! is non-negative.
+theorem Real.exponentialCoefficient_nonneg (k : Natural)
+        : Real.zero ≤ Real.exponentialCoefficient(k) := {
+  claim Rational.zero < (Natural.factorial(k) : Rational)
+      since Rational.factorial_cast_positive;
+  claim Rational.zero
+        < Rational.reciprocal_function((Natural.factorial(k) : Rational))
+      since Rational.reciprocal_function_positive_of_positive;
+  claim Real.zero
+        < (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+      since Rational.to_real.positive_preserves;
+  done since Real.LessThan.weaken
+}
+
+-- The even-indexed coefficient is +1/(4j)! ≥ 0.
+theorem Real.cosineCoefficient_one_even (j : Natural)
+        : Real.cosineCoefficient(Real.one, 2 * j)
+          = Real.exponentialCoefficient(2 * (2 * j)) := {
+  claim signOne : Real.power(-Real.one, 2 * j) = Real.one
+      by calc Real.power(-Real.one, 2 * j)
+            = Real.power(Real.one, 2 * j)
+                  by Real.power_negate_even(Real.one, j)
+            = Real.one
+                  by Real.power_one(2 * j);
+  calc Real.cosineCoefficient(Real.one, 2 * j)
+     = Real.exponentialCoefficient(2 * (2 * j)) * Real.power(-Real.one, 2 * j)
+           by Real.cosineCoefficient_one_value(2 * j)
+     = Real.exponentialCoefficient(2 * (2 * j)) * Real.one
+           since signOne
+     = Real.exponentialCoefficient(2 * (2 * j))
+           by ring
+}
+
+-- The odd-indexed coefficient is −1/(2(2j+1))! ≤ 0.
+theorem Real.cosineCoefficient_one_odd (j : Natural)
+        : Real.cosineCoefficient(Real.one, successor(2 * j))
+          = -Real.exponentialCoefficient(2 * successor(2 * j)) := {
+  claim signNegOne : Real.power(-Real.one, successor(2 * j)) = -Real.one
+      by calc Real.power(-Real.one, successor(2 * j))
+            = -(Real.power(Real.one, successor(2 * j)))
+                  by Real.power_negate_odd(Real.one, j)
+            = -Real.one
+                  by Real.power_one(successor(2 * j));
+  calc Real.cosineCoefficient(Real.one, successor(2 * j))
+     = Real.exponentialCoefficient(2 * successor(2 * j))
+           * Real.power(-Real.one, successor(2 * j))
+           by Real.cosineCoefficient_one_value(successor(2 * j))
+     = Real.exponentialCoefficient(2 * successor(2 * j)) * (-Real.one)
+           since signNegOne
+     = -Real.exponentialCoefficient(2 * successor(2 * j))
            by ring
 }
