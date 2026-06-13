@@ -986,3 +986,133 @@ theorem Real.cosine_one_upper_bound
               Real.cosine_paired_series_converges(Real.one),
               3, eventuallyBelow)
 }
+
+-- ----------------------------------------------------------------------
+-- The matching lower bracket: summed from index 2 on, the cosine series
+-- adds nothing negative, so cos 1 ≥ S₂ = 1 − 1/2 = 1/2.
+theorem Real.cosine_one_lower_bound
+        : Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+          ≤ cos(Real.one) := {
+  claim leadNonnegative
+      : (k : Natural) → Real.zero ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
+      by (k : Natural) ↦ {
+           claim evenIndex : (2 : Natural) + 2 * k = 2 * successor(k) by ring;
+           claim ccValue
+               : Real.cosineCoefficient(Real.one, 2 + 2 * k)
+                 = Real.exponentialCoefficient(2 * (2 * successor(k)))
+               by calc Real.cosineCoefficient(Real.one, 2 + 2 * k)
+                     = Real.cosineCoefficient(Real.one, 2 * successor(k))
+                           by evenIndex
+                     = Real.exponentialCoefficient(2 * (2 * successor(k)))
+                           by Real.cosineCoefficient_one_even(successor(k));
+           claim Real.zero ≤ Real.exponentialCoefficient(2 * (2 * successor(k)))
+               by Real.exponentialCoefficient_nonneg(2 * (2 * successor(k)));
+           done by substituting ccValue
+         };
+  claim pairNonnegative
+      : (k : Natural)
+        → Real.zero
+          ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
+                + Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
+      by (k : Natural) ↦ {
+           claim evenIndex : (2 : Natural) + 2 * k = 2 * successor(k) by ring;
+           claim oddIndex
+               : (2 : Natural) + successor(2 * k) = successor(2 * successor(k))
+               by ring;
+           claim evenValue
+               : Real.cosineCoefficient(Real.one, 2 + 2 * k)
+                 = Real.exponentialCoefficient(2 * (2 * successor(k)))
+               by calc Real.cosineCoefficient(Real.one, 2 + 2 * k)
+                     = Real.cosineCoefficient(Real.one, 2 * successor(k))
+                           by evenIndex
+                     = Real.exponentialCoefficient(2 * (2 * successor(k)))
+                           by Real.cosineCoefficient_one_even(successor(k));
+           claim oddValue
+               : Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
+                 = -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
+               by calc Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
+                     = Real.cosineCoefficient(Real.one, successor(2 * successor(k)))
+                           by oddIndex
+                     = -Real.exponentialCoefficient(
+                            2 * successor(2 * successor(k)))
+                           by Real.cosineCoefficient_one_odd(successor(k));
+           claim indexLe
+               : 2 * (2 * successor(k)) ≤ 2 * successor(2 * successor(k))
+               by {
+                 claim gap : 2 * successor(2 * successor(k))
+                             = 2 * (2 * successor(k)) + 2
+                     by ring;
+                 claim 2 * (2 * successor(k)) ≤ 2 * (2 * successor(k)) + 2
+                     since Natural.less_or_equal_add_right;
+                 done by substituting gap
+               };
+           claim ecLe
+               : Real.exponentialCoefficient(2 * successor(2 * successor(k)))
+                 ≤ Real.exponentialCoefficient(2 * (2 * successor(k)))
+               by Real.exponentialCoefficient_antitone(
+                      2 * (2 * successor(k)),
+                      2 * successor(2 * successor(k)),
+                      indexLe);
+           claim -Real.exponentialCoefficient(2 * (2 * successor(k)))
+                 ≤ -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
+               by Real.LessOrEqual.negate(
+                      Real.exponentialCoefficient(2 * successor(2 * successor(k))),
+                      Real.exponentialCoefficient(2 * (2 * successor(k))),
+                      ecLe);
+           calc Real.zero
+              = Real.exponentialCoefficient(2 * (2 * successor(k)))
+                + -Real.exponentialCoefficient(2 * (2 * successor(k)))
+                    by ring
+              ≤ Real.exponentialCoefficient(2 * (2 * successor(k)))
+                + -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
+                    since Real.add_preserves_LessOrEqual_left
+              = Real.cosineCoefficient(Real.one, 2 + 2 * k)
+                + -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
+                    since evenValue
+              = Real.cosineCoefficient(Real.one, 2 + 2 * k)
+                + Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
+                    since oddValue
+         };
+  claim eventuallyAbove
+      : (M : Natural) → 2 ≤ M
+        → Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+          ≤ Real.partialSum(Real.cosineCoefficient(Real.one), M)
+      by (M : Natural) (twoLeqM : 2 ≤ M) ↦ {
+           obtain ⟨r, mEqual⟩ from Natural.le_to_add(2, M, twoLeqM);
+           claim Real.zero
+                 ≤ Real.partialSum(
+                       (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j), r)
+               by Real.partialSum_nonnegative(
+                      (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j),
+                      leadNonnegative, pairNonnegative, r);
+           claim splitForm
+               : Real.partialSum(Real.cosineCoefficient(Real.one), M)
+                 = Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+                   + Real.partialSum(
+                         (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j), r)
+               by calc Real.partialSum(Real.cosineCoefficient(Real.one), M)
+                     = Real.partialSum(Real.cosineCoefficient(Real.one), r + 2)
+                           by mEqual
+                     = Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+                       + Real.partialSum(
+                             (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j),
+                             r)
+                           by Real.partialSum_split(
+                                  Real.cosineCoefficient(Real.one), 2, r);
+           calc Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+              = Real.partialSum(Real.cosineCoefficient(Real.one), 2) + Real.zero
+                    by ring
+              ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+                + Real.partialSum(
+                      (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j), r)
+                    since Real.add_preserves_LessOrEqual_left
+              = Real.partialSum(Real.cosineCoefficient(Real.one), M)
+                    since splitForm
+         };
+  done by Real.SequenceConverges.ge_of_eventually_ge(
+              Real.partialSum(Real.cosineCoefficient(Real.one)),
+              cos(Real.one),
+              Real.partialSum(Real.cosineCoefficient(Real.one), 2),
+              Real.cosine_paired_series_converges(Real.one),
+              2, eventuallyAbove)
+}
