@@ -96,6 +96,22 @@ opaque definition Rational.IsNonneg (x : Rational) : Proposition :=
       Rational.IsNonneg_respect,
       x)
 
+-- Boundary lemmas for the opaque `Rational.IsNonneg`. On a fraction
+-- n / (d + 1), being non-negative is exactly `Integer.IsNonneg(n)`.
+-- These two are the *only* places that pierce the opacity (the `unfold`
+-- collapses the `Quotient.lift`); every consumer cites them by name and
+-- never sees the lift.
+theorem Rational.IsNonneg.of_numerator
+        (n : Integer) (d : Natural) (numeratorIsNonneg : Integer.IsNonneg(n))
+        : Rational.IsNonneg(Rational.fraction(n, d)) :=
+  unfold Rational.IsNonneg in numeratorIsNonneg
+
+theorem Rational.IsNonneg.numerator
+        (n : Integer) (d : Natural)
+        (fractionIsNonneg : Rational.IsNonneg(Rational.fraction(n, d)))
+        : Integer.IsNonneg(n) :=
+  unfold Rational.IsNonneg in fractionIsNonneg
+
 -- ≤ on Rational.
 definition Rational.LessOrEqual (x y : Rational) : Proposition :=
   Rational.IsNonneg(y - x)

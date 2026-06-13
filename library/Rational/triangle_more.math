@@ -73,11 +73,12 @@ theorem Rational.absolute_value_when_nonneg_at_representative
 theorem Rational.absolute_value_when_nonneg
         (x : Rational) (xIsNonneg : Rational.IsNonneg(x))
         : abs(x) = x :=
-  
-  (cases x refining xIsNonneg {
-    | rep =>
-        Rational.absolute_value_when_nonneg_at_representative(rep, xIsNonneg)
-  })
+  cases x refining xIsNonneg {
+    | RationalRepresentative.make(n, d) =>
+        Rational.absolute_value_when_nonneg_at_representative(
+            RationalRepresentative.make(n, d),
+            Rational.IsNonneg.numerator(n, d, xIsNonneg))
+  }
 
 -- |x| = -x on Rational when IsNonneg(-x). From the previous lemma
 -- applied to -x: |-x| = -x. And |-x| = |x|, so |x| = -x.
@@ -109,8 +110,7 @@ theorem Rational.absolute_value_IsNonneg_at_representative
           → Rational.IsNonneg(
                 Rational.absolute_value_at_representative(rep))
   | RationalRepresentative.make(n, d) =>
-      
-      (Integer.absolute_value_IsNonneg(n))
+      Rational.IsNonneg.of_numerator(abs(n), d, Integer.absolute_value_IsNonneg(n))
 
 -- |x| < c implies -c < x and x < c. Case split on the sign of x via
 -- IsNonneg_or_negate_IsNonneg. Each branch uses absolute_value_when_*

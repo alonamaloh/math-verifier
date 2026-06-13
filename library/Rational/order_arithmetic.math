@@ -87,8 +87,9 @@ theorem Integer.IsNonneg_and_negate_IsNonneg_implies_zero
 -- IsNonneg(0). At rep, IsNonneg_at_representative(make(0, 0)) reduces
 -- to Integer.IsNonneg(Integer.zero), witnessed by Natural zero.
 theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) :=
-  
-  (Integer.zero_is_nonneg)
+  -- Rational.zero is the fraction 0 / 1, whose numerator 0 is IsNonneg.
+  claim Rational.IsNonneg(Rational.zero)
+    by Rational.IsNonneg.of_numerator
 
 -- 0 ≤ q ↔ IsNonneg(q) was already in `Rational.positive`. We mirror
 -- as Rational.LessOrEqual.reflexive: x ≤ x.
@@ -118,16 +119,18 @@ theorem Rational.IsNonneg.add (p q : Rational)
         (pIsNonneg : Rational.IsNonneg(p))
         (qIsNonneg : Rational.IsNonneg(q))
         : Rational.IsNonneg(p + q) :=
-  
-  (cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1) =>
+  cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1) =>
     cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2) =>
-      Integer.IsNonneg.add(?, ?,
+      -- The sum's numerator is n1·(d2+1) + n2·(d1+1); each summand is
+      -- a product of non-negatives, so the goal reduces to its IsNonneg.
+      unfold Rational.IsNonneg in
+      (Integer.IsNonneg.add(?, ?,
           Integer.IsNonneg.multiply(?, ?,
-              pIsNonneg,
+              Rational.IsNonneg.numerator(n1, d1, pIsNonneg),
               Integer.from_natural_is_nonneg(successor(d2))),
           Integer.IsNonneg.multiply(?, ?,
-              qIsNonneg,
-              Integer.from_natural_is_nonneg(successor(d1)))) } })
+              Rational.IsNonneg.numerator(n2, d2, qIsNonneg),
+              Integer.from_natural_is_nonneg(successor(d1))))) } }
 
 -- Rational analog: IsNonneg(q) ∧ IsNonneg(-q) → q = 0. Take a
 -- representative for q; at the rep level, n is both nonneg and
@@ -138,17 +141,20 @@ theorem Rational.IsNonneg_and_negate_IsNonneg_implies_zero
         (qIsNonneg : Rational.IsNonneg(q))
         (negQIsNonneg : Rational.IsNonneg(-q))
         : q = Rational.zero :=
-  
-  (cases q refining qIsNonneg, negQIsNonneg {
-    | RationalRepresentative.make(n, d) =>
-        -- n = 0; then mk(make(0, d)) = Rational.zero via
-        -- Quotient.sound (0 · succ(0) = 0 · succ(d), both = 0).
+  cases q refining qIsNonneg, negQIsNonneg {
+    | RationalRepresentative.make(n, d) => {
+        -- At the rep level the numerator n is both nonneg and (-n)-nonneg,
+        -- so n = 0 (Integer antisymmetry); then mk(make(0, d)) =
+        -- Rational.zero via Quotient.sound (0 · succ(0) = 0 · succ(d)).
+        claim Integer.IsNonneg(n) by Rational.IsNonneg.numerator;
+        claim Integer.IsNonneg(-n) by Rational.IsNonneg.numerator;
+        claim nIsZero : n = Integer.zero
+            by Integer.IsNonneg_and_negate_IsNonneg_implies_zero;
         calc Rational.fraction(n, d)
-           = Rational.fraction(Integer.zero, d)
-           -- mk(make(Integer.zero, d)) = Rational.zero.
-           = Rational.zero
-                 by Quotient.sound
-  })
+           = Rational.fraction(Integer.zero, d)   by substituting nIsZero
+           = Rational.zero                         by Quotient.sound
+      }
+  }
 
 -- Antisymmetry: x ≤ y, y ≤ x → x = y. Use: y - x = -(x - y), then
 -- IsNonneg(y - x) ∧ IsNonneg(x - y) = IsNonneg(y - x) ∧ IsNonneg(-(y - x)),
