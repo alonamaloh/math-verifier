@@ -396,20 +396,31 @@ ExpressionPointer Elaborator::tryDiffApplyUserProof(
                 leftCursor, localBinders, localBinders.size());
             ExpressionPointer rightOpened = openOverLocalBinders(
                 rightCursor, localBinders, localBinders.size());
+            // BOUNDED-fuel endpoint probes (kDefeqProbeFuel). Locating the
+            // diff only needs to recognise when a cursor IS a user-proof
+            // endpoint — a cheap structural / shallow-defeq hit. A probe at a
+            // NON-matching position can otherwise reduce a heavy subterm (a
+            // degree-4 complex power, say) wide enough to exhaust memory; the
+            // cap makes the kernel answer a conservative `false` instead, and
+            // the walk descends structurally to where the match is cheap.
             bool forwardMatch =
                 isDefinitionallyEqual(environment_, openedContext,
-                                       leftOpened, userLeftOpened)
+                                       leftOpened, userLeftOpened,
+                                       kDefeqProbeFuel)
                 && isDefinitionallyEqual(environment_, openedContext,
-                                          rightOpened, userRightOpened);
+                                          rightOpened, userRightOpened,
+                                          kDefeqProbeFuel);
             if (forwardMatch) {
                 innerProof = userProof;
                 break;
             }
             bool symmetricMatch =
                 isDefinitionallyEqual(environment_, openedContext,
-                                       leftOpened, userRightOpened)
+                                       leftOpened, userRightOpened,
+                                       kDefeqProbeFuel)
                 && isDefinitionallyEqual(environment_, openedContext,
-                                          rightOpened, userLeftOpened);
+                                          rightOpened, userLeftOpened,
+                                          kDefeqProbeFuel);
             if (symmetricMatch) {
                 // The cursor endpoints are the user proof's endpoints
                 // SWAPPED, so wrap with Equality.symmetry. userCarrier /

@@ -23,6 +23,16 @@ struct TypeError : std::runtime_error {
     ExpressionPointer actualType;
 };
 
+// A reduction ran out of its resource budget — the recursion-depth bound
+// or the WHNF fuel limit — before reaching a normal form. Distinct from a
+// genuine type error so `isDefinitionallyEqual` can downgrade it to a
+// conservative `false` ("can't decide, assume not equal" — never an unsound
+// acceptance, which would require `true`), while direct WHNF / type-checking
+// callers still see it as the TypeError it derives from.
+struct KernelResourceExhausted : TypeError {
+    using TypeError::TypeError;
+};
+
 struct ContextEntry {
     std::string name;
     ExpressionPointer type;

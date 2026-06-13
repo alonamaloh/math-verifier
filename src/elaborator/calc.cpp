@@ -723,7 +723,8 @@ ExpressionPointer Elaborator::elaborateCalc(
             Context stepContext = buildContextFromLocalBinders(localBinders);
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
-                                        stepRelationTypeOpened)) {
+                                        stepRelationTypeOpened,
+                                        kDefeqProbeFuel)) {
                 // Auto-rewrite fallback for = steps only.
                 ExpressionPointer rewriteAttempt;
                 if (step.stepProof
@@ -771,7 +772,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                 && step.relation == CalcRelation::Equality
                 && !isDefinitionallyEqual(environment_, stepContext,
                                             stepProofType,
-                                            stepRelationTypeOpened)) {
+                                            stepRelationTypeOpened,
+                                            kDefeqProbeFuel)) {
                 try {
                     ExpressionPointer proofTypeWhnf = weakHeadNormalForm(
                         environment_, stepProofType);
@@ -822,7 +824,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                 && step.relation == CalcRelation::Equality
                 && !isDefinitionallyEqual(environment_, stepContext,
                                             stepProofType,
-                                            stepRelationTypeOpened)) {
+                                            stepRelationTypeOpened,
+                                            kDefeqProbeFuel)) {
                 ExpressionPointer diffAttempt;
                 try {
                     diffAttempt = tryDiffApplyUserProof(
@@ -866,7 +869,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                 && std::holds_alternative<Pi>(stepProofType->node)
                 && !isDefinitionallyEqual(environment_, stepContext,
                                             stepProofType,
-                                            stepRelationTypeOpened)) {
+                                            stepRelationTypeOpened,
+                                            kDefeqProbeFuel)) {
                 ExpressionPointer bareAttempt;
                 try {
                     bareAttempt = tryApplyBareLemmaToDiff(
@@ -908,7 +912,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                 && step.relation == CalcRelation::Equality
                 && !isDefinitionallyEqual(environment_, stepContext,
                                             stepProofType,
-                                            stepRelationTypeOpened)) {
+                                            stepRelationTypeOpened,
+                                            kDefeqProbeFuel)) {
                 ExpressionPointer swappedRelation;
                 if (auto* appB = std::get_if<Application>(
                         &stepRelationType->node)) {

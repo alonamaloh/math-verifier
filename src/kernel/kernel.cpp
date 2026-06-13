@@ -266,7 +266,7 @@ struct ReductionDepthGuard {
     ReductionDepthGuard() {
         if (++kernelReductionDepth > kernelMaxReductionDepth) {
             --kernelReductionDepth;
-            throw TypeError(
+            throw KernelResourceExhausted(
                 "kernel reduction recursion exceeded the depth bound ("
                 + std::to_string(kernelMaxReductionDepth)
                 + "); the term needs deeper nested reduction than the "
@@ -1010,7 +1010,7 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
     while (true) {
         kernelStep("whnf", expression);
         if (--fuel <= 0) {
-            throw TypeError(
+            throw KernelResourceExhausted(
                 "weakHeadNormalForm: reduction did not terminate within "
                 "fuel limit; expression may be ill-typed");
         }
@@ -1743,6 +1743,18 @@ bool isDefinitionallyEqual(const Environment& environment,
     try {
         answer = isDefinitionallyEqualImpl(
             environment, context, std::move(left), std::move(right), fuel);
+    } catch (const KernelResourceExhausted&) {
+        // A reduction at some position exhausted its depth/fuel budget
+        // before we could decide equality. Conservatively answer `false`
+        // ("can't tell, assume not equal") rather than propagating: a
+        // `false` is always sound (acceptance needs `true`), and it lets
+        // callers — coercion, the calc diff-walk — fall through to their
+        // structural strategies instead of aborting the whole elaboration
+        // on a heavy subterm at a non-matching position. Not cached
+        // (matching the fuel-exhaustion contract: a conservative `false`
+        // must never be reused as if it were a decided answer).
+        isDefEqInFlight.erase(cacheKey);
+        return false;
     } catch (...) {
         isDefEqInFlight.erase(cacheKey);
         throw;

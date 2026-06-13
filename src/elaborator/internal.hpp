@@ -33,6 +33,20 @@
 
 
 
+// Fuel cap for "is this term the proof/endpoint I'm looking for?" PROBE
+// calls to isDefinitionallyEqual — the calc-step coercion gates and the
+// diff-walk endpoint matches. These only need the cheap recognitions
+// (structural identity — free — ζ-unfold, a Definition head or two); they
+// must NOT fully reduce a heavy subterm sitting at a NON-matching position
+// (e.g. comparing a whole sum against one summand whose head unfolds a
+// degree-4 complex power — which, with a warm kernel cache, reduces WIDE
+// rather than deep, sailing past the depth bound and exhausting memory).
+// On the cap the kernel answers a conservative `false` (a `false` is always
+// sound — acceptance needs `true`), letting the walk descend structurally
+// to where the match is cheap, or a later FULL-fuel check accept a genuine
+// deep-defeq step. Well under the kernel's default fuel (10000).
+constexpr int kDefeqProbeFuel = 256;
+
 // Spine-head hash used to bucket rewrite lemmas in the calc auto-prover's
 // lemma index (Phase 3). We walk the Application spine to its head and
 // hash just that head's identifying tag (Constant name, or a leaf-shape
