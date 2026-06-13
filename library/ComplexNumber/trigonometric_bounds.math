@@ -137,6 +137,93 @@ theorem Real.partialSum_pair (s : Natural → Real) (N : Natural)
   }
 
 -- ----------------------------------------------------------------------
+-- Even and odd powers of a negation: (−y)^{2m} = y^{2m} and
+-- (−y)^{2m+1} = −(y^{2m+1}). Proved together by induction on m (each
+-- step multiplies by −y twice). This carries the alternating sign of
+-- the cosine/sine coefficients: (−x²)^m flips sign with the parity of m.
+theorem Real.power_negate_parity (y : Real)
+        : (m : Natural)
+          → And(
+                Real.power(-y, 2 * m) = Real.power(y, 2 * m),
+                Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m))))
+  | zero => {
+      claim twoTimesZero : 2 * 0 = 0;
+      claim evenPart
+          : Real.power(-y, 2 * 0) = Real.power(y, 2 * 0)
+          by calc Real.power(-y, 2 * 0)
+                = Real.power(-y, 0)        by twoTimesZero
+                = Real.one
+                = Real.power(y, 0)
+                = Real.power(y, 2 * 0)     by twoTimesZero;
+      claim oddPart
+          : Real.power(-y, successor(2 * 0))
+            = -(Real.power(y, successor(2 * 0)))
+          by {
+            claim succTwoTimesZero : successor(2 * 0) = 1;
+            calc Real.power(-y, successor(2 * 0))
+               = Real.power(-y, 1)               by succTwoTimesZero
+               = (-y) * Real.power(-y, 0)
+               = (-y) * Real.one
+               = -(y * Real.one)
+                     by ring
+               = -(y * Real.power(y, 0))
+               = -(Real.power(y, 1))
+               = -(Real.power(y, successor(2 * 0)))
+                     by succTwoTimesZero
+          };
+      done by And.introduction(evenPart, oddPart)
+    }
+  | successor(m) => {
+      obtain ⟨evenAt, oddAt⟩ from Real.power_negate_parity(y, m);
+      claim indexEven : 2 * successor(m) = successor(successor(2 * m)) by ring;
+      claim indexOdd
+          : successor(2 * successor(m))
+            = successor(successor(successor(2 * m)))
+          by ring;
+      claim evenPart
+          : Real.power(-y, 2 * successor(m)) = Real.power(y, 2 * successor(m))
+          by calc Real.power(-y, 2 * successor(m))
+                = Real.power(-y, successor(successor(2 * m)))
+                      by indexEven
+                = (-y) * ((-y) * Real.power(-y, 2 * m))
+                = (-y) * ((-y) * Real.power(y, 2 * m))
+                      since evenAt
+                = y * (y * Real.power(y, 2 * m))
+                      by ring
+                = Real.power(y, successor(successor(2 * m)))
+                = Real.power(y, 2 * successor(m))
+                      by indexEven;
+      claim oddPart
+          : Real.power(-y, successor(2 * successor(m)))
+            = -(Real.power(y, successor(2 * successor(m))))
+          by calc Real.power(-y, successor(2 * successor(m)))
+                = Real.power(-y, successor(successor(successor(2 * m))))
+                      by indexOdd
+                = (-y) * ((-y) * ((-y) * Real.power(-y, 2 * m)))
+                = (-y) * ((-y) * ((-y) * Real.power(y, 2 * m)))
+                      since evenAt
+                = -(y * (y * (y * Real.power(y, 2 * m))))
+                      by ring
+                = -(Real.power(y, successor(successor(successor(2 * m)))))
+                = -(Real.power(y, successor(2 * successor(m))))
+                      by indexOdd;
+      done by And.introduction(evenPart, oddPart)
+    }
+
+-- The two projections, as standalone facts.
+theorem Real.power_negate_even (y : Real) (m : Natural)
+        : Real.power(-y, 2 * m) = Real.power(y, 2 * m) := {
+  obtain ⟨evenPart, _⟩ from Real.power_negate_parity(y, m);
+  done
+}
+
+theorem Real.power_negate_odd (y : Real) (m : Natural)
+        : Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m))) := {
+  obtain ⟨_, oddPart⟩ from Real.power_negate_parity(y, m);
+  done
+}
+
+-- ----------------------------------------------------------------------
 -- The even subsequence of a convergent sequence converges to the same
 -- limit (2N grows past any threshold, since N ≤ 2N).
 theorem Real.SequenceConverges.subsequence_double
