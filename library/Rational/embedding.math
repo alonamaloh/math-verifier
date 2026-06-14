@@ -75,21 +75,26 @@ theorem Integer.to_rational.add_preserves (a b : Integer)
       Rational.add_representatives(
           RationalRepresentative.make(a, 0),
           RationalRepresentative.make(b, 0)),
-      calc (a + b) * (successor(0) : Integer)
+      calc (a + b) * (successor(0 + 0 * successor(0)) : Integer)
+         = (a + b) * (successor(0) : Integer)                                  by substituting Natural.zero_add
          = (a * (successor(0) : Integer) + b * (successor(0) : Integer))
              * (successor(0) : Integer))
 
 -- Embedding preserves multiplication. At reps:
 --   LHS-rep: make(a · b, 0)
 --   RHS-rep: make(a · b, 0 + 0·succ(0))
--- Both denominators have successor 1 (the RHS by Natural.add zero
--- pattern + Natural.multiply zero pattern), so the equivalence
--- reduces to `(a·b)·Integer.one = (a·b)·Integer.one` — just
--- reflexivity.
+-- The RHS denominator-minus-one `0 + 0·succ(0)` no longer folds to 0 on
+-- its own (Natural.add opaque), so the equivalence is a one-step
+-- zero_add bridge rather than reflexivity.
 theorem Integer.to_rational.multiply_preserves (a b : Integer)
         : (a * b : Rational) = (a : Rational) * (b : Rational) :=
-  reflexivity(Rational,
-      (a * b : Rational))
+  Quotient.sound(
+      RationalRepresentative.make(a * b, 0),
+      Rational.multiply_representatives(
+          RationalRepresentative.make(a, 0),
+          RationalRepresentative.make(b, 0)),
+      calc (a * b) * (successor(0 + 0 * successor(0)) : Integer)
+         = a * b * (successor(0) : Integer)                                    by substituting Natural.zero_add)
 
 -- Embedding preserves negation: negate the numerator, leave the
 -- denominator at 0.
