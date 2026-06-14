@@ -36,6 +36,7 @@ import Rational.order
 import Rational.order_arithmetic
 import Rational.order_multiplication
 import Rational.absolute_value
+import Rational.triangle_more
 import Rational.positive
 import Rational.reciprocal_function
 import Real.sequence
@@ -84,14 +85,30 @@ theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) :=
     claim cauchyEquivalence : CauchyEquivalent(zeroSequence, oneSequence);
     obtain ⟨witnessIndex, atWitnessIndex⟩
         from cauchyEquivalence(Rational.one, Rational.zero_less_one);
+    -- Rational.one is IsNonneg (it is positive), so |Rational.one| = Rational.one.
+    claim oneIsNonneg : Rational.IsNonneg(Rational.one)
+      by Rational.IsNonneg_of_LessOrEqual_zero(
+             Rational.one, Rational.LessThan.weaken(Rational.zero_less_one));
+    -- The two constant sequences are 0 and 1 everywhere, so the difference
+    -- term reduces to |0 - 1| = |-1| = |1| = 1.
+    claim absOneEqualsOne : abs(Rational.one) = Rational.one
+      by Rational.absolute_value_when_nonneg(Rational.one, oneIsNonneg);
+    claim absNegateOneEqualsAbsOne : abs(-(Rational.one)) = abs(Rational.one)
+      by Rational.absolute_value_negate(Rational.one);
+    claim negateOneIsZeroMinusOne : -(Rational.one) = Rational.zero - Rational.one by ring;
     calc Rational.one
+       = abs(Rational.one)                                  by Equality.symmetry(absOneEqualsOne)
+       = abs(-(Rational.one))                               by Equality.symmetry(absNegateOneEqualsAbsOne)
+       = abs(Rational.zero - Rational.one)                  by substituting negateOneIsZeroMinusOne
        = abs(
              CauchyRationalSequence.sequenceFunction(zeroSequence, witnessIndex)
              - CauchyRationalSequence.sequenceFunction(oneSequence, witnessIndex))   as oneEqualsAbsDiff;
-    claim oneLessThanOne : Rational.one < Rational.one
-      by rewrite(
-             Equality.symmetry(oneEqualsAbsDiff),
-             atWitnessIndex(witnessIndex, LessOrEqual.reflexivity(witnessIndex)));
+    calc Rational.one
+       = abs(
+             CauchyRationalSequence.sequenceFunction(zeroSequence, witnessIndex)
+             - CauchyRationalSequence.sequenceFunction(oneSequence, witnessIndex))   by oneEqualsAbsDiff
+       < Rational.one
+           by atWitnessIndex(witnessIndex, LessOrEqual.reflexivity(witnessIndex))   as oneLessThanOne;
     Rational.LessThan.distinct(oneLessThanOne)(
         reflexivity(Rational, Rational.one))
   }

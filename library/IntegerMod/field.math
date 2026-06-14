@@ -84,10 +84,15 @@ theorem IntegerMod.zero_not_one (p : Natural)
         (primality : Natural.is_prime(p))
         : ¬(IntegerMod.zero(p) = IntegerMod.one(p)) :=
   (zeroEqualsOne : IntegerMod.zero(p) = IntegerMod.one(p)) ↦ {
-    claim Integer.CongruentModulo(p, Integer.zero, Integer.one);
+    claim congruent : Integer.CongruentModulo(p, Integer.zero, Integer.one);
     -- p | (0 − 1); negate to get p | 1.
-    claim Integer.divides((p : Integer), Integer.one);
-    claim Natural.divides(p, 1);
+    claim Integer.divides((p : Integer), -(Integer.zero - Integer.one))
+        by Integer.divides_negate((p : Integer), Integer.zero - Integer.one, congruent);
+    claim negationEquation : -(Integer.zero - Integer.one) = Integer.one by ring;
+    claim dividesOne : Integer.divides((p : Integer), Integer.one)
+        by substituting negationEquation;
+    claim Natural.divides(p, 1)
+        by Integer.natural_divides_of_integer_divides(p, 1, dividesOne);
     claim pEqualsOne : p = 1;
     Natural.not_two_less_or_equal_one(
         rewrite(pEqualsOne, Natural.is_prime.at_least_two(p, primality)))
