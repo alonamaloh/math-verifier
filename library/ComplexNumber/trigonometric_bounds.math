@@ -1264,14 +1264,27 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by natOneReal
             = Real.one + Real.one
                   by natOneReal;
+  claim factorialOne : Natural.factorial(1) = 1
+      by Natural.one_multiply(Natural.factorial(0));
+  claim factorialTwo : Natural.factorial(2) = 2
+      by calc Natural.factorial(2)
+            = 2 * Natural.factorial(1)
+            = 2 * 1
+                  by substituting factorialOne
+            = 2
+                  by Natural.multiply_one(2);
   claim d2Value : d2 = Real.one + Real.one
       by calc d2
+            = (Natural.factorial(2) : Real)
             = (2 : Real)
+                  by substituting factorialTwo
             = Real.one + Real.one
                   by twoNatReal;
   claim fourValue : four = Real.one + Real.one + Real.one + Real.one
       by calc four
+            = (4 : Real)
             = (2 + 2 : Real)
+                  by substituting (ring : (4 : Natural) = 2 + 2)
             = (2 : Real) + (2 : Real)
                   by Real.from_natural_add_preserves(2, 2)
             = (Real.one + Real.one) + (2 : Real)
@@ -1411,17 +1424,9 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by Real.exponentialCoefficient_antitone(0, 4, Natural.zero_least(4))
             = Real.one
                   by ec0;
-  claim ec4SquareNonneg
-      : Real.zero ≤ Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
-      by { claim Real.zero
-                 < Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
-               by Real.multiply_positive(
-                      Real.exponentialCoefficient(4), Real.exponentialCoefficient(4),
-                      ec4Positive, ec4Positive);
-           done since Real.LessThan.weaken };
   -- EC 4² ≤ EC 4 (EC 4 ≤ 1).
-  claim ec4Square : Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
-                    ≤ Real.exponentialCoefficient(4)
+  claim Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
+        ≤ Real.exponentialCoefficient(4)
       by calc Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
             ≤ Real.one * Real.exponentialCoefficient(4)
                   by Real.LessOrEqual.multiply_monotone_nonneg(
@@ -1434,9 +1439,32 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by ring;
 
   -- 4·EC 4 < EC 2, via multiplying 4·d2 < d4 by the positive EC 2·EC 4.
+  claim factorialThree : Natural.factorial(3) = 6
+      by calc Natural.factorial(3)
+            = 3 * Natural.factorial(2)
+            = 3 * 2
+                  by substituting factorialTwo
+            = 6
+                  by ring;
+  claim factorialFour : Natural.factorial(4) = 24
+      by calc Natural.factorial(4)
+            = 4 * Natural.factorial(3)
+            = 4 * 6
+                  by substituting factorialThree
+            = 24
+                  by ring;
   claim natBound : successor(4 * Natural.factorial(2)) ≤ Natural.factorial(4)
-      by { claim (9 : Natural) ≤ 15 + 9 by Natural.less_or_equal_add_left(9, 15);
-           done };
+      by calc successor(4 * Natural.factorial(2))
+            = successor(4 * 2)
+                  by substituting factorialTwo
+            = (9 : Natural)
+                  by ring
+            ≤ 15 + 9
+                  by Natural.less_or_equal_add_left(9, 15)
+            = (24 : Natural)
+                  by ring
+            = Natural.factorial(4)
+                  by substituting factorialFour;
   claim aLessD4 : a < d4
       by Real.from_natural_LessThan(4 * Natural.factorial(2), Natural.factorial(4), natBound);
   claim aMultForm : a = four * d2
@@ -1451,27 +1479,13 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
   claim lhsForm
       : a * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
         = four * Real.exponentialCoefficient(4)
-      by calc a * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
-            = (four * d2)
-              * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
-                  by aMultForm
-            = four * (d2 * Real.exponentialCoefficient(2))
-              * Real.exponentialCoefficient(4)
-                  by ring
-            = four * Real.one * Real.exponentialCoefficient(4)
-                  by relation2
-            = four * Real.exponentialCoefficient(4)
-                  by ring;
+      by linear_combination(
+             (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4)) * aMultForm
+             + four * Real.exponentialCoefficient(4) * relation2);
   claim rhsForm
       : d4 * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
         = Real.exponentialCoefficient(2)
-      by calc d4 * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
-            = (d4 * Real.exponentialCoefficient(4)) * Real.exponentialCoefficient(2)
-                  by ring
-            = Real.one * Real.exponentialCoefficient(2)
-                  by relation4
-            = Real.exponentialCoefficient(2)
-                  by ring;
+      by linear_combination(Real.exponentialCoefficient(2) * relation4);
   claim fourEC4Less
       : four * Real.exponentialCoefficient(4) < Real.exponentialCoefficient(2)
       by calc four * Real.exponentialCoefficient(4)
@@ -1483,24 +1497,32 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by rhsForm;
 
   -- 2·EC 4 + 2·EC 4² ≤ 4·EC 4 < EC 2.
+  claim Real.IsNonneg(Real.one + Real.one)
+      by { claim Real.zero < Real.one
+               by { claim Real.zero < (Rational.one : Real)
+                        by Rational.to_real.positive_preserves(
+                               Rational.one, Rational.zero_less_one);
+                    done };
+           claim Real.zero < Real.one + Real.one
+               by calc Real.zero
+                     = Real.zero + Real.zero
+                           by ring
+                     < Real.one + Real.one
+                           since Real.LessThan.add_strict_strict;
+           claim Real.zero ≤ Real.one + Real.one since Real.LessThan.weaken;
+           done since Real.IsNonneg_of_LessOrEqual_zero };
   claim twoEC4SquareLe
       : (Real.one + Real.one) * (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
         ≤ (Real.one + Real.one) * Real.exponentialCoefficient(4)
-      by Real.LessOrEqual.multiply_monotone_nonneg(
-             Real.one + Real.one, Real.one + Real.one,
-             Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4),
-             Real.exponentialCoefficient(4),
-             Real.LessOrEqual.reflexive(Real.one + Real.one),
-             ec4Square,
-             { claim Real.zero < Real.one + Real.one
-                   by { claim Real.zero < Real.one
-                            by { claim Real.zero < (Rational.one : Real)
-                                     by Rational.to_real.positive_preserves(
-                                            Rational.one, Rational.zero_less_one);
-                                 done };
-                        done since Real.LessThan.add_strict_strict };
-               done since Real.LessThan.weaken },
-             ec4SquareNonneg);
+      by calc (Real.one + Real.one)
+                  * (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
+            = (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
+                  * (Real.one + Real.one)
+                  by ring
+            ≤ Real.exponentialCoefficient(4) * (Real.one + Real.one)
+                  since Real.LessOrEqual.multiply_by_nonneg_right
+            = (Real.one + Real.one) * Real.exponentialCoefficient(4)
+                  by ring;
   claim keyLe
       : (Real.one + Real.one) * Real.exponentialCoefficient(4)
           + (Real.one + Real.one)
