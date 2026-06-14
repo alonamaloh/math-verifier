@@ -700,7 +700,16 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
             [](const ContextEquality& a, const ContextEquality& b) {
                 return a.cost < b.cost;
             });
-        for (const ContextEquality& eq : equalities) {
+        // Two passes (cheap before expensive): pass 0 closes a rewritten goal
+        // ONLY via the bounded-defeq reflexivity check above — no recursive
+        // prove — so the equation whose rewrite makes the goal reflexive is
+        // found cheaply, before any other equation's rewrite drags the full
+        // recursive search. Pass 1 is the original recursive behaviour, run
+        // only if pass 0 found nothing, so proofs that genuinely need the
+        // search are unaffected.
+        for (int pass = 0; pass < 2; ++pass) {
+          bool fastOnly = (pass == 0);
+          for (const ContextEquality& eq : equalities) {
             // Try both rewrite directions:
             //   direction 0: replace rhs in goal with lhs — uses eq
             //     directly (transport: motive(lhs) → motive(rhs)).
@@ -725,12 +734,59 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                 ExpressionPointer rewrittenGoal = substitute(
                     abstractedBody, 0, toSide);
                 ExpressionPointer proofRewritten;
-                try {
-                    proofRewritten = autoProveClaim(
-                        rewrittenGoal, localBinders,
-                        line, budget - 1);
-                } catch (const ElaborateError&) { continue; }
-                  catch (const TypeError&) { continue; }
+                // Cheap close: if the rewrite left a definitionally-reflexive
+                // goal (often the case for the RIGHT equation — e.g. rewriting
+                // `to_rational(a+b)` to `to_rational a + to_rational b` makes
+                // the two sides defeq), close it by reflexivity with a bounded
+                // defeq probe and NO recursive prover call. The reflexivity is
+                // re-checked at full fuel by the kernel, so a bounded false
+                // positive cannot slip through.
+                {
+                    EqualityComponents rc;
+                    bool plain = true;
+                    try {
+                        rc = extractEqualityComponents(
+                            rewrittenGoal,
+                            "context-equality bridge fast close", line);
+                    } catch (const ElaborateError&) { plain = false; }
+                      catch (const TypeError&) { plain = false; }
+                    if (plain) {
+                        int N = static_cast<int>(localBinders.size());
+                        bool refl = structurallyEqual(
+                            rc.leftEndpoint, rc.rightEndpoint);
+                        if (!refl) {
+                            try {
+                                refl = isDefinitionallyEqual(
+                                    environment_,
+                                    buildContextFromLocalBinders(localBinders),
+                                    openOverLocalBinders(
+                                        rc.leftEndpoint, localBinders, N),
+                                    openOverLocalBinders(
+                                        rc.rightEndpoint, localBinders, N),
+                                    kDefeqProbeFuel);
+                            } catch (...) { refl = false; }
+                        }
+                        if (refl) {
+                            proofRewritten = makeApplication(
+                                makeApplication(
+                                    makeConstant("reflexivity",
+                                        {rc.carrierUniverseLevel}),
+                                    rc.carrierType),
+                                rc.leftEndpoint);
+                        }
+                    }
+                }
+                if (!proofRewritten) {
+                    // Pass 0 does the cheap close ONLY — let a later equation
+                    // (or pass 1) handle anything that needs the real search.
+                    if (fastOnly) continue;
+                    try {
+                        proofRewritten = autoProveClaim(
+                            rewrittenGoal, localBinders,
+                            line, budget - 1);
+                    } catch (const ElaborateError&) { continue; }
+                      catch (const TypeError&) { continue; }
+                }
                 ExpressionPointer motive = makeLambda(
                     "_rewriteHole",
                     eq.carrierType, abstractedBody);
@@ -767,6 +823,7 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                 call = makeApplication(call, proofRewritten);
                 return call;
             }
+          }
         }
         return nullptr;
     }
