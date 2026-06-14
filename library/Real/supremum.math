@@ -931,12 +931,18 @@ theorem Real.bisectionLeft_step_monotone
         (Rational.halve(
              Real.BisectionInterval.left(intervals)
              + Real.BisectionInterval.right(intervals)) : Real);
-    Real.bisectionLeft_step_monotone_step(
-        subset, intervals,
-        Real.bisectionLeq_invariant(
-            subset, initial, initialLeftLeqRight, n),
-        Logic.classical_decidable(
-            Real.IsUpperBound(subset, midReal)))
+    -- The step lemma proves left(n) ≤ left(successor(n)); bridge the
+    -- stated index `1 + n` to `successor(n)` so `bisectionLeft` unfolds.
+    claim
+          Real.bisectionLeft(subset, initial, n)
+            ≤ Real.bisectionLeft(subset, initial, successor(n))
+      by Real.bisectionLeft_step_monotone_step(
+             subset, intervals,
+             Real.bisectionLeq_invariant(
+                 subset, initial, initialLeftLeqRight, n),
+             Logic.classical_decidable(
+                 Real.IsUpperBound(subset, midReal)));
+    done by substituting Natural.one_add
   }
 
 -- Step lemma: right(stepWithDec) ≤ right(state).
@@ -977,12 +983,18 @@ theorem Real.bisectionRight_step_monotone
         (Rational.halve(
              Real.BisectionInterval.left(intervals)
              + Real.BisectionInterval.right(intervals)) : Real);
-    Real.bisectionRight_step_monotone_step(
-        subset, intervals,
-        Real.bisectionLeq_invariant(
-            subset, initial, initialLeftLeqRight, n),
-        Logic.classical_decidable(
-            Real.IsUpperBound(subset, midReal)))
+    -- The step lemma proves right(successor(n)) ≤ right(n); bridge the
+    -- stated index `1 + n` to `successor(n)` so `bisectionRight` unfolds.
+    claim
+          Real.bisectionRight(subset, initial, successor(n))
+            ≤ Real.bisectionRight(subset, initial, n)
+      by Real.bisectionRight_step_monotone_step(
+             subset, intervals,
+             Real.bisectionLeq_invariant(
+                 subset, initial, initialLeftLeqRight, n),
+             Logic.classical_decidable(
+                 Real.IsUpperBound(subset, midReal)));
+    done by substituting Natural.one_add
   }
 
 -- ----------------------------------------------------------------------
@@ -1005,9 +1017,15 @@ theorem Real.bisectionLeft_le_subsequent
                subset, initial, initialLeftLeqRight, k, n);
       claim Real.bisectionLeft(subset, initial, k + n)
               ≤ Real.bisectionLeft(subset, initial, 1 + (k + n));
+      -- `successor(k) + n = 1 + (k + n)`: shift the successor across the sum.
+      claim indexShift : successor(k) + n = 1 + (k + n)
+        by calc successor(k) + n = successor(k + n)   by Natural.successor_add
+                                = 1 + (k + n)         by Natural.one_add;
       calc Real.bisectionLeft(subset, initial, n)
          ≤ Real.bisectionLeft(subset, initial, k + n)
          ≤ Real.bisectionLeft(subset, initial, 1 + (k + n))
+         = Real.bisectionLeft(subset, initial, successor(k) + n)
+           by substituting indexShift
   }
 
 theorem Real.bisectionRight_le_predecessor
@@ -1027,7 +1045,13 @@ theorem Real.bisectionRight_le_predecessor
                subset, initial, initialLeftLeqRight, k, n);
       claim Real.bisectionRight(subset, initial, 1 + (k + n))
               ≤ Real.bisectionRight(subset, initial, k + n);
-      calc Real.bisectionRight(subset, initial, 1 + (k + n))
+      -- `successor(k) + n = 1 + (k + n)`: shift the successor across the sum.
+      claim indexShift : successor(k) + n = 1 + (k + n)
+        by calc successor(k) + n = successor(k + n)   by Natural.successor_add
+                                = 1 + (k + n)         by Natural.one_add;
+      calc Real.bisectionRight(subset, initial, successor(k) + n)
+         = Real.bisectionRight(subset, initial, 1 + (k + n))
+           by substituting indexShift
          ≤ Real.bisectionRight(subset, initial, k + n)
          ≤ Real.bisectionRight(subset, initial, n)
   }
@@ -1066,7 +1090,9 @@ theorem Rational.halve_two_plus_le_one_plus (n : Natural)
   -- 1 ≤ 1 + n because n ≥ 0:  1 = 1 + 0 ≤ 1 + n.
   claim Rational.IsNonneg((n : Rational))   since Rational.from_natural_IsNonneg;
   claim (0 : Rational) ≤ (n : Rational)     since Rational.LessOrEqual_zero_of_IsNonneg;
-  claim (1 : Rational) ≤ (1 : Rational) + (n : Rational);
+  -- 1 = 1 + 0 ≤ 1 + n, adding 1 on the left to 0 ≤ n.
+  calc (1 : Rational) = (1 : Rational) + (0 : Rational)
+                      ≤ (1 : Rational) + (n : Rational)   by Rational.add_general_LessOrEqual_left;
   -- 1 + 1 + n = 1 + (1 + n) ≤ (1 + n) + (1 + n), since 1 ≤ 1 + n.
   calc (1 : Rational) + (1 : Rational) + (n : Rational)
           = (1 : Rational) + ((1 : Rational) + (n : Rational))

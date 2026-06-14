@@ -250,13 +250,24 @@ theorem GaussianInteger.reconstruct_coeffs
                 * GaussianInteger.embedInteger(
                       Product.second(GaussianInteger.coordinatesOfCoefficients(a)))
   | Polynomial.Coefficients.nil => {
-      -- coords(nil) = (0,0); classOf(nil) = 0 = embed(0) + i·0
-      -- (embed(0)=0 found via embed_zero; i·0=0 here).
-      claim GaussianInteger.i
-              * RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
+      -- coords(nil) = (0,0), so the goal is classOf(nil) = embed(0) + i·embed(0).
+      -- classOf(nil) = 0 (defeq); embed(0) = 0 by embed_zero; i·0 = 0 here.
+      claim embedZero
+          : GaussianInteger.embedInteger(Integer.zero)
             = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
-          by Ring.multiply_zero_right(GaussianInteger.ring_bundle, GaussianInteger.i);
-      done
+          by GaussianInteger.embed_zero;
+      claim iTimesZero
+          : GaussianInteger.i * GaussianInteger.embedInteger(Integer.zero)
+            = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
+          by substituting embedZero;
+      calc GaussianInteger.classOf(Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))
+         = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
+         = GaussianInteger.embedInteger(Integer.zero)
+               + RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
+               by substituting embedZero
+         = GaussianInteger.embedInteger(Integer.zero)
+             + GaussianInteger.i * GaussianInteger.embedInteger(Integer.zero)
+               by substituting iTimesZero
     }
   | Polynomial.Coefficients.cons(c, rest) =>
       calc GaussianInteger.classOf(

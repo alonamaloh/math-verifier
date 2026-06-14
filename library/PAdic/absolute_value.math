@@ -238,7 +238,14 @@ theorem Rational.padic_absolute_value_at_succ
                         Natural.power(
                             Natural.padic_valuation(p, (1 + k)), p),
                         1)) :=
-  Equality.transport_proposition(
+  -- With `1 + k` opaque the cases motive no longer reduces at `1 + k`, so
+  -- bridge the hypothesis to `successor(k)`, where the successor branch fires.
+  {
+   claim absSuccessor : Integer.absolute_value_natural(n) = successor(k)
+       by calc Integer.absolute_value_natural(n)
+             = 1 + k         by absSucc
+             = successor(k)  by Natural.one_add;
+   Equality.transport_proposition(
       (m : Natural) ↦
           (cases m {
              | zero => Rational.zero
@@ -248,10 +255,11 @@ theorem Rational.padic_absolute_value_at_succ
            } : Rational)
           = Rational.fraction((Natural.power(Natural.padic_valuation(p, (1 + d)), p) : Integer),
                     Natural.monus(Natural.power(Natural.padic_valuation(p, (1 + k)), p), 1)),
-      ?, ?, Equality.symmetry(absSucc),
+      ?, ?, Equality.symmetry(absSuccessor),
       reflexivity(Rational,
           Rational.fraction((Natural.power(Natural.padic_valuation(p, (1 + d)), p) : Integer),
                   Natural.monus(Natural.power(Natural.padic_valuation(p, (1 + k)), p), 1))))
+  }
 
 -- The main respect proof: equivalent Rational representatives map to
 -- the same Rational under the p-adic absolute value. Four cases on
@@ -271,11 +279,23 @@ theorem Rational.padic_absolute_value_respect
      | RationalRepresentative.make(n1, d1) =>
          (cases rep2 {
             | RationalRepresentative.make(n2, d2) =>
-             (cross : n1 * ((1 + d2) : Integer)
-                              = n2 * ((1 + d1) : Integer)) ↦ {
+             (cross : n1 * ((successor(d2)) : Integer)
+                              = n2 * ((successor(d1)) : Integer)) ↦ {
+               -- `RationalEquivalent` hands us the `successor`-form cross
+               -- equation; the helper below wants the `1 + d` form.
+               claim crossPlus
+                   : n1 * ((1 + d2) : Integer) = n2 * ((1 + d1) : Integer)
+                 by calc n1 * ((1 + d2) : Integer)
+                       = n1 * ((successor(d2)) : Integer)
+                             by substituting Natural.one_add(d2)
+                       = n2 * ((successor(d1)) : Integer)  by cross
+                       = n2 * ((1 + d1) : Integer)
+                             by substituting Natural.one_add(d1);
                claim naturalCross
                      : Integer.absolute_value_natural(n1) * (1 + d2)
-                       = Integer.absolute_value_natural(n2) * (1 + d1);
+                       = Integer.absolute_value_natural(n2) * (1 + d1)
+                 by Rational.padic_cross_mult_natural_absolute_value(
+                        n1, n2, d1, d2, crossPlus);
                -- with-pattern on |n1| and |n2|.
                cases Integer.absolute_value_natural(n1) with eqAbs1 {
                   | zero =>
@@ -287,35 +307,54 @@ theorem Rational.padic_absolute_value_respect
                                 = Rational.padic_absolute_value_at_representative(
                                       p, RationalRepresentative.make(n2, d2))
                          | successor(k2) => {
+                             -- zero = succ(k2)·succ(d1) = succ(d1 + k2·succ(d1)),
+                             -- a successor — impossible. (The product no longer
+                             -- folds to a successor on its own, so close with ring.)
                              calc (0 : Natural)
                                 = 0 * (1 + d2)
                                 = (1 + k2) * (1 + d1)
                                       by rewrite(eqAbs2,
-                                                 rewrite(eqAbs1, naturalCross))   as contradEq;
-                             -- The above derives:
-                             -- zero = succ(k2) * succ(d1), and
-                             -- succ(k2) * succ(d1) reduces to
-                             -- succ(d1 + k2 * succ(d1)).
+                                                 rewrite(eqAbs1, naturalCross))
+                                = successor(d1 + k2 * successor(d1))             by ring   as contradEq;
                              absurd(contradEq)
                            }
                        }
                   | successor(k1) =>
                       cases Integer.absolute_value_natural(n2) with eqAbs2 {
                          | zero => {
-                             calc (1 + k1) * (1 + d2)
+                             calc successor(d2 + k1 * successor(d2))
+                                = (1 + k1) * (1 + d2)                             by ring
                                 = 0 * (1 + d1)
                                       by rewrite(eqAbs1,
                                                  rewrite(eqAbs2, naturalCross))
                                 = (0 : Natural)                                    as contradEq;
-                             absurd(Equality.symmetry(contradEq))
+                             absurd(contradEq)
                            }
                          | successor(k2) => {
+                             -- eqAbs1/eqAbs2 bind the `successor` form, but the
+                             -- proof body below is written in `1 + k` form;
+                             -- bridge them once via `one_add`.
+                             claim eqAbs1Plus
+                                 : Integer.absolute_value_natural(n1) = (1 + k1)
+                               by calc Integer.absolute_value_natural(n1)
+                                     = successor(k1)  by eqAbs1
+                                     = 1 + k1         by Natural.one_add;
+                             claim eqAbs2Plus
+                                 : Integer.absolute_value_natural(n2) = (1 + k2)
+                               by calc Integer.absolute_value_natural(n2)
+                                     = successor(k2)  by eqAbs2
+                                     = 1 + k2         by Natural.one_add;
                              -- Substitute into naturalCross to get
                              --   succ(k1) * succ(d2) = succ(k2) * succ(d1).
                              claim (1 + k1) * (1 + d2)
                                      = (1 + k2) * (1 + d1)
-                               by rewrite(eqAbs1,
-                                          rewrite(eqAbs2, naturalCross));
+                               by calc (1 + k1) * (1 + d2)
+                                     = Integer.absolute_value_natural(n1) * (1 + d2)
+                                           by substituting eqAbs1Plus
+                                     = Integer.absolute_value_natural(n2) * (1 + d1)
+                                           by naturalCross
+                                     = (1 + k2) * (1 + d1)
+                                           by substituting eqAbs2Plus;
                              -- Reorganise via commutativity to
                              --   succ(d1) * succ(k2) = succ(d2) * succ(k1).
                              calc (1 + d1) * (1 + k2)
@@ -363,10 +402,61 @@ theorem Rational.padic_absolute_value_respect
                                                        Natural.padic_valuation(
                                                            p, (1 + k2)), p),
                                                    1)),
-                                           Rational.padic_quotient_cross_equation(
-                                               p, primality,
-                                               d1, d2, k1, k2,
-                                               succCross))
+                                           -- `RationalEquivalent` reduces the
+                                           -- denominators to `successor(monus(...))`,
+                                           -- whereas the cross-equation helper states
+                                           -- them as `1 + monus(...)`; bridge via
+                                           -- one_add inside each cast.
+                                           (calc (Natural.power(
+                                                      Natural.padic_valuation(
+                                                          p, (1 + d1)), p) : Integer)
+                                                  * (successor(
+                                                        Natural.monus(
+                                                            Natural.power(
+                                                                Natural.padic_valuation(
+                                                                    p, (1 + k2)), p),
+                                                            1)) : Integer)
+                                               = (Natural.power(
+                                                      Natural.padic_valuation(
+                                                          p, (1 + d1)), p) : Integer)
+                                                  * ((1 + Natural.monus(
+                                                             Natural.power(
+                                                                 Natural.padic_valuation(
+                                                                     p, (1 + k2)), p),
+                                                             1)) : Integer)
+                                                     by substituting Natural.one_add(
+                                                            Natural.monus(
+                                                                Natural.power(
+                                                                    Natural.padic_valuation(
+                                                                        p, (1 + k2)), p),
+                                                                1))
+                                               = (Natural.power(
+                                                      Natural.padic_valuation(
+                                                          p, (1 + d2)), p) : Integer)
+                                                  * ((1 + Natural.monus(
+                                                             Natural.power(
+                                                                 Natural.padic_valuation(
+                                                                     p, (1 + k1)), p),
+                                                             1)) : Integer)
+                                                     by Rational.padic_quotient_cross_equation(
+                                                            p, primality,
+                                                            d1, d2, k1, k2,
+                                                            succCross)
+                                               = (Natural.power(
+                                                      Natural.padic_valuation(
+                                                          p, (1 + d2)), p) : Integer)
+                                                  * (successor(
+                                                        Natural.monus(
+                                                            Natural.power(
+                                                                Natural.padic_valuation(
+                                                                    p, (1 + k1)), p),
+                                                            1)) : Integer)
+                                                     by substituting Natural.one_add(
+                                                            Natural.monus(
+                                                                Natural.power(
+                                                                    Natural.padic_valuation(
+                                                                        p, (1 + k1)), p),
+                                                                1))))
                                 = Rational.padic_absolute_value_at_representative(
                                       p, RationalRepresentative.make(n2, d2))
                            }
@@ -505,9 +595,18 @@ theorem Rational.padic_multiplicative_cross_equation
   -- So power(v_p(succ(dy + dx*succ(dy))), p) = power(v_p(succ(dx)*succ(dy)), p)
   -- = power(v_p(succ(dx)) + v_p(succ(dy)), p)        [multiplicativity]
   -- = power(v_p(succ(dx)), p) * power(v_p(succ(dy)), p)  [power_add].
+  -- Under opacity `1 + dy + dx*(1+dy)` no longer reduces to the product
+  -- form, so fold it to `(1+dx)*(1+dy)` (a ring identity) before applying
+  -- multiplicativity of the valuation.
+  claim dProductFold
+      : (1 + dy + dx * (1 + dy)) = (1 + dx) * (1 + dy)  by ring;
   calc Natural.power(
            Natural.padic_valuation(
                p, (1 + dy + dx * (1 + dy))), p)
+     = Natural.power(
+           Natural.padic_valuation(
+               p, (1 + dx) * (1 + dy)), p)
+           by substituting dProductFold
      = Natural.power(
            Natural.padic_valuation(p, (1 + dx))
                + Natural.padic_valuation(p, (1 + dy)), p)
@@ -517,9 +616,15 @@ theorem Rational.padic_multiplicative_cross_equation
      = Natural.power(Natural.padic_valuation(p, (1 + dx)), p)
          * Natural.power(Natural.padic_valuation(p, (1 + dy)), p);
   -- Similarly for the denominator (k side).
+  claim kProductFold
+      : (1 + ky + kx * (1 + ky)) = (1 + kx) * (1 + ky)  by ring;
   calc Natural.power(
            Natural.padic_valuation(
                p, (1 + ky + kx * (1 + ky))), p)
+     = Natural.power(
+           Natural.padic_valuation(
+               p, (1 + kx) * (1 + ky)), p)
+           by substituting kProductFold
      = Natural.power(
            Natural.padic_valuation(p, (1 + kx))
                + Natural.padic_valuation(p, (1 + ky)), p)
@@ -570,6 +675,22 @@ theorem Rational.padic_multiplicative_cross_equation
             by (calc (1 +
                          Natural.monus(
                              Natural.power(
+                                 Natural.padic_valuation(p, (1 + ky)), p),
+                             1)
+                           + Natural.monus(
+                                 Natural.power(
+                                     Natural.padic_valuation(p, (1 + kx)), p),
+                                 1)
+                             * (1 +
+                                 Natural.monus(
+                                     Natural.power(
+                                         Natural.padic_valuation(p, (1 + ky)), p),
+                                     1)))
+                       -- the sum form folds back to the product of the two
+                       -- successor factors (no longer a kernel defeq).
+                   = (1 +
+                         Natural.monus(
+                             Natural.power(
                                  Natural.padic_valuation(p, (1 + kx)), p),
                              1))
                        * (1 +
@@ -577,6 +698,7 @@ theorem Rational.padic_multiplicative_cross_equation
                                  Natural.power(
                                      Natural.padic_valuation(p, (1 + ky)), p),
                                  1))
+                       by ring
                    = Natural.power(
                          Natural.padic_valuation(p, (1 + kx)), p)
                        * (1 +
@@ -660,10 +782,30 @@ theorem Rational.padic_absolute_value_multiplicative
                       let absYAtRep : Rational :=
                           Rational.padic_absolute_value_at_representative(
                               p, RationalRepresentative.make(ny, dy));
+                      -- The product representative's denominator is
+                      -- `dy + dx*successor(dy)` (from multiply_representatives);
+                      -- under opacity this is no longer defeq to the
+                      -- `dy + dx*(1+dy)` form used by the helpers, so keep both
+                      -- and bridge them once.
                       let absXYAtRep : Rational :=
                           Rational.padic_absolute_value_at_representative(
                               p, RationalRepresentative.make(
+                                     nx * ny, dy + dx * successor(dy)));
+                      let absXYAtRepPlus : Rational :=
+                          Rational.padic_absolute_value_at_representative(
+                              p, RationalRepresentative.make(
                                      nx * ny, dy + dx * (1 + dy)));
+                      claim denomXYEq
+                          : dy + dx * successor(dy) = dy + dx * (1 + dy)
+                        by substituting Natural.one_add(dy);
+                      claim absXYAtRepEq : absXYAtRep = absXYAtRepPlus
+                        by calc Rational.padic_absolute_value_at_representative(
+                                    p, RationalRepresentative.make(
+                                           nx * ny, dy + dx * successor(dy)))
+                              = Rational.padic_absolute_value_at_representative(
+                                    p, RationalRepresentative.make(
+                                           nx * ny, dy + dx * (1 + dy)))
+                                  by substituting denomXYEq;
                       -- With-pattern on |nx| and |ny|.
                       cases Integer.absolute_value_natural(nx) with eqAbsNx {
                          | zero => {
@@ -675,6 +817,7 @@ theorem Rational.padic_absolute_value_multiplicative
                                       * Integer.absolute_value_natural(ny)
                                 = 0;
                              calc absXYAtRep
+                                = absXYAtRepPlus           by absXYAtRepEq
                                 = Rational.zero
                                 = Rational.zero * absYAtRep
                                 = absXAtRep * absYAtRep
@@ -691,6 +834,7 @@ theorem Rational.padic_absolute_value_multiplicative
                                              * 0
                                        = 0;
                                     calc absXYAtRep
+                                       = absXYAtRepPlus    by absXYAtRepEq
                                        = Rational.zero
                                        = absXAtRep * Rational.zero
                                        = absXAtRep * absYAtRep
@@ -717,6 +861,142 @@ theorem Rational.padic_absolute_value_multiplicative
                                                          Natural.padic_valuation(
                                                              p, (1 + ky + kx * (1 + ky))), p),
                                                      1));
+                                    -- The `Quotient.sound` below needs the
+                                    -- multiply_representatives form, whose
+                                    -- denominator is `b + a*successor(b)` with
+                                    -- `successor`s; the cross-equation helper
+                                    -- states the `1 + ...` form. Bridge once.
+                                    -- Successor/`1 +` reconciliation of the two
+                                    -- denominators, as Natural identities.
+                                    claim lhsDenomFold
+                                        : successor(
+                                              Natural.monus(
+                                                  Natural.power(
+                                                      Natural.padic_valuation(p, (1 + ky)), p),
+                                                  1)
+                                                + Natural.monus(
+                                                      Natural.power(
+                                                          Natural.padic_valuation(p, (1 + kx)), p),
+                                                      1)
+                                                  * successor(
+                                                        Natural.monus(
+                                                            Natural.power(
+                                                                Natural.padic_valuation(p, (1 + ky)), p),
+                                                            1)))
+                                          = (1 + Natural.monus(
+                                                     Natural.power(
+                                                         Natural.padic_valuation(p, (1 + ky)), p),
+                                                     1)
+                                               + Natural.monus(
+                                                     Natural.power(
+                                                         Natural.padic_valuation(p, (1 + kx)), p),
+                                                     1)
+                                                 * (1 + Natural.monus(
+                                                            Natural.power(
+                                                                Natural.padic_valuation(p, (1 + ky)), p),
+                                                            1)))
+                                      by ring;
+                                    claim soundEquiv
+                                        : (Natural.power(
+                                               Natural.padic_valuation(
+                                                   p, (1 + dy + dx * (1 + dy))), p) : Integer)
+                                            * (successor(
+                                                  Natural.monus(
+                                                      Natural.power(
+                                                          Natural.padic_valuation(p, (1 + ky)), p),
+                                                      1)
+                                                    + Natural.monus(
+                                                          Natural.power(
+                                                              Natural.padic_valuation(p, (1 + kx)), p),
+                                                          1)
+                                                      * successor(
+                                                            Natural.monus(
+                                                                Natural.power(
+                                                                    Natural.padic_valuation(p, (1 + ky)), p),
+                                                                1)))
+                                                : Integer)
+                                          = ((Natural.power(
+                                                  Natural.padic_valuation(p, (1 + dx)), p)
+                                                : Integer)
+                                             * (Natural.power(
+                                                    Natural.padic_valuation(p, (1 + dy)), p)
+                                                  : Integer))
+                                            * (successor(
+                                                  Natural.monus(
+                                                      Natural.power(
+                                                          Natural.padic_valuation(
+                                                              p, (1 + ky + kx * (1 + ky))), p),
+                                                      1))
+                                                : Integer)
+                                      by calc (Natural.power(
+                                                   Natural.padic_valuation(
+                                                       p, (1 + dy + dx * (1 + dy))), p) : Integer)
+                                                * (successor(
+                                                      Natural.monus(
+                                                          Natural.power(
+                                                              Natural.padic_valuation(p, (1 + ky)), p),
+                                                          1)
+                                                        + Natural.monus(
+                                                              Natural.power(
+                                                                  Natural.padic_valuation(p, (1 + kx)), p),
+                                                              1)
+                                                          * successor(
+                                                                Natural.monus(
+                                                                    Natural.power(
+                                                                        Natural.padic_valuation(p, (1 + ky)), p),
+                                                                    1)))
+                                                    : Integer)
+                                            = (Natural.power(
+                                                   Natural.padic_valuation(
+                                                       p, (1 + dy + dx * (1 + dy))), p) : Integer)
+                                                * ((1 + Natural.monus(
+                                                              Natural.power(
+                                                                  Natural.padic_valuation(p, (1 + ky)), p),
+                                                              1)
+                                                       + Natural.monus(
+                                                             Natural.power(
+                                                                 Natural.padic_valuation(p, (1 + kx)), p),
+                                                             1)
+                                                         * (1 + Natural.monus(
+                                                                    Natural.power(
+                                                                        Natural.padic_valuation(p, (1 + ky)), p),
+                                                                    1)))
+                                                    : Integer)
+                                                  by substituting lhsDenomFold
+                                            = ((Natural.power(
+                                                    Natural.padic_valuation(p, (1 + dx)), p)
+                                                  : Integer)
+                                               * (Natural.power(
+                                                      Natural.padic_valuation(p, (1 + dy)), p)
+                                                    : Integer))
+                                                * ((1 + Natural.monus(
+                                                              Natural.power(
+                                                                  Natural.padic_valuation(
+                                                                      p, (1 + ky + kx * (1 + ky))), p),
+                                                              1))
+                                                    : Integer)
+                                                  by Rational.padic_multiplicative_cross_equation(
+                                                         p, primality, dx, dy, kx, ky)
+                                            = ((Natural.power(
+                                                    Natural.padic_valuation(p, (1 + dx)), p)
+                                                  : Integer)
+                                               * (Natural.power(
+                                                      Natural.padic_valuation(p, (1 + dy)), p)
+                                                    : Integer))
+                                                * (successor(
+                                                      Natural.monus(
+                                                          Natural.power(
+                                                              Natural.padic_valuation(
+                                                                  p, (1 + ky + kx * (1 + ky))), p),
+                                                          1))
+                                                    : Integer)
+                                                  by substituting
+                                                      Natural.one_add(
+                                                          Natural.monus(
+                                                              Natural.power(
+                                                                  Natural.padic_valuation(
+                                                                      p, (1 + ky + kx * (1 + ky))), p),
+                                                              1));
                                     -- |nx*ny| = |nx|*|ny| = succ(kx)*succ(ky)
                                     -- = succ(ky + kx*succ(ky)) (by kernel reduction).
                                     calc Integer.absolute_value_natural(
@@ -728,6 +1008,8 @@ theorem Rational.padic_absolute_value_multiplicative
                                        = (1 + kx) * (1 + ky)
                                        = (1 + ky + kx * (1 + ky))                  as productAbsSucc;
                                     calc absXYAtRep
+                                       = absXYAtRepPlus
+                                             by absXYAtRepEq
                                        = padicAvMkXY
                                              by Rational.padic_absolute_value_at_succ(
                                                     p, nx * ny,
@@ -781,14 +1063,15 @@ theorem Rational.padic_absolute_value_multiplicative
                                                                 Natural.power(
                                                                     Natural.padic_valuation(p, (1 + ky)), p),
                                                                 1))),
-                                                    Rational.padic_multiplicative_cross_equation(
-                                                        p, primality,
-                                                        dx, dy, kx, ky))
+                                                    soundEquiv)
                                        = absXAtRep * padicAvMkY
                                              by Equality.symmetry(
                                                     Rational.padic_absolute_value_at_succ(
                                                         p, nx, dx, kx, eqAbsNx))
                                        = absXAtRep * absYAtRep
+                                             by Equality.symmetry(
+                                                    Rational.padic_absolute_value_at_succ(
+                                                        p, ny, dy, ky, eqAbsNy))
                                   }
                               }
                        }
@@ -1015,13 +1298,35 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_sum_zero
   let avY : Rational := Rational.padic_absolute_value(p, primality, y);
   -- |x+y|_p = 0 (sum's numerator has |·| = 0) and avX + avY is nonneg,
   -- so LHS ≤ RHS via 0 ≤ RHS.
+  -- `x + y` reduces to the `successor`-form representative; bridge to the
+  -- `1 + ...` form the hypothesis/at_zero are stated in (each `substituting`
+  -- collapses every `successor(d_)` occurrence at once), then apply at_zero.
   claim lhsIsZero
         : Rational.padic_absolute_value(p, primality, x + y) = Rational.zero
-    by Rational.padic_absolute_value_at_zero(
-           p,
-           nx * ((1 + dy) : Integer) + ny * ((1 + dx) : Integer),
-           dy + dx * (1 + dy),
-           eqAbsSumZero);
+    by calc Rational.padic_absolute_value(p, primality, x + y)
+          = Rational.padic_absolute_value_at_representative(
+                p, RationalRepresentative.make(
+                       nx * (successor(dy) : Integer)
+                       + ny * (successor(dx) : Integer),
+                       dy + dx * successor(dy)))
+          = Rational.padic_absolute_value_at_representative(
+                p, RationalRepresentative.make(
+                       nx * ((1 + dy) : Integer)
+                       + ny * (successor(dx) : Integer),
+                       dy + dx * (1 + dy)))
+                by substituting Natural.one_add(dy)
+          = Rational.padic_absolute_value_at_representative(
+                p, RationalRepresentative.make(
+                       nx * ((1 + dy) : Integer)
+                       + ny * ((1 + dx) : Integer),
+                       dy + dx * (1 + dy)))
+                by substituting Natural.one_add(dx)
+          = Rational.zero
+                by Rational.padic_absolute_value_at_zero(
+                       p,
+                       nx * ((1 + dy) : Integer) + ny * ((1 + dx) : Integer),
+                       dy + dx * (1 + dy),
+                       eqAbsSumZero);
   claim avXNonneg : Rational.IsNonneg(avX)
     by Rational.IsNonneg_of_LessOrEqual_zero(
            avX, Rational.padic_absolute_value_nonneg(p, primality, x));
@@ -1074,16 +1379,43 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
   claim succDyPos    : 1 ≤ (1 + dy)   ;
   claim succKSumPos  : 1 ≤ (1 + kSum) ;
   -- |nx · (succ(dy):Int)|_Nat = |nx|_Nat · succ(dy) = succ(kx) · succ(dy).
-  -- (|(succ(dy):Int)|_Nat = succ(dy) is definitional via distance(succ(dy), 0).)
+  -- Under opacity `|(1+dy : Int)|_Nat` no longer reduces to `1+dy` on its
+  -- own, so establish that bridge via the image lemma + Natural injectivity.
+  claim absSuccDyEq
+      : Integer.absolute_value_natural(((1 + dy) : Integer)) = (1 + dy)
+    by Natural.to_integer.injective(
+           Integer.absolute_value_natural(((1 + dy) : Integer)), (1 + dy),
+           calc (Integer.absolute_value_natural(((1 + dy) : Integer)) : Integer)
+              = abs(((1 + dy) : Integer))
+                    by Equality.symmetry(
+                           Integer.absolute_value_natural_is_image(((1 + dy) : Integer)))
+              = (((1 + dy)) : Integer)
+                    by Integer.absolute_value_of_natural((1 + dy)));
+  claim absSuccDxEq
+      : Integer.absolute_value_natural(((1 + dx) : Integer)) = (1 + dx)
+    by Natural.to_integer.injective(
+           Integer.absolute_value_natural(((1 + dx) : Integer)), (1 + dx),
+           calc (Integer.absolute_value_natural(((1 + dx) : Integer)) : Integer)
+              = abs(((1 + dx) : Integer))
+                    by Equality.symmetry(
+                           Integer.absolute_value_natural_is_image(((1 + dx) : Integer)))
+              = (((1 + dx)) : Integer)
+                    by Integer.absolute_value_of_natural((1 + dx)));
   calc Integer.absolute_value_natural(
            nx * ((1 + dy) : Integer))
-     = Integer.absolute_value_natural(nx) * (1 + dy)
+     = Integer.absolute_value_natural(nx)
+           * Integer.absolute_value_natural(((1 + dy) : Integer))
            by Integer.absolute_value_natural_multiplicative
+     = Integer.absolute_value_natural(nx) * (1 + dy)
+           since absSuccDyEq
      = (1 + kx) * (1 + dy);
   calc Integer.absolute_value_natural(
            ny * ((1 + dx) : Integer))
-     = Integer.absolute_value_natural(ny) * (1 + dx)
+     = Integer.absolute_value_natural(ny)
+           * Integer.absolute_value_natural(((1 + dx) : Integer))
            by Integer.absolute_value_natural_multiplicative
+     = Integer.absolute_value_natural(ny) * (1 + dx)
+           since absSuccDxEq
      = (1 + ky) * (1 + dx);
   -- |sum|_Nat ≥ 1.
   claim sumAbsPositive
@@ -1149,14 +1481,21 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
                        + ny * ((1 + dx) : Integer)))
           = Natural.padic_valuation(p, (1 + kSum));
   -- v_p(succ(dy + dx · succ(dy))) = v_p(succ(dx)) + v_p(succ(dy)).
-  -- This uses padic_valuation_multiplicative on succ(dx) and succ(dy),
-  -- whose product is definitionally succ(dy + dx · succ(dy)).
+  -- Under opacity `1 + dy + dx*(1+dy)` no longer reduces to the product, so
+  -- fold it (a ring identity) before applying multiplicativity.
+  claim dProductFold
+      : (1 + dy + dx * (1 + dy)) = (1 + dx) * (1 + dy)  by ring;
   claim Natural.padic_valuation(p, (1 + dy + dx * (1 + dy)))
           = Natural.padic_valuation(p, (1 + dx))
               + Natural.padic_valuation(p, (1 + dy))
-    by Natural.padic_valuation_multiplicative(
-           p, (1 + dx), (1 + dy),
-           primality, succDxPos, succDyPos);
+    by calc Natural.padic_valuation(p, (1 + dy + dx * (1 + dy)))
+          = Natural.padic_valuation(p, (1 + dx) * (1 + dy))
+                by substituting dProductFold
+          = Natural.padic_valuation(p, (1 + dx))
+              + Natural.padic_valuation(p, (1 + dy))
+                by Natural.padic_valuation_multiplicative(
+                       p, (1 + dx), (1 + dy),
+                       primality, succDxPos, succDyPos);
   -- The Helper A exponent inequality. Substitute vDFormulaMult on the
   -- LHS, then AC-rearrange to align with le_add_preserves_right; the
   -- final ≤ step uses vASumLeVKSum to bound (vp(kx) + vp(dy)) by vp(kSum).
@@ -1193,7 +1532,10 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
            Natural.padic_valuation(p, (1 + kSum)),
            Natural.padic_valuation(p, (1 + kx)),
            exponentLe);
-  -- Bridge LHS: padic_av(x+y) = mk(make((p^... : Int), ...)).
+  -- Bridge LHS: padic_av(x+y) = mk(make((p^... : Int), ...)). `x + y`
+  -- reduces to the `successor`-form representative; bridge to the `1 + ...`
+  -- form (each `substituting` collapses every `successor(d_)` at once) and
+  -- then apply at_succ.
   claim Rational.padic_absolute_value(
             p, primality,
             Rational.fraction(nx, dx)
@@ -1205,12 +1547,40 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
                       Natural.power(
                           Natural.padic_valuation(p, (1 + kSum)), p),
                       1))
-    by Rational.padic_absolute_value_at_succ(
-           p,
-           nx * ((1 + dy) : Integer)
-             + ny * ((1 + dx) : Integer),
-           dy + dx * (1 + dy),
-           kSum, eqAbsSum);
+    by calc Rational.padic_absolute_value(
+                p, primality,
+                Rational.fraction(nx, dx)
+                + Rational.fraction(ny, dy))
+          = Rational.padic_absolute_value_at_representative(
+                p, RationalRepresentative.make(
+                       nx * (successor(dy) : Integer)
+                       + ny * (successor(dx) : Integer),
+                       dy + dx * successor(dy)))
+          = Rational.padic_absolute_value_at_representative(
+                p, RationalRepresentative.make(
+                       nx * ((1 + dy) : Integer)
+                       + ny * (successor(dx) : Integer),
+                       dy + dx * (1 + dy)))
+                by substituting Natural.one_add(dy)
+          = Rational.padic_absolute_value_at_representative(
+                p, RationalRepresentative.make(
+                       nx * ((1 + dy) : Integer)
+                       + ny * ((1 + dx) : Integer),
+                       dy + dx * (1 + dy)))
+                by substituting Natural.one_add(dx)
+          = Rational.fraction((Natural.power(
+                         Natural.padic_valuation(p, (1 + dy + dx * (1 + dy))), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, (1 + kSum)), p),
+                        1))
+                by Rational.padic_absolute_value_at_succ(
+                       p,
+                       nx * ((1 + dy) : Integer)
+                         + ny * ((1 + dx) : Integer),
+                       dy + dx * (1 + dy),
+                       kSum, eqAbsSum);
   -- Bridge RHS: |x|_p = mk(make((p^... : Int), ...)).
   claim Rational.padic_absolute_value(
             p, primality,
