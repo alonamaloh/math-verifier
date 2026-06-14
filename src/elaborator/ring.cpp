@@ -3374,6 +3374,40 @@ ExpressionPointer Elaborator::proveNaturalLiteralPushThroughStep(
                 buildNaturalLiteralKernel(j + 1));
             ExpressionPointer formB = buildRingOp(
                 step.outerAddName, toOuterJ, toOuterOne);
+            // `formA` is the coercion of the LITERAL TOWER succ^{j+1}(zero),
+            // but `addPreserves` speaks the ADD form coercion(naturalJ + 1).
+            // Under opaque Natural.add these are no longer defeq, so bridge
+            // the tower to the add form via `Natural.add_one` (lifted through
+            // the coercion) before chaining the add-preservation law.
+            ExpressionPointer naturalCarrierType = makeConstant("Natural");
+            LevelPointer naturalCarrierLevel = makeLevelConst(0);
+            ExpressionPointer literalTower = buildNaturalLiteralKernel(j + 1);
+            ExpressionPointer naturalAddForm = makeApplication(
+                makeApplication(makeConstant("Natural.add"), naturalJ),
+                naturalOne);
+            ExpressionPointer addForm = makeApplication(
+                makeConstant(step.coercionFunctionName), naturalAddForm);
+            // Natural.add_one(naturalJ) : naturalJ + 1 = successor(naturalJ)
+            // (= succ^{j+1}(zero) = literalTower); flip to tower = add form.
+            ExpressionPointer addOneProof = makeApplication(
+                makeConstant("Natural.add_one"), naturalJ);
+            ExpressionPointer towerEqualsAddForm = buildEqualitySymmetry(
+                naturalCarrierLevel, naturalCarrierType,
+                naturalAddForm, literalTower, addOneProof);
+            ExpressionPointer coerceLambda = makeLambda(
+                "_lit_coerce_z", naturalCarrierType,
+                makeApplication(makeConstant(step.coercionFunctionName),
+                                  makeBoundVariable(0)));
+            ExpressionPointer litBridge = buildEqualityCongruence(
+                naturalCarrierLevel, naturalCarrierType,
+                step.outerCarrierUniverseLevel, step.outerCarrierType,
+                coerceLambda, literalTower, naturalAddForm,
+                towerEqualsAddForm);
+            // formA = addForm [litBridge] = formB [addPreserves].
+            ExpressionPointer formAToB = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                formA, addForm, formB,
+                litBridge, addPreserves);
             ExpressionPointer toOuterJLifted =
                 liftBoundVariables(toOuterJ, 1, 0);
             ExpressionPointer lambdaRight = makeLambda(
@@ -3403,7 +3437,7 @@ ExpressionPointer Elaborator::proveNaturalLiteralPushThroughStep(
             ExpressionPointer stepAB = buildEqualityTransitivity(
                 universeLevel, carrierType,
                 formA, formB, formC,
-                addPreserves, congrRight);
+                formAToB, congrRight);
             currentProof = buildEqualityTransitivity(
                 universeLevel, carrierType,
                 formA, formC, formD,
