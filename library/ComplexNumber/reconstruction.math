@@ -207,13 +207,24 @@ theorem ComplexNumber.reconstruct_coeffs
                 * ComplexNumber.from_real(
                       Product.second(ComplexNumber.coordinatesOfCoefficients(a)))
   | Polynomial.Coefficients.nil => {
-      -- coords(nil) = (0,0); classOf(nil) = 0 = from_real(0) + i·0
-      -- (from_real(0)=0 via from_real_zero; i·0=0 here).
-      claim ComplexNumber.i
-              * RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      -- coords(nil) = (0,0), so the goal is classOf(nil) = from_real(0) + i·from_real(0).
+      -- classOf(nil) = 0 (defeq); from_real(0) = 0 by from_real_zero; i·0 = 0 here.
+      claim fromRealZero
+          : ComplexNumber.from_real(Real.zero)
             = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
-          by Ring.multiply_zero_right(ComplexNumber.ring_bundle, ComplexNumber.i);
-      done
+          by ComplexNumber.from_real_zero;
+      claim iTimesZero
+          : ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+            = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+          by substituting fromRealZero;
+      calc ComplexNumber.classOf(Polynomial.Coefficients.nil(Real))
+         = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+         = ComplexNumber.from_real(Real.zero)
+               + RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+               by substituting fromRealZero
+         = ComplexNumber.from_real(Real.zero)
+             + ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+               by substituting iTimesZero
     }
   | Polynomial.Coefficients.cons(c, rest) =>
       calc ComplexNumber.classOf(

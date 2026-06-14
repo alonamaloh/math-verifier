@@ -496,20 +496,29 @@ theorem Natural.wilson (p n : Natural)
     | zero => {
         -- n = 0 would make p = 1, which is not prime.
         claim 2 ≤ p since Natural.is_prime.at_least_two;
-        claim 2 ≤ 1 by substituting pEquation;
+        claim 2 ≤ 1 + 0 by substituting pEquation;
+        claim 2 ≤ 1 by substituting Natural.add_zero(1);
         claim impossible : False since Natural.not_two_less_or_equal_one;
         absurd(impossible)
       }
     | successor(m) =>
         cases m refining pEquation {
           | zero => {
-              -- p = 2: 1! + 1 = 2 divides itself.
-              claim Integer.divides((((1 + 1) : Natural) : Integer),
-                        (Natural.factorial(1) : Integer) + Integer.one)
-                  by ⟨Integer.one,
-                      calc (Natural.factorial(1) : Integer) + Integer.one
-                         = (((1 + 1) : Natural) : Integer) * Integer.one⟩;
-              done by substituting pEquation
+              -- p = 2: 1! + 1 = 2 divides itself.  factorial(1) reduces to 1,
+              -- and p = 1 + 1 casts to 1 + 1 over the integers.
+              claim castP : (p : Integer) = Integer.one + Integer.one
+                  by calc (p : Integer)
+                        = ((1 + successor(zero) : Natural) : Integer)
+                              by substituting pEquation
+                        = ((1 : Natural) : Integer) + ((successor(zero) : Natural) : Integer)
+                              by Natural.to_integer.add_preserves(1, successor(zero))
+                        = Integer.one + Integer.one
+                              by substituting Natural.to_integer.one_preserves;
+              witness Integer.one with
+                  calc (Natural.factorial(successor(zero)) : Integer) + Integer.one
+                     = ((successor(zero) : Natural) : Integer) + Integer.one
+                     = (Integer.one + Integer.one) * Integer.one        by ring
+                     = (p : Integer) * Integer.one                      by substituting castP
             }
           | successor(k) => {
               -- n = 2 + k ≥ 2: the pairing argument applies.
@@ -547,12 +556,17 @@ theorem Natural.divisor_one_or_self_of_divides_factorial_plus_one
               absurd(impossible)
             }
           | Or.introduceRight(divisorAtMostP) => {
-              claim divisor ≤ successor(n) by substituting pEquation;
+              claim divisor ≤ successor(n)
+                  by calc divisor
+                        ≤ p             by divisorAtMostP
+                        = 1 + n         by pEquation
+                        = successor(n)  by substituting Natural.one_add(n);
               claim ¬(divisor = successor(n))
                   by (isTop : divisor = successor(n)) ↦ {
                       claim isPAgain : divisor = p
                           by calc divisor
                                 = successor(n)   by isTop
+                                = 1 + n          by substituting Natural.one_add(n)
                                 = p              by pEquation;
                       notP(isPAgain)
                     };
@@ -592,8 +606,12 @@ theorem Natural.prime_of_divides_factorial_plus_one (p n : Natural)
         (pEquation : p = 1 + n) (nPositive : 1 ≤ n)
         (wilsonDivides : Natural.divides(p, Natural.factorial(n) + 1))
         : Natural.is_prime(p) := {
-  claim 1 + 1 ≤ 1 + n since Natural.add_left_monotone;
-  claim pAtLeastTwo : 2 ≤ p by substituting pEquation;
+  claim oneAddOne : 1 + 1 ≤ 1 + n since Natural.add_left_monotone;
+  claim pAtLeastTwo : 2 ≤ p
+      by calc (2 : Natural)
+            = 1 + 1   by substituting Natural.add_one(1)
+            ≤ 1 + n   by oneAddOne
+            = p       by pEquation;
   claim divisorCondition
       : (divisor : Natural) → divisor ∣ p → divisor = 1 ∨ divisor = p
       by (divisor : Natural) (dividesP : divisor ∣ p) ↦ {
