@@ -195,7 +195,7 @@ It explicitly does **not**:
 - do **induction** or **case analysis on data**.
 
 The line is *anchored unification, yes; term invention, no.* Everything
-that needs anchoring gets explicit syntax: `take` / `choose` /
+that needs anchoring gets explicit syntax: `take` / `obtain` /
 `by_induction` / `cases`.
 
 ### The local/global split is the predictability lever
@@ -241,7 +241,7 @@ that replaces global auto-search.
   goal from its local context. The common case (last established fact *is*
   the goal) is the trivial/cheap call. No explicit "exact" needed.
 - Grammar rule: a statement must be a `Prop`-typed term ("prove and add"),
-  or a binder form (`let` / `obtain` / `choose` / `take` / `suppose`). A
+  or a binder form (`let` / `obtain` / `take` / `suppose`). A
   bare non-`Prop` term establishes nothing and is an error.
 
 ---
@@ -314,9 +314,9 @@ There is **no** standalone `to prove Q { … }` (that is just `Q { … }`);
 
 ### Contradiction
 
-`suppose P for contradiction { … derive False … }` always produces the
-**constructive** thing, `¬P` (i.e. `P → False`). One rule covers both uses,
-because the prover's silent DNE finishes the rest:
+`suppose P for contradiction { … derive False … }` always produces `¬P`
+(i.e. `P → False`) directly. One rule covers both uses, because the prover's
+silent DNE finishes the rest:
 
 - goal `¬Q`: the block yields `¬Q`, closes directly;
 - goal `Q`: `suppose not Q for contradiction { … False … }` yields `¬¬Q`,
@@ -326,33 +326,54 @@ No separate reductio keyword; classicality lives entirely in the prover.
 
 ---
 
-## 5. Existentials: `choose` / `take`
+## 5. Existentials: `obtain` / `take`
 
-The elim/intro pair, both able to cross `Prop → data` via classical choice
-(see §7).
+The elim/intro pair.
 
-- **`choose q such that <body> from <source>`** — eliminate an existential.
-  `from` accepts a *proposition*; the prover proves it (tactics + context),
-  then the existential is destructed. Elaborates to
-  `q := Classical.choose(h)` and hands back `Classical.choose_spec` as the
-  proof of `<body>`.
-  - The source must be massaged into existential form. For an **opaque**
-    predicate (e.g. `Divides`), register its **characterizing lemma as a
-    destructor** so `choose … from (2 | n)` works uniformly whether or not
-    the predicate is transparent.
-- **`take <witness> { … }`** — introduce an existential for the goal. The
-  boring prover deliberately refuses to *guess* witnesses, so the intro side
-  is always explicit. Example boundary case:
+- **`obtain ⟨w, hw⟩ from <source>`** — eliminate an existential **in a
+  proof**. `from` accepts a proposition; the prover proves it (tactics +
+  context); then it is destructured, binding the witness `w` and the
+  property `hw`. This is the workhorse (≈640 uses in the current library);
+  the older `choose … such that` keyword is **retired** (0 uses). It is
+  ordinary `Prop → Prop` elimination — **no axiom**, because a proof's goal
+  is itself a `Prop`.
+  - For an **opaque** predicate (e.g. `Divides`), register its
+    characterizing lemma as a **destructor**, so `obtain ⟨q, …⟩ from (2 ∣ n)`
+    works whether or not the predicate is transparent.
+- **`take <witness> { … }`** — introduce an existential for the goal; the
+  boring prover refuses to *guess* witnesses, so intro is always explicit.
 
 ```
-2 | n  to prove  4 | n*n {
-  choose q such that n = 2*q from (2 | n)
-  n*n
-    = (2*q) * (2*q)
-    = 4 * (q*q)
-  take q*q  ⊢  n*n = 4*(q*q)     -- divides-intro; witness made explicit
+2 ∣ n  to prove  4 ∣ n*n {
+  obtain ⟨q, nEqualsTwoQ⟩ from (2 ∣ n)     -- n = 2*q
+  n*n = (2*q)*(2*q) = 4*(q*q)
+  take q*q                                  -- divides-intro; witness explicit
 }
 ```
+
+### Unique existence and definite description
+
+`∃! x. P(x)` ("exactly one") packages `∃ x. P(x)` with uniqueness. In a
+**proof**, `obtain ⟨x, hx, uniqueness⟩ from <∃! …>` extracts the witness,
+its property, and uniqueness — again no axiom.
+
+Turning a unique-existence proof into an actual **function** (building
+**data**) is the one thing `obtain` cannot do: the recursor may not
+eliminate a `Prop` into `Type`. That bridge is the definite-description
+axiom — and it surfaces **only** as a binder inside a definition:
+
+```
+definition Real.limit (s : Sequence) : Real
+  := unique x such that <s converges to x>      -- obligation: ∃! such x
+```
+
+The `∃!` obligation is discharged by the prover. The raw four-argument
+operator `the(T, P, existence, uniqueness)` **never appears**, and neither
+does the bare token `the`: a reader meets `Real.limit` everywhere and
+`unique x such that …` only at this one definition site. We keep **unique**
+choice only — there is deliberately no general Hilbert-ε `choose`; unique
+choice is the weakest axiom that does the job, and the library already
+lives within it.
 
 ---
 
@@ -399,29 +420,22 @@ statement" — the genuine mathematical lesson — not a foundations error.
 
 ---
 
-## 7. Logic mode: classical by default, constructivity as a scoped badge
+## 7. Logic mode: classical, full stop
 
-- **Default everywhere: classical.** LEM, classical choice, and silent
-  DNE / `¬¬`-elimination are all part of the built-in tactics. A mathematician never
-  writes an extra step to get `P` from `¬¬P`.
-  - **`Classical.choose`** (value extraction from a `Prop`-existential) is
-    available, which dissolves the `Prop`/`Type` large-elimination wall for
-    `choose`-as-data. Cost to document once: such values are
-    **noncomputable** — `choose` and `decide`/evaluation live in different
-    worlds; a definition that reaches for choice cannot later be unfolded to
-    compute.
-- **Constructivity is a scoped, certifiable property**, not (only) a global
-  switch. A `constructively { … }` block locally drops LEM, choice, and the
-  `¬¬` rewrites, and **errors at the exact offending step** ("this step uses
-  double-negation elimination, unavailable under `constructively`"). That
-  turns a non-constructive proof into a precise, teachable diagnostic, and
-  lets a result *advertise* that it was proved constructively — like a
-  `noncomputable` badge in reverse — without bifurcating the library. A
-  global `--constructive` build can sit on top of the same mechanism.
-  - Inside `constructively`, `choose`-as-data is no longer free: the witness
-    must be carried in a `Σ`/`Type`-level existential from the start. The
-    `Prop`/`Type` leak reappears *honestly and locally*, exactly where it
-    should be visible.
+- **Classical everywhere; no constructive fragment.** LEM, definite
+  description (unique choice, §5), and silent DNE / `¬¬`-elimination are all
+  part of the built-in tactics. A mathematician never writes an extra step to
+  get `P` from `¬¬P`. There is **no `constructively` badge** and **no
+  per-step constructivity tracking**: the language is never used to compute,
+  so constructivity's one payoff — program extraction — does not apply, and
+  §8 already decouples *reasoning* from *computation* (definitions reason via
+  their registered equations, not by reduction). Accepting a non-constructive
+  step anywhere costs nothing here.
+- **`decide` is uniformly classical.** Building data by deciding a
+  proposition (`decide P`, §8 — e.g. `List.filter`) always uses classical
+  decidability for *any* `P`, with no `Decidable`-instance plumbing. Such a
+  value is noncomputable, which is irrelevant because we never compute it —
+  reasoning goes through the defining equations.
 
 ---
 
@@ -474,6 +488,12 @@ rather than making the surface pretend CIC isn't underneath.
   just state the conclusion. (Reader-facing "this follows from those" is
   served by `since`/`note`, not a keyword.)
 - Raw pattern-matching in **proofs**.
+- The **`choose … such that` keyword** — `obtain ⟨…⟩ from …` is the sole
+  existential-elimination form (§5).
+- The **`constructively` badge** and all constructivity tracking — the
+  language is classical, full stop (§7).
+- The **bare `the(…)` operator** — definite description surfaces only as
+  `unique x such that …` inside a definition (§5).
 
 ## 10. Residual leaks to keep contained (honest list)
 
@@ -482,8 +502,9 @@ possible:
 
 - **Dependent pattern-matching / dependent definitions** — §8; keep rare,
   behind interfaces.
-- **Noncomputability of `Classical.choose`** — §7; document the
-  choice-vs-compute boundary once.
+- **Noncomputability of definite description** (`unique x such that …`,
+  §5) — values built by description do not reduce; harmless because §8
+  reasons through equations, never by computation. Document once.
 - **Induction-hypothesis strengthening** — §6; genuinely mathematical, and
   surfaced as "strengthen the statement," not as motive editing.
 - **Definitional-equality surprises** — largely removed by the
@@ -497,8 +518,8 @@ possible:
 - Exact concrete syntax for the `cases` / `by_induction` case blocks
   (constructor enumeration, binder names for sub-data + IH).
 - Layout/indentation rules for chain continuation lines and nested blocks.
-- The destructor-registration mechanism for opaque predicates (so `choose
-  … from <opaque prop>` is uniform).
+- The destructor-registration mechanism for opaque predicates (so `obtain
+  ⟨…⟩ from <opaque prop>` is uniform, §5).
 - Depth/step budget defaults for the local-context search. The "facts in
   scope were …" failure message should additionally surface fingerprint-
   indexed "did you mean `by L`?" candidates from the import surface (§1) —
