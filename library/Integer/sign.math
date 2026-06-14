@@ -105,8 +105,10 @@ theorem Natural.add_eq_zero_left_zero
         : (a b : Natural) → a + b = 0 → a = 0
   | zero, _, _ =>
       reflexivity(0)
-  | successor(k), b, equation =>
-      absurd(rewrite(Natural.successor_add(k, b), equation))
+  | successor(k), b, equation => {
+      claim isZero : successor(k + b) = 0 by substituting Natural.successor_add;
+      absurd(isZero)
+    }
 
 -- And the right component.
 theorem Natural.add_eq_zero_right_zero
@@ -118,11 +120,16 @@ theorem Natural.multiply_successor_eq_zero_left_zero
         : (a d : Natural) → a * successor(d) = 0 → a = 0
   | zero, _, _ =>
       reflexivity(0)
-  | successor(k), d, equation =>
-      -- successor(k) * successor(d) reduces (multiply on successor first
-      -- arg) to successor(d) + k * successor(d) = successor(d + k *
-      -- successor(d)). A successor is never zero.
-      absurd(equation)
+  | successor(k), d, equation => {
+      -- successor(k) * successor(d) = successor(d) + k * successor(d)
+      -- = successor(d + k * successor(d)), a successor — never zero.
+      calc successor(d + k * successor(d))
+         = successor(d) + k * successor(d)    by substituting Natural.successor_add
+         = successor(k) * successor(d)         by substituting Natural.successor_multiply
+         = 0                                    by equation
+         as isZero;
+      absurd(isZero)
+    }
 
 -- The Natural-to-Integer embedding is injective.
 theorem Natural.to_integer.injective (n m : Natural)
