@@ -365,8 +365,10 @@ theorem Real.avoidingLeft_le_subsequent
                      Real.avoidingIntervals_ordered(f, predecessor + N));
         calc Real.avoidingLeft(f, N)
            ≤ Real.avoidingLeft(f, predecessor + N)        since IH
-           ≤ Real.avoidingLeft(f, successor(predecessor) + N)
+           ≤ Real.avoidingLeft(f, successor(predecessor + N))
                  since leftGrows
+           = Real.avoidingLeft(f, successor(predecessor) + N)
+                 by substituting Natural.successor_add
       }
   }
 
@@ -387,6 +389,8 @@ theorem Real.avoidingRight_le_subsequent
                      f(predecessor + N),
                      Real.avoidingIntervals_ordered(f, predecessor + N));
         calc Real.avoidingRight(f, successor(predecessor) + N)
+           = Real.avoidingRight(f, successor(predecessor + N))
+                 by substituting Natural.successor_add
            ≤ Real.avoidingRight(f, predecessor + N)       since rightShrinks
            ≤ Real.avoidingRight(f, N)                     since IH
       }
@@ -431,10 +435,14 @@ theorem Real.avoidingLeft_le_avoidingRight
 -- The step at index n throws f(n) out of interval n+1.
 theorem Real.avoiding_avoids (f : Natural → Real) (n : Natural)
         : Or(f(n) < Real.avoidingLeft(f, 1 + n),
-             Real.avoidingRight(f, 1 + n) < f(n)) :=
-  Real.avoidStep_avoids(
-      Real.avoidingIntervals(f, n), f(n),
-      Real.avoidingIntervals_ordered(f, n))
+             Real.avoidingRight(f, 1 + n) < f(n)) := {
+  claim Or(f(n) < Real.avoidingLeft(f, successor(n)),
+           Real.avoidingRight(f, successor(n)) < f(n))
+      by Real.avoidStep_avoids(
+             Real.avoidingIntervals(f, n), f(n),
+             Real.avoidingIntervals_ordered(f, n));
+  done by substituting Natural.one_add
+}
 
 -- ----------------------------------------------------------------------
 -- The diagonal: every listing misses a real — the supremum of the left

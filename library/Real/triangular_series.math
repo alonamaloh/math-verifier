@@ -242,6 +242,37 @@ theorem Real.triangular_term_telescopes (k : Natural)
                   * Rational.reciprocal_function(
                         (successor(successor(k)) : Rational)))
 
+-- The same telescoping identity, written with the index `successor(1 + k)`
+-- so it lines up with `Real.telescoping_partialSum` (which subtracts the
+-- shifted term `t(1 + k)`).
+theorem Real.triangular_term_telescopes_shifted (k : Natural)
+        : Real.triangular_reciprocal_term(k)
+          = (((2 : Rational)
+              * Rational.reciprocal_function((successor(k) : Rational)))
+             : Real)
+            - (((2 : Rational)
+                * Rational.reciprocal_function(
+                      (successor(1 + k) : Rational)))
+               : Real) := {
+  claim oneAddK : (1 + k : Natural) = successor(k)
+      since Natural.one_add;
+  claim shiftIndex : successor(successor(k)) = successor(1 + k)
+      by substituting oneAddK;
+  calc Real.triangular_reciprocal_term(k)
+     = (((2 : Rational)
+         * Rational.reciprocal_function((successor(k) : Rational))) : Real)
+       - (((2 : Rational)
+           * Rational.reciprocal_function(
+                 (successor(successor(k)) : Rational))) : Real)
+           by Real.triangular_term_telescopes(k)
+     = (((2 : Rational)
+         * Rational.reciprocal_function((successor(k) : Rational))) : Real)
+       - (((2 : Rational)
+           * Rational.reciprocal_function(
+                 (successor(1 + k) : Rational))) : Real)
+           by substituting shiftIndex
+}
+
 -- ----------------------------------------------------------------------
 -- The tail 2/(n+1) converges to zero.
 theorem Real.triangular_tail_converges
@@ -343,10 +374,13 @@ theorem Real.triangular_reciprocals_sum_to_two
             = Rational.one                       by ring;
   claim Rational.zero < (successor(0) : Rational)
       since Rational.successor_cast_positive;
+  claim ¬((successor(0) : Rational) = Rational.zero)
+      since Rational.nonzero_of_positive;
   claim cancelS0
         : (successor(0) : Rational)
               * Rational.reciprocal_function((successor(0) : Rational))
-          = Rational.one;
+          = Rational.one
+      since Rational.reciprocal_function_multiplies;
   claim recipS0
         : Rational.reciprocal_function((successor(0) : Rational))
           = Rational.one
@@ -363,12 +397,7 @@ theorem Real.triangular_reciprocals_sum_to_two
         : (2 : Rational)
               * Rational.reciprocal_function((successor(0) : Rational))
           = (2 : Rational)
-      by calc (2 : Rational)
-                  * Rational.reciprocal_function((successor(0) : Rational))
-            = (2 : Rational) * Rational.one
-                  by recipS0
-            = (2 : Rational)
-                  by ring;
+      by substituting recipS0;
   -- Limit algebra: constant head plus vanishing negated tail.
   claim negatedTailConverges
         : Real.SequenceConverges(
@@ -474,7 +503,7 @@ theorem Real.triangular_reciprocals_sum_to_two
                                    * Rational.reciprocal_function(
                                          (successor(1 + k) : Rational)))
                                   : Real),
-                           Real.triangular_term_telescopes,
+                           Real.triangular_term_telescopes_shifted,
                            n)
               = (((2 : Rational)
                   * Rational.reciprocal_function(

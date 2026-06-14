@@ -102,12 +102,27 @@ theorem Real.binomial_theorem (a b : Real) (n : Natural)
                   = Real.zero + Real.one * (Real.one * Real.one)
                   = Real.one
                         by ring;
+        claim oneAddZero : (1 : Natural) + 0 = successor(0)
+            since Natural.one_add;
         calc Real.power(a + b, 0)
            = Real.one
            = Real.zero
              + ((Natural.binomial(0, 0) : Rational) : Real)
                * (Real.power(a, 0) * Real.power(b, Natural.monus(0, 0)))
                  by baseValue
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(0, k) : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b, Natural.monus(0, k))),
+                 successor(0))
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(0, k) : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b, Natural.monus(0, k))),
+                 1 + 0)
+                 by oneAddZero
       }
     case successor(predecessor): {
         -- Head values: both rows start with bⁿ⁺¹-flavored heads that
@@ -664,13 +679,12 @@ theorem Real.binomial_theorem (a b : Real) (n : Natural)
                         1)
                     + Real.partialSum(
                           (j : Natural) ↦
-                              b * (((Natural.binomial(predecessor,
-                                                      successor(j))
+                              b * (((Natural.binomial(predecessor, 1 + j)
                                      : Rational) : Real)
-                                   * (Real.power(a, successor(j))
+                                   * (Real.power(a, 1 + j)
                                       * Real.power(b,
                                             Natural.monus(predecessor,
-                                                          successor(j))))),
+                                                          1 + j)))),
                           predecessor)
                         by Real.partialSum_split(
                                (k : Natural) ↦
@@ -680,7 +694,66 @@ theorem Real.binomial_theorem (a b : Real) (n : Natural)
                                            * Real.power(b,
                                                  Natural.monus(predecessor,
                                                                k)))),
-                               1, predecessor);
+                               1, predecessor)
+                  = Real.partialSum(
+                        (k : Natural) ↦
+                            b * (((Natural.binomial(predecessor, k)
+                                   : Rational) : Real)
+                                 * (Real.power(a, k)
+                                    * Real.power(b,
+                                          Natural.monus(predecessor, k)))),
+                        1)
+                    + Real.partialSum(
+                          (j : Natural) ↦
+                              b * (((Natural.binomial(predecessor,
+                                                      successor(j))
+                                     : Rational) : Real)
+                                   * (Real.power(a, successor(j))
+                                      * Real.power(b,
+                                            Natural.monus(predecessor,
+                                                          successor(j))))),
+                          predecessor)
+                        by Real.partialSum_pointwise(
+                               (j : Natural) ↦
+                                   b * (((Natural.binomial(predecessor, 1 + j)
+                                          : Rational) : Real)
+                                        * (Real.power(a, 1 + j)
+                                           * Real.power(b,
+                                                 Natural.monus(predecessor,
+                                                               1 + j)))),
+                               (j : Natural) ↦
+                                   b * (((Natural.binomial(predecessor,
+                                                           successor(j))
+                                          : Rational) : Real)
+                                        * (Real.power(a, successor(j))
+                                           * Real.power(b,
+                                                 Natural.monus(predecessor,
+                                                               successor(j))))),
+                               (j : Natural) ↦ {
+                                 claim jBridge : (1 : Natural) + j = successor(j)
+                                     since Natural.one_add;
+                                 claim bridged
+                                       : b
+                                         * (((Natural.binomial(predecessor,
+                                                               1 + j)
+                                              : Rational) : Real)
+                                            * (Real.power(a, 1 + j)
+                                               * Real.power(b,
+                                                     Natural.monus(predecessor,
+                                                                   1 + j))))
+                                         = b
+                                           * (((Natural.binomial(predecessor,
+                                                                 successor(j))
+                                                : Rational) : Real)
+                                              * (Real.power(a, successor(j))
+                                                 * Real.power(b,
+                                                       Natural.monus(
+                                                           predecessor,
+                                                           successor(j)))))
+                                     by substituting jBridge;
+                                 bridged
+                               },
+                               predecessor);
         -- Assemble.
         calc Real.power(a + b, successor(predecessor))
            = (a + b) * Real.power(a + b, predecessor)
@@ -1065,6 +1138,61 @@ theorem Real.binomial_theorem (a b : Real) (n : Natural)
                                               successor(j)))),
                    successor(predecessor))
                  by pascalPointwise
+           = Real.partialSum(
+                 (k : Natural) ↦
+                     ((Natural.binomial(successor(predecessor), k)
+                       : Rational) : Real)
+                     * (Real.power(a, k)
+                        * Real.power(b,
+                              Natural.monus(successor(predecessor), k))),
+                 1)
+             + Real.partialSum(
+                   (j : Natural) ↦
+                       ((Natural.binomial(successor(predecessor),
+                                          1 + j) : Rational) : Real)
+                       * (Real.power(a, 1 + j)
+                          * Real.power(b,
+                                Natural.monus(successor(predecessor),
+                                              1 + j))),
+                   successor(predecessor))
+                 by Real.partialSum_pointwise(
+                        (j : Natural) ↦
+                            ((Natural.binomial(successor(predecessor),
+                                               successor(j)) : Rational) : Real)
+                            * (Real.power(a, successor(j))
+                               * Real.power(b,
+                                     Natural.monus(successor(predecessor),
+                                                   successor(j)))),
+                        (j : Natural) ↦
+                            ((Natural.binomial(successor(predecessor),
+                                               1 + j) : Rational) : Real)
+                            * (Real.power(a, 1 + j)
+                               * Real.power(b,
+                                     Natural.monus(successor(predecessor),
+                                                   1 + j))),
+                        (j : Natural) ↦ {
+                          claim jBridge : (1 : Natural) + j = successor(j)
+                              since Natural.one_add;
+                          claim bridged
+                                : ((Natural.binomial(successor(predecessor),
+                                                     successor(j)) : Rational)
+                                   : Real)
+                                  * (Real.power(a, successor(j))
+                                     * Real.power(b,
+                                           Natural.monus(successor(predecessor),
+                                                         successor(j))))
+                                  = ((Natural.binomial(successor(predecessor),
+                                                       1 + j) : Rational)
+                                     : Real)
+                                    * (Real.power(a, 1 + j)
+                                       * Real.power(b,
+                                             Natural.monus(
+                                                 successor(predecessor),
+                                                 1 + j)))
+                              by substituting jBridge;
+                          bridged
+                        },
+                        successor(predecessor))
            = Real.partialSum(
                  (k : Natural) ↦
                      ((Natural.binomial(successor(predecessor), k)

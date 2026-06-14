@@ -175,12 +175,25 @@ theorem Real.exponentialTerm_zero (x : Real)
 
 theorem Real.exponentialTerm_one (x : Real)
         : Real.exponentialTerm(x, 1) = x := {
-  claim (Natural.factorial(1) : Rational) = Rational.one;
+  claim factorialOne : Natural.factorial(1) = 1 since Natural.one_multiply;
+  claim oneCast : (Natural.to_integer(1) : Rational) = Rational.one
+      by calc (Natural.to_integer(1) : Rational)
+            = (Integer.one : Rational)
+                  since Natural.to_integer.one_preserves
+            = Rational.one
+                  since Integer.to_rational.one_preserves;
+  claim factorialOneCast : (Natural.factorial(1) : Rational) = Rational.one
+      by calc (Natural.factorial(1) : Rational)
+            = (Natural.to_integer(1) : Rational) by substituting factorialOne
+            = Rational.one by oneCast;
   claim (Rational.one : Real) = Real.one;
   claim Real.power(x, 1) = x * Real.one;
   calc Real.exponentialTerm(x, 1)
+     = (Rational.reciprocal_function((Natural.factorial(1) : Rational)) : Real)
+       * Real.power(x, 1)
      = (Rational.reciprocal_function(Rational.one) : Real)
        * Real.power(x, 1)
+           by substituting factorialOneCast
      = (Rational.one : Real) * Real.power(x, 1)
            since Rational.reciprocal_function_one
      = Real.one * (x * Real.one)
@@ -237,13 +250,17 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
   obtain ⟨xRoofPositive, xRoofBounds⟩ from xRoofData;
   obtain ⟨K, doubleRoofBelowAbsolute⟩
       from Rational.absolute_value_le_succ_natural(xRoof + xRoof);
-  claim Rational.zero < xRoof + xRoof;
+  claim Rational.zero < xRoof + xRoof
+      by calc Rational.zero
+            = Rational.zero + Rational.zero by ring
+            < xRoof + xRoof
+                since Rational.LessThan.add_strict_strict;
   claim Rational.zero ≤ xRoof + xRoof since Rational.LessThan.weaken;
   claim Rational.IsNonneg(xRoof + xRoof)
       since Rational.IsNonneg_of_LessOrEqual_zero;
   claim doubleRoofAbsolute : abs(xRoof + xRoof) = xRoof + xRoof
       since Rational.absolute_value_when_nonneg;
-  claim doubleRoofBelow : xRoof + xRoof ≤ (successor(K) : Rational)
+  claim xRoof + xRoof ≤ (successor(K) : Rational)
       by substituting doubleRoofAbsolute;
   -- Past K, one series step multiplies the term by at most 1/2.
   claim ratioBound
@@ -474,7 +491,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
          };
   -- The geometric roof: partial sums of (1/2)ᵏ never exceed 2.
   claim Rational.zero < Rational.one_half by Rational.one_half_positive;
-  claim halfRealPositive : Real.zero < (Rational.one_half : Real)
+  claim Real.zero < (Rational.one_half : Real)
       since Rational.to_real.positive_preserves;
   claim Real.zero ≤ (Rational.one_half : Real) since Real.LessThan.weaken;
   claim halvesSum
@@ -541,8 +558,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                   = (Rational.one_half : Real) + (Rational.one_half : Real)
                   = Real.one
                         by halvesSum;
-        claim scaledBound
-              : (Rational.one_half : Real)
+        claim (Rational.one_half : Real)
                 * Real.partialSum(
                       (k : Natural) ↦ Real.power((Rational.one_half : Real), k),
                       c)
@@ -588,7 +604,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
   claim Rational.zero < Rational.one;
   claim Real.zero < (Rational.one : Real)
       since Rational.to_real.positive_preserves;
-  claim onePlusOnePositive : Real.zero < Real.one + Real.one
+  claim Real.zero < Real.one + Real.one
       by calc Real.zero
             < (Rational.one : Real)
             = Real.one + Real.zero
@@ -679,8 +695,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                   by {
                     take j : Natural;
                     take _ : successor(j) ≤ c;
-                    claim decay
-                          : abs(Real.exponentialTerm(x, j + K))
+                    claim abs(Real.exponentialTerm(x, j + K))
                             ≤ abs(Real.exponentialTerm(x, K))
                               * Real.power((Rational.one_half : Real), j)
                         by tailDecay(j);
@@ -700,8 +715,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                         since Real.power_nonneg;
                     done
                   };
-              claim geometricSumNonneg
-                    : Real.zero
+              claim Real.zero
                       ≤ Real.partialSum(
                             (j : Natural)
                               ↦ Real.power((Rational.one_half : Real), j), c)
@@ -709,14 +723,12 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                          (j : Natural)
                            ↦ Real.power((Rational.one_half : Real), j),
                          c, powersNonneg);
-              claim geometricSumBelow
-                    : Real.partialSum(
+              claim Real.partialSum(
                           (j : Natural)
                             ↦ Real.power((Rational.one_half : Real), j), c)
                       ≤ Real.one + Real.one
                   by geometricRoof(c);
-              claim windowBound
-                    : Real.partialSum(
+              claim Real.partialSum(
                           (j : Natural)
                             ↦ abs(Real.exponentialTerm(x, K + j)), c)
                       ≤ abs(Real.exponentialTerm(x, K))
@@ -1011,9 +1023,17 @@ theorem Real.e_above_two : Real.one + Real.one < Real.e := {
                   by zeroCast
             = Rational.one + Rational.one
                   by ring;
+  claim factorialOne : Natural.factorial(1) = 1 since Natural.one_multiply;
+  claim factorialTwo : Natural.factorial(2) = 2
+      by calc Natural.factorial(2)
+            = 2 * Natural.factorial(1)
+            = 2 * 1 by substituting factorialOne
+            = 2 by ring;
   claim factorialTwoCast
         : (Natural.factorial(2) : Rational) = Rational.one + Rational.one
-      by castTwo;
+      by calc (Natural.factorial(2) : Rational)
+            = ((2 : Natural) : Rational) by substituting factorialTwo
+            = Rational.one + Rational.one by castTwo;
   claim Rational.zero < (Natural.factorial(2) : Rational)
       by Rational.factorial_cast_positive(2);
   claim ¬((Natural.factorial(2) : Rational) = Rational.zero)
@@ -1104,7 +1124,7 @@ theorem Real.e_above_two : Real.one + Real.one < Real.e := {
   claim Rational.zero < Rational.one;
   claim Real.zero < (Rational.one : Real)
       since Rational.to_real.positive_preserves;
-  claim zeroLessOne : Real.zero < Real.one
+  claim Real.zero < Real.one
       by calc Real.zero
             < (Rational.one : Real)
             = Real.one;
