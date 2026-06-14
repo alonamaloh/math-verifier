@@ -209,36 +209,46 @@ ExpressionPointer abstractStructuralOccurrenceMasked(
         }
         return expression;
     }
+    // Recursive cases sequence the sub-calls into named locals before
+    // passing to make*: each sub-call mutates `positionCounter`, and
+    // function-argument evaluation order is unspecified in C++ — passing
+    // them directly would let the compiler reorder, swapping the
+    // position indices between children and breaking the mask.
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        auto newDomain = abstractStructuralOccurrenceMasked(
+            pi->domain, target, currentDepth, positionCounter, mask);
+        auto newCodomain = abstractStructuralOccurrenceMasked(
+            pi->codomain, target, currentDepth + 1, positionCounter, mask);
         return makePi(pi->displayHint,
-            abstractStructuralOccurrenceMasked(pi->domain, target,
-                currentDepth, positionCounter, mask),
-            abstractStructuralOccurrenceMasked(pi->codomain, target,
-                currentDepth + 1, positionCounter, mask));
+            std::move(newDomain), std::move(newCodomain));
     }
     if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        auto newDomain = abstractStructuralOccurrenceMasked(
+            lambda->domain, target, currentDepth, positionCounter, mask);
+        auto newBody = abstractStructuralOccurrenceMasked(
+            lambda->body, target, currentDepth + 1, positionCounter, mask);
         return makeLambda(lambda->displayHint,
-            abstractStructuralOccurrenceMasked(lambda->domain, target,
-                currentDepth, positionCounter, mask),
-            abstractStructuralOccurrenceMasked(lambda->body, target,
-                currentDepth + 1, positionCounter, mask));
+            std::move(newDomain), std::move(newBody));
     }
     if (auto* application =
             std::get_if<Application>(&expression->node)) {
-        return makeApplication(
-            abstractStructuralOccurrenceMasked(application->function,
-                target, currentDepth, positionCounter, mask),
-            abstractStructuralOccurrenceMasked(application->argument,
-                target, currentDepth, positionCounter, mask));
+        auto newFn = abstractStructuralOccurrenceMasked(
+            application->function, target, currentDepth,
+            positionCounter, mask);
+        auto newArg = abstractStructuralOccurrenceMasked(
+            application->argument, target, currentDepth,
+            positionCounter, mask);
+        return makeApplication(std::move(newFn), std::move(newArg));
     }
     if (auto* let = std::get_if<Let>(&expression->node)) {
+        auto newType = abstractStructuralOccurrenceMasked(
+            let->type, target, currentDepth, positionCounter, mask);
+        auto newValue = abstractStructuralOccurrenceMasked(
+            let->value, target, currentDepth, positionCounter, mask);
+        auto newBody = abstractStructuralOccurrenceMasked(
+            let->body, target, currentDepth + 1, positionCounter, mask);
         return makeLet(let->displayHint,
-            abstractStructuralOccurrenceMasked(let->type, target,
-                currentDepth, positionCounter, mask),
-            abstractStructuralOccurrenceMasked(let->value, target,
-                currentDepth, positionCounter, mask),
-            abstractStructuralOccurrenceMasked(let->body, target,
-                currentDepth + 1, positionCounter, mask));
+            std::move(newType), std::move(newValue), std::move(newBody));
     }
     return expression;
 }
