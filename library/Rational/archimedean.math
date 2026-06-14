@@ -92,7 +92,12 @@ theorem Rational.from_natural_IsNonneg (n : Natural)
 -- Rational sum.
 theorem Rational.successor_cast (n : Natural)
         : (successor(n) : Rational) = (1 : Rational) + (n : Rational) :=
-  Integer.to_rational.add_preserves(Integer.one, (n : Integer))
+  -- (successor n : Integer) no longer folds to Integer.one + (n : Integer)
+  -- on its own (Natural.add opaque); bridge it, then split the cast.
+  calc (successor(n) : Rational)
+     = ((Integer.one + (n : Integer)) : Rational)                          by substituting Natural.to_integer.successor_preserves
+     = ((Integer.one : Integer) : Rational) + ((n : Integer) : Rational)   by Integer.to_rational.add_preserves
+     = (1 : Rational) + (n : Rational)
 
 -- 0 < (successor(n) : Rational). 0 < 1 (strict) ≤ 1 + (n : R) = succ(n).
 theorem Rational.successor_cast_positive (n : Natural)
@@ -113,10 +118,17 @@ theorem Rational.successor_cast_positive (n : Natural)
 theorem Rational.successor_successor_cast (n : Natural)
         : (successor(successor(n)) : Rational)
           = (1 : Rational) + (1 : Rational) + (n : Rational) :=
-  calc (successor(successor(n)) : Rational)
-     = ((Integer.one + Integer.one : Integer) : Rational) + (n : Rational)
-            by Integer.to_rational.add_preserves
-     = (1 : Rational) + (1 : Rational) + (n : Rational)
+  {
+    claim castSuccessorSuccessor : (successor(successor(n)) : Integer) = Integer.one + Integer.one + (n : Integer)
+        by calc (successor(successor(n)) : Integer)
+              = Integer.one + (successor(n) : Integer)              by Natural.to_integer.successor_preserves
+              = Integer.one + (Integer.one + (n : Integer))         by substituting Natural.to_integer.successor_preserves
+              = Integer.one + Integer.one + (n : Integer)           by ring;
+    calc (successor(successor(n)) : Rational)
+       = ((Integer.one + Integer.one + (n : Integer)) : Rational)            by substituting castSuccessorSuccessor
+       = ((Integer.one + Integer.one : Integer) : Rational) + (n : Rational) by Integer.to_rational.add_preserves
+       = (1 : Rational) + (1 : Rational) + (n : Rational)
+  }
 
 
 -- ----------------------------------------------------------------------

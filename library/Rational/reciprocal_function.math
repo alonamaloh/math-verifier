@@ -98,20 +98,31 @@ theorem Rational.reciprocal_at_natural_pair_positive_shift
                 denominatorPredecessor)
             = Rational.fraction((successor(denominatorPredecessor) : Integer),
                        shiftPredecessor)
-  | zero, shiftPredecessor, denominatorPredecessor =>
-      -- a = 0, so a + succ(shiftPred) = succ(shiftPred). The
-      -- pattern reduces to (succ(shiftPred), 0, d), which returns
-      -- mk(make(succ d : I, shiftPred)) by the first nonzero case.
-      reflexivity(
-          Rational,
-          Rational.fraction((successor(denominatorPredecessor) : Integer),
-                   shiftPredecessor))
-  | successor(predecessor), shiftPredecessor, denominatorPredecessor =>
-      -- (succ(predecessor) + succ(shiftPred), succ(predecessor), d)
-      -- reduces by the recursive case to
-      -- (predecessor + succ(shiftPred), predecessor, d). Apply IH.
-      Rational.reciprocal_at_natural_pair_positive_shift(
-          predecessor, shiftPredecessor, denominatorPredecessor)
+  | zero, shiftPredecessor, denominatorPredecessor => {
+      -- a = 0, so a + succ(shiftPred) = succ(shiftPred). With Natural.add
+      -- opaque the leading argument no longer folds on its own, so we
+      -- bridge it; then the pattern reduces to (succ(shiftPred), 0, d),
+      -- which returns mk(make(succ d : I, shiftPred)) by the first nonzero case.
+      claim reduceArgument : 0 + successor(shiftPredecessor) = successor(shiftPredecessor)
+          by Natural.zero_add;
+      calc Rational.reciprocal_at_natural_pair(0 + successor(shiftPredecessor), 0, denominatorPredecessor)
+         = Rational.reciprocal_at_natural_pair(successor(shiftPredecessor), 0, denominatorPredecessor)   by substituting reduceArgument
+         = Rational.fraction((successor(denominatorPredecessor) : Integer), shiftPredecessor)
+    }
+  | successor(predecessor), shiftPredecessor, denominatorPredecessor => {
+      -- (succ(predecessor) + succ(shiftPred), succ(predecessor), d) — the
+      -- leading sum is now opaque, so bridge it to succ(predecessor +
+      -- succ(shiftPred)); the pattern then reduces to (predecessor +
+      -- succ(shiftPred), predecessor, d), which the IH closes.
+      claim reduceArgument : successor(predecessor) + successor(shiftPredecessor) = successor(predecessor + successor(shiftPredecessor))
+          by Natural.successor_add;
+      let recursiveResult : Rational.reciprocal_at_natural_pair(predecessor + successor(shiftPredecessor), predecessor, denominatorPredecessor) = Rational.fraction((successor(denominatorPredecessor) : Integer), shiftPredecessor)
+          := Rational.reciprocal_at_natural_pair_positive_shift(predecessor, shiftPredecessor, denominatorPredecessor);
+      calc Rational.reciprocal_at_natural_pair(successor(predecessor) + successor(shiftPredecessor), successor(predecessor), denominatorPredecessor)
+         = Rational.reciprocal_at_natural_pair(successor(predecessor + successor(shiftPredecessor)), successor(predecessor), denominatorPredecessor)   by substituting reduceArgument
+         = Rational.reciprocal_at_natural_pair(predecessor + successor(shiftPredecessor), predecessor, denominatorPredecessor)
+         = Rational.fraction((successor(denominatorPredecessor) : Integer), shiftPredecessor)                                                          by recursiveResult
+    }
 
 theorem Rational.reciprocal_at_natural_pair_negative_shift
         : (anchorValue shiftPredecessor denominatorPredecessor : Natural)
@@ -121,14 +132,23 @@ theorem Rational.reciprocal_at_natural_pair_negative_shift
                 denominatorPredecessor)
             = Rational.fraction(-(successor(denominatorPredecessor) : Integer),
                        shiftPredecessor)
-  | zero, shiftPredecessor, denominatorPredecessor =>
-      reflexivity(
-          Rational,
-          Rational.fraction(-(successor(denominatorPredecessor) : Integer),
-                   shiftPredecessor))
-  | successor(predecessor), shiftPredecessor, denominatorPredecessor =>
-      Rational.reciprocal_at_natural_pair_negative_shift(
-          predecessor, shiftPredecessor, denominatorPredecessor)
+  | zero, shiftPredecessor, denominatorPredecessor => {
+      claim reduceArgument : 0 + successor(shiftPredecessor) = successor(shiftPredecessor)
+          by Natural.zero_add;
+      calc Rational.reciprocal_at_natural_pair(0, 0 + successor(shiftPredecessor), denominatorPredecessor)
+         = Rational.reciprocal_at_natural_pair(0, successor(shiftPredecessor), denominatorPredecessor)   by substituting reduceArgument
+         = Rational.fraction(-(successor(denominatorPredecessor) : Integer), shiftPredecessor)
+    }
+  | successor(predecessor), shiftPredecessor, denominatorPredecessor => {
+      claim reduceArgument : successor(predecessor) + successor(shiftPredecessor) = successor(predecessor + successor(shiftPredecessor))
+          by Natural.successor_add;
+      let recursiveResult : Rational.reciprocal_at_natural_pair(predecessor, predecessor + successor(shiftPredecessor), denominatorPredecessor) = Rational.fraction(-(successor(denominatorPredecessor) : Integer), shiftPredecessor)
+          := Rational.reciprocal_at_natural_pair_negative_shift(predecessor, shiftPredecessor, denominatorPredecessor);
+      calc Rational.reciprocal_at_natural_pair(successor(predecessor), successor(predecessor) + successor(shiftPredecessor), denominatorPredecessor)
+         = Rational.reciprocal_at_natural_pair(successor(predecessor), successor(predecessor + successor(shiftPredecessor)), denominatorPredecessor)   by substituting reduceArgument
+         = Rational.reciprocal_at_natural_pair(predecessor, predecessor + successor(shiftPredecessor), denominatorPredecessor)
+         = Rational.fraction(-(successor(denominatorPredecessor) : Integer), shiftPredecessor)                                                         by recursiveResult
+    }
 
 -- ----------------------------------------------------------------------
 -- Respect at the natural-pair level: integer-equivalent pairs give

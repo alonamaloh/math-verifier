@@ -52,12 +52,27 @@ theorem Rational.one_half_doubled
           RationalRepresentative.make(Integer.one, 1),
           RationalRepresentative.make(Integer.one, 1)),
       RationalRepresentative.make(Integer.one, 0),
-      -- Cross-multiplication equivalence at Integer level. Both sides
-      -- reduce to (4 : Integer) after Natural.to_integer.multiply_preserves
-      -- and Integer.multiply_identity.
-      reflexivity(Integer,
-          Integer.one * (successor(1) : Integer)
-          + Integer.one * (successor(1) : Integer)))
+      -- Cross-multiplication equivalence at Integer level. With Natural.add
+      -- opaque the right denominator `successor(1 + 1·succ(1))` no longer
+      -- computes to 4, so we bridge it to the factored product, make the
+      -- numeral casts concrete (succ(1) ↦ 1 + 1), and let ring fold.
+      {
+        claim denominatorFactors : successor(1 + 1 * successor(1)) = successor(1) * successor(1)
+            by Rational.added_denominator_factors;
+        claim splitDenominator : (successor(1) * successor(1) : Integer) = (successor(1) : Integer) * (successor(1) : Integer)
+            by Natural.to_integer.multiply_preserves;
+        claim castTwo : (successor(1) : Integer) = Integer.one + Integer.one
+            by calc (successor(1) : Integer)
+                  = Integer.one + (1 : Integer)        by Natural.to_integer.successor_preserves
+                  = Integer.one + Integer.one          by substituting Natural.to_integer.one_preserves;
+        calc (Integer.one * (successor(1) : Integer) + Integer.one * (successor(1) : Integer)) * (successor(0) : Integer)
+           = (Integer.one * (Integer.one + Integer.one) + Integer.one * (Integer.one + Integer.one)) * (successor(0) : Integer)  by substituting castTwo
+           = (Integer.one * (Integer.one + Integer.one) + Integer.one * (Integer.one + Integer.one)) * Integer.one              by substituting Natural.to_integer.one_preserves
+           = Integer.one * ((Integer.one + Integer.one) * (Integer.one + Integer.one))                                         by ring
+           = Integer.one * ((successor(1) : Integer) * (successor(1) : Integer))                                               by substituting castTwo
+           = Integer.one * (successor(1) * successor(1) : Integer)                                                             by substituting splitDenominator
+           = Integer.one * (successor(1 + 1 * successor(1)) : Integer)                                                         by substituting denominatorFactors
+      })
 
 -- Halve a rational: q * (1/2).
 definition Rational.halve (q : Rational) : Rational :=
