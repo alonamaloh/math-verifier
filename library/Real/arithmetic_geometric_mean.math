@@ -613,11 +613,12 @@ theorem Real.means_inequality_predecessor (m : Natural)
                    },
                extendedNonneg);
     -- The augmented sum telescopes to (m+1)·A.
-    claim indexEquation : successor(m) = m + 1;
+    claim indexEquation : successor(m) = m + 1 by Natural.add_one(m);
+    let successorCastReal : Real := ((successor(m) : Rational) : Real);
     claim succCast
-          : ((successor(m) : Rational) : Real)
+          : successorCastReal
             = Real.one + ((m : Rational) : Real)
-        by calc ((successor(m) : Rational) : Real)
+        by calc successorCastReal
               = (((1 : Rational) + (m : Rational)) : Real)
                     since Rational.successor_cast
               = (((1 : Rational)) : Real) + ((m : Rational) : Real)
@@ -626,12 +627,22 @@ theorem Real.means_inequality_predecessor (m : Natural)
                     since Real.from_natural_one_preserves;
     claim shiftedAgree
           : (j : Natural)
-            → ((cases successor(j) {
+            → ((cases 1 + j {
                   | zero => Real.partialSum(s, m)
                   | successor(j2) => ((m : Rational) : Real) * s(j2)
                 } : Real))
               = ((m : Rational) : Real) * s(j)
-        by (j : Natural) ↦ reflexivity(Real, ((m : Rational) : Real) * s(j));
+        by (j : Natural) ↦
+             calc ((cases 1 + j {
+                      | zero => Real.partialSum(s, m)
+                      | successor(j2) => ((m : Rational) : Real) * s(j2)
+                    } : Real))
+                = ((cases successor(j) {
+                      | zero => Real.partialSum(s, m)
+                      | successor(j2) => ((m : Rational) : Real) * s(j2)
+                    } : Real))
+                      by substituting Natural.one_add(j)
+                = ((m : Rational) : Real) * s(j);
     claim sumValue
           : Real.partialSum(
                 (k : Natural) ↦
@@ -640,7 +651,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                       | successor(j) => ((m : Rational) : Real) * s(j)
                     },
                 successor(m))
-            = ((successor(m) : Rational) : Real) * Real.partialSum(s, m)
+            = successorCastReal * Real.partialSum(s, m)
         by calc Real.partialSum(
                     (k : Natural) ↦
                         cases k {
@@ -686,7 +697,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                                     1)
                                 + Real.partialSum(
                                       (j : Natural) ↦
-                                          cases successor(j) {
+                                          cases 1 + j {
                                             | zero => Real.partialSum(s, m)
                                             | successor(j2) =>
                                                 ((m : Rational) : Real)
@@ -704,7 +715,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                       claim tailForm
                             : Real.partialSum(
                                   (j : Natural) ↦
-                                      cases successor(j) {
+                                      cases 1 + j {
                                         | zero => Real.partialSum(s, m)
                                         | successor(j2) =>
                                             ((m : Rational) : Real) * s(j2)
@@ -716,7 +727,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                                     m)
                           by Real.partialSum_pointwise(
                                  (j : Natural) ↦
-                                     cases successor(j) {
+                                     cases 1 + j {
                                        | zero => Real.partialSum(s, m)
                                        | successor(j2) =>
                                            ((m : Rational) : Real) * s(j2)
@@ -743,7 +754,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                                1)
                            + Real.partialSum(
                                  (j : Natural) ↦
-                                     cases successor(j) {
+                                     cases 1 + j {
                                        | zero => Real.partialSum(s, m)
                                        | successor(j2) =>
                                            ((m : Rational) : Real) * s(j2)
@@ -777,7 +788,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                 + ((m : Rational) : Real) * Real.partialSum(s, m)
               = (Real.one + ((m : Rational) : Real)) * Real.partialSum(s, m)
                     by ring
-              = ((successor(m) : Rational) : Real) * Real.partialSum(s, m)
+              = successorCastReal * Real.partialSum(s, m)
                     by succCast;
     -- The augmented product telescopes to A·mᵐ·Π.
     claim productValue
@@ -815,7 +826,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                     1)
                 * Real.partialProduct(
                       (j : Natural) ↦
-                          cases successor(j) {
+                          cases 1 + j {
                             | zero => Real.partialSum(s, m)
                             | successor(j2) =>
                                 ((m : Rational) : Real) * s(j2)
@@ -841,7 +852,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                       m)
                     by Real.partialProduct_pointwise(
                            (j : Natural) ↦
-                               cases successor(j) {
+                               cases 1 + j {
                                  | zero => Real.partialSum(s, m)
                                  | successor(j2) =>
                                      ((m : Rational) : Real) * s(j2)
@@ -908,7 +919,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                     successor(m))
                     by applied
               = Real.power(
-                    ((successor(m) : Rational) : Real) * Real.partialSum(s, m),
+                    successorCastReal * Real.partialSum(s, m),
                     successor(m))
                     by sumValue
               = Real.power(((successor(m) : Rational) : Real), successor(m))
@@ -937,11 +948,29 @@ theorem Real.means_inequality_predecessor (m : Natural)
                 claim Real.zero < (Rational.one : Real)
                     since Rational.to_real.positive_preserves;
                 claim Real.one ≤ Real.one since Real.LessOrEqual.reflexive;
-                claim trivialValue
+                claim powerValue
+                      : Real.power(((0 : Rational) : Real), 0) = Real.one;
+                claim productValue : Real.partialProduct(s, 0) = Real.one;
+                claim leftValue
                       : Real.power(((0 : Rational) : Real), 0)
                         * Real.partialProduct(s, 0)
-                        = Real.one;
-                done by substituting trivialValue
+                        = Real.one
+                    by calc Real.power(((0 : Rational) : Real), 0)
+                            * Real.partialProduct(s, 0)
+                          = Real.one * Real.partialProduct(s, 0)
+                                by substituting powerValue
+                          = Real.one * Real.one
+                                by substituting productValue
+                          = Real.one
+                                by ring;
+                claim rightValue
+                      : Real.power(Real.partialSum(s, 0), 0) = Real.one;
+                calc Real.power(((0 : Rational) : Real), 0)
+                     * Real.partialProduct(s, 0)
+                   = Real.one
+                         by leftValue
+                   ≤ Real.power(Real.partialSum(s, 0), 0)
+                         by substituting rightValue
               }
             | successor(mPredecessor) => {
                 claim lastTermZero : s(mPredecessor) = Real.zero
@@ -1035,11 +1064,13 @@ theorem Natural.le_doubling (n : Natural) : n ≤ Natural.doubling(n) :=
               : successor(predecessor) ≤ successor(Natural.doubling(predecessor))
             since Natural.successor_less_or_equal_successor;
         claim grown
-              : successor(Natural.doubling(predecessor))
+              : 1 + Natural.doubling(predecessor)
                 ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
             since Natural.le_add_preserves_left;
         calc successor(predecessor)
            ≤ successor(Natural.doubling(predecessor))    by stepped
+           = 1 + Natural.doubling(predecessor)
+                 by Natural.one_add(Natural.doubling(predecessor))
            ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
                  by grown
       }
@@ -1052,11 +1083,19 @@ theorem Real.means_inequality_downward (difference : Natural)
           → Real.MeansInequalityAt(n) :=
   by_induction on difference with IH {
     case zero:
-        (n : Natural) (atIndex : Real.MeansInequalityAt(0 + n)) ↦ atIndex
+        (n : Natural) (atIndex : Real.MeansInequalityAt(0 + n)) ↦ {
+          claim Real.MeansInequalityAt(n) by substituting Natural.zero_add(n);
+          done
+        }
     case successor(predecessor):
         (n : Natural)
-        (atTop : Real.MeansInequalityAt(successor(predecessor) + n)) ↦
-          IH(n, Real.means_inequality_predecessor(predecessor + n, atTop))
+        (atTop : Real.MeansInequalityAt(successor(predecessor) + n)) ↦ {
+          claim atShifted : Real.MeansInequalityAt(successor(predecessor + n))
+              by substituting Natural.successor_add(predecessor, n);
+          claim atLower : Real.MeansInequalityAt(predecessor + n)
+              by Real.means_inequality_predecessor(predecessor + n, atShifted);
+          IH(n, atLower)
+        }
   }
 
 -- ----------------------------------------------------------------------

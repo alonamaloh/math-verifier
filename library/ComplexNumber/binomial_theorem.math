@@ -176,6 +176,8 @@ theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
                          * one)
                   = one
                         by ring;
+        claim oneAddZero : (1 : Natural) + 0 = successor(0)
+            since Natural.one_add;
         calc ComplexNumber.power(a + b, 0)
            = one
            = zero
@@ -183,6 +185,19 @@ theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
                * (ComplexNumber.power(a, 0)
                   * ComplexNumber.power(b, Natural.monus(0, 0)))
                  by baseValue
+           = ComplexNumber.partialSum(
+                 (k : Natural) ↦
+                     ComplexNumber.binomialCoefficient(0, k)
+                     * (ComplexNumber.power(a, k)
+                        * ComplexNumber.power(b, Natural.monus(0, k))),
+                 successor(0))
+           = ComplexNumber.partialSum(
+                 (k : Natural) ↦
+                     ComplexNumber.binomialCoefficient(0, k)
+                     * (ComplexNumber.power(a, k)
+                        * ComplexNumber.power(b, Natural.monus(0, k))),
+                 1 + 0)
+                 by oneAddZero
       }
     case successor(predecessor): {
         let zero : ComplexNumber :=
@@ -713,11 +728,10 @@ theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
                     + ComplexNumber.partialSum(
                           (j : Natural) ↦
                               b * (ComplexNumber.binomialCoefficient(predecessor,
-                                       successor(j))
-                                   * (ComplexNumber.power(a, successor(j))
+                                       1 + j)
+                                   * (ComplexNumber.power(a, 1 + j)
                                       * ComplexNumber.power(b,
-                                            Natural.monus(predecessor,
-                                                          successor(j))))),
+                                            Natural.monus(predecessor, 1 + j)))),
                           predecessor)
                         by ComplexNumber.partialSum_split(
                                (k : Natural) ↦
@@ -725,7 +739,58 @@ theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
                                         * (ComplexNumber.power(a, k)
                                            * ComplexNumber.power(b,
                                                  Natural.monus(predecessor, k)))),
-                               1, predecessor);
+                               1, predecessor)
+                  = ComplexNumber.partialSum(
+                        (k : Natural) ↦
+                            b * (ComplexNumber.binomialCoefficient(predecessor, k)
+                                 * (ComplexNumber.power(a, k)
+                                    * ComplexNumber.power(b,
+                                          Natural.monus(predecessor, k)))),
+                        1)
+                    + ComplexNumber.partialSum(
+                          (j : Natural) ↦
+                              b * (ComplexNumber.binomialCoefficient(predecessor,
+                                       successor(j))
+                                   * (ComplexNumber.power(a, successor(j))
+                                      * ComplexNumber.power(b,
+                                            Natural.monus(predecessor,
+                                                          successor(j))))),
+                          predecessor)
+                        by ComplexNumber.partialSum_pointwise(
+                               (j : Natural) ↦
+                                   b * (ComplexNumber.binomialCoefficient(predecessor,
+                                            1 + j)
+                                        * (ComplexNumber.power(a, 1 + j)
+                                           * ComplexNumber.power(b,
+                                                 Natural.monus(predecessor, 1 + j)))),
+                               (j : Natural) ↦
+                                   b * (ComplexNumber.binomialCoefficient(predecessor,
+                                            successor(j))
+                                        * (ComplexNumber.power(a, successor(j))
+                                           * ComplexNumber.power(b,
+                                                 Natural.monus(predecessor,
+                                                               successor(j))))),
+                               (j : Natural) ↦ {
+                                 claim jBridge : (1 : Natural) + j = successor(j)
+                                     since Natural.one_add;
+                                 claim bridged
+                                       : b
+                                         * (ComplexNumber.binomialCoefficient(predecessor,
+                                                1 + j)
+                                            * (ComplexNumber.power(a, 1 + j)
+                                               * ComplexNumber.power(b,
+                                                     Natural.monus(predecessor, 1 + j))))
+                                         = b
+                                           * (ComplexNumber.binomialCoefficient(
+                                                  predecessor, successor(j))
+                                              * (ComplexNumber.power(a, successor(j))
+                                                 * ComplexNumber.power(b,
+                                                       Natural.monus(predecessor,
+                                                                     successor(j)))))
+                                     by substituting jBridge;
+                                 bridged
+                               },
+                               predecessor);
         -- Assemble.
         calc ComplexNumber.power(a + b, successor(predecessor))
            = (a + b) * ComplexNumber.power(a + b, predecessor)
@@ -1055,6 +1120,55 @@ theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
                                 Natural.monus(successor(predecessor), successor(j)))),
                    successor(predecessor))
                  by pascalPointwise
+           = ComplexNumber.partialSum(
+                 (k : Natural) ↦
+                     ComplexNumber.binomialCoefficient(successor(predecessor), k)
+                     * (ComplexNumber.power(a, k)
+                        * ComplexNumber.power(b,
+                              Natural.monus(successor(predecessor), k))),
+                 1)
+             + ComplexNumber.partialSum(
+                   (j : Natural) ↦
+                       ComplexNumber.binomialCoefficient(successor(predecessor),
+                           1 + j)
+                       * (ComplexNumber.power(a, 1 + j)
+                          * ComplexNumber.power(b,
+                                Natural.monus(successor(predecessor), 1 + j))),
+                   successor(predecessor))
+                 by ComplexNumber.partialSum_pointwise(
+                        (j : Natural) ↦
+                            ComplexNumber.binomialCoefficient(successor(predecessor),
+                                successor(j))
+                            * (ComplexNumber.power(a, successor(j))
+                               * ComplexNumber.power(b,
+                                     Natural.monus(successor(predecessor),
+                                                   successor(j)))),
+                        (j : Natural) ↦
+                            ComplexNumber.binomialCoefficient(successor(predecessor),
+                                1 + j)
+                            * (ComplexNumber.power(a, 1 + j)
+                               * ComplexNumber.power(b,
+                                     Natural.monus(successor(predecessor), 1 + j))),
+                        (j : Natural) ↦ {
+                          claim jBridge : (1 : Natural) + j = successor(j)
+                              since Natural.one_add;
+                          claim bridged
+                                : ComplexNumber.binomialCoefficient(successor(predecessor),
+                                      successor(j))
+                                  * (ComplexNumber.power(a, successor(j))
+                                     * ComplexNumber.power(b,
+                                           Natural.monus(successor(predecessor),
+                                                         successor(j))))
+                                  = ComplexNumber.binomialCoefficient(successor(predecessor),
+                                        1 + j)
+                                    * (ComplexNumber.power(a, 1 + j)
+                                       * ComplexNumber.power(b,
+                                             Natural.monus(successor(predecessor),
+                                                           1 + j)))
+                              by substituting jBridge;
+                          bridged
+                        },
+                        successor(predecessor))
            = ComplexNumber.partialSum(
                  (k : Natural) ↦
                      ComplexNumber.binomialCoefficient(successor(predecessor), k)
