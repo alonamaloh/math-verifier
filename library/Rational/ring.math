@@ -50,21 +50,26 @@ theorem Rational.add_commutative_at_representatives
                 Rational.add_representatives(rep1, rep2),
                 Rational.add_representatives(rep2, rep1))
   | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2) =>
+    RationalRepresentative.make(n2, d2) => {
       -- Goal:
       --   (n1·s_d2 + n2·s_d1) · t(succ(d1 + d2·succ(d1)))
       -- = (n2·s_d1 + n1·s_d2) · t(succ(d2 + d1·succ(d2)))
-      -- where t = Natural.to_integer, s_X = t(succ(X)). The kernel
-      -- reduces `successor(d_a + d_b·succ(d_a))` to `succ(d_b)·succ(d_a)`
-      -- (multiply pattern picks the *first* factor's predecessor and
-      -- shoves it into the second's `Natural.add`). So the equality
-      -- denominators factor as `succ(d2)·succ(d1)` (LHS) and
-      -- `succ(d1)·succ(d2)` (RHS). The calc then commutes the numerator
-      -- and the lifted denominator.
-      calc (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d2) * successor(d1) : Integer)
+      -- where t = Natural.to_integer, s_X = t(succ(X)). With `Natural.add`
+      -- opaque the stored denominators no longer fold to the factored
+      -- products on their own, so we bridge each across
+      -- `added_denominator_factors`; in between, the calc commutes the
+      -- numerator and the lifted denominator.
+      claim leftDenominator : successor(d1 + d2 * successor(d1)) = successor(d2) * successor(d1)
+          by Rational.added_denominator_factors;
+      claim rightDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
+          by Rational.added_denominator_factors;
+      calc (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d1 + d2 * successor(d1)) : Integer)
+         = (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d2) * successor(d1) : Integer)         by substituting leftDenominator
          = (n2 * (successor(d1) : Integer) + n1 * (successor(d2) : Integer)) * ((successor(d2) : Integer) * (successor(d1) : Integer))
          = (n2 * (successor(d1) : Integer) + n1 * (successor(d2) : Integer)) * ((successor(d1) : Integer) * (successor(d2) : Integer))
          = (n2 * (successor(d1) : Integer) + n1 * (successor(d2) : Integer)) * (successor(d1) * successor(d2) : Integer)
+         = (n2 * (successor(d1) : Integer) + n1 * (successor(d2) : Integer)) * (successor(d2 + d1 * successor(d2)) : Integer)    by substituting rightDenominator
+    }
 
 theorem Rational.add_commutative (x y : Rational)
         : x + y = y + x :=
@@ -84,11 +89,18 @@ theorem Rational.multiply_commutative_at_representatives
                 Rational.multiply_representatives(rep1, rep2),
                 Rational.multiply_representatives(rep2, rep1))
   | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2) =>
-      calc n1 * n2 * (successor(d2) * successor(d1) : Integer)
+    RationalRepresentative.make(n2, d2) => {
+      claim leftDenominator : successor(d1 + d2 * successor(d1)) = successor(d2) * successor(d1)
+          by Rational.added_denominator_factors;
+      claim rightDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
+          by Rational.added_denominator_factors;
+      calc n1 * n2 * (successor(d1 + d2 * successor(d1)) : Integer)
+         = n1 * n2 * (successor(d2) * successor(d1) : Integer)                  by substituting leftDenominator
          = n2 * n1 * ((successor(d2) : Integer) * (successor(d1) : Integer))
          = n2 * n1 * ((successor(d1) : Integer) * (successor(d2) : Integer))
          = n2 * n1 * (successor(d1) * successor(d2) : Integer)
+         = n2 * n1 * (successor(d2 + d1 * successor(d2)) : Integer)             by substituting rightDenominator
+    }
 
 theorem Rational.multiply_commutative (x y : Rational)
         : x * y = y * x :=
@@ -118,6 +130,7 @@ theorem Rational.add_zero_at_representatives_natural
   calc (n * (successor(0) : Integer) + Integer.zero * (successor(d) : Integer)) * (successor(d) : Integer)
      = n * (successor(d) : Integer)
      = n * (successor(d * successor(0)) : Integer)
+     = n * (successor(0 + d * successor(0)) : Integer)   by substituting Natural.zero_add
 
 theorem Rational.add_zero (x : Rational)
         : x + Rational.zero = x := {
@@ -145,9 +158,10 @@ theorem Rational.zero_add (x : Rational)
 
 theorem Rational.multiply_one_at_representatives_natural
         (n : Integer) (d : Natural)
-        : n * Integer.one * (successor(d) : Integer) = n * (successor(d * successor(0)) : Integer) :=
+        : n * Integer.one * (successor(d) : Integer) = n * (successor(0 + d * successor(0)) : Integer) :=
   calc n * Integer.one * (successor(d) : Integer)
      = n * (successor(d * successor(0)) : Integer)
+     = n * (successor(0 + d * successor(0)) : Integer)   by substituting Natural.zero_add
 
 theorem Rational.multiply_one (x : Rational)
         : x * Rational.one = x := {

@@ -37,6 +37,17 @@ definition Rational.add_representatives
           n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer),
           d2 + d1 * successor(d2))
 
+-- The added representative's stored denominator `b + a·succ(b)` has
+-- successor `succ(a)·succ(b)` — the product of the two source
+-- denominators. With `Natural.add` opaque the kernel no longer reduces
+-- the stored form to the product on its own, so each respect proof
+-- bridges across this identity (a one-line `ring` fact).
+theorem Rational.added_denominator_factors (a b : Natural)
+        : successor(b + a * successor(b)) = successor(a) * successor(b) :=
+  calc successor(b + a * successor(b))
+     = successor(b) + a * successor(b)        by substituting Natural.successor_add
+     = successor(a) * successor(b)            by substituting Natural.successor_multiply
+
 -- ----------------------------------------------------------------------
 -- Two Integer-level helpers used by every respect proof.
 
@@ -112,10 +123,23 @@ theorem Rational.add_respects_first
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n1Prime, d1Prime),
     RationalRepresentative.make(n2, d2),
-    equivalenceHypothesis =>
-      Rational.add_respects_first_integer(
-          n1, n1Prime, n2, d1, d1Prime, d2,
-          equivalenceHypothesis)
+    equivalenceHypothesis => {
+      -- The equivalence is the cross-multiplication on the added pairs;
+      -- its denominators are the stored sums, which we bridge to the
+      -- factored products the `_integer` kernel speaks.
+      claim firstDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
+          by Rational.added_denominator_factors;
+      claim primeDenominator : successor(d2 + d1Prime * successor(d2)) = successor(d1Prime) * successor(d2)
+          by Rational.added_denominator_factors;
+      calc (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer))
+             * (successor(d2 + d1Prime * successor(d2)) : Integer)
+         = (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer))
+             * (successor(d1Prime) * successor(d2) : Integer)            by substituting primeDenominator
+         = (n1Prime * (successor(d2) : Integer) + n2 * (successor(d1Prime) : Integer))
+             * (successor(d1) * successor(d2) : Integer)                  by Rational.add_respects_first_integer
+         = (n1Prime * (successor(d2) : Integer) + n2 * (successor(d1Prime) : Integer))
+             * (successor(d2 + d1 * successor(d2)) : Integer)             by substituting firstDenominator
+    }
 
 -- ----------------------------------------------------------------------
 -- The second-argument respect kernel. Symmetric to the first-argument
@@ -161,10 +185,20 @@ theorem Rational.add_respects_second
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n2, d2),
     RationalRepresentative.make(n2Prime, d2Prime),
-    equivalenceHypothesis =>
-      Rational.add_respects_second_integer(
-          n1, n2, n2Prime, d1, d2, d2Prime,
-          equivalenceHypothesis)
+    equivalenceHypothesis => {
+      claim leftDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
+          by Rational.added_denominator_factors;
+      claim primeDenominator : successor(d2Prime + d1 * successor(d2Prime)) = successor(d1) * successor(d2Prime)
+          by Rational.added_denominator_factors;
+      calc (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer))
+             * (successor(d2Prime + d1 * successor(d2Prime)) : Integer)
+         = (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer))
+             * (successor(d1) * successor(d2Prime) : Integer)            by substituting primeDenominator
+         = (n1 * (successor(d2Prime) : Integer) + n2Prime * (successor(d1) : Integer))
+             * (successor(d1) * successor(d2) : Integer)                  by Rational.add_respects_second_integer
+         = (n1 * (successor(d2Prime) : Integer) + n2Prime * (successor(d1) : Integer))
+             * (successor(d2 + d1 * successor(d2)) : Integer)             by substituting leftDenominator
+    }
 
 -- ----------------------------------------------------------------------
 -- Add the fraction representatives; well-defined in each argument by the

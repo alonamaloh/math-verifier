@@ -85,10 +85,16 @@ theorem Rational.multiply_respects_first
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n1Prime, d1Prime),
     RationalRepresentative.make(n2, d2),
-    equivalenceHypothesis =>
-      Rational.multiply_respects_first_integer(
-          n1, n1Prime, n2, d1, d1Prime, d2,
-          equivalenceHypothesis)
+    equivalenceHypothesis => {
+      claim firstDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
+          by Rational.added_denominator_factors;
+      claim primeDenominator : successor(d2 + d1Prime * successor(d2)) = successor(d1Prime) * successor(d2)
+          by Rational.added_denominator_factors;
+      calc n1 * n2 * (successor(d2 + d1Prime * successor(d2)) : Integer)
+         = n1 * n2 * (successor(d1Prime) * successor(d2) : Integer)            by substituting primeDenominator
+         = n1Prime * n2 * (successor(d1) * successor(d2) : Integer)            by Rational.multiply_respects_first_integer
+         = n1Prime * n2 * (successor(d2 + d1 * successor(d2)) : Integer)       by substituting firstDenominator
+    }
 
 -- ----------------------------------------------------------------------
 -- Second-argument respect, factored form. Symmetric: re-pair to
@@ -124,10 +130,16 @@ theorem Rational.multiply_respects_second
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n2, d2),
     RationalRepresentative.make(n2Prime, d2Prime),
-    equivalenceHypothesis =>
-      Rational.multiply_respects_second_integer(
-          n1, n2, n2Prime, d1, d2, d2Prime,
-          equivalenceHypothesis)
+    equivalenceHypothesis => {
+      claim leftDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
+          by Rational.added_denominator_factors;
+      claim primeDenominator : successor(d2Prime + d1 * successor(d2Prime)) = successor(d1) * successor(d2Prime)
+          by Rational.added_denominator_factors;
+      calc n1 * n2 * (successor(d2Prime + d1 * successor(d2Prime)) : Integer)
+         = n1 * n2 * (successor(d1) * successor(d2Prime) : Integer)            by substituting primeDenominator
+         = n1 * n2Prime * (successor(d1) * successor(d2) : Integer)            by Rational.multiply_respects_second_integer
+         = n1 * n2Prime * (successor(d2 + d1 * successor(d2)) : Integer)       by substituting leftDenominator
+    }
 
 -- ----------------------------------------------------------------------
 -- Multiply the fraction representatives; well-defined in each argument by
