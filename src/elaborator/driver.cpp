@@ -6,6 +6,8 @@
 
 #include "elaborator/internal.hpp"
 
+#include <cstring>
+
 void Elaborator::emitAutoProverProfile() {
         if (autoProveRows_.empty()) return;
         // Headline: time spent on losing tactic attempts vs the
