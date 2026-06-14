@@ -134,7 +134,17 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
             bool rewrittenProveFailed = false;
         };
         std::vector<SubstAttempt> attemptLog;
-        for (const ContextEquality& eq : candidates) {
+        // Two passes over (candidate × direction). PASS 0 ("fast only") tries
+        // every rewrite but closes ONLY via the reflexivity/defeq fast path —
+        // no prover call — so a goal that becomes reflexive after the right
+        // rewrite is settled cheaply, in WHICHEVER direction achieves it,
+        // before any direction's backward rewrite can grow the goal and burn
+        // the full prover search closing it. PASS 1 is the original behaviour
+        // (prover allowed), with the original direction order preserved, so
+        // proofs that legitimately need the search are unaffected.
+        for (int pass = 0; pass < 2; ++pass) {
+          bool fastPathOnly = (pass == 0);
+          for (const ContextEquality& eq : candidates) {
             for (int direction = 0; direction < 2; ++direction) {
                 ExpressionPointer fromSide =
                     (direction == 0) ? eq.rhs : eq.lhs;
@@ -239,9 +249,37 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                         } catch (const TypeError&) {
                             plainEquality = false;
                         }
-                        if (plainEquality
+                        bool sidesEqual = plainEquality
                             && structurallyEqual(components.leftEndpoint,
-                                                 components.rightEndpoint)) {
+                                                 components.rightEndpoint);
+                        if (plainEquality && !sidesEqual) {
+                            // The rewrite frequently yields endpoints that are
+                            // definitionally — but not *syntactically* — equal
+                            // (the substituted term reaches the kernel via a
+                            // slightly different elaboration than the matching
+                            // term on the other side). A bounded defeq probe
+                            // catches those, so the reflexive close still fires
+                            // instead of falling through to the full prover
+                            // search — which, on a goal carrying a recursive
+                            // term like `power(_, m)`, scans hundreds of
+                            // candidate lemmas at ~170k kernel-steps. The
+                            // reflexivity proof we build is still checked at
+                            // full fuel by the kernel, so a bounded false
+                            // positive can't slip through — at worst the probe
+                            // is wasted and we take the slow path anyway.
+                            int N = static_cast<int>(localBinders.size());
+                            try {
+                                sidesEqual = isDefinitionallyEqual(
+                                    environment_,
+                                    buildContextFromLocalBinders(localBinders),
+                                    openOverLocalBinders(
+                                        components.leftEndpoint, localBinders, N),
+                                    openOverLocalBinders(
+                                        components.rightEndpoint, localBinders, N),
+                                    kDefeqProbeFuel);
+                            } catch (...) { sidesEqual = false; }
+                        }
+                        if (sidesEqual) {
                             ExpressionPointer reflexive = makeConstant(
                                 "reflexivity",
                                 {components.carrierUniverseLevel});
@@ -252,6 +290,10 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                             return buildTransport(abstractedBody, reflexive);
                         }
                     }
+                    // Fast-path-only pass: the rewrite didn't make the goal
+                    // reflexive, so do NOT pay the prover here — let a different
+                    // rewrite/direction (or the later prover pass) handle it.
+                    if (fastPathOnly) return nullptr;
                     try {
                         AutoProveCallerLabelGuard callerLabel(
                             *this, "`by substituting` re-proof");
@@ -299,9 +341,10 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     if (result) return result;
                 }
                 attempt.rewrittenProveFailed = true;
-                attemptLog.push_back(attempt);
+                if (!fastPathOnly) attemptLog.push_back(attempt);
                 continue;
             }
+          }
         }
         // Hypothesis-rewriting fallback (narrowed `by substituting <eq>`
         // only). Goal-rewriting can't reach an endpoint hidden behind a
