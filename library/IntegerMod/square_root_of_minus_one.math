@@ -65,8 +65,11 @@ theorem IntegerMod.negate_one_power_even (p t : Natural)
     case successor(k):
         -- (k+1) + (k+1) = 1 + (1 + (k + k)): peel two negations at once.
         calc IntegerMod.negate_one_power(p, successor(k) + successor(k))
+           = IntegerMod.negate_one_power(p, successor(k + successor(k)))
+                 by substituting Natural.successor_add(k, successor(k))
            = IntegerMod.negate(IntegerMod.negate_one_power(p, k + successor(k)))
            = IntegerMod.negate(IntegerMod.negate_one_power(p, successor(k + k)))
+                 by substituting Natural.add_successor(k, k)
            = IntegerMod.negate(IntegerMod.negate(
                  IntegerMod.negate_one_power(p, k + k)))
            = IntegerMod.negate_one_power(p, k + k)
@@ -120,7 +123,11 @@ theorem IntegerMod.offset_residues_product_pairs (p h : Natural)
       }
     case successor(predecessorCount): {
         take j : Natural;
-        suppose j + (1 + predecessorCount) = h as jEquation;
+        suppose j + successor(predecessorCount) = h as jSuccessorEquation;
+        claim jEquation : j + (1 + predecessorCount) = h
+            by calc j + (1 + predecessorCount)
+                  = j + successor(predecessorCount)   by substituting Natural.one_add(predecessorCount)
+                  = h                                  by jSuccessorEquation;
         let remainingProduct : IntegerMod(p)
             := IntegerMod.offset_residues_product(p, h, predecessorCount);
         -- The new top element h + (1 + count′) pairs with 1 + j across p.
@@ -139,10 +146,20 @@ theorem IntegerMod.offset_residues_product_pairs (p h : Natural)
                   = j + (1 + predecessorCount)
                   = h                            by jEquation;
         -- Pull the sign out, fold [1+j] into the factorial, and recurse.
+        claim topIndex : h + successor(predecessorCount) = h + (1 + predecessorCount)
+            by substituting Natural.one_add(predecessorCount);
+        claim successorFactorial : Natural.factorial(1 + j) = (1 + j) * Natural.factorial(j)
+            by calc Natural.factorial(1 + j)
+                  = Natural.factorial(successor(j))   by substituting Natural.one_add(j)
+                  = successor(j) * Natural.factorial(j)
+                  = (1 + j) * Natural.factorial(j)    by substituting Natural.one_add(j);
         calc IntegerMod.offset_residues_product(p, h, successor(predecessorCount))
+                 * IntegerMod.make(p, (Natural.factorial(j) : Integer))
+           = (IntegerMod.residue(p, h + successor(predecessorCount)) * remainingProduct)
                  * IntegerMod.make(p, (Natural.factorial(j) : Integer))
            = (IntegerMod.residue(p, h + (1 + predecessorCount)) * remainingProduct)
                  * IntegerMod.make(p, (Natural.factorial(j) : Integer))
+                 by substituting topIndex
            = (IntegerMod.negate(IntegerMod.residue(p, 1 + j)) * remainingProduct)
                  * IntegerMod.make(p, (Natural.factorial(j) : Integer))
                  by substituting topPairs
@@ -160,6 +177,7 @@ theorem IntegerMod.offset_residues_product_pairs (p h : Natural)
                  by Natural.to_integer.multiply_preserves(1 + j, Natural.factorial(j))
            = IntegerMod.negate(remainingProduct
                  * IntegerMod.make(p, (Natural.factorial(1 + j) : Integer)))
+                 by substituting successorFactorial
            = IntegerMod.negate(IntegerMod.negate_one_power(p, predecessorCount)
                  * IntegerMod.make(p, (Natural.factorial(h) : Integer)))
                  by substituting IH(1 + j, shiftedEquation)
