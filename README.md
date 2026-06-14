@@ -114,7 +114,9 @@ Imports flow up the dependency layers: a file in `Integer/` can import
 
 - **Foundations:** propositional extensionality, function extensionality,
   Quotient kernel (`Quotient.mk` / `.sound` / `.lift` / `.induct` / `.exact`),
-  classical `Decidable`, `Set`.
+  classical `Decidable`, `Set`, and definite description (`Logic.the`:
+  the unique object satisfying a uniquely-satisfied predicate), which
+  underpins `Real.limit`, square roots, and `exp`.
 - **Algebra:** `IsMonoid`, `IsGroup`, `IsRing`, `IsCommutativeRing`,
   `IsField` predicates with bundled-structure carriers; generic lemmas
   (cancellation, inverse uniqueness, ring annihilation / negation,
@@ -136,15 +138,24 @@ Imports flow up the dependency layers: a file in `Integer/` can import
   complete-ordered-field interface** (field, total order compatible
   with + and ×, suprema of bounded-above nonempty sets, an
   order-embedded ℚ), after which downstream development never touches
-  the quotient. Analysis is under way on top: limit arithmetic and the
-  monotone convergence theorem.
+  the quotient. A substantial **analysis layer** now sits on top:
+  sequence limits and limit arithmetic, **Cauchy completeness**
+  (every Cauchy sequence converges), continuity, the intermediate
+  value theorem, a division-free **differential calculus** (constant /
+  identity / sum / scale / negation / difference / product rules,
+  continuity of differentiable maps, uniqueness of the derivative),
+  square root as an honest function, the Cauchy–Schwarz inequality, and
+  the **real exponential** `exp(x) = lim Σ xᵏ/k!` with `e`, `1 + x ≤
+  exp(x)`, and `exp(x) > 0`.
 - **PAdic:** p-adic-Cauchy sequences of Rationals; full
   commutative-ring instance; honest p-adic absolute value; embedding.
 - **Polynomial:** polynomials over a ring; degree, division with
   remainder, gcd / Bezout, irreducibility; `R[x]/(f)` is a field when
   `f` is irreducible over a field.
 - **ComplexNumber:** ℂ = ℝ[x]/(x²+1) — commutative ring and field
-  (x²+1 irreducible over ℝ), i² = −1, injective ℝ ↪ ℂ.
+  (x²+1 irreducible over ℝ), i² = −1, injective ℝ ↪ ℂ; real and
+  imaginary coordinates with reconstruction `z = re + im·i`, and the
+  honest modulus `|z| = √(re² + im²)`.
 - **FiniteField:** F_{p^k} = F_p[x]/(f) is a field for irreducible f.
 - **GaussianInteger:** ℤ[i] via the generic RingModulo; coordinates,
   norm, units, Euclidean structure.
@@ -253,6 +264,10 @@ These have been load-bearing decisions that show up everywhere:
 - `docs/error_message_corpus.md` — the data-driven error-message
   improvement workflow (capture → diagnose → fix → regression).
 - `TODO.md` — planned work, in priority/dependency order.
+- `STRESS_PROBES.md` — a diagnostic roadmap of library extensions
+  (analysis depth, geometry/topology, metatheory, abstract linear
+  algebra, new quotients) chosen to load one layer — prover, surface
+  language, or foundations — at a time and reveal where it bends.
 - `LUX_PLAN.md` — design for a planned higher-level proof surface.
 - `HASH_USE_VS_LEAN.md` — design note pinning down where our
   subtree-hashing plan lines up with Lean's and where it diverges.
