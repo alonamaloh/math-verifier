@@ -3278,7 +3278,14 @@ ExpressionPointer Elaborator::proveEqualsCanonical_impl(
         // 1 + e, so a reflexivity bridge routes it through the add path.
         if (context.carrierName == "Natural") {
             int literalValue = 0;
-            if (tryParseNaturalLiteral(expression, literalValue)) {
+            // Base case only: the ring one `successor(zero)` (and the never-
+            // reached zero) is its own canonical kernel, so reflexivity bridges
+            // with no add reduction. Larger literals are successor-headed and
+            // fall through to the successor branch below — under opaque
+            // Natural.add the tower `successor^k(zero)` is no longer defeq to
+            // the sum-of-ones, so we cannot close them by reflexivity.
+            if (tryParseNaturalLiteral(expression, literalValue)
+                    && literalValue <= 1) {
                 RingPolynomial polynomial;
                 if (literalValue > 0) {
                     polynomial[RingMonomialSignature{}] = literalValue;
@@ -3295,10 +3302,14 @@ ExpressionPointer Elaborator::proveEqualsCanonical_impl(
                     unfolded, context, axiomNames, polynomialOut);
                 ExpressionPointer canonicalKernel =
                     buildCanonicalPolynomial(polynomialOut, context);
-                // expression ≡ unfolded definitionally (1 + e ι-reduces
-                // to successor(e)); reflexivity at `expression` bridges.
-                ExpressionPointer reflBridge = buildReflexivity(
-                    universeLevel, carrierType, expression);
+                // expression (= successor(e)) = unfolded (= 1 + e). With
+                // Natural.add opaque this is no longer reflexivity, so cite
+                // `Natural.one_add` (1 + e = successor(e)) and flip it.
+                ExpressionPointer oneAddProof = makeApplication(
+                    makeConstant("Natural.one_add"), successorInner);
+                ExpressionPointer reflBridge = buildEqualitySymmetry(
+                    universeLevel, carrierType, unfolded, expression,
+                    oneAddProof);
                 return buildEqualityTransitivity(
                     universeLevel, carrierType,
                     expression, unfolded, canonicalKernel,
