@@ -33,13 +33,18 @@ theorem Natural.multiply_successor_claim (a b : Natural)
         : a * successor(b) = a + a * b :=
   claim a * successor(b) = a + a * b by induction on a with IH {
     case zero:
-      reflexivity
+      done by ring
     case successor(predecessor):
-      calc successor(b + predecessor * successor(b))
-         = successor(b + (predecessor + predecessor * b))
-         = successor((b + predecessor) + predecessor * b)
-         = successor((predecessor + b) + predecessor * b)
-         = successor(predecessor + (b + predecessor * b))
+      -- `successor(predecessor) * successor(b)` no longer β-reduces under
+      -- opaque `Natural.add`; expose the multiply step, apply the IH, finish
+      -- with `ring`.
+      calc successor(predecessor) * successor(b)
+         = successor(b) + predecessor * successor(b)
+              by Natural.successor_multiply
+         = successor(b) + (predecessor + predecessor * b)
+              by substituting IH
+         = successor(predecessor) + successor(predecessor) * b
+              by ring
   }
 
 -- (3) Bare `claim by induction on a {…}` — proposition inferred

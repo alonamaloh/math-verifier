@@ -23,32 +23,20 @@ theorem Natural.multiply_successor_inductive (a b : Natural)
         : a * successor(b) = a + a * b :=
   by_induction on a with IH {
     case zero:
-      reflexivity(zero);
+      done by ring;
     case successor(predecessor):
-      -- (Original verbose version below; the un-reduced form follows
-      -- as `Natural.multiply_successor_unreduced`.)
-      -- The kernel β-reduces both sides of the goal:
-      --   LHS = successor(predecessor) * successor(b)
-      --       ≡ successor(b) + predecessor * successor(b)
-      --       ≡ successor(b + predecessor * successor(b))
-      --   RHS = successor(predecessor) + successor(predecessor) * b
-      --       ≡ successor(predecessor + successor(predecessor) * b)
-      --       ≡ successor(predecessor + (b + predecessor * b))
-      -- So the visible goal is
-      --   successor(b + predecessor * successor(b))
-      --   = successor(predecessor + (b + predecessor * b))
-      -- which we prove by rewriting under the `successor(_)` wrapper.
-      calc successor(b + predecessor * successor(b))
-         = successor(b + (predecessor + predecessor * b))
-              by rewrite(IH)
-         = successor((b + predecessor) + predecessor * b)
-              by Natural.add_associative(
-                     b, predecessor, predecessor * b)
-         = successor((predecessor + b) + predecessor * b)
-              by rewrite(Natural.add_commutative(b, predecessor))
-         = successor(predecessor + (b + predecessor * b))
-              by rewrite(Natural.add_associative(
-                  predecessor, b, predecessor * b));
+      -- With `Natural.add` opaque, `successor(predecessor) * successor(b)`
+      -- no longer β-reduces to `successor(b + predecessor * successor(b))`
+      -- on its own. So expose the leading multiply step explicitly
+      -- (`successor_multiply`), apply the induction hypothesis, and let
+      -- `ring` re-associate to the right-hand side.
+      calc successor(predecessor) * successor(b)
+         = successor(b) + predecessor * successor(b)
+              by Natural.successor_multiply
+         = successor(b) + (predecessor + predecessor * b)
+              by substituting IH
+         = successor(predecessor) + successor(predecessor) * b
+              by ring;
   }
 
 -- Same proof, written with the calc LHS in its un-reduced surface
