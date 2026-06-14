@@ -1488,7 +1488,7 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             // we don't carry winners over from earlier tactics.
             lastContextFactWinner_.clear();
             lastContextFactCandidateCount_ = 0;
-            auto t0 = std::chrono::steady_clock::now();
+            long long t0 = monotonicNanos();
             ExpressionPointer result = nullptr;
             try {
                 result = fn();
@@ -1497,10 +1497,8 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             } catch (const TypeError&) {
                 result = nullptr;
             }
-            auto t1 = std::chrono::steady_clock::now();
-            attempt.micros =
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                    t1 - t0).count();
+            long long t1 = monotonicNanos();
+            attempt.micros = (t1 - t0) / 1000;
             attempt.succeeded = (result != nullptr);
             if (std::string(tacticName) == "contextFactMatch") {
                 attempt.winner = lastContextFactWinner_;

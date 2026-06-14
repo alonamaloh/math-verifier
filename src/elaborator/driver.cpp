@@ -227,12 +227,10 @@ void Elaborator::runModule(const SurfaceModule& module) {
             && timeFlag[0] != '0';
         for (const auto& statement : module.statements) {
             if (timeDeclarations) {
-                auto t0 = std::chrono::steady_clock::now();
+                long long t0 = monotonicNanos();
                 elaborateTopStatement(statement);
-                auto t1 = std::chrono::steady_clock::now();
-                long long elapsedMs =
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        t1 - t0).count();
+                long long t1 = monotonicNanos();
+                long long elapsedMs = (t1 - t0) / 1000000;
                 // Emit only non-trivial timings to keep noise low.
                 if (elapsedMs >= 50) {
                     std::string label = topStatementLabel(statement);

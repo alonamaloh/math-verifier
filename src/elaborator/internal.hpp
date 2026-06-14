@@ -20,7 +20,7 @@
 #include "kernel/printer.hpp"
 #include "kernel/subtree_hash.hpp"
 
-#include <chrono>
+#include "timing.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <sys/resource.h>
@@ -178,12 +178,10 @@ public:
     ExpressionPointer runTactic(const std::string& name, F&& fn) {
         if (!tacticTimingEnabled_) return fn();
         ++tacticStats_[name].invocations;
-        auto t0 = std::chrono::steady_clock::now();
+        long long t0 = monotonicNanos();
         ExpressionPointer result = fn();
-        auto t1 = std::chrono::steady_clock::now();
-        tacticStats_[name].totalMicros +=
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                t1 - t0).count();
+        long long t1 = monotonicNanos();
+        tacticStats_[name].totalMicros += (t1 - t0) / 1000;
         if (result) ++tacticStats_[name].successes;
         return result;
     }
@@ -195,21 +193,19 @@ public:
     struct TimedScope {
         Elaborator& self_;
         const std::string name_;
-        std::chrono::steady_clock::time_point t0_;
+        long long t0_ = 0;
         bool active_;
         TimedScope(Elaborator& self, const char* name)
             : self_(self), name_(name), active_(self.tacticTimingEnabled_) {
             if (active_) {
                 ++self_.tacticStats_[name_].invocations;
-                t0_ = std::chrono::steady_clock::now();
+                t0_ = monotonicNanos();
             }
         }
         ~TimedScope() {
             if (!active_) return;
-            auto t1 = std::chrono::steady_clock::now();
-            self_.tacticStats_[name_].totalMicros +=
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                    t1 - t0_).count();
+            long long t1 = monotonicNanos();
+            self_.tacticStats_[name_].totalMicros += (t1 - t0_) / 1000;
         }
     };
 

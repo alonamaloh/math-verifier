@@ -9,6 +9,7 @@
 #include "kernel/printer.hpp"
 #include "kernel/serialize.hpp"
 #include "syntax/surface.hpp"
+#include "timing.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -5272,7 +5273,7 @@ int verifyWithCache(const std::string& sourcePath,
     }
 
     // Load dependency caches (with transitive expansion).
-    auto loadT0 = std::chrono::steady_clock::now();
+    long long loadT0 = monotonicNanos();
     for (const auto& dependency : resolvedDependencyCachePaths) {
         // Prefer the dependency's interface cache: a downstream file's
         // verification depends only on its imports' interfaces (declaration
@@ -5295,11 +5296,9 @@ int verifyWithCache(const std::string& sourcePath,
             return 1;
         }
     }
-    auto loadT1 = std::chrono::steady_clock::now();
+    long long loadT1 = monotonicNanos();
     if (std::getenv("MATH_REPORT_ADDDECL")) {
-        long long loadMs =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                loadT1 - loadT0).count();
+        long long loadMs = (loadT1 - loadT0) / 1000000;
         std::cerr << "[load] " << moduleName << " dep_load="
                   << loadMs << "ms deps=" << alreadyLoaded.size() << "\n";
     }

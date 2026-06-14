@@ -1122,13 +1122,13 @@ ExpressionPointer Elaborator::elaborateExpression(
             bool dumpLetSize = claimSizeFlag2
                 && claimSizeFlag2[0] != '\0'
                 && claimSizeFlag2[0] != '0';
-            auto tLet0 = std::chrono::steady_clock::now();
-            auto tLetTypeOnly = tLet0;
+            long long tLet0 = monotonicNanos();
+            long long tLetTypeOnly = tLet0;
             ExpressionPointer letType;
             ExpressionPointer letValue;
             if (let->type) {
                 letType = elaborateExpression(*let->type, localBinders);
-                tLetTypeOnly = std::chrono::steady_clock::now();
+                tLetTypeOnly = monotonicNanos();
                 // Pass the declared type as the expected type for the
                 // value so bidirectional elaborators (cases, anonymous
                 // tuples, hammer, calc) can use it — without this,
@@ -1154,8 +1154,8 @@ ExpressionPointer Elaborator::elaborateExpression(
                     inferTypeInLocalContext(localBinders, letValue),
                     localBinders, localBinders.size());
             }
-            auto tLetType = tLetTypeOnly;
-            auto tLetValue = std::chrono::steady_clock::now();
+            long long tLetType = tLetTypeOnly;
+            long long tLetValue = monotonicNanos();
             // Diff-inference for non-calc equality coercion: covers
             // `claim X : succ(a) = succ(b) by eq` (desugars to a
             // SurfaceLet) without an explicit congruenceOf wrapper.
@@ -1163,20 +1163,14 @@ ExpressionPointer Elaborator::elaborateExpression(
                 letValue = coerceToExpectedTypeViaDiff(
                     localBinders, letValue, letType);
             }
-            auto tLetCoerce = std::chrono::steady_clock::now();
+            long long tLetCoerce = monotonicNanos();
             checkRedundantCongruenceOfWrapper(
                 let->value, localBinders, letType,
                 "let value");
             if (dumpLetSize) {
-                long long typeMs =
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        tLetType - tLet0).count();
-                long long valueMs =
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        tLetValue - tLetType).count();
-                long long coerceMs =
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        tLetCoerce - tLetValue).count();
+                long long typeMs = (tLetType - tLet0) / 1000000;
+                long long valueMs = (tLetValue - tLetType) / 1000000;
+                long long coerceMs = (tLetCoerce - tLetValue) / 1000000;
                 long long totalMs = typeMs + valueMs + coerceMs;
                 if (totalMs >= 100) {
                     size_t typeSize = countExpressionNodes(letType);

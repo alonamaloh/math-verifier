@@ -1396,6 +1396,14 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
             recursiveArgToHypothesis,
         int outerBinderCount) {
 
+        // Optional sub-expressions reach this pass as a null pointer — a
+        // by-less calc step's `stepProof`, an omitted `let`/lambda/Pi/
+        // ascription type annotation, and so on. There is nothing to rewrite,
+        // so hand the null straight back. Without this guard the `*expression`
+        // below binds a reference to a null pointer (and then reads `node.node`
+        // off a near-null address) — undefined behavior that different
+        // toolchains compile into different results.
+        if (!expression) return expression;
         const SurfaceExpression& node = *expression;
         if (auto* application =
                 std::get_if<SurfaceApplication>(&node.node)) {

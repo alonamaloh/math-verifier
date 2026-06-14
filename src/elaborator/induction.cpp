@@ -424,7 +424,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         const char* claimSizeFlag = std::getenv("MATH_CLAIM_SIZES");
         bool dumpClaimSize = claimSizeFlag && claimSizeFlag[0] != '\0'
             && claimSizeFlag[0] != '0';
-        auto t0 = std::chrono::steady_clock::now();
+        long long t0 = monotonicNanos();
         ExpressionPointer result;
         ExpressionPointer hintType;
         ExpressionPointer hintTerm;
@@ -470,13 +470,11 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             result = recoverClaimHint(
                 hintTerm, *claim.byHint, goalClosed, localBinders, line);
         }
-        auto tFill = std::chrono::steady_clock::now();
+        long long tFill = monotonicNanos();
         if (dumpClaimSize && hintType) {
             size_t goalSize = countExpressionNodes(goalClosed);
             size_t hintSize = countExpressionNodes(hintType);
-            long long totalMs =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    tFill - t0).count();
+            long long totalMs = (tFill - t0) / 1000000;
             if (totalMs >= 50 || goalSize >= 100) {
                 std::cerr << "[claim-size] " << moduleName_
                           << ":" << line

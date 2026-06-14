@@ -1,4 +1,12 @@
+# Default compiler per platform: clang++ on macOS, g++ on Linux. Both are
+# C++20-capable. Override on the command line with `make CXX=...` if you
+# want a specific toolchain (a command-line assignment beats this).
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
 CXX = clang++
+else
+CXX = g++
+endif
 CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -O3 -g -Isrc -MMD -MP
 
 OBJDIR := build/obj
@@ -31,14 +39,27 @@ OBJS := $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRCS))
 
 # mimalloc — small-object allocator that's faster than the system
 # malloc on node-heavy workloads (substitute/makeApplication create
-# small Expression nodes constantly). Linked as a force_load on the
-# static library so malloc/free are overridden at link time without
-# needing DYLD_INSERT_LIBRARIES at runtime.
+# small Expression nodes constantly). Whole-archive-linked so malloc/free
+# are overridden at link time without needing a runtime preload. Optional:
+# if the static library isn't found the kernel still builds (just slower),
+# so a fresh checkout with no mimalloc installed Just Works.
+#
+# macOS: located via Homebrew, force-loaded with the Apple-ld spelling.
+# Linux: located via pkg-config, whole-archived with the GNU-ld spelling.
+ifeq ($(UNAME_S),Darwin)
 MIMALLOC_PREFIX := $(shell brew --prefix mimalloc 2>/dev/null)
 ifeq ($(MIMALLOC_PREFIX),)
 LDFLAGS_MIMALLOC :=
 else
 LDFLAGS_MIMALLOC := -Wl,-force_load,$(MIMALLOC_PREFIX)/lib/libmimalloc.a
+endif
+else
+MIMALLOC_LIB := $(wildcard $(shell pkg-config --variable=libdir mimalloc 2>/dev/null)/libmimalloc.a)
+ifeq ($(MIMALLOC_LIB),)
+LDFLAGS_MIMALLOC :=
+else
+LDFLAGS_MIMALLOC := -Wl,--whole-archive $(MIMALLOC_LIB) -Wl,--no-whole-archive
+endif
 endif
 
 kernel: $(OBJS)
