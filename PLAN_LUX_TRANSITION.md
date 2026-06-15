@@ -282,9 +282,19 @@ boundary lemmas) and rebuilding the whole library broke **exactly 3 files**
 fixable by routing through a boundary lemma, none needing restructuring.
 Opacity-retrofit cost scales with the number of defeq-*exploiting* sites, not
 *uses* (everything already going through a lemma interface is unaffected). So
-retrofit is bounded and mechanical → **transform, do not greenfield.** (Caveat:
-a recursive-function body like `multiply` will have more exploit-sites than a
-relation alias; spike one before fully generalizing.)
+retrofit is bounded and mechanical → **transform, do not greenfield.**
+
+**Caveat now closed — recursive functions behave the same.** A second spike
+opacified `Natural.multiply` (a recursive function — the *bulk* kind of
+definition). Result: its home file (`arithmetic`) needed `Natural.multiply`
+added to **8** law-proof `unfold`s (mechanical — those proofs are written in
+multiply's reduced form), and **only 2 downstream files** broke
+(`multiply_order`, `prime_two`), both the same reduction-exploit shape. Crucially
+**`ring` and every arithmetic-heavy file (Real/Complex/Polynomial) were
+untouched** — they go through the multiply *lemmas*, not its reduction. So a
+recursive function has a larger *home-file* boundary than a relation alias (8 vs
+0 lemmas) but the same small, mechanical *downstream* ripple. Opacity retrofit is
+bounded and mechanical across both kinds → the transform decision is firm.
 
 **The order foundation (decided + prototyped).** Invert the `<`/`≤` primitivity:
 - `opaque definition Natural.LessThan (a b) := ∃ c. a + (1 + c) = b` — the
