@@ -36,6 +36,7 @@ import Logic.basics
 import Logic.exists
 import Equality.basics
 import Natural.basics
+import Natural.arithmetic
 import Natural.order
 import Integer.basics
 import Rational.basics
@@ -48,19 +49,34 @@ theorem Natural.constructor_totality
   | successor(predecessor) =>
       Or.introduceRight(witness predecessor with reflexivity(successor(predecessor)))
 
+-- `≤` is now `< ∨ =` (not an inductive), so this "view" is recovered from
+-- the strict-order witness rather than a constructor split: when
+-- `smaller < larger`, the witness `c` with `smaller + (1 + c) = larger`
+-- exhibits `larger = successor(smaller + c)` with `smaller ≤ smaller + c`.
 theorem LessOrEqual.constructor_totality
         (smaller larger : Natural)
         : smaller ≤ larger
           → smaller = larger
             ∨ ∃ (largerPredecessor : Natural).
                   larger = successor(largerPredecessor)
-                  ∧ smaller ≤ largerPredecessor
-  | LessOrEqual.reflexivity(commonValue) =>
-      Or.introduceLeft(reflexivity(commonValue))
-  | LessOrEqual.step(smallerD, largerPredecessor, subproof) =>
-      Or.introduceRight(
-          witness largerPredecessor with
-              And.introduction(reflexivity(successor(largerPredecessor)), subproof))
+                  ∧ smaller ≤ largerPredecessor :=
+  (proof : smaller ≤ larger) ↦
+    cases proof {
+      | Or.introduceLeft(lessThan) => {
+          obtain ⟨c, equation⟩ by Natural.lt_elim;
+          claim smaller ≤ smaller + c by Natural.less_or_equal_add_right;
+          calc larger
+             = smaller + (1 + c)        by equation
+             = smaller + successor(c)   by Natural.one_add(c)
+             = successor(smaller + c)   by Natural.add_successor(smaller, c)
+             as largerIsSuccessor;
+          Or.introduceRight(
+              witness (smaller + c) with
+                  And.introduction(largerIsSuccessor, (smaller ≤ smaller + c)))
+        }
+      | Or.introduceRight(equal) =>
+          Or.introduceLeft(equal)
+    }
 
 -- (`And.constructor_totality` once lived here, stating `conjunction =
 -- And.introduction(left, right)` via `Equality.{0}(And(A, B), …)`. That

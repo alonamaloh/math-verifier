@@ -1,113 +1,290 @@
 -- Natural/order.math
 --
--- LessOrEqual: the inductive ≤ relation on Natural. Two constructors:
--- reflexivity gives n ≤ n; step lifts n ≤ m to n ≤ successor(m).
+-- The order on Natural, founded on a successor-free, opaque strict order.
+--
+--   `a < b`   is   `∃ c. a + (1 + c) = b`   — b exceeds a by at least one.
+--   `a ≤ b`   is   `a < b ∨ a = b`           — mere notation on top of `<`.
+--
+-- `<` is OPAQUE: its body is visible only to the two boundary lemmas
+-- `lt_intro` / `lt_elim`. Everything below them reasons through the
+-- interface, never the `∃`. `≤` is TRANSPARENT — `< ∨ =` *is* its meaning.
+--
+-- Both relations are ordinary registered operators (like Integer/Rational/
+-- Real). With the strict-order `weaken`/`transitive_left`/`transitive_right`
+-- lemmas below, `<` is a full `calc` citizen, so the whole order interface
+-- reads as mixed `<`/`≤`/`=` chains.
 
 module Natural.order
 
 import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.one_plus_induction
+import Logic.basics
+import Logic.exists
+import Equality.basics
 
-inductive LessOrEqual : Natural → Natural → Proposition where
-  | LessOrEqual.reflexivity
-      : (naturalNumber : Natural)
-        → LessOrEqual(naturalNumber, naturalNumber)
-  | LessOrEqual.step
-      : (smaller larger : Natural)
-        → LessOrEqual(smaller, larger)
-        → LessOrEqual(smaller, successor(larger))
+-- ── The strict-order foundation ───────────────────────────────────────
 
--- Strict order. `a < b` means `successor(a) ≤ b`. It is defined via
--- `successor` so it is DEFINITIONALLY equal to the `successor(a) ≤ b` form
--- the core proofs already use — order lemmas and the induction principles
--- can then be restated with `<` without reworking their proofs, while the
--- `successor` constructor stays sealed behind the `<` notation for
--- everything downstream. (`a > b` desugars to `b < a` automatically, and
--- `a ≥ b` to `b ≤ a`, so no separate `>`/`≥` declarations are needed.)
-definition Natural.LessThan (a b : Natural) : Proposition :=
-  successor(a) ≤ b
+-- `a < b` iff b exceeds a by at least one. Successor-free (only `+`/`1`),
+-- and opaque — its body is seen ONLY by the two boundary lemmas below.
+opaque definition Natural.LessThan (a b : Natural) : Proposition :=
+  ∃ (c : Natural). a + (1 + c) = b
 
 operator (<) on (Natural, Natural) := Natural.LessThan
 
--- Zero is at most every natural number. By induction on the upper bound:
--- 0 ≤ 0 reflexively, and 0 ≤ predecessor lifts to 0 ≤ successor(predecessor)
--- by stepping the bound once.
-definition Natural.zero_least (upperBound : Natural) : 0 ≤ upperBound :=
-  unfold Natural.add in
-  by_induction on upperBound with IH {
-    case zero:
-        done
-    case successor(predecessor):
-        LessOrEqual.step(0, predecessor, IH)
-  }
+-- ── Boundary (the only place `<`'s body is seen) ──────────────────────
+-- A gap `c` with `a + (1 + c) = b` witnesses `a < b`, and conversely.
+theorem Natural.lt_intro (a b c : Natural) (h : a + (1 + c) = b) : a < b :=
+  unfold Natural.LessThan in ⟨c, h⟩
 
--- ≤ is transitive. By induction on the derivation of b ≤ c, carrying the
--- proof of a ≤ b (refined as the induction varies b).
-theorem LessOrEqual.transitive (a b c : Natural)
-        (bc : b ≤ c) (ab : a ≤ b) : a ≤ c :=
-  unfold Natural.add in
-  by_induction on bc with IH refining ab {
-    case LessOrEqual.reflexivity(_):
-        -- b = c, so a ≤ b already is a ≤ c.
-        ab
-    case LessOrEqual.step(_, cPredecessor, _):
-        -- c = successor(cPredecessor) with b ≤ cPredecessor; the IH gives
-        -- a ≤ cPredecessor, then one more step reaches a ≤ c.
-        LessOrEqual.step(a, cPredecessor, IH(ab))
-  }
+theorem Natural.lt_elim (a b : Natural) (h : a < b)
+        : ∃ (c : Natural). a + (1 + c) = b :=
+  unfold Natural.LessThan in h
 
--- Successor preserves ≤: a ≤ b implies successor(a) ≤ successor(b). By
--- induction on the derivation of a ≤ b. The case bodies use the
--- DESTRUCTURED names (commonValue, smallerD) — the constructor's specific
--- index values — not the outer binders a and b.
-theorem Natural.successor_less_or_equal_successor (a b : Natural)
-        (proof : a ≤ b) : successor(a) ≤ successor(b) :=
-  unfold Natural.add in
-  by_induction on proof with IH {
-    case LessOrEqual.reflexivity(commonValue):
-        done
-    case LessOrEqual.step(smallerD, largerPredecessor, _):
-        LessOrEqual.step(
-            successor(smallerD), successor(largerPredecessor), IH)
-  }
+-- ── `≤` as transparent notation on top of `<` ─────────────────────────
+definition Natural.LessOrEqual (a b : Natural) : Proposition :=
+  a < b ∨ a = b
 
--- 1 ≤ succ(k). Appears constantly in analytic proofs as a positivity witness.
-theorem Natural.successor_positive (k : Natural) : 1 ≤ successor(k) := {
-  -- 0 ≤ k since zero is least; then 1 ≤ successor(k) (i.e.
-  -- successor(0) ≤ successor(k)) because successor is monotone.
-  claim 0 ≤ k since Natural.zero_least;
-  done since Natural.successor_less_or_equal_successor
+operator (≤) on (Natural, Natural) := Natural.LessOrEqual
+
+-- ── The two atomic strict facts (the only consumers of `lt_intro`) ────
+
+-- a < 1 + a — the gap is 0.
+theorem Natural.lt_one_plus (a : Natural) : a < 1 + a :=
+  unfold Natural.LessThan in witness 0 with ring
+
+-- a < successor(a) — the same fact in successor form.
+theorem Natural.lt_successor (a : Natural) : a < successor(a) :=
+  unfold Natural.LessThan in witness 0 with
+      (calc a + (1 + 0)
+          = 1 + a          by ring
+          = successor(a)   by Natural.one_add(a))
+
+-- Irreflexivity: a value never lies strictly below itself. A gap `c` with
+-- `a + (1 + c) = a` cancels `a` to force `1 + c = 0`, i.e. `successor(c) = 0`.
+theorem Natural.lt_irreflexive (a : Natural) : ¬ (a < a) := {
+  suppose a < a as _;
+  obtain ⟨gap, equation⟩ by Natural.lt_elim;
+  calc a + (1 + gap)
+     = a       by equation
+     = a + 0   by Natural.add_zero(a);
+  claim 1 + gap = 0 by Natural.add_cancel_left;
+  absurd((calc successor(gap)
+            = 1 + gap   by Natural.one_add(gap)
+            = 0         by (1 + gap = 0)))
 }
 
--- a ≤ a + b. By induction on a (successor(_) + b and zero + b reduce
--- definitionally on the first argument).
+-- Transitivity of `<`: stacking the two gaps gives a gap for a < c. This is
+-- the one composition proven directly from the witnesses; the `calc`
+-- interface below is then built on it.
+theorem Natural.lt_transitive (a b c : Natural)
+        (aLessThanB : a < b) (bLessThanC : b < c) : a < c := {
+  obtain ⟨gapAB, equationAB⟩ from Natural.lt_elim(a, b, aLessThanB);
+  obtain ⟨gapBC, equationBC⟩ from Natural.lt_elim(b, c, bLessThanC);
+  calc a + (1 + (gapAB + (1 + gapBC)))
+     = (a + (1 + gapAB)) + (1 + gapBC)   by ring
+     = b + (1 + gapBC)                   by substituting equationAB
+     = c                                 by equationBC
+     as combinedGap;
+  done by Natural.lt_intro(c := gapAB + (1 + gapBC), h := combinedGap)
+}
+
+-- ── The `calc` interface for `<` (the names `calc` resolves through the
+-- registered operator). With these, mixed `<`/`≤`/`=` chains compose. ──
+
+-- A strict inequality is in particular a weak one (disjunction injection).
+theorem Natural.LessThan.weaken (a b : Natural) (h : a < b) : a ≤ b := {
+  done
+}
+
+-- a ≤ b and b < c give a < c.
+theorem Natural.LessThan.transitive_left (a b c : Natural)
+        (aLessOrEqualB : a ≤ b) (bLessThanC : b < c) : a < c :=
+  cases aLessOrEqualB {
+    | Or.introduceLeft(aLessThanB) => done by Natural.lt_transitive
+    | Or.introduceRight(aEqualB)   => done by substituting aEqualB
+  }
+
+-- a < b and b ≤ c give a < c.
+theorem Natural.LessThan.transitive_right (a b c : Natural)
+        (aLessThanB : a < b) (bLessOrEqualC : b ≤ c) : a < c :=
+  cases bLessOrEqualC {
+    | Or.introduceLeft(bLessThanC) => done by Natural.lt_transitive
+    | Or.introduceRight(bEqualC)   => done by substituting bEqualC
+  }
+
+-- ── The `calc` interface for `≤` ──────────────────────────────────────
+
+theorem Natural.LessOrEqual.reflexive (a : Natural) : a ≤ a := {
+  claim a = a;
+  done
+}
+
+theorem Natural.LessOrEqual.transitive (a b c : Natural)
+        (aLessOrEqualB : a ≤ b) (bLessOrEqualC : b ≤ c) : a ≤ c :=
+  cases bLessOrEqualC {
+    | Or.introduceLeft(bLessThanC) => {
+        claim a < c by Natural.LessThan.transitive_left;
+        done
+      }
+    | Or.introduceRight(bEqualC) => done by substituting bEqualC
+  }
+
+-- ── Order facts, now as `calc` chains ─────────────────────────────────
+
+-- n ≤ successor(n).
+theorem Natural.le_successor (n : Natural) : n ≤ successor(n) := {
+  claim n < successor(n) by Natural.lt_successor;
+  done
+}
+
+-- Right-extension by one (the role the old `LessOrEqual.step` constructor
+-- played): smaller ≤ larger ≤ successor(larger).
+theorem Natural.le_step (smaller larger : Natural) (proof : smaller ≤ larger)
+        : smaller ≤ successor(larger) :=
+  calc smaller
+     ≤ larger              by proof
+     ≤ successor(larger)   by Natural.le_successor
+
+-- a ≤ a + b.
 theorem Natural.less_or_equal_add_right (a b : Natural) : a ≤ a + b :=
-  unfold Natural.add in
-  by_induction on a with IH {
-    case zero:
-        -- 0 + b ≡ b, and zero is least.
-        done by Natural.zero_least
-    case successor(predecessor): {
-        -- predecessor ≤ predecessor + b by the IH; successor is monotone.
-        claim predecessor ≤ predecessor + b by IH;
-        done by Natural.successor_less_or_equal_successor
+  cases b {
+    | zero => {
+        calc a = a + 0   by Natural.add_zero(a);
+        done
+      }
+    | successor(predecessor) => {
+        calc a + (1 + predecessor)
+           = a + successor(predecessor)   by Natural.one_add(predecessor)
+           as addGap;
+        claim a < a + successor(predecessor) by Natural.lt_intro(c := predecessor, h := addGap);
+        done
       }
   }
 
--- n ≤ successor(n). The one-step right-extension that calc chains
--- over Natural reach for constantly. Built from reflexivity by
--- stepping the upper bound once.
-theorem Natural.le_successor (n : Natural) : n ≤ successor(n) :=
-  LessOrEqual.step(n, n, done)
+-- Zero is at most every natural number: 0 ≤ 0 + upperBound = upperBound.
+theorem Natural.zero_least (upperBound : Natural) : 0 ≤ upperBound :=
+  calc 0
+     ≤ 0 + upperBound   by Natural.less_or_equal_add_right
+     = upperBound        by Natural.zero_add(upperBound)
 
--- 1 ≤ 2. Direct corollary.
+-- Trichotomy: the strict-order elimination principle (any two naturals
+-- compare as `<`, `=`, or `>`). Induction on a, b universal.
+theorem Natural.lt_trichotomy (a : Natural)
+        : (b : Natural) → a < b ∨ a = b ∨ b < a :=
+  by_induction on a with IH {
+    case base: (b : Natural) ↦
+      cases b {
+        | zero => {
+            claim 0 = 0;
+            done
+          }
+        | successor(predecessor) =>
+            calc 0
+               ≤ predecessor          by Natural.zero_least
+               < successor(predecessor)   by Natural.lt_successor
+      }
+    case step(predecessor): (b : Natural) ↦
+      cases IH(b) {
+        | Or.introduceLeft(predecessorLessThanB) => {
+            obtain ⟨gap, equation⟩ by Natural.lt_elim;
+            cases gap refining equation {
+              | zero => {
+                  -- the gap was exactly one: 1 + predecessor = b.
+                  calc 1 + predecessor
+                     = predecessor + (1 + 0)   by ring
+                     = b                        by equation;
+                  done
+                }
+              | successor(gapPredecessor) => {
+                  -- the gap exceeds one: 1 + predecessor < b.
+                  calc (1 + predecessor) + (1 + gapPredecessor)
+                     = predecessor + (1 + successor(gapPredecessor))   by ring
+                     = b                                                by equation
+                     as wideGap;
+                  claim 1 + predecessor < b by Natural.lt_intro(c := gapPredecessor, h := wideGap);
+                  done
+                }
+            }
+          }
+        | Or.introduceRight(predecessorEqualOrAbove) =>
+            cases predecessorEqualOrAbove {
+              | Or.introduceLeft(predecessorEqualB) => {
+                  calc b
+                     = predecessor          by (predecessor = b)
+                     < 1 + predecessor      by Natural.lt_one_plus;
+                  done
+                }
+              | Or.introduceRight(bLessThanPredecessor) => {
+                  calc b
+                     < predecessor          by bLessThanPredecessor
+                     < 1 + predecessor      by Natural.lt_one_plus;
+                  done
+                }
+            }
+      }
+  }
+
+-- Successor preserves ≤.
+theorem Natural.successor_less_or_equal_successor (a b : Natural)
+        (proof : a ≤ b) : successor(a) ≤ successor(b) :=
+  cases proof {
+    | Or.introduceLeft(aLessThanB) => {
+        obtain ⟨gap, equation⟩ by Natural.lt_elim;
+        calc successor(a) + (1 + gap)
+           = successor(a + (1 + gap))   by Natural.successor_add(a, 1 + gap)
+           = successor(b)               by substituting equation
+           as successorGap;
+        claim successor(a) < successor(b) by Natural.lt_intro(c := gap, h := successorGap);
+        done
+      }
+    | Or.introduceRight(aEqualB) => {
+        calc successor(a) = successor(b)   by aEqualB;
+        done
+      }
+  }
+
+-- 1 ≤ successor(k): `successor` monotonicity applied at 0 (`1` is `successor(0)`).
+theorem Natural.successor_positive (k : Natural) : 1 ≤ successor(k) := {
+  claim 0 ≤ k by Natural.zero_least;
+  done by Natural.successor_less_or_equal_successor
+}
+
+-- 1 ≤ 2.
 theorem Natural.one_less_or_equal_two : 1 ≤ 2 :=
-  { done by Natural.le_successor }
+  done by Natural.le_successor
 
--- successor(p) ≤ upperBound implies p ≤ upperBound. Transitive via the
--- single-step `p ≤ successor(p)`.
+-- successor(p) ≤ upperBound implies p ≤ upperBound.
 theorem Natural.less_or_equal_predecessor_less_or_equal
         (p upperBound : Natural) (successorLessOrEqual : successor(p) ≤ upperBound)
-        : p ≤ upperBound :=
+        : p ≤ upperBound := {
   calc p
-     ≤ successor(p)
-     ≤ upperBound
+     < successor(p)   by Natural.lt_successor
+     ≤ upperBound     by successorLessOrEqual;
+  done
+}
+
+-- ── The `<` ↔ `successor ≤` bridge ────────────────────────────────────
+-- Under the old foundation `a < b` was DEFINITIONALLY `successor(a) ≤ b`;
+-- now `<` is the opaque `∃`-relation, so the equivalence is a (cheap)
+-- theorem. Code that used to lean on the defeq routes through these.
+
+-- k < n  ⟹  successor(k) ≤ n.
+theorem Natural.successor_le_of_lt (k n : Natural) (h : k < n) : successor(k) ≤ n := {
+  obtain ⟨gap, equation⟩ by Natural.lt_elim;
+  calc successor(k) + gap
+     = (1 + k) + gap        by Natural.one_add(k)
+     = k + (1 + gap)        by ring
+     = n                     by equation
+     as shifted;
+  calc successor(k)
+     ≤ successor(k) + gap   by Natural.less_or_equal_add_right
+     = n                     by shifted
+}
+
+-- successor(k) ≤ n  ⟹  k < n: k < successor(k) ≤ n.
+theorem Natural.lt_of_successor_le (k n : Natural) (h : successor(k) ≤ n) : k < n :=
+  calc k
+     < successor(k)   by Natural.lt_successor
+     ≤ n              by h

@@ -62,7 +62,10 @@ theorem Natural.no_double_square (m : Natural)
     let kPositive : 1 ≤ k :=
         cases k with kIsZero {
           | zero => { absurd(calc successor(0) ≤ subject = 2 * k = 2 * 0 = 0) }
-          | successor(predecessor) => { claim }
+          | successor(predecessor) => {
+              claim 1 ≤ successor(predecessor) by Natural.successor_positive;
+              done by substituting kIsZero
+            }
         };
 
     -- Substituting subject = 2·k and cancelling the leading 2 leaves
@@ -79,8 +82,10 @@ theorem Natural.no_double_square (m : Natural)
     -- The new instance is smaller: n < subject. (Otherwise subject ≤ n
     -- gives subject² ≤ n² < 2·n² = subject², which is absurd.)
     cases Natural.compare_strict(n, subject) {
-      | Natural.StrictComparison.below(nBelowSubject) =>
-          inductionHypothesis(n, nBelowSubject, k, nPositive, kPositive, descendedEquation)
+      | Natural.StrictComparison.below(nBelowSubject) => {
+          claim n < subject by Natural.lt_of_successor_le;
+          inductionHypothesis(n, (n < subject), k, nPositive, kPositive, descendedEquation)
+        }
       | Natural.StrictComparison.atLeast(subjectAtMostN) => {
           claim subject * subject ≤ subject * n;
           claim n * subject ≤ n * n;

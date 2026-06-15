@@ -233,17 +233,22 @@ theorem Natural.le_antisymmetric (a b : Natural) (aLeB : a ≤ b) (bLeA : b ≤ 
 -- A ≤ gap as an explicit additive decomposition, with the summand on
 -- the LEFT (so an induction over it reduces structurally).
 theorem Natural.le_to_add (smaller larger : Natural)
-        : smaller ≤ larger
-          → ∃ (k : Natural). larger = k + smaller
-  | LessOrEqual.reflexivity(commonValue) =>
-      witness 0 with done
-  | LessOrEqual.step(_, largerPredecessor, subProof) => {
-      obtain ⟨k', preEq⟩
-          from Natural.le_to_add(smaller, largerPredecessor, subProof);
-      -- larger = successor(largerPredecessor) = successor(k' + smaller)
-      --        = successor(k') + smaller.
-      witness successor(k') with
-          congruenceOf(successor, preEq)
+        (proof : smaller ≤ larger)
+        : ∃ (k : Natural). larger = k + smaller :=
+  cases proof {
+    | Or.introduceLeft(lessThan) => {
+        obtain ⟨c, equation⟩ by Natural.lt_elim;
+        -- larger = smaller + (1 + c) = (1 + c) + smaller.
+        witness (1 + c) with
+            (calc larger
+                = smaller + (1 + c)   by equation
+                = (1 + c) + smaller   by Natural.add_commutative(smaller, 1 + c))
+      }
+    | Or.introduceRight(equal) =>
+        witness 0 with
+            (calc larger
+                = smaller       by equal
+                = 0 + smaller   by Natural.zero_add(smaller))
   }
 
 

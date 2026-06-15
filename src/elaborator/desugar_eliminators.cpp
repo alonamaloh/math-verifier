@@ -37,48 +37,65 @@ ExpressionPointer Elaborator::desugarAbsurd(
             }
         }
 
-        // Shape: `LessOrEqual(successor(K), zero)`. The type is built
-        // as `App(App(LessOrEqual, successor(K)), zero)`. Both
-        // endpoints are WHNF'd so that definitional reductions like
-        // `successor(k) + b → successor(k + b)` expose the
-        // constructor.
+        // Shape: `successor(K) ≤ 0`. `Natural.LessOrEqual` is a transparent
+        // definition (`a < b ∨ a = b`), so the witness's inferred type may
+        // arrive folded (a plain hypothesis: `Natural.LessOrEqual(succ K, 0)`)
+        // OR already unfolded (a `rewrite`/`calc`-produced term:
+        // `Or(succ K < 0, succ K = 0)`). WHNF normalises both to the `Or`
+        // form, so we match THAT: an `Or` whose left disjunct is
+        // `Natural.LessThan(successor(K), zero)`. The impossibility routes
+        // through `not_less_or_equal_successor_zero`, whose `successor(K) ≤ 0`
+        // argument type is definitionally equal to this `Or`. (`successor(K)`
+        // is exposed by WHNF, so numerals like `2 = successor(1)` match too.)
         if (!falseProof) {
-            auto* outerApp =
+            // witnessType : Or(leftDisjunct, _) = App(App(Or, left), right)
+            auto* orOuter =
                 std::get_if<Application>(&witnessType->node);
-            if (outerApp) {
-                ExpressionPointer rhsNormalised = weakHeadNormalForm(
-                    environment_, outerApp->argument);
-                auto* zeroConstant = std::get_if<Constant>(
-                    &rhsNormalised->node);
-                bool rhsIsZero = zeroConstant
-                    && zeroConstant->name == "zero";
-                auto* innerApp = std::get_if<Application>(
-                    &outerApp->function->node);
-                if (rhsIsZero && innerApp) {
-                    auto* head = std::get_if<Constant>(
-                        &innerApp->function->node);
-                    if (head && head->name == "LessOrEqual") {
+            auto* orInner = orOuter
+                ? std::get_if<Application>(&orOuter->function->node)
+                : nullptr;
+            auto* orHead = orInner
+                ? std::get_if<Constant>(&orInner->function->node)
+                : nullptr;
+            if (orHead && orHead->name == "Or") {
+                // left disjunct : `Natural.LessThan(L, zero)`
+                ExpressionPointer leftDisjunct = weakHeadNormalForm(
+                    environment_, orInner->argument);
+                auto* lessThanOuter =
+                    std::get_if<Application>(&leftDisjunct->node);
+                if (lessThanOuter) {
+                    ExpressionPointer lessThanRhs = weakHeadNormalForm(
+                        environment_, lessThanOuter->argument);
+                    auto* lessThanRhsZero =
+                        std::get_if<Constant>(&lessThanRhs->node);
+                    auto* lessThanInner = std::get_if<Application>(
+                        &lessThanOuter->function->node);
+                    auto* lessThanHead = lessThanInner
+                        ? std::get_if<Constant>(
+                              &lessThanInner->function->node)
+                        : nullptr;
+                    if (lessThanRhsZero
+                        && lessThanRhsZero->name == "zero"
+                        && lessThanHead
+                        && lessThanHead->name == "Natural.LessThan") {
                         ExpressionPointer lhsNormalised =
                             weakHeadNormalForm(
-                                environment_, innerApp->argument);
+                                environment_, lessThanInner->argument);
                         auto* succApp = std::get_if<Application>(
                             &lhsNormalised->node);
-                        if (succApp) {
-                            auto* succHead = std::get_if<Constant>(
-                                &succApp->function->node);
-                            if (succHead
-                                && succHead->name == "successor") {
-                                ExpressionPointer kValue =
-                                    succApp->argument;
-                                ExpressionPointer call = makeConstant(
-                                    "Natural.not_less_or_equal_successor_zero",
-                                    {});
-                                call = makeApplication(
-                                    std::move(call), kValue);
-                                call = makeApplication(
-                                    std::move(call), witnessKernel);
-                                falseProof = std::move(call);
-                            }
+                        auto* succHead = succApp
+                            ? std::get_if<Constant>(
+                                  &succApp->function->node)
+                            : nullptr;
+                        if (succHead && succHead->name == "successor") {
+                            ExpressionPointer call = makeConstant(
+                                "Natural.not_less_or_equal_successor_zero",
+                                {});
+                            call = makeApplication(
+                                std::move(call), succApp->argument);
+                            call = makeApplication(
+                                std::move(call), witnessKernel);
+                            falseProof = std::move(call);
                         }
                     }
                 }

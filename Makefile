@@ -144,19 +144,20 @@ tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
 # just these headliner files plus their transitive dependencies (wired by
 # library-depends.mk) — the fast Phase-0 iteration loop, so a keystone
 # elaborator change re-checks this core in ~a second instead of the whole
-# library. Chosen to span every complexity (see the plan's §5.1 matrix):
-#   Integer/{basics,addition}          binary quotient lift (WS3 worst case)
-#   Real/harmonic_series               1+n induction + characterising lemma
-#   Algebra/principal_ideal_domain     abstract Ring.carrier; cite-only prover
-#   Set/finite                         dependent cardinals (CIC-ish corner)
-#   Rational/order_multiplication      polymorphic Quotient.exact + successor
-#   Rational/{halve,reciprocal}        value-level successor leaks
+# library. Chosen to span every complexity (see the plan's §5.1 matrix)
+# while staying SHALLOW — the import-closure size (in parens) is kept small
+# so the baby build is genuinely agile (max 21 vs 93 for the Real tower):
+#   Integer/basics (8)        quotient construction
+#   Integer/addition (9)      binary quotient lift (WS3 6-decl worst case)
+#   Integer/cancellation (21) polymorphic Quotient.exact + universe pain
+#   Lists/length (10)         1+n induction + characterising lemma (keystone)
+#   Algebra/ring_lemmas (6)   abstract Ring.carrier; cite-only over bundles
+#   Set/finite (13)           dependent cardinals (CIC-ish corner)
 BABY_MATH_FILES := \
     library/Integer/basics.math library/Integer/addition.math \
-    library/Rational/halve.math library/Rational/reciprocal.math \
-    library/Rational/order_multiplication.math \
-    library/Real/harmonic_series.math \
-    library/Algebra/principal_ideal_domain.math \
+    library/Integer/cancellation.math \
+    library/Lists/length.math \
+    library/Algebra/ring_lemmas.math \
     library/Set/finite.math
 BABY_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(BABY_MATH_FILES))
 BABY_MATHV_IFACE_FILES := $(BABY_MATHV_FILES:.mathv=.mathv.iface)

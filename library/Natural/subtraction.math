@@ -19,24 +19,21 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 
--- If b ≤ a then ∃ c. a = b + c. By induction on the ≤ derivation:
--- reflexivity gives c = 0; the step case takes the IH witness and bumps it
--- through successor + add_successor.
+-- If b ≤ a then ∃ c. a = b + c. Read straight off `≤`'s meaning
+-- (`b < a ∨ b = a`): equality gives c = 0; the strict-order witness `c'`
+-- with `b + (1 + c') = a` gives c = 1 + c'.
 theorem Natural.subtraction_witness (b a : Natural)
         (proof : b ≤ a) : ∃ (c : Natural). a = b + c :=
-  by_induction on proof with IH {
-    case LessOrEqual.reflexivity(commonValue):
-        -- b = a = commonValue, so c = 0.
-        witness 0 with calc commonValue = commonValue + 0
-    case LessOrEqual.step(smaller, predecessorOfA, _): {
-        -- a = successor(predecessorOfA), smaller ≤ predecessorOfA; the IH
-        -- gives predecessorOfA = smaller + cPrime, so c = successor(cPrime).
-        obtain ⟨cPrime, predEquality⟩ from IH;
-        witness successor(cPrime) with
-            calc successor(predecessorOfA)
-               = successor(smaller + cPrime)
-               = smaller + successor(cPrime)
+  cases proof {
+    | Or.introduceLeft(lessThan) => {
+        obtain ⟨cPrime, equation⟩ by Natural.lt_elim;
+        witness (1 + cPrime) with (calc a = b + (1 + cPrime)   by equation)
       }
+    | Or.introduceRight(equal) =>
+        witness 0 with
+            calc a
+               = b       by equal
+               = b + 0   by Natural.add_zero(b)
   }
 
 -- Totality: for any a, b, either a ≤ b or b ≤ a. The successor case

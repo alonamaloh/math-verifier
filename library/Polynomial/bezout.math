@@ -125,7 +125,7 @@ theorem Polynomial.gcd_bezout (r : Ring)
             ∧ Ring.divides(Polynomial.ring(r), m, x)
             ∧ Ring.divides(Polynomial.ring(r), m, y),
     (subject : Natural)
-             (IH : (k : Natural) → successor(k) ≤ subject
+             (IH : (k : Natural) → k < subject
                    → (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
                      → Polynomial.DegreeLessThan(r, y, k)
                      → (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
@@ -153,8 +153,9 @@ theorem Polynomial.gcd_bezout (r : Ring)
           | no yNotZero => {
               obtain ⟨degreeY, yDegreeBound, leadingNonzero⟩
                   from Polynomial.exists_degree_of_nonzero(r, y, yNotZero);
-              claim successorDegreeLessOrEqualBound : successor(degreeY) ≤ subject
+              claim successor(degreeY) ≤ subject
                   by Natural.not_le_implies_successor_le;
+              claim degreeY < subject by Natural.lt_of_successor_le;
               obtain ⟨quotient, remainder, divisionEquation, remainderBound⟩
                   from Polynomial.division_with_remainder(r, commutativity, y, degreeY,
                            yDegreeBound,
@@ -163,7 +164,7 @@ theorem Polynomial.gcd_bezout (r : Ring)
                            x);
               -- divisionEquation : x = quotient·y + remainder.
               obtain ⟨m, aRest, bRest, restEquation, mDividesY, mDividesRemainder⟩
-                  from IH(degreeY, successorDegreeLessOrEqualBound, remainder, remainderBound, y);
+                  from IH(degreeY, (degreeY < subject), remainder, remainderBound, y);
               -- restEquation : m = aRest·y + bRest·remainder.
               calc (x + (- (quotient * y)))
                          = (((quotient * y) + remainder) + (- (quotient * y)))

@@ -26,17 +26,30 @@ import Equality.basics
 import Logic.basics
 import Logic.exists
 
--- View lemma: any LessOrEqual proof is either an equality (reflexivity
--- constructor) or has an upper bound that is `successor` of something.
+-- View lemma: any `s ≤ b` is either an equality or has an upper bound that
+-- is `successor` of something. With `≤` now `< ∨ =`, the equality case is
+-- the right disjunct directly; the strict case turns its witness `c`
+-- (`s + (1 + c) = b`) into `b = successor(s + c)` with `s ≤ s + c`.
 theorem LessOrEqual.invert (s b : Natural)
         : s ≤ b
-          → s = b ∨ ∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ s ≤ bPredecessor
-  | LessOrEqual.reflexivity(commonValue) =>
-      Or.introduceLeft(done)
-  | LessOrEqual.step(_, bPredecessorD, subproof) =>
-      Or.introduceRight(
-          ⟨bPredecessorD,
-           ⟨done, subproof⟩⟩)
+          → s = b ∨ ∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ s ≤ bPredecessor :=
+  (proof : s ≤ b) ↦
+    cases proof {
+      | Or.introduceLeft(lessThan) => {
+          obtain ⟨c, equation⟩ by Natural.lt_elim;
+          claim s ≤ s + c by Natural.less_or_equal_add_right;
+          calc b
+             = s + (1 + c)        by equation
+             = s + successor(c)   by Natural.one_add(c)
+             = successor(s + c)   by Natural.add_successor(s, c)
+             as bIsSuccessor;
+          Or.introduceRight(
+              witness (s + c) with
+                  And.introduction(bIsSuccessor, (s ≤ s + c)))
+        }
+      | Or.introduceRight(equal) =>
+          Or.introduceLeft(equal)
+    }
 
 -- successor(k) ≰ 0. Apply invert and discharge both disjuncts via
 -- Natural.successor_not_zero.
@@ -166,7 +179,20 @@ theorem Natural.strong_induction
                 → P(n))
         (n : Natural)
         : P(n) := {
+  -- `for_all_below` is stated with the `successor(k) ≤ m` step form; bridge
+  -- the caller's `<`-step to it (and the `<`-result back) through
+  -- `successor_le_of_lt` — `<` is no longer defeq to `successor ≤`.
+  claim adaptedStep
+        : (m : Natural) → ((k : Natural) → successor(k) ≤ m → P(k)) → P(m)
+      by (m : Natural) (belowM : (k : Natural) → successor(k) ≤ m → P(k)) ↦
+          step(m, (k : Natural) (kLessThanM : k < m) ↦ {
+            claim successor(k) ≤ m by Natural.successor_le_of_lt;
+            belowM(k, (successor(k) ≤ m))
+          });
   claim below : (k : Natural) → k < n → P(k)
-      by Natural.for_all_below;
+      by (k : Natural) (kLessThanN : k < n) ↦ {
+        claim successor(k) ≤ n by Natural.successor_le_of_lt;
+        Natural.for_all_below(P, adaptedStep, n, k, (successor(k) ≤ n))
+      };
   step(n, below)
 }

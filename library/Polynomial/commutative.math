@@ -67,17 +67,18 @@ theorem Polynomial.Sum.extensional_range (r : Ring)
           → ((i : Natural) → i ≤ n → f(i) = g(i))
           → Polynomial.Sum(r, f, n) = Polynomial.Sum(r, g, n)
   | zero => (h : (i : Natural) → i ≤ 0 → f(i) = g(i)) ↦
-      h(0, LessOrEqual.reflexivity(0))
+      h(0, Natural.LessOrEqual.reflexive(0))
   | successor(k) => (h : (i : Natural) → i ≤ successor(k) → f(i) = g(i)) ↦
       calc Polynomial.Sum(r, f, successor(k))
          = (Polynomial.Sum(r, f, k) + f(successor(k)))
          = (Polynomial.Sum(r, g, k) + f(successor(k)))
              by Polynomial.Sum.extensional_range(r, f, g, k,
                     (i : Natural) (smaller : i ≤ k) ↦
-                        h(i, LessOrEqual.transitive(i, k, successor(k),
-                               Natural.le_successor(k), smaller)))
+                        h(i, (calc i
+                                 ≤ k             by smaller
+                                 ≤ successor(k)  by Natural.le_successor)))
          = (Polynomial.Sum(r, g, k) + g(successor(k)))
-             by h(successor(k), LessOrEqual.reflexivity(successor(k)))
+             by h(successor(k), Natural.LessOrEqual.reflexive(successor(k)))
          = Polynomial.Sum(r, g, successor(k))
 
 -- Register the range-restricted variant too: a `Sum(r,f,n) = Sum(r,g,n)`

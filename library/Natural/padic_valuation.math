@@ -198,7 +198,7 @@ theorem Natural.padic_valuation_step_fuel_stable
               = Natural.padic_valuation_step(f2, prime, t),
       (n : Natural)
                (inductionHypothesis :
-                   (k : Natural) → successor(k) ≤ n
+                   (k : Natural) → k < n
                      → (f1 f2 : Natural)
                          → successor(0) ≤ k → k ≤ f1 → k ≤ f2
                          → Natural.padic_valuation_step(f1, prime, k)
@@ -211,20 +211,18 @@ theorem Natural.padic_valuation_step_fuel_stable
           (cases f1 {
              | zero =>
                  (refinedNLeF1 : n ≤ 0) ↦
-                   absurd(
-                       LessOrEqual.transitive(
-                           successor(0), n, 0,
-                           refinedNLeF1, nPositive))
+                   absurd((calc 1
+                              ≤ n   by nPositive
+                              ≤ 0   by refinedNLeF1))
              | successor(f1') =>
                  (refinedNLeF1 : n ≤ successor(f1')) ↦
                    -- Case on f2 next.
                    (cases f2 {
                       | zero =>
                           (refinedNLeF2 : n ≤ 0) ↦
-                            absurd(
-                                LessOrEqual.transitive(
-                                    successor(0), n, 0,
-                                    refinedNLeF2, nPositive))
+                            absurd((calc 1
+                                       ≤ n   by nPositive
+                                       ≤ 0   by refinedNLeF2))
                       | successor(f2') =>
                           (refinedNLeF2 : n ≤ successor(f2')) ↦
                             -- Both fuels are successors. Case on modulo.
@@ -238,11 +236,13 @@ theorem Natural.padic_valuation_step_fuel_stable
                                            f2', prime, Natural.divide(prime, n)))
                                             by inductionHypothesis(
                                                    Natural.divide(prime, n),
-                                                   Natural.divide_lt_when_divides(
-                                                       prime, n,
-                                                       primeAtLeastTwo,
-                                                       nPositive,
-                                                       refinedModuloEq),
+                                                   Natural.lt_of_successor_le(
+                                                       Natural.divide(prime, n), n,
+                                                       Natural.divide_lt_when_divides(
+                                                           prime, n,
+                                                           primeAtLeastTwo,
+                                                           nPositive,
+                                                           refinedModuloEq)),
                                                    f1', f2',
                                                    Natural.divide_positive_when_divides(
                                                        prime, n,
@@ -251,27 +251,15 @@ theorem Natural.padic_valuation_step_fuel_stable
                                                    Natural.less_or_equal_successor_successor_descend(
                                                        Natural.divide(prime, n),
                                                        f1',
-                                                       LessOrEqual.transitive(
-                                                           successor(Natural.divide(prime, n)),
-                                                           n, successor(f1'),
-                                                           refinedNLeF1,
-                                                           Natural.divide_lt_when_divides(
-                                                               prime, n,
-                                                               primeAtLeastTwo,
-                                                               nPositive,
-                                                               refinedModuloEq))),
+                                                       (calc successor(Natural.divide(prime, n))
+                                                           ≤ n               by Natural.divide_lt_when_divides
+                                                           ≤ successor(f1')  by refinedNLeF1)),
                                                    Natural.less_or_equal_successor_successor_descend(
                                                        Natural.divide(prime, n),
                                                        f2',
-                                                       LessOrEqual.transitive(
-                                                           successor(Natural.divide(prime, n)),
-                                                           n, successor(f2'),
-                                                           refinedNLeF2,
-                                                           Natural.divide_lt_when_divides(
-                                                               prime, n,
-                                                               primeAtLeastTwo,
-                                                               nPositive,
-                                                               refinedModuloEq))))
+                                                       (calc successor(Natural.divide(prime, n))
+                                                           ≤ n               by Natural.divide_lt_when_divides
+                                                           ≤ successor(f2')  by refinedNLeF2)))
                                      = Natural.padic_valuation_step(
                                            successor(f2'), prime, n)
                               | successor(predM) =>
@@ -383,7 +371,7 @@ theorem Natural.padic_valuation_strip
                          primeAtLeastTwo, quotientPositive,
                          Natural.less_or_equal_successor_successor_descend(
                              quotient, predPQ, successorQuotientLeSuccessor),
-                         LessOrEqual.reflexivity(quotient))
+                         Natural.LessOrEqual.reflexive(quotient))
     }
   }
 }
@@ -443,7 +431,7 @@ theorem Natural.padic_valuation_multiplicative
                     + Natural.padic_valuation(prime, b'),
       (n : Natural)
                (inductionHypothesis :
-                   (k : Natural) → successor(k) ≤ n
+                   (k : Natural) → k < n
                      → (a' b' : Natural)
                          → successor(0) ≤ a' → successor(0) ≤ b'
                          → a' + b' = k
@@ -469,14 +457,15 @@ theorem Natural.padic_valuation_multiplicative
                 -- IH on (divide(p, a'), b'): succ(divide + b') ≤ a' + b' = n.
                 calc successor(Natural.divide(prime, a') + b')
                        ≤ a' + b'
-                       = n as recursiveSumLeN;
+                       = n;
+                claim Natural.divide(prime, a') + b' < n by Natural.lt_of_successor_le;
                 claim Natural.padic_valuation(
                           prime, Natural.divide(prime, a') * b')
                       = Natural.padic_valuation(prime, Natural.divide(prime, a'))
                             + Natural.padic_valuation(prime, b')
                   by inductionHypothesis(
                          Natural.divide(prime, a') + b',
-                         recursiveSumLeN,
+                         (Natural.divide(prime, a') + b' < n),
                          Natural.divide(prime, a'), b',
                          divideAPositive, b'Positive,
                          reflexivity(Natural,
@@ -526,7 +515,8 @@ theorem Natural.padic_valuation_multiplicative
                              = successor(Natural.divide(prime, b') + a')
                              ≤ b' + a'
                              = a' + b'
-                             = n as recursiveSumLeN;
+                             = n;
+                      claim a' + Natural.divide(prime, b') < n by Natural.lt_of_successor_le;
                       claim Natural.padic_valuation(
                                 prime, a' * Natural.divide(prime, b'))
                             = Natural.padic_valuation(prime, a')
@@ -534,7 +524,7 @@ theorem Natural.padic_valuation_multiplicative
                                         prime, Natural.divide(prime, b'))
                         by inductionHypothesis(
                                a' + Natural.divide(prime, b'),
-                               recursiveSumLeN,
+                               (a' + Natural.divide(prime, b') < n),
                                a', Natural.divide(prime, b'),
                                a'Positive, divideBPositive,
                                reflexivity(Natural,
@@ -624,7 +614,7 @@ theorem Natural.padic_valuation_power_divides
               Natural.power(Natural.padic_valuation(prime, m), prime), m),
       (m : Natural)
                (inductionHypothesis :
-                   (k : Natural) → successor(k) ≤ m
+                   (k : Natural) → k < m
                      → Natural.divides(
                            Natural.power(Natural.padic_valuation(prime, k), prime),
                            k)) ↦
@@ -662,8 +652,8 @@ theorem Natural.padic_valuation_power_divides
                      claim 1 ≤ successor(predQ);
                        -- succ(q) < m. From m = p * q with p ≥ 2, q ≥ 1:
                        -- succ(q) ≤ p * q = m.
-                       claim succQLeM
-                             : successor(successor(predQ)) ≤ m;
+                       claim successor(successor(predQ)) ≤ m;
+                       claim successor(predQ) < m by Natural.lt_of_successor_le;
                        -- IH on succ(predQ): p^v_p(succ(predQ)) | succ(predQ).
                        claim Natural.divides(
                                    Natural.power(
@@ -671,7 +661,7 @@ theorem Natural.padic_valuation_power_divides
                                            prime, successor(predQ)), prime),
                                    successor(predQ))
                          by inductionHypothesis(
-                                successor(predQ), succQLeM);
+                                successor(predQ), (successor(predQ) < m));
                        -- Apply strip: v_p(p * succ(predQ)) = succ(v_p(succ(predQ))).
                        claim valuationProduct
                              : Natural.padic_valuation(
@@ -1302,7 +1292,7 @@ theorem Integer.padic_valuation_absolute_value_natural_ultrametric_when_le
               Natural.padic_valuation(
                   prime, Integer.absolute_value_natural(A)),
               Integer.absolute_value_natural(A),
-              LessOrEqual.reflexivity(
+              Natural.LessOrEqual.reflexive(
                   Natural.padic_valuation(
                       prime, Integer.absolute_value_natural(A)))),
           Natural.padic_valuation_ge_implies_power_divides(
