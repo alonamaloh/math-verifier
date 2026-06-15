@@ -251,11 +251,9 @@ migration; each cascades:
    defeq `k < n` broke ~100 `successor` sites across the finite-cardinals
    consumers (`finite_product`/`pigeonhole`/`sum`), because the auto-prover
    and `calc` match **structurally** and don't see through the `<` definition
-   (`Natural.LessThan := successor(a) ≤ b`). **Highest-leverage next infra:
-   make the prover/calc matcher unfold a definition like `<` to its defeq
-   body when matching**, so a `<`-spelling interface change is invisible to
-   consumers. Without it, every value-level migration rewrites every
-   downstream calc step by hand.
+   (`Natural.LessThan := successor(a) ≤ b`). The fix is NOT a smarter matcher
+   (that would *automate* defeq-exploitation, the opposite of what we want) but
+   **opacity** — see the decision below.
 2. **Up, to cast/order lemmas.** `Rational/halve`'s `successor` are the
    rational rep's `denominator = successor(denominatorMinusOne)` encoding,
    reasoned about via upstream lemmas stated in `successor` form
@@ -271,11 +269,47 @@ migration; each cascades:
    combinator exposing only the `f(1+k) = …` recurrence — a companion piece
    to the induction keystone, to be built before the recursion-heavy files.
 
-Net: build (1) the defeq-aware matcher next (it unblocks the value-level
-bulk), then (3) the recursion combinator, then sweep bottom-up
-(Integer → Rational → Set/Lists → Polynomial → Real/Complex) per §7. The
-representative core stays the proving ground, but it is migrated **in
-dependency order**, not by picking a file in the middle of the tower.
+### 5.6 Decision: opaque-by-default, refined — and the order foundation (validated 2026-06-15)
+
+**Refined principle.** "Opaque by default" means *seal genuine implementation
+choices*, not "opacify literally everything." A pure notational convenience —
+where the body *is* the meaning, not an implementation — may stay transparent.
+
+**Measured cost of opacity (the greenfield question).** A spike making the
+single most-used relation, `Natural.LessThan`, opaque (body unchanged, two
+boundary lemmas) and rebuilding the whole library broke **exactly 3 files**
+(`division`, `prime_divisor`, `strong_recursion`) — every break a defeq-exploit
+fixable by routing through a boundary lemma, none needing restructuring.
+Opacity-retrofit cost scales with the number of defeq-*exploiting* sites, not
+*uses* (everything already going through a lemma interface is unaffected). So
+retrofit is bounded and mechanical → **transform, do not greenfield.** (Caveat:
+a recursive-function body like `multiply` will have more exploit-sites than a
+relation alias; spike one before fully generalizing.)
+
+**The order foundation (decided + prototyped).** Invert the `<`/`≤` primitivity:
+- `opaque definition Natural.LessThan (a b) := ∃ c. a + (1 + c) = b` — the
+  foundation, **successor-free** (founded on `+`/`1`), body visible only to a
+  two-lemma boundary (`lt_intro` / `lt_elim`).
+- `definition Natural.LessOrEqual := a < b ∨ a = b` — **transparent**, a
+  notational convenience (`< ∨ =` is its meaning).
+
+Prototyped end-to-end in `library/Test/order_proto.math` (namespace `Proto`):
+the boundary lemmas, the step `a < 1 + a`, irreflexivity, transitivity, the
+three `≤` laws, **and trichotomy** (the elimination principle) all verify — the
+core came out first-try, with `ring` + `substituting` carrying the arithmetic.
+This confirms the opaque-`<` / transparent-`≤` footing is clean. (`strong_induction`
+re-derives the same way — trichotomy already exercises the inversion it needs.)
+
+This replaces the "defeq-aware matcher" idea entirely: opacity makes the
+matcher's ignorance of the body *correct*, and consumers reason through the
+interface.
+
+Net: (1) **migrate the order layer onto this foundation first** — it is the
+bottom of the tower and everything sits on it; promote `order_proto` into
+`Natural/order` + restate the order/strong-induction lemmas on the boundary.
+(2) Build the recursion combinator (finding #3) before the recursion-heavy
+files. (3) Then sweep bottom-up (Integer → Rational → Set/Lists → Polynomial →
+Real/Complex) per §7, migrating the representative core **in dependency order**.
 
 ---
 

@@ -1,0 +1,144 @@
+-- PROTOTYPE (PLAN_LUX_TRANSITION design spike): order founded on an
+-- opaque, successor-free `<`, with `≤` a transparent `< ∨ =` convenience.
+-- Validates that the core order interface comes out clean on this footing.
+
+module Test.order_proto
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.one_plus_induction
+import Logic.basics
+import Logic.exists
+import Equality.basics
+
+-- The foundation: `a < b` iff b exceeds a by at least one. Successor-free
+-- (only `+` and `1`), and opaque — its body is visible ONLY to the two
+-- boundary lemmas below.
+opaque definition Proto.lt (a b : Natural) : Proposition :=
+  ∃ (c : Natural). a + (1 + c) = b
+
+-- `≤` is mere notation on top of `<`: transparent, because `< ∨ =` IS its
+-- meaning, not an implementation choice.
+definition Proto.le (a b : Natural) : Proposition :=
+  Proto.lt(a, b) ∨ a = b
+
+-- ── Boundary (the only place `<`'s body is seen) ──────────────────────
+theorem Proto.lt_intro (a b c : Natural) (h : a + (1 + c) = b) : Proto.lt(a, b) :=
+  unfold Proto.lt in ⟨c, h⟩
+
+theorem Proto.lt_elim (a b : Natural) (h : Proto.lt(a, b))
+        : ∃ (c : Natural). a + (1 + c) = b :=
+  unfold Proto.lt in h
+
+-- ── Core interface (body-blind from here down) ────────────────────────
+
+-- The step: a < 1 + a (successor-free).
+theorem Proto.lt_one_plus (a : Natural) : Proto.lt(a, 1 + a) :=
+  Proto.lt_intro(a, 1 + a, 0, ring)
+
+-- Irreflexivity.
+theorem Proto.lt_irreflexive (a : Natural) : ¬ Proto.lt(a, a) :=
+  (h : Proto.lt(a, a)) ↦ {
+    obtain ⟨c, hc⟩ from Proto.lt_elim(a, a, h);
+    claim sumEq : a + (1 + c) = a + 0
+        by calc a + (1 + c)
+              = a       by hc
+              = a + 0   by Natural.add_zero(a);
+    claim oneC : 1 + c = 0 by Natural.add_cancel_left(a, 1 + c, 0, sumEq);
+    claim succEq : successor(c) = 0
+        by calc successor(c)
+              = 1 + c   by Natural.one_add(c)
+              = 0       by oneC;
+    Natural.successor_not_zero(c)(succEq)
+  }
+
+-- Transitivity.
+theorem Proto.lt_transitive (a b c : Natural)
+        (hab : Proto.lt(a, b)) (hbc : Proto.lt(b, c)) : Proto.lt(a, c) := {
+  obtain ⟨c1, h1⟩ from Proto.lt_elim(a, b, hab);
+  obtain ⟨c2, h2⟩ from Proto.lt_elim(b, c, hbc);
+  Proto.lt_intro(a, c, c1 + (1 + c2),
+      calc a + (1 + (c1 + (1 + c2)))
+         = (a + (1 + c1)) + (1 + c2)   by ring
+         = b + (1 + c2)                 by substituting h1
+         = c                            by h2)
+}
+
+-- ── ≤ on top, for free from transparency ──────────────────────────────
+theorem Proto.le_reflexive (a : Natural) : Proto.le(a, a) :=
+  Or.introduceRight(reflexivity(Natural, a))
+
+theorem Proto.lt_weaken (a b : Natural) (h : Proto.lt(a, b)) : Proto.le(a, b) :=
+  Or.introduceLeft(h)
+
+theorem Proto.le_transitive (a b c : Natural)
+        (hab : Proto.le(a, b)) (hbc : Proto.le(b, c)) : Proto.le(a, c) :=
+  cases hab {
+    | Or.introduceLeft(ab) =>
+        cases hbc {
+          | Or.introduceLeft(bc) => Or.introduceLeft(Proto.lt_transitive(a, b, c, ab, bc))
+          | Or.introduceRight(bEqC) => Or.introduceLeft(rewrite(bEqC, ab))
+        }
+    | Or.introduceRight(aEqB) =>
+        cases hbc {
+          | Or.introduceLeft(bc) => Or.introduceLeft(rewrite(Equality.symmetry(aEqB), bc))
+          | Or.introduceRight(bEqC) => Or.introduceRight(calc a = b by aEqB = c by bEqC)
+        }
+  }
+
+-- ── Trichotomy: the elimination test (does opaque `<` support case
+-- analysis?). Induction on a, with b universal (Pi-returning motive).
+theorem Proto.trichotomy (a : Natural)
+        : (b : Natural) → Proto.lt(a, b) ∨ a = b ∨ Proto.lt(b, a) :=
+  by_induction on a with IH {
+    case base: (b : Natural) ↦
+      cases Natural.zero_or_successor(b) {
+        | Or.introduceLeft(bZero) =>
+            Or.introduceRight(Or.introduceLeft(Equality.symmetry(bZero)))
+        | Or.introduceRight(bSucc) => {
+            obtain ⟨k, bEqSucc⟩ from bSucc;
+            Or.introduceLeft(Proto.lt_intro(0, b, k,
+                calc 0 + (1 + k)
+                   = 1 + k         by Natural.zero_add(1 + k)
+                   = successor(k)  by Natural.one_add(k)
+                   = b             by Equality.symmetry(bEqSucc)))
+          }
+      }
+    case step(a'): (b : Natural) ↦
+      cases IH(b) {
+        | Or.introduceLeft(a'LtB) => {
+            obtain ⟨c, hc⟩ from Proto.lt_elim(a', b, a'LtB);
+            cases Natural.zero_or_successor(c) {
+              | Or.introduceLeft(cZero) =>
+                  Or.introduceRight(Or.introduceLeft(
+                      calc 1 + a'
+                         = a' + (1 + 0)  by ring
+                         = a' + (1 + c)  by substituting Equality.symmetry(cZero)
+                         = b             by hc))
+              | Or.introduceRight(cSucc) => {
+                  obtain ⟨c', cEqSucc⟩ from cSucc;
+                  claim cBridge : 1 + c' = c
+                      by calc 1 + c'
+                            = successor(c')  by Natural.one_add(c')
+                            = c              by Equality.symmetry(cEqSucc);
+                  Or.introduceLeft(Proto.lt_intro(1 + a', b, c',
+                      calc (1 + a') + (1 + c')
+                         = a' + (1 + (1 + c'))  by ring
+                         = a' + (1 + c)         by substituting cBridge
+                         = b                    by hc))
+                }
+            }
+          }
+        | Or.introduceRight(rest) =>
+            cases rest {
+              | Or.introduceLeft(a'EqB) =>
+                  Or.introduceRight(Or.introduceRight(
+                      rewrite(a'EqB, Proto.lt_one_plus(a'))))
+              | Or.introduceRight(bLtA') =>
+                  Or.introduceRight(Or.introduceRight(
+                      Proto.lt_transitive(b, a', 1 + a', bLtA',
+                          Proto.lt_one_plus(a'))))
+            }
+      }
+  }
