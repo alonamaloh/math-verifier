@@ -126,6 +126,13 @@ public:
                 autoProveBudgetLimit_ = parsed;
             }
         }
+        // Experimental structuralDiff pre-tactic (purely syntactic
+        // congruence + local-context leaf discharge). Off by default while
+        // we A/B it against the library; MATH_STRUCTURAL_DIFF=1 enables it.
+        const char* structuralDiffFlag = std::getenv("MATH_STRUCTURAL_DIFF");
+        structuralDiffEnabled_ = structuralDiffFlag
+            && structuralDiffFlag[0] != '\0'
+            && structuralDiffFlag[0] != '0';
     }
 
     ~Elaborator() {
@@ -1237,6 +1244,31 @@ private:
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
         int line);
+
+    // Experimental structuralDiff pre-tactic (gated by MATH_STRUCTURAL_DIFF).
+    // Closes an equality goal `l = r` whose sides differ only at positions
+    // bridgeable by a local context fact, by PURELY SYNTACTIC congruence —
+    // never calling weakHeadNormalForm. At each differing node it first
+    // tries `tryContextFactMatch` on the whole pair (so `|nx| = 1+kx` is
+    // matched as a unit), and otherwise congruence-peels matching
+    // applications and recurses. nullptr on miss (falls through to the
+    // normal, defeq-heavy equality battery).
+    ExpressionPointer tryStructuralDiff(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders, int line);
+    ExpressionPointer structuralDiffProve(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer left, ExpressionPointer right,
+        ExpressionPointer carrierType, LevelPointer carrierLevel, int line);
+    // Cheap leaf discharge for structuralDiff: prove `left = right` from a
+    // LOCAL hypothesis only (no library scan, no autoFill). Endpoints are
+    // matched with a fuel-bounded defeq probe so e.g. `successor(kx)` still
+    // matches a goal written `1 + kx`. nullptr if nothing local matches.
+    ExpressionPointer tryLocalEqualityLeaf(
+        ExpressionPointer left, ExpressionPointer right,
+        ExpressionPointer carrierType, LevelPointer carrierLevel,
+        const std::vector<LocalBinder>& localBinders, int line);
+    bool structuralDiffEnabled_ = false;
 
     // Unified equality fact representation. Both local-hypothesis
     // equalities and library-lemma equalities (after subexpression

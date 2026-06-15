@@ -1300,6 +1300,260 @@ ExpressionPointer Elaborator::autoProveClaim(
             goalClosed, localBinders, line, transportBudget);
     }
 
+ExpressionPointer Elaborator::tryLocalEqualityLeaf(
+        ExpressionPointer left, ExpressionPointer right,
+        ExpressionPointer carrierType, LevelPointer carrierLevel,
+        const std::vector<LocalBinder>& localBinders, int line) {
+        int N = static_cast<int>(localBinders.size());
+        auto context = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer leftOpened = openOverLocalBinders(left, localBinders, N);
+        ExpressionPointer rightOpened =
+            openOverLocalBinders(right, localBinders, N);
+        auto defeq = [&](ExpressionPointer a, ExpressionPointer b) -> bool {
+            try {
+                return isDefinitionallyEqual(
+                    environment_, context, a, b, kDefeqProbeFuel);
+            } catch (...) { return false; }
+        };
+        auto eqType = [&](ExpressionPointer x, ExpressionPointer y) {
+            ExpressionPointer e = makeConstant("Equality", {carrierLevel});
+            e = makeApplication(std::move(e), carrierType);
+            e = makeApplication(std::move(e), x);
+            e = makeApplication(std::move(e), y);
+            return e;
+        };
+        auto transitivity = [&](ExpressionPointer x, ExpressionPointer y,
+                                ExpressionPointer z, ExpressionPointer p,
+                                ExpressionPointer q) {
+            ExpressionPointer t = makeConstant(
+                "Equality.transitivity", {carrierLevel});
+            t = makeApplication(std::move(t), carrierType);
+            t = makeApplication(std::move(t), x);
+            t = makeApplication(std::move(t), y);
+            t = makeApplication(std::move(t), z);
+            t = makeApplication(std::move(t), std::move(p));
+            t = makeApplication(std::move(t), std::move(q));
+            return t;
+        };
+        // Scan local hypotheses last-bound-first (most recent wins on ties),
+        // mirroring collectContextEqualities — but local ONLY for the primary
+        // match (no library scan there).
+        for (int b = N - 1; b >= 0; --b) {
+            autoProveSpend(1);
+            int lift = N - b;
+            ExpressionPointer hypReduced = weakHeadNormalForm(
+                environment_,
+                liftBoundVariables(localBinders[b].type, lift, 0));
+            EqualityComponents c;
+            try {
+                c = extractEqualityComponents(
+                    hypReduced, "structuralDiff local leaf", 0);
+            } catch (const ElaborateError&) { continue; }
+            ExpressionPointer proofRef = makeBoundVariable(N - 1 - b);
+            // Try the fact in both orientations: `lhs = rhs` (proofRef) and
+            // `rhs = lhs` (symmetry proofRef). In each, the oriented LHS must
+            // match the leaf's left under defeq.
+            for (int orient = 0; orient < 2; ++orient) {
+                ExpressionPointer ol =
+                    (orient == 0) ? c.leftEndpoint : c.rightEndpoint;
+                ExpressionPointer orr =
+                    (orient == 0) ? c.rightEndpoint : c.leftEndpoint;
+                if (!defeq(openOverLocalBinders(ol, localBinders, N),
+                           leftOpened)) {
+                    continue;
+                }
+                ExpressionPointer op;
+                if (orient == 0) {
+                    op = proofRef;
+                } else {
+                    ExpressionPointer s = makeConstant(
+                        "Equality.symmetry", {c.carrierUniverseLevel});
+                    s = makeApplication(std::move(s), c.carrierType);
+                    s = makeApplication(std::move(s), c.leftEndpoint);
+                    s = makeApplication(std::move(s), c.rightEndpoint);
+                    s = makeApplication(std::move(s), proofRef);
+                    op = std::move(s);
+                }
+                // Exact (defeq) RHS match: the oriented proof already has the
+                // goal type up to defeq.
+                if (defeq(openOverLocalBinders(orr, localBinders, N),
+                          rightOpened)) {
+                    return op;
+                }
+                // RHS differs (e.g. the opaque `successor(k)` vs `1+k` gap):
+                // bridge `orr = right` and chain by transitivity. The gap is
+                // a numeral/arithmetic normalisation, so the bridge goes to
+                // the equality battery (which runs `ring`), NOT a fact scan —
+                // but on the SMALL bridge term it is cheap, unlike running the
+                // battery on the whole step. Only reached once the LHS already
+                // matched a local hypothesis, so it is rare.
+                ExpressionPointer bridge = tryAutoProveEqualityGoal(
+                    eqType(orr, right), localBinders, line);
+                if (bridge) {
+                    return transitivity(ol, orr, right,
+                                        std::move(op), std::move(bridge));
+                }
+            }
+        }
+        return nullptr;
+    }
+
+ExpressionPointer Elaborator::tryStructuralDiff(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders, int line) {
+        // Cheap structural peek (no WHNF): is the goal already a fully
+        // applied `Equality.{u}(A, l, r)`? If not, decline immediately so we
+        // pay nothing on non-equality / unreduced goals.
+        auto* appR = std::get_if<Application>(&goalClosed->node);
+        if (!appR) return nullptr;
+        auto* appL = std::get_if<Application>(&appR->function->node);
+        if (!appL) return nullptr;
+        auto* appA = std::get_if<Application>(&appL->function->node);
+        if (!appA) return nullptr;
+        auto* head = std::get_if<Constant>(&appA->function->node);
+        if (!head || head->name != "Equality"
+            || head->universeArguments.size() != 1) return nullptr;
+        // We assemble Equality.congruence / .transitivity proofs; bail if the
+        // environment hasn't declared them yet (early bootstrap modules).
+        if (environment_.lookup("Equality.congruence") == nullptr
+            || environment_.lookup("Equality.transitivity") == nullptr) {
+            return nullptr;
+        }
+        ExpressionPointer carrierType = appA->argument;
+        ExpressionPointer left = appL->argument;
+        ExpressionPointer right = appR->argument;
+        LevelPointer carrierLevel = head->universeArguments[0];
+        // A reflexive goal is the battery's job (a one-shot conversion);
+        // we only handle genuinely differing sides.
+        if (structurallyEqual(left, right)) return nullptr;
+        return structuralDiffProve(localBinders, left, right,
+                                    carrierType, carrierLevel, line);
+    }
+
+ExpressionPointer Elaborator::structuralDiffProve(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer left, ExpressionPointer right,
+        ExpressionPointer carrierType, LevelPointer carrierLevel, int line) {
+        autoProveSpend(1);
+        // Discharge `left = right` as a unit from the LOCAL context. This is
+        // the LEAF rule, reached only where the two sides cannot be
+        // congruence-peeled (different head symbols, or not both
+        // applications). It must stay cheap: an earlier version called
+        // tryContextFactMatch here, which scans the whole library with a
+        // WHNF-heavy fill — that made the pre-tactic cost MORE than the
+        // battery it exists to pre-empt (it roughly doubled the heavy steps
+        // in PAdic/absolute_value). tryLocalEqualityLeaf scans local binders
+        // only, with a fuel-bounded defeq probe.
+        auto contextLeaf = [&]() -> ExpressionPointer {
+            return tryLocalEqualityLeaf(left, right, carrierType,
+                                        carrierLevel, localBinders, line);
+        };
+        auto* leftApp = std::get_if<Application>(&left->node);
+        auto* rightApp = std::get_if<Application>(&right->node);
+        if (!leftApp || !rightApp) return contextLeaf();
+        try {
+            ExpressionPointer leftFn = leftApp->function;
+            ExpressionPointer rightFn = rightApp->function;
+            ExpressionPointer leftArg = leftApp->argument;
+            ExpressionPointer rightArg = rightApp->argument;
+            bool fnEq = structurallyEqual(leftFn, rightFn);
+            bool argEq = structurallyEqual(leftArg, rightArg);
+            if (fnEq && argEq) return nullptr;  // == left structurallyEqual right
+            // Both sides differ AND have different head symbols → not a
+            // congruence; treat the whole pair as one divergence leaf
+            // (e.g. |nx| vs 1+kx, matched as a unit against the context).
+            if (!fnEq && !argEq && spineHash(left) != spineHash(right)) {
+                return contextLeaf();
+            }
+
+            auto closedType = [&](ExpressionPointer t) {
+                return closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, t),
+                    localBinders, localBinders.size());
+            };
+            ExpressionPointer argType = closedType(leftArg);
+            LevelPointer argLevel = typeUniverseOf(localBinders, leftArg);
+            ExpressionPointer fnType = closedType(leftFn);
+            LevelPointer fnLevel = typeUniverseOf(localBinders, leftFn);
+            ExpressionPointer appLeft = makeApplication(leftFn, leftArg);
+            ExpressionPointer appType = closedType(appLeft);
+            LevelPointer appLevel = typeUniverseOf(localBinders, appLeft);
+
+            // congruence on the argument: leftFn leftArg = leftFn rightArg
+            //   (motive λz. leftFn z), given a proof of leftArg = rightArg.
+            auto argCongruence = [&](ExpressionPointer argProof) {
+                ExpressionPointer motive = makeLambda("_sd_z", argType,
+                    makeApplication(liftBoundVariables(leftFn, 1, 0),
+                                    makeBoundVariable(0)));
+                ExpressionPointer c = makeConstant(
+                    "Equality.congruence", {argLevel, appLevel});
+                c = makeApplication(std::move(c), argType);
+                c = makeApplication(std::move(c), appType);
+                c = makeApplication(std::move(c), std::move(motive));
+                c = makeApplication(std::move(c), leftArg);
+                c = makeApplication(std::move(c), rightArg);
+                c = makeApplication(std::move(c), std::move(argProof));
+                return c;
+            };
+            // congruence on the function: leftFn side = rightFn side
+            //   (motive λf. f side), given a proof of leftFn = rightFn.
+            auto fnCongruence = [&](ExpressionPointer side,
+                                    ExpressionPointer fnProof) {
+                ExpressionPointer motive = makeLambda("_sd_f", fnType,
+                    makeApplication(makeBoundVariable(0),
+                                    liftBoundVariables(side, 1, 0)));
+                ExpressionPointer c = makeConstant(
+                    "Equality.congruence", {fnLevel, appLevel});
+                c = makeApplication(std::move(c), fnType);
+                c = makeApplication(std::move(c), appType);
+                c = makeApplication(std::move(c), std::move(motive));
+                c = makeApplication(std::move(c), leftFn);
+                c = makeApplication(std::move(c), rightFn);
+                c = makeApplication(std::move(c), std::move(fnProof));
+                return c;
+            };
+
+            if (argEq) {
+                // only the function differs; the argument is shared.
+                ExpressionPointer fnProof = structuralDiffProve(
+                    localBinders, leftFn, rightFn, fnType, fnLevel, line);
+                if (!fnProof) return nullptr;
+                return fnCongruence(leftArg, std::move(fnProof));
+            }
+            if (fnEq) {
+                // only the argument differs; the function is shared.
+                ExpressionPointer argProof = structuralDiffProve(
+                    localBinders, leftArg, rightArg, argType, argLevel, line);
+                if (!argProof) return nullptr;
+                return argCongruence(std::move(argProof));
+            }
+            // both differ: leftFn leftArg = leftFn rightArg = rightFn rightArg.
+            ExpressionPointer argProof = structuralDiffProve(
+                localBinders, leftArg, rightArg, argType, argLevel, line);
+            if (!argProof) return nullptr;
+            ExpressionPointer fnProof = structuralDiffProve(
+                localBinders, leftFn, rightFn, fnType, fnLevel, line);
+            if (!fnProof) return nullptr;
+            ExpressionPointer cong1 = argCongruence(std::move(argProof));
+            ExpressionPointer cong2 = fnCongruence(rightArg, std::move(fnProof));
+            ExpressionPointer mid = makeApplication(leftFn, rightArg);
+            ExpressionPointer appRight = makeApplication(rightFn, rightArg);
+            ExpressionPointer trans = makeConstant(
+                "Equality.transitivity", {appLevel});
+            trans = makeApplication(std::move(trans), appType);
+            trans = makeApplication(std::move(trans), appLeft);
+            trans = makeApplication(std::move(trans), mid);
+            trans = makeApplication(std::move(trans), appRight);
+            trans = makeApplication(std::move(trans), std::move(cong1));
+            trans = makeApplication(std::move(trans), std::move(cong2));
+            return trans;
+        } catch (const TypeError&) {
+            return nullptr;
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+    }
+
 ExpressionPointer Elaborator::autoProveClaimTactics(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -1318,6 +1572,18 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
         if (autoProveProfileEnabled_ && autoProveDepth_ == 1) {
             return autoProveClaimProfiling(
                 goalClosed, localBinders, line, transportBudget);
+        }
+
+        // Experimental: a cheap, purely-syntactic congruence diff that runs
+        // BEFORE the defeq-heavy equality battery. When it applies it closes
+        // the goal without unfolding any definition (the battery's diff walk
+        // WHNFs at every level, which is what makes abs/quotient-arithmetic
+        // steps cost hundreds of thousands of kernel steps). Off by default.
+        if (structuralDiffEnabled_) {
+            ExpressionPointer attempt = runTactic("structuralDiff",
+                [&] { return tryStructuralDiff(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
         }
 
         {
