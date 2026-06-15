@@ -475,9 +475,22 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                 "induction_on_one_plus has no base argument after the "
                 "motive");
         }
-        ExpressionPointer baseType = basePi->domain;  // P(0), our context
+        // Beta-reduce the motive applications (`motive 0`, `motive k`,
+        // `motive (1+k)`) into clean goal shapes. Leaving them as redexes
+        // makes the downstream cases/claim motive machinery in a complex
+        // step body build a malformed term — the recursor path never hits
+        // this because ι-reduction already delivers a reduced case goal.
+        ExpressionPointer baseType = weakHeadNormalForm(
+            environment_, basePi->domain);  // P(0), our context
+        // basePi->codomain lives UNDER the `base` binder (base : P(0)), so its
+        // localBinder references sit one deeper than our actual step context
+        // (stepBinders has [subject, ih], not base). The step/target types
+        // never use the base proof, so strengthen that binder out — lower
+        // every bound variable above index 0 by one. (Single-step induction
+        // à la strong_induction has no base binder, hence no such fixup.)
         ExpressionPointer afterBase = weakHeadNormalForm(
-            environment_, basePi->codomain);
+            environment_,
+            liftBoundVariables(basePi->codomain, -1, 1));
         auto* stepPi = std::get_if<Pi>(&afterBase->node);
         if (!stepPi) {
             throwElaborate(
@@ -500,8 +513,10 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                 "induction_on_one_plus's step must have an IH argument "
                 "after the predecessor");
         }
-        ExpressionPointer ihType = stepIhPi->domain;        // P(k), ctx [k]
-        ExpressionPointer stepBodyType = stepIhPi->codomain; // P(1+k), [k,ih]
+        ExpressionPointer ihType = weakHeadNormalForm(
+            environment_, stepIhPi->domain);        // P(k), ctx [k]
+        ExpressionPointer stepBodyType = weakHeadNormalForm(
+            environment_, stepIhPi->codomain);      // P(1+k), ctx [k, ih]
 
         // --- Base body: prove P(0).
         ExpressionPointer baseKernel = elaborateExpression(

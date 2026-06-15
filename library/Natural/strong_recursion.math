@@ -18,6 +18,8 @@
 module Natural.strong_recursion
 
 import Natural.basics
+import Natural.arithmetic
+import Natural.one_plus_induction
 import Natural.order
 import Natural.peano
 import Equality.basics
@@ -92,14 +94,23 @@ theorem Natural.for_all_below
         (n : Natural)
         : (k : Natural) → successor(k) ≤ n → P(k) :=
   by_induction on n with IH {
-    case zero:
+    case base:
         (k : Natural) (impossible : successor(k) ≤ 0) ↦
           absurd(impossible)
-    case successor(predecessor):
+    case step(predecessor):
         (k : Natural)
-            (successorKLessOrEqualSuccessor :
-                successor(k) ≤ successor(predecessor)) ↦
-          cases by Natural.less_or_equal_successor_successor_inversion {
+            (successorKLessOrEqualOnePlus :
+                successor(k) ≤ 1 + predecessor) ↦ {
+          -- The step bound is `1 + predecessor` (opaque `add`), not defeq to
+          -- `successor(predecessor)`; bridge with `one_add` (via `rewrite`) so
+          -- the successor-form inversion lemma applies.
+          claim inversionResult
+                  : k = predecessor ∨ successor(k) ≤ predecessor
+              by Natural.less_or_equal_successor_successor_inversion(
+                  k, predecessor,
+                  rewrite(Natural.one_add(predecessor),
+                          successorKLessOrEqualOnePlus));
+          cases inversionResult {
             | Or.introduceLeft(kEqualsPredecessor) =>
                 -- We need P(k). step(predecessor, IH) gives P(predecessor);
                 -- the diff-bridge auto-lifts via kEqualsPredecessor in scope.
@@ -108,6 +119,7 @@ theorem Natural.for_all_below
                 -- Recurse on the predecessor level via the IH.
                 IH(k, successorKLessOrEqualPredecessor)
           }
+        }
   }
 
 -- q ≤ 0 forces q = 0. Apply LessOrEqual.invert and discharge the
