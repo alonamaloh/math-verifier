@@ -16,6 +16,18 @@ inductive LessOrEqual : Natural → Natural → Proposition where
         → LessOrEqual(smaller, larger)
         → LessOrEqual(smaller, successor(larger))
 
+-- Strict order. `a < b` means `successor(a) ≤ b`. It is defined via
+-- `successor` so it is DEFINITIONALLY equal to the `successor(a) ≤ b` form
+-- the core proofs already use — order lemmas and the induction principles
+-- can then be restated with `<` without reworking their proofs, while the
+-- `successor` constructor stays sealed behind the `<` notation for
+-- everything downstream. (`a > b` desugars to `b < a` automatically, and
+-- `a ≥ b` to `b ≤ a`, so no separate `>`/`≥` declarations are needed.)
+definition Natural.LessThan (a b : Natural) : Proposition :=
+  successor(a) ≤ b
+
+operator (<) on (Natural, Natural) := Natural.LessThan
+
 -- Zero is at most every natural number. By induction on the upper bound:
 -- 0 ≤ 0 reflexively, and 0 ≤ predecessor lifts to 0 ≤ successor(predecessor)
 -- by stepping the bound once.
