@@ -18,9 +18,11 @@ Three layers can fail, and they have completely different verdicts. Every goal
 is tagged with the layer it loads hardest.
 
 - **[PROVER]** — the auto-prover (the thing behind `by`-less steps, `done`,
-  bare `claim`). Per `LEAK_REDUCTION_FINDINGS.md` it does one library lookup,
-  discharges against *in-scope* hypotheses, runs `ring`, and does **no**
-  backward chaining. If a probe balloons here, the approach is fine and the
+  bare `claim`). Today it does one library lookup, discharges against
+  *in-scope* hypotheses, runs `ring`, and does **no** backward chaining.
+  (Under the planned Lux cite-only prover — `PLAN_LUX_TRANSITION.md` — global
+  lookup goes away entirely; this probe's verdicts still apply to the
+  local-context + tactics core.) If a probe balloons here, the approach is fine and the
   prover is just immature — and the fix (e.g. `linarith`) is known.
 - **[SURFACE]** — the surface language's readability under binders,
   abstraction, and higher-order objects. If a probe degenerates into
@@ -100,9 +102,8 @@ turns into many staged `claim`s. If so, you've made the empirical case for
 `linarith`. Capture a representative ε-chasing step that *should* have been
 automatic — that snippet is the spec for the procedure.
 
-**Done =** Bolzano–Weierstrass verified for ℝ; a note in
-`LEAK_REDUCTION_FINDINGS.md` (or a new `PROVER_GAPS.md`) recording every step
-that needed manual estimate work.
+**Done =** Bolzano–Weierstrass verified for ℝ; a note in `TODO.md` (or a new
+`PROVER_GAPS.md`) recording every step that needed manual estimate work.
 
 **Stretch note.** FTC needs integration built from scratch (derivatives exist,
 integrals do not). That is a substantial build, not a polish task; treat it as
@@ -268,8 +269,8 @@ took and a judgment on whether new sugar would remove them.
   *success* depends on hash order is a reproducibility smell worth fixing,
   especially for a small-trusted-base project.
 - [ ] **Keep the leak ratchet honest.** Run `scripts/cic_leak_report` before/
-  after each probe and record deltas in `LEAK_REDUCTION_FINDINGS.md`. New
-  subsystems are the moment leakage creeps back in.
+  after each probe and record deltas in `TODO.md`. New subsystems are the
+  moment leakage creeps back in.
 
 ---
 
