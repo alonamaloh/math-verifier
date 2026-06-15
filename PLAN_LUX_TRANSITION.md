@@ -231,6 +231,52 @@ decisions back into `LUX_PLAN.md`). If the cite-only prover proves too
 costly to author against, that is the moment to revisit — cheaply, on 15
 files, not after the bulk.
 
+### 5.5 Findings (live; 2026-06-15)
+
+**Keystone done.** `Natural.induction_on_one_plus` proven from the recursor;
+`by_induction { case base / case step(k) }` routes to it (step goal `P(1+k)`,
+`IH : P(k)`); `by_strong_induction` now *derives* from it (`for_all_below`
+repointed), sealing the raw recursor to the bootstrap layer
+(`Natural/basics` + `arithmetic`) + `one_plus_induction.math`. An engine bug
+was found+fixed (base-binder de Bruijn off-by-one; regression
+`Test.parametric_goal_with_cases`).
+
+**The consumer rewrite cascades — so the sweep must be strictly bottom-up by
+whole layers, and needs two more infra pieces.** Attempting the first
+consumer files surfaced that *no* baby file is a self-contained successor
+migration; each cascades:
+
+1. **Down, through structural matchers (the big one).** Changing
+   `Set/finite`'s `NaturalsBelow` interface from `successor(k) ≤ n` to the
+   defeq `k < n` broke ~100 `successor` sites across the finite-cardinals
+   consumers (`finite_product`/`pigeonhole`/`sum`), because the auto-prover
+   and `calc` match **structurally** and don't see through the `<` definition
+   (`Natural.LessThan := successor(a) ≤ b`). **Highest-leverage next infra:
+   make the prover/calc matcher unfold a definition like `<` to its defeq
+   body when matching**, so a `<`-spelling interface change is invisible to
+   consumers. Without it, every value-level migration rewrites every
+   downstream calc step by hand.
+2. **Up, to cast/order lemmas.** `Rational/halve`'s `successor` are the
+   rational rep's `denominator = successor(denominatorMinusOne)` encoding,
+   reasoned about via upstream lemmas stated in `successor` form
+   (`Natural.to_integer.successor_preserves`, `…added_denominator_factors`).
+   Migrating it cleanly needs those upstream lemmas in `1 + n`/`<` form
+   first — confirming the bottom-up order (Integer/IntegerMod before
+   Rational). The rep encoding itself is the WS3 `/`-operator / quotient-rep
+   redesign target.
+3. **Into a recursion combinator.** `Real/harmonic_series` defines
+   `Natural.doubling` by `| zero / | successor(K)` recursion. The keystone
+   handles *induction*; a recursive *definition* still names the constructor.
+   A successor-free user-space recursive definition needs a fold/recursor
+   combinator exposing only the `f(1+k) = …` recurrence — a companion piece
+   to the induction keystone, to be built before the recursion-heavy files.
+
+Net: build (1) the defeq-aware matcher next (it unblocks the value-level
+bulk), then (3) the recursion combinator, then sweep bottom-up
+(Integer → Rational → Set/Lists → Polynomial → Real/Complex) per §7. The
+representative core stays the proving ground, but it is migrated **in
+dependency order**, not by picking a file in the middle of the tower.
+
 ---
 
 ## 6. Phase 1 — the mechanical translator
