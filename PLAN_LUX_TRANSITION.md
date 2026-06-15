@@ -175,6 +175,19 @@ the recurring pain points below). This is where Lux's open design questions
 Keep the set ~10–15 files. Bottom-of-the-tower bias so dependencies are
 shallow.
 
+**Selected (2026-06-15)** — eight headliner files, carved as the `make baby`
+target (verifies just these + their transitive deps, the fast Phase-0 loop):
+`Integer/basics` + `Integer/addition` (binary quotient lift),
+`Real/harmonic_series` (1+n induction + characterising lemma — the keystone
+exemplar, and the spike named in the old successor plan),
+`Algebra/principal_ideal_domain` (abstract `Ring.carrier`; the 956K-step
+fingerprint worst case; the cite-only prover over bundles), `Set/finite`
+(dependent cardinals), `Rational/order_multiplication` (polymorphic
+`Quotient.exact` + heavy successor — the largest at 583 lines, the deliberate
+hard case), and `Rational/{halve,reciprocal}` (small value-level successor
+leaks). The list lives in the Makefile's `BABY_MATH_FILES`; grow it there if
+a complexity turns out under-covered.
+
 ### 5.2 What must work end-to-end before leaving Phase 0
 
 - The **keystone**: `by_induction` desugars to the `1 + n` form (step proves
