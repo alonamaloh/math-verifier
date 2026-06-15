@@ -340,6 +340,198 @@ ExpressionPointer Elaborator::elaborateByInductionUsingInner(
         return application;
     }
 
+ExpressionPointer Elaborator::elaborateByInductionOnePlus(
+        const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "by_induction (1+n) at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "by_induction needs an expected type from context");
+        }
+
+        // --- Extract the `case base:` and `case step(k):` clause bodies.
+        // The parser appended the IH name to the `step` constructor pattern,
+        // so its arguments are [predecessor, IH].
+        const SurfaceExpression* baseBody = nullptr;
+        const SurfaceExpression* stepBody = nullptr;
+        std::string stepSubjectName;
+        std::string ihName = cases.inductionHypothesisName;
+        for (const auto& clause : cases.clauses) {
+            if (auto* bareName = std::get_if<SurfacePatternBareName>(
+                    &clause.pattern->node)) {
+                if (bareName->name == "base") {
+                    baseBody = clause.body.get();
+                    continue;
+                }
+            }
+            if (auto* constructorPattern =
+                    std::get_if<SurfacePatternConstructor>(
+                        &clause.pattern->node)) {
+                if (constructorPattern->constructorName == "step") {
+                    if (constructorPattern->arguments.empty()) {
+                        throwElaborate(
+                            "by_induction: `case step` must bind the "
+                            "predecessor, as `case step(k):`");
+                    }
+                    auto* predecessorName =
+                        std::get_if<SurfacePatternBareName>(
+                            &constructorPattern->arguments[0]->node);
+                    if (!predecessorName) {
+                        throwElaborate(
+                            "by_induction: `case step`'s first binder "
+                            "must be a plain name (the predecessor `k`)");
+                    }
+                    stepSubjectName = predecessorName->name;
+                    stepBody = clause.body.get();
+                    continue;
+                }
+            }
+            throwElaborate(
+                "by_induction (1+n form) expects exactly `case base:` and "
+                "`case step(k):` clauses");
+        }
+        if (!baseBody || !stepBody) {
+            throwElaborate(
+                "by_induction (1+n form) needs both a `case base:` and a "
+                "`case step(k):` clause");
+        }
+
+        // --- Scrutinee must be a local-binder variable (so we can abstract
+        // it from the goal to form the motive).
+        ExpressionPointer scrutineeKernel = elaborateExpression(
+            *cases.scrutinee, localBinders);
+        auto* boundVariable =
+            std::get_if<BoundVariable>(&scrutineeKernel->node);
+        if (!boundVariable
+            || boundVariable->deBruijnIndex < 0
+            || boundVariable->deBruijnIndex
+                   >= static_cast<int>(localBinders.size())) {
+            throwElaborate(
+                "by_induction's scrutinee must be a local-binder "
+                "variable (a parameter or let-binding name)");
+        }
+        int scrutineeDeBruijn = boundVariable->deBruijnIndex;
+        int scrutineeArrayIndex =
+            static_cast<int>(localBinders.size()) - 1 - scrutineeDeBruijn;
+        ExpressionPointer scrutineeType =
+            localBinders[scrutineeArrayIndex].type;
+
+        // --- Resolve `<Carrier>.induction_on_one_plus` from the scrutinee's
+        // carrier head.
+        ExpressionPointer scrutineeTypeWhnf = weakHeadNormalForm(
+            environment_,
+            inferTypeInLocalContext(localBinders, scrutineeKernel));
+        ExpressionPointer spineHead = scrutineeTypeWhnf;
+        while (auto* app = std::get_if<Application>(&spineHead->node)) {
+            spineHead = app->function;
+        }
+        auto* headConstant = std::get_if<Constant>(&spineHead->node);
+        if (!headConstant) {
+            throwElaborate(
+                "by_induction: scrutinee's type has no named carrier "
+                "(head must be a constant like `Natural`)");
+        }
+        std::string lemmaName =
+            headConstant->name + ".induction_on_one_plus";
+        if (!environment_.lookup(lemmaName)) {
+            throwElaborate(
+                "by_induction: no `" + lemmaName + "` in scope (the "
+                "`1 + n` induction principle for carrier `"
+                + headConstant->name + "`); import the module that "
+                "provides it, or use `case zero` / `case successor` for "
+                "the raw-recursor form");
+        }
+        SurfaceExpressionPointer lemmaSurface = makeSurfaceIdentifier(
+            lemmaName, {}, line, column);
+        ExpressionPointer lemmaKernel = elaborateExpression(
+            *lemmaSurface, localBinders);
+
+        // --- Motive: λ(subject : T). expectedType[scrutinee := Bound 0].
+        ExpressionPointer motiveBody =
+            abstractOverBoundVariables(expectedType, {scrutineeDeBruijn});
+        ExpressionPointer motive = makeLambda(
+            stepSubjectName, scrutineeType, motiveBody);
+
+        // Apply the motive; read the remaining argument types off the
+        // lemma's own type (kernel-computed, with the motive substituted).
+        // Close back over localBinders before extracting sub-terms (the
+        // opened-vs-closed discipline of elaborateByInductionUsingInner).
+        ExpressionPointer lemmaAppliedToMotive =
+            makeApplication(lemmaKernel, motive);
+        ExpressionPointer remainingType = weakHeadNormalForm(
+            environment_,
+            closeOverLocalBinders(
+                inferTypeInLocalContext(localBinders, lemmaAppliedToMotive),
+                localBinders, localBinders.size()));
+        // remainingType = (base : P 0)
+        //               → (step : (k : T) → P(k) → P(1 + k))
+        //               → (target : T) → P(target)
+        auto* basePi = std::get_if<Pi>(&remainingType->node);
+        if (!basePi) {
+            throwElaborate(
+                "induction_on_one_plus has no base argument after the "
+                "motive");
+        }
+        ExpressionPointer baseType = basePi->domain;  // P(0), our context
+        ExpressionPointer afterBase = weakHeadNormalForm(
+            environment_, basePi->codomain);
+        auto* stepPi = std::get_if<Pi>(&afterBase->node);
+        if (!stepPi) {
+            throwElaborate(
+                "induction_on_one_plus has no step argument after the "
+                "base");
+        }
+        ExpressionPointer stepType = weakHeadNormalForm(
+            environment_, stepPi->domain);
+        auto* stepSubjectPi = std::get_if<Pi>(&stepType->node);
+        if (!stepSubjectPi) {
+            throwElaborate(
+                "induction_on_one_plus's step must begin with a "
+                "predecessor argument (Pi)");
+        }
+        ExpressionPointer afterSubject = weakHeadNormalForm(
+            environment_, stepSubjectPi->codomain);
+        auto* stepIhPi = std::get_if<Pi>(&afterSubject->node);
+        if (!stepIhPi) {
+            throwElaborate(
+                "induction_on_one_plus's step must have an IH argument "
+                "after the predecessor");
+        }
+        ExpressionPointer ihType = stepIhPi->domain;        // P(k), ctx [k]
+        ExpressionPointer stepBodyType = stepIhPi->codomain; // P(1+k), [k,ih]
+
+        // --- Base body: prove P(0).
+        ExpressionPointer baseKernel = elaborateExpression(
+            *baseBody, localBinders, baseType);
+
+        // --- Step body: prove P(1 + k) given k and IH : P(k). The step
+        // body's context is localBinders ++ [(k, T), (IH, P(k))], with k at
+        // Bound(1) and IH at Bound(0); ihType / stepBodyType already live in
+        // that context (extracted from the closed lemma type).
+        std::vector<LocalBinder> stepBinders = localBinders;
+        stepBinders.push_back({stepSubjectName, scrutineeType});
+        stepBinders.push_back({ihName, ihType});
+        ExpressionPointer stepBodyKernel = elaborateExpression(
+            *stepBody, stepBinders, stepBodyType);
+        ExpressionPointer ihLambda = makeLambda(
+            ihName, ihType, stepBodyKernel);
+        ExpressionPointer stepLambda = makeLambda(
+            stepSubjectName, scrutineeType, ihLambda);
+
+        // --- Assemble: lemma(motive)(base)(step)(scrutinee).
+        ExpressionPointer application =
+            makeApplication(lemmaAppliedToMotive, std::move(baseKernel));
+        application = makeApplication(
+            std::move(application), std::move(stepLambda));
+        application = makeApplication(
+            std::move(application), std::move(scrutineeKernel));
+        (void)column;
+        return application;
+    }
+
 ExpressionPointer Elaborator::elaborateStructuredClaim(
         const SurfaceStructuredClaim& claim,
         const std::vector<LocalBinder>& localBinders,

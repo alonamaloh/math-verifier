@@ -933,6 +933,37 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
+        // Keystone (PLAN_LUX_TRANSITION.md): a `by_induction` cases-block
+        // (inductionHypothesisName set) that uses the `case base:` /
+        // `case step(k):` vocabulary routes to the `1 + n` principle
+        // `<Carrier>.induction_on_one_plus`. `base` / `step` are never real
+        // carrier constructors, so this is additive — legacy `case zero` /
+        // `case successor` blocks fall through to the raw-recursor path
+        // below, and the bulk keeps building until the sweep migrates it.
+        if (!cases.inductionHypothesisName.empty()) {
+            bool usesOnePlusVocabulary = false;
+            for (const auto& clause : cases.clauses) {
+                if (auto* constructorPattern =
+                        std::get_if<SurfacePatternConstructor>(
+                            &clause.pattern->node)) {
+                    if (constructorPattern->constructorName == "step") {
+                        usesOnePlusVocabulary = true;
+                        break;
+                    }
+                }
+                if (auto* bareName = std::get_if<SurfacePatternBareName>(
+                        &clause.pattern->node)) {
+                    if (bareName->name == "base") {
+                        usesOnePlusVocabulary = true;
+                        break;
+                    }
+                }
+            }
+            if (usesOnePlusVocabulary) {
+                return elaborateByInductionOnePlus(
+                    cases, localBinders, expectedType, line, column);
+            }
+        }
         bool plain = cases.refiningNames.empty()
             && cases.equalityHypothesisName.empty();
         if (plain && expectedType) {

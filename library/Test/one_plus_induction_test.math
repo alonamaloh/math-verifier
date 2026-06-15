@@ -1,0 +1,29 @@
+-- Exercises the `1 + n` form of `by_induction` (the successor-sealing
+-- keystone, PLAN_LUX_TRANSITION.md): `case base:` / `case step(k):`
+-- routes to `Natural.induction_on_one_plus`, the step goal is `P(1 + k)`
+-- with `IH : P(k)`, and no `successor` token appears.
+
+module Test.one_plus_induction_test
+
+import Natural.basics
+import Natural.arithmetic
+import Natural.one_plus_induction
+import Equality.basics
+
+-- Mechanism: motive build + base + step + assembly, fully kernel-checked.
+-- (If the step goal weren't P(1+k) or IH weren't P(k), the assembled
+-- induction_on_one_plus application would fail to typecheck.)
+theorem Test.reflexive_one_plus (n : Natural) : n = n :=
+  by_induction on n with IH {
+    case base:    done
+    case step(k): done
+  }
+
+-- IH usage: the step goal is genuinely `(1 + k) + 0 = 1 + k` and the
+-- hypothesis is `IH : k + 0 = k`.
+theorem Test.add_zero_one_plus (a : Natural) : a + 0 = a :=
+  unfold Natural.add in
+  by_induction on a with IH {
+    case base:    done
+    case step(k): done
+  }

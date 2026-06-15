@@ -1069,6 +1069,21 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // The `1 + n` ordinary induction (the successor-sealing keystone,
+    // PLAN_LUX_TRANSITION.md). Triggered additively from
+    // `elaborateCasesExpression` when a `by_induction` cases-block uses the
+    // `case base:` / `case step(k):` vocabulary (legacy `case zero` /
+    // `case successor` keeps the raw-recursor path). Resolves
+    // `<Carrier>.induction_on_one_plus`, builds the motive from the goal —
+    // exactly as `elaborateByInductionUsingInner` does — and elaborates the
+    // base body against `P(0)` and the step body against `P(1 + k)` with
+    // `IH : P(k)`, so no `successor` token reaches user space.
+    ExpressionPointer elaborateByInductionOnePlus(
+        const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
     // Step 2 of the structured-proof feature. Elaborates
     // `claim P [by Hint]` (and the bare-claim trailing form, where
     // the goal is the surrounding expectedType). Auto-fills the

@@ -1,0 +1,32 @@
+-- Natural/induction.math
+--
+-- The `1 + n` induction principle — the keystone of the successor-sealing
+-- transition (PLAN_LUX_TRANSITION.md, Phase 0). It proves a motive for
+-- every Natural from its value at `0` and a step that goes from `k` to
+-- `1 + k`, never naming the `successor` constructor. `by_induction` will
+-- desugar to this so that a consumer's inductive step proves `P(1 + k)`
+-- from `IH : P(k)` and no `successor` token ever appears in user space.
+--
+-- This is the *one* place the constructor-level recursor is legitimately
+-- visible outside the core: we bootstrap the `1 + n` principle from the
+-- ordinary (successor-form) induction here, bridging `1 + k = successor(k)`
+-- with the definitional `Natural.one_add`.
+
+module Natural.one_plus_induction
+
+import Natural.basics
+import Natural.arithmetic
+import Equality.basics
+
+-- The step yields `P(1 + k)`; the recursor's successor case demands
+-- `P(successor(k))`. They are bridged by `Natural.one_add : 1 + k =
+-- successor(k)`, transporting the step's result onto the constructor form.
+theorem Natural.induction_on_one_plus
+        {P : Natural → Proposition}
+        (base : P(0))
+        (step : (k : Natural) → P(k) → P(1 + k))
+        (n : Natural) : P(n) :=
+  by_induction on n with IH {
+    case zero:         base
+    case successor(k): rewrite(Natural.one_add(k), step(k, IH))
+  }
