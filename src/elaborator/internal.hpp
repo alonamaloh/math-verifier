@@ -133,6 +133,17 @@ public:
         structuralDiffEnabled_ = structuralDiffFlag
             && structuralDiffFlag[0] != '\0'
             && structuralDiffFlag[0] != '0';
+        // Cite-only prover (PLAN_LUX_TRANSITION Phase 0): turn OFF the
+        // auto-prover's GLOBAL library search, so a goal closes only from
+        // local context + built-in batteries (ring/field/decide,
+        // equality/transitivity/conjunction/…) + an explicit `by L`. Keeps
+        // shotgun citing from hiding the real proof structure. Gated on
+        // MATH_CITE_ONLY while we measure the authoring burden on the baby
+        // library before committing it as the default.
+        const char* citeOnlyFlag = std::getenv("MATH_CITE_ONLY");
+        citeOnly_ = citeOnlyFlag
+            && citeOnlyFlag[0] != '\0'
+            && citeOnlyFlag[0] != '0';
     }
 
     ~Elaborator() {
@@ -4863,6 +4874,7 @@ private:
     // tried, and how long each tactic took. Recursive sub-calls
     // aggregate but do not emit rows.
     bool autoProveProfileEnabled_ = false;
+    bool citeOnly_ = false;
     // Stage-1 statements-only mode (skip proof bodies). See constructor.
     bool statementsOnly_ = false;
     int autoProveDepth_ = 0;

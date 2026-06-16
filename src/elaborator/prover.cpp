@@ -226,6 +226,10 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
                 localBinders[b].type, lift, 0);
             facts.push_back(std::move(fact));
         }
+        // Cite-only mode: stop here — local hypotheses only. The global
+        // library scan below is exactly the shotgun auto-search we disable,
+        // so an unproven goal must be closed by an explicit `by L`.
+        if (citeOnly_) return facts;
         // Library / module declarations (cost 3) — only those whose
         // conclusion's spine matches the goal's at SOME peel depth.
         // Match against BOTH the goal's WHNF-reduced spineHash AND
@@ -555,7 +559,7 @@ ExpressionPointer Elaborator::tryContextFactMatch(
             // candidate with the full hole-inference + context-discharge
             // machinery (see `tryLemmaByConclusion`). Only pays this cost
             // on candidates the structural path already rejected.
-            if (!result) {
+            if (!result && !citeOnly_) {
                 if (auto* constantHead =
                         std::get_if<Constant>(&fact.proofTerm->node)) {
                     result = tryLemmaByConclusion(

@@ -314,6 +314,39 @@ This replaces the "defeq-aware matcher" idea entirely: opacity makes the
 matcher's ignorance of the body *correct*, and consumers reason through the
 interface.
 
+### 5.7 Cite-only prover — implemented and validated (2026-06-16)
+
+The riskiest gate (§5.2) is **decided: cite-only is viable, burden ~zero.**
+Implemented as `MATH_CITE_ONLY` (elaborator flag): it disables the auto-prover's
+**global library scan** in exactly two spots — the library-declaration loop of
+`collectContextFacts` and the `tryLemmaByConclusion` fallback — while keeping
+local hypotheses, the built-in batteries (equality/`ring`/`field`,
+transitivity, conjunction/disjunction, contradiction, context-equality &
+quotient-exact bridges, symmetry-flip) and explicit `by L`. Default off; flip on
+with `MATH_CITE_ONLY=1`.
+
+**Result on the baby closure (~35 files):** verifies cite-only with a SINGLE
+break — one `claim` in `Integer/cancellation` that had no `by` and was leaning on
+the library scan to prove `1 ≤ successor(k)` (now `by Natural.successor_positive`).
+Everything else already cited explicitly. So shotgun search was carrying almost
+nothing; turning it off costs one citation across the core. **Recommend adopting
+cite-only as the default** once the bulk sweep confirms the same low burden layer
+by layer.
+
+**CIC-leak pass on the headliners (same session).** Removed the compound
+proof-term calls in `cancellation` (`multiply_cancel_right(?,?,?,…)`,
+`cancellation_natural(…)`, `…_at_representatives(…)` as bare proof terms → `done by`
+/ cited `claim` + return-by-name; the `Quotient.exact(repX, repY, h)` stays as an
+explicit foundational-boundary `by`-citation). `Set/finite`'s `And.introduction(…)`
+→ `⟨…⟩`. The other headliners were already tell-free.
+
+**Confirmed Phase-2, not baby-local:** the `successor(k)` in `Set/finite`'s
+`NaturalsBelow` (`successor(k) ≤ n` → opaque `k < n`) cascades to its 4 consumers
+(`finite_{product,pigeonhole,successor,sum}`) and wants a `not_less_than_zero`
+lemma; `cancellation`'s `successor(k)` positive-multiplier API ripples to callers
+and needs upstream `1+n`-form lemmas. Both are the §5.5.1 bottom-up-layer sweep —
+left for Phase 2, exactly as the strictly-bottom-up rule requires.
+
 Net: (1) **migrate the order layer onto this foundation first** — it is the
 bottom of the tower and everything sits on it; promote `order_proto` into
 `Natural/order` + restate the order/strong-induction lemmas on the boundary.
