@@ -73,15 +73,26 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
                 * List.product(IntegerMod(p), IntegerMod.multiply,
                       IntegerMod.one(p), list)
   | List.empty =>
-      -- Both sides are 1 (and 1·1 reduces to 1).
+      -- map(x·_) fixes the empty list, and |empty| = 0 with x^0 = 1 the left
+      -- identity. (Kept factored as 1 · ∏empty rather than reducing 1·1 — the
+      -- latter forces an expensive normalisation through the IntegerMod quotient.)
       calc List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
                List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
                    List.empty(IntegerMod(p))))
+         = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+               List.empty(IntegerMod(p)))
+         = IntegerMod.power(p, x, 0)
+               * List.product(IntegerMod(p), IntegerMod.multiply,
+                     IntegerMod.one(p), List.empty(IntegerMod(p)))
+               by IntegerMod.multiply_identity_left
          = IntegerMod.power(p, x, List.length(IntegerMod(p), List.empty(IntegerMod(p))))
                * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), List.empty(IntegerMod(p)))
+               by List.length_empty
   | List.prepend(head, tail) =>
-      -- Peel the head and exchange the four factors.
+      -- Peel the head and exchange the four factors, then step the exponent:
+      -- x · x^|tail| = x^successor(|tail|) = x^|head :: tail| (the last step
+      -- through |head :: tail| = 1 + |tail|).
       calc List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
                List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
                    List.prepend(IntegerMod(p), head, tail)))
@@ -93,7 +104,7 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
                * (IntegerMod.power(p, x, List.length(IntegerMod(p), tail))
                    * List.product(IntegerMod(p), IntegerMod.multiply,
                          IntegerMod.one(p), tail))
-               by substituting IntegerMod.product_map_multiply(p, x, tail)
+               by IntegerMod.product_map_multiply(p, x, tail)
          = (x * IntegerMod.power(p, x, List.length(IntegerMod(p), tail)))
                * (head * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), tail))
@@ -101,10 +112,18 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
                       IntegerMod.power(p, x, List.length(IntegerMod(p), tail)),
                       List.product(IntegerMod(p), IntegerMod.multiply,
                           IntegerMod.one(p), tail))
+         = IntegerMod.power(p, x, successor(List.length(IntegerMod(p), tail)))
+               * List.product(IntegerMod(p), IntegerMod.multiply,
+                     IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
+         = IntegerMod.power(p, x, 1 + List.length(IntegerMod(p), tail))
+               * List.product(IntegerMod(p), IntegerMod.multiply,
+                     IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
+               by Natural.one_add
          = IntegerMod.power(p, x,
                List.length(IntegerMod(p), List.prepend(IntegerMod(p), head, tail)))
                * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
+               by List.length_prepend
 
 -- ----------------------------------------------------------------------
 -- A product of nonzero classes is nonzero.
