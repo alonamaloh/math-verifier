@@ -36,22 +36,12 @@ theorem Ring.zero_multiply
     let ⟨addGroupProof, _⟩ := abelianAdd;
     let ⟨addMonoidProof, _, _⟩ := addGroupProof;
     let ⟨_, addIdentityLeft, addIdentityRight⟩ := addMonoidProof;
-    -- (1) multiply(zero, x) + multiply(zero, x) = multiply(zero + zero, x)
-    --                                            = multiply(zero, x).
+    -- add(0·x, 0·x) = 0·x = add(0·x, 0); cancelling 0·x leaves 0·x = 0.
     calc add(multiply(zero, x), multiply(zero, x))
-       = multiply(add(zero, zero), x)
-             by distributivityRight(zero, zero, x)
-       = multiply(zero, x)
-             by addIdentityLeft(zero);
-    -- (2) Same value also equals add(multiply(zero, x), zero) by add_zero.
-    claim multiply(zero, x) = add(multiply(zero, x), zero)
-        by addIdentityRight(multiply(zero, x));
-    -- Combine: add(0·x, 0·x) = add(0·x, 0) ⇒ 0·x = 0 by cancel_left.
-    Group.cancel_left(
-        multiply(zero, x), multiply(zero, x), zero,
-        calc add(multiply(zero, x), multiply(zero, x))
-           = multiply(zero, x)
-           = add(multiply(zero, x), zero))
+       = multiply(add(zero, zero), x)   by distributivityRight(zero, zero, x)
+       = multiply(zero, x)              by addIdentityLeft(zero)
+       = add(multiply(zero, x), zero)   by addIdentityRight(multiply(zero, x));
+    done by Group.cancel_left
 }
 
 -- Zero absorbs multiplication on the right: `multiply(x, zero) = zero`.
@@ -70,18 +60,12 @@ theorem Ring.multiply_zero
     let ⟨addGroupProof, _⟩ := abelianAdd;
     let ⟨addMonoidProof, _, _⟩ := addGroupProof;
     let ⟨_, addIdentityLeft, addIdentityRight⟩ := addMonoidProof;
+    -- add(x·0, x·0) = x·0 = add(x·0, 0); cancelling x·0 leaves x·0 = 0.
     calc add(multiply(x, zero), multiply(x, zero))
-       = multiply(x, add(zero, zero))
-             by distributivityLeft(x, zero, zero)
-       = multiply(x, zero)
-             by addIdentityLeft(zero);
-    claim multiply(x, zero) = add(multiply(x, zero), zero)
-        by addIdentityRight(multiply(x, zero));
-    Group.cancel_left(
-        multiply(x, zero), multiply(x, zero), zero,
-        calc add(multiply(x, zero), multiply(x, zero))
-           = multiply(x, zero)
-           = add(multiply(x, zero), zero))
+       = multiply(x, add(zero, zero))   by distributivityLeft(x, zero, zero)
+       = multiply(x, zero)              by addIdentityLeft(zero)
+       = add(multiply(x, zero), zero)   by addIdentityRight(multiply(x, zero));
+    done by Group.cancel_left
 }
 
 -- `multiply(negate(a), b) = negate(multiply(a, b))`. Recognise
@@ -102,20 +86,13 @@ theorem Ring.multiply_negate_left
     let ⟨abelianAdd, _, _, distributivityRight⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
     let ⟨_, inverseLeftAxiom, _⟩ := addGroupProof;
-    -- Show add(multiply(negate(a), b), multiply(a, b)) = zero, then
-    -- left_inverse_unique gives multiply(negate(a), b) = negate(multiply(a, b)).
-    Group.left_inverse_unique(
-        carrier, add, zero, negate, addGroupProof,
-        multiply(a, b), multiply(negate(a), b),
-        calc add(multiply(negate(a), b), multiply(a, b))
-           = multiply(add(negate(a), a), b)
-                  by distributivityRight(negate(a), a, b)
-           = multiply(zero, b)
-                  by inverseLeftAxiom(a)
-           = zero
-                  by Ring.zero_multiply(
-                         carrier, add, zero, negate, multiply, one,
-                         ringProof, b))
+    -- multiply(negate(a), b) is the additive inverse of multiply(a, b):
+    -- their sum is multiply(negate(a) + a, b) = multiply(0, b) = 0.
+    calc add(multiply(negate(a), b), multiply(a, b))
+       = multiply(add(negate(a), a), b)   by distributivityRight(negate(a), a, b)
+       = multiply(zero, b)                by inverseLeftAxiom(a)
+       = zero                             by Ring.zero_multiply;
+    done by Group.left_inverse_unique
 }
 
 -- `multiply(a, negate(b)) = negate(multiply(a, b))`. Mirror of the
@@ -133,18 +110,11 @@ theorem Ring.multiply_negate_right
     let ⟨abelianAdd, _, distributivityLeft, _⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
     let ⟨_, inverseLeftAxiom, _⟩ := addGroupProof;
-    Group.left_inverse_unique(
-        carrier, add, zero, negate, addGroupProof,
-        multiply(a, b), multiply(a, negate(b)),
-        calc add(multiply(a, negate(b)), multiply(a, b))
-           = multiply(a, add(negate(b), b))
-                  by distributivityLeft(a, negate(b), b)
-           = multiply(a, zero)
-                  by inverseLeftAxiom(b)
-           = zero
-                  by Ring.multiply_zero(
-                         carrier, add, zero, negate, multiply, one,
-                         ringProof, a))
+    calc add(multiply(a, negate(b)), multiply(a, b))
+       = multiply(a, add(negate(b), b))   by distributivityLeft(a, negate(b), b)
+       = multiply(a, zero)                by inverseLeftAxiom(b)
+       = zero                             by Ring.multiply_zero;
+    done by Group.left_inverse_unique
 }
 
 -- `multiply(negate(a), negate(b)) = multiply(a, b)`. Apply
@@ -163,17 +133,15 @@ theorem Ring.negate_multiply_negate
         : multiply(negate(a), negate(b)) = multiply(a, b) := {
     let ⟨abelianAdd, _, _, _⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
+    -- Peel each negation onto the product, then the additive inverse is
+    -- involutive. Step 2 cites `multiply_negate_right` argument-free even
+    -- though it applies UNDER a `negate(·)`: the calc diff bridge descends
+    -- to the differing subterm and instantiates the lemma's ring bundle
+    -- against the subterm equality, then re-wraps the congruence.
     calc multiply(negate(a), negate(b))
-       = negate(multiply(a, negate(b)))
-              by Ring.multiply_negate_left(
-                     carrier, add, zero, negate, multiply, one,
-                     ringProof, a, negate(b))
-       = negate(negate(multiply(a, b)))
-              by Ring.multiply_negate_right(
-                     carrier, add, zero, negate, multiply, one,
-                     ringProof, a, b)
-       = multiply(a, b)
-              by Group.inverse_involution
+       = negate(multiply(a, negate(b)))   by Ring.multiply_negate_left
+       = negate(negate(multiply(a, b)))   by Ring.multiply_negate_right
+       = multiply(a, b)                   by Group.inverse_involution
 }
 
 -- The reduction behind the `linear_combination` tactic. Given a known
@@ -198,13 +166,14 @@ theorem Ring.equal_of_linear_combination
     let ⟨abelianAdd, _, _, _⟩ := ringProof;
     let ⟨addGroup, _⟩ := abelianAdd;
     let ⟨_, _, addInverseRight⟩ := addGroup;
+    -- The combination's difference is zero (it's combRight − combRight)...
     calc add(combLeft, negate(combRight))
-              = add(combRight, negate(combRight))
-              = zero                                 by addInverseRight(combRight);
-    Group.cancel_right(carrier, add, zero, negate, addGroup,
-        negate(goalRight), goalLeft, goalRight,
-        calc add(goalLeft, negate(goalRight))
-           = add(combLeft, negate(combRight))
-           = zero
-           = add(goalRight, negate(goalRight))   by addInverseRight(goalRight))
+       = add(combRight, negate(combRight))   by substituting combination
+       = zero                                by addInverseRight(combRight);
+    -- ...so the goal's difference is zero too, and cancelling finishes.
+    calc add(goalLeft, negate(goalRight))
+       = add(combLeft, negate(combRight))    by ringBridge
+       = zero
+       = add(goalRight, negate(goalRight))   by addInverseRight(goalRight);
+    done by Group.cancel_right
 }

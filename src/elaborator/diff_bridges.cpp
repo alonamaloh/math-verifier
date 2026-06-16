@@ -579,6 +579,53 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
         ExpressionPointer toTerm =
             zetaUnfoldLetBinders(nextKernel, localBinders);
         while (true) {
+            // Strongest attempt first: prove THIS diff level's subterm
+            // equality by citing the lemma through the same goal-driven
+            // instantiation a `by <lemma>` calc step uses
+            // (`autoFillHintForClaim`). Unlike the local unify+discharge
+            // below, it back-infers a lemma's NON-conclusion DATA arguments
+            // from the context — e.g. an abstract ring bundle's
+            // carrier/add/zero/one, recovered from an in-scope `IsRing`
+            // hypothesis — which `unifyConstructorParameters` refuses to
+            // bind (its value-free-var soundness guard). So an argument-free
+            // citation works on a CONGRUENCE step over an abstract carrier;
+            // the diff bridge then wraps the (sub)equality in the
+            // surrounding congruence. At the OUTER level the lemma's
+            // conclusion won't match a congruence wrapper, so this falls
+            // through and we descend to the differing subterm.
+            //
+            // The sub-goal's carrier type must live in the SAME
+            // closed-over-local scope as fromTerm/toTerm (BV references),
+            // exactly as the calc machinery builds an `=` step goal: infer
+            // it OPENED, then close. Skipping the close leaves carrier as a
+            // free variable that won't structurally match the BV the bundle
+            // hypothesis carries — so the lemma's data args never pin.
+            try {
+                ExpressionPointer carrierType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, fromTerm),
+                    localBinders, localBinders.size());
+                LevelPointer carrierLevel =
+                    typeUniverseOf(localBinders, fromTerm);
+                ExpressionPointer levelGoal = makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Equality", {carrierLevel}),
+                            carrierType),
+                        fromTerm),
+                    toTerm);
+                ExpressionPointer filled = autoFillHintForClaim(
+                    bareLemma, bareLemmaType, levelGoal, localBinders, line);
+                if (filled) {
+                    ExpressionPointer filledType =
+                        inferTypeInLocalContext(localBinders, filled);
+                    ExpressionPointer wrapped = tryDiffApplyUserProof(
+                        localBinders, previousKernel, nextKernel,
+                        filled, filledType, line, column);
+                    if (wrapped) return wrapped;
+                }
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
             // Try the lemma at the current level, both orientations (it may
             // prove `subterm = other` or `other = subterm`).
             for (int orientation = 0; orientation < 2; ++orientation) {

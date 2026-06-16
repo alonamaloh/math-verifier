@@ -898,6 +898,40 @@ ExpressionPointer Elaborator::elaborateCalc(
                     }
                 }
             }
+            // Argument-free citation whose CONCLUSION *is* the whole step
+            // equality (not a congruence subterm): `= zero by
+            // Ring.zero_multiply` on a step `multiply(zero, b) = zero`. The
+            // bare lemma survives elaboration with its Pi type intact;
+            // instantiate it goal-driven against the step's equality — the
+            // same path `claim … by L` / `done by L` use — so an `=` step
+            // can cite a lemma argument-free, exactly like a `≤` step or a
+            // claim. (Complements the subterm-congruence case above, which
+            // matches the lemma against a differing SUBTERM.)
+            if (step.stepProof
+                && step.relation == CalcRelation::Equality
+                && std::holds_alternative<Pi>(stepProofType->node)
+                && !isDefinitionallyEqual(environment_, stepContext,
+                                            stepProofType,
+                                            stepRelationTypeOpened,
+                                            kDefeqProbeFuel)) {
+                try {
+                    ExpressionPointer filled = autoFillHintForClaim(
+                        stepProofKernel, stepProofType, stepRelationType,
+                        localBinders, step.line);
+                    if (filled) {
+                        ExpressionPointer filledType =
+                            inferTypeInLocalContext(localBinders, filled);
+                        if (isDefinitionallyEqual(environment_, stepContext,
+                                                    filledType,
+                                                    stepRelationTypeOpened)) {
+                            stepProofKernel = filled;
+                            stepProofType = filledType;
+                        }
+                    }
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {
+                }
+            }
             // Orientation retry. A citation whose conclusion has a bare
             // metavariable on one side — e.g. argument-free `since x + 0 = x`
             // on a REVERSED step `p = p + 0` — infers its arguments against

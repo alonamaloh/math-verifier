@@ -474,3 +474,86 @@ instead of OOM/depth-error. RESIDUAL: a warm-cache, whole-file reduction
 that materialises an enormous *cached* WHNF normal form still costs GBs —
 a kernel-caching concern (cap cache by term size?), distinct from the probe
 behaviour; the `substituting` idiom avoids it.
+
+### named-arg `Lemma(a := a)` whose param name equals an in-scope local silently falls back to positional, with an opaque message at the WRONG line — 2026-06-15 (Phase-0 ring_lemmas)
+note: in `Algebra/ring_lemmas.math` `Ring.negate_multiply_negate`, the calc `=` step
+`= negate(multiply(a, negate(b))) by Ring.multiply_negate_left(a := a, b := negate(b))`
+failed with:
+    elaborate error: theorem 'Ring.negate_multiply_negate'
+      this argument has the wrong type for the function it is given to
+        the function expects: Type 0
+        but this argument is: carrier
+The named argument `a := a` (lemma param `a` collides with the in-scope local
+`a`) silently resolved as POSITIONAL, feeding the value `a` (type `carrier`)
+to the lemma's first param `carrier : Type(0)` — hence "expects Type 0, but
+argument is carrier". Three problems: (1) names neither the named-arg-resolution
+failure nor the offending `a := a`; (2) the location points at the enclosing
+`let ⟨…⟩ := ringProof` rather than the calc step containing the call; (3) the
+real one-line reason was buried under a large dump of folded bundle types
+(`IsRing carrier add …`, `_tupleRest_86_86_5 : And …`). `Lemma(x := b)` (no
+collision) resolves fine, so the trigger is param-name == local-name. Cost
+many edit/build cycles to localise.
+diagnosis:
+rubric (0/1): cause 0 · location 0 · actionable 0 · folded-types 0 · no-jargon 1
+
+### argument-free `by <Lemma>` in an `=` calc step says "proves a different relation" and dumps the un-applied Pi-type, not the actionable "apply it" — 2026-06-15 (Phase-0 ring_lemmas)
+note: `= zero by Ring.zero_multiply` (argument-free) in a calc `=` step failed:
+    this step's justification proves a different relation than the step claims
+      this step claims:    (multiply zero b) = zero
+      but its proof shows: (carrier : Type 0) → … → IsRing … → (x : carrier) → (multiply zero x) = zero
+The `=`-step diff-inference doesn't instantiate an argument-free citation (it
+works for ≤/∣ steps, for claims, and for a final `done by`, but NOT for `=`
+steps — see proof-style.md). The message shows the un-applied Pi-type (a useful
+tell) but never states the fix: "an `=` step needs the lemma applied — write
+`by Lemma(arg := …)` or supply the data argument." This is the single biggest
+blocker to cite-only over abstract bundles; closing the underlying gap (let an
+`=` step instantiate an argument-free citation from its endpoints) would remove
+it. Worth a targeted hint even before the gap is closed.
+diagnosis:
+rubric (0/1): cause 1 · location 1 · actionable 0 · folded-types 0 · no-jargon 1
+
+### RESOLVED (whole-conclusion case) 2026-06-15 — argument-free `by <Lemma>` on an `=` calc step
+The "argument-free `by <Lemma>` in an `=` calc step" gap above is FIXED for the
+case where the lemma's CONCLUSION is the whole step equality: calc.cpp now
+routes such a citation through `autoFillHintForClaim` (the same goal-driven
+instantiation `claim … by L` / `done by L` use), gated on (Equality step, Pi-typed
+proof, relation mismatch) so it's purely additive — the full library re-verified
+unchanged. `Ring.{zero_multiply,multiply_zero,multiply_negate_left,…}` now cite
+argument-free on `=` steps over the abstract ring bundle.
+RESIDUAL: a CONGRUENCE `=` step (lemma matches a SUBTERM, e.g. `negate(·)` over
+`multiply_negate_right`) still can't be cited argument-free over an abstract
+bundle — `tryApplyBareLemmaToDiff` discharges only PROPOSITIONAL non-conclusion
+args from context, not the bundle's DATA args (`carrier`/`add`/`zero`/`one`,
+absent from the conclusion). Those stay applied (one site in ring_lemmas). A
+deeper fix would infer non-proposition data args by type-match in the congruence
+discharge.
+
+### (follow-up to the above residual) why the congruence-over-bundle data-arg inference is non-trivial — 2026-06-15
+Tried fixing the RESIDUAL by switching tryApplyBareLemmaToDiff's side-condition
+discharge from a defeq CHECK to a `unifyConstructorParameters` against the
+candidate bundle hypothesis (to pin carrier/add/zero/one from `IsRing(carrier,…)`).
+It can't work: `unifyConstructorParameters` has a SOUNDNESS guard
+(`!containsValueArgumentFreeVar(target)`, unification.cpp) that refuses to bind a
+metavar to a target containing a local-binder free variable — and carrier/add/zero
+ARE opened local binders, so the guard (correctly) blocks the binding. The right
+fix is to route the differing SUBTERM through `autoFillHintForClaim` (the full
+goal-driven inference that already solves the whole-conclusion case), then wrap
+with the congruence diff bridge.
+
+### RESOLVED 2026-06-15 — argument-free CONGRUENCE citation over an abstract bundle now works
+Implemented the "right fix" above: `tryApplyBareLemmaToDiff` (diff_bridges.cpp), at
+each level of its diff descent, now builds the level's subterm equality goal and
+hands it to `autoFillHintForClaim` (the same goal-driven instantiation the
+whole-conclusion case uses), then wraps the result via `tryDiffApplyUserProof`. So
+`= negate(negate(multiply(a,b))) by Ring.multiply_negate_right` — a `negate(·)`
+CONGRUENCE over the lemma — now cites ARGUMENT-FREE over the abstract ring bundle;
+the bundle's data args (carrier/add/zero/one) are back-inferred from the in-scope
+`IsRing` hypothesis. ring_lemmas `negate_multiply_negate` step 2 is now bare.
+ROOT-CAUSE LESSON (the bug that cost the most): when hand-building an `=` goal to
+feed a matcher, the carrier TYPE argument must be closed into the SAME
+closed-over-local scope (`closeOverLocalBinders`) as the BV endpoints — exactly as
+calc.cpp builds a step goal. My first cut passed the raw `inferTypeInLocalContext`
+result (OPENED, carrier as a free variable); it printed identically but failed to
+structurally match the `BV` the bundle hypothesis carries, so the data args never
+pinned and the inner match silently fell through. Mixed opened/closed scope in a
+single term is the trap. (`autoFillHintForClaim` itself was correct all along.)

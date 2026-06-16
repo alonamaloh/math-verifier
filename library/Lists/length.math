@@ -1,9 +1,13 @@
 -- Lists/length.math
 --
--- The length of a `List(A)`: a general-purpose counting function. Wilson's
--- theorem (the product-of-units pairing) needs to induct on the number of
--- elements, which requires `length` and its invariance under permutation;
--- but `length` is broadly reusable, so it lives here on its own.
+-- The length of a `List(A)` — a general-purpose counting function.
+--
+-- Phase-0 form (PLAN_LUX_TRANSITION): `length` is an OPAQUE recursive
+-- definition; its `1 + n` recurrence is published as the two characterising
+-- lemmas (`length_empty` / `length_prepend`), and every consumer reasons
+-- through them. No `successor` appears outside the sealed body — this is
+-- the keystone "recursive definition publishes its `f(1 + k) = …` lemma and
+-- goes opaque" pattern that the bulk of the library will follow.
 
 module Lists.length
 
@@ -13,47 +17,55 @@ import Equality.basics
 import Lists.list
 import Lists.permutation
 
--- The number of elements in a list.
-definition List.length (A : Type(0)) : List(A) → Natural
+-- Recursive on the list spine, then sealed behind the characterising
+-- lemmas below.
+opaque definition List.length (A : Type(0)) : List(A) → Natural
   | List.empty               => 0
-  | List.prepend(head, tail) => successor(List.length(A, tail))
+  | List.prepend(head, tail) => 1 + List.length(A, tail)
 
--- `length(prepend(h, t)) = successor(length t)` — definitional, named for
--- readability at call sites.
+-- ── Characterising lemmas (the opaque boundary) ───────────────────────
+theorem List.length_empty (A : Type(0)) : List.length(A, List.empty(A)) = 0 :=
+  done by unfolding List.length
+
 theorem List.length_prepend (A : Type(0)) (head : A) (tail : List(A))
-        : List.length(A, List.prepend(head, tail)) = successor(List.length(A, tail)) :=
-  calc List.length(A, List.prepend(head, tail))
-     = successor(List.length(A, tail))
+        : List.length(A, List.prepend(head, tail)) = 1 + List.length(A, tail) :=
+  done by unfolding List.length
 
--- A nonempty list has positive length.
+-- ── Consumers reason through the boundary ─────────────────────────────
+
+-- A nonempty list has positive length: 1 ≤ 1 + length(tail) = length(list).
 theorem List.length_positive_of_member (A : Type(0)) (element : A) (list : List(A))
         (membership : List.member(A, element, list))
         : 1 ≤ List.length(A, list) :=
   cases list {
     | List.empty => absurd(List.no_member_empty(A, element, membership))
-    | List.prepend(head, tail) => Natural.successor_positive(List.length(A, tail))
+    | List.prepend(head, tail) =>
+        calc 1
+           ≤ 1 + List.length(A, tail)                     by Natural.less_or_equal_add_right
+           = List.length(A, List.prepend(A, head, tail))  by List.length_prepend(A, head, tail)
   }
 
--- Length is invariant under permutation (mirrors `product_invariant`:
--- induct on the permutation; skip adds one to both, swap adds two to both,
--- transitive chains, and the by-less steps backward-chain this lemma on the
--- sub-permutations). Needed for the orbit induction in Wilson's theorem, but
--- a basic reusable fact.
+-- Length is invariant under permutation. Recursion on the permutation
+-- derivation: `skip` adds one to both sides, `swap` two, and `transitive`
+-- chains the two sub-permutations (their length equalities are
+-- backward-chained from this lemma on the by-less steps).
 theorem List.Permutation.length_invariant (A : Type(0)) (l1 l2 : List(A))
         : List.Permutation(A, l1, l2)
           → List.length(A, l1) = List.length(A, l2)
   | List.Permutation.empty =>
-      reflexivity(Natural, List.length(A, List.empty(A)))
-  | List.Permutation.skip(x, a, b, perm) =>
+      done
+  | List.Permutation.skip(x, a, b, subPermutation) =>
       calc List.length(A, List.prepend(A, x, a))
-         = successor(List.length(A, a))
-         = successor(List.length(A, b))
-         = List.length(A, List.prepend(A, x, b))
+         = 1 + List.length(A, a)                  by List.length_prepend(A, x, a)
+         = 1 + List.length(A, b)
+         = List.length(A, List.prepend(A, x, b))  by List.length_prepend(A, x, b)
   | List.Permutation.swap(x, y, l) =>
       calc List.length(A, List.prepend(A, x, List.prepend(A, y, l)))
-         = successor(successor(List.length(A, l)))
-         = List.length(A, List.prepend(A, y, List.prepend(A, x, l)))
-  | List.Permutation.transitive(a, b, c, p, q) =>
+         = 1 + List.length(A, List.prepend(A, y, l))             by List.length_prepend(A, x, List.prepend(A, y, l))
+         = 1 + (1 + List.length(A, l))                           by List.length_prepend(A, y, l)
+         = 1 + List.length(A, List.prepend(A, x, l))             by List.length_prepend(A, x, l)
+         = List.length(A, List.prepend(A, y, List.prepend(A, x, l)))  by List.length_prepend(A, y, List.prepend(A, x, l))
+  | List.Permutation.transitive(a, b, c, leftPermutation, rightPermutation) =>
       calc List.length(A, a)
          = List.length(A, b)
          = List.length(A, c)
