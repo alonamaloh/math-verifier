@@ -65,9 +65,9 @@ theorem Natural.lt_successor (a : Natural) : a < successor(a) :=
 -- `a + (1 + c) = a` cancels `a` to force `1 + c = 0`, i.e. `successor(c) = 0`.
 theorem Natural.lt_irreflexive (a : Natural) : ¬ (a < a) := {
   suppose a < a as _;
-  obtain ⟨gap, equation⟩ by Natural.lt_elim;
+  choose gap such that a + (1 + gap) = a from Natural.lt_elim;
   calc a + (1 + gap)
-     = a       by equation
+     = a
      = a + 0   by Natural.add_zero(a);
   claim 1 + gap = 0 by Natural.add_cancel_left;
   absurd((calc successor(gap)
@@ -188,7 +188,7 @@ theorem Natural.lt_trichotomy (a : Natural)
     case step(predecessor): (b : Natural) ↦
       cases IH(b) {
         | Or.introduceLeft(predecessorLessThanB) => {
-            obtain ⟨gap, equation⟩ by Natural.lt_elim;
+            choose gap such that predecessor + (1 + gap) = b as equation from Natural.lt_elim;
             cases gap refining equation {
               | zero => {
                   -- the gap was exactly one: 1 + predecessor = b.
@@ -231,7 +231,7 @@ theorem Natural.successor_less_or_equal_successor (a b : Natural)
         (proof : a ≤ b) : successor(a) ≤ successor(b) :=
   cases proof {
     | Or.introduceLeft(aLessThanB) => {
-        obtain ⟨gap, equation⟩ by Natural.lt_elim;
+        choose gap such that a + (1 + gap) = b as equation from Natural.lt_elim;
         calc successor(a) + (1 + gap)
            = successor(a + (1 + gap))   by Natural.successor_add(a, 1 + gap)
            = successor(b)               by substituting equation
@@ -272,11 +272,11 @@ theorem Natural.less_or_equal_predecessor_less_or_equal
 
 -- k < n  ⟹  successor(k) ≤ n.
 theorem Natural.successor_le_of_lt (k n : Natural) (h : k < n) : successor(k) ≤ n := {
-  obtain ⟨gap, equation⟩ by Natural.lt_elim;
+  choose gap such that k + (1 + gap) = n from Natural.lt_elim;
   calc successor(k) + gap
      = (1 + k) + gap        by Natural.one_add(k)
      = k + (1 + gap)        by ring
-     = n                     by equation
+     = n
      as shifted;
   calc successor(k)
      ≤ successor(k) + gap   by Natural.less_or_equal_add_right

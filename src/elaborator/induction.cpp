@@ -78,30 +78,46 @@ ExpressionPointer Elaborator::elaborateChoose(
         //       original behaviour).
         SurfaceExpressionPointer scrutinee;
         if (choose.source) {
-            bool sourceIsLocalHypothesis = false;
-            if (auto* identifier =
-                    std::get_if<SurfaceIdentifier>(&choose.source->node)) {
-                for (const auto& binder : localBinders) {
-                    if (binder.name == identifier->qualifiedName) {
-                        sourceIsLocalHypothesis = true;
-                        break;
-                    }
+            // Does the source ALREADY have an existential type — a
+            // hypothesis (`aDividesB`), or any applied term (`gSurjective(z)`,
+            // `List.Permutation.extract(…)`)? Then destructure it directly.
+            // Only a still-unapplied lemma (a Pi type) needs citing. Decide
+            // by elaborating the source and inspecting its type, so applied
+            // terms aren't mistaken for lemmas.
+            bool sourceIsExistential = false;
+            try {
+                ExpressionPointer sourceTerm = elaborateExpression(
+                    *choose.source, localBinders);
+                ExpressionPointer sourceType = weakHeadNormalForm(
+                    environment_, openOverLocalBinders(
+                        inferTypeInLocalContext(localBinders, sourceTerm),
+                        localBinders, N));
+                ExpressionPointer head = sourceType;
+                while (auto* app = std::get_if<Application>(&head->node)) {
+                    head = app->function;
                 }
+                if (auto* headConstant =
+                        std::get_if<Constant>(&head->node)) {
+                    sourceIsExistential = headConstant->name == "Exists";
+                }
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
             }
-            if (sourceIsLocalHypothesis) {
+            if (sourceIsExistential) {
                 scrutinee = choose.source;
+            } else if (!choose.predicate) {
+                // Lemma source, no `such that`: cite the lemma argument-free
+                // and destructure its existential — its premises discharge
+                // from context, exactly like `obtain ⟨…⟩ by <lemma>`. No body
+                // restatement needed. (Add `such that` only to DISAMBIGUATE
+                // when several in-scope facts could discharge the premise.)
+                scrutinee = makeSurfaceCiteInferred(
+                    choose.source, line, column);
             } else {
-                // Lemma source: cite it against `∃ (name : T). prop`, where
-                // the explicit body `prop` disambiguates the citation (which
-                // hypothesis the lemma's premise discharges against) and the
-                // witness type T is read off the lemma's own conclusion
-                // existential. `such that` is therefore required.
-                if (!choose.predicate) {
-                    throwElaborate(
-                        "choose " + choose.name + " from <lemma> needs "
-                        "`such that <prop>` to shape the citation (the "
-                        "lemma's existential is built from <prop>)");
-                }
+                // Lemma source WITH `such that`: cite it against the explicit
+                // `∃ (name : T). prop`, so the body disambiguates which
+                // hypothesis the lemma's premise discharges against; the
+                // witness type T is read off the lemma's own conclusion.
                 ExpressionPointer lemmaTerm = elaborateExpression(
                     *choose.source, localBinders);
                 ExpressionPointer lemmaType = inferTypeInLocalContext(
