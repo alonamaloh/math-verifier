@@ -460,6 +460,15 @@ struct SurfaceChoose {
     std::string name;
     SurfaceExpressionPointer predicate;
     SurfaceExpressionPointer body;
+    // `as <conditionName>` — names the chosen condition (the predicate
+    // fact) so it can be cited explicitly; empty means anonymous (the
+    // auto-prover consults it by type-match).
+    std::string conditionName;
+    // `from <source>` — the existential's source. Null means "scan scope
+    // for the most-recent Exists". A local-hypothesis name destructures
+    // that hypothesis directly; a bare lemma name is cited argument-free
+    // (shaped by `such that`) and the result destructured.
+    SurfaceExpressionPointer source;
 };
 
 // `claim` — a structured-proof step in mathematician style. Forms:
@@ -803,10 +812,13 @@ inline SurfaceExpressionPointer makeSurfaceChoose(
     std::string name,
     SurfaceExpressionPointer predicate,
     SurfaceExpressionPointer body,
-    int line, int column) {
+    int line, int column,
+    std::string conditionName = "",
+    SurfaceExpressionPointer source = nullptr) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceChoose{std::move(name), std::move(predicate),
-                       std::move(body)},
+                       std::move(body), std::move(conditionName),
+                       std::move(source)},
         line, column});
 }
 

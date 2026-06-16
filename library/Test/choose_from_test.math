@@ -1,0 +1,59 @@
+-- Tests for the extended `choose`:
+--   choose <name> [such that <prop>] [as <condName>] [from <source>];
+-- where <source> is either an in-scope HYPOTHESIS (destructured directly,
+-- naming WHICH existential among several) or a LEMMA (cited argument-free,
+-- shaped by `such that` into `∃ (name : T). prop`, T read off the lemma).
+
+module Test.choose_from_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- (1) `from <hypothesis>`: choose the OLDER existential, which plain
+-- `choose` (most-recent) could never reach.
+theorem choose_from_named_hypothesis
+        (older : ∃ (n : Natural). n = zero)
+        (newer : ∃ (n : Natural). 1 ≤ n)
+        : ∃ (n : Natural). n = zero := {
+  choose z such that z = zero as zIsZero from older;
+  witness z with zIsZero
+}
+
+-- (2) bare `choose d from <hypothesis>` — no `such that`, anonymous condition
+-- consumed by the by-less `witness` step.
+theorem choose_bare
+        (witnessExists : ∃ (n : Natural). 1 ≤ n)
+        : ∃ (n : Natural). 1 ≤ n := {
+  choose d from witnessExists;
+  witness d with done
+}
+
+-- (3) `from <lemma>`: cite lt_elim argument-free, shaped by such-that; the
+-- witness type Natural is read off the lemma's existential.
+theorem choose_from_lemma (a b : Natural) (h : a < b)
+        : ∃ (c : Natural). a + (1 + c) = b := {
+  choose gap such that a + (1 + gap) = b as gapEquation from Natural.lt_elim;
+  witness gap with gapEquation
+}
+
+-- (4) `from <lemma>` with TWO `<` in scope — `such that` disambiguates
+-- which inequality lt_elim eliminates (the case plain citing can't).
+theorem choose_from_lemma_disambiguates
+        (a b c : Natural) (hab : a < b) (hbc : b < c)
+        : ∃ (g : Natural). a + (1 + g) = b := {
+  choose gapAB such that a + (1 + gapAB) = b as gapEquation from Natural.lt_elim;
+  witness gapAB with gapEquation
+}
+
+-- (5) TWO consecutive `choose … from <lemma>` in one block.
+theorem two_choose_from (a b c : Natural) (hab : a < b) (hbc : b < c)
+        : ∃ (g : Natural). b + (1 + g) = c := {
+  choose g1 such that a + (1 + g1) = b from Natural.lt_elim;
+  choose g2 such that b + (1 + g2) = c from Natural.lt_elim;
+  witness g2 with done
+}

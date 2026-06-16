@@ -66,34 +66,126 @@ ExpressionPointer Elaborator::elaborateChoose(
             "choose " + choose.name + " at line "
             + std::to_string(line));
         int N = static_cast<int>(localBinders.size());
-        int matchedIndex = -1;
-        for (int b = N - 1; b >= 0; --b) {
-            int lift = N - b;
-            ExpressionPointer binderTypeInScope =
-                liftBoundVariables(localBinders[b].type, lift, 0);
-            ExpressionPointer binderTypeOpen = openOverLocalBinders(
-                binderTypeInScope, localBinders, N);
-            ExpressionPointer whnf = weakHeadNormalForm(
-                environment_, binderTypeOpen);
-            // Exists(T, motive) is App(App(Const "Exists"), T, motive).
-            auto* outerApp = std::get_if<Application>(&whnf->node);
-            if (!outerApp) continue;
-            auto* innerApp = std::get_if<Application>(
-                &outerApp->function->node);
-            if (!innerApp) continue;
-            auto* head = std::get_if<Constant>(
-                &innerApp->function->node);
-            if (!head || head->name != "Exists") continue;
-            matchedIndex = b;
-            break;
-        }
-        if (matchedIndex == -1) {
-            throwElaborate(
-                "choose " + choose.name + " such that <pred>: "
-                "no in-scope hypothesis has type Exists(_, _). "
-                "Prepend `claim Exists(...) by …;` to bring one "
-                "into scope, or use `obtain ⟨…⟩ from …;` with an "
-                "explicit source.");
+
+        // Decide the existential's SOURCE — what the cases below
+        // destructures. Three forms:
+        //   (a) `from <hypothesis>` — destructure that hypothesis directly
+        //       (names WHICH one, when several existentials are in scope);
+        //   (b) `from <lemma>` — cite the lemma argument-free, shaped by
+        //       `such that <prop>` into `∃ (name : _). prop`, and
+        //       destructure the result;
+        //   (c) no `from` — scan scope for the most-recent Exists (the
+        //       original behaviour).
+        SurfaceExpressionPointer scrutinee;
+        if (choose.source) {
+            bool sourceIsLocalHypothesis = false;
+            if (auto* identifier =
+                    std::get_if<SurfaceIdentifier>(&choose.source->node)) {
+                for (const auto& binder : localBinders) {
+                    if (binder.name == identifier->qualifiedName) {
+                        sourceIsLocalHypothesis = true;
+                        break;
+                    }
+                }
+            }
+            if (sourceIsLocalHypothesis) {
+                scrutinee = choose.source;
+            } else {
+                // Lemma source: cite it against `∃ (name : T). prop`, where
+                // the explicit body `prop` disambiguates the citation (which
+                // hypothesis the lemma's premise discharges against) and the
+                // witness type T is read off the lemma's own conclusion
+                // existential. `such that` is therefore required.
+                if (!choose.predicate) {
+                    throwElaborate(
+                        "choose " + choose.name + " from <lemma> needs "
+                        "`such that <prop>` to shape the citation (the "
+                        "lemma's existential is built from <prop>)");
+                }
+                ExpressionPointer lemmaTerm = elaborateExpression(
+                    *choose.source, localBinders);
+                ExpressionPointer lemmaType = inferTypeInLocalContext(
+                    localBinders, lemmaTerm);
+                ExpressionPointer conclusion = openOverLocalBinders(
+                    lemmaType, localBinders, N);
+                while (auto* pi = std::get_if<Pi>(&conclusion->node)) {
+                    conclusion = pi->codomain;
+                }
+                conclusion = weakHeadNormalForm(environment_, conclusion);
+                // Exists(T, motive) = App(App(Const "Exists"), T, motive).
+                ExpressionPointer witnessType;
+                if (auto* outer =
+                        std::get_if<Application>(&conclusion->node)) {
+                    if (auto* inner = std::get_if<Application>(
+                            &outer->function->node)) {
+                        if (auto* head = std::get_if<Constant>(
+                                &inner->function->node)) {
+                            if (head->name == "Exists") {
+                                witnessType = inner->argument;
+                            }
+                        }
+                    }
+                }
+                auto* witnessConstant = witnessType
+                    ? std::get_if<Constant>(&witnessType->node) : nullptr;
+                if (!witnessConstant) {
+                    throwElaborate(
+                        "choose " + choose.name + " from <lemma>: could not "
+                        "read a simple (closed) witness type from the "
+                        "lemma's existential conclusion. Use the explicit "
+                        "form `claim ∃ (" + choose.name + " : <T>). <prop> "
+                        "by <lemma>; choose " + choose.name + " …` instead.");
+                }
+                SurfaceExpressionPointer witnessTypeSurface =
+                    makeSurfaceIdentifier(witnessConstant->name, {},
+                        line, column);
+                SurfaceBinder witnessBinder;
+                witnessBinder.names = {choose.name};
+                witnessBinder.type = witnessTypeSurface;
+                SurfaceExpressionPointer motive = makeSurfaceLambda(
+                    witnessBinder, choose.predicate, line, column);
+                SurfaceExpressionPointer existential =
+                    makeSurfaceApplication(
+                        makeSurfaceIdentifier("Exists", {}, line, column),
+                        std::vector<SurfaceExpressionPointer>{
+                            witnessTypeSurface, motive},
+                        line, column);
+                scrutinee = makeSurfaceAscription(
+                    makeSurfaceCiteInferred(choose.source, line, column),
+                    existential, line, column);
+            }
+        } else {
+            int matchedIndex = -1;
+            for (int b = N - 1; b >= 0; --b) {
+                int lift = N - b;
+                ExpressionPointer binderTypeInScope =
+                    liftBoundVariables(localBinders[b].type, lift, 0);
+                ExpressionPointer binderTypeOpen = openOverLocalBinders(
+                    binderTypeInScope, localBinders, N);
+                ExpressionPointer whnf = weakHeadNormalForm(
+                    environment_, binderTypeOpen);
+                // Exists(T, motive) is App(App(Const "Exists"), T, motive).
+                auto* outerApp = std::get_if<Application>(&whnf->node);
+                if (!outerApp) continue;
+                auto* innerApp = std::get_if<Application>(
+                    &outerApp->function->node);
+                if (!innerApp) continue;
+                auto* head = std::get_if<Constant>(
+                    &innerApp->function->node);
+                if (!head || head->name != "Exists") continue;
+                matchedIndex = b;
+                break;
+            }
+            if (matchedIndex == -1) {
+                throwElaborate(
+                    "choose " + choose.name + " such that <pred>: "
+                    "no in-scope hypothesis has type Exists(_, _). "
+                    "Prepend `claim Exists(...) by …;` to bring one "
+                    "into scope, name the source with `from <hyp>`, or "
+                    "use `obtain ⟨…⟩ from …;`.");
+            }
+            scrutinee = makeSurfaceIdentifier(
+                localBinders[matchedIndex].name, {}, line, column);
         }
         // Unused-name warning: `choose N such that P(N);` then a
         // body that never mentions N is dead weight. Check at the
@@ -109,14 +201,15 @@ ExpressionPointer Elaborator::elaborateChoose(
             && !surfaceContainsAutoProverInvocation(*choose.body)) {
             warnIfSurfaceNameUnused(
                 choose.name, *choose.body, line, column,
-                "`choose ... such that`");
+                "`choose ...`");
         }
-        // Build a SurfaceCases destructuring the matched hypothesis.
-        SurfaceExpressionPointer scrutinee = makeSurfaceIdentifier(
-            localBinders[matchedIndex].name, {}, line, column);
-        std::string predHypName =
-            "_choice_pred_" + std::to_string(line) + "_"
-            + std::to_string(column);
+        // Build a SurfaceCases destructuring the chosen existential. The
+        // condition hypothesis takes the user's `as <name>` when given, else
+        // an internal name (the auto-prover finds it by type-match anyway).
+        std::string predHypName = choose.conditionName.empty()
+            ? ("_choice_pred_" + std::to_string(line) + "_"
+               + std::to_string(column))
+            : choose.conditionName;
         std::vector<SurfacePatternPointer> patternComponents;
         patternComponents.push_back(
             makeSurfacePatternBareName(

@@ -988,6 +988,8 @@ private:
             std::string name;                  // TypedLet, Suppose, Choose, Set
             SurfaceExpressionPointer type;     // TypedLet, Suppose, NoteGoal
             SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set, NoteAssertion
+            std::string conditionName;         // Choose: optional `as <name>`
+            SurfaceExpressionPointer source;   // Choose: optional `from <source>`
             // Only set for TypedLet wrappers that came from `calc … as NAME;`
             // with an explicit user-supplied NAME. Propagated onto the
             // resulting SurfaceLet so the elaborator can emit the
@@ -1295,23 +1297,42 @@ private:
                 }
                 Token nameToken = consumeAny();
                 wrapper.name = nameToken.lexeme;
-                // `such` and `that` are ordinary identifiers
-                // everywhere except in this slot — text-match here
-                // so they remain usable as variable names elsewhere.
-                if (peek().kind != TokenKind::Identifier
-                    || peek().lexeme != "such") {
-                    throwHere(
-                        "expected 'such' after choose name "
-                        "(choose n such that P(n);)");
+                // Optional `such that <predicate>`. `such`/`that` are
+                // ordinary identifiers everywhere except this slot —
+                // text-match so they stay usable as variable names.
+                if (peek().kind == TokenKind::Identifier
+                    && peek().lexeme == "such") {
+                    consumeAny();
+                    if (peek().kind != TokenKind::Identifier
+                        || peek().lexeme != "that") {
+                        throwHere(
+                            "expected 'that' after 'such' in choose");
+                    }
+                    consumeAny();
+                    wrapper.value = parseExpression();
                 }
-                consumeAny();
-                if (peek().kind != TokenKind::Identifier
-                    || peek().lexeme != "that") {
-                    throwHere(
-                        "expected 'that' after 'such' in choose");
+                // Optional `as <conditionName>` — name the chosen fact
+                // (otherwise it joins the context anonymously).
+                if (peek().kind == TokenKind::KeywordAs) {
+                    consumeAny();
+                    if (!isIdentifierLike(peek().kind)) {
+                        throwHere("expected a name after 'as' in choose");
+                    }
+                    wrapper.conditionName = consumeAny().lexeme;
                 }
-                consumeAny();
-                wrapper.value = parseExpression();
+                // Optional `from <source>` — the existential's source: a
+                // hypothesis to destructure, or a lemma to cite (shaped
+                // by `such that`). Absent ⇒ scan scope for the most recent.
+                if (peek().kind == TokenKind::KeywordFrom) {
+                    consumeAny();
+                    wrapper.source = parseExpression();
+                }
+                if (!wrapper.value && !wrapper.source) {
+                    throwHere(
+                        "choose needs `such that <prop>` and/or "
+                        "`from <source>` (choose n such that P(n); "
+                        "or choose n from h;)");
+                }
             } else if (isObtain) {
                 wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();
@@ -1599,7 +1620,9 @@ private:
                         std::move(iterator->name),
                         std::move(iterator->value),
                         std::move(result),
-                        iterator->line, iterator->column);
+                        iterator->line, iterator->column,
+                        std::move(iterator->conditionName),
+                        std::move(iterator->source));
                     break;
                 }
                 case BlockWrapper::Set:
