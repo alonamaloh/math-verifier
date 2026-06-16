@@ -11,6 +11,7 @@ import Equality.basics
 import Natural.basics
 import Natural.order
 import Natural.add_order
+import Natural.arithmetic
 import Lists.list
 import Lists.range
 import Lists.map
@@ -250,7 +251,14 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0))
         cases l2 refining lengthEquation, distinct2 {
           | List.empty => List.Permutation.empty(A)
           | List.prepend(head, tail) => {
-              -- 0 = 1 + |tail| is absurd.
+              -- |empty| = 0 but |prepend| = 1 + |tail| = successor(|tail|), so
+              -- 0 is a successor — absurd.
+              claim (0 : Natural) = successor(List.length(A, tail))
+                  by calc (0 : Natural)
+                        = List.length(A, List.empty(A))                 by List.length_empty
+                        = List.length(A, List.prepend(A, head, tail))   by lengthEquation
+                        = 1 + List.length(A, tail)                      by List.length_prepend
+                        = successor(List.length(A, tail))               by Natural.one_add;
               claim impossible : False since Natural.zero_not_successor;
               absurd(impossible)
             }
@@ -306,16 +314,14 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0))
         claim lengthPermuted
             : List.length(A, l2) = List.length(A, List.prepend(A, head, rest))
             since List.Permutation.length_invariant;
-        claim successor(List.length(A, tail)) = successor(List.length(A, rest))
-            by calc successor(List.length(A, tail))
-                  = List.length(A, List.prepend(A, head, tail))
-                  = List.length(A, l2)
-                        by lengthEquation
-                  = List.length(A, List.prepend(A, head, rest))
-                        by lengthPermuted
-                  = successor(List.length(A, rest));
+        claim 1 + List.length(A, tail) = 1 + List.length(A, rest)
+            by calc 1 + List.length(A, tail)
+                  = List.length(A, List.prepend(A, head, tail))   by List.length_prepend
+                  = List.length(A, l2)                            by lengthEquation
+                  = List.length(A, List.prepend(A, head, rest))   by lengthPermuted
+                  = 1 + List.length(A, rest)                      by List.length_prepend;
         claim restLengthEquation : List.length(A, tail) = List.length(A, rest)
-            since Natural.successor_injective;
+            since Natural.add_cancel_left;
         -- Recurse on the tails and reassemble.
         claim tailPermutation : List.Permutation(A, tail, rest)
             by List.permutation_of_distinct_inclusion(A, tail, rest,

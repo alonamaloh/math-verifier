@@ -557,3 +557,38 @@ result (OPENED, carrier as a free variable); it printed identically but failed t
 structurally match the `BV` the bundle hypothesis carries, so the data args never
 pinned and the inner match silently fell through. Mixed opened/closed scope in a
 single term is the trap. (`autoFillHintForClaim` itself was correct all along.)
+
+### RESOLVED 2026-06-15 — argument-free citation now sees THROUGH a recursive-definition redex
+`by List.length_prepend` (argument-free) on a step whose list argument is a REDEX —
+`List.length(Natural, List.range_down(successor(k)))`, where `range_down(successor(k))`
+only REDUCES to a `List.prepend(…)` — failed: the lemma conclusion
+`List.length(A, List.prepend(A, head, tail))` couldn't be matched against the
+unreduced goal. Two layers to it:
+(1) the conclusion matcher (`matchAgainstPattern`) DOES δι-unfold a subject on head
+    mismatch, and WHNF correctly exposes the `prepend`; but
+(2) WHNF brings the tail back as the raw recursor IH (`Natural_recursor(… k)`), while
+    the OTHER side of the goal pins the same lemma slot to the FOLDED `range_down(k)`.
+    Folded vs unfolded are definitionally equal but structurally different, so the
+    slot's consistency check (`structurallyEqual`) rejected the (correct) match.
+FIX: when the structural consistency check on an already-bound slot fails, fall back
+to a δ/ι-aware `isDefinitionallyEqual` (empty context — free BVs act as opaque atoms;
+same idiom as the projection-resolution pass). Purely additive (only reached after
+the structural check fails) and sound (accepts only genuinely-equal terms). Now
+`map_length` / `range_down_length` cite `List.length_prepend` / `List.length_empty`
+fully argument-free over the map/range_down redex.
+
+### GOTCHA (not a bug) 2026-06-15 — `1 + n` is NO LONGER defeq to `successor(n)` under opaque `add`
+`Natural.add` is now an `opaque definition`, so `1 + n` (= `add(1, n)`) does NOT
+WHNF-reduce to `successor(n)`; `Natural.one_add : 1 + a = successor(a)` is a real
+(propositional) lemma proved `by unfolding Natural.add`, not a reflexivity. The
+CLAUDE.md convention note calling them "both kernel-defeq" is STALE under the Lux
+opacity transition. Practical consequence hit while de-cascading `Lists/{distinct,
+pairing}`: `length_prepend` yields `1 + |tail|`, but the Peano/order lemmas
+(`zero_not_successor`, `successor_injective`, `successor_le_cancel`,
+`not_less_or_equal_successor_zero`, `less_or_equal_predecessor_less_or_equal`) are
+all `successor`-phrased and will NOT match a `1 + n` form. Bridge explicitly with a
+`= successor(…) by Natural.one_add` calc step, or stay in `1 + n` and use the
+`1 + n`-native lemmas (`Natural.add_cancel_left`, `Natural.add_left_le_cancel`). The
+new congruence-citation feature makes the `one_add`/`length_prepend` bridges cite
+argument-free even under `successor(·)` / `1 + ·` (e.g. pairing.math's six-step
+length-bound calc).

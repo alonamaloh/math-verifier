@@ -17,16 +17,21 @@ definition List.map (A B : Type(0)) (f : A → B) : List(A) → List(B)
   | List.prepend(head, tail) =>
       List.prepend(B, f(head), List.map(A, B, f, tail))
 
--- `map` preserves length.
+-- `map` preserves length. Recursion on the list: the empty image has
+-- length 0 on both sides; a prepend adds one to each (the tail equality
+-- is backward-chained from this lemma on the by-less middle step).
 theorem List.map_length (A B : Type(0)) (f : A → B)
         : (list : List(A))
           → List.length(B, List.map(A, B, f, list)) = List.length(A, list)
-  | List.empty => reflexivity(Natural, 0)
+  | List.empty =>
+      calc List.length(B, List.map(A, B, f, List.empty(A)))
+         = 0                              by List.length_empty
+         = List.length(A, List.empty(A))  by List.length_empty
   | List.prepend(head, tail) =>
       calc List.length(B, List.map(A, B, f, List.prepend(A, head, tail)))
-         = successor(List.length(B, List.map(A, B, f, tail)))
-         = successor(List.length(A, tail))
-         = List.length(A, List.prepend(A, head, tail))
+         = 1 + List.length(B, List.map(A, B, f, tail))   by List.length_prepend
+         = 1 + List.length(A, tail)
+         = List.length(A, List.prepend(A, head, tail))   by List.length_prepend
 
 -- `map` carries membership forward: x ∈ l ⟹ f(x) ∈ map(f, l). (Pattern-match
 -- on the member proof at definition level — `cases` on it is blocked by the

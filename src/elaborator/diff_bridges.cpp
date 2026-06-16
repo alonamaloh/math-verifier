@@ -873,8 +873,29 @@ bool Elaborator::matchAgainstPattern(
                     bindings[slot] = shiftedSubject;
                     return true;
                 }
-                return structurallyEqual(
-                    bindings[slot], shiftedSubject);
+                if (structurallyEqual(bindings[slot], shiftedSubject)) {
+                    return true;
+                }
+                // The same slot can be pinned once from a FOLDED occurrence
+                // and once from an UNFOLDED one and still be consistent: a
+                // recursive definition's tail comes back as `range_down(k)`
+                // from one side of the goal, but as the raw recursor IH
+                // `Natural_recursor(… k)` after the OTHER side is
+                // WHNF-unfolded to expose a constructor head (`prepend`).
+                // The two are definitionally equal; accept on a δ/ι-aware
+                // check. Empty context: any free bound variables act as
+                // opaque atoms and the bridging reduction is
+                // context-independent (same pattern as the projection
+                // resolution below). Additive — only reached when the
+                // structural check already failed, so it can widen matches
+                // but never narrow them.
+                try {
+                    return isDefinitionallyEqual(
+                        environment_, Context{},
+                        bindings[slot], shiftedSubject);
+                } catch (const TypeError&) {
+                    return false;
+                }
             }
             // idx < piDepth: descended Pi binder; idx >=
             // piDepth + binderCount: outer-scope binder. Either
