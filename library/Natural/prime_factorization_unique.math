@@ -77,8 +77,8 @@ theorem Natural.prime_equals_of_prime_divides (p q : Natural)
 
 theorem Natural.prime_member_of_divides_product (p : Natural)
         (pPrime : Natural.is_prime(p))
-        : (list : List(Natural))
-          → ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+        : ∀ (list : List(Natural)).
+          (∀ (k : Natural). List.member(Natural, k, list) → Natural.is_prime(k))
           → p ∣ Natural.listProduct(list)
           → List.member(Natural, p, list)
   | List.empty, allPrime, pDividesProduct => {
@@ -102,7 +102,7 @@ theorem Natural.prime_member_of_divides_product (p : Natural)
           }
         | Or.introduceRight(pDividesTail) => {
             claim allPrimeTail
-                : (k : Natural) → List.member(Natural, k, tail) → Natural.is_prime(k);
+                : ∀ (k : Natural). List.member(Natural, k, tail) → Natural.is_prime(k);
             List.member.there(Natural, p, head, tail,
                 Natural.prime_member_of_divides_product(p, pPrime, tail,
                     allPrimeTail, pDividesTail))
@@ -114,8 +114,8 @@ theorem Natural.prime_member_of_divides_product (p : Natural)
 -- A prime list with product 1 is empty.
 
 theorem Natural.prime_list_product_one_implies_empty
-        : (list : List(Natural))
-          → ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+        : ∀ (list : List(Natural)).
+          (∀ (k : Natural). List.member(Natural, k, list) → Natural.is_prime(k))
           → Natural.listProduct(list) = 1
           → list = List.empty(Natural)
   | List.empty, allPrime, productIsOne =>
@@ -139,7 +139,7 @@ theorem Natural.prime_list_product_one_implies_empty
 
 theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 ≤ n)
         : ∃ (list : List(Natural)).
-            ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+            (∀ (k : Natural). List.member(Natural, k, list) → Natural.is_prime(k))
             ∧ Natural.listProduct(list) = n :=
   (by_induction on n using Natural.strong_induction with subject, inductionHypothesis {
      (subjectAtLeastOne : 1 ≤ subject) ↦ {
@@ -186,7 +186,7 @@ theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 �
    }
    : 1 ≤ n
      → ∃ (list : List(Natural)).
-         ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+         (∀ (k : Natural). List.member(Natural, k, list) → Natural.is_prime(k))
          ∧ Natural.listProduct(list) = n
    )(atLeastOne)
 
@@ -194,9 +194,9 @@ theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 �
 -- Uniqueness: prime lists with equal product are permutations.
 
 theorem Natural.prime_factorization_unique
-        : (l1 l2 : List(Natural))
-          → ((k : Natural) → List.member(Natural, k, l1) → Natural.is_prime(k))
-          → ((k : Natural) → List.member(Natural, k, l2) → Natural.is_prime(k))
+        : ∀ (l1 l2 : List(Natural)).
+          (∀ (k : Natural). List.member(Natural, k, l1) → Natural.is_prime(k))
+          → (∀ (k : Natural). List.member(Natural, k, l2) → Natural.is_prime(k))
           → Natural.listProduct(l1) = Natural.listProduct(l2)
           → List.Permutation(Natural, l1, l2)
   | List.empty, l2, allPrime1, allPrime2, productEqual => {
@@ -233,9 +233,9 @@ theorem Natural.prime_factorization_unique
           by Natural.multiply_cancel_left;
       -- Recurse and assemble.
       claim allPrimeRest1
-          : (k : Natural) → List.member(Natural, k, rest1) → Natural.is_prime(k);
+          : ∀ (k : Natural). List.member(Natural, k, rest1) → Natural.is_prime(k);
       claim allPrimeL2rest
-          : (k : Natural) → List.member(Natural, k, l2rest) → Natural.is_prime(k);
+          : ∀ (k : Natural). List.member(Natural, k, l2rest) → Natural.is_prime(k);
       claim restPermutation : List.Permutation(Natural, rest1, l2rest)
           by Natural.prime_factorization_unique(rest1, l2rest, allPrimeRest1,
                  allPrimeL2rest, restProductsEqual);
@@ -254,18 +254,18 @@ theorem Natural.prime_factorization_unique
 
 theorem Natural.fundamental_theorem_of_arithmetic (n : Natural) (atLeastOne : 1 ≤ n)
         : (∃ (list : List(Natural)).
-              ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+              (∀ (k : Natural). List.member(Natural, k, list) → Natural.is_prime(k))
               ∧ Natural.listProduct(list) = n)
-          ∧ ((l1 l2 : List(Natural))
-                → ((k : Natural) → List.member(Natural, k, l1) → Natural.is_prime(k))
-                → ((k : Natural) → List.member(Natural, k, l2) → Natural.is_prime(k))
+          ∧ (∀ (l1 l2 : List(Natural)).
+                (∀ (k : Natural). List.member(Natural, k, l1) → Natural.is_prime(k))
+                → (∀ (k : Natural). List.member(Natural, k, l2) → Natural.is_prime(k))
                 → Natural.listProduct(l1) = n
                 → Natural.listProduct(l2) = n
                 → List.Permutation(Natural, l1, l2)) :=
   ⟨done by Natural.prime_factorization_exists_list,
    (l1 l2 : List(Natural))
-   (allPrime1 : (k : Natural) → List.member(Natural, k, l1) → Natural.is_prime(k))
-   (allPrime2 : (k : Natural) → List.member(Natural, k, l2) → Natural.is_prime(k))
+   (allPrime1 : ∀ (k : Natural). List.member(Natural, k, l1) → Natural.is_prime(k))
+   (allPrime2 : ∀ (k : Natural). List.member(Natural, k, l2) → Natural.is_prime(k))
    (l1Product : Natural.listProduct(l1) = n)
    (l2Product : Natural.listProduct(l2) = n) ↦ {
      calc Natural.listProduct(l1) = n = Natural.listProduct(l2);

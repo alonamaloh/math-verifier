@@ -24,10 +24,10 @@ import Natural.strong_recursion
 -- A minimal witness: a point where the predicate holds with nothing
 -- below it doing so.
 theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
-        : (n : Natural) → predicate(n)
+        : ∀ (n : Natural). predicate(n)
           → ∃ (minimum : Natural).
               predicate(minimum)
-              ∧ ((k : Natural) → k < minimum → ¬predicate(k)) := {
+              ∧ (∀ (k : Natural). k < minimum → ¬predicate(k)) := {
   take n : Natural;
   by_strong_induction on n with subject, inductionHypothesis {
     suppose predicate(subject) as predicateAtSubject;
@@ -41,7 +41,7 @@ theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
         }
       | no noneSmaller => {
           -- Nothing below `subject` satisfies the predicate, so it is least.
-          claim subjectIsMinimal : (k : Natural) → k < subject → ¬predicate(k);
+          claim subjectIsMinimal : ∀ (k : Natural). k < subject → ¬predicate(k);
           ⟨subject, ⟨predicateAtSubject, subjectIsMinimal⟩⟩
         }
     }
@@ -54,12 +54,12 @@ theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
 theorem Natural.least_witness (predicate : Natural → Proposition)
         (n : Natural) (witnessAtN : predicate(n))
         : ∃ (minimum : Natural).
-            predicate(minimum) ∧ ((k : Natural) → predicate(k) → minimum ≤ k) := {
+            predicate(minimum) ∧ (∀ (k : Natural). predicate(k) → minimum ≤ k) := {
   claim minimalWitness
         : ∃ (minimum : Natural).
-            predicate(minimum) ∧ ((k : Natural) → k < minimum → ¬predicate(k))
+            predicate(minimum) ∧ (∀ (k : Natural). k < minimum → ¬predicate(k))
       by Natural.least_witness_minimal;
   obtain ⟨minimum, predicateAtMinimum, nothingBelow⟩ from minimalWitness;
-  claim minimumIsLeast : (k : Natural) → predicate(k) → minimum ≤ k;
+  claim minimumIsLeast : ∀ (k : Natural). predicate(k) → minimum ≤ k;
   ⟨minimum, ⟨predicateAtMinimum, minimumIsLeast⟩⟩
 }

@@ -58,7 +58,7 @@ theorem Natural.degree_bound_helper (d j i : Natural)
 -- A sum whose summand vanishes everywhere on 0..n is zero.
 theorem Polynomial.Sum.vanishes_below (r : Ring)
         (h : Natural → Ring.carrier(r)) (n : Natural)
-        (vanish : (i : Natural) → i ≤ n → h(i) = Ring.zero(r))
+        (vanish : ∀ (i : Natural). i ≤ n → h(i) = Ring.zero(r))
         : Polynomial.Sum(r, h, n) = Ring.zero(r) :=
   calc Polynomial.Sum(r, h, n)
      = Polynomial.Sum(r, (i : Natural) ↦ Ring.zero(r), n)
@@ -69,12 +69,12 @@ theorem Polynomial.Sum.vanishes_below (r : Ring)
 theorem Polynomial.Sum.single_point (r : Ring)
         (h : Natural → Ring.carrier(r)) (j : Natural) (n : Natural)
         : j ≤ n
-          → ((i : Natural) → ¬(i = j) → h(i) = Ring.zero(r))
+          → (∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r))
           → Polynomial.Sum(r, h, n) = h(j) :=
   by_induction on n with IH {
     case zero:
       (jLessOrEqualZero : j ≤ 0)
-               (vanish : (i : Natural) → ¬(i = j) → h(i) = Ring.zero(r)) ↦ {
+               (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦ {
         claim jEqualsZero : j = 0
             by Natural.less_or_equal_zero_implies_equals_zero(j, jLessOrEqualZero);
         calc Polynomial.Sum(r, h, 0)
@@ -83,7 +83,7 @@ theorem Polynomial.Sum.single_point (r : Ring)
       }
     case successor(m):
       (jLessOrEqualSuccessor : j ≤ successor(m))
-               (vanish : (i : Natural) → ¬(i = j) → h(i) = Ring.zero(r)) ↦
+               (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦
           decide j = successor(m) {
             | yes jEqualsSuccessor => {
                 claim Polynomial.Sum(r, h, m) = Ring.zero(r)

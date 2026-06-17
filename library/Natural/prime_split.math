@@ -32,10 +32,10 @@ import Logic.exists
 -- (the divisor in the range, with proofs that it's ≥ 2, ≤ bound, and
 -- divides n) or a "no such divisor" function.
 theorem Natural.search_proper_divisor_up_to (n : Natural)
-        : (candidateBound : Natural)
-          → Exists(Natural, (divisor : Natural) ↦
-                  2 ≤ divisor ∧ divisor ≤ candidateBound ∧ divisor ∣ n) ∨ ((divisor : Natural)
-                → 2 ≤ divisor
+        : ∀ (candidateBound : Natural).
+          Exists(Natural, (divisor : Natural) ↦
+                  2 ≤ divisor ∧ divisor ≤ candidateBound ∧ divisor ∣ n) ∨ (∀ (divisor : Natural).
+                2 ≤ divisor
                 → divisor ≤ candidateBound
                 → divisor ∤ n)
   | zero =>
@@ -143,7 +143,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
 
 -- d ≠ 0 implies 1 ≤ d.
 theorem Natural.geq_one_when_not_zero
-        : (d : Natural) → d ≠ 0 → 1 ≤ d
+        : ∀ (d : Natural). d ≠ 0 → 1 ≤ d
   | zero, notZero =>
       absurd(notZero(done))
   | successor(predD), _ =>
@@ -151,8 +151,8 @@ theorem Natural.geq_one_when_not_zero
 
 -- Helper: if d is neither 0 nor 1, then 2 ≤ d. Pattern-match on d.
 theorem Natural.geq_two_when_not_zero_or_one
-        : (d : Natural)
-          → d ≠ 0 → d ≠ 1 → 2 ≤ d
+        : ∀ (d : Natural).
+          d ≠ 0 → d ≠ 1 → 2 ≤ d
   | zero, notZero, _ =>
       absurd(notZero(done))
   | successor(predD), _, notOne => {
@@ -190,8 +190,8 @@ theorem Natural.equals_when_less_or_equal_and_not_less_than (a b : Natural)
 theorem Natural.classify_divisor_when_no_proper
         (predecessorOfN : Natural)
         (noProperDivisor :
-            (divisor : Natural)
-            → 2 ≤ divisor
+            ∀ (divisor : Natural).
+            2 ≤ divisor
             → divisor ≤ predecessorOfN
             → divisor ∤ successor(predecessorOfN))
         (divisor : Natural)
@@ -252,15 +252,15 @@ theorem Natural.classify_divisor_when_no_proper
 
 -- The main split: for n ≥ 2, n is prime or has a proper divisor.
 theorem Natural.prime_or_proper_divisor
-        : (n : Natural)
-          → 2 ≤ n
+        : ∀ (n : Natural).
+          2 ≤ n
           → Natural.is_prime(n) ∨ Exists(Natural, (divisor : Natural) ↦
                     2 ≤ divisor ∧ successor(divisor) ≤ n ∧ divisor ∣ n)
   | zero, atLeastTwo =>
       absurd(atLeastTwo)
   | successor(predecessorOfN), atLeastTwo =>
       claim (∃ (divisor : Natural). 2 ≤ divisor ∧ divisor ≤ predecessorOfN ∧ divisor ∣ successor(predecessorOfN))
-          ∨ ((divisor : Natural) → 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN))
+          ∨ (∀ (divisor : Natural). 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN))
       claim by cases {
         in (∃ (divisor : Natural). 2 ≤ divisor ∧ divisor ≤ predecessorOfN ∧ divisor ∣ successor(predecessorOfN)) as foundDivisor: {
             obtain ⟨divisor, twoLessOrEqualDivisor,
@@ -272,7 +272,7 @@ theorem Natural.prime_or_proper_divisor
                      done,
                      divDivides⟩)
         }
-        in ((divisor : Natural) → 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN)) as noProperDivisor:
+        in (∀ (divisor : Natural). 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN)) as noProperDivisor:
             Or.introduceLeft(
                 ⟨atLeastTwo,
                  (divisor : Natural)

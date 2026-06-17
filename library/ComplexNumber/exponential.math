@@ -311,8 +311,8 @@ definition ComplexNumber.partialSum (s : Natural → ComplexNumber)
   | successor(n) => RingModulo.add(ComplexNumber.partialSum(s, n), s(n))
 
 theorem ComplexNumber.realPart_partialSum (s : Natural → ComplexNumber)
-        : (n : Natural)
-          → ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
+        : ∀ (n : Natural).
+          ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
             = Real.partialSum(
                   (k : Natural) ↦ ComplexNumber.realPart(s(k)), n)
   | zero => done
@@ -326,8 +326,8 @@ theorem ComplexNumber.realPart_partialSum (s : Natural → ComplexNumber)
                by ComplexNumber.realPart_partialSum(s, n)
 
 theorem ComplexNumber.imaginaryPart_partialSum (s : Natural → ComplexNumber)
-        : (n : Natural)
-          → ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
+        : ∀ (n : Natural).
+          ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
             = Real.partialSum(
                   (k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n)
   | zero => done
@@ -417,8 +417,8 @@ theorem ComplexNumber.add_cancel_left (u v : ComplexNumber)
 -- The modulus of a partial sum is at most the real partial sum of the
 -- moduli (the triangle inequality, summed).
 theorem ComplexNumber.modulus_partialSum_le (s : Natural → ComplexNumber)
-        : (n : Natural)
-          → ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
+        : ∀ (n : Natural).
+          ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
             ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
   | zero => {
       claim ComplexNumber.modulus(ComplexNumber.partialSum(s, 0)) = Real.zero
@@ -446,14 +446,14 @@ theorem ComplexNumber.modulus_partialSum_le (s : Natural → ComplexNumber)
 -- matching real window).
 theorem ComplexNumber.series_dominated_cauchy
         (t : Natural → ComplexNumber) (b : Natural → Real)
-        (domination : (k : Natural) → ComplexNumber.modulus(t(k)) ≤ b(k))
+        (domination : ∀ (k : Natural). ComplexNumber.modulus(t(k)) ≤ b(k))
         (boundCauchy : Real.SequenceIsCauchy(Real.partialSum(b)))
         : ComplexNumber.SequenceIsCauchy(ComplexNumber.partialSum(t)) :=
   (epsilon : Rational)
   (epsilonPositive : Rational.zero < epsilon) ↦ {
     choose N as tailClose from boundCauchy(epsilon, epsilonPositive);
     claim oneSided
-          : (i j : Natural) → N ≤ i → N ≤ j → i ≤ j
+          : ∀ (i j : Natural). N ≤ i → N ≤ j → i ≤ j
             → ComplexNumber.modulus(
                   ComplexNumber.partialSum(t, j) - ComplexNumber.partialSum(t, i))
               < (epsilon : Real)
@@ -588,12 +588,12 @@ theorem ComplexNumber.eq_of_subtract_zero (z w : ComplexNumber)
 -- A complex number with arbitrarily small modulus is zero.
 theorem ComplexNumber.eq_zero_of_modulus_less_than_all_positive
         (u : ComplexNumber)
-        (hypothesis : (epsilon : Rational) → Rational.zero < epsilon →
+        (hypothesis : ∀ (epsilon : Rational). Rational.zero < epsilon →
                           ComplexNumber.modulus(u) < (epsilon : Real))
         : u = RingModulo.zero(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial) := {
   claim realSmall
-      : (epsilon : Rational) → Rational.zero < epsilon
+      : ∀ (epsilon : Rational). Rational.zero < epsilon
         → abs(ComplexNumber.realPart(u)) < (epsilon : Real)
       by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
            claim abs(ComplexNumber.realPart(u)) ≤ ComplexNumber.modulus(u)
@@ -603,7 +603,7 @@ theorem ComplexNumber.eq_zero_of_modulus_less_than_all_positive
            done since Real.LessThan.transitive_left
          };
   claim imaginarySmall
-      : (epsilon : Rational) → Rational.zero < epsilon
+      : ∀ (epsilon : Rational). Rational.zero < epsilon
         → abs(ComplexNumber.imaginaryPart(u)) < (epsilon : Real)
       by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
            claim abs(ComplexNumber.imaginaryPart(u)) ≤ ComplexNumber.modulus(u)
@@ -638,7 +638,7 @@ theorem ComplexNumber.SequenceConverges.unique
         (converges2 : ComplexNumber.SequenceConverges(s, limit2))
         : limit1 = limit2 := {
   claim differenceSmall
-      : (epsilon : Rational) → Rational.zero < epsilon
+      : ∀ (epsilon : Rational). Rational.zero < epsilon
         → ComplexNumber.modulus(limit1 - limit2) < (epsilon : Real)
       by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
            claim halfPositive : Rational.zero < Rational.halve(epsilon)
@@ -763,8 +763,8 @@ theorem ComplexNumber.modulus_one
 
 -- |zⁿ| = |z|ⁿ.
 theorem ComplexNumber.modulus_power (z : ComplexNumber)
-        : (n : Natural)
-          → ComplexNumber.modulus(ComplexNumber.power(z, n))
+        : ∀ (n : Natural).
+          ComplexNumber.modulus(ComplexNumber.power(z, n))
             = Real.power(ComplexNumber.modulus(z), n)
   | zero => {
       claim ComplexNumber.modulus(ComplexNumber.power(z, 0)) = Real.one
@@ -852,8 +852,8 @@ theorem ComplexNumber.exponential_series_convergent (z : ComplexNumber)
              Real.partialSum(Real.exponentialTerm(ComplexNumber.modulus(z))),
              realSeriesConvergent);
   claim domination
-      : (k : Natural)
-        → ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
+      : ∀ (k : Natural).
+        ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
           ≤ Real.exponentialTerm(ComplexNumber.modulus(z), k)
       by (k : Natural) ↦ {
            claim sameValue
@@ -906,15 +906,15 @@ theorem ComplexNumber.exponential_zero
           = RingModulo.one(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial) := {
   claim termSuccessor
-        : (k : Natural)
-          → ComplexNumber.exponentialTerm(
+        : ∀ (k : Natural).
+          ComplexNumber.exponentialTerm(
                 RingModulo.zero(Real.polynomial_commutative_ring,
                     Complex.definingPolynomial), successor(k))
             = RingModulo.zero(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial);
   claim tailConstant
-        : (p : Natural)
-          → ComplexNumber.partialSum(
+        : ∀ (p : Natural).
+          ComplexNumber.partialSum(
                 ComplexNumber.exponentialTerm(
                     RingModulo.zero(Real.polynomial_commutative_ring,
                         Complex.definingPolynomial)), successor(p))

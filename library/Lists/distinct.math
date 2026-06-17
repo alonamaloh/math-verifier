@@ -33,8 +33,8 @@ inductive List.Distinct (A : Type(0)) : List(A) → Proposition where
 
 theorem List.Distinct_invert_general (A : Type(0)) (list : List(A))
         : List.Distinct(A, list)
-          → (head : A) → (tail : List(A))
-          → list = List.prepend(A, head, tail)
+          → ∀ (head : A). ∀ (tail : List(A)).
+          list = List.prepend(A, head, tail)
           → ¬(List.member(A, head, tail)) ∧ List.Distinct(A, tail)
   | List.Distinct.empty =>
       (head : A) (tail : List(A))
@@ -167,27 +167,27 @@ theorem List.range_down_distinct (n : Natural)
 -- of the list. (k ↦ [k] mod p is not globally injective — [0] = [p] — yet
 -- on the members of range_down(p−1) it is, and that is all this asks.)
 theorem List.map_distinct_on (A B : Type(0)) (f : A → B)
-        : (list : List(A))
-          → ((x y : A) → List.member(A, x, list) → List.member(A, y, list)
+        : ∀ (list : List(A)).
+          (∀ (x y : A). List.member(A, x, list) → List.member(A, y, list)
                  → f(x) = f(y) → x = y)
           → List.Distinct(A, list)
           → List.Distinct(B, List.map(A, B, f, list))
   | List.empty =>
       (injectiveOnList
-          : (x y : A) → List.member(A, x, List.empty(A))
+          : ∀ (x y : A). List.member(A, x, List.empty(A))
               → List.member(A, y, List.empty(A)) → f(x) = f(y) → x = y)
       (distinct : List.Distinct(A, List.empty(A))) ↦
         List.Distinct.empty(B)
   | List.prepend(head, tail) =>
       (injectiveOnList
-          : (x y : A) → List.member(A, x, List.prepend(A, head, tail))
+          : ∀ (x y : A). List.member(A, x, List.prepend(A, head, tail))
               → List.member(A, y, List.prepend(A, head, tail))
               → f(x) = f(y) → x = y)
       (distinct : List.Distinct(A, List.prepend(A, head, tail))) ↦ {
         -- Restrict the injectivity hypothesis to the tail's members, and
         -- to comparisons against the head.
         claim injectiveOnTail
-            : (x y : A) → List.member(A, x, tail) → List.member(A, y, tail)
+            : ∀ (x y : A). List.member(A, x, tail) → List.member(A, y, tail)
                 → f(x) = f(y) → x = y
             by (x y : A)
                (xMember : List.member(A, x, tail))
@@ -219,7 +219,7 @@ theorem List.map_distinct_on (A B : Type(0)) (f : A → B)
 
 -- An injective map preserves distinctness.
 theorem List.map_distinct (A B : Type(0)) (f : A → B)
-        (injective : (x y : A) → f(x) = f(y) → x = y)
+        (injective : ∀ (x y : A). f(x) = f(y) → x = y)
         (list : List(A))
         : List.Distinct(A, list)
           → List.Distinct(B, List.map(A, B, f, list))
@@ -235,17 +235,17 @@ theorem List.map_distinct (A B : Type(0)) (f : A → B)
 -- cardinalities is a bijection" fact, in list form. Extract the head of
 -- l1 from l2 and recurse on the tails.
 theorem List.permutation_of_distinct_inclusion (A : Type(0))
-        : (l1 l2 : List(A))
-          → List.Distinct(A, l1)
+        : ∀ (l1 l2 : List(A)).
+          List.Distinct(A, l1)
           → List.Distinct(A, l2)
-          → ((x : A) → List.member(A, x, l1) → List.member(A, x, l2))
+          → (∀ (x : A). List.member(A, x, l1) → List.member(A, x, l2))
           → List.length(A, l1) = List.length(A, l2)
           → List.Permutation(A, l1, l2)
   | List.empty =>
       (l2 : List(A))
       (distinct1 : List.Distinct(A, List.empty(A)))
       (distinct2 : List.Distinct(A, l2))
-      (inclusion : (x : A) → List.member(A, x, List.empty(A))
+      (inclusion : ∀ (x : A). List.member(A, x, List.empty(A))
           → List.member(A, x, l2))
       (lengthEquation : List.length(A, List.empty(A)) = List.length(A, l2)) ↦
         cases l2 refining lengthEquation, distinct2 {
@@ -267,7 +267,7 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0))
       (l2 : List(A))
       (distinct1 : List.Distinct(A, List.prepend(A, head, tail)))
       (distinct2 : List.Distinct(A, l2))
-      (inclusion : (x : A) → List.member(A, x, List.prepend(A, head, tail))
+      (inclusion : ∀ (x : A). List.member(A, x, List.prepend(A, head, tail))
           → List.member(A, x, l2))
       (lengthEquation
           : List.length(A, List.prepend(A, head, tail)) = List.length(A, l2)) ↦ {
@@ -293,7 +293,7 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0))
         -- The tail is contained in the remainder: an x ∈ tail is in l2,
         -- lands in head :: rest, and is not the head (head ∉ tail).
         claim tailInclusion
-            : (x : A) → List.member(A, x, tail) → List.member(A, x, rest)
+            : ∀ (x : A). List.member(A, x, tail) → List.member(A, x, rest)
             by (x : A) (xInTail : List.member(A, x, tail)) ↦ {
                 claim xInList1
                     : List.member(A, x, List.prepend(A, head, tail))

@@ -99,12 +99,12 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
 -- forAllBelow n : for every k < n, P holds. Ordinary induction on n.
 theorem Natural.for_all_below
         (P : Natural → Proposition)
-        (step : (n : Natural)
-                → ((k : Natural)
-                    → successor(k) ≤ n → P(k))
+        (step : ∀ (n : Natural).
+                (∀ (k : Natural).
+                    successor(k) ≤ n → P(k))
                 → P(n))
         (n : Natural)
-        : (k : Natural) → successor(k) ≤ n → P(k) :=
+        : ∀ (k : Natural). successor(k) ≤ n → P(k) :=
   by_induction on n with IH {
     case base:
         (k : Natural) (impossible : successor(k) ≤ 0) ↦
@@ -172,9 +172,9 @@ theorem Natural.less_or_equal_successor_successor_descend
 -- checks unchanged.
 theorem Natural.strong_induction
         (P : Natural → Proposition)
-        (step : (n : Natural)
-                → ((k : Natural)
-                    → k < n → P(k))
+        (step : ∀ (n : Natural).
+                (∀ (k : Natural).
+                    k < n → P(k))
                 → P(n))
         (n : Natural)
         : P(n) := {
@@ -182,13 +182,13 @@ theorem Natural.strong_induction
   -- the caller's `<`-step to it (and the `<`-result back) through
   -- `successor_le_of_lt` — `<` is no longer defeq to `successor ≤`.
   claim adaptedStep
-        : (m : Natural) → ((k : Natural) → successor(k) ≤ m → P(k)) → P(m)
-      by (m : Natural) (belowM : (k : Natural) → successor(k) ≤ m → P(k)) ↦
+        : ∀ (m : Natural). (∀ (k : Natural). successor(k) ≤ m → P(k)) → P(m)
+      by (m : Natural) (belowM : ∀ (k : Natural). successor(k) ≤ m → P(k)) ↦
           step(m, (k : Natural) (kLessThanM : k < m) ↦ {
             claim successor(k) ≤ m by Natural.successor_le_of_lt;
             belowM(k, (successor(k) ≤ m))
           });
-  claim below : (k : Natural) → k < n → P(k)
+  claim below : ∀ (k : Natural). k < n → P(k)
       by (k : Natural) (kLessThanN : k < n) ↦ {
         claim successor(k) ≤ n by Natural.successor_le_of_lt;
         Natural.for_all_below(P, adaptedStep, n, k, (successor(k) ≤ n))

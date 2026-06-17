@@ -145,8 +145,8 @@ theorem Real.partialSum_pair (s : Natural → Real) (N : Natural)
 -- step multiplies by −y twice). This carries the alternating sign of
 -- the cosine/sine coefficients: (−x²)^m flips sign with the parity of m.
 theorem Real.power_negate_parity (y : Real)
-        : (m : Natural)
-          → Real.power(-y, 2 * m) = Real.power(y, 2 * m) ∧ Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)))
+        : ∀ (m : Natural).
+          Real.power(-y, 2 * m) = Real.power(y, 2 * m) ∧ Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)))
   | zero => {
       claim twoTimesZero : 2 * 0 = 0;
       claim evenPart
@@ -287,8 +287,8 @@ theorem Real.cosine_paired_series_converges (x : Real)
              cos(x), fullConverges);
   -- Each 2N-cut sums in pairs, and each pair drops to its even term.
   claim pairsCollapse
-      : (N : Natural)
-        → Real.partialSum(
+      : ∀ (N : Natural).
+        Real.partialSum(
               (k : Natural) ↦
                   ComplexNumber.realPart(
                       ComplexNumber.exponentialTerm(
@@ -429,8 +429,8 @@ theorem Real.sine_paired_series_converges (x : Real)
                              ComplexNumber.i * ComplexNumber.from_real(x), k))),
              sin(x), fullConverges);
   claim pairsCollapse
-      : (N : Natural)
-        → Real.partialSum(
+      : ∀ (N : Natural).
+        Real.partialSum(
               (k : Natural) ↦
                   ComplexNumber.imaginaryPart(
                       ComplexNumber.exponentialTerm(
@@ -557,7 +557,7 @@ theorem Natural.factorial_le_succ (n : Natural)
 
 -- a! ≤ (k + a)!, by induction on the gap k (each step a factorial-le-succ).
 theorem Natural.factorial_le_add (a : Natural)
-        : (k : Natural) → Natural.factorial(a) ≤ Natural.factorial(k + a)
+        : ∀ (k : Natural). Natural.factorial(a) ≤ Natural.factorial(k + a)
   | zero => {
       claim Natural.factorial(a) ≤ Natural.factorial(a)
           by Natural.LessOrEqual.reflexive;
@@ -610,7 +610,7 @@ theorem Real.exponentialCoefficient_antitone (i j : Natural) (iLeqJ : i ≤ j)
 -- ----------------------------------------------------------------------
 -- Every natural is even or odd: n = 2j or n = 2j+1.
 theorem Natural.even_or_odd
-        : (n : Natural) → ∃ (j : Natural). n = 2 * j ∨ n = successor(2 * j)
+        : ∀ (n : Natural). ∃ (j : Natural). n = 2 * j ∨ n = successor(2 * j)
   | zero => {
       claim base : (0 : Natural) = 2 * 0;
       witness 0 with Or.introduceLeft(base)
@@ -638,11 +638,11 @@ theorem Natural.even_or_odd
 -- consecutive pair sums to ≤ 0. The even and odd cuts are handled
 -- together by induction on the pair index.
 theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
-        (leadNonpositive : (j : Natural) → g(2 * j) ≤ Real.zero)
+        (leadNonpositive : ∀ (j : Natural). g(2 * j) ≤ Real.zero)
         (pairNonpositive
-            : (j : Natural) → g(2 * j) + g(successor(2 * j)) ≤ Real.zero)
-        : (j : Natural)
-          → Real.partialSum(g, 2 * j) ≤ Real.zero ∧ Real.partialSum(g, successor(2 * j)) ≤ Real.zero
+            : ∀ (j : Natural). g(2 * j) + g(successor(2 * j)) ≤ Real.zero)
+        : ∀ (j : Natural).
+          Real.partialSum(g, 2 * j) ≤ Real.zero ∧ Real.partialSum(g, successor(2 * j)) ≤ Real.zero
   | zero => {
       claim evenZero : Real.partialSum(g, 2 * 0) ≤ Real.zero;
       claim oddZero : Real.partialSum(g, successor(2 * 0)) ≤ Real.zero
@@ -692,9 +692,9 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
 
 -- … hence non-positive at every cut (split n by parity).
 theorem Real.partialSum_nonpositive (g : Natural → Real)
-        (leadNonpositive : (j : Natural) → g(2 * j) ≤ Real.zero)
+        (leadNonpositive : ∀ (j : Natural). g(2 * j) ≤ Real.zero)
         (pairNonpositive
-            : (j : Natural) → g(2 * j) + g(successor(2 * j)) ≤ Real.zero)
+            : ∀ (j : Natural). g(2 * j) + g(successor(2 * j)) ≤ Real.zero)
         (n : Natural)
         : Real.partialSum(g, n) ≤ Real.zero := {
   obtain ⟨j, disjunction⟩ from Natural.even_or_odd(n);
@@ -718,12 +718,12 @@ theorem Real.partialSum_nonpositive (g : Natural → Real)
 -- terms are ≥ 0 and each consecutive pair sums to ≥ 0 (apply the
 -- non-positive lemma to −g, which negates the partial sums).
 theorem Real.partialSum_nonnegative (g : Natural → Real)
-        (leadNonnegative : (j : Natural) → Real.zero ≤ g(2 * j))
+        (leadNonnegative : ∀ (j : Natural). Real.zero ≤ g(2 * j))
         (pairNonnegative
-            : (j : Natural) → Real.zero ≤ g(2 * j) + g(successor(2 * j)))
+            : ∀ (j : Natural). Real.zero ≤ g(2 * j) + g(successor(2 * j)))
         (n : Natural)
         : Real.zero ≤ Real.partialSum(g, n) := {
-  claim negLead : (j : Natural) → -g(2 * j) ≤ Real.zero
+  claim negLead : ∀ (j : Natural). -g(2 * j) ≤ Real.zero
       by (j : Natural) ↦
            calc -g(2 * j)
               ≤ -Real.zero
@@ -731,7 +731,7 @@ theorem Real.partialSum_nonnegative (g : Natural → Real)
               = Real.zero
                     by ring;
   claim negPair
-      : (j : Natural) → -g(2 * j) + -g(successor(2 * j)) ≤ Real.zero
+      : ∀ (j : Natural). -g(2 * j) + -g(successor(2 * j)) ≤ Real.zero
       by (j : Natural) ↦
            calc -g(2 * j) + -g(successor(2 * j))
               = -(g(2 * j) + g(successor(2 * j)))
@@ -851,7 +851,7 @@ theorem Real.cosine_one_upper_bound
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3) := {
   -- Lead terms (odd index 3 + 2k) are −1/(…)! ≤ 0.
   claim leadNonpositive
-      : (k : Natural) → Real.cosineCoefficient(Real.one, 3 + 2 * k) ≤ Real.zero
+      : ∀ (k : Natural). Real.cosineCoefficient(Real.one, 3 + 2 * k) ≤ Real.zero
       by (k : Natural) ↦ {
            claim oddIndex : (3 : Natural) + 2 * k = successor(2 * successor(k))
                by ring;
@@ -883,8 +883,8 @@ theorem Real.cosine_one_upper_bound
          };
   -- Each consecutive pair (odd then even) sums to ≤ 0 (magnitudes shrink).
   claim pairNonpositive
-      : (k : Natural)
-        → Real.cosineCoefficient(Real.one, 3 + 2 * k)
+      : ∀ (k : Natural).
+        Real.cosineCoefficient(Real.one, 3 + 2 * k)
               + Real.cosineCoefficient(Real.one, 3 + successor(2 * k))
           ≤ Real.zero
       by (k : Natural) ↦ {
@@ -945,7 +945,7 @@ theorem Real.cosine_one_upper_bound
   -- Hence the tail from index 3 is non-positive, and every partial sum
   -- past 3 stays ≤ S₃.
   claim eventuallyBelow
-      : (M : Natural) → 3 ≤ M
+      : ∀ (M : Natural). 3 ≤ M
         → Real.partialSum(Real.cosineCoefficient(Real.one), M)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3)
       by (M : Natural) (threeLeqM : 3 ≤ M) ↦ {
@@ -995,7 +995,7 @@ theorem Real.cosine_one_lower_bound
         : Real.partialSum(Real.cosineCoefficient(Real.one), 2)
           ≤ cos(Real.one) := {
   claim leadNonnegative
-      : (k : Natural) → Real.zero ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
+      : ∀ (k : Natural). Real.zero ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
       by (k : Natural) ↦ {
            claim evenIndex : (2 : Natural) + 2 * k = 2 * successor(k) by ring;
            claim ccValue
@@ -1011,8 +1011,8 @@ theorem Real.cosine_one_lower_bound
            done by substituting ccValue
          };
   claim pairNonnegative
-      : (k : Natural)
-        → Real.zero
+      : ∀ (k : Natural).
+        Real.zero
           ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
                 + Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
       by (k : Natural) ↦ {
@@ -1075,7 +1075,7 @@ theorem Real.cosine_one_lower_bound
                     since oddValue
          };
   claim eventuallyAbove
-      : (M : Natural) → 2 ≤ M
+      : ∀ (M : Natural). 2 ≤ M
         → Real.partialSum(Real.cosineCoefficient(Real.one), 2)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), M)
       by (M : Natural) (twoLeqM : 2 ≤ M) ↦ {
