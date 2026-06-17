@@ -284,7 +284,7 @@ theorem Real.geometric_series (r : Real) (rSmall : abs(r) < Real.one)
 -- Partial sums only see the terms' values.
 theorem Real.partialSum_pointwise
         (s sequencePrime : Natural → Real)
-        (pointwiseEqual : (k : Natural) → s(k) = sequencePrime(k))
+        (pointwiseEqual : ∀ (k : Natural). s(k) = sequencePrime(k))
         (n : Natural)
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
   by_induction on n with IH {
@@ -306,14 +306,14 @@ theorem Real.partialSum_pointwise
 theorem Real.partialSum_pointwise_below
         (s sequencePrime : Natural → Real)
         : (n : Natural)
-          → ((k : Natural) → successor(k) ≤ n → s(k) = sequencePrime(k))
+          → (∀ (k : Natural). successor(k) ≤ n → s(k) = sequencePrime(k))
           → Real.partialSum(s, n) = Real.partialSum(sequencePrime, n)
   | zero =>
-      (pointwiseEqual : (k : Natural) → successor(k) ≤ 0
+      (pointwiseEqual : ∀ (k : Natural). successor(k) ≤ 0
            → s(k) = sequencePrime(k)) ↦
         done
   | successor(predecessor) =>
-      (pointwiseEqual : (k : Natural) → successor(k) ≤ successor(predecessor)
+      (pointwiseEqual : ∀ (k : Natural). successor(k) ≤ successor(predecessor)
            → s(k) = sequencePrime(k)) ↦ {
         claim tailEqual
             : Real.partialSum(s, predecessor)
@@ -390,7 +390,7 @@ theorem Real.partialSum_split (s : Natural → Real) (n k : Natural)
 
 -- Termwise comparison below the cut compares the partial sums.
 theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
-        (termsBounded : (j : Natural) → successor(j) ≤ n → s(j) ≤ t(j))
+        (termsBounded : ∀ (j : Natural). successor(j) ≤ n → s(j) ≤ t(j))
         : Real.partialSum(s, n) ≤ Real.partialSum(t, n) :=
   by_induction on n with IH refining termsBounded {
     case zero: {
@@ -399,7 +399,7 @@ theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
       }
     case successor(predecessor): {
         claim prefixBounded
-              : (j : Natural) → successor(j) ≤ predecessor → s(j) ≤ t(j)
+              : ∀ (j : Natural). successor(j) ≤ predecessor → s(j) ≤ t(j)
             by (j : Natural) (jBelow : successor(j) ≤ predecessor) ↦
                  termsBounded(
                      j, Natural.le_step(successor(j), predecessor, jBelow));
@@ -419,7 +419,7 @@ theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
 
 -- Sums of nonnegative terms are nonnegative.
 theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
-        (termsNonneg : (j : Natural) → Real.zero ≤ s(j))
+        (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
         : Real.zero ≤ Real.partialSum(s, n) :=
   by_induction on n with IH {
     case zero: {
@@ -439,7 +439,7 @@ theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
 
 -- … so partial sums of nonnegative terms only grow.
 theorem Real.partialSum_monotone_of_nonneg (s : Natural → Real)
-        (termsNonneg : (j : Natural) → Real.zero ≤ s(j))
+        (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.partialSum(s, N) ≤ Real.partialSum(s, m) := {
   obtain ⟨k, mEq⟩ by Natural.le_to_add;
@@ -601,7 +601,7 @@ theorem Real.partialSum_scale_right (s : Natural → Real) (c : Real) (n : Natur
 -- A sum of nonnegative terms vanishes only if every term below the cut
 -- does: each term is squeezed between zero and the whole sum.
 theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
-        (termsNonneg : (j : Natural) → Real.zero ≤ s(j))
+        (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
         (sumZero : Real.partialSum(s, n) = Real.zero)
         (j : Natural) (jBelow : successor(j) ≤ n)
         : s(j) = Real.zero := {
@@ -641,14 +641,14 @@ theorem Real.partialSum_zero (n : Natural)
 -- Termwise equality below the cut gives equal partial sums.
 theorem Real.partialSum_pointwise_bounded
         (s sequencePrime : Natural → Real) (n : Natural)
-        (termsEqual : (j : Natural) → successor(j) ≤ n
+        (termsEqual : ∀ (j : Natural). successor(j) ≤ n
                       → s(j) = sequencePrime(j))
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
   by_induction on n with IH refining termsEqual {
     case zero: done
     case successor(predecessor): {
         claim prefixEqual
-              : (j : Natural) → successor(j) ≤ predecessor
+              : ∀ (j : Natural). successor(j) ≤ predecessor
                 → s(j) = sequencePrime(j)
             by (j : Natural) (jBelow : successor(j) ≤ predecessor) ↦
                  termsEqual(

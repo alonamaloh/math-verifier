@@ -69,18 +69,18 @@ theorem Rational.sequence.product_is_cauchy_bound
         (n_ge : Natural.maximum(
                     Natural.maximum(N_s_bound, N_t_bound),
                     Natural.maximum(N_s, N_t)) ≤ n)
-        (sBound : (m_arg : Natural) → N_s_bound ≤ m_arg →
+        (sBound : ∀ (m_arg : Natural). N_s_bound ≤ m_arg →
                     abs(s(m_arg))
                       ≤ (successor(K_s) : Rational))
-        (tBound : (n_arg : Natural) → N_t_bound ≤ n_arg →
+        (tBound : ∀ (n_arg : Natural). N_t_bound ≤ n_arg →
                     abs(t(n_arg))
                       ≤ (successor(K_t) : Rational))
-        (sCauchyAt : (m_arg : Natural) → N_s ≤ m_arg →
-                       (n_arg : Natural) → N_s ≤ n_arg →
+        (sCauchyAt : ∀ (m_arg : Natural). N_s ≤ m_arg →
+                       ∀ (n_arg : Natural). N_s ≤ n_arg →
                          abs(s(m_arg) - s(n_arg))
                            < delta_s)
-        (tCauchyAt : (m_arg : Natural) → N_t ≤ m_arg →
-                       (n_arg : Natural) → N_t ≤ n_arg →
+        (tCauchyAt : ∀ (m_arg : Natural). N_t ≤ m_arg →
+                       ∀ (n_arg : Natural). N_t ≤ n_arg →
                          abs(t(m_arg) - t(n_arg))
                            < delta_t)
         (delta_s_props : And(Rational.zero < delta_s,
@@ -213,14 +213,14 @@ theorem Rational.sequence.product_is_cauchy
     -- Step 1: bound |s| eventually by (succ K_s : R) starting from N_s_bound.
     claim sNaturallyBounded
         : ∃ (K : Natural). ∃ (N : Natural).
-            (m : Natural) → N ≤ m → abs(s(m)) ≤ (successor(K) : Rational)
+            ∀ (m : Natural). N ≤ m → abs(s(m)) ≤ (successor(K) : Rational)
         by Rational.sequence.cauchy_is_naturally_bounded(s, sIsCauchy);
     choose K_s as sBoundedAtN_s from sNaturallyBounded;
     choose N_s_bound as sBound from sBoundedAtN_s;
     -- Step 2: similar for t.
     claim tNaturallyBounded
         : ∃ (K : Natural). ∃ (N : Natural).
-            (m : Natural) → N ≤ m → abs(t(m)) ≤ (successor(K) : Rational)
+            ∀ (m : Natural). N ≤ m → abs(t(m)) ≤ (successor(K) : Rational)
         by Rational.sequence.cauchy_is_naturally_bounded(t, tIsCauchy);
     choose K_t as tBoundedAtN_t from tNaturallyBounded;
     choose N_t_bound as tBound from tBoundedAtN_t;
@@ -266,12 +266,12 @@ theorem Rational.sequence.product_is_cauchy
     -- top-down: `choose` can't infer them through the opaque Rational.
     claim sCauchyBound
         : ∃ (N : Natural).
-            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(s(m) - s(n)) < delta_s
+            ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < delta_s
         by sIsCauchy(delta_s, delta_s_pos);
     choose N_s as sCauchyAt from sCauchyBound;
     claim tCauchyBound
         : ∃ (N : Natural).
-            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(t(m) - t(n)) < delta_t
+            ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(t(m) - t(n)) < delta_t
         by tIsCauchy(delta_t, delta_t_pos);
     choose N_t as tCauchyAt from tCauchyBound;
     -- Final N := max(N_s_bound, N_t_bound, N_s, N_t).
@@ -407,7 +407,7 @@ theorem Real.multiply_after_first_respects_at_rep_inner
                              CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime)))
         (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon)
         : ∃ (N : Natural).
-            (m : Natural) → N ≤ m →
+            ∀ (m : Natural). N ≤ m →
               abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
                 < epsilon := {
     choose K as xBoundedAtN
@@ -469,7 +469,7 @@ theorem Real.multiply_respects_at_rep_y_inner
                              CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime)))
         (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon)
         : ∃ (N : Natural).
-            (m : Natural) → N ≤ m →
+            ∀ (m : Natural). N ≤ m →
               abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
                 < epsilon :=
   -- Reduce to multiply_after_first_respects_at_rep_inner with s_y as

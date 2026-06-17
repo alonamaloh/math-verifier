@@ -53,13 +53,13 @@ import Real.series
 definition Real.SequenceIsCauchy (s : Natural → Real) : Proposition :=
   (epsilon : Rational) → Rational.zero < epsilon →
     ∃ (N : Natural).
-      (m n : Natural) → N ≤ m → N ≤ n →
+      ∀ (m n : Natural). N ≤ m → N ≤ n →
         abs(s(m) - s(n)) < (epsilon : Real)
 
 -- The eventual lower bounds of a sequence: the reals that some tail
 -- of the sequence stays at or above.
 definition Real.eventual_lower_bounds (s : Natural → Real) : Set(Real) :=
-  (t : Real) ↦ ∃ (N : Natural). (m : Natural) → N ≤ m → t ≤ s(m)
+  (t : Real) ↦ ∃ (N : Natural). ∀ (m : Natural). N ≤ m → t ≤ s(m)
 
 -- ----------------------------------------------------------------------
 -- A Cauchy tail at tolerance q pins the eventual lower bounds around
@@ -68,7 +68,7 @@ definition Real.eventual_lower_bounds (s : Natural → Real) : Set(Real) :=
 
 theorem Real.cauchy_tail_gives_lower_bound
         (s : Natural → Real) (N : Natural) (q : Rational)
-        (tailClose : (m n : Natural) → N ≤ m → N ≤ n
+        (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
                      → abs(s(m) - s(n)) < (q : Real))
         : (s(N) - (q : Real)) ∈ Real.eventual_lower_bounds(s) :=
   witness N with
@@ -89,7 +89,7 @@ theorem Real.cauchy_tail_gives_lower_bound
 
 theorem Real.cauchy_tail_gives_upper_bound
         (s : Natural → Real) (N : Natural) (q : Rational)
-        (tailClose : (m n : Natural) → N ≤ m → N ≤ n
+        (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
                      → abs(s(m) - s(n)) < (q : Real))
         : Real.IsUpperBound(Real.eventual_lower_bounds(s),
                             s(N) + (q : Real)) :=
@@ -300,7 +300,7 @@ theorem Real.converges_implies_cauchy (s : Natural → Real)
 -- partial sums of b are Cauchy, so are the partial sums of t — any
 -- window of t-terms is absolutely below the matching window of b.
 theorem Real.series_dominated_cauchy (t b : Natural → Real)
-        (domination : (k : Natural) → abs(t(k)) ≤ b(k))
+        (domination : ∀ (k : Natural). abs(t(k)) ≤ b(k))
         (boundCauchy : Real.SequenceIsCauchy(Real.partialSum(b)))
         : Real.SequenceIsCauchy(Real.partialSum(t)) :=
   (epsilon : Rational)
@@ -308,7 +308,7 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
     obtain ⟨N, tailClose⟩ from boundCauchy(epsilon, epsilonPositive);
     -- The ordered case: the gap from index i up to index j ≥ i.
     claim oneSided
-          : (i j : Natural) → N ≤ i → N ≤ j → i ≤ j
+          : ∀ (i j : Natural). N ≤ i → N ≤ j → i ≤ j
             → abs(Real.partialSum(t, j) - Real.partialSum(t, i))
               < (epsilon : Real)
         by {
@@ -412,7 +412,7 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
 -- The comparison test: a series termwise dominated by a convergent
 -- series converges.
 theorem Real.series_dominated_converges (t b : Natural → Real)
-        (domination : (k : Natural) → abs(t(k)) ≤ b(k))
+        (domination : ∀ (k : Natural). abs(t(k)) ≤ b(k))
         (boundConvergent : Real.SequenceConvergent(Real.partialSum(b)))
         : Real.SequenceConvergent(Real.partialSum(t)) := {
   claim Real.SequenceIsCauchy(Real.partialSum(b))
