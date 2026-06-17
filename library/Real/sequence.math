@@ -67,7 +67,10 @@ definition Rational.sequence.Bounded
 -- Rational.zero` and `|Rational.zero| = Rational.zero`.
 theorem Rational.absolute_value_subtract_self (q : Rational)
         : abs(q - q) = Rational.zero :=
-  congruenceOf(Rational.absolute_value, Rational.add_negate_right(q))
+  calc abs(q - q)
+     = abs(q + -q)
+     = abs(Rational.zero)   by substituting Rational.add_negate_right(q)
+     = Rational.zero        by Rational.absolute_value_zero
 
 -- Pointwise negation of a Cauchy sequence is Cauchy: |-s(m) - -s(n)|
 -- = |s(m) - s(n)| (via subtract_of_negates + absolute_value_negate),
@@ -79,12 +82,19 @@ theorem Rational.sequence.negate_is_cauchy
               (n : Natural) ↦ -s(n)) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨N, sCauchy_at_N⟩ from sIsCauchy(epsilon, epsilonPositive);
+    -- `obtain … from sIsCauchy(ε, …)` cannot infer the existential's type
+    -- through the opaque Rational (the inferType-application bridge is
+    -- blocked), so name it explicitly first.
+    claim existsBound
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(s(m) - s(n)) < epsilon
+        by sIsCauchy(epsilon, epsilonPositive);
+    choose N as sCauchy_at_N from existsBound;
     witness N with
         (m : Natural) (N_leq_m : N ≤ m)
                  (n : Natural) (N_leq_n : N ≤ n) ↦
           calc abs(-s(m) - -s(n))
-             = abs(s(m) - s(n))
+             = abs(s(m) - s(n))   by Rational.absolute_value_of_subtract_of_negates(s(m), s(n))
              < epsilon            by sCauchy_at_N(m, N_leq_m, n, N_leq_n)
   }
 

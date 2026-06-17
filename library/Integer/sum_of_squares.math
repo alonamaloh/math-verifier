@@ -28,17 +28,13 @@ import Algebra.integer_domain
 
 -- The Natural embedding is injective at 0: (m : Integer) = 0 ⟹ m = 0.
 theorem Natural.to_integer.eq_zero_implies (m : Natural)
-        (imageZero : Natural.to_integer(m) = Integer.zero) : m = 0 := {
-  claim equiv
-      : IntegerEquivalent(IntegerRepresentative.make(m, 0), IntegerRepresentative.make(0, 0))
-      by Quotient.exact(IntegerRepresentative.make(m, 0), IntegerRepresentative.make(0, 0),
-             imageZero);
-  -- IntegerEquivalent(make(m,0), make(0,0)) is definitionally m + 0 = 0 + 0.
+        (imageZero : Natural.to_integer(m) = Integer.zero) : m = 0 :=
+  -- `(m : Integer) = 0` is `from_difference(m, 0) = from_difference(0, 0)`;
+  -- the boundary reads it back as the cross-equation `m + 0 = 0 + 0`.
   calc m
      = m + 0       by Natural.add_zero
-     = 0 + 0       by equiv
-     = 0
-}
+     = 0 + 0       by Integer.difference_equal_implies(m, 0, 0, 0, imageZero)
+     = 0           by Natural.add_zero
 
 -- A square is non-negative: ∃ n. a·a = (n : Integer).
 theorem Integer.square_is_nonneg (a : Integer) : Integer.IsNonneg(a * a) :=
@@ -89,20 +85,14 @@ theorem Integer.sum_of_squares_zero (a b : Integer)
   claim nZero : n = 0 by Natural.add_equals_zero_right;
   -- a² = (m : Integer) = (0 : Integer) = 0, so a = 0; likewise b.
   calc a * a
-     = (m : Integer)
-           by aaEqualsM
-     = (0 : Integer)
-           by substituting mZero
-     = Integer.zero
-           by Natural.to_integer.zero_preserves
+     = (m : Integer)    by aaEqualsM
+     = (0 : Integer)    by mZero
+     = Integer.zero     by Natural.to_integer.zero_preserves
   as aaZero;
   calc b * b
-     = (n : Integer)
-           by bbEqualsN
-     = (0 : Integer)
-           by substituting nZero
-     = Integer.zero
-           by Natural.to_integer.zero_preserves
+     = (n : Integer)    by bbEqualsN
+     = (0 : Integer)    by nZero
+     = Integer.zero     by Natural.to_integer.zero_preserves
   as bbZero;
   let aZero : a = Integer.zero :=
       cases Integer.multiply_eq_zero_implies(a, a, aaZero) {

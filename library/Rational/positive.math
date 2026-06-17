@@ -43,8 +43,8 @@ theorem Integer.IsNonneg.multiply
         (xIsNonneg : Integer.IsNonneg(x))
         (yIsNonneg : Integer.IsNonneg(y))
         : Integer.IsNonneg(x * y) := {
-    obtain ⟨n, xIsImage⟩ from xIsNonneg;
-    obtain ⟨m, yIsImage⟩ from yIsNonneg;
+    choose n as xIsImage from xIsNonneg;
+    choose m as yIsImage from yIsNonneg;
     witness n * m with
         (calc x * y
             = (n : Integer) * (m : Integer)
@@ -73,33 +73,31 @@ theorem Rational.LessOrEqual_zero_of_IsNonneg
 -- ----------------------------------------------------------------------
 -- Rational-level IsNonneg arithmetic.
 
--- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p * q). Through the
--- representative-level Integer.IsNonneg.multiply on numerators.
-theorem Rational.IsNonneg.multiply_at_representatives
-        (n1 n2 : Integer) (d1 d2 : Natural)
-        (n1IsNonneg : Integer.IsNonneg(n1))
-        (n2IsNonneg : Integer.IsNonneg(n2))
-        : Rational.IsNonneg(
-              Rational.fraction(n1, d1)
-              * Rational.fraction(n2, d2)) :=
-  -- The product's numerator is n1 * n2, which is IsNonneg.
-  done by Integer.IsNonneg.multiply unfolding Rational.IsNonneg
-
--- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p * q) on Rational. Take
--- representatives; the at-representatives lemma proves it.
+-- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p * q) on Rational. At reps the
+-- product's sign-witness `(n1·n2)·(d1·d2)` rearranges (ring) to
+-- `(n1·d1)·(n2·d2)`, a product of the two non-negative witnesses.
 theorem Rational.IsNonneg.multiply (p q : Rational)
         (pIsNonneg : Rational.IsNonneg(p))
         (qIsNonneg : Rational.IsNonneg(q))
         : Rational.IsNonneg(p * q) :=
   unfold Rational.IsNonneg in
-  (cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1) =>
-    cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2) =>
-      Rational.IsNonneg.multiply_at_representatives(
-          n1, n2, d1, d2, pIsNonneg, qIsNonneg) } })
+  (cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1, _) =>
+    cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2, _) => {
+      claim Integer.IsNonneg((n1 * d1) * (n2 * d2))
+          by Integer.IsNonneg.multiply(n1 * d1, n2 * d2, pIsNonneg, qIsNonneg);
+      claim witnessForm : (n1 * n2) * (d1 * d2) = (n1 * d1) * (n2 * d2)
+          by ring;
+      done by substituting witnessForm
+    } } })
 
--- 1/2 is IsNonneg: numerator is Integer.one, which is the image of 1 : Natural.
-theorem Rational.one_half_IsNonneg : Rational.IsNonneg(Rational.one_half) :=
-  done by Integer.from_natural_is_nonneg(successor(0)) unfolding Rational.IsNonneg
+-- 1/2 is IsNonneg: its sign-witness is `1·2`, the image of a natural.
+theorem Rational.one_half_IsNonneg : Rational.IsNonneg(Rational.one_half) := {
+  claim Integer.IsNonneg((successor(1) : Integer))
+      by Integer.from_natural_is_nonneg;
+  claim witnessForm : Integer.one * (successor(1) : Integer) = (successor(1) : Integer)
+      by ring;
+  done by substituting witnessForm unfolding Rational.IsNonneg
+}
 
 -- halve(q) is IsNonneg given q is IsNonneg.
 theorem Rational.halve_IsNonneg (q : Rational)

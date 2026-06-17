@@ -592,3 +592,33 @@ all `successor`-phrased and will NOT match a `1 + n` form. Bridge explicitly wit
 new congruence-citation feature makes the `one_add`/`length_prepend` bridges cite
 argument-free even under `successor(·)` / `1 + ·` (e.g. pairing.math's six-step
 length-bound calc).
+
+### `calc` step `by <lemma>` not recognised when subtraction doesn't surface as `+ -` — 2026-06-16 (Rational opaque migration)
+note: in `Rational/order_multiplication.math`, the step
+`calc epsilon - Rational.halve(epsilon) = (halve + halve) + -halve by Rational.halve_doubled(epsilon)`
+failed with "this step's justification proves a different relation than the
+step claims / proof shows: halve + halve = epsilon". The diff-inference for the
+step couldn't localise the `epsilon` vs `halve+halve` difference because the LHS
+`a - b` (Rational.subtract) wasn't reduced to `a + -b`, so the top-level heads
+(`subtract` vs `add`) mismatched and no single-subterm bridge was found. Writing
+the RHS with `-` and closing the next step `by ring` fixed it. The message is
+accurate about the relation mismatch but gives no hint that the obstacle is an
+unreduced `subtract` head / that `ring` or an explicit `+ -` would bridge.
+diagnosis:
+
+### `choose <v> as <c> from <hypothesis>` doesn't count the `from`-source as a use — 2026-06-17 (obtain→choose sweep)
+note: converting `claim h : ∃… by src; obtain ⟨v, c⟩ from h;` to
+`claim h : ∃… by src; choose v as c from h;` makes `h` fire the unused-name
+warning ("unused name `h` — the auto-prover consumes this fact by type-match,
+so the name is dead weight"). But `choose v as c from h` DOES reference `h` —
+it's the destructure source. The usage tracker apparently doesn't count a
+`choose … from <name>` source as a use of that name, so the only
+warning-free spellings are (a) anonymous `claim ∃… by src;` + `choose v such
+that <pred> as c;` (scope-scan), which forces re-spelling the whole predicate,
+or (b) accept the spurious warning. Counting `from <name>` as a name-use would
+remove the false positive and let the readable single-spelling form stay clean.
+This bites every opaque-Rational existential workaround (~10 sites in
+Real/{addition,multiplication,sequence,absolute_value,order}).
+diagnosis: usage tracker for the unused-name lint should treat a
+`choose … from <ident>` (and likely `obtain … from <ident>`) source as a
+reference to <ident>.

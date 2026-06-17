@@ -73,10 +73,8 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
     claim halvedPositive : Rational.zero < Rational.halve(epsilon);
-    obtain ⟨N_a, aBound⟩
-        from aEventuallyNonneg(Rational.halve(epsilon), halvedPositive);
-    obtain ⟨N_eq, eqBound⟩
-        from aEquivB(Rational.halve(epsilon), halvedPositive);
+    choose N_a as aBound from aEventuallyNonneg(Rational.halve(epsilon), halvedPositive);
+    choose N_eq as eqBound from aEquivB(Rational.halve(epsilon), halvedPositive);
     witness Natural.maximum(N_a, N_eq) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) ↦ {
@@ -102,11 +100,18 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
                   < Rational.halve(epsilon) as swappedAbs;
           -- Extract the lower bound: -(ε/2) < sf(b, m) - sf(a, m)
           -- (lower half of the |·| bounds on swappedAbs).
-          obtain ⟨swappedDelta, _⟩
-              from Rational.absolute_value_LessThan_bounds(
-                       CauchyRationalSequence.sequenceFunction(b, m)
-                       - CauchyRationalSequence.sequenceFunction(a, m),
-                       Rational.halve(epsilon), swappedAbs);
+          claim And(
+                  -Rational.halve(epsilon)
+                    < CauchyRationalSequence.sequenceFunction(b, m)
+                      - CauchyRationalSequence.sequenceFunction(a, m),
+                  CauchyRationalSequence.sequenceFunction(b, m)
+                    - CauchyRationalSequence.sequenceFunction(a, m)
+                    < Rational.halve(epsilon))
+              by Rational.absolute_value_LessThan_bounds;
+          claim swappedDelta
+              : -Rational.halve(epsilon)
+                < CauchyRationalSequence.sequenceFunction(b, m)
+                  - CauchyRationalSequence.sequenceFunction(a, m);
           -- Chain the two ε/2 bounds end-to-end:
           --   -ε = -halve(ε) + -halve(ε)
           --      < sf(a, m) + -halve(ε)                    (aBoundAtM)
@@ -223,10 +228,16 @@ theorem Rational.sequence.IsEventuallyNonneg.add
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
     claim halvedPositive : Rational.zero < Rational.halve(epsilon);
-    obtain ⟨N_s, sBound⟩
-        from sNonneg(Rational.halve(epsilon), halvedPositive);
-    obtain ⟨N_t, tBound⟩
-        from tNonneg(Rational.halve(epsilon), halvedPositive);
+    -- `obtain` cannot infer these existentials through the opaque Rational,
+    -- so state them top-down first.
+    claim sBounded
+        : ∃ (N : Natural). (m : Natural) → N ≤ m → -Rational.halve(epsilon) < s(m)
+        by sNonneg(Rational.halve(epsilon), halvedPositive);
+    choose N_s as sBound from sBounded;
+    claim tBounded
+        : ∃ (N : Natural). (m : Natural) → N ≤ m → -Rational.halve(epsilon) < t(m)
+        by tNonneg(Rational.halve(epsilon), halvedPositive);
+    choose N_t as tBound from tBounded;
     witness Natural.maximum(N_s, N_t) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_t) ≤ m) ↦ {
@@ -259,18 +270,21 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.add
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
     set sf := CauchyRationalSequence.sequenceFunction;
-    obtain ⟨N, pointwiseBound⟩
-        from Rational.sequence.IsEventuallyNonneg.add(
-                 sf(a), sf(b), aNonneg, bNonneg)(
-                 epsilon, epsilonPositive);
+    claim pointwiseExists
+        : ∃ (N : Natural). (m : Natural) → N ≤ m → -epsilon < sf(a, m) + sf(b, m)
+        by Rational.sequence.IsEventuallyNonneg.add(
+               sf(a), sf(b), aNonneg, bNonneg)(epsilon, epsilonPositive);
+    choose N as pointwiseBound from pointwiseExists;
     witness N with
         (m : Natural) (N_leq_m : N ≤ m) ↦
           -- -ε < sf(a, m) + sf(b, m) (the pointwise bound), and
           -- sf(a, m) + sf(b, m) = sf(add(a, b), m) (bridge lemma).
           calc -epsilon
-             < sf(a, m) + sf(b, m)
-                   by pointwiseBound(m, N ≤ m)
-             = sf(CauchyRationalSequence.add(a, b), m)
+             < CauchyRationalSequence.sequenceFunction(a, m)
+               + CauchyRationalSequence.sequenceFunction(b, m)
+                   by pointwiseBound(m, N_leq_m)
+             = CauchyRationalSequence.sequenceFunction(
+                   CauchyRationalSequence.add(a, b), m)
   }
 
 -- Real.IsNonneg.add: Real-level statement. Lift via Quotient.induct_two.
@@ -319,9 +333,8 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
                 abs(s(m) - Rational.zero) < epsilon :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨N_s, sLowerBound⟩ from sNonneg(epsilon, epsilonPositive);
-    obtain ⟨N_negS, negSLowerBound⟩
-        from negSNonneg(epsilon, epsilonPositive);
+    choose N_s as sLowerBound from sNonneg(epsilon, epsilonPositive);
+    choose N_negS as negSLowerBound from negSNonneg(epsilon, epsilonPositive);
     witness Natural.maximum(N_s, N_negS) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_negS) ≤ m) ↦ {

@@ -42,23 +42,28 @@ import Algebra.ring_lemmas
 theorem Rational.IsNonneg_or_negate_IsNonneg
         (value : Rational)
         : Or(Rational.IsNonneg(value), Rational.IsNonneg(-value)) :=
-  by_representatives value as ⟨numerator, denominator⟩ =>
-      cases Integer.sign_split(numerator) {
-          | Or.introduceLeft(numeratorNonneg) =>
+  by_representatives value as ⟨numerator, denominator, denominatorNonzero⟩ =>
+      -- The sign-witness of value is numerator · denominator; split on it.
+      cases Integer.sign_split(numerator * denominator) {
+          | Or.introduceLeft(productNonneg) =>
               Or.introduceLeft(?, ?,
-                  Rational.IsNonneg.of_numerator(numerator, denominator, numeratorNonneg))
-          | Or.introduceRight(numeratorNegated) =>
+                  Rational.IsNonneg.of_numerator_denominator(
+                      numerator, denominator, denominatorNonzero, productNonneg))
+          | Or.introduceRight(productNegated) =>
               Or.introduceRight(?, ?,
-                  Rational.IsNonneg.of_numerator(-numerator, denominator, {
-                      obtain ⟨k, numeratorEqualsNegatedK⟩ from numeratorNegated;
-                      -- numerator = -(k : Integer), so
-                      -- -numerator = -(-(k : Integer)) = (k : Integer).
-                      rewrite(
-                          Equality.symmetry(
-                              calc -numerator
-                                 = -(-(k : Integer))
-                                 = (k : Integer)),
-                          Integer.from_natural_is_nonneg(k))
+                  Rational.IsNonneg.of_numerator_denominator(
+                      -numerator, denominator, denominatorNonzero, {
+                      choose k as productEqualsNegatedK from productNegated;
+                      -- (-numerator)·denominator = -(numerator·denominator)
+                      --   = -(-(k : Integer)) = (k : Integer) ≥ 0.
+                      claim witnessForm : (-numerator) * denominator = (k : Integer)
+                          by calc (-numerator) * denominator
+                                = -(numerator * denominator)   by ring
+                                = -(-(k : Integer))            by substituting productEqualsNegatedK
+                                = (k : Integer)                by ring;
+                      claim Integer.IsNonneg((k : Integer))
+                          by Integer.from_natural_is_nonneg;
+                      done by substituting witnessForm
                   }))
         }
 

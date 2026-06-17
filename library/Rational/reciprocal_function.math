@@ -1,24 +1,23 @@
 -- Rational/reciprocal_function.math
 --
--- A total reciprocal function `Rational → Rational`, with junk
--- value `Rational.zero` at zero. Correct (i.e., `x · reciprocal(x)
--- = Rational.one`) for every non-zero input. The function is built
--- by Natural-pair recursion at the representative level and lifted
--- to `Rational` via two Quotient.lifts (over the integer numerator,
--- then over the Rational). The respect proofs use shift-and-reduce
--- helpers to collapse equivalent natural pairs to a canonical form
--- (one of `(n, n)`, `(n + succ k, n)`, `(n, n + succ k)`).
+-- A total reciprocal function `Rational → Rational`, with junk value
+-- `Rational.zero` at zero, correct (`x · reciprocal(x) = 1`) for every
+-- non-zero input. With the field-of-fractions construction the inverse of a
+-- nonzero rational already exists (`Rational.reciprocal_exists_for_nonzero`),
+-- so we turn that existence into a function with the description operator
+-- `Logic.the`, pinned by the predicate `x·y = 1 ∨ (x = 0 ∧ y = 0)`.
 --
--- This unlocks Real-as-Field: the Real reciprocal Cauchy sequence
--- builds on a function-typed pointwise reciprocal, which
--- `Rational.reciprocal_exists_for_nonzero` (propositional ∃)
--- alone can't provide.
+-- This unlocks Real-as-Field: the Real reciprocal Cauchy sequence builds on a
+-- function-typed pointwise reciprocal, which the propositional ∃ alone can't
+-- provide.
 
 module Rational.reciprocal_function
 
 import Logic.basics
 import Logic.exists
 import Logic.quotient
+import Logic.description
+import Logic.excluded_middle
 import Equality.basics
 import Natural.basics
 import Natural.peano
@@ -45,538 +44,111 @@ import Rational.order
 import Rational.absolute_value
 import Rational.reciprocal
 import Rational.field
+import Rational.order_multiplication
 
 -- ----------------------------------------------------------------------
--- Rep-level recursion: the natural-pair reciprocal.
---
--- `reciprocal_at_natural_pair(a, b, denominatorPredecessor)` is the
--- reciprocal of the rational whose representative is `make((a - b : I),
--- denominatorPredecessor)`. Junk value `Rational.zero` when a = b
--- (i.e., the rational is zero); positive `mk(make(succ d, k))` when
--- a > b (= b + succ k); negative `mk(make(-(succ d), k))` when b > a.
+-- The total reciprocal as a function. With the field-of-fractions
+-- construction the reciprocal of a nonzero rational already exists
+-- (`Rational.reciprocal_exists_for_nonzero`); we turn that existence into
+-- a function with the description operator, pinning the value by the
+-- predicate
+--   P(x, y) := x·y = 1  ∨  (x = 0 ∧ y = 0),
+-- which holds of a unique y (the inverse when x ≠ 0, junk 0 when x = 0).
 
-definition Rational.reciprocal_at_natural_pair
-        : Natural → Natural → Natural → Rational
-  | zero, b, denominatorPredecessor =>
-      cases b {
-        | zero =>
-            Rational.zero
-        | successor(predecessorB) =>
-            Rational.fraction(-(successor(denominatorPredecessor) : Integer),
-                    predecessorB)
-      }
-  | successor(predecessorA), b, denominatorPredecessor =>
-      cases b {
-        | zero =>
-            Rational.fraction((successor(denominatorPredecessor) : Integer),
-                    predecessorA)
-        | successor(predecessorB) =>
-            Rational.reciprocal_at_natural_pair(
-                predecessorA, predecessorB, denominatorPredecessor)
-      }
+definition Rational.reciprocal_predicate (x y : Rational) : Proposition :=
+  Or(x * y = Rational.one, And(x = Rational.zero, y = Rational.zero))
 
--- ----------------------------------------------------------------------
--- Three closed-form characterizations: at self, at a positive shift,
--- and at a negative shift. Each by Natural induction on the leading
--- argument.
-
-theorem Rational.reciprocal_at_natural_pair_self
-        : (anchorValue denominatorPredecessor : Natural)
-          → Rational.reciprocal_at_natural_pair(
-                anchorValue, anchorValue, denominatorPredecessor)
-            = Rational.zero
-  | zero, _ => reflexivity(Rational, Rational.zero)
-  | successor(predecessor), denominatorPredecessor =>
-      Rational.reciprocal_at_natural_pair_self(
-          predecessor, denominatorPredecessor)
-
-theorem Rational.reciprocal_at_natural_pair_positive_shift
-        : (anchorValue shiftPredecessor denominatorPredecessor : Natural)
-          → Rational.reciprocal_at_natural_pair(
-                anchorValue + successor(shiftPredecessor),
-                anchorValue,
-                denominatorPredecessor)
-            = Rational.fraction((successor(denominatorPredecessor) : Integer),
-                       shiftPredecessor)
-  | zero, shiftPredecessor, denominatorPredecessor => {
-      -- a = 0, so a + succ(shiftPred) = succ(shiftPred). With Natural.add
-      -- opaque the leading argument no longer folds on its own, so we
-      -- bridge it; then the pattern reduces to (succ(shiftPred), 0, d),
-      -- which returns mk(make(succ d : I, shiftPred)) by the first nonzero case.
-      claim reduceArgument : 0 + successor(shiftPredecessor) = successor(shiftPredecessor)
-          by Natural.zero_add;
-      calc Rational.reciprocal_at_natural_pair(0 + successor(shiftPredecessor), 0, denominatorPredecessor)
-         = Rational.reciprocal_at_natural_pair(successor(shiftPredecessor), 0, denominatorPredecessor)   by substituting reduceArgument
-         = Rational.fraction((successor(denominatorPredecessor) : Integer), shiftPredecessor)
+theorem Rational.reciprocal_exists_with_junk (x : Rational)
+        : ∃ (y : Rational). Rational.reciprocal_predicate(x, y) :=
+  claim by cases {
+    case (x = Rational.zero) as xIsZero:
+        witness Rational.zero with
+            Or.introduceRight(?, ?,
+                And.introduction(
+                    x = Rational.zero, Rational.zero = Rational.zero,
+                    xIsZero, reflexivity(Rational, Rational.zero)))
+    case Not(x = Rational.zero) as xNonzero: {
+        choose y as productIsOne from Rational.reciprocal_exists_for_nonzero(x, xNonzero);
+        witness y with Or.introduceLeft(?, ?, productIsOne)
     }
-  | successor(predecessor), shiftPredecessor, denominatorPredecessor => {
-      -- (succ(predecessor) + succ(shiftPred), succ(predecessor), d) — the
-      -- leading sum is now opaque, so bridge it to succ(predecessor +
-      -- succ(shiftPred)); the pattern then reduces to (predecessor +
-      -- succ(shiftPred), predecessor, d), which the IH closes.
-      claim reduceArgument : successor(predecessor) + successor(shiftPredecessor) = successor(predecessor + successor(shiftPredecessor))
-          by Natural.successor_add;
-      let recursiveResult : Rational.reciprocal_at_natural_pair(predecessor + successor(shiftPredecessor), predecessor, denominatorPredecessor) = Rational.fraction((successor(denominatorPredecessor) : Integer), shiftPredecessor)
-          := Rational.reciprocal_at_natural_pair_positive_shift(predecessor, shiftPredecessor, denominatorPredecessor);
-      calc Rational.reciprocal_at_natural_pair(successor(predecessor) + successor(shiftPredecessor), successor(predecessor), denominatorPredecessor)
-         = Rational.reciprocal_at_natural_pair(successor(predecessor + successor(shiftPredecessor)), successor(predecessor), denominatorPredecessor)   by substituting reduceArgument
-         = Rational.reciprocal_at_natural_pair(predecessor + successor(shiftPredecessor), predecessor, denominatorPredecessor)
-         = Rational.fraction((successor(denominatorPredecessor) : Integer), shiftPredecessor)                                                          by recursiveResult
-    }
-
-theorem Rational.reciprocal_at_natural_pair_negative_shift
-        : (anchorValue shiftPredecessor denominatorPredecessor : Natural)
-          → Rational.reciprocal_at_natural_pair(
-                anchorValue,
-                anchorValue + successor(shiftPredecessor),
-                denominatorPredecessor)
-            = Rational.fraction(-(successor(denominatorPredecessor) : Integer),
-                       shiftPredecessor)
-  | zero, shiftPredecessor, denominatorPredecessor => {
-      claim reduceArgument : 0 + successor(shiftPredecessor) = successor(shiftPredecessor)
-          by Natural.zero_add;
-      calc Rational.reciprocal_at_natural_pair(0, 0 + successor(shiftPredecessor), denominatorPredecessor)
-         = Rational.reciprocal_at_natural_pair(0, successor(shiftPredecessor), denominatorPredecessor)   by substituting reduceArgument
-         = Rational.fraction(-(successor(denominatorPredecessor) : Integer), shiftPredecessor)
-    }
-  | successor(predecessor), shiftPredecessor, denominatorPredecessor => {
-      claim reduceArgument : successor(predecessor) + successor(shiftPredecessor) = successor(predecessor + successor(shiftPredecessor))
-          by Natural.successor_add;
-      let recursiveResult : Rational.reciprocal_at_natural_pair(predecessor, predecessor + successor(shiftPredecessor), denominatorPredecessor) = Rational.fraction(-(successor(denominatorPredecessor) : Integer), shiftPredecessor)
-          := Rational.reciprocal_at_natural_pair_negative_shift(predecessor, shiftPredecessor, denominatorPredecessor);
-      calc Rational.reciprocal_at_natural_pair(successor(predecessor), successor(predecessor) + successor(shiftPredecessor), denominatorPredecessor)
-         = Rational.reciprocal_at_natural_pair(successor(predecessor), successor(predecessor + successor(shiftPredecessor)), denominatorPredecessor)   by substituting reduceArgument
-         = Rational.reciprocal_at_natural_pair(predecessor, predecessor + successor(shiftPredecessor), denominatorPredecessor)
-         = Rational.fraction(-(successor(denominatorPredecessor) : Integer), shiftPredecessor)                                                         by recursiveResult
-    }
-
--- ----------------------------------------------------------------------
--- Respect at the natural-pair level: integer-equivalent pairs give
--- equal reciprocal values.
-
-theorem Rational.reciprocal_at_natural_pair_respect
-        (firstA firstB secondA secondB denominatorPredecessor : Natural)
-        (equivalenceHypothesis : firstA + secondB = firstB + secondA)
-        : Rational.reciprocal_at_natural_pair(
-              firstA, firstB, denominatorPredecessor)
-          = Rational.reciprocal_at_natural_pair(
-                secondA, secondB, denominatorPredecessor) :=
-  -- Trichotomy on (firstA, firstB) via Natural.totality_of_less_or_equal.
-  cases Natural.totality_of_less_or_equal(firstA, firstB) {
-    | Or.introduceLeft(firstALeqFirstB) => {
-        obtain ⟨gap, firstBEqualsFirstAPlusGap⟩
-            from Natural.subtraction_witness(
-                     firstA, firstB, firstALeqFirstB);
-        -- Case on gap, with the equation firstB = firstA + gap
-        -- refined per branch via the convoy pattern.
-        cases gap with gapEq {
-           | zero => {
-               claim firstB = firstA + 0;
-               calc firstA
-                  = firstA + 0
-                  = firstB;
-               claim secondB = secondA
-                 by {
-                   calc firstB + secondB
-                      = firstA + secondB
-                      = firstB + secondA                           as sumEquation;
-                   Natural.add_cancel_left(
-                       firstB, secondB, secondA, sumEquation)
-                 };
-               calc Rational.reciprocal_at_natural_pair(
-                        firstA, firstB, denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        firstB, firstB, denominatorPredecessor)
-                  = Rational.zero
-                  = Rational.reciprocal_at_natural_pair(
-                        secondA, secondA, denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        secondA, secondB, denominatorPredecessor)
-             }
-           | successor(gapPredecessor) => {
-               claim firstB = firstA + successor(gapPredecessor);
-               claim secondB = secondA + successor(gapPredecessor)
-                 by {
-                   calc firstA + secondB
-                           = firstB + secondA
-                           = (firstA + successor(gapPredecessor)) + secondA
-                           = firstA + (secondA + successor(gapPredecessor))    as sumEquation;                     Natural.add_cancel_left(
-                       firstA, secondB,
-                       secondA + successor(gapPredecessor),
-                       sumEquation)
-                 };
-               calc Rational.reciprocal_at_natural_pair(
-                        firstA, firstB, denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        firstA, firstA + successor(gapPredecessor),
-                        denominatorPredecessor)
-                  = Rational.fraction(-(successor(denominatorPredecessor) : Integer),
-                             gapPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        secondA, secondA + successor(gapPredecessor),
-                        denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        secondA, secondB, denominatorPredecessor)
-             }
-        }
-      }
-    | Or.introduceRight(firstBLeqFirstA) => {
-        obtain ⟨gap, firstAEqualsFirstBPlusGap⟩
-            from Natural.subtraction_witness(
-                     firstB, firstA, firstBLeqFirstA);
-        cases gap with gapEq {
-           | zero => {
-               claim firstA = firstB + 0;
-               calc firstB
-                  = firstB + 0
-                  = firstA;
-               claim secondA = secondB
-                 by {
-                   calc firstA + secondB
-                      = firstB + secondA
-                      = firstA + secondA                           as sumEquation;
-                   Equality.symmetry(
-                       Natural.add_cancel_left(
-                           firstA, secondB, secondA, sumEquation))
-                 };
-               calc Rational.reciprocal_at_natural_pair(
-                        firstA, firstB, denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        firstA, firstA, denominatorPredecessor)
-                  = Rational.zero
-                  = Rational.reciprocal_at_natural_pair(
-                        secondB, secondB, denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        secondA, secondB, denominatorPredecessor)
-             }
-           | successor(gapPredecessor) => {
-               claim firstA = firstB + successor(gapPredecessor);
-               claim secondA = secondB + successor(gapPredecessor)
-                 by {
-                   calc firstB + secondA
-                           = firstA + secondB
-                           = (firstB + successor(gapPredecessor)) + secondB
-                           = firstB + (secondB + successor(gapPredecessor))    as sumEquation;                     Natural.add_cancel_left(
-                       firstB, secondA,
-                       secondB + successor(gapPredecessor),
-                       sumEquation)
-                 };
-               calc Rational.reciprocal_at_natural_pair(
-                        firstA, firstB, denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        firstB + successor(gapPredecessor), firstB,
-                        denominatorPredecessor)
-                  = Rational.fraction((successor(denominatorPredecessor) : Integer),
-                             gapPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        secondB + successor(gapPredecessor), secondB,
-                        denominatorPredecessor)
-                  = Rational.reciprocal_at_natural_pair(
-                        secondA, secondB, denominatorPredecessor)
-             }
-        }
-      }
   }
 
--- ----------------------------------------------------------------------
--- Integer-rep level reciprocal: case-analyzes the integer rep to
--- the underlying natural pair.
-definition Rational.reciprocal_at_integer_rep
-        (denominatorPredecessor : Natural)
-        : IntegerRepresentative → Rational
-  | IntegerRepresentative.make(numeratorPositive, numeratorNegative) =>
-      Rational.reciprocal_at_natural_pair(
-          numeratorPositive, numeratorNegative,
-          denominatorPredecessor)
-
--- Respect at the integer-rep level. Multi-pattern destructures both
--- reps to expose the natural pairs, then defers to the natural-pair
--- respect proof.
-theorem Rational.reciprocal_at_integer_rep_respect
-        (denominatorPredecessor : Natural)
-        : (firstRepresentative secondRepresentative
-              : IntegerRepresentative)
-          → IntegerEquivalent(firstRepresentative,
-                                secondRepresentative)
-          → Rational.reciprocal_at_integer_rep(
-                denominatorPredecessor, firstRepresentative)
-            = Rational.reciprocal_at_integer_rep(
-                  denominatorPredecessor, secondRepresentative)
-  | IntegerRepresentative.make(firstA, firstB),
-    IntegerRepresentative.make(secondA, secondB),
-    equationFirstASecondB =>
-      Rational.reciprocal_at_natural_pair_respect(
-          firstA, firstB, secondA, secondB,
-          denominatorPredecessor,
-          equationFirstASecondB)
-
--- ----------------------------------------------------------------------
--- Lift over the integer numerator: `Rational.reciprocal_at_integer(n,
--- denominatorPredecessor)` produces the reciprocal as a Rational. Uses
--- the natural-pair function plus the natural-pair respect proof.
-
-definition Rational.reciprocal_at_integer
-        (integerNumerator : Integer) (denominatorPredecessor : Natural)
-        : Rational :=
-  Quotient.lift(
-      IntegerRepresentative, IntegerEquivalent, Rational,
-      Rational.reciprocal_at_integer_rep(denominatorPredecessor),
-      Rational.reciprocal_at_integer_rep_respect(denominatorPredecessor),
-      integerNumerator)
-
--- ----------------------------------------------------------------------
--- Multiplication-cancels at the integer level: for non-zero `n`,
--- mk(make(n, d)) * reciprocal_at_integer(n, d) = Rational.one. Sign-
--- splits `n` via Integer.sign_split; the positive branch reuses
--- StrictPositiveRational.reciprocal_multiplied, the negative branch
--- carries the explicit negate-cancellation calc.
-
-theorem Rational.reciprocal_at_integer_multiplies
-        (n : Integer) (denominatorPredecessor : Natural)
-        (mkNonzero
-            : ¬(Rational.fraction(n, denominatorPredecessor)
-                    = Rational.zero))
-        : Rational.fraction(n, denominatorPredecessor)
-            * Rational.reciprocal_at_integer(n, denominatorPredecessor)
-          = Rational.one := {
-    claim Integer.IsNonneg(n) ∨ (∃ (k : Natural). n = -(k : Integer))
-        by Integer.sign_split
-    claim by cases {
-      in (Integer.IsNonneg(n)) as nIsNonneg: {
-          obtain ⟨a, nIsImage⟩ from nIsNonneg;
-          cases a with aEq {
-             | zero => {
-                 -- n = (zero : I) = Integer.zero, so mk(make(n, d)) = Rational.zero,
-                 -- contradicting mkNonzero.
-                 claim n = (0 : Integer)
-                   by substituting aEq;
-                 absurd(mkNonzero(
-                            calc Rational.fraction(n, denominatorPredecessor)
-                               = Rational.fraction(Integer.zero,
-                                         denominatorPredecessor)
-                               = Rational.zero))
-               }
-             | successor(predecessor) => {
-                 -- n = succ(predecessor) : I. Chain through congruence
-                 -- on both factors, then StrictPositive multiplication.
-                 claim
-                       n = (successor(predecessor) : Integer)
-                     by substituting aEq;
-                 calc Rational.fraction(n, denominatorPredecessor)
-                          * Rational.reciprocal_at_integer(
-                                n, denominatorPredecessor)
-                    = Rational.fraction((successor(predecessor) : Integer),
-                               denominatorPredecessor)
-                          * Rational.reciprocal_at_integer(
-                                (successor(predecessor) : Integer),
-                                denominatorPredecessor)
-                    = Rational.one
-                           by StrictPositiveRational.reciprocal_multiplied(
-                                  StrictPositiveRational.make(
-                                      predecessor,
-                                      denominatorPredecessor))
-               }
+theorem Rational.reciprocal_unique (x : Rational)
+        : (y1 y2 : Rational)
+          → Rational.reciprocal_predicate(x, y1)
+          → Rational.reciprocal_predicate(x, y2)
+          → y1 = y2 :=
+  (y1 y2 : Rational)
+  (predicate1 : Rational.reciprocal_predicate(x, y1))
+  (predicate2 : Rational.reciprocal_predicate(x, y2)) ↦
+    cases predicate1 {
+      | Or.introduceLeft(productOne1) =>
+          cases predicate2 {
+            | Or.introduceLeft(productOne2) =>
+                calc y1
+                   = y1 * Rational.one    by ring
+                   = y1 * (x * y2)        by substituting productOne2
+                   = (x * y1) * y2        by ring
+                   = Rational.one * y2    by substituting productOne1
+                   = y2                   by ring
+            | Or.introduceRight(zeroPair2) => {
+                claim xIsZero : x = Rational.zero
+                    by And.left(x = Rational.zero, y2 = Rational.zero, zeroPair2);
+                claim oneIsZero : Rational.one = Rational.zero
+                    by calc Rational.one
+                          = x * y1               by productOne1
+                          = Rational.zero * y1   by substituting xIsZero
+                          = Rational.zero        by ring;
+                absurd(Rational.zero_not_equal_one(Equality.symmetry(oneIsZero)))
+              }
           }
-      }
-      in (∃ (k : Natural). n = -(k : Integer)) as nIsNegated: {
-          obtain ⟨a, nIsNegatedImage⟩ from nIsNegated;
-          cases a with aEq {
-             | zero => {
-                 -- n = -(zero : I) = -Integer.zero. mk(make(n, d))
-                 -- is Rational.zero — contradiction.
-                 claim n = -(0 : Integer)
-                   by substituting aEq;
-                 absurd(mkNonzero(
-                            calc Rational.fraction(n, denominatorPredecessor)
-                               = Rational.fraction(Integer.zero,
-                                         denominatorPredecessor)
-                               = Rational.zero))
-               }
-             | successor(predecessor) => {
-                 -- n = -(succ(predecessor) : I). Chain congruence on n,
-                 -- then the negate-cancellation Quotient.sound calc.
-                 claim
-                       n = -(successor(predecessor) : Integer)
-                     by substituting aEq;
-                 calc Rational.fraction(n, denominatorPredecessor)
-                          * Rational.reciprocal_at_integer(
-                                n, denominatorPredecessor)
-                    = Rational.fraction(-(successor(predecessor) : Integer),
-                               denominatorPredecessor)
-                          * Rational.reciprocal_at_integer(
-                                -(successor(predecessor) : Integer),
-                                denominatorPredecessor)
-                    = Rational.one
-                           by Quotient.sound(
-                         RationalRepresentative, RationalEquivalent,
-                         RationalRepresentative.make(
-                             -(successor(predecessor) : Integer)
-                                 * -(successor(denominatorPredecessor) : Integer),
-                             predecessor
-                                 + denominatorPredecessor
-                                   * successor(predecessor)),
-                         RationalRepresentative.make(Integer.one, 0),
-                         calc -(successor(predecessor) : Integer)
-                                  * -(successor(denominatorPredecessor) : Integer)
-                                  * (successor(0) : Integer)
-                            = (successor(predecessor) : Integer)
-                                  * (successor(denominatorPredecessor) : Integer)
-                            = (successor(predecessor)
-                                   * successor(denominatorPredecessor)
-                                   : Integer)
-                            = (successor(predecessor
-                                              + denominatorPredecessor
-                                                * successor(predecessor))
-                                   : Integer)
-                                 by (calc successor(predecessor)
-                                              * successor(denominatorPredecessor)
-                                        = successor(predecessor)
-                                            + successor(predecessor)
-                                              * denominatorPredecessor
-                                        = successor(predecessor)
-                                            + denominatorPredecessor
-                                              * successor(predecessor)
-                                        = successor(
-                                              predecessor
-                                              + denominatorPredecessor
-                                                * successor(predecessor)))
-                            = Integer.one
-                                  * (successor(predecessor
-                                                   + denominatorPredecessor
-                                                     * successor(predecessor))
-                                      : Integer))
-               }
+      | Or.introduceRight(zeroPair1) =>
+          cases predicate2 {
+            | Or.introduceLeft(productOne2) => {
+                claim xIsZero : x = Rational.zero
+                    by And.left(x = Rational.zero, y1 = Rational.zero, zeroPair1);
+                claim oneIsZero : Rational.one = Rational.zero
+                    by calc Rational.one
+                          = x * y2               by productOne2
+                          = Rational.zero * y2   by substituting xIsZero
+                          = Rational.zero        by ring;
+                absurd(Rational.zero_not_equal_one(Equality.symmetry(oneIsZero)))
+              }
+            | Or.introduceRight(zeroPair2) =>
+                calc y1
+                   = Rational.zero   by And.right(x = Rational.zero, y1 = Rational.zero, zeroPair1)
+                   = y2              by Equality.symmetry(
+                                            And.right(x = Rational.zero, y2 = Rational.zero, zeroPair2))
           }
-      }
     }
-}
-
--- ----------------------------------------------------------------------
--- mk(make(n, d)) = Rational.zero ↔ n = Integer.zero. Forward direction:
--- since the two fractions are equal, their representatives are
--- equivalent — `n * succ(zero) = Integer.zero * succ(d)` — whose two
--- sides reduce to `n` and `Integer.zero`.
-
-theorem Rational.mk_zero_implies_integer_zero
-        (n : Integer) (denominatorPredecessor : Natural)
-        (mkIsZero
-            : Rational.fraction(n, denominatorPredecessor)
-                = Rational.zero)
-        : n = Integer.zero := {
-    -- The representative equivalence of `mkIsZero` (auto: exact-bridge).
-    -- Naming the representatives keeps the bridge cheap; the equivalence
-    -- reduces to the cross-multiplied `n · 1 = 0 · (denominator)`.
-    claim RationalEquivalent(
-              RationalRepresentative.make(n, denominatorPredecessor),
-              RationalRepresentative.make(Integer.zero, zero));
-    calc n
-       = n * (successor(0) : Integer)
-       = Integer.zero
-}
-
--- ----------------------------------------------------------------------
--- reciprocal_at_integer(Integer.zero, d) = Rational.zero. Reduces
--- definitionally to reciprocal_at_natural_pair(zero, zero, d) =
--- Rational.zero by the lift's iota.
-theorem Rational.reciprocal_at_integer_zero
-        (denominatorPredecessor : Natural)
-        : Rational.reciprocal_at_integer(
-              Integer.zero, denominatorPredecessor)
-          = Rational.zero :=
-  reflexivity(Rational, Rational.zero)
-
--- ----------------------------------------------------------------------
--- The rep-level shim: just defers to reciprocal_at_integer.
-definition Rational.reciprocal_function_at_rational_rep
-        : RationalRepresentative → Rational
-  | RationalRepresentative.make(numerator, denominatorPredecessor) =>
-      Rational.reciprocal_at_integer(numerator, denominatorPredecessor)
-
--- ----------------------------------------------------------------------
--- Respect at the rational-rep level. Multi-pattern destructures both
--- reps to expose (n, d). Case-splits on whether mk(make(n1, d1)) is
--- Rational.zero; the zero branch reduces both reciprocals to
--- Rational.zero by the helpers above; the non-zero branch uses
--- uniqueness of multiplicative inverse via reciprocal_at_integer_multiplies.
-
-theorem Rational.reciprocal_function_at_rational_rep_respect
-        : (firstRep secondRep : RationalRepresentative)
-          → RationalEquivalent(firstRep, secondRep)
-          → Rational.reciprocal_function_at_rational_rep(firstRep)
-            = Rational.reciprocal_function_at_rational_rep(secondRep)
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2),
-    equivalenceHypothesis =>
-      decide Rational.fraction(n1, d1)
-                 = Rational.zero {
-        | yes mkFirstIsZero => {
-            -- Zero branch: both reciprocals reduce to Rational.zero.
-            claim n1 = Integer.zero
-              by Rational.mk_zero_implies_integer_zero;
-            calc Rational.fraction(n2, d2)
-               = Rational.fraction(n1, d1)
-                     by Quotient.sound
-               = Rational.zero;
-            calc Rational.reciprocal_at_integer(n1, d1)
-               = Rational.reciprocal_at_integer(Integer.zero, d1)
-               = Rational.reciprocal_at_integer(Integer.zero, d2)
-               = Rational.reciprocal_at_integer(n2, d2)
-          }
-        | no mkFirstIsNonzero => {
-            -- Non-zero branch: uniqueness of inverse via multiplication.
-            claim ¬(Rational.fraction(n2, d2)
-                        = Rational.zero);
-            claim Rational.fraction(n1, d1)
-                  = Rational.fraction(n2, d2)
-              by Quotient.sound;
-            -- Uniqueness chain:
-            -- reciprocal(n1, d1)
-            --   = 1 * reciprocal(n1, d1)
-            --   = (mk2 * reciprocal(n2, d2)) * reciprocal(n1, d1)
-            --   = (mk1 * reciprocal(n2, d2)) * reciprocal(n1, d1)   [mks equal]
-            --   = reciprocal(n2, d2) * (mk1 * reciprocal(n1, d1))   [comm + assoc]
-            --   = reciprocal(n2, d2) * 1
-            --   = reciprocal(n2, d2)
-            calc Rational.reciprocal_at_integer(n1, d1)
-               = Rational.one * Rational.reciprocal_at_integer(n1, d1)
-               = (Rational.fraction(n2, d2)
-                       * Rational.reciprocal_at_integer(n2, d2))
-                   * Rational.reciprocal_at_integer(n1, d1)
-               = (Rational.fraction(n1, d1)
-                       * Rational.reciprocal_at_integer(n2, d2))
-                   * Rational.reciprocal_at_integer(n1, d1)
-               = Rational.reciprocal_at_integer(n2, d2)
-                   * (Rational.fraction(n1, d1)
-                       * Rational.reciprocal_at_integer(n1, d1))
-               = Rational.reciprocal_at_integer(n2, d2) * Rational.one
-               = Rational.reciprocal_at_integer(n2, d2)
-          }
-      }
-
--- ----------------------------------------------------------------------
--- The headline definition: a total Rational → Rational function.
--- Quotient.lift over the Rational; the body destructures `make(n, d)`
--- to call reciprocal_at_integer, with the rational-level respect
--- proof.
 
 definition Rational.reciprocal_function (x : Rational) : Rational :=
-  Quotient.lift(
-      RationalRepresentative, RationalEquivalent, Rational,
-      Rational.reciprocal_function_at_rational_rep,
-      Rational.reciprocal_function_at_rational_rep_respect,
-      x)
+  Logic.the(
+      Rational, (y : Rational) ↦ Rational.reciprocal_predicate(x, y),
+      Rational.reciprocal_exists_with_junk(x),
+      Rational.reciprocal_unique(x))
+
+theorem Rational.reciprocal_function_satisfies (x : Rational)
+        : Rational.reciprocal_predicate(x, Rational.reciprocal_function(x)) :=
+  Logic.the_satisfies(
+      Rational, (y : Rational) ↦ Rational.reciprocal_predicate(x, y),
+      Rational.reciprocal_exists_with_junk(x),
+      Rational.reciprocal_unique(x))
 
 -- ----------------------------------------------------------------------
--- Multiplication correctness: for non-zero x, x * reciprocal_function(x)
--- = Rational.one. Quotient.induct over x; the rep-level case reduces
--- to reciprocal_at_integer_multiplies.
+-- Multiplication correctness: for non-zero x, x · reciprocal_function(x)
+-- = Rational.one (the right disjunct of the predicate is ruled out).
 
 theorem Rational.reciprocal_function_multiplies
         (x : Rational) (xNonzero : ¬(x = Rational.zero))
         : x * Rational.reciprocal_function(x) = Rational.one :=
-  cases x refining xNonzero { | RationalRepresentative.make(n, d) =>
-    Rational.reciprocal_at_integer_multiplies(n, d, xNonzero) }
-
+  cases Rational.reciprocal_function_satisfies(x) {
+    | Or.introduceLeft(productOne) => productOne
+    | Or.introduceRight(zeroPair) =>
+        absurd(xNonzero(
+            And.left(x = Rational.zero,
+                     Rational.reciprocal_function(x) = Rational.zero, zeroPair)))
+  }
 
 -- Reciprocals are multiplicative: for nonzero a and b,
 -- a⁻¹ · b⁻¹ = (a·b)⁻¹. Multiply by (a·b)·(a·b)⁻¹ = 1 and regroup so

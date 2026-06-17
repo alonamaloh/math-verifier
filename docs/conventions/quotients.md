@@ -20,13 +20,19 @@ be rare.
 
 ```math
 -- Short (preferred): T inferred from rep's type, R from expected type.
+-- (`Rational` is opaque, so the mk is pierced once with `unfold Rational`;
+-- normally you'd write `Rational.fraction(…)` and never see this.)
 definition Rational.zero : Rational :=
-  Quotient.mk(RationalRepresentative.make(Integer.zero, zero))
+  unfold Rational in
+    Quotient.mk(RationalRepresentative.make(
+        Integer.zero, Integer.one, Integer.one_is_nonzero))
 
 -- Verbose (avoid unless necessary):
 definition Rational.zero : Rational :=
-  Quotient.mk(RationalRepresentative, RationalEquivalent,
-              RationalRepresentative.make(Integer.zero, zero))
+  unfold Rational in
+    Quotient.mk(RationalRepresentative, RationalEquivalent,
+                RationalRepresentative.make(
+                    Integer.zero, Integer.one, Integer.one_is_nonzero))
 ```
 
 The short form needs an expected type of shape `Quotient(T, R)` from
@@ -227,15 +233,19 @@ introduction form** for a quotient. It is an ordinary *transparent*
 definition (the kernel δ-reduces `Name(args)` to the body), so it is
 def-equal to the underlying `Quotient.mk(...)` and needs no special
 support in `cases` / `lift` / `reflexivity`. The win is readability:
-proofs and printed goals say `Rational.fraction(n, d)` instead of
-`Quotient.mk(RationalRepresentative.make(n, d))`.
+proofs and printed goals say `Rational.fraction(n, d, dNonzero)` instead of
+`Quotient.mk(RationalRepresentative.make(n, d, dNonzero))`. (`Rational` is an
+opaque type, so the body pierces it once with `unfold Rational`; see
+`opaque.md`.)
 
 ```math
-construction Rational.fraction (n : Integer) (d : Natural) : Rational :=
-  Quotient.mk(RationalRepresentative.make(n, d))
+construction Rational.fraction
+        (n d : Integer) (dNonzero : ¬(d = Integer.zero)) : Rational :=
+  unfold Rational in Quotient.mk(RationalRepresentative.make(n, d, dNonzero))
 
 -- Downstream, prefer the named form:
-definition Rational.zero : Rational := Rational.fraction(Integer.zero, 0)
+definition Rational.zero : Rational :=
+  Rational.fraction(Integer.zero, Integer.one, Integer.one_is_nonzero)
 ```
 
 It parses exactly like a `definition` (same binder / `: T` / `:= body`
@@ -307,8 +317,8 @@ scrutinees, with any number of refining names.
 theorem Rational.multiply_positive_positive
         (x y : Rational) (xPos : 0 < x) (yPos : 0 < y)
         : 0 < x * y :=
-  cases x refining xPos { | RationalRepresentative.make(n_x, d_x) =>
-    cases y refining yPos { | RationalRepresentative.make(n_y, d_y) =>
+  cases x refining xPos { | RationalRepresentative.make(n_x, d_x, dxNonzero) =>
+    cases y refining yPos { | RationalRepresentative.make(n_y, d_y, dyNonzero) =>
       …use xPos (now refined to 0 < [n_x/d_x]) … } }
 ```
 

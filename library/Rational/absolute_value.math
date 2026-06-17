@@ -1,9 +1,9 @@
 -- Rational/absolute_value.math
 --
--- Absolute value on Rational. On representatives, replace the
--- numerator with its Integer absolute value; the denominator is
--- unchanged. The respect proof reduces to a small identity on
--- Integer absolute value.
+-- Absolute value on Rational. Since denominators may now be negative,
+-- |n/d| = |n|/|d| (both made non-negative); the denominator |d| is nonzero
+-- because d is. The respect proof is multiplicativity of Integer absolute
+-- value applied to the cross-multiplication.
 
 module Rational.absolute_value
 
@@ -11,20 +11,15 @@ import Logic.basics
 import Logic.exists
 import Logic.quotient
 import Equality.basics
-import Natural.basics
-import Natural.peano
-import Natural.arithmetic
-import Natural.distance
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
-import Integer.embedding
 import Integer.negation
 import Integer.ring
-import Integer.algebra
 import Integer.order
 import Integer.absolute_value
-import Integer.sign
+import Integer.absolute_value_multiplicative
+import Integer.integral_domain
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -32,26 +27,22 @@ import Rational.negation
 import Rational.ring
 import Rational.order
 
--- Representative-level absolute value: replace numerator with its
--- Integer absolute value.
+-- Representative-level absolute value: |n| / |d|.
 definition Rational.absolute_value_at_representative
         : RationalRepresentative → Rational
-  | RationalRepresentative.make(n, d) =>
-      Rational.fraction(abs(n), d)
+  | RationalRepresentative.make(n, d, dNonzero) =>
+      Rational.fraction(abs(n), abs(d), Integer.absolute_value_nonzero(d, dNonzero))
 
--- Helper: at the (n1, d1) / (n2, d2) level, the cross-multiplication
--- carries over to absolute values via Integer.absolute_value_multiply_
--- by_positive_natural.
+-- Helper: the cross-multiplication carries over to absolute values via
+-- multiplicativity of Integer absolute value.
 theorem Rational.absolute_value_respect_at_representatives
-        (n1 n2 : Integer) (d1 d2 : Natural)
-        (cross : n1 * (successor(d2) : Integer)
-                 = n2 * (successor(d1) : Integer))
-        : abs(n1) * (successor(d2) : Integer)
-          = abs(n2) * (successor(d1) : Integer) :=
-  calc abs(n1) * (successor(d2) : Integer)
-     = abs(n1 * (successor(d2) : Integer))
-     = abs(n2 * (successor(d1) : Integer))
-     = abs(n2) * (successor(d1) : Integer)
+        (n1 n2 d1 d2 : Integer)
+        (cross : n1 * d2 = n2 * d1)
+        : abs(n1) * abs(d2) = abs(n2) * abs(d1) :=
+  calc abs(n1) * abs(d2)
+     = abs(n1 * d2)       by Integer.absolute_value_multiplicative
+     = abs(n2 * d1)       by substituting cross
+     = abs(n2) * abs(d1)  by Integer.absolute_value_multiplicative
 
 -- Respect of Rational.absolute_value via the lift.
 theorem Rational.absolute_value_respect
@@ -60,12 +51,14 @@ theorem Rational.absolute_value_respect
         : Rational.absolute_value_at_representative(rep1)
           = Rational.absolute_value_at_representative(rep2) :=
   cases rep1 refining equivalenceHypothesis {
-    | RationalRepresentative.make(n1, d1) =>
+    | RationalRepresentative.make(n1, d1, d1Nonzero) =>
         cases rep2 refining equivalenceHypothesis {
-          | RationalRepresentative.make(n2, d2) =>
-              -- The equivalence closes the class equality (WS3 coercion).
-              Rational.absolute_value_respect_at_representatives(
-                  n1, n2, d1, d2, equivalenceHypothesis)
+          | RationalRepresentative.make(n2, d2, d2Nonzero) =>
+              Rational.fraction_equal(
+                  abs(n1), abs(d1), Integer.absolute_value_nonzero(d1, d1Nonzero),
+                  abs(n2), abs(d2), Integer.absolute_value_nonzero(d2, d2Nonzero),
+                  Rational.absolute_value_respect_at_representatives(
+                      n1, n2, d1, d2, equivalenceHypothesis))
         }
   }
 
@@ -75,24 +68,28 @@ definition Rational.absolute_value : Rational → Rational
 
 overload abs := Rational.absolute_value
 
--- |0| = 0. By kernel reduction.
+-- |0| = 0: |0|/|1| ~ 0/1 since both cross-products vanish.
 theorem Rational.absolute_value_zero
         : abs(Rational.zero) = Rational.zero :=
-  reflexivity(Rational, Rational.zero)
+  Rational.fraction_equal(
+      abs(Integer.zero), abs(Integer.one),
+      Integer.absolute_value_nonzero(Integer.one, Integer.one_is_nonzero),
+      Integer.zero, Integer.one, Integer.one_is_nonzero,
+      calc abs(Integer.zero) * Integer.one
+         = Integer.zero * Integer.one        by substituting Integer.absolute_value_zero
+         = Integer.zero * abs(Integer.one)   by ring)
 
--- |-x| = |x| at the representative level: negate negates the
--- numerator, and Integer.absolute_value_negate then reverses it.
+-- |-x| = |x| at the representative level: negate negates the numerator
+-- (and leaves the denominator), and |-n| = |n|.
 theorem Rational.absolute_value_negate_at_representative
         : (rep : RationalRepresentative)
           → Rational.absolute_value_at_representative(
                 Rational.negate_representatives(rep))
             = Rational.absolute_value_at_representative(rep)
-  | RationalRepresentative.make(n, d) =>
-      -- LHS = mk(make(|-n|, d)). RHS = mk(make(|n|, d)).
-      -- |-n| = |n| by Integer.absolute_value_negate.
+  | RationalRepresentative.make(n, d, dNonzero) =>
       congruenceOf(
           (m : Integer) ↦
-              Rational.fraction(m, d),
+              Rational.fraction(m, abs(d), Integer.absolute_value_nonzero(d, dNonzero)),
           Integer.absolute_value_negate(n))
 
 -- |-x| = |x| on Rational.
@@ -105,7 +102,11 @@ theorem Rational.negate_negate_at_representative
         : (rep : RationalRepresentative)
           → Rational.negate_representatives(
                 Rational.negate_representatives(rep)) = rep
-  | RationalRepresentative.make(n, d) => Integer.negate_negate(n)
+  | RationalRepresentative.make(n, d, dNonzero) =>
+      congruenceOf(
+          (m : Integer) ↦
+              RationalRepresentative.make(m, d, dNonzero),
+          Integer.negate_negate(n))
 
 -- -(-x) = x on Rational.
 theorem Rational.negate_negate (x : Rational) : -(-x) = x :=
@@ -118,21 +119,13 @@ theorem Rational.negate_negate (x : Rational) : -(-x) = x :=
   }
 
 -- Numerator-level identity used by negate_add at representatives:
--- -(n1 * succ(d2) + n2 * succ(d1)) = -n1 * succ(d2) + -n2 * succ(d1).
+-- -(n1·d2 + n2·d1) = (-n1)·d2 + (-n2)·d1.
 theorem Rational.negate_add_numerator_identity
-        (n1 n2 : Integer) (d1 d2 : Natural)
-        : -(n1 * (successor(d2) : Integer)
-             + n2 * (successor(d1) : Integer))
-          = -n1 * (successor(d2) : Integer)
-              + -n2 * (successor(d1) : Integer) :=
-  calc -(n1 * (successor(d2) : Integer)
-         + n2 * (successor(d1) : Integer))
-     = -n1 * (successor(d2) : Integer)
-       + -n2 * (successor(d1) : Integer)
+        (n1 n2 d1 d2 : Integer)
+        : -(n1 * d2 + n2 * d1) = -n1 * d2 + -n2 * d1 :=
+  ring
 
--- -(rep_p + rep_q) = -rep_p + -rep_q at the representative level
--- (same denominator on both sides, numerator equality from the
--- helper above).
+-- -(rep_p + rep_q) = -rep_p + -rep_q at the representative level.
 theorem Rational.negate_add_at_representatives
         : (rep_p rep_q : RationalRepresentative)
           → Rational.negate_representatives(
@@ -140,9 +133,14 @@ theorem Rational.negate_add_at_representatives
             = Rational.add_representatives(
                 Rational.negate_representatives(rep_p),
                 Rational.negate_representatives(rep_q))
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2) =>
-      Rational.negate_add_numerator_identity(n1, n2, d1, d2)
+  | RationalRepresentative.make(n1, d1, d1Nonzero),
+    RationalRepresentative.make(n2, d2, d2Nonzero) =>
+      congruenceOf(
+          (m : Integer) ↦
+              RationalRepresentative.make(
+                  m, d1 * d2,
+                  Integer.multiply_nonzero(d1, d2, d1Nonzero, d2Nonzero)),
+          Rational.negate_add_numerator_identity(n1, n2, d1, d2))
 
 -- -(p + q) = -p + -q on Rational. Lift through Quotient.induct_two.
 theorem Rational.negate_add (p q : Rational) : -(p + q) = -p + -q :=
@@ -162,8 +160,7 @@ theorem Rational.subtract_swap (x y : Rational) : x - y = -(y - x) :=
      = -(y + -x)
      = -(y - x)
 
--- |x - y| = |y - x| on Rational. From x - y = -(y - x) and
--- |-z| = |z|.
+-- |x - y| = |y - x| on Rational.
 theorem Rational.absolute_value_subtract_swap (x y : Rational)
         : abs(x - y)
           = abs(y - x) :=

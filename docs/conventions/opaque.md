@@ -75,6 +75,10 @@ Currently opaque: `Natural.monus`, `Natural.divide_step`,
 `Natural.modulo_step`, `Natural.padic_valuation_step`,
 `Natural.power`, `Real.IsNonneg`, `Rational.IsNonneg`.
 
+Opaque **types** (sealed quotients, reasoned about only through a boundary API —
+see the `Integer` / `Rational` discussion below): `Integer`, `IntegerEquivalent`,
+`Rational`.
+
 ### A second motivation: a `Quotient.lift` abstraction boundary
 
 `Real.IsNonneg` and `Rational.IsNonneg` are opaque for a different
@@ -103,28 +107,33 @@ leaking into every order proof.
 proved once with `unfold`, that consumers cite by name:
 
 ```math
--- Rational/order.math
-theorem Rational.IsNonneg.of_numerator
-        (n : Integer) (d : Natural) (h : Integer.IsNonneg(n))
-        : Rational.IsNonneg(Rational.fraction(n, d)) :=
-  unfold Rational.IsNonneg in h
-theorem Rational.IsNonneg.numerator
-        (n : Integer) (d : Natural) (h : Rational.IsNonneg(Rational.fraction(n, d)))
-        : Integer.IsNonneg(n) :=
-  unfold Rational.IsNonneg in h
+-- Rational/order.math — denominators are now arbitrary nonzero Integers, so the
+-- sign witness is `Integer.IsNonneg(n · d)` (for d > 0 this is n ≥ 0; for d < 0
+-- it flips, exactly as the fraction's value demands).
+theorem Rational.IsNonneg.of_numerator_denominator
+        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        (productIsNonneg : Integer.IsNonneg(n * d))
+        : Rational.IsNonneg(Rational.fraction(n, d, denominatorNonzero)) :=
+  unfold Rational.IsNonneg in productIsNonneg
+theorem Rational.IsNonneg.numerator_denominator
+        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        (fractionIsNonneg : Rational.IsNonneg(Rational.fraction(n, d, denominatorNonzero)))
+        : Integer.IsNonneg(n * d) :=
+  unfold Rational.IsNonneg in fractionIsNonneg
 ```
 
 `Real.IsNonneg` has the analogous `of_eventually_nonneg` / `eventually_nonneg`
 pair over `CauchyRationalSequence.IsEventuallyNonneg`. The consumer rule:
 
-- **destruct** — route through `.numerator` / `.eventually_nonneg`. After
-  `cases x refining h { | rep => … }`, `h : IsNonneg(mk rep)`; feed it to the
-  destructor to recover the rep-level fact. Sites that *apply* an IsNonneg
-  value as the `∀ε∃N` form use `(unfold Real.IsNonneg in h)(…)`.
-- **literal / nameable-rep construct** — cite `.of_numerator` /
-  `.of_eventually_nonneg`. `by Rational.IsNonneg.of_numerator` even
-  auto-discharges the Integer/Natural-image premise (the auto-prover finds e.g.
-  `Integer.zero_is_nonneg`).
+- **destruct** — route through `.numerator_denominator` / `.eventually_nonneg`.
+  After `cases x refining h { | rep => … }`, `h : IsNonneg(mk rep)`; feed it to
+  the destructor to recover the rep-level fact (`Integer.IsNonneg(n · d)`). Sites
+  that *apply* an IsNonneg value as the `∀ε∃N` form use
+  `(unfold Real.IsNonneg in h)(…)`.
+- **literal / nameable-rep construct** — cite `.of_numerator_denominator` /
+  `.of_eventually_nonneg`. `by Rational.IsNonneg.of_numerator_denominator` even
+  auto-discharges the `Integer.IsNonneg(n · d)` premise when the auto-prover can
+  find it (e.g. `Integer.zero_is_nonneg`).
 - **arithmetic-result or constant construct** (sums, products, `Real.zero`, the
   Real `*_at_make` ε/δ lemmas, triangle, the supremum bisection bounds) — the
   reduced fraction/sequence is awkward to spell, so keep a goal-side

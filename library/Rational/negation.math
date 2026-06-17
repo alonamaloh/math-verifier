@@ -1,10 +1,9 @@
 -- Rational/negation.math
 --
 -- Negation on Rational. On representatives, negation acts only on the
--- numerator: `-(n / (d+1)) = (-n) / (d+1)`. The denominator is
--- unchanged, so the respect proof reduces to negating both sides of
--- the cross-multiplication hypothesis via
--- `Integer.multiply_negate_left`. Subtraction is the usual derived
+-- numerator: `-(n / d) = (-n) / d`. The denominator (and its nonzero
+-- proof) is unchanged, so the respect proof negates both sides of the
+-- cross-multiplication hypothesis. Subtraction is the usual derived
 -- `x - y := x + (-y)`.
 
 module Rational.negation
@@ -13,43 +12,26 @@ import Logic.basics
 import Logic.exists
 import Logic.quotient
 import Equality.basics
-import Natural.basics
-import Natural.peano
-import Natural.arithmetic
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
-import Integer.embedding
 import Integer.ring
 import Integer.negation
-import Integer.algebra
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
 
 -- ----------------------------------------------------------------------
 -- Negation on representatives: negate the numerator; preserve the
--- denominator-minus-one.
+-- denominator and its nonzero proof.
 definition Rational.negate_representatives
         : RationalRepresentative → RationalRepresentative
-  | RationalRepresentative.make(n, d) =>
-      RationalRepresentative.make(-n, d)
+  | RationalRepresentative.make(n, d, dNonzero) =>
+      RationalRepresentative.make(-n, d, dNonzero)
 
 -- ----------------------------------------------------------------------
--- Respect: if `(n1, d1) ~ (n1', d1')` then `(-n1, d1) ~ (-n1', d1')`.
--- Both equivalences are Integer cross-multiplications; negating both
--- sides of the original via `multiply_negate_left` yields the negated
--- equivalence.
-
-theorem Rational.negate_respects_integer
-        (n1 n1Prime : Integer) (d1 d1Prime : Natural)
-        (equivalenceHypothesis
-            : n1 * (successor(d1Prime) : Integer) = n1Prime * (successor(d1) : Integer))
-        : -n1 * (successor(d1Prime) : Integer) = -n1Prime * (successor(d1) : Integer) :=
-  calc -n1 * (successor(d1Prime) : Integer)
-     = -(n1 * (successor(d1Prime) : Integer))
-     = -(n1Prime * (successor(d1) : Integer))
-     = -n1Prime * (successor(d1) : Integer)
+-- Respect: if `(n1, d1) ~ (n1', d1')` then `(-n1, d1) ~ (-n1', d1')` —
+-- negate both sides of the cross-multiplication.
 
 theorem Rational.negate_respects
         : (rep1 rep1Prime : RationalRepresentative)
@@ -57,11 +39,13 @@ theorem Rational.negate_respects
           → RationalEquivalent(
                 Rational.negate_representatives(rep1),
                 Rational.negate_representatives(rep1Prime))
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n1Prime, d1Prime),
+  | RationalRepresentative.make(n1, d1, _),
+    RationalRepresentative.make(n1Prime, d1Prime, _),
     equivalenceHypothesis =>
-      Rational.negate_respects_integer(
-          n1, n1Prime, d1, d1Prime, equivalenceHypothesis)
+      calc (-n1) * d1Prime
+         = -(n1 * d1Prime)     by ring
+         = -(n1Prime * d1)     by substituting equivalenceHypothesis
+         = (-n1Prime) * d1     by ring
 
 -- ----------------------------------------------------------------------
 -- Negation on Rational: negate the representative; well-defined because

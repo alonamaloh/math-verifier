@@ -36,60 +36,19 @@ import Rational.halve
 import Rational.positive
 
 -- ----------------------------------------------------------------------
--- Integer-level: IsNonneg(x) ∧ IsNonneg(-x) → x = Integer.zero.
-
--- Helper: if (a : I) = -(k : I), then both a and k are zero. The
--- proof descends through Quotient.exact: the equality of Integers
--- forces a + k = 0 (Natural), hence both are zero.
-theorem Integer.image_eq_negate_image_implies_both_zero
-        (a k : Natural) (equation : (a : Integer) = -(k : Integer))
-        : And(a = 0, k = 0) := {
-  -- (a : I) = mk(make(a, 0)); -(k : I) = mk(make(0, k)). Quotient.exact
-  -- yields IntegerEquivalent(make(a, 0), make(0, k)), i.e., a + k = 0.
-  claim IntegerEquivalent(
-        IntegerRepresentative.make(a, 0),
-        IntegerRepresentative.make(0, k));
-  -- IntegerEquivalent.make(a, 0) and make(0, k): a + k = 0 + 0 = 0.
-  calc a + k
-          = 0    as sumIsZero;  And.introduction(
-      a = 0, k = 0,
-      Natural.add_eq_zero_left_zero(a, k, sumIsZero),
-      Natural.add_eq_zero_right_zero(a, k, sumIsZero))
-}
-
--- IsNonneg(x) ∧ IsNonneg(-x) → x = Integer.zero. Two witnesses
--- collapse via the helper above.
-theorem Integer.IsNonneg_and_negate_IsNonneg_implies_zero
-        (x : Integer)
-        (xIsNonneg : Integer.IsNonneg(x))
-        (negXIsNonneg : Integer.IsNonneg(-x))
-        : x = Integer.zero := {
-    obtain ⟨a, xIsImage⟩ from xIsNonneg;
-    obtain ⟨k, negXIsImage⟩ from negXIsNonneg;
-    -- x = (a : I); -x = (k : I), so x = -(k : I). Hence
-    -- (a : I) = -(k : I), giving a = 0 ∧ k = 0, so x = 0.
-    obtain ⟨aIsZero, _kIsZero⟩
-        from Integer.image_eq_negate_image_implies_both_zero(
-                 a, k,
-                 calc (a : Integer)
-                    = x
-                    = -(-x)
-                    = -((k : Integer)));
-    calc x
-       = (a : Integer)
-       = Natural.to_integer(0)
-       = Integer.zero
-}
-
--- ----------------------------------------------------------------------
 -- Rational ≤ reflexivity and transitivity.
 
 -- IsNonneg(0). At rep, IsNonneg_at_representative(make(0, 0)) reduces
 -- to Integer.IsNonneg(Integer.zero), witnessed by Natural zero.
-theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) :=
-  -- Rational.zero is the fraction 0 / 1, whose numerator 0 is IsNonneg.
-  claim Rational.IsNonneg(Rational.zero)
-    by Rational.IsNonneg.of_numerator
+theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) := {
+  -- Rational.zero is 0/1, whose sign-witness is 0·1 = 0.
+  claim productNonneg : Integer.IsNonneg(Integer.zero * Integer.one) by {
+      claim Integer.IsNonneg(Integer.zero) by Integer.zero_is_nonneg;
+      done by substituting (ring : Integer.zero * Integer.one = Integer.zero)
+  };
+  done by Rational.IsNonneg.of_numerator_denominator(
+      Integer.zero, Integer.one, Integer.one_is_nonzero, productNonneg)
+}
 
 -- 0 ≤ q ↔ IsNonneg(q) was already in `Rational.positive`. We mirror
 -- as Rational.LessOrEqual.reflexive: x ≤ x.
@@ -105,8 +64,8 @@ theorem Integer.IsNonneg.add
         (xIsNonneg : Integer.IsNonneg(x))
         (yIsNonneg : Integer.IsNonneg(y))
         : Integer.IsNonneg(x + y) := {
-    obtain ⟨a, xIsImage⟩ from xIsNonneg;
-    obtain ⟨b, yIsImage⟩ from yIsNonneg;
+    choose a as xIsImage from xIsNonneg;
+    choose b as yIsImage from yIsNonneg;
     witness a + b with
         (calc x + y
             = (a : Integer) + (b : Integer)
@@ -119,18 +78,22 @@ theorem Rational.IsNonneg.add (p q : Rational)
         (pIsNonneg : Rational.IsNonneg(p))
         (qIsNonneg : Rational.IsNonneg(q))
         : Rational.IsNonneg(p + q) :=
-  cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1) =>
-    cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2) =>
-      -- The sum's numerator is n1·(d2+1) + n2·(d1+1); each summand is
-      -- a product of non-negatives, so the goal reduces to its IsNonneg.
-      unfold Rational.IsNonneg in
-      (Integer.IsNonneg.add(?, ?,
-          Integer.IsNonneg.multiply(?, ?,
-              Rational.IsNonneg.numerator(n1, d1, pIsNonneg),
-              Integer.from_natural_is_nonneg(successor(d2))),
-          Integer.IsNonneg.multiply(?, ?,
-              Rational.IsNonneg.numerator(n2, d2, qIsNonneg),
-              Integer.from_natural_is_nonneg(successor(d1))))) } }
+  unfold Rational.IsNonneg in
+  (cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1, _) =>
+    cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2, _) => {
+      -- pIsNonneg : IsNonneg(n1·d1), qIsNonneg : IsNonneg(n2·d2).
+      -- (n1·d2 + n2·d1)·(d1·d2) = (n1·d1)·(d2·d2) + (n2·d2)·(d1·d1).
+      claim term1 : Integer.IsNonneg((n1 * d1) * (d2 * d2))
+          by Integer.multiply_nonneg(n1 * d1, d2 * d2, pIsNonneg, Integer.square_IsNonneg(d2));
+      claim term2 : Integer.IsNonneg((n2 * d2) * (d1 * d1))
+          by Integer.multiply_nonneg(n2 * d2, d1 * d1, qIsNonneg, Integer.square_IsNonneg(d1));
+      claim Integer.IsNonneg((n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1))
+          by Integer.IsNonneg.add(
+                 (n1 * d1) * (d2 * d2), (n2 * d2) * (d1 * d1), term1, term2);
+      done by substituting
+          (ring : (n1 * d2 + n2 * d1) * (d1 * d2)
+                  = (n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1))
+    } } })
 
 -- Rational analog: IsNonneg(q) ∧ IsNonneg(-q) → q = 0. Take a
 -- representative for q; at the rep level, n is both nonneg and
@@ -142,17 +105,29 @@ theorem Rational.IsNonneg_and_negate_IsNonneg_implies_zero
         (negQIsNonneg : Rational.IsNonneg(-q))
         : q = Rational.zero :=
   cases q refining qIsNonneg, negQIsNonneg {
-    | RationalRepresentative.make(n, d) => {
-        -- At the rep level the numerator n is both nonneg and (-n)-nonneg,
-        -- so n = 0 (Integer antisymmetry); then mk(make(0, d)) =
-        -- Rational.zero via Quotient.sound (0 · succ(0) = 0 · succ(d)).
-        claim Integer.IsNonneg(n) by Rational.IsNonneg.numerator;
-        claim Integer.IsNonneg(-n) by Rational.IsNonneg.numerator;
+    | RationalRepresentative.make(n, d, dNonzero) => {
+        -- Sign-witness n·d is both nonneg and -(n·d)-nonneg, so n·d = 0;
+        -- since d ≠ 0, n = 0, and 0/d = 0.
+        claim productNonneg : Integer.IsNonneg(n * d)
+            by Rational.IsNonneg.numerator_denominator(n, d, dNonzero, qIsNonneg);
+        claim negProductNonneg : Integer.IsNonneg(-(n * d)) by {
+            claim Integer.IsNonneg((-n) * d)
+                by Rational.IsNonneg.numerator_denominator(-n, d, dNonzero, negQIsNonneg);
+            done by substituting (ring : (-n) * d = -(n * d))
+        };
+        claim productZero : n * d = Integer.zero
+            by Integer.nonneg_and_negate_nonneg_implies_zero(n * d, productNonneg, negProductNonneg);
+        claim cancelEquation : n * d = Integer.zero * d
+            by calc n * d = Integer.zero by productZero = Integer.zero * d by ring;
         claim nIsZero : n = Integer.zero
-            by Integer.IsNonneg_and_negate_IsNonneg_implies_zero;
-        calc Rational.fraction(n, d)
-           = Rational.fraction(Integer.zero, d)   by substituting nIsZero
-           = Rational.zero                         by Quotient.sound
+            by Integer.multiply_cancel_right_by_nonzero(n, Integer.zero, d, dNonzero, cancelEquation);
+        calc Rational.fraction(n, d, dNonzero)
+           = Rational.fraction(Integer.zero, d, dNonzero)   by substituting nIsZero
+           = Rational.zero
+                 by Quotient.sound(
+                        RationalRepresentative.make(Integer.zero, d, dNonzero),
+                        RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
+                        (ring : Integer.zero * Integer.one = Integer.zero * d))
       }
   }
 

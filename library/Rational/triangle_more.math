@@ -23,8 +23,11 @@ import Integer.negation
 import Integer.ring
 import Integer.algebra
 import Integer.order
+import Integer.order_multiply
 import Integer.absolute_value
 import Integer.absolute_value_natural
+import Integer.absolute_value_multiplicative
+import Integer.integral_domain
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -45,11 +48,39 @@ import Rational.order_multiplication
 theorem Integer.absolute_value_when_nonneg
         (x : Integer) (xIsNonneg : Integer.IsNonneg(x))
         : abs(x) = x := {
-    obtain ⟨n, xIsImage⟩ from xIsNonneg;
+    choose n as xIsImage from xIsNonneg;
     calc abs(x)
        = abs((n : Integer))
        = (n : Integer)
        = x
+}
+
+-- For a fraction n/d with n·d ≥ 0, |n|·d = n·|d| (the cross-multiplication
+-- that makes |n|/|d| equal to n/d). Cancel a common d after using
+-- |n|·|d| = |n·d| = n·d and d² = |d|².
+theorem Integer.absolute_value_numerator_cross
+        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        (productNonneg : Integer.IsNonneg(n * d))
+        : abs(n) * d = n * abs(d) := {
+  claim absoluteProduct : abs(n) * abs(d) = n * d
+      by calc abs(n) * abs(d)
+            = abs(n * d)   by Integer.absolute_value_multiplicative
+            = n * d        by Integer.absolute_value_when_nonneg(n * d, productNonneg);
+  claim squareAbsolute : d * d = abs(d) * abs(d)
+      by calc d * d
+            = abs(d * d)        by Equality.symmetry(
+                                       Integer.absolute_value_when_nonneg(
+                                           d * d, Integer.square_IsNonneg(d)))
+            = abs(d) * abs(d)   by Integer.absolute_value_multiplicative;
+  claim cancelEquation : (abs(n) * d) * d = (n * abs(d)) * d
+      by calc (abs(n) * d) * d
+            = abs(n) * (d * d)            by ring
+            = abs(n) * (abs(d) * abs(d))  by substituting squareAbsolute
+            = (abs(n) * abs(d)) * abs(d)  by ring
+            = (n * d) * abs(d)            by substituting absoluteProduct
+            = (n * abs(d)) * d            by ring;
+  done by Integer.multiply_cancel_right_by_nonzero(
+              abs(n) * d, n * abs(d), d, denominatorNonzero, cancelEquation)
 }
 
 -- ----------------------------------------------------------------------
@@ -65,8 +96,12 @@ theorem Rational.absolute_value_when_nonneg_at_representative
         : Rational.absolute_value_at_representative(rep)
           = (Quotient.mk(rep) : Rational) :=
   cases rep refining representativeIsNonneg {
-    | RationalRepresentative.make(n, d) =>
-        Integer.absolute_value_when_nonneg(n, representativeIsNonneg)
+    | RationalRepresentative.make(n, d, dNonzero) =>
+        Quotient.sound(
+            RationalRepresentative.make(
+                abs(n), abs(d), Integer.absolute_value_nonzero(d, dNonzero)),
+            RationalRepresentative.make(n, d, dNonzero),
+            Integer.absolute_value_numerator_cross(n, d, dNonzero, representativeIsNonneg))
   }
 
 -- |x| = x on Rational when IsNonneg(x). Lift via cases on x.
@@ -74,10 +109,10 @@ theorem Rational.absolute_value_when_nonneg
         (x : Rational) (xIsNonneg : Rational.IsNonneg(x))
         : abs(x) = x :=
   cases x refining xIsNonneg {
-    | RationalRepresentative.make(n, d) =>
+    | RationalRepresentative.make(n, d, dNonzero) =>
         Rational.absolute_value_when_nonneg_at_representative(
-            RationalRepresentative.make(n, d),
-            Rational.IsNonneg.numerator(n, d, xIsNonneg))
+            RationalRepresentative.make(n, d, dNonzero),
+            Rational.IsNonneg.numerator_denominator(n, d, dNonzero, xIsNonneg))
   }
 
 -- |x| = -x on Rational when IsNonneg(-x). From the previous lemma
@@ -102,15 +137,6 @@ theorem Integer.absolute_value_IsNonneg (n : Integer)
           Integer.absolute_value_natural_is_image(n)),
       Integer.from_natural_is_nonneg(
           Integer.absolute_value_natural(n)))
-
--- |x| is always IsNonneg. At rep level it reduces to
--- Integer.IsNonneg(|n|).
-theorem Rational.absolute_value_IsNonneg_at_representative
-        : (rep : RationalRepresentative)
-          → Rational.IsNonneg(
-                Rational.absolute_value_at_representative(rep))
-  | RationalRepresentative.make(n, d) =>
-      Rational.IsNonneg.of_numerator(abs(n), d, Integer.absolute_value_IsNonneg(n))
 
 -- |x| < c implies -c < x and x < c. Case split on the sign of x via
 -- IsNonneg_or_negate_IsNonneg. Each branch uses absolute_value_when_*

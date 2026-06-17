@@ -1,7 +1,9 @@
 -- Rational/triangle.math
 --
--- The Rational triangle inequality |x + y| ≤ |x| + |y|, plus a few
--- order helpers needed to express it.
+-- The Rational triangle inequality |x + y| ≤ |x| + |y| and
+-- multiplicativity |x·y| = |x|·|y|. With |n/d| = |n|/|d| and signed
+-- denominators, both reduce — via multiplicativity of Integer absolute
+-- value (|d1·d2| = |d1|·|d2|) — to facts about the integer numerators.
 
 module Rational.triangle
 
@@ -9,21 +11,16 @@ import Logic.basics
 import Logic.exists
 import Logic.quotient
 import Equality.basics
-import Natural.basics
-import Natural.peano
-import Natural.arithmetic
-import Natural.distance
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
-import Integer.embedding
 import Integer.negation
 import Integer.ring
-import Integer.algebra
 import Integer.order
-import Integer.sign
+import Integer.order_multiply
 import Integer.absolute_value
 import Integer.absolute_value_multiplicative
+import Integer.integral_domain
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -33,149 +30,83 @@ import Rational.algebra
 import Rational.order
 import Rational.absolute_value
 
--- Multiplicative monotonicity for IsNonneg by a positive Natural.
--- If x is IsNonneg (= some Natural's image), then x * succ(d) is too.
-theorem Integer.IsNonneg.multiply_by_positive_natural
-        (x : Integer) (d : Natural) (xIsNonneg : Integer.IsNonneg(x))
-        : Integer.IsNonneg(x * (successor(d) : Integer)) := {
-    obtain ⟨n, xIsImage⟩ from xIsNonneg;
-    witness n * successor(d) with
-        (calc x * (successor(d) : Integer)
-            = (n : Integer) * (successor(d) : Integer)
-            = (n * successor(d) : Integer))
-}
-
--- The Integer-level kernel: B ≤ A and then (A - B) * succ(d) is
--- non-negative, AND distributes through.
--- We'll need: A * s(d) + (-B) * s(d) = (A - B) * s(d). Pure ring.
-theorem Integer.scaled_subtract_distribute
-        (A B : Integer) (d : Natural)
-        : A * (successor(d) : Integer) + -B * (successor(d) : Integer)
-          = (A - B) * (successor(d) : Integer) :=
-  calc A * (successor(d) : Integer) + -B * (successor(d) : Integer)
-     = (A - B) * (successor(d) : Integer)
-
--- The Integer triangle inequality applied to (n1·s(d2)) + (n2·s(d1))
--- and then collapsed via absolute_value_multiply_by_positive_natural:
--- |n1·s(d2) + n2·s(d1)| ≤ |n1|·s(d2) + |n2|·s(d1).
-theorem Integer.triangle_inequality_rational_form
-        (n1 n2 : Integer) (d1 d2 : Natural)
-        : abs(
-              n1 * (successor(d2) : Integer)
-              + n2 * (successor(d1) : Integer))
-          ≤ abs(n1) * (successor(d2) : Integer)
-            + abs(n2) * (successor(d1) : Integer) :=
-  rewrite(
-      -- |n1·s(d2)| + |n2·s(d1)| = |n1|·s(d2) + |n2|·s(d1).
-      calc abs(n1 * (successor(d2) : Integer))
-           + abs(n2 * (successor(d1) : Integer))
-         = abs(n1) * (successor(d2) : Integer)
-           + abs(n2) * (successor(d1) : Integer),
-      Integer.triangle_inequality(
-          n1 * (successor(d2) : Integer),
-          n2 * (successor(d1) : Integer)))
-
--- Bridge lemma: if A·s(d) + (-B)·s(d) can be rewritten as (n·s(d) : I)
--- (where n : Natural), then this Integer is IsNonneg. Used by the
--- triangle_inequality_at_representatives proof.
-theorem Integer.IsNonneg.transport_from_natural_form
-        (A B : Integer) (d : Natural) (n : Natural)
-        (witnessEquation
-            : A + -B = (n : Integer))
-        : Integer.IsNonneg(
-              A * (successor(d) : Integer)
-              + -B * (successor(d) : Integer)) :=
-  witness n * successor(d) with
-      (calc A * (successor(d) : Integer)
-            + -B * (successor(d) : Integer)
-          = (A - B) * (successor(d) : Integer)
-          = (n : Integer) * (successor(d) : Integer)
-          = (n * successor(d) : Integer))
-
--- The representative-level triangle inequality. Both |p+q| and |p|+|q|
--- on representatives have denominator d := d2 + d1*succ(d2), and the
--- difference (|p|+|q|) - |p+q| evaluates to IsNonneg of
--- (A - B) * succ(d) where A, B are the Integer numerators with
--- B ≤ A by triangle_inequality_rational_form.
-theorem Rational.triangle_inequality_at_representatives
-        (n1 n2 : Integer) (d1 d2 : Natural)
-        : abs((Rational.fraction(n1, d1)
-              + Rational.fraction(n2, d2)
-               : Rational))
-          ≤ abs(Rational.fraction(n1, d1))
-            + abs(Rational.fraction(n2, d2)) :=
-  -- After kernel reduction, the LessOrEqual goal becomes
-  -- Integer.IsNonneg(A·s(d) + (-B)·s(d)) where:
-  --   A = |n1|·s(d2) + |n2|·s(d1)
-  --   B = |n1·s(d2) + n2·s(d1)|
-  --   d = d2 + d1·s(d2).
-  -- From Integer.triangle_inequality_rational_form we have B ≤ A,
-  -- i.e., ∃ n. A = B + (n : I). Then A + -B = (n : I), and the
-  -- bridge lemma gives IsNonneg of the desired form.
-  unfold Rational.IsNonneg in
-  (({
-    obtain ⟨n, witnessHypothesis⟩
-        from Integer.triangle_inequality_rational_form(n1, n2, d1, d2);
-    Integer.IsNonneg.transport_from_natural_form(
-        abs(n1) * (successor(d2) : Integer)
-            + abs(n2)
-                * (successor(d1) : Integer),
-        abs(
-            n1 * (successor(d2) : Integer)
-            + n2 * (successor(d1) : Integer)),
-        d2 + d1 * successor(d2),
-        n,
-        -- A + -B = (n : I). Witness: A = B + (n : I), so
-        -- A + -B = B + (n : I) + -B = (n : I) by ring.
-        calc abs(n1)
-                 * (successor(d2) : Integer)
-             + abs(n2)
-                 * (successor(d1) : Integer)
-             + -abs(
-                   n1 * (successor(d2) : Integer)
-                   + n2 * (successor(d1) : Integer))
-           = abs(
-                 n1 * (successor(d2) : Integer)
-                 + n2 * (successor(d1) : Integer))
-             + (n : Integer)
-             + -abs(
-                   n1 * (successor(d2) : Integer)
-                   + n2 * (successor(d1) : Integer))
-           = (n : Integer))
-  } : Integer.IsNonneg(
-          (abs(n1) * (successor(d2) : Integer)
-           + abs(n2) * (successor(d1) : Integer))
-          * (successor(d2 + d1 * successor(d2)) : Integer)
-          + -(abs(
-                  n1 * (successor(d2) : Integer)
-                  + n2 * (successor(d1) : Integer)))
-            * (successor(d2 + d1 * successor(d2)) : Integer))))
-
--- |x + y| ≤ |x| + |y| on Rational. Take representatives x = [n1/d1],
--- y = [n2/d2]; the at-representatives lemma proves it.
+-- ----------------------------------------------------------------------
+-- |x + y| ≤ |x| + |y|.
+--
+-- At reps the sign-witness of (|x|+|y|) − |x+y| is
+--   (A·Q + (−B)·P) · (P·Q),   A = |n1||d2| + |n2||d1|,  B = |n1·d2 + n2·d1|,
+--                              P = |d1||d2|,             Q = |d1·d2|.
+-- Since Q = P (multiplicativity), this is (A−B)·P³, and A−B ≥ 0 by the
+-- Integer triangle inequality, P ≥ 0 as a product of absolute values.
 theorem Rational.triangle_inequality (x y : Rational)
         : abs(x + y) ≤ abs(x) + abs(y) :=
-  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ =>
-    Rational.triangle_inequality_at_representatives(n1, n2, d1, d2)
+  by_representatives x as ⟨n1, d1, _⟩, y as ⟨n2, d2, _⟩ =>
+    unfold Rational.IsNonneg in {
+      claim crossTriangle
+            : Integer.IsNonneg(
+                  (abs(n1) * abs(d2) + abs(n2) * abs(d1))
+                  + -abs(n1 * d2 + n2 * d1)) by {
+        claim baseLessOrEqual : abs(n1 * d2 + n2 * d1) ≤ abs(n1 * d2) + abs(n2 * d1)
+            by Integer.triangle_inequality;
+        claim Integer.IsNonneg(
+                  (abs(n1 * d2) + abs(n2 * d1)) - abs(n1 * d2 + n2 * d1))
+            by Integer.nonneg_difference_of_le(
+                   abs(n1 * d2 + n2 * d1), abs(n1 * d2) + abs(n2 * d1),
+                   baseLessOrEqual);
+        done by substituting Integer.absolute_value_multiplicative
+      };
+      claim denominatorNonneg : Integer.IsNonneg(abs(d1) * abs(d2)) by {
+        claim Integer.IsNonneg(abs(d1)) by Integer.absolute_value_is_nonneg;
+        claim Integer.IsNonneg(abs(d2)) by Integer.absolute_value_is_nonneg;
+        done by Integer.multiply_nonneg
+      };
+      claim denominatorSquareNonneg
+            : Integer.IsNonneg((abs(d1) * abs(d2)) * (abs(d1) * abs(d2)))
+          by Integer.multiply_nonneg(
+                 abs(d1) * abs(d2), abs(d1) * abs(d2),
+                 denominatorNonneg, denominatorNonneg);
+      claim denominatorCubeNonneg
+            : Integer.IsNonneg(
+                  (abs(d1) * abs(d2))
+                  * ((abs(d1) * abs(d2)) * (abs(d1) * abs(d2))))
+          by Integer.multiply_nonneg(
+                 abs(d1) * abs(d2),
+                 (abs(d1) * abs(d2)) * (abs(d1) * abs(d2)),
+                 denominatorNonneg, denominatorSquareNonneg);
+      claim productNonneg
+            : Integer.IsNonneg(
+                  ((abs(n1) * abs(d2) + abs(n2) * abs(d1))
+                   + -abs(n1 * d2 + n2 * d1))
+                  * ((abs(d1) * abs(d2))
+                     * ((abs(d1) * abs(d2)) * (abs(d1) * abs(d2)))))
+          by Integer.multiply_nonneg(
+                 (abs(n1) * abs(d2) + abs(n2) * abs(d1)) + -abs(n1 * d2 + n2 * d1),
+                 (abs(d1) * abs(d2)) * ((abs(d1) * abs(d2)) * (abs(d1) * abs(d2))),
+                 crossTriangle, denominatorCubeNonneg);
+      claim denominatorFactors : abs(d1 * d2) = abs(d1) * abs(d2)
+          by Integer.absolute_value_multiplicative;
+      claim witnessEquation
+            : ((abs(n1) * abs(d2) + abs(n2) * abs(d1)) * abs(d1 * d2)
+               + -abs(n1 * d2 + n2 * d1) * (abs(d1) * abs(d2)))
+              * ((abs(d1) * abs(d2)) * abs(d1 * d2))
+              = ((abs(n1) * abs(d2) + abs(n2) * abs(d1)) + -abs(n1 * d2 + n2 * d1))
+                * ((abs(d1) * abs(d2)) * ((abs(d1) * abs(d2)) * (abs(d1) * abs(d2))))
+          by calc ((abs(n1) * abs(d2) + abs(n2) * abs(d1)) * abs(d1 * d2)
+                   + -abs(n1 * d2 + n2 * d1) * (abs(d1) * abs(d2)))
+                  * ((abs(d1) * abs(d2)) * abs(d1 * d2))
+             = ((abs(n1) * abs(d2) + abs(n2) * abs(d1)) * (abs(d1) * abs(d2))
+                + -abs(n1 * d2 + n2 * d1) * (abs(d1) * abs(d2)))
+                  * ((abs(d1) * abs(d2)) * (abs(d1) * abs(d2)))   by substituting denominatorFactors
+             = ((abs(n1) * abs(d2) + abs(n2) * abs(d1)) + -abs(n1 * d2 + n2 * d1))
+                  * ((abs(d1) * abs(d2)) * ((abs(d1) * abs(d2)) * (abs(d1) * abs(d2))))   by ring;
+      done by substituting witnessEquation
+    }
 
 -- ----------------------------------------------------------------------
--- Multiplicativity: |x * y| = |x| * |y| at Rational.
-
--- At representatives: both sides have the same denominator
--- d_y + d_x · succ(d_y); numerators differ by |n_x · n_y| vs
--- |n_x| · |n_y|, which Integer.absolute_value_multiplicative equates.
-theorem Rational.absolute_value_multiplicative_at_representatives
-        (n_x n_y : Integer) (d_x d_y : Natural)
-        : abs((Rational.fraction(n_x, d_x)
-              * Rational.fraction(n_y, d_y) : Rational))
-          = abs(Rational.fraction(n_x, d_x))
-            * abs(Rational.fraction(n_y, d_y)) :=
-  Integer.absolute_value_multiplicative(n_x, n_y)
-
--- |xy| = |x||y| on Rational. Take representatives x = [n_x/d_x],
--- y = [n_y/d_y]; the at-representatives lemma proves it.
+-- |x · y| = |x| · |y|: |n_x·n_y|/|d_x·d_y| ~ (|n_x|·|n_y|)/(|d_x|·|d_y|).
 theorem Rational.absolute_value_multiplicative (x y : Rational)
         : abs(x * y) = abs(x) * abs(y) :=
-  by_representatives x as ⟨n_x, d_x⟩, y as ⟨n_y, d_y⟩ =>
-    Rational.absolute_value_multiplicative_at_representatives(
-        n_x, n_y, d_x, d_y)
+  by_representatives x as ⟨n_x, d_x, _⟩, y as ⟨n_y, d_y, _⟩ =>
+    calc abs(n_x * n_y) * (abs(d_x) * abs(d_y))
+       = (abs(n_x) * abs(n_y)) * (abs(d_x) * abs(d_y))   by substituting Integer.absolute_value_multiplicative
+       = (abs(n_x) * abs(n_y)) * abs(d_x * d_y)          by substituting Integer.absolute_value_multiplicative

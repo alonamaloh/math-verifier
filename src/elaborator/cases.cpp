@@ -1030,6 +1030,16 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
             elaborateExpression(*cases.scrutinee, localBinders);
         ExpressionPointer scrutineeTypeOpened = weakHeadNormalForm(
             environment_, inferTypeInLocalContext(localBinders, scrutinee));
+        // Opaque quotient-type alias (e.g. `opaque definition Integer :=
+        // Quotient(...)`): WHNF stops at the opaque head, so the `Quotient`
+        // dispatch below wouldn't fire and `by_representatives x` would be
+        // rejected as "not an inductive". Engage the alias's unfold (as the
+        // eliminator short forms do) and re-normalise.
+        if (engageOpaqueQuotientAlias(scrutineeTypeOpened)) {
+            scrutineeTypeOpened = weakHeadNormalForm(
+                environment_,
+                inferTypeInLocalContext(localBinders, scrutinee));
+        }
 
         std::vector<ExpressionPointer> inductiveArguments;
         ExpressionPointer cursor = scrutineeTypeOpened;

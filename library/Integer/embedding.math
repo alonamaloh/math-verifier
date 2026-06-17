@@ -44,7 +44,7 @@ theorem Natural.to_integer.one_preserves
 -- + zero + zero ≡ zero) to mk(make(a + b, 0)). Reflexivity closes.
 theorem Natural.to_integer.add_preserves (a b : Natural)
         : Natural.to_integer(a + b) = Natural.to_integer(a) + Natural.to_integer(b) :=
-  done by substituting Natural.zero_add
+  done by substituting Natural.zero_add unfolding Integer
 
 -- Embedding preserves the successor: `to_integer(successor n) = 1 +
 -- to_integer(n)`. With `Natural.add` opaque the cast of a successor no
@@ -65,14 +65,8 @@ theorem Natural.to_integer.successor_preserves (n : Natural)
 -- Natural-level proof of equivalence.
 theorem Natural.to_integer.multiply_preserves (a b : Natural)
         : Natural.to_integer(a * b) = Natural.to_integer(a) * Natural.to_integer(b) :=
-  Quotient.sound(
-      IntegerRepresentative.make(a * b, 0),
-      IntegerRepresentative.make(a * b + 0, a * 0 + 0),
-      -- IntegerEquivalent(make(a·b, 0), make(a·b + 0, a·0 + 0))
-      -- reduces definitionally to
-      --   a·b + (a·0 + 0) = 0 + (a·b + 0)
-      -- The RHS definitionally reduces to a·b + 0 (add reduces on
-      -- its first argument when it's zero), so it suffices to bring
-      -- the LHS to a·b + 0 too: drop the inner trailing zero, replace
-      -- a·0 by zero, and stop.
+  -- The product class is `mk(make(a·b + 0, a·0 + 0))`; it equals
+  -- `mk(make(a·b, 0))` because the cross-equation `a·b + (a·0 + 0) =
+  -- 0 + (a·b + 0)` holds (`ring`). `difference_equal` is the boundary form.
+  Integer.difference_equal(a * b, 0, a * b + 0, a * 0 + 0,
       (ring : a * b + (a * 0 + 0) = 0 + (a * b + 0)))

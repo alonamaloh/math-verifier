@@ -376,3 +376,68 @@ each improvement is measured and protected against regression.
   stale — rebuild with make)" hint when the name exists in source but
   not in the loaded environment; low value now that the message names
   the identifier honestly.
+
+### 15. `obtain`/`choose` type-inference through an opaque quotient — PENDING
+
+- **Trigger (2026-06-16, Rational → opaque field-of-fractions migration):**
+  destructuring an existential whose type must be *inferred* from an
+  application, when that type folds through an **opaque** quotient. E.g.
+  `obtain ⟨N, h⟩ from sIsCauchy(ε, εPos)` where
+  `sIsCauchy : Rational.sequence.IsCauchy(s)` reduces to
+  `… → ∃ N. … abs(s(m) - s(n)) < ε`, and `<`/`abs` fold through the now-opaque
+  `Rational` (via `Rational.IsNonneg = Quotient.lift(…)`). `choose … from …`
+  fails identically. Many sites in `Real/{addition,multiplication,absolute_value,
+  order,sequence}.math`.
+- **Was (symptom):**
+  ```
+  library/Real/sequence.math:83:3: elaborate error: theorem
+    'Rational.sequence.negate_is_cauchy'
+    this argument has the wrong type for the function it is given to
+      the function expects: Quotient.{0} RationalRepresentative RationalEquivalent
+      but this argument is: Rational
+  ```
+- **Diagnosis:** `obtain`/`choose` synthesise the source's type bottom-up;
+  inferType WHNF-reduces the existential body, whose order relations fold to
+  `Quotient.lift(…, x)` with `x : Rational`. Hard opacity (`isHardOpaqueConstant`)
+  blocks the inferType-application bridge that would unfold `Rational` to
+  `Quotient(RationalRepresentative, RationalEquivalent)`, so the lift's domain
+  stays the raw `Quotient …` while the argument is the opaque `Rational` — and
+  the two no longer unify. Giving the type **top-down** sidesteps the
+  synthesis entirely: `claim h : ∃ … by <source>;` then
+  `obtain ⟨…⟩ from h` checks the source against the stated type and verifies.
+- **Score:** cause **0** (reports the unify symptom, not "can't infer the
+  source's type through an opaque head"), location **0** (points at the
+  enclosing theorem's first line, not the `obtain`/`choose` keyword), actionable
+  **0** (no hint to annotate the type), user-facing-types **0** (prints the
+  *unfolded* `Quotient.{0} RationalRepresentative RationalEquivalent` — the very
+  form opacity exists to hide — while the user only ever wrote `Rational`),
+  jargon **0** (`Quotient.{0}` leaks the universe-annotated internal head). 0/5.
+- **Better message:** at the `obtain`/`choose` site —
+  "cannot infer the type of `<source>`: it reduces through the opaque
+  `Rational`, exposing a `Quotient.lift` whose domain can't be matched while
+  `Rational` is sealed. State the result type explicitly —
+  `claim <name> : <type> by <source>; obtain ⟨…⟩ from <name>` — or ascribe
+  `(<source> : <type>)`." And print `Rational`, not its unfolded quotient.
+
+### 16. `by substituting` silently stalls on an opaque head deep in the goal — PENDING (good-ish)
+
+- **Trigger (2026-06-16):** `done by substituting absZero` (with
+  `absZero : abs(Real.zero) = Real.zero`) to close
+  `abs(Real.partialSum(s, 0)) ≤ Real.partialSum(…, 0)`. `Real.partialSum(s, 0)`
+  is defeq `Real.zero`, but `Real.zero` is a `Quotient.mk` over an opaque-`Rational`
+  sequence, so deep-WHNF stalls before surfacing `abs(Real.zero)`.
+- **Message (verbatim, the helpful part):**
+  ```
+  `by substituting <eq>` couldn't close the goal.
+  Direction search:
+      rhs → lhs: 0 occurrences (surface or deep-WHNF)
+      lhs → rhs: 0 occurrences (surface or deep-WHNF)  …
+  ```
+- **Diagnosis:** genuinely informative — it told me the rewrite endpoint never
+  appeared in either direction, which correctly pointed at "the goal isn't
+  reducing to the shape my equation mentions" (deep-WHNF stalling on the opaque
+  `Rational` inside `Real.zero`), and I switched to an explicit `calc` with the
+  defeq step written out. Score: cause **1**, location **1**, actionable **1**
+  (the "add `by <proof>`" tail), types **1**, jargon **1**. 5/5 — keep as a
+  positive exemplar; the only gap is it can't *know* an opaque head blocked the
+  reduction, which would have named the cause directly.

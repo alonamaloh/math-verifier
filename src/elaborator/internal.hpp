@@ -4508,6 +4508,23 @@ private:
         ExpressionPointer typeExpression,
         QuotientDecomposition& result);
 
+    // Structural match: is `cursor` (already in WHNF) a `Quotient(T, R)`
+    // application? No reduction, no opacity handling.
+    static bool decomposeQuotientApplication(
+        const ExpressionPointer& cursor,
+        QuotientDecomposition& result);
+
+    // If `cursor` is headed by an opaque definition whose body is a
+    // `Quotient(T, R)` (e.g. `opaque definition Integer := Quotient(...)`),
+    // engage that definition's unfold for the rest of the current
+    // declaration — flipping it to Transparent exactly as `unfold X in …`
+    // does — and return true. This is the one deliberate exception to hard
+    // opacity: the quotient short forms (`by representatives`,
+    // `Quotient.lift` / `.induct` / `.mk` / `.sound`) may see through an
+    // opaque quotient-type alias, so both the decomposition here AND the
+    // kernel's later typecheck of the built term see `Integer ≡ Quotient(...)`.
+    bool engageOpaqueQuotientAlias(const ExpressionPointer& cursor);
+
     // `Quotient.mk(rep)` — desugars to `Quotient.mk.{u}(T, R, rep)`,
     // recovering `T` from `rep`'s inferred type and `R` (plus
     // confirming `T`) from the expected type when available.

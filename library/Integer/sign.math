@@ -34,11 +34,12 @@ theorem Integer.from_subtraction_witness
         (witnessEquation : a = b + k)
         : Integer.from_difference(a, b)
           = (k : Integer) :=
-  -- IntegerEquivalent(make(a, b), make(k, zero)) is a + zero = b + k;
-  -- that equivalence closes the class equality (WS3 coercion).
-  calc a + 0
-     = a
-     = b + k
+  -- `(k : Integer)` is `from_difference(k, 0)`; the boundary needs the
+  -- cross-equation `a + 0 = b + k`.
+  Integer.difference_equal(a, b, k, 0,
+      calc a + 0
+         = a          by Natural.add_zero
+         = b + k      by witnessEquation)
 
 -- Helper: when a ≤ b, mk(make(a, b)) is the negation of a Natural image.
 -- Specifically: mk(make(a, b)) = -(k : Integer) where b = a + k.
@@ -47,11 +48,12 @@ theorem Integer.from_reverse_subtraction_witness
         (witnessEquation : b = a + k)
         : Integer.from_difference(a, b)
           = -(k : Integer) :=
-  -- IntegerEquivalent(make(a, b), make(zero, k)) is a + k = b + zero;
-  -- that equivalence closes the class equality (WS3 coercion).
-  calc a + k
-     = b
-     = b + 0
+  -- `-(k : Integer)` is `from_difference(0, k)`; the boundary needs the
+  -- cross-equation `a + k = b + 0`.
+  Integer.difference_equal(a, b, 0, k,
+      calc a + k
+         = b          by witnessEquation
+         = b + 0      by Natural.add_zero)
 
 -- The two disjuncts as named propositions (avoid huge inline forms).
 definition Integer.MkIsNonneg (a b : Natural) : Proposition :=
@@ -134,18 +136,13 @@ theorem Natural.multiply_successor_eq_zero_left_zero
 -- The Natural-to-Integer embedding is injective.
 theorem Natural.to_integer.injective (n m : Natural)
         (embeddingEquality : (n : Integer) = (m : Integer))
-        : n = m := {
-  -- (n : Integer) and (m : Integer) are the classes [n/0] and [m/0]; equal
-  -- classes have equivalent representatives. Naming the representatives makes
-  -- the exact-bridge cheap (it matches `embeddingEquality` directly instead
-  -- of searching for them); the equivalence IS `n + 0 = m + 0`, so the middle
-  -- calc step closes by type-match. The outer steps are add_zero.
-  claim IntegerEquivalent(IntegerRepresentative.make(n, 0),
-                          IntegerRepresentative.make(m, 0));
+        : n = m :=
+  -- `(n : Integer) = (m : Integer)` is `from_difference(n, 0) =
+  -- from_difference(m, 0)`; the boundary reads it back as `n + 0 = 0 + m`.
   calc n
-     = n + 0
-     = m
-}
+     = n + 0     by ring
+     = 0 + m     by Integer.difference_equal_implies(n, 0, m, 0, embeddingEquality)
+     = m         by ring
 
 -- ----------------------------------------------------------------------
 -- The key cancellation/sign lemma for Rational.IsNonneg_respect:

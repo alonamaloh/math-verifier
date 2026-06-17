@@ -48,137 +48,24 @@ import Algebra.ring
 import Algebra.field
 
 -- ----------------------------------------------------------------------
--- Helper: at the rep level, mk(make(Integer.zero, d)) = Rational.zero
--- for any denominator-minus-one `d`. Used to derive a contradiction
--- when a Rational known to be nonzero has a zero numerator at some rep.
-theorem Rational.mk_zero_numerator_is_zero (d : Natural)
-        : Rational.fraction(Integer.zero, d)
-          = Rational.zero :=
-  Quotient.sound(
-      RationalRepresentative, RationalEquivalent,
-      RationalRepresentative.make(Integer.zero, d),
-      RationalRepresentative.make(Integer.zero, 0),
-      -- RationalEquivalent: Integer.zero * succ(0) = Integer.zero * succ(d).
-      calc Integer.zero * (successor(0) : Integer)
-         = Integer.zero * (successor(d) : Integer))
-
--- ----------------------------------------------------------------------
--- Positive-numerator reciprocal: a representative whose numerator is
--- (succ(k) : Integer) has the rational succ(d)/succ(k) as its
--- reciprocal. Reuses `StrictPositiveRational.reciprocal_multiplied`.
-theorem Rational.reciprocal_exists_when_numerator_positive
-        (k d : Natural)
-        : ∃ (y : Rational).
-            Rational.fraction((successor(k) : Integer), d)
-              * y = Rational.one :=
-  witness Rational.fraction((successor(d) : Integer), k)
-      with StrictPositiveRational.reciprocal_multiplied(
-               StrictPositiveRational.make(k, d))
-
--- ----------------------------------------------------------------------
--- Negative-numerator reciprocal: a representative whose numerator is
--- -(succ(k) : Integer) has the rational -(succ(d))/succ(k) as its
--- reciprocal. The product reduces to the same cross-multiplication
--- as the positive case once we cancel the two negations.
-theorem Rational.reciprocal_exists_when_numerator_negative
-        (k d : Natural)
-        : ∃ (y : Rational).
-            Rational.fraction(-(successor(k) : Integer), d)
-              * y = Rational.one :=
-  witness Rational.fraction(-(successor(d) : Integer), k)
-      with Quotient.sound(
-               RationalRepresentative, RationalEquivalent,
-               -- Product representative.
-               RationalRepresentative.make(
-                   -(successor(k) : Integer) * -(successor(d) : Integer),
-                   k + d * successor(k)),
-               RationalRepresentative.make(Integer.one, 0),
-               -- RationalEquivalent cross-mult:
-               --   (-succ(k) * -succ(d)) * succ(0)
-               -- = 1 * succ(k + d * succ(k))
-               calc -(successor(k) : Integer) * -(successor(d) : Integer)
-                        * (successor(0) : Integer)
-                  = (successor(k) : Integer) * (successor(d) : Integer)
-                  = (successor(k) * successor(d) : Integer)
-                  = (successor(k + d * successor(k)) : Integer)
-                        by (calc successor(k) * successor(d)
-                               = successor(k) + successor(k) * d
-                               = successor(k) + d * successor(k)
-                               = successor(k + d * successor(k)))
-                  = Integer.one
-                        * (successor(k + d * successor(k)) : Integer))
-
--- ----------------------------------------------------------------------
--- For any non-zero Rational expressed at a representative, a
--- reciprocal exists. We sign-split the numerator into nonneg vs. the
--- negation of a Natural image, and then case on the witness Natural:
--- zero leads to a numerator of Integer.zero, contradicting the
--- non-zero hypothesis; succ(k) lands in one of the two reciprocal
--- helpers above.
+-- For any non-zero Rational at a representative n/d, the reciprocal is
+-- simply d/n: the numerator n is nonzero (a nonzero fraction has a nonzero
+-- numerator), so d/n is a valid fraction, and (n/d)·(d/n) = (n·d)/(d·n) = 1
+-- by a ring cross-multiplication.
 theorem Rational.reciprocal_exists_at_representative
-        (n : Integer) (d : Natural)
-        (qNonzero
-            : ¬(Rational.fraction(n, d)
-                    = Rational.zero))
+        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        (qNonzero : ¬(Rational.fraction(n, d, denominatorNonzero) = Rational.zero))
         : ∃ (y : Rational).
-            Rational.fraction(n, d)
-              * y = Rational.one := {
-    claim Integer.IsNonneg(n) ∨ (∃ (k : Natural). n = -(k : Integer))
-        by Integer.sign_split
-    claim by cases {
-      in (Integer.IsNonneg(n)) as nIsNonneg: {
-          obtain ⟨a, nIsImage⟩ from nIsNonneg;
-          cases a with aEq {
-             | zero => {
-                 -- aEq : a = zero, so nIsImage : n = (zero : I) = Integer.zero;
-                 -- the rational is Rational.zero, contradicting qNonzero.
-                 claim n = (0 : Integer)
-                   by substituting aEq;
-                 absurd(qNonzero(
-                            calc Rational.fraction(n, d)
-                               = Rational.fraction((0 : Integer), d)
-                               = Rational.zero))
-               }
-             | successor(k) => {
-                 claim refinedHypothesis
-                       : n = (successor(k) : Integer)
-                     by substituting aEq;
-                 rewrite(
-                     Equality.symmetry(refinedHypothesis),
-                     Rational.reciprocal_exists_when_numerator_positive(
-                         k, d))
-               }
-          }
-      }
-      in (∃ (k : Natural). n = -(k : Integer)) as nIsNegOfNat: {
-          obtain ⟨a, nIsNegImage⟩ from nIsNegOfNat;
-          cases a with aEq {
-             | zero => {
-                 -- n = -(zero : I) = -Integer.zero = Integer.zero,
-                 -- giving Rational.zero — contradiction with qNonzero.
-                 claim n = -(0 : Integer)
-                   by substituting aEq;
-                 absurd(qNonzero(
-                            calc Rational.fraction(n, d)
-                               = Rational.fraction(Integer.zero, d)
-                                      -- -(zero : Integer) reduces to
-                                      -- mk(negate_representatives(make(zero, zero)))
-                                      -- = mk(make(zero, zero)) = Integer.zero
-                                      -- definitionally.
-                               = Rational.zero))
-               }
-             | successor(k) => {
-                 claim refinedHypothesis
-                       : n = -(successor(k) : Integer)
-                     by substituting aEq;
-                 rewrite(
-                     Equality.symmetry(refinedHypothesis),
-                     Rational.reciprocal_exists_when_numerator_negative(
-                         k, d))
-               }
-          }
-      }
-    }
+            Rational.fraction(n, d, denominatorNonzero) * y = Rational.one := {
+  claim numeratorNonzero : ¬(n = Integer.zero)
+      by Rational.numerator_nonzero(n, d, denominatorNonzero, qNonzero);
+  witness Rational.fraction(d, n, numeratorNonzero) with
+      Quotient.sound(
+          Rational.multiply_representatives(
+              RationalRepresentative.make(n, d, denominatorNonzero),
+              RationalRepresentative.make(d, n, numeratorNonzero)),
+          RationalRepresentative.make(Integer.one, Integer.one, Integer.one_is_nonzero),
+          (ring : (n * d) * Integer.one = Integer.one * (d * n)))
 }
 
 -- ----------------------------------------------------------------------
@@ -189,8 +76,8 @@ theorem Rational.reciprocal_exists_for_nonzero
         (x : Rational) (xNonzero : ¬(x = Rational.zero))
         : ∃ (y : Rational). x * y = Rational.one :=
   cases x refining xNonzero {
-    | RationalRepresentative.make(n, d) =>
-        Rational.reciprocal_exists_at_representative(n, d, xNonzero)
+    | RationalRepresentative.make(n, d, dNonzero) =>
+        Rational.reciprocal_exists_at_representative(n, d, dNonzero, xNonzero)
   }
 
 -- ----------------------------------------------------------------------

@@ -2,14 +2,10 @@
 --
 -- Multiplication on Rational, lifted from the textbook formula on
 -- representatives:
---     n1/(d1+1) · n2/(d2+1)  =  (n1·n2) / ((d1+1)·(d2+1))
--- The combined denominator-minus-one is the same expression
--- (`d2 + d1·succ(d2)`) used for addition, so we reuse
--- `Rational.lifted_denominator_factors` from Rational.addition.
--- The respect proofs are simpler than addition's — there is no
--- distributivity step, just a four-factor rearrangement that re-pairs
--- the hypothesis-bound factors so the cross-multiplication hypothesis
--- bites directly.
+--     n1/d1 · n2/d2  =  (n1·n2) / (d1·d2)
+-- The combined denominator d1·d2 is nonzero (product of nonzero
+-- integers). The respect proofs re-pair the four-factor product so the
+-- cross-multiplication hypothesis bites, via two `ring` steps.
 
 module Rational.multiplication
 
@@ -17,64 +13,30 @@ import Logic.basics
 import Logic.exists
 import Logic.quotient
 import Equality.basics
-import Natural.basics
-import Natural.peano
-import Natural.arithmetic
-import Natural.order
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
-import Integer.embedding
 import Integer.ring
+import Integer.integral_domain
 import Rational.basics
-import Rational.addition
 
 -- ----------------------------------------------------------------------
 -- Multiplication on representatives. Numerator is the Integer product;
--- the combined denominator-minus-one is `d2 + d1·succ(d2)`, identical
--- to the addition case (its successor reduces to `succ(d1)·succ(d2)`).
+-- the combined denominator d1·d2 is nonzero.
 definition Rational.multiply_representatives
         : RationalRepresentative → RationalRepresentative
           → RationalRepresentative
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2) =>
+  | RationalRepresentative.make(n1, d1, d1Nonzero),
+    RationalRepresentative.make(n2, d2, d2Nonzero) =>
       RationalRepresentative.make(
           n1 * n2,
-          d2 + d1 * successor(d2))
+          d1 * d2,
+          Integer.multiply_nonzero(d1, d2, d1Nonzero, d2Nonzero))
 
 -- ----------------------------------------------------------------------
--- First-argument respect, factored form. With shared denominator
--- factoring (`succ(d1') · succ(d2)`) split into `succ(d1') · succ(d2)`
--- the proof is a three-step calc: re-pair to surface the hypothesis,
--- substitute, re-pair back.
-
-theorem Rational.multiply_respects_first_integer_factored
-        (n1 n1Prime n2 : Integer) (d1 d1Prime d2 : Natural)
-        (equivalenceHypothesis
-            : n1 * (successor(d1Prime) : Integer) = n1Prime * (successor(d1) : Integer))
-        : n1 * n2 * ((successor(d1Prime) : Integer) * (successor(d2) : Integer)) = n1Prime * n2 * ((successor(d1) : Integer) * (successor(d2) : Integer)) :=
-  calc n1 * n2 * ((successor(d1Prime) : Integer) * (successor(d2) : Integer))
-     = n1 * (successor(d1Prime) : Integer) * (n2 * (successor(d2) : Integer))
-     = n1Prime * (successor(d1) : Integer) * (n2 * (successor(d2) : Integer))
-     = n1Prime * n2 * ((successor(d1) : Integer) * (successor(d2) : Integer))
-
--- Wrap the factored kernel so the conclusion uses
--- `to_integer(succ(_) · succ(_))` directly, matching the form the
--- kernel reduces the RationalEquivalent of the multiplied
--- representatives to.
-
-theorem Rational.multiply_respects_first_integer
-        (n1 n1Prime n2 : Integer) (d1 d1Prime d2 : Natural)
-        (equivalenceHypothesis
-            : n1 * (successor(d1Prime) : Integer) = n1Prime * (successor(d1) : Integer))
-        : n1 * n2 * (successor(d1Prime) * successor(d2) : Integer) = n1Prime * n2 * (successor(d1) * successor(d2) : Integer) :=
-  calc n1 * n2 * (successor(d1Prime) * successor(d2) : Integer)
-     = n1 * n2 * ((successor(d1Prime) : Integer) * (successor(d2) : Integer))
-     = n1Prime * n2 * ((successor(d1) : Integer) * (successor(d2) : Integer))
-     = n1Prime * n2 * (successor(d1) * successor(d2) : Integer)
-
--- First-argument respect at representative level. Destructure all
--- three representatives plus the equivalence hypothesis in one row.
+-- Respect in each argument: the cross-multiplication equivalence of the
+-- two combined representatives is a ring identity once the hypothesis is
+-- applied to the term where it bites.
 
 theorem Rational.multiply_respects_first
         : (rep1 rep1Prime rep2 : RationalRepresentative)
@@ -82,44 +44,14 @@ theorem Rational.multiply_respects_first
           → RationalEquivalent(
                 Rational.multiply_representatives(rep1, rep2),
                 Rational.multiply_representatives(rep1Prime, rep2))
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n1Prime, d1Prime),
-    RationalRepresentative.make(n2, d2),
-    equivalenceHypothesis => {
-      claim firstDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
-          by Rational.added_denominator_factors;
-      claim primeDenominator : successor(d2 + d1Prime * successor(d2)) = successor(d1Prime) * successor(d2)
-          by Rational.added_denominator_factors;
-      calc n1 * n2 * (successor(d2 + d1Prime * successor(d2)) : Integer)
-         = n1 * n2 * (successor(d1Prime) * successor(d2) : Integer)            by substituting primeDenominator
-         = n1Prime * n2 * (successor(d1) * successor(d2) : Integer)            by Rational.multiply_respects_first_integer
-         = n1Prime * n2 * (successor(d2 + d1 * successor(d2)) : Integer)       by substituting firstDenominator
-    }
-
--- ----------------------------------------------------------------------
--- Second-argument respect, factored form. Symmetric: re-pair to
--- surface the hypothesis on the n2 / n2' side, substitute, re-pair
--- back.
-
-theorem Rational.multiply_respects_second_integer_factored
-        (n1 n2 n2Prime : Integer) (d1 d2 d2Prime : Natural)
-        (equivalenceHypothesis
-            : n2 * (successor(d2Prime) : Integer) = n2Prime * (successor(d2) : Integer))
-        : n1 * n2 * ((successor(d1) : Integer) * (successor(d2Prime) : Integer)) = n1 * n2Prime * ((successor(d1) : Integer) * (successor(d2) : Integer)) :=
-  calc n1 * n2 * ((successor(d1) : Integer) * (successor(d2Prime) : Integer))
-     = n1 * (successor(d1) : Integer) * (n2 * (successor(d2Prime) : Integer))
-     = n1 * (successor(d1) : Integer) * (n2Prime * (successor(d2) : Integer))
-     = n1 * n2Prime * ((successor(d1) : Integer) * (successor(d2) : Integer))
-
-theorem Rational.multiply_respects_second_integer
-        (n1 n2 n2Prime : Integer) (d1 d2 d2Prime : Natural)
-        (equivalenceHypothesis
-            : n2 * (successor(d2Prime) : Integer) = n2Prime * (successor(d2) : Integer))
-        : n1 * n2 * (successor(d1) * successor(d2Prime) : Integer) = n1 * n2Prime * (successor(d1) * successor(d2) : Integer) :=
-  calc n1 * n2 * (successor(d1) * successor(d2Prime) : Integer)
-     = n1 * n2 * ((successor(d1) : Integer) * (successor(d2Prime) : Integer))
-     = n1 * n2Prime * ((successor(d1) : Integer) * (successor(d2) : Integer))
-     = n1 * n2Prime * (successor(d1) * successor(d2) : Integer)
+  | RationalRepresentative.make(n1, d1, _),
+    RationalRepresentative.make(n1Prime, d1Prime, _),
+    RationalRepresentative.make(n2, d2, _),
+    equivalenceHypothesis =>
+      calc (n1 * n2) * (d1Prime * d2)
+         = (n1 * d1Prime) * (n2 * d2)   by ring
+         = (n1Prime * d1) * (n2 * d2)   by substituting equivalenceHypothesis
+         = (n1Prime * n2) * (d1 * d2)   by ring
 
 theorem Rational.multiply_respects_second
         : (rep1 rep2 rep2Prime : RationalRepresentative)
@@ -127,19 +59,14 @@ theorem Rational.multiply_respects_second
           → RationalEquivalent(
                 Rational.multiply_representatives(rep1, rep2),
                 Rational.multiply_representatives(rep1, rep2Prime))
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2),
-    RationalRepresentative.make(n2Prime, d2Prime),
-    equivalenceHypothesis => {
-      claim leftDenominator : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
-          by Rational.added_denominator_factors;
-      claim primeDenominator : successor(d2Prime + d1 * successor(d2Prime)) = successor(d1) * successor(d2Prime)
-          by Rational.added_denominator_factors;
-      calc n1 * n2 * (successor(d2Prime + d1 * successor(d2Prime)) : Integer)
-         = n1 * n2 * (successor(d1) * successor(d2Prime) : Integer)            by substituting primeDenominator
-         = n1 * n2Prime * (successor(d1) * successor(d2) : Integer)            by Rational.multiply_respects_second_integer
-         = n1 * n2Prime * (successor(d2 + d1 * successor(d2)) : Integer)       by substituting leftDenominator
-    }
+  | RationalRepresentative.make(n1, d1, _),
+    RationalRepresentative.make(n2, d2, _),
+    RationalRepresentative.make(n2Prime, d2Prime, _),
+    equivalenceHypothesis =>
+      calc (n1 * n2) * (d1 * d2Prime)
+         = (n2 * d2Prime) * (n1 * d1)   by ring
+         = (n2Prime * d2) * (n1 * d1)   by substituting equivalenceHypothesis
+         = (n1 * n2Prime) * (d1 * d2)   by ring
 
 -- ----------------------------------------------------------------------
 -- Multiply the fraction representatives; well-defined in each argument by

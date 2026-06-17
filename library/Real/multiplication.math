@@ -208,31 +208,72 @@ theorem Rational.sequence.product_is_cauchy
               (n : Natural) ↦ s(n) * t(n)) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
+    -- `obtain` cannot infer these existentials through the opaque Rational,
+    -- so each is stated top-down before destructuring.
     -- Step 1: bound |s| eventually by (succ K_s : R) starting from N_s_bound.
-    obtain ⟨K_s, N_s_bound, sBound⟩
-        from Rational.sequence.cauchy_is_naturally_bounded(s, sIsCauchy);
+    claim sNaturallyBounded
+        : ∃ (K : Natural). ∃ (N : Natural).
+            (m : Natural) → N ≤ m → abs(s(m)) ≤ (successor(K) : Rational)
+        by Rational.sequence.cauchy_is_naturally_bounded(s, sIsCauchy);
+    choose K_s as sBoundedAtN_s from sNaturallyBounded;
+    choose N_s_bound as sBound from sBoundedAtN_s;
     -- Step 2: similar for t.
-    obtain ⟨K_t, N_t_bound, tBound⟩
-        from Rational.sequence.cauchy_is_naturally_bounded(t, tIsCauchy);
+    claim tNaturallyBounded
+        : ∃ (K : Natural). ∃ (N : Natural).
+            (m : Natural) → N ≤ m → abs(t(m)) ≤ (successor(K) : Rational)
+        by Rational.sequence.cauchy_is_naturally_bounded(t, tIsCauchy);
+    choose K_t as tBoundedAtN_t from tNaturallyBounded;
+    choose N_t_bound as tBound from tBoundedAtN_t;
     -- Step 3: get δ_s with (succ K_t) · δ_s ≤ ε/4.
-    obtain ⟨delta_s, delta_s_pos, delta_s_bound⟩
-        from Rational.divide_by_succ_positive(
-            Rational.halve(Rational.halve(epsilon)),
-            K_t,
-            Rational.halve_positive(
-                Rational.halve(epsilon),
-                Rational.halve_positive(epsilon, epsilonPositive)));
+    claim deltaSExists
+        : ∃ (delta : Rational).
+            And(Rational.zero < delta,
+                Rational.LessOrEqual(
+                    (successor(K_t) : Rational) * delta,
+                    Rational.halve(Rational.halve(epsilon))))
+        by Rational.divide_by_succ_positive(
+               Rational.halve(Rational.halve(epsilon)),
+               K_t,
+               Rational.halve_positive(
+                   Rational.halve(epsilon),
+                   Rational.halve_positive(epsilon, epsilonPositive)));
+    choose delta_s from deltaSExists;
+    claim delta_s_pos : Rational.zero < delta_s;
+    claim delta_s_bound
+        : Rational.LessOrEqual(
+              (successor(K_t) : Rational) * delta_s,
+              Rational.halve(Rational.halve(epsilon)));
     -- Step 4: get δ_t.
-    obtain ⟨delta_t, delta_t_pos, delta_t_bound⟩
-        from Rational.divide_by_succ_positive(
-            Rational.halve(Rational.halve(epsilon)),
-            K_s,
-            Rational.halve_positive(
-                Rational.halve(epsilon),
-                Rational.halve_positive(epsilon, epsilonPositive)));
-    -- Step 5: apply sCauchy(δ_s) and tCauchy(δ_t).
-    obtain ⟨N_s, sCauchyAt⟩ from sIsCauchy(delta_s, delta_s_pos);
-    obtain ⟨N_t, tCauchyAt⟩ from tIsCauchy(delta_t, delta_t_pos);
+    claim deltaTExists
+        : ∃ (delta : Rational).
+            And(Rational.zero < delta,
+                Rational.LessOrEqual(
+                    (successor(K_s) : Rational) * delta,
+                    Rational.halve(Rational.halve(epsilon))))
+        by Rational.divide_by_succ_positive(
+               Rational.halve(Rational.halve(epsilon)),
+               K_s,
+               Rational.halve_positive(
+                   Rational.halve(epsilon),
+                   Rational.halve_positive(epsilon, epsilonPositive)));
+    choose delta_t from deltaTExists;
+    claim delta_t_pos : Rational.zero < delta_t;
+    claim delta_t_bound
+        : Rational.LessOrEqual(
+              (successor(K_s) : Rational) * delta_t,
+              Rational.halve(Rational.halve(epsilon)));
+    -- Step 5: apply sCauchy(δ_s) and tCauchy(δ_t). State the existentials
+    -- top-down: `choose` can't infer them through the opaque Rational.
+    claim sCauchyBound
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(s(m) - s(n)) < delta_s
+        by sIsCauchy(delta_s, delta_s_pos);
+    choose N_s as sCauchyAt from sCauchyBound;
+    claim tCauchyBound
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(t(m) - t(n)) < delta_t
+        by tIsCauchy(delta_t, delta_t_pos);
+    choose N_t as tCauchyAt from tCauchyBound;
     -- Final N := max(N_s_bound, N_t_bound, N_s, N_t).
     witness Natural.maximum(
                 Natural.maximum(N_s_bound, N_t_bound),
@@ -369,13 +410,17 @@ theorem Real.multiply_after_first_respects_at_rep_inner
             (m : Natural) → N ≤ m →
               abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
                 < epsilon := {
-    obtain ⟨K, N_x_bound, xBound⟩
+    choose K as xBoundedAtN
         from Rational.sequence.cauchy_is_naturally_bounded(s_x, sCauchy_x);
-    obtain ⟨delta, delta_pos, delta_bound⟩
+    choose N_x_bound as xBound from xBoundedAtN;
+    choose delta
         from Rational.divide_by_succ_positive(
             Rational.halve(epsilon), K,
             Rational.halve_positive(epsilon, epsilonPositive));
-    obtain ⟨N_y, yEquivAt⟩ from refinedYEquiv(delta, delta_pos);
+    claim delta_pos : Rational.zero < delta;
+    claim delta_bound
+        : Rational.LessOrEqual((successor(K) : Rational) * delta, Rational.halve(epsilon));
+    choose N_y as yEquivAt from refinedYEquiv(delta, delta_pos);
     witness Natural.maximum(N_x_bound, N_y) with
         (m : Natural)
                  (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) ↦
@@ -430,8 +475,7 @@ theorem Real.multiply_respects_at_rep_y_inner
   -- Reduce to multiply_after_first_respects_at_rep_inner with s_y as
   -- the "fixed" sequence (bounded) and x varying.
   {
-    obtain ⟨N, boundedY⟩
-        from Real.multiply_after_first_respects_at_rep_inner(
+    choose N as boundedY from Real.multiply_after_first_respects_at_rep_inner(
                  s_y, sCauchy_y, s_x, s_xPrime, sCauchy_x, sCauchy_xPrime,
                  refinedXEquiv, epsilon, epsilonPositive);
     witness N with

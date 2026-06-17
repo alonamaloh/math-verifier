@@ -1,8 +1,10 @@
 -- Rational/order.math
 --
--- Order and sign on Rational. Lift `Integer.IsNonneg` over the
--- Rational quotient (via `Quotient.lift` to Proposition), then derive
--- `LessOrEqual` and the operator overloads.
+-- Order and sign on Rational. Because denominators are now arbitrary
+-- nonzero integers (possibly negative), "n/d ≥ 0" is captured sign-robustly
+-- as `Integer.IsNonneg(n · d)`: for d > 0 this is `n ≥ 0`, and for d < 0 it
+-- is `n ≤ 0`, exactly as the fraction's value demands. Lift this over the
+-- Rational quotient, then derive `LessOrEqual` and the operators.
 
 module Rational.order
 
@@ -10,81 +12,71 @@ import Logic.basics
 import Logic.exists
 import Logic.quotient
 import Equality.basics
-import Natural.basics
-import Natural.peano
-import Natural.arithmetic
-import Natural.distance
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
 import Integer.embedding
 import Integer.negation
 import Integer.ring
-import Integer.algebra
 import Integer.order
+import Integer.order_multiply
 import Integer.sign
+import Integer.integral_domain
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
 import Rational.negation
 
--- Representative-level "is non-negative": just IsNonneg on the numerator.
+-- Representative-level "is non-negative": the numerator times the
+-- denominator is non-negative.
 definition Rational.IsNonneg_at_representative
         : RationalRepresentative → Proposition
-  | RationalRepresentative.make(n, _) => Integer.IsNonneg(n)
+  | RationalRepresentative.make(n, d, _) => Integer.IsNonneg(n * d)
 
--- Forward direction of the IsNonneg respect: if `n1 * succ(d2) =
--- n2 * succ(d1)` (Integer equality) and IsNonneg(n1), then
--- IsNonneg(n2). Case-splits n2 via sign_split; the negative case
--- forces k = 0 via the cancellation lemma.
+-- Forward direction of the respect: from the cross-multiplication
+-- `n1·d2 = n2·d1` and `n1·d1 ≥ 0`, derive `n2·d2 ≥ 0`. Multiply through by
+-- the (positive) squared denominators and cancel.
 theorem Rational.IsNonneg_forward_helper
-        (n1 n2 : Integer) (d1 d2 : Natural)
-        (equivalenceHypothesis
-            : n1 * (successor(d2) : Integer)
-              = n2 * (successor(d1) : Integer))
-        (n1IsNonneg : Integer.IsNonneg(n1))
-        : Integer.IsNonneg(n2) := {
-    obtain ⟨a, n1IsImage⟩ from n1IsNonneg;
-    claim Integer.IsNonneg(n2) ∨ (∃ (k : Natural). n2 = -(k : Integer))
-        by Integer.sign_split
-    claim by cases {
-      in (Integer.IsNonneg(n2)) as n2IsNonneg: n2IsNonneg
-      in (∃ (k : Natural). n2 = -(k : Integer)) as n2NegEvidence: {
-          obtain ⟨k, n2EqNegK⟩ from n2NegEvidence;
-          calc (a : Integer) * (successor(d2) : Integer)
-                  = n1 * (successor(d2) : Integer)
-                  = n2 * (successor(d1) : Integer)
-                  = -(k : Integer) * (successor(d1) : Integer);
-          claim k = 0;
-          calc n2
-             = -(k : Integer)
-             = -((0 : Natural) : Integer)
-             = Integer.zero                                          as n2EqZero;
-          rewrite(
-              Equality.symmetry(n2EqZero),
-              Integer.zero_is_nonneg)
-      }
-    }
+        (n1 n2 d1 d2 : Integer)
+        (d1Nonzero : ¬(d1 = Integer.zero)) (d2Nonzero : ¬(d2 = Integer.zero))
+        (equivalenceHypothesis : n1 * d2 = n2 * d1)
+        (numeratorProductNonneg : Integer.IsNonneg(n1 * d1))
+        : Integer.IsNonneg(n2 * d2) := {
+    claim productIdentity : (n2 * d2) * (d1 * d1) = (n1 * d1) * (d2 * d2)
+        by calc (n2 * d2) * (d1 * d1)
+              = (n2 * d1) * (d1 * d2)   by ring
+              = (n1 * d2) * (d1 * d2)   by substituting equivalenceHypothesis
+              = (n1 * d1) * (d2 * d2)   by ring;
+    claim d2SquareNonneg : Integer.IsNonneg(d2 * d2) by Integer.square_IsNonneg;
+    claim scaledNonneg : Integer.IsNonneg((n1 * d1) * (d2 * d2))
+        by Integer.multiply_nonneg(n1 * d1, d2 * d2, numeratorProductNonneg, d2SquareNonneg);
+    claim targetScaledNonneg : Integer.IsNonneg((n2 * d2) * (d1 * d1))
+        by substituting productIdentity;
+    claim d1SquareNonneg : Integer.IsNonneg(d1 * d1) by Integer.square_IsNonneg;
+    claim d1SquareNonzero : ¬(d1 * d1 = Integer.zero)
+        by Integer.multiply_nonzero(d1, d1, d1Nonzero, d1Nonzero);
+    Integer.IsNonneg_of_product_with_positive(
+        n2 * d2, d1 * d1, targetScaledNonneg, d1SquareNonneg, d1SquareNonzero)
 }
 
--- Respect: via propositional extensionality, forward and backward.
--- Backward is forward with sides swapped (symmetric equation).
+-- Respect: via propositional extensionality, both directions are the
+-- forward helper (the backward one on the symmetric equation).
 theorem Rational.IsNonneg_respect
         (rep1 rep2 : RationalRepresentative)
         (equivalenceHypothesis : RationalEquivalent(rep1, rep2))
         : Rational.IsNonneg_at_representative(rep1)
           = Rational.IsNonneg_at_representative(rep2) :=
   cases rep1 refining equivalenceHypothesis {
-    | RationalRepresentative.make(n1, d1) =>
+    | RationalRepresentative.make(n1, d1, d1Nonzero) =>
         cases rep2 refining equivalenceHypothesis {
-          | RationalRepresentative.make(n2, d2) =>
+          | RationalRepresentative.make(n2, d2, d2Nonzero) =>
               Equality.propositional_extensionality(
-                  Integer.IsNonneg(n1),
-                  Integer.IsNonneg(n2),
+                  Integer.IsNonneg(n1 * d1),
+                  Integer.IsNonneg(n2 * d2),
                   Rational.IsNonneg_forward_helper(
-                      n1, n2, d1, d2, equivalenceHypothesis),
+                      n1, n2, d1, d2, d1Nonzero, d2Nonzero, equivalenceHypothesis),
                   Rational.IsNonneg_forward_helper(
-                      n2, n1, d2, d1,
+                      n2, n1, d2, d1, d2Nonzero, d1Nonzero,
                       Equality.symmetry(equivalenceHypothesis)))
         }
   }
@@ -96,20 +88,20 @@ opaque definition Rational.IsNonneg (x : Rational) : Proposition :=
       Rational.IsNonneg_respect,
       x)
 
--- Boundary lemmas for the opaque `Rational.IsNonneg`. On a fraction
--- n / (d + 1), being non-negative is exactly `Integer.IsNonneg(n)`.
--- These two are the *only* places that pierce the opacity (the `unfold`
--- collapses the `Quotient.lift`); every consumer cites them by name and
--- never sees the lift.
-theorem Rational.IsNonneg.of_numerator
-        (n : Integer) (d : Natural) (numeratorIsNonneg : Integer.IsNonneg(n))
-        : Rational.IsNonneg(Rational.fraction(n, d)) :=
+-- Boundary lemmas for the opaque `Rational.IsNonneg`. On a fraction n / d,
+-- being non-negative is exactly `Integer.IsNonneg(n · d)`. These two are the
+-- *only* places that pierce the opacity (the `unfold` collapses the
+-- `Quotient.lift`); every consumer cites them by name.
+theorem Rational.IsNonneg.of_numerator_denominator
+        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        (productIsNonneg : Integer.IsNonneg(n * d))
+        : Rational.IsNonneg(Rational.fraction(n, d, denominatorNonzero)) :=
   done by unfolding Rational.IsNonneg
 
-theorem Rational.IsNonneg.numerator
-        (n : Integer) (d : Natural)
-        (fractionIsNonneg : Rational.IsNonneg(Rational.fraction(n, d)))
-        : Integer.IsNonneg(n) :=
+theorem Rational.IsNonneg.numerator_denominator
+        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        (fractionIsNonneg : Rational.IsNonneg(Rational.fraction(n, d, denominatorNonzero)))
+        : Integer.IsNonneg(n * d) :=
   done by unfolding Rational.IsNonneg
 
 -- ≤ on Rational.

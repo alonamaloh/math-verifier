@@ -51,24 +51,15 @@ import Rational.reciprocal_function
 theorem Rational.from_natural_le_preserves
         (a b : Natural) (aLeqB : a ≤ b)
         : (a : Rational) ≤ (b : Rational) := {
-    obtain ⟨c, witnessEquation⟩ from Natural.subtraction_witness(a, b, aLeqB);
+    choose c as witnessEquation from Natural.subtraction_witness(a, b, aLeqB);
     -- At the representatives, ((a + c) : R) - (a : R) = (c : R): cross-
     -- multiply, and both numerators reduce to (c : Integer).
     claim ((a + c) : Rational) - (a : Rational) = (c : Rational)
-      by Quotient.sound(
-             RationalRepresentative.make(
-                 ((a + c) : Integer) * (successor(0) : Integer)
-                 + -(a : Integer) * (successor(0) : Integer),
-                 0 + 0 * successor(0)),
-             RationalRepresentative.make((c : Integer), 0),
-             calc (((a + c) : Integer) * (successor(0) : Integer)
-                   + -(a : Integer) * (successor(0) : Integer))
-                      * (successor(0) : Integer)
-                = ((a + c) : Integer) + -(a : Integer)
-                = ((a : Integer) + (c : Integer)) + -(a : Integer)
-                = (c : Integer) * (successor(0) : Integer)
-                = (c : Integer)
-                      * (successor(0 + 0 * successor(0)) : Integer));
+      by calc ((a + c) : Rational) - (a : Rational)
+            = ((a : Rational) + (c : Rational)) - (a : Rational)
+                  by substituting Rational.from_natural_add_preserves
+            = (c : Rational)
+                  by ring;
     -- With b = a + c, (b : R) - (a : R) = (c : R), and the rational image of
     -- a natural is nonnegative. The goal (a : R) ≤ (b : R) is by definition
     -- IsNonneg of that difference, so substituting closes it.
@@ -83,8 +74,11 @@ theorem Rational.from_natural_le_preserves
 -- Natural → Integer → Rational; the numerator at the Rational
 -- representative is Integer.from_natural(n), which is Integer.IsNonneg.
 theorem Rational.from_natural_IsNonneg (n : Natural)
-        : Rational.IsNonneg((n : Rational)) :=
-  done by Integer.from_natural_is_nonneg unfolding Rational.IsNonneg
+        : Rational.IsNonneg((n : Rational)) := {
+  claim Integer.IsNonneg((n : Integer)) by Integer.from_natural_is_nonneg;
+  done by substituting (ring : (n : Integer) * Integer.one = (n : Integer))
+      unfolding Rational.IsNonneg
+}
 
 -- (successor(n) : Rational) = (1 : Rational) + (n : Rational). The cast
 -- of (succ(n) : Integer) reduces definitionally to Integer.one + (n :
@@ -200,8 +194,7 @@ theorem Rational.archimedean_for_positives
   claim Rational.IsNonneg(c * Rational.reciprocal_function(epsilon));
   claim abs(c * Rational.reciprocal_function(epsilon))
         = c * Rational.reciprocal_function(epsilon);
-  obtain ⟨K, absBound⟩
-      from Rational.absolute_value_le_succ_natural(
+  choose K as absBound from Rational.absolute_value_le_succ_natural(
                c * Rational.reciprocal_function(epsilon));
   calc c * Rational.reciprocal_function(epsilon)
           = abs(c * Rational.reciprocal_function(epsilon))
@@ -283,8 +276,7 @@ theorem Rational.scaled_reciprocal_successor_eventually_below
       since Rational.halve_positive;
   claim Rational.zero ≤ Rational.halve(epsilon)
       since Rational.LessThan.weaken;
-  obtain ⟨K, archBound⟩
-      from Rational.archimedean_for_positives(
+  choose K as archBound from Rational.archimedean_for_positives(
                c, Rational.halve(epsilon), cNonneg, halfPositive);
   witness K with
       (m : Natural) (KLeqM : K ≤ m) ↦ {

@@ -427,26 +427,90 @@ bool Elaborator::signatureAcceptsArgumentTypesDefeq(
         return true;
     }
 
+// Structural match: is `cursor` (already in WHNF) a `Quotient(T, R)`
+// application? Fills `result` and returns true if so. No reduction, no
+// opacity handling — that's the caller's job.
+bool Elaborator::decomposeQuotientApplication(
+        const ExpressionPointer& cursor,
+        QuotientDecomposition& result) {
+    auto* outerApp = std::get_if<Application>(&cursor->node);
+    if (!outerApp) return false;
+    auto* innerApp =
+        std::get_if<Application>(&outerApp->function->node);
+    if (!innerApp) return false;
+    auto* quotientConstant =
+        std::get_if<Constant>(&innerApp->function->node);
+    if (!quotientConstant || quotientConstant->name != "Quotient")
+        return false;
+    if (quotientConstant->universeArguments.size() != 1)
+        return false;
+    result.carrierType = innerApp->argument;
+    result.relation = outerApp->argument;
+    result.universeLevel = quotientConstant->universeArguments[0];
+    return true;
+}
+
+bool Elaborator::engageOpaqueQuotientAlias(const ExpressionPointer& cursor) {
+        // Peel the application spine to the head constant.
+        ExpressionPointer head = cursor;
+        std::vector<ExpressionPointer> args;
+        while (auto* app = std::get_if<Application>(&head->node)) {
+            args.push_back(app->argument);
+            head = app->function;
+        }
+        auto* constant = std::get_if<Constant>(&head->node);
+        if (!constant) return false;
+        auto it = environment_.declarations.find(constant->name);
+        if (it == environment_.declarations.end()) return false;
+        auto* definition = std::get_if<Definition>(&it->second);
+        if (!definition || definition->opacity != Opacity::Opaque)
+            return false;
+        if (definition->universeParameters.size()
+                != constant->universeArguments.size()) {
+            return false;
+        }
+        // Peek at the unfolded body: only engage for a genuine quotient
+        // alias (body reduces to `Quotient(T, R)`), never an arbitrary
+        // opaque definition.
+        ExpressionPointer body = definition->body;
+        if (!definition->universeParameters.empty()) {
+            body = substituteUniverseLevels(
+                body, definition->universeParameters,
+                constant->universeArguments);
+        }
+        std::reverse(args.begin(), args.end());
+        for (auto& argument : args) body = makeApplication(body, argument);
+        QuotientDecomposition probe;
+        if (!decomposeQuotientApplication(
+                weakHeadNormalForm(environment_, body), probe)) {
+            return false;
+        }
+        // Engage the unfold for the rest of this declaration, mirroring
+        // `unfold <name> in …` (see dispatch.cpp): record the original
+        // opacity for restore, flip to Transparent, and drop the kernel
+        // caches (reduction results depend on opacity).
+        pendingOpacityRestores_.push_back(
+            {constant->name, definition->opacity});
+        definition->opacity = Opacity::Transparent;
+        invalidateKernelCaches();
+        return true;
+    }
+
 bool Elaborator::tryDecomposeQuotient(
         ExpressionPointer typeExpression,
         QuotientDecomposition& result) {
         ExpressionPointer cursor = weakHeadNormalForm(
             environment_, typeExpression);
-        auto* outerApp = std::get_if<Application>(&cursor->node);
-        if (!outerApp) return false;
-        auto* innerApp =
-            std::get_if<Application>(&outerApp->function->node);
-        if (!innerApp) return false;
-        auto* quotientConstant =
-            std::get_if<Constant>(&innerApp->function->node);
-        if (!quotientConstant || quotientConstant->name != "Quotient")
-            return false;
-        if (quotientConstant->universeArguments.size() != 1)
-            return false;
-        result.carrierType = innerApp->argument;
-        result.relation = outerApp->argument;
-        result.universeLevel = quotientConstant->universeArguments[0];
-        return true;
+        if (decomposeQuotientApplication(cursor, result)) return true;
+        // Opaque quotient-type alias (e.g. `opaque definition Integer :=
+        // Quotient(...)`): a normal WHNF stops at the opaque head, so the
+        // structural match fails. Engage the alias's unfold and retry, so
+        // the short forms work on the opaque type.
+        if (engageOpaqueQuotientAlias(cursor)) {
+            cursor = weakHeadNormalForm(environment_, typeExpression);
+            return decomposeQuotientApplication(cursor, result);
+        }
+        return false;
     }
 
 ExpressionPointer Elaborator::desugarQuotientMk(

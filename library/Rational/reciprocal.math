@@ -23,6 +23,7 @@ import Integer.ring
 import Integer.algebra
 import Integer.order
 import Integer.sign
+import Integer.integral_domain
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -45,20 +46,21 @@ inductive StrictPositiveRational : Type(0) where
         → (denominatorPredecessor : Natural)
         → StrictPositiveRational
 
--- Underlying Rational of a packaged strict positive.
+-- Underlying Rational of a packaged strict positive: succ(k)/succ(d).
 definition StrictPositiveRational.value
         : StrictPositiveRational → Rational
   | StrictPositiveRational.make(k, d) =>
       Rational.fraction(
-                      (successor(k) : Integer), d)
+          (successor(k) : Integer), (successor(d) : Integer),
+          Integer.from_natural_successor_nonzero(d))
 
--- Reciprocal of a packaged strict positive: swap numerator (succ(k))
--- and denominator (succ(d)), giving succ(d)/succ(k) = mk(make(succ(d) : I, k)).
+-- Reciprocal of a packaged strict positive: swap to succ(d)/succ(k).
 definition StrictPositiveRational.reciprocal
         : StrictPositiveRational → Rational
   | StrictPositiveRational.make(k, d) =>
       Rational.fraction(
-                      (successor(d) : Integer), k)
+          (successor(d) : Integer), (successor(k) : Integer),
+          Integer.from_natural_successor_nonzero(k))
 
 -- Multiplicative cancellation: r * (1/r) = 1 for r = succ(k)/succ(d).
 -- At reps: (succ(k) : I, d) * (succ(d) : I, k) = (succ(k) · succ(d), k + d·succ(k)).
@@ -74,29 +76,19 @@ theorem StrictPositiveRational.reciprocal_multiplied (r : StrictPositiveRational
           = Rational.one :=
   cases r {
     | StrictPositiveRational.make(k, d) =>
+        -- value · reciprocal = (succ(k)·succ(d)) / (succ(d)·succ(k)); the
+        -- cross-multiplication with 1/1 is a ring identity (commutativity).
         Quotient.sound(
-            RationalRepresentative, RationalEquivalent,
-            RationalRepresentative.make(
-                (successor(k) : Integer) * (successor(d) : Integer),
-                k + d * successor(k)),
-            RationalRepresentative.make(Integer.one, 0),
-            -- Cross-mult equation:
-            -- (succ(k)·succ(d)) · succ(zero) = 1 · succ(k + d·succ(k)).
-            calc (successor(k) : Integer) * (successor(d) : Integer)
-                   * (successor(0) : Integer)
-               = (successor(k) : Integer) * (successor(d) : Integer)
-               = (successor(k) * successor(d) : Integer)
-               = (successor(k + d * successor(k)) : Integer)
-                      -- succ(k) * succ(d) = succ(k + d·succ(k)).
-                      -- succ(k)*succ(d) = succ(k)*d + succ(k)
-                      --   (Natural multiply_successor on right)
-                      -- = d·succ(k) + succ(k) (commute)
-                      -- = succ(k + d·succ(k)) (Natural add_successor).
-                      by (calc successor(k) * successor(d)
-                             = successor(k) + successor(k) * d
-                             = successor(k) + d * successor(k)
-                             = successor(k + d * successor(k)))
-               = Integer.one * (successor(k + d * successor(k)) : Integer))
+            Rational.multiply_representatives(
+                RationalRepresentative.make(
+                    (successor(k) : Integer), (successor(d) : Integer),
+                    Integer.from_natural_successor_nonzero(d)),
+                RationalRepresentative.make(
+                    (successor(d) : Integer), (successor(k) : Integer),
+                    Integer.from_natural_successor_nonzero(k))),
+            RationalRepresentative.make(Integer.one, Integer.one, Integer.one_is_nonzero),
+            (ring : ((successor(k) : Integer) * (successor(d) : Integer)) * Integer.one
+                    = Integer.one * ((successor(d) : Integer) * (successor(k) : Integer))))
   }
 
 -- Extract a StrictPositiveRational witness from a strict-positivity
@@ -109,7 +101,7 @@ theorem Rational.strict_positive_witness_at_representative
         (nNonzero
            : Not(n = Integer.zero))
         : ∃ (k : Natural). n = (successor(k) : Integer) := {
-    obtain ⟨a, nIsImage⟩ from nIsNonneg;
+    choose a as nIsImage from nIsNonneg;
     cases a with aEq {
        | zero => {
            -- n = (zero : I) = Integer.zero, contradicts nNonzero.

@@ -49,12 +49,18 @@ theorem Rational.sequence.sum_is_cauchy
               (n : Natural) ↦ s(n) + t(n)) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨N_s, sBound⟩
-        from sIsCauchy(Rational.halve(epsilon),
-                       Rational.halve_positive(epsilon, epsilonPositive));
-    obtain ⟨N_t, tBound⟩
-        from tIsCauchy(Rational.halve(epsilon),
-                       Rational.halve_positive(epsilon, epsilonPositive));
+    -- `choose` can't infer the existential through the opaque Rational (the
+    -- inferType-application bridge is blocked), so state it top-down first.
+    claim sBounded
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(s(m) - s(n)) < Rational.halve(epsilon)
+        by sIsCauchy(Rational.halve(epsilon), Rational.halve_positive(epsilon, epsilonPositive));
+    choose N_s as sBound from sBounded;
+    claim tBounded
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(t(m) - t(n)) < Rational.halve(epsilon)
+        by tIsCauchy(Rational.halve(epsilon), Rational.halve_positive(epsilon, epsilonPositive));
+    choose N_t as tBound from tBounded;
     witness Natural.maximum(N_s, N_t) with
         (m : Natural)
                  (m_ge_max : Natural.maximum(N_s, N_t) ≤ m)
@@ -120,7 +126,7 @@ theorem Real.add_respects_second
         : CauchyEquivalent(rep_x + rep_y, rep_x + rep_yPrime) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-      obtain ⟨N, yEquiv_at_N⟩ from yEquiv(epsilon, epsilonPositive);
+      choose N as yEquiv_at_N from yEquiv(epsilon, epsilonPositive);
       witness N with
           (m : Natural) (N_leq_m : N ≤ m) ↦ {
             let sx : Rational :=
@@ -148,7 +154,7 @@ theorem Real.add_respects_first
         : CauchyEquivalent(rep_x + rep_y, rep_xPrime + rep_y) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-      obtain ⟨N, xEquiv_at_N⟩ from xEquiv(epsilon, epsilonPositive);
+      choose N as xEquiv_at_N from xEquiv(epsilon, epsilonPositive);
       witness N with
           (m : Natural) (N_leq_m : N ≤ m) ↦ {
             let sx : Rational :=

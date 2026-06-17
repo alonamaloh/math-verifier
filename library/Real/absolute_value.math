@@ -52,7 +52,13 @@ theorem Rational.sequence.absolute_value_is_cauchy
               (n : Natural) ↦ abs(s(n))) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨N, sBound⟩ from sIsCauchy(epsilon, epsilonPositive);
+    -- `obtain` cannot infer the existential through the opaque Rational, so
+    -- state it top-down first.
+    claim sBounded
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m → (n : Natural) → N ≤ n → abs(s(m) - s(n)) < epsilon
+        by sIsCauchy(epsilon, epsilonPositive);
+    choose N as sBound from sBounded;
     witness N with
         (m : Natural) (N_leq_m : N ≤ m)
                  (n : Natural) (N_leq_n : N ≤ n) ↦
@@ -97,8 +103,7 @@ theorem Real.absolute_value_respects
               CauchyRationalSequence.absolute_value(rep')) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-      obtain ⟨N, origAtN⟩
-          from equivalenceHypothesis(epsilon, epsilonPositive);
+      choose N as origAtN from equivalenceHypothesis(epsilon, epsilonPositive);
       witness N with
               (m : Natural) (N_leq_m : N ≤ m) ↦
                 -- Goal: |sf(abs(rep), m) - sf(abs(rep'), m)| < ε.

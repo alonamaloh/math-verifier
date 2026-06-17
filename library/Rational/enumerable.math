@@ -26,48 +26,142 @@ import Set.basics
 import Set.cantor
 import Set.enumerable
 import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.sign
+import Integer.integral_domain
 import Integer.enumerable
 import Rational.basics
 
--- The representatives are countable: pair a listing of ℤ for the
--- numerator with the raw second coordinate for the denominator.
-theorem RationalRepresentative.is_enumerable
-        : IsEnumerable(RationalRepresentative) := {
-  obtain ⟨integerListing, integerSurjective⟩ from Integer.is_enumerable;
-  obtain ⟨pairListing, pairSurjective⟩ from Natural.pairs_enumerable;
-  witness ((n : Natural) ↦
-      RationalRepresentative.make(
-          integerListing(Product.first(pairListing(n))),
-          Product.second(pairListing(n))))
-  with
-      (target : RationalRepresentative) ↦
-        cases target {
-          | RationalRepresentative.make(numerator, denominatorPredecessor) => {
-              obtain ⟨m, integerHit⟩ from integerSurjective(numerator);
-              obtain ⟨n, pairHit⟩
-                  from pairSurjective(Product.make(m, denominatorPredecessor));
-              witness n with
-                  calc RationalRepresentative.make(
-                           integerListing(Product.first(pairListing(n))),
-                           Product.second(pairListing(n)))
-                     = RationalRepresentative.make(
-                           integerListing(
-                               Product.first(
-                                   Product.make(m, denominatorPredecessor))),
-                           Product.second(
-                               Product.make(m, denominatorPredecessor)))
-                           since pairHit
-                     = RationalRepresentative.make(
-                           integerListing(m), denominatorPredecessor)
-                     = RationalRepresentative.make(
-                           numerator, denominatorPredecessor)
-                           since integerHit
-            }
-        }
+-- Shared witness step: given any positive-denominator form
+-- numCanonical / succ(k) equal to a target rational, the listing
+-- `(i, k) ↦ integerListing(i) / succ(k)` hits it.
+theorem Rational.enumeration_witness
+        (integerListing : Natural → Integer)
+        (integerSurjective : Function.IsSurjective(Natural, Integer, integerListing))
+        (pairListing : Natural → Product(Natural, Natural))
+        (pairSurjective : Function.IsSurjective(Natural, Product(Natural, Natural), pairListing))
+        (target : Rational) (numCanonical : Integer) (k : Natural)
+        (targetEquation
+            : target
+              = Rational.fraction(
+                    numCanonical, (successor(k) : Integer),
+                    Integer.from_natural_successor_nonzero(k)))
+        : ∃ (listIndex : Natural).
+            Rational.fraction(
+                integerListing(Product.first(pairListing(listIndex))),
+                (successor(Product.second(pairListing(listIndex))) : Integer),
+                Integer.from_natural_successor_nonzero(
+                    Product.second(pairListing(listIndex))))
+            = target := {
+  choose i as integerHit from integerSurjective(numCanonical);
+  choose listIndex as pairHit from pairSurjective(Product.make(i, k));
+  witness listIndex with
+      calc Rational.fraction(
+               integerListing(Product.first(pairListing(listIndex))),
+               (successor(Product.second(pairListing(listIndex))) : Integer),
+               Integer.from_natural_successor_nonzero(
+                   Product.second(pairListing(listIndex))))
+         = Rational.fraction(
+               integerListing(Product.first(Product.make(i, k))),
+               (successor(Product.second(Product.make(i, k))) : Integer),
+               Integer.from_natural_successor_nonzero(
+                   Product.second(Product.make(i, k))))
+               by substituting pairHit
+         = Rational.fraction(
+               numCanonical, (successor(k) : Integer),
+               Integer.from_natural_successor_nonzero(k))
+               by substituting integerHit
+         = target   by Equality.symmetry(targetEquation)
 }
 
--- Freek #3: ℚ is denumerable.
-theorem Rational.is_enumerable : IsEnumerable(Rational) :=
-  IsEnumerable.quotient(
-      RationalRepresentative, RationalEquivalent,
-      RationalRepresentative.is_enumerable)
+-- Freek #3: ℚ is denumerable. Enumerate via (i, k) ↦ integerListing(i) /
+-- succ(k); every rational has a positive-denominator form, found by
+-- sign-splitting the denominator.
+theorem Rational.is_enumerable : IsEnumerable(Rational) := {
+  choose integerListing as integerSurjective from Integer.is_enumerable;
+  choose pairListing as pairSurjective from Natural.pairs_enumerable;
+  witness ((listIndex : Natural) ↦
+      Rational.fraction(
+          integerListing(Product.first(pairListing(listIndex))),
+          (successor(Product.second(pairListing(listIndex))) : Integer),
+          Integer.from_natural_successor_nonzero(
+              Product.second(pairListing(listIndex)))))
+  with
+      (target : Rational) ↦
+        cases target {
+          | RationalRepresentative.make(numerator, denominator, denominatorNonzero) =>
+              cases Integer.sign_split(denominator) {
+                | Or.introduceLeft(denominatorNonneg) => {
+                    choose m as denominatorImage from denominatorNonneg;
+                    cases Natural.zero_or_successor(m) {
+                      | Or.introduceLeft(mIsZero) => {
+                          claim denominatorZero : denominator = Integer.zero
+                              by calc denominator
+                                    = (m : Integer)              by denominatorImage
+                                    = ((0 : Natural) : Integer)  by substituting mIsZero
+                                    = Integer.zero               by Natural.to_integer.zero_preserves;
+                          absurd(denominatorNonzero(denominatorZero))
+                        }
+                      | Or.introduceRight(mIsSuccessor) => {
+                          choose k as mEqualsSuccessor from mIsSuccessor;
+                          claim targetEquation
+                                : Rational.fraction(numerator, denominator, denominatorNonzero)
+                                  = Rational.fraction(
+                                        numerator, (successor(k) : Integer),
+                                        Integer.from_natural_successor_nonzero(k))
+                              by Quotient.sound(
+                                     RationalRepresentative, RationalEquivalent,
+                                     RationalRepresentative.make(numerator, denominator, denominatorNonzero),
+                                     RationalRepresentative.make(
+                                         numerator, (successor(k) : Integer),
+                                         Integer.from_natural_successor_nonzero(k)),
+                                     calc numerator * (successor(k) : Integer)
+                                        = numerator * (m : Integer)        by substituting mEqualsSuccessor
+                                        = numerator * denominator          by substituting denominatorImage);
+                          Rational.enumeration_witness(
+                              integerListing, integerSurjective, pairListing, pairSurjective,
+                              Rational.fraction(numerator, denominator, denominatorNonzero), numerator, k, targetEquation)
+                        }
+                    }
+                  }
+                | Or.introduceRight(denominatorNegated) => {
+                    choose m as denominatorImage from denominatorNegated;
+                    cases Natural.zero_or_successor(m) {
+                      | Or.introduceLeft(mIsZero) => {
+                          claim denominatorZero : denominator = Integer.zero
+                              by calc denominator
+                                    = -(m : Integer)              by denominatorImage
+                                    = -((0 : Natural) : Integer)  by substituting mIsZero
+                                    = Integer.zero                by ring;
+                          absurd(denominatorNonzero(denominatorZero))
+                        }
+                      | Or.introduceRight(mIsSuccessor) => {
+                          choose k as mEqualsSuccessor from mIsSuccessor;
+                          claim targetEquation
+                                : Rational.fraction(numerator, denominator, denominatorNonzero)
+                                  = Rational.fraction(
+                                        -numerator, (successor(k) : Integer),
+                                        Integer.from_natural_successor_nonzero(k))
+                              by Quotient.sound(
+                                     RationalRepresentative, RationalEquivalent,
+                                     RationalRepresentative.make(numerator, denominator, denominatorNonzero),
+                                     RationalRepresentative.make(
+                                         -numerator, (successor(k) : Integer),
+                                         Integer.from_natural_successor_nonzero(k)),
+                                     calc numerator * (successor(k) : Integer)
+                                        = numerator * (m : Integer)        by substituting mEqualsSuccessor
+                                        = -numerator * -(m : Integer)      by ring
+                                        = -numerator * denominator         by substituting denominatorImage);
+                          Rational.enumeration_witness(
+                              integerListing, integerSurjective, pairListing, pairSurjective,
+                              Rational.fraction(numerator, denominator, denominatorNonzero), -numerator, k, targetEquation)
+                        }
+                    }
+                  }
+              }
+        }
+}

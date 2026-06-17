@@ -451,7 +451,7 @@ theorem ComplexNumber.series_dominated_cauchy
         : ComplexNumber.SequenceIsCauchy(ComplexNumber.partialSum(t)) :=
   (epsilon : Rational)
   (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨N, tailClose⟩ from boundCauchy(epsilon, epsilonPositive);
+    choose N as tailClose from boundCauchy(epsilon, epsilonPositive);
     claim oneSided
           : (i j : Natural) → N ≤ i → N ≤ j → i ≤ j
             → ComplexNumber.modulus(
@@ -461,8 +461,7 @@ theorem ComplexNumber.series_dominated_cauchy
           take i : Natural; take j : Natural;
           take iInTail : N ≤ i; take jInTail : N ≤ j;
           take iLeqJ : i ≤ j;
-          obtain ⟨c, splitEquation⟩
-              from Natural.subtraction_witness(i, j, iLeqJ);
+          choose c as splitEquation from Natural.subtraction_witness(i, j, iLeqJ);
           claim jAsSum : j = c + i
               by calc j
                     = i + c    by splitEquation
@@ -644,10 +643,8 @@ theorem ComplexNumber.SequenceConverges.unique
       by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
            claim halfPositive : Rational.zero < Rational.halve(epsilon)
                since Rational.halve_positive;
-           obtain ⟨threshold1, close1⟩
-               from converges1(Rational.halve(epsilon), halfPositive);
-           obtain ⟨threshold2, close2⟩
-               from converges2(Rational.halve(epsilon), halfPositive);
+           choose threshold1 as close1 from converges1(Rational.halve(epsilon), halfPositive);
+           choose threshold2 as close2 from converges2(Rational.halve(epsilon), halfPositive);
            claim threshold1 ≤ Natural.maximum(threshold1, threshold2)
                since Natural.left_le_max;
            claim threshold2 ≤ Natural.maximum(threshold1, threshold2)
@@ -924,15 +921,49 @@ theorem ComplexNumber.exponential_zero
             = RingModulo.one(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial)
       by by_induction on p with IH {
-           case zero:
+           case zero: {
+               -- exponentialTerm(z, 0) = from_real(1/0!) · z⁰ = from_real(1) · 1 = one.
+               -- Opacity stalls the Rational `reciprocal_function(1) = 1` reduction the
+               -- auto-prover used to do for free, so cite it (and from_real_one) directly.
+               claim firstTermIsOne
+                   : ComplexNumber.exponentialTerm(
+                         RingModulo.zero(Real.polynomial_commutative_ring,
+                             Complex.definingPolynomial), 0)
+                     = RingModulo.one(Real.polynomial_commutative_ring,
+                           Complex.definingPolynomial)
+                   by {
+                     claim factorialCastOne : (Natural.factorial(0) : Rational) = Rational.one;
+                     claim reciprocalOne
+                         : Rational.reciprocal_function((Natural.factorial(0) : Rational)) = Rational.one
+                         by calc Rational.reciprocal_function((Natural.factorial(0) : Rational))
+                               = Rational.reciprocal_function(Rational.one)   by substituting factorialCastOne
+                               = Rational.one                                 by Rational.reciprocal_function_one;
+                     calc ComplexNumber.exponentialTerm(
+                              RingModulo.zero(Real.polynomial_commutative_ring,
+                                  Complex.definingPolynomial), 0)
+                        = ComplexNumber.from_real(
+                              (Rational.reciprocal_function((Natural.factorial(0) : Rational)) : Real))
+                          * ComplexNumber.power(
+                                RingModulo.zero(Real.polynomial_commutative_ring,
+                                    Complex.definingPolynomial), 0)
+                        = ComplexNumber.from_real((Rational.one : Real))
+                          * RingModulo.one(Real.polynomial_commutative_ring,
+                                Complex.definingPolynomial)
+                              by substituting reciprocalOne
+                        = RingModulo.one(Real.polynomial_commutative_ring,
+                              Complex.definingPolynomial)
+                          * RingModulo.one(Real.polynomial_commutative_ring,
+                                Complex.definingPolynomial)
+                              by substituting ComplexNumber.from_real_one
+                        = RingModulo.one(Real.polynomial_commutative_ring,
+                              Complex.definingPolynomial)
+                   };
                calc ComplexNumber.partialSum(
                         ComplexNumber.exponentialTerm(
                             RingModulo.zero(Real.polynomial_commutative_ring,
                                 Complex.definingPolynomial)), successor(0))
-                  = ComplexNumber.partialSum(
-                        ComplexNumber.exponentialTerm(
-                            RingModulo.zero(Real.polynomial_commutative_ring,
-                                Complex.definingPolynomial)), 0)
+                  = RingModulo.zero(Real.polynomial_commutative_ring,
+                        Complex.definingPolynomial)
                     + ComplexNumber.exponentialTerm(
                           RingModulo.zero(Real.polynomial_commutative_ring,
                               Complex.definingPolynomial), 0)
@@ -940,8 +971,10 @@ theorem ComplexNumber.exponential_zero
                         Complex.definingPolynomial)
                     + RingModulo.one(Real.polynomial_commutative_ring,
                           Complex.definingPolynomial)
+                        by substituting firstTermIsOne
                   = RingModulo.one(Real.polynomial_commutative_ring,
                         Complex.definingPolynomial)
+             }
            case successor(q):
                calc ComplexNumber.partialSum(
                         ComplexNumber.exponentialTerm(
@@ -981,8 +1014,7 @@ theorem ComplexNumber.exponential_zero
         take epsilonPositive : Rational.zero < epsilon;
         witness 1 with
             (m : Natural) (oneBelow : 1 ≤ m) ↦ {
-              obtain ⟨c, mSplit⟩
-                  from Natural.subtraction_witness(1, m, oneBelow);
+              choose c as mSplit from Natural.subtraction_witness(1, m, oneBelow);
               claim ComplexNumber.partialSum(
                           ComplexNumber.exponentialTerm(
                               RingModulo.zero(Real.polynomial_commutative_ring,

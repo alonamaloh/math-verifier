@@ -1,14 +1,10 @@
 -- Rational/algebra.math
 --
--- Three-argument ring laws for Rational: associativity of `+` and `·`,
--- and distributivity of `·` over `+`. The user-facing theorems pull
--- three representatives via the `obtain Quotient.mk(rep) from x;` sugar
--- and apply `Quotient.sound` over the corresponding Integer-level
--- kernel. The Integer-level kernels are the heavy lifters; we drive
--- them by repeated use of `Integer.multiply_associative`,
--- `multiply_commutative`, `Integer.distributivity_left` / `_right`,
--- and `Natural.to_integer.multiply_preserves` to flatten and rearrange
--- the triple products that arise from the lifted denominators.
+-- Three-argument ring laws for Rational: associativity of `+` and `·`, and
+-- distributivity of `·` over `+`. With denominators now plain nonzero
+-- integers, the combined denominator of each side is a product of the
+-- d_i's, so every cross-multiplication equivalence is a pure ring identity:
+-- pull the three representatives and discharge with `ring`.
 
 module Rational.algebra
 
@@ -16,17 +12,11 @@ import Logic.basics
 import Logic.exists
 import Logic.quotient
 import Equality.basics
-import Natural.basics
-import Natural.peano
-import Natural.arithmetic
-import Natural.order
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
-import Integer.embedding
 import Integer.ring
 import Integer.negation
-import Integer.algebra
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -34,265 +24,38 @@ import Rational.ring
 
 -- ======================================================================
 -- Multiplicative associativity.
---
--- After Quotient.lift β-reduction, the cross-multiplication
--- `RationalEquivalent` for the LHS-rep / RHS-rep of associativity
--- unfolds to
---   ((n1·n2)·n3) · to_int(succ(D_R))  =  (n1·(n2·n3)) · to_int(succ(D_L))
--- where (definitionally, via the Natural.multiply→Natural.add reduction
--- pattern)
---   succ(D_R) ≡ succ(d1)·(succ(d2)·succ(d3))      -- right-associated
---   succ(D_L) ≡ (succ(d1)·succ(d2))·succ(d3)      -- left-associated
--- So the equivalence reduces to a numerator associativity step on the
--- n's plus a denominator reassociation handled by lifting both forms
--- via `Natural.to_integer.multiply_preserves` and reassociating the
--- result with `Integer.multiply_associative`.
-
-theorem Rational.multiply_associative_at_representatives_integer
-        (n1 n2 n3 : Integer) (d1 d2 d3 : Natural)
-        : n1 * n2 * n3 * (successor(d1) *
-                      (successor(d2) * successor(d3)) : Integer) = n1 * (n2 * n3) * ((successor(d1) * successor(d2)) *
-                      successor(d3) : Integer) :=
-  calc n1 * n2 * n3 * (successor(d1) * (successor(d2) * successor(d3)) : Integer)
-     = n1 * (n2 * n3) * ((successor(d1) : Integer) * (successor(d2) * successor(d3) : Integer))
-     = n1 * (n2 * n3) * ((successor(d1) : Integer) * ((successor(d2) : Integer) * (successor(d3) : Integer)))
-     = n1 * (n2 * n3) * ((successor(d1) : Integer) * (successor(d2) : Integer) * (successor(d3) : Integer))
-     = n1 * (n2 * n3) * ((successor(d1) * successor(d2) : Integer) * (successor(d3) : Integer))
-     = n1 * (n2 * n3) * ((successor(d1) * successor(d2)) * successor(d3) : Integer)
-
--- ----------------------------------------------------------------------
--- Stored-denominator bridges. The three-argument laws nest the stored
--- denominator `b + a·succ(b)` twice; with `Natural.add` opaque the
--- successor of the nested form no longer folds to the factored triple
--- product on its own, so each consumer bridges across one of these
--- (each a short `added_denominator_factors` composition).
-
--- successor of the left-associated stored denominator.
-theorem Rational.left_associated_denominator (d1 d2 d3 : Natural)
-        : successor(d3 + (d2 + d1 * successor(d2)) * successor(d3)) = (successor(d1) * successor(d2)) * successor(d3) := {
-  claim inner : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
-      by Rational.added_denominator_factors;
-  calc successor(d3 + (d2 + d1 * successor(d2)) * successor(d3))
-     = successor(d2 + d1 * successor(d2)) * successor(d3)          by Rational.added_denominator_factors
-     = (successor(d1) * successor(d2)) * successor(d3)             by substituting inner
-}
-
--- successor of the right-associated stored denominator.
-theorem Rational.right_associated_denominator (d1 d2 d3 : Natural)
-        : successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) = successor(d1) * (successor(d2) * successor(d3)) := {
-  claim inner : successor(d3 + d2 * successor(d3)) = successor(d2) * successor(d3)
-      by Rational.added_denominator_factors;
-  calc successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3)))
-     = successor(d1) * successor(d3 + d2 * successor(d3))          by Rational.added_denominator_factors
-     = successor(d1) * (successor(d2) * successor(d3))             by substituting inner
-}
-
--- successor of the distributed stored denominator (the (x·y)+(x·z) side).
-theorem Rational.distributed_denominator (d1 d2 d3 : Natural)
-        : successor((d3 + d1 * successor(d3)) + (d2 + d1 * successor(d2)) * successor(d3 + d1 * successor(d3))) = (successor(d1) * successor(d2)) * (successor(d1) * successor(d3)) := {
-  claim leftFactor : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
-      by Rational.added_denominator_factors;
-  claim rightFactor : successor(d3 + d1 * successor(d3)) = successor(d1) * successor(d3)
-      by Rational.added_denominator_factors;
-  calc successor((d3 + d1 * successor(d3)) + (d2 + d1 * successor(d2)) * successor(d3 + d1 * successor(d3)))
-     = successor(d2 + d1 * successor(d2)) * successor(d3 + d1 * successor(d3))   by Rational.added_denominator_factors
-     = (successor(d1) * successor(d2)) * successor(d3 + d1 * successor(d3))      by substituting leftFactor
-     = (successor(d1) * successor(d2)) * (successor(d1) * successor(d3))         by substituting rightFactor
-}
 
 theorem Rational.multiply_associative (x y z : Rational)
         : (x * y) * z = x * (y * z) := {
-  obtain RationalRepresentative.make(n1, d1) from x;
-  obtain RationalRepresentative.make(n2, d2) from y;
-  obtain RationalRepresentative.make(n3, d3) from z;
-  -- The stored denominators nest two deep and no longer fold on their
-  -- own; bridge each to the factored triple product the `_integer`
-  -- kernel speaks. The numerators are pure Integer products, unaffected.
-  claim rightDenominator : successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) = successor(d1) * (successor(d2) * successor(d3))
-      by Rational.right_associated_denominator;
-  claim leftDenominator : successor(d3 + (d2 + d1 * successor(d2)) * successor(d3)) = (successor(d1) * successor(d2)) * successor(d3)
-      by Rational.left_associated_denominator;
-  calc n1 * n2 * n3 * (successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) : Integer)
-     = n1 * n2 * n3 * (successor(d1) * (successor(d2) * successor(d3)) : Integer)                  by substituting rightDenominator
-     = n1 * (n2 * n3) * ((successor(d1) * successor(d2)) * successor(d3) : Integer)                by Rational.multiply_associative_at_representatives_integer
-     = n1 * (n2 * n3) * (successor(d3 + (d2 + d1 * successor(d2)) * successor(d3)) : Integer)      by substituting leftDenominator
+  obtain RationalRepresentative.make(n1, d1, _) from x;
+  obtain RationalRepresentative.make(n2, d2, _) from y;
+  obtain RationalRepresentative.make(n3, d3, _) from z;
+  calc ((n1 * n2) * n3) * (d1 * (d2 * d3))
+     = (n1 * (n2 * n3)) * ((d1 * d2) * d3)   by ring
 }
 
 -- ======================================================================
--- Reusable helper: bridge between the right-associated and
--- left-associated lifted-three-denominator forms. Both
--- `add_associative_at_representatives_integer` and
--- `distributivity_left_at_representatives_integer` need to swap
--- `to_int(succ(d1)·(succ(d2)·succ(d3)))` and
--- `to_int((succ(d1)·succ(d2))·succ(d3))` because the lifted
--- denominators of the LHS-rep / RHS-rep land on opposite
--- parenthesizations.
-
-theorem Rational.three_denominator_associativity_swap
-        (d1 d2 d3 : Natural)
-        : (successor(d1) * (successor(d2) * successor(d3)) : Integer) = ((successor(d1) * successor(d2)) * successor(d3) : Integer) :=
-  calc (successor(d1) * (successor(d2) * successor(d3)) : Integer)
-     = (successor(d1) : Integer) * (successor(d2) * successor(d3) : Integer)
-     = (successor(d1) : Integer) * ((successor(d2) : Integer) * (successor(d3) : Integer))
-     = (successor(d1) : Integer) * (successor(d2) : Integer) * (successor(d3) : Integer)
-     = (successor(d1) * successor(d2) : Integer) * (successor(d3) : Integer)
-     = ((successor(d1) * successor(d2)) * successor(d3) : Integer)
-
--- ======================================================================
 -- Additive associativity.
---
--- The Integer cross-multiplication kernel is the harder of the two
--- three-argument additive laws: the numerator is a sum of products
--- nested two-deep on each side, and we must distribute and re-associate
--- to bring both into a canonical fully-distributed three-summand form
--- `n1·(s_d2·s_d3) + (n2·s_d3)·s_d1 + (n3·s_d2)·s_d1`.
-
--- Numerator-only equality: the LHS-rep numerator equals the RHS-rep
--- numerator as Integers. Both expand via `Integer.distributivity_right`
--- and the multiply-preserves lift to the same canonical three-summand
--- form; we go through that canonical form to chain the two ends.
-
-theorem Rational.add_associative_numerator_equality
-        (n1 n2 n3 : Integer) (d1 d2 d3 : Natural)
-        : (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d3) : Integer) + n3 * (successor(d1) * successor(d2) : Integer) = n1 * (successor(d2) * successor(d3) : Integer) + (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer) :=
-  -- Canonical form on the way through:
-  --   n1·(s2·s3) + (n2·s3)·s1 + (n3·s2)·s1
-  -- where s_i = to_integer(successor(d_i)). The outer + is
-  -- right-associated so it matches the structure we'll re-form into
-  -- `_ + (n2·s3 + n3·s2)·s1` on the RHS side.
-  calc (n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d3) : Integer) + n3 * (successor(d1) * successor(d2) : Integer)
-     -- Distribute the first summand: (a+b)·c = a·c + b·c.
-     -- Reassociate the n1 summand: (n1·s2)·s3 → n1·(s2·s3).
-     = n1 * ((successor(d2) : Integer) * (successor(d3) : Integer)) + n2 * (successor(d1) : Integer) * (successor(d3) : Integer) + n3 * (successor(d1) * successor(d2) : Integer)
-     -- Contract n1·(s2·s3) → n1·to_int(succ(d2)·succ(d3)).
-     = n1 * (successor(d2) * successor(d3) : Integer) + n2 * (successor(d3) : Integer) * (successor(d1) : Integer) + n3 * (successor(d1) * successor(d2) : Integer)
-     -- Now the n3 summand: n3·to_int(succ(d1)·succ(d2))
-     --   = n3·(s1·s2)              [multiply_preserves]
-     --   = n3·(s2·s1)              [commute]
-     --   = (n3·s2)·s1              [symm assoc]
-     = n1 * (successor(d2) * successor(d3) : Integer) + n2 * (successor(d3) : Integer) * (successor(d1) : Integer) + n3 * ((successor(d1) : Integer) * (successor(d2) : Integer))
-     -- Reassociate the outer add: (A + B·s1) + C·s1 = A + (B·s1 + C·s1).
-     -- Un-distribute (B·s1 + C·s1) = (B + C)·s1.
-     = n1 * (successor(d2) * successor(d3) : Integer) + (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)
-
--- Assemble add_associative_at_representatives_integer using the
--- numerator equality and the denominator-associativity swap. The
--- shape of the equivalence is `M_L · denom_R = M_R · denom_L`; with
--- `M_L = M_R` we just need to bridge `denom_R = denom_L`.
-
-theorem Rational.add_associative_at_representatives_integer
-        (n1 n2 n3 : Integer) (d1 d2 d3 : Natural)
-        : ((n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d3) : Integer) + n3 * (successor(d1) * successor(d2) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer) = (n1 * (successor(d2) * successor(d3) : Integer) + (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)) * ((successor(d1) * successor(d2)) * successor(d3) : Integer) :=
-  calc ((n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d3) : Integer) + n3 * (successor(d1) * successor(d2) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)
-     = (n1 * (successor(d2) * successor(d3) : Integer) + (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)) * ((successor(d1) * successor(d2)) * successor(d3) : Integer)
 
 theorem Rational.add_associative (x y z : Rational)
         : (x + y) + z = x + (y + z) := {
-  obtain RationalRepresentative.make(n1, d1) from x;
-  obtain RationalRepresentative.make(n2, d2) from y;
-  obtain RationalRepresentative.make(n3, d3) from z;
-  -- Both the numerators (a leftover `succ(stored)` factor on the n3 / n1
-  -- terms) and the denominators carry stored sums that no longer fold;
-  -- bridge each across `added_denominator_factors` / the nested lemmas.
-  claim numeratorLeft : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
-      by Rational.added_denominator_factors;
-  claim numeratorRight : successor(d3 + d2 * successor(d3)) = successor(d2) * successor(d3)
-      by Rational.added_denominator_factors;
-  claim rightDenominator : successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) = successor(d1) * (successor(d2) * successor(d3))
-      by Rational.right_associated_denominator;
-  claim leftDenominator : successor(d3 + (d2 + d1 * successor(d2)) * successor(d3)) = (successor(d1) * successor(d2)) * successor(d3)
-      by Rational.left_associated_denominator;
-  calc ((n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d3) : Integer) + n3 * (successor(d2 + d1 * successor(d2)) : Integer)) * (successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) : Integer)
-     = ((n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d3) : Integer) + n3 * (successor(d1) * successor(d2) : Integer)) * (successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) : Integer)        by substituting numeratorLeft
-     = ((n1 * (successor(d2) : Integer) + n2 * (successor(d1) : Integer)) * (successor(d3) : Integer) + n3 * (successor(d1) * successor(d2) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)                                          by substituting rightDenominator
-     = (n1 * (successor(d2) * successor(d3) : Integer) + (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)) * ((successor(d1) * successor(d2)) * successor(d3) : Integer)                                        by Rational.add_associative_at_representatives_integer
-     = (n1 * (successor(d3 + d2 * successor(d3)) : Integer) + (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)) * ((successor(d1) * successor(d2)) * successor(d3) : Integer)                                  by substituting numeratorRight
-     = (n1 * (successor(d3 + d2 * successor(d3)) : Integer) + (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)) * (successor(d3 + (d2 + d1 * successor(d2)) * successor(d3)) : Integer)                        by substituting leftDenominator
+  obtain RationalRepresentative.make(n1, d1, _) from x;
+  obtain RationalRepresentative.make(n2, d2, _) from y;
+  obtain RationalRepresentative.make(n3, d3, _) from z;
+  calc ((n1 * d2 + n2 * d1) * d3 + n3 * (d1 * d2)) * (d1 * (d2 * d3))
+     = (n1 * (d2 * d3) + (n2 * d3 + n3 * d2) * d1) * ((d1 * d2) * d3)   by ring
 }
 
 -- ======================================================================
 -- Left distributivity: `x · (y + z) = x · y + x · z`.
---
--- After Quotient.lift β-reduction, the cross-multiplication is
---   M_L · to_int((succ(d1)·succ(d2)) · (succ(d1)·succ(d3)))
---   = M_R · to_int(succ(d1)·(succ(d2)·succ(d3)))
--- where
---   M_L = n1·(n2·s_d3 + n3·s_d2)
---   M_R = (n1·n2)·to_int(succ(d1)·succ(d3)) + (n1·n3)·to_int(succ(d1)·succ(d2))
--- and (importantly) the RHS denominator has an *extra* `succ(d1)`
--- factor compared to the LHS — `(succ(d1)·succ(d2))·(succ(d1)·succ(d3))`
--- vs `succ(d1)·(succ(d2)·succ(d3))`. So we factor the extra `s_d1` out
--- of `M_R` and out of the denominator, and the two sides match.
-
--- Denominator bridge: `to_int((succ(d1)·succ(d2)) · (succ(d1)·succ(d3))) =
--- s_d1 · to_int(succ(d1)·(succ(d2)·succ(d3)))`.
-theorem Rational.distributivity_left_denominator_bridge
-        (d1 d2 d3 : Natural)
-        : ((successor(d1) * successor(d2)) *
-                  (successor(d1) * successor(d3)) : Integer) = (successor(d1) : Integer) * (successor(d1) * (successor(d2) * successor(d3)) : Integer) :=
-  calc ((successor(d1) * successor(d2)) *
-           (successor(d1) * successor(d3)) : Integer)
-     = (successor(d1) * successor(d2) : Integer) * (successor(d1) * successor(d3) : Integer)
-     = (successor(d1) : Integer) * (successor(d2) : Integer) * ((successor(d1) : Integer) * (successor(d3) : Integer))
-     -- (s_d1·s_d2)·(s_d1·s_d3) = (s_d1·s_d1)·(s_d2·s_d3) by
-     -- `multiply_swap_inner_positions` on the inner (s_d2, s_d1) pair.
-     -- (s_d1·s_d1)·(s_d2·s_d3) = s_d1·(s_d1·(s_d2·s_d3))
-     = (successor(d1) : Integer) * ((successor(d1) : Integer) * ((successor(d2) : Integer) * (successor(d3) : Integer)))
-     -- Contract s_d1·(s_d2·s_d3) back into to_int(succ(d2)·succ(d3)).
-     = (successor(d1) : Integer) * ((successor(d1) : Integer) * (successor(d2) * successor(d3) : Integer))
-     -- Contract s_d1·to_int(succ(d2)·succ(d3)) into
-     -- to_int(succ(d1)·(succ(d2)·succ(d3))).
-     = (successor(d1) : Integer) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)
-
--- Numerator factoring: `M_L · s_d1 = M_R` at the Integer level.
-theorem Rational.distributivity_left_numerator_factoring
-        (n1 n2 n3 : Integer) (d1 d2 d3 : Natural)
-        : n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer) = n1 * n2 * (successor(d1) * successor(d3) : Integer) + n1 * n3 * (successor(d1) * successor(d2) : Integer) :=
-  calc n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)
-     -- Distribute n1 inside: n1·(n2·s3 + n3·s2) = n1·(n2·s3) + n1·(n3·s2)
-     -- Distribute s_d1 over the outer +.
-     -- Reassociate first summand: `(n1·(n2·s3))·s1 = ((n1·n2)·s3)·s1`.
-     -- Now reassociate: `((n1·n2)·s3)·s1 = (n1·n2)·(s3·s1)`.
-     = n1 * n2 * ((successor(d1) : Integer) * (successor(d3) : Integer)) + n1 * (n3 * (successor(d2) : Integer)) * (successor(d1) : Integer)
-     = n1 * n2 * (successor(d1) * successor(d3) : Integer) + n1 * n3 * ((successor(d1) : Integer) * (successor(d2) : Integer))
-     = n1 * n2 * (successor(d1) * successor(d3) : Integer) + n1 * n3 * (successor(d1) * successor(d2) : Integer)
-
--- Assemble: `M_L · denom_R = (M_L · s_d1) · denom_L = M_R · denom_L`.
-theorem Rational.distributivity_left_at_representatives_integer
-        (n1 n2 n3 : Integer) (d1 d2 d3 : Natural)
-        : n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * ((successor(d1) * successor(d2)) *
-                      (successor(d1) * successor(d3)) : Integer) = (n1 * n2 * (successor(d1) * successor(d3) : Integer) + n1 * n3 * (successor(d1) * successor(d2) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer) :=
-  calc n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * ((successor(d1) * successor(d2)) *
-               (successor(d1) * successor(d3)) : Integer)
-     -- Rewrite denom_R = s_d1 · denom_L.
-     = n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * ((successor(d1) : Integer) * (successor(d1) * (successor(d2) * successor(d3)) : Integer))
-     -- Reassociate: M_L · (s_d1 · denom_L) → (M_L · s_d1) · denom_L.
-     = n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor(d1) : Integer) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)
-     -- Replace `M_L · s_d1` with `M_R`.
-     = (n1 * n2 * (successor(d1) * successor(d3) : Integer) + n1 * n3 * (successor(d1) * successor(d2) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)
 
 theorem Rational.distributivity_left (x y z : Rational)
         : x * (y + z) = x * y + x * z := {
-  obtain RationalRepresentative.make(n1, d1) from x;
-  obtain RationalRepresentative.make(n2, d2) from y;
-  obtain RationalRepresentative.make(n3, d3) from z;
-  -- The (x·y)+(x·z) side carries stored sums in both its numerator
-  -- factors `succ(d_i + d1·succ(d_i))` and its outer denominator; the
-  -- x·(y+z) side carries the right-associated stored denominator.
-  claim numeratorXz : successor(d3 + d1 * successor(d3)) = successor(d1) * successor(d3)
-      by Rational.added_denominator_factors;
-  claim numeratorXy : successor(d2 + d1 * successor(d2)) = successor(d1) * successor(d2)
-      by Rational.added_denominator_factors;
-  claim distributedDenominator : successor((d3 + d1 * successor(d3)) + (d2 + d1 * successor(d2)) * successor(d3 + d1 * successor(d3))) = (successor(d1) * successor(d2)) * (successor(d1) * successor(d3))
-      by Rational.distributed_denominator;
-  claim rightDenominator : successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) = successor(d1) * (successor(d2) * successor(d3))
-      by Rational.right_associated_denominator;
-  calc n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * (successor((d3 + d1 * successor(d3)) + (d2 + d1 * successor(d2)) * successor(d3 + d1 * successor(d3))) : Integer)
-     = n1 * (n2 * (successor(d3) : Integer) + n3 * (successor(d2) : Integer)) * ((successor(d1) * successor(d2)) * (successor(d1) * successor(d3)) : Integer)                                                            by substituting distributedDenominator
-     = (n1 * n2 * (successor(d1) * successor(d3) : Integer) + n1 * n3 * (successor(d1) * successor(d2) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)                                        by Rational.distributivity_left_at_representatives_integer
-     = (n1 * n2 * (successor(d3 + d1 * successor(d3)) : Integer) + n1 * n3 * (successor(d1) * successor(d2) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)                                  by substituting numeratorXz
-     = (n1 * n2 * (successor(d3 + d1 * successor(d3)) : Integer) + n1 * n3 * (successor(d2 + d1 * successor(d2)) : Integer)) * (successor(d1) * (successor(d2) * successor(d3)) : Integer)                            by substituting numeratorXy
-     = (n1 * n2 * (successor(d3 + d1 * successor(d3)) : Integer) + n1 * n3 * (successor(d2 + d1 * successor(d2)) : Integer)) * (successor((d3 + d2 * successor(d3)) + d1 * successor(d3 + d2 * successor(d3))) : Integer)  by substituting rightDenominator
+  obtain RationalRepresentative.make(n1, d1, _) from x;
+  obtain RationalRepresentative.make(n2, d2, _) from y;
+  obtain RationalRepresentative.make(n3, d3, _) from z;
+  calc (n1 * (n2 * d3 + n3 * d2)) * ((d1 * d2) * (d1 * d3))
+     = ((n1 * n2) * (d1 * d3) + (n1 * n3) * (d1 * d2)) * (d1 * (d2 * d3))   by ring
 }
 
 -- Right distributivity: derived from left + multiply_commutative.

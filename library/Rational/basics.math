@@ -1,22 +1,24 @@
 -- Rational/basics.math
 --
--- The rationals as equivalence classes of (Integer numerator,
--- positive Natural denominator) pairs under cross-multiplication.
--- This is the construction a mathematician would write: a Rational
--- is an Integer over a positive Natural, with `(n1, d1) ~ (n2, d2)`
--- iff `n1 · d2 = n2 · d1`. The "positive" side condition is captured
--- by storing the denominator as `denominatorMinusOne + 1`, so the
--- type itself rules out zero denominators without an attached proof.
+-- The rationals as the field of fractions of ℤ: equivalence classes of
+-- (Integer numerator, nonzero Integer denominator) pairs under
+-- cross-multiplication. A `RationalRepresentative.make(n, d, proof)` is the
+-- fraction n/d, carrying a proof that the denominator `d` is nonzero — the
+-- honest non-degeneracy condition (the older "denominator = predecessor + 1"
+-- trick only worked because ℤ's positives are exactly the successors; it does
+-- not generalise to other multiplicative sets). Two fractions are equivalent
+-- iff `n1 · d2 = n2 · d1`; the proofs are irrelevant to the equivalence.
 --
--- Transitivity is the substantial step. We cross-multiply, reshape
--- the resulting Integer products into the form
---     (n1 · succ(d3)) · succ(d2) = (n3 · succ(d1)) · succ(d2),
--- and apply `Integer.multiply_cancel_right_by_natural_successor` to
--- strip the common `succ(d2)` factor. The cancellation lemma in turn
--- rests on `Quotient.exact` (derived from propositional
--- extensionality in Logic/quotient.math) — recovering the underlying
--- representative equivalence from a quotient equality is the missing
--- piece that previously forced an awkward concrete-triple encoding.
+-- Transitivity is the substantial step: cross-multiply, reshape to
+--     (n1 · d3) · d2 = (n3 · d1) · d2,
+-- and cancel the common nonzero factor `d2` via
+-- `Integer.multiply_cancel_right_by_nonzero` (ℤ is an integral domain).
+--
+-- The `Rational` type itself is **opaque**: the rest of the library reasons
+-- about rationals through the boundary lemmas published here
+-- (`Rational.fraction_equal` and its converse), never by unfolding the
+-- quotient. How the rationals are built is an implementation detail behind
+-- that boundary — exactly as `Integer` seals its own quotient.
 
 module Rational.basics
 
@@ -35,20 +37,23 @@ import Integer.multiplication
 import Integer.embedding
 import Integer.ring
 import Integer.cancellation
+import Integer.integral_domain
 
 -- ----------------------------------------------------------------------
 -- Representatives and the equivalence relation.
 
 inductive RationalRepresentative : Type(0) where
   | RationalRepresentative.make
-      : Integer → Natural → RationalRepresentative
+      : Integer → (denominator : Integer) → ¬(denominator = Integer.zero)
+        → RationalRepresentative
 
--- (n1, d1) ~ (n2, d2) iff n1 · (d2 + 1) = n2 · (d1 + 1) in Integer.
+-- (n1, d1) ~ (n2, d2) iff n1 · d2 = n2 · d1 in Integer. The nonzero proofs
+-- play no part in the relation.
 definition RationalEquivalent
         : RationalRepresentative → RationalRepresentative → Proposition
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2) =>
-      n1 * (successor(d2) : Integer) = n2 * (successor(d1) : Integer)
+  | RationalRepresentative.make(n1, d1, _),
+    RationalRepresentative.make(n2, d2, _) =>
+      n1 * d2 = n2 * d1
 
 -- ----------------------------------------------------------------------
 -- Reflexivity is just reflexivity of Integer equality.
@@ -56,9 +61,8 @@ definition RationalEquivalent
 theorem RationalEquivalent.reflexive
         : (representative : RationalRepresentative)
           → RationalEquivalent(representative, representative)
-  | RationalRepresentative.make(n, d) =>
-      reflexivity(Integer,
-          n * (successor(d) : Integer))
+  | RationalRepresentative.make(n, d, _) =>
+      reflexivity(Integer, n * d)
 
 -- ----------------------------------------------------------------------
 -- Symmetry is just symmetry of Integer equality after destructuring
@@ -68,74 +72,42 @@ theorem RationalEquivalent.symmetric
         : (x y : RationalRepresentative)
           → RationalEquivalent(x, y)
           → RationalEquivalent(y, x)
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2),
+  | RationalRepresentative.make(n1, d1, _),
+    RationalRepresentative.make(n2, d2, _),
     equivalenceHypothesis =>
       Equality.symmetry(equivalenceHypothesis)
 
 -- ----------------------------------------------------------------------
--- Transitivity: cross-multiply, reshape so a common `succ(d2)` factor
--- is rightmost on both sides of the chained equation, cancel via
--- Integer cancellation.
-
-theorem RationalEquivalent.transitive_natural
-        (n1 : Integer) (d1 : Natural)
-        (n2 : Integer) (d2 : Natural)
-        (n3 : Integer) (d3 : Natural)
-        (firstEquivalence
-            : n1 * (successor(d2) : Integer) = n2 * (successor(d1) : Integer))
-        (secondEquivalence
-            : n2 * (successor(d3) : Integer) = n3 * (successor(d2) : Integer))
-        : n1 * (successor(d3) : Integer) = n3 * (successor(d1) : Integer) := {
-    -- Multiply firstEquivalence on the right by succ(d3), then
-    -- shuffle (succ(d2) succ(d3)) → (succ(d3) succ(d2)) on the LHS
-    -- so the chained-cancellation factor succ(d2) is rightmost.
-    calc n1 * (successor(d3) : Integer) * (successor(d2) : Integer)
-              = n1 * (successor(d2) : Integer) * (successor(d3) : Integer)
-              = n2 * (successor(d1) : Integer) * (successor(d3) : Integer);
-    -- Now reshape secondEquivalence the same way: multiply by
-    -- succ(d1) and shuffle so the answer ends with succ(d2) rightmost.
-    calc n2 * (successor(d1) : Integer) * (successor(d3) : Integer)
-              = n2 * (successor(d3) : Integer) * (successor(d1) : Integer)
-              = n3 * (successor(d2) : Integer) * (successor(d1) : Integer)
-              = n3 * (successor(d1) : Integer) * (successor(d2) : Integer);
-    -- Chain through the shared midpoint n2·succ(d1)·succ(d3): the end
-    -- of leftChainedToD3 IS the start of rightChainedToD1.
-    calc n1 * (successor(d3) : Integer) * (successor(d2) : Integer)
-              = n2 * (successor(d1) : Integer) * (successor(d3) : Integer)
-              = n3 * (successor(d1) : Integer) * (successor(d2) : Integer)    as cancellableEquation;    -- Cancel succ(d2).
-    Integer.multiply_cancel_right_by_natural_successor(?, ?, d2,
-        cancellableEquation)
-}
-
--- Destructure all three representatives in one row; both hypotheses
--- refine to the Integer-level form for direct hand-off to `_natural`.
+-- Transitivity: from n1·d2 = n2·d1 and n2·d3 = n3·d2, derive n1·d3 = n3·d1.
+-- Multiply the goal out by the common nonzero factor d2 and cancel it: both
+-- sides reshape (by ring) through the shared product n2·d1·d3.
 
 theorem RationalEquivalent.transitive
         : (x y z : RationalRepresentative)
           → RationalEquivalent(x, y)
           → RationalEquivalent(y, z)
           → RationalEquivalent(x, z)
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2),
-    RationalRepresentative.make(n3, d3),
-    firstHypothesis, secondHypothesis =>
-      RationalEquivalent.transitive_natural(
-          n1, d1, n2, d2, n3, d3,
-          firstHypothesis, secondHypothesis)
+  | RationalRepresentative.make(n1, d1, _),
+    RationalRepresentative.make(n2, d2, d2Nonzero),
+    RationalRepresentative.make(n3, d3, _),
+    firstEquivalence, secondEquivalence => {
+      claim cancellableEquation : (n1 * d3) * d2 = (n3 * d1) * d2
+          by calc (n1 * d3) * d2
+                = (n1 * d2) * d3   by ring
+                = (n2 * d1) * d3   by substituting firstEquivalence
+                = (n2 * d3) * d1   by ring
+                = (n3 * d2) * d1   by substituting secondEquivalence
+                = (n3 * d1) * d2   by ring;
+      Integer.multiply_cancel_right_by_nonzero(
+          n1 * d3, n3 * d1, d2, d2Nonzero, cancellableEquation)
+  }
 
 -- ----------------------------------------------------------------------
 -- The Rational type and canonical constants.
+-- Opaque — the quotient structure is sealed behind the boundary lemmas.
 
-definition Rational : Type(0) :=
+opaque definition Rational : Type(0) :=
   Quotient(RationalRepresentative, RationalEquivalent)
-
--- The canonical introduction form: the class of the fraction n / (d + 1).
--- A transparent definition (δ-reduces to the underlying `Quotient.mk`),
--- registered as a `construction` so proofs read `Rational.fraction(n, d)`
--- instead of `Quotient.mk(RationalRepresentative.make(n, d))`.
-construction Rational.fraction (n : Integer) (d : Natural) : Rational :=
-  Quotient.mk(RationalRepresentative.make(n, d))
 
 -- The equivalence bundled as an `IsEquivalenceRelation`, registered as
 -- the canonical instance — `Quotient.exact(x, y, mkEquality)` then
@@ -148,8 +120,45 @@ definition Rational.equivalence
 
 instance Rational.equivalence
 
+-- The canonical introduction form: the class of the fraction n / d, given a
+-- proof that d is nonzero. Registered as a `construction` so proofs read
+-- `Rational.fraction(n, d, proof)` instead of the raw `Quotient.mk`. The
+-- `unfold Rational` pierces the opaque type once, here at the boundary.
+construction Rational.fraction
+        (n : Integer) (d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        : Rational :=
+  unfold Rational in Quotient.mk(RationalRepresentative.make(n, d, denominatorNonzero))
+
+-- ----------------------------------------------------------------------
+-- The boundary API. Every consumer compares rationals through these two
+-- lemmas: `fraction(n1, d1, _) = fraction(n2, d2, _)` is exactly the Integer
+-- cross-equation `n1 · d2 = n2 · d1`, in both directions. The opaque
+-- `Rational` is pierced only here.
+
+-- Cross-equation ⇒ equal fractions (via Quotient.sound).
+theorem Rational.fraction_equal
+        (n1 d1 : Integer) (d1Nonzero : ¬(d1 = Integer.zero))
+        (n2 d2 : Integer) (d2Nonzero : ¬(d2 = Integer.zero))
+        (crossEquation : n1 * d2 = n2 * d1)
+        : Rational.fraction(n1, d1, d1Nonzero) = Rational.fraction(n2, d2, d2Nonzero) :=
+  unfold Rational in
+    Quotient.sound(RationalRepresentative.make(n1, d1, d1Nonzero),
+                   RationalRepresentative.make(n2, d2, d2Nonzero),
+                   crossEquation)
+
+-- Equal fractions ⇒ cross-equation (via Quotient.exact).
+theorem Rational.fraction_equal_implies
+        (n1 d1 : Integer) (d1Nonzero : ¬(d1 = Integer.zero))
+        (n2 d2 : Integer) (d2Nonzero : ¬(d2 = Integer.zero))
+        (fractionEquality
+            : Rational.fraction(n1, d1, d1Nonzero) = Rational.fraction(n2, d2, d2Nonzero))
+        : n1 * d2 = n2 * d1 :=
+  Quotient.exact(RationalRepresentative.make(n1, d1, d1Nonzero),
+                 RationalRepresentative.make(n2, d2, d2Nonzero),
+                 unfold Rational in fractionEquality)
+
 definition Rational.zero : Rational :=
-  Rational.fraction(Integer.zero, zero)
+  Rational.fraction(Integer.zero, Integer.one, Integer.one_is_nonzero)
 
 definition Rational.one : Rational :=
-  Rational.fraction(Integer.one, zero)
+  Rational.fraction(Integer.one, Integer.one, Integer.one_is_nonzero)

@@ -46,26 +46,22 @@ import Rational.reciprocal
 -- lemma for the opaque IsNonneg (the cast form): the `unfold` collapses
 -- the lift, so call sites cite this name and never pierce the opacity.
 theorem Rational.from_natural_is_nonneg (n : Natural)
-        : Rational.IsNonneg((n : Rational)) :=
-  done by Integer.from_natural_is_nonneg unfolding Rational.IsNonneg
+        : Rational.IsNonneg((n : Rational)) := {
+  claim Integer.IsNonneg((n : Integer)) by Integer.from_natural_is_nonneg;
+  done by substituting (ring : (n : Integer) * Integer.one = (n : Integer))
+      unfolding Rational.IsNonneg
+}
 
 -- ----------------------------------------------------------------------
 -- Multiplication and negation interaction at Rational.
 
 -- (-x) * y = -(x * y). At reps, both sides have the same denominator
 -- and the numerator equality reduces to Integer.multiply_negate_left.
-theorem Rational.multiply_negate_left_at_representatives
-        (n_x n_y : Integer) (d_x d_y : Natural)
-        : Rational.fraction(-n_x, d_x)
-              * Rational.fraction(n_y, d_y)
-          = -(Rational.fraction(n_x, d_x)
-              * Rational.fraction(n_y, d_y)) :=
-  Integer.multiply_negate_left(n_x, n_y)
-
 theorem Rational.multiply_negate_left (x y : Rational)
         : (-x) * y = -(x * y) :=
-  by_representatives x as ⟨n_x, d_x⟩, y as ⟨n_y, d_y⟩ =>
-      Rational.multiply_negate_left_at_representatives(n_x, n_y, d_x, d_y)
+  by_representatives x as ⟨n_x, d_x, _⟩, y as ⟨n_y, d_y, _⟩ =>
+      calc ((-n_x) * n_y) * (d_x * d_y)
+         = (-(n_x * n_y)) * (d_x * d_y)   by ring
 
 -- Distribute multiplication over subtraction: (b - a) * c = b*c - a*c.
 theorem Rational.subtract_multiply_distribute (a b c : Rational)
@@ -106,25 +102,22 @@ theorem Rational.LessOrEqual.multiply_by_nonneg_left
 -- Natural — impossible.
 theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
   (zeroEqOne : Rational.zero = Rational.one) ↦ {
-    -- Rational.zero = [Integer.zero / 0], Rational.one = [Integer.one / 0];
-    -- equal classes ⇒ Integer.zero · 1 = Integer.one · 1, then cancel the
-    -- positive denominator to get the Integers equal.
-    claim rationalEquivalence : RationalEquivalent(RationalRepresentative.make(Integer.zero, 0), RationalRepresentative.make(Integer.one, 0))
-        by Quotient.exact(RationalRepresentative.make(Integer.zero, 0), RationalRepresentative.make(Integer.one, 0), zeroEqOne);
-    claim Integer.zero * (successor(0) : Integer) = Integer.one * (successor(0) : Integer)
-        by rationalEquivalence;
-    claim integersEqual : Integer.zero = Integer.one by Integer.multiply_cancel_right_by_natural_successor;
-    -- Integer.zero = [0 / 0], Integer.one = [successor(0) / 0]; equal classes
-    -- ⇒ 0 + 0 = successor(0) + 0, which collapses (add_zero) to successor(0) = 0.
-    claim integerEquivalenceClass : IntegerEquivalent(IntegerRepresentative.make(0, 0), IntegerRepresentative.make(successor(0), 0))
-        by Quotient.exact(IntegerRepresentative.make(0, 0), IntegerRepresentative.make(successor(0), 0), integersEqual);
-    claim integerEquivalence : (0 : Natural) + 0 = successor(0) + 0 by integerEquivalenceClass;
-    claim successorZeroEqualsZero : successor(0) = (0 : Natural)
-        by calc successor(0)
-              = successor(0) + 0       by substituting Natural.add_zero
-              = 0 + 0                  by integerEquivalence
-              = 0                      by substituting Natural.add_zero;
-    Natural.successor_not_zero(0, successorZeroEqualsZero)
+    -- Equal fractions ⇒ Integer.zero · 1 = Integer.one · 1, i.e. 0 = 1 in ℤ.
+    claim fractionEquality
+          : Rational.fraction(Integer.zero, Integer.one, Integer.one_is_nonzero)
+            = Rational.fraction(Integer.one, Integer.one, Integer.one_is_nonzero)
+        by zeroEqOne;
+    claim crossEquation : Integer.zero * Integer.one = Integer.one * Integer.one
+        by Rational.fraction_equal_implies(
+               Integer.zero, Integer.one, Integer.one_is_nonzero,
+               Integer.one, Integer.one, Integer.one_is_nonzero,
+               fractionEquality);
+    claim integersEqual : Integer.zero = Integer.one
+        by calc Integer.zero
+              = Integer.zero * Integer.one   by ring
+              = Integer.one * Integer.one    by crossEquation
+              = Integer.one                  by ring;
+    Integer.one_is_nonzero(Equality.symmetry(integersEqual))
   }
 
 -- 0 < 1 at Rational. And of (0 ≤ 1) and (0 ≠ 1).
@@ -132,10 +125,13 @@ theorem Rational.zero_less_one : Rational.zero < Rational.one :=
   And.introduction(
       Rational.LessOrEqual_zero_of_IsNonneg(
           Rational.one,
-          -- Rational.one is the fraction 1 / 1, and Integer.one = (succ(0) : I)
-          -- is the image of a Natural, hence IsNonneg.
-          Rational.IsNonneg.of_numerator(Integer.one, 0,
-              Integer.from_natural_is_nonneg(successor(0)))),
+          -- Rational.one is 1/1, sign-witness 1·1 = 1 ≥ 0.
+          Rational.IsNonneg.of_numerator_denominator(
+              Integer.one, Integer.one, Integer.one_is_nonzero, {
+                  claim Integer.IsNonneg(Integer.one)
+                      by Integer.from_natural_is_nonneg(successor(0));
+                  done by substituting (ring : Integer.one * Integer.one = Integer.one)
+              })),
       Rational.zero_not_equal_one)
 
 -- halve(ε) < ε when 0 < ε.
@@ -146,9 +142,9 @@ theorem Rational.halve_less_than_self
   -- by halve_doubled and ring algebra. halve_IsNonneg gives IsNonneg.
   calc epsilon - Rational.halve(epsilon)
      = (Rational.halve(epsilon) + Rational.halve(epsilon))
-         + -Rational.halve(epsilon)
-            by Rational.halve_doubled(epsilon)
-     = Rational.halve(epsilon)                                       as diffEqualsHalve;
+         - Rational.halve(epsilon)
+            by substituting Rational.halve_doubled(epsilon)
+     = Rational.halve(epsilon)                                       by ring   as diffEqualsHalve;
   -- halve(ε) > 0 from halve_positive.
   claim halvePositive : Rational.zero < Rational.halve(epsilon);
   -- halve(ε) ≤ ε from IsNonneg(ε - halve(ε)) = IsNonneg(halve(ε)).
@@ -174,13 +170,12 @@ theorem Rational.absolute_value_IsNonneg (q : Rational)
   -- At a representative make(n, d), |q| has numerator
   -- Integer.absolute_value(n) — the image of a Natural (= distance(a, b)
   -- for n = mk(make(a, b))), hence IsNonneg.
-  by_representatives q as ⟨n, d⟩ =>
-      Rational.IsNonneg.of_numerator(Integer.absolute_value(n), d,
-          rewrite(
-              Equality.symmetry(
-                  Integer.absolute_value_natural_is_image(n)),
-              Integer.from_natural_is_nonneg(
-                  Integer.absolute_value_natural(n))))
+  by_representatives q as ⟨n, d, _⟩ =>
+      unfold Rational.IsNonneg in {
+        claim Integer.IsNonneg(abs(n)) by Integer.absolute_value_is_nonneg;
+        claim Integer.IsNonneg(abs(d)) by Integer.absolute_value_is_nonneg;
+        done by Integer.multiply_nonneg
+      }
 
 -- 0 ≤ |q|.
 theorem Rational.zero_le_absolute_value (q : Rational)
@@ -192,128 +187,75 @@ theorem Rational.zero_le_absolute_value (q : Rational)
 -- ----------------------------------------------------------------------
 -- Archimedean property: |q| is bounded by some Natural's image.
 
--- (succ(K) : I) + -(K : I) = Integer.one. Direct calc using
--- (succ(K) : I) = (K + 1 : I) then split and cancel.
-theorem Integer.succ_minus_natural (K : Natural)
-        : (successor(K) : Integer) + -(K : Integer) = Integer.one := {
-  calc successor(K)
-     = successor(K + 0)
-     = K + successor(0);
-  calc (successor(K) : Integer) + -(K : Integer)
-     = ((K + successor(0)) : Integer) + -(K : Integer)
-     = ((K : Integer) + (successor(0) : Integer)) + -(K : Integer)
-     = Integer.one
-}
-
--- The numerator-simplification step: at Integer level,
--- (succ(K) : I) * succ(d) + -(K : I) = (succ(K * d + d) : I).
--- Concretely: succ(K)·succ(d) = K·d + K + d + 1, so the LHS = K·d + d + 1
--- (after the -K cancels K). Stated for use in the IsNonneg argument.
-theorem Integer.scaled_succ_minus_natural_simplifies
-        (K d : Natural)
-        : (successor(K) : Integer) * (successor(d) : Integer)
-              + -(K : Integer)
-          = (successor(K * d + d) : Integer) :=
-  calc (successor(K) : Integer) * (successor(d) : Integer)
-           + -(K : Integer)
-     = (successor(K) * successor(d) : Integer) + -(K : Integer)
-     -- succ(K) · succ(d) = succ(K) + succ(K)·d (multiply_successor).
-     = (successor(K) + successor(K) * d : Integer) + -(K : Integer)
-     -- Split the Integer image of a sum: (a + b : I) = (a : I) + (b : I).
-     = ((successor(K) : Integer) + (successor(K) * d : Integer))
-           + -(K : Integer)
-     -- Regroup so the -K combines with succ(K).
-     = ((successor(K) : Integer) + -(K : Integer))
-           + (successor(K) * d : Integer)
-     -- succ(K) - K = 1. Via Integer.succ_minus_natural (below).
-     = Integer.one + (successor(K) * d : Integer)
-     -- Combine 1 + (succ(K)·d : I) = (succ(succ(K) · d) : I).
-     = (successor(successor(K) * d) : Integer)
-     -- successor(K) · d = K · d + d (multiply_successor on first arg, then commute).
-     = (successor(K * d + d) : Integer)
-            by (calc successor(K) * d
-                   = d + K * d
-                   = K * d + d)
-
--- Archimedean step: at rep make(n, d), |q| ≤ (succ(K) : R) where
--- K := Integer.absolute_value_natural(n). The difference simplifies
--- to a non-negative Integer numerator over denominator d.
--- Helper: the explicit Rational difference equation
---   (succ(K) : R) - mk(make((K : I), d)) = mk(make((succ(K·d + d) : I), d))
--- via Quotient.sound. Bridges the unreduced Rational subtraction to a
--- clean mk form so we can apply IsNonneg through the lift.
-theorem Rational.succ_natural_minus_natural_form_at_rep
-        (K d : Natural)
-        : (successor(K) : Rational)
-              - Rational.fraction((K : Integer), d)
-          = Rational.fraction((successor(K * d + d) : Integer), d) :=
-  -- LHS reduces (through Rational.add + Rational.negate β) to
-  -- mk(make((succ K : I)·succ(d) + (-(K : I))·succ(0), d + 0·succ(d))).
-  -- We Quotient.sound to mk(make((succ(K·d + d) : I), d)) by
-  -- cross-multiplying with Quotient.exact–free arithmetic.
-  Quotient.sound(
-      RationalRepresentative, RationalEquivalent,
-      RationalRepresentative.make(
-          (successor(K) : Integer) * (successor(d) : Integer)
-              + -(K : Integer) * (successor(0) : Integer),
-          d + 0 * successor(d)),
-      RationalRepresentative.make(
-          (successor(K * d + d) : Integer), d),
-      -- Cross equivalence: LHS_num · succ(d) = (succ(K·d+d) : I) · succ(d + 0·s(d)).
-      -- The RHS side's denom-1 reduces: succ(d + 0·succ(d)) = succ(d + 0) = succ(d)
-      -- (Natural.zero_multiply makes 0·succ(d) = 0; then d + 0 stays unreduced,
-      -- but succ(d + 0) = succ(d) requires add_zero in the body).
-      calc ((successor(K) : Integer) * (successor(d) : Integer)
-            + -(K : Integer) * (successor(0) : Integer))
-              * (successor(d) : Integer)
-         -- Simplify · succ(zero) at the second term to identity.
-         = ((successor(K) : Integer) * (successor(d) : Integer)
-            + -(K : Integer))
-              * (successor(d) : Integer)
-         -- Apply the Integer simplification lemma.
-         = (successor(K * d + d) : Integer)
-              * (successor(d + 0 * successor(d)) : Integer))
-
--- |q|-at-rep ≤ (succ(K) : R) form, expressed via the explicit
--- difference equation above.
-theorem Rational.absolute_value_natural_form_le_succ
-        (K d : Natural)
-        : Rational.LessOrEqual(
-              Rational.fraction((K : Integer), d),
-              (successor(K) : Rational)) :=
-  -- Rational.LessOrEqual unfolds to Rational.IsNonneg of the diff.
-  -- Transport the diff to the explicit mk(make((succ(K·d+d) : I), d))
-  -- form, where Rational.IsNonneg reduces (via the lift) to
-  -- Integer.IsNonneg of the numerator, which is a Natural image.
-  Equality.transport_proposition(
-      Rational.IsNonneg, ?, ?,
-      Equality.symmetry(
-          Rational.succ_natural_minus_natural_form_at_rep(K, d)),
-      Rational.IsNonneg.of_numerator(
-          (successor(K * d + d) : Integer), d,
-          Integer.from_natural_is_nonneg(successor(K * d + d))))
-
--- Archimedean step at a Rational representative.
+-- At rep make(n, d): |q| = |n|/|d| ≤ succ(K) with K := |n| as a Natural,
+-- because |d| ≥ 1. The sign-witness of succ(K) − |q| is
+--   ((succ(K):I)·|d| + (-|n|)·1) · (1·|d|),
+-- which equals ((K:I)·(|d|−1) + |d|) · |d| ≥ 0.
 theorem Rational.absolute_value_le_succ_natural_at_representative
-        (n : Integer) (d : Natural)
+        (n d : Integer) (dNonzero : ¬(d = Integer.zero))
         : Rational.LessOrEqual(
-              abs(Rational.fraction(n, d)),
+              abs(Rational.fraction(n, d, dNonzero)),
               (successor(Integer.absolute_value_natural(n)) : Rational)) :=
-  -- |q| at rep = mk(make(Integer.absolute_value(n), d)) which equals
-  -- mk(make((K : I), d)) via the abs_value_natural_is_image bridge.
-  calc abs(Rational.fraction(n, d))
-     = Rational.fraction((Integer.absolute_value_natural(n) : Integer), d)
-         by Integer.absolute_value_natural_is_image(n)
-     ≤ (successor(Integer.absolute_value_natural(n)) : Rational)
+  unfold Rational.IsNonneg in {
+    claim absoluteImage : abs(n) = (Integer.absolute_value_natural(n) : Integer)
+        by Integer.absolute_value_natural_is_image;
+    claim successorImage
+          : (successor(Integer.absolute_value_natural(n)) : Integer)
+            = Integer.one + (Integer.absolute_value_natural(n) : Integer)
+        by Natural.to_integer.successor_preserves;
+    claim denominatorMinusOneNonneg : Integer.IsNonneg(abs(d) + -Integer.one)
+        by Integer.absolute_value_minus_one_nonneg(d, dNonzero);
+    claim absoluteDenominatorNonneg : Integer.IsNonneg(abs(d))
+        by Integer.absolute_value_is_nonneg;
+    claim scaledNonneg
+          : Integer.IsNonneg(
+                (Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one))
+        by Integer.multiply_nonneg(
+               (Integer.absolute_value_natural(n) : Integer), abs(d) + -Integer.one,
+               Integer.from_natural_is_nonneg(Integer.absolute_value_natural(n)),
+               denominatorMinusOneNonneg);
+    claim numeratorNonneg
+          : Integer.IsNonneg(
+                (Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one) + abs(d))
+        by Integer.IsNonneg.add(
+               (Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one), abs(d),
+               scaledNonneg, absoluteDenominatorNonneg);
+    claim productNonneg
+          : Integer.IsNonneg(
+                ((Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one) + abs(d))
+                * abs(d))
+        by Integer.multiply_nonneg(
+               (Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one) + abs(d),
+               abs(d), numeratorNonneg, absoluteDenominatorNonneg);
+    claim witnessEquation
+          : ((successor(Integer.absolute_value_natural(n)) : Integer) * abs(d)
+             + (-abs(n)) * Integer.one) * (Integer.one * abs(d))
+            = ((Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one) + abs(d))
+              * abs(d)
+        by calc ((successor(Integer.absolute_value_natural(n)) : Integer) * abs(d)
+                 + (-abs(n)) * Integer.one) * (Integer.one * abs(d))
+             = ((Integer.one + (Integer.absolute_value_natural(n) : Integer)) * abs(d)
+                + (-abs(n)) * Integer.one)
+               * (Integer.one * abs(d))
+                   by substituting successorImage
+             = ((Integer.one + (Integer.absolute_value_natural(n) : Integer)) * abs(d)
+                + (-(Integer.absolute_value_natural(n) : Integer)) * Integer.one)
+               * (Integer.one * abs(d))
+                   by substituting absoluteImage
+             = ((Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one) + abs(d))
+               * abs(d)
+                   by ring;
+    done by substituting witnessEquation
+  }
 
 -- The headline Archimedean property: for any Rational q, there is a
 -- Natural K with |q| ≤ (succ(K) : Rational).
 theorem Rational.absolute_value_le_succ_natural (q : Rational)
         : ∃ (K : Natural).
             abs(q) ≤ (successor(K) : Rational) :=
-  by_representatives q as ⟨n, d⟩ =>
+  by_representatives q as ⟨n, d, dNonzero⟩ =>
       witness Integer.absolute_value_natural(n) with
-          Rational.absolute_value_le_succ_natural_at_representative(n, d)
+          Rational.absolute_value_le_succ_natural_at_representative(n, d, dNonzero)
 
 -- ----------------------------------------------------------------------
 -- General additive monotonicity (left-add by any constant) and
@@ -346,12 +288,14 @@ theorem Rational.reciprocal_of_succ_IsNonneg (K : Natural)
         : Rational.IsNonneg(
               StrictPositiveRational.reciprocal(
                   StrictPositiveRational.make(K, 0))) :=
-  -- The reciprocal is mk(make((successor(zero) : Integer), K)),
-  -- whose numerator is (1 : Integer), IsNonneg by from_natural_is_nonneg.
-  Rational.IsNonneg.of_numerator((successor(0) : Integer), K,
-      Integer.from_natural_is_nonneg(successor(0)))
+  -- The reciprocal is succ(0)/succ(K); sign-witness succ(0)·succ(K) ≥ 0.
+  unfold Rational.IsNonneg in {
+    claim Integer.IsNonneg((successor(0) : Integer)) by Integer.from_natural_is_nonneg;
+    claim Integer.IsNonneg((successor(K) : Integer)) by Integer.from_natural_is_nonneg;
+    done by Integer.multiply_nonneg
+  }
 
--- 1/(succ(K)) is non-zero (numerator is succ(zero) ≠ 0 as Integer).
+-- 1/(succ(K)) is non-zero.
 theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
         : Not(Rational.zero
               = StrictPositiveRational.reciprocal(
@@ -360,29 +304,25 @@ theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
               : Rational.zero
                 = StrictPositiveRational.reciprocal(
                       StrictPositiveRational.make(K, 0))) ↦ {
-    -- Rational.zero = [Integer.zero / 0] and 1/(K+1) = [successor(0) / K];
-    -- equal classes ⇒ Integer.zero · succ(K) = successor(0) · 1, which
-    -- simplifies (0·x = 0, 1·1 = 1) to Integer.zero = Integer.one.
-    claim rationalEquivalence : RationalEquivalent(RationalRepresentative.make(Integer.zero, 0), RationalRepresentative.make((successor(0) : Integer), K))
-        by Quotient.exact(RationalRepresentative.make(Integer.zero, 0), RationalRepresentative.make((successor(0) : Integer), K), zeroEqRecip);
-    claim crossMultiplication : Integer.zero * (successor(K) : Integer) = (successor(0) : Integer) * (successor(0) : Integer)
-        by rationalEquivalence;
-    claim integersEqual : Integer.zero = Integer.one
-        by calc Integer.zero
-              = Integer.zero * (successor(K) : Integer)              by ring
-              = (successor(0) : Integer) * (successor(0) : Integer)  by crossMultiplication
-              = Integer.one * Integer.one                           by substituting Natural.to_integer.one_preserves
-              = Integer.one                                         by ring;
-    -- Descending to Natural as in zero_not_equal_one: successor(0) = 0.
-    claim integerEquivalenceClass : IntegerEquivalent(IntegerRepresentative.make(0, 0), IntegerRepresentative.make(successor(0), 0))
-        by Quotient.exact(IntegerRepresentative.make(0, 0), IntegerRepresentative.make(successor(0), 0), integersEqual);
-    claim integerEquivalence : (0 : Natural) + 0 = successor(0) + 0 by integerEquivalenceClass;
-    claim successorZeroEqualsZero : successor(0) = (0 : Natural)
-        by calc successor(0)
-              = successor(0) + 0       by substituting Natural.add_zero
-              = 0 + 0                  by integerEquivalence
-              = 0                      by substituting Natural.add_zero;
-    Natural.successor_not_zero(0, successorZeroEqualsZero)
+    -- Equal classes ⇒ 0·succ(K) = succ(0)·1, i.e. 0 = 1 in ℤ.
+    claim rationalEquivalence
+          : RationalEquivalent(
+                RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
+                RationalRepresentative.make(
+                    (successor(0) : Integer), (successor(K) : Integer),
+                    Integer.from_natural_successor_nonzero(K)))
+        by Quotient.exact(
+               RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
+               RationalRepresentative.make(
+                   (successor(0) : Integer), (successor(K) : Integer),
+                   Integer.from_natural_successor_nonzero(K)),
+               unfold Rational in zeroEqRecip);
+    claim integersEqual : (successor(0) : Integer) = Integer.zero
+        by calc (successor(0) : Integer)
+              = (successor(0) : Integer) * Integer.one    by ring
+              = Integer.zero * (successor(K) : Integer)   by rationalEquivalence
+              = Integer.zero                              by ring;
+    Integer.one_is_nonzero(integersEqual)
   }
 
 -- 1/(succ(K)) > 0.
@@ -397,118 +337,77 @@ theorem Rational.reciprocal_of_succ_positive (K : Natural)
           Rational.reciprocal_of_succ_IsNonneg(K)),
       Rational.reciprocal_of_succ_nonzero(K))
 
--- Helper: at representatives `make(n_x, d_x)` and `make(n_y, d_y)`,
--- if both numerators are strictly positive (= succ(k) form), then the
--- product is strictly positive (= succ(_) numerator).
-theorem Rational.multiply_positive_at_representatives
-        (k_x k_y d_x d_y : Natural)
-        : Rational.zero
-            < Rational.fraction((successor(k_x) : Integer), d_x)
-                * Rational.fraction((successor(k_y) : Integer), d_y) := {
-  -- The product at rep: mk(make((succ(k_x) : I) · (succ(k_y) : I), d_y + d_x · succ(d_y))).
-  -- (succ(k_x) : I) · (succ(k_y) : I) = (succ(k_x) · succ(k_y) : I) = (succ(some) : I).
-  -- IsNonneg follows from from_natural_is_nonneg.
-  -- Nonzero: assume 0 = product. Quotient.exact gives Integer-level
-  -- equation; reduces to (succ(k_x) · succ(k_y)) = 0 (Natural), false.
-  -- Each factor's numerator is a Natural image, hence IsNonneg; the
-  -- product of two non-negatives is non-negative.
-  claim Rational.IsNonneg(Rational.fraction((successor(k_x) : Integer), d_x))
-    by Rational.IsNonneg.of_numerator;
-  claim Rational.IsNonneg(Rational.fraction((successor(k_y) : Integer), d_y))
-    by Rational.IsNonneg.of_numerator;
-  claim productIsNonneg
-      : Rational.IsNonneg(
-            Rational.fraction((successor(k_x) : Integer), d_x)
-              * Rational.fraction((successor(k_y) : Integer), d_y))
-    by Rational.IsNonneg.multiply;
-  claim productNonzero
-      : Not(Rational.zero
-            = Rational.fraction((successor(k_x) : Integer), d_x)
-                * Rational.fraction((successor(k_y) : Integer), d_y));
-  And.introduction(
-      Rational.LessOrEqual_zero_of_IsNonneg(
-          Rational.fraction((successor(k_x) : Integer), d_x)
-              * Rational.fraction((successor(k_y) : Integer), d_y),
-          productIsNonneg),
-      productNonzero)
+-- A zero numerator makes a fraction zero, so a nonzero fraction has a
+-- nonzero numerator.
+theorem Rational.numerator_nonzero
+        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
+        (fractionNonzero : ¬(Rational.fraction(n, d, denominatorNonzero) = Rational.zero))
+        : ¬(n = Integer.zero) := {
+  suppose n = Integer.zero as numeratorZero;
+  claim fractionIsZero : Rational.fraction(n, d, denominatorNonzero) = Rational.zero
+      by calc Rational.fraction(n, d, denominatorNonzero)
+            = Rational.fraction(Integer.zero, d, denominatorNonzero)   by substituting numeratorZero
+            = Rational.zero
+                  by Quotient.sound(
+                         RationalRepresentative.make(Integer.zero, d, denominatorNonzero),
+                         RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
+                         (ring : Integer.zero * Integer.one = Integer.zero * d));
+  absurd(fractionNonzero(fractionIsZero))
 }
 
--- Multiplication preserves strict positivity. Take representatives
--- x = [n_x/d_x], y = [n_y/d_y]; strict-positive witnesses give
--- n_x = succ(k_x), n_y = succ(k_y), then succ * succ > 0 at the
--- representative level proves the result.
+-- ℚ has no zero divisors: a product of nonzero rationals is nonzero. At
+-- reps the cross with 0/1 forces n_x·n_y = 0, impossible for nonzero
+-- numerators (ℤ is an integral domain).
+theorem Rational.multiply_nonzero
+        (x y : Rational)
+        (xNonzero : ¬(x = Rational.zero)) (yNonzero : ¬(y = Rational.zero))
+        : ¬(x * y = Rational.zero) :=
+  cases x refining xNonzero { | RationalRepresentative.make(n_x, d_x, dxNonzero) =>
+    cases y refining yNonzero { | RationalRepresentative.make(n_y, d_y, dyNonzero) => {
+      suppose Rational.fraction(n_x, d_x, dxNonzero) * Rational.fraction(n_y, d_y, dyNonzero)
+              = Rational.zero as productZero;
+      claim crossEquivalence
+            : RationalEquivalent(
+                  Rational.multiply_representatives(
+                      RationalRepresentative.make(n_x, d_x, dxNonzero),
+                      RationalRepresentative.make(n_y, d_y, dyNonzero)),
+                  RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero))
+          by Quotient.exact(
+                 Rational.multiply_representatives(
+                     RationalRepresentative.make(n_x, d_x, dxNonzero),
+                     RationalRepresentative.make(n_y, d_y, dyNonzero)),
+                 RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
+                 productZero);
+      claim numeratorProductZero : n_x * n_y = Integer.zero
+          by calc n_x * n_y
+                = (n_x * n_y) * Integer.one    by ring
+                = Integer.zero * (d_x * d_y)   by crossEquivalence
+                = Integer.zero                 by ring;
+      Integer.multiply_nonzero(
+          n_x, n_y,
+          Rational.numerator_nonzero(n_x, d_x, dxNonzero, xNonzero),
+          Rational.numerator_nonzero(n_y, d_y, dyNonzero, yNonzero))(numeratorProductZero)
+    } } }
+
+-- Multiplication preserves strict positivity: 0 < x, 0 < y → 0 < x·y.
 theorem Rational.multiply_positive_positive
         (x y : Rational) (xPos : Rational.zero < x) (yPos : Rational.zero < y)
         : Rational.zero < x * y :=
-  cases x refining xPos { | RationalRepresentative.make(n_x, d_x) =>
-    cases y refining yPos { | RationalRepresentative.make(n_y, d_y) => {
-      obtain ⟨k_x, n_x_eq⟩ from
-        Rational.strict_positive_witness_at_representative(
-            n_x, d_x,
-            Rational.IsNonneg.numerator(n_x, d_x,
-                Rational.IsNonneg_of_LessOrEqual_zero(
-                    Rational.fraction(n_x, d_x),
-                    Rational.LessThan.weaken(xPos))),
-            (zeroEqNx : n_x = Integer.zero) ↦
-              Rational.LessThan.distinct(xPos)(
-                  calc Rational.zero
-                     = Quotient.mk(
-                           RationalRepresentative,
-                           RationalEquivalent,
-                           RationalRepresentative.make(Integer.zero, 0))
-                     = Quotient.mk(
-                           RationalRepresentative,
-                           RationalEquivalent,
-                           RationalRepresentative.make(n_x, d_x))
-                           by Quotient.sound(
-                                  RationalRepresentative,
-                                  RationalEquivalent,
-                                  RationalRepresentative.make(
-                                      Integer.zero, 0),
-                                  RationalRepresentative.make(n_x, d_x),
-                                  calc Integer.zero
-                                          * (successor(d_x) : Integer)
-                                      = n_x
-                                      = n_x
-                                          * (successor(0) : Integer))));
-      obtain ⟨k_y, n_y_eq⟩ from
-        Rational.strict_positive_witness_at_representative(
-            n_y, d_y,
-            Rational.IsNonneg.numerator(n_y, d_y,
-                Rational.IsNonneg_of_LessOrEqual_zero(
-                    Rational.fraction(n_y, d_y),
-                    Rational.LessThan.weaken(yPos))),
-            (zeroEqNy : n_y = Integer.zero) ↦
-              Rational.LessThan.distinct(yPos)(
-                  calc Rational.zero
-                     = Quotient.mk(
-                           RationalRepresentative,
-                           RationalEquivalent,
-                           RationalRepresentative.make(Integer.zero, 0))
-                     = Quotient.mk(
-                           RationalRepresentative,
-                           RationalEquivalent,
-                           RationalRepresentative.make(n_y, d_y))
-                           by Quotient.sound(
-                                  RationalRepresentative,
-                                  RationalEquivalent,
-                                  RationalRepresentative.make(
-                                      Integer.zero, 0),
-                                  RationalRepresentative.make(n_y, d_y),
-                                  calc Integer.zero
-                                          * (successor(d_y) : Integer)
-                                      = n_y
-                                      = n_y
-                                          * (successor(0) : Integer))));
-      -- Transport to the (succ k_x, succ k_y) form.
-      calc Rational.zero
-         < Rational.fraction((successor(k_x) : Integer), d_x)
-               * Rational.fraction((successor(k_y) : Integer), d_y)
-         = Rational.fraction(n_x, d_x)
-               * Rational.fraction(n_y, d_y)
-    } } }
-
--- The ε construction: given ε > 0 and Natural K, produce a positive
+  And.introduction(
+      Rational.LessOrEqual_zero_of_IsNonneg(
+          x * y,
+          Rational.IsNonneg.multiply(
+              x, y,
+              Rational.IsNonneg_of_LessOrEqual_zero(x, Rational.LessThan.weaken(xPos)),
+              Rational.IsNonneg_of_LessOrEqual_zero(y, Rational.LessThan.weaken(yPos)))),
+      (zeroEqProduct : Rational.zero = x * y) ↦
+          Rational.multiply_nonzero(
+              x, y,
+              (xEqZero : x = Rational.zero) ↦
+                  Rational.LessThan.distinct(xPos)(Equality.symmetry(xEqZero)),
+              (yEqZero : y = Rational.zero) ↦
+                  Rational.LessThan.distinct(yPos)(Equality.symmetry(yEqZero)))(
+              Equality.symmetry(zeroEqProduct)))
 -- δ with (succ(K) : R) · δ ≤ ε. Witness: δ := ε · (1/succ(K)).
 theorem Rational.divide_by_succ_positive
         (epsilon : Rational) (K : Natural)
@@ -553,25 +452,25 @@ theorem Rational.divide_by_succ_positive
 theorem Rational.zero_not_equal_one_half
         : Not(Rational.zero = Rational.one_half) :=
   (zeroEqualsOneHalf : Rational.zero = Rational.one_half) ↦ {
-    claim rationalEquivalence : RationalEquivalent(RationalRepresentative.make(Integer.zero, 0), RationalRepresentative.make(Integer.one, 1))
-        by Quotient.exact(RationalRepresentative.make(Integer.zero, 0), RationalRepresentative.make(Integer.one, 1), zeroEqualsOneHalf);
-    claim crossMultiplication : Integer.zero * (successor(1) : Integer) = Integer.one * (successor(0) : Integer)
-        by rationalEquivalence;
-    claim integersEqual : Integer.zero = Integer.one
-        by calc Integer.zero
-              = Integer.zero * (successor(1) : Integer)   by Integer.multiply_zero_left
-              = Integer.one * (successor(0) : Integer)    by crossMultiplication
-              = Integer.one * Integer.one                 by substituting Natural.to_integer.one_preserves
-              = Integer.one                               by ring;
-    claim integerEquivalenceClass : IntegerEquivalent(IntegerRepresentative.make(0, 0), IntegerRepresentative.make(successor(0), 0))
-        by Quotient.exact(IntegerRepresentative.make(0, 0), IntegerRepresentative.make(successor(0), 0), integersEqual);
-    claim integerEquivalence : (0 : Natural) + 0 = successor(0) + 0 by integerEquivalenceClass;
-    claim successorZeroEqualsZero : successor(0) = (0 : Natural)
-        by calc successor(0)
-              = successor(0) + 0       by substituting Natural.add_zero
-              = 0 + 0                  by integerEquivalence
-              = 0                      by substituting Natural.add_zero;
-    Natural.successor_not_zero(0, successorZeroEqualsZero)
+    -- Equal classes ⇒ 0·2 = 1·1, i.e. 0 = 1 in ℤ.
+    claim rationalEquivalence
+          : RationalEquivalent(
+                RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
+                RationalRepresentative.make(
+                    Integer.one, (successor(1) : Integer),
+                    Integer.from_natural_successor_nonzero(1)))
+        by Quotient.exact(
+               RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
+               RationalRepresentative.make(
+                   Integer.one, (successor(1) : Integer),
+                   Integer.from_natural_successor_nonzero(1)),
+               unfold Rational in zeroEqualsOneHalf);
+    claim integersEqual : Integer.one = Integer.zero
+        by calc Integer.one
+              = Integer.one * Integer.one               by ring
+              = Integer.zero * (successor(1) : Integer)  by rationalEquivalence
+              = Integer.zero                            by ring;
+    Integer.one_is_nonzero(integersEqual)
   }
 
 -- 0 < 1/2 at Rational. And of (0 ≤ 1/2) and (0 ≠ 1/2).

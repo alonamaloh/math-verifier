@@ -71,8 +71,10 @@ Three forms, increasing in readability:
    `(Quotient.mk(rep) : T)`.
 3. **`construction`** — `construction Name(args) : T := Quotient.mk(...)`.
    A *transparent* definition (δ-reduces to `mk`), so it's def-equal to the
-   underlying class but reads as math: `Rational.fraction(n, d)` instead of
-   `Quotient.mk(RationalRepresentative.make(n, d))`. The preferred public form.
+   underlying class but reads as math: `Rational.fraction(n, d, dNonzero)` instead
+   of `Quotient.mk(RationalRepresentative.make(n, d, dNonzero))`. The preferred
+   public form. (When `T` is an opaque type like `Rational`, the body wraps the
+   mk in `unfold T`.)
 
 ### 3b. Elimination — using a class
 

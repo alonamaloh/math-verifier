@@ -156,16 +156,22 @@ calc a = c        -- this step auto-closes via the binding above
      = d
 ```
 
-Both forms desugar to `claim NAME : (first = last) by calc …` where
-`first` and `last` come from the calc's endpoints. The anonymous form
-synthesises a name like `_calc_<line>_<col>`. Either way the binding
-is in scope for the rest of the block, so the auto-prover's local-
-hypothesis matcher picks it up.
+Both forms bind `first <strongest-relation> last` (from the calc's
+endpoints) into scope; the anonymous form synthesises a name like
+`_calc_<line>_<col>`. Either way the binding is in scope for the rest of
+the block, so the auto-prover's local-hypothesis matcher picks it up.
 
-Restrictions:
-- All-`=` chains only. For mixed `=`/`≤`/`<` calcs at statement
-  position, use the explicit `claim NAME : TYPE by calc …;` form so
-  the resulting relation type is unambiguous.
+**Never hand-write `claim T by calc …`.** It restates exactly what the
+calc already concludes — the bare `calc …;` (or `calc … as NAME;`) *is*
+that claim, without the ceremony. This is a hard style rule.
+
+Mixed-relation chains work at statement position too: the binding gets
+the chain's strongest relation. `calc a ≤ b = c as h;` binds `h : a ≤ c`;
+the bare `calc a ≤ b = c;` binds it anonymously. (There is no "all-`=`
+only" restriction — that earlier claim was wrong. `claim NAME : TYPE by
+calc …` is never needed.)
+
+Restriction:
 - The `as NAME` postfix lives at the END of the calc, after the last
   step's optional `by`. Parses cleanly: `calc … = rhs by lemma as foo;`.
 

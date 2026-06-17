@@ -20,20 +20,21 @@ import Rational.triangle
 -- introduced as `Rational.fraction(n, d)` (def-equal to the underlying
 -- mk), so reflexivity closes the goal.
 theorem single_representative (x : Rational) : x = x :=
-  by_representatives x as ⟨n, d⟩ =>
-    reflexivity(Rational, Rational.fraction(n, d))
+  by_representatives x as ⟨n, d, dNonzero⟩ =>
+    reflexivity(Rational, Rational.fraction(n, d, dNonzero))
 
--- Two scrutinees, tuple patterns, dispatching to an at-representatives
--- lemma (the canonical triangle-inequality shape).
+-- Two scrutinees, tuple patterns, dispatching the reconstructed fractions
+-- to the canonical triangle inequality.
 theorem two_representatives (x y : Rational)
         : abs(x + y) ≤ abs(x) + abs(y) :=
-  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ =>
-    Rational.triangle_inequality_at_representatives(n1, n2, d1, d2)
+  by_representatives x as ⟨n1, d1, p1⟩, y as ⟨n2, d2, p2⟩ =>
+    Rational.triangle_inequality(
+        Rational.fraction(n1, d1, p1), Rational.fraction(n2, d2, p2))
 
 -- Explicit constructor pattern still works (equivalent to the tuple).
 theorem explicit_constructor_pattern (x : Rational) : x = x :=
-  by_representatives x as RationalRepresentative.make(n, d) =>
-    reflexivity(Rational, Rational.fraction(n, d))
+  by_representatives x as RationalRepresentative.make(n, d, dNonzero) =>
+    reflexivity(Rational, Rational.fraction(n, d, dNonzero))
 
 -- Bare name binds the whole representative (no destructure). The
 -- ascription supplies the expected type the short `Quotient.mk` needs.

@@ -92,31 +92,25 @@ theorem Integer.multiply_cancel_right_at_representatives
   | IntegerRepresentative.make(p1, q1),
     IntegerRepresentative.make(p2, q2),
     multipliedEquality => {
-      -- `multipliedEquality`'s type reduces (lift compute + the
+      -- `multipliedEquality` reduces (lift compute + the
       -- multiply_representatives match) to an equality of two specific
-      -- mk(make(...)) classes; equal classes have equivalent
-      -- representatives (auto: exact-bridge).
-      claim IntegerEquivalent(
-                  IntegerRepresentative.make(
-                      p1 * successor(k) + q1 * 0,
-                      p1 * 0 + q1 * successor(k)),
-                  IntegerRepresentative.make(
-                      p2 * successor(k) + q2 * 0,
-                      p2 * 0 + q2 * successor(k)))
-          by Quotient.exact(
-                 IntegerRepresentative.make(
-                     p1 * successor(k) + q1 * 0,
-                     p1 * 0 + q1 * successor(k)),
-                 IntegerRepresentative.make(
-                     p2 * successor(k) + q2 * 0,
-                     p2 * 0 + q2 * successor(k)),
-                 multipliedEquality);
-      -- The kernel has reduced `IntegerEquivalent(make(...), make(...))`
-      -- to the Natural-level equation; the cancellation kernel extracts
-      -- `p1 + q2 = q1 + p2`, and that closes the class equality directly
-      -- (WS3 coercion of the representative equation to its class).
+      -- difference classes; `Quotient.exact` recovers their equivalence,
+      -- and `to_natural` reads it back as the multiplied cross-equation.
+      claim (p1 * successor(k) + q1 * 0) + (p2 * 0 + q2 * successor(k))
+              = (p1 * 0 + q1 * successor(k)) + (p2 * successor(k) + q2 * 0)
+          by IntegerEquivalent.to_natural(
+                 Quotient.exact(
+                     IntegerRepresentative.make(
+                         p1 * successor(k) + q1 * 0,
+                         p1 * 0 + q1 * successor(k)),
+                     IntegerRepresentative.make(
+                         p2 * successor(k) + q2 * 0,
+                         p2 * 0 + q2 * successor(k)),
+                     unfold Integer in multipliedEquality));
+      -- The cancellation kernel extracts `p1 + q2 = q1 + p2`; `from_natural`
+      -- bridges that back to the class equality the goal asks for.
       claim naturalEquation : p1 + q2 = q1 + p2 by Integer.cancellation_natural;
-      naturalEquation
+      IntegerEquivalent.from_natural(naturalEquation)
   }
 
 -- ----------------------------------------------------------------------

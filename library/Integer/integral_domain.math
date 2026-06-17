@@ -1,0 +1,327 @@
+-- Integer/integral_domain.math
+--
+-- ℤ is an integral domain: multiplication by a nonzero element cancels,
+-- and a product of nonzero elements is nonzero. These are the facts the
+-- field-of-fractions construction of Rational needs (transitivity of the
+-- cross-multiplication equivalence, and that the product of two nonzero
+-- denominators is again a valid denominator).
+--
+-- The cancellation reuses `Integer.multiply_cancel_right_by_natural_successor`
+-- (cancel a positive-natural factor): a nonzero Integer is, by sign split,
+-- either a nonzero natural image `(successor j : Integer)` or its negation,
+-- and the negated case is bridged by two `ring` steps.
+
+module Integer.integral_domain
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.order_multiply
+import Integer.absolute_value
+import Integer.absolute_value_natural
+import Integer.cancellation
+import Integer.sign
+import Natural.add_order
+
+-- Cancel a nonzero right factor: x·c = y·c with c ≠ 0 forces x = y.
+theorem Integer.multiply_cancel_right_by_nonzero
+        (x y c : Integer) (cNonzero : ¬(c = Integer.zero))
+        (productEquality : x * c = y * c)
+        : x = y :=
+  cases Integer.sign_split(c) {
+    | Or.introduceLeft(cNonneg) => {
+        choose n as cIsImage from cNonneg;
+        cases Natural.zero_or_successor(n) {
+          | Or.introduceLeft(nIsZero) => {
+              claim cIsZero : c = Integer.zero
+                  by calc c
+                        = (n : Integer)           by cIsImage
+                        = ((0 : Natural) : Integer) by substituting nIsZero
+                        = Integer.zero;
+              absurd(cNonzero(cIsZero))
+            }
+          | Or.introduceRight(nIsSuccessor) => {
+              choose j as nEqualsSuccessor from nIsSuccessor;
+              claim x * (successor(j) : Integer) = y * (successor(j) : Integer)
+                  by calc x * (successor(j) : Integer)
+                        = x * (n : Integer)             by substituting nEqualsSuccessor
+                        = x * c                         by substituting cIsImage
+                        = y * c                         by productEquality
+                        = y * (n : Integer)             by substituting cIsImage
+                        = y * (successor(j) : Integer)  by substituting nEqualsSuccessor;
+              done by Integer.multiply_cancel_right_by_natural_successor
+            }
+        }
+      }
+    | Or.introduceRight(cNegated) => {
+        choose k as cIsNegated from cNegated;
+        cases Natural.zero_or_successor(k) {
+          | Or.introduceLeft(kIsZero) => {
+              claim cIsZero : c = Integer.zero
+                  by calc c
+                        = -(k : Integer)              by cIsNegated
+                        = -((0 : Natural) : Integer)  by substituting kIsZero
+                        = Integer.zero                by ring;
+              absurd(cNonzero(cIsZero))
+            }
+          | Or.introduceRight(kIsSuccessor) => {
+              choose j as kEqualsSuccessor from kIsSuccessor;
+              claim x * (successor(j) : Integer) = y * (successor(j) : Integer)
+                  by calc x * (successor(j) : Integer)
+                        = -(x * -(successor(j) : Integer))  by ring
+                        = -(x * -(k : Integer))             by substituting kEqualsSuccessor
+                        = -(x * c)                          by substituting cIsNegated
+                        = -(y * c)                          by substituting productEquality
+                        = -(y * -(k : Integer))             by substituting cIsNegated
+                        = -(y * -(successor(j) : Integer))  by substituting kEqualsSuccessor
+                        = y * (successor(j) : Integer)      by ring;
+              done by Integer.multiply_cancel_right_by_natural_successor
+            }
+        }
+      }
+  }
+
+-- 1 ≠ 0 in ℤ: the unit denominator is a valid (nonzero) denominator.
+theorem Integer.one_is_nonzero : ¬(Integer.one = Integer.zero) := {
+  suppose Integer.one = Integer.zero as oneEqualsZero;
+  claim castEqual : ((successor(0) : Natural) : Integer) = ((0 : Natural) : Integer)
+      by calc ((successor(0) : Natural) : Integer)
+            = Integer.one               by Natural.to_integer.one_preserves
+            = Integer.zero              by oneEqualsZero
+            = ((0 : Natural) : Integer) by Natural.to_integer.zero_preserves;
+  claim successorEqualsZero : successor(0) = (0 : Natural)
+      by Natural.to_integer.injective(successor(0), 0, castEqual);
+  absurd(successorEqualsZero)
+}
+
+-- The product of two nonzero integers is nonzero (no zero divisors).
+theorem Integer.multiply_nonzero
+        (x y : Integer)
+        (xNonzero : ¬(x = Integer.zero)) (yNonzero : ¬(y = Integer.zero))
+        : ¬(x * y = Integer.zero) := {
+  suppose x * y = Integer.zero as productZero;
+  claim cancelEquation : x * y = Integer.zero * y
+      by calc x * y
+            = Integer.zero       by productZero
+            = Integer.zero * y   by ring;
+  claim xIsZero : x = Integer.zero
+      by Integer.multiply_cancel_right_by_nonzero(x, Integer.zero, y, yNonzero, cancelEquation);
+  absurd(xNonzero(xIsZero))
+}
+
+-- ----------------------------------------------------------------------
+-- Sign helpers for the (signed-denominator) Rational order.
+
+-- If both x and -x are nonnegative, x = 0.
+theorem Integer.nonneg_and_negate_nonneg_implies_zero
+        (x : Integer)
+        (xNonneg : Integer.IsNonneg(x))
+        (negateNonneg : Integer.IsNonneg(-x))
+        : x = Integer.zero := {
+  choose m as xIsImage from xNonneg;
+  choose j as negateIsImage from negateNonneg;
+  claim sumCastImage : ((m + j : Natural) : Integer) = ((0 : Natural) : Integer)
+      by calc ((m + j : Natural) : Integer)
+            = (m : Integer) + (j : Integer)   by Natural.to_integer.add_preserves
+            = x + (j : Integer)               by substituting xIsImage
+            = x + -x                          by substituting negateIsImage
+            = Integer.zero                    by ring
+            = ((0 : Natural) : Integer)       by Natural.to_integer.zero_preserves;
+  claim mPlusJZero : m + j = 0
+      by Natural.to_integer.injective(m + j, 0, sumCastImage);
+  claim mZero : m = 0
+      by Natural.add_eq_zero_implies_left_zero(m, j, mPlusJZero);
+  calc x
+     = (m : Integer)              by xIsImage
+     = ((0 : Natural) : Integer)  by substituting mZero
+     = Integer.zero               by Natural.to_integer.zero_preserves
+}
+
+-- Cancel a positive factor from a nonnegativity: if a·p ≥ 0 with p ≥ 0 and
+-- p ≠ 0 (so p > 0), then a ≥ 0.
+theorem Integer.IsNonneg_of_product_with_positive
+        (a p : Integer)
+        (productNonneg : Integer.IsNonneg(a * p))
+        (pNonneg : Integer.IsNonneg(p))
+        (pNonzero : ¬(p = Integer.zero))
+        : Integer.IsNonneg(a) :=
+  cases Integer.sign_split(a) {
+    | Or.introduceLeft(aNonneg) => aNonneg
+    | Or.introduceRight(aNegated) => {
+        choose k as aIsNegated from aNegated;
+        claim kImageNonneg : Integer.IsNonneg((k : Integer))
+            by Integer.from_natural_is_nonneg;
+        claim kProductNonneg : Integer.IsNonneg((k : Integer) * p)
+            by Integer.multiply_nonneg((k : Integer), p, kImageNonneg, pNonneg);
+        claim productForm : a * p = -((k : Integer) * p)
+            by calc a * p
+                  = -(k : Integer) * p     by substituting aIsNegated
+                  = -((k : Integer) * p)   by ring;
+        claim negateProductNonneg : Integer.IsNonneg(-((k : Integer) * p))
+            by substituting productForm;
+        claim kProductZero : (k : Integer) * p = Integer.zero
+            by Integer.nonneg_and_negate_nonneg_implies_zero(
+                   (k : Integer) * p, kProductNonneg, negateProductNonneg);
+        claim cancelEquation : (k : Integer) * p = Integer.zero * p
+            by calc (k : Integer) * p
+                  = Integer.zero       by kProductZero
+                  = Integer.zero * p   by ring;
+        claim kImageZero : (k : Integer) = Integer.zero
+            by Integer.multiply_cancel_right_by_nonzero(
+                   (k : Integer), Integer.zero, p, pNonzero, cancelEquation);
+        claim aIsZero : a = Integer.zero
+            by calc a
+                  = -(k : Integer)    by aIsNegated
+                  = -(Integer.zero)   by substituting kImageZero
+                  = Integer.zero      by ring;
+        done by substituting aIsZero
+    }
+  }
+
+-- ----------------------------------------------------------------------
+-- Absolute value and nonzero-ness (for |n/d| = |n|/|d| on Rational).
+
+-- |x| = 0 forces x = 0.
+theorem Integer.absolute_value_eq_zero_implies_zero
+        (x : Integer) (absoluteValueZero : abs(x) = Integer.zero)
+        : x = Integer.zero :=
+  cases Integer.sign_split(x) {
+    | Or.introduceLeft(xNonneg) => {
+        choose k as xImage from xNonneg;
+        calc x
+           = (k : Integer)        by xImage
+           = abs((k : Integer))   by Integer.absolute_value_of_natural
+           = abs(x)               by substituting xImage
+           = Integer.zero         by absoluteValueZero
+      }
+    | Or.introduceRight(xNegated) => {
+        choose k as xIsNegated from xNegated;
+        claim kImageZero : (k : Integer) = Integer.zero
+            by calc (k : Integer)
+                  = abs((k : Integer))    by Integer.absolute_value_of_natural
+                  = abs(-(k : Integer))   by Integer.absolute_value_negate
+                  = abs(x)                by substituting xIsNegated
+                  = Integer.zero          by absoluteValueZero;
+        calc x
+           = -(k : Integer)    by xIsNegated
+           = -(Integer.zero)   by substituting kImageZero
+           = Integer.zero      by ring
+      }
+  }
+
+-- |x| ≠ 0 when x ≠ 0.
+theorem Integer.absolute_value_nonzero
+        (x : Integer) (xNonzero : ¬(x = Integer.zero))
+        : ¬(abs(x) = Integer.zero) := {
+  suppose abs(x) = Integer.zero as absoluteValueZero;
+  claim xIsZero : x = Integer.zero
+      by Integer.absolute_value_eq_zero_implies_zero(x, absoluteValueZero);
+  absurd(xNonzero(xIsZero))
+}
+
+-- A successor-natural image is a valid (nonzero) denominator: the common
+-- case for denominators built from positive naturals.
+theorem Integer.from_natural_successor_nonzero (k : Natural)
+        : ¬((successor(k) : Integer) = Integer.zero) := {
+  suppose (successor(k) : Integer) = Integer.zero as castZero;
+  claim castEqual : ((successor(k) : Natural) : Integer) = ((0 : Natural) : Integer)
+      by calc ((successor(k) : Natural) : Integer)
+            = Integer.zero               by castZero
+            = ((0 : Natural) : Integer)  by Natural.to_integer.zero_preserves;
+  claim successorEqualsZero : successor(k) = (0 : Natural)
+      by Natural.to_integer.injective(successor(k), 0, castEqual);
+  absurd(successorEqualsZero)
+}
+
+-- Same fact stated in `1 + n` form, so consumers never need to spell
+-- `successor` in fraction denominators. (`Natural.add` is opaque, so
+-- `1 + k` is not definitionally `successor(k)`; bridge via `Natural.one_add`.)
+theorem Integer.one_plus_natural_nonzero (k : Natural)
+        : ¬(((1 + k) : Integer) = Integer.zero) :=
+  (castZero : ((1 + k) : Integer) = Integer.zero) ↦
+      Natural.successor_not_zero(k)(
+          rewrite(
+              Natural.one_add(k),
+              Natural.to_integer.injective(1 + k, 0,
+                  calc ((1 + k) : Integer)
+                     = Integer.zero               by castZero
+                     = ((0 : Natural) : Integer)  by Natural.to_integer.zero_preserves)))
+
+-- |x| ≥ 0: the absolute value is the image of a natural.
+theorem Integer.absolute_value_is_nonneg (x : Integer)
+        : Integer.IsNonneg(abs(x)) := {
+  claim imageForm : abs(x) = (Integer.absolute_value_natural(x) : Integer)
+      by Integer.absolute_value_natural_is_image;
+  claim Integer.IsNonneg((Integer.absolute_value_natural(x) : Integer))
+      by Integer.from_natural_is_nonneg;
+  done by substituting imageForm
+}
+
+-- |d| ≥ 1 when d ≠ 0 (as IsNonneg(|d| − 1)): the absolute value of a nonzero
+-- integer is a positive natural image, so subtracting one stays non-negative.
+theorem Integer.absolute_value_minus_one_nonneg
+        (d : Integer) (dNonzero : ¬(d = Integer.zero))
+        : Integer.IsNonneg(abs(d) + -Integer.one) := {
+  claim absoluteImage : abs(d) = (Integer.absolute_value_natural(d) : Integer)
+      by Integer.absolute_value_natural_is_image;
+  claim absoluteNaturalNonzero : ¬(Integer.absolute_value_natural(d) = 0) by {
+      suppose Integer.absolute_value_natural(d) = 0 as absoluteNaturalZero;
+      claim absoluteZero : abs(d) = Integer.zero
+          by calc abs(d)
+                = (Integer.absolute_value_natural(d) : Integer)  by absoluteImage
+                = ((0 : Natural) : Integer)                      by substituting absoluteNaturalZero
+                = Integer.zero                                   by Natural.to_integer.zero_preserves;
+      claim d = Integer.zero by Integer.absolute_value_eq_zero_implies_zero(d, absoluteZero);
+      absurd(dNonzero(d = Integer.zero))
+  };
+  cases Natural.zero_or_successor(Integer.absolute_value_natural(d)) {
+    | Or.introduceLeft(isZero) => absurd(absoluteNaturalNonzero(isZero))
+    | Or.introduceRight(isSuccessor) => {
+        choose j as absoluteEqualsSuccessor from isSuccessor;
+        witness j with
+            calc abs(d) + -Integer.one
+               = (Integer.absolute_value_natural(d) : Integer) + -Integer.one
+                     by substituting absoluteImage
+               = ((successor(j) : Natural) : Integer) + -Integer.one
+                     by substituting absoluteEqualsSuccessor
+               = (Integer.one + (j : Integer)) + -Integer.one
+                     by substituting Natural.to_integer.successor_preserves
+               = (j : Integer)
+                     by ring
+      }
+  }
+}
+
+-- The magnitude of a nonzero integer is a positive natural.
+theorem Integer.absolute_value_natural_positive_of_nonzero
+        (d : Integer) (dNonzero : ¬(d = Integer.zero))
+        : 1 ≤ Integer.absolute_value_natural(d) :=
+  cases Natural.zero_or_successor(Integer.absolute_value_natural(d)) {
+    | Or.introduceLeft(isZero) => {
+        claim absoluteZero : abs(d) = Integer.zero
+            by calc abs(d)
+                  = (Integer.absolute_value_natural(d) : Integer)  by Integer.absolute_value_natural_is_image
+                  = ((0 : Natural) : Integer)                      by substituting isZero
+                  = Integer.zero                                   by Natural.to_integer.zero_preserves;
+        claim d = Integer.zero by Integer.absolute_value_eq_zero_implies_zero(d, absoluteZero);
+        absurd(dNonzero(d = Integer.zero))
+      }
+    | Or.introduceRight(isSuccessor) => {
+        choose j as magnitudeEquation from isSuccessor;
+        calc (1 : Natural)
+           ≤ successor(j)                          by Natural.successor_positive
+           = Integer.absolute_value_natural(d)     by magnitudeEquation
+      }
+  }

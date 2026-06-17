@@ -2,6 +2,10 @@
 -- is additionally registered as a canonical quotient-introduction form.
 -- It elaborates exactly like a definition; the value is that proofs (and,
 -- via the registry, by_representatives) read in the named form.
+--
+-- `Rational` is now opaque, so the underlying `Quotient.mk` is only visible
+-- after `unfold Rational` — the construction still δ-reduces to the mk, but
+-- the opaque type seals that view behind the boundary.
 
 module Test.construction_test
 
@@ -10,29 +14,32 @@ import Logic.quotient
 import Equality.basics
 import Natural.basics
 import Integer.basics
+import Integer.integral_domain
 import Rational.basics
 
 -- Use the construction defined in Rational.basics.
-theorem fraction_is_mk (n : Integer) (d : Natural)
-        : Rational.fraction(n, d)
-          = Quotient.mk(RationalRepresentative.make(n, d)) :=
-  -- Transparent: fraction δ-reduces to the underlying mk, so this is
-  -- closed by reflexivity.
-  reflexivity(Rational, Rational.fraction(n, d))
+theorem fraction_is_mk (n : Integer) (d : Integer) (dNonzero : ¬(d = Integer.zero))
+        : Rational.fraction(n, d, dNonzero)
+          = (Quotient.mk(RationalRepresentative.make(n, d, dNonzero)) : Rational) :=
+  -- fraction δ-reduces to the underlying mk; `unfold Rational` pierces the
+  -- opaque type once so the equality typechecks and closes by reflexivity.
+  unfold Rational in reflexivity(Rational, Rational.fraction(n, d, dNonzero))
 
 -- Rational.zero, now defined via fraction, is still def-equal to the raw
 -- representative class (two δ-steps: zero → fraction → mk).
 theorem zero_is_rep
         : Rational.zero
-          = Quotient.mk(RationalRepresentative.make(Integer.zero, zero)) :=
-  reflexivity(Rational, Rational.zero)
+          = (Quotient.mk(RationalRepresentative.make(
+                 Integer.zero, Integer.one, Integer.one_is_nonzero)) : Rational) :=
+  unfold Rational in reflexivity(Rational, Rational.zero)
 
 -- A local construction over the same quotient: the keyword is general,
 -- not special-cased to Rational.fraction.
 construction Rational.from_integer_fraction (n : Integer) : Rational :=
-  Rational.fraction(n, zero)
+  Rational.fraction(n, Integer.one, Integer.one_is_nonzero)
 
 theorem from_integer_fraction_unfolds (n : Integer)
         : Rational.from_integer_fraction(n)
-          = Quotient.mk(RationalRepresentative.make(n, zero)) :=
-  reflexivity(Rational, Rational.from_integer_fraction(n))
+          = (Quotient.mk(RationalRepresentative.make(
+                 n, Integer.one, Integer.one_is_nonzero)) : Rational) :=
+  unfold Rational in reflexivity(Rational, Rational.from_integer_fraction(n))
