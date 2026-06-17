@@ -173,12 +173,11 @@ theorem Real.avoidStepWithDecision_nested
                                       Real.NestedInterval.left(state),
                                       Real.NestedInterval.right(state)))))
           → Real.NestedInterval.left(state) < Real.NestedInterval.right(state)
-          → And(Real.NestedInterval.left(state)
+          → Real.NestedInterval.left(state)
                   ≤ Real.NestedInterval.left(
-                        Real.avoidStepWithDecision(state, point, decision)),
-                Real.NestedInterval.right(
+                        Real.avoidStepWithDecision(state, point, decision)) ∧ Real.NestedInterval.right(
                     Real.avoidStepWithDecision(state, point, decision))
-                  ≤ Real.NestedInterval.right(state))
+                  ≤ Real.NestedInterval.right(state)
   | Real.NestedInterval.make(a, b) =>
       (point : Real)
       (decision : Logic.Decidable(
@@ -228,11 +227,10 @@ theorem Real.avoidStepWithDecision_avoids
                                       Real.NestedInterval.left(state),
                                       Real.NestedInterval.right(state)))))
           → Real.NestedInterval.left(state) < Real.NestedInterval.right(state)
-          → Or(point < Real.NestedInterval.left(
-                           Real.avoidStepWithDecision(state, point, decision)),
-               Real.NestedInterval.right(
+          → point < Real.NestedInterval.left(
+                           Real.avoidStepWithDecision(state, point, decision)) ∨ Real.NestedInterval.right(
                    Real.avoidStepWithDecision(state, point, decision))
-                 < point)
+                 < point
   | Real.NestedInterval.make(a, b) =>
       (point : Real)
       (decision : Logic.Decidable(
@@ -287,10 +285,9 @@ theorem Real.avoidStep_nested
         (state : Real.NestedInterval) (point : Real)
         (ordered : Real.NestedInterval.left(state)
                      < Real.NestedInterval.right(state))
-        : And(Real.NestedInterval.left(state)
-                ≤ Real.NestedInterval.left(Real.avoidStep(state, point)),
-              Real.NestedInterval.right(Real.avoidStep(state, point))
-                ≤ Real.NestedInterval.right(state)) :=
+        : Real.NestedInterval.left(state)
+                ≤ Real.NestedInterval.left(Real.avoidStep(state, point)) ∧ Real.NestedInterval.right(Real.avoidStep(state, point))
+                ≤ Real.NestedInterval.right(state) :=
   Real.avoidStepWithDecision_nested(
       state, point,
       Logic.classical_decidable(
@@ -304,8 +301,7 @@ theorem Real.avoidStep_avoids
         (state : Real.NestedInterval) (point : Real)
         (ordered : Real.NestedInterval.left(state)
                      < Real.NestedInterval.right(state))
-        : Or(point < Real.NestedInterval.left(Real.avoidStep(state, point)),
-             Real.NestedInterval.right(Real.avoidStep(state, point)) < point) :=
+        : point < Real.NestedInterval.left(Real.avoidStep(state, point)) ∨ Real.NestedInterval.right(Real.avoidStep(state, point)) < point :=
   Real.avoidStepWithDecision_avoids(
       state, point,
       Logic.classical_decidable(
@@ -434,10 +430,8 @@ theorem Real.avoidingLeft_le_avoidingRight
 
 -- The step at index n throws f(n) out of interval n+1.
 theorem Real.avoiding_avoids (f : Natural → Real) (n : Natural)
-        : Or(f(n) < Real.avoidingLeft(f, 1 + n),
-             Real.avoidingRight(f, 1 + n) < f(n)) := {
-  claim Or(f(n) < Real.avoidingLeft(f, successor(n)),
-           Real.avoidingRight(f, successor(n)) < f(n))
+        : f(n) < Real.avoidingLeft(f, 1 + n) ∨ Real.avoidingRight(f, 1 + n) < f(n) := {
+  claim f(n) < Real.avoidingLeft(f, successor(n)) ∨ Real.avoidingRight(f, successor(n)) < f(n)
       by Real.avoidStep_avoids(
              Real.avoidingIntervals(f, n), f(n),
              Real.avoidingIntervals_ordered(f, n));

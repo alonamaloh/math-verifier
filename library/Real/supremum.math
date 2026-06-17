@@ -162,11 +162,9 @@ definition Real.IsBoundedAbove (subset : Set(Real)) : Proposition :=
 --   - every other upper bound `b` satisfies `s ≤ b`.
 definition Real.IsSupremum (subset : Set(Real)) (s : Real)
         : Proposition :=
-  And(
-      Real.IsUpperBound(subset, s),
-      ∀ (otherBound : Real).
+  Real.IsUpperBound(subset, s) ∧ ∀ (otherBound : Real).
             Real.IsUpperBound(subset, otherBound)
-          → s ≤ otherBound)
+          → s ≤ otherBound
 
 -- ----------------------------------------------------------------------
 -- Building block #1: every Real has a Rational lower bound.
@@ -272,7 +270,7 @@ theorem Real.exists_rational_above (x : Real)
 -- A positive rational roof over |x|: the form every ε-argument wants,
 -- with positivity bundled in so the roof can be fed to reciprocals.
 theorem Real.exists_positive_rational_roof (x : Real)
-        : ∃ (q : Rational). And(Rational.zero < q, abs(x) ≤ (q : Real)) := {
+        : ∃ (q : Rational). Rational.zero < q ∧ abs(x) ≤ (q : Real) := {
   obtain ⟨bound, boundRoof⟩ from Real.exists_rational_above(abs(x));
   claim Real.zero ≤ abs(x) since Real.absolute_value_nonneg;
   claim Rational.zero < Rational.one;
@@ -434,8 +432,7 @@ theorem Real.bisectionLeft_below_witness_step
         (intervals : Real.BisectionInterval)
         (predecessorLeftBelowSome
             : ∃ (y : Real).
-                  And(y ∈ subset,
-                      (Real.BisectionInterval.left(intervals) : Real) ≤ y))
+                  y ∈ subset ∧ (Real.BisectionInterval.left(intervals) : Real) ≤ y)
         (decision
             : Logic.Decidable(
                   Real.IsUpperBound(
@@ -445,10 +442,9 @@ theorem Real.bisectionLeft_below_witness_step
                            + Real.BisectionInterval.right(intervals))
                        : Real))))
         : ∃ (y : Real).
-              And(y ∈ subset,
-                  (Real.BisectionInterval.left(
+              y ∈ subset ∧ (Real.BisectionInterval.left(
                        Real.bisectionStepWithDec(subset, intervals, decision))
-                   : Real) ≤ y) :=
+                   : Real) ≤ y :=
   cases decision {
     | Logic.Decidable.yes(_) =>
         -- New left = old left. IH applies directly.
@@ -484,12 +480,10 @@ theorem Real.bisectionLeft_below_witness
         (initial : Real.BisectionInterval)
         (initialLeftBelowSome
             : ∃ (y : Real).
-                  And(y ∈ subset,
-                      (Real.BisectionInterval.left(initial) : Real) ≤ y))
+                  y ∈ subset ∧ (Real.BisectionInterval.left(initial) : Real) ≤ y)
         (n : Natural)
         : ∃ (y : Real).
-              And(y ∈ subset,
-                  (Real.bisectionLeft(subset, initial, n) : Real) ≤ y) :=
+              y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ y :=
   by_induction on n with IH {
     case zero: initialLeftBelowSome
     case successor(predecessor): {
@@ -1571,8 +1565,7 @@ theorem Real.bisectionLimit_is_least
               ≤ Real.BisectionInterval.right(initial))
         (initialLeftBelowSome
             : ∃ (y : Real).
-                  And(y ∈ subset,
-                      (Real.BisectionInterval.left(initial) : Real) ≤ y))
+                  y ∈ subset ∧ (Real.BisectionInterval.left(initial) : Real) ≤ y)
         (otherBound : Real)
         (otherIsUpper : Real.IsUpperBound(subset, otherBound))
         : Real.bisectionLimit(subset, initial, initialLeftLeqRight)
@@ -1617,13 +1610,11 @@ theorem Real.supremum_exists
   -- by bisectionLeft_below_witness / bisectionLimit_is_least.
   claim initialLeftBelowSome
         : ∃ (y : Real).
-              And(y ∈ subset,
-                  (Real.BisectionInterval.left(initial) : Real) ≤ y)
+              y ∈ subset ∧ (Real.BisectionInterval.left(initial) : Real) ≤ y
     by Exists.introduce(
            Real,
            (y : Real) ↦
-               And(y ∈ subset,
-                   (Real.BisectionInterval.left(initial) : Real) ≤ y),
+               y ∈ subset ∧ (Real.BisectionInterval.left(initial) : Real) ≤ y,
            x0,
            And.introduction(x0InS, a0LeqX0));
   -- a0 ≤ b0 as Rationals follows from (a0 : Real) ≤ x0 ≤ B0 ≤ (b0 : Real).
@@ -1660,8 +1651,8 @@ theorem Real.IsSupremum.exists_above
         (subset : Set(Real)) (s u : Real)
         (isSupremum : Real.IsSupremum(subset, s))
         (uBelowSupremum : u < s)
-        : ∃ (x : Real). And(x ∈ subset, u < x) :=
-  decide ∃ (x : Real). And(x ∈ subset, u < x) {
+        : ∃ (x : Real). x ∈ subset ∧ u < x :=
+  decide ∃ (x : Real). x ∈ subset ∧ u < x {
     | yes someAbove => someAbove
     | no noneAbove => {
         -- Every element fails to exceed u, so u is an upper bound …

@@ -1,5 +1,5 @@
 -- Tests for the disjunction-introduction auto-prover strategy.
--- When the goal is `Or(A, B)`, the auto-prover tries to prove A
+-- When the goal is `A ∨ B`, the auto-prover tries to prove A
 -- (via the full dispatch); if that fails, it tries B. The wrapped
 -- proof uses `Or.introduceLeft` or `Or.introduceRight` accordingly.
 
@@ -16,51 +16,51 @@ import Natural.order
 -- (1) Left branch via direct hypothesis: A is in scope, picked
 -- first (left-biased).
 theorem disj_intro_left_hyp
-        (P Q : Proposition) (hP : P) : Or(P, Q) :=
+        (P Q : Proposition) (hP : P) : P ∨ Q :=
   claim
 
 -- (2) Right branch via hypothesis: A isn't provable (no hyp for P),
 -- so the strategy falls through to B.
 theorem disj_intro_right_hyp
-        (P Q : Proposition) (hQ : Q) : Or(P, Q) :=
+        (P Q : Proposition) (hQ : Q) : P ∨ Q :=
   claim
 
 -- (3) Left branch via reflexivity (the equality battery proves
 -- `n = n` for the left conjunct).
 theorem disj_intro_left_via_eq_battery
-        (n : Natural) (other : Proposition) : Or(n = n, other) :=
+        (n : Natural) (other : Proposition) : n = n ∨ other :=
   claim
 
 -- (4) Right branch via transitivity bridge: left is unprovable,
 -- right closes through the BFS chain.
 theorem disj_intro_right_via_transitivity
         (other : Proposition) (a b c : Natural)
-        (h1 : a ≤ b) (h2 : b ≤ c) : Or(other, a ≤ c) :=
+        (h1 : a ≤ b) (h2 : b ≤ c) : other ∨ a ≤ c :=
   claim
 
 -- ----------------------------------------------------------------------
 -- Disjunction-injection coercion. Distinct from the auto-prover above:
 -- here the proof of one disjunct is given EXPLICITLY, and the elaborator
--- recognizes the `Or(A, B)` goal and wraps the matching Or.introduce*
+-- recognizes the `A ∨ B` goal and wraps the matching Or.introduce*
 -- (a targeted, search-free coercion — no need to name Or.introduceLeft/
 -- Right). This is what lets a `cases` arm just state one side.
 
 -- (5) Explicit proof of the left disjunct injects Or.introduceLeft.
 theorem disj_inject_left_explicit
-        (P Q : Proposition) (hP : P) : Or(P, Q) :=
+        (P Q : Proposition) (hP : P) : P ∨ Q :=
   hP
 
 -- (6) Explicit proof of the right disjunct injects Or.introduceRight —
 -- the case the auto-prover would have to search for, given directly.
 theorem disj_inject_right_explicit
-        (P Q : Proposition) (hQ : Q) : Or(P, Q) :=
+        (P Q : Proposition) (hQ : Q) : P ∨ Q :=
   hQ
 
 -- (7) The injected proof can itself be a derivation (here a calc), and
 -- the disjunct is matched up to definitional equality.
 theorem disj_inject_calc
         (a b c : Natural) (other : Proposition)
-        (h1 : a = b) (h2 : b = c) : Or(other, a = c) :=
+        (h1 : a = b) (h2 : b = c) : other ∨ a = c :=
   calc a = b = c
 
 -- ----------------------------------------------------------------------
