@@ -34,7 +34,7 @@ expressions (kernel-defeq; pattern positions keep `successor`).
 | `(x : T) ↦ e` | lambda (also `(x : T)(y : U) ↦ e`) |
 | `⟨a, b, c⟩` | anonymous tuple — `∧`-intro / `∃`-intro (right-nested) |
 | `reflexivity(x)` | `x = x` |
-| `absurd(p)` | from a proof of an impossible/`False` fact, prove anything |
+| `absurd(p)` | from a proof of an impossible/`False` fact, prove anything; `p` may be a **proposition** (proved from context, then contradicted) |
 | `witness w with proof` | prove `∃ x. P(x)` |
 
 ## calc
@@ -97,9 +97,9 @@ End each with `;`; the block returns its final non-`;` expression.
 |---|---|
 | `take x : T;` | introduce a ∀-bound variable |
 | `suppose P as h;` | introduce a hypothesis |
-| `obtain ⟨a, b⟩ from E;` | destructure an `∃`/`∧` value |
-| `obtain ⟨a, b⟩ by L;` | … from lemma `L`, arguments inferred |
-| `choose n such that P(n);` | `∃`-elimination by scope lookup |
+| `choose w [such that P] [as h] from S;` | `∃`-elimination (preferred): `S` a hypothesis, a lemma cited argument-free, or an applied term |
+| `choose n such that P(n);` | `∃`-elimination from the most-recent in-scope `∃` |
+| `obtain ⟨a, b⟩ from E;` / `let ⟨a, b⟩ := E;` | tuple destructure — non-existential structures only (`∃`/`∧` → use `choose`) |
 | `let x := V;` / `set x := V;` | local (transparent) binding |
 
 ## Tactics
@@ -116,4 +116,6 @@ End each with `;`; the block returns its final non-`;` expression.
   from the goal/other arguments (does not invoke the auto-prover).
 - `recalling f, g` after a `by`/`since` hint — bring extra named facts into
   the discharge scope.
+- A context hypothesis `A ∧ B` makes both `A` and `B` available as facts
+  (conjunction-elimination, recursive) — no manual `And.left`/`And.right`.
 - `{x : T}` — an implicit parameter, solved by unification at call sites.

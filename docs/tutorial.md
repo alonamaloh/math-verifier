@@ -205,22 +205,33 @@ prover use it, or apply it by name if it is a function. Applying a *local*
 hypothesis like `IH(k)` or `notEqual(proof)` is fine and reads well — it is
 only *library lemmas* that we avoid invoking positionally.
 
-## Existentials: `witness` and `obtain`
+## Existentials: `witness` and `choose`
 
 We saw `witness` for *proving* an existential. To *use* one — to get at the
-thing it claims exists — `obtain` destructures it (and likewise unpacks an
-`∧`):
+thing it claims exists — `choose` names the witness and (optionally) states the
+property it satisfies:
 
 ```
-  obtain ⟨quotient, equation⟩ from dDividesA;   -- from a value in scope
+  choose quotient such that a = d * quotient from dDividesA;   -- from a fact in scope
 ```
 
-If the existential comes straight from a lemma, you can skip naming the
-intermediate and let the arguments be inferred:
+The `such that …` is a verified, in-place reminder of what `quotient` gives
+you — better than making the reader unfold what `dDividesA` means. `from`
+also takes a lemma, cited argument-free:
 
 ```
-  obtain ⟨quotient, equation⟩ by Natural.subtraction_witness;
+  choose quotient such that a = b + quotient from Natural.subtraction_witness;
 ```
+
+Add `as <name>` to name the property for later citation, or leave it off and a
+later by-less step picks it up. (Prefer `choose` over the raw tuple destructure
+`obtain ⟨w, p⟩` / `let ⟨w, p⟩ := …` for `∃`/`∧` — the `⟨…⟩` exposes that they
+happen to be encoded as tuples, which isn't how you think about them. Keep the
+tuple form for genuine records.)
+
+A context `A ∧ B` gives you both `A` and `B` as facts directly — no projecting
+a pair — and `absurd(0 = successor(k))` lets you state a contradictory fact and
+have it proved-then-contradicted.
 
 ## Induction
 
@@ -315,8 +326,8 @@ then `d` divides `a + b`":
 theorem Tutorial.divides_add (d a b : Natural)
         (dDividesA : d ∣ a) (dDividesB : d ∣ b)
         : d ∣ (a + b) := {
-  obtain ⟨q1, aEquation⟩ from dDividesA;   -- a = d * q1
-  obtain ⟨q2, bEquation⟩ from dDividesB;   -- b = d * q2
+  choose q1 such that a = d * q1 from dDividesA;
+  choose q2 such that b = d * q2 from dDividesB;
   witness q1 + q2 with
     calc a + b
        = d * q1 + d * q2       -- using the two equations in context

@@ -379,15 +379,38 @@ returns its final non-`;`-terminated expression.
   substituting <eq>` (narrowed to a supplied equation — `<eq>` may be a
   proof *or* a bare equation `(a = b)`, which is auto-proved), `by cases
   { … }`, `by cases on E { case A: … case B: … }`, `by induction { … }`.
-- `obtain ⟨a, b⟩ from <existentialOrAnd>;` — destructure an
-  `∃ x. P(x)` or `And(A, B)` into named binders.
-- `obtain ⟨a, b⟩ by <lemma>;` — cite `<lemma>` with ALL its explicit
-  arguments inferred (its premises recovered from context, no positional
-  application), then destructure the existential it yields. E.g. with a
-  single `≤` hypothesis in scope, `obtain ⟨c, eq⟩ by Natural.subtraction_witness;`
-  replaces `obtain ⟨c, eq⟩ from Natural.subtraction_witness(b, a, proof);`.
-  Needs the premises to be unambiguous in context — if two hypotheses match
-  (e.g. both `a ≤ b` and `b ≤ a`), name them with the `from <lemma>(args)` form.
+- **Eliminating an existential — prefer `choose`.**
+  `choose <name> [such that <prop>] [as <condName>] from <source>;` is the
+  readable way to take a witness out of an `∃ x. P(x)`. It shows — and the
+  kernel verifies — *what the witness satisfies* in place, and it avoids the
+  `⟨…⟩` tuple pattern, which leaks that `∃`/`∧` are encoded as tuples
+  (something a mathematician never thinks about). The clauses:
+  - **`from <source>`** — where the existential comes from. A **hypothesis**
+    name destructures that specific one (so you say *which* when several `∃`
+    are in scope — what plain `choose` can't). A **lemma** name is cited
+    argument-free (premises discharged from context, like `obtain … by`), then
+    destructured. `from` also takes any applied term of existential type
+    (`gSurjective(z)`, `Permutation.extract(a, b, sub)`, an explicit recursive
+    self-call). With **no `from`**, `choose` takes the most-recent in-scope `∃`.
+  - **`such that <prop>`** — optional but PREFERRED: a formally-verified,
+    locally-readable assertion of the witness's property, so the reader needn't
+    hunt in the lemma's statement or unfold a definition (`∣`, `Equinumerous`).
+    Give the full existential body — a conjunction is fine (`such that A ∧ B`).
+    For a *lemma* source it is also the disambiguator when several context
+    facts could discharge the premise.
+  - **`as <condName>`** — names the chosen condition for later citation; omit
+    it and the condition joins the context anonymously, to be consumed by
+    type-match in a by-less / `by` / `substituting` step (the usual case).
+  Example: `choose firstQuotient such that b = a * firstQuotient from aDividesB;`
+  or, citing a lemma, `choose gap such that a + (1 + gap) = b from Natural.lt_elim;`.
+- A context **conjunction's legs are facts on their own**: a hypothesis
+  `A ∧ B` lets you prove/cite `A` or `B` directly — no manual `And.left`/
+  `And.right`. So after `choose x such that A ∧ B from h;`, both `A` and `B` are
+  usable in by-less / `by` / `substituting` steps.
+- `obtain ⟨a, b⟩ from <expr>;` / `let ⟨a, b⟩ := <expr>;` — the tuple
+  destructure, now reserved for **non-existential** structures (records,
+  `Subtype`, …) where naming several components flatly is what's wanted. For an
+  `∃`/`∧`, use `choose` above — the `⟨…⟩` is an implementation tell.
 - `cases by <lemma> { … }` — the same inference for a **case-split**: cite
   `<lemma>` argument-free (premises from context) and case-split on the
   disjunction / inductive it yields. E.g. `cases by
@@ -409,8 +432,12 @@ returns its final non-`;`-terminated expression.
   disjunction-introduction picks whichever disjunct is in context. (Same for
   proving a universal: prefer `take x; …` — introduce the variable — over a
   point-free function value; see `Natural.totality_of_less_or_equal`.)
-- `choose N such that P(N);` — sugar for `obtain ⟨N, _⟩` followed
-  by a `claim P(N) by …`; reads as the textbook phrasing.
+- **Deriving a contradiction — `absurd`.** `absurd(<proof>)` closes any goal
+  from a proof of `False` or of a recognised contradiction (`0 = succ k`,
+  `succ k = 0`, `succ k ≤ 0`). It also accepts a **proposition**:
+  `absurd(0 = successor(k))` proves that proposition from context (e.g. a
+  conjunction leg) and contradicts it — state the false fact directly rather
+  than naming a tuple component or citing the negation lemma by hand.
 - `let <name> ∈ <type> [with <predicate>];` — introduce a typed
   variable that can later be refined.
 - `let <name> [: <type>] := <value>;` — ζ-tracked abbreviation
