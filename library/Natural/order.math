@@ -61,6 +61,20 @@ theorem Natural.lt_successor (a : Natural) : a < successor(a) :=
           = 1 + a          by ring
           = successor(a)   by Natural.one_add(a))
 
+-- Nothing lies strictly below zero. A gap `c` with `k + (1 + c) = 0` makes
+-- the left side a successor of `k + c`, which is never zero. (Opaque `<` has
+-- no Decidable instance, so `absurd` cannot refute `k < 0` on its own; this
+-- is the boundary lemma consumers cite instead — e.g. `NaturalsBelow(0)` is
+-- empty.)
+theorem Natural.not_less_than_zero (k : Natural) : ¬(k < 0) := {
+  suppose k < 0 as _;
+  choose gap such that k + (1 + gap) = 0 from Natural.lt_elim;
+  absurd((calc successor(k + gap)
+            = k + successor(gap)   by Natural.add_successor
+            = k + (1 + gap)        by Natural.one_add
+            = 0                    by (k + (1 + gap) = 0)))
+}
+
 -- Irreflexivity: a value never lies strictly below itself. A gap `c` with
 -- `a + (1 + c) = a` cancels `a` to force `1 + c = 0`, i.e. `successor(c) = 0`.
 theorem Natural.lt_irreflexive (a : Natural) : ¬ (a < a) := {

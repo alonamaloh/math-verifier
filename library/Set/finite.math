@@ -23,9 +23,9 @@ import Natural.order
 import Natural.strong_recursion
 
 -- `NaturalsBelow(n)`: the naturals strictly below n. An element is a value
--- `k` together with a proof that `successor(k) ≤ n`, i.e. `k < n`.
+-- `k` together with a proof that `k < n`.
 definition NaturalsBelow (n : Natural) : Type(0) :=
-  Subtype(Natural, (k : Natural) ↦ successor(k) ≤ n)
+  Subtype(Natural, (k : Natural) ↦ k < n)
 
 -- The element interface. Working through `make` / `value` / `below` (rather
 -- than the raw `Subtype.make(Natural, (k) ↦ …)` spelling) lets every call
@@ -33,9 +33,9 @@ definition NaturalsBelow (n : Natural) : Type(0) :=
 -- inferred from the element.
 
 -- Build an element from a value and a proof it lies below n.
-definition NaturalsBelow.make {n : Natural} (value : Natural) (below : successor(value) ≤ n)
+definition NaturalsBelow.make {n : Natural} (value : Natural) (below : value < n)
         : NaturalsBelow(n) :=
-  Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ n, value, below)
+  Subtype.make(Natural, (k : Natural) ↦ k < n, value, below)
 
 -- The underlying value of an element.
 definition NaturalsBelow.value {n : Natural} (element : NaturalsBelow(n)) : Natural :=
@@ -43,7 +43,7 @@ definition NaturalsBelow.value {n : Natural} (element : NaturalsBelow(n)) : Natu
 
 -- Every element's value lies below n.
 definition NaturalsBelow.below {n : Natural} (element : NaturalsBelow(n))
-        : successor(NaturalsBelow.value(element)) ≤ n :=
+        : NaturalsBelow.value(element) < n :=
   Subtype.property(element)
 
 -- Extensionality: elements with equal values are equal (the bound proofs
@@ -65,9 +65,11 @@ theorem NaturalsBelow.has_size (n : Natural) : HasSize(NaturalsBelow(n), n) :=
   { done by Equinumerous.reflexive }
 
 -- There are no naturals below 0: an element's value would be below 0, i.e.
--- `successor(value) ≤ 0`, which is impossible.
-theorem NaturalsBelow.zero_is_empty (element : NaturalsBelow(0)) : False :=
-  absurd(NaturalsBelow.below(element))
+-- `value < 0`, which is impossible.
+theorem NaturalsBelow.zero_is_empty (element : NaturalsBelow(0)) : False := {
+  claim NaturalsBelow.value(element) < 0 by NaturalsBelow.below;
+  done by Natural.not_less_than_zero
+}
 
 -- Size is invariant under equinumerosity: if X is the same size as Y and
 -- Y has n elements, so does X. This is transitivity of equinumerosity,
