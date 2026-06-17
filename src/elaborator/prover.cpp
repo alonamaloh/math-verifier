@@ -226,6 +226,46 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
                 localBinders[b].type, lift, 0);
             facts.push_back(std::move(fact));
         }
+        // Conjunction elimination: a hypothesis `A ∧ B` makes A and B
+        // available as facts in their own right — a mathematician just *has*
+        // both, and never "projects a pair". Worklist so nested conjunctions
+        // fully decompose. Kept BEFORE the cite-only cutoff: this is local
+        // context, not a library scan, so it stays on under cite-only.
+        for (size_t cursor = 0; cursor < facts.size() && cursor < 4096;
+             ++cursor) {
+            ExpressionPointer conjunction = weakHeadNormalForm(
+                environment_, facts[cursor].type);
+            auto* outerApp =
+                std::get_if<Application>(&conjunction->node);
+            if (!outerApp) continue;
+            auto* innerApp =
+                std::get_if<Application>(&outerApp->function->node);
+            if (!innerApp) continue;
+            auto* head =
+                std::get_if<Constant>(&innerApp->function->node);
+            if (!head || head->name != "And") continue;
+            ExpressionPointer leftType = innerApp->argument;   // A
+            ExpressionPointer rightType = outerApp->argument;  // B
+            ExpressionPointer proof = facts[cursor].proofTerm;
+            long long childCost = facts[cursor].cost + 1;
+            std::string childSource = facts[cursor].source;
+            ContextFact leftFact;
+            leftFact.cost = childCost;
+            leftFact.source = childSource + " (∧-left)";
+            leftFact.proofTerm = makeApplication(makeApplication(
+                makeApplication(makeConstant("And.left", {}),
+                    leftType), rightType), proof);
+            leftFact.type = leftType;
+            facts.push_back(std::move(leftFact));
+            ContextFact rightFact;
+            rightFact.cost = childCost;
+            rightFact.source = childSource + " (∧-right)";
+            rightFact.proofTerm = makeApplication(makeApplication(
+                makeApplication(makeConstant("And.right", {}),
+                    leftType), rightType), proof);
+            rightFact.type = rightType;
+            facts.push_back(std::move(rightFact));
+        }
         // Cite-only mode: stop here — local hypotheses only. The global
         // library scan below is exactly the shotgun auto-search we disable,
         // so an unproven goal must be closed by an explicit `by L`.

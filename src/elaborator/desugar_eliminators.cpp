@@ -27,6 +27,23 @@ ExpressionPointer Elaborator::desugarAbsurd(
         ExpressionPointer witnessType = closeOverLocalBinders(
             witnessTypeOpened, localBinders, localBinders.size());
 
+        // `absurd(<proposition>)`: the argument is a PROPOSITION (its type is
+        // `Proposition` = `Sort 0`), not a proof. State the contradictory fact
+        // directly — `absurd(0 = successor(k))` — and we prove it from context
+        // (conjunction-elimination makes a context `A ∧ B`'s legs reachable),
+        // then contradict that proof with the shape handling below.
+        if (auto* sortNode = std::get_if<Sort>(&witnessTypeOpened->node)) {
+            if (auto* level = std::get_if<LevelConst>(
+                    &sortNode->level->node)) {
+                if (level->value == 0) {
+                    ExpressionPointer proposition = witnessKernel;
+                    witnessKernel = autoProveClaim(
+                        proposition, localBinders, line);
+                    witnessType = proposition;
+                }
+            }
+        }
+
         ExpressionPointer falseProof;
 
         // Shape: witness is already a proof of False.
