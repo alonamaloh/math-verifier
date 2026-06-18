@@ -1811,22 +1811,22 @@ private:
         ExpressionPointer termTypeClosed,
         ExpressionPointer expectedTypeClosed);
 
-    // If `type` WHNFs to a class equality `Quotient.mk(T, R, x) =
-    // Quotient.mk(T, R, y)`, return the underlying equivalence `R(x, y)`;
+    // If `type` WHNFs to a class equality `Quotient.class_of(T, R, x) =
+    // Quotient.class_of(T, R, y)`, return the underlying equivalence `R(x, y)`;
     // else nullptr. Used both by the equality-of-classes coercion and by
     // hole-filling (so a proof citing `R` fills its `?`s against `R(x, y)`
     // when the surrounding goal is the class equality). `type` is returned
     // in whatever representation it came in — sub-terms are extracted and
     // reassembled in place, so callers can stay in opened or closed form.
-    // Components of a `Quotient.mk(T, R, rep)` class. `level` is the mk's
+    // Components of a `Quotient.class_of(T, R, rep)` class. `level` is the mk's
     // universe argument (null if absent).
     struct QuotientClassParts {
         ExpressionPointer carrier, relation, rep;
         LevelPointer level = nullptr;
     };
 
-    // WHNF `endpoint` and peel `Quotient.mk(T, R, rep)` (three Application
-    // layers, head `Quotient.mk`). The single shared mk-peeler — used by the
+    // WHNF `endpoint` and peel `Quotient.class_of(T, R, rep)` (three Application
+    // layers, head `Quotient.class_of`). The single shared mk-peeler — used by the
     // class-equality relaxer, the sound coercion, and the exact bridge.
     bool peelQuotientClass(ExpressionPointer endpoint, QuotientClassParts& out);
 
@@ -1834,13 +1834,13 @@ private:
 
     // Equality-of-classes coercion (WS3). When a proof of the underlying
     // equivalence `R(x, y)` is supplied where an equality of quotient
-    // classes `Quotient.mk(T, R, x) = Quotient.mk(T, R, y)` is expected,
-    // wrap it in `Quotient.sound(T, R, x, y, proof)` — so proofs say "these
+    // classes `Quotient.class_of(T, R, x) = Quotient.class_of(T, R, y)` is expected,
+    // wrap it in `Quotient.equivalent_implies_equal(T, R, x, y, proof)` — so proofs say "these
     // representatives are equivalent" and never name the quotient axiom.
     // The expected endpoints may be `construction` forms (e.g.
-    // `Rational.fraction(...)`) that δ-reduce to `Quotient.mk`; WHNF exposes
+    // `Rational.fraction(...)`) that δ-reduce to `Quotient.class_of`; WHNF exposes
     // the head. Returns nullptr unless the expected type really is an
-    // equality of two `Quotient.mk` applications over the same (T, R) and
+    // equality of two `Quotient.class_of` applications over the same (T, R) and
     // the term's type is definitionally `R(x, y)`.
     ExpressionPointer tryQuotientSoundForClassEquality(
             const std::vector<LocalBinder>& localBinders,
@@ -1850,10 +1850,10 @@ private:
 
     // The `exact` bridge — the mirror of tryQuotientSoundForClassEquality.
     // When the goal is a quotient relation application `R(a, b)` and some
-    // in-scope hypothesis proves `Quotient.mk(a) = Quotient.mk(b)` (the two
+    // in-scope hypothesis proves `Quotient.class_of(a) = Quotient.class_of(b)` (the two
     // classes are equal — possibly written through `construction` forms that
     // δ-reduce to `mk`), discharge it with
-    // `Quotient.exact.{u}(T, R, <equivalence instance>, a, b, h)` — so the
+    // `Quotient.equal_implies_equivalent.{u}(T, R, <equivalence instance>, a, b, h)` — so the
     // proof reads "since the classes are equal" and never names the axiom.
     // Scope (prototype): concrete-carrier quotients, where the carrier's
     // `IsEquivalenceRelation` instance is registered with no parameters and
@@ -3682,7 +3682,7 @@ private:
     // scrutinee)` term directly.
     //
     // Restrictions: exactly one clause; pattern shape
-    // `Quotient.mk(rep)` with a single bare-name argument; scrutinee is
+    // `Quotient.class_of(rep)` with a single bare-name argument; scrutinee is
     // a local-binder variable (so we can abstract it from the goal).
     // Expected type must reduce to a Proposition since `Quotient.induct`
     // requires a Proposition-valued motive.
@@ -4542,7 +4542,7 @@ private:
     // kernel's later typecheck of the built term see `Integer ≡ Quotient(...)`.
     bool engageOpaqueQuotientAlias(const ExpressionPointer& cursor);
 
-    // `Quotient.mk(rep)` — desugars to `Quotient.mk.{u}(T, R, rep)`,
+    // `Quotient.class_of(rep)` — desugars to `Quotient.class_of.{u}(T, R, rep)`,
     // recovering `T` from `rep`'s inferred type and `R` (plus
     // confirming `T`) from the expected type when available.
     ExpressionPointer desugarQuotientMk(
@@ -4551,8 +4551,8 @@ private:
         ExpressionPointer expectedType,
         int line, int /*column*/);
 
-    // `Quotient.sound(x, y, proof)` — desugars to
-    // `Quotient.sound.{u}(T, R, x, y, proof)`. Recovers `T` from `x`'s
+    // `Quotient.equivalent_implies_equal(x, y, proof)` — desugars to
+    // `Quotient.equivalent_implies_equal.{u}(T, R, x, y, proof)`. Recovers `T` from `x`'s
     // type and `R` by walking `proof`'s type as `R(x, y)` to extract
     // the head `R`.
     ExpressionPointer desugarQuotientSound(

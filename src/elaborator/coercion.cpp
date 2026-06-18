@@ -156,7 +156,7 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
         ExpressionPointer termTypeClosed = closeOverLocalBinders(
             termTypeOpened, localBinders, localBinders.size());
         // Equality-of-classes (WS3): a proof of `R(x, y)` where
-        // `mk(x) = mk(y)` is expected wraps with Quotient.sound.
+        // `mk(x) = mk(y)` is expected wraps with Quotient.equivalent_implies_equal.
         ExpressionPointer wrapped = tryQuotientSoundForClassEquality(
             localBinders, term, termTypeClosed, expectedTypeClosed);
         if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
@@ -635,7 +635,7 @@ bool Elaborator::peelQuotientClass(ExpressionPointer endpoint, QuotientClassPart
         auto* a1 = std::get_if<Application>(&a2->function->node);
         if (!a1) return false;
         auto* head = std::get_if<Constant>(&a1->function->node);
-        if (!head || head->name != "Quotient.mk") return false;
+        if (!head || head->name != "Quotient.class_of") return false;
         out.rep = a3->argument;
         out.relation = a2->argument;
         out.carrier = a1->argument;
@@ -668,7 +668,7 @@ ExpressionPointer Elaborator::tryQuotientSoundForClassEquality(
             ExpressionPointer term,
             ExpressionPointer termTypeClosed,
             ExpressionPointer expectedTypeClosed) {
-        if (!environment_.lookup("Quotient.sound")) return nullptr;
+        if (!environment_.lookup("Quotient.equivalent_implies_equal")) return nullptr;
         Context openedContext = buildContextFromLocalBinders(localBinders);
         ExpressionPointer expectedOpened = openOverLocalBinders(
             expectedTypeClosed, localBinders, localBinders.size());
@@ -697,13 +697,13 @@ ExpressionPointer Elaborator::tryQuotientSoundForClassEquality(
                                    termTypeOpened, relationApplied)) {
             return nullptr;
         }
-        // Build Quotient.sound.{u}(T, R, x, y, term); close the opened
+        // Build Quotient.equivalent_implies_equal.{u}(T, R, x, y, term); close the opened
         // endpoint pieces (term is already closed over the local binders).
         auto closeBack = [&](ExpressionPointer e) {
             return closeOverLocalBinders(e, localBinders, localBinders.size());
         };
         ExpressionPointer sound = makeConstant(
-            "Quotient.sound", {levelLeft});
+            "Quotient.equivalent_implies_equal", {levelLeft});
         sound = makeApplication(std::move(sound), closeBack(carrierLeft));
         sound = makeApplication(std::move(sound), closeBack(relationLeft));
         sound = makeApplication(std::move(sound), closeBack(x));
@@ -794,7 +794,7 @@ ExpressionPointer Elaborator::resolveEquivalenceInstance(
 ExpressionPointer Elaborator::tryQuotientExactBridge(
             ExpressionPointer goalClosed,
             const std::vector<LocalBinder>& localBinders) {
-        if (!environment_.lookup("Quotient.exact")) return nullptr;
+        if (!environment_.lookup("Quotient.equal_implies_equivalent")) return nullptr;
         Context openedContext = buildContextFromLocalBinders(localBinders);
         ExpressionPointer goalOpened = openOverLocalBinders(
             goalClosed, localBinders, localBinders.size());
@@ -863,7 +863,7 @@ ExpressionPointer Elaborator::tryQuotientExactBridge(
                 return closeOverLocalBinders(e, localBinders,
                                               localBinders.size());
             };
-            ExpressionPointer exact = makeConstant("Quotient.exact", {levelL});
+            ExpressionPointer exact = makeConstant("Quotient.equal_implies_equivalent", {levelL});
             exact = makeApplication(std::move(exact), closeBack(carrierL));
             exact = makeApplication(std::move(exact), closeBack(relationL));
             exact = makeApplication(std::move(exact), equivalenceInstance);

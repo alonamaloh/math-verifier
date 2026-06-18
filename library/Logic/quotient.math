@@ -2,11 +2,11 @@
 --
 -- Quotient types: given a type T and an equivalence relation R on T,
 -- `Quotient(T, R)` is the type of equivalence classes of T under R.
--- Two `Quotient.mk` applications are equal whenever the underlying
--- representatives are related: `Quotient.sound`. Functions on T that
+-- Two `Quotient.class_of` applications are equal whenever the underlying
+-- representatives are related: `Quotient.equivalent_implies_equal`. Functions on T that
 -- respect R lift to functions on the quotient via `Quotient.lift`.
 --
--- The reduction rule `Quotient.lift(_, _, _, f, _, Quotient.mk(_, _,
+-- The reduction rule `Quotient.lift(_, _, _, f, _, Quotient.class_of(_, _,
 -- x)) ≡ f(x)` is built into the kernel's `weakHeadNormalForm` so the
 -- equivalence is preserved by computation. Without that rule, every
 -- compute-step would need an explicit Equality.transport via
@@ -26,7 +26,7 @@ import axioms
 
 -- Compute rule as a propositional equality: a `reflexivity` proof
 -- because the kernel's WHNF rule reduces `Quotient.lift(_, _, _, f, _,
--- Quotient.mk(_, _, x))` to `f(x)` definitionally. Useful when a
+-- Quotient.class_of(_, _, x))` to `f(x)` definitionally. Useful when a
 -- user needs the equality explicitly (e.g., to transport along a
 -- specific predicate).
 theorem Quotient.compute.{u, v}
@@ -35,7 +35,7 @@ theorem Quotient.compute.{u, v}
         (h : ∀ (x y : T). R(x, y) → f(x) = f(y))
         (x : T)
         : Quotient.lift(
-                           T, R, U, f, h, Quotient.mk(T, R, x)) = f(x) :=
+                           T, R, U, f, h, Quotient.class_of(T, R, x)) = f(x) :=
   reflexivity(U, f(x))
 
 -- ----------------------------------------------------------------------
@@ -44,7 +44,7 @@ theorem Quotient.compute.{u, v}
 -- first parameter is the carrier type), so the canonical-instance
 -- machinery resolves it: register one `instance <X>.equivalence` per
 -- quotient construction and the three proofs are threaded automatically
--- — notably into `Quotient.exact` below, which then needs only the two
+-- — notably into `Quotient.equal_implies_equivalent` below, which then needs only the two
 -- representatives and the `mk`-equality.
 
 definition IsEquivalenceRelation.{u}
@@ -97,8 +97,8 @@ definition Quotient.induct_two.{u, v}
               → Proposition)
         (atRepresentatives
             : (x1 : T1) → (x2 : T2)
-              → predicate(Quotient.mk(T1, R1, x1),
-                          Quotient.mk(T2, R2, x2)))
+              → predicate(Quotient.class_of(T1, R1, x1),
+                          Quotient.class_of(T2, R2, x2)))
         (q1 : Quotient(T1, R1))
         (q2 : Quotient(T2, R2))
         : predicate(q1, q2) :=
@@ -107,7 +107,7 @@ definition Quotient.induct_two.{u, v}
       (x1 : T1) ↦
           Quotient.induct(
               (q : Quotient(T2, R2)) ↦
-                  predicate(Quotient.mk(T1, R1, x1), q),
+                  predicate(Quotient.class_of(T1, R1, x1), q),
               (x2 : T2) ↦ atRepresentatives(x1, x2),
               q2),
       q1)
@@ -133,9 +133,9 @@ definition Quotient.induct_three.{u, v, w}
               → Proposition)
         (atRepresentatives
             : (x1 : T1) → (x2 : T2) → (x3 : T3)
-              → predicate(Quotient.mk(T1, R1, x1),
-                          Quotient.mk(T2, R2, x2),
-                          Quotient.mk(T3, R3, x3)))
+              → predicate(Quotient.class_of(T1, R1, x1),
+                          Quotient.class_of(T2, R2, x2),
+                          Quotient.class_of(T3, R3, x3)))
         (q1 : Quotient(T1, R1))
         (q2 : Quotient(T2, R2))
         (q3 : Quotient(T3, R3))
@@ -145,13 +145,13 @@ definition Quotient.induct_three.{u, v, w}
       (x1 : T1) ↦
           Quotient.induct(
               (qa : Quotient(T2, R2)) ↦
-                  predicate(Quotient.mk(T1, R1, x1), qa, q3),
+                  predicate(Quotient.class_of(T1, R1, x1), qa, q3),
               (x2 : T2) ↦
                   Quotient.induct(
                       (qb : Quotient(T3, R3)) ↦
                           predicate(
-                              Quotient.mk(T1, R1, x1),
-                              Quotient.mk(T2, R2, x2),
+                              Quotient.class_of(T1, R1, x1),
+                              Quotient.class_of(T2, R2, x2),
                               qb),
                       (x3 : T3) ↦
                           atRepresentatives(x1, x2, x3),
@@ -168,7 +168,7 @@ definition Quotient.induct_three.{u, v, w}
 -- is unbearable.)
 
 -- ----------------------------------------------------------------------
--- Quotient.exact: the converse of Quotient.sound. From a proof that
+-- Quotient.equal_implies_equivalent: the converse of Quotient.equivalent_implies_equal. From a proof that
 -- two `mk`'s are equal, recover the underlying equivalence.
 --
 -- Derived from propositional extensionality + the existing
@@ -190,16 +190,16 @@ definition Quotient.induct_three.{u, v, w}
 -- `IsEquivalenceRelation(T, R)` — an implicit argument, so it is filled
 -- by instance inference from the quotient's registered `equivalence`
 -- instance (or a local hypothesis). T and R are implicit too, recovered
--- from the `mk`-equality, so the call is just `Quotient.exact(x, y, h)`.
-theorem Quotient.exact.{u}
+-- from the `mk`-equality, so the call is just `Quotient.equal_implies_equivalent(x, y, h)`.
+theorem Quotient.equal_implies_equivalent.{u}
         {T : Type(u)}
         {R : T → T → Proposition}
         {equivalence : IsEquivalenceRelation(T, R)}
         (x y : T)
         (mkEqualityHypothesis
             : Equality(Quotient(T, R),
-                            Quotient.mk(T, R, x),
-                            Quotient.mk(T, R, y)))
+                            Quotient.class_of(T, R, x),
+                            Quotient.class_of(T, R, y)))
         : R(x, y) := {
     let ⟨reflexivityOfR, symmetryOfR, transitivityOfR⟩ := equivalence;
     -- Step 1: build the lifted "related to x by R" predicate. Its
@@ -222,7 +222,7 @@ theorem Quotient.exact.{u}
                              symmetryOfR(y1, y2, relation_y1_y2))));
     -- Step 2: `isRelatedToX(mk(x))` reduces definitionally to
     -- `R(x, x)`. The assumed reflexivity discharges it.
-    let reflexivityAtX : isRelatedToX(Quotient.mk(T, R, x))
+    let reflexivityAtX : isRelatedToX(Quotient.class_of(T, R, x))
       := reflexivityOfR(x);
     -- Step 3: transport along the input equality. After the lift's
     -- compute rule fires on `mk(y)`, the transported proof has type

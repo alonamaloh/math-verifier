@@ -74,7 +74,7 @@ std::vector<SurfaceExpressionPointer> Elaborator::reorderArgumentsForCall(
         // Two windows to try: the PREFIX [0..argCount) and the SUFFIX
         // [size-argCount..size). Prefix wins for fully-applied calls
         // and for explicit-parameter calls; suffix wins for desugared
-        // calls (Quotient.sound, Quotient.mk, etc.) where the user
+        // calls (Quotient.equivalent_implies_equal, Quotient.class_of, etc.) where the user
         // supplies only the trailing explicit parameters. Pick the
         // window that accepts every named argument; if both, prefix
         // wins as the more general default.
@@ -710,13 +710,13 @@ ExpressionPointer Elaborator::elaborateExpression(
                 // standard implicit-argument machinery doesn't play
                 // well with the combined universe-polymorphism +
                 // implicit-binder case for axioms).
-                if (name == "Quotient.mk" && argumentCount == 1) {
+                if (name == "Quotient.class_of" && argumentCount == 1) {
                     return desugarQuotientMk(
                         positionalArguments[0],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
-                if (name == "Quotient.sound" && argumentCount == 3) {
+                if (name == "Quotient.equivalent_implies_equal" && argumentCount == 3) {
                     return desugarQuotientSound(
                         positionalArguments[0],
                         positionalArguments[1],
@@ -1442,7 +1442,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                 ExpressionPointer leftType = closeOverLocalBinders(
                     leftTypeOpen, localBinders, localBinders.size());
                 // Pass leftType as expected type for the right side.
-                // This lets `Quotient.mk(rep2)` (implicit T, R) back-
+                // This lets `Quotient.class_of(rep2)` (implicit T, R) back-
                 // infer R from the carrier when the left side fixes it.
                 ExpressionPointer rightKernel =
                     elaborateExpression(*binary->right, localBinders,
@@ -1531,7 +1531,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                 //
                 // Propagate the outer expected type to the operand
                 // when it has a Constant head — `-` is type-preserving
-                // for numeric carriers, so short-form `Quotient.mk(rep)`
+                // for numeric carriers, so short-form `Quotient.class_of(rep)`
                 // can fire under it.
                 ExpressionPointer operandExpectedType = nullptr;
                 if (expectedType

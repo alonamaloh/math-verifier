@@ -254,7 +254,7 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
         // ascription is the user's explicit label, and inferType
         // unfolds carrier aliases (e.g. `Real` -> `Quotient(...)`),
         // which would lose the label needed to pick the carrier-
-        // specific overload. Concretely: `abs((Quotient.mk(rep) :
+        // specific overload. Concretely: `abs((Quotient.class_of(rep) :
         // Real))` would otherwise match the Quotient head (no
         // candidate) instead of Real.
         std::vector<ExpressionPointer> argumentKernels;
@@ -519,7 +519,7 @@ ExpressionPointer Elaborator::desugarQuotientMk(
         ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
-            "Quotient.mk(rep) at line " + std::to_string(line));
+            "Quotient.class_of(rep) at line " + std::to_string(line));
         ExpressionPointer representativeKernel =
             elaborateExpression(*representativeSurface, localBinders);
         ExpressionPointer representativeTypeOpened =
@@ -538,18 +538,18 @@ ExpressionPointer Elaborator::desugarQuotientMk(
         }
         if (!relation) {
             throwElaborate(
-                "Quotient.mk(rep): cannot infer the equivalence "
+                "Quotient.class_of(rep): cannot infer the equivalence "
                 "relation `R`. The short form needs an expected type "
                 "of shape `Quotient(T, R)` from context. Common spots "
                 "this fails: operand of unary `-`, immediate body of "
                 "`function (rep) =>` inside `Quotient.lift`, or any "
                 "position with no propagated expected type. Fall back "
-                "to the explicit 3-arg form: `Quotient.mk(T, R, rep)`. "
+                "to the explicit 3-arg form: `Quotient.class_of(T, R, rep)`. "
                 "Needed an expected type of the form "
                 "`Quotient(T, R)` in context");
         }
         ExpressionPointer call = makeConstant(
-            "Quotient.mk", {universeLevel});
+            "Quotient.class_of", {universeLevel});
         call = makeApplication(std::move(call), representativeType);
         call = makeApplication(std::move(call), relation);
         call = makeApplication(std::move(call),
@@ -565,7 +565,7 @@ ExpressionPointer Elaborator::desugarQuotientSound(
         ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
-            "Quotient.sound at line " + std::to_string(line));
+            "Quotient.equivalent_implies_equal at line " + std::to_string(line));
         // Prefer pulling `T` and `R` from the expected type. Its
         // shape (after WHNF/δ-reduction) is
         // `Equality(Quotient(T, R), mk(T, R, x), mk(T, R, y))`, which
@@ -643,7 +643,7 @@ ExpressionPointer Elaborator::desugarQuotientSound(
             // would over-unfold a Definition-headed relation (e.g.
             // `Integer.CongruentModulo(modulus)` → `Integer.divides` →
             // the underlying `Exists`), recovering the wrong head — which
-            // is what breaks short `Quotient.sound` inside a short
+            // is what breaks short `Quotient.equivalent_implies_equal` inside a short
             // `Quotient.lift` respect handler, where no expected type is
             // propagated to pin `R`.
             ExpressionPointer proofTypeOpened =
@@ -669,13 +669,13 @@ ExpressionPointer Elaborator::desugarQuotientSound(
         }
         if (!relation) {
             throwElaborate(
-                "Quotient.sound(x, y, proof): cannot infer the "
+                "Quotient.equivalent_implies_equal(x, y, proof): cannot infer the "
                 "equivalence relation `R` — provide an expected type "
                 "of the form `Equality(Quotient(T, R), …, …)` or use "
-                "the explicit `Quotient.sound(T, R, x, y, proof)` form");
+                "the explicit `Quotient.equivalent_implies_equal(T, R, x, y, proof)` form");
         }
         ExpressionPointer call = makeConstant(
-            "Quotient.sound", {universeLevel});
+            "Quotient.equivalent_implies_equal", {universeLevel});
         call = makeApplication(std::move(call), carrierType);
         call = makeApplication(std::move(call), relation);
         call = makeApplication(std::move(call), std::move(xKernel));
@@ -910,7 +910,7 @@ ExpressionPointer Elaborator::desugarQuotientLift(
             "Quotient.lift at line " + std::to_string(line));
         // Elaborate `q` first to get T from its `Quotient(T, R)` type;
         // then we can build `T → U` as the expected type for `f`, which
-        // lets the lambda body's `Quotient.mk` etc. back-infer when
+        // lets the lambda body's `Quotient.class_of` etc. back-infer when
         // they appear in a position whose carrier matches U.
         ExpressionPointer qKernel = elaborateExpression(
             *qSurface, localBinders);
@@ -930,7 +930,7 @@ ExpressionPointer Elaborator::desugarQuotientLift(
             // Pi domain matches the closed `expectedType` representation —
             // otherwise a dependent carrier like `CommutativeRing.carrier(c)`
             // / `Wrap(n)` would leak its free `c`/`n` into the function the
-            // `Quotient.mk` short form reads its (T, R) from. The codomain
+            // `Quotient.class_of` short form reads its (T, R) from. The codomain
             // gains the new Pi binder, so lift its bound variables by one.
             fExpected = makePi(
                 "_",
@@ -995,7 +995,7 @@ ExpressionPointer Elaborator::desugarQuotientLift(
         // applied to (T, R, U, f). Passing it in lets the lambda-body
         // coercion fire the equality-of-classes wrap (WS3): a respect
         // proof returning the bare equivalence `R(f(x_rep), f(y_rep))`
-        // closes the `mk = mk` obligation without naming Quotient.sound.
+        // closes the `mk = mk` obligation without naming Quotient.equivalent_implies_equal.
         ExpressionPointer hExpected = nullptr;
         {
             ExpressionPointer partialCall = makeConstant(
@@ -1025,7 +1025,7 @@ ExpressionPointer Elaborator::desugarQuotientLift(
         // elaboration above can't reach the per-leaf class-equality
         // coercion (it only fires on a lambda body). Eta-expand `h` to the
         // respect arity and re-elaborate: the application body then sits in
-        // a lambda body and the coercion wraps Quotient.sound. So
+        // a lambda body and the coercion wraps Quotient.equivalent_implies_equal. So
         // `well_defined by <named respects lemma>` works, not just an
         // inline `(a b) (e) ↦ …` proof.
         if (hExpected) {

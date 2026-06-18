@@ -772,7 +772,7 @@ private:
     // desugar (unary) to `(x) ↦ Quotient.lift((rep) ↦ <body>, <proof>, x)`.
     // The short-form `Quotient.lift` infers (T, R, U) and coerces the
     // respect proof, so a `well_defined` proof of the bare equivalence
-    // closes the obligation — the lift apparatus and `Quotient.sound` are
+    // closes the obligation — the lift apparatus and `Quotient.equivalent_implies_equal` are
     // never named. The carrier representative may be destructured with a
     // tuple/constructor pattern, in which case `<body>` runs under a
     // `cases` on a synthesised representative binder.

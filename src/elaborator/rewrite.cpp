@@ -40,8 +40,8 @@ ExpressionPointer Elaborator::desugarRewriteTerm(
         // here: definitions like `Rational.LessThan(x, y) :=
         // And(LessOrEqual(x, y), Not(x = y))` unfold to a Constant
         // head whose argument appears twice (once on each conjunct),
-        // and `Rational.IsNonneg(Quotient.mk(rep))` unfolds via
-        // `Quotient.lift` so the `Quotient.mk` head disappears.
+        // and `Rational.IsNonneg(Quotient.class_of(rep))` unfolds via
+        // `Quotient.lift` so the `Quotient.class_of` head disappears.
         // Either kills the structural-occurrence search. Keeping the
         // unreduced form gives us the user-visible motive shape, with
         // the rewrite endpoint exactly where they expect it. If no

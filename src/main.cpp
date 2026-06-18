@@ -3767,7 +3767,7 @@ theorem swap_test
         "multi-constructor pattern desugars via nested cases",
         __LINE__);
 
-    // Quotient kernel reduction: `Quotient.lift(f, _, Quotient.mk(x))`
+    // Quotient kernel reduction: `Quotient.lift(f, _, Quotient.class_of(x))`
     // should reduce to `f(x)` definitionally, so a `reflexivity` proof
     // closes the resulting equality. Tests the special-cased rule in
     // `weakHeadNormalForm`.
@@ -3785,7 +3785,7 @@ inductive Natural : Type(0) where
   | successor : Natural → Natural
 
 axiom Quotient.{u} : (T : Type(u)) → (R : T → T → Proposition) → Type(u)
-axiom Quotient.mk.{u}
+axiom Quotient.class_of.{u}
     : (T : Type(u)) → (R : T → T → Proposition) → T → Quotient.{u}(T, R)
 axiom Quotient.lift.{u, v}
     : (T : Type(u)) → (R : T → T → Proposition) → (U : Type(v))
@@ -3807,12 +3807,12 @@ theorem lift_reduces_to_f_of_x
                             Natural, trivialRelation, Natural,
                             (n : Natural) ↦ n,
                             trivialRespect,
-                            Quotient.mk.{0}(
+                            Quotient.class_of.{0}(
                                 Natural, trivialRelation, zero)),
                         zero) :=
   reflexivity.{0}(Natural, zero)
 )",
-        "Quotient.lift on Quotient.mk reduces to f(x) definitionally",
+        "Quotient.lift on Quotient.class_of reduces to f(x) definitionally",
         __LINE__);
 
     // calc block, two-step transitivity chain.

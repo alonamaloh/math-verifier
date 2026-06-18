@@ -1712,7 +1712,7 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
         // Quotient `exact` bridge — last resort (only reached once the
         // cheaper strategies miss, so its per-goal scan rarely runs): goal
         // `R(a, b)` closes from an in-scope `mk a = mk b` fact via
-        // Quotient.exact, so proofs never name it. Placed before symmetryFlip
+        // Quotient.equal_implies_equivalent, so proofs never name it. Placed before symmetryFlip
         // so a flipped fact (`mk b = mk a`) is caught when symmetryFlip
         // recurses on the flipped goal `R(b, a)`.
         {

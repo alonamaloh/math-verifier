@@ -112,7 +112,7 @@ opaque definition Integer : Type(0) :=
   Quotient(IntegerRepresentative, IntegerEquivalent)
 
 -- The equivalence bundled as an `IsEquivalenceRelation`, registered as
--- the canonical instance. This is what lets `Quotient.exact` recover
+-- the canonical instance. This is what lets `Quotient.equal_implies_equivalent` recover
 -- reflexivity / symmetry / transitivity automatically.
 definition Integer.equivalence
         : IsEquivalenceRelation(IntegerRepresentative, IntegerEquivalent) :=
@@ -126,7 +126,7 @@ instance Integer.equivalence
 -- Registered as a `construction` so proofs read `Integer.from_difference(a, b)`.
 -- The `unfold Integer` pierces the opaque type once, here at the boundary.
 construction Integer.from_difference (a b : Natural) : Integer :=
-  unfold Integer in Quotient.mk(IntegerRepresentative.make(a, b))
+  unfold Integer in Quotient.class_of(IntegerRepresentative.make(a, b))
 
 -- ----------------------------------------------------------------------
 -- The boundary API. Every consumer compares Integers through these two
@@ -134,20 +134,20 @@ construction Integer.from_difference (a b : Natural) : Integer :=
 -- Natural cross-equation `a + d = b + c`, in both directions. The opaque
 -- `Integer` is pierced only here (the equivalence is already transparent).
 
--- Cross-equation ⇒ equal classes (via Quotient.sound).
+-- Cross-equation ⇒ equal classes (via Quotient.equivalent_implies_equal).
 theorem Integer.difference_equal (a b c d : Natural)
         (crossEquation : a + d = b + c)
         : Integer.from_difference(a, b) = Integer.from_difference(c, d) :=
   unfold Integer in
-    Quotient.sound(IntegerRepresentative.make(a, b),
+    Quotient.equivalent_implies_equal(IntegerRepresentative.make(a, b),
                    IntegerRepresentative.make(c, d),
                    crossEquation)
 
--- Equal classes ⇒ cross-equation (via Quotient.exact).
+-- Equal classes ⇒ cross-equation (via Quotient.equal_implies_equivalent).
 theorem Integer.difference_equal_implies (a b c d : Natural)
         (differenceEquality
             : Integer.from_difference(a, b) = Integer.from_difference(c, d))
         : a + d = b + c :=
-  Quotient.exact(IntegerRepresentative.make(a, b),
+  Quotient.equal_implies_equivalent(IntegerRepresentative.make(a, b),
                  IntegerRepresentative.make(c, d),
                  unfold Integer in differenceEquality)

@@ -81,7 +81,7 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // `-`, the result type equals the operand type, so the hint
         // is exactly the operand type. For `≤`, `<`, etc. the result
         // type is `Proposition` (a Sort, not a Constant), so the
-        // guard skips them. Lets short-form `Quotient.mk(rep)` fire
+        // guard skips them. Lets short-form `Quotient.class_of(rep)` fire
         // on the LEFT of a homogeneous operator when the outer
         // context provides the carrier head.
         ExpressionPointer leftExpectedType = nullptr;
@@ -103,7 +103,7 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         ExpressionPointer leftTypeRaw =
             inferTypeInLocalContext(localBinders, leftKernel);
         // Propagate the left operand's type as expected type for the
-        // right operand. This lets short-form `Quotient.mk(rep)` (with
+        // right operand. This lets short-form `Quotient.class_of(rep)` (with
         // R inferred from expected type) fire in operand position of
         // homogeneous operators like `+`, `*`, `≤`, `<` on Rational,
         // Real, etc. — mirrors the `=` desugaring's identical trick.
@@ -134,7 +134,7 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // Fallback: if the raw head Constant didn't match anything,
         // try operand-type names from the registry whose definition
         // δ-reduces to the operand's actual type. This catches
-        // `Quotient.mk(IntegerRepresentative, IntegerEquivalent, _)`
+        // `Quotient.class_of(IntegerRepresentative, IntegerEquivalent, _)`
         // (raw type head: `Quotient`) being treated as `Integer`
         // (whose definition body is exactly that `Quotient(...)`).
         if (targetFunction.empty()) {

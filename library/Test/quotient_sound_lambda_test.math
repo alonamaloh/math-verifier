@@ -1,4 +1,4 @@
--- Regression: short `Quotient.sound(x, y, proof)` propagates the
+-- Regression: short `Quotient.equivalent_implies_equal(x, y, proof)` propagates the
 -- relation's type `R(x, y)` into the `proof` argument. When `R` is a
 -- function-valued relation (as for the Cauchy / p-adic sequence
 -- equivalences) and `proof` is a user-written `function (…) => <block>`,
@@ -23,21 +23,21 @@ definition SeqEquiv (a b : Seq) : Proposition :=
 
 theorem sound_lambda_no_ascription (a b : Seq)
         (h : ∀ (e : Natural). ∃ (n : Natural). n = n)
-        : (Quotient.mk(a) : Quotient(Seq, SeqEquiv)) = Quotient.mk(b) :=
-  Quotient.sound(a, b,
+        : (Quotient.class_of(a) : Quotient(Seq, SeqEquiv)) = Quotient.class_of(b) :=
+  Quotient.equivalent_implies_equal(a, b,
       (e : Natural) ↦
         { obtain ⟨n, equation⟩ from h(e); witness n with equation })
 
 -- Regression (WS3): the short-form `Quotient.lift` elaborates its respect
 -- proof against the `f(x) = f(y)` obligation, so a proof of the bare
 -- equivalence `R(x, y)` closes the `mk(x) = mk(y)` goal via the
--- equality-of-classes coercion — no `Quotient.sound` written at the lift
+-- equality-of-classes coercion — no `Quotient.equivalent_implies_equal` written at the lift
 -- site. (Before the fix, `h` was elaborated with no expected type, the
 -- lambda took its natural `… → R(x,y)` type, and the lift call failed.)
 definition Seq.identity_map
         : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv) :=
   (q : Quotient(Seq, SeqEquiv)) ↦
     Quotient.lift(
-        (s : Seq) ↦ (Quotient.mk(s) : Quotient(Seq, SeqEquiv)),
+        (s : Seq) ↦ (Quotient.class_of(s) : Quotient(Seq, SeqEquiv)),
         (a b : Seq) (related : SeqEquiv(a, b)) ↦ related,
         q)

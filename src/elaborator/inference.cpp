@@ -1094,7 +1094,7 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             // `mk(x) = mk(y)` but this function concludes in the underlying
             // relation `R`, unify the result pattern against `R(x, y)` so
             // the holes fill. The result then has type `R(x, y)`, and the
-            // equality-of-classes coercion wraps it in Quotient.sound.
+            // equality-of-classes coercion wraps it in Quotient.equivalent_implies_equal.
             anyUnassigned = false;
             for (const auto& name : metavariableNames) {
                 if (!assignment.count(name)) { anyUnassigned = true; break; }

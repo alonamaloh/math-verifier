@@ -110,7 +110,7 @@ opaque definition Rational : Type(0) :=
   Quotient(RationalRepresentative, RationalEquivalent)
 
 -- The equivalence bundled as an `IsEquivalenceRelation`, registered as
--- the canonical instance — `Quotient.exact(x, y, mkEquality)` then
+-- the canonical instance — `Quotient.equal_implies_equivalent(x, y, mkEquality)` then
 -- recovers reflexivity / symmetry / transitivity automatically.
 definition Rational.equivalence
         : IsEquivalenceRelation(RationalRepresentative, RationalEquivalent) :=
@@ -122,12 +122,12 @@ instance Rational.equivalence
 
 -- The canonical introduction form: the class of the fraction n / d, given a
 -- proof that d is nonzero. Registered as a `construction` so proofs read
--- `Rational.fraction(n, d, proof)` instead of the raw `Quotient.mk`. The
+-- `Rational.fraction(n, d, proof)` instead of the raw `Quotient.class_of`. The
 -- `unfold Rational` pierces the opaque type once, here at the boundary.
 construction Rational.fraction
         (n : Integer) (d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
         : Rational :=
-  unfold Rational in Quotient.mk(RationalRepresentative.make(n, d, denominatorNonzero))
+  unfold Rational in Quotient.class_of(RationalRepresentative.make(n, d, denominatorNonzero))
 
 -- ----------------------------------------------------------------------
 -- The boundary API. Every consumer compares rationals through these two
@@ -135,25 +135,25 @@ construction Rational.fraction
 -- cross-equation `n1 · d2 = n2 · d1`, in both directions. The opaque
 -- `Rational` is pierced only here.
 
--- Cross-equation ⇒ equal fractions (via Quotient.sound).
+-- Cross-equation ⇒ equal fractions (via Quotient.equivalent_implies_equal).
 theorem Rational.fraction_equal
         (n1 d1 : Integer) (d1Nonzero : ¬(d1 = Integer.zero))
         (n2 d2 : Integer) (d2Nonzero : ¬(d2 = Integer.zero))
         (crossEquation : n1 * d2 = n2 * d1)
         : Rational.fraction(n1, d1, d1Nonzero) = Rational.fraction(n2, d2, d2Nonzero) :=
   unfold Rational in
-    Quotient.sound(RationalRepresentative.make(n1, d1, d1Nonzero),
+    Quotient.equivalent_implies_equal(RationalRepresentative.make(n1, d1, d1Nonzero),
                    RationalRepresentative.make(n2, d2, d2Nonzero),
                    crossEquation)
 
--- Equal fractions ⇒ cross-equation (via Quotient.exact).
+-- Equal fractions ⇒ cross-equation (via Quotient.equal_implies_equivalent).
 theorem Rational.fraction_equal_implies
         (n1 d1 : Integer) (d1Nonzero : ¬(d1 = Integer.zero))
         (n2 d2 : Integer) (d2Nonzero : ¬(d2 = Integer.zero))
         (fractionEquality
             : Rational.fraction(n1, d1, d1Nonzero) = Rational.fraction(n2, d2, d2Nonzero))
         : n1 * d2 = n2 * d1 :=
-  Quotient.exact(RationalRepresentative.make(n1, d1, d1Nonzero),
+  Quotient.equal_implies_equivalent(RationalRepresentative.make(n1, d1, d1Nonzero),
                  RationalRepresentative.make(n2, d2, d2Nonzero),
                  unfold Rational in fractionEquality)
 

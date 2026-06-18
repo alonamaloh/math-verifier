@@ -1164,9 +1164,9 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                 }
 
                 // Quotient lift reduction: Quotient.lift(T, R, U, f, h,
-                // Quotient.mk(T, R, x)) reduces to f(x). The axioms in
+                // Quotient.class_of(T, R, x)) reduces to f(x). The axioms in
                 // `library/Logic/quotient.math` give Quotient.lift and
-                // Quotient.mk specific arities (6 and 3 value args); we
+                // Quotient.class_of specific arities (6 and 3 value args); we
                 // recognise them by name. Without this rule, every
                 // computation on a quotient value would need an
                 // explicit `Quotient.compute` transport.
@@ -1177,7 +1177,7 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                     auto qSpine = peelApplicationSpine(reducedQ);
                     if (auto* mkHead = std::get_if<Constant>(
                             &qSpine.head->node);
-                        mkHead && mkHead->name == "Quotient.mk"
+                        mkHead && mkHead->name == "Quotient.class_of"
                         && qSpine.args.size() >= 3) {
                         ExpressionPointer x = qSpine.args[2];
                         ExpressionPointer f = spine.args[3];

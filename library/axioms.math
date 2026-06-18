@@ -11,10 +11,10 @@
 --   1. Propositional extensionality. If two propositions imply each
 --      other, they are equal as values of `Proposition`. Standard
 --      logical axiom (Lean adds the same one). Required to derive
---      `Quotient.exact` from `Quotient.lift`.
+--      `Quotient.equal_implies_equivalent` from `Quotient.lift`.
 --
---   2. The quotient type kernel: `Quotient`, `Quotient.mk`,
---      `Quotient.sound`, `Quotient.lift`, `Quotient.induct`. These are
+--   2. The quotient type kernel: `Quotient`, `Quotient.class_of`,
+--      `Quotient.equivalent_implies_equal`, `Quotient.lift`, `Quotient.induct`. These are
 --      the kernel's quotient infrastructure. Lean keeps `Quot` similarly
 --      axiomatic. The alternative (deriving quotients from inductive
 --      types) is significantly more setup for no practical gain since
@@ -75,19 +75,19 @@ axiom Quotient.{u} : ∀ (T : Type(u)). (R : T → T → Proposition) → Type(u
 -- explicit parameters here, but the elaborator's custom desugars
 -- (`desugar Quotient.{mk, sound, lift, induct}` in elaborator.cpp)
 -- infer those from the remaining arguments at call sites — so user
--- code just writes `Quotient.mk(rep)`, `Quotient.sound(rep1, rep2,
+-- code just writes `Quotient.class_of(rep)`, `Quotient.equivalent_implies_equal(rep1, rep2,
 -- proof)`, etc.
 
-axiom Quotient.mk.{u}
+axiom Quotient.class_of.{u}
     : ∀ (T : Type(u)). (R : T → T → Proposition)
       → T → Quotient(T, R)
 
-axiom Quotient.sound.{u}
+axiom Quotient.equivalent_implies_equal.{u}
     : ∀ (T : Type(u)). (R : T → T → Proposition)
       → ∀ (x y : T). ∀ (proof : R(x, y)).
       Equality(Quotient(T, R),
-                   Quotient.mk(T, R, x),
-                   Quotient.mk(T, R, y))
+                   Quotient.class_of(T, R, x),
+                   Quotient.class_of(T, R, y))
 
 axiom Quotient.lift.{u, v}
     : ∀ (T : Type(u)). (R : T → T → Proposition) → ∀ (U : Type(v)).
@@ -98,7 +98,7 @@ axiom Quotient.lift.{u, v}
 axiom Quotient.induct.{u}
     : ∀ (T : Type(u)). (R : T → T → Proposition)
       → (motive : Quotient(T, R) → Proposition)
-      → (atRepresentative : ∀ (x : T). motive(Quotient.mk(T, R, x)))
+      → (atRepresentative : ∀ (x : T). motive(Quotient.class_of(T, R, x)))
       → ∀ (q : Quotient(T, R)). motive(q)
 
 -- ----------------------------------------------------------------------

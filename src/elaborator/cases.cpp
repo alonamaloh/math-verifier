@@ -236,7 +236,7 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
         if (cases.clauses.size() != 1) {
             throwElaborate(
                 "quotient-cases takes exactly one clause "
-                "(`<rep> => …` or `Quotient.mk(<rep>) => …`), got "
+                "(`<rep> => …` or `Quotient.class_of(<rep>) => …`), got "
                 + std::to_string(cases.clauses.size()));
         }
         const SurfaceCasesClause& clause = cases.clauses[0];
@@ -244,7 +244,7 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
         // Accepted pattern shapes (where <pat_inner> is itself a bare
         // name or a constructor pattern over the carrier type):
         //   - <bare_name>                      — bind rep, no destructure
-        //   - Quotient.mk(<pat_inner>)         — explicit wrap (also accepted)
+        //   - Quotient.class_of(<pat_inner>)         — explicit wrap (also accepted)
         //   - <Constructor.…>(args)            — destructure rep directly
         //
         // For the non-bare-name inner patterns, we synthesise a fresh
@@ -264,10 +264,10 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
                 // `cases x { | rep_x => body }`: no destructure.
                 representativeName = bareName->name;
             } else if (constructorPattern
-                && constructorPattern->constructorName == "Quotient.mk") {
+                && constructorPattern->constructorName == "Quotient.class_of") {
                 if (constructorPattern->arguments.size() != 1) {
                     throwElaborate(
-                        "quotient-cases: `Quotient.mk` pattern takes "
+                        "quotient-cases: `Quotient.class_of` pattern takes "
                         "one argument (the representative), got "
                         + std::to_string(
                             constructorPattern->arguments.size()));
@@ -307,7 +307,7 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
                     "(binding the representative), a constructor "
                     "pattern or tuple `⟨…⟩` over the carrier type "
                     "(destructures the representative), or "
-                    "`Quotient.mk(<inner>)`");
+                    "`Quotient.class_of(<inner>)`");
             }
         }
 
@@ -325,7 +325,7 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
         std::vector<LocalBinder> innerBinders = localBinders;
         innerBinders.push_back({representativeName, carrierType});
 
-        // Build the body's expected type as `motive(Quotient.mk(T, R, rep))`
+        // Build the body's expected type as `motive(Quotient.class_of(T, R, rep))`
         // in inner context. Shift outer terms up by 1 to account for the
         // new binder; rep is BoundVariable(0). The kernel's WHNF will
         // beta-reduce when needed.
@@ -336,7 +336,7 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
             makeApplication(
                 makeApplication(
                     makeApplication(
-                        makeConstant("Quotient.mk", {quotientUniverse}),
+                        makeConstant("Quotient.class_of", {quotientUniverse}),
                         carrierTypeInner),
                     relationInner),
                 makeBoundVariable(0));
@@ -1059,7 +1059,7 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         // Quotient is not an inductive — it's an axiomatic kernel
         // primitive eliminated via `Quotient.induct`. When the scrutinee
         // is a value of `Quotient.{u}(T, R)` and the user supplied a
-        // single clause `Quotient.mk(rep) => body`, dispatch to a
+        // single clause `Quotient.class_of(rep) => body`, dispatch to a
         // dedicated handler that builds the induct application directly.
         // This is the "WLOG pick a representative" sugar — the
         // mathematician's natural reading of a quotient elimination.
