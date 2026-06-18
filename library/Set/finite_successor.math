@@ -21,25 +21,25 @@ import Natural.basics
 import Natural.order
 import Natural.strong_recursion
 
--- Only 0 lies below 1: from successor(k) ≤ 1 (= 1), peel the
--- successor to get k ≤ 0, which forces k = 0.
+-- Only 0 lies below 1: from k < 1, peel the successor to get k ≤ 0, which
+-- forces k = 0.
 theorem NaturalsBelow.below_one_is_zero (k : Natural)
-        (belowOne : successor(k) ≤ 1) : k = 0 :=
+        (belowOne : k < 1) : k = 0 :=
   Natural.less_or_equal_zero_implies_equals_zero(k,
-      Natural.less_or_equal_successor_successor_descend(k, 0, belowOne))
+      Natural.less_or_equal_successor_successor_descend(k, 0,
+          Natural.successor_le_of_lt(k, 1, belowOne)))
 
 -- NaturalsBelow(1) is inhabited: 0 is its single point.
 definition NaturalsBelow.one_point : NaturalsBelow(1) :=
-  Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ 1,
-      0, Natural.LessOrEqual.reflexive(1))
+  NaturalsBelow.make(0, Natural.lt_successor(0))
 
 -- NaturalsBelow(1) is a subsingleton: any two elements are equal, since
 -- both have value 0.
 theorem NaturalsBelow.one_subsingleton (a b : NaturalsBelow(1)) : a = b :=
-  Subtype.equal_of_value_equal(Natural, (k : Natural) ↦ successor(k) ≤ 1, a, b,
-      calc Subtype.value(a)
-         = 0                by NaturalsBelow.below_one_is_zero(Subtype.value(a), Subtype.property(a))
-         = Subtype.value(b) by NaturalsBelow.below_one_is_zero(Subtype.value(b), Subtype.property(b)))
+  NaturalsBelow.equal_of_value(1, a, b,
+      calc NaturalsBelow.value(a)
+         = 0                      by NaturalsBelow.below_one_is_zero(NaturalsBelow.value(a), NaturalsBelow.below(a))
+         = NaturalsBelow.value(b) by NaturalsBelow.below_one_is_zero(NaturalsBelow.value(b), NaturalsBelow.below(b)))
 
 -- The successor decomposition: NaturalsBelow(1) ⊎ NaturalsBelow(n) is the
 -- same size as NaturalsBelow(successor(n)). This is the sum bijection at

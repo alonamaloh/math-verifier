@@ -37,30 +37,37 @@ theorem NaturalsBelow.decompose_at_least (m k : Natural) (atLeast : m ≤ k)
 -- free of inequality bookkeeping.
 
 -- A value already below m is below m + n: the left block stays put.
-theorem NaturalsBelow.below_extends (m n value : Natural) (belowM : successor(value) ≤ m)
-        : successor(value) ≤ m + n :=
-  calc successor(value)
-     ≤ m
-     ≤ m + n
+theorem NaturalsBelow.below_extends (m n value : Natural) (belowM : value < m)
+        : value < m + n :=
+  calc value
+     < m
+     ≤ m + n   by Natural.less_or_equal_add_right
 
 -- A value below n, shifted up by m, is below m + n: the right block.
-theorem NaturalsBelow.below_shifts (m n value : Natural) (belowN : successor(value) ≤ n)
-        : successor(m + value) ≤ m + n :=
-  calc successor(m + value)
-     = m + successor(value)
-     ≤ m + n
+theorem NaturalsBelow.below_shifts (m n value : Natural) (belowN : value < n)
+        : m + value < m + n := {
+  claim successor(value) ≤ n by Natural.successor_le_of_lt;
+  done by Natural.lt_of_successor_le(m + value, m + n,
+    calc successor(m + value)
+       = m + successor(value)
+       ≤ m + n)
+}
 
 -- Conversely, a value at least m and below m + n drops below n once shifted
 -- down by m. Rewrite the bound as `m + successor(value − m) ≤ m + n` using
 -- `value = m + (value − m)`, then cancel m on the left.
 theorem NaturalsBelow.below_unshifts (m n value : Natural)
-        (atLeast : m ≤ value) (belowSum : successor(value) ≤ m + n)
-        : successor(Natural.monus(value, m)) ≤ n := {
-  calc m + successor(Natural.monus(value, m))
-            = successor(m + Natural.monus(value, m))
-            = successor(value)
-            ≤ m + n;
-  claim
+        (atLeast : m ≤ value) (belowSum : value < m + n)
+        : Natural.monus(value, m) < n := {
+  claim successor(value) ≤ m + n by Natural.successor_le_of_lt;
+  claim successor(Natural.monus(value, m)) ≤ n by {
+    calc m + successor(Natural.monus(value, m))
+              = successor(m + Natural.monus(value, m))
+              = successor(value)
+              ≤ m + n;
+    claim
+  };
+  done by Natural.lt_of_successor_le
 }
 
 -- ----------------------------------------------------------------------
@@ -83,7 +90,8 @@ definition NaturalsBelow.sum_out_of (m n : Natural)
   (element : NaturalsBelow(m + n)) ↦
     cases Natural.compare_strict(NaturalsBelow.value(element), m) {
       | Natural.StrictComparison.below(strictlyBelow) =>
-          Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow))
+          Sum.left(NaturalsBelow.make(NaturalsBelow.value(element),
+              Natural.lt_of_successor_le(NaturalsBelow.value(element), m, strictlyBelow)))
       | Natural.StrictComparison.atLeast(atLeast) =>
           Sum.right(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(element), m),
                   NaturalsBelow.below_unshifts(m, n, NaturalsBelow.value(element),
@@ -103,19 +111,23 @@ theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
         cases Natural.compare_strict(NaturalsBelow.value(element), m) {
           -- The value really is below m, so out_of returns it to the left;
           -- and ⟨value, _⟩ is element, since their values agree.
-          | Natural.StrictComparison.below(strictlyBelow) =>
-              calc (Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow))
+          | Natural.StrictComparison.below(strictlyBelow) => {
+              let valueBelow : NaturalsBelow.value(element) < m :=
+                  Natural.lt_of_successor_le(NaturalsBelow.value(element), m, strictlyBelow);
+              calc (Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), valueBelow))
                         : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)))
                  = Sum.left(element)
                       by NaturalsBelow.equal_of_value(m,
-                             NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow), element,
+                             NaturalsBelow.make(NaturalsBelow.value(element), valueBelow), element,
                              reflexivity(Natural, NaturalsBelow.value(element)))
+            }
           -- m ≤ value would put value strictly below itself.
           | Natural.StrictComparison.atLeast(atLeast) => {
-              calc successor(NaturalsBelow.value(element))
-                        ≤ m
-                        ≤ NaturalsBelow.value(element) as valueBelowItself;
-              absurd(Natural.not_successor_less_or_equal_self(NaturalsBelow.value(element), valueBelowItself))
+              calc NaturalsBelow.value(element)
+                        < m                              by NaturalsBelow.below(element)
+                        ≤ NaturalsBelow.value(element)   by atLeast
+                        as valueBelowItself;
+              absurd(Natural.lt_irreflexive(NaturalsBelow.value(element), valueBelowItself))
             }
         }
     | Sum.right(element) =>

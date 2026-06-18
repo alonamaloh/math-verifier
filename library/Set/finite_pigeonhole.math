@@ -24,10 +24,10 @@ import Natural.compare
 -- The inclusion NaturalsBelow(k) ↪ NaturalsBelow(successor(k)): keep the
 -- value, loosen the bound by one.
 theorem NaturalsBelow.value_below_successor (k : Natural) (element : NaturalsBelow(k))
-        : successor(NaturalsBelow.value(element)) ≤ successor(k) :=
-  calc successor(NaturalsBelow.value(element))
-     ≤ k
-     ≤ successor(k)
+        : NaturalsBelow.value(element) < successor(k) :=
+  calc NaturalsBelow.value(element)
+     < k                by NaturalsBelow.below(element)
+     ≤ successor(k)     by Natural.le_successor
 
 definition NaturalsBelow.inclusion (k : Natural) (element : NaturalsBelow(k))
         : NaturalsBelow(successor(k)) :=
@@ -36,7 +36,7 @@ definition NaturalsBelow.inclusion (k : Natural) (element : NaturalsBelow(k))
 
 -- The top element of NaturalsBelow(successor(k)): value k.
 definition NaturalsBelow.top (k : Natural) : NaturalsBelow(successor(k)) :=
-  NaturalsBelow.make(k, Natural.LessOrEqual.reflexive(successor(k)))
+  NaturalsBelow.make(k, Natural.lt_successor(k))
 
 -- ----------------------------------------------------------------------
 -- The redirect. Given an injection f : NaturalsBelow(1+k) → NaturalsBelow(1+n')
@@ -64,12 +64,16 @@ theorem NaturalsBelow.pigeonhole_top_value_below (k n' : Natural)
   let topValue : Natural := NaturalsBelow.value(f(NaturalsBelow.top(k)));
   claim imageValue ≤ n'
       by Natural.less_or_equal_successor_successor_descend(
-             imageValue, n', NaturalsBelow.below(f(NaturalsBelow.inclusion(k, i))));
+             imageValue, n',
+             Natural.successor_le_of_lt(imageValue, successor(n'),
+                 NaturalsBelow.below(f(NaturalsBelow.inclusion(k, i)))));
   -- imageValue is both ≤ n' and (atLeast) ≥ n', so it equals n'.
   claim imageValue = n' since Natural.le_antisymmetric;
   claim topValueBelow : topValue ≤ n'
       by Natural.less_or_equal_successor_successor_descend(
-             topValue, n', NaturalsBelow.below(f(NaturalsBelow.top(k))));
+             topValue, n',
+             Natural.successor_le_of_lt(topValue, successor(n'),
+                 NaturalsBelow.below(f(NaturalsBelow.top(k)))));
   -- n' ≠ topValue: otherwise top and inclusion i collide under f.
   claim notEqual : ¬(n' = topValue) by {
     suppose n' = topValue as _;
@@ -82,10 +86,10 @@ theorem NaturalsBelow.pigeonhole_top_value_below (k n' : Natural)
         by inj(NaturalsBelow.top(k), NaturalsBelow.inclusion(k, i), imagesEqual);
     calc NaturalsBelow.value(NaturalsBelow.top(k))
               = NaturalsBelow.value(NaturalsBelow.inclusion(k, i));
-    calc successor(NaturalsBelow.value(i))
-              ≤ k
+    calc NaturalsBelow.value(i)
+              < k                        by NaturalsBelow.below(i)
               = NaturalsBelow.value(i) as belowSelf;
-    absurd(Natural.not_successor_less_or_equal_self(NaturalsBelow.value(i), belowSelf))
+    absurd(Natural.lt_irreflexive(NaturalsBelow.value(i), belowSelf))
   };
   Natural.less_or_equal_not_equal_successor(topValue, n', topValueBelow, notEqual)
 }
@@ -98,10 +102,12 @@ definition NaturalsBelow.pigeonhole_redirect (k n' : Natural)
   (i : NaturalsBelow(k)) ↦
     cases Natural.compare_strict(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n') {
       | Natural.StrictComparison.below(strictlyBelow) =>
-          NaturalsBelow.make(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), strictlyBelow)
+          NaturalsBelow.make(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))),
+              Natural.lt_of_successor_le(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n', strictlyBelow))
       | Natural.StrictComparison.atLeast(atLeast) =>
           NaturalsBelow.make(NaturalsBelow.value(f(NaturalsBelow.top(k))),
-              NaturalsBelow.pigeonhole_top_value_below(k, n', f, inj, i, atLeast))
+              Natural.lt_of_successor_le(NaturalsBelow.value(f(NaturalsBelow.top(k))), n',
+                  NaturalsBelow.pigeonhole_top_value_below(k, n', f, inj, i, atLeast)))
     }
 
 -- Reading off the redirect's value. Branching on the comparison reduces
@@ -181,10 +187,10 @@ theorem NaturalsBelow.pigeonhole_inclusion_not_top (k n' : Natural)
   -- value(inclusion i) ≡ value i and value(top) ≡ k.
   calc NaturalsBelow.value(NaturalsBelow.inclusion(k, i))
             = NaturalsBelow.value(NaturalsBelow.top(k));
-  calc successor(NaturalsBelow.value(i))
-            ≤ k
+  calc NaturalsBelow.value(i)
+            < k                        by NaturalsBelow.below(i)
             = NaturalsBelow.value(i) as belowSelf;
-  Natural.not_successor_less_or_equal_self(NaturalsBelow.value(i), belowSelf)
+  Natural.lt_irreflexive(NaturalsBelow.value(i), belowSelf)
 }
 
 -- The redirect is injective. Take i, j with redirect(i) = redirect(j) and
@@ -250,14 +256,18 @@ theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : Natural)
                          NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n',
                          Natural.less_or_equal_successor_successor_descend(
                              NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n',
-                             NaturalsBelow.below(f(NaturalsBelow.inclusion(k, i)))),
+                             Natural.successor_le_of_lt(
+                                 NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), successor(n'),
+                                 NaturalsBelow.below(f(NaturalsBelow.inclusion(k, i))))),
                          atLeastI);
               claim NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))) = n'
                   by Natural.le_antisymmetric(
                          NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))), n',
                          Natural.less_or_equal_successor_successor_descend(
                              NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))), n',
-                             NaturalsBelow.below(f(NaturalsBelow.inclusion(k, j)))),
+                             Natural.successor_le_of_lt(
+                                 NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))), successor(n'),
+                                 NaturalsBelow.below(f(NaturalsBelow.inclusion(k, j))))),
                          atLeastJ);
               calc NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
                         = n'
@@ -291,7 +301,8 @@ theorem NaturalsBelow.injective_domain_le_codomain
             -- The point 0 of NaturalsBelow(successor(k)) maps into the
             -- empty NaturalsBelow(0).
             absurd(NaturalsBelow.zero_is_empty(
-                f(NaturalsBelow.make(0, Natural.successor_positive(k)))))
+                f(NaturalsBelow.make(0,
+                    Natural.lt_of_successor_le(0, successor(k), Natural.successor_positive(k))))))
       }
   | successor(n'), m, f, inj =>
       cases m refining f, inj {
