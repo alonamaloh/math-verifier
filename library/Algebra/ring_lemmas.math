@@ -15,96 +15,86 @@ import Algebra.group
 import Algebra.group_lemmas
 import Algebra.ring
 
--- Throughout this file we work in an arbitrary ring. The bundle below is a
--- pervasive convention: naming any ring operation prepends the whole
--- signature implicitly — including `ringProof` — so each lemma states only
--- its genuine arguments and cites the ring axioms by name
--- (`IsRing.distributivity_right(…)`, `IsRing.add_identity_left(…)`) with
--- `ringProof` recovered from context. The one standing `claim` per proof
--- brings the additive group into scope for the generic `Group.*`
--- cancellation lemmas.
+-- Throughout this file we work in an arbitrary ring, written in operator
+-- notation. The bundle below is a pervasive convention: naming any ring
+-- operation (`+`, `·`, `-`) prepends the whole signature implicitly —
+-- including `ringProof` — so each lemma states only its genuine arguments
+-- and cites the ring axioms by name (`IsRing.distributivity_right(…)`,
+-- `IsRing.add_identity_left(…)`) with `ringProof` recovered from context.
+-- The one standing `claim` per proof brings the additive group into scope
+-- for the generic `Group.*` cancellation lemmas.
 convention carrier : Type(0)
-convention add : carrier → carrier → carrier
+convention (+) : carrier → carrier → carrier
 convention zero : carrier
-convention negate : carrier → carrier
-convention multiply : carrier → carrier → carrier
+convention (-) : carrier → carrier
+convention (·) : carrier → carrier → carrier
 convention one : carrier
-convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
+convention ringProof : IsRing(carrier, (+), zero, (-), (·), one)
 
 -- ----------------------------------------------------------------------
--- Zero absorbs multiplication on the left: `multiply(zero, x) = zero`.
+-- Zero absorbs multiplication on the left: `zero · x = zero`.
 --
--- Proof: `multiply(zero, x) + multiply(zero, x) = multiply(zero + zero, x)
--- = multiply(zero, x)`. The additive group cancels `multiply(zero, x)`
--- against `multiply(zero, x) + multiply(zero, x) = multiply(zero, x) + zero`,
--- leaving `multiply(zero, x) = zero`.
-theorem Ring.zero_multiply (x : carrier) : multiply(zero, x) = zero := {
-    claim IsGroup(carrier, add, zero, negate) since IsRing.additive_group;
-    -- add(0·x, 0·x) = 0·x = add(0·x, 0); cancelling 0·x leaves 0·x = 0.
-    calc add(multiply(zero, x), multiply(zero, x))
-       = multiply(add(zero, zero), x)   by IsRing.distributivity_right(zero, zero, x)
-       = multiply(zero, x)
-       = add(multiply(zero, x), zero);
+-- Proof: `zero · x + zero · x = (zero + zero) · x = zero · x`. The additive
+-- group cancels `zero · x` against `zero · x + zero · x = zero · x + zero`,
+-- leaving `zero · x = zero`.
+theorem Ring.zero_multiply (x : carrier) : zero · x = zero := {
+    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
+    calc zero · x + zero · x
+       = (zero + zero) · x   by IsRing.distributivity_right(zero, zero, x)
+       = zero · x
+       = zero · x + zero;
     done since Group.cancel_left
 }
 
--- Zero absorbs multiplication on the right: `multiply(x, zero) = zero`.
+-- Zero absorbs multiplication on the right: `x · zero = zero`.
 -- Same proof shape using `distributivity_left`.
-theorem Ring.multiply_zero (x : carrier) : multiply(x, zero) = zero := {
-    claim IsGroup(carrier, add, zero, negate) since IsRing.additive_group;
-    -- add(x·0, x·0) = x·0 = add(x·0, 0); cancelling x·0 leaves x·0 = 0.
-    calc add(multiply(x, zero), multiply(x, zero))
-       = multiply(x, add(zero, zero))   by IsRing.distributivity_left(x, zero, zero)
-       = multiply(x, zero)
-       = add(multiply(x, zero), zero);
+theorem Ring.multiply_zero (x : carrier) : x · zero = zero := {
+    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
+    calc x · zero + x · zero
+       = x · (zero + zero)   by IsRing.distributivity_left(x, zero, zero)
+       = x · zero
+       = x · zero + zero;
     done since Group.cancel_left
 }
 
--- `multiply(negate(a), b) = negate(multiply(a, b))`. Recognise
--- `multiply(negate(a), b)` as the additive inverse of `multiply(a, b)`:
--- `multiply(negate(a), b) + multiply(a, b) = multiply(negate(a) + a, b)
--- = multiply(zero, b) = zero`. Then `right_inverse_unique` in the
--- additive group identifies it with `negate(multiply(a, b))`.
+-- `(-a) · b = -(a · b)`. Recognise `(-a) · b` as the additive inverse of
+-- `a · b`: their sum is `(-a + a) · b = zero · b = zero`. Then
+-- `left_inverse_unique` in the additive group identifies it with `-(a · b)`.
 theorem Ring.multiply_negate_left (a b : carrier)
-        : multiply(negate(a), b) = negate(multiply(a, b)) := {
-    claim IsGroup(carrier, add, zero, negate) since IsRing.additive_group;
-    -- multiply(negate(a), b) is the additive inverse of multiply(a, b):
-    -- their sum is multiply(negate(a) + a, b) = multiply(0, b) = 0.
-    calc add(multiply(negate(a), b), multiply(a, b))
-       = multiply(add(negate(a), a), b)   by IsRing.distributivity_right(negate(a), a, b)
-       = multiply(zero, b)
-       = zero                             by Ring.zero_multiply;
+        : (-a) · b = -(a · b) := {
+    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
+    calc (-a) · b + a · b
+       = (-a + a) · b   by IsRing.distributivity_right((-a), a, b)
+       = zero · b
+       = zero           by Ring.zero_multiply;
     done since Group.left_inverse_unique
 }
 
--- `multiply(a, negate(b)) = negate(multiply(a, b))`. Mirror of the
--- left version using `distributivity_left` and `inverse_right`.
+-- `a · (-b) = -(a · b)`. Mirror of the left version using
+-- `distributivity_left` and `inverse_right`.
 theorem Ring.multiply_negate_right (a b : carrier)
-        : multiply(a, negate(b)) = negate(multiply(a, b)) := {
-    claim IsGroup(carrier, add, zero, negate) since IsRing.additive_group;
-    calc add(multiply(a, negate(b)), multiply(a, b))
-       = multiply(a, add(negate(b), b))   by IsRing.distributivity_left(a, negate(b), b)
-       = multiply(a, zero)
-       = zero                             by Ring.multiply_zero;
+        : a · (-b) = -(a · b) := {
+    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
+    calc a · (-b) + a · b
+       = a · (-b + b)   by IsRing.distributivity_left(a, (-b), b)
+       = a · zero
+       = zero           by Ring.multiply_zero;
     done since Group.left_inverse_unique
 }
 
--- `multiply(negate(a), negate(b)) = multiply(a, b)`. Apply
--- `multiply_negate_left` and then `multiply_negate_right` to peel both
--- negations into a double negation of the product; the additive
--- inverse is involutive.
+-- `(-a) · (-b) = a · b`. Peel each negation onto the product, then the
+-- additive inverse is involutive.
 theorem Ring.negate_multiply_negate (a b : carrier)
-        : multiply(negate(a), negate(b)) = multiply(a, b) := {
-    claim IsGroup(carrier, add, zero, negate) since IsRing.additive_group;
-    -- Peel each negation onto the product, then the additive inverse is
-    -- involutive. Step 2 cites `multiply_negate_right` argument-free even
-    -- though it applies UNDER a `negate(·)`: the calc diff bridge descends
-    -- to the differing subterm and instantiates the lemma's ring bundle
-    -- against the subterm equality, then re-wraps the congruence.
-    calc multiply(negate(a), negate(b))
-       = negate(multiply(a, negate(b)))   by Ring.multiply_negate_left
-       = negate(negate(multiply(a, b)))   by Ring.multiply_negate_right
-       = multiply(a, b)                   by Group.inverse_involution
+        : (-a) · (-b) = a · b := {
+    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
+    -- Step 2 cites `multiply_negate_right` argument-free even though it
+    -- applies UNDER a `-(·)`: the calc diff bridge descends to the differing
+    -- subterm, instantiates the lemma's ring bundle against the subterm
+    -- equality, then re-wraps the congruence.
+    calc (-a) · (-b)
+       = -(a · (-b))   by Ring.multiply_negate_left
+       = -(-(a · b))   by Ring.multiply_negate_right
+       = a · b         by Group.inverse_involution
 }
 
 -- The reduction behind the `linear_combination` tactic. Given a known
@@ -116,18 +106,17 @@ theorem Ring.negate_multiply_negate (a b : carrier)
 theorem Ring.equal_of_linear_combination
         (goalLeft goalRight combLeft combRight : carrier)
         (combination : combLeft = combRight)
-        (ringBridge : add(goalLeft, negate(goalRight))
-                      = add(combLeft, negate(combRight)))
+        (ringBridge : goalLeft + (-goalRight) = combLeft + (-combRight))
         : goalLeft = goalRight := {
-    claim IsGroup(carrier, add, zero, negate) since IsRing.additive_group;
+    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
     -- The combination's difference is zero (it's combRight − combRight)...
-    calc add(combLeft, negate(combRight))
-       = add(combRight, negate(combRight))
+    calc combLeft + (-combRight)
+       = combRight + (-combRight)
        = zero;
     -- ...so the goal's difference is zero too, and cancelling finishes.
-    calc add(goalLeft, negate(goalRight))
-       = add(combLeft, negate(combRight))    since ringBridge
+    calc goalLeft + (-goalRight)
+       = combLeft + (-combRight)    since ringBridge
        = zero
-       = add(goalRight, negate(goalRight));
+       = goalRight + (-goalRight);
     done since Group.cancel_right
 }

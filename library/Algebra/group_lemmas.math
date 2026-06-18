@@ -13,8 +13,7 @@ import Equality.basics
 import Algebra.monoid
 import Algebra.group
 
--- Uniqueness of the right inverse: if `operation(a, b) = identity`
--- then `b = inverse(a)`.
+-- Uniqueness of the right inverse: if `a · b = identity` then `b = a⁻¹`.
 --
 -- Proof: b = e · b              [identity_left]
 --          = (a⁻¹ · a) · b      [inverse_left]
@@ -23,171 +22,157 @@ import Algebra.group
 --          = a⁻¹                [identity_right]
 theorem Group.right_inverse_unique
         (carrier : Type(0))
-        (operation : carrier → carrier → carrier)
+        ((·) : carrier → carrier → carrier)
         (identity : carrier)
-        (inverse : carrier → carrier)
-        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
         (a b : carrier)
-        (combineHypothesis
-            : operation(a, b) = identity)
-        : b = inverse(a) := {
+        (combineHypothesis : a · b = identity)
+        : b = a⁻¹ := {
     calc b
-       = operation(identity, b)
-       = operation(operation(inverse(a), a), b)
-       = operation(inverse(a), operation(a, b))
-       = operation(inverse(a), identity)
-       = inverse(a)
+       = identity · b
+       = (a⁻¹ · a) · b
+       = a⁻¹ · (a · b)
+       = a⁻¹ · identity
+       = a⁻¹
 }
 
--- Symmetric: if `operation(b, a) = identity` then `b = inverse(a)`.
--- Same proof shape, using `inverse_right` and `identity_right` /
--- `identity_left` in mirrored positions.
+-- Symmetric: if `b · a = identity` then `b = a⁻¹`. Same proof shape, using
+-- `inverse_right` and `identity_right` / `identity_left` in mirrored
+-- positions.
 theorem Group.left_inverse_unique
         (carrier : Type(0))
-        (operation : carrier → carrier → carrier)
+        ((·) : carrier → carrier → carrier)
         (identity : carrier)
-        (inverse : carrier → carrier)
-        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
         (a b : carrier)
-        (combineHypothesis
-            : operation(b, a) = identity)
-        : b = inverse(a) := {
+        (combineHypothesis : b · a = identity)
+        : b = a⁻¹ := {
     calc b
-       = operation(b, identity)
-       = operation(b, operation(a, inverse(a)))
-       = operation(operation(b, a), inverse(a))
-       = operation(identity, inverse(a))
-       = inverse(a)
+       = b · identity
+       = b · (a · a⁻¹)
+       = (b · a) · a⁻¹
+       = identity · a⁻¹
+       = a⁻¹
 }
 
--- The inverse function is an involution: `inverse(inverse(x)) = x`.
--- Apply right_inverse_unique with a = inverse(x), b = x: the
--- hypothesis `operation(inverse(x), x) = identity` is exactly the
--- `inverse_left` axiom.
+-- The inverse function is an involution: `(x⁻¹)⁻¹ = x`. Apply
+-- right_inverse_unique with a = x⁻¹, b = x: the hypothesis `x⁻¹ · x =
+-- identity` is exactly the `inverse_left` axiom.
 theorem Group.inverse_involution
         (carrier : Type(0))
-        (operation : carrier → carrier → carrier)
+        ((·) : carrier → carrier → carrier)
         (identity : carrier)
-        (inverse : carrier → carrier)
-        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
         (x : carrier)
-        : inverse(inverse(x)) = x := {
+        : (x⁻¹)⁻¹ = x := {
     Group.right_inverse_unique(
-        carrier, operation, identity, inverse, groupProof,
-        inverse(x), x,
+        carrier, (·), identity, (⁻¹), groupProof,
+        x⁻¹, x,
         IsGroup.inverse_left(x))
 }
 
--- The inverse of the identity is the identity. `op(e, e) = e` by
--- `identity_left`, then `right_inverse_unique` with a = e, b = e
--- gives `e = inverse(e)`.
+-- The inverse of the identity is the identity. `e · e = e` by
+-- `identity_left`, then `right_inverse_unique` with a = e, b = e gives
+-- `e = e⁻¹`.
 theorem Group.inverse_identity
         (carrier : Type(0))
-        (operation : carrier → carrier → carrier)
+        ((·) : carrier → carrier → carrier)
         (identity : carrier)
-        (inverse : carrier → carrier)
-        (groupProof : IsGroup(carrier, operation, identity, inverse))
-        : inverse(identity) = identity := {
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        : identity⁻¹ = identity := {
     Group.right_inverse_unique(
-        carrier, operation, identity, inverse, groupProof,
+        carrier, (·), identity, (⁻¹), groupProof,
         identity, identity,
         IsGroup.identity_left(identity))
 }
 
--- Left cancellation: `op(a, b) = op(a, c)` → `b = c`. Apply
--- inverse(a) on the left, then collapse via associativity +
--- inverse_left + identity_left.
+-- Left cancellation: `a · b = a · c` → `b = c`. Apply a⁻¹ on the left,
+-- then collapse via associativity + inverse_left + identity_left.
 theorem Group.cancel_left
         {carrier : Type(0)}
-        {operation : carrier → carrier → carrier}
+        {(·) : carrier → carrier → carrier}
         {identity : carrier}
-        {inverse : carrier → carrier}
-        {groupProof : IsGroup(carrier, operation, identity, inverse)}
+        {(⁻¹) : carrier → carrier}
+        {groupProof : IsGroup(carrier, (·), identity, (⁻¹))}
         (a b c : carrier)
-        (equation : operation(a, b) = operation(a, c))
+        (equation : a · b = a · c)
         : b = c := {
     calc b
-       = operation(identity, b)
-       = operation(operation(inverse(a), a), b)
-       = operation(inverse(a), operation(a, b))
-       = operation(inverse(a), operation(a, c))
-       = operation(operation(inverse(a), a), c)
-       = operation(identity, c)
+       = identity · b
+       = (a⁻¹ · a) · b
+       = a⁻¹ · (a · b)
+       = a⁻¹ · (a · c)
+       = (a⁻¹ · a) · c
+       = identity · c
        = c
 }
 
--- Right cancellation: `op(b, a) = op(c, a)` → `b = c`. Mirror of
--- the left version, using `inverse_right` and `identity_right`.
+-- Right cancellation: `b · a = c · a` → `b = c`. Mirror of the left
+-- version, using `inverse_right` and `identity_right`.
 theorem Group.cancel_right
         (carrier : Type(0))
-        (operation : carrier → carrier → carrier)
+        ((·) : carrier → carrier → carrier)
         (identity : carrier)
-        (inverse : carrier → carrier)
-        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
         (a b c : carrier)
-        (equation : operation(b, a) = operation(c, a))
+        (equation : b · a = c · a)
         : b = c := {
     calc b
-       = operation(b, identity)
-       = operation(b, operation(a, inverse(a)))
-       = operation(operation(b, a), inverse(a))
-       = operation(operation(c, a), inverse(a))
-       = operation(c, operation(a, inverse(a)))
-       = operation(c, identity)
+       = b · identity
+       = b · (a · a⁻¹)
+       = (b · a) · a⁻¹
+       = (c · a) · a⁻¹
+       = c · (a · a⁻¹)
+       = c · identity
        = c
 }
 
--- `inverse(op(a, b)) = op(inverse(b), inverse(a))`. Standard group
--- fact: the inverse of a product is the product of the inverses in
--- reverse order. Apply `right_inverse_unique` to
--- `op(op(a, b), op(inverse(b), inverse(a))) = identity`, which a
+-- `(a · b)⁻¹ = b⁻¹ · a⁻¹`. Standard group fact: the inverse of a product
+-- is the product of the inverses in reverse order. Apply
+-- `right_inverse_unique` to `(a · b) · (b⁻¹ · a⁻¹) = identity`, which a
 -- short calc establishes from associativity + inverse axioms.
 theorem Group.inverse_operation
         (carrier : Type(0))
-        (operation : carrier → carrier → carrier)
+        ((·) : carrier → carrier → carrier)
         (identity : carrier)
-        (inverse : carrier → carrier)
-        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
         (a b : carrier)
-        : inverse(operation(a, b))
-          = operation(inverse(b), inverse(a)) := {
+        : (a · b)⁻¹ = b⁻¹ · a⁻¹ := {
     Group.right_inverse_unique(
-        carrier, operation, identity, inverse, groupProof,
-        operation(a, b),
-            operation(inverse(b), inverse(a)),
-            calc operation(operation(a, b),
-                            operation(inverse(b), inverse(a)))
-               = operation(a, operation(b,
-                       operation(inverse(b), inverse(a))))
-                      by IsGroup.associativity(a, b,
-                             operation(inverse(b), inverse(a)))
-               = operation(a, operation(operation(b, inverse(b)),
-                                          inverse(a)))
-                      by IsGroup.associativity(b, inverse(b),
-                             inverse(a))
-               = operation(a, operation(identity, inverse(a)))
-               = operation(a, inverse(a))
+        carrier, (·), identity, (⁻¹), groupProof,
+        a · b,
+            b⁻¹ · a⁻¹,
+            calc (a · b) · (b⁻¹ · a⁻¹)
+               = a · (b · (b⁻¹ · a⁻¹))
+                      by IsGroup.associativity(a, b, b⁻¹ · a⁻¹)
+               = a · ((b · b⁻¹) · a⁻¹)
+                      by IsGroup.associativity(b, b⁻¹, a⁻¹)
+               = a · (identity · a⁻¹)
+               = a · a⁻¹
                = identity)
 }
 
--- In an abelian group, `inverse(op(a, b)) = op(inverse(a), inverse(b))`.
--- Compose `inverse_operation` with commutativity on the result.
+-- In an abelian group, `(a · b)⁻¹ = a⁻¹ · b⁻¹`. Compose `inverse_operation`
+-- with commutativity on the result.
 theorem AbelianGroup.inverse_operation
         (carrier : Type(0))
-        (operation : carrier → carrier → carrier)
+        ((·) : carrier → carrier → carrier)
         (identity : carrier)
-        (inverse : carrier → carrier)
-        (abelianProof
-            : IsAbelianGroup(carrier, operation, identity, inverse))
+        ((⁻¹) : carrier → carrier)
+        (abelianProof : IsAbelianGroup(carrier, (·), identity, (⁻¹)))
         (a b : carrier)
-        : inverse(operation(a, b))
-          = operation(inverse(a), inverse(b)) := {
+        : (a · b)⁻¹ = a⁻¹ · b⁻¹ := {
     let ⟨groupProof, commutativity⟩ := abelianProof;
-    calc inverse(operation(a, b))
-       = operation(inverse(b), inverse(a))
+    calc (a · b)⁻¹
+       = b⁻¹ · a⁻¹
               by Group.inverse_operation(
-                     carrier, operation, identity, inverse,
-                     groupProof, a, b)
-       = operation(inverse(a), inverse(b))
-              by commutativity(inverse(b), inverse(a))
+                     carrier, (·), identity, (⁻¹), groupProof, a, b)
+       = a⁻¹ · b⁻¹
+              by commutativity(b⁻¹, a⁻¹)
 }

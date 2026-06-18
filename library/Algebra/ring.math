@@ -63,22 +63,22 @@ definition IsCommutativeRing
 -- congruence/reversed calc step mis-binds — those are still read off a
 -- destructured additive group at the use site.
 convention carrier : Type(0)
-convention add : carrier → carrier → carrier
+convention (+) : carrier → carrier → carrier
 convention zero : carrier
-convention negate : carrier → carrier
-convention multiply : carrier → carrier → carrier
+convention (-) : carrier → carrier
+convention (·) : carrier → carrier → carrier
 convention one : carrier
-convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
+convention ringProof : IsRing(carrier, (+), zero, (-), (·), one)
 
--- The ring's additive group `(carrier, add, zero, negate)`, viewed as a
--- group — what the generic `Group.*` lemmas take as their `groupProof`.
-theorem IsRing.additive_group : IsGroup(carrier, add, zero, negate) := {
+-- The ring's additive group `(carrier, +, zero, -)`, viewed as a group —
+-- what the generic `Group.*` lemmas take as their `groupProof`.
+theorem IsRing.additive_group : IsGroup(carrier, (+), zero, (-)) := {
     let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
     let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
     done by additiveGroup
 }
 
-theorem IsRing.add_identity_left (x : carrier) : add(zero, x) = x := {
+theorem IsRing.add_identity_left (x : carrier) : zero + x = x := {
     let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
     let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
     let ⟨additiveMonoid, _, _⟩ := additiveGroup;
@@ -86,7 +86,7 @@ theorem IsRing.add_identity_left (x : carrier) : add(zero, x) = x := {
     done by identityLeft(x)
 }
 
-theorem IsRing.add_identity_right (x : carrier) : add(x, zero) = x := {
+theorem IsRing.add_identity_right (x : carrier) : x + zero = x := {
     let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
     let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
     let ⟨additiveMonoid, _, _⟩ := additiveGroup;
@@ -94,14 +94,14 @@ theorem IsRing.add_identity_right (x : carrier) : add(x, zero) = x := {
     done by identityRight(x)
 }
 
-theorem IsRing.add_inverse_left (x : carrier) : add(negate(x), x) = zero := {
+theorem IsRing.add_inverse_left (x : carrier) : (-x) + x = zero := {
     let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
     let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
     let ⟨_, inverseLeft, _⟩ := additiveGroup;
     done by inverseLeft(x)
 }
 
-theorem IsRing.add_inverse_right (x : carrier) : add(x, negate(x)) = zero := {
+theorem IsRing.add_inverse_right (x : carrier) : x + (-x) = zero := {
     let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
     let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
     let ⟨_, _, inverseRight⟩ := additiveGroup;
@@ -109,13 +109,13 @@ theorem IsRing.add_inverse_right (x : carrier) : add(x, negate(x)) = zero := {
 }
 
 theorem IsRing.distributivity_left (x y z : carrier)
-        : multiply(x, add(y, z)) = add(multiply(x, y), multiply(x, z)) := {
+        : x · (y + z) = x · y + x · z := {
     let ⟨_, _, distributivityLeft, _⟩ := ringProof;
     done by distributivityLeft(x, y, z)
 }
 
 theorem IsRing.distributivity_right (x y z : carrier)
-        : multiply(add(x, y), z) = add(multiply(x, z), multiply(y, z)) := {
+        : (x + y) · z = x · z + y · z := {
     let ⟨_, _, _, distributivityRight⟩ := ringProof;
     done by distributivityRight(x, y, z)
 }
