@@ -1,0 +1,32 @@
+-- Test/convention_bundle_test.math
+--
+-- A `convention` whose type references an earlier convention. Declaring
+-- `carrier`, then `add … : carrier → …`, then `ringProof : IsRing(carrier,
+-- add, …)` lets a lemma state only its genuine argument; the elaborator
+-- prepends the whole ring signature implicitly, transitively (naming
+-- `multiply`/`ringProof` pulls in `carrier`/`add`/`negate`/`one`) and in
+-- dependency order (carrier before the operations before ringProof).
+
+module Test.convention_bundle_test
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_lemmas
+
+convention carrier : Type(0)
+convention add : carrier → carrier → carrier
+convention zero : carrier
+convention negate : carrier → carrier
+convention multiply : carrier → carrier → carrier
+convention one : carrier
+convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
+
+-- Statement names only `multiply`/`zero`; body names `ringProof`. The
+-- prepended implicit bundle (carrier, add, zero, negate, multiply, one,
+-- ringProof) must be complete and dependency-ordered for this to elaborate.
+theorem Test.bundle_prepends_in_order (x : carrier) : multiply(zero, x) = zero :=
+  Ring.zero_multiply(carrier, add, zero, negate, multiply, one, ringProof, x)

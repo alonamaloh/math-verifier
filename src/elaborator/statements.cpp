@@ -136,6 +136,7 @@ void Elaborator::elaborateConventionDeclaration(
                     + "' is already registered");
             }
             conventionRegistry_[name] = entry;
+            conventionOrder_.push_back(name);
         }
     }
 
@@ -649,17 +650,18 @@ SurfaceDefinitionDeclaration Elaborator::augmentDeclarationWithConventions(
                 userBoundNames.insert(name);
             }
         }
-        // We preserve insertion order: a convention is added the first
-        // time we see it mentioned. We walk binders' types, the
-        // declaration type, the body (if any), and each case body.
-        std::vector<std::string> orderedMentioned;
-        std::unordered_set<std::string> mentionedSet;
+        // Collect which conventions are needed. A name is needed if the
+        // declaration mentions it, OR if an already-needed convention's
+        // type / side-conditions mention it (transitive closure): a lemma
+        // that names only `multiply` and `ringProof` still needs `carrier`,
+        // `add`, `negate`, … because `ringProof`'s `IsRing(carrier, add, …)`
+        // type references them. The worklist drives that closure.
+        std::unordered_set<std::string> needed;
+        std::vector<std::string> worklist;
         auto record = [&](const std::string& name) {
             if (userBoundNames.count(name) > 0) return;
             if (conventionRegistry_.count(name) == 0) return;
-            if (mentionedSet.insert(name).second) {
-                orderedMentioned.push_back(name);
-            }
+            if (needed.insert(name).second) worklist.push_back(name);
         };
         for (const auto& binder : declaration.arguments) {
             if (binder.type) collectMentionsInSurface(*binder.type, record);
@@ -671,12 +673,28 @@ SurfaceDefinitionDeclaration Elaborator::augmentDeclarationWithConventions(
             collectMentionsInSurface(*declaration.body, record);
         }
         for (const auto& clause : declaration.cases) {
-            for (const auto& pattern : clause.patterns) {
-                (void)pattern;
-            }
             if (clause.body) collectMentionsInSurface(*clause.body, record);
         }
-        if (orderedMentioned.empty()) return declaration;
+        // Transitive closure over convention types and side-conditions.
+        while (!worklist.empty()) {
+            std::string name = worklist.back();
+            worklist.pop_back();
+            const auto& entry = conventionRegistry_[name];
+            if (entry.type) collectMentionsInSurface(*entry.type, record);
+            for (const auto& prop : entry.propositions) {
+                if (prop.proposition) {
+                    collectMentionsInSurface(*prop.proposition, record);
+                }
+            }
+        }
+        if (needed.empty()) return declaration;
+        // Emit in registration order — a valid dependency order, so each
+        // prepended binder's type already has its referenced conventions
+        // bound ahead of it.
+        std::vector<std::string> orderedMentioned;
+        for (const auto& name : conventionOrder_) {
+            if (needed.count(name) > 0) orderedMentioned.push_back(name);
+        }
         // Build prepended binders. For each mentioned convention, push
         // an implicit binder for the name itself, then one implicit
         // binder per side-condition proposition (with an auto-generated
@@ -684,6 +702,11 @@ SurfaceDefinitionDeclaration Elaborator::augmentDeclarationWithConventions(
         SurfaceDefinitionDeclaration augmented = declaration;
         std::vector<SurfaceBinder> prepended;
         int propCounter = 0;
+        // Side-conditions are shared across the names of one `convention`
+        // declaration (`convention p q : … with H(p)` stores the same H on
+        // both p and q). Emit each distinct proposition once, keyed by its
+        // surface pointer, so a lemma mentioning both names binds H once.
+        std::unordered_set<const SurfaceExpression*> emittedProps;
         for (const auto& name : orderedMentioned) {
             const auto& entry = conventionRegistry_[name];
             SurfaceBinder nameBinder;
@@ -692,6 +715,10 @@ SurfaceDefinitionDeclaration Elaborator::augmentDeclarationWithConventions(
             nameBinder.isImplicit = true;
             prepended.push_back(nameBinder);
             for (const auto& prop : entry.propositions) {
+                if (prop.proposition
+                    && !emittedProps.insert(prop.proposition.get()).second) {
+                    continue;
+                }
                 SurfaceBinder propBinder;
                 propBinder.names = {
                     prop.name.empty()

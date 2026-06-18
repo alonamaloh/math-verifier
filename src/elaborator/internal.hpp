@@ -5146,6 +5146,12 @@ private:
         std::vector<SurfaceConventionProposition> propositions;
     };
     std::unordered_map<std::string, ConventionEntry> conventionRegistry_;
+    // Registration order of convention names. A convention's type/side-
+    // conditions may reference only earlier-declared conventions (you write
+    // `convention carrier : Type(0)` before `convention add : carrier → …`),
+    // so this order is a valid dependency order — the prepended implicit
+    // binders are emitted in it so each one's type is already in scope.
+    std::vector<std::string> conventionOrder_;
     // Names declared via `construction` — canonical quotient-introduction
     // forms. They are ordinary transparent definitions; this set records
     // which definitions are the preferred named introduction so that
