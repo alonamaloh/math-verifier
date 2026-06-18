@@ -3,13 +3,11 @@
 -- Multiplicative cancellation on Integer when the multiplier is a
 -- positive natural lifted to Integer:
 --     x · to_integer(c) = y · to_integer(c)  →  x = y     (for c ≥ 1)
--- The proof descends through `Quotient.exact` (newly available from
--- propositional extensionality) to recover the underlying
--- `IntegerEquivalent` at the multiplied representatives, simplifies
--- away the `_·0` and `0+_` noise that the kernel can't reduce
--- structurally, factors out `c`, applies the Natural-level
--- cancellation, and reassembles via `Quotient.sound`. This is the
--- step that the original Rational plan needed and couldn't get.
+-- The proof descends through `Quotient.exact` to recover the underlying
+-- cross-equation at the multiplied representatives, factors `c` out of each
+-- side (by `ring`), applies the Natural-level cancellation, and reassembles
+-- the class equality. This is the step the original Rational plan needed and
+-- couldn't get.
 
 module Integer.cancellation
 
@@ -46,10 +44,10 @@ theorem Integer.cancellation_natural
     -- Each side is `c` times a sum; they agree by the multiplied
     -- hypothesis, so cancelling the positive `c` gives the result.
     calc (p1 + q2) * c
-       = (p1 * c + q1 * 0) + (p2 * 0 + q2 * c)   by ring
-       = (p1 * 0 + q1 * c) + (p2 * c + q2 * 0)   by equivalenceAfterMultiply
-       = (q1 + p2) * c                           by ring;
-    done by Natural.multiply_cancel_right
+       = (p1 * c + q1 * 0) + (p2 * 0 + q2 * c)
+       = (p1 * 0 + q1 * c) + (p2 * c + q2 * 0)   since equivalenceAfterMultiply
+       = (q1 + p2) * c;
+    done since Natural.multiply_cancel_right
 }
 
 -- ----------------------------------------------------------------------
@@ -88,7 +86,7 @@ theorem Integer.multiply_cancel_right_at_representatives
                  unfold Integer in multipliedEquality);
       -- The cancellation kernel extracts `p1 + q2 = q1 + p2`, which IS the
       -- class equality the goal asks for (the equivalence is transparent).
-      claim naturalEquation : p1 + q2 = q1 + p2 by Integer.cancellation_natural;
+      claim naturalEquation : p1 + q2 = q1 + p2 since Integer.cancellation_natural;
       naturalEquation
   }
 
@@ -103,4 +101,4 @@ theorem Integer.multiply_cancel_right_by_positive_natural
         : x = y :=
   cases x refining productEquality { | representativeX =>
     cases y refining productEquality { | representativeY =>
-      done by Integer.multiply_cancel_right_at_representatives } }
+      done since Integer.multiply_cancel_right_at_representatives } }
