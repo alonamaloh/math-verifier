@@ -15,6 +15,19 @@ import Algebra.group
 import Algebra.group_lemmas
 import Algebra.ring
 
+-- Throughout this file we work in an arbitrary ring. The bundle below is
+-- prepended implicitly to every lemma that mentions any of its names, in
+-- dependency order (carrier before the operations before `ringProof`), so
+-- each lemma states only its genuine arguments and the inter-lemma
+-- citations recover the bundle by unifying `ringProof`'s type.
+convention carrier : Type(0)
+convention add : carrier → carrier → carrier
+convention zero : carrier
+convention negate : carrier → carrier
+convention multiply : carrier → carrier → carrier
+convention one : carrier
+convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
+
 -- ----------------------------------------------------------------------
 -- Zero absorbs multiplication on the left: `multiply(zero, x) = zero`.
 --
@@ -22,16 +35,7 @@ import Algebra.ring
 -- = multiply(zero, x)`. The additive group cancels `multiply(zero, x)`
 -- against `multiply(zero, x) + multiply(zero, x) = multiply(zero, x) + zero`,
 -- leaving `multiply(zero, x) = zero`.
-theorem Ring.zero_multiply
-        (carrier : Type(0))
-        (add : carrier → carrier → carrier)
-        (zero : carrier)
-        (negate : carrier → carrier)
-        (multiply : carrier → carrier → carrier)
-        (one : carrier)
-        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
-        (x : carrier)
-        : multiply(zero, x) = zero := {
+theorem Ring.zero_multiply (x : carrier) : multiply(zero, x) = zero := {
     let ⟨abelianAdd, _, _, distributivityRight⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
     let ⟨addMonoidProof, _, _⟩ := addGroupProof;
@@ -46,16 +50,7 @@ theorem Ring.zero_multiply
 
 -- Zero absorbs multiplication on the right: `multiply(x, zero) = zero`.
 -- Same proof shape using `distributivity_left`.
-theorem Ring.multiply_zero
-        (carrier : Type(0))
-        (add : carrier → carrier → carrier)
-        (zero : carrier)
-        (negate : carrier → carrier)
-        (multiply : carrier → carrier → carrier)
-        (one : carrier)
-        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
-        (x : carrier)
-        : multiply(x, zero) = zero := {
+theorem Ring.multiply_zero (x : carrier) : multiply(x, zero) = zero := {
     let ⟨abelianAdd, _, distributivityLeft, _⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
     let ⟨addMonoidProof, _, _⟩ := addGroupProof;
@@ -73,15 +68,7 @@ theorem Ring.multiply_zero
 -- `multiply(negate(a), b) + multiply(a, b) = multiply(negate(a) + a, b)
 -- = multiply(zero, b) = zero`. Then `right_inverse_unique` in the
 -- additive group identifies it with `negate(multiply(a, b))`.
-theorem Ring.multiply_negate_left
-        (carrier : Type(0))
-        (add : carrier → carrier → carrier)
-        (zero : carrier)
-        (negate : carrier → carrier)
-        (multiply : carrier → carrier → carrier)
-        (one : carrier)
-        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
-        (a b : carrier)
+theorem Ring.multiply_negate_left (a b : carrier)
         : multiply(negate(a), b) = negate(multiply(a, b)) := {
     let ⟨abelianAdd, _, _, distributivityRight⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
@@ -97,15 +84,7 @@ theorem Ring.multiply_negate_left
 
 -- `multiply(a, negate(b)) = negate(multiply(a, b))`. Mirror of the
 -- left version using `distributivity_left` and `inverse_right`.
-theorem Ring.multiply_negate_right
-        (carrier : Type(0))
-        (add : carrier → carrier → carrier)
-        (zero : carrier)
-        (negate : carrier → carrier)
-        (multiply : carrier → carrier → carrier)
-        (one : carrier)
-        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
-        (a b : carrier)
+theorem Ring.multiply_negate_right (a b : carrier)
         : multiply(a, negate(b)) = negate(multiply(a, b)) := {
     let ⟨abelianAdd, _, distributivityLeft, _⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
@@ -121,15 +100,7 @@ theorem Ring.multiply_negate_right
 -- `multiply_negate_left` and then `multiply_negate_right` to peel both
 -- negations into a double negation of the product; the additive
 -- inverse is involutive.
-theorem Ring.negate_multiply_negate
-        (carrier : Type(0))
-        (add : carrier → carrier → carrier)
-        (zero : carrier)
-        (negate : carrier → carrier)
-        (multiply : carrier → carrier → carrier)
-        (one : carrier)
-        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
-        (a b : carrier)
+theorem Ring.negate_multiply_negate (a b : carrier)
         : multiply(negate(a), negate(b)) = multiply(a, b) := {
     let ⟨abelianAdd, _, _, _⟩ := ringProof;
     let ⟨addGroupProof, _⟩ := abelianAdd;
@@ -151,13 +122,6 @@ theorem Ring.negate_multiply_negate
 -- (it's `combRight − combRight`), so the goal's difference is zero, and
 -- cancellation finishes.
 theorem Ring.equal_of_linear_combination
-        (carrier : Type(0))
-        (add : carrier → carrier → carrier)
-        (zero : carrier)
-        (negate : carrier → carrier)
-        (multiply : carrier → carrier → carrier)
-        (one : carrier)
-        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
         (goalLeft goalRight combLeft combRight : carrier)
         (combination : combLeft = combRight)
         (ringBridge : add(goalLeft, negate(goalRight))

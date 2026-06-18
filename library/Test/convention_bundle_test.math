@@ -30,3 +30,22 @@ convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
 -- ringProof) must be complete and dependency-ordered for this to elaborate.
 theorem Test.bundle_prepends_in_order (x : carrier) : multiply(zero, x) = zero :=
   Ring.zero_multiply(carrier, add, zero, negate, multiply, one, ringProof, x)
+
+-- Argument-free citation of a bundled-ring lemma — the pattern every
+-- `Algebra.ring_lemmas` body relies on. `Ring.zero_multiply` now carries its
+-- ring signature as implicit conventions, so only its explicit `(x : carrier)`
+-- is genuinely an argument. Citing it by name against the goal
+-- `multiply(zero, x) = zero` must (a) recover `x` from the goal and
+-- (b) discharge the implicit `ringProof` argument from the in-scope
+-- `ringProof`, UNIFYING its `IsRing(…)` type to pin `add`/`negate`/`one`,
+-- which the goal never mentions.
+--
+-- The bundle is in scope only because the body NAMES `ringProof` (the `let`):
+-- a convention fires for a declaration that transitively references it, and
+-- `multiply`/`zero` alone do not reach `ringProof`. A real ring lemma always
+-- destructures `ringProof` for its proof, so the bundle is present there too.
+theorem Test.bundle_citation_argument_free (x : carrier)
+        : multiply(zero, x) = zero := {
+    let ⟨_, _, _, _⟩ := ringProof;
+    done by Ring.zero_multiply
+}

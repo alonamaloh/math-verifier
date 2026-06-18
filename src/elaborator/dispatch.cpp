@@ -393,11 +393,45 @@ ExpressionPointer Elaborator::elaborateExpression(
                                     std::move(head),
                                     std::move(leadingValue));
                             }
-                            return head;
+                            // Only adopt this implicit-only application when
+                            // it ALREADY has the expected type. The whole
+                            // point of this path is the bare operation case
+                            // (`IntegerMod.add` where `C(m)→C(m)→C(m)` is
+                            // expected): the implicit prefix `{m}` is the
+                            // ONLY thing standing between the constant and a
+                            // type-correct value. When EXPLICIT arguments
+                            // still remain — e.g. a bundled-ring lemma
+                            // `Ring.zero_multiply` (implicits
+                            // carrier/add/…/ringProof, then an explicit
+                            // `(x:carrier)`) cited where `multiply(zero,b) =
+                            // zero` is expected — the implicit-only head is
+                            // still a function type `(x:carrier) → …`, which
+                            // does NOT prove the goal. Returning it here would
+                            // shadow the by-name argument-inference path below,
+                            // which fills the remaining explicit holes from the
+                            // goal. So fall through unless the head is already
+                            // a complete proof of the expected type.
+                            ExpressionPointer headType =
+                                inferTypeInLocalContext(localBinders, head);
+                            ExpressionPointer expectedOpened =
+                                openOverLocalBinders(
+                                    expectedType, localBinders,
+                                    localBinders.size());
+                            Context headContext =
+                                buildContextFromLocalBinders(localBinders);
+                            if (isDefinitionallyEqual(
+                                    environment_, headContext,
+                                    headType, expectedOpened)) {
+                                return head;
+                            }
+                            // else: explicit arguments remain — fall through.
                         } catch (const ElaborateError&) {
                             // Could not infer the implicits from the
                             // expected type — fall through to the bare
                             // constant, preserving prior behavior.
+                        } catch (const TypeError&) {
+                            // Type inference on the partial application
+                            // failed — fall through as well.
                         }
                     }
                 }
