@@ -41,5 +41,59 @@ definition IsCommutativeRing
         (one : carrier)
         : Proposition :=
     IsRing(carrier, add, zero, negate, multiply, one)
-    ∧ (∀ (x y : carrier). 
+    ∧ (∀ (x y : carrier).
            multiply(x, y) = multiply(y, x))
+
+-- ----------------------------------------------------------------------
+-- Accessors for the ring axioms.
+--
+-- `IsRing` bundles four facts (the additive abelian group, the
+-- multiplicative monoid, and the two distributivity laws) as a nested
+-- conjunction. Reaching one axiom from a ring proof means destructuring
+-- that nest — `let ⟨⟨⟨_, idLeft, _⟩, …⟩, …⟩ := ringProof` — noise that
+-- every ring lemma would otherwise repeat. These accessors do the
+-- destructuring ONCE; a ring lemma cites the axiom by name
+-- (`by IsRing.distributivity_right(…)`), with the implicit `ringProof`
+-- recovered from context. The bundle below is the standing ring signature.
+--
+-- Only the distributivity and identity axioms get accessors: their
+-- conclusions have a structured or variable right-hand side, so a citation
+-- unifies cleanly against a goal. The inverse axioms (`add(negate(x), x) =
+-- zero`) have the bare constant `zero` on the right, which a citation in a
+-- congruence/reversed calc step mis-binds — those are still read off a
+-- destructured additive group at the use site.
+convention carrier : Type(0)
+convention add : carrier → carrier → carrier
+convention zero : carrier
+convention negate : carrier → carrier
+convention multiply : carrier → carrier → carrier
+convention one : carrier
+convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
+
+theorem IsRing.add_identity_left (x : carrier) : add(zero, x) = x := {
+    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
+    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    let ⟨additiveMonoid, _, _⟩ := additiveGroup;
+    let ⟨_, identityLeft, _⟩ := additiveMonoid;
+    done by identityLeft(x)
+}
+
+theorem IsRing.add_identity_right (x : carrier) : add(x, zero) = x := {
+    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
+    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    let ⟨additiveMonoid, _, _⟩ := additiveGroup;
+    let ⟨_, _, identityRight⟩ := additiveMonoid;
+    done by identityRight(x)
+}
+
+theorem IsRing.distributivity_left (x y z : carrier)
+        : multiply(x, add(y, z)) = add(multiply(x, y), multiply(x, z)) := {
+    let ⟨_, _, distributivityLeft, _⟩ := ringProof;
+    done by distributivityLeft(x, y, z)
+}
+
+theorem IsRing.distributivity_right (x y z : carrier)
+        : multiply(add(x, y), z) = add(multiply(x, z), multiply(y, z)) := {
+    let ⟨_, _, _, distributivityRight⟩ := ringProof;
+    done by distributivityRight(x, y, z)
+}
