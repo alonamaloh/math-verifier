@@ -99,6 +99,182 @@ std::vector<LevelPointer> Elaborator::universeArgumentsForConstructorCall(
         return zeros;
     }
 
+void Elaborator::resolveStructureClassLeadingImplicits(
+        int numLeadingToInfer,
+        const std::vector<std::string>& leadingFreshNames,
+        const std::vector<ExpressionPointer>& leadingDomains,
+        const std::set<std::string>& metavariableNames,
+        const std::vector<LocalBinder>& localBinders,
+        std::map<std::string, ExpressionPointer>& assignment) {
+        bool madeProgress = true;
+        while (madeProgress) {
+            madeProgress = false;
+            for (int i = 0; i < numLeadingToInfer; ++i) {
+                const std::string& metaName = leadingFreshNames[i];
+                if (assignment.count(metaName)) continue;
+                ExpressionPointer domain = substituteFreeVariables(
+                    leadingDomains[i], assignment);
+                std::string structureName = headConstantName(domain);
+                if (structureName == "<unknown>") continue;
+                if (!structureHeadIsClass(structureName)) continue;
+                // First argument of the structure application is the
+                // carrier; collect the spine and read it off.
+                ExpressionPointer spine = domain;
+                ExpressionPointer carrierArgument;
+                while (auto* application =
+                           std::get_if<Application>(&spine->node)) {
+                    carrierArgument = application->argument;
+                    spine = application->function;
+                }
+                if (!carrierArgument) continue;
+                std::string carrierName =
+                    headConstantName(carrierArgument);
+
+                // --- Registry path. Open the instance's leading
+                // parameter Pis as fresh metavariables and unify the
+                // resulting structure application against the domain.
+                // This solves the parameters from WHEREVER they appear
+                // — in the carrier (`IsGroup(IntegerMod(m), …)`) or in
+                // the relation (`IsEquivalenceRelation(Integer,
+                // CongruentModulo(m))`) — and fills the domain's own
+                // sibling metavariables. The instance is then emitted
+                // applied to the solved parameters.
+                auto entry = (carrierName == "<unknown>")
+                    ? environment_.canonicalInstanceRegistry.end()
+                    : environment_.canonicalInstanceRegistry.find(
+                          std::make_tuple(structureName, carrierName));
+                if (entry != environment_.canonicalInstanceRegistry.end()
+                    && entry->second.universeParameters.empty()) {
+                    std::set<std::string> parameterMetavariables =
+                        metavariableNames;
+                    std::vector<std::string> parameterMetaNames;
+                    ExpressionPointer openedInstanceType =
+                        entry->second.type;
+                    bool opened = true;
+                    for (int k = 0; k < entry->second.parameterCount;
+                         ++k) {
+                        auto* pi = std::get_if<Pi>(
+                            &openedInstanceType->node);
+                        if (!pi) { opened = false; break; }
+                        std::string fresh = "_instanceParameter_"
+                            + std::to_string(k) + "_"
+                            + entry->second.termName;
+                        parameterMetavariables.insert(fresh);
+                        parameterMetaNames.push_back(fresh);
+                        openedInstanceType = openBinder(
+                            pi->codomain, fresh,
+                            FreeVariableOrigin::Internal);
+                    }
+                    if (opened) {
+                        std::map<std::string, ExpressionPointer>
+                            instanceAssignment = assignment;
+                        // unifyConstructorParameters solves the
+                        // metavariables in its FIRST argument. Run both
+                        // directions: domain-first solves the domain's
+                        // sibling metavariables (operation/identity/…)
+                        // from the instance; instance-first solves the
+                        // instance's parameters from the domain.
+                        unifyConstructorParameters(
+                            domain, openedInstanceType,
+                            parameterMetavariables, instanceAssignment);
+                        unifyConstructorParameters(
+                            openedInstanceType, domain,
+                            parameterMetavariables, instanceAssignment);
+                        bool allSolved = true;
+                        for (const auto& p : parameterMetaNames) {
+                            if (!instanceAssignment.count(p)) {
+                                allSolved = false; break;
+                            }
+                        }
+                        if (allSolved) {
+                            // Merge the sibling domain-metavariable
+                            // solutions (substituting the parameters)
+                            // into the real assignment.
+                            for (const auto& nm : leadingFreshNames) {
+                                if (assignment.count(nm)) continue;
+                                auto it = instanceAssignment.find(nm);
+                                if (it != instanceAssignment.end()) {
+                                    assignment[nm] =
+                                        substituteFreeVariables(
+                                            it->second,
+                                            instanceAssignment);
+                                }
+                            }
+                            ExpressionPointer instanceTerm =
+                                makeConstant(entry->second.termName);
+                            for (const auto& p : parameterMetaNames) {
+                                instanceTerm = makeApplication(
+                                    std::move(instanceTerm),
+                                    instanceAssignment[p]);
+                            }
+                            assignment[metaName] =
+                                std::move(instanceTerm);
+                            madeProgress = true;
+                            continue;
+                        }
+                    }
+                }
+
+                // --- Local-hypothesis path: abstract carrier. Find a
+                // UNIQUE in-scope binder whose type is the same
+                // structure on a matching carrier; use it as the
+                // instance and read its operations off to fill the
+                // sibling implicits. Work in opened form (FreeVariables
+                // for the local binders), then close the solved values
+                // back; reject on a non-unique match.
+                ExpressionPointer domainOpened = openOverLocalBinders(
+                    domain, localBinders, localBinders.size());
+                Context hypothesisContext =
+                    buildContextFromLocalBinders(localBinders);
+                int matchCount = 0;
+                int matchBinder = -1;
+                std::map<std::string, ExpressionPointer> matchTrial;
+                for (int j =
+                         static_cast<int>(localBinders.size()) - 1;
+                     j >= 0; --j) {
+                    ExpressionPointer candidateType =
+                        openOverLocalBinders(
+                            localBinders[j].type, localBinders,
+                            static_cast<size_t>(j));
+                    if (headConstantName(candidateType)
+                        != structureName) {
+                        continue;
+                    }
+                    std::map<std::string, ExpressionPointer> trial;
+                    std::vector<ExpressionPointer> binderStack;
+                    unifyConstructorParameters(
+                        domainOpened, candidateType, metavariableNames,
+                        trial, 0, &binderStack);
+                    ExpressionPointer resolved =
+                        substituteFreeVariables(domainOpened, trial);
+                    if (!isDefinitionallyEqual(
+                            environment_, hypothesisContext,
+                            resolved, candidateType)) {
+                        continue;
+                    }
+                    ++matchCount;
+                    matchBinder = j;
+                    matchTrial = trial;
+                    if (matchCount > 1) break;
+                }
+                if (matchCount == 1) {
+                    for (const auto& solvedValue : matchTrial) {
+                        if (!assignment.count(solvedValue.first)) {
+                            assignment[solvedValue.first] =
+                                closeOverLocalBinders(
+                                    solvedValue.second, localBinders,
+                                    localBinders.size());
+                        }
+                    }
+                    assignment[metaName] = makeBoundVariable(
+                        static_cast<int>(localBinders.size()) - 1
+                        - matchBinder);
+                    madeProgress = true;
+                }
+            }
+        }
+    }
+
 Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
         const std::string& diagnosticName,
         ExpressionPointer instantiatedDeclarationType,
@@ -144,6 +320,20 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
         // expected domain types, which is essential for nested
         // under-applied calls.
         std::map<std::string, ExpressionPointer> assignment;
+        // Discharge structure-class implicits (a cited lemma's
+        // `ringProof : IsRing(…)`, a typeclass instance) FROM CONTEXT
+        // first, BEFORE backward inference matches the conclusion against
+        // the goal. The structure proof pins its own operations
+        // (`add`/`zero`/…); letting backward inference bind them
+        // positionally from the goal instead mis-fires when the citation
+        // is used in a congruence/reversed calc step (e.g. the conclusion's
+        // constant `zero` aligns with a `multiply(zero, b)` subterm),
+        // which then blocks the very discharge that would have pinned them
+        // correctly. Only fires for a UNIQUE in-scope structure hypothesis,
+        // so it is a no-op when the instance is ambiguous or carrier-driven.
+        resolveStructureClassLeadingImplicits(
+            numLeadingToInfer, leadingFreshNames, leadingDomains,
+            metavariableNames, localBinders, assignment);
         if (expectedType) {
             ExpressionPointer resultProbe = cursor;
             for (size_t j = 0;
@@ -294,185 +484,14 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
                                  FreeVariableOrigin::Internal);
         }
 
-        // Instance resolution (Stage 3 + local-instance follow-on). For
-        // any still-unassigned leading implicit whose domain is a
-        // PREDICATE application (a structure class like IsGroup/IsRing —
-        // head Definition returning Proposition), resolve it either from
-        // the canonical-instance registry (concrete or parameterized
-        // carrier) OR from a UNIQUE in-scope hypothesis (abstract carrier);
-        // either way the sibling operation/identity/… implicits are filled
-        // by unifying the chosen instance's type against the domain. The
-        // predicate gate keeps ordinary implicits (`{T : Type(0)}`,
-        // `{x : Tagged(m)}`) untouched.
-        {
-            bool madeProgress = true;
-            while (madeProgress) {
-                madeProgress = false;
-                for (int i = 0; i < numLeadingToInfer; ++i) {
-                    const std::string& metaName = leadingFreshNames[i];
-                    if (assignment.count(metaName)) continue;
-                    ExpressionPointer domain = substituteFreeVariables(
-                        leadingDomains[i], assignment);
-                    std::string structureName = headConstantName(domain);
-                    if (structureName == "<unknown>") continue;
-                    if (!structureHeadIsClass(structureName)) continue;
-                    // First argument of the structure application is the
-                    // carrier; collect the spine and read it off.
-                    ExpressionPointer spine = domain;
-                    ExpressionPointer carrierArgument;
-                    while (auto* application =
-                               std::get_if<Application>(&spine->node)) {
-                        carrierArgument = application->argument;
-                        spine = application->function;
-                    }
-                    if (!carrierArgument) continue;
-                    std::string carrierName =
-                        headConstantName(carrierArgument);
-
-                    // --- Registry path. Open the instance's leading
-                    // parameter Pis as fresh metavariables and unify the
-                    // resulting structure application against the domain.
-                    // This solves the parameters from WHEREVER they appear
-                    // — in the carrier (`IsGroup(IntegerMod(m), …)`) or in
-                    // the relation (`IsEquivalenceRelation(Integer,
-                    // CongruentModulo(m))`) — and fills the domain's own
-                    // sibling metavariables. The instance is then emitted
-                    // applied to the solved parameters.
-                    auto entry = (carrierName == "<unknown>")
-                        ? environment_.canonicalInstanceRegistry.end()
-                        : environment_.canonicalInstanceRegistry.find(
-                              std::make_tuple(structureName, carrierName));
-                    if (entry != environment_.canonicalInstanceRegistry.end()
-                        && entry->second.universeParameters.empty()) {
-                        std::set<std::string> parameterMetavariables =
-                            metavariableNames;
-                        std::vector<std::string> parameterMetaNames;
-                        ExpressionPointer openedInstanceType =
-                            entry->second.type;
-                        bool opened = true;
-                        for (int k = 0; k < entry->second.parameterCount;
-                             ++k) {
-                            auto* pi = std::get_if<Pi>(
-                                &openedInstanceType->node);
-                            if (!pi) { opened = false; break; }
-                            std::string fresh = "_instanceParameter_"
-                                + std::to_string(k) + "_"
-                                + entry->second.termName;
-                            parameterMetavariables.insert(fresh);
-                            parameterMetaNames.push_back(fresh);
-                            openedInstanceType = openBinder(
-                                pi->codomain, fresh,
-                                FreeVariableOrigin::Internal);
-                        }
-                        if (opened) {
-                            std::map<std::string, ExpressionPointer>
-                                instanceAssignment = assignment;
-                            // unifyConstructorParameters solves the
-                            // metavariables in its FIRST argument. Run both
-                            // directions: domain-first solves the domain's
-                            // sibling metavariables (operation/identity/…)
-                            // from the instance; instance-first solves the
-                            // instance's parameters from the domain.
-                            unifyConstructorParameters(
-                                domain, openedInstanceType,
-                                parameterMetavariables, instanceAssignment);
-                            unifyConstructorParameters(
-                                openedInstanceType, domain,
-                                parameterMetavariables, instanceAssignment);
-                            bool allSolved = true;
-                            for (const auto& p : parameterMetaNames) {
-                                if (!instanceAssignment.count(p)) {
-                                    allSolved = false; break;
-                                }
-                            }
-                            if (allSolved) {
-                                // Merge the sibling domain-metavariable
-                                // solutions (substituting the parameters)
-                                // into the real assignment.
-                                for (const auto& nm : leadingFreshNames) {
-                                    if (assignment.count(nm)) continue;
-                                    auto it = instanceAssignment.find(nm);
-                                    if (it != instanceAssignment.end()) {
-                                        assignment[nm] =
-                                            substituteFreeVariables(
-                                                it->second,
-                                                instanceAssignment);
-                                    }
-                                }
-                                ExpressionPointer instanceTerm =
-                                    makeConstant(entry->second.termName);
-                                for (const auto& p : parameterMetaNames) {
-                                    instanceTerm = makeApplication(
-                                        std::move(instanceTerm),
-                                        instanceAssignment[p]);
-                                }
-                                assignment[metaName] =
-                                    std::move(instanceTerm);
-                                madeProgress = true;
-                                continue;
-                            }
-                        }
-                    }
-
-                    // --- Local-hypothesis path: abstract carrier. Find a
-                    // UNIQUE in-scope binder whose type is the same
-                    // structure on a matching carrier; use it as the
-                    // instance and read its operations off to fill the
-                    // sibling implicits. Work in opened form (FreeVariables
-                    // for the local binders), then close the solved values
-                    // back; reject on a non-unique match.
-                    ExpressionPointer domainOpened = openOverLocalBinders(
-                        domain, localBinders, localBinders.size());
-                    Context hypothesisContext =
-                        buildContextFromLocalBinders(localBinders);
-                    int matchCount = 0;
-                    int matchBinder = -1;
-                    std::map<std::string, ExpressionPointer> matchTrial;
-                    for (int j =
-                             static_cast<int>(localBinders.size()) - 1;
-                         j >= 0; --j) {
-                        ExpressionPointer candidateType =
-                            openOverLocalBinders(
-                                localBinders[j].type, localBinders,
-                                static_cast<size_t>(j));
-                        if (headConstantName(candidateType)
-                            != structureName) {
-                            continue;
-                        }
-                        std::map<std::string, ExpressionPointer> trial;
-                        std::vector<ExpressionPointer> binderStack;
-                        unifyConstructorParameters(
-                            domainOpened, candidateType, metavariableNames,
-                            trial, 0, &binderStack);
-                        ExpressionPointer resolved =
-                            substituteFreeVariables(domainOpened, trial);
-                        if (!isDefinitionallyEqual(
-                                environment_, hypothesisContext,
-                                resolved, candidateType)) {
-                            continue;
-                        }
-                        ++matchCount;
-                        matchBinder = j;
-                        matchTrial = trial;
-                        if (matchCount > 1) break;
-                    }
-                    if (matchCount == 1) {
-                        for (const auto& solvedValue : matchTrial) {
-                            if (!assignment.count(solvedValue.first)) {
-                                assignment[solvedValue.first] =
-                                    closeOverLocalBinders(
-                                        solvedValue.second, localBinders,
-                                        localBinders.size());
-                            }
-                        }
-                        assignment[metaName] = makeBoundVariable(
-                            static_cast<int>(localBinders.size()) - 1
-                            - matchBinder);
-                        madeProgress = true;
-                    }
-                }
-            }
-        }
+        // Instance resolution (Stage 3 + local-instance follow-on): see
+        // `resolveStructureClassLeadingImplicits`. Run again here — after
+        // forward inference — to catch instances whose carrier only the
+        // trailing arguments / goal pin (the early pass before backward
+        // inference couldn't, with the carrier still a metavariable).
+        resolveStructureClassLeadingImplicits(
+            numLeadingToInfer, leadingFreshNames, leadingDomains,
+            metavariableNames, localBinders, assignment);
 
         // If any leading value still remains unassigned after forward
         // inference, retry the backward unification (now potentially

@@ -3897,6 +3897,23 @@ private:
         const std::string& metavariablePrefix,
         int line);
 
+    // Discharge any unassigned leading implicit whose domain is a
+    // structure-class application (IsGroup/IsRing/…) from the canonical-
+    // instance registry or a UNIQUE in-scope hypothesis, filling its
+    // sibling operation/identity implicits by unifying the chosen
+    // instance's type against the domain. Called both BEFORE backward
+    // inference (so the structure proof — and the operations it pins —
+    // win over a positional, possibly-spurious goal match) and after
+    // forward inference (to catch instances whose carrier only the goal
+    // determines). Only ever ASSIGNS unassigned metavariables.
+    void resolveStructureClassLeadingImplicits(
+        int numLeadingToInfer,
+        const std::vector<std::string>& leadingFreshNames,
+        const std::vector<ExpressionPointer>& leadingDomains,
+        const std::set<std::string>& metavariableNames,
+        const std::vector<LocalBinder>& localBinders,
+        std::map<std::string, ExpressionPointer>& assignment);
+
     // True when `openedType` (already opened over `localBinders`) is a
     // Proposition — i.e. its own type weak-head-reduces to `Sort 0`. Used
     // to restrict context-discharge to proof obligations, never values.

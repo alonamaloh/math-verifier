@@ -70,6 +70,14 @@ convention multiply : carrier → carrier → carrier
 convention one : carrier
 convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
 
+-- The ring's additive group `(carrier, add, zero, negate)`, viewed as a
+-- group — what the generic `Group.*` lemmas take as their `groupProof`.
+theorem IsRing.additive_group : IsGroup(carrier, add, zero, negate) := {
+    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
+    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    done by additiveGroup
+}
+
 theorem IsRing.add_identity_left (x : carrier) : add(zero, x) = x := {
     let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
     let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
@@ -84,6 +92,20 @@ theorem IsRing.add_identity_right (x : carrier) : add(x, zero) = x := {
     let ⟨additiveMonoid, _, _⟩ := additiveGroup;
     let ⟨_, _, identityRight⟩ := additiveMonoid;
     done by identityRight(x)
+}
+
+theorem IsRing.add_inverse_left (x : carrier) : add(negate(x), x) = zero := {
+    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
+    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    let ⟨_, inverseLeft, _⟩ := additiveGroup;
+    done by inverseLeft(x)
+}
+
+theorem IsRing.add_inverse_right (x : carrier) : add(x, negate(x)) = zero := {
+    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
+    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    let ⟨_, _, inverseRight⟩ := additiveGroup;
+    done by inverseRight(x)
 }
 
 theorem IsRing.distributivity_left (x y z : carrier)

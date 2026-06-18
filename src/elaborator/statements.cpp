@@ -676,15 +676,67 @@ SurfaceDefinitionDeclaration Elaborator::augmentDeclarationWithConventions(
             if (clause.body) collectMentionsInSurface(*clause.body, record);
         }
         // Transitive closure over convention types and side-conditions.
-        while (!worklist.empty()) {
-            std::string name = worklist.back();
-            worklist.pop_back();
-            const auto& entry = conventionRegistry_[name];
-            if (entry.type) collectMentionsInSurface(*entry.type, record);
-            for (const auto& prop : entry.propositions) {
-                if (prop.proposition) {
-                    collectMentionsInSurface(*prop.proposition, record);
+        auto drainWorklist = [&]() {
+            while (!worklist.empty()) {
+                std::string name = worklist.back();
+                worklist.pop_back();
+                const auto& entry = conventionRegistry_[name];
+                if (entry.type) collectMentionsInSurface(*entry.type, record);
+                for (const auto& prop : entry.propositions) {
+                    if (prop.proposition) {
+                        collectMentionsInSurface(*prop.proposition, record);
+                    }
                 }
+            }
+        };
+        drainWorklist();
+        // Pervasive bundle-proof conventions. A convention whose type is a
+        // structure-class application — `ringProof : IsRing(carrier, add, …)`,
+        // head `IsRing` being a `… → Proposition` class — is "in force"
+        // throughout the file: writing about its operations means working in
+        // that structure. So once the closure has any operation the proof
+        // bundles, pull the proof in too (and transitively the rest of the
+        // bundle), realising "throughout this file we work in a ring" without
+        // the lemma naming `ringProof`. Forward closure pulls a proof's
+        // operations but never the proof from an operation (operation types
+        // don't mention it); this is the reverse direction, gated to
+        // structure-class proofs so ordinary data conventions
+        // (`add : carrier → …`) are never auto-included. Fixpoint: a freshly
+        // pulled-in proof's operations may license another proof.
+        auto surfaceHeadName =
+            [](const SurfaceExpression& expr) -> std::string {
+            const SurfaceExpression* cursor = &expr;
+            while (auto* app =
+                       std::get_if<SurfaceApplication>(&cursor->node)) {
+                cursor = app->function.get();
+            }
+            if (auto* identifier =
+                    std::get_if<SurfaceIdentifier>(&cursor->node)) {
+                return identifier->qualifiedName;
+            }
+            return "";
+        };
+        bool addedBundleProof = true;
+        while (addedBundleProof) {
+            addedBundleProof = false;
+            for (const auto& name : conventionOrder_) {
+                if (needed.count(name) > 0) continue;
+                if (userBoundNames.count(name) > 0) continue;
+                const auto& entry = conventionRegistry_[name];
+                if (!entry.type) continue;
+                std::string head = surfaceHeadName(*entry.type);
+                if (head.empty() || !structureHeadIsClass(head)) continue;
+                bool referencesNeeded = false;
+                collectMentionsInSurface(*entry.type,
+                    [&](const std::string& referenced) {
+                        if (needed.count(referenced) > 0) {
+                            referencesNeeded = true;
+                        }
+                    });
+                if (!referencesNeeded) continue;
+                record(name);
+                drainWorklist();
+                addedBundleProof = true;
             }
         }
         if (needed.empty()) return declaration;

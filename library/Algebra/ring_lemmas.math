@@ -15,11 +15,14 @@ import Algebra.group
 import Algebra.group_lemmas
 import Algebra.ring
 
--- Throughout this file we work in an arbitrary ring. The bundle below is
--- prepended implicitly to every lemma that mentions any of its names, in
--- dependency order (carrier before the operations before `ringProof`), so
--- each lemma states only its genuine arguments and the inter-lemma
--- citations recover the bundle by unifying `ringProof`'s type.
+-- Throughout this file we work in an arbitrary ring. The bundle below is a
+-- pervasive convention: naming any ring operation prepends the whole
+-- signature implicitly — including `ringProof` — so each lemma states only
+-- its genuine arguments and cites the ring axioms by name
+-- (`IsRing.distributivity_right(…)`, `IsRing.add_identity_left(…)`) with
+-- `ringProof` recovered from context. The one standing `claim` per proof
+-- brings the additive group into scope for the generic `Group.*`
+-- cancellation lemmas.
 convention carrier : Type(0)
 convention add : carrier → carrier → carrier
 convention zero : carrier
@@ -36,8 +39,7 @@ convention ringProof : IsRing(carrier, add, zero, negate, multiply, one)
 -- against `multiply(zero, x) + multiply(zero, x) = multiply(zero, x) + zero`,
 -- leaving `multiply(zero, x) = zero`.
 theorem Ring.zero_multiply (x : carrier) : multiply(zero, x) = zero := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    claim IsGroup(carrier, add, zero, negate) by IsRing.additive_group;
     -- add(0·x, 0·x) = 0·x = add(0·x, 0); cancelling 0·x leaves 0·x = 0.
     calc add(multiply(zero, x), multiply(zero, x))
        = multiply(add(zero, zero), x)   by IsRing.distributivity_right(zero, zero, x)
@@ -49,8 +51,7 @@ theorem Ring.zero_multiply (x : carrier) : multiply(zero, x) = zero := {
 -- Zero absorbs multiplication on the right: `multiply(x, zero) = zero`.
 -- Same proof shape using `distributivity_left`.
 theorem Ring.multiply_zero (x : carrier) : multiply(x, zero) = zero := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    claim IsGroup(carrier, add, zero, negate) by IsRing.additive_group;
     -- add(x·0, x·0) = x·0 = add(x·0, 0); cancelling x·0 leaves x·0 = 0.
     calc add(multiply(x, zero), multiply(x, zero))
        = multiply(x, add(zero, zero))   by IsRing.distributivity_left(x, zero, zero)
@@ -66,14 +67,12 @@ theorem Ring.multiply_zero (x : carrier) : multiply(x, zero) = zero := {
 -- additive group identifies it with `negate(multiply(a, b))`.
 theorem Ring.multiply_negate_left (a b : carrier)
         : multiply(negate(a), b) = negate(multiply(a, b)) := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    let ⟨_, additiveInverseLeft, _⟩ := additiveGroup;
+    claim IsGroup(carrier, add, zero, negate) by IsRing.additive_group;
     -- multiply(negate(a), b) is the additive inverse of multiply(a, b):
     -- their sum is multiply(negate(a) + a, b) = multiply(0, b) = 0.
     calc add(multiply(negate(a), b), multiply(a, b))
        = multiply(add(negate(a), a), b)   by IsRing.distributivity_right(negate(a), a, b)
-       = multiply(zero, b)                by additiveInverseLeft(a)
+       = multiply(zero, b)                by IsRing.add_inverse_left(a)
        = zero                             by Ring.zero_multiply;
     done by Group.left_inverse_unique
 }
@@ -82,12 +81,10 @@ theorem Ring.multiply_negate_left (a b : carrier)
 -- left version using `distributivity_left` and `inverse_right`.
 theorem Ring.multiply_negate_right (a b : carrier)
         : multiply(a, negate(b)) = negate(multiply(a, b)) := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    let ⟨_, additiveInverseLeft, _⟩ := additiveGroup;
+    claim IsGroup(carrier, add, zero, negate) by IsRing.additive_group;
     calc add(multiply(a, negate(b)), multiply(a, b))
        = multiply(a, add(negate(b), b))   by IsRing.distributivity_left(a, negate(b), b)
-       = multiply(a, zero)                by additiveInverseLeft(b)
+       = multiply(a, zero)                by IsRing.add_inverse_left(b)
        = zero                             by Ring.multiply_zero;
     done by Group.left_inverse_unique
 }
@@ -98,8 +95,7 @@ theorem Ring.multiply_negate_right (a b : carrier)
 -- inverse is involutive.
 theorem Ring.negate_multiply_negate (a b : carrier)
         : multiply(negate(a), negate(b)) = multiply(a, b) := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+    claim IsGroup(carrier, add, zero, negate) by IsRing.additive_group;
     -- Peel each negation onto the product, then the additive inverse is
     -- involutive. Step 2 cites `multiply_negate_right` argument-free even
     -- though it applies UNDER a `negate(·)`: the calc diff bridge descends
@@ -123,17 +119,15 @@ theorem Ring.equal_of_linear_combination
         (ringBridge : add(goalLeft, negate(goalRight))
                       = add(combLeft, negate(combRight)))
         : goalLeft = goalRight := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    let ⟨_, _, additiveInverseRight⟩ := additiveGroup;
+    claim IsGroup(carrier, add, zero, negate) by IsRing.additive_group;
     -- The combination's difference is zero (it's combRight − combRight)...
     calc add(combLeft, negate(combRight))
        = add(combRight, negate(combRight))   by substituting combination
-       = zero                                by additiveInverseRight(combRight);
+       = zero                                by IsRing.add_inverse_right(combRight);
     -- ...so the goal's difference is zero too, and cancelling finishes.
     calc add(goalLeft, negate(goalRight))
        = add(combLeft, negate(combRight))    by ringBridge
        = zero
-       = add(goalRight, negate(goalRight))   by additiveInverseRight(goalRight);
+       = add(goalRight, negate(goalRight))   by IsRing.add_inverse_right(goalRight);
     done by Group.cancel_right
 }
