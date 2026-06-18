@@ -1505,6 +1505,23 @@ ExpressionPointer Elaborator::elaborateExpression(
                                         std::move(operandKernel));
             }
             if (unary->opSymbol == "-") {
+                // A locally-bound `-` (an operator-named binder or
+                // convention — e.g. an abstract additive group's negation):
+                // apply it directly, before the type-directed `<T>.negate`
+                // dispatch. Mirrors how a locally-bound binary `·`/`+`
+                // resolves to its binder rather than a global operator.
+                for (const auto& binder : localBinders) {
+                    if (binder.name == "-") {
+                        SurfaceExpressionPointer call = makeSurfaceApplication(
+                            makeSurfaceIdentifier(
+                                "-", {}, expression.line, expression.column),
+                            std::vector<SurfaceExpressionPointer>{
+                                unary->operand},
+                            expression.line, expression.column);
+                        return elaborateExpression(
+                            *call, localBinders, expectedType);
+                    }
+                }
                 // Dispatch unary `-` based on the operand's head type:
                 // Integer.negate / Rational.negate / etc. If the raw
                 // head type doesn't have a `.negate`, try operand-type
@@ -1661,6 +1678,22 @@ ExpressionPointer Elaborator::elaborateExpression(
             // dispatch function like `Group.inverse {g} : C(g) → C(g)`
             // gets its `{g}` filled from the operand's type.
             {
+                // A locally-bound postfix operator (e.g. an abstract group's
+                // `⁻¹`, bound as an operator convention/parameter): apply it
+                // directly, before the type-directed registry dispatch.
+                for (const auto& binder : localBinders) {
+                    if (binder.name == unary->opSymbol) {
+                        SurfaceExpressionPointer call = makeSurfaceApplication(
+                            makeSurfaceIdentifier(
+                                unary->opSymbol, {},
+                                expression.line, expression.column),
+                            std::vector<SurfaceExpressionPointer>{
+                                unary->operand},
+                            expression.line, expression.column);
+                        return elaborateExpression(
+                            *call, localBinders, expectedType);
+                    }
+                }
                 ExpressionPointer operandKernel =
                     elaborateExpression(*unary->operand, localBinders);
                 ExpressionPointer operandType =

@@ -83,6 +83,7 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::NotLessOrEqual:
         case TokenKind::ElementOf:
         case TokenKind::SubsetOf:
+        case TokenKind::InverseSuperscript:
             return true;
         default:
             return false;
@@ -629,17 +630,35 @@ private:
     SurfaceConventionDeclaration parseConventionDeclaration() {
         consumeAny();  // 'convention'
         SurfaceConventionDeclaration declaration;
-        if (!isIdentifierLike(peek().kind)) {
+        // A convention name is an identifier OR an operator symbol in
+        // parentheses (`(·)`, `(+)`) — the same spelling explicit binders
+        // accept. So a ring/group operation can be a pervasive convention
+        // and still be written infix (`x · y`, `x + y`) in every lemma.
+        auto tryConventionName = [&]() -> bool {
+            if (isIdentifierLike(peek().kind)) {
+                declaration.names.push_back(consumeAny().lexeme);
+                return true;
+            }
+            if (peek().kind == TokenKind::LeftParen
+                && position_ + 2 < tokens_.size()
+                && isOperatorSymbolToken(tokens_[position_ + 1].kind)
+                && tokens_[position_ + 2].kind == TokenKind::RightParen) {
+                consumeAny();  // '('
+                declaration.names.push_back(consumeAny().lexeme);
+                consumeAny();  // ')'
+                return true;
+            }
+            return false;
+        };
+        if (!tryConventionName()) {
             throwHere("expected at least one name after 'convention'");
         }
-        declaration.names.push_back(consumeAny().lexeme);
         // Optional additional names share the same type/propositions.
         while (peek().kind != TokenKind::Colon) {
-            if (!isIdentifierLike(peek().kind)) {
+            if (!tryConventionName()) {
                 throwHere("expected ':' or another name in convention "
                           "declaration");
             }
-            declaration.names.push_back(consumeAny().lexeme);
         }
         expect(TokenKind::Colon, "before convention type");
         declaration.type = parseExpression();
