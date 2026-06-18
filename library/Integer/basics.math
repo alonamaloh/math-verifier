@@ -7,11 +7,17 @@
 -- when their differences agree — an equality that stays inside
 -- Natural and so doesn't depend on integer subtraction at all.
 --
--- Both `IntegerEquivalent` and `Integer` are **opaque**: the rest of
--- the library reasons about Integers through the boundary lemmas
--- published here (`Integer.difference_equal` and its converse), never
--- by unfolding the quotient or the equivalence. How the integers are
+-- `Integer` is **opaque**: the rest of the library reasons about Integers
+-- through the boundary lemmas published here (`Integer.difference_equal`
+-- and its converse), never by unfolding the quotient. How the integers are
 -- built is an implementation detail behind that boundary.
+--
+-- `IntegerEquivalent` (the equivalence relation), by contrast, is
+-- **transparent**: it is only ever touched by the `Integer/` construction
+-- itself, which genuinely reasons about it, so `IntegerEquivalent(make(a,
+-- b), make(c, d))` is just `a + d = b + c` definitionally — no bridge
+-- lemmas, no unfolding. Opacity there bought nothing (no external consumer
+-- to protect) and only imposed ceremony on the modules that must see it.
 
 module Integer.basics
 
@@ -42,38 +48,27 @@ definition IntegerRepresentative.negativePart : IntegerRepresentative → Natura
 -- (a, b) ~ (c, d) iff a + d = b + c — their differences `a - b`, `c - d`
 -- agree. Stated through the projections (a plain `:=`, no pattern match),
 -- so the equivalence proofs reason about `positivePart(x)` / `negativePart(x)`
--- for an abstract `x` without ever destructuring it. Opaque: consumers use
--- the boundary lemmas, not this body.
-opaque definition IntegerEquivalent (x y : IntegerRepresentative) : Proposition :=
+-- for an abstract `x` without ever destructuring it. Transparent: it is
+-- internal to this construction, so it reduces freely (no boundary lemmas).
+definition IntegerEquivalent (x y : IntegerRepresentative) : Proposition :=
   IntegerRepresentative.positivePart(x) + IntegerRepresentative.negativePart(y)
     = IntegerRepresentative.negativePart(x) + IntegerRepresentative.positivePart(y)
 
--- ----------------------------------------------------------------------
--- The characterising lemmas: the equivalence at concrete representatives
--- IS the cross-addition equation. Proved once here by unfolding; nothing
--- downstream unfolds `IntegerEquivalent`.
-
-theorem IntegerEquivalent.from_natural {a b c d : Natural}
-        (crossEquation : a + d = b + c)
-        : IntegerEquivalent(IntegerRepresentative.make(a, b),
-                            IntegerRepresentative.make(c, d)) :=
-  done by crossEquation unfolding IntegerEquivalent
-
-theorem IntegerEquivalent.to_natural {a b c d : Natural}
-        (equivalence : IntegerEquivalent(IntegerRepresentative.make(a, b),
-                                          IntegerRepresentative.make(c, d)))
-        : a + d = b + c :=
-  unfold IntegerEquivalent in equivalence
+-- The equivalence at concrete representatives IS the cross-addition
+-- equation: `IntegerEquivalent(make(a, b), make(c, d))` is definitionally
+-- `a + d = b + c`. So a cross-equation and the equivalence are
+-- interchangeable by reduction — no bridge lemmas, no unfolding needed.
 
 -- ----------------------------------------------------------------------
--- The equivalence relation is reflexive, symmetric, transitive. Each
--- proof unfolds `IntegerEquivalent` once to a Natural-component identity
--- about the projections of an abstract representative — no destructure.
+-- The equivalence relation is reflexive, symmetric, transitive. Each proof
+-- reduces (`IntegerEquivalent` being transparent) to a Natural-component
+-- identity about the projections of an abstract representative — no
+-- destructure, and the named kernel lemma `since`-cites the real content.
 
 -- Reflexive: positivePart(x) + negativePart(x) = negativePart(x) + positivePart(x).
 theorem IntegerEquivalent.reflexive (x : IntegerRepresentative)
         : IntegerEquivalent(x, x) :=
-  done by Natural.add_commutative unfolding IntegerEquivalent
+  done since Natural.add_commutative
 
 -- Symmetry kernel at the Natural level: a + d = b + c gives c + b = d + a.
 theorem IntegerEquivalent.symmetric_natural (a b c d : Natural)
@@ -86,7 +81,7 @@ theorem IntegerEquivalent.symmetric_natural (a b c d : Natural)
 theorem IntegerEquivalent.symmetric (x y : IntegerRepresentative)
         (xEquivalentY : IntegerEquivalent(x, y))
         : IntegerEquivalent(y, x) :=
-  done by IntegerEquivalent.symmetric_natural unfolding IntegerEquivalent
+  done since IntegerEquivalent.symmetric_natural
 
 -- Transitivity kernel at the Natural level. From `a + d = b + c` and
 -- `c + f = d + e`, derive `a + f = b + e`: sum the hypotheses, rearrange
@@ -108,7 +103,7 @@ theorem IntegerEquivalent.transitive (x y z : IntegerRepresentative)
         (xEquivalentY : IntegerEquivalent(x, y))
         (yEquivalentZ : IntegerEquivalent(y, z))
         : IntegerEquivalent(x, z) :=
-  done by IntegerEquivalent.transitive_natural unfolding IntegerEquivalent
+  done since IntegerEquivalent.transitive_natural
 
 -- ----------------------------------------------------------------------
 -- The Integer type: equivalence classes of IntegerRepresentative.
@@ -137,7 +132,7 @@ construction Integer.from_difference (a b : Natural) : Integer :=
 -- The boundary API. Every consumer compares Integers through these two
 -- lemmas: `from_difference(a, b) = from_difference(c, d)` is exactly the
 -- Natural cross-equation `a + d = b + c`, in both directions. The opaque
--- `Integer` / `IntegerEquivalent` are pierced only here.
+-- `Integer` is pierced only here (the equivalence is already transparent).
 
 -- Cross-equation ⇒ equal classes (via Quotient.sound).
 theorem Integer.difference_equal (a b c d : Natural)
@@ -146,14 +141,13 @@ theorem Integer.difference_equal (a b c d : Natural)
   unfold Integer in
     Quotient.sound(IntegerRepresentative.make(a, b),
                    IntegerRepresentative.make(c, d),
-                   IntegerEquivalent.from_natural(crossEquation))
+                   crossEquation)
 
 -- Equal classes ⇒ cross-equation (via Quotient.exact).
 theorem Integer.difference_equal_implies (a b c d : Natural)
         (differenceEquality
             : Integer.from_difference(a, b) = Integer.from_difference(c, d))
         : a + d = b + c :=
-  IntegerEquivalent.to_natural(a, b, c, d,
-      Quotient.exact(IntegerRepresentative.make(a, b),
-                     IntegerRepresentative.make(c, d),
-                     unfold Integer in differenceEquality))
+  Quotient.exact(IntegerRepresentative.make(a, b),
+                 IntegerRepresentative.make(c, d),
+                 unfold Integer in differenceEquality)
