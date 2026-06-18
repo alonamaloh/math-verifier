@@ -2,12 +2,12 @@
 --
 -- Multiplicative cancellation on Integer when the multiplier is a
 -- positive natural lifted to Integer:
---     x · to_integer(succ(k)) = y · to_integer(succ(k))  →  x = y
+--     x · to_integer(c) = y · to_integer(c)  →  x = y     (for c ≥ 1)
 -- The proof descends through `Quotient.exact` (newly available from
 -- propositional extensionality) to recover the underlying
 -- `IntegerEquivalent` at the multiplied representatives, simplifies
 -- away the `_·0` and `0+_` noise that the kernel can't reduce
--- structurally, factors out `succ(k)`, applies the Natural-level
+-- structurally, factors out `c`, applies the Natural-level
 -- cancellation, and reassembles via `Quotient.sound`. This is the
 -- step that the original Rational plan needed and couldn't get.
 
@@ -33,43 +33,42 @@ import Integer.embedding
 -- equivalence relation between the two multiplied representatives,
 -- conclude the equivalence between the original representatives.
 -- The proof simplifies the multiplied-out equation to one factor of
--- `succ(k)` on each side, then cancels.
+-- `c` on each side, then cancels the positive factor.
 
 theorem Integer.cancellation_natural
-        (p1 q1 p2 q2 k : Natural)
+        (p1 q1 p2 q2 c : Natural) (positive : 1 ≤ c)
         (equivalenceAfterMultiply
-            : (p1 * successor(k) + q1 * 0)
-              + (p2 * 0 + q2 * successor(k))
-              = (p1 * 0 + q1 * successor(k))
-                + (p2 * successor(k) + q2 * 0))
+            : (p1 * c + q1 * 0)
+              + (p2 * 0 + q2 * c)
+              = (p1 * 0 + q1 * c)
+                + (p2 * c + q2 * 0))
         : p1 + q2 = q1 + p2 := {
-    -- Simplify zeros on each side, then factor succ(k).
-    calc (p1 * successor(k) + q1 * 0)
-            + (p2 * 0 + q2 * successor(k))
-       = (p1 * successor(k) + 0)
-           + (p2 * 0 + q2 * successor(k))
-       = (p1 * successor(k) + 0)
-           + (0 + q2 * successor(k))
-       = p1 * successor(k) + (0 + q2 * successor(k))
-       = p1 * successor(k) + q2 * successor(k)
-       = (p1 + q2) * successor(k);
-    calc (p1 * 0 + q1 * successor(k))
-            + (p2 * successor(k) + q2 * 0)
-       = (0 + q1 * successor(k))
-           + (p2 * successor(k) + q2 * 0)
-       = (0 + q1 * successor(k))
-           + (p2 * successor(k) + 0)
-       = q1 * successor(k) + (p2 * successor(k) + 0)
-       = q1 * successor(k) + p2 * successor(k)
-       = (q1 + p2) * successor(k);
-    calc (p1 + q2) * successor(k)
-       = (p1 * successor(k) + q1 * 0)
-           + (p2 * 0 + q2 * successor(k))
-       = (p1 * 0 + q1 * successor(k))
-           + (p2 * successor(k) + q2 * 0)
-       = (q1 + p2) * successor(k);
-    claim 1 ≤ successor(k) by Natural.successor_positive;
-    -- Cancel the positive factor successor(k) from both sides.
+    -- Simplify zeros on each side, then factor c.
+    calc (p1 * c + q1 * 0)
+            + (p2 * 0 + q2 * c)
+       = (p1 * c + 0)
+           + (p2 * 0 + q2 * c)
+       = (p1 * c + 0)
+           + (0 + q2 * c)
+       = p1 * c + (0 + q2 * c)
+       = p1 * c + q2 * c
+       = (p1 + q2) * c;
+    calc (p1 * 0 + q1 * c)
+            + (p2 * c + q2 * 0)
+       = (0 + q1 * c)
+           + (p2 * c + q2 * 0)
+       = (0 + q1 * c)
+           + (p2 * c + 0)
+       = q1 * c + (p2 * c + 0)
+       = q1 * c + p2 * c
+       = (q1 + p2) * c;
+    calc (p1 + q2) * c
+       = (p1 * c + q1 * 0)
+           + (p2 * 0 + q2 * c)
+       = (p1 * 0 + q1 * c)
+           + (p2 * c + q2 * 0)
+       = (q1 + p2) * c;
+    -- Cancel the positive factor c from both sides.
     done by Natural.multiply_cancel_right
 }
 
@@ -79,14 +78,14 @@ theorem Integer.cancellation_natural
 -- hand it to the Natural-level cancellation kernel.
 
 theorem Integer.multiply_cancel_right_at_representatives
-        (k : Natural)
+        (c : Natural) (positive : 1 ≤ c)
         : ∀ (representativeX representativeY : IntegerRepresentative).
             Integer.multiply(
                     Quotient.mk(representativeX),
-                    (successor(k) : Integer))
+                    (c : Integer))
             = Integer.multiply(
                     Quotient.mk(representativeY),
-                    (successor(k) : Integer))
+                    (c : Integer))
           → (Quotient.mk(representativeX) : Integer)
             = Quotient.mk(representativeY)
   | IntegerRepresentative.make(p1, q1),
@@ -97,16 +96,16 @@ theorem Integer.multiply_cancel_right_at_representatives
       -- reads it back as the cross-equation. The explicit `Quotient.exact`
       -- (with `unfold Integer`) is required here: the opaque `Integer`
       -- boundary blocks the bare-claim exact-bridge's WHNF match.
-      claim (p1 * successor(k) + q1 * 0) + (p2 * 0 + q2 * successor(k))
-              = (p1 * 0 + q1 * successor(k)) + (p2 * successor(k) + q2 * 0)
+      claim (p1 * c + q1 * 0) + (p2 * 0 + q2 * c)
+              = (p1 * 0 + q1 * c) + (p2 * c + q2 * 0)
           by IntegerEquivalent.to_natural(
                  Quotient.exact(
                      IntegerRepresentative.make(
-                         p1 * successor(k) + q1 * 0,
-                         p1 * 0 + q1 * successor(k)),
+                         p1 * c + q1 * 0,
+                         p1 * 0 + q1 * c),
                      IntegerRepresentative.make(
-                         p2 * successor(k) + q2 * 0,
-                         p2 * 0 + q2 * successor(k)),
+                         p2 * c + q2 * 0,
+                         p2 * 0 + q2 * c),
                      unfold Integer in multipliedEquality));
       -- The cancellation kernel extracts `p1 + q2 = q1 + p2`; `from_natural`
       -- bridges that back to the class equality the goal asks for.
@@ -118,10 +117,10 @@ theorem Integer.multiply_cancel_right_at_representatives
 -- Main theorem: lift the at-representatives version through
 -- Quotient.induct_two so it applies to any Integer x and y.
 
-theorem Integer.multiply_cancel_right_by_natural_successor
-        (x y : Integer) (k : Natural)
+theorem Integer.multiply_cancel_right_by_positive_natural
+        (x y : Integer) (c : Natural) (positive : 1 ≤ c)
         (productEquality
-            : x * (successor(k) : Integer) = y * (successor(k) : Integer))
+            : x * (c : Integer) = y * (c : Integer))
         : x = y :=
   cases x refining productEquality { | representativeX =>
     cases y refining productEquality { | representativeY =>

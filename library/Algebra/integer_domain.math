@@ -97,22 +97,13 @@ theorem Integer.multiply_eq_zero_implies (x y : Integer)
                          = Natural.to_integer(0)
                          = Integer.zero))
                 };
-                claim oneAtMostN : 1 ≤ n by {
-                  cases Natural.is_zero_or_at_least_one(n) {
-                    | Or.introduceLeft(nZero) => absurd(nNonzero(nZero))
-                    | Or.introduceRight(positive) => positive
-                  }
-                };
-                obtain ⟨predecessor, nEqualsSuccessor⟩
-                    from Natural.subtraction_witness(1, n, oneAtMostN);
-                -- nEqualsSuccessor : n = 1 + predecessor = successor(predecessor).
-                calc x * (successor(predecessor) : Integer)
-                          = x * Natural.to_integer(n)
+                claim oneAtMostN : 1 ≤ n by Natural.one_le_of_nonzero;
+                calc x * (n : Integer)
                           = x * y
                           = Integer.zero
-                          = Integer.zero * (successor(predecessor) : Integer) as productCancellable;
-                Integer.multiply_cancel_right_by_natural_successor(
-                    x, Integer.zero, predecessor, productCancellable)
+                          = Integer.zero * (n : Integer) as productCancellable;
+                Integer.multiply_cancel_right_by_positive_natural(
+                    x, Integer.zero, n, oneAtMostN, productCancellable)
               }
             | Or.introduceRight(yNegative) => {
                 obtain ⟨n, yIsNegativeImage⟩ from yNegative;
@@ -125,29 +116,16 @@ theorem Integer.multiply_eq_zero_implies (x y : Integer)
                          = -Natural.to_integer(0)
                          = Integer.zero))
                 };
-                claim oneAtMostN : 1 ≤ n by {
-                  cases Natural.is_zero_or_at_least_one(n) {
-                    | Or.introduceLeft(nZero) => absurd(nNonzero(nZero))
-                    | Or.introduceRight(positive) => positive
-                  }
-                };
-                obtain ⟨predecessor, nEqualsSuccessor⟩
-                    from Natural.subtraction_witness(1, n, oneAtMostN);
-                calc x * (successor(predecessor) : Integer)
-                          = x * Natural.to_integer(n)
-                          = x * (-y)
-                                by congruenceOf(
-                                       (z : Integer) ↦ x * z,
-                                       calc Natural.to_integer(n)
-                                          = -(-Natural.to_integer(n))
-                                          = -y)
-                          = Integer.zero * (successor(predecessor) : Integer)
-                                by calc x * (-y)
-                                      = -(x * y)
-                                      = -Integer.zero
-                                      = Integer.zero * (successor(predecessor) : Integer) as productCancellable;
-                Integer.multiply_cancel_right_by_natural_successor(
-                    x, Integer.zero, predecessor, productCancellable)
+                claim oneAtMostN : 1 ≤ n by Natural.one_le_of_nonzero;
+                claim productCancellable
+                    : x * (n : Integer) = Integer.zero * (n : Integer)
+                    by calc x * (n : Integer)
+                          = x * (-y)            by substituting (y = -(n : Integer))
+                          = -(x * y)            by ring
+                          = -Integer.zero       by substituting (x * y = Integer.zero)
+                          = Integer.zero * (n : Integer)   by ring;
+                Integer.multiply_cancel_right_by_positive_natural(
+                    x, Integer.zero, n, oneAtMostN, productCancellable)
               }
           }
         };

@@ -6,10 +6,11 @@
 -- cross-multiplication equivalence, and that the product of two nonzero
 -- denominators is again a valid denominator).
 --
--- The cancellation reuses `Integer.multiply_cancel_right_by_natural_successor`
--- (cancel a positive-natural factor): a nonzero Integer is, by sign split,
--- either a nonzero natural image `(successor j : Integer)` or its negation,
--- and the negated case is bridged by two `ring` steps.
+-- The cancellation reuses `Integer.multiply_cancel_right_by_positive_natural`:
+-- a nonzero Integer is, by sign split, either a nonzero natural image
+-- `(n : Integer)` or its negation `-(k : Integer)`; either way the positive
+-- natural (`n` or `k`, at least one since the Integer is nonzero) is the
+-- multiplier to cancel, and the negated case is bridged by `ring`.
 
 module Integer.integral_domain
 
@@ -43,53 +44,41 @@ theorem Integer.multiply_cancel_right_by_nonzero
   cases Integer.sign_split(c) {
     | Or.introduceLeft(cNonneg) => {
         choose n as cIsImage from cNonneg;
-        cases Natural.zero_or_successor(n) {
-          | Or.introduceLeft(nIsZero) => {
-              claim cIsZero : c = Integer.zero
-                  by calc c
-                        = (n : Integer)           by cIsImage
-                        = ((0 : Natural) : Integer) by substituting nIsZero
-                        = Integer.zero;
-              absurd(cNonzero(cIsZero))
-            }
-          | Or.introduceRight(nIsSuccessor) => {
-              choose j as nEqualsSuccessor from nIsSuccessor;
-              claim x * (successor(j) : Integer) = y * (successor(j) : Integer)
-                  by calc x * (successor(j) : Integer)
-                        = x * (n : Integer)             by substituting nEqualsSuccessor
-                        = x * c                         by substituting cIsImage
-                        = y * c                         by productEquality
-                        = y * (n : Integer)             by substituting cIsImage
-                        = y * (successor(j) : Integer)  by substituting nEqualsSuccessor;
-              done by Integer.multiply_cancel_right_by_natural_successor
-            }
-        }
+        -- c = (n : Integer); n ≠ 0 since c ≠ 0, so n is a positive multiplier.
+        claim nNonzero : ¬(n = 0) by {
+          suppose n = 0 as nIsZero;
+          absurd(cNonzero(calc c
+                             = (n : Integer)              by cIsImage
+                             = ((0 : Natural) : Integer)  by substituting nIsZero
+                             = Integer.zero))
+        };
+        claim 1 ≤ n by Natural.one_le_of_nonzero;
+        claim x * (n : Integer) = y * (n : Integer)
+            by calc x * (n : Integer)
+                  = x * c               by substituting cIsImage
+                  = y * c               by productEquality
+                  = y * (n : Integer)   by substituting cIsImage;
+        done by Integer.multiply_cancel_right_by_positive_natural
       }
     | Or.introduceRight(cNegated) => {
         choose k as cIsNegated from cNegated;
-        cases Natural.zero_or_successor(k) {
-          | Or.introduceLeft(kIsZero) => {
-              claim cIsZero : c = Integer.zero
-                  by calc c
-                        = -(k : Integer)              by cIsNegated
-                        = -((0 : Natural) : Integer)  by substituting kIsZero
-                        = Integer.zero                by ring;
-              absurd(cNonzero(cIsZero))
-            }
-          | Or.introduceRight(kIsSuccessor) => {
-              choose j as kEqualsSuccessor from kIsSuccessor;
-              claim x * (successor(j) : Integer) = y * (successor(j) : Integer)
-                  by calc x * (successor(j) : Integer)
-                        = -(x * -(successor(j) : Integer))  by ring
-                        = -(x * -(k : Integer))             by substituting kEqualsSuccessor
-                        = -(x * c)                          by substituting cIsNegated
-                        = -(y * c)                          by substituting productEquality
-                        = -(y * -(k : Integer))             by substituting cIsNegated
-                        = -(y * -(successor(j) : Integer))  by substituting kEqualsSuccessor
-                        = y * (successor(j) : Integer)      by ring;
-              done by Integer.multiply_cancel_right_by_natural_successor
-            }
-        }
+        -- c = -(k : Integer); k ≠ 0 since c ≠ 0, so k is a positive multiplier.
+        claim kNonzero : ¬(k = 0) by {
+          suppose k = 0 as kIsZero;
+          absurd(cNonzero(calc c
+                             = -(k : Integer)              by cIsNegated
+                             = -((0 : Natural) : Integer)  by substituting kIsZero
+                             = Integer.zero                by ring))
+        };
+        claim 1 ≤ k by Natural.one_le_of_nonzero;
+        claim x * (k : Integer) = y * (k : Integer)
+            by calc x * (k : Integer)
+                  = -(x * -(k : Integer))   by ring
+                  = -(x * c)                by substituting cIsNegated
+                  = -(y * c)                by substituting productEquality
+                  = -(y * -(k : Integer))   by substituting cIsNegated
+                  = y * (k : Integer)       by ring;
+        done by Integer.multiply_cancel_right_by_positive_natural
       }
   }
 
