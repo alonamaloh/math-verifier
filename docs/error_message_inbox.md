@@ -622,3 +622,21 @@ Real/{addition,multiplication,sequence,absolute_value,order}).
 diagnosis: usage tracker for the unused-name lint should treat a
 `choose … from <ident>` (and likely `obtain … from <ident>`) source as a
 reference to <ident>.
+
+### Redundancy checker over-reports a `by` that's only redundant in isolation — 2026-06-17 (polish of de-plumb + Set/finite)
+note: `--check-redundant-by` flags each `by`/claim by re-proving that ONE site
+with its hint removed but every OTHER hint present. In `below_unshifts`
+(Set/finite_sum) the inner `claim successor(monus(value,m)) ≤ n by { calc …;
+claim }` is reported redundant, but actually removing it makes the proof fail
+(`elaborate error: claim at line N`) — it only "closes without help" in the
+checker's run because the *sibling* `claim successor(value) ≤ m+n;` is still
+there to feed it, and the auto-prover happens to reach it from that. So a
+batch of by-less edits guided by the report can over-remove: each looked
+redundant alone, but they were collectively load-bearing. Same shape bit the
+`group_lemmas` `inverse_operation` nested calc (two associativity steps each
+flagged, but removing both broke the second). diagnosis: the report is a
+per-site lower bound, not a jointly-safe set; the workflow (re-run after each
+edit, restore on breakage) already absorbs this, but a note in the checker
+output — "redundant given the other hints; removing several at once may not be
+safe" — would set expectations. A stronger checker could re-verify with ALL
+flagged hints removed and only report the ones still redundant jointly.
