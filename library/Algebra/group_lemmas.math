@@ -31,18 +31,16 @@ theorem Group.right_inverse_unique
         (combineHypothesis
             : operation(a, b) = identity)
         : b = inverse(a) := {
-    let ⟨monoidProof, inverseLeftAxiom, _⟩ := groupProof;
-    let ⟨associativity, identityLeft, identityRight⟩ := monoidProof;
     calc b
        = operation(identity, b)
-              by identityLeft(b)
+              by IsGroup.identity_left(b)
        = operation(operation(inverse(a), a), b)
-              by inverseLeftAxiom(a)
+              by IsGroup.inverse_left(a)
        = operation(inverse(a), operation(a, b))
-              by associativity(inverse(a), a, b)
+              by IsGroup.associativity(inverse(a), a, b)
        = operation(inverse(a), identity)
        = inverse(a)
-              by identityRight(inverse(a))
+              by IsGroup.identity_right(inverse(a))
 }
 
 -- Symmetric: if `operation(b, a) = identity` then `b = inverse(a)`.
@@ -58,18 +56,16 @@ theorem Group.left_inverse_unique
         (combineHypothesis
             : operation(b, a) = identity)
         : b = inverse(a) := {
-    let ⟨monoidProof, _, inverseRightAxiom⟩ := groupProof;
-    let ⟨associativity, identityLeft, identityRight⟩ := monoidProof;
     calc b
        = operation(b, identity)
-              by identityRight(b)
+              by IsGroup.identity_right(b)
        = operation(b, operation(a, inverse(a)))
-              by inverseRightAxiom(a)
+              by IsGroup.inverse_right(a)
        = operation(operation(b, a), inverse(a))
-              by associativity(b, a, inverse(a))
+              by IsGroup.associativity(b, a, inverse(a))
        = operation(identity, inverse(a))
        = inverse(a)
-              by identityLeft(inverse(a))
+              by IsGroup.identity_left(inverse(a))
 }
 
 -- The inverse function is an involution: `inverse(inverse(x)) = x`.
@@ -84,11 +80,10 @@ theorem Group.inverse_involution
         (groupProof : IsGroup(carrier, operation, identity, inverse))
         (x : carrier)
         : inverse(inverse(x)) = x := {
-    let ⟨_, inverseLeftAxiom, _⟩ := groupProof;
     Group.right_inverse_unique(
         carrier, operation, identity, inverse, groupProof,
         inverse(x), x,
-        inverseLeftAxiom(x))
+        IsGroup.inverse_left(x))
 }
 
 -- The inverse of the identity is the identity. `op(e, e) = e` by
@@ -101,12 +96,10 @@ theorem Group.inverse_identity
         (inverse : carrier → carrier)
         (groupProof : IsGroup(carrier, operation, identity, inverse))
         : inverse(identity) = identity := {
-    let ⟨monoidProof, _, _⟩ := groupProof;
-    let ⟨_, identityLeft, _⟩ := monoidProof;
     Group.right_inverse_unique(
         carrier, operation, identity, inverse, groupProof,
         identity, identity,
-        identityLeft(identity))
+        IsGroup.identity_left(identity))
 }
 
 -- Left cancellation: `op(a, b) = op(a, c)` → `b = c`. Apply
@@ -121,22 +114,20 @@ theorem Group.cancel_left
         (a b c : carrier)
         (equation : operation(a, b) = operation(a, c))
         : b = c := {
-    let ⟨monoidProof, inverseLeftAxiom, _⟩ := groupProof;
-    let ⟨associativity, identityLeft, _⟩ := monoidProof;
     calc b
        = operation(identity, b)
-              by identityLeft(b)
+              by IsGroup.identity_left(b)
        = operation(operation(inverse(a), a), b)
-              by inverseLeftAxiom(a)
+              by IsGroup.inverse_left(a)
        = operation(inverse(a), operation(a, b))
-              by associativity(inverse(a), a, b)
+              by IsGroup.associativity(inverse(a), a, b)
        = operation(inverse(a), operation(a, c))
        = operation(operation(inverse(a), a), c)
-              by associativity(inverse(a), a, c)
+              by IsGroup.associativity(inverse(a), a, c)
        = operation(identity, c)
-              by inverseLeftAxiom(a)
+              by IsGroup.inverse_left(a)
        = c
-              by identityLeft(c)
+              by IsGroup.identity_left(c)
 }
 
 -- Right cancellation: `op(b, a) = op(c, a)` → `b = c`. Mirror of
@@ -150,22 +141,20 @@ theorem Group.cancel_right
         (a b c : carrier)
         (equation : operation(b, a) = operation(c, a))
         : b = c := {
-    let ⟨monoidProof, _, inverseRightAxiom⟩ := groupProof;
-    let ⟨associativity, _, identityRight⟩ := monoidProof;
     calc b
        = operation(b, identity)
-              by identityRight(b)
+              by IsGroup.identity_right(b)
        = operation(b, operation(a, inverse(a)))
-              by inverseRightAxiom(a)
+              by IsGroup.inverse_right(a)
        = operation(operation(b, a), inverse(a))
-              by associativity(b, a, inverse(a))
+              by IsGroup.associativity(b, a, inverse(a))
        = operation(operation(c, a), inverse(a))
        = operation(c, operation(a, inverse(a)))
-              by associativity(c, a, inverse(a))
+              by IsGroup.associativity(c, a, inverse(a))
        = operation(c, identity)
-              by inverseRightAxiom(a)
+              by IsGroup.inverse_right(a)
        = c
-              by identityRight(c)
+              by IsGroup.identity_right(c)
 }
 
 -- `inverse(op(a, b)) = op(inverse(b), inverse(a))`. Standard group
@@ -182,8 +171,6 @@ theorem Group.inverse_operation
         (a b : carrier)
         : inverse(operation(a, b))
           = operation(inverse(b), inverse(a)) := {
-    let ⟨monoidProof, _, inverseRightAxiom⟩ := groupProof;
-    let ⟨associativity, identityLeft, _⟩ := monoidProof;
     Group.right_inverse_unique(
         carrier, operation, identity, inverse, groupProof,
         operation(a, b),
@@ -192,18 +179,18 @@ theorem Group.inverse_operation
                             operation(inverse(b), inverse(a)))
                = operation(a, operation(b,
                        operation(inverse(b), inverse(a))))
-                      by associativity(a, b,
+                      by IsGroup.associativity(a, b,
                              operation(inverse(b), inverse(a)))
                = operation(a, operation(operation(b, inverse(b)),
                                           inverse(a)))
-                      by associativity(b, inverse(b),
+                      by IsGroup.associativity(b, inverse(b),
                              inverse(a))
                = operation(a, operation(identity, inverse(a)))
-                      by inverseRightAxiom(b)
+                      by IsGroup.inverse_right(b)
                = operation(a, inverse(a))
-                      by identityLeft(inverse(a))
+                      by IsGroup.identity_left(inverse(a))
                = identity
-                      by inverseRightAxiom(a))
+                      by IsGroup.inverse_right(a))
 }
 
 -- In an abelian group, `inverse(op(a, b)) = op(inverse(a), inverse(b))`.
