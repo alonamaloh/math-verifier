@@ -578,6 +578,15 @@ ExpressionPointer Elaborator::tryContextFactMatch(
         lastContextFactWinner_.clear();
         lastContextFactCandidateCount_ = 0;
         int triedCount = 0;
+        // Gate the citation premise-discharge's defeq fallback off for the
+        // duration of this speculative scan (restored on exit): it is an
+        // explicit-citation convenience, too costly to run per candidate here.
+        bool savedSpeculativeScan = inSpeculativeContextScan_;
+        inSpeculativeContextScan_ = true;
+        struct ScanGuard {
+            bool& flag; bool saved;
+            ~ScanGuard() { flag = saved; }
+        } scanGuard{inSpeculativeContextScan_, savedSpeculativeScan};
         for (const ContextFact& fact : facts) {
             // Each candidate runs a structural fill (and possibly a full
             // hole-inference) — both trigger kernel conversions that can

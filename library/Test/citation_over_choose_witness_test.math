@@ -1,0 +1,33 @@
+-- Citing a lemma whose premise must match a `choose`-bound (Exists-
+-- eliminator) witness. The citation matcher pins the lemma's binders
+-- from the goal, then discharges the remaining premise from context;
+-- the syntactic matcher used to miss the witness-typed hypothesis even
+-- though it is definitionally the premise. A local defeq fallback in the
+-- premise discharge closes the gap (see Elaborator::completeCitationFromBindings).
+
+module Test.citation_over_choose_witness_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+
+definition IsInv (A B : Type(0)) (f : A → B) (g : B → A) : Proposition :=
+  (∀ (x : A). g(f(x)) = x) ∧ (∀ (y : B). f(g(y)) = y)
+
+theorem inv_swap (A B : Type(0)) (f : A → B) (g : B → A)
+        : IsInv(A, B, f, g) → IsInv(B, A, g, f)
+  | And.introduction(leftInverse, rightInverse) =>
+      And.introduction(rightInverse, leftInverse)
+
+definition Equin (A B : Type(0)) : Proposition :=
+  ∃ (f : A → B). ∃ (g : B → A). IsInv(A, B, f, g)
+
+-- `inv_swap`'s every binder (A, B, f, g) is pinned by the goal IsInv(B, A, g, f);
+-- only its premise IsInv(A, B, f, g) is discharged from context — and that
+-- hypothesis, `inverse`, is typed in the chosen witnesses f and g.
+theorem swap_over_choose (A B : Type(0)) (equinumerous : Equin(A, B)) : Equin(B, A) := {
+  choose f from equinumerous;
+  choose g such that IsInv(A, B, f, g) as inverse;
+  claim swapped : IsInv(B, A, g, f) since inv_swap;
+  witness g with witness f with swapped
+}

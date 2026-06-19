@@ -5064,6 +5064,12 @@ private:
     // returns, then cleared.
     std::string lastContextFactWinner_;
     int lastContextFactCandidateCount_ = 0;
+    // True while tryContextFactMatch is speculatively scanning candidate
+    // facts/lemmas. The citation premise-discharge's defeq fallback (a') in
+    // completeCitationFromBindings is gated off during such a scan: it is an
+    // explicit-citation convenience, and running it per candidate makes the
+    // library scan exhaust the auto-prover budget on hard goals.
+    bool inSpeculativeContextScan_ = false;
     struct AutoProveAttempt {
         std::string tacticName;
         bool succeeded;

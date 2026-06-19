@@ -1207,6 +1207,41 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                         }
                     }
                     if (bindings[innerIndex]) continue;
+                    // (a') local defeq search once the premise is fully
+                    // determined. The syntactic matcher in (a) lines a
+                    // hypothesis up by first-order structure; it misses when
+                    // the matching hypothesis's type mentions `choose`-bound
+                    // (Exists-eliminator) witnesses, whose de Bruijn indexing
+                    // the matcher can't reconcile even though the types are
+                    // definitionally equal. Compare the now-concrete premise
+                    // against each in-scope hypothesis by `isDefinitionallyEqual`
+                    // instead — bounded (one defeq per binder, no library scan
+                    // or recursive proving, so speculative candidates stay
+                    // cheap). Additive: it runs only after (a) already failed,
+                    // and selects a hypothesis whose type IS the premise, so it
+                    // cannot change a citation that already resolves.
+                    if (!inSpeculativeContextScan_
+                        && !referencesUnfilled(domain, 0)) {
+                        ExpressionPointer concretePremise =
+                            instantiateLemmaBinders(domain, bindings);
+                        ExpressionPointer concreteOpened = openOverLocalBinders(
+                            concretePremise, localBinders, N);
+                        for (int b = N - 1; b >= 0; --b) {
+                            ExpressionPointer hypTypeOpened = openOverLocalBinders(
+                                liftBoundVariables(
+                                    localBinders[b].type, N - b, 0),
+                                localBinders, N);
+                            if (isDefinitionallyEqual(environment_, openedContext,
+                                                      concreteOpened,
+                                                      hypTypeOpened)) {
+                                bindings[innerIndex] =
+                                    makeBoundVariable(N - 1 - b);
+                                progress = true;
+                                break;
+                            }
+                        }
+                        if (bindings[innerIndex]) continue;
+                    }
                     // (b) reflexivity for a now-determined equality premise.
                     if (referencesUnfilled(domain, 0)) continue;
                     ExpressionPointer concrete =
