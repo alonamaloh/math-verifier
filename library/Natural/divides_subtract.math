@@ -29,18 +29,18 @@ import Natural.gcd
 -- ----------------------------------------------------------------------
 -- a + b = 0 implies b = 0. Mirror lemma; only the right-side variant
 -- is used downstream.
-theorem Natural.add_equals_zero_right
-        : ∀ (a b : Natural). a + b = 0 → b = 0
-  | zero, b, equation =>
-      equation
-  | successor(predA), b, equation => {
-      claim isZero : successor(predA + b) = 0 by substituting Natural.successor_add;
-      absurd(isZero)
-    }
+theorem Natural.add_equals_zero_right (a b : Natural) (equation : a + b = 0) : b = 0 :=
+  cases a refining equation {
+    | zero => equation
+    | successor(predA) => {
+        claim isZero : successor(predA + b) = 0 by substituting Natural.successor_add;
+        absurd(isZero)
+      }
+  }
 
 -- ----------------------------------------------------------------------
 -- "Peel one divisor" lemmas. Two case-helpers, then the main statement
--- via pattern-matching on the witness.
+-- via a case-split on the witness.
 
 theorem Natural.divides_after_remove_one_witness_zero
         (divisor secondSummand : Natural)
@@ -86,13 +86,11 @@ theorem Natural.divides_after_remove_multiple
         : ∀ (secondSummand : Natural).
           divisor ∣ (divisor * q + secondSummand)
           → divisor ∣ secondSummand :=
-  unfold Natural.add in
   by_induction on q with IH {
     case zero: {
         take secondSummand : Natural;
         suppose divisor ∣ (divisor * 0 + secondSummand) as dividesEnlargedSum;
         calc divisor * 0 + secondSummand
-           = 0 + secondSummand
            = secondSummand;
         claim divisor ∣ secondSummand by substitution
       }
@@ -103,12 +101,11 @@ theorem Natural.divides_after_remove_multiple
         -- Reshape divisor·(predQ+1) + s into divisor + (divisor·predQ + s),
         -- peel one divisor, then recurse on predQ via the IH.
         calc divisor * successor(predQ) + secondSummand
-           = (divisor + divisor * predQ) + secondSummand
            = divisor + (divisor * predQ + secondSummand);
         claim divisor ∣ (divisor + (divisor * predQ + secondSummand))
             by substitution;
         claim peeled : divisor ∣ (divisor * predQ + secondSummand)
-            by Natural.divides_after_remove_one;
+            since Natural.divides_after_remove_one;
         IH(secondSummand, peeled)
       }
   }
@@ -127,7 +124,7 @@ theorem Natural.divides_subtract_from_sum
   choose q such that firstSummand = divisor * q as firstEquation from dividesFirst;
   claim divisor ∣ (divisor * q + secondSummand)
       by substituting firstEquation;
-  done by Natural.divides_after_remove_multiple
+  done since Natural.divides_after_remove_multiple
 }
 
 -- ----------------------------------------------------------------------
