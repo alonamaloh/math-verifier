@@ -342,6 +342,65 @@ ExpressionPointer Elaborator::proveGroupEquality(
         return {prep.word, prep.term, proof};
     };
 
+    // inverse(A) = inverse(A') from proofA : A = A'.
+    auto inverseCongruence = [&](ExpressionPointer A, ExpressionPointer Ap,
+                                 ExpressionPointer pA) -> ExpressionPointer {
+        ExpressionPointer invLift = liftBoundVariables(scheme.inverse, 1, 0);
+        ExpressionPointer body =
+            makeApplication(invLift, makeBoundVariable(0));
+        ExpressionPointer lambda = makeLambda("_g", carrier, body);
+        return buildEqualityCongruenceSameCarrier(
+            level, carrier, lambda, A, Ap, pA);
+    };
+
+    // Push an inverse inward (de Morgan for groups): given P = wordToTerm(W)
+    // with W reduced, produce the reduced inverse word (reverse + flip
+    // signs), its term Q, and a proof `inverse(P) = Q` built from the group
+    // axioms only. Proof = the right-inverse-uniqueness template
+    //   Q = id·Q = (P⁻¹·P)·Q = P⁻¹·(P·Q) = P⁻¹·id = P⁻¹
+    // where `P·Q = id` is exactly what `concat(W, invertedW)` proves.
+    auto pushInverse = [&](const std::vector<GroupAtom>& W,
+                           ExpressionPointer P) -> GroupNorm {
+        std::vector<GroupAtom> inv;
+        for (auto it = W.rbegin(); it != W.rend(); ++it) {
+            inv.push_back(GroupAtom{it->term, !it->inverted});
+        }
+        ExpressionPointer Q = wordToTerm(inv);
+        ExpressionPointer Pinv = makeApplication(scheme.inverse, P);
+        GroupNorm hc = concat(W, P, inv, Q);  // hc.proof : op(P,Q) = identity
+        ExpressionPointer H = hc.proof;
+        ExpressionPointer idQ =
+            applyAccessor(scheme.identityLeftName, {Q});       // id·Q = Q
+        ExpressionPointer sa = buildEqualitySymmetry(
+            level, carrier, buildOp(scheme.identity, Q), Q, idQ);  // Q = id·Q
+        ExpressionPointer invLeftP =
+            applyAccessor(scheme.inverseLeftName, {P});        // P⁻¹·P = id
+        ExpressionPointer idEq = buildEqualitySymmetry(
+            level, carrier, buildOp(Pinv, P), scheme.identity, invLeftP);
+        ExpressionPointer sb = opCongruence(
+            scheme.identity, buildOp(Pinv, P), idEq, Q, Q, refl(Q));
+        ExpressionPointer sc =
+            applyAccessor(scheme.associativityName, {Pinv, P, Q});
+        ExpressionPointer sd = opCongruence(
+            Pinv, Pinv, refl(Pinv), buildOp(P, Q), scheme.identity, H);
+        ExpressionPointer se =
+            applyAccessor(scheme.identityRightName, {Pinv});
+        ExpressionPointer t1 = trans(
+            Q, buildOp(scheme.identity, Q), buildOp(buildOp(Pinv, P), Q),
+            sa, sb);
+        ExpressionPointer t2 = trans(
+            Q, buildOp(buildOp(Pinv, P), Q), buildOp(Pinv, buildOp(P, Q)),
+            t1, sc);
+        ExpressionPointer t3 = trans(
+            Q, buildOp(Pinv, buildOp(P, Q)), buildOp(Pinv, scheme.identity),
+            t2, sd);
+        ExpressionPointer QeqPinv = trans(
+            Q, buildOp(Pinv, scheme.identity), Pinv, t3, se);  // Q = P⁻¹
+        ExpressionPointer proof = buildEqualitySymmetry(
+            level, carrier, Q, Pinv, QeqPinv);                 // P⁻¹ = Q
+        return {inv, Q, proof};
+    };
+
     // ---- normalize: e = canonical reduced word, with proof -------------
     std::function<GroupNorm(ExpressionPointer)> normalize =
         [&](ExpressionPointer e) -> GroupNorm {
@@ -350,12 +409,20 @@ ExpressionPointer Elaborator::proveGroupEquality(
         }
         ExpressionPointer invArg;
         if (matchInverse(e, invArg)) {
-            ExpressionPointer a, b;
-            ExpressionPointer innerInv;
-            if (matchOp(invArg, a, b) || matchInverse(invArg, innerInv)
+            ExpressionPointer a2, b2, innerInv;
+            if (matchOp(invArg, a2, b2) || matchInverse(invArg, innerInv)
                 || isIdentity(invArg)) {
-                // inverse of a compound: opaque positive atom.
-                return {{GroupAtom{e, false}}, e, refl(e)};
+                // inverse of a compound: normalise the body, then push the
+                // inverse inward — `(x·y)⁻¹ = y⁻¹·x⁻¹`, `(x⁻¹)⁻¹ = x`,
+                // `identity⁻¹ = identity` — from the axioms alone.
+                GroupNorm ne = normalize(invArg);
+                ExpressionPointer congInv =
+                    inverseCongruence(invArg, ne.term, ne.proof);
+                GroupNorm pushed = pushInverse(ne.word, ne.term);
+                ExpressionPointer proof = trans(
+                    e, makeApplication(scheme.inverse, ne.term), pushed.term,
+                    congInv, pushed.proof);
+                return {pushed.word, pushed.term, proof};
             }
             return {{GroupAtom{invArg, true}}, e, refl(e)};
         }
