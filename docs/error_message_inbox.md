@@ -640,3 +640,41 @@ edit, restore on breakage) already absorbs this, but a note in the checker
 output — "redundant given the other hints; removing several at once may not be
 safe" — would set expectations. A stronger checker could re-verify with ALL
 flagged hints removed and only report the ones still redundant jointly.
+
+## quotient bridge mis-infers the equivalence relation from the proof's type; error blames the enclosing theorem with raw `T → Set T`
+
+*(Salvaged from the `rational-field-of-fractions` branch, observed 2026-06-15
+under the old name `Quotient.sound`; the bridge is now
+`Quotient.equivalent_implies_equal`, but the instance-based relation-inference
+hazard below is unchanged — both `IntegerEquivalent` and `RationalEquivalent`
+are still registered as `instance`s, so re-verify under the current API.)*
+
+Scenario (`Rational/enumerable.math`, ℚ as the field of fractions of ℤ): a
+quotient bridge call left `T`/`R` to be inferred, and was given a proof term
+that is an **Integer** equality. The reported error pointed at the enclosing
+theorem with an argument-type clash:
+
+```
+elaborate error: theorem 'Rational.is_enumerable'
+  this argument has the wrong type for the function it is given to
+    the function expects: RationalRepresentative → Set RationalRepresentative
+    but this argument is: Integer → Set Integer
+```
+
+Diagnosis: with the proof an *Integer*-equality term and `IntegerEquivalent`
+registered as an instance, `R` unified to `IntegerEquivalent`
+(`Integer → Set Integer`) instead of `RationalEquivalent`. The message then
+reports the *downstream* argument clash, not the actual fault.
+
+Rubric: (1) cause-not-symptom **0** — never says "couldn't infer the quotient
+relation R" / "ambiguous equivalence instance"; (2) location **0** — points at
+the enclosing `theorem`, not the bridge citation or the mis-typed proof; (3)
+actionable **0** — no "pass `T` and `R` explicitly"; (4) user-facing types
+**0** — prints the relation as `T → Set T` (a relation is
+`T → T → Proposition`; `Set T` leaks); (5) jargon **0/1**.
+
+Better message sketch: "couldn't infer the quotient equivalence relation: the
+proof you gave has type `… = …` over `Integer`, so `R` was inferred as
+`IntegerEquivalent`, but the goal is an equality over `Rational`
+(`RationalEquivalent`). Pass `T` and `R` explicitly." — and point at the
+bridge citation token, not the enclosing theorem.
