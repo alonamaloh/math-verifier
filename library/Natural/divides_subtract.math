@@ -140,21 +140,26 @@ theorem Natural.is_gcd_remainder_lift
         (decomposition : first = quotient * second + remainder)
         (gcdOfSecondRemainder : Natural.is_gcd(gcdValue, second, remainder))
         : Natural.is_gcd(gcdValue, first, second) := {
-    let ⟨gcdDividesSecond, gcdDividesRemainder, universalForward⟩
-        := gcdOfSecondRemainder;
+    -- gcdValue divides first = quotient·second + remainder (both summands are
+    -- multiples of it, the second being a leg of `gcdOfSecondRemainder`).
+    claim gcdValue ∣ second;
+    claim gcdValue ∣ remainder;
     claim gcdValue ∣ (quotient * second);
     claim gcdValue ∣ (quotient * second + remainder);
-    claim gcdDividesFirst : gcdValue ∣ first
-        by substituting decomposition;
-    ⟨gcdDividesFirst,
-     gcdDividesSecond,
-     (commonDivisor : Natural)
-              (dDividesFirst : commonDivisor ∣ first)
-              (dDividesSecond : commonDivisor ∣ second) ↦ {
-       claim commonDivisor ∣ (quotient * second);
-       claim commonDivisor ∣ (quotient * second + remainder)
-         by substituting decomposition;
-       claim dDividesRemainder : commonDivisor ∣ remainder;
-       universalForward(commonDivisor, dDividesSecond, dDividesRemainder)
-     }⟩
+    claim gcdValue ∣ first by substituting decomposition;
+    -- any common divisor of (first, second) also divides remainder = first −
+    -- quotient·second, hence divides gcdValue by the universal property at
+    -- (second, remainder).
+    claim universalForward : ∀ (d : Natural). d ∣ second → d ∣ remainder → d ∣ gcdValue;
+    claim ∀ (commonDivisor : Natural).
+            commonDivisor ∣ first → commonDivisor ∣ second → commonDivisor ∣ gcdValue by {
+      take commonDivisor : Natural;
+      suppose commonDivisor ∣ first as dDividesFirst;
+      suppose commonDivisor ∣ second as dDividesSecond;
+      claim commonDivisor ∣ (quotient * second);
+      claim commonDivisor ∣ (quotient * second + remainder) by substituting decomposition;
+      claim dDividesRemainder : commonDivisor ∣ remainder;
+      universalForward(commonDivisor, dDividesSecond, dDividesRemainder)
+    };
+    done
 }
