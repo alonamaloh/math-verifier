@@ -32,6 +32,8 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordContradiction:
         case TokenKind::KeywordSorry:
         case TokenKind::KeywordRing:
+        case TokenKind::KeywordGroup:
+        case TokenKind::KeywordMonoid:
         case TokenKind::KeywordField:
         case TokenKind::KeywordLinearCombination:
         case TokenKind::KeywordOperator:
@@ -2248,6 +2250,14 @@ private:
         if (current.kind == TokenKind::KeywordRing) {
             Token ringToken = consumeAny();
             return makeSurfaceRing(ringToken.line, ringToken.column);
+        }
+        if (current.kind == TokenKind::KeywordGroup) {
+            Token token = consumeAny();
+            return makeSurfaceGroup(true, token.line, token.column);
+        }
+        if (current.kind == TokenKind::KeywordMonoid) {
+            Token token = consumeAny();
+            return makeSurfaceGroup(false, token.line, token.column);
         }
         if (current.kind == TokenKind::KeywordField) {
             Token fieldToken = consumeAny();

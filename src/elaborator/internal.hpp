@@ -2343,6 +2343,25 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // `group` / `monoid` tactic: prove an `=` goal over an abstract group or
+    // monoid by normalising both sides (flatten associativity, drop identity,
+    // and — when allowInverses — cancel adjacent inverses). The structure is
+    // found from an in-scope `IsGroup` / `IsMonoid` hypothesis. Returns the
+    // proof, or null when the tactic does not apply (so the auto-prover can
+    // fall through); throws only for an explicit `by group` with no structure.
+    ExpressionPointer elaborateGroup(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column, bool allowInverses);
+
+    // Core of the group/monoid tactic, returning null instead of throwing
+    // (used both by elaborateGroup and the calc-step auto-prover). `mustThrow`
+    // lets the explicit-tactic path surface a diagnostic.
+    ExpressionPointer proveGroupEquality(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        bool allowInverses, int line);
+
     // Prove `originalProduct = canonical` where `canonical` is the
     // left-associated product of `sortedFactors`. The original is
     // assumed to be some product over the same factor multiset.

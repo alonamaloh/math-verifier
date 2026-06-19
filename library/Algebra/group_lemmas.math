@@ -57,39 +57,6 @@ theorem Group.left_inverse_unique
        = a⁻¹
 }
 
--- The inverse function is an involution: `(x⁻¹)⁻¹ = x`. Apply
--- right_inverse_unique with a = x⁻¹, b = x: the hypothesis `x⁻¹ · x =
--- identity` is exactly the `inverse_left` axiom.
-theorem Group.inverse_involution
-        (carrier : Type(0))
-        ((·) : carrier → carrier → carrier)
-        (identity : carrier)
-        ((⁻¹) : carrier → carrier)
-        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
-        (x : carrier)
-        : (x⁻¹)⁻¹ = x := {
-    Group.right_inverse_unique(
-        carrier, (·), identity, (⁻¹), groupProof,
-        x⁻¹, x,
-        IsGroup.inverse_left(x))
-}
-
--- The inverse of the identity is the identity. `e · e = e` by
--- `identity_left`, then `right_inverse_unique` with a = e, b = e gives
--- `e = e⁻¹`.
-theorem Group.inverse_identity
-        (carrier : Type(0))
-        ((·) : carrier → carrier → carrier)
-        (identity : carrier)
-        ((⁻¹) : carrier → carrier)
-        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
-        : identity⁻¹ = identity := {
-    Group.right_inverse_unique(
-        carrier, (·), identity, (⁻¹), groupProof,
-        identity, identity,
-        IsGroup.identity_left(identity))
-}
-
 -- Left cancellation: `a · b = a · c` → `b = c`. Apply a⁻¹ on the left,
 -- then collapse via associativity + inverse_left + identity_left.
 theorem Group.cancel_left
@@ -132,10 +99,43 @@ theorem Group.cancel_right
        = c
 }
 
--- `(a · b)⁻¹ = b⁻¹ · a⁻¹`. Standard group fact: the inverse of a product
--- is the product of the inverses in reverse order. Apply
--- `right_inverse_unique` to `(a · b) · (b⁻¹ · a⁻¹) = identity`, which a
--- short calc establishes from associativity + inverse axioms.
+-- The inverse function is an involution: `(x⁻¹)⁻¹ = x`. Both `(x⁻¹)⁻¹` and
+-- `x` are right inverses of `x⁻¹` (each collapses to `identity` under `x⁻¹`
+-- on the left), so left-cancellation identifies them.
+theorem Group.inverse_involution
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        (identity : carrier)
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        (x : carrier)
+        : (x⁻¹)⁻¹ = x := {
+    calc x⁻¹ · (x⁻¹)⁻¹
+       = identity   since IsGroup.inverse_right
+       = x⁻¹ · x;
+    done since Group.cancel_left
+}
+
+-- The inverse of the identity is the identity. Both `identity⁻¹` and
+-- `identity` are right inverses of `identity`, so left-cancellation
+-- identifies them.
+theorem Group.inverse_identity
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        (identity : carrier)
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        : identity⁻¹ = identity := {
+    calc identity · identity⁻¹
+       = identity              since IsGroup.inverse_right
+       = identity · identity;
+    done since Group.cancel_left
+}
+
+-- `(a · b)⁻¹ = b⁻¹ · a⁻¹`: the inverse of a product is the product of the
+-- inverses in reverse order. Both `(a · b)⁻¹` and `b⁻¹ · a⁻¹` are right
+-- inverses of `a · b` — the latter because associativity collapses
+-- `(a · b) · (b⁻¹ · a⁻¹)` to `identity` — so left-cancellation identifies them.
 theorem Group.inverse_operation
         (carrier : Type(0))
         ((·) : carrier → carrier → carrier)
@@ -144,18 +144,11 @@ theorem Group.inverse_operation
         (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
         (a b : carrier)
         : (a · b)⁻¹ = b⁻¹ · a⁻¹ := {
-    Group.right_inverse_unique(
-        carrier, (·), identity, (⁻¹), groupProof,
-        a · b,
-            b⁻¹ · a⁻¹,
-            calc (a · b) · (b⁻¹ · a⁻¹)
-               = a · (b · (b⁻¹ · a⁻¹))
-                      by IsGroup.associativity(a, b, b⁻¹ · a⁻¹)
-               = a · ((b · b⁻¹) · a⁻¹)
-                      by IsGroup.associativity(b, b⁻¹, a⁻¹)
-               = a · (identity · a⁻¹)
-               = a · a⁻¹
-               = identity)
+    claim (a · b) · (b⁻¹ · a⁻¹) = identity by group;
+    calc (a · b) · (a · b)⁻¹
+       = identity                since IsGroup.inverse_right
+       = (a · b) · (b⁻¹ · a⁻¹);
+    done since Group.cancel_left
 }
 
 -- In an abelian group, `(a · b)⁻¹ = a⁻¹ · b⁻¹`. Compose `inverse_operation`
@@ -170,9 +163,6 @@ theorem AbelianGroup.inverse_operation
         : (a · b)⁻¹ = a⁻¹ · b⁻¹ := {
     let ⟨groupProof, commutativity⟩ := abelianProof;
     calc (a · b)⁻¹
-       = b⁻¹ · a⁻¹
-              by Group.inverse_operation(
-                     carrier, (·), identity, (⁻¹), groupProof, a, b)
-       = a⁻¹ · b⁻¹
-              by commutativity(b⁻¹, a⁻¹)
+       = b⁻¹ · a⁻¹   since Group.inverse_operation
+       = a⁻¹ · b⁻¹   by commutativity(b⁻¹, a⁻¹)
 }

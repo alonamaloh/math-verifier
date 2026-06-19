@@ -19,6 +19,21 @@ closed under ring ops + the p-adic norm.
   `negate_multiply_negate`. Add more here as concrete-carrier
   proofs find themselves wanting them.
 
+## Tactics
+
+- **Unify `ring` / `field` / `group` / `monoid` (/ future `semiring`)
+  into one `arithmetic_manipulation` tactic.** Instead of the user
+  picking the algebraic structure by name, the tactic would inspect the
+  operators appearing in the goal and their *registered properties*
+  (associativity, commutativity, identity, inverses, distributivity,
+  reciprocals), choose the matching canonical form, and normalise both
+  sides to compare. The current per-structure tactics already share the
+  same skeleton (extract the `=` goal → normalise each side to a
+  canonical form via the structure's axioms → chain `L = canon = R`);
+  this merges the entry points and the structure detection. Not urgent,
+  but the right long-term shape. (Filed 2026-06-19 while adding `group`/
+  `monoid`.)
+
 ## Elaborator quirks (small open issues)
 
 - **`by_induction … using` (prime_divisor v3 style) needs the

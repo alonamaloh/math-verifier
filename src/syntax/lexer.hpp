@@ -56,6 +56,8 @@ enum class TokenKind {
     KeywordSet,             // `set n := E;` — transparent local definition
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof
     KeywordRing,            // `ring` — commutative-ring decision tactic
+    KeywordGroup,           // `group` — group decision tactic (associativity + inverse cancellation)
+    KeywordMonoid,          // `monoid` — monoid decision tactic (associativity + identity)
     KeywordField,           // `field` — field decision tactic (ring + reciprocal_function)
     KeywordLinearCombination,  // `linear_combination(e)` — ring + a known equation
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder

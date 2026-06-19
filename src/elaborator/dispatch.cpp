@@ -1769,6 +1769,12 @@ ExpressionPointer Elaborator::elaborateExpression(
             return elaborateRing(localBinders, expectedType,
                                   expression.line, expression.column);
         }
+        if (auto* groupTactic =
+                std::get_if<SurfaceGroup>(&expression.node)) {
+            return elaborateGroup(localBinders, expectedType,
+                                  expression.line, expression.column,
+                                  groupTactic->allowInverses);
+        }
         if (auto* fieldTactic =
                 std::get_if<SurfaceField>(&expression.node)) {
             return elaborateField(*fieldTactic, localBinders, expectedType,

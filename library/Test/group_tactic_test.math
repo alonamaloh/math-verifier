@@ -1,0 +1,78 @@
+-- Test/group_tactic_test.math
+--
+-- Exercises the `group` and `monoid` decision tactics: associativity
+-- flattening, identity elimination, and (group) adjacent-inverse
+-- cancellation, against an abstract structure found from an in-scope
+-- IsGroup / IsMonoid hypothesis.
+
+module Test.group_tactic_test
+
+import Algebra.monoid
+import Algebra.group
+
+-- (1) Pure reassociation.
+theorem group_reassociate
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        (identity : carrier)
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        (a b c : carrier)
+        : (a · b) · c = a · (b · c) :=
+  group
+
+-- (2) Adjacent inverse cancellation to the identity.
+theorem group_inverse_cancels
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        (identity : carrier)
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        (a : carrier)
+        : a⁻¹ · a = identity :=
+  group
+
+-- (3) The socks-and-shoes computation — the motivating case.
+theorem group_socks_and_shoes
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        (identity : carrier)
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        (a b : carrier)
+        : (a · b) · (b⁻¹ · a⁻¹) = identity :=
+  group
+
+-- (4) Identity elimination plus cancellation, reduced word on both sides.
+theorem group_mixed
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        (identity : carrier)
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        (a b c : carrier)
+        : a · ((b · b⁻¹) · (c · identity)) = a · c :=
+  group
+
+-- (5) As a calc step: an inverse cancels, leaving the tail.
+theorem group_calc_step
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        (identity : carrier)
+        ((⁻¹) : carrier → carrier)
+        (groupProof : IsGroup(carrier, (·), identity, (⁻¹)))
+        (a b c : carrier)
+        : (a · a⁻¹) · (b · c) = b · c :=
+  calc (a · a⁻¹) · (b · c)
+     = b · c   by group
+
+-- (6) Monoid: associativity + identity only (no inverses available).
+theorem monoid_reassociate
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (monoidProof : IsMonoid(carrier, operation, identity))
+        (a b c : carrier)
+        : operation(operation(a, b), operation(identity, c))
+          = operation(a, operation(b, c)) :=
+  monoid

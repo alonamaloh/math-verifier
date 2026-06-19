@@ -275,6 +275,14 @@ struct SurfaceDecide {
 // associativity / commutativity / distributivity lemmas.
 struct SurfaceRing { };
 
+// `group` / `monoid` — closes an equality goal in a (abstract) group or
+// monoid by normalising both sides: flatten associativity, drop identity,
+// and (group only) cancel adjacent inverses. `allowInverses` distinguishes
+// `group` (true) from `monoid` (false). The structure (operation / identity /
+// inverse / axiom proof) is found from an in-scope `IsGroup` / `IsMonoid`
+// hypothesis.
+struct SurfaceGroup { bool allowInverses; };
+
 // `field(h1, h2, ...)` — closes an equality goal in a field by clearing
 // `reciprocal_function(t)` occurrences with the user-supplied nonzero
 // hypotheses `h_i : ¬(t_i = zero)`, then deferring to `ring` on the
@@ -517,7 +525,7 @@ struct SurfaceExpression {
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
-        SurfaceRing, SurfaceField, SurfaceLinearCombination,
+        SurfaceRing, SurfaceGroup, SurfaceField, SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold,
@@ -660,6 +668,11 @@ inline SurfaceExpressionPointer makeSurfaceDecide(
 inline SurfaceExpressionPointer makeSurfaceRing(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceRing{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceGroup(
+    bool allowInverses, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceGroup{allowInverses}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceField(
     std::vector<SurfaceExpressionPointer> nonzeroHypotheses,
