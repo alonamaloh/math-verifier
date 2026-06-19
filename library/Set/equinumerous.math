@@ -70,16 +70,17 @@ theorem Function.inverse_is_injective (A B : Type(0)) (f : A → B) (g : B → A
 theorem Function.inverse_is_surjective (A B : Type(0)) (f : A → B) (g : B → A)
         : Function.IsInverse(A, B, f, g) → Function.IsSurjective(A, B, f)
   | And.introduction(leftInverse, rightInverse) =>
-      (y : B) ↦ ⟨g(y), rightInverse(y)⟩
+      (y : B) ↦ witness g(y) with rightInverse(y)
 
 -- The bridge to the established vocabulary: an inverse pair makes f
 -- bijective.
 theorem Function.inverse_is_bijective (A B : Type(0)) (f : A → B) (g : B → A)
         (inverse : Function.IsInverse(A, B, f, g))
-        : Function.IsBijective(A, B, f) :=
-  And.introduction(
-      Function.inverse_is_injective(A, B, f, g, inverse),
-      Function.inverse_is_surjective(A, B, f, g, inverse))
+        : Function.IsBijective(A, B, f) := {
+  claim Function.IsInjective(A, B, f) since Function.inverse_is_injective;
+  claim Function.IsSurjective(A, B, f) since Function.inverse_is_surjective;
+  done
+}
 
 -- ----------------------------------------------------------------------
 -- Equinumerosity: A and B have the same size when some pair (f, g) are
@@ -90,15 +91,19 @@ definition Equinumerous (A B : Type(0)) : Proposition :=
   ∃ (f : A → B). ∃ (g : B → A). Function.IsInverse(A, B, f, g)
 
 -- Reflexive: every type is equinumerous to itself via the identity.
-theorem Equinumerous.reflexive (A : Type(0)) : Equinumerous(A, A) :=
-  ⟨(x : A) ↦ x, ⟨(x : A) ↦ x, Function.identity_is_inverse(A)⟩⟩
+theorem Equinumerous.reflexive (A : Type(0)) : Equinumerous(A, A) := {
+  claim selfInverse : Function.IsInverse(A, A, (x : A) ↦ x, (x : A) ↦ x)
+      since Function.identity_is_inverse;
+  witness ((x : A) ↦ x) with witness ((x : A) ↦ x) with selfInverse
+}
 
 -- Symmetric: swap the inverse pair.
 theorem Equinumerous.symmetric (A B : Type(0))
         (equinumerous : Equinumerous(A, B)) : Equinumerous(B, A) := {
   choose f from equinumerous;
   choose g such that Function.IsInverse(A, B, f, g) as inverse;
-  ⟨g, ⟨f, Function.inverse_swap(A, B, f, g, inverse)⟩⟩
+  claim swapped : Function.IsInverse(B, A, g, f) since Function.inverse_swap;
+  witness g with witness f with swapped
 }
 
 -- Transitive: compose the inverse pairs.
@@ -110,9 +115,13 @@ theorem Equinumerous.transitive (A B C : Type(0))
   choose g such that Function.IsInverse(A, B, f, g) as fgInverse;
   choose h from secondEquinumerous;
   choose k such that Function.IsInverse(B, C, h, k) as hkInverse;
-  ⟨(x : A) ↦ h(f(x)),
-   ⟨(z : C) ↦ g(k(z)),
-    Function.compose_inverse(A, B, C, f, g, h, k, fgInverse, hkInverse)⟩⟩
+  -- Implementation note: `compose_inverse`'s middle type B appears only in its
+  -- premises, never its conclusion, so the goal doesn't pin it — a `since`
+  -- citation would have to back-infer B by unifying a premise against the
+  -- chosen `fgInverse`, which the citation matcher can't do over `choose`-bound
+  -- witnesses. Supply the arguments explicitly.
+  witness ((x : A) ↦ h(f(x))) with witness ((z : C) ↦ g(k(z))) with
+    Function.compose_inverse(A, B, C, f, g, h, k, fgInverse, hkInverse)
 }
 
 -- `≈` reads "is equinumerous to". Registering it (with the transitivity lemma
@@ -126,8 +135,10 @@ operator (≈) on (_, _) := Equinumerous
 -- the nested inverse-pair tuple.
 theorem Equinumerous.empty_types (A B : Type(0))
         (emptyA : A → False) (emptyB : B → False) : Equinumerous(A, B) :=
-  ⟨(x : A) ↦ absurd(emptyA(x)),
-   ⟨(y : B) ↦ absurd(emptyB(y)),
-    And.introduction(
-        (x : A) ↦ absurd(emptyA(x)),
-        (y : B) ↦ absurd(emptyB(y)))⟩⟩
+  -- every input on either side is contradictory, so both maps and both
+  -- inverse laws are vacuous.
+  witness ((x : A) ↦ absurd(emptyA(x))) with
+    witness ((y : B) ↦ absurd(emptyB(y))) with
+      And.introduction(
+          (x : A) ↦ absurd(emptyA(x)),
+          (y : B) ↦ absurd(emptyB(y)))
