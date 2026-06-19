@@ -92,6 +92,7 @@ enum class TokenKind {
     NotLessOrEqual,  // "≰" (negated ≤)
     ElementOf,       // "∈" (set membership)
     SubsetOf,        // "⊆" (subset)
+    Approx,          // "≈" (equinumerous / generic transitive relation)
     ForAll,          // "∀" (universal-quantifier prefix)
     Exists,          // "∃" (existential-quantifier prefix)
     Arrow,           // "→" or "->"

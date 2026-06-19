@@ -83,6 +83,7 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::NotLessOrEqual:
         case TokenKind::ElementOf:
         case TokenKind::SubsetOf:
+        case TokenKind::Approx:
         case TokenKind::InverseSuperscript:
             return true;
         default:
@@ -2871,7 +2872,8 @@ private:
                || peek().kind == TokenKind::GreaterOrEqual
                || peek().kind == TokenKind::Greater
                || peek().kind == TokenKind::Divides
-               || peek().kind == TokenKind::SubsetOf) {
+               || peek().kind == TokenKind::SubsetOf
+               || peek().kind == TokenKind::Approx) {
             Token relationToken = consumeAny();
             CalcRelation relation = CalcRelation::Equality;
             std::string relationOperator;
@@ -2891,6 +2893,8 @@ private:
                     relationOperator = "∣"; break;
                 case TokenKind::SubsetOf:
                     relationOperator = "⊆"; break;
+                case TokenKind::Approx:
+                    relationOperator = "≈"; break;
                 default:
                     relation = CalcRelation::Equality; break;
             }

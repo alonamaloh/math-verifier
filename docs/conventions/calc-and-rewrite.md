@@ -40,13 +40,13 @@ to the same `autoProveClaim` an equality `claim` uses — context-fact
 match, the equality bridge, and the symmetry flip (so `0 = b` closes from
 a `b = 0` fact). A calc `=` step and an equality claim are one prover.
 
-## `calc` over preorders (`∣`, `⊆`, …)
+## `calc` over preorders (`∣`, `⊆`, `≈`, …)
 
 `calc` also chains any transitive relation, not just the order ones. A
-step separated by `∣` (divides) or `⊆` (subset) routes the whole chain to
-a generic-preorder fold that uses the carrier's relation and its
-transitivity lemma (`<R>.transitive` or `<R>_transitive`), absorbing
-interleaved `=` steps by transport:
+step separated by `∣` (divides), `⊆` (subset), or `≈` (equinumerous)
+routes the whole chain to a generic-preorder fold that uses the carrier's
+relation and its transitivity lemma (`<R>.transitive` or `<R>_transitive`),
+absorbing interleaved `=` steps by transport:
 
 ```math
 calc p
@@ -55,9 +55,12 @@ calc p
 ```
 
 proves `p ∣ b`, and `calc a = b ∣ c = d` proves `a ∣ d`. A single chain
-uses one non-`=` relation. A new transitive relation becomes calc-usable
-just by having its operator registered and a `<R>.transitive` lemma in
-scope — no parser/elaborator change.
+uses one non-`=` relation. The carrier may even be `Type(0)` itself — `≈`
+(`Equinumerous`, registered `operator (≈) on (_, _)`) chains types:
+`calc X ≈ Y ≈ NaturalsBelow(n)` (see `Set/finite.math`). Reusing one of the
+existing relation symbols (`∣`/`⊆`/`≈`) needs only its operator + a
+`<R>.transitive` lemma in scope; a brand-new symbol also needs a lexer/parser
+token (the relation separators are a fixed set).
 
 ### `let` for local abbreviations — the auto-prover sees through
 

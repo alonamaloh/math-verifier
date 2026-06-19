@@ -257,6 +257,7 @@ private:
             {"≰", TokenKind::NotLessOrEqual},
             {"∈", TokenKind::ElementOf},
             {"⊆", TokenKind::SubsetOf},
+            {"≈", TokenKind::Approx},
             {"∀", TokenKind::ForAll},
             {"∃", TokenKind::Exists},
             {"⟨", TokenKind::LeftAngle},
@@ -465,6 +466,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::NotLessOrEqual:       return "'≰'";
         case TokenKind::ElementOf:            return "'∈'";
         case TokenKind::SubsetOf:             return "'⊆'";
+        case TokenKind::Approx:               return "'≈'";
         case TokenKind::ForAll:               return "'∀'";
         case TokenKind::Exists:               return "'∃'";
         case TokenKind::Arrow:                return "'->' or '→'";
