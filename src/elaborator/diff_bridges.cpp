@@ -758,6 +758,23 @@ ExpressionPointer Elaborator::tryAcRearrangement(
                     carrierType),
                 previousKernel),
             nextKernel);
+        // Group / monoid rearrangement: a step over an abstract group/monoid
+        // closes by flattening associativity, cancelling adjacent inverses,
+        // and dropping identity. `proveGroupEquality` returns null (no throw)
+        // when no matching `IsGroup`/`IsMonoid` hypothesis is in scope or the
+        // sides don't reduce alike, so this is a cheap no-op off-group. Try
+        // the group form first (cancellation needs an `IsGroup`), then the
+        // monoid form (associativity + identity, e.g. a pure monoid carrier).
+        try {
+            ExpressionPointer groupProof = proveGroupEquality(
+                localBinders, expectedType, /*allowInverses=*/true, line);
+            if (groupProof) return groupProof;
+            ExpressionPointer monoidProof = proveGroupEquality(
+                localBinders, expectedType, /*allowInverses=*/false, line);
+            if (monoidProof) return monoidProof;
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
         try {
             return elaborateRing(localBinders, expectedType, line, 0);
         } catch (const ElaborateError&) {
