@@ -54,9 +54,9 @@ theorem Natural.to_integer.add_preserves (a b : Natural)
 theorem Natural.to_integer.successor_preserves (n : Natural)
         : Natural.to_integer(successor(n)) = Integer.one + Natural.to_integer(n) :=
   calc Natural.to_integer(successor(n))
-     = Natural.to_integer(1 + n)                                      by substituting Natural.one_add
-     = Natural.to_integer(1) + Natural.to_integer(n)                  by Natural.to_integer.add_preserves
-     = Integer.one + Natural.to_integer(n)                            by substituting Natural.to_integer.one_preserves
+     = Natural.to_integer(1 + n)                                      since Natural.one_add
+     = Natural.to_integer(1) + Natural.to_integer(n)                  since Natural.to_integer.add_preserves
+     = Integer.one + Natural.to_integer(n)                            since Natural.to_integer.one_preserves
 
 -- Embedding preserves multiplication. Reduction yields
 -- mk(make(a·b + 0, a·0 + 0)), which is *not* definitionally equal to
@@ -64,12 +64,13 @@ theorem Natural.to_integer.successor_preserves (n : Natural)
 -- kernel reduction alone. Quotient.equivalent_implies_equal bridges the gap with a
 -- Natural-level proof of equivalence.
 theorem Natural.to_integer.multiply_preserves (a b : Natural)
-        : Natural.to_integer(a * b) = Natural.to_integer(a) * Natural.to_integer(b) :=
+        : Natural.to_integer(a * b) = Natural.to_integer(a) * Natural.to_integer(b) := {
   -- The product class is `mk(make(a·b + 0, a·0 + 0))`; it equals
-  -- `mk(make(a·b, 0))` because the cross-equation `a·b + (a·0 + 0) =
-  -- 0 + (a·b + 0)` holds (`ring`). `difference_equal` is the boundary form.
-  Integer.difference_equal(a * b, 0, a * b + 0, a * 0 + 0,
-      (ring : a * b + (a * 0 + 0) = 0 + (a * b + 0)))
+  -- `mk(make(a·b, 0))` because the cross-equation below holds (`ring`).
+  -- `difference_equal` is the boundary form that consumes it.
+  claim a * b + (a * 0 + 0) = 0 + (a * b + 0) since ring;
+  done since Integer.difference_equal
+}
 
 -- Multiplying a difference class by an embedded natural scales both parts:
 -- `(p − q)·c = (p·c − q·c)`. The representative-computation form of the
@@ -80,6 +81,7 @@ theorem Natural.to_integer.multiply_preserves (a b : Natural)
 -- `class_of(make(p·c, q·c))` by the cross-equation (`ring`).
 theorem Integer.from_difference_times_natural (p q c : Natural)
         : Integer.from_difference(p, q) * (c : Integer)
-          = Integer.from_difference(p * c, q * c) :=
-  Integer.difference_equal(p * c + q * 0, p * 0 + q * c, p * c, q * c,
-      (ring : (p * c + q * 0) + q * c = (p * 0 + q * c) + p * c))
+          = Integer.from_difference(p * c, q * c) := {
+  claim (p * c + q * 0) + q * c = (p * 0 + q * c) + p * c since ring;
+  done since Integer.difference_equal
+}
