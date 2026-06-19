@@ -887,7 +887,17 @@ ExpressionPointer Elaborator::tryConjunctionIntro(
         int line) {
         ExpressionPointer goalOpened = openOverLocalBinders(
             goalClosed, localBinders, localBinders.size());
-        auto* outerApp = std::get_if<Application>(&goalOpened->node);
+        // WHNF the goal so one headed by a DEFINITION that unfolds to `A ∧ B`
+        // — e.g. `is_gcd(g, a, b)` — is recognised as a conjunction and
+        // assembled from its legs. This mirrors the decomposition side, which
+        // already WHNFs before reading the `And` head, so `A ∧ B ∧ C` can be
+        // proved by proving `A`, `B`, `C` even when the goal wears a
+        // definition name. (`And` is an inductive, so it survives WHNF; a
+        // genuinely non-conjunction goal reduces to a different head and we
+        // bail, exactly as before.)
+        ExpressionPointer goalWhnf = weakHeadNormalForm(
+            environment_, goalOpened);
+        auto* outerApp = std::get_if<Application>(&goalWhnf->node);
         if (!outerApp) return nullptr;
         auto* innerApp = std::get_if<Application>(
             &outerApp->function->node);
