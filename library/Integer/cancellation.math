@@ -3,12 +3,14 @@
 -- Multiplicative cancellation on Integer when the multiplier is a
 -- positive natural lifted to Integer:
 --     x · to_integer(c) = y · to_integer(c)  →  x = y     (for c ≥ 1)
--- The proof picks representatives x = (p₁ − q₁), y = (p₂ − q₂), scales each
--- by `c` through the boundary lemma `Integer.from_difference_times_natural`,
--- reads off the resulting cross-equation with `Integer.difference_equal_implies`,
--- factors `c` out of each side (by `ring`), and cancels the positive factor.
--- Everything stays at the `from_difference` boundary — no quotient operations
--- or representative unfolding leak into the argument.
+-- The mathematical argument lives in `multiply_cancel_right_at_differences`,
+-- stated and proved entirely in difference classes: with x = (p₁ − q₁),
+-- y = (p₂ − q₂), scale each by `c` through the boundary lemma
+-- `Integer.from_difference_times_natural`, read off the cross-equation with
+-- `Integer.difference_equal_implies`, factor `c` out of each side (by `ring`),
+-- and cancel the positive factor. A thin adapter then bridges the quotient
+-- representatives produced by `cases` to that difference-class lemma, so no
+-- quotient plumbing leaks into the mathematics.
 
 module Integer.cancellation
 
@@ -46,9 +48,29 @@ theorem Integer.cancellation_natural
 }
 
 -- ----------------------------------------------------------------------
--- At representatives: destructure both as differences (p₁ − q₁), (p₂ − q₂);
--- scale each by `c` through `from_difference_times_natural`, read off the
--- cross-equation, and hand it to the Natural-level cancellation kernel.
+-- At differences: the mathematical heart, stated entirely in difference
+-- classes. Scale each difference by `c` through `from_difference_times_natural`
+-- so the multiplied equality becomes an equality of difference classes; read
+-- off the cross-equation, cancel the positive `c`, and reassemble.
+
+theorem Integer.multiply_cancel_right_at_differences
+        (p1 q1 p2 q2 c : Natural) (positive : 1 ≤ c)
+        (multipliedEquality
+            : Integer.from_difference(p1, q1) * (c : Integer)
+              = Integer.from_difference(p2, q2) * (c : Integer))
+        : Integer.from_difference(p1, q1) = Integer.from_difference(p2, q2) := {
+    calc Integer.from_difference(p1 * c, q1 * c)
+       = Integer.from_difference(p1, q1) * (c : Integer)   by Integer.from_difference_times_natural
+       = Integer.from_difference(p2, q2) * (c : Integer)   since multipliedEquality
+       = Integer.from_difference(p2 * c, q2 * c)           by Integer.from_difference_times_natural;
+    claim p1 * c + q2 * c = q1 * c + p2 * c since Integer.difference_equal_implies;
+    claim p1 + q2 = q1 + p2 since Integer.cancellation_natural;
+    done since Integer.difference_equal
+}
+
+-- ----------------------------------------------------------------------
+-- At representatives: the thin adapter from the quotient `cases` output to
+-- the difference-class lemma above (`class_of(make(p, q))` is `from_difference(p, q)`).
 
 theorem Integer.multiply_cancel_right_at_representatives
         (c : Natural) (positive : 1 ≤ c)
@@ -64,17 +86,11 @@ theorem Integer.multiply_cancel_right_at_representatives
   | IntegerRepresentative.make(p1, q1),
     IntegerRepresentative.make(p2, q2),
     multipliedEquality => {
-      -- Rewrite each scaled product as a single difference class, so the
-      -- multiplied equality becomes a plain equality of difference classes.
-      calc Integer.from_difference(p1 * c, q1 * c)
-         = Integer.from_difference(p1, q1) * (c : Integer)   by Integer.from_difference_times_natural
-         = Integer.from_difference(p2, q2) * (c : Integer)   since multipliedEquality
-         = Integer.from_difference(p2 * c, q2 * c)           by Integer.from_difference_times_natural;
-      -- Read off the cross-equation, then cancel the positive `c`. The
-      -- resulting `p1 + q2 = q1 + p2` IS the class equality the goal asks for.
-      claim p1 * c + q2 * c = q1 * c + p2 * c since Integer.difference_equal_implies;
-      claim naturalEquation : p1 + q2 = q1 + p2 since Integer.cancellation_natural;
-      naturalEquation
+      -- The same multiplied equality, read at the `from_difference` boundary.
+      claim Integer.from_difference(p1, q1) * (c : Integer)
+              = Integer.from_difference(p2, q2) * (c : Integer)
+          since multipliedEquality;
+      done since Integer.multiply_cancel_right_at_differences
   }
 
 -- ----------------------------------------------------------------------
