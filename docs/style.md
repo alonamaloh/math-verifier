@@ -47,6 +47,18 @@ linter counts them, and there is always a math-like form:
 | a positional lemma call | `claim … by <lemma>` / `done by <lemma>` |
 | raw `Subtype.make(…)` | the structure's `construction`/intro form |
 
+## Layer the file
+
+Keep proof-assistant machinery out of the mathematical proof. Standard
+shape: **definition/construction → boundary lemmas → representation-level
+kernel → thin adapter → public theorem.** Every lifted operation publishes a
+representative-computation boundary lemma; consumers compare opaque-quotient
+values through those lemmas, never `Quotient.class_of`/the bridge directly;
+state the math lemma in boundary terms and quarantine the `cases` bridge in a
+thin adapter. Name vacuous constructions (empty-type bijections, …) behind the
+concept. Lead comments with the math; pull kernel/elaborator mechanics into a
+`-- Implementation note:` aside. Depth: `conventions/proof-style.md`.
+
 ## Closers & names
 
 - Close the goal with `done` / `okay` (≡ `claim goal`); `goal` alone is not

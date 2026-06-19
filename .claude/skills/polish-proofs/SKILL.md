@@ -61,6 +61,16 @@ is a large readability win.)
 | Redundant `by <binder>` where the binder is an `obtain`/`suppose`/lambda hypothesis used nowhere else | **Leave it** — by-less'ing just moves the warning to an unused binder. |
 | A whole claim the prover derives without its stated proof | Try **deleting the scaffolding entirely** (the checker sometimes reveals a 5-line derivation is unnecessary); keep the claim itself only if it documents a milestone. |
 
+**Comment hygiene — no checker catches this.** Restructuring a proof
+strands its comments. Re-read every comment in a site you edited and
+confirm it names the lemma/tactic actually used — we have shipped a
+`by ring` header on steps that became explicit calc, and an `inverse_right`
+note on an `inverse_left` proof. Fix it to name the real lemma or describe
+the step generically ("gather into one factor of `c`"). While there: lead
+each comment block with the math and pull kernel/elaborator mechanics
+(`WHNF`, `Quotient.lift` reduction, why an `unfold` is needed) into a
+marked `-- Implementation note:` aside.
+
 ## 4. Settle the cascade and re-verify
 
 Anonymizing names and removing hints makes the prover consume facts by

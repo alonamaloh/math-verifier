@@ -204,6 +204,14 @@ Concretely:
   form. Even a two-step calc is usually clearer than the equivalent
   `Equality.transitivity(...)`.
 
+- **Quarantine implementation comments.** Lead each comment block with
+  the math. Pull kernel/elaborator mechanics — `WHNF`, the
+  `Quotient.lift` reduction rule, why an `unfold` is needed — into a
+  marked `-- Implementation note:` aside, so the mathematical narration
+  reads unbroken. And re-read comments after restructuring a proof: a
+  comment that still says "by `ring`" or "`inverse_right`" when the proof
+  now does neither is worse than no comment.
+
 - **Sequence-of-claims style is encouraged.** When a proof has
   several distinct subgoals, write them as a sequence of `claim
   <name> : <type> by <proof>` lines and then assemble the result
@@ -581,6 +589,47 @@ Same for `Rational.LessThan.distinct(x, y, h) : ¬(x = y)` vs
 `And.right(...)`. Helpers live in `Rational/order_arithmetic.math`
 alongside `LessOrEqual.negate`, `LessThan.negate`,
 `negate_LessThan_zero_of_positive`, `LessOrEqual_zero_of_negate_IsNonneg`.
+
+### Quarantine the machinery: layer the file
+
+Keep proof-assistant bureaucracy out of the mathematical proof by giving
+the file a consistent layering:
+
+    definition / construction     -- the object
+    boundary lemmas               -- the only way in and out of the encoding
+    representation-level kernel    -- the math, stated in boundary terms
+    thin adapter (if needed)      -- bridges the encoding to the kernel
+    public theorem
+
+The discipline that makes this pay off, for an **opaque quotient** like
+`Integer` (the difference-class quotient of `IntegerRepresentative`):
+
+- **Every lifted operation publishes a representative-computation boundary
+  lemma.** `Integer.from_difference_times_natural : from_difference(p, q) ·
+  (c : Integer) = from_difference(p·c, q·c)` lets a consumer scale a
+  difference *at the boundary* instead of unfolding the `multiply` lift at
+  representatives. Without it the proof drowns in `make(p·c + q·0, …)` noise.
+
+- **Consumers compare quotient values only through the boundary lemmas**
+  (`difference_equal` / `difference_equal_implies`), never
+  `Quotient.class_of` / `.equivalent_implies_equal` /
+  `.equal_implies_equivalent` directly. Those are construction-internal.
+
+- **State the mathematical lemma in boundary terms; quarantine the quotient
+  `cases` bridge in a thin adapter.** In `Integer/cancellation.math` the
+  heart is `multiply_cancel_right_at_differences`, proved purely in
+  `from_difference` — no `Quotient.class_of` in sight; a one-line
+  `*_at_representatives` adapter bridges what `cases` produces to it. The
+  math reads clean and the maintainer still sees where induction enters.
+
+- **Name vacuous / structural constructions behind the concept.** A
+  bijection between two empty types is `Equinumerous.empty_types`, not a
+  nested `⟨absurd(…), ⟨absurd(…), …⟩⟩` at the use site. Likewise maps out
+  of `False`, identity inverses, subtype proof-irrelevance.
+
+The smell: if a *consumer's* proof mentions the encoding (`Quotient.class_of`,
+a raw `make(…)` rep, an `unfold <Opaque>`), a boundary lemma is missing — add
+it next to the operation, not a workaround at the call site.
 
 ### Pattern-match at constructor reps for Quotient-lifted proofs
 
