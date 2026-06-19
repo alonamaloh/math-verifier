@@ -1,11 +1,15 @@
 -- Integer/addition.math
 --
 -- Addition on Integer, lifted from componentwise addition on
--- `IntegerRepresentative`. The lift uses Quotient.lift twice — once
--- for each Integer argument — and discharges respect for the
--- equivalence in two pieces (one per argument). Both respect proofs
--- factor through a Natural-level kernel lemma and a small destructure
--- chain.
+-- `IntegerRepresentative`: (a − b) + (c − d) = (a + c) − (b + d). The only
+-- obligation is well-definedness — addition respects the equivalence — and
+-- it is discharged one argument at a time, each piece factoring through a
+-- Natural-level kernel lemma.
+--
+-- Implementation note: the operation is the nested lift of
+-- `add_representatives` over both arguments; the kernel's lift-reduction
+-- rule collapses both lifts on `class_of` inputs to
+-- `class_of(add_representatives(…))`, the form the respect proofs compare.
 
 module Integer.addition
 
@@ -90,17 +94,14 @@ theorem Integer.add_respects_second
       done since Integer.add_respects_second_natural
 
 -- ----------------------------------------------------------------------
--- Integer.add itself: lift add_representatives over both arguments.
--- The outer Quotient.lift varies rep1; the inner one (captured by the
--- outer function) varies rep2 with the chosen rep1. The kernel's
--- Quotient.lift reduction rule makes both lifts collapse on
--- Quotient.class_of inputs to a plain mk(add_representatives(...)), which
--- is what the respect proofs need to compare.
-
 -- Add the difference-pair representatives componentwise; well-defined in
 -- each argument because addition respects the equivalence (the two
--- *_respects lemmas above). The binary define-by-representatives
--- synthesises the nested lift over both arguments.
+-- *_respects lemmas above).
+--
+-- Implementation note: `by representatives` synthesises the nested lift
+-- over both arguments — the outer `Quotient.lift` varies rep1, the inner
+-- one varies rep2 with rep1 fixed — and both collapse on `class_of` inputs
+-- to `class_of(add_representatives(…))`.
 definition Integer.add : Integer → Integer → Integer
   by representatives a, c ↦ Quotient.class_of(Integer.add_representatives(a, c))
   well_defined by Integer.add_respects_first, Integer.add_respects_second
@@ -117,9 +118,8 @@ definition Integer.one : Integer :=
 -- Operator overload: `+` on Integers routes here.
 operator (+) on (Integer, Integer) := Integer.add
 
--- Smoke test: zero + one = one (definitionally via the kernel
--- Quotient.lift reduction — both lifts collapse on the mk-form
--- inputs).
+-- Smoke test: zero + one = one. (Implementation note: holds definitionally
+-- — both lifts collapse on the `class_of` inputs via the kernel lift rule.)
 theorem Integer.add_zero_one_equals_one
         : Integer.zero + Integer.one = Integer.one :=
   done by substituting Natural.zero_add unfolding Integer

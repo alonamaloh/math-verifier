@@ -3,11 +3,12 @@
 -- Multiplicative cancellation on Integer when the multiplier is a
 -- positive natural lifted to Integer:
 --     x · to_integer(c) = y · to_integer(c)  →  x = y     (for c ≥ 1)
--- The proof descends through `Quotient.equal_implies_equivalent` to recover the underlying
--- cross-equation at the multiplied representatives, factors `c` out of each
--- side (by `ring`), applies the Natural-level cancellation, and reassembles
--- the class equality. This is the step the original Rational plan needed and
--- couldn't get.
+-- The proof picks representatives x = (p₁ − q₁), y = (p₂ − q₂), scales each
+-- by `c` through the boundary lemma `Integer.from_difference_times_natural`,
+-- reads off the resulting cross-equation with `Integer.difference_equal_implies`,
+-- factors `c` out of each side (by `ring`), and cancels the positive factor.
+-- Everything stays at the `from_difference` boundary — no quotient operations
+-- or representative unfolding leak into the argument.
 
 module Integer.cancellation
 
@@ -27,33 +28,27 @@ import Integer.multiplication
 import Integer.embedding
 
 -- ----------------------------------------------------------------------
--- Natural-level kernel of the cancellation argument. Given the
--- equivalence relation between the two multiplied representatives,
--- conclude the equivalence between the original representatives.
--- The proof simplifies the multiplied-out equation to one factor of
--- `c` on each side, then cancels the positive factor.
+-- Natural-level kernel of the cancellation argument: from the scaled
+-- cross-equation `p₁·c + q₂·c = q₁·c + p₂·c`, gather each side into one
+-- factor of `c` and cancel the positive `c` to get `p₁ + q₂ = q₁ + p₂`.
 
 theorem Integer.cancellation_natural
         (p1 q1 p2 q2 c : Natural) (positive : 1 ≤ c)
-        (equivalenceAfterMultiply
-            : (p1 * c + q1 * 0)
-              + (p2 * 0 + q2 * c)
-              = (p1 * 0 + q1 * c)
-                + (p2 * c + q2 * 0))
+        (scaledCrossEquation : p1 * c + q2 * c = q1 * c + p2 * c)
         : p1 + q2 = q1 + p2 := {
-    -- Each side is `c` times a sum; they agree by the multiplied
-    -- hypothesis, so cancelling the positive `c` gives the result.
+    -- Each side is `c` times a sum; they agree by the scaled hypothesis, so
+    -- cancelling the positive `c` gives the result.
     calc (p1 + q2) * c
-       = (p1 * c + q1 * 0) + (p2 * 0 + q2 * c)
-       = (p1 * 0 + q1 * c) + (p2 * c + q2 * 0)   since equivalenceAfterMultiply
+       = p1 * c + q2 * c
+       = q1 * c + p2 * c   since scaledCrossEquation
        = (q1 + p2) * c;
     done since Natural.multiply_cancel_right
 }
 
 -- ----------------------------------------------------------------------
--- At representatives: destructure both, recover the Natural-level
--- equivalence from the multiplied equality via Quotient.equal_implies_equivalent, then
--- hand it to the Natural-level cancellation kernel.
+-- At representatives: destructure both as differences (p₁ − q₁), (p₂ − q₂);
+-- scale each by `c` through `from_difference_times_natural`, read off the
+-- cross-equation, and hand it to the Natural-level cancellation kernel.
 
 theorem Integer.multiply_cancel_right_at_representatives
         (c : Natural) (positive : 1 ≤ c)
@@ -69,30 +64,23 @@ theorem Integer.multiply_cancel_right_at_representatives
   | IntegerRepresentative.make(p1, q1),
     IntegerRepresentative.make(p2, q2),
     multipliedEquality => {
-      -- `multipliedEquality` says the two multiplied difference classes are
-      -- equal; `Quotient.equal_implies_equivalent` recovers their equivalence, which (the
-      -- equivalence being transparent) IS the cross-equation. The explicit
-      -- `Quotient.equal_implies_equivalent` (with `unfold Integer`) is required here: the opaque
-      -- `Integer` boundary blocks the bare-claim exact-bridge's WHNF match.
-      claim (p1 * c + q1 * 0) + (p2 * 0 + q2 * c)
-              = (p1 * 0 + q1 * c) + (p2 * c + q2 * 0)
-          by Quotient.equal_implies_equivalent(
-                 IntegerRepresentative.make(
-                     p1 * c + q1 * 0,
-                     p1 * 0 + q1 * c),
-                 IntegerRepresentative.make(
-                     p2 * c + q2 * 0,
-                     p2 * 0 + q2 * c),
-                 unfold Integer in multipliedEquality);
-      -- The cancellation kernel extracts `p1 + q2 = q1 + p2`, which IS the
-      -- class equality the goal asks for (the equivalence is transparent).
+      -- Rewrite each scaled product as a single difference class, so the
+      -- multiplied equality becomes a plain equality of difference classes.
+      calc Integer.from_difference(p1 * c, q1 * c)
+         = Integer.from_difference(p1, q1) * (c : Integer)   by Integer.from_difference_times_natural
+         = Integer.from_difference(p2, q2) * (c : Integer)   since multipliedEquality
+         = Integer.from_difference(p2 * c, q2 * c)           by Integer.from_difference_times_natural;
+      -- Read off the cross-equation, then cancel the positive `c`. The
+      -- resulting `p1 + q2 = q1 + p2` IS the class equality the goal asks for.
+      claim p1 * c + q2 * c = q1 * c + p2 * c since Integer.difference_equal_implies;
       claim naturalEquation : p1 + q2 = q1 + p2 since Integer.cancellation_natural;
       naturalEquation
   }
 
 -- ----------------------------------------------------------------------
--- Main theorem: lift the at-representatives version through
--- Quotient.induct_two so it applies to any Integer x and y.
+-- Main theorem: cancellation for any Integers x and y. Pick a
+-- representative for each (refining the product hypothesis as we go) and
+-- the at-representatives version finishes.
 
 theorem Integer.multiply_cancel_right_by_positive_natural
         (x y : Integer) (c : Natural) (positive : 1 ≤ c)
