@@ -1,4 +1,4 @@
--- Natural/induction.math
+-- Natural/strong_recursion.math
 --
 -- Proves Natural.strong_induction from the ordinary recursor. The
 -- derivation goes through three small lemmas:
@@ -9,11 +9,13 @@
 --   2. Natural.not_less_or_equal_successor_zero: `successor(k) ≰ zero`.
 --      Both reflexivity and step cases lead to `successor(_) = zero`, which
 --      Natural.successor_not_zero rules out.
---   3. The "below" predicate `forAllBelow n` asserts P holds for every
---      k < n. Build it by ordinary induction on n, using (1) to
---      decompose `successor(k) ≤ successor(m)` and (2) to reject `successor(k) ≤ 0`.
+--   3. The "below" predicate `for_all_below n` asserts P holds for every
+--      k with `successor(k) ≤ n`. Build it by ordinary induction on n, using
+--      (1) to decompose `successor(k) ≤ successor(m)` and (2) to reject
+--      `successor(k) ≤ 0`.
 --
--- Then `strong_induction n := step n (forAllBelow n)`.
+-- Then `strong_induction` applies `step` to `for_all_below n`, bridging the
+-- caller's `<`-step to the `successor ≤` form through `successor_le_of_lt`.
 
 module Natural.strong_recursion
 
@@ -37,11 +39,10 @@ theorem LessOrEqual.invert (s b : Natural)
     cases proof {
       | Or.introduceLeft(lessThan) => {
           choose c such that s + (1 + c) = b as equation from Natural.lt_elim;
-          claim s ≤ s + c by Natural.less_or_equal_add_right;
+          claim s ≤ s + c since Natural.less_or_equal_add_right;
           calc b
-             = s + (1 + c)        by equation
-             = s + successor(c)   by Natural.one_add(c)
-             = successor(s + c)   by Natural.add_successor(s, c)
+             = s + (1 + c)        since equation
+             = successor(s + c)
              as bIsSuccessor;
           Or.introduceRight(
               witness (s + c) with
@@ -56,8 +57,6 @@ theorem LessOrEqual.invert (s b : Natural)
 theorem Natural.not_less_or_equal_successor_zero (k : Natural)
         : successor(k) ≤ 0 → False :=
   (impossible : successor(k) ≤ 0) ↦
-    claim (successor(k) = 0)
-        ∨ (∃ (bPredecessor : Natural). 0 = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor)
     claim by cases {
       in (successor(k) = 0) as successorKEqualsZero:
           done by Natural.successor_not_zero
@@ -74,12 +73,10 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
         : successor(k) ≤ successor(m)
           → k = m ∨ successor(k) ≤ m :=
   (successorKLessOrEqualSuccessorMProof : successor(k) ≤ successor(m)) ↦
-    claim (successor(k) = successor(m))
-        ∨ (∃ (bPredecessor : Natural). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor)
     claim by cases {
       in (successor(k) = successor(m)) as successorKEqualsSuccessorM: {
           -- strip the successors: k = m, the left disjunct.
-          claim k = m by Natural.successor_injective;
+          claim k = m since Natural.successor_injective;
           done
         }
       in (∃ (bPredecessor : Natural). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) as existsProof:
@@ -96,7 +93,8 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
           }
     }
 
--- forAllBelow n : for every k < n, P holds. Ordinary induction on n.
+-- for_all_below n : P holds for every k with successor(k) ≤ n. Ordinary
+-- induction on n.
 theorem Natural.for_all_below
         (P : Natural → Proposition)
         (step : ∀ (n : Natural).
@@ -113,15 +111,12 @@ theorem Natural.for_all_below
         (k : Natural)
             (successorKLessOrEqualOnePlus :
                 successor(k) ≤ 1 + predecessor) ↦ {
-          -- The step bound is `1 + predecessor` (opaque `add`), not defeq to
-          -- `successor(predecessor)`; bridge with `one_add` (via `rewrite`) so
-          -- the successor-form inversion lemma applies.
+          -- The step bound `1 + predecessor` is not defeq to
+          -- `successor(predecessor)`, but the successor-form inversion lemma
+          -- still applies — its premise is discharged up to `one_add`.
           claim inversionResult
                   : k = predecessor ∨ successor(k) ≤ predecessor
-              by Natural.less_or_equal_successor_successor_inversion(
-                  k, predecessor,
-                  rewrite(Natural.one_add(predecessor),
-                          successorKLessOrEqualOnePlus));
+              since Natural.less_or_equal_successor_successor_inversion;
           cases inversionResult {
             | Or.introduceLeft(kEqualsPredecessor) =>
                 -- We need P(k). step(predecessor, IH) gives P(predecessor);
@@ -139,8 +134,6 @@ theorem Natural.for_all_below
 theorem Natural.less_or_equal_zero_implies_equals_zero (q : Natural)
         : q ≤ 0 → q = 0 :=
   (quotientLessOrEqualZero : q ≤ 0) ↦
-    claim (q = 0)
-        ∨ (∃ (bPredecessor : Natural). 0 = successor(bPredecessor) ∧ q ≤ bPredecessor)
     claim by cases {
       in (q = 0) as quotientEqualsZero:
           quotientEqualsZero
@@ -150,19 +143,16 @@ theorem Natural.less_or_equal_zero_implies_equals_zero (q : Natural)
       }
     }
 
--- Inversion of `successor(p) ≤ successor(otherPredecessor)`: yields
--- `p ≤ otherPredecessor`. Combines le_succ_succ_inversion with
--- le_predecessor_le. Structured-proof form: the inversion lemma is
--- found by Or-shape lookup; both arms close via library scan plus
--- (in the equality arm) a transport-via-equality bridge.
+-- `successor(p) ≤ successor(otherPredecessor)` descends to
+-- `p ≤ otherPredecessor`: invert to `p = otherPredecessor` or
+-- `successor(p) ≤ otherPredecessor`; both yield `p ≤ otherPredecessor`.
 theorem Natural.less_or_equal_successor_successor_descend
         (p otherPredecessor : Natural)
-        (succP_le_succM : successor(p) ≤ successor(otherPredecessor))
+        (successorPLessOrEqualSuccessor : successor(p) ≤ successor(otherPredecessor))
         : p ≤ otherPredecessor :=
-  claim (p = otherPredecessor) ∨ (successor(p) ≤ otherPredecessor)
   claim by cases {
-    in (p = otherPredecessor):              claim
-    in (successor(p) ≤ otherPredecessor):   claim
+    in (p = otherPredecessor):              done
+    in (successor(p) ≤ otherPredecessor):   done since Natural.less_or_equal_predecessor_less_or_equal
   }
 
 -- Strong induction: combine for_all_below with the step at level n.
@@ -181,17 +171,16 @@ theorem Natural.strong_induction
   -- `for_all_below` is stated with the `successor(k) ≤ m` step form; bridge
   -- the caller's `<`-step to it (and the `<`-result back) through
   -- `successor_le_of_lt` — `<` is no longer defeq to `successor ≤`.
-  claim adaptedStep
-        : ∀ (m : Natural). (∀ (k : Natural). successor(k) ≤ m → P(k)) → P(m)
+  claim ∀ (m : Natural). (∀ (k : Natural). successor(k) ≤ m → P(k)) → P(m)
       by (m : Natural) (belowM : ∀ (k : Natural). successor(k) ≤ m → P(k)) ↦
           step(m, (k : Natural) (kLessThanM : k < m) ↦ {
-            claim successor(k) ≤ m by Natural.successor_le_of_lt;
+            claim successor(k) ≤ m since Natural.successor_le_of_lt;
             belowM(k, (successor(k) ≤ m))
           });
   claim below : ∀ (k : Natural). k < n → P(k)
       by (k : Natural) (kLessThanN : k < n) ↦ {
-        claim successor(k) ≤ n by Natural.successor_le_of_lt;
-        Natural.for_all_below(P, adaptedStep, n, k, (successor(k) ≤ n))
+        claim successor(k) ≤ n since Natural.successor_le_of_lt;
+        done since Natural.for_all_below
       };
   step(n, below)
 }
