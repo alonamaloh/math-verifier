@@ -49,6 +49,8 @@ theorem Natural.divides_transitive (a b c : Natural)
 theorem Natural.divides_less_or_equal_or_zero (d n : Natural)
         (dDividesN : d ∣ n)
         : n = 0 ∨ d ≤ n :=
+  -- `add` is opaque; unfold it so the case-split's `1 + qm1` is visible as a
+  -- `successor` (and `d·(1+qm1) = d + d·qm1` reduces) for the auto-prover.
   unfold Natural.add in {
   choose quotient such that n = d * quotient as nEqualsDtimesQuotient from dDividesN;
   claim by cases {
@@ -109,7 +111,6 @@ theorem Natural.divides_one_of_consecutive_multiples
         : ∀ (q2 : Natural).
           successor(d * q1) = d * q2
           → d ∣ 1 :=
-  unfold Natural.add in
   by_induction on q1 with IH {
     case zero: {
         take q2 : Natural;
@@ -131,12 +132,11 @@ theorem Natural.divides_one_of_consecutive_multiples
               -- Cancel a leading `d` from each side, then recurse on the
               -- smaller pair via the induction hypothesis.
               calc d + successor(d * q1Predecessor)
-                 = successor(d + d * q1Predecessor)
                  = successor(d * successor(q1Predecessor))
                  = d * successor(q2Predecessor)
                  = d + d * q2Predecessor;
               claim peeled : successor(d * q1Predecessor) = d * q2Predecessor
-                  by Natural.add_cancel_left;
+                  since Natural.add_cancel_left;
               IH(q2Predecessor, peeled)
             }
         }
@@ -154,5 +154,5 @@ theorem Natural.divides_consecutive_implies_one
   calc successor(d * firstQuotient)
      = successor(a)
      = d * secondQuotient;
-  done by Natural.divides_one_of_consecutive_multiples
+  done since Natural.divides_one_of_consecutive_multiples
 }
