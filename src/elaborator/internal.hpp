@@ -3914,6 +3914,25 @@ private:
         const std::vector<LocalBinder>& localBinders,
         std::map<std::string, ExpressionPointer>& assignment);
 
+    // Build a proof of the structure-class type `targetTypeClosed` (CLOSED
+    // over `localBinders`) by applying a registered forgetful instance (e.g.
+    // `IsRing.additive_group`) to a UNIQUE in-scope premise-structure
+    // hypothesis. Returns the proof term CLOSED over `localBinders`, or
+    // nullptr when no unambiguous derivation exists. Only ever called as a
+    // fallback after the direct instance/hypothesis discharge has failed, so
+    // it never perturbs an already-resolved call.
+    //
+    // `targetTypeClosed` MAY still contain unresolved-hole free variables
+    // named in `outerMetavars` (e.g. a group's `identity`/`inverse` that only
+    // the structure proof pins). When the unique premise hypothesis resolves
+    // them, their solutions are written back into `outerAssignment` so the
+    // caller's sibling slots see them.
+    ExpressionPointer tryForgetfulDerivation(
+        const ExpressionPointer& targetTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        const std::set<std::string>& outerMetavars,
+        std::map<std::string, ExpressionPointer>& outerAssignment);
+
     // True when `openedType` (already opened over `localBinders`) is a
     // Proposition — i.e. its own type weak-head-reduces to `Sort 0`. Used
     // to restrict context-discharge to proof obligations, never values.

@@ -21,8 +21,9 @@ import Algebra.ring
 -- including `ringProof` — so each lemma states only its genuine arguments
 -- and cites the ring axioms by name (`IsRing.distributivity_right(…)`,
 -- `IsRing.add_identity_left(…)`) with `ringProof` recovered from context.
--- The one standing `claim` per proof brings the additive group into scope
--- for the generic `Group.*` cancellation lemmas.
+-- The generic `Group.*` cancellation lemmas need the additive group as their
+-- `IsGroup` proof: it is supplied automatically from `ringProof` through the
+-- registered `IsRing.additive_group` forgetful instance — no explicit claim.
 convention carrier : Type(0)
 convention (+) : carrier → carrier → carrier
 convention zero : carrier
@@ -38,22 +39,20 @@ convention ringProof : IsRing(carrier, (+), zero, (-), (·), one)
 -- group cancels `zero · x` against `zero · x + zero · x = zero · x + zero`,
 -- leaving `zero · x = zero`.
 theorem Ring.zero_multiply (x : carrier) : zero · x = zero := {
-    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
     calc zero · x + zero · x
        = (zero + zero) · x   by IsRing.distributivity_right(zero, zero, x)
-       = zero · x
-       = zero · x + zero;
+       = zero · x            by IsRing.add_identity_left
+       = zero · x + zero     by IsRing.add_identity_right;
     done since Group.cancel_left
 }
 
 -- Zero absorbs multiplication on the right: `x · zero = zero`.
 -- Same proof shape using `distributivity_left`.
 theorem Ring.multiply_zero (x : carrier) : x · zero = zero := {
-    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
     calc x · zero + x · zero
        = x · (zero + zero)   by IsRing.distributivity_left(x, zero, zero)
-       = x · zero
-       = x · zero + zero;
+       = x · zero            by IsRing.add_identity_left
+       = x · zero + zero     by IsRing.add_identity_right;
     done since Group.cancel_left
 }
 
@@ -62,10 +61,9 @@ theorem Ring.multiply_zero (x : carrier) : x · zero = zero := {
 -- `left_inverse_unique` in the additive group identifies it with `-(a · b)`.
 theorem Ring.multiply_negate_left (a b : carrier)
         : (-a) · b = -(a · b) := {
-    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
     calc (-a) · b + a · b
        = (-a + a) · b   by IsRing.distributivity_right((-a), a, b)
-       = zero · b
+       = zero · b       by IsRing.add_inverse_left
        = zero           by Ring.zero_multiply;
     done since Group.left_inverse_unique
 }
@@ -74,10 +72,9 @@ theorem Ring.multiply_negate_left (a b : carrier)
 -- `distributivity_left` and `inverse_right`.
 theorem Ring.multiply_negate_right (a b : carrier)
         : a · (-b) = -(a · b) := {
-    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
     calc a · (-b) + a · b
        = a · (-b + b)   by IsRing.distributivity_left(a, (-b), b)
-       = a · zero
+       = a · zero       by IsRing.add_inverse_left
        = zero           by Ring.multiply_zero;
     done since Group.left_inverse_unique
 }
@@ -86,7 +83,6 @@ theorem Ring.multiply_negate_right (a b : carrier)
 -- additive inverse is involutive.
 theorem Ring.negate_multiply_negate (a b : carrier)
         : (-a) · (-b) = a · b := {
-    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
     -- Step 2 cites `multiply_negate_right` argument-free even though it
     -- applies UNDER a `-(·)`: the calc diff bridge descends to the differing
     -- subterm, instantiates the lemma's ring bundle against the subterm
@@ -108,15 +104,17 @@ theorem Ring.equal_of_linear_combination
         (combination : combLeft = combRight)
         (ringBridge : goalLeft + (-goalRight) = combLeft + (-combRight))
         : goalLeft = goalRight := {
-    claim IsGroup(carrier, (+), zero, (-)) since IsRing.additive_group;
-    -- The combination's difference is zero (it's combRight − combRight)...
-    calc combLeft + (-combRight)
-       = combRight + (-combRight)
-       = zero;
-    -- ...so the goal's difference is zero too, and cancelling finishes.
+    -- Each difference of a term with itself is zero.
+    claim combinationDifferenceZero : combRight + (-combRight) = zero
+        by IsRing.add_inverse_right;
+    claim goalDifferenceZero : goalRight + (-goalRight) = zero
+        by IsRing.add_inverse_right;
+    -- The combination's difference is zero, so the goal's difference is too,
+    -- and cancelling the common `-goalRight` finishes.
     calc goalLeft + (-goalRight)
        = combLeft + (-combRight)    since ringBridge
-       = zero
-       = goalRight + (-goalRight);
+       = combRight + (-combRight)   since combination
+       = zero                       since combinationDifferenceZero
+       = goalRight + (-goalRight)   since goalDifferenceZero;
     done since Group.cancel_right
 }

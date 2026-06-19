@@ -23,7 +23,7 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // was expanded to a TREE on disk — Test/ring_test.mathv was 574 MB of
 // which gzip kept 17 (every shared subterm of the ring certificate
 // written out in full at every occurrence).
-constexpr uint32_t cacheVersion = 7;
+constexpr uint32_t cacheVersion = 8;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -603,6 +603,15 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
         writer.writeString(entry.carrierName);
         writer.writeString(entry.termName);
     }
+    writer.writeU32(
+        static_cast<uint32_t>(contents.forgetfulRegistrations.size()));
+    for (const auto& entry : contents.forgetfulRegistrations) {
+        writer.writeString(entry.conclusionStructureName);
+        writer.writeString(entry.termName);
+        writer.writeU32(static_cast<uint32_t>(entry.leadingImplicitCount));
+        writer.writeU32(static_cast<uint32_t>(entry.premiseIndex));
+        writer.writeString(entry.premiseStructureName);
+    }
     if (!output) {
         throw SerializationError("write failed (final flush): " + path);
     }
@@ -712,6 +721,17 @@ CacheContents readCacheFile(const std::string& path,
         entry.carrierName = reader.readString();
         entry.termName = reader.readString();
         contents.bundleRegistrations.push_back(std::move(entry));
+    }
+    uint32_t forgetfulCount = reader.readU32();
+    contents.forgetfulRegistrations.reserve(forgetfulCount);
+    for (uint32_t i = 0; i < forgetfulCount; ++i) {
+        CachedForgetfulRegistration entry;
+        entry.conclusionStructureName = reader.readString();
+        entry.termName = reader.readString();
+        entry.leadingImplicitCount = static_cast<int>(reader.readU32());
+        entry.premiseIndex = static_cast<int>(reader.readU32());
+        entry.premiseStructureName = reader.readString();
+        contents.forgetfulRegistrations.push_back(std::move(entry));
     }
     return contents;
 }

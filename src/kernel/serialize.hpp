@@ -100,6 +100,17 @@ struct CachedBundleRegistration {
     std::string termName;
 };
 
+// Forgetful (derived) instance registry entry: only the scalar shape is
+// stored; the lemma's type is re-fetched from the loaded declaration
+// `termName` at replay time (see Environment::forgetfulInstanceRegistry).
+struct CachedForgetfulRegistration {
+    std::string conclusionStructureName;
+    std::string termName;
+    int leadingImplicitCount;
+    int premiseIndex;
+    std::string premiseStructureName;
+};
+
 // The full contents of a .mathv file, prior to (de)serialization.
 struct CacheContents {
     std::string sourcePath;
@@ -123,6 +134,8 @@ struct CacheContents {
     std::vector<CachedInstanceRegistration> instanceRegistrations;
     // Canonical structure-bundle-registry entries added by this file.
     std::vector<CachedBundleRegistration> bundleRegistrations;
+    // Forgetful (derived) instance registry entries added by this file.
+    std::vector<CachedForgetfulRegistration> forgetfulRegistrations;
 };
 
 // Write `contents` to `path`. Throws SerializationError on I/O failure.

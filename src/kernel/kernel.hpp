@@ -179,6 +179,27 @@ struct Environment {
     std::map<std::tuple<std::string, std::string>, std::string>
         canonicalBundleRegistry;
 
+    // Forgetful (derived) instances: a carrier-POLYMORPHIC lemma that
+    // produces one structure class from another on the SAME carrier, e.g.
+    // `IsRing.additive_group : … → IsGroup(carrier, +, zero, -)` with premise
+    // `ringProof : IsRing(carrier, +, zero, -, ·, one)`. Because the carrier
+    // is abstract there is no concrete `(structure, carrier)` key; instead we
+    // key by the CONCLUSION structure and, when a needed structure-class
+    // proof has no direct instance/hypothesis, apply the lemma to a unique
+    // in-scope premise-structure hypothesis (`tryForgetfulDerivation`).
+    // Registered by `instance <lemma>` whose conclusion carrier is abstract
+    // and which has a structure-class premise. Surface-elaborator concern.
+    struct ForgetfulInstance {
+        std::string termName;
+        ExpressionPointer type;
+        int leadingImplicitCount = 0;
+        int premiseIndex = -1;          // which leading binder is the premise
+        std::string premiseStructureName;
+        std::vector<std::string> universeParameters;
+    };
+    std::map<std::string, std::vector<ForgetfulInstance>>
+        forgetfulInstanceRegistry;
+
     const Declaration* lookup(const std::string& name) const {
         auto iterator = declarations.find(name);
         return iterator == declarations.end() ? nullptr : &iterator->second;

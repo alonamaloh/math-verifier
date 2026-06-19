@@ -224,6 +224,51 @@ void Elaborator::elaborateInstanceDeclaration(
         ExpressionPointer carrierArgument = reversedArguments.back();
         std::string carrierName = headConstantName(carrierArgument);
         if (carrierName == "<unknown>") {
+            // Forgetful (derived) instance: the carrier is abstract (a bound
+            // variable), but a leading argument is a structure-class premise
+            // on that same carrier — e.g. `IsRing.additive_group`, whose
+            // `ringProof : IsRing(carrier, …)` premise yields the conclusion
+            // `IsGroup(carrier, …)`. Register it under the conclusion
+            // structure; resolution applies it to an in-scope premise
+            // hypothesis (see `tryForgetfulDerivation`).
+            int premiseIndex = -1;
+            std::string premiseStructure;
+            if (structureHeadIsClass(structureName)) {
+                ExpressionPointer walk = type;
+                for (int k = 0; k < parameterCount; ++k) {
+                    auto* pi = std::get_if<Pi>(&walk->node);
+                    if (!pi) break;
+                    std::string domainHead = headConstantName(pi->domain);
+                    if (domainHead != "<unknown>"
+                        && structureHeadIsClass(domainHead)) {
+                        premiseIndex = k;
+                        premiseStructure = domainHead;
+                    }
+                    walk = pi->codomain;
+                }
+            }
+            if (premiseIndex >= 0) {
+                Environment::ForgetfulInstance forgetful;
+                forgetful.termName = declaration.name;
+                forgetful.type = type;
+                forgetful.leadingImplicitCount = parameterCount;
+                forgetful.premiseIndex = premiseIndex;
+                forgetful.premiseStructureName = premiseStructure;
+                forgetful.universeParameters =
+                    declarationUniverseParameters(*decl);
+                auto& bucket =
+                    environment_.forgetfulInstanceRegistry[structureName];
+                bool replaced = false;
+                for (auto& existing : bucket) {
+                    if (existing.termName == declaration.name) {
+                        existing = forgetful;
+                        replaced = true;
+                        break;
+                    }
+                }
+                if (!replaced) bucket.push_back(std::move(forgetful));
+                return;
+            }
             throwElaborate(
                 "instance '" + declaration.name + "': could not determine "
                 "the carrier head of its structure type");

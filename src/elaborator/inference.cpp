@@ -270,9 +270,173 @@ void Elaborator::resolveStructureClassLeadingImplicits(
                         static_cast<int>(localBinders.size()) - 1
                         - matchBinder);
                     madeProgress = true;
+                    continue;
+                }
+
+                // --- Forgetful-instance path: derive this structure from a
+                // DIFFERENT in-scope structure on the same carrier via a
+                // registered forgetful lemma (e.g. `IsGroup` from an in-scope
+                // `IsRing` via `IsRing.additive_group`). Only useful once the
+                // domain's operations are concrete (the second pass, after
+                // backward inference); an abstract domain pins no unique
+                // premise, so it is a no-op then.
+                ExpressionPointer derived =
+                    tryForgetfulDerivation(domain, localBinders,
+                                           metavariableNames, assignment);
+                if (derived) {
+                    assignment[metaName] = std::move(derived);
+                    madeProgress = true;
                 }
             }
         }
+    }
+
+ExpressionPointer Elaborator::tryForgetfulDerivation(
+        const ExpressionPointer& targetTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        const std::set<std::string>& outerMetavars,
+        std::map<std::string, ExpressionPointer>& outerAssignment) {
+        std::string structureName = headConstantName(targetTypeClosed);
+        if (structureName == "<unknown>") return nullptr;
+        auto bucket =
+            environment_.forgetfulInstanceRegistry.find(structureName);
+        if (bucket == environment_.forgetfulInstanceRegistry.end()) {
+            return nullptr;
+        }
+        int N = static_cast<int>(localBinders.size());
+        ExpressionPointer targetOpened =
+            openOverLocalBinders(targetTypeClosed, localBinders, N);
+        Context context = buildContextFromLocalBinders(localBinders);
+
+        // Iterated substitution to a fixpoint: a solved hole may map to
+        // another (also-solved) hole — e.g. the conclusion binds the lemma's
+        // `identity` meta to the caller's `?identity` hole, which the premise
+        // then binds to `zero`. A single pass would stop at `?identity`.
+        auto resolveFully =
+            [this](ExpressionPointer expr,
+               const std::map<std::string, ExpressionPointer>& solved) {
+            for (int pass = 0; pass < 6; ++pass) {
+                ExpressionPointer next = substituteFreeVariables(expr, solved);
+                if (compareExpressionStructure(next, expr) == 0) return next;
+                expr = next;
+            }
+            return expr;
+        };
+
+        for (const auto& forgetful : bucket->second) {
+            // Universe-polymorphic forgetful instances are not yet handled.
+            if (!forgetful.universeParameters.empty()) continue;
+
+            // Open the lemma's leading implicit Pis as fresh metavariables;
+            // remember the premise domain and the conclusion. The lemma's own
+            // metas AND the caller's still-open holes are both solvable here
+            // (the latter pinned via the premise hypothesis).
+            std::set<std::string> metas = outerMetavars;
+            std::vector<std::string> names;
+            ExpressionPointer opened = forgetful.type;
+            ExpressionPointer premiseDomain;
+            bool ok = true;
+            for (int k = 0; k < forgetful.leadingImplicitCount; ++k) {
+                auto* pi = std::get_if<Pi>(&opened->node);
+                if (!pi) { ok = false; break; }
+                std::string fresh = "_forgetful_" + std::to_string(k) + "_"
+                    + forgetful.termName;
+                metas.insert(fresh);
+                names.push_back(fresh);
+                if (k == forgetful.premiseIndex) premiseDomain = pi->domain;
+                opened = openBinder(pi->codomain, fresh,
+                                     FreeVariableOrigin::Internal);
+            }
+            if (!ok || !premiseDomain) continue;
+            ExpressionPointer conclusion = opened;
+
+            // Pin the shared carrier/operations from the target conclusion.
+            std::map<std::string, ExpressionPointer> trial;
+            unifyConstructorParameters(
+                conclusion, targetOpened, metas, trial);
+            ExpressionPointer premiseResolved =
+                resolveFully(premiseDomain, trial);
+
+            // Resolve the premise from a UNIQUE in-scope hypothesis of the
+            // premise structure on the matching carrier/operations.
+            int matchCount = 0;
+            int matchBinder = -1;
+            std::map<std::string, ExpressionPointer> matchTrial;
+            for (int j = N - 1; j >= 0; --j) {
+                ExpressionPointer candidateType = openOverLocalBinders(
+                    localBinders[j].type, localBinders,
+                    static_cast<size_t>(j));
+                if (headConstantName(candidateType)
+                    != forgetful.premiseStructureName) {
+                    continue;
+                }
+                std::map<std::string, ExpressionPointer> attempt = trial;
+                std::vector<ExpressionPointer> binderStack;
+                unifyConstructorParameters(
+                    premiseResolved, candidateType, metas, attempt, 0,
+                    &binderStack);
+                ExpressionPointer resolved =
+                    resolveFully(premiseResolved, attempt);
+                bool equal;
+                try {
+                    equal = isDefinitionallyEqual(
+                        environment_, context, resolved, candidateType);
+                } catch (const TypeError&) {
+                    equal = false;
+                }
+                if (!equal) continue;
+                ++matchCount;
+                matchBinder = j;
+                matchTrial = attempt;
+                if (matchCount > 1) break;
+            }
+            if (matchCount != 1) continue;
+
+            // Every shared operation must have been solved (the premise proof
+            // slot is supplied as the matched binder, not a metavariable).
+            bool allSolved = true;
+            for (int k = 0; k < forgetful.leadingImplicitCount; ++k) {
+                if (k == forgetful.premiseIndex) continue;
+                ExpressionPointer value =
+                    resolveFully(makeFreeVariable(names[k]), matchTrial);
+                if (containsNamedFreeVariable(value, metas)) {
+                    allSolved = false;
+                    break;
+                }
+            }
+            if (!allSolved) continue;
+
+            // Emit the lemma applied to its leading arguments (CLOSED over
+            // local binders): shared operations closed from the solved
+            // metavariables, the premise proof as the matched binder.
+            ExpressionPointer term = makeConstant(forgetful.termName);
+            for (int k = 0; k < forgetful.leadingImplicitCount; ++k) {
+                ExpressionPointer argument;
+                if (k == forgetful.premiseIndex) {
+                    argument = makeBoundVariable(N - 1 - matchBinder);
+                } else {
+                    argument = closeOverLocalBinders(
+                        resolveFully(makeFreeVariable(names[k]), matchTrial),
+                        localBinders, localBinders.size());
+                }
+                term = makeApplication(std::move(term), std::move(argument));
+            }
+
+            // Write back any caller holes the premise pinned (e.g. the
+            // group's `identity`/`inverse`), so sibling slots see them.
+            for (const auto& outerName : outerMetavars) {
+                if (outerAssignment.count(outerName)) continue;
+                ExpressionPointer value =
+                    resolveFully(makeFreeVariable(outerName), matchTrial);
+                if (containsNamedFreeVariable(value, metas)) continue;
+                try {
+                    outerAssignment[outerName] = closeOverLocalBinders(
+                        value, localBinders, localBinders.size());
+                } catch (...) { /* leave unsolved */ }
+            }
+            return term;
+        }
+        return nullptr;
     }
 
 Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
@@ -1271,6 +1435,18 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         break;
                     }
                 }
+                // Fallback: no direct hypothesis of this structure class, but
+                // a registered forgetful instance may derive it from another
+                // in-scope structure (e.g. `IsGroup` from `IsRing`).
+                if (!found) {
+                    ExpressionPointer derived =
+                        tryForgetfulDerivation(slotType, localBinders,
+                                               dischargeMetavars, assignment);
+                    if (derived) {
+                        elaboratedArgs[i] = std::move(derived);
+                        found = true;
+                    }
+                }
                 if (!found) remaining.push_back(i);
             }
             unresolved = std::move(remaining);
@@ -1492,6 +1668,30 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                                 "to name the intended hypothesis: `"
                                 + diagnosticName
                                 + "(…)` (with `from` in an `obtain`).";
+                        }
+                    }
+                    // Forgetful fallback: once the sibling hypotheses have
+                    // pinned this slot's operations (no remaining holes), a
+                    // structure-class slot with no matching hypothesis may be
+                    // derived from another in-scope structure on the same
+                    // carrier (e.g. `IsGroup` from `IsRing`). Iterated by the
+                    // enclosing `while (progress)`, so a slot whose operations
+                    // are pinned only on a later round is retried.
+                    if (!filled) {
+                        // The slot may still carry operation holes (a group's
+                        // `identity`/`inverse`) that only the structure proof
+                        // pins; the forgetful derivation co-solves them from
+                        // the premise hypothesis and writes them back.
+                        ExpressionPointer slotNow =
+                            substituteFreeVariables(piDomains[i], assignment);
+                        ExpressionPointer derived =
+                            tryForgetfulDerivation(slotNow, localBinders,
+                                                   dischargeMetavars,
+                                                   assignment);
+                        if (derived) {
+                            elaboratedArgs[i] = std::move(derived);
+                            filled = true;
+                            progress = true;
                         }
                     }
                     if (!filled) stillUnresolved.push_back(i);

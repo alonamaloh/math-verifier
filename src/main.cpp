@@ -5084,6 +5084,27 @@ void loadCacheRecursive(Environment& environment,
         environment.canonicalBundleRegistry[std::make_tuple(
             entry.structureName, entry.carrierName)] = entry.termName;
     }
+    for (const auto& entry : contents.forgetfulRegistrations) {
+        const Declaration* declaration = environment.lookup(entry.termName);
+        if (!declaration) continue;
+        Environment::ForgetfulInstance forgetful;
+        forgetful.termName = entry.termName;
+        forgetful.leadingImplicitCount = entry.leadingImplicitCount;
+        forgetful.premiseIndex = entry.premiseIndex;
+        forgetful.premiseStructureName = entry.premiseStructureName;
+        if (auto* axiom = std::get_if<Axiom>(declaration)) {
+            forgetful.type = axiom->type;
+            forgetful.universeParameters = axiom->universeParameters;
+        } else if (auto* definition =
+                       std::get_if<Definition>(declaration)) {
+            forgetful.type = definition->type;
+            forgetful.universeParameters = definition->universeParameters;
+        } else {
+            continue;
+        }
+        environment.forgetfulInstanceRegistry[entry.conclusionStructureName]
+            .push_back(std::move(forgetful));
+    }
     alreadyLoaded.insert(cachePath);
 }
 
@@ -5345,6 +5366,13 @@ int verifyWithCache(const std::string& sourcePath,
     for (const auto& [key, _] : environment.canonicalBundleRegistry) {
         bundlesBefore.insert(key);
     }
+    std::set<std::tuple<std::string, std::string>> forgetfulBefore;
+    for (const auto& [structure, entries] :
+             environment.forgetfulInstanceRegistry) {
+        for (const auto& entry : entries) {
+            forgetfulBefore.insert(std::make_tuple(structure, entry.termName));
+        }
+    }
 
     // A lazy whole-library snapshot for failing-proof suggestions: built
     // (once) only if a proof actually fails, so successful builds — the
@@ -5531,6 +5559,22 @@ int verifyWithCache(const std::string& sourcePath,
             entry.carrierName = std::get<1>(key);
             entry.termName = termName;
             cache.bundleRegistrations.push_back(std::move(entry));
+        }
+    }
+    for (const auto& [structure, entries] :
+             environment.forgetfulInstanceRegistry) {
+        for (const auto& forgetful : entries) {
+            if (forgetfulBefore.count(
+                    std::make_tuple(structure, forgetful.termName))) {
+                continue;
+            }
+            CachedForgetfulRegistration entry;
+            entry.conclusionStructureName = structure;
+            entry.termName = forgetful.termName;
+            entry.leadingImplicitCount = forgetful.leadingImplicitCount;
+            entry.premiseIndex = forgetful.premiseIndex;
+            entry.premiseStructureName = forgetful.premiseStructureName;
+            cache.forgetfulRegistrations.push_back(std::move(entry));
         }
     }
 
