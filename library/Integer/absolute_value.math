@@ -40,8 +40,9 @@ theorem Integer.absolute_value_respect_natural
         (aPlusDEqualsBPlusC : a + d = b + c)
         : (Natural.distance(a, b) : Integer)
           = (Natural.distance(c, d) : Integer) :=
-  Natural.distance_respects_integer_equivalent(
-      a, b, c, d, aPlusDEqualsBPlusC)
+  calc (Natural.distance(a, b) : Integer)
+     = (Natural.distance(c, d) : Integer)
+         since Natural.distance_respects_integer_equivalent
 
 theorem Integer.absolute_value_respect
         : ∀ (rep1 rep1Prime : IntegerRepresentative).
@@ -69,18 +70,19 @@ overload abs := Integer.absolute_value
 -- distance(0, 0) = 0.
 theorem Integer.absolute_value_zero
         : abs(Integer.zero) = Integer.zero :=
-  reflexivity(Integer, Integer.zero)
+  okay
 
 -- |(n : Integer)| = (n : Integer) for n : Natural. Via lift β:
 -- (n : Integer) = mk(make(n, zero)), |.| = (distance(n, zero) :
 -- Integer) = (n : Integer) by distance_zero_right.
 theorem Integer.absolute_value_of_natural (n : Natural)
-        : abs((n : Integer)) = (n : Integer) :=
-  Integer.difference_equal(Natural.distance(n, 0), 0, n, 0,
-      calc Natural.distance(n, 0) + 0
-         = Natural.distance(n, 0)    by Natural.add_zero
-         = n                          by Natural.distance_zero_right
-         = 0 + n                      by Natural.zero_add)
+        : abs((n : Integer)) = (n : Integer) := {
+    calc Natural.distance(n, 0) + 0
+       = Natural.distance(n, 0)
+       = n                          since Natural.distance_zero_right
+       = 0 + n;
+    done since Integer.difference_equal
+}
 
 -- |-x| = |x| at the representative level: negate swaps (a, b) to
 -- (b, a), and distance is symmetric.
@@ -90,32 +92,29 @@ theorem Integer.absolute_value_negate_at_representative
                 Integer.negate_representatives(rep))
             = Integer.absolute_value_at_representative(rep)
   | IntegerRepresentative.make(a, b) =>
-      congruenceOf(Natural.to_integer,
-          Natural.distance_symmetric(b, a))
+      calc (Natural.distance(b, a) : Integer)
+         = (Natural.distance(a, b) : Integer)
+             since Natural.distance_symmetric
 
 -- |-x| = |x| on Integer.
 theorem Integer.absolute_value_negate (x : Integer)
         : abs(-x) = abs(x) :=
-  cases x { | rep =>
-    Integer.absolute_value_negate_at_representative(rep) }
+  by_representatives x as ⟨a, b⟩ =>
+      calc (Natural.distance(b, a) : Integer)
+         = (Natural.distance(a, b) : Integer)
+             since Natural.distance_symmetric
 
 -- -(-x) = x at the representative level: double-negation cancels.
 theorem Integer.negate_negate_at_representative
         : ∀ (rep : IntegerRepresentative).
           Integer.negate_representatives(
                 Integer.negate_representatives(rep)) = rep
-  | IntegerRepresentative.make(a, b) =>
-      reflexivity(IntegerRepresentative,
-          IntegerRepresentative.make(a, b))
+  | IntegerRepresentative.make(a, b) => okay
 
--- -(-x) = x on Integer. Take a representative rep for x; the equation
--- at the rep lifts to the quotient via congruence on `mk`.
+-- -(-x) = x on Integer. At a representative (a, b) both sides reduce
+-- to make(a, b).
 theorem Integer.negate_negate (x : Integer) : -(-x) = x :=
-  cases x { | rep =>
-    congruenceOf(
-        (r : IntegerRepresentative) ↦
-            (Quotient.class_of(r) : Integer),
-        Integer.negate_negate_at_representative(rep)) }
+  by_representatives x as ⟨a, b⟩ => okay
 
 -- -(p + q) = -p + -q at the representative level. Both sides reduce
 -- to make(β + δ, α + γ) when p = mk(make(α, β)), q = mk(make(γ, δ)).
@@ -127,18 +126,11 @@ theorem Integer.negate_add_at_representatives
                 Integer.negate_representatives(rep_p),
                 Integer.negate_representatives(rep_q))
   | IntegerRepresentative.make(alpha, beta),
-    IntegerRepresentative.make(gamma, delta) =>
-      reflexivity(IntegerRepresentative,
-          IntegerRepresentative.make(beta + delta, alpha + gamma))
+    IntegerRepresentative.make(gamma, delta) => okay
 
 -- -(p + q) = -p + -q on Integer. Take representatives for both p and q.
 theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=
-  cases p { | rep_p =>
-    cases q { | rep_q =>
-      congruenceOf(
-          (r : IntegerRepresentative) ↦
-              (Quotient.class_of(r) : Integer),
-          Integer.negate_add_at_representatives(rep_p, rep_q)) } }
+  by_representatives p as ⟨alpha, beta⟩, q as ⟨gamma, delta⟩ => okay
 
 -- ----------------------------------------------------------------------
 -- Triangle inequality.
@@ -148,8 +140,7 @@ theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=
 theorem Natural.to_integer.le_preserves
         (n m : Natural) (nLeqM : n ≤ m)
         : (n : Integer) ≤ (m : Integer) := {
-    obtain ⟨k, mEqualsNPlusK⟩
-        from Natural.subtraction_witness(n, m, nLeqM);
+    choose k such that m = n + k from Natural.subtraction_witness;
     witness k with
         (calc (m : Integer)
             = (n + k : Integer)
@@ -164,23 +155,25 @@ theorem Integer.absolute_value_add_at_representatives
         : abs(((Integer.from_difference(a, b)
                 + Integer.from_difference(c, d)) : Integer))
           = (Natural.distance(a + c, b + d) : Integer) :=
-  reflexivity(Integer, (Natural.distance(a + c, b + d) : Integer))
+  okay
 
 -- Triangle inequality on representatives. Establishes the Integer ≤
 -- between the embedded distances. The actual Integer.triangle_inequality
--- then lifts via Quotient.induct_two.
+-- then takes representatives for both arguments.
 theorem Integer.triangle_inequality_at_representatives
         (a b c d : Natural)
         : (Natural.distance(a + c, b + d) : Integer)
           ≤ (Natural.distance(a, b) : Integer)
-            + (Natural.distance(c, d) : Integer) :=
-  rewrite(
-      Natural.to_integer.add_preserves(
-          Natural.distance(a, b), Natural.distance(c, d)),
-      Natural.to_integer.le_preserves(
-          Natural.distance(a + c, b + d),
-          Natural.distance(a, b) + Natural.distance(c, d),
-          Natural.distance_add_triangle(a, b, c, d)))
+            + (Natural.distance(c, d) : Integer) := {
+    claim Natural.distance(a + c, b + d)
+            ≤ Natural.distance(a, b) + Natural.distance(c, d)
+        since Natural.distance_add_triangle;
+    calc (Natural.distance(a + c, b + d) : Integer)
+       ≤ ((Natural.distance(a, b) + Natural.distance(c, d)) : Integer)
+           since Natural.to_integer.le_preserves
+       = (Natural.distance(a, b) : Integer)
+           + (Natural.distance(c, d) : Integer)
+}
 
 -- |x + y| ≤ |x| + |y| on Integer. Take representatives x = [(a, b)],
 -- y = [(c, d)]; the result follows from the at-representatives lemma.
@@ -188,7 +181,10 @@ theorem Integer.triangle_inequality (x y : Integer)
         : abs(x + y)
           ≤ abs(x) + abs(y) :=
   by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩ =>
-      Integer.triangle_inequality_at_representatives(a, b, c, d)
+      calc (Natural.distance(a + c, b + d) : Integer)
+         ≤ (Natural.distance(a, b) : Integer)
+             + (Natural.distance(c, d) : Integer)
+             since Integer.triangle_inequality_at_representatives
 
 
 -- x - y = -(y - x). Single ring identity; the auto-prover closes
