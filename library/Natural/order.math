@@ -113,16 +113,16 @@ theorem Natural.LessThan.weaken (a b : Natural) (h : a < b) : a ≤ b := {
 theorem Natural.LessThan.transitive_left (a b c : Natural)
         (aLessOrEqualB : a ≤ b) (bLessThanC : b < c) : a < c :=
   claim by cases {
-    in (a < b) as aLessThanB: done since Natural.lt_transitive
-    in (a = b) as aEqualB:   done by substituting aEqualB
+    in (a < b): done since Natural.lt_transitive
+    in (a = b): done by substitution
   }
 
 -- a < b and b ≤ c give a < c.
 theorem Natural.LessThan.transitive_right (a b c : Natural)
         (aLessThanB : a < b) (bLessOrEqualC : b ≤ c) : a < c :=
   claim by cases {
-    in (b < c) as bLessThanC: done since Natural.lt_transitive
-    in (b = c) as bEqualC:   done by substituting bEqualC
+    in (b < c): done since Natural.lt_transitive
+    in (b = c): done by substitution
   }
 
 -- ── The `calc` interface for `≤` ──────────────────────────────────────
@@ -135,11 +135,11 @@ theorem Natural.LessOrEqual.reflexive (a : Natural) : a ≤ a := {
 theorem Natural.LessOrEqual.transitive (a b c : Natural)
         (aLessOrEqualB : a ≤ b) (bLessOrEqualC : b ≤ c) : a ≤ c :=
   claim by cases {
-    in (b < c) as bLessThanC: {
+    in (b < c): {
         claim a < c since Natural.LessThan.transitive_left;
         done
       }
-    in (b = c) as bEqualC: done by substituting bEqualC
+    in (b = c): done by substitution
   }
 
 -- ── Order facts, now as `calc` chains ─────────────────────────────────
@@ -183,7 +183,7 @@ theorem Natural.lt_trichotomy_successor_step (predecessor b : Natural)
         (predecessorComparison : predecessor < b ∨ predecessor = b ∨ b < predecessor)
         : 1 + predecessor < b ∨ 1 + predecessor = b ∨ b < 1 + predecessor :=
   claim by cases {
-    in (predecessor < b) as predecessorLessThanB: {
+    in (predecessor < b): {
         choose gap such that predecessor + (1 + gap) = b as equation from Natural.lt_elim;
         cases gap refining equation {
           | zero => {
@@ -203,17 +203,17 @@ theorem Natural.lt_trichotomy_successor_step (predecessor b : Natural)
             }
         }
       }
-    in (predecessor = b ∨ b < predecessor) as predecessorEqualOrAbove: {
+    in (predecessor = b ∨ b < predecessor): {
         claim by cases {
-          in (predecessor = b) as predecessorEqualB: {
+          in (predecessor = b): {
               calc b
                  = predecessor          by (predecessor = b)
                  < 1 + predecessor      since Natural.lt_one_plus;
               done
             }
-          in (b < predecessor) as bLessThanPredecessor: {
+          in (b < predecessor): {
               calc b
-                 < predecessor          since bLessThanPredecessor
+                 < predecessor
                  < 1 + predecessor      since Natural.lt_one_plus;
               done
             }
@@ -246,7 +246,7 @@ theorem Natural.lt_trichotomy (a : Natural)
 theorem Natural.successor_less_or_equal_successor (a b : Natural)
         (proof : a ≤ b) : successor(a) ≤ successor(b) :=
   claim by cases {
-    in (a < b) as aLessThanB: {
+    in (a < b): {
         choose gap such that a + (1 + gap) = b as equation from Natural.lt_elim;
         calc successor(a) + (1 + gap)
            = successor(a + (1 + gap))
@@ -254,10 +254,7 @@ theorem Natural.successor_less_or_equal_successor (a b : Natural)
         claim successor(a) < successor(b) since Natural.lt_intro;
         done
       }
-    in (a = b) as aEqualB: {
-        calc successor(a) = successor(b)   since aEqualB;
-        done
-      }
+    in (a = b): done by substitution
   }
 
 -- 1 ≤ successor(k): `successor` monotonicity applied at 0 (`1` is `successor(0)`).
