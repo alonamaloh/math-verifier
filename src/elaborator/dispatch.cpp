@@ -1460,7 +1460,8 @@ ExpressionPointer Elaborator::elaborateExpression(
                 return applied;
             }
             // Negated relations: `a ≠ b` → `Not(a = b)`,
-            // `a ≰ b` → `Not(a ≤ b)`, `a ∤ b` → `Not(a ∣ b)`. We
+            // `a ≰ b` → `Not(a ≤ b)`, `a ∤ b` → `Not(a ∣ b)`,
+            // `a ∉ b` → `Not(a ∈ b)`, `a ⊈ b` → `Not(a ⊆ b)`. We
             // build the surface call to the positive relation and
             // recursively elaborate inside a `Not`.
             const std::string& sym = binary->opSymbol;
@@ -1468,6 +1469,8 @@ ExpressionPointer Elaborator::elaborateExpression(
             if (sym == "≠") positive = "=";
             else if (sym == "≰") positive = "≤";
             else if (sym == "∤") positive = "∣";
+            else if (sym == "∉") positive = "∈";
+            else if (sym == "⊈") positive = "⊆";
             if (positive) {
                 if (environment_.lookup("Not") == nullptr) {
                     throw ElaborateError(

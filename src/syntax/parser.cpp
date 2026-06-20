@@ -84,7 +84,9 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::NotDivides:
         case TokenKind::NotLessOrEqual:
         case TokenKind::ElementOf:
+        case TokenKind::NotElementOf:
         case TokenKind::SubsetOf:
+        case TokenKind::NotSubsetOf:
         case TokenKind::Approx:
         case TokenKind::InverseSuperscript:
             return true;
@@ -2082,7 +2084,9 @@ private:
             || kind == TokenKind::NotDivides
             || kind == TokenKind::NotLessOrEqual
             || kind == TokenKind::ElementOf
-            || kind == TokenKind::SubsetOf;
+            || kind == TokenKind::NotElementOf
+            || kind == TokenKind::SubsetOf
+            || kind == TokenKind::NotSubsetOf;
     }
 
     SurfaceExpressionPointer parseRelational() {
@@ -2110,7 +2114,9 @@ private:
                 case TokenKind::NotDivides:     sym = "∤"; break;
                 case TokenKind::NotLessOrEqual: sym = "≰"; break;
                 case TokenKind::ElementOf:      sym = "∈"; break;
+                case TokenKind::NotElementOf:   sym = "∉"; break;
                 case TokenKind::SubsetOf:       sym = "⊆"; break;
+                case TokenKind::NotSubsetOf:    sym = "⊈"; break;
                 default: break;
             }
             if (reversed) std::swap(left, right);
