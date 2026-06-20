@@ -26,6 +26,13 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 - **No abbreviations in declared identifiers.** `representative`, not
   `rep`; long qualified names are searchable. Local-variable abbreviations
   are fine.
+- **A comment is an admission of defeat.** The proof should carry the
+  reasoning itself: a comment explaining *what* a step does is a signal the
+  step wasn't saying enough — push it into the code (`since <named-lemma>`, a
+  named `claim`, a `calc` form) and delete the comment. A one-line *why*
+  comment (a non-obvious strategy) may still earn its place, for now; kernel
+  mechanics stay quarantined as `-- Implementation note:` in the foundational
+  files only. Full rule + the what/why split: `docs/conventions/proof-style.md`.
 - **`ring` / `field` first.** For any commutative-ring identity, the
   default is `:= ring` (or `field(h1, ...)` when reciprocals are
   involved). Reach for hand-written `congruenceOf`/associativity only

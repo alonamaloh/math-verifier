@@ -193,24 +193,43 @@ Concretely:
   `transport_proposition` calls.
 
 - **Length is fine if it's pedagogical.** Don't golf. A 40-line
-  proof that explains each step in mathematical language is better
+  proof that explains each step in *named mathematical steps* is better
   than a 10-line proof that requires unwinding three nested
-  `Quotient.lift` calls in your head to follow. Inline comments
-  describing the strategy ("`|x| = |(a−b)+b| ≤ |a−b| + |b|` then
-  subtract `|b|`") earn their keep.
+  `Quotient.lift` calls in your head to follow. But the explanation
+  belongs in the proof code — a `calc` chain, named `claim`s, `since`
+  citations — not in a comment narrating what the code should already say
+  (see the comment maxim below).
 
 - **`calc` is encouraged.** It mirrors how a mathematician writes
   an equation chain. Use it whenever you can name each intermediate
   form. Even a two-step calc is usually clearer than the equivalent
   `Equality.transitivity(...)`.
 
-- **Quarantine implementation comments.** Lead each comment block with
-  the math. Pull kernel/elaborator mechanics — `WHNF`, the
-  `Quotient.lift` reduction rule, why an `unfold` is needed — into a
-  marked `-- Implementation note:` aside, so the mathematical narration
-  reads unbroken. And re-read comments after restructuring a proof: a
-  comment that still says "by `ring`" or "`inverse_right`" when the proof
-  now does neither is worse than no comment.
+- **A comment is an admission of defeat — make the *proof* carry the
+  reasoning.** The aspiration (borrowed from good C++ practice) is that the
+  proof reads like the mathematics on its own; a comment is a signal that a
+  step wasn't saying enough. Triage every comment:
+  - **A "what" comment is defeat.** `-- b divides 0 (every n divides 0)` over a
+    bare `claim b ∣ 0;` puts the *reason* in prose, not code. Push it into the
+    proof — `claim b ∣ 0 since Natural.divides_zero;` — and delete the comment.
+    The lever is almost always a `since <named-lemma>`, a named `claim`, a
+    `calc` form, or `take`/`suppose`. (A claim stays bare only when a
+    *tactic/computation* closes it — `ring`, defeq, the equality battery —
+    where there is no lemma to name; see "don't justify routine computation".)
+  - **A "why" comment may earn its place — for now, be lenient.** A genuinely
+    non-derivable strategic choice ("recurse on the derivation, not the list";
+    "scale both differences by `c` so the equality becomes one of classes") is
+    the proof analog of a C++ comment explaining *why*, not *what*. Keep it to
+    one line. As the surface language grows to express such intent directly,
+    we tighten toward deleting these too.
+  - **Kernel/elaborator mechanics are quarantined**, never mixed with the
+    math: a marked `-- Implementation note:` aside, and only in the
+    foundational plumbing files (`Logic/quotient`, `Equality/basics`, the
+    Integer construction) — the analog of C++ that must comment a hardware
+    erratum. The math-facing files aim for none.
+  Re-read comments after restructuring a proof: a comment that still says "by
+  `ring`" or "`inverse_right`" when the proof now does neither is worse than no
+  comment.
 
 - **Sequence-of-claims style is encouraged.** When a proof has
   several distinct subgoals, write them as a sequence of `claim
