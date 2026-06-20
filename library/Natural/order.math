@@ -112,17 +112,17 @@ theorem Natural.LessThan.weaken (a b : Natural) (h : a < b) : a ≤ b := {
 -- a ≤ b and b < c give a < c.
 theorem Natural.LessThan.transitive_left (a b c : Natural)
         (aLessOrEqualB : a ≤ b) (bLessThanC : b < c) : a < c :=
-  cases aLessOrEqualB {
-    | Or.introduceLeft(aLessThanB) => done since Natural.lt_transitive
-    | Or.introduceRight(aEqualB)   => done by substituting aEqualB
+  claim by cases {
+    in (a < b): done since Natural.lt_transitive
+    in (a = b): done by substitution
   }
 
 -- a < b and b ≤ c give a < c.
 theorem Natural.LessThan.transitive_right (a b c : Natural)
         (aLessThanB : a < b) (bLessOrEqualC : b ≤ c) : a < c :=
-  cases bLessOrEqualC {
-    | Or.introduceLeft(bLessThanC) => done since Natural.lt_transitive
-    | Or.introduceRight(bEqualC)   => done by substituting bEqualC
+  claim by cases {
+    in (b < c): done since Natural.lt_transitive
+    in (b = c): done by substitution
   }
 
 -- ── The `calc` interface for `≤` ──────────────────────────────────────
@@ -134,12 +134,12 @@ theorem Natural.LessOrEqual.reflexive (a : Natural) : a ≤ a := {
 
 theorem Natural.LessOrEqual.transitive (a b c : Natural)
         (aLessOrEqualB : a ≤ b) (bLessOrEqualC : b ≤ c) : a ≤ c :=
-  cases bLessOrEqualC {
-    | Or.introduceLeft(bLessThanC) => {
+  claim by cases {
+    in (b < c): {
         claim a < c since Natural.LessThan.transitive_left;
         done
       }
-    | Or.introduceRight(bEqualC) => done by substituting bEqualC
+    in (b = c): done by substitution
   }
 
 -- ── Order facts, now as `calc` chains ─────────────────────────────────
@@ -179,6 +179,48 @@ theorem Natural.zero_least (upperBound : Natural) : 0 ≤ upperBound :=
      ≤ 0 + upperBound   since Natural.less_or_equal_add_right
      = upperBound
 
+theorem Natural.lt_trichotomy_successor_step (predecessor b : Natural)
+        (predecessorComparison : predecessor < b ∨ predecessor = b ∨ b < predecessor)
+        : 1 + predecessor < b ∨ 1 + predecessor = b ∨ b < 1 + predecessor :=
+  claim by cases {
+    in (predecessor < b): {
+        choose gap such that predecessor + (1 + gap) = b as equation from Natural.lt_elim;
+        cases gap refining equation {
+          | zero => {
+              -- the gap was exactly one: 1 + predecessor = b.
+              calc 1 + predecessor
+                 = predecessor + (1 + 0)
+                 = b                        since equation;
+              done
+            }
+          | successor(gapPredecessor) => {
+              -- the gap exceeds one: 1 + predecessor < b.
+              calc (1 + predecessor) + (1 + gapPredecessor)
+                 = predecessor + (1 + successor(gapPredecessor))
+                 = b                                                since equation;
+              claim 1 + predecessor < b since Natural.lt_intro;
+              done
+            }
+        }
+      }
+    in (predecessor = b ∨ b < predecessor): {
+        claim by cases {
+          in (predecessor = b): {
+              calc b
+                 = predecessor          by (predecessor = b)
+                 < 1 + predecessor      since Natural.lt_one_plus;
+              done
+            }
+          in (b < predecessor): {
+              calc b
+                 < predecessor
+                 < 1 + predecessor      since Natural.lt_one_plus;
+              done
+            }
+        }
+      }
+  }
+
 -- Trichotomy: the strict-order elimination principle (any two naturals
 -- compare as `<`, `=`, or `>`). Induction on a, b universal.
 theorem Natural.lt_trichotomy (a : Natural)
@@ -195,51 +237,16 @@ theorem Natural.lt_trichotomy (a : Natural)
                ≤ predecessor              since Natural.zero_least
                < successor(predecessor)   since Natural.lt_successor
       }
-    case step(predecessor): (b : Natural) ↦
-      cases IH(b) {
-        | Or.introduceLeft(predecessorLessThanB) => {
-            choose gap such that predecessor + (1 + gap) = b as equation from Natural.lt_elim;
-            cases gap refining equation {
-              | zero => {
-                  -- the gap was exactly one: 1 + predecessor = b.
-                  calc 1 + predecessor
-                     = predecessor + (1 + 0)
-                     = b                        since equation;
-                  done
-                }
-              | successor(gapPredecessor) => {
-                  -- the gap exceeds one: 1 + predecessor < b.
-                  calc (1 + predecessor) + (1 + gapPredecessor)
-                     = predecessor + (1 + successor(gapPredecessor))
-                     = b                                                since equation;
-                  claim 1 + predecessor < b since Natural.lt_intro;
-                  done
-                }
-            }
-          }
-        | Or.introduceRight(predecessorEqualOrAbove) =>
-            cases predecessorEqualOrAbove {
-              | Or.introduceLeft(predecessorEqualB) => {
-                  calc b
-                     = predecessor          by (predecessor = b)
-                     < 1 + predecessor      since Natural.lt_one_plus;
-                  done
-                }
-              | Or.introduceRight(bLessThanPredecessor) => {
-                  calc b
-                     < predecessor          since bLessThanPredecessor
-                     < 1 + predecessor      since Natural.lt_one_plus;
-                  done
-                }
-            }
-      }
+    case step(predecessor): (b : Natural) ↦ {
+      Natural.lt_trichotomy_successor_step(predecessor, b, IH(b))
+    }
   }
 
 -- Successor preserves ≤.
 theorem Natural.successor_less_or_equal_successor (a b : Natural)
         (proof : a ≤ b) : successor(a) ≤ successor(b) :=
-  cases proof {
-    | Or.introduceLeft(aLessThanB) => {
+  claim by cases {
+    in (a < b): {
         choose gap such that a + (1 + gap) = b as equation from Natural.lt_elim;
         calc successor(a) + (1 + gap)
            = successor(a + (1 + gap))
@@ -247,10 +254,7 @@ theorem Natural.successor_less_or_equal_successor (a b : Natural)
         claim successor(a) < successor(b) since Natural.lt_intro;
         done
       }
-    | Or.introduceRight(aEqualB) => {
-        calc successor(a) = successor(b)   since aEqualB;
-        done
-      }
+    in (a = b): done by substitution
   }
 
 -- 1 ≤ successor(k): `successor` monotonicity applied at 0 (`1` is `successor(0)`).

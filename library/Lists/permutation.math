@@ -130,11 +130,11 @@ theorem List.Permutation.member_forward (A : Type(0)) (element : A)
       (mem : List.member(A, element, List.empty(A))) ↦ mem
   | List.Permutation.skip(x, a, b, perm) =>
       (mem : List.member(A, element, List.prepend(A, x, a))) ↦
-        cases by List.member_prepend_invert {
-          | Or.introduceLeft(elementEqualsX) =>
+        claim by cases {
+          in (element = x):
               -- element = x: it is the (shared) head of prepend(x, b).
-              done by substituting elementEqualsX
-          | Or.introduceRight(memberInA) =>
+              done by substitution
+          in (List.member(A, element, a)) as memberInA:
               -- element lies in a; transport it into b, behind the head x.
               List.member.there(A, element, x, b,
                   List.Permutation.member_forward(A, element, a, b, perm, memberInA))
@@ -142,23 +142,23 @@ theorem List.Permutation.member_forward (A : Type(0)) (element : A)
   | List.Permutation.swap(x, y, l) =>
       (mem : List.member(A, element,
                  List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
-        claim outerSplit : element = x ∨ List.member(A, element, List.prepend(A, y, l))
+        claim element = x ∨ List.member(A, element, List.prepend(A, y, l))
             since List.member_prepend_invert;
-        cases outerSplit {
-          | Or.introduceLeft(elementEqualsX) => {
+        claim by cases {
+          in (element = x): {
               -- element = x: in prepend(y, prepend(x, l)) it sits one level deep.
               claim List.member(A, x, List.prepend(A, y, List.prepend(A, x, l)))
                   by List.member.there;
-              done by substituting elementEqualsX
+              done by substitution
             }
-          | Or.introduceRight(memberInYL) => {
-              claim innerSplit : element = y ∨ List.member(A, element, l)
+          in (List.member(A, element, List.prepend(A, y, l))): {
+              claim element = y ∨ List.member(A, element, l)
                   since List.member_prepend_invert;
-              cases innerSplit {
-                | Or.introduceLeft(elementEqualsY) =>
+              claim by cases {
+                in (element = y):
                     -- element = y: the head of prepend(y, prepend(x, l)).
-                    done by substituting elementEqualsY
-                | Or.introduceRight(memberInL) =>
+                    done by substitution
+                in (List.member(A, element, l)) as memberInL:
                     List.member.there(A, element, y, List.prepend(A, x, l),
                         List.member.there(A, element, x, l, memberInL))
               }
