@@ -27,9 +27,8 @@ definition Integer.negate_representatives
   | IntegerRepresentative.make(a, b) =>
       IntegerRepresentative.make(b, a)
 
--- Respect: if `(a, b) ~ (a', b')` then `(b, a) ~ (b', a')`. Both
--- equivalence statements unfold to the same Natural-level equation
--- modulo `Equality.symmetry`.
+-- Respect: if `(a, b) ~ (a', b')` then `(b, a) ~ (b', a')`. Swapping the
+-- components just swaps the two sides of the cross-addition equation.
 theorem Integer.negate_respects
         : ∀ (rep1 rep2 : IntegerRepresentative).
           IntegerEquivalent(rep1, rep2)
@@ -39,7 +38,7 @@ theorem Integer.negate_respects
   | IntegerRepresentative.make(a, b),
     IntegerRepresentative.make(aPrime, bPrime),
     eq =>
-      done since Equality.symmetry
+      done since eq
 
 -- ----------------------------------------------------------------------
 -- Negation on Integer: negate the representative; well-defined because
@@ -56,21 +55,14 @@ definition Integer.subtract (x y : Integer) : Integer :=
 -- ----------------------------------------------------------------------
 -- Inverse identities: x + (−x) = 0 and (−x) + x = 0.
 
--- Natural-level kernel: at rep (a, b) the LHS reduces to mk(make(b + a,
--- a + b)) and Integer.zero is mk(make(zero, zero)). Equivalence
--- requires (b + a) + zero = (a + b) + zero, which reduces to b + a =
--- a + b via add_zero on both sides.
-theorem Integer.add_negate_left_natural (a b : Natural)
-        : (b + a) + 0 = (a + b) + 0 :=
-  calc (b + a) + 0
-     = b + a
-     = a + b
-     = (a + b) + 0
-
+-- At rep (a, b), -x + x is mk(make(b + a, a + b)) and Integer.zero is
+-- mk(make(0, 0)); the cross-equation is just commutativity of the sum.
 theorem Integer.add_negate_left (x : Integer)
         : -x + x = Integer.zero :=
-  by_representatives x as ⟨a, b⟩ =>
-      Integer.add_negate_left_natural(a, b)
+  by_representatives x as ⟨a, b⟩ => {
+    claim (b + a) + 0 = (a + b) + 0;
+    done
+  }
 
 -- Right inverse: derived via commutativity.
 theorem Integer.add_negate_right (x : Integer)
