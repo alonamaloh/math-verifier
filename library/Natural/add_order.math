@@ -38,8 +38,8 @@ theorem Natural.add_left_monotone (a x y : Natural)
     case successor(predecessorA): {
         -- successor(predecessorA) + z ≡ successor(predecessorA + z); apply
         -- successor monotonicity to the IH.
-        claim predecessorA + x ≤ predecessorA + y by IH;
-        done by Natural.successor_less_or_equal_successor
+        claim predecessorA + x ≤ predecessorA + y since IH;
+        done since Natural.successor_less_or_equal_successor
       }
   }
 
@@ -64,7 +64,7 @@ theorem Natural.add_left_le_cancel (a : Natural)
             as lessOrEqual;
         -- peel a successor off each side, then recurse via the IH.
         claim peeled : predecessorA + x ≤ predecessorA + y
-            by Natural.less_or_equal_successor_successor_descend;
+            since Natural.less_or_equal_successor_successor_descend;
         done since IH(x, y, peeled)
       }
   }
@@ -84,7 +84,7 @@ theorem Natural.not_successor_less_or_equal_self (n : Natural)
     case successor(predecessor): {
         -- peel a successor off each side, then the IH.
         claim peeled : successor(predecessor) ≤ predecessor
-            by Natural.less_or_equal_successor_successor_descend;
+            since Natural.less_or_equal_successor_successor_descend;
         IH(peeled)
       }
   }
@@ -102,7 +102,7 @@ theorem Natural.not_equal_successor_add (x c : Natural)
     case successor(k): {
         suppose successor(k) = successor(successor(k) + c) as equation;
         -- strip the successor: k = successor(k + c), contradicting the IH.
-        claim k = successor(k + c) by Natural.successor_injective;
+        claim k = successor(k + c) since Natural.successor_injective;
         done since IH
       }
   }
@@ -113,20 +113,19 @@ theorem Natural.not_equal_successor_add (x c : Natural)
 theorem Natural.successor_le_cancel (a b : Natural)
         (successorsOrdered : successor(a) ≤ successor(b))
         : a ≤ b := {
-  obtain ⟨c, successorEquation⟩ by Natural.subtraction_witness;
-  -- successorEquation : successor(b) = successor(a) + c ≡ successor(a + c).
-  claim bEquation : b = a + c by Natural.successor_injective;
+  choose c such that successor(b) = successor(a) + c from Natural.subtraction_witness;
+  claim bEquation : b = a + c since Natural.successor_injective;
   calc a
      ≤ a + c   by Natural.less_or_equal_add_right
-     = b       by bEquation
+     = b       since bEquation
 }
 
 theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
         (lessOrEqual : j ≤ successor(m))
         (notEqual : ¬(j = successor(m)))
         : j ≤ m := {
-  obtain ⟨c, equation⟩ by Natural.subtraction_witness;
-  cases c refining equation {
+  choose c such that successor(m) = j + c as cEquation from Natural.subtraction_witness;
+  cases c refining cEquation {
     | zero => {
         -- c = 0: successor(m) = j + 0 = j, so j = successor(m), absurd.
         calc j
@@ -137,8 +136,7 @@ theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
       }
     | successor(cPredecessor) => {
         claim mEquation : m = j + cPredecessor
-            by Natural.successor_injective;
-        -- substitute m = j + cPredecessor: j ≤ m becomes j ≤ j + cPredecessor.
+            since Natural.successor_injective;
         claim j ≤ m by substituting mEquation
       }
   }
@@ -161,17 +159,19 @@ theorem Natural.less_or_equal_add_left (a b : Natural) : a ≤ b + a :=
 theorem Natural.less_or_equal_not_equal_successor (a i : Natural)
         (lessOrEqual : a ≤ i) (notEqual : ¬(i = a))
         : successor(a) ≤ i := {
-  obtain ⟨c, equation⟩ by Natural.subtraction_witness;
-  cases c refining equation {
-    | zero =>
-        absurd(notEqual(calc i = a + 0 = a))
+  choose c such that i = a + c as cEquation from Natural.subtraction_witness;
+  cases c refining cEquation {
+    | zero => {
+        calc i = a + 0 = a as iEqualsA;
+        absurd(notEqual(iEqualsA))
+      }
     | successor(cPredecessor) => {
         -- i = a + successor(cPredecessor) = successor(a + cPredecessor),
         -- and successor(a) ≤ successor(a + cPredecessor) by monotonicity.
         claim a ≤ a + cPredecessor
-            by Natural.less_or_equal_add_right;
+            since Natural.less_or_equal_add_right;
         claim successor(a) ≤ successor(a + cPredecessor)
-            by Natural.successor_less_or_equal_successor;
+            since Natural.successor_less_or_equal_successor;
         calc i
            = a + successor(cPredecessor)
            = successor(a + cPredecessor)
@@ -184,7 +184,7 @@ theorem Natural.less_or_equal_not_equal_successor (a i : Natural)
 -- a ≤ c gives a + b ≤ c + b, and b ≤ d gives a + b ≤ a + d.
 theorem Natural.le_add_preserves_left (a c b : Natural) (aLeC : a ≤ c)
         : a + b ≤ c + b := {
-  obtain ⟨r, cEqAplusR⟩ by Natural.subtraction_witness;
+  choose r such that c = a + r from Natural.subtraction_witness;
   calc a + b
      ≤ (a + b) + r
      = (a + r) + b
@@ -209,20 +209,17 @@ theorem Natural.add_eq_zero_implies_left_zero (c d : Natural)
 -- forces c + d = 0, hence c = 0, and then b = a + c = a.
 theorem Natural.le_antisymmetric (a b : Natural) (aLeB : a ≤ b) (bLeA : b ≤ a)
         : a = b := {
-  -- Two ≤ hypotheses are in scope, so obtain-by is ambiguous; the typed
-  -- claim pins which witness each existential comes from (its premise
-  -- `a ≤ b` / `b ≤ a` then matches uniquely).
-  claim bWitness : ∃ (c : Natural). b = a + c by Natural.subtraction_witness;
-  obtain ⟨c, bEquation⟩ from bWitness;
-  claim aWitness : ∃ (d : Natural). a = b + d by Natural.subtraction_witness;
-  obtain ⟨d, aEquation⟩ from aWitness;
+  -- The `such that` body pins which ≤ witness each existential comes from
+  -- (both `a ≤ b` and `b ≤ a` are in scope).
+  choose c such that b = a + c from Natural.subtraction_witness;
+  choose d such that a = b + d from Natural.subtraction_witness;
   -- a + (c + d) = a + 0, so cancelling a forces c + d = 0.
   calc a + (c + d)
      = (a + c) + d
      = b + d
      = a
      = a + 0;
-  claim c + d = 0 by Natural.add_cancel_left;
+  claim c + d = 0 since Natural.add_cancel_left;
   calc a
      = a + 0
      = a + c
@@ -235,20 +232,21 @@ theorem Natural.le_antisymmetric (a b : Natural) (aLeB : a ≤ b) (bLeA : b ≤ 
 theorem Natural.le_to_add (smaller larger : Natural)
         (proof : smaller ≤ larger)
         : ∃ (k : Natural). larger = k + smaller :=
-  cases proof {
-    | Or.introduceLeft(lessThan) => {
-        obtain ⟨c, equation⟩ by Natural.lt_elim;
+  claim by cases {
+    in (smaller < larger) as lessThan: {
+        choose c such that smaller + (1 + c) = larger from Natural.lt_elim;
         -- larger = smaller + (1 + c) = (1 + c) + smaller.
         witness (1 + c) with
-            (calc larger
-                = smaller + (1 + c)   by equation
-                = (1 + c) + smaller   by Natural.add_commutative(smaller, 1 + c))
+            calc larger
+               = smaller + (1 + c)
+               = (1 + c) + smaller
       }
-    | Or.introduceRight(equal) =>
+    in (smaller = larger) as equal: {
         witness 0 with
-            (calc larger
-                = smaller       by equal
-                = 0 + smaller   by Natural.zero_add(smaller))
+            calc larger
+               = smaller
+               = 0 + smaller
+      }
   }
 
 
@@ -262,7 +260,7 @@ theorem Natural.monus_successor_shift (n : Natural)
   by_induction on n with IH {
     case zero:
         (j : Natural) (inRange : successor(j) ≤ 0) ↦
-          absurd(Natural.not_less_or_equal_successor_zero(j, inRange))
+          absurd(inRange)
     case successor(nPredecessor):
         (j : Natural) (inRange : successor(j) ≤ successor(nPredecessor)) ↦
           cases j refining inRange {
@@ -293,35 +291,36 @@ theorem Natural.monus_successor_shift (n : Natural)
 
 -- Peeling a successor off the minuend, below the diagonal:
 -- (a + 1) − b = (a − b) + 1 when b ≤ a.
-theorem Natural.monus_succ_left
-        : ∀ (b a : Natural). b ≤ a
-          → Natural.monus(successor(a), b) = successor(Natural.monus(a, b))
-  | zero =>
-      (a : Natural) (bound : 0 ≤ a) ↦
+theorem Natural.monus_succ_left (b : Natural)
+        : ∀ (a : Natural). b ≤ a
+          → Natural.monus(successor(a), b) = successor(Natural.monus(a, b)) :=
+  by_induction on b with IH {
+    case zero: {
+        take a : Natural;
+        suppose 0 ≤ a as bound;
         calc Natural.monus(successor(a), 0)
-           = successor(a)
-                 by Natural.monus_zero(successor(a))
-           = successor(Natural.monus(a, 0))
-                 by Natural.monus_zero(a)
-  | successor(bPredecessor) =>
-      (a : Natural) (bound : successor(bPredecessor) ≤ a) ↦
+           = successor(a)                   since Natural.monus_zero
+           = successor(Natural.monus(a, 0)) since Natural.monus_zero
+      }
+    case successor(bPredecessor): {
+        take a : Natural;
+        suppose successor(bPredecessor) ≤ a as bound;
         cases a refining bound {
           | zero =>
-              absurd(Natural.not_less_or_equal_successor_zero(
-                         bPredecessor, bound))
+              absurd(bound)
           | successor(aPredecessor) => {
-              claim bPredecessor ≤ aPredecessor
+              claim innerBound : bPredecessor ≤ aPredecessor
                   since Natural.successor_le_cancel;
               calc Natural.monus(successor(successor(aPredecessor)),
                        successor(bPredecessor))
                  = Natural.monus(successor(aPredecessor), bPredecessor)
-                       by Natural.monus_succ_succ(
-                              successor(aPredecessor), bPredecessor)
+                       since Natural.monus_succ_succ
                  = successor(Natural.monus(aPredecessor, bPredecessor))
-                       by Natural.monus_succ_left(bPredecessor, aPredecessor,
-                              (bPredecessor ≤ aPredecessor))
+                       by IH(aPredecessor, innerBound)
                  = successor(Natural.monus(successor(aPredecessor),
                        successor(bPredecessor)))
-                       by Natural.monus_succ_succ(aPredecessor, bPredecessor)
+                       since Natural.monus_succ_succ
             }
         }
+      }
+  }
