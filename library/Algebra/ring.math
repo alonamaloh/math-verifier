@@ -49,17 +49,12 @@ definition IsCommutativeRing
 --
 -- `IsRing` bundles four facts (the additive abelian group, the
 -- multiplicative monoid, and the two distributivity laws) as a nested
--- conjunction. Reaching one axiom from a ring proof means destructuring
--- that nest — `let ⟨⟨⟨_, idLeft, _⟩, …⟩, …⟩ := ringProof` — noise that
--- every ring lemma would otherwise repeat. These accessors do the
--- destructuring ONCE; a ring lemma cites the axiom by name
--- (`by IsRing.distributivity_right(…)`), with the implicit `ringProof`
--- recovered from context. The bundle below is the standing ring signature.
---
--- The distributivity and identity accessors cite cleanly. The inverse axioms
--- (`add(negate(x), x) = zero`) have the bare constant `zero` on the right,
--- which a citation in a congruence/reversed calc step mis-binds — so their
--- accessors below destructure the additive group directly instead.
+-- conjunction. Each accessor re-exposes one axiom (or the additive group) as
+-- a named theorem; with `ringProof` a pervasive convention, the auto-prover
+-- projects the conjunct it needs from context, so the proof is a bare `done`
+-- and a ring lemma cites the axiom by name (`since IsRing.distributivity_right`)
+-- rather than walking the nest by hand. The bundle below is the standing ring
+-- signature.
 convention carrier : Type(0)
 convention (+) : carrier → carrier → carrier
 convention zero : carrier
@@ -70,11 +65,8 @@ convention ringProof : IsRing(carrier, (+), zero, (-), (·), one)
 
 -- The ring's additive group `(carrier, +, zero, -)`, viewed as a group —
 -- what the generic `Group.*` lemmas take as their `groupProof`.
-theorem IsRing.additive_group : IsGroup(carrier, (+), zero, (-)) := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    done since additiveGroup
-}
+theorem IsRing.additive_group : IsGroup(carrier, (+), zero, (-)) :=
+  done
 
 -- Register the additive group as a forgetful (derived) instance: wherever a
 -- `Group.*` lemma needs `IsGroup(carrier, +, zero, -)` and a `ringProof` is in
@@ -82,44 +74,22 @@ theorem IsRing.additive_group : IsGroup(carrier, (+), zero, (-)) := {
 -- explicit `claim IsGroup(…) since IsRing.additive_group` at the use site.
 instance IsRing.additive_group
 
-theorem IsRing.add_identity_left (x : carrier) : zero + x = x := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    let ⟨additiveMonoid, _, _⟩ := additiveGroup;
-    let ⟨_, identityLeft, _⟩ := additiveMonoid;
-    done since identityLeft
-}
+theorem IsRing.add_identity_left (x : carrier) : zero + x = x :=
+  done
 
-theorem IsRing.add_identity_right (x : carrier) : x + zero = x := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    let ⟨additiveMonoid, _, _⟩ := additiveGroup;
-    let ⟨_, _, identityRight⟩ := additiveMonoid;
-    done since identityRight
-}
+theorem IsRing.add_identity_right (x : carrier) : x + zero = x :=
+  done
 
-theorem IsRing.add_inverse_left (x : carrier) : (-x) + x = zero := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    let ⟨_, inverseLeft, _⟩ := additiveGroup;
-    done since inverseLeft
-}
+theorem IsRing.add_inverse_left (x : carrier) : (-x) + x = zero :=
+  done
 
-theorem IsRing.add_inverse_right (x : carrier) : x + (-x) = zero := {
-    let ⟨additiveAbelianGroup, _, _, _⟩ := ringProof;
-    let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-    let ⟨_, _, inverseRight⟩ := additiveGroup;
-    done since inverseRight
-}
+theorem IsRing.add_inverse_right (x : carrier) : x + (-x) = zero :=
+  done
 
 theorem IsRing.distributivity_left (x y z : carrier)
-        : x · (y + z) = x · y + x · z := {
-    let ⟨_, _, distributivityLeft, _⟩ := ringProof;
-    done since distributivityLeft
-}
+        : x · (y + z) = x · y + x · z :=
+  done
 
 theorem IsRing.distributivity_right (x y z : carrier)
-        : (x + y) · z = x · z + y · z := {
-    let ⟨_, _, _, distributivityRight⟩ := ringProof;
-    done since distributivityRight
-}
+        : (x + y) · z = x · z + y · z :=
+  done
