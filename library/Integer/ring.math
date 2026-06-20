@@ -6,13 +6,12 @@
 -- semiring (the additional negation in Integer/negation.math makes it a
 -- commutative ring).
 --
--- Each lemma factors through a representative-level kernel theorem
--- (the algebraic identity on `IntegerRepresentative`'s components, in
--- Natural) plus one or more `Quotient.induct` calls that walk every
--- Integer argument down to its `mk(make(_, _))` form. At the leaf the
--- equivalence is closed by `Quotient.equivalent_implies_equal`; symmetric companions
--- (e.g. add_identity_right, distributivity_right) are derived from
--- their primal partner plus commutativity.
+-- Each law drops to representatives, where both sides reduce to concrete
+-- difference pairs; the equivalence of those pairs is a cross-addition
+-- equation between Natural polynomials — a pure ring identity, stated as
+-- a claim and closed by `done`. The symmetric companions
+-- (add_identity_right, distributivity_right, …) are derived from their
+-- primal partner plus commutativity.
 
 module Integer.ring
 
@@ -27,80 +26,33 @@ import Integer.basics
 import Integer.addition
 import Integer.multiplication
 
--- ----------------------------------------------------------------------
--- A small helper: two representatives with componentwise equal
--- components are equivalent. Used at every leaf where the natural-
--- level kernel proves the two components separately rather than the
--- raw `x1 + y2 = x2 + y1` form.
-theorem IntegerEquivalent.from_components_equal
-        (a b c d : Natural)
-        (firstComponentEquality : a = c)
-        (secondComponentEquality : b = d)
-        : IntegerEquivalent(IntegerRepresentative.make(a, b),
-                            IntegerRepresentative.make(c, d)) :=
-  -- The cross-equation `a + d = b + c` IS the equivalence (transparent):
-  -- two local-hypothesis steps plus commutativity.
-  calc a + d
-     = a + b
-     = b + a
-     = b + c
-
 -- ======================================================================
 -- Addition
 -- ======================================================================
 
--- ----------------------------------------------------------------------
--- Integer.add_commutative
-
--- Natural-level kernel: (a+c, b+d) ~ (c+a, d+b) reduces to
--- (a+c) + (d+b) = (b+d) + (c+a), which just shuffles via commutativity.
-theorem Integer.add_commutative_natural (a b c d : Natural)
-        : (a + c) + (d + b) = (b + d) + (c + a) := ring
-
--- Take representatives x = [(a, b)] and y = [(c, d)]; both sides of
--- x + y = y + x β-reduce on Quotient.lift to mk(make(a+c, b+d)) and
--- mk(make(c+a, d+b)); the Natural-level kernel closes the equivalence.
+-- At reps (a, b), (c, d) both sides reduce to mk(make(a + c, b + d)) and
+-- mk(make(c + a, d + b)); the cross-equation shuffles via commutativity.
 theorem Integer.add_commutative (x y : Integer)
         : x + y = y + x :=
-  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩ =>
-      Integer.add_commutative_natural(a, b, c, d)
+  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩ => {
+    claim (a + c) + (d + b) = (b + d) + (c + a);
+    done
+  }
 
--- ----------------------------------------------------------------------
--- Integer.add_associative
-
--- Natural-level kernel for associativity. After reduction LHS rep has
--- first component (a+c)+e, second (b+d)+f; RHS rep has first a+(c+e),
--- second b+(d+f). The equivalence is
---   ((a+c)+e) + (b + (d+f)) = ((b+d)+f) + (a + (c+e)).
--- Reassociate both sides into the (a + (c+e)) + ((b+d)+f) shape, then
--- swap the outer order via commutativity.
-theorem Integer.add_associative_natural (a b c d e f : Natural)
-        : ((a + c) + e) + (b + (d + f)) = ((b + d) + f) + (a + (c + e)) :=
-  ring
-
--- Take representatives x = [(a, b)], y = [(c, d)], z = [(e, f)]; both
--- sides reduce on Quotient.lift to mk(make(((a+c)+e), ((b+d)+f))) and
--- mk(make((a+(c+e)), (b+(d+f)))). The Natural-level kernel closes the
--- equivalence.
 theorem Integer.add_associative (x y z : Integer)
         : x + y + z = x + (y + z) :=
-  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩, z as ⟨e, f⟩ =>
-      Integer.add_associative_natural(a, b, c, d, e, f)
+  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩, z as ⟨e, f⟩ => {
+    claim ((a + c) + e) + (b + (d + f)) = ((b + d) + f) + (a + (c + e));
+    done
+  }
 
--- ----------------------------------------------------------------------
--- Integer.add_identity_left
-
--- Take a representative x = [(a, b)]. Integer.add(zero, mk(make(a, b)))
--- reduces definitionally to mk(make(zero + a, zero + b)) = mk(make(a,
--- b)) — the `zero + _` reductions fire because add recurses on the
--- first argument. So the leaf is `reflexivity`.
+-- add(zero, mk(make(a, b))) reduces definitionally to mk(make(0 + a,
+-- 0 + b)); `zero_add` collapses both components to the identity.
 theorem Integer.add_identity_left (x : Integer)
         : Integer.zero + x = x :=
   by_representatives x as ⟨a, b⟩ =>
       done by substituting Natural.zero_add
 
--- ----------------------------------------------------------------------
--- Integer.add_identity_right — derived via commutativity + identity_left.
 theorem Integer.add_identity_right (x : Integer)
         : x + Integer.zero = x :=
   calc x + Integer.zero
@@ -111,58 +63,25 @@ theorem Integer.add_identity_right (x : Integer)
 -- Multiplication
 -- ======================================================================
 
--- ----------------------------------------------------------------------
--- Integer.multiply_commutative
-
--- Natural-level kernel: at the leaf both reps have multiplied
--- components, and we need
---   (a*c + b*d) + (c*b + d*a) = (a*d + b*c) + (c*a + d*b).
--- Each term reshuffles to the form on the other side via
--- multiply_commutative; the outer pair-arrangement uses add_commutative.
-theorem Integer.multiply_commutative_natural (a b c d : Natural)
-        : (a * c + b * d) + (c * b + d * a)
-          = (a * d + b * c) + (c * a + d * b) :=
-  -- Each step is a single-position commutativity swap — auto-prover.
-  calc (a * c + b * d) + (c * b + d * a)
-     = (a * c + b * d) + (b * c + a * d)
-     = (a * d + b * c) + (a * c + b * d)
-     = (a * d + b * c) + (c * a + d * b)
-
--- Take representatives x = [(a, b)] and y = [(c, d)]; both sides reduce
--- to mk(make(a*c + b*d, a*d + b*c)) and mk(make(c*a + d*b, c*b + d*a)).
+-- At reps (a, b), (c, d) both sides reduce to mk(make(a*c + b*d,
+-- a*d + b*c)) and mk(make(c*a + d*b, c*b + d*a)); each term reshuffles
+-- via commutativity.
 theorem Integer.multiply_commutative (x y : Integer)
         : x * y = y * x :=
-  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩ =>
-      Integer.multiply_commutative_natural(a, b, c, d)
+  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩ => {
+    claim (a * c + b * d) + (c * b + d * a) = (a * d + b * c) + (c * a + d * b);
+    done
+  }
 
--- ----------------------------------------------------------------------
--- Integer.multiply_identity_left
-
--- Natural-level: prove componentwise that
---   1 * a + zero * b = a   and   1 * b + zero * a = b
--- After both reductions the first is `(a + zero) + zero` and the second
--- is `(b + zero) + zero`. We use one_multiply + zero_multiply +
--- add_zero to close each.
-theorem Integer.multiply_identity_left_first_component (a b : Natural)
-        : 1 * a + 0 * b = a :=
-  calc 1 * a + 0 * b
-     = a + 0 * b
-     = a
-
-theorem Integer.multiply_identity_left_second_component (a b : Natural)
-        : 1 * b + 0 * a = b :=
-  calc 1 * b + 0 * a
-     = b
-
+-- one * mk(make(a, b)) reduces to mk(make(1*a + 0*b, 1*b + 0*a)); the
+-- cross-equation simplifies to a + b = b + a.
 theorem Integer.multiply_identity_left (x : Integer)
         : Integer.one * x = x :=
-  by_representatives x as ⟨a, b⟩ =>
-      IntegerEquivalent.from_components_equal(?, ?, ?, ?,
-          Integer.multiply_identity_left_first_component(a, b),
-          Integer.multiply_identity_left_second_component(a, b))
+  by_representatives x as ⟨a, b⟩ => {
+    claim (1 * a + 0 * b) + b = (1 * b + 0 * a) + a;
+    done
+  }
 
--- ----------------------------------------------------------------------
--- Integer.multiply_identity_right — derived via commutativity.
 theorem Integer.multiply_identity_right (x : Integer)
         : x * Integer.one = x :=
   calc x * Integer.one
@@ -173,41 +92,16 @@ theorem Integer.multiply_identity_right (x : Integer)
 -- Distributivity
 -- ======================================================================
 
--- ----------------------------------------------------------------------
--- Integer.distributivity_left: x * (y + z) = x * y + x * z.
---
--- At reps make(a, b), make(c, d), make(e, f):
---   LHS rep first component  = a*(c+e) + b*(d+f)
---   LHS rep second component = a*(d+f) + b*(c+e)
---   RHS rep first component  = (a*c + b*d) + (a*e + b*f)
---   RHS rep second component = (a*d + b*c) + (a*f + b*e)
--- We show each component of LHS rep equals the corresponding component
--- of RHS rep, then close via IntegerEquivalent.from_components_equal.
-
-theorem Integer.distributivity_left_first_component (a b c d e f : Natural)
-        : a * (c + e) + b * (d + f) = (a * c + b * d) + (a * e + b * f) :=
-  calc a * (c + e) + b * (d + f)
-     = (a * c + a * e) + (b * d + b * f)
-     = (a * c + b * d) + (a * e + b * f)
-
-theorem Integer.distributivity_left_second_component (a b c d e f : Natural)
-        : a * (d + f) + b * (c + e) = (a * d + b * c) + (a * f + b * e) :=
-  calc a * (d + f) + b * (c + e)
-     = (a * d + a * f) + (b * c + b * e)
-     = (a * d + b * c) + (a * f + b * e)
-
--- Take representatives x = [(a, b)], y = [(c, d)], z = [(e, f)]; the
--- two component lemmas close the equivalence at the leaf.
+-- At reps (a, b), (c, d), (e, f): x*(y+z) and x*y + x*z reduce to
+-- difference pairs whose cross-equation expands by left-distributivity.
 theorem Integer.distributivity_left (x y z : Integer)
         : x * (y + z) = x * y + x * z :=
-  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩, z as ⟨e, f⟩ =>
-      IntegerEquivalent.from_components_equal(?, ?, ?, ?,
-          Integer.distributivity_left_first_component(a, b, c, d, e, f),
-          Integer.distributivity_left_second_component(a, b, c, d, e, f))
+  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩, z as ⟨e, f⟩ => {
+    claim (a * (c + e) + b * (d + f)) + ((a * d + b * c) + (a * f + b * e))
+        = (a * (d + f) + b * (c + e)) + ((a * c + b * d) + (a * e + b * f));
+    done
+  }
 
--- ----------------------------------------------------------------------
--- Integer.distributivity_right: (x + y) * z = x * z + y * z. Derived
--- from distributivity_left + multiply_commutative.
 theorem Integer.distributivity_right (x y z : Integer)
         : (x + y) * z = x * z + y * z :=
   calc (x + y) * z
@@ -219,48 +113,12 @@ theorem Integer.distributivity_right (x y z : Integer)
 -- Multiplication associativity
 -- ======================================================================
 
--- At reps make(a, b), make(c, d), make(e, f):
---   LHS rep first component  = (a*c + b*d) * e + (a*d + b*c) * f
---   LHS rep second component = (a*c + b*d) * f + (a*d + b*c) * e
---   RHS rep first component  = a * (c*e + d*f) + b * (c*f + d*e)
---   RHS rep second component = a * (c*f + d*e) + b * (c*e + d*f)
--- Expand each LHS component via right-distributivity and multiply-
--- associativity, then group via add_two_two_swap to match the RHS
--- expansion. The two component-equality lemmas share the same shape.
-
--- Internal helper: expand (a*c + b*d)*p + (a*d + b*c)*q where p, q play
--- the "outer" role. After full expansion the result is a sum of four
--- triple-products. We capture the canonical form so distributivity_left
--- on a-times-(c*p + d*q) and b-times-(d*p + c*q) lands exactly.
-theorem Integer.multiply_associative_expand (a b c d p q : Natural)
-        : (a * c + b * d) * p + (a * d + b * c) * q
-          = a * (c * p + d * q) + b * (d * p + c * q) :=
-  calc (a * c + b * d) * p + (a * d + b * c) * q
-     = (a * c * p + b * d * p) + (a * d * q + b * c * q)
-     = (a * c * p + a * d * q) + (b * d * p + b * c * q)
-     = (a * (c * p) + a * (d * q)) + (b * d * p + b * c * q)
-     = a * (c * p + d * q) + (b * (d * p) + b * (c * q))
-     = a * (c * p + d * q) + b * (d * p + c * q)
-
-theorem Integer.multiply_associative_first_component (a b c d e f : Natural)
-        : (a * c + b * d) * e + (a * d + b * c) * f
-          = a * (c * e + d * f) + b * (c * f + d * e) :=
-  calc (a * c + b * d) * e + (a * d + b * c) * f
-     = a * (c * e + d * f) + b * (d * e + c * f)
-     = a * (c * e + d * f) + b * (c * f + d * e)
-
-theorem Integer.multiply_associative_second_component
-        (a b c d e f : Natural)
-        : (a * c + b * d) * f + (a * d + b * c) * e
-          = a * (c * f + d * e) + b * (c * e + d * f) :=
-  calc (a * c + b * d) * f + (a * d + b * c) * e
-     = a * (c * f + d * e) + b * (c * e + d * f)
-
--- Take representatives x = [(a, b)], y = [(c, d)], z = [(e, f)]; the
--- two component lemmas close the equivalence at the leaf.
+-- At reps (a, b), (c, d), (e, f): (x*y)*z and x*(y*z) reduce to
+-- difference pairs whose cross-equation is a degree-three ring identity.
 theorem Integer.multiply_associative (x y z : Integer)
         : x * y * z = x * (y * z) :=
-  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩, z as ⟨e, f⟩ =>
-      IntegerEquivalent.from_components_equal(?, ?, ?, ?,
-          Integer.multiply_associative_first_component(a, b, c, d, e, f),
-          Integer.multiply_associative_second_component(a, b, c, d, e, f))
+  by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩, z as ⟨e, f⟩ => {
+    claim ((a * c + b * d) * e + (a * d + b * c) * f) + (a * (c * f + d * e) + b * (c * e + d * f))
+        = ((a * c + b * d) * f + (a * d + b * c) * e) + (a * (c * e + d * f) + b * (c * f + d * e));
+    done
+  }
