@@ -1,9 +1,8 @@
 -- Rational/reciprocal.math
 --
--- Reciprocal of a positive Rational and the ε/R construction needed
--- by the Cauchy product respect proofs. Given r > 0, we extract a
--- Natural witness `succ(k)` for the numerator and build
--- `1/r := mk(make((succ(d_r) : I), k))`. Then `r * (1/r) = 1`.
+-- Reciprocal of a strictly positive Rational, packaged as
+-- succ(k)/succ(d) with its numerator witness, for the Cauchy product
+-- respect proofs. The reciprocal is succ(d)/succ(k), and r · (1/r) = 1.
 
 module Rational.reciprocal
 
@@ -49,73 +48,59 @@ inductive StrictPositiveRational : Type(0) where
 -- Underlying Rational of a packaged strict positive: succ(k)/succ(d).
 definition StrictPositiveRational.value
         : StrictPositiveRational → Rational
-  | StrictPositiveRational.make(k, d) =>
-      Rational.fraction(
-          (successor(k) : Integer), (successor(d) : Integer),
-          Integer.from_natural_successor_nonzero(d))
+  | StrictPositiveRational.make(k, d) => {
+      let denominatorNonzero
+            : ¬((successor(d) : Integer) = Integer.zero)
+          := done since Integer.from_natural_successor_nonzero;
+      Rational.fraction((successor(k) : Integer), (successor(d) : Integer), denominatorNonzero)
+    }
 
 -- Reciprocal of a packaged strict positive: swap to succ(d)/succ(k).
 definition StrictPositiveRational.reciprocal
         : StrictPositiveRational → Rational
-  | StrictPositiveRational.make(k, d) =>
-      Rational.fraction(
-          (successor(d) : Integer), (successor(k) : Integer),
-          Integer.from_natural_successor_nonzero(k))
+  | StrictPositiveRational.make(k, d) => {
+      let denominatorNonzero
+            : ¬((successor(k) : Integer) = Integer.zero)
+          := done since Integer.from_natural_successor_nonzero;
+      Rational.fraction((successor(d) : Integer), (successor(k) : Integer), denominatorNonzero)
+    }
 
 -- Multiplicative cancellation: r * (1/r) = 1 for r = succ(k)/succ(d).
--- At reps: (succ(k) : I, d) * (succ(d) : I, k) = (succ(k) · succ(d), k + d·succ(k)).
--- We want this to equal Rational.one = (1, 0). Cross-multiply:
---   succ(k)·succ(d) · 1 = 1 · succ(k + d·succ(k))
--- LHS = succ(k)·succ(d). RHS = succ(k + d·succ(k)) = succ(k) + d·succ(k) + ?
--- Specifically succ(k + d·succ(k)) = k + d·succ(k) + 1.
--- And succ(k)·succ(d) = succ(k)·d + succ(k) = succ(k) + d·succ(k) (after commute).
--- So both sides equal succ(k) + d·succ(k) — Natural equation.
 theorem StrictPositiveRational.reciprocal_multiplied (r : StrictPositiveRational)
         : StrictPositiveRational.value(r)
               * StrictPositiveRational.reciprocal(r)
           = Rational.one :=
   cases r {
-    | StrictPositiveRational.make(k, d) =>
-        -- value · reciprocal = (succ(k)·succ(d)) / (succ(d)·succ(k)); the
-        -- cross-multiplication with 1/1 is a ring identity (commutativity).
-        Quotient.equivalent_implies_equal(
-            Rational.multiply_representatives(
-                RationalRepresentative.make(
-                    (successor(k) : Integer), (successor(d) : Integer),
-                    Integer.from_natural_successor_nonzero(d)),
-                RationalRepresentative.make(
-                    (successor(d) : Integer), (successor(k) : Integer),
-                    Integer.from_natural_successor_nonzero(k))),
-            RationalRepresentative.make(Integer.one, Integer.one, Integer.one_is_nonzero),
-            (ring : ((successor(k) : Integer) * (successor(d) : Integer)) * Integer.one
-                    = Integer.one * ((successor(d) : Integer) * (successor(k) : Integer))))
+    | StrictPositiveRational.make(k, d) => {
+        claim ¬((successor(d) : Integer) = Integer.zero)
+            since Integer.from_natural_successor_nonzero;
+        claim ¬((successor(k) : Integer) = Integer.zero)
+            since Integer.from_natural_successor_nonzero;
+        let productDenominatorNonzero
+              : ¬((successor(d) : Integer) * (successor(k) : Integer) = Integer.zero)
+            := done since Integer.multiply_nonzero;
+        calc Rational.fraction(
+                 (successor(k) : Integer) * (successor(d) : Integer),
+                 (successor(d) : Integer) * (successor(k) : Integer),
+                 productDenominatorNonzero)
+           = Rational.one
+               since Rational.fraction_equal
+      }
   }
 
--- Extract a StrictPositiveRational witness from a strict-positivity
--- proof at a representative. From 0 < q and q = mk(make(n, d)), we
--- get a Natural k with n = (succ(k) : Integer); take d as the
--- denominator-minus-one to form the witness.
+-- A nonnegative, nonzero Integer is the image of some successor: its
+-- Natural witness cannot be zero, so it is succ(predecessor).
 theorem Rational.strict_positive_witness_at_representative
         (n : Integer) (d : Natural)
         (nIsNonneg : Integer.IsNonneg(n))
         (nNonzero
            : Not(n = Integer.zero))
         : ∃ (k : Natural). n = (successor(k) : Integer) := {
-    choose a as nIsImage from nIsNonneg;
-    cases a with aEq {
-       | zero => {
-           -- n = (zero : I) = Integer.zero, contradicts nNonzero.
-           claim n = (0 : Integer)
-             by rewrite(aEq, nIsImage);
-           absurd(nNonzero(
-                      calc n
-                         = Integer.zero))
-         }
-       | successor(predecessor) => {
-           let refinedHypothesis
-                 : n = (successor(predecessor) : Integer) :=
-               rewrite(aEq, nIsImage);
-           witness predecessor with refinedHypothesis
-         }
+    choose a such that n = (a : Integer) as nIsImage from nIsNonneg;
+    cases a refining nIsImage {
+       | zero =>
+           absurd(nNonzero(calc n = (zero : Integer) = Integer.zero))
+       | successor(predecessor) =>
+           witness predecessor with nIsImage
     }
 }
