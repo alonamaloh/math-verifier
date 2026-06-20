@@ -1,0 +1,29 @@
+-- Test/symmetry_through_definition_test.math
+--
+-- Citing a hypothesis `h : R(a, b)` against a goal `R(b, a)` where `R` is
+-- a `definition` that unfolds to an equality. The diff-wrap bridge WHNFs
+-- the goal and flips the equality with `Equality.symmetry`; its cheap
+-- prefilter in `coerceToExpectedTypeViaDiff` used to test the goal head
+-- WITHOUT unfolding, so a definition-wrapped equality (a custom relation,
+-- or a quotient's equivalence like `RationalEquivalent`) bailed before the
+-- bridge could fire — forcing a calc workaround or a raw `Equality.symmetry`.
+
+module Test.symmetry_through_definition_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+
+definition Test.Related (a b : Natural) : Proposition := a = b
+
+-- Forward citation needs no flip.
+theorem Test.related_forward (a b : Natural) (h : Test.Related(a, b))
+        : Test.Related(a, b) :=
+  done since h
+
+-- Reversed citation through the definition wrapper: the symmetric bridge
+-- must see through `Test.Related` to the underlying equality.
+theorem Test.related_symmetric (a b : Natural) (h : Test.Related(a, b))
+        : Test.Related(b, a) :=
+  done since h

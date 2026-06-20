@@ -55,6 +55,19 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
                 return constant && constant->name == "Equality";
             };
         bool expectedCouldFire = headIsEqualityConstant(expectedTypeClosed);
+        if (!expectedCouldFire) {
+            // The expected type may be a `definition` that unfolds to an
+            // Equality — a custom relation `R a b := a = b`, or a quotient's
+            // equivalence (`RationalEquivalent`, `IntegerEquivalent`). WHNF
+            // once to expose the head so the diff-wrap strategy (which WHNFs
+            // internally, line 34) still fires; without this the prefilter
+            // bails and `done since h` cannot bridge `R b a` from `h : R a b`.
+            expectedCouldFire = headIsEqualityConstant(
+                weakHeadNormalForm(
+                    environment_,
+                    openOverLocalBinders(expectedTypeClosed, localBinders,
+                                         localBinders.size())));
+        }
         bool contextCouldFire = false;
         if (!expectedCouldFire) {
             for (const auto& binder : localBinders) {
