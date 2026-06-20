@@ -196,9 +196,9 @@ ExpressionPointer Elaborator::elaborateChoose(
                 throwElaborate(
                     "choose " + choose.name + " such that <pred>: "
                     "no in-scope hypothesis has type Exists(_, _). "
-                    "Prepend `claim Exists(...) by …;` to bring one "
-                    "into scope, name the source with `from <hyp>`, or "
-                    "use `obtain ⟨…⟩ from …;`.");
+                    "Name the source with `from <hypothesis-or-lemma>`, or "
+                    "prepend `claim ∃ …;` (optionally `by <lemma>`) to bring "
+                    "the existential into scope first.");
             }
             scrutinee = makeSurfaceIdentifier(
                 localBinders[matchedIndex].name, {}, line, column);
