@@ -40,21 +40,23 @@ import Algebra.factorization_list
 theorem IntegralDomain.listProduct_permutation_invariant (d : IntegralDomain)
         (l1 l2 : List(Ring.carrier(IntegralDomain.ring(d))))
         (perm : List.Permutation(Ring.carrier(IntegralDomain.ring(d)), l1, l2))
-        : IntegralDomain.listProduct(d, l1) = IntegralDomain.listProduct(d, l2) :=
-  List.Permutation.product_invariant(
-      Ring.carrier(IntegralDomain.ring(d)),
-      (x y : Ring.carrier(IntegralDomain.ring(d))) ↦ x * y,
-      Ring.one(IntegralDomain.ring(d)),
-      Ring.multiply_associative(IntegralDomain.ring(d)),
-      IntegralDomain.commutative(d),
-      l1, l2, perm)
+        : IntegralDomain.listProduct(d, l1) = IntegralDomain.listProduct(d, l2) := {
+  let s : Ring := IntegralDomain.ring(d);
+  -- the fold-product is invariant under permutation because · is
+  -- associative and commutative.
+  claim ∀ (x y z : Ring.carrier(s)). (x * y) * z = x * (y * z)
+      since Ring.multiply_associative;
+  claim ∀ (x y : Ring.carrier(s)). x * y = y * x
+      since IntegralDomain.commutative;
+  done since List.Permutation.product_invariant
+}
 
 -- ----------------------------------------------------------------------
 -- The strengthened, unit-carrying uniqueness statement. Induction on l1.
 
 theorem IntegralDomain.prime_factorization_unique_helper (d : IntegralDomain)
-        : (l1 : List(Ring.carrier(IntegralDomain.ring(d))))
-          → (l2 : List(Ring.carrier(IntegralDomain.ring(d))))
+        (l1 : List(Ring.carrier(IntegralDomain.ring(d))))
+        : (l2 : List(Ring.carrier(IntegralDomain.ring(d))))
           → (u : Ring.carrier(IntegralDomain.ring(d)))
           → ((k : Ring.carrier(IntegralDomain.ring(d)))
                 → List.member(Ring.carrier(IntegralDomain.ring(d)), k, l1)
@@ -67,156 +69,164 @@ theorem IntegralDomain.prime_factorization_unique_helper (d : IntegralDomain)
             = IntegralDomain.listProduct(d, l2)
           → ∃ (m : List(Ring.carrier(IntegralDomain.ring(d)))).
               List.Permutation(Ring.carrier(IntegralDomain.ring(d)), l2, m)
-              ∧ IntegralDomain.ListAssociate(d, l1, m)
-  | List.empty =>
-      (l2 : List(Ring.carrier(IntegralDomain.ring(d))))
-      (u : Ring.carrier(IntegralDomain.ring(d)))
-      (allPrime1 : (k : Ring.carrier(IntegralDomain.ring(d)))
-                   → List.member(Ring.carrier(IntegralDomain.ring(d)), k,
-                         List.empty(Ring.carrier(IntegralDomain.ring(d))))
-                   → IntegralDomain.IsPrimeElement(d, k))
-      (allPrime2 : (k : Ring.carrier(IntegralDomain.ring(d)))
-                   → List.member(Ring.carrier(IntegralDomain.ring(d)), k, l2)
-                   → IntegralDomain.IsPrimeElement(d, k))
-      (uUnit : Ring.IsUnit(IntegralDomain.ring(d), u))
-      (equation : u * IntegralDomain.listProduct(d,
-                      List.empty(Ring.carrier(IntegralDomain.ring(d))))
-                  = IntegralDomain.listProduct(d, l2)) ↦ {
-        let s : Ring := IntegralDomain.ring(d);
-        -- listProduct(l2) = u, hence a unit; so l2 is empty.
-        claim IntegralDomain.listProduct(d, l2) = u;
-        claim Ring.IsUnit(s, IntegralDomain.listProduct(d, l2));
-        claim l2Empty : l2 = List.empty(Ring.carrier(s));
-        ⟨List.empty(Ring.carrier(s)),
-         Equality.transport_proposition(
-             (t : List(Ring.carrier(s))) ↦
-                 List.Permutation(Ring.carrier(s), t,
-                     List.empty(Ring.carrier(s))),
-             List.empty(Ring.carrier(s)), l2,
-             Equality.symmetry(l2Empty),
-             List.Permutation.empty(Ring.carrier(s))),
-         IntegralDomain.ListAssociate.empty(d)⟩
-      }
-  | List.prepend(p1, rest1) =>
-      (l2 : List(Ring.carrier(IntegralDomain.ring(d))))
-      (u : Ring.carrier(IntegralDomain.ring(d)))
-      (allPrime1 : (k : Ring.carrier(IntegralDomain.ring(d)))
-                   → List.member(Ring.carrier(IntegralDomain.ring(d)), k,
-                         List.prepend(Ring.carrier(IntegralDomain.ring(d)),
-                             p1, rest1))
-                   → IntegralDomain.IsPrimeElement(d, k))
-      (allPrime2 : (k : Ring.carrier(IntegralDomain.ring(d)))
-                   → List.member(Ring.carrier(IntegralDomain.ring(d)), k, l2)
-                   → IntegralDomain.IsPrimeElement(d, k))
-      (uUnit : Ring.IsUnit(IntegralDomain.ring(d), u))
-      (equation : u * IntegralDomain.listProduct(d,
-                      List.prepend(Ring.carrier(IntegralDomain.ring(d)),
-                          p1, rest1))
-                  = IntegralDomain.listProduct(d, l2)) ↦ {
-        let s : Ring := IntegralDomain.ring(d);
-        let restProduct : Ring.carrier(s) := IntegralDomain.listProduct(d, rest1);
-        claim p1Prime : IntegralDomain.IsPrimeElement(d, p1)
-            by allPrime1(p1,
-                   List.member.here(Ring.carrier(s), p1, rest1));
-        let ⟨p1NotZero, p1NotUnit, _⟩ := p1Prime;
+              ∧ IntegralDomain.ListAssociate(d, l1, m) :=
+  by_induction on l1 with uniqueOfShorter {
+    case List.empty:
+        (l2 : List(Ring.carrier(IntegralDomain.ring(d))))
+        (u : Ring.carrier(IntegralDomain.ring(d)))
+        (allPrime1 : (k : Ring.carrier(IntegralDomain.ring(d)))
+                     → List.member(Ring.carrier(IntegralDomain.ring(d)), k,
+                           List.empty(Ring.carrier(IntegralDomain.ring(d))))
+                     → IntegralDomain.IsPrimeElement(d, k))
+        (allPrime2 : (k : Ring.carrier(IntegralDomain.ring(d)))
+                     → List.member(Ring.carrier(IntegralDomain.ring(d)), k, l2)
+                     → IntegralDomain.IsPrimeElement(d, k))
+        (uUnit : Ring.IsUnit(IntegralDomain.ring(d), u))
+        (equation : u * IntegralDomain.listProduct(d,
+                        List.empty(Ring.carrier(IntegralDomain.ring(d))))
+                    = IntegralDomain.listProduct(d, l2)) ↦ {
+          let s : Ring := IntegralDomain.ring(d);
+          -- ∏ l2 = u, hence a unit; so l2 is empty.
+          claim IntegralDomain.listProduct(d, l2) = u;
+          claim Ring.IsUnit(s, IntegralDomain.listProduct(d, l2));
+          claim l2Empty : l2 = List.empty(Ring.carrier(s))
+              since IntegralDomain.prime_list_unit_product_empty;
+          claim List.Permutation(Ring.carrier(s), List.empty(Ring.carrier(s)),
+              List.empty(Ring.carrier(s))) since List.Permutation.reflexive;
+          claim List.Permutation(Ring.carrier(s), l2, List.empty(Ring.carrier(s)))
+              by substituting l2Empty;
+          claim IntegralDomain.ListAssociate(d, List.empty(Ring.carrier(s)),
+              List.empty(Ring.carrier(s))) since IntegralDomain.ListAssociate.empty;
+          claim emptyWitness : List.Permutation(Ring.carrier(s), l2, List.empty(Ring.carrier(s)))
+              ∧ IntegralDomain.ListAssociate(d, List.empty(Ring.carrier(s)),
+                    List.empty(Ring.carrier(s)));
+          witness List.empty(Ring.carrier(s)) with emptyWitness
+        }
+    case List.prepend(p1, rest1):
+        (l2 : List(Ring.carrier(IntegralDomain.ring(d))))
+        (u : Ring.carrier(IntegralDomain.ring(d)))
+        (allPrime1 : (k : Ring.carrier(IntegralDomain.ring(d)))
+                     → List.member(Ring.carrier(IntegralDomain.ring(d)), k,
+                           List.prepend(Ring.carrier(IntegralDomain.ring(d)),
+                               p1, rest1))
+                     → IntegralDomain.IsPrimeElement(d, k))
+        (allPrime2 : (k : Ring.carrier(IntegralDomain.ring(d)))
+                     → List.member(Ring.carrier(IntegralDomain.ring(d)), k, l2)
+                     → IntegralDomain.IsPrimeElement(d, k))
+        (uUnit : Ring.IsUnit(IntegralDomain.ring(d), u))
+        (equation : u * IntegralDomain.listProduct(d,
+                        List.prepend(Ring.carrier(IntegralDomain.ring(d)),
+                            p1, rest1))
+                    = IntegralDomain.listProduct(d, l2)) ↦ {
+          let s : Ring := IntegralDomain.ring(d);
+          let restProduct : Ring.carrier(s) := IntegralDomain.listProduct(d, rest1);
+          claim p1Prime : IntegralDomain.IsPrimeElement(d, p1)
+              by allPrime1(p1, List.member.here(Ring.carrier(s), p1, rest1));
+          let ⟨p1NotZero, p1NotUnit, _⟩ := p1Prime;
 
-        -- p1 divides ∏ l2, because ∏ l2 = p1 · (u · ∏ rest1).
-        claim p1DividesL2 : Ring.divides(s, p1, IntegralDomain.listProduct(d, l2))
-            by ⟨u * restProduct,
-                calc IntegralDomain.listProduct(d, l2)
-                   = u * (p1 * restProduct)
-                   = p1 * (u * restProduct)⟩;
+          -- p1 divides ∏ l2, because ∏ l2 = p1 · (u · ∏ rest1).
+          claim Ring.divides(s, p1, IntegralDomain.listProduct(d, l2))
+              by witness u * restProduct with
+                  (calc IntegralDomain.listProduct(d, l2)
+                     = u * (p1 * restProduct)
+                     = p1 * (u * restProduct));
 
-        -- A prime factor q of l2 with p1 ∣ q, hence q's associate is p1.
-        obtain ⟨q, qMember, p1DividesQ⟩
-            from IntegralDomain.prime_divides_listProduct_member(d, p1, p1Prime,
-                     l2, p1DividesL2);
-        claim IntegralDomain.IsPrimeElement(d, q)
-            by allPrime2(q, qMember);
-        claim qIrreducible : IntegralDomain.IsIrreducible(d, q);
-        obtain ⟨c, cUnit, qEqualsP1c⟩
-            from IntegralDomain.associate_of_divides_irreducible(d, p1, q,
-                     qIrreducible, p1NotUnit, p1DividesQ);
-        -- qEqualsP1c : q = p1 · c, c a unit.
+          -- some prime factor q of l2 has p1 ∣ q, and being irreducible q = p1·c.
+          claim ∃ (q : Ring.carrier(s)).
+              List.member(Ring.carrier(s), q, l2) ∧ Ring.divides(s, p1, q)
+              since IntegralDomain.prime_divides_listProduct_member;
+          choose q such that List.member(Ring.carrier(s), q, l2) ∧ Ring.divides(s, p1, q);
+          claim qMemberL2 : List.member(Ring.carrier(s), q, l2);
+          claim IntegralDomain.IsPrimeElement(d, q) by allPrime2(q, qMemberL2);
+          claim IntegralDomain.IsIrreducible(d, q)
+              since IntegralDomain.prime_element_is_irreducible;
+          claim IntegralDomain.Associate(d, p1, q)
+              since IntegralDomain.associate_of_divides_irreducible;
+          choose c such that Ring.IsUnit(s, c) ∧ q = p1 * c;
+          claim q = p1 * c;
 
-        -- Rotate q to the front of l2.
-        obtain ⟨l2rest, permL2⟩
-            from List.Permutation.extract(Ring.carrier(s), q, l2, qMember);
-        let restProduct2 : Ring.carrier(s) := IntegralDomain.listProduct(d, l2rest);
-        -- ∏ l2 = q · ∏ l2rest = p1 · (c · ∏ l2rest).
-        calc IntegralDomain.listProduct(d, l2)
-                  = IntegralDomain.listProduct(d,
-                        List.prepend(Ring.carrier(s), q, l2rest))
-                  = q * restProduct2
-                  = (p1 * c) * restProduct2
-                  = p1 * (c * restProduct2);
+          -- rotate q to the front of l2.
+          claim ∃ (l2rest : List(Ring.carrier(s))).
+              List.Permutation(Ring.carrier(s), l2, List.prepend(Ring.carrier(s), q, l2rest))
+              since List.Permutation.extract;
+          choose l2rest such that
+              List.Permutation(Ring.carrier(s), l2, List.prepend(Ring.carrier(s), q, l2rest))
+              as permL2;
+          let restProduct2 : Ring.carrier(s) := IntegralDomain.listProduct(d, l2rest);
+          -- ∏ l2 = q · ∏ l2rest = p1 · (c · ∏ l2rest).
+          calc IntegralDomain.listProduct(d, l2)
+             = IntegralDomain.listProduct(d, List.prepend(Ring.carrier(s), q, l2rest))
+             = q * restProduct2
+             = (p1 * c) * restProduct2
+             = p1 * (c * restProduct2);
 
-        -- Cancel p1: u · ∏ rest1 = c · ∏ l2rest.
-        claim u * restProduct = c * restProduct2
-            by IntegralDomain.multiply_cancel_left(d, p1,
-                   u * restProduct,
-                   c * restProduct2,
-                   p1NotZero,
-                   calc p1 * (u * restProduct)
-                      = u * (p1 * restProduct)
-                      = IntegralDomain.listProduct(d, l2)
-                      = p1 * (c * restProduct2));
+          -- cancel p1: u · ∏ rest1 = c · ∏ l2rest.
+          calc p1 * (u * restProduct)
+             = u * (p1 * restProduct)
+             = IntegralDomain.listProduct(d, l2)
+             = p1 * (c * restProduct2);
+          claim u * restProduct = c * restProduct2 since IntegralDomain.multiply_cancel_left;
 
-        -- Form the next floating unit u' = c⁻¹ · u.
-        obtain ⟨cInverse, cInverseUnit, cTimesInverse⟩
-            from IntegralDomain.unit_inverse_is_unit(d, c, cUnit);
-        -- cTimesInverse : c · cInverse = 1.
-        claim uPrimeUnit : Ring.IsUnit(s, cInverse * u);
-        calc cInverse * c
-                  = c * cInverse
-                  = Ring.one(s);
-        calc (cInverse * u) * restProduct
-                  = cInverse * (u * restProduct)
-                  = cInverse * (c * restProduct2)
-                  = (cInverse * c) * restProduct2
-                  = Ring.one(s) * restProduct2
-                  = restProduct2 as uPrimeEquation;
+          -- the next floating unit is u' = c⁻¹ · u.
+          claim ∃ (cInverse : Ring.carrier(s)).
+              Ring.IsUnit(s, cInverse) ∧ c * cInverse = Ring.one(s)
+              since IntegralDomain.unit_inverse_is_unit;
+          choose cInverse such that Ring.IsUnit(s, cInverse) ∧ c * cInverse = Ring.one(s);
+          claim uPrimeUnit : Ring.IsUnit(s, cInverse * u) since IntegralDomain.unit_product;
+          calc cInverse * c = c * cInverse = Ring.one(s);
+          calc (cInverse * u) * restProduct
+             = cInverse * (u * restProduct)
+             = cInverse * (c * restProduct2)
+             = (cInverse * c) * restProduct2
+             = Ring.one(s) * restProduct2
+             = restProduct2 as uPrimeEquation;
 
-        -- Recurse on rest1 against l2rest with the new unit.
-        claim allPrimeRest1
-            : ∀ (k : Ring.carrier(s)).
-              List.member(Ring.carrier(s), k, rest1)
-              → IntegralDomain.IsPrimeElement(d, k)
-            by (k : Ring.carrier(s))
-               (memberRest1 : List.member(Ring.carrier(s), k, rest1)) ↦
-                 allPrime1(k,
-                     List.member.there(Ring.carrier(s), k, p1, rest1,
-                         memberRest1));
-        claim allPrimeL2rest
-            : ∀ (k : Ring.carrier(s)).
-              List.member(Ring.carrier(s), k, l2rest)
-              → IntegralDomain.IsPrimeElement(d, k)
-            by (k : Ring.carrier(s))
-               (memberL2rest : List.member(Ring.carrier(s), k, l2rest)) ↦
-                 allPrime2(k,
-                     List.Permutation.member_forward(Ring.carrier(s), k,
-                         List.prepend(Ring.carrier(s), q, l2rest), l2,
-                         List.Permutation.symmetric(Ring.carrier(s), l2,
-                             List.prepend(Ring.carrier(s), q, l2rest), permL2),
-                         List.member.there(Ring.carrier(s), k, q, l2rest,
-                             memberL2rest)));
-        obtain ⟨mPrime, permL2rest, listAssocRest⟩
-            from IntegralDomain.prime_factorization_unique_helper(d, rest1, l2rest,
-                     cInverse * u, allPrimeRest1, allPrimeL2rest,
+          -- recurse on rest1 against l2rest with the new unit.
+          claim allPrimeRest1
+              : ∀ (k : Ring.carrier(s)). List.member(Ring.carrier(s), k, rest1)
+                → IntegralDomain.IsPrimeElement(d, k)
+              by (k : Ring.carrier(s))
+                 (memberRest1 : List.member(Ring.carrier(s), k, rest1)) ↦
+                   allPrime1(k, List.member.there(Ring.carrier(s), k, p1, rest1, memberRest1));
+          claim allPrimeL2rest
+              : ∀ (k : Ring.carrier(s)). List.member(Ring.carrier(s), k, l2rest)
+                → IntegralDomain.IsPrimeElement(d, k) by {
+            take k : Ring.carrier(s);
+            suppose List.member(Ring.carrier(s), k, l2rest) as memberL2rest;
+            claim List.member(Ring.carrier(s), k,
+                List.prepend(Ring.carrier(s), q, l2rest)) since List.member.there;
+            claim List.Permutation(Ring.carrier(s),
+                List.prepend(Ring.carrier(s), q, l2rest), l2) since List.Permutation.symmetric;
+            claim memberKL2 : List.member(Ring.carrier(s), k, l2)
+                since List.Permutation.member_forward;
+            done by allPrime2(k, memberKL2)
+          };
+          claim ∃ (mPrime : List(Ring.carrier(s))).
+              List.Permutation(Ring.carrier(s), l2rest, mPrime)
+              ∧ IntegralDomain.ListAssociate(d, rest1, mPrime)
+              by uniqueOfShorter(l2rest, cInverse * u, allPrimeRest1, allPrimeL2rest,
                      uPrimeUnit, uPrimeEquation);
+          choose mPrime such that
+              List.Permutation(Ring.carrier(s), l2rest, mPrime)
+              ∧ IntegralDomain.ListAssociate(d, rest1, mPrime);
 
-        -- Assemble m = prepend(q, mPrime).
-        ⟨List.prepend(Ring.carrier(s), q, mPrime),
-         List.Permutation.transitive(Ring.carrier(s),
-             l2,
-             List.prepend(Ring.carrier(s), q, l2rest),
-             List.prepend(Ring.carrier(s), q, mPrime),
-             permL2,
-             List.Permutation.skip(Ring.carrier(s), q, l2rest, mPrime,
-                 permL2rest)),
-         IntegralDomain.ListAssociate.cons(d, p1, q,
-             ⟨c, cUnit, qEqualsP1c⟩, rest1, mPrime, listAssocRest)⟩
-      }
+          -- assemble m = q :: mPrime.
+          claim List.Permutation(Ring.carrier(s),
+              List.prepend(Ring.carrier(s), q, l2rest),
+              List.prepend(Ring.carrier(s), q, mPrime)) since List.Permutation.skip;
+          claim List.Permutation(Ring.carrier(s), l2,
+              List.prepend(Ring.carrier(s), q, mPrime)) since List.Permutation.transitive;
+          claim IntegralDomain.ListAssociate(d,
+              List.prepend(Ring.carrier(s), p1, rest1),
+              List.prepend(Ring.carrier(s), q, mPrime)) since IntegralDomain.ListAssociate.cons;
+          claim resultWitness : List.Permutation(Ring.carrier(s), l2,
+                  List.prepend(Ring.carrier(s), q, mPrime))
+                ∧ IntegralDomain.ListAssociate(d,
+                      List.prepend(Ring.carrier(s), p1, rest1),
+                      List.prepend(Ring.carrier(s), q, mPrime));
+          witness List.prepend(Ring.carrier(s), q, mPrime) with resultWitness
+        }
+  }
 
 -- ----------------------------------------------------------------------
 -- Uniqueness proper: equal products of prime lists are associate-
@@ -233,10 +243,12 @@ theorem IntegralDomain.prime_factorization_unique (d : IntegralDomain)
                       = IntegralDomain.listProduct(d, l2))
         : ∃ (m : List(Ring.carrier(IntegralDomain.ring(d)))).
             List.Permutation(Ring.carrier(IntegralDomain.ring(d)), l2, m)
-            ∧ IntegralDomain.ListAssociate(d, l1, m) :=
-  IntegralDomain.prime_factorization_unique_helper(d, l1, l2,
-      Ring.one(IntegralDomain.ring(d)), allPrime1, allPrime2,
-      Ring.one_is_unit(IntegralDomain.ring(d)),
-      calc Ring.one(IntegralDomain.ring(d)) * IntegralDomain.listProduct(d, l1)
-         = IntegralDomain.listProduct(d, l1)
-         = IntegralDomain.listProduct(d, l2))
+            ∧ IntegralDomain.ListAssociate(d, l1, m) := {
+  let s : Ring := IntegralDomain.ring(d);
+  -- run the unit-carrying helper with the floating unit set to 1.
+  claim Ring.IsUnit(s, Ring.one(s)) since Ring.one_is_unit;
+  calc Ring.one(s) * IntegralDomain.listProduct(d, l1)
+     = IntegralDomain.listProduct(d, l1)
+     = IntegralDomain.listProduct(d, l2);
+  done since IntegralDomain.prime_factorization_unique_helper
+}
