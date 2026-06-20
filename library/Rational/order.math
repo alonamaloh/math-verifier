@@ -57,25 +57,22 @@ theorem Rational.IsNonneg_forward_helper
 -- Respect: via propositional extensionality, both directions are the
 -- forward helper (the backward one on the symmetric equation).
 theorem Rational.IsNonneg_respect
-        (rep1 rep2 : RationalRepresentative)
-        (equivalenceHypothesis : RationalEquivalent(rep1, rep2))
-        : Rational.IsNonneg_at_representative(rep1)
-          = Rational.IsNonneg_at_representative(rep2) :=
-  cases rep1 refining equivalenceHypothesis {
-    | RationalRepresentative.make(n1, d1, d1Nonzero) =>
-        cases rep2 refining equivalenceHypothesis {
-          | RationalRepresentative.make(n2, d2, d2Nonzero) => {
-              claim Integer.IsNonneg(n1 * d1) → Integer.IsNonneg(n2 * d2)
-                  since Rational.IsNonneg_forward_helper;
-              claim Integer.IsNonneg(n2 * d2) → Integer.IsNonneg(n1 * d1) by {
-                  suppose Integer.IsNonneg(n2 * d2) as numeratorProductNonneg;
-                  calc n2 * d1 = n1 * d2   since equivalenceHypothesis;
-                  done since Rational.IsNonneg_forward_helper
-              };
-              done since Equality.propositional_extensionality
-          }
-        }
-  }
+        : ∀ (rep1 rep2 : RationalRepresentative).
+          RationalEquivalent(rep1, rep2)
+          → Rational.IsNonneg_at_representative(rep1)
+            = Rational.IsNonneg_at_representative(rep2)
+  | RationalRepresentative.make(n1, d1, d1Nonzero),
+    RationalRepresentative.make(n2, d2, d2Nonzero),
+    equivalenceHypothesis => {
+      claim Integer.IsNonneg(n1 * d1) → Integer.IsNonneg(n2 * d2)
+          since Rational.IsNonneg_forward_helper;
+      claim Integer.IsNonneg(n2 * d2) → Integer.IsNonneg(n1 * d1) by {
+          suppose Integer.IsNonneg(n2 * d2) as numeratorProductNonneg;
+          calc n2 * d1 = n1 * d2   since equivalenceHypothesis;
+          done since Rational.IsNonneg_forward_helper
+      };
+      done since Equality.propositional_extensionality
+    }
 
 -- IsNonneg on Rational.
 opaque definition Rational.IsNonneg (x : Rational) : Proposition :=
