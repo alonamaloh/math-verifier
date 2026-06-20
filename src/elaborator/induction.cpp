@@ -804,7 +804,17 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // auto-prover on the same goal. If it would also discharge
         // the goal, warn that the hint is redundant. A `since` hint is an
         // intentional explanation — exempt it from the check.
-        if (reportRedundantBy_ && !claim.byIsExplanation) {
+        //
+        // Also exempt a `by unfolding <X>` hint: it flips `<X>`'s opacity for
+        // the proof, and the speculative re-proof runs while that transparency
+        // is still in scope — so it would spuriously "succeed" (the hint looks
+        // redundant) even though removing it leaves `<X>` opaque and the bare
+        // claim fails. An unfolding hint is load-bearing by construction, so
+        // the check can't faithfully test its removal.
+        bool byInvolvesUnfolding = claim.byHint
+            && std::get_if<SurfaceUnfold>(&claim.byHint->node) != nullptr;
+        if (reportRedundantBy_ && !claim.byIsExplanation
+            && !byInvolvesUnfolding) {
             // Cap the budget so each re-proof bails early; exceeding it
             // (the hint is load-bearing for speed) yields no proof. The guard
             // also bounds the bare-citation re-elaboration below (its backward
