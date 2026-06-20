@@ -36,17 +36,18 @@ theorem LessOrEqual.invert (s b : Natural)
         : s ≤ b
           → s = b ∨ ∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ s ≤ bPredecessor :=
   (proof : s ≤ b) ↦
-    cases proof {
-      | Or.introduceLeft(lessThan) => {
+    claim by cases {
+      in (s < b) as lessThan: {
           choose c such that s + (1 + c) = b as equation from Natural.lt_elim;
           claim s ≤ s + c since Natural.less_or_equal_add_right;
           calc b
              = s + (1 + c)        since equation
              = successor(s + c);
-          Or.introduceRight(
-              witness (s + c) with (b = successor(s + c) ∧ s ≤ s + c))
+          claim ∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ s ≤ bPredecessor
+              by witness (s + c) with (b = successor(s + c) ∧ s ≤ s + c);
+          done
         }
-      | Or.introduceRight(equal) => equal
+      in (s = b) as equal: equal
     }
 
 -- successor(k) ≰ 0. Apply invert and discharge both disjuncts via
@@ -110,15 +111,14 @@ theorem Natural.for_all_below
           -- The step bound `1 + predecessor` is not defeq to
           -- `successor(predecessor)`, but the successor-form inversion lemma
           -- still applies — its premise is discharged up to `one_add`.
-          claim inversionResult
-                  : k = predecessor ∨ successor(k) ≤ predecessor
+          claim k = predecessor ∨ successor(k) ≤ predecessor
               since Natural.less_or_equal_successor_successor_inversion;
-          cases inversionResult {
-            | Or.introduceLeft(kEqualsPredecessor) =>
+          claim by cases {
+            in (k = predecessor) as kEqualsPredecessor:
                 -- We need P(k). step(predecessor, IH) gives P(predecessor);
                 -- the diff-bridge auto-lifts via kEqualsPredecessor in scope.
                 step(predecessor, IH)
-            | Or.introduceRight(successorKLessOrEqualPredecessor) =>
+            in (successor(k) ≤ predecessor) as successorKLessOrEqualPredecessor:
                 IH(k, successorKLessOrEqualPredecessor)
           }
         }

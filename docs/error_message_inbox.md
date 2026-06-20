@@ -18,6 +18,43 @@ Keep entries here only until triaged — the corpus is the durable record.
 
 <!-- captures are appended below this line -->
 
+### `claim by cases` can pick a higher-order IH instead of the local disjunction — 2026-06-20 (baby `Or` cleanup)
+note: while rewriting `Natural.lt_trichotomy` from raw
+`Or.introduceLeft/Right` branches to proposition arms, this local setup:
+
+```
+let predecessorComparison : predecessor < b ∨ predecessor = b ∨ b < predecessor := IH(b);
+claim by cases {
+  in (predecessor < b) as predecessorLessThanB: ...
+  in (predecessor = b) as predecessorEqualB: ...
+  in (b < predecessor) as bLessThanPredecessor: ...
+}
+```
+
+failed with:
+
+```
+library/Natural/order.math:186:3: elaborate error: theorem 'Natural.lt_trichotomy'
+  this argument has the wrong type for the function it is given to
+    the function expects: Natural
+    but this argument is: predecessor < b ∨ predecessor = b ∨ b < predecessor
+```
+
+The source of the case split should have been the local disjunction
+`predecessorComparison`, but the search also saw the induction hypothesis
+`IH : (b : Natural) → predecessor < b ∨ predecessor = b ∨ b < predecessor`
+and appears to have tried to use the goal proposition itself as IH's
+argument. The error blames the theorem and prints a generic application
+type mismatch, not "`claim by cases` chose/considered the wrong disjunction
+source." Factoring the step into a helper with an explicit disjunction
+parameter avoided the higher-order IH in scope.
+diagnosis: `claim by cases` source search should prefer exact in-scope
+disjunction facts over functions returning disjunctions, and failures from
+candidate application should name the candidate and the case-split source
+search rather than surfacing as a generic function-argument mismatch.
+
+---
+
 ### (performance, not message) `by substituting <name>` re-runs the full prover per direction — 2026-06-12 (ℂ polish)
 note: a calc step `= Product.make(x, y - Real.zero) by substituting firstZero`
 (with `firstZero : x - Real.zero = x` in context) tripped the
