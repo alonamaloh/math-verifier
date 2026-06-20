@@ -84,18 +84,16 @@ theorem Rational.IsNonneg.multiply (p q : Rational)
   (cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1, _) =>
     cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2, _) => {
       claim Integer.IsNonneg((n1 * d1) * (n2 * d2))
-          by Integer.IsNonneg.multiply;
-      claim witnessForm : (n1 * n2) * (d1 * d2) = (n1 * d1) * (n2 * d2)
-          by ring;
+          since Integer.IsNonneg.multiply;
+      claim witnessForm : (n1 * n2) * (d1 * d2) = (n1 * d1) * (n2 * d2);
       done by substituting witnessForm
     } } })
 
 -- 1/2 is IsNonneg: its sign-witness is `1·2`, the image of a natural.
 theorem Rational.one_half_IsNonneg : Rational.IsNonneg(Rational.one_half) := {
   claim Integer.IsNonneg((2 : Integer))
-      by Integer.from_natural_is_nonneg;
-  claim witnessForm : Integer.one * (2 : Integer) = (2 : Integer)
-      by ring;
+      since Integer.from_natural_is_nonneg;
+  claim witnessForm : Integer.one * (2 : Integer) = (2 : Integer);
   done by substituting witnessForm unfolding Rational.IsNonneg
 }
 
@@ -123,18 +121,12 @@ theorem Rational.halve_nonzero (q : Rational)
 -- The headline theorem.
 theorem Rational.halve_positive (q : Rational)
         (qPositive : Rational.zero < q)
-        : Rational.zero < Rational.halve(q) :=
-  And.introduction(
-      Rational.LessOrEqual_zero_of_IsNonneg(
-          Rational.halve(q),
-          Rational.halve_IsNonneg(q,
-              Rational.IsNonneg_of_LessOrEqual_zero(q,
-                  And.left(
-                      Rational.LessOrEqual(Rational.zero, q),
-                      Not(Rational.zero = q),
-                      qPositive)))),
-      Rational.halve_nonzero(q,
-          And.right(
-              Rational.LessOrEqual(Rational.zero, q),
-              Not(Rational.zero = q),
-              qPositive)))
+        : Rational.zero < Rational.halve(q) := {
+  let ⟨qNonneg, qNonzero⟩ := qPositive;
+  claim Rational.IsNonneg(q) since Rational.IsNonneg_of_LessOrEqual_zero;
+  claim Rational.IsNonneg(Rational.halve(q)) since Rational.halve_IsNonneg;
+  claim Rational.LessOrEqual(Rational.zero, Rational.halve(q))
+      since Rational.LessOrEqual_zero_of_IsNonneg;
+  claim Not(Rational.zero = Rational.halve(q)) since Rational.halve_nonzero;
+  done
+}
