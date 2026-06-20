@@ -1,0 +1,40 @@
+-- `by <hypothesis>` matches a cited LOCAL hypothesis whose conclusion
+-- mentions an ENCLOSING binder. The conclusion is matched first-order against
+-- the goal after peeling the hypothesis's own ∀-binders; those peeled binders
+-- become metavariables, which shifts every ambient (outer-scope) variable in
+-- the conclusion up by the peel count. The matcher must undo that shift when
+-- lining an ambient variable up against the goal — otherwise a perfectly good
+-- citation fails with "the hint's arguments could not be inferred from the
+-- goal". (Top-level lemmas never hit this: their conclusions reference only
+-- constants and their own binders. It bites a hypothesis destructured from a
+-- bundle — e.g. the `primeDivides` field of `IsPrimeElement(d, p)`, whose
+-- conclusion mentions the surrounding `d` and `p`.)
+--
+-- The relation `R` is abstract, so the auto-prover cannot close the goal on
+-- its own: only the cited hypothesis proves it.
+
+module Test.citation_ambient_binder_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+
+-- `relation` and `p` are enclosing binders; `lemma`'s conclusion `relation(p,
+-- n)` mentions both, with only `n` being its own (peeled) binder. Citing it at
+-- `relation(p, m)` must infer `n := m` while matching the ambient `relation`
+-- and `p` through the peel-count shift.
+theorem cite_ambient_through_peel
+        (relation : Natural → Natural → Proposition)
+        (p m : Natural)
+        (lemma : ∀ (n : Natural). relation(p, n))
+        : relation(p, m) :=
+  claim by lemma
+
+-- The ambient binder appears INSIDE a deeper argument, not just at the head —
+-- the shift has to be applied wherever it occurs in the conclusion.
+theorem cite_ambient_nested
+        (relation : Natural → Natural → Proposition)
+        (base p m : Natural)
+        (lemma : ∀ (n : Natural). relation(base + p, n))
+        : relation(base + p, m) :=
+  claim by lemma

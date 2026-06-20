@@ -914,11 +914,24 @@ bool Elaborator::matchAgainstPattern(
                     return false;
                 }
             }
-            // idx < piDepth: descended Pi binder; idx >=
-            // piDepth + binderCount: outer-scope binder. Either
-            // way, subject must be the same BV index.
+            // idx < piDepth: a Pi/Lambda binder descended DURING the match —
+            // present in both pattern and subject, so the indices coincide.
+            // idx >= piDepth + binderCount: an ambient outer-scope variable.
+            // The pattern carries `binderCount` leading metavariable binders
+            // (the lemma's peeled arguments) that the subject does NOT have,
+            // so the same ambient variable sits `binderCount` higher in the
+            // pattern than in the subject — shift before comparing. (For a
+            // top-level lemma the conclusion never mentions an ambient
+            // variable, only Constants and its own binders-as-metavariables,
+            // so this path is exercised only when citing a LOCAL hypothesis
+            // whose type references enclosing binders — e.g. a `primeDivides`
+            // field destructured from `IsPrimeElement(d, p)`, whose `d`/`p`
+            // are the surrounding theorem's parameters.)
             auto* s = std::get_if<BoundVariable>(&subject->node);
-            return s && s->deBruijnIndex == idx;
+            if (!s) return false;
+            int expectedSubjectIndex =
+                idx < piDepth ? idx : idx - binderCount;
+            return s->deBruijnIndex == expectedSubjectIndex;
         }
         if (pattern->node.index() != subject->node.index()) {
             // Kind mismatch — try WHNF on the subject. A δ-defined
