@@ -32,49 +32,39 @@ import Rational.algebra
 import Rational.order
 import Rational.absolute_value
 
--- 1/2 : numerator 1 over the denominator 2 = 2.
-definition Rational.one_half : Rational :=
-  Rational.fraction(
-      Integer.one, (2 : Integer), Integer.from_natural_successor_nonzero(1))
+-- 2 ≠ 0 in ℤ: a successor-natural image is a valid denominator.
+theorem Rational.two_nonzero : ¬((2 : Integer) = Integer.zero) :=
+  done since Integer.from_natural_successor_nonzero
 
--- The key identity: 1/2 + 1/2 = 1. The combined denominator is 2·2 and the
--- numerator 1·2 + 1·2; equivalence to 1/1 needs `2 = 1 + 1` made concrete so
--- ring can fold `(2 + 2)·1 = 1·(2·2)`.
+-- 1/2 : numerator 1 over denominator 2.
+definition Rational.one_half : Rational :=
+  Rational.fraction(Integer.one, (2 : Integer), Rational.two_nonzero)
+
+-- The key identity: 1/2 + 1/2 = 1. Adding the fractions gives numerator
+-- 1·2 + 1·2 over denominator 2·2; the cross-equation with 1/1 is the ring
+-- identity (1·2 + 1·2)·1 = 1·(2·2).
 theorem Rational.one_half_doubled
         : Rational.one_half + Rational.one_half = Rational.one :=
+  let oneHalfRepresentative : RationalRepresentative :=
+      RationalRepresentative.make(Integer.one, (2 : Integer), Rational.two_nonzero) in
   Quotient.equivalent_implies_equal(
-      Rational.add_representatives(
-          RationalRepresentative.make(
-              Integer.one, (2 : Integer),
-              Integer.from_natural_successor_nonzero(1)),
-          RationalRepresentative.make(
-              Integer.one, (2 : Integer),
-              Integer.from_natural_successor_nonzero(1))),
+      Rational.add_representatives(oneHalfRepresentative, oneHalfRepresentative),
       RationalRepresentative.make(Integer.one, Integer.one, Integer.one_is_nonzero),
-      {
-        claim castTwo : (2 : Integer) = Integer.one + Integer.one
-            by calc (2 : Integer)
-                  = Integer.one + (1 : Integer)        by Natural.to_integer.successor_preserves
-                  = Integer.one + Integer.one          by substituting Natural.to_integer.one_preserves;
-        calc (Integer.one * (2 : Integer) + Integer.one * (2 : Integer)) * Integer.one
-           = (Integer.one * (Integer.one + Integer.one) + Integer.one * (Integer.one + Integer.one)) * Integer.one  by substituting castTwo
-           = Integer.one * ((Integer.one + Integer.one) * (Integer.one + Integer.one))                             by ring
-           = Integer.one * ((2 : Integer) * (2 : Integer))                                   by substituting castTwo
-      })
+      calc (Integer.one * (2 : Integer) + Integer.one * (2 : Integer)) * Integer.one
+         = Integer.one * ((2 : Integer) * (2 : Integer)))
 
 -- Halve a rational: q * (1/2).
 definition Rational.halve (q : Rational) : Rational :=
   q * Rational.one_half
 
--- halve(q) + halve(q) = q. Distributivity + one_half_doubled +
--- multiply_one.
+-- halve(q) + halve(q) = q.
 theorem Rational.halve_doubled (q : Rational)
         : Rational.halve(q) + Rational.halve(q) = q :=
   calc Rational.halve(q) + Rational.halve(q)
      = q * Rational.one_half + q * Rational.one_half
      = q * (Rational.one_half + Rational.one_half)
      = q * Rational.one
-            by rewrite(Rational.one_half_doubled)
+            by substituting Rational.one_half_doubled
      = q
 
 -- ----------------------------------------------------------------------
