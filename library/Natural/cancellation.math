@@ -29,7 +29,6 @@ theorem Natural.add_equals_zero_left
   | zero, _, _ =>
       done
   | successor(predA), b, equation => {
-      -- successor(predA) + b = successor(predA + b), which cannot be zero.
       claim isZero : successor(predA + b) = 0 by substituting Natural.successor_add;
       absurd(isZero)
     }
@@ -49,8 +48,7 @@ theorem Natural.multiply_equals_zero_with_positive_right
       -- (Natural.multiply pattern-matches on its first argument), so
       -- the hypothesis productZero already has the reduced form.
       claim c + predB * c = 0;
-      claim cEqualsZero : c = 0;
-      -- c ≥ 1 and c = 0 give 1 ≤ 0, which is impossible.
+      claim cEqualsZero : c = 0 since Natural.add_equals_zero_left;
       claim oneLessOrEqualZero : 1 ≤ 0 by substituting cEqualsZero;
       absurd(oneLessOrEqualZero)
   }
@@ -68,9 +66,8 @@ theorem Natural.multiply_cancel_right (a : Natural)
         take c : Natural;
         suppose 1 ≤ c as positivity;
         suppose 0 * c = b * c as equation;
-        -- 0 · c = 0, so b · c = 0 too; then 0 = b by the zero-product helper.
         claim b * c = 0;
-        claim b = 0
+        claim b = 0 since Natural.multiply_equals_zero_with_positive_right
       }
     case successor(predA): {
         take b : Natural;
@@ -79,22 +76,19 @@ theorem Natural.multiply_cancel_right (a : Natural)
         suppose successor(predA) * c = b * c as equation;
         cases b {
           | zero => {
-              -- successor(predA) · c = 0. By the helper, successor(predA) = 0.
-              -- But that's absurd.
               calc successor(predA) * c
                       = 0;
               claim successorEqualsZero
-                    : successor(predA) = 0;
+                    : successor(predA) = 0
+                    since Natural.multiply_equals_zero_with_positive_right;
               absurd(successorEqualsZero)
             }
           | successor(predB) => {
-              -- successor(predA) · c = c + predA · c.
-              -- successor(predB) · c = c + predB · c.
-              -- After add_cancel_left: predA · c = predB · c; recurse via IH.
               calc c + predA * c
                       = c + predB * c;
               claim reduced
-                    : predA * c = predB * c;
+                    : predA * c = predB * c
+                    since Natural.add_cancel_left;
               claim predA = predB
                 since IH(predB, c, positivity, reduced);
               calc successor(predA)
