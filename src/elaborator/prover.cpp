@@ -711,27 +711,72 @@ std::vector<Elaborator::ContextEquality> Elaborator::collectContextEqualities(
         std::vector<ContextEquality> result;
         int N = static_cast<int>(localBinders.size());
         // Local hypotheses (cost 1) — scan last-bound first so the
-        // most-recent equality wins on ties.
+        // most-recent equality wins on ties. A hypothesis `A ∧ B` makes its
+        // equality legs available too (a mathematician who has `… ∧ x = y`
+        // just *has* `x = y` to rewrite with): a worklist decomposes nested
+        // conjunctions, projecting `And.left`/`And.right`, mirroring
+        // `collectContextFacts`. The leg propositions live in the same
+        // closed-over-N scope as the binder's proof `BoundVariable(N-1-b)`,
+        // so `And.left(A, B, proof)` is well-formed there.
+        struct EqualityWorkItem {
+            ExpressionPointer type;
+            ExpressionPointer proof;
+            int cost;
+            std::string source;
+        };
+        std::vector<EqualityWorkItem> work;
         for (int b = N - 1; b >= 0; --b) {
             int lift = N - b;
-            ExpressionPointer hypInScope = liftBoundVariables(
-                localBinders[b].type, lift, 0);
-            ExpressionPointer hypReduced = weakHeadNormalForm(
-                environment_, hypInScope);
+            work.push_back({
+                liftBoundVariables(localBinders[b].type, lift, 0),
+                makeBoundVariable(N - 1 - b), 1,
+                "local binder " + localBinders[b].name});
+        }
+        for (size_t cursor = 0; cursor < work.size() && cursor < 4096;
+             ++cursor) {
+            ExpressionPointer reduced = weakHeadNormalForm(
+                environment_, work[cursor].type);
             EqualityComponents components;
+            bool isEquality = true;
             try {
                 components = extractEqualityComponents(
-                    hypReduced, "local equality", 0);
-            } catch (const ElaborateError&) { continue; }
-            ContextEquality eq;
-            eq.cost = 1;
-            eq.source = "local binder " + localBinders[b].name;
-            eq.carrierType = components.carrierType;
-            eq.lhs = components.leftEndpoint;
-            eq.rhs = components.rightEndpoint;
-            eq.carrierLevel = components.carrierUniverseLevel;
-            eq.proofExpr = makeBoundVariable(N - 1 - b);
-            result.push_back(std::move(eq));
+                    reduced, "local equality", 0);
+            } catch (const ElaborateError&) { isEquality = false; }
+            if (isEquality) {
+                ContextEquality eq;
+                eq.cost = work[cursor].cost;
+                eq.source = work[cursor].source;
+                eq.carrierType = components.carrierType;
+                eq.lhs = components.leftEndpoint;
+                eq.rhs = components.rightEndpoint;
+                eq.carrierLevel = components.carrierUniverseLevel;
+                eq.proofExpr = work[cursor].proof;
+                result.push_back(std::move(eq));
+                continue;
+            }
+            // Conjunction: split into legs and keep decomposing.
+            auto* outerApp = std::get_if<Application>(&reduced->node);
+            if (!outerApp) continue;
+            auto* innerApp =
+                std::get_if<Application>(&outerApp->function->node);
+            if (!innerApp) continue;
+            auto* head =
+                std::get_if<Constant>(&innerApp->function->node);
+            if (!head || head->name != "And") continue;
+            ExpressionPointer leftType = innerApp->argument;   // A
+            ExpressionPointer rightType = outerApp->argument;  // B
+            ExpressionPointer proof = work[cursor].proof;
+            int childCost = work[cursor].cost + 1;
+            work.push_back({leftType,
+                makeApplication(makeApplication(makeApplication(
+                    makeConstant("And.left", {}), leftType), rightType),
+                    proof),
+                childCost, work[cursor].source + " (∧-left)"});
+            work.push_back({rightType,
+                makeApplication(makeApplication(makeApplication(
+                    makeConstant("And.right", {}), leftType), rightType),
+                    proof),
+                childCost, work[cursor].source + " (∧-right)"});
         }
         // Library lemmas matched against goal subexpressions
         // (cost 3) — walks Application subexpressions and queries

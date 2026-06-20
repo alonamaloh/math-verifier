@@ -84,47 +84,59 @@ inductive IntegralDomain.ListAssociate (d : IntegralDomain)
 theorem IntegralDomain.prime_divides_listProduct_member (d : IntegralDomain)
         (p : Ring.carrier(IntegralDomain.ring(d)))
         (primality : IntegralDomain.IsPrimeElement(d, p))
-        : (l : List(Ring.carrier(IntegralDomain.ring(d))))
-          → Ring.divides(IntegralDomain.ring(d), p,
-                IntegralDomain.listProduct(d, l))
+        (l : List(Ring.carrier(IntegralDomain.ring(d))))
+        : Ring.divides(IntegralDomain.ring(d), p,
+              IntegralDomain.listProduct(d, l))
           → ∃ (q : Ring.carrier(IntegralDomain.ring(d))).
               List.member(Ring.carrier(IntegralDomain.ring(d)), q, l)
-              ∧ Ring.divides(IntegralDomain.ring(d), p, q)
-  | List.empty =>
-      (pDividesOne :
-          Ring.divides(IntegralDomain.ring(d), p,
-              IntegralDomain.listProduct(d,
-                  List.empty(Ring.carrier(IntegralDomain.ring(d)))))) ↦ {
-        let ⟨_, pNotUnit, _⟩ := primality;
-        -- listProduct(empty) = 1, so pDividesOne says p is a unit.
-        absurd(pNotUnit(pDividesOne))
-      }
-  | List.prepend(head, tail) =>
-      (pDividesProduct :
-          Ring.divides(IntegralDomain.ring(d), p,
-              IntegralDomain.listProduct(d,
-                  List.prepend(Ring.carrier(IntegralDomain.ring(d)),
-                      head, tail)))) ↦ {
-        let ⟨_, _, primeDivides⟩ := primality;
-        -- listProduct(prepend(head,tail)) = head · listProduct(tail).
-        cases primeDivides(head, IntegralDomain.listProduct(d, tail),
-                  pDividesProduct) {
-          | Or.introduceLeft(pDividesHead) =>
-              ⟨head,
-               List.member.here(Ring.carrier(IntegralDomain.ring(d)),
-                   head, tail),
-               pDividesHead⟩
-          | Or.introduceRight(pDividesTail) => {
-              obtain ⟨q, qMember, pDividesQ⟩
-                  from IntegralDomain.prime_divides_listProduct_member(d, p,
-                           primality, tail, pDividesTail);
-              ⟨q,
-               List.member.there(Ring.carrier(IntegralDomain.ring(d)),
-                   q, head, tail, qMember),
-               pDividesQ⟩
-            }
+              ∧ Ring.divides(IntegralDomain.ring(d), p, q) :=
+  by_induction on l with memberFromTail {
+    case List.empty:
+        (pDividesOne :
+            Ring.divides(IntegralDomain.ring(d), p,
+                IntegralDomain.listProduct(d,
+                    List.empty(Ring.carrier(IntegralDomain.ring(d)))))) ↦ {
+          let ⟨_, pNotUnit, _⟩ := primality;
+          -- listProduct(empty) = 1, so pDividesOne says p is a unit.
+          absurd(pNotUnit(pDividesOne))
         }
-      }
+    case List.prepend(head, tail):
+        (pDividesProduct :
+            Ring.divides(IntegralDomain.ring(d), p,
+                IntegralDomain.listProduct(d,
+                    List.prepend(Ring.carrier(IntegralDomain.ring(d)),
+                        head, tail)))) ↦ {
+          let s : Ring := IntegralDomain.ring(d);
+          let ⟨_, _, primeDivides⟩ := primality;
+          -- listProduct(prepend(head,tail)) = head · listProduct(tail), so p
+          -- divides the product — and being prime, divides head or the tail.
+          claim Ring.divides(s, p, head)
+              ∨ Ring.divides(s, p, IntegralDomain.listProduct(d, tail))
+              by primeDivides(head, IntegralDomain.listProduct(d, tail),
+                     pDividesProduct);
+          claim by cases {
+            in (Ring.divides(s, p, head)) as pDividesHead: {
+                claim List.member(Ring.carrier(s), head,
+                    List.prepend(Ring.carrier(s), head, tail)) since List.member.here;
+                claim headWitness : List.member(Ring.carrier(s), head,
+                        List.prepend(Ring.carrier(s), head, tail))
+                      ∧ Ring.divides(s, p, head);
+                witness head with headWitness
+              }
+            in (Ring.divides(s, p, IntegralDomain.listProduct(d, tail))) as pDividesTail: {
+                choose q such that
+                    List.member(Ring.carrier(s), q, tail) ∧ Ring.divides(s, p, q)
+                    from memberFromTail(pDividesTail);
+                claim List.member(Ring.carrier(s), q,
+                    List.prepend(Ring.carrier(s), head, tail)) since List.member.there;
+                claim tailWitness : List.member(Ring.carrier(s), q,
+                        List.prepend(Ring.carrier(s), head, tail))
+                      ∧ Ring.divides(s, p, q);
+                witness q with tailWitness
+              }
+          }
+        }
+  }
 
 -- ----------------------------------------------------------------------
 -- A list of primes whose product is a unit is empty. (If it had a head
@@ -150,14 +162,17 @@ theorem IntegralDomain.prime_list_unit_product_empty (d : IntegralDomain)
             by allPrime(head,
                    List.member.here(Ring.carrier(s), head, tail));
         let ⟨_, headNotUnit, _⟩ := headIsPrime;
-        obtain ⟨unitInverse, oneEqualsProductInverse⟩ from productIsUnit;
-        -- oneEqualsProductInverse : 1 = listProduct(prepend(head,tail)) · unitInverse
-        --                             = head · (listProduct(tail) · unitInverse).
+        choose unitInverse such that
+            Ring.one(s) = IntegralDomain.listProduct(d,
+                              List.prepend(Ring.carrier(s), head, tail)) * unitInverse
+            from productIsUnit;
+        -- 1 = head · (listProduct(tail) · unitInverse), so head is a unit —
+        -- contradicting that a prime is not a unit.
         claim headIsUnit : Ring.IsUnit(s, head)
-            by ⟨IntegralDomain.listProduct(d, tail) * unitInverse,
-                calc Ring.one(s)
+            by witness IntegralDomain.listProduct(d, tail) * unitInverse with
+                (calc Ring.one(s)
                    = (head * IntegralDomain.listProduct(d, tail)) * unitInverse
-                   = head * (IntegralDomain.listProduct(d, tail) * unitInverse)⟩;
+                   = head * (IntegralDomain.listProduct(d, tail) * unitInverse));
         absurd(headNotUnit(headIsUnit))
       }
   }

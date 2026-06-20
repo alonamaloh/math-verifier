@@ -41,11 +41,10 @@ theorem IntegralDomain.unit_inverse_is_unit (d : IntegralDomain)
             Ring.IsUnit(IntegralDomain.ring(d), v)
             ∧ u * v = Ring.one(IntegralDomain.ring(d)) := {
   let s : Ring := IntegralDomain.ring(d);
-  obtain ⟨v, oneEqualsProduct⟩ from uIsUnit;
-  -- oneEqualsProduct : 1 = u·v.
-  ⟨v,
-   ⟨u, calc Ring.one(s) = u * v = v * u⟩,
-   Equality.symmetry(oneEqualsProduct)⟩
+  choose v such that Ring.one(s) = u * v from uIsUnit;
+  claim Ring.IsUnit(s, v) by witness u with (calc Ring.one(s) = u * v = v * u);
+  claim u * v = Ring.one(s);
+  witness v with (Ring.IsUnit(s, v) ∧ u * v = Ring.one(s))
 }
 
 -- Units are closed under multiplication: if u, w are units so is u·w.
@@ -55,14 +54,14 @@ theorem IntegralDomain.unit_product (d : IntegralDomain)
         (wIsUnit : Ring.IsUnit(IntegralDomain.ring(d), w))
         : Ring.IsUnit(IntegralDomain.ring(d), u * w) := {
   let s : Ring := IntegralDomain.ring(d);
-  obtain ⟨uInverse, oneEqualsUproduct⟩ from uIsUnit;
-  obtain ⟨wInverse, oneEqualsWproduct⟩ from wIsUnit;
-  calc (u * w) * (wInverse * uInverse)
-            = u * ((w * wInverse) * uInverse)
-            = u * (Ring.one(s) * uInverse)
-            = u * uInverse
-            = Ring.one(s) as productEqualsOne;
-  ⟨wInverse * uInverse, Equality.symmetry(productEqualsOne)⟩
+  choose uInverse such that Ring.one(s) = u * uInverse from uIsUnit;
+  choose wInverse such that Ring.one(s) = w * wInverse from wIsUnit;
+  witness wInverse * uInverse with
+    calc Ring.one(s)
+       = u * uInverse
+       = u * (Ring.one(s) * uInverse)
+       = u * ((w * wInverse) * uInverse)
+       = (u * w) * (wInverse * uInverse)
 }
 
 -- ----------------------------------------------------------------------
@@ -77,10 +76,12 @@ definition IntegralDomain.Associate (d : IntegralDomain)
 -- Reflexive: a = a·1 and 1 is a unit.
 theorem IntegralDomain.associate_reflexive (d : IntegralDomain)
         (a : Ring.carrier(IntegralDomain.ring(d)))
-        : IntegralDomain.Associate(d, a, a) :=
-  ⟨Ring.one(IntegralDomain.ring(d)),
-   Ring.one_is_unit(IntegralDomain.ring(d)),
-   Equality.symmetry(Ring.multiply_one(IntegralDomain.ring(d), a))⟩
+        : IntegralDomain.Associate(d, a, a) := {
+  let s : Ring := IntegralDomain.ring(d);
+  claim Ring.IsUnit(s, Ring.one(s)) since Ring.one_is_unit;
+  claim a = a * Ring.one(s);
+  witness Ring.one(s) with (Ring.IsUnit(s, Ring.one(s)) ∧ a = a * Ring.one(s))
+}
 
 -- Symmetric: if b = a·u with u a unit (inverse v), then a = b·v.
 theorem IntegralDomain.associate_symmetric (d : IntegralDomain)
@@ -88,16 +89,12 @@ theorem IntegralDomain.associate_symmetric (d : IntegralDomain)
         (associated : IntegralDomain.Associate(d, a, b))
         : IntegralDomain.Associate(d, b, a) := {
   let s : Ring := IntegralDomain.ring(d);
-  obtain ⟨u, uIsUnit, bEqualsAu⟩ from associated;
-  obtain ⟨v, vIsUnit, uvEqualsOne⟩
-      from IntegralDomain.unit_inverse_is_unit(d, u, uIsUnit);
-  -- bEqualsAu : b = a·u; uvEqualsOne : u·v = 1.
-  ⟨v, vIsUnit,
-   calc a
-      = a * Ring.one(s)
-      = a * (u * v)
-      = (a * u) * v
-      = b * v⟩
+  choose u such that Ring.IsUnit(s, u) ∧ b = a * u from associated;
+  claim ∃ (v : Ring.carrier(s)). Ring.IsUnit(s, v) ∧ u * v = Ring.one(s)
+      since IntegralDomain.unit_inverse_is_unit;
+  choose v such that Ring.IsUnit(s, v) ∧ u * v = Ring.one(s);
+  calc a = a * Ring.one(s) = a * (u * v) = (a * u) * v = b * v;
+  witness v with (Ring.IsUnit(s, v) ∧ a = b * v)
 }
 
 -- Transitive: associate is closed under composing unit factors.
@@ -106,13 +103,12 @@ theorem IntegralDomain.associate_transitive (d : IntegralDomain)
         (associatedAB : IntegralDomain.Associate(d, a, b))
         (associatedBC : IntegralDomain.Associate(d, b, c))
         : IntegralDomain.Associate(d, a, c) := {
-  obtain ⟨u, uIsUnit, bEqualsAu⟩ from associatedAB;
-  obtain ⟨w, wIsUnit, cEqualsBw⟩ from associatedBC;
-  ⟨u * w, IntegralDomain.unit_product(d, u, w, uIsUnit, wIsUnit),
-   calc c
-      = b * w
-      = (a * u) * w
-      = a * (u * w)⟩
+  let s : Ring := IntegralDomain.ring(d);
+  choose u such that Ring.IsUnit(s, u) ∧ b = a * u from associatedAB;
+  choose w such that Ring.IsUnit(s, w) ∧ c = b * w from associatedBC;
+  claim Ring.IsUnit(s, u * w) since IntegralDomain.unit_product;
+  calc c = b * w = (a * u) * w = a * (u * w);
+  witness u * w with (Ring.IsUnit(s, u * w) ∧ c = a * (u * w))
 }
 
 -- ----------------------------------------------------------------------
@@ -126,11 +122,15 @@ theorem IntegralDomain.associate_of_divides_irreducible (d : IntegralDomain)
         (pNotUnit : ¬(Ring.IsUnit(IntegralDomain.ring(d), p)))
         (pDividesQ : Ring.divides(IntegralDomain.ring(d), p, q))
         : IntegralDomain.Associate(d, p, q) := {
+  let s : Ring := IntegralDomain.ring(d);
   let ⟨_, _, factorClause⟩ := qIrreducible;
-  obtain ⟨c, qEqualsPc⟩ from pDividesQ;
-  -- qEqualsPc : q = p·c.
-  cases factorClause(p, c, qEqualsPc) {
-    | Or.introduceLeft(pIsUnit) => absurd(pNotUnit(pIsUnit))
-    | Or.introduceRight(cIsUnit) => ⟨c, cIsUnit, qEqualsPc⟩
+  choose c such that q = p * c as qEqualsPc from pDividesQ;
+  claim Ring.IsUnit(s, p) ∨ Ring.IsUnit(s, c) by factorClause(p, c, qEqualsPc);
+  claim by cases {
+    in (Ring.IsUnit(s, p)) as pIsUnit: absurd(pNotUnit(pIsUnit))
+    in (Ring.IsUnit(s, c)) as cIsUnit: {
+        claim cAssociate : Ring.IsUnit(s, c) ∧ q = p * c;
+        witness c with cAssociate
+      }
   }
 }
