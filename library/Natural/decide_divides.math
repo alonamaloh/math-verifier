@@ -41,7 +41,7 @@ theorem Natural.le_q_d_mult_q
     case successor(predD):
         calc q
            ≤ q + predD * q          by Natural.less_or_equal_add_right
-           = successor(predD) * q   by Natural.successor_multiply(predD, q)
+           = successor(predD) * q
   }
 
 -- Bounded quotient search. Returns either a witness q ≤ bound with
@@ -55,86 +55,78 @@ theorem Natural.search_quotient_witness_up_to
     case zero: {
         claim (n = d * 0) ∨ (n ≠ d * 0)
         claim by cases {
-          in (n = d * 0) as nEqualsDTimesZero:
-              Or.introduceLeft(
-                  ⟨0,
-                   ⟨done,
-                    nEqualsDTimesZero⟩⟩)
-          in (n ≠ d * 0) as nNotDTimesZero:
-              Or.introduceRight(
-                  (q : Natural)
-                      (quotientLessOrEqualZero : q ≤ 0)
-                      (nEqualsDTimesQuotient : n = d * q) ↦ {
-                    -- q ≤ 0 forces q = 0, so n = d·q = d·0 — contradiction.
-                    claim qIsZero : q = 0
-                        by Natural.less_or_equal_zero_implies_equals_zero;
-                    claim nEqualsDTimesZero : n = d * 0
-                        by substituting qIsZero;
-                    nNotDTimesZero(nEqualsDTimesZero)
-                  })
+          in (n = d * 0) as nEqualsDTimesZero: {
+              claim ∃ (q : Natural). q ≤ 0 ∧ n = d * q by {
+                witness 0 with (0 ≤ 0 ∧ n = d * 0)
+              };
+              done
+          }
+          in (n ≠ d * 0) as nNotDTimesZero: {
+              claim ∀ (q : Natural). q ≤ 0 → n ≠ d * q by {
+                take q : Natural;
+                suppose q ≤ 0 as quotientLessOrEqualZero;
+                suppose n = d * q as nEqualsDTimesQuotient;
+                claim qIsZero : q = 0 since Natural.less_or_equal_zero_implies_equals_zero;
+                claim n = d * 0 by substituting qIsZero;
+                done
+              };
+              done
+          }
         }
       }
-    case successor(prevBound):
-      cases IH {
-        | Or.introduceLeft(foundEarlier) => {
-            -- Found earlier: propagate, boosting the bound proof.
-            obtain ⟨q, qLePrevBound, nEqualsDTimesQuotient⟩ from foundEarlier;
-            Or.introduceLeft(
-                witness q with
-                    ⟨Natural.le_step(q, prevBound, qLePrevBound),
-                     nEqualsDTimesQuotient⟩)
+    case successor(prevBound): {
+        claim by cases {
+          in (∃ (q : Natural). q ≤ prevBound ∧ n = d * q) as foundEarlier: {
+              choose q such that q ≤ prevBound ∧ n = d * q from foundEarlier;
+              claim ∃ (qNext : Natural). qNext ≤ successor(prevBound) ∧ n = d * qNext by {
+                claim q ≤ successor(prevBound) since Natural.le_step;
+                witness q with (q ≤ successor(prevBound) ∧ n = d * q)
+              };
+              done
           }
-        | Or.introduceRight(noneEarlier) => {
-            -- Not found in [0, prevBound]: check q = successor(prevBound).
-            claim (n = d * successor(prevBound)) ∨ (n ≠ d * successor(prevBound))
-            claim by cases {
-              in (n = d * successor(prevBound)) as nEqualsDTimesSuccessorPrevious:
-                  Or.introduceLeft(
-                      ⟨successor(prevBound),
-                       ⟨done,
-                        nEqualsDTimesSuccessorPrevious⟩⟩)
-              in (n ≠ d * successor(prevBound)) as nNotDTimesSuccessorPrevious:
-                  Or.introduceRight(
-                      (q : Natural)
-                          (quotientLessOrEqualSuccessorPrevious :
-                              q ≤ successor(prevBound))
-                          (nEqualsDTimesQuotient : n = d * q) ↦ {
-                            -- q ≤ successor(prevBound): either q = successor(prevBound)
-                            -- (contradicts nNotDTimesSuccessorPrevious) or q ≤ prevBound
-                            -- (contradicts noneEarlier).
-                            claim (q = successor(prevBound))
-                                  ∨ (∃ (bPredecessor : Natural). successor(prevBound) =
-                                                  successor(bPredecessor) ∧ q ≤ bPredecessor)
-                            claim by cases {
-                              in (q = successor(prevBound)) as quotientEqualsSuccessorPrevious: {
-                                  -- q = successor(prevBound) ⇒ n = d·successor(prevBound).
-                                  claim nEqualsDTimesSuccessor
-                                        : n = d * successor(prevBound)
-                                      by substituting quotientEqualsSuccessorPrevious;
-                                  nNotDTimesSuccessorPrevious(nEqualsDTimesSuccessor)
-                                }
-                              in (∃ (bPredecessor : Natural). successor(prevBound) =
-                                                  successor(bPredecessor) ∧ q ≤ bPredecessor) as existsProof: {
-                                  obtain ⟨bPredecessor, successorEquals,
-                                          quotientLessOrEqualBPredecessor⟩
-                                      from existsProof;
-                                  -- strip successors: prevBound = bPredecessor, so
-                                  -- q ≤ bPredecessor becomes q ≤ prevBound.
-                                  claim prevBoundEqualsBPredecessor
-                                        : prevBound = bPredecessor
-                                      by Natural.successor_injective;
-                                  claim quotientLessOrEqualPrevBound
-                                        : q ≤ prevBound
-                                      by substituting prevBoundEqualsBPredecessor;
-                                  noneEarlier(
-                                      q,
-                                      quotientLessOrEqualPrevBound,
-                                      nEqualsDTimesQuotient)
-                              }
-                            }
-                          })
-            }
+          in (∀ (q : Natural). q ≤ prevBound → n ≠ d * q) as noneEarlier: {
+              claim (n = d * successor(prevBound)) ∨ (n ≠ d * successor(prevBound))
+              claim by cases {
+                in (n = d * successor(prevBound)) as nEqualsDTimesSuccessorPrevious: {
+                    claim ∃ (q : Natural). q ≤ successor(prevBound) ∧ n = d * q by {
+                      witness successor(prevBound)
+                          with (successor(prevBound) ≤ successor(prevBound) ∧ n = d * successor(prevBound))
+                    };
+                    done
+                }
+                in (n ≠ d * successor(prevBound)) as nNotDTimesSuccessorPrevious: {
+                    claim ∀ (q : Natural). q ≤ successor(prevBound) → n ≠ d * q by {
+                      take q : Natural;
+                      suppose q ≤ successor(prevBound) as quotientLessOrEqualSuccessorPrevious;
+                      suppose n = d * q as nEqualsDTimesQuotient;
+                      -- q ≤ successor(prevBound) means q = successor(prevBound) (contradicts
+                      -- this branch's hypothesis) or q ≤ prevBound (contradicts noneEarlier).
+                      claim (q = successor(prevBound))
+                            ∨ (∃ (bPredecessor : Natural).
+                                  successor(prevBound) = successor(bPredecessor) ∧ q ≤ bPredecessor)
+                      claim by cases {
+                        in (q = successor(prevBound)) as quotientEqualsSuccessorPrevious: {
+                            claim n = d * successor(prevBound) by substituting quotientEqualsSuccessorPrevious;
+                            done
+                        }
+                        in (∃ (bPredecessor : Natural).
+                              successor(prevBound) = successor(bPredecessor) ∧ q ≤ bPredecessor)
+                            as smallerBound: {
+                            choose bPredecessor such that
+                                successor(prevBound) = successor(bPredecessor) ∧ q ≤ bPredecessor
+                                from smallerBound;
+                            claim prevBoundEqualsBPredecessor : prevBound = bPredecessor
+                                since Natural.successor_injective;
+                            claim q ≤ prevBound by substituting prevBoundEqualsBPredecessor;
+                            done by noneEarlier(q)
+                        }
+                      }
+                    };
+                    done
+                }
+              }
           }
+        }
       }
   }
 
@@ -149,45 +141,48 @@ theorem Natural.decides_divides
     | zero => {
         claim (n = 0) ∨ (n ≠ 0)
         claim by cases {
-          in (n = 0) as nEqualsZero:
+          in (n = 0) as nEqualsZero: {
               -- 0 ∣ n with witness q = 0: 0 · 0 = 0 = n.
-              Or.introduceLeft(⟨0, nEqualsZero⟩)
-          in (n ≠ 0) as nNotEqualZero:
+              claim 0 ∣ n;
+              done
+          }
+          in (n ≠ 0) as nNotEqualZero: {
               -- A divisibility witness would give n = 0 · q = 0,
               -- contradicting nNotEqualZero.
-              Or.introduceRight((divProof : 0 ∣ n) ↦ {
-                obtain ⟨q, nEqMulZeroQ⟩ from divProof;
-                nNotEqualZero(nEqMulZeroQ)
-              })
+              claim 0 ∤ n by {
+                suppose 0 ∣ n as divProof;
+                choose q such that n = 0 * q as nEqualsZeroTimesQuotient from divProof;
+                claim n = 0 by substituting nEqualsZeroTimesQuotient;
+                done
+              };
+              done
+          }
         }
       }
     | successor(predD) => {
         claim (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
               ∨ (∀ (q : Natural). q ≤ n → n ≠ successor(predD) * q)
         claim by cases {
-          in (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
-              as foundWitness:
+          in (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q) as foundWitness: {
               -- Witness found; that's the divisor.
-              { obtain ⟨q, _, nEqualsDTimesQuotient⟩
-                    from foundWitness;
-                Or.introduceLeft(⟨q, nEqualsDTimesQuotient⟩) }
-          in (∀ (q : Natural). q ≤ n → n ≠ successor(predD) * q)
-              as noQuotientInRange:
-              -- A divisibility witness gives some q with n = d · q.
-              -- The cap lemma forces q ≤ d · q = n; then
-              -- noQuotientInRange contradicts.
-              Or.introduceRight(
-                  (divProof : successor(predD) ∣ n) ↦ {
-                obtain ⟨q, nEqualsDTimesQuotient⟩ from divProof;
-                -- successor(predD) ≥ 1, so q ≤ successor(predD)·q = n.
-                claim 0 ≤ predD by Natural.zero_least;
-                claim 1 ≤ successor(predD)
-                    by Natural.successor_less_or_equal_successor;
-                claim q ≤ successor(predD) * q
-                    by Natural.le_q_d_mult_q;
-                claim qLeN : q ≤ n by substituting nEqualsDTimesQuotient;
-                noQuotientInRange(q, qLeN, nEqualsDTimesQuotient)
-              })
+              choose q such that q ≤ n ∧ n = successor(predD) * q from foundWitness;
+              claim successor(predD) ∣ n;
+              done
+          }
+          in (∀ (q : Natural). q ≤ n → n ≠ successor(predD) * q) as noQuotientInRange: {
+              -- A divisibility witness gives some q with n = d · q; the cap
+              -- lemma forces q ≤ d · q = n, which noQuotientInRange forbids.
+              claim successor(predD) ∤ n by {
+                suppose successor(predD) ∣ n as divProof;
+                choose q such that n = successor(predD) * q as nEqualsDTimesQuotient
+                    from divProof;
+                claim 1 ≤ successor(predD) since Natural.successor_less_or_equal_successor;
+                claim q ≤ successor(predD) * q since Natural.le_q_d_mult_q;
+                claim q ≤ n by substituting nEqualsDTimesQuotient;
+                done by noQuotientInRange(q)
+              };
+              done
+          }
         }
       }
   }
