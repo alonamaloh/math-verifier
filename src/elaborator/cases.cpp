@@ -6,6 +6,26 @@
 
 #include "elaborator/internal.hpp"
 
+// The logical connectives whose tuple encoding should never show in surface
+// proofs: `And` and `Exists` ARE single-constructor inductives (so `⟨…⟩`
+// builds/destructures them), but a reader should never see that they happen to
+// be tuples underneath. (`Or` has two constructors, so `⟨…⟩` can't touch it.)
+// Genuine data records — `Ring`, `Group`, `Subtype`, a quotient representative
+// — are honestly tuples and stay un-flagged. A future per-inductive
+// "not publicly a tuple" attribute could replace this hard-coded set.
+static bool isConnectiveNotPubliclyTuple(const std::string& inductiveHead) {
+    return inductiveHead == "And" || inductiveHead == "Exists";
+}
+
+// The check is opt-in (audit tool, not day-to-day build noise): set
+// MATH_CHECK_ANON_TUPLES=1 to surface every user-written `⟨…⟩` that builds or
+// destructures a logical connective. Read once.
+static bool anonTupleConnectiveCheckEnabled() {
+    static const bool on =
+        std::getenv("MATH_CHECK_ANON_TUPLES") != nullptr;
+    return on;
+}
+
 ExpressionPointer Elaborator::elaborateSorry(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
@@ -118,6 +138,15 @@ ExpressionPointer Elaborator::elaborateAnonymousTuple(
                 + ": expected type's head '" + constant->name
                 + "' is not an inductive");
         }
+        if (anonTupleConnectiveCheckEnabled()
+            && tuple.userWritten
+            && isConnectiveNotPubliclyTuple(constant->name)) {
+            std::cerr << "warning: " << moduleName_ << ":" << line
+                << ": ⟨…⟩ builds a '" << constant->name
+                << "' — a logical connective, not publicly a tuple; prove it"
+                   " with a `claim`/`done` (for ∧) or `witness … with <prop>`"
+                   " (for ∃) instead of exposing its tuple encoding\n";
+        }
         if (inductive->constructorNames.size() != 1) {
             throw ElaborateError(
                 "anonymous tuple '⟨...⟩' at line "
@@ -159,7 +188,7 @@ ExpressionPointer Elaborator::elaborateAnonymousTuple(
             std::vector<SurfaceExpressionPointer> tail(
                 tuple.components.begin() + 1, tuple.components.end());
             components.push_back(makeSurfaceAnonymousTuple(
-                std::move(tail), line, column));
+                std::move(tail), line, column, tuple.userWritten));
         } else {
             throw ElaborateError(
                 "anonymous tuple '⟨...⟩' at line "
@@ -1292,6 +1321,17 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
             SurfaceExpressionPointer body = clause.body;
             if (auto* tupleNode = std::get_if<SurfacePatternTuple>(
                     &pattern->node)) {
+                if (anonTupleConnectiveCheckEnabled()
+                    && tupleNode->userWritten
+                    && isConnectiveNotPubliclyTuple(constant->name)) {
+                    std::cerr << "warning: " << moduleName_ << ":"
+                        << clause.line
+                        << ": ⟨…⟩ destructures a '" << constant->name
+                        << "' — a logical connective, not publicly a tuple;"
+                           " use `choose … such that …` (for ∃) or take the"
+                           " conjuncts via `done`/`since`/`by cases` (for ∧)"
+                           " instead of exposing its tuple encoding\n";
+                }
                 if (inductive->constructorNames.size() != 1) {
                     throw ElaborateError(
                         "cases at line " + std::to_string(clause.line)
@@ -1345,7 +1385,8 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                     SurfacePatternPointer restPattern =
                         makeSurfacePatternTuple(
                             std::move(restComponents),
-                            clause.line, clause.column);
+                            clause.line, clause.column,
+                            tupleNode->userWritten);
                     SurfaceExpressionPointer freshReference =
                         makeSurfaceIdentifier(freshName, {},
                                                clause.line, clause.column);

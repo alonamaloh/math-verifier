@@ -234,7 +234,8 @@ ExpressionPointer Elaborator::elaborateChoose(
             makeSurfacePatternBareName(
                 std::move(predHypName), line, column));
         SurfacePatternPointer tuplePattern = makeSurfacePatternTuple(
-            std::move(patternComponents), line, column);
+            std::move(patternComponents), line, column,
+            /*userWritten=*/false);
         SurfaceCasesClause clause;
         clause.pattern = std::move(tuplePattern);
         clause.body = choose.body;

@@ -1,0 +1,36 @@
+-- The type-aware "not publicly a tuple" check (opt-in via
+-- MATH_CHECK_ANON_TUPLES=1) warns when a USER-written `⟨…⟩` builds or
+-- destructures a logical connective (`And`/`Exists`), whose tuple encoding
+-- should stay hidden — while leaving the math-like `witness`/`choose` forms
+-- (and genuine data-record tuples) alone. This file exercises all the paths so
+-- they keep elaborating; the warning behaviour itself is checked by
+-- `make anon-tuple-report`.
+
+module Test.connective_tuple_flag_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+
+-- WOULD warn (build/destructure a connective via literal ⟨…⟩):
+theorem build_and (A B : Proposition) (a : A) (b : B) : A ∧ B :=
+  ⟨a, b⟩
+theorem destructure_and (A B : Proposition) (h : A ∧ B) : A := {
+  let ⟨left, _⟩ := h;
+  left
+}
+theorem build_exists (P : Natural → Proposition) (k : Natural) (pk : P(k))
+        : ∃ (n : Natural). P(n) :=
+  ⟨k, pk⟩
+
+-- Would NOT warn (the math-like forms): `witness` builds the ∃, `choose`
+-- destructures it.
+theorem build_exists_witness (P : Natural → Proposition) (k : Natural) (pk : P(k))
+        : ∃ (n : Natural). P(n) :=
+  witness k with pk
+theorem use_choose (P : Natural → Proposition) (h : ∃ (n : Natural). P(n))
+        : ∃ (n : Natural). P(n) := {
+  choose w such that P(w) from h;
+  witness w with P(w)
+}

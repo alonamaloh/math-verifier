@@ -184,6 +184,11 @@ struct SurfaceUnaryOperation {
 // N-ary tuples right-associate: `⟨a, b, c⟩` ≡ `⟨a, ⟨b, c⟩⟩`.
 struct SurfaceAnonymousTuple {
     std::vector<SurfaceExpressionPointer> components;
+    // True for a literal `⟨…⟩` the user wrote, false when synthesised by a
+    // math-like shorthand (`witness E with P`). Only user-written tuples are
+    // flagged when they build a logical connective (`And`/`Exists`) — `witness`
+    // is the recommended ∃ form and must not warn.
+    bool userWritten = true;
 };
 
 // `cases scrutinee { | pattern => body  | pattern => body  ... }`. The
@@ -632,9 +637,9 @@ inline SurfaceExpressionPointer makeSurfaceUnaryOperation(
 }
 inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
     std::vector<SurfaceExpressionPointer> components,
-    int line, int column) {
+    int line, int column, bool userWritten = true) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceAnonymousTuple{std::move(components)}, line, column});
+        SurfaceAnonymousTuple{std::move(components), userWritten}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceSorry(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
@@ -777,6 +782,13 @@ struct SurfacePatternConstructor {
 // scrutinee's type, matching the same logic as SurfaceAnonymousTuple.
 struct SurfacePatternTuple {
     std::vector<SurfacePatternPointer> components;
+    // True when the `⟨…⟩` was written by the user (a literal tuple pattern in
+    // `let ⟨…⟩ :=` / `obtain ⟨…⟩` / `cases { | ⟨…⟩ => }`), false when the
+    // elaborator synthesised it (e.g. desugaring `choose … such that …`). Only
+    // user-written tuples are flagged when they destructure a logical
+    // connective (`And`/`Exists`) — `choose` is the math-like form and must
+    // not warn.
+    bool userWritten = true;
 };
 struct SurfacePattern {
     std::variant<SurfacePatternBareName, SurfacePatternConstructor,
@@ -801,9 +813,9 @@ inline SurfacePatternPointer makeSurfacePatternConstructor(
 }
 inline SurfacePatternPointer makeSurfacePatternTuple(
     std::vector<SurfacePatternPointer> components,
-    int line, int column) {
+    int line, int column, bool userWritten = true) {
     return std::make_shared<const SurfacePattern>(
-        SurfacePattern{SurfacePatternTuple{std::move(components)},
+        SurfacePattern{SurfacePatternTuple{std::move(components), userWritten},
                        line, column});
 }
 

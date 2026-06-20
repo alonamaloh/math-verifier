@@ -275,7 +275,21 @@ leak-report:
 leak-ratchet:
 	@scripts/cic_leak_report --max $(LEAK_BUDGET)
 
-.PHONY: leak-report leak-ratchet
+# Type-aware audit: every user-written `⟨…⟩` that builds or destructures a
+# logical connective (`And`/`Exists`) — the "conjunctions are secretly tuples"
+# tell. The check lives in the elaborator (it needs the expected/scrutinee
+# type), gated off by default so normal builds stay quiet; this target turns it
+# on and re-verifies the whole library, grouping the warnings by file.
+# Restricted to the clean manifest (the bounded "reads like math" set), not the
+# whole library — the manifest is exactly the set we hold to this standard.
+anon-tuple-report:
+	@rm -f $(CLEAN_MATHV_FILES)
+	@MATH_CHECK_ANON_TUPLES=1 $(MAKE) clean-check 2>&1 \
+	  | grep "not publicly a tuple" \
+	  | sed -E 's/^warning: ([A-Za-z0-9_.]+):[0-9]+: ⟨…⟩ (builds|destructures) a .(And|Exists).*/\2 \3  \1/' \
+	  | sort | uniq -c | sort -rn
+
+.PHONY: leak-report leak-ratchet anon-tuple-report
 
 # ----------------------------------------------------------------------
 # Error-provenance audit (PLAN_LESS_CIC_STYLE.md, Phase 0.3). Runs the

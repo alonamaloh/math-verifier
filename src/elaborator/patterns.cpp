@@ -1665,7 +1665,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                     recursiveArgToHypothesis, outerBinderCount));
             }
             return makeSurfaceAnonymousTuple(
-                std::move(rewrittenComponents), node.line, node.column);
+                std::move(rewrittenComponents), node.line, node.column,
+                tuple->userWritten);
         }
         if (auto* note = std::get_if<SurfaceNote>(&node.node)) {
             auto rewriteOrNull = [&](const SurfaceExpressionPointer& sub) {

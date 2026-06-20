@@ -239,7 +239,7 @@ SurfaceExpressionPointer substituteSurfaceName(
                 component, targetName, replacement));
         }
         return makeSurfaceAnonymousTuple(std::move(newComponents),
-                                          line, column);
+                                          line, column, tuple->userWritten);
     }
     if (auto* cases = std::get_if<SurfaceCases>(&node.node)) {
         SurfaceExpressionPointer newScrutinee = substituteSurfaceName(
@@ -3499,7 +3499,8 @@ private:
         components.push_back(std::move(witnessProof));
         return makeSurfaceAnonymousTuple(
             std::move(components),
-            witnessToken.line, witnessToken.column);
+            witnessToken.line, witnessToken.column,
+            /*userWritten=*/false);
     }
 
     // `∀ (binder)+ . body` desugars to a Pi chain `(binder)+ → body`.
