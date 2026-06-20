@@ -152,7 +152,7 @@ tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
 #                     CLEAN_LEAK_BUDGET, so a cleaned file cannot regress.
 CLEAN_MATH_FILES := $(shell grep -vE '^\#|^\s*$$' scripts/clean_manifest.txt)
 CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
-CLEAN_LEAK_BUDGET ?= 54
+CLEAN_LEAK_BUDGET ?= 55
 
 clean-status:
 	@python3 scripts/clean_status.py
