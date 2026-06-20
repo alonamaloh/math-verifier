@@ -42,21 +42,16 @@ theorem Rational.IsNonneg_forward_helper
         (equivalenceHypothesis : n1 * d2 = n2 * d1)
         (numeratorProductNonneg : Integer.IsNonneg(n1 * d1))
         : Integer.IsNonneg(n2 * d2) := {
-    claim productIdentity : (n2 * d2) * (d1 * d1) = (n1 * d1) * (d2 * d2)
-        by calc (n2 * d2) * (d1 * d1)
-              = (n2 * d1) * (d1 * d2)   by ring
-              = (n1 * d2) * (d1 * d2)   by substituting equivalenceHypothesis
-              = (n1 * d1) * (d2 * d2)   by ring;
-    claim Integer.IsNonneg(d2 * d2) by Integer.square_IsNonneg;
-    claim Integer.IsNonneg((n1 * d1) * (d2 * d2))
-        by Integer.multiply_nonneg;
-    claim targetScaledNonneg : Integer.IsNonneg((n2 * d2) * (d1 * d1))
-        by substituting productIdentity;
-    claim d1SquareNonneg : Integer.IsNonneg(d1 * d1) by Integer.square_IsNonneg;
-    claim d1SquareNonzero : ¬(d1 * d1 = Integer.zero)
-        by Integer.multiply_nonzero;
-    Integer.IsNonneg_of_product_with_positive(
-        n2 * d2, d1 * d1, targetScaledNonneg, d1SquareNonneg, d1SquareNonzero)
+    calc (n2 * d2) * (d1 * d1)
+       = (n2 * d1) * (d1 * d2)
+       = (n1 * d2) * (d1 * d2)   since equivalenceHypothesis
+       = (n1 * d1) * (d2 * d2)   as productIdentity;
+    claim Integer.IsNonneg(d2 * d2) since Integer.square_IsNonneg;
+    claim Integer.IsNonneg((n1 * d1) * (d2 * d2)) since Integer.multiply_nonneg;
+    claim Integer.IsNonneg((n2 * d2) * (d1 * d1)) by substituting productIdentity;
+    claim Integer.IsNonneg(d1 * d1) since Integer.square_IsNonneg;
+    claim ¬(d1 * d1 = Integer.zero) since Integer.multiply_nonzero;
+    done since Integer.IsNonneg_of_product_with_positive
 }
 
 -- Respect: via propositional extensionality, both directions are the
@@ -69,15 +64,16 @@ theorem Rational.IsNonneg_respect
   cases rep1 refining equivalenceHypothesis {
     | RationalRepresentative.make(n1, d1, d1Nonzero) =>
         cases rep2 refining equivalenceHypothesis {
-          | RationalRepresentative.make(n2, d2, d2Nonzero) =>
-              Equality.propositional_extensionality(
-                  Integer.IsNonneg(n1 * d1),
-                  Integer.IsNonneg(n2 * d2),
-                  Rational.IsNonneg_forward_helper(
-                      n1, n2, d1, d2, d1Nonzero, d2Nonzero, equivalenceHypothesis),
-                  Rational.IsNonneg_forward_helper(
-                      n2, n1, d2, d1, d2Nonzero, d1Nonzero,
-                      Equality.symmetry(equivalenceHypothesis)))
+          | RationalRepresentative.make(n2, d2, d2Nonzero) => {
+              claim Integer.IsNonneg(n1 * d1) → Integer.IsNonneg(n2 * d2)
+                  since Rational.IsNonneg_forward_helper;
+              claim Integer.IsNonneg(n2 * d2) → Integer.IsNonneg(n1 * d1) by {
+                  suppose Integer.IsNonneg(n2 * d2) as numeratorProductNonneg;
+                  calc n2 * d1 = n1 * d2   since equivalenceHypothesis;
+                  done since Rational.IsNonneg_forward_helper
+              };
+              done since Equality.propositional_extensionality
+          }
         }
   }
 

@@ -66,13 +66,8 @@ definition Integer.commutative_ring_bundle : CommutativeRing :=
 
 theorem Integer.one_not_zero : ¬(Integer.one = Integer.zero) := {
   suppose Integer.one = Integer.zero as oneEqualsZero;
-  calc Natural.to_integer(1)
-            = Integer.one
-            = Integer.zero
-            = Natural.to_integer(0) as castsEqual;
-  absurd(Natural.zero_not_successor(0,
-      Equality.symmetry(
-          Natural.to_integer.injective(1, 0, castsEqual))))
+  claim 1 = 0 since Natural.to_integer.injective;
+  absurd(0 = successor(0))
 }
 
 -- ----------------------------------------------------------------------
@@ -84,12 +79,14 @@ theorem Integer.multiply_eq_zero_implies (x y : Integer)
   decide y = Integer.zero {
     | yes yIsZero => okay
     | no yNonzero => {
-        claim xIsZero : x = Integer.zero by {
-          cases Integer.sign_split(y) {
+        claim x = Integer.zero by {
+          claim signSplit
+              : Integer.IsNonneg(y) ∨ ∃ (k : Natural). y = -(k : Integer)
+              since Integer.sign_split;
+          cases signSplit {
             | Or.introduceLeft(yNonneg) => {
-                obtain ⟨n, yIsImage⟩ from yNonneg;
-                -- y = (n : Integer); n ≠ 0 (else y = 0).
-                claim nNonzero : ¬(n = 0) by {
+                choose n such that y = (n : Integer) from yNonneg;
+                claim ¬(n = 0) by {
                   suppose n = 0 as nZero;
                   absurd(yNonzero(
                       calc y
@@ -97,18 +94,16 @@ theorem Integer.multiply_eq_zero_implies (x y : Integer)
                          = Natural.to_integer(0)
                          = Integer.zero))
                 };
-                claim oneAtMostN : 1 ≤ n by Natural.one_le_of_nonzero;
+                claim 1 ≤ n since Natural.one_le_of_nonzero;
                 calc x * (n : Integer)
                           = x * y
                           = Integer.zero
-                          = Integer.zero * (n : Integer) as productCancellable;
-                Integer.multiply_cancel_right_by_positive_natural(
-                    x, Integer.zero, n, oneAtMostN, productCancellable)
+                          = Integer.zero * (n : Integer);
+                done since Integer.multiply_cancel_right_by_positive_natural
               }
             | Or.introduceRight(yNegative) => {
-                obtain ⟨n, yIsNegativeImage⟩ from yNegative;
-                -- y = -(n : Integer); n ≠ 0 (else y = 0).
-                claim nNonzero : ¬(n = 0) by {
+                choose n such that y = -(n : Integer) from yNegative;
+                claim ¬(n = 0) by {
                   suppose n = 0 as nZero;
                   absurd(yNonzero(
                       calc y
@@ -116,20 +111,17 @@ theorem Integer.multiply_eq_zero_implies (x y : Integer)
                          = -Natural.to_integer(0)
                          = Integer.zero))
                 };
-                claim oneAtMostN : 1 ≤ n by Natural.one_le_of_nonzero;
-                claim productCancellable
-                    : x * (n : Integer) = Integer.zero * (n : Integer)
-                    by calc x * (n : Integer)
+                claim 1 ≤ n since Natural.one_le_of_nonzero;
+                calc x * (n : Integer)
                           = x * (-y)            by substituting (y = -(n : Integer))
-                          = -(x * y)            by ring
-                          = -Integer.zero       by substituting (x * y = Integer.zero)
-                          = Integer.zero * (n : Integer)   by ring;
-                Integer.multiply_cancel_right_by_positive_natural(
-                    x, Integer.zero, n, oneAtMostN, productCancellable)
+                          = -(x * y)
+                          = -Integer.zero
+                          = Integer.zero * (n : Integer);
+                done since Integer.multiply_cancel_right_by_positive_natural
               }
           }
         };
-        Or.introduceLeft(xIsZero)
+        done
       }
   }
 }
