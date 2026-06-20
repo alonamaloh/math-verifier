@@ -2093,12 +2093,19 @@ private:
             if (isRelationalKind(peek().kind)) {
                 throwHere("relational operators are non-associative");
             }
+            // `>` / `≥` are pure notation for the reverse of `<` / `≤`:
+            // `a > b` is `b < a` and `a ≥ b` is `b ≤ a`. We desugar them
+            // here by swapping the operands and emitting `<` / `≤`, so only
+            // those two operators ever need a registered meaning and every
+            // ordered type gets `>` / `≥` for free. (The calc machinery does
+            // the same swap for backward chains — see the calc renderer.)
             const char* sym = "?";
+            bool reversed = false;
             switch (op.kind) {
                 case TokenKind::Less:           sym = "<"; break;
                 case TokenKind::LessOrEqual:    sym = "≤"; break;
-                case TokenKind::Greater:        sym = ">"; break;
-                case TokenKind::GreaterOrEqual: sym = "≥"; break;
+                case TokenKind::Greater:        sym = "<"; reversed = true; break;
+                case TokenKind::GreaterOrEqual: sym = "≤"; reversed = true; break;
                 case TokenKind::Divides:        sym = "∣"; break;
                 case TokenKind::NotDivides:     sym = "∤"; break;
                 case TokenKind::NotLessOrEqual: sym = "≰"; break;
@@ -2106,6 +2113,7 @@ private:
                 case TokenKind::SubsetOf:       sym = "⊆"; break;
                 default: break;
             }
+            if (reversed) std::swap(left, right);
             left = makeSurfaceBinaryOperation(sym, std::move(left),
                                                std::move(right),
                                                op.line, op.column);
