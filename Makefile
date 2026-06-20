@@ -131,38 +131,34 @@ TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
 LIBRARY_MATHV_IFACE_FILES := $(LIBRARY_MATHV_FILES:.mathv=.mathv.iface)
 TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 
-.PHONY: library library-clean tests error-tests checker-tests baby
+.PHONY: library library-clean tests error-tests checker-tests \
+        clean-check clean-status
 
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
 
 # ----------------------------------------------------------------------
-# Baby library (PLAN_LUX_TRANSITION.md, Phase 0). The representative core
-# we rewrite into the full Lux stack first, to iterate the design and
-# de-risk the cite-only prover before the bulk sweep. `make baby` verifies
-# just these headliner files plus their transitive dependencies (wired by
-# library-depends.mk) — the fast Phase-0 iteration loop, so a keystone
-# elaborator change re-checks this core in ~a second instead of the whole
-# library. Chosen to span every complexity (see the plan's §5.1 matrix)
-# while staying SHALLOW — the import-closure size (in parens) is kept small
-# so the baby build is genuinely agile (max 21 vs 93 for the Real tower):
-#   Integer/basics (8)        quotient construction
-#   Integer/addition (9)      binary quotient lift (WS3 6-decl worst case)
-#   Integer/cancellation (21) polymorphic Quotient.exact + universe pain
-#   Lists/length (10)         1+n induction + characterising lemma (keystone)
-#   Algebra/ring_lemmas (6)   abstract Ring.carrier; cite-only over bundles
-#   Set/finite (13)           dependent cardinals (CIC-ish corner)
-BABY_MATH_FILES := \
-    library/Integer/basics.math library/Integer/addition.math \
-    library/Integer/cancellation.math \
-    library/Lists/length.math \
-    library/Algebra/ring_lemmas.math \
-    library/Set/finite.math
-BABY_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(BABY_MATH_FILES))
-BABY_MATHV_IFACE_FILES := $(BABY_MATHV_FILES:.mathv=.mathv.iface)
+# The clean set (see docs/CLEAN_STYLE_PLAN.md). `scripts/clean_manifest.txt`
+# lists the files held to clean ("reads like math") style — a set that grows,
+# bottom-up by dependency layer, toward whole-library coverage. The milestone
+# theorems FTA -> Q-field -> R-field -> IVT each turn GREEN once their whole
+# import cone is in the manifest. (Formerly the "baby library" — the manifest
+# is seeded from that original headliner cone.)
+#
+# `make clean-status` prints the milestone dashboard.
+# `make clean-check`  verifies the manifest files and ratchets their residual
+#                     (intended-boundary) leak total — it must not exceed
+#                     CLEAN_LEAK_BUDGET, so a cleaned file cannot regress.
+CLEAN_MATH_FILES := $(shell grep -vE '^\#|^\s*$$' scripts/clean_manifest.txt)
+CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
+CLEAN_LEAK_BUDGET ?= 30
 
-baby: $(BABY_MATHV_FILES) $(BABY_MATHV_IFACE_FILES)
+clean-status:
+	@python3 scripts/clean_status.py
+
+clean-check: $(CLEAN_MATHV_FILES)
+	@python3 scripts/clean_status.py --ratchet $(CLEAN_LEAK_BUDGET)
 
 # The redundancy checker's speculative re-proofs must not corrupt later
 # kernel judgements (environment-owner cache guard): this file verifies
@@ -304,8 +300,8 @@ corpus-update: library
 # provenance gate) and the CIC leak count has not increased (Phase 0
 # ratchet). This is the "CI" entry point — run it before committing
 # elaborator/kernel changes.
-check: tests self-tests corpus-audit leak-ratchet
-	@echo "check: library + tests + self-tests verified; provenance gate and leak ratchet OK"
+check: tests self-tests corpus-audit leak-ratchet clean-check
+	@echo "check: library + tests + self-tests verified; provenance gate, leak ratchet, and clean set OK"
 
 # The kernel binary's built-in C++ test suite (./kernel with no args).
 # Wired into `check` 2026-06-12 after three expectation drifts sat
