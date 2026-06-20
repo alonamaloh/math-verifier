@@ -715,3 +715,51 @@ proof you gave has type `… = …` over `Integer`, so `R` was inferred as
 `IntegerEquivalent`, but the goal is an equality over `Rational`
 (`RationalEquivalent`). Pass `T` and `R` explicitly." — and point at the
 bridge citation token, not the enclosing theorem.
+
+## `witness v with (A ∧ B)` silently no-ops inside a `by cases` arm → bare "argument is Proposition"
+
+Observed 2026-06-20 cleaning `Algebra/associate` / `Algebra/unique_factorization`
+(FTA cone). `witness v with (<conjunction proposition>)` is supposed to
+auto-prove the conjunction from context and inject the `Exists`. It works at
+theorem-body top level, but inside a `claim by cases { in (P): … }` arm (or
+other nested position) the bare-proposition coercion's prefilter
+(`barePropositionCouldFire` in coercion.cpp — requires the written prop
+*structurally* equal to the expected ∃-body) doesn't fire, so the proposition
+reaches the kernel as a term where a proof was expected:
+
+```
+elaborate error: case for 'Exists.introduce' of 'Exists'
+  …
+  this argument has the wrong type for the function it is given to
+    the function expects: And (Ring.IsUnit (IntegralDomain.ring d) c) (q = …)
+    but this argument is: Proposition
+```
+
+Diagnosis: the message says "argument is Proposition" but never that the
+*auto-prove-the-proposition coercion* was skipped (prefilter missed it because
+the spelling used the `s := ring(d)` alias, not structurally equal to the
+expected `ring(d)`-spelled body). The fix the user needs is "assemble it as a
+named `claim X : A ∧ B; witness v with X`" — undiscoverable from the text.
+
+Rubric: cause-not-symptom **0**; actionable **0**; location **1** (right token).
+Better: "the `with` proposition couldn't be coerced to a proof here (auto-prove
+only fires when it's structurally the expected type); state it as a `claim`
+first, or write the proof explicitly." Deeper fix: route the `with`-proposition
+through the full `autoProveClaim` (it already proves such conjunctions as a bare
+`claim`), so the inline form is as strong as the named-claim form.
+
+## redundant-`by` check flags a hint whose by-less re-proof is *expensive* (50k steps), contradicting the expensive-step warning
+
+Observed 2026-06-20, `unique_factorization` helper. A calc step substituting a
+`choose`-condition conjunction leg (`q = p1·c`) ran a 50183-kernel-step by-less
+search (→ "expensive by-less proof step" warning). Adding `by qEqualsP1c` made
+it fast, but then `--check-redundant-by` flagged that very hint as redundant
+("auto-prover closes it without help"). So the two checks give opposite orders
+on the same step. Per proof-style.md the redundant check is meant to fire only
+when the by-less re-proof is "near-free"; 50k steps is not. Either the redundant
+check should treat an expensive by-less re-proof as non-redundant (and say
+"kept: by-less costs N steps"), or both should agree. Workaround that satisfied
+both: an anonymous standalone `claim q = p1 * c;` re-exposing the leg as a
+cost-1 equality, so the by-less step is cheap *and* hint-free. (Root cause of
+the expense: the new conjunction-leg decomposition in `collectContextEqualities`
+multiplies candidate equalities when many conjunctions are in scope.)
