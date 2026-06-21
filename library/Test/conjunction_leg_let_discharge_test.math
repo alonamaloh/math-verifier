@@ -1,0 +1,37 @@
+-- A context ∀-fact whose premise must be ζ-unfolded to meet an in-scope
+-- hypothesis applies through the auto-prover's local-defeq side-condition
+-- discharge — even inside the SPECULATIVE context-fact scan (where that
+-- discharge used to be gated off for performance).
+--
+-- The shape that used to fail: a `let s := IntegralDomain.ring(d)` alias
+-- bound BEFORE the lambda binders, so the goal/hypotheses read over `s`
+-- while the prime-divides clause (a decomposed conjunction leg of
+-- `primality`, stated over `IntegralDomain.ring(d)`) reads over the
+-- unfolded value. Proving the `p ∣ a ∨ p ∣ b` disjunction means applying
+-- that leg and discharging its `p ∣ a · b` premise against `pDividesProduct`
+-- — which needs ζ to see `s` and `IntegralDomain.ring(d)` as the same ring.
+
+module Test.conjunction_leg_let_discharge_test
+
+import axioms
+import Logic.basics
+import Logic.sum
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_divisibility
+import Algebra.integral_domain
+import Algebra.irreducible
+
+theorem leg_premise_through_let
+        (d : IntegralDomain)
+        (p : Ring.carrier(IntegralDomain.ring(d)))
+        (primality : IntegralDomain.IsPrimeElement(d, p))
+        : ∀ (a b : Ring.carrier(IntegralDomain.ring(d))).
+            Ring.divides(IntegralDomain.ring(d), p, a * b)
+            → Ring.divides(IntegralDomain.ring(d), p, a)
+              ∨ Ring.divides(IntegralDomain.ring(d), p, b) := {
+  let s : Ring := IntegralDomain.ring(d);
+  (a b : Ring.carrier(s)) (pDividesProduct : Ring.divides(s, p, a * b)) ↦ {
+    claim Ring.divides(s, p, a) ∨ Ring.divides(s, p, b)
+  }
+}

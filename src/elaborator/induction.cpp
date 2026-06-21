@@ -1243,15 +1243,20 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                     // the matching hypothesis's type mentions `choose`-bound
                     // (Exists-eliminator) witnesses, whose de Bruijn indexing
                     // the matcher can't reconcile even though the types are
-                    // definitionally equal. Compare the now-concrete premise
-                    // against each in-scope hypothesis by `isDefinitionallyEqual`
-                    // instead — bounded (one defeq per binder, no library scan
-                    // or recursive proving, so speculative candidates stay
-                    // cheap). Additive: it runs only after (a) already failed,
-                    // and selects a hypothesis whose type IS the premise, so it
-                    // cannot change a citation that already resolves.
-                    if (!inSpeculativeContextScan_
-                        && !referencesUnfilled(domain, 0)) {
+                    // definitionally equal — OR when a `let`-bound alias makes
+                    // the premise read over `s` and the hypothesis over the
+                    // unfolded value (or vice versa). Compare the now-concrete
+                    // premise against each in-scope hypothesis by
+                    // `isDefinitionallyEqual` instead — bounded (one defeq per
+                    // binder, no library scan or recursive proving). Additive:
+                    // it runs only after (a) already failed, and selects a
+                    // hypothesis whose type IS the premise, so it cannot change
+                    // a citation that already resolves. Kept ON even in the
+                    // speculative context-fact scan: a context ∀-fact (e.g. a
+                    // decomposed conjunction leg) whose premise needs ζ to meet
+                    // a hypothesis only applies through this path, and the
+                    // search is cheap enough to afford per candidate.
+                    if (!referencesUnfilled(domain, 0)) {
                         ExpressionPointer concretePremise =
                             instantiateLemmaBinders(domain, bindings);
                         ExpressionPointer concreteOpened = openOverLocalBinders(
