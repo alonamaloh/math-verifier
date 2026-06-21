@@ -13,48 +13,34 @@ import Logic.exists
 import axioms
 
 -- ----------------------------------------------------------------------
--- Double-negation elimination: `¬¬proposition → proposition`. Case on
--- excluded_middle: the positive branch returns the proof; the
--- negative branch is absurd from `notNotProposition(notProposition)`.
+-- Double-negation elimination: `¬¬proposition → proposition`. Either the
+-- proposition holds, or its negation does — and the latter contradicts
+-- `notNotProposition`.
 theorem Logic.double_negation_eliminate
         (proposition : Proposition)
         (notNotProposition : Not(Not(proposition)))
         : proposition :=
   claim by cases {
     case proposition       as proof:           proof
-    case Not(proposition)  as notProposition:
-        False.eliminate_proposition(
-            proposition, notNotProposition(notProposition))
+    case Not(proposition)  as notProposition:  absurd(notNotProposition(notProposition))
   }
 
 -- ----------------------------------------------------------------------
 -- Negation distributes across implication: `¬(antecedent → consequent)
--- → antecedent ∧ ¬consequent`. Classical — case-split on
--- excluded_middle(antecedent):
---   * antecedent holds: pair it with `¬consequent`, derived because
---     any proof of consequent would satisfy the implication via the
---     constant function, contradicting notImplication.
---   * antecedent fails: notImplication applied to the vacuous
---     ⊥-implication (antecedent → False → consequent) is absurd.
+-- → antecedent ∧ ¬consequent`. Classical, on whether the antecedent holds.
 theorem Logic.not_implies_implies_and_not
         (antecedent consequent : Proposition)
         (notImplication : Not(antecedent → consequent))
         : antecedent ∧ Not(consequent) :=
   claim by cases {
     case antecedent      as antecedentHolds:
-        And.introduction(
-            antecedentHolds,
-            (consequentHolds : consequent) ↦
-                notImplication(
-                    (_ : antecedent) ↦ consequentHolds))
-    case Not(antecedent) as notAntecedent:
-        False.eliminate_proposition(
-            antecedent ∧ Not(consequent),
-            notImplication(
-                (antecedentHolds : antecedent) ↦
-                    False.eliminate_proposition(
-                        consequent,
-                        notAntecedent(antecedentHolds))))
+        -- `antecedent` holds; and any proof of `consequent` would make the
+        -- implication hold constantly, contradicting `notImplication`.
+        done
+    case Not(antecedent):
+        -- With no antecedent, the implication holds vacuously, contradicting
+        -- notImplication.
+        done
   }
 
 -- ----------------------------------------------------------------------

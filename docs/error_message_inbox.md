@@ -836,3 +836,43 @@ respect-Pi codomain `R(x,y1) = R(x,y2)`) is not pushed into the block. Workaroun
 hoist to a typed `let respectsR : ∀ … := { … }` — the annotation supplies the
 goal, so the block's intros and final `done` typecheck. Ideally the expected
 type of an argument position would flow into a block-bodied lambda there too.
+
+## `absurd(…)` inside a lambda body mis-frames a captured-variable goal → "unbound internal variable" at kernel verify (2026-06-21)
+
+Repro (minimal): a vacuous-implication proof where `absurd` produces the
+codomain of a lambda whose expected type is an outer parameter.
+
+```
+theorem repro (A C : Proposition) (notA : Not(A)) : A → C :=
+  (a : A) ↦ absurd(notA(a))      -- goal of the body is `C` (a captured param)
+```
+yields, at the final `./kernel verify` pass (not at elaboration):
+```
+elaborate error: theorem 'repro'
+  kernel: unbound internal variable: C (in-scope: A C notA a)
+```
+Hit while cleaning `Logic/excluded_middle.math`
+(`Logic.not_implies_implies_and_not`, the `Not(antecedent)` arm). That file no
+longer exercises the bug — the arm now closes with a bare `done` (the auto-prover
+finds the contradiction) — so the `repro` above is the standalone witness.
+Writing the False-eliminator explicitly (`False.eliminate_proposition(C,
+notA(a))`) is the manual stand-in for positions where `done` doesn't apply.
+
+diagnosis: `desugarAbsurd` (desugar_eliminators.cpp) is the only consumer that
+*splices* the goal `expectedType` verbatim into its output term
+(`False.eliminate_proposition(expectedType, falseProof)`), so it is uniquely
+sensitive to the exact de-Bruijn frame of `expectedType`. The value it receives
+is `elaborateLambda`'s `expectedBody` — the expected Pi codomain peeled at
+inference.cpp:2096 via `weakHeadNormalFormForcingOpaqueHead(pi->codomain)`. That
+peeled codomain is correct for type *comparison* (what every other body consumer
+uses it for — coerceToExpectedTypeViaDiff, constructor-param inference), but its
+frame is off by the lambda's own binders when spliced into a CLOSED-over-
+`extended` term: a captured outer variable (`C`) lands at the wrong index and
+reads as unbound. Note a blanket `openOverLocalBinders(expectedType, …)` in
+desugarAbsurd is NOT the fix — it regresses the cases-arm path (where absurd is
+*not* under an extra lambda and `expectedType` is already in the arm frame), so
+the two paths deliver `expectedType` in different frames. Real fix likely lives
+in elaborateLambda: hand the body an `expectedBody` that is consistently CLOSED
+over `extended` (lift/adjust the peeled codomain by the lambda binders), so
+absurd's splice is correct without special-casing. Worth doing before the Real
+analysis files (absurd-under-a-binder is common there).
