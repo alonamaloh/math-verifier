@@ -61,16 +61,19 @@ definition Rational.reciprocal_predicate (x y : Rational) : Proposition :=
 theorem Rational.reciprocal_exists_with_junk (x : Rational)
         : ∃ (y : Rational). Rational.reciprocal_predicate(x, y) :=
   claim by cases {
-    case (x = Rational.zero) as xIsZero:
-        witness Rational.zero with
-            Or.introduceRight(?, ?,
-                And.introduction(
-                    x = Rational.zero, Rational.zero = Rational.zero,
-                    xIsZero, reflexivity(Rational, Rational.zero)))
+    case (x = Rational.zero) as xIsZero: {
+        -- The junk value 0 satisfies the right disjunct (x = 0 ∧ 0 = 0).
+        claim atZero : x * Rational.zero = Rational.one
+                       ∨ x = Rational.zero ∧ Rational.zero = Rational.zero;
+        witness Rational.zero with atZero
+      }
     case Not(x = Rational.zero) as xNonzero: {
-        choose y as productIsOne from Rational.reciprocal_exists_for_nonzero(x, xNonzero);
-        witness y with Or.introduceLeft(?, ?, productIsOne)
-    }
+        choose y such that x * y = Rational.one
+            from Rational.reciprocal_exists_for_nonzero;
+        -- The inverse y satisfies the left disjunct x · y = 1.
+        claim atY : x * y = Rational.one ∨ x = Rational.zero ∧ y = Rational.zero;
+        witness y with atY
+      }
   }
 
 theorem Rational.reciprocal_unique (x : Rational)
@@ -81,43 +84,46 @@ theorem Rational.reciprocal_unique (x : Rational)
   (y1 y2 : Rational)
   (predicate1 : Rational.reciprocal_predicate(x, y1))
   (predicate2 : Rational.reciprocal_predicate(x, y2)) ↦
-    cases predicate1 {
-      | Or.introduceLeft(productOne1) =>
-          cases predicate2 {
-            | Or.introduceLeft(productOne2) =>
+    claim by cases {
+      case (x * y1 = Rational.one) as productOne1:
+          claim by cases {
+            case (x * y2 = Rational.one) as productOne2:
                 calc y1
-                   = y1 * Rational.one    by ring
-                   = y1 * (x * y2)        by substituting productOne2
-                   = (x * y1) * y2        by ring
-                   = Rational.one * y2    by substituting productOne1
-                   = y2                   by ring
-            | Or.introduceRight(zeroPair2) => {
-                claim xIsZero : x = Rational.zero
-                    by And.left;
-                claim oneIsZero : Rational.one = Rational.zero
-                    by calc Rational.one
-                          = x * y1               by productOne1
-                          = Rational.zero * y1   by substituting xIsZero
-                          = Rational.zero        by ring;
-                absurd(Rational.zero_not_equal_one(Equality.symmetry(oneIsZero)))
+                   = y1 * Rational.one
+                   = y1 * (x * y2)
+                   = (x * y1) * y2
+                   = Rational.one * y2
+                   = y2
+            case (x = Rational.zero ∧ y2 = Rational.zero) as zeroPair2: {
+                -- x = 0 forces 1 = x·y1 = 0, contradicting 0 ≠ 1.
+                claim x = Rational.zero;
+                calc Rational.one
+                   = x * y1
+                   = Rational.zero * y1
+                   = Rational.zero;
+                claim zeroNotOne : Rational.zero ≠ Rational.one since Rational.zero_not_equal_one;
+                claim zeroEqualsOne : Rational.zero = Rational.one;
+                absurd(zeroNotOne(zeroEqualsOne))
               }
           }
-      | Or.introduceRight(zeroPair1) =>
-          cases predicate2 {
-            | Or.introduceLeft(productOne2) => {
-                claim xIsZero : x = Rational.zero
-                    by And.left;
-                claim oneIsZero : Rational.one = Rational.zero
-                    by calc Rational.one
-                          = x * y2               by productOne2
-                          = Rational.zero * y2   by substituting xIsZero
-                          = Rational.zero        by ring;
-                absurd(Rational.zero_not_equal_one(Equality.symmetry(oneIsZero)))
+      case (x = Rational.zero ∧ y1 = Rational.zero) as zeroPair1:
+          claim by cases {
+            case (x * y2 = Rational.one) as productOne2: {
+                -- Symmetrically, x = 0 forces 1 = x·y2 = 0.
+                claim x = Rational.zero;
+                calc Rational.one
+                   = x * y2
+                   = Rational.zero * y2
+                   = Rational.zero;
+                claim zeroNotOne : Rational.zero ≠ Rational.one since Rational.zero_not_equal_one;
+                claim zeroEqualsOne : Rational.zero = Rational.one;
+                absurd(zeroNotOne(zeroEqualsOne))
               }
-            | Or.introduceRight(zeroPair2) =>
+            case (x = Rational.zero ∧ y2 = Rational.zero) as zeroPair2:
+                -- Both are the junk value 0.
                 calc y1
-                   = Rational.zero   by And.right
-                   = y2              by Equality.symmetry
+                   = Rational.zero
+                   = y2
           }
     }
 
@@ -141,13 +147,19 @@ theorem Rational.reciprocal_function_satisfies (x : Rational)
 theorem Rational.reciprocal_function_multiplies
         (x : Rational) (xNonzero : ¬(x = Rational.zero))
         : x * Rational.reciprocal_function(x) = Rational.one :=
-  cases Rational.reciprocal_function_satisfies(x) {
-    | Or.introduceLeft(productOne) => productOne
-    | Or.introduceRight(zeroPair) =>
-        absurd(xNonzero(
-            And.left(x = Rational.zero,
-                     Rational.reciprocal_function(x) = Rational.zero, zeroPair)))
+  {
+  claim Rational.reciprocal_predicate(x, Rational.reciprocal_function(x))
+      since Rational.reciprocal_function_satisfies;
+  claim by cases {
+    case (x * Rational.reciprocal_function(x) = Rational.one) as productOne:
+        done
+    case (x = Rational.zero ∧ Rational.reciprocal_function(x) = Rational.zero) as zeroPair: {
+        -- x = 0 contradicts xNonzero.
+        claim xIsZero : x = Rational.zero;
+        absurd(xNonzero(xIsZero))
+      }
   }
+}
 
 -- Reciprocals are multiplicative: for nonzero a and b,
 -- a⁻¹ · b⁻¹ = (a·b)⁻¹. Multiply by (a·b)·(a·b)⁻¹ = 1 and regroup so
@@ -162,15 +174,15 @@ theorem Rational.reciprocal_function_product (a b : Rational)
       since Rational.reciprocal_function_multiplies;
   claim ¬(a * b = Rational.zero)
       by (productZero : a * b = Rational.zero) ↦ {
-           claim bIsZero : b = Rational.zero
-               by calc b
-                    = Rational.one * b                           by ring
-                    = (a * Rational.reciprocal_function(a)) * b  since aCancel
-                    = Rational.reciprocal_function(a) * (a * b)  by ring
-                    = Rational.reciprocal_function(a) * Rational.zero
-                          since productZero
-                    = Rational.zero                              by ring;
-           absurd(bNonzero(bIsZero))
+           calc b
+              = Rational.one * b
+              = (a * Rational.reciprocal_function(a)) * b  since aCancel
+              = Rational.reciprocal_function(a) * (a * b)
+              = Rational.reciprocal_function(a) * Rational.zero
+                    since productZero
+              = Rational.zero
+           as bIsZero;
+           bNonzero(bIsZero)
          };
   claim productCancel
         : (a * b) * Rational.reciprocal_function(a * b) = Rational.one
@@ -178,7 +190,6 @@ theorem Rational.reciprocal_function_product (a b : Rational)
   calc Rational.reciprocal_function(a) * Rational.reciprocal_function(b)
      = (Rational.reciprocal_function(a) * Rational.reciprocal_function(b))
        * Rational.one
-           by ring
      = (Rational.reciprocal_function(a) * Rational.reciprocal_function(b))
        * ((a * b) * Rational.reciprocal_function(a * b))
            since productCancel
@@ -192,5 +203,4 @@ theorem Rational.reciprocal_function_product (a b : Rational)
      = (Rational.one * Rational.one) * Rational.reciprocal_function(a * b)
            since bCancel
      = Rational.reciprocal_function(a * b)
-           by ring
 }

@@ -42,30 +42,29 @@ import Algebra.ring_lemmas
 theorem Rational.IsNonneg_or_negate_IsNonneg
         (value : Rational)
         : Rational.IsNonneg(value) ∨ Rational.IsNonneg(-value) :=
-  by_representatives value as ⟨numerator, denominator, denominatorNonzero⟩ =>
-      -- The sign-witness of value is numerator · denominator; split on it.
-      cases Integer.sign_split(numerator * denominator) {
-          | Or.introduceLeft(productNonneg) =>
-              Or.introduceLeft(?, ?,
-                  Rational.IsNonneg.of_numerator_denominator(
-                      numerator, denominator, denominatorNonzero, productNonneg))
-          | Or.introduceRight(productNegated) =>
-              Or.introduceRight(?, ?,
-                  Rational.IsNonneg.of_numerator_denominator(
-                      -numerator, denominator, denominatorNonzero, {
-                      choose k as productEqualsNegatedK from productNegated;
-                      -- (-numerator)·denominator = -(numerator·denominator)
-                      --   = -(-(k : Integer)) = (k : Integer) ≥ 0.
-                      claim witnessForm : (-numerator) * denominator = (k : Integer)
-                          by calc (-numerator) * denominator
-                                = -(numerator * denominator)   by ring
-                                = -(-(k : Integer))            by substituting productEqualsNegatedK
-                                = (k : Integer)                by ring;
-                      claim Integer.IsNonneg((k : Integer))
-                          by Integer.from_natural_is_nonneg;
-                      done by substituting witnessForm
-                  }))
-        }
+  by_representatives value as ⟨numerator, denominator, denominatorNonzero⟩ => {
+      -- Split on the sign of the sign-witness numerator · denominator.
+      claim Integer.SignSplitProp(numerator * denominator) since Integer.sign_split;
+      claim by cases {
+        case Integer.IsNonneg(numerator * denominator) as productNonneg: {
+            claim Rational.IsNonneg(Rational.fraction(numerator, denominator, denominatorNonzero));
+            done
+          }
+        case (∃ (k : Natural). numerator * denominator = -(k : Integer)) as productNegated: {
+            choose k such that numerator * denominator = -(k : Integer) from productNegated;
+            -- (−numerator)·denominator = −(numerator·denominator) = (k : Integer) ≥ 0.
+            calc (-numerator) * denominator
+               = -(numerator * denominator)
+               = -(-(k : Integer))
+               = (k : Integer)
+            as negatedProductForm;
+            claim Integer.IsNonneg((k : Integer)) since Integer.from_natural_is_nonneg;
+            claim Integer.IsNonneg((-numerator) * denominator) by substituting negatedProductForm;
+            claim Rational.IsNonneg(Rational.fraction(-numerator, denominator, denominatorNonzero));
+            done
+          }
+      }
+    }
 
 -- ----------------------------------------------------------------------
 -- Algebraic helper used by the linearity argument:
@@ -84,11 +83,13 @@ theorem Rational.LessOrEqual.linear
         : left ≤ right ∨ right ≤ left :=
   claim by cases {
     case Rational.IsNonneg(right - left) as differenceNonneg:
-        Or.introduceLeft(differenceNonneg)
-    case Rational.IsNonneg(-(right - left)) as negatedDifferenceNonneg:
-        -- right ≤ left = IsNonneg(left - right). We have
-        -- IsNonneg(-(right - left)) = IsNonneg(left - right) via Rational.negate_subtract.
-        Or.introduceRight(rewrite(Rational.negate_subtract(right, left), negatedDifferenceNonneg))
+        -- left ≤ right is exactly IsNonneg(right - left).
+        done
+    case Rational.IsNonneg(-(right - left)) as negatedDifferenceNonneg: {
+        -- right ≤ left is IsNonneg(left - right) = IsNonneg(-(right - left)).
+        claim Rational.IsNonneg(left - right) by substituting (left - right = -(right - left));
+        done
+      }
   }
 
 -- ----------------------------------------------------------------------
@@ -101,37 +102,33 @@ theorem Rational.not_LessThan_implies_LessOrEqual
         : b ≤ a :=
   claim by cases {
     case a ≤ b as aLeqB:
-        -- a ≤ b. Show a = b, then b ≤ a by reflexivity.
         claim by cases {
           case a = b:
-              -- a = b, so b = a, and a ≤ a is reflexivity.
+              -- a = b, so b = a and b ≤ a by reflexivity.
               calc b
                  = a
                  ≤ a
-          case Not(a = b) as aNotEqB:
-              absurd(
-                  notLessThan(
-                      And.introduction(
-                          a ≤ b, Not(a = b),
-                          aLeqB, aNotEqB)))
+          case Not(a = b): {
+              -- a ≤ b together with a ≠ b is a < b, contradicting notLessThan.
+              claim aLessThanB : a < b;
+              absurd(notLessThan(aLessThanB))
+            }
         }
     case b ≤ a as bLeqA: bLeqA
   }
 
 -- A Rational square is nonnegative.
 theorem Rational.square_IsNonneg (q : Rational)
-        : Rational.IsNonneg(Rational.multiply(q, q)) :=
-  cases Rational.IsNonneg_or_negate_IsNonneg(q) {
-    | Or.introduceLeft(qIsNonneg) =>
-        Rational.IsNonneg.multiply(q, q, qIsNonneg, qIsNonneg)
-    | Or.introduceRight(negateQIsNonneg) => {
-        -- (−q)·(−q) = q·q, and the left side is a product of nonnegatives.
-        claim squareEquation
-            : Rational.multiply(Rational.negate(q), Rational.negate(q))
-              = Rational.multiply(q, q) by ring;
-        rewrite(squareEquation,
-            Rational.IsNonneg.multiply(Rational.negate(q), Rational.negate(q),
-                negateQIsNonneg, negateQIsNonneg))
+        : Rational.IsNonneg(q * q) :=
+  claim by cases {
+    case Rational.IsNonneg(q) as qIsNonneg: {
+        claim Rational.IsNonneg(q * q);
+        done
+      }
+    case Rational.IsNonneg(-q) as negateQIsNonneg: {
+        -- (−q)·(−q) = q·q, a product of nonnegatives.
+        claim Rational.IsNonneg((-q) * (-q));
+        done by substituting ((-q) * (-q) = q * q)
       }
   }
 
