@@ -62,14 +62,12 @@ theorem Rational.nonzero_of_absolute_value_positive
         (q : Rational)
         (absolutePositive : Rational.zero < abs(q))
         : ¬(q = Rational.zero) :=
-  (qIsZero : q = Rational.zero) ↦
-    -- |q| = |Rational.zero| = Rational.zero. Then 0 < 0 contradicts
-    -- the strict inequality's non-equal component.
-    Rational.LessThan.distinct(absolutePositive)(
-        Equality.symmetry(
-            calc abs(q)
-               = abs(Rational.zero)
-               = Rational.zero))
+  (qIsZero : q = Rational.zero) ↦ {
+    claim zeroDistinctFromAbsolute : Rational.zero ≠ abs(q) since Rational.LessThan.distinct;
+    calc abs(q) = abs(Rational.zero) = Rational.zero;
+    claim zeroEqualsAbsolute : Rational.zero = abs(q);
+    absurd(zeroDistinctFromAbsolute(zeroEqualsAbsolute))
+  }
 
 -- ----------------------------------------------------------------------
 -- 0 ≠ 1 on Real. Since 0 = 1 as Reals, their representative sequences are
@@ -83,34 +81,35 @@ theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) :=
     let oneSequence  : CauchyRationalSequence :=
         Rational.to_cauchy_constant(Rational.one);
     claim cauchyEquivalence : CauchyEquivalent(zeroSequence, oneSequence);
-    obtain ⟨witnessIndex, atWitnessIndex⟩
+    choose witnessIndex such that
+        ∀ (m : Natural). witnessIndex ≤ m →
+          abs(CauchyRationalSequence.sequenceFunction(zeroSequence, m)
+              - CauchyRationalSequence.sequenceFunction(oneSequence, m)) < Rational.one
+        as atWitnessIndex
         from cauchyEquivalence(Rational.one, Rational.zero_less_one);
     -- Rational.one is IsNonneg (it is positive), so |Rational.one| = Rational.one.
-    claim oneIsNonneg : Rational.IsNonneg(Rational.one)
-      by Rational.IsNonneg_of_LessOrEqual_zero(
-             Rational.one, Rational.LessThan.weaken(Rational.zero_less_one));
+    claim Rational.zero ≤ Rational.one since Rational.LessThan.weaken;
+    claim Rational.IsNonneg(Rational.one)
+      since Rational.IsNonneg_of_LessOrEqual_zero;
     -- The two constant sequences are 0 and 1 everywhere, so the difference
     -- term reduces to |0 - 1| = |-1| = |1| = 1.
-    claim absOneEqualsOne : abs(Rational.one) = Rational.one
-      by Rational.absolute_value_when_nonneg(Rational.one, oneIsNonneg);
-    claim absNegateOneEqualsAbsOne : abs(-(Rational.one)) = abs(Rational.one)
-      by Rational.absolute_value_negate(Rational.one);
-    claim negateOneIsZeroMinusOne : -(Rational.one) = Rational.zero - Rational.one by ring;
+    claim abs(Rational.one) = Rational.one
+      since Rational.absolute_value_when_nonneg;
+    claim abs(-(Rational.one)) = abs(Rational.one)
+      since Rational.absolute_value_negate;
+    claim -(Rational.one) = Rational.zero - Rational.one;
+    claim witnessReflexive : witnessIndex ≤ witnessIndex since Natural.LessOrEqual.reflexive;
     calc Rational.one
-       = abs(Rational.one)                                  by Equality.symmetry(absOneEqualsOne)
-       = abs(-(Rational.one))                               by Equality.symmetry(absNegateOneEqualsAbsOne)
-       = abs(Rational.zero - Rational.one)                  by substituting negateOneIsZeroMinusOne
+       = abs(Rational.one)
+       = abs(-(Rational.one))
+       = abs(Rational.zero - Rational.one)
        = abs(
              CauchyRationalSequence.sequenceFunction(zeroSequence, witnessIndex)
-             - CauchyRationalSequence.sequenceFunction(oneSequence, witnessIndex))   as oneEqualsAbsDiff;
-    calc Rational.one
-       = abs(
-             CauchyRationalSequence.sequenceFunction(zeroSequence, witnessIndex)
-             - CauchyRationalSequence.sequenceFunction(oneSequence, witnessIndex))   by oneEqualsAbsDiff
+             - CauchyRationalSequence.sequenceFunction(oneSequence, witnessIndex))
        < Rational.one
-           by atWitnessIndex(witnessIndex, Natural.LessOrEqual.reflexive(witnessIndex))   as oneLessThanOne;
-    Rational.LessThan.distinct(oneLessThanOne)(
-        reflexivity(Rational, Rational.one))
+           since atWitnessIndex(witnessIndex, witnessReflexive);
+    claim oneDistinctFromOne : Rational.one ≠ Rational.one since Rational.LessThan.distinct;
+    absurd(oneDistinctFromOne(reflexivity(Rational, Rational.one)))
   }
 
 -- ----------------------------------------------------------------------
@@ -197,12 +196,20 @@ theorem Real.reciprocal_exists_for_nonzero
         -- Apartness: ¬(mk(rep) = mk(constant_zero)) → ¬CauchyEquivalent(rep, constant_zero).
         let zeroSequence : CauchyRationalSequence :=
             Rational.to_cauchy_constant(Rational.zero);
-        claim notEquivalentToZero
-              : ¬CauchyEquivalent(rep, zeroSequence);
-        obtain ⟨lowerBound, apartnessTail⟩
-            from Real.cauchy_apartness_from_zero(rep, notEquivalentToZero);
-        obtain ⟨apartnessIndex, andBundle⟩ from apartnessTail;
-        let ⟨lowerBoundPositive, apartness⟩ := andBundle;
+        claim ¬CauchyEquivalent(rep, zeroSequence);
+        choose lowerBound such that
+            ∃ (apartnessIndex : Natural).
+              Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
+                    lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(rep, m))
+            as apartnessTail
+            from Real.cauchy_apartness_from_zero;
+        choose apartnessIndex such that
+              Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
+                    lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(rep, m))
+            from apartnessTail;
+        claim lowerBoundPositive : Rational.zero < lowerBound;
+        claim apartness : ∀ (m : Natural). apartnessIndex ≤ m →
+                    lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(rep, m));
         -- Package the reciprocal as its own Cauchy sequence, then
         -- promote to a Real. The witness is the Quotient equivalence
         -- class of recipPacked. The `?` placeholders are recoverable
@@ -224,10 +231,12 @@ theorem Real.reciprocal_exists_for_nonzero
 -- Real is a Field.
 theorem Real.is_field
         : IsField(Real, Real.add, Real.zero, Real.negate,
-                   Real.multiply, Real.one) :=
-    ⟨Real.is_commutative_ring,
-     Real.zero_not_equal_one,
-     Real.reciprocal_exists_for_nonzero⟩
+                   Real.multiply, Real.one) := {
+    claim Real.is_commutative_ring;
+    claim Real.zero_not_equal_one;
+    claim Real.reciprocal_exists_for_nonzero;
+    done
+  }
 
 -- ----------------------------------------------------------------------
 -- A multiplicative inverse is unique: two right-inverses of the same x
@@ -245,17 +254,23 @@ theorem Real.inverse_unique (x a b : Real)
 -- THE reciprocal, by definite description: existence from
 -- reciprocal_exists_for_nonzero, uniqueness from the lemma above. The
 -- reciprocal is now an honest function of (x, proof that x ≠ 0).
-definition Real.reciprocal (x : Real) (xNonzero : ¬(x = Real.zero)) : Real :=
+definition Real.reciprocal (x : Real) (xNonzero : ¬(x = Real.zero)) : Real := {
+  claim reciprocalExists : ∃ (y : Real). x * y = Real.one
+      since Real.reciprocal_exists_for_nonzero;
   Logic.the(
       Real,
       (y : Real) ↦ x * y = Real.one,
-      Real.reciprocal_exists_for_nonzero(x, xNonzero),
+      reciprocalExists,
       Real.inverse_unique(x))
+}
 
 theorem Real.reciprocal_multiplies (x : Real) (xNonzero : ¬(x = Real.zero))
-        : x * Real.reciprocal(x, xNonzero) = Real.one :=
+        : x * Real.reciprocal(x, xNonzero) = Real.one := {
+  claim reciprocalExists : ∃ (y : Real). x * y = Real.one
+      since Real.reciprocal_exists_for_nonzero;
   Logic.the_satisfies(
       Real,
       (y : Real) ↦ x * y = Real.one,
-      Real.reciprocal_exists_for_nonzero(x, xNonzero),
+      reciprocalExists,
       Real.inverse_unique(x))
+}
