@@ -876,3 +876,35 @@ in elaborateLambda: hand the body an `expectedBody` that is consistently CLOSED
 over `extended` (lift/adjust the peeled codomain by the lambda binders), so
 absurd's splice is correct without special-casing. Worth doing before the Real
 analysis files (absurd-under-a-binder is common there).
+
+## argument-free citation of `multiply_by_nonneg_left` mis-resolves the goal's `*` operator (2026-06-21)
+
+Cleaning Real/multiplication.math: converting
+`by Rational.LessOrEqual.multiply_by_nonneg_right(a, b, c, premA, premB)` to the
+argument-free `by Rational.LessOrEqual.multiply_by_nonneg_right` WORKS (both
+premises discharged from context, incl. `0 ≤ |…|` auto-found). But the
+*`_left`* sibling fails: for goal `(succ K : Rational) * |x| ≤ (succ K) * δ`,
+```
+the hint's arguments could not be inferred ...
+  goal: Rational.from_integer_multiply (Natural.to_integer (successor K)) (…) ≤ …
+```
+The citation reconstructs the goal's `(succ K : Rational) * …` with the
+Integer×Real scalar operator `Real.from_integer_multiply` instead of
+`Rational.multiply`, so the conclusion `c * a ≤ c * b` never unifies. The `right`
+form (`a * c ≤ b * c`) avoids it because the overloaded factor is in a different
+position. Workaround: keep the `_left` calls fully positional. Real fix: the
+argument-free citation's goal/operator elaboration should respect the Rational
+multiply already present rather than re-resolving the `·` overload to the
+Integer-scalar variant.
+
+## (observation, not an error) bare auto-proved claims feeding `choose`/positional args flag unused-name
+
+Recurring while cleaning the Real cone: `claim h : ∃…  by <lemma>(…); choose v
+from h;` flags `h` as unused ("auto-prover consumes this fact by type-match"),
+because `choose`'s `from h` is found by type, not by the name. Likewise a bare
+`claim h : T;` whose only consumer is a positional `F(…, h)` arg. The clean
+escape that works: drop the name and use the most-recent-∃ form
+`claim ∃…; choose v such that <pred> as p;` (anonymous claim → no name to flag),
+or anonymize the claim and let a bare downstream step find it by type. This is
+why Real/multiplication.math (~10 such claims) needs the anonymize-and-such-that
+sweep before it is unused-name-clean.
