@@ -61,6 +61,11 @@ A milestone is **GREEN** once its whole cone is in the clean manifest:
 
 ## Order of attack
 
-Currently in progress: **FTA** (the shared base). Then `ℚ-field` → `ℝ-field` →
-`IVT`, greening each milestone in turn. Within `Real`: basics → sequences →
-Cauchy/completeness → field → continuity → IVT.
+**FTA** (20/20) and **ℚ is a field** (78/78) are **GREEN** — their cones are
+fully in the manifest (`make clean-status`). The live front is **ℝ-field**
+(~80%) → then **IVT**, greening each in turn. Within `Real`: basics →
+sequences → Cauchy/completeness → field → continuity → IVT.
+
+The fine-grained residual checklist for the green cones (the few intended
+`⟨…⟩`/leg-applied residuals, and the elaborator gaps fixed to clear them) is in
+the `clean_cone_remaining_work` memory.
