@@ -99,6 +99,15 @@ CATEGORIES = {
 # then inferred from the goal), not to invoke the lemma as a function.
 POSITIONAL_CALL_CATEGORY = "direct proof-lemma call"
 
+# `successor` is the Natural constructor — an internal detail of how the
+# naturals are built. Outside the `Natural/` definitional modules its
+# appearance is leakage: a consumer should speak `1 + n` (or numerals
+# `0`/`1`/`2`), never the raw constructor. Counted only for files NOT under
+# `library/Natural/`; the count there is expected to ratchet to zero.
+SUCCESSOR_CATEGORY = "successor (outside Natural/)"
+SUCCESSOR_RE = re.compile(r"\bsuccessor\b")
+NATURAL_DIR_PREFIX = os.path.join("library", "Natural") + os.sep
+
 # A qualified or bare name immediately followed by `(`. We only count it when
 # the name is a known `theorem` (so definitions, constructors, and type
 # formers are excluded); any positional-argument arity counts.
@@ -221,7 +230,13 @@ def scan_file(path, theorem_names):
     leaks = {name: len(rx.findall(body)) for name, rx in CATEGORIES.items()}
     total_calls, arity = positional_lemma_calls(body, theorem_names)
     leaks[POSITIONAL_CALL_CATEGORY] = total_calls
-    return leaks, arity
+    # `successor` leakage — only outside the `Natural/` definitional modules.
+    # Tracked separately from `leaks` so it never enters the CIC-leak total.
+    rel = os.path.relpath(path, REPO_ROOT)
+    successor_count = (
+        0 if rel.startswith(NATURAL_DIR_PREFIX)
+        else len(SUCCESSOR_RE.findall(body)))
+    return leaks, arity, successor_count
 
 
 def main():
@@ -239,12 +254,16 @@ def main():
     theorem_names = collect_theorem_names(LIBRARY_ROOT)
 
     # Display order: the regex CIC/structural categories, then positional calls.
+    # `successor`-outside-Natural is tracked SEPARATELY (like the arity
+    # breakdown) so it never inflates the CIC-leak total / clean budget.
     category_names = list(CATEGORIES) + [POSITIONAL_CALL_CATEGORY]
 
-    per_file = {}       # rel_path -> {category: count}   (counted leaks)
-    per_file_anti = {}  # rel_path -> {arity: count}       (informational)
+    per_file = {}            # rel_path -> {category: count}   (counted leaks)
+    per_file_anti = {}       # rel_path -> {arity: count}       (informational)
+    per_file_successor = {}  # rel_path -> successor count       (separate tally)
     category_totals = {name: 0 for name in category_names}
     anti_totals = {"1 arg": 0, "2 args": 0, ">=3 args": 0}
+    successor_total = 0
     foundational_count = 0
 
     for dirpath, _dirs, files in os.walk(LIBRARY_ROOT):
@@ -258,7 +277,7 @@ def main():
             if is_foundational(rel, exact, prefixes):
                 foundational_count += 1
                 continue
-            leaks, antis = scan_file(full, theorem_names)
+            leaks, antis, successor_count = scan_file(full, theorem_names)
             if sum(leaks.values()) > 0:
                 per_file[rel] = leaks
                 for name, count in leaks.items():
@@ -267,6 +286,9 @@ def main():
                 per_file_anti[rel] = antis
                 for name, count in antis.items():
                     anti_totals[name] += count
+            if successor_count > 0:
+                per_file_successor[rel] = successor_count
+                successor_total += successor_count
 
     total = sum(category_totals.values())
     anti_total = sum(anti_totals.values())
@@ -283,6 +305,10 @@ def main():
                 "by_arity": anti_totals,
                 "per_file": {p: {k: v for k, v in c.items() if v}
                              for p, c in per_file_anti.items()},
+            },
+            "successor_outside_natural": {
+                "total": successor_total,
+                "per_file": dict(sorted(per_file_successor.items())),
             },
         }, indent=2, ensure_ascii=False))
     else:
@@ -313,6 +339,16 @@ def main():
             for rel, counts in sorted(per_file_anti.items(),
                                       key=lambda kv: sum(kv[1].values()), reverse=True):
                 print(f"  {sum(counts.values()):4d}  {rel}")
+
+        print("\n`successor` outside Natural/ (constructor leakage —"
+              " speak `1 + n` / numerals; target 0)")
+        print("=" * 62)
+        print(f"  {successor_total:5d}  across {len(per_file_successor)} files")
+        if args.by_file and per_file_successor:
+            print("  Per-file (most first):")
+            for rel, count in sorted(per_file_successor.items(),
+                                     key=lambda kv: kv[1], reverse=True):
+                print(f"  {count:4d}  {rel}")
 
     if args.max is not None and total > args.max:
         print(f"\nLEAK RATCHET FAILED: total {total} exceeds budget {args.max}",
