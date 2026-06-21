@@ -1512,6 +1512,28 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             // a premise can be unified against an `A ∧ B` hypothesis's leg.
             std::vector<ContextFact> localFacts =
                 collectLocalBinderFacts(localBinders);
+            // ζ-unfold map: a non-proof `let s := v` binder makes the
+            // structural unifier below see `s` and `v` as different terms,
+            // so a lemma premise stated over `v` (e.g. `IntegralDomain.ring
+            // d`) never unifies against a hypothesis stated over the alias
+            // `s` (or vice versa) — leaving the premise's holes unsolved.
+            // Inline the let values into both sides before unifying.
+            std::map<std::string, ExpressionPointer> letValues;
+            for (size_t li = 0; li < localBinders.size(); ++li) {
+                if (localBinders[li].value
+                    && !localBinders[li].valueIsProof) {
+                    try {
+                        letValues[openingNameFor(localBinders, li)] =
+                            openOverLocalBinders(
+                                localBinders[li].value, localBinders, li);
+                    } catch (...) {}
+                }
+            }
+            auto zetaUnfoldOpened =
+                [&](ExpressionPointer t) -> ExpressionPointer {
+                if (letValues.empty()) return t;
+                return substituteFreeVariables(t, letValues);
+            };
             bool progress = true;
             while (progress && !unresolved.empty()) {
                 progress = false;
@@ -1533,8 +1555,8 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         substituteFreeVariables(piDomains[i], assignment);
                     ExpressionPointer slotOpened;
                     try {
-                        slotOpened = openOverLocalBinders(
-                            slotType, localBinders, N);
+                        slotOpened = zetaUnfoldOpened(openOverLocalBinders(
+                            slotType, localBinders, N));
                     } catch (...) {
                         stillUnresolved.push_back(i); continue;
                     }
@@ -1582,8 +1604,8 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     for (size_t f = 0;
                          f < localFacts.size() && !filled; ++f) {
                         ExpressionPointer candidateType =
-                            openOverLocalBinders(
-                                localFacts[f].type, localBinders, N);
+                            zetaUnfoldOpened(openOverLocalBinders(
+                                localFacts[f].type, localBinders, N));
                         // Trial-unify the slot pattern against the
                         // candidate, solving the slot's remaining holes.
                         std::map<std::string, ExpressionPointer> trial =

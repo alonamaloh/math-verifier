@@ -1,0 +1,57 @@
+-- A `since <lemma>` citation whose argument must be inferred from a context
+-- equation works even when a `let s := IntegralDomain.ring(d)` alias, bound
+-- BEFORE the lambda binders, makes the goal/hypotheses read over `s` while
+-- the lemma reads over the unfolded `IntegralDomain.ring(d)`. The hole-solving
+-- unification (inference.cpp step 5c) now ζ-unfolds the let value on both
+-- sides, so it can solve the lemma's argument (here the unit-witness `c`)
+-- against the `s`-stated equation.
+--
+-- This is the shape inside `IntegralDomain.prime_element_is_irreducible`: a
+-- `claim by cases { in (p ∣ a) as …: … }` arm under a `claim ∀ … by (lambda)`,
+-- with `let s` before the lambda. Before the fix the
+-- `unit_of_one_equals_product` citation could not infer its `c`.
+
+module Test.citation_let_alias_in_arm_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_divisibility
+import Algebra.integral_domain
+import Algebra.irreducible
+
+theorem citation_through_let_alias_in_arm
+        (d : IntegralDomain)
+        (p : Ring.carrier(IntegralDomain.ring(d)))
+        (primality : IntegralDomain.IsPrimeElement(d, p))
+        : ∀ (a b : Ring.carrier(IntegralDomain.ring(d))). p = a * b
+            → Ring.IsUnit(IntegralDomain.ring(d), a)
+              ∨ Ring.IsUnit(IntegralDomain.ring(d), b) := {
+  let s : Ring := IntegralDomain.ring(d);
+  (a b : Ring.carrier(s)) (pEqualsProduct : p = a * b) ↦ {
+    claim Ring.divides(s, p, a * b);
+    claim by cases {
+      in (Ring.divides(s, p, a)) as pDividesA: {
+          choose c such that a = p * c from pDividesA;
+          calc p * Ring.one(s) = p = a * b = (p * c) * b = p * (c * b);
+          claim Ring.one(s) = c * b since IntegralDomain.multiply_cancel_left;
+          calc Ring.one(s) = c * b = b * c;
+          claim Ring.IsUnit(s, b) since IntegralDomain.unit_of_one_equals_product;
+          done
+        }
+      in (Ring.divides(s, p, b)) as pDividesB: {
+          choose c such that b = p * c from pDividesB;
+          calc p * Ring.one(s) = p = a * b = a * (p * c) = p * (c * a);
+          claim Ring.one(s) = c * a since IntegralDomain.multiply_cancel_left;
+          calc Ring.one(s) = c * a = a * c;
+          claim Ring.IsUnit(s, a) since IntegralDomain.unit_of_one_equals_product;
+          done
+        }
+    }
+  }
+}
