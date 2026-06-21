@@ -248,6 +248,9 @@ def main():
                         help="emit machine-readable totals")
     parser.add_argument("--max", type=int, default=None,
                         help="exit 1 if the total leak exceeds N (ratchet)")
+    parser.add_argument("--successor-max", type=int, default=None,
+                        help="exit 1 if `successor`-outside-Natural total exceeds "
+                             "N (independent ratchet; never grows)")
     args = parser.parse_args()
 
     exact, prefixes = load_manifest(MANIFEST)
@@ -350,6 +353,11 @@ def main():
                                      key=lambda kv: kv[1], reverse=True):
                 print(f"  {count:4d}  {rel}")
 
+    if args.successor_max is not None and successor_total > args.successor_max:
+        print(f"\nSUCCESSOR RATCHET FAILED: `successor`-outside-Natural total "
+              f"{successor_total} exceeds budget {args.successor_max} — speak "
+              f"`n + 1` / numerals instead", file=sys.stderr)
+        return 1
     if args.max is not None and total > args.max:
         print(f"\nLEAK RATCHET FAILED: total {total} exceeds budget {args.max}",
               file=sys.stderr)
