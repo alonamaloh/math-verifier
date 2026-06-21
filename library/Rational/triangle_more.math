@@ -62,25 +62,23 @@ theorem Integer.absolute_value_numerator_cross
         (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
         (productNonneg : Integer.IsNonneg(n * d))
         : abs(n) * d = n * abs(d) := {
-  claim absoluteProduct : abs(n) * abs(d) = n * d
-      by calc abs(n) * abs(d)
-            = abs(n * d)   by Integer.absolute_value_multiplicative
-            = n * d        by Integer.absolute_value_when_nonneg(n * d, productNonneg);
-  claim squareAbsolute : d * d = abs(d) * abs(d)
-      by calc d * d
-            = abs(d * d)        by Equality.symmetry(
-                                       Integer.absolute_value_when_nonneg(
-                                           d * d, Integer.square_IsNonneg(d)))
-            = abs(d) * abs(d)   by Integer.absolute_value_multiplicative;
-  claim cancelEquation : (abs(n) * d) * d = (n * abs(d)) * d
-      by calc (abs(n) * d) * d
-            = abs(n) * (d * d)            by ring
-            = abs(n) * (abs(d) * abs(d))  by substituting squareAbsolute
-            = (abs(n) * abs(d)) * abs(d)  by ring
-            = (n * d) * abs(d)            by substituting absoluteProduct
-            = (n * abs(d)) * d            by ring;
-  done by Integer.multiply_cancel_right_by_nonzero(
-              abs(n) * d, n * abs(d), d, denominatorNonzero, cancelEquation)
+  calc abs(n) * abs(d)
+     = abs(n * d)   since Integer.absolute_value_multiplicative
+     = n * d        since Integer.absolute_value_when_nonneg
+  as absoluteProduct;
+  claim Integer.IsNonneg(d * d) since Integer.square_IsNonneg;
+  calc d * d
+     = abs(d * d)        since Integer.absolute_value_when_nonneg
+     = abs(d) * abs(d)   since Integer.absolute_value_multiplicative
+  as squareAbsolute;
+  calc (abs(n) * d) * d
+     = abs(n) * (d * d)
+     = abs(n) * (abs(d) * abs(d))
+     = (abs(n) * abs(d)) * abs(d)
+     = (n * d) * abs(d)
+     = (n * abs(d)) * d
+  as cancelEquation;
+  done by Integer.multiply_cancel_right_by_nonzero
 }
 
 -- ----------------------------------------------------------------------
@@ -139,12 +137,12 @@ theorem Rational.absolute_value_when_negate_nonneg
 -- absolute_value_natural_is_image: |n| = (|n|_ℕ : I), the embedding
 -- of a Natural, which is IsNonneg.
 theorem Integer.absolute_value_IsNonneg (n : Integer)
-        : Integer.IsNonneg(abs(n)) :=
-  rewrite(
-      Equality.symmetry(
-          Integer.absolute_value_natural_is_image(n)),
-      Integer.from_natural_is_nonneg(
-          Integer.absolute_value_natural(n)))
+        : Integer.IsNonneg(abs(n)) := {
+  -- |n| is the embedding of the Natural |n|_ℕ, which is nonnegative.
+  claim Integer.IsNonneg((Integer.absolute_value_natural(n) : Integer))
+      since Integer.from_natural_is_nonneg;
+  done by substituting Integer.absolute_value_natural_is_image
+}
 
 -- |x| < c implies -c < x and x < c. Case split on the sign of x via
 -- IsNonneg_or_negate_IsNonneg. Each branch uses absolute_value_when_*
@@ -154,35 +152,34 @@ theorem Rational.absolute_value_LessThan_bounds
         (x c : Rational)
         (absLessThan : abs(x) < c)
         : -c < x ∧ x < c := {
+    claim Rational.IsNonneg(abs(x)) since Rational.absolute_value_IsNonneg;
     calc Rational.zero
-       ≤ abs(x)
-           by Rational.LessOrEqual_zero_of_IsNonneg(
-                  abs(x),
-                  Rational.absolute_value_IsNonneg(x))
+       ≤ abs(x)   since Rational.LessOrEqual_zero_of_IsNonneg
        < c;
-    cases Rational.IsNonneg_or_negate_IsNonneg(x) {
-      | Or.introduceLeft(xNonneg) =>
-          -- |x| = x; so x < c. For -c < x: chain -c < 0 ≤ x.
-          ⟨calc -c
-              < Rational.zero
-              ≤ x,
-           calc x
-              = abs(x)
-              < c⟩
-      | Or.introduceRight(negXNonneg) =>
-          -- |x| = -x; so -x < c. Negate to get -c < -(-x) = x. And
-          -- x < c follows from x ≤ 0 < c.
-          ({
-            calc -x
-                      = abs(x)
-                      < c;
-            ⟨calc -c
-                < -(-x)
-                = x,
-             calc x
-                ≤ Rational.zero
-                < c⟩
-          } : -c < x ∧ x < c)
+    claim by cases {
+      case Rational.IsNonneg(x) as xNonneg: {
+          -- |x| = x; so x < c, and -c < 0 ≤ x.
+          calc -c
+             < Rational.zero
+             ≤ x;
+          calc x
+             = abs(x)
+             < c;
+          done
+        }
+      case Rational.IsNonneg(-x) as negXNonneg: {
+          -- |x| = -x; so -x < c, giving -c < -(-x) = x; and x ≤ 0 < c.
+          calc -x
+             = abs(x)
+             < c;
+          calc -c
+             < -(-x)
+             = x;
+          calc x
+             ≤ Rational.zero
+             < c;
+          done
+        }
     }
 }
 
@@ -221,20 +218,17 @@ theorem Rational.absolute_value_reverse_triangle
         : abs(
               abs(a) - abs(b))
           ≤ abs(a - b) :=
-  cases Rational.IsNonneg_or_negate_IsNonneg(
-            abs(a) - abs(b)) {
-    | Or.introduceLeft(diffNonneg) =>
-        -- Branch 1: IsNonneg(|a| - |b|), so ||a| - |b|| = |a| - |b| ≤ |a - b|.
+  claim by cases {
+    case Rational.IsNonneg(abs(a) - abs(b)) as diffNonneg:
+        -- IsNonneg(|a| - |b|), so ||a| - |b|| = |a| - |b| ≤ |a - b|.
         calc abs(
                  abs(a)
                  - abs(b))
            = abs(a)
              - abs(b)
            ≤ abs(a - b)
-    | Or.introduceRight(negDiffNonneg) =>
-        -- Branch 2: IsNonneg(-(|a| - |b|)), so ||a| - |b|| = |b| - |a|.
-        -- Bound by |b - a| via absolute_value_difference_le.
-        -- Then |b - a| = |a - b| via absolute_value_subtract_swap.
+    case Rational.IsNonneg(-(abs(a) - abs(b))) as negDiffNonneg:
+        -- IsNonneg(-(|a| - |b|)), so ||a| - |b|| = |b| - |a| ≤ |b - a| = |a - b|.
         calc abs(
                  abs(a)
                  - abs(b))
@@ -255,15 +249,14 @@ theorem Rational.absolute_value_LessThan_of_bounds
         (x c : Rational)
         (lowerBound : -c < x) (upperBound : x < c)
         : abs(x) < c :=
-  cases Rational.IsNonneg_or_negate_IsNonneg(x) {
-    | Or.introduceLeft(xNonneg) =>
-        -- Branch 1: x is IsNonneg, so |x| = x < c directly.
+  claim by cases {
+    case Rational.IsNonneg(x) as xNonneg:
+        -- x is IsNonneg, so |x| = x < c directly.
         calc abs(x)
            = x
            < c
-    | Or.introduceRight(negXNonneg) =>
-        -- Branch 2: -x is IsNonneg, so |x| = -x. From -c < x, negate
-        -- both sides to get -x < c.
+    case Rational.IsNonneg(-x) as negXNonneg:
+        -- -x is IsNonneg, so |x| = -x; from -c < x, negate to get -x < -(-c) = c.
         calc abs(x)
            = -x
            < -(-c)
@@ -273,18 +266,18 @@ theorem Rational.absolute_value_LessThan_of_bounds
 -- ----------------------------------------------------------------------
 -- x ≤ |x|: equality when x is nonnegative; otherwise x ≤ -x = |x|.
 theorem Rational.le_absolute_value (x : Rational) : x ≤ abs(x) :=
-  cases Rational.IsNonneg_or_negate_IsNonneg(x) {
-    | Or.introduceLeft(xNonneg) =>
+  claim by cases {
+    case Rational.IsNonneg(x) as xNonneg:
         calc x
            ≤ x        by Rational.LessOrEqual.reflexive
-           = abs(x)   by Rational.absolute_value_when_nonneg(x, xNonneg)
-    | Or.introduceRight(negateNonneg) => {
+           = abs(x)   since Rational.absolute_value_when_nonneg
+    case Rational.IsNonneg(-x) as negateNonneg: {
         -- x ≤ -x, since -x - x = -x + -x is a sum of nonnegatives.
         claim Rational.IsNonneg(-x + -x) since Rational.IsNonneg.add;
         claim x ≤ -x by substituting (ring : -x + -x = -x - x);
         calc x
            ≤ -x       by (x ≤ -x)
-           = abs(x)   by Rational.absolute_value_when_negate_nonneg(x, negateNonneg)
+           = abs(x)   since Rational.absolute_value_when_negate_nonneg
       }
   }
 
@@ -295,30 +288,27 @@ theorem Rational.subtract_absolute_value_lower_bound (x delta : Rational)
         (deltaPositive : Rational.zero < delta)
         (lowerBound : -delta < x)
         : -(delta + delta) < x - abs(x) :=
-  cases Rational.IsNonneg_or_negate_IsNonneg(x) {
-    | Or.introduceLeft(xNonneg) => {
-        claim absEquation : abs(x) = x
-            by Rational.absolute_value_when_nonneg(x, xNonneg);
-        claim Rational.zero < delta + delta
-            by calc Rational.zero
-                  = Rational.zero + Rational.zero   by ring
-                  < delta + Rational.zero           by Rational.add_preserves_LessThan
-                  < delta + delta                   by Rational.add_left_preserves_LessThan;
+  claim by cases {
+    case Rational.IsNonneg(x) as xNonneg: {
+        claim abs(x) = x since Rational.absolute_value_when_nonneg;
+        calc Rational.zero
+           = Rational.zero + Rational.zero
+           < delta + Rational.zero           since Rational.add_preserves_LessThan
+           < delta + delta                   since Rational.add_left_preserves_LessThan;
         calc -(delta + delta)
-           < Rational.zero    by Rational.negate_LessThan_zero_of_positive
-           = x - x            by ring
-           = x - abs(x)       by substituting absEquation
+           < Rational.zero    since Rational.negate_LessThan_zero_of_positive
+           = x - x
+           = x - abs(x)
       }
-    | Or.introduceRight(negateNonneg) => {
-        claim absEquation : abs(x) = -x
-            by Rational.absolute_value_when_negate_nonneg(x, negateNonneg);
+    case Rational.IsNonneg(-x) as negateNonneg: {
+        claim abs(x) = -x since Rational.absolute_value_when_negate_nonneg;
         -- x - |x| = x + x, and each summand exceeds -δ.
         calc -(delta + delta)
-           = -delta + -delta   by ring
-           < x + -delta        by Rational.add_preserves_LessThan
-           < x + x             by Rational.add_left_preserves_LessThan
-           = x - -x            by ring
-           = x - abs(x)        by substituting absEquation
+           = -delta + -delta
+           < x + -delta        since Rational.add_preserves_LessThan
+           < x + x             since Rational.add_left_preserves_LessThan
+           = x - -x
+           = x - abs(x)
       }
   }
 
@@ -333,28 +323,26 @@ theorem Rational.product_lower_bound_of_lower_bounds (s t delta bound : Rational
         (sBound : abs(s) ≤ bound) (tBound : abs(t) ≤ bound)
         : -(bound * delta) ≤ s * t := {
   claim Rational.zero ≤ delta since Rational.LessThan.weaken;
-  claim Rational.zero ≤ bound
-      by calc Rational.zero
-            ≤ abs(s)   by Rational.zero_le_absolute_value
-            ≤ bound    by sBound;
-  cases Rational.IsNonneg_or_negate_IsNonneg(t) {
-    | Or.introduceLeft(tNonneg) => {
+  calc Rational.zero
+     ≤ abs(s)   since Rational.zero_le_absolute_value
+     ≤ bound    since sBound;
+  claim by cases {
+    case Rational.IsNonneg(t) as tNonneg: {
         claim -delta ≤ s since Rational.LessThan.weaken;
         claim scaledLower : -delta * t ≤ s * t
             since Rational.LessOrEqual.multiply_by_nonneg_right;
-        claim t ≤ bound
-            by calc t
-                  ≤ abs(t)   by Rational.le_absolute_value
-                  ≤ bound    by tBound;
+        calc t
+           ≤ abs(t)   since Rational.le_absolute_value
+           ≤ bound    since tBound;
         claim delta * t ≤ delta * bound
             since Rational.LessOrEqual.multiply_by_nonneg_left;
         calc -(bound * delta)
-           = -(delta * bound)   by ring
+           = -(delta * bound)
            ≤ -(delta * t)       by Rational.LessOrEqual.negate
-           = -delta * t         by ring
-           ≤ s * t              by scaledLower
+           = -delta * t
+           ≤ s * t              since scaledLower
       }
-    | Or.introduceRight(negateTNonneg) => {
+    case Rational.IsNonneg(-t) as negateTNonneg: {
         -- |t| ≤ δ, so the product is within B·δ of zero in absolute value.
         claim absTEquation : abs(t) = -t
             since Rational.absolute_value_when_negate_nonneg;
@@ -366,17 +354,15 @@ theorem Rational.product_lower_bound_of_lower_bounds (s t delta bound : Rational
         claim Rational.IsNonneg(abs(t)) since Rational.absolute_value_IsNonneg;
         claim firstFactor : abs(s) * abs(t) ≤ bound * abs(t)
             since Rational.LessOrEqual.multiply_by_nonneg_right;
-        claim abs(t) ≤ delta
-            by calc abs(t)
-                  = -t      by absTEquation
-                  ≤ delta   by (-t ≤ delta);
+        calc abs(t)
+           = -t      by absTEquation
+           ≤ delta   by (-t ≤ delta);
         claim secondFactor : bound * abs(t) ≤ bound * delta
             since Rational.LessOrEqual.multiply_by_nonneg_left;
-        claim abs(s * t) ≤ bound * delta
-            by calc abs(s * t)
-                  = abs(s) * abs(t)   by absProduct
-                  ≤ bound * abs(t)    by firstFactor
-                  ≤ bound * delta     by secondFactor;
+        calc abs(s * t)
+           = abs(s) * abs(t)   by absProduct
+           ≤ bound * abs(t)    by firstFactor
+           ≤ bound * delta     by secondFactor;
         -- s·t ≥ -|s·t| ≥ -(B·δ).
         claim -(s * t) ≤ abs(-(s * t)) since Rational.le_absolute_value;
         claim absNegate : abs(-(s * t)) = abs(s * t)
