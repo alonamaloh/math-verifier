@@ -10,9 +10,10 @@
 -- Mirrors `Algebra/ring_bundle.math`: `Group` is a single-constructor
 -- inductive (a dependent record), the projections recover each field,
 -- and the flattened law projections (`Group.associative`,
--- `Group.identity_left`, …) pull the individual equations out of the
--- nested-∧ `IsGroup` once, so consumers never walk the hierarchy by
--- hand. The derived facts (`Group.cancel_left`, `Group.inverse_involution`,
+-- `Group.identity_left`, …) bring the nested-∧ `IsGroup` into context and
+-- let the prover decompose it to the individual equation, so consumers
+-- never walk the hierarchy by hand. The derived facts (`Group.cancel_left`,
+-- `Group.inverse_involution`,
 -- …) re-export the generic `group_lemmas.math` results at the bundle.
 --
 -- As with the ring bundle, the field projections are written with
@@ -86,47 +87,45 @@ definition Group.is_group (g : Group)
     isGroup }
 
 -- ----------------------------------------------------------------------
--- Flattened law projections. Each destructures `Group.is_group(g)` to
--- the depth needed and returns the equation. IsGroup unfolds to
+-- Flattened law projections. Each brings `IsGroup(…)` into context via
+-- `Group.is_group` and lets the auto-prover decompose the nested ∧ to
+-- discharge the individual law. IsGroup unfolds to
 --   IsMonoid(·) ∧ inverseLeft ∧ inverseRight,
 -- and IsMonoid to associative ∧ identityLeft ∧ identityRight.
 
 theorem Group.associative (g : Group)
         : ∀ (x y z : Group.carrier(g)).
           x · y · z = x · (y · z) := {
-  let ⟨monoidProof, _, _⟩ := Group.is_group(g);
-  let ⟨associative, _, _⟩ := monoidProof;
-  associative
+  claim IsGroup(Group.carrier(g), Group.operation, Group.identity(g), Group.inverse) since Group.is_group;
+  done
 }
 
 theorem Group.identity_left (g : Group)
         : ∀ (x : Group.carrier(g)).
           Group.identity(g) · x = x := {
-  let ⟨monoidProof, _, _⟩ := Group.is_group(g);
-  let ⟨_, identityLeft, _⟩ := monoidProof;
-  identityLeft
+  claim IsGroup(Group.carrier(g), Group.operation, Group.identity(g), Group.inverse) since Group.is_group;
+  done
 }
 
 theorem Group.identity_right (g : Group)
         : ∀ (x : Group.carrier(g)).
           x · Group.identity(g) = x := {
-  let ⟨monoidProof, _, _⟩ := Group.is_group(g);
-  let ⟨_, _, identityRight⟩ := monoidProof;
-  identityRight
+  claim IsGroup(Group.carrier(g), Group.operation, Group.identity(g), Group.inverse) since Group.is_group;
+  done
 }
 
 theorem Group.inverse_left (g : Group)
         : ∀ (x : Group.carrier(g)).
           x⁻¹ · x = Group.identity(g) := {
-  let ⟨_, inverseLeft, _⟩ := Group.is_group(g);
-  inverseLeft
+  claim IsGroup(Group.carrier(g), Group.operation, Group.identity(g), Group.inverse) since Group.is_group;
+  done
 }
 
 theorem Group.inverse_right (g : Group)
         : ∀ (x : Group.carrier(g)).
           x · x⁻¹ = Group.identity(g) := {
-  let ⟨_, _, inverseRight⟩ := Group.is_group(g);
-  inverseRight
+  claim IsGroup(Group.carrier(g), Group.operation, Group.identity(g), Group.inverse) since Group.is_group;
+  done
 }
 
 -- ----------------------------------------------------------------------
