@@ -154,16 +154,16 @@ theorem Rational.LessOrEqual.transitive
 -- Strict transitivity and additive monotonicity.
 
 -- Drop the strict part: x < y → x ≤ y. Saves spelling out the And
--- members at every use site (`And.left(LessOrEqual(x, y), Not(x = y),
+-- members at every use site (`And.left(LessOrEqual(x, y), x ≠ y,
 -- xLessThanY)` collapses to `Rational.LessThan.weaken(xLessThanY)`).
 theorem Rational.LessThan.weaken
         {x y : Rational} (xLessThanY : x < y) : x ≤ y :=
-  And.left(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY)
+  And.left(Rational.LessOrEqual(x, y), x ≠ y, xLessThanY)
 
--- Extract the distinctness part: x < y → ¬(x = y).
+-- Extract the distinctness part: x < y → x ≠ y.
 theorem Rational.LessThan.distinct
-        {x y : Rational} (xLessThanY : x < y) : Not(x = y) :=
-  And.right(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY)
+        {x y : Rational} (xLessThanY : x < y) : x ≠ y :=
+  And.right(Rational.LessOrEqual(x, y), x ≠ y, xLessThanY)
 
 -- Lift a strict inequality across a function that preserves ≤ and
 -- whose application is injective on equality witnesses. Eliminates
@@ -181,8 +181,8 @@ theorem Rational.LessThan.lift
         : fx < fy := {
   claim x ≤ y since Rational.LessThan.weaken;
   claim fx ≤ fy since weak;
-  claim xDistinct : Not(x = y) since Rational.LessThan.distinct;
-  claim Not(fx = fy) by (fxEqFy : fx = fy) ↦ xDistinct(injection(fxEqFy));
+  claim xDistinct : x ≠ y since Rational.LessThan.distinct;
+  claim fx ≠ fy by (fxEqFy : fx = fy) ↦ xDistinct(injection(fxEqFy));
   done
 }
 
@@ -192,9 +192,9 @@ theorem Rational.LessThan.transitive_left
         (xLeqY : x ≤ y) (yLessThanZ : y < z)
         : x < z := {
   claim y ≤ z;
-  claim yNotZ : Not(y = z);
+  claim yNotZ : y ≠ z;
   claim x ≤ z;
-  claim Not(x = z) by {
+  claim x ≠ z by {
     -- y ≤ z = x, so y ≤ x. Combined with x ≤ y, antisymmetry gives
     -- x = y, then x = z gives y = z — contradicts yNotZ.
     suppose x = z as xEqualsZ;
@@ -213,9 +213,9 @@ theorem Rational.LessThan.transitive_right
         (xLessThanY : x < y) (yLeqZ : y ≤ z)
         : x < z := {
   claim x ≤ y;
-  claim xNotY : Not(x = y);
+  claim xNotY : x ≠ y;
   claim x ≤ z;
-  claim Not(x = z) by {
+  claim x ≠ z by {
     -- x ≤ y AND y ≤ z = x, so x ≤ y ≤ x. Antisymmetry: x = y.
     -- Contradicts xNotY.
     suppose x = z as xEqualsZ;

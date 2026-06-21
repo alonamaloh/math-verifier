@@ -101,7 +101,7 @@ theorem Rational.LessOrEqual.multiply_by_nonneg_left
 -- 0 ≠ 1 at Rational. Equal Rational classes give equivalent
 -- representatives, descending through Integer to 1 = 0 at Natural —
 -- impossible.
-theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
+theorem Rational.zero_not_equal_one : Rational.zero ≠ Rational.one :=
   (zeroEqOne : Rational.zero = Rational.one) ↦ {
     claim Rational.fraction(Integer.zero, Integer.one, Integer.one_is_nonzero)
             = Rational.fraction(Integer.one, Integer.one, Integer.one_is_nonzero)
@@ -125,7 +125,7 @@ theorem Rational.zero_less_one : Rational.zero < Rational.one := {
       by substituting (ring : Integer.one * Integer.one = (successor(0) : Integer));
   claim Rational.IsNonneg(Rational.one) since Rational.IsNonneg.of_numerator_denominator;
   claim Rational.LessOrEqual(Rational.zero, Rational.one) since Rational.LessOrEqual_zero_of_IsNonneg;
-  claim Not(Rational.zero = Rational.one) since Rational.zero_not_equal_one;
+  claim Rational.zero ≠ Rational.one since Rational.zero_not_equal_one;
   done
 }
 
@@ -146,7 +146,7 @@ theorem Rational.halve_less_than_self
       by substituting diffEqualsHalve;
   claim Rational.halve(epsilon) ≤ epsilon;
   -- halve(ε) ≠ ε: equality would force ε − halve(ε) = 0 = halve(ε), contradicting halve(ε) > 0.
-  claim Not(Rational.halve(epsilon) = epsilon);
+  claim Rational.halve(epsilon) ≠ epsilon;
   done
 }
 
@@ -183,7 +183,7 @@ theorem Rational.zero_le_absolute_value (q : Rational)
 --   ((succ(K):I)·|d| + (-|n|)·1) · (1·|d|),
 -- which equals ((K:I)·(|d|−1) + |d|) · |d| ≥ 0.
 theorem Rational.absolute_value_le_succ_natural_at_representative
-        (n d : Integer) (dNonzero : ¬(d = Integer.zero))
+        (n d : Integer) (dNonzero : d ≠ Integer.zero)
         : Rational.LessOrEqual(
               abs(Rational.fraction(n, d, dNonzero)),
               (successor(Integer.absolute_value_natural(n)) : Rational)) :=
@@ -283,14 +283,14 @@ theorem Rational.reciprocal_of_succ_IsNonneg (K : Natural)
 
 -- 1/(succ(K)) is non-zero.
 theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
-        : Not(Rational.zero
-              = StrictPositiveRational.reciprocal(
-                    StrictPositiveRational.make(K, 0))) :=
+        : Rational.zero
+              ≠ StrictPositiveRational.reciprocal(
+                    StrictPositiveRational.make(K, 0)) :=
   (zeroEqRecip
               : Rational.zero
                 = StrictPositiveRational.reciprocal(
                       StrictPositiveRational.make(K, 0))) ↦ {
-    let successorNonzero : ¬((successor(K) : Integer) = Integer.zero) :=
+    let successorNonzero : (successor(K) : Integer) ≠ Integer.zero :=
         done since Integer.from_natural_successor_nonzero;
     -- Equal classes ⇒ 0·succ(K) = succ(0)·1, i.e. 0 = 1 in ℤ.
     claim rationalEquivalence
@@ -323,8 +323,8 @@ theorem Rational.reciprocal_of_succ_positive (K : Natural)
             Rational.zero,
             StrictPositiveRational.reciprocal(StrictPositiveRational.make(K, 0)))
       since Rational.LessOrEqual_zero_of_IsNonneg;
-  claim Not(Rational.zero
-            = StrictPositiveRational.reciprocal(StrictPositiveRational.make(K, 0)))
+  claim Rational.zero
+            ≠ StrictPositiveRational.reciprocal(StrictPositiveRational.make(K, 0))
       since Rational.reciprocal_of_succ_nonzero;
   done
 }
@@ -332,9 +332,9 @@ theorem Rational.reciprocal_of_succ_positive (K : Natural)
 -- A zero numerator makes a fraction zero, so a nonzero fraction has a
 -- nonzero numerator.
 theorem Rational.numerator_nonzero
-        (n d : Integer) (denominatorNonzero : ¬(d = Integer.zero))
-        (fractionNonzero : ¬(Rational.fraction(n, d, denominatorNonzero) = Rational.zero))
-        : ¬(n = Integer.zero) := {
+        (n d : Integer) (denominatorNonzero : d ≠ Integer.zero)
+        (fractionNonzero : Rational.fraction(n, d, denominatorNonzero) ≠ Rational.zero)
+        : n ≠ Integer.zero := {
   suppose n = Integer.zero as numeratorZero;
   -- 0/d ≡ 0/1 since 0·1 = 0·d, so 0/d is the zero class.
   claim RationalEquivalent(
@@ -353,8 +353,8 @@ theorem Rational.numerator_nonzero
 -- numerators (ℤ is an integral domain).
 theorem Rational.multiply_nonzero
         (x y : Rational)
-        (xNonzero : ¬(x = Rational.zero)) (yNonzero : ¬(y = Rational.zero))
-        : ¬(x * y = Rational.zero) :=
+        (xNonzero : x ≠ Rational.zero) (yNonzero : y ≠ Rational.zero)
+        : x * y ≠ Rational.zero :=
   cases x refining xNonzero { | RationalRepresentative.make(n_x, d_x, dxNonzero) =>
     cases y refining yNonzero { | RationalRepresentative.make(n_y, d_y, dyNonzero) => {
       suppose Rational.fraction(n_x, d_x, dxNonzero) * Rational.fraction(n_y, d_y, dyNonzero)
@@ -376,9 +376,9 @@ theorem Rational.multiply_nonzero
          = (n_x * n_y) * Integer.one
          = Integer.zero * (d_x * d_y)   since crossEquivalence
          = Integer.zero;
-      claim ¬(n_x = Integer.zero) by Rational.numerator_nonzero(n_x, d_x, dxNonzero, xNonzero);
-      claim ¬(n_y = Integer.zero) by Rational.numerator_nonzero(n_y, d_y, dyNonzero, yNonzero);
-      claim productNumeratorNonzero : ¬(n_x * n_y = Integer.zero) since Integer.multiply_nonzero;
+      claim n_x ≠ Integer.zero by Rational.numerator_nonzero(n_x, d_x, dxNonzero, xNonzero);
+      claim n_y ≠ Integer.zero by Rational.numerator_nonzero(n_y, d_y, dyNonzero, yNonzero);
+      claim productNumeratorNonzero : n_x * n_y ≠ Integer.zero since Integer.multiply_nonzero;
       absurd(productNumeratorNonzero(n_x * n_y = Integer.zero))
     } } }
 
@@ -394,11 +394,11 @@ theorem Rational.multiply_positive_positive
   claim Rational.IsNonneg(x * y) since Rational.IsNonneg.multiply;
   claim Rational.LessOrEqual(Rational.zero, x * y) since Rational.LessOrEqual_zero_of_IsNonneg;
   -- x·y ≠ 0 since neither factor is 0 (no zero divisors).
-  claim ¬(x = Rational.zero) since Rational.LessThan.distinct;
-  claim ¬(y = Rational.zero) since Rational.LessThan.distinct;
-  claim Not(Rational.zero = x * y) by {
+  claim x ≠ Rational.zero since Rational.LessThan.distinct;
+  claim y ≠ Rational.zero since Rational.LessThan.distinct;
+  claim Rational.zero ≠ x * y by {
     suppose Rational.zero = x * y as zeroEqProduct;
-    claim productNonzero : ¬(x * y = Rational.zero) since Rational.multiply_nonzero;
+    claim productNonzero : x * y ≠ Rational.zero since Rational.multiply_nonzero;
     absurd(productNonzero(x * y = Rational.zero))
   };
   done
@@ -434,9 +434,9 @@ theorem Rational.divide_by_succ_positive
 -- Integer level, i.e. Integer.zero = Integer.one — same numeral
 -- discrimination as zero_not_equal_one.
 theorem Rational.zero_not_equal_one_half
-        : Not(Rational.zero = Rational.one_half) :=
+        : Rational.zero ≠ Rational.one_half :=
   (zeroEqualsOneHalf : Rational.zero = Rational.one_half) ↦ {
-    let twoNonzero : ¬((successor(1) : Integer) = Integer.zero) :=
+    let twoNonzero : (successor(1) : Integer) ≠ Integer.zero :=
         done since Integer.from_natural_successor_nonzero;
     -- Equal classes ⇒ 0·2 = 1·1, i.e. 0 = 1 in ℤ.
     claim rationalEquivalence
@@ -461,6 +461,6 @@ theorem Rational.zero_not_equal_one_half
 theorem Rational.one_half_positive : Rational.zero < Rational.one_half := {
   claim Rational.IsNonneg(Rational.one_half) since Rational.one_half_IsNonneg;
   claim Rational.LessOrEqual(Rational.zero, Rational.one_half) since Rational.LessOrEqual_zero_of_IsNonneg;
-  claim Not(Rational.zero = Rational.one_half) since Rational.zero_not_equal_one_half;
+  claim Rational.zero ≠ Rational.one_half since Rational.zero_not_equal_one_half;
   done
 }

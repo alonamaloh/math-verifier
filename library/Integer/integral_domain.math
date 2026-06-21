@@ -38,7 +38,7 @@ import Natural.add_order
 
 -- Cancel a nonzero right factor: x·c = y·c with c ≠ 0 forces x = y.
 theorem Integer.multiply_cancel_right_by_nonzero
-        (x y c : Integer) (cNonzero : ¬(c = Integer.zero))
+        (x y c : Integer) (cNonzero : c ≠ Integer.zero)
         (productEquality : x * c = y * c)
         : x = y := {
   claim signSplit : Integer.IsNonneg(c) ∨ ∃ (k : Natural). c = -(k : Integer)
@@ -46,7 +46,7 @@ theorem Integer.multiply_cancel_right_by_nonzero
   cases signSplit {
     | Or.introduceLeft(cNonneg) => {
         choose n such that c = (n : Integer) from cNonneg;
-        claim ¬(n = 0) by {
+        claim n ≠ 0 by {
           suppose n = 0 as nIsZero;
           absurd(cNonzero(calc c
                              = (n : Integer)
@@ -62,7 +62,7 @@ theorem Integer.multiply_cancel_right_by_nonzero
       }
     | Or.introduceRight(cNegated) => {
         choose k such that c = -(k : Integer) from cNegated;
-        claim ¬(k = 0) by {
+        claim k ≠ 0 by {
           suppose k = 0 as kIsZero;
           absurd(cNonzero(calc c
                              = -(k : Integer)
@@ -82,7 +82,7 @@ theorem Integer.multiply_cancel_right_by_nonzero
 }
 
 -- 1 ≠ 0 in ℤ: the unit denominator is a valid (nonzero) denominator.
-theorem Integer.one_is_nonzero : ¬(Integer.one = Integer.zero) := {
+theorem Integer.one_is_nonzero : Integer.one ≠ Integer.zero := {
   suppose Integer.one = Integer.zero as oneEqualsZero;
   claim ((1 : Natural) : Integer) = ((0 : Natural) : Integer) since oneEqualsZero;
   claim 1 = (0 : Natural) since Natural.to_integer.injective;
@@ -92,8 +92,8 @@ theorem Integer.one_is_nonzero : ¬(Integer.one = Integer.zero) := {
 -- The product of two nonzero integers is nonzero (no zero divisors).
 theorem Integer.multiply_nonzero
         (x y : Integer)
-        (xNonzero : ¬(x = Integer.zero)) (yNonzero : ¬(y = Integer.zero))
-        : ¬(x * y = Integer.zero) := {
+        (xNonzero : x ≠ Integer.zero) (yNonzero : y ≠ Integer.zero)
+        : x * y ≠ Integer.zero := {
   suppose x * y = Integer.zero as productZero;
   calc x * y
      = Integer.zero
@@ -132,7 +132,7 @@ theorem Integer.IsNonneg_of_product_with_positive
         (a p : Integer)
         (productNonneg : Integer.IsNonneg(a * p))
         (pNonneg : Integer.IsNonneg(p))
-        (pNonzero : ¬(p = Integer.zero))
+        (pNonzero : p ≠ Integer.zero)
         : Integer.IsNonneg(a) := {
   claim signSplit : Integer.IsNonneg(a) ∨ ∃ (k : Natural). a = -(k : Integer)
       since Integer.sign_split;
@@ -195,8 +195,8 @@ theorem Integer.absolute_value_eq_zero_implies_zero
 
 -- |x| ≠ 0 when x ≠ 0.
 theorem Integer.absolute_value_nonzero
-        (x : Integer) (xNonzero : ¬(x = Integer.zero))
-        : ¬(abs(x) = Integer.zero) := {
+        (x : Integer) (xNonzero : x ≠ Integer.zero)
+        : abs(x) ≠ Integer.zero := {
   suppose abs(x) = Integer.zero as absoluteValueZero;
   claim x = Integer.zero since Integer.absolute_value_eq_zero_implies_zero;
   absurd(xNonzero(x = Integer.zero))
@@ -205,7 +205,7 @@ theorem Integer.absolute_value_nonzero
 -- A successor-natural image is a valid (nonzero) denominator: the common
 -- case for denominators built from positive naturals.
 theorem Integer.from_natural_successor_nonzero (k : Natural)
-        : ¬((successor(k) : Integer) = Integer.zero) := {
+        : (successor(k) : Integer) ≠ Integer.zero := {
   suppose (successor(k) : Integer) = Integer.zero as castZero;
   calc ((successor(k) : Natural) : Integer)
      = Integer.zero
@@ -218,7 +218,7 @@ theorem Integer.from_natural_successor_nonzero (k : Natural)
 -- `successor` in fraction denominators. (`Natural.add` is opaque, so
 -- `1 + k` is not definitionally `successor(k)`; bridge via `Natural.one_add`.)
 theorem Integer.one_plus_natural_nonzero (k : Natural)
-        : ¬(((1 + k) : Integer) = Integer.zero) := {
+        : ((1 + k) : Integer) ≠ Integer.zero := {
   suppose ((1 + k) : Integer) = Integer.zero as castZero;
   calc ((1 + k) : Integer)
      = Integer.zero
@@ -243,11 +243,11 @@ theorem Integer.absolute_value_is_nonneg (x : Integer)
 -- |d| ≥ 1 when d ≠ 0 (as IsNonneg(|d| − 1)): the absolute value of a nonzero
 -- integer is a positive natural image, so subtracting one stays non-negative.
 theorem Integer.absolute_value_minus_one_nonneg
-        (d : Integer) (dNonzero : ¬(d = Integer.zero))
+        (d : Integer) (dNonzero : d ≠ Integer.zero)
         : Integer.IsNonneg(abs(d) + -Integer.one) := {
   claim abs(d) = (Integer.absolute_value_natural(d) : Integer)
       since Integer.absolute_value_natural_is_image;
-  claim absoluteNaturalNonzero : ¬(Integer.absolute_value_natural(d) = 0) by {
+  claim absoluteNaturalNonzero : Integer.absolute_value_natural(d) ≠ 0 by {
       suppose Integer.absolute_value_natural(d) = 0 as absoluteNaturalZero;
       calc abs(d)
          = (Integer.absolute_value_natural(d) : Integer)
@@ -277,7 +277,7 @@ theorem Integer.absolute_value_minus_one_nonneg
 
 -- The magnitude of a nonzero integer is a positive natural.
 theorem Integer.absolute_value_natural_positive_of_nonzero
-        (d : Integer) (dNonzero : ¬(d = Integer.zero))
+        (d : Integer) (dNonzero : d ≠ Integer.zero)
         : 1 ≤ Integer.absolute_value_natural(d) := {
   claim absoluteNaturalSplit
         : Integer.absolute_value_natural(d) = 0
