@@ -93,78 +93,52 @@ theorem Rational.sequence.product_is_cauchy_bound
         : abs(s(m) * t(m) - s(n) * t(n)) < epsilon := {
   -- m, n ≥ N_s_bound, N_t_bound, N_s, N_t. Each projects m_ge / n_ge through
   -- the nested max; the prover backward-chains `le_through_max` to the bound.
-  claim m_ge_N_s_bound : N_s_bound ≤ m by Natural.le_through_max_left;
-  claim n_ge_N_t_bound : N_t_bound ≤ n by Natural.le_through_max_right;
-  claim m_ge_N_s : N_s ≤ m by Natural.le_through_max_left;
-  claim n_ge_N_s : N_s ≤ n by Natural.le_through_max_left;
-  claim m_ge_N_t : N_t ≤ m by Natural.le_through_max_right;
-  claim n_ge_N_t : N_t ≤ n by Natural.le_through_max_right;
+  claim m_ge_N_s_bound : N_s_bound ≤ m since Natural.le_through_max_left;
+  claim n_ge_N_t_bound : N_t_bound ≤ n since Natural.le_through_max_right;
+  claim m_ge_N_s : N_s ≤ m since Natural.le_through_max_left;
+  claim n_ge_N_s : N_s ≤ n since Natural.le_through_max_left;
+  claim m_ge_N_t : N_t ≤ m since Natural.le_through_max_right;
+  claim n_ge_N_t : N_t ≤ n since Natural.le_through_max_right;
   -- Specific bounds at m, n.
-  claim s_at_m_bound : abs(s(m)) ≤ (successor(K_s) : Rational)
-    by sBound(m, m_ge_N_s_bound);
-  claim t_at_n_bound : abs(t(n)) ≤ (successor(K_t) : Rational)
-    by tBound(n, n_ge_N_t_bound);
+  claim abs(s(m)) ≤ (successor(K_s) : Rational)
+    since sBound(m, m_ge_N_s_bound);
+  claim abs(t(n)) ≤ (successor(K_t) : Rational)
+    since tBound(n, n_ge_N_t_bound);
   claim abs(s(m) - s(n)) < delta_s
     by sCauchyAt(m, m_ge_N_s, n, n_ge_N_s);
   claim abs(t(m) - t(n)) < delta_t
     by tCauchyAt(m, m_ge_N_t, n, n_ge_N_t);
-  claim s_diff_weak : abs(s(m) - s(n)) ≤ delta_s
-    by Rational.LessThan.weaken;
-  claim t_diff_weak : abs(t(m) - t(n)) ≤ delta_t
-    by Rational.LessThan.weaken;
+  claim abs(s(m) - s(n)) ≤ delta_s
+    since Rational.LessThan.weaken;
+  claim abs(t(m) - t(n)) ≤ delta_t
+    since Rational.LessThan.weaken;
   claim (successor(K_t) : Rational) * delta_s
-          ≤ Rational.halve(Rational.halve(epsilon))
-    by And.right;
+          ≤ Rational.halve(Rational.halve(epsilon));
   claim (successor(K_s) : Rational) * delta_t
-          ≤ Rational.halve(Rational.halve(epsilon))
-    by And.right;
+          ≤ Rational.halve(Rational.halve(epsilon));
   claim abs(
             s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
           ≤ abs(s(m) * (t(m) - t(n)))
             + abs(t(n) * (s(m) - s(n)))
-    by Rational.triangle_inequality;
+    since Rational.triangle_inequality;
   claim abs(s(m))
             * abs(t(m) - t(n))
           ≤ (successor(K_s) : Rational)
             * abs(t(m) - t(n))
-    by Rational.LessOrEqual.multiply_by_nonneg_right(
-           abs(s(m)),
-           (successor(K_s) : Rational),
-           abs(t(m) - t(n)),
-           s_at_m_bound,
-           Rational.zero_le_absolute_value(t(m) - t(n)));
+    by Rational.LessOrEqual.multiply_by_nonneg_right;
   claim (successor(K_s) : Rational)
             * abs(t(m) - t(n))
           ≤ (successor(K_s) : Rational) * delta_t
-    by Rational.LessOrEqual.multiply_by_nonneg_left(
-           abs(t(m) - t(n)),
-           delta_t,
-           (successor(K_s) : Rational),
-           t_diff_weak,
-           Rational.LessOrEqual_zero_of_IsNonneg(
-               (successor(K_s) : Rational),
-               Rational.from_natural_is_nonneg(successor(K_s))));
+    by Rational.LessOrEqual.multiply_by_nonneg_left;
   claim abs(t(n))
             * abs(s(m) - s(n))
           ≤ (successor(K_t) : Rational)
             * abs(s(m) - s(n))
-    by Rational.LessOrEqual.multiply_by_nonneg_right(
-           abs(t(n)),
-           (successor(K_t) : Rational),
-           abs(s(m) - s(n)),
-           t_at_n_bound,
-           Rational.zero_le_absolute_value(s(m) - s(n)));
+    by Rational.LessOrEqual.multiply_by_nonneg_right;
   claim (successor(K_t) : Rational)
             * abs(s(m) - s(n))
           ≤ (successor(K_t) : Rational) * delta_s
-    by Rational.LessOrEqual.multiply_by_nonneg_left(
-           abs(s(m) - s(n)),
-           delta_s,
-           (successor(K_t) : Rational),
-           s_diff_weak,
-           Rational.LessOrEqual_zero_of_IsNonneg(
-               (successor(K_t) : Rational),
-               Rational.from_natural_is_nonneg(successor(K_t))));
+    by Rational.LessOrEqual.multiply_by_nonneg_left;
   calc abs(s(m) * (t(m) - t(n)))
      = abs(s(m))
          * abs(t(m) - t(n))
@@ -212,28 +186,25 @@ theorem Rational.sequence.product_is_cauchy
     claim sNaturallyBounded
         : ∃ (K : Natural). ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → abs(s(m)) ≤ (successor(K) : Rational)
-        by Rational.sequence.cauchy_is_naturally_bounded(s, sIsCauchy);
+        since Rational.sequence.cauchy_is_naturally_bounded;
     choose K_s as sBoundedAtN_s from sNaturallyBounded;
     choose N_s_bound as sBound from sBoundedAtN_s;
     -- Step 2: similar for t.
     claim tNaturallyBounded
         : ∃ (K : Natural). ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → abs(t(m)) ≤ (successor(K) : Rational)
-        by Rational.sequence.cauchy_is_naturally_bounded(t, tIsCauchy);
+        since Rational.sequence.cauchy_is_naturally_bounded;
     choose K_t as tBoundedAtN_t from tNaturallyBounded;
     choose N_t_bound as tBound from tBoundedAtN_t;
-    -- Step 3: get δ_s with (succ K_t) · δ_s ≤ ε/4.
+    -- Step 3: get δ_s and δ_t with (succ K_·) · δ ≤ ε/4. Both need ε/4 > 0.
+    claim Rational.zero < Rational.halve(epsilon) since Rational.halve_positive;
+    claim Rational.zero < Rational.halve(Rational.halve(epsilon)) since Rational.halve_positive;
     claim deltaSExists
         : ∃ (delta : Rational).
             Rational.zero < delta ∧ Rational.LessOrEqual(
                     (successor(K_t) : Rational) * delta,
                     Rational.halve(Rational.halve(epsilon)))
-        by Rational.divide_by_succ_positive(
-               Rational.halve(Rational.halve(epsilon)),
-               K_t,
-               Rational.halve_positive(
-                   Rational.halve(epsilon),
-                   Rational.halve_positive(epsilon, epsilonPositive)));
+        since Rational.divide_by_succ_positive;
     choose delta_s from deltaSExists;
     claim delta_s_pos : Rational.zero < delta_s;
     claim delta_s_bound
@@ -246,12 +217,7 @@ theorem Rational.sequence.product_is_cauchy
             Rational.zero < delta ∧ Rational.LessOrEqual(
                     (successor(K_s) : Rational) * delta,
                     Rational.halve(Rational.halve(epsilon)))
-        by Rational.divide_by_succ_positive(
-               Rational.halve(Rational.halve(epsilon)),
-               K_s,
-               Rational.halve_positive(
-                   Rational.halve(epsilon),
-                   Rational.halve_positive(epsilon, epsilonPositive)));
+        since Rational.divide_by_succ_positive;
     choose delta_t from deltaTExists;
     claim delta_t_pos : Rational.zero < delta_t;
     claim delta_t_bound
@@ -263,12 +229,12 @@ theorem Rational.sequence.product_is_cauchy
     claim sCauchyBound
         : ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < delta_s
-        by sIsCauchy(delta_s, delta_s_pos);
+        since sIsCauchy(delta_s, delta_s_pos);
     choose N_s as sCauchyAt from sCauchyBound;
     claim tCauchyBound
         : ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(t(m) - t(n)) < delta_t
-        by tIsCauchy(delta_t, delta_t_pos);
+        since tIsCauchy(delta_t, delta_t_pos);
     choose N_t as tCauchyAt from tCauchyBound;
     -- Final N := max(N_s_bound, N_t_bound, N_s, N_t).
     witness Natural.maximum(
@@ -282,7 +248,6 @@ theorem Rational.sequence.product_is_cauchy
                  (n_ge : Natural.maximum(
                             Natural.maximum(N_s_bound, N_t_bound),
                             Natural.maximum(N_s, N_t)) ≤ n) ↦
-          -- Bound chain proof comes here.
           Rational.sequence.product_is_cauchy_bound(
               s, t, epsilon,
               K_s, K_t,
@@ -292,8 +257,8 @@ theorem Rational.sequence.product_is_cauchy
               m_ge, n_ge,
               sBound, tBound,
               sCauchyAt, tCauchyAt,
-              ⟨delta_s_pos, delta_s_bound⟩,
-              ⟨delta_t_pos, delta_t_bound⟩,
+              And.introduction(delta_s_pos, delta_s_bound),
+              And.introduction(delta_t_pos, delta_t_bound),
               epsilonPositive)
   }
 
@@ -354,28 +319,16 @@ theorem Real.multiply_respect_bound_chain
         (epsilonPositive : Rational.zero < epsilon)
         : abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
             < epsilon := {
-  claim s_y_diff_weak : abs(s_y(m) - s_yPrime(m)) ≤ delta;
+  claim abs(s_y(m) - s_yPrime(m)) ≤ delta;
   claim abs(s_x(m))
             * abs(s_y(m) - s_yPrime(m))
           ≤ (successor(K) : Rational)
             * abs(s_y(m) - s_yPrime(m))
-    by Rational.LessOrEqual.multiply_by_nonneg_right(
-           abs(s_x(m)),
-           (successor(K) : Rational),
-           abs(s_y(m) - s_yPrime(m)),
-           s_x_at_m_bound,
-           Rational.zero_le_absolute_value(s_y(m) - s_yPrime(m)));
+    by Rational.LessOrEqual.multiply_by_nonneg_right;
   claim (successor(K) : Rational)
             * abs(s_y(m) - s_yPrime(m))
           ≤ (successor(K) : Rational) * delta
-    by Rational.LessOrEqual.multiply_by_nonneg_left(
-           abs(s_y(m) - s_yPrime(m)),
-           delta,
-           (successor(K) : Rational),
-           s_y_diff_weak,
-           Rational.LessOrEqual_zero_of_IsNonneg(
-               (successor(K) : Rational),
-               Rational.from_natural_is_nonneg(successor(K))));
+    by Rational.LessOrEqual.multiply_by_nonneg_left;
   -- Factor s_x(m) out; |·| splits multiplicatively; bound |s_x| by
   -- (K+1), then |s_y - s_yPrime| by δ; finally δ·(K+1) ≤ ε/2 < ε.
   calc abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
@@ -406,29 +359,33 @@ theorem Real.multiply_after_first_respects_at_rep_inner
             ∀ (m : Natural). N ≤ m →
               abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
                 < epsilon := {
-    choose K as xBoundedAtN
-        from Rational.sequence.cauchy_is_naturally_bounded(s_x, sCauchy_x);
+    claim xNaturallyBounded
+        : ∃ (K : Natural). ∃ (N : Natural).
+            ∀ (m : Natural). N ≤ m → abs(s_x(m)) ≤ (successor(K) : Rational)
+        since Rational.sequence.cauchy_is_naturally_bounded;
+    choose K as xBoundedAtN from xNaturallyBounded;
     choose N_x_bound as xBound from xBoundedAtN;
-    choose delta
-        from Rational.divide_by_succ_positive(
-            Rational.halve(epsilon), K,
-            Rational.halve_positive(epsilon, epsilonPositive));
+    claim Rational.zero < Rational.halve(epsilon) since Rational.halve_positive;
+    claim deltaExists
+        : ∃ (delta : Rational).
+            Rational.zero < delta ∧ Rational.LessOrEqual(
+                    (successor(K) : Rational) * delta, Rational.halve(epsilon))
+        since Rational.divide_by_succ_positive;
+    choose delta from deltaExists;
     claim delta_pos : Rational.zero < delta;
-    claim delta_bound
-        : Rational.LessOrEqual((successor(K) : Rational) * delta, Rational.halve(epsilon));
+    claim Rational.LessOrEqual((successor(K) : Rational) * delta, Rational.halve(epsilon));
     choose N_y as yEquivAt from refinedYEquiv(delta, delta_pos);
     witness Natural.maximum(N_x_bound, N_y) with
         (m : Natural)
-                 (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) ↦
-          Real.multiply_respect_bound_chain(
-              s_x, s_y, s_yPrime,
-              epsilon, K, delta, m,
-              xBound(m,
-                  Natural.le_through_max_left(N_x_bound, N_y, m, m_ge_max)),
-              yEquivAt(m,
-                  Natural.le_through_max_right(N_x_bound, N_y, m, m_ge_max)),
-              delta_bound,
-              epsilonPositive)
+                 (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) ↦ {
+          claim mGeNxBound : N_x_bound ≤ m since Natural.le_through_max_left;
+          claim mGeNy : N_y ≤ m since Natural.le_through_max_right;
+          claim abs(s_x(m)) ≤ (successor(K) : Rational) since xBound(m, mGeNxBound);
+          claim abs(s_y(m) - s_yPrime(m)) < delta since yEquivAt(m, mGeNy);
+          claim abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)) < epsilon
+              by Real.multiply_respect_bound_chain;
+          done
+        }
 }
 
 -- Respect of multiplication in the second argument: rep_x fixed, y
@@ -444,12 +401,11 @@ theorem Real.multiply_respects_second
     CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime),
     refinedYEquiv =>
       (epsilon : Rational)
-               (epsilonPositive : Rational.zero < epsilon) ↦
-        Real.multiply_after_first_respects_at_rep_inner(
-            s_x, sCauchy_x, s_y, s_yPrime,
-            sCauchy_y, sCauchy_yPrime,
-            refinedYEquiv,
-            epsilon, epsilonPositive)
+               (epsilonPositive : Rational.zero < epsilon) ↦ {
+        change ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
+                 abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)) < epsilon;
+        done since Real.multiply_after_first_respects_at_rep_inner
+      }
 
 -- Symmetric inner-chain helper for multiply_respects_first: y is
 -- bounded, x varies via xEquiv.
@@ -479,7 +435,7 @@ theorem Real.multiply_respects_at_rep_y_inner
           calc abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
              = abs(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
              < epsilon
-                  by boundedY(m, N_leq_m)
+                  since boundedY(m, N_leq_m)
   }
 
 -- Respect of multiplication in the first argument: symmetric to
@@ -494,12 +450,11 @@ theorem Real.multiply_respects_first
     CauchyRationalSequence.make(s_y, sCauchy_y),
     refinedXEquiv =>
       (epsilon : Rational)
-               (epsilonPositive : Rational.zero < epsilon) ↦
-        Real.multiply_respects_at_rep_y_inner(
-            s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
-            s_y, sCauchy_y,
-            refinedXEquiv,
-            epsilon, epsilonPositive)
+               (epsilonPositive : Rational.zero < epsilon) ↦ {
+        change ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
+                 abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)) < epsilon;
+        done by Real.multiply_respects_at_rep_y_inner
+      }
 
 -- Real.multiply: multiply the representative sequences pointwise;
 -- well-defined in each argument by the respect lemmas above.

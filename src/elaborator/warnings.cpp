@@ -330,6 +330,14 @@ bool Elaborator::surfaceMentionsName(
             if (choose->predicate
                 && surfaceMentionsName(*choose->predicate, name))
                 return true;
+            // `choose v … from <source>` destructures <source>: a bare
+            // hypothesis name there IS a reference to it. Without this the
+            // walker missed `h` in `choose v from h;` and flagged the claim
+            // that introduced `h` as unused (the fact is consumed by the
+            // destructure, not by type-match).
+            if (choose->source
+                && surfaceMentionsName(*choose->source, name))
+                return true;
             return choose->body
                 && surfaceMentionsName(*choose->body, name);
         }
