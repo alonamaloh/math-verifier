@@ -315,7 +315,10 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                     targetFunction = "LessOrEqual";
                     wrapLeftInSuccessor = true;
                 }
-                else if (operatorSymbol == "∣") targetFunction = "Natural.divides";
+                // `∣` is registered like `+`/`*` via the operator registry —
+                // `operator (∣) on (Natural, Natural) := Natural.divides`
+                // (Natural/divisibility) and `(Ring.carrier, Ring.carrier)` for
+                // the ring form — so no built-in special case is needed here.
             }
         }
         if (targetFunction.empty()) {
