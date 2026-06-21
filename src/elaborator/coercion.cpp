@@ -839,13 +839,13 @@ ExpressionPointer Elaborator::tryQuotientExactBridge(
             return head && head->name == "Equality";
         };
 
-        int N = static_cast<int>(localBinders.size());
-        for (int b = N - 1; b >= 0; --b) {
-            ExpressionPointer hypInScope = liftBoundVariables(
-                localBinders[b].type, N - b, 0);
+        // Local facts — binders AND conjunction legs (shared
+        // `collectLocalBinderFacts`) — so a class equality buried in an
+        // `… ∧ (mk a = mk b)` hypothesis coerces like a stand-alone one.
+        for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
             ExpressionPointer eqLhs, eqRhs;
-            if (!peelEquality(hypInScope, eqLhs, eqRhs)) continue;
-            ExpressionPointer proofExpr = makeBoundVariable(N - 1 - b);
+            if (!peelEquality(fact.type, eqLhs, eqRhs)) continue;
+            ExpressionPointer proofExpr = fact.proofTerm;
             QuotientClassParts left, right;
             if (!peelQuotientClass(openOverLocalBinders(eqLhs, localBinders,
                                        localBinders.size()), left)) continue;
