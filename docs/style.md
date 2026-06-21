@@ -47,6 +47,10 @@ linter counts them, and there is always a math-like form:
 | a positional lemma call | `claim … by <lemma>` / `done by <lemma>` |
 | raw `Subtype.make(…)` | the structure's `construction`/intro form |
 | `⟨pA, pB⟩ : A ∧ B`, `⟨v, p⟩ : ∃…` | see "Connectives aren't tuples" |
+| `Not(a = b)`, `¬(a = b)` | `a ≠ b` (the operator desugars to it) |
+
+`a ≠ b` is the surface spelling of `Not(a = b)`; prefer it everywhere — in
+hypotheses, claims, and goals — over the raw `¬(…)` / `Not(…)` forms.
 
 ## Connectives aren't tuples
 
