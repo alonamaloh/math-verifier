@@ -83,22 +83,26 @@ theorem Rational.LessThan.multiply_cancel_right
         (cPositive : Rational.zero < c)
         (xCLessThanYC : x * c < y * c)
         : x < y :=
-  cases Rational.LessOrEqual.linear(x, y) {
-    | Or.introduceLeft(xLeqY) =>
-        And.introduction(
-            xLeqY,
-            (xEqY : x = y) ↦
-              Rational.LessThan.distinct(xCLessThanYC)(
-                  xEqY))
-    | Or.introduceRight(yLeqX) =>
-        absurd(
-            Rational.LessThan.distinct(xCLessThanYC)(
-                Rational.LessOrEqual.antisymmetric(
-                    x * c, y * c,
-                    Rational.LessThan.weaken(xCLessThanYC),
-                    Rational.LessOrEqual.multiply_by_nonneg_right(
-                        y, x, c, yLeqX,
-                        Rational.LessThan.weaken(cPositive)))))
+  claim by cases {
+    case x ≤ y as xLeqY: {
+        -- x ≤ y; and x ≠ y, since x = y would give x·c = y·c, contradicting x·c < y·c.
+        claim productDistinct : x * c ≠ y * c since Rational.LessThan.distinct;
+        claim x ≠ y by (xEqY : x = y) ↦ {
+            claim productEqual : x * c = y * c by substituting xEqY;
+            productDistinct(productEqual)
+          };
+        done
+      }
+    case y ≤ x as yLeqX: {
+        -- y·c ≤ x·c (multiply by c ≥ 0); antisymmetric with x·c ≤ y·c forces
+        -- x·c = y·c, contradicting x·c < y·c.
+        claim Rational.zero ≤ c since Rational.LessThan.weaken;
+        claim y * c ≤ x * c since Rational.LessOrEqual.multiply_by_nonneg_right;
+        claim x * c ≤ y * c since Rational.LessThan.weaken;
+        claim productEqual : x * c = y * c since Rational.LessOrEqual.antisymmetric;
+        claim productDistinct : x * c ≠ y * c since Rational.LessThan.distinct;
+        absurd(productDistinct(productEqual))
+      }
   }
 
 -- ----------------------------------------------------------------------
@@ -121,15 +125,12 @@ theorem Real.reciprocal_sequence_is_cauchy
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
     -- The scaled threshold ε · (K · K) is positive.
-    claim lowerBoundSquaredPositive
-          : Rational.zero < lowerBound * lowerBound;
-    claim scaledEpsilonPositive
-          : Rational.zero < epsilon * (lowerBound * lowerBound);
+    claim Rational.zero < lowerBound * lowerBound;
     -- Apply Cauchy at ε · (K · K).
-    obtain ⟨cauchyIndex, cauchyAtScaledEpsilon⟩
+    choose cauchyIndex as cauchyAtScaledEpsilon
         from underlyingIsCauchy(
                  epsilon * (lowerBound * lowerBound),
-                 scaledEpsilonPositive);
+                 (Rational.zero < epsilon * (lowerBound * lowerBound)));
     -- N := max(apartnessIndex, cauchyIndex). Both apartness and Cauchy
     -- apply beyond N.
     witness Natural.maximum(apartnessIndex, cauchyIndex) with
@@ -148,11 +149,11 @@ theorem Real.reciprocal_sequence_is_cauchy
             claim
                   lowerBound
                       ≤ abs(underlyingSequence(m))
-              by apartness(m, apartnessIndexLeqM);
+              since apartness(m, apartnessIndexLeqM);
             claim
                   lowerBound
                       ≤ abs(underlyingSequence(n))
-              by apartness(n, apartnessIndexLeqN);
+              since apartness(n, apartnessIndexLeqN);
             -- s(m), s(n) are nonzero (0 < lowerBound ≤ |s(·)|).
             claim Rational.zero < abs(underlyingSequence(m));
             claim Rational.zero < abs(underlyingSequence(n));
@@ -205,7 +206,7 @@ theorem Real.reciprocal_sequence_is_cauchy
                                 underlyingSequence(m))
                               - Rational.reciprocal_function(
                                     underlyingSequence(n)))
-              by Rational.zero_le_absolute_value;
+              since Rational.zero_le_absolute_value;
             -- K * K ≤ |s(m)| * |s(n)|. We have K ≤ |s(m)| and K ≤ |s(n)|.
             -- K * K ≤ |s(m)| * K  [multiply_by_nonneg_right with cNonneg = K ≥ 0]
             -- |s(m)| * K ≤ |s(m)| * |s(n)|  [multiply_by_nonneg_left with cNonneg = |s(m)| ≥ 0]
@@ -232,19 +233,12 @@ theorem Real.reciprocal_sequence_is_cauchy
                           * (abs(underlyingSequence(m))
                                  * abs(underlyingSequence(n)))
                     = abs(underlyingSequence(n) - underlyingSequence(m))
-                    < epsilon * (lowerBound * lowerBound) as recipDiffScaledLessThan;
+                    < epsilon * (lowerBound * lowerBound);
             -- Cancel (K · K) on both sides.
             -- The reciprocal sequence value at m equals
             -- reciprocal_function(s(m)), by Real.reciprocal_sequence's
             -- definition.
-            Rational.LessThan.multiply_cancel_right(
-                abs(
-                    Real.reciprocal_sequence(underlyingSequence)(m)
-                      - Real.reciprocal_sequence(underlyingSequence)(n)),
-                epsilon,
-                lowerBound * lowerBound,
-                lowerBoundSquaredPositive,
-                recipDiffScaledLessThan)
+            done by Rational.LessThan.multiply_cancel_right
           }
   }
 
