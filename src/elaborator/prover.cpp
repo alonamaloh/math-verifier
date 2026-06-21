@@ -265,6 +265,28 @@ std::vector<Elaborator::ContextFact> Elaborator::collectLocalBinderFacts(
         return facts;
 }
 
+ExpressionPointer Elaborator::tryLocalFactExactMatch(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders) {
+        // BASE binders only — no conjunction-leg decomposition (which WHNFs
+        // every binder type and would tax this per-goal fast path). A goal
+        // that equals a leg is still caught later by contextFactMatch; the
+        // payoff here is a goal that IS a whole in-scope fact (e.g. a claimed
+        // `IsCommutativeRing(…)`), matched as a unit before conjunctionIntro
+        // decomposes it. Lift each binder's type to the goal's depth and
+        // compare syntactically (cheap: structurallyEqual bails on head
+        // mismatch). Most-recent binder first.
+        int N = static_cast<int>(localBinders.size());
+        for (int b = N - 1; b >= 0; --b) {
+            ExpressionPointer factType = liftBoundVariables(
+                localBinders[b].type, N - b, 0);
+            if (structurallyEqual(factType, goalClosed)) {
+                return makeBoundVariable(N - 1 - b);
+            }
+        }
+        return nullptr;
+}
+
 std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
         ExpressionPointer /*goalClosed*/,
         const std::vector<LocalBinder>& localBinders,
@@ -1673,6 +1695,13 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
         }
 
         {
+            ExpressionPointer attempt = runTactic("localFactExactMatch",
+                [&] { return tryLocalFactExactMatch(
+                    goalClosed, localBinders); });
+            if (attempt) return attempt;
+        }
+
+        {
             ExpressionPointer attempt = runTactic("conjunctionIntro",
                 [&] { return tryConjunctionIntro(
                     goalClosed, localBinders, line); });
@@ -1869,6 +1898,9 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         runProfiled("transitivityBridge", [&] {
             return tryTransitivityBridge(
                 goalClosed, localBinders, line);
+        });
+        runProfiled("localFactExactMatch", [&] {
+            return tryLocalFactExactMatch(goalClosed, localBinders);
         });
         runProfiled("conjunctionIntro", [&] {
             return tryConjunctionIntro(

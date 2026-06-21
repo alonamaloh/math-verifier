@@ -1198,6 +1198,32 @@ ExpressionPointer Elaborator::elaborateExpression(
             ExpressionPointer letValue;
             if (let->type) {
                 letType = elaborateExpression(*let->type, localBinders);
+                // `claim <proofTerm>;` desugars (parseStructuredClaimSequence)
+                // to `let _anon : <proofTerm> := <claim> ;`, so the annotation
+                // is itself a PROOF, not a type. Use the proof's type as the
+                // binding's type — the mirror of the claim-proof coercion.
+                // Fires only when the annotation is a proof of a proposition
+                // (its type is a proposition), never for an ordinary type.
+                {
+                    Context letCtx =
+                        buildContextFromLocalBinders(localBinders);
+                    ExpressionPointer letTypeOpened = openOverLocalBinders(
+                        letType, localBinders, localBinders.size());
+                    if (!typeIsProposition(letCtx, letTypeOpened)) {
+                        try {
+                            ExpressionPointer annotationType = inferType(
+                                environment_, letCtx, letTypeOpened);
+                            if (typeIsProposition(letCtx, annotationType)) {
+                                letType = closeOverLocalBinders(
+                                    annotationType, localBinders,
+                                    localBinders.size());
+                            }
+                        } catch (...) {
+                            // not a proof — leave letType, the kernel will
+                            // report the ordinary "not a type" error
+                        }
+                    }
+                }
                 tLetTypeOnly = monotonicNanos();
                 // Pass the declared type as the expected type for the
                 // value so bidirectional elaborators (cases, anonymous

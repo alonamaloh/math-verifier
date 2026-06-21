@@ -1390,6 +1390,17 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // Cheap STRUCTURAL local-fact match: if an in-scope fact (a local binder
+    // or a decomposed conjunction leg) has EXACTLY the goal's shape, return
+    // its proof. Run before conjunctionIntro so a goal that is itself a
+    // defined conjunction (e.g. `IsCommutativeRing(…)`) matches its fact as a
+    // unit, instead of being decomposed atom-by-atom and each ring axiom
+    // re-projected. Syntactic only (no unfolding), so it is a fast path —
+    // anything it misses falls through to the defeq-aware tactics below.
+    ExpressionPointer tryLocalFactExactMatch(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders);
+
     // Transitivity bridge: if the goal is `H(a, c)` and
     // `<H>.transitive` exists in scope, perform a bounded BFS over
     // hypotheses of type `H(_, _)` to find a chain a → m1 → … → c,

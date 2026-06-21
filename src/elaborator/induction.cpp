@@ -690,6 +690,31 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         }
 
         if (!claim.byHint && !claim.bySubstitution) {
+            // `claim <proofTerm>` — the argument elaborated to a PROOF, not
+            // the proposition to prove, so claim its TYPE with the argument
+            // as the proof. This is the mirror of the proposition-as-proof
+            // coercion (a proof position may take a proposition, auto-proved);
+            // here a proposition position takes a proof, and we read off its
+            // type. Detected by: the argument is not itself a proposition, but
+            // its type is. Lets `claim Rational.is_commutative_ring;` bring the
+            // named fact into context without restating its (long) type.
+            if (claim.proposition && !propositionIsGoal) {
+                try {
+                    Context openedContext =
+                        buildContextFromLocalBinders(localBinders);
+                    ExpressionPointer goalOpened = openOverLocalBinders(
+                        goalClosed, localBinders, localBinders.size());
+                    if (!typeIsProposition(openedContext, goalOpened)) {
+                        ExpressionPointer goalType = inferType(
+                            environment_, openedContext, goalOpened);
+                        if (typeIsProposition(openedContext, goalType)) {
+                            return goalClosed;
+                        }
+                    }
+                } catch (...) {
+                    // fall through to the ordinary auto-prove path
+                }
+            }
             return autoProveClaim(
                 goalClosed, localBinders, line);
         }

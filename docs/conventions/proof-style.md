@@ -406,6 +406,17 @@ returns its final non-`;`-terminated expression.
   substituting <eq>` (narrowed to a supplied equation — `<eq>` may be a
   proof *or* a bare equation `(a = b)`, which is auto-proved), `by cases
   { … }`, `by cases on E { case A: … case B: … }`, `by induction { … }`.
+- `claim <proofTerm>;` — when the argument is already a **proof** (a
+  hypothesis, a cited lemma), `claim` introduces its *type* as the fact,
+  with that proof — the mirror of the proposition-as-proof coercion (a
+  proof position may take a proposition; here the proposition position
+  takes a proof). Lets a named fact enter context without restating its
+  (often long) type: `claim Rational.is_commutative_ring;` adds the
+  `IsCommutativeRing(…)` fact. Assembling a bundle from its named
+  components reads as `claim a; claim b; claim c; done` — and because each
+  fact is exact-typed, the `done` conjoins them directly (no expensive
+  decomposition), so this is the form for `⟨a, b, c⟩`-style structure
+  proofs (`IsField`, `IsEquivalenceRelation`, …), not a tuple.
 - **Eliminating an existential — prefer `choose`.**
   `choose <name> [such that <prop>] [as <condName>] from <source>;` is the
   readable way to take a witness out of an `∃ x. P(x)`. It shows — and the
