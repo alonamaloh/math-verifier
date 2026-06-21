@@ -153,6 +153,12 @@ tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
 CLEAN_MATH_FILES := $(shell grep -vE '^\#|^\s*$$' scripts/clean_manifest.txt)
 CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 CLEAN_LEAK_BUDGET ?= 77
+# Second, independent axis: user-written `⟨…⟩` over a logical connective
+# (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
+# elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
+# current floor; the surviving sites are factorization_list's negation-leg
+# destructures (await the item-7 records refactor). Ratchets *down* as cleaned.
+CLEAN_ANON_BUDGET ?= 4
 
 clean-status:
 	@python3 scripts/clean_status.py
@@ -289,7 +295,23 @@ anon-tuple-report:
 	  | sed -E 's/^warning: ([A-Za-z0-9_.]+):[0-9]+: ⟨…⟩ (builds|destructures) a .(And|Exists).*/\2 \3  \1/' \
 	  | sort | uniq -c | sort -rn
 
-.PHONY: leak-report leak-ratchet anon-tuple-report
+# Ratchet companion to `anon-tuple-report`: fail if the manifest's
+# connective-`⟨…⟩` count exceeds CLEAN_ANON_BUDGET. Wired into `check` so a new
+# tuple over an `And`/`Exists` cannot land in the clean set; the budget only
+# moves down. Mirrors the report's build (rm + rebuild with the audit on).
+clean-anon-ratchet:
+	@rm -f $(CLEAN_MATHV_FILES)
+	@MATH_CHECK_ANON_TUPLES=1 $(MAKE) clean-check 2>&1 \
+	  | grep "not publicly a tuple" > $(BUILD_DIR)/anon-tuples.log || true; \
+	  n=$$(wc -l < $(BUILD_DIR)/anon-tuples.log); \
+	  if [ $$n -gt $(CLEAN_ANON_BUDGET) ]; then \
+	    echo "anon-tuple ratchet FAIL: $$n connective-⟨…⟩ site(s) in the clean manifest > budget $(CLEAN_ANON_BUDGET):"; \
+	    sed -E 's/^warning: /  /' $(BUILD_DIR)/anon-tuples.log; \
+	    exit 1; \
+	  fi; \
+	  echo "anon-tuple ratchet OK: $$n connective-⟨…⟩ site(s) <= budget $(CLEAN_ANON_BUDGET)"
+
+.PHONY: leak-report leak-ratchet anon-tuple-report clean-anon-ratchet
 
 # ----------------------------------------------------------------------
 # Error-provenance audit (PLAN_LESS_CIC_STYLE.md, Phase 0.3). Runs the
@@ -314,8 +336,8 @@ corpus-update: library
 # provenance gate) and the CIC leak count has not increased (Phase 0
 # ratchet). This is the "CI" entry point — run it before committing
 # elaborator/kernel changes.
-check: tests self-tests corpus-audit leak-ratchet clean-check
-	@echo "check: library + tests + self-tests verified; provenance gate, leak ratchet, and clean set OK"
+check: tests self-tests corpus-audit leak-ratchet clean-check clean-anon-ratchet
+	@echo "check: library + tests + self-tests verified; provenance gate, leak ratchet, clean set, and anon-tuple ratchet OK"
 
 # The kernel binary's built-in C++ test suite (./kernel with no args).
 # Wired into `check` 2026-06-12 after three expectation drifts sat

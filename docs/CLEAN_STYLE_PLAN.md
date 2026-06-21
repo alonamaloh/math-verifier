@@ -17,12 +17,21 @@ documented elaborator gap). The set was seeded from the original headliner cone
 
 - `make clean-status` — milestone dashboard.
 - `make clean-check` — verifies every manifest file and asserts their residual
-  leak total ≤ `CLEAN_LEAK_BUDGET`. Wired into `make check`, so **a file in the
-  manifest cannot regress**, and the budget ratchets *down* as elaborator
-  features remove the intended residuals.
+  leak total ≤ `CLEAN_LEAK_BUDGET` (the `cic_leak_report` axis: positional
+  lemma calls, raw `congruenceOf`/`rewrite`, etc.). Wired into `make check`, so
+  **a file in the manifest cannot regress**, and the budget ratchets *down* as
+  elaborator features remove the intended residuals.
+- `make clean-anon-ratchet` — a second, independent axis: the count of
+  user-written `⟨…⟩` over a logical connective (`And`/`Exists`) must stay
+  ≤ `CLEAN_ANON_BUDGET` (currently 4 — `factorization_list`'s negation-leg
+  destructures, awaiting a records refactor). Also wired into `make check`;
+  `make anon-tuple-report` is the same audit grouped by file. This axis is
+  elaborator-measured (it needs the expected/scrutinee type), so it rebuilds the
+  manifest with `MATH_CHECK_ANON_TUPLES=1` rather than reading the leak report.
 
 Adding a file to the manifest is a one-line edit *after* it is cleaned; bump
-`CLEAN_LEAK_BUDGET` only by the file's documented intended residuals.
+`CLEAN_LEAK_BUDGET` (and, if it carries intended connective-`⟨…⟩` residuals,
+`CLEAN_ANON_BUDGET`) only by the file's documented intended residuals.
 
 ## The milestone ladder (vertical slices)
 

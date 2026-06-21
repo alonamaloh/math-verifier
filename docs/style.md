@@ -78,7 +78,9 @@ data records — `Ring`, a quotient representative, `Subtype` — **are** tuples
   conjunction and finds the leg.
 
 Audit with `make anon-tuple-report` (type-aware; opt-in via
-`MATH_CHECK_ANON_TUPLES=1`). Depth: `conventions/proof-style.md`.
+`MATH_CHECK_ANON_TUPLES=1`). `make check` enforces it: `clean-anon-ratchet`
+fails if the manifest's connective-`⟨…⟩` count exceeds `CLEAN_ANON_BUDGET`, so a
+new one can't land in the clean set. Depth: `conventions/proof-style.md`.
 
 ## Layer the file
 
