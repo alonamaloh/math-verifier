@@ -196,23 +196,25 @@ theorem Quotient.equal_implies_equivalent.{u}
         (classesEqual
             : Quotient.class_of(T, R, x) = Quotient.class_of(T, R, y))
         : R(x, y) := {
-    -- The predicate "is related to x by R" descends to the quotient: if
-    -- y1 ~ y2 then x ~ y1 ↔ x ~ y2 (forward by transitivity; backward by
-    -- symmetry then transitivity), so `relatedToX([z]) := x ~ z` is
-    -- well-defined.
-    let respectsR : ∀ (y1 y2 : T). R(y1, y2) → (R(x, y1) = R(x, y2)) := {
-      take y1 : T;
-      take y2 : T;
-      suppose R(y1, y2) as relation_y1_y2;
-      claim R(x, y1) → R(x, y2);
-      claim R(x, y2) → R(x, y1);
-      done since Equality.propositional_extensionality
-    };
+    -- The predicate "is related to x by R" descends to the quotient: the
+    -- respect proof shows y1 ~ y2 makes x ~ y1 and x ~ y2 mutually implied,
+    -- so `relatedToX([z]) := x ~ z` is well-defined.
     let relatedToX : Quotient(T, R) → Proposition
-      := Quotient.lift(T, R, Proposition, (z : T) ↦ R(x, z), respectsR);
-    -- x ~ x, i.e. relatedToX([x]), by reflexivity.
+      := Quotient.lift(
+             T, R, Proposition, (z : T) ↦ R(x, z),
+             (y1 y2 : T) ↦ (relation_y1_y2 : R(y1, y2)) ↦ {
+               claim R(x, y1) → R(x, y2) by {
+                 suppose R(x, y1) as relation_x_y1;
+                 done since IsEquivalenceRelation.transitive
+               };
+               claim R(x, y2) → R(x, y1) by {
+                 suppose R(x, y2) as relation_x_y2;
+                 claim R(y2, y1) since IsEquivalenceRelation.symmetric;
+                 done since IsEquivalenceRelation.transitive
+               };
+               done since Equality.propositional_extensionality
+             });
     claim relatedToX(Quotient.class_of(T, R, x))
-        since IsEquivalenceRelation.reflexive.{u};
-    -- [x] = [y] carries it to relatedToX([y]), which is x ~ y.
+        since IsEquivalenceRelation.reflexive;
     done by substituting classesEqual
 }

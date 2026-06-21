@@ -764,7 +764,31 @@ cost-1 equality, so the by-less step is cheap *and* hint-free. (Root cause of
 the expense: the new conjunction-leg decomposition in `collectContextEqualities`
 multiplies candidate equalities when many conjunctions are in scope.)
 
-## `since`/`by` citation gaps surfaced rewriting Quotient.equal_implies_equivalent (2026-06-21)
+## (RESOLVED 2026-06-21 — all three gaps closed; `Logic/quotient.math` now drops every workaround and the clean phrasing verifies) `since`/`by` citation gaps surfaced rewriting Quotient.equal_implies_equivalent (2026-06-21)
+
+Resolution:
+- **Gap 1 (universe inference).** `elaborateIdentifier` now fills a bare
+  universe-polymorphic citation's universe arguments with placeholder
+  parameters (`allowImplicitCitationLevels_`); `matchAgainstPattern` treats a
+  placeholder level as a wildcard, and `completeCitationFromBindings` resolves
+  each to a concrete level from the recovered argument bindings' inferred types
+  — the citation-path analogue of the value-argument universe inference at the
+  ordinary application path. `done since IsEquivalenceRelation.reflexive` (no
+  `.{u}`) now works.
+- **Gap 2 (unpinned middle binder).** Already closed by commit f3c25b6 ("shift
+  ambient bound-vars when matching a cited local hypothesis"). The direct
+  `done since IsEquivalenceRelation.transitive` for goal `R(x, y2)` discharges
+  both premises from the in-scope `R(x, y1)` / `R(y1, y2)` with no `recalling`.
+- **Gap 3 (argument-position block lambda).** Stage-2 universe inference in the
+  application dispatcher (`dispatch.cpp`) used to elaborate every value argument
+  with no expected type; it now walks the universe-instantiated signature and
+  feeds each argument its declared parameter type, so an inline block-bodied
+  `Quotient.lift` respect proof receives the respect-Pi codomain as its goal.
+  The `let respectsR : … := { … }` hoist is no longer needed.
+
+Regression coverage: `library/Test/citation_universe_inference_test.math`.
+
+Original report follows.
 
 Spike: rewrote `Logic/quotient.math`'s `equal_implies_equivalent` from raw
 plumbing (`let ⟨…⟩ := equivalence`, positional `propositional_extensionality`,

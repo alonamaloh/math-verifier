@@ -57,12 +57,30 @@ ExpressionPointer Elaborator::elaborateIdentifier(
             }
         } else if (environmentDeclaration
                    && universeParameterCount(*environmentDeclaration) > 0) {
-            throw ElaborateError(
-                "constant '" + identifier.qualifiedName + "' requires "
-                + std::to_string(
-                      universeParameterCount(*environmentDeclaration))
-                + " universe argument(s); supply them explicitly with "
-                ".{...} at line " + std::to_string(line));
+            if (allowImplicitCitationLevels_) {
+                // Cited bare (no `.{...}`): fill the universe arguments with
+                // fresh placeholder parameters. The citation matcher treats
+                // each as a level wildcard when unifying the lemma against the
+                // goal, then `completeCitationFromBindings` resolves them to
+                // concrete levels from the recovered argument bindings —
+                // mirroring how ordinary application elaboration infers `.{u}`
+                // from its value arguments.
+                size_t count =
+                    universeParameterCount(*environmentDeclaration);
+                for (size_t i = 0; i < count; ++i) {
+                    std::string placeholder =
+                        "_cite_u_" + std::to_string(metavarCounter_++);
+                    citationLevelPlaceholders_.insert(placeholder);
+                    universeArguments.push_back(makeLevelParam(placeholder));
+                }
+            } else {
+                throw ElaborateError(
+                    "constant '" + identifier.qualifiedName + "' requires "
+                    + std::to_string(
+                          universeParameterCount(*environmentDeclaration))
+                    + " universe argument(s); supply them explicitly with "
+                    ".{...} at line " + std::to_string(line));
+            }
         }
         return makeConstant(identifier.qualifiedName,
                             std::move(universeArguments));

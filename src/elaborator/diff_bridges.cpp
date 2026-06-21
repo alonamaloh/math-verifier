@@ -965,6 +965,9 @@ bool Elaborator::matchAgainstPattern(
         }
         if (auto* p = std::get_if<Sort>(&pattern->node)) {
             auto* s = std::get_if<Sort>(&subject->node);
+            // A citation placeholder level matches any subject level: it is
+            // resolved post-match from the recovered bindings (Gap 1).
+            if (citationLevelIsPlaceholder(p->level)) return true;
             return levelsDefinitionallyEqual(p->level, s->level);
         }
         if (auto* p = std::get_if<Application>(&pattern->node)) {
@@ -1041,6 +1044,10 @@ bool Elaborator::matchAgainstPattern(
                 return false;
             }
             for (size_t i = 0; i < p->universeArguments.size(); ++i) {
+                // A citation placeholder level matches any subject level: it
+                // is resolved post-match from the recovered bindings (Gap 1).
+                if (citationLevelIsPlaceholder(p->universeArguments[i]))
+                    continue;
                 if (!levelsDefinitionallyEqual(
                         p->universeArguments[i],
                         s->universeArguments[i])) {

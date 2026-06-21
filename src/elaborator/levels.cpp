@@ -56,6 +56,15 @@ void Elaborator::resetAutoBoundState() {
     metavarCounter_ = 0;
 }
 
+bool Elaborator::citationLevelIsPlaceholder(
+    const LevelPointer& level) const {
+    if (citationLevelPlaceholders_.empty()) return false;
+    if (auto* parameter = std::get_if<LevelParam>(&level->node)) {
+        return citationLevelPlaceholders_.count(parameter->name) > 0;
+    }
+    return false;
+}
+
 std::vector<std::string> Elaborator::finalUniverseParameters(
     const std::vector<std::string>& userDeclared) {
     std::vector<std::string> result = userDeclared;

@@ -1,0 +1,37 @@
+module Test.citation_universe_inference_test
+
+import Logic.quotient
+import Equality.basics
+
+-- Gap 1: a universe-polymorphic lemma cited bare (no `.{u}`). The universe
+-- argument is inferred from the recovered argument bindings, exactly as
+-- ordinary application elaboration infers it from its value arguments.
+theorem bare_polymorphic_citation.{u}
+        {T : Type(u)}
+        {R : T → T → Proposition}
+        {equivalence : IsEquivalenceRelation(T, R)}
+        (a b c : T)
+        (relation_a_b : R(a, b))
+        (relation_b_c : R(b, c))
+        : R(a, c) := {
+  done since IsEquivalenceRelation.transitive
+}
+
+-- Gap 3: the Quotient.lift respect proof written inline as a block-bodied
+-- lambda argument (not hoisted to a typed `let`). The argument's expected
+-- type — the respect-Pi codomain — flows into the block so its final
+-- bare `done` typechecks.
+theorem inline_lift_respect_proof.{u}
+        {T : Type(u)}
+        {R : T → T → Proposition}
+        {equivalence : IsEquivalenceRelation(T, R)}
+        (x : T)
+        : Quotient(T, R) → Proposition :=
+  Quotient.lift(
+      T, R, Proposition,
+      (z : T) ↦ R(x, z),
+      (y1 y2 : T) ↦ (relation_y1_y2 : R(y1, y2)) ↦ {
+        claim R(x, y1) → R(x, y2);
+        claim R(x, y2) → R(x, y1);
+        done since Equality.propositional_extensionality
+      })

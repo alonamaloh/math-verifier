@@ -1069,11 +1069,23 @@ ExpressionPointer Elaborator::elaborateExpression(
                 if (!isCurrentDeclaration
                     && environmentDeclaration
                     && universeParameterCount(*environmentDeclaration) > 0) {
+                    // Probe-elaborate the arguments with no expected type, just
+                    // to infer the universe levels. An argument that NEEDS an
+                    // expected type to elaborate — an inline block-bodied
+                    // lambda respect proof, say — fails the probe and comes
+                    // back null; the universe levels don't depend on it (they
+                    // come from the carrier/target type arguments), so this is
+                    // harmless. Such arguments are re-elaborated below with the
+                    // expected type the function's signature supplies.
                     std::vector<ExpressionPointer> valueArguments;
                     for (const auto& argumentSurface :
                          positionalArguments) {
-                        valueArguments.push_back(elaborateExpression(
-                            *argumentSurface, localBinders));
+                        try {
+                            valueArguments.push_back(elaborateExpression(
+                                *argumentSurface, localBinders));
+                        } catch (const ElaborateError&) {
+                            valueArguments.push_back(nullptr);
+                        }
                     }
                     std::vector<LevelPointer> inferredUniverseArguments =
                         inferUniverseArguments(*environmentDeclaration,
@@ -1082,11 +1094,35 @@ ExpressionPointer Elaborator::elaborateExpression(
                                                  /*skipLeadingPis=*/0,
                                                  /*callSiteName=*/name,
                                                  /*errorOnUninferred=*/true);
+                    // Walk the universe-instantiated signature so each argument
+                    // sees its declared parameter type as its expected type —
+                    // the same propagation the generic application path does —
+                    // letting a lambda-shaped argument (whose body is a block)
+                    // receive the respect-Pi codomain as its goal.
+                    ExpressionPointer instantiatedType = substituteUniverseLevels(
+                        declarationType(*environmentDeclaration),
+                        declarationUniverseParameters(*environmentDeclaration),
+                        inferredUniverseArguments);
                     ExpressionPointer head = makeConstant(
                         name, inferredUniverseArguments);
-                    for (auto& valueArgument : valueArguments) {
+                    ExpressionPointer running = weakHeadNormalForm(
+                        environment_, instantiatedType);
+                    for (size_t i = 0; i < positionalArguments.size(); ++i) {
+                        ExpressionPointer argumentExpectedType;
+                        auto* pi = std::get_if<Pi>(&running->node);
+                        if (pi) argumentExpectedType = pi->domain;
+                        ExpressionPointer argumentTerm = valueArguments[i];
+                        if (!argumentTerm) {
+                            argumentTerm = elaborateExpression(
+                                *positionalArguments[i], localBinders,
+                                argumentExpectedType);
+                        }
+                        if (pi) {
+                            running = weakHeadNormalForm(environment_,
+                                substitute(pi->codomain, 0, argumentTerm));
+                        }
                         head = makeApplication(std::move(head),
-                                                std::move(valueArgument));
+                                                std::move(argumentTerm));
                     }
                     return head;
                 }

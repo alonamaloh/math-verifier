@@ -5070,6 +5070,20 @@ private:
     // explicit-citation convenience, and running it per candidate makes the
     // library scan exhaust the auto-prover budget on hard goals.
     bool inSpeculativeContextScan_ = false;
+    // Citation universe inference. When a universe-polymorphic lemma is cited
+    // bare (no `.{...}`), `elaborateIdentifier` fills its universe arguments
+    // with fresh placeholder LevelParams (their names collected here) rather
+    // than demanding they be written. `matchAgainstPattern` then treats a
+    // placeholder level as a wildcard while unifying the lemma against the
+    // goal, and `completeCitationFromBindings` resolves each placeholder to a
+    // concrete level from the recovered argument bindings before assembling
+    // the proof term — the citation-path analogue of the universe inference
+    // ordinary application elaboration already does from its value arguments.
+    bool allowImplicitCitationLevels_ = false;
+    std::set<std::string> citationLevelPlaceholders_;
+    // True iff `level` is a bare placeholder parameter introduced for a bare
+    // citation (used by the matcher to treat it as a level wildcard).
+    bool citationLevelIsPlaceholder(const LevelPointer& level) const;
     struct AutoProveAttempt {
         std::string tacticName;
         bool succeeded;

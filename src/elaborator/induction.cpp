@@ -745,6 +745,25 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         ExpressionPointer result;
         ExpressionPointer hintType;
         ExpressionPointer hintTerm;
+        // Allow a bare universe-polymorphic citation (no `.{...}`) for the
+        // span of this hint's elaboration AND its match against the goal:
+        // placeholder levels are introduced during elaboration and resolved
+        // inside the matcher (Gap 1). Restored on scope exit so the
+        // placeholder set never leaks into unrelated elaboration.
+        bool savedAllowCiteLevels = allowImplicitCitationLevels_;
+        std::set<std::string> savedCitePlaceholders = citationLevelPlaceholders_;
+        allowImplicitCitationLevels_ = true;
+        struct CiteLevelsGuard {
+            bool& flag; bool savedFlag;
+            std::set<std::string>& placeholders;
+            std::set<std::string> savedPlaceholders;
+            ~CiteLevelsGuard() {
+                flag = savedFlag;
+                placeholders = std::move(savedPlaceholders);
+            }
+        } citeLevelsGuard{allowImplicitCitationLevels_, savedAllowCiteLevels,
+                          citationLevelPlaceholders_,
+                          std::move(savedCitePlaceholders)};
         try {
             hintTerm = elaborateExpression(
                 *claim.byHint, localBinders,
@@ -1359,6 +1378,63 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                     "structurally");
             }
             bindings[innerIndex] = matchedTerm;
+        }
+
+        // Resolve citation universe placeholders (Gap 1). The lemma was
+        // cited bare, so `elaborateIdentifier` filled its universe arguments
+        // with placeholder parameters and the matcher above treated them as
+        // wildcards. Now that every argument binding is known, read off the
+        // concrete levels by unifying each peeled binder's expected type
+        // against the inferred type of its recovered binding — the same
+        // type-driven level inference `inferUniverseArguments` does for an
+        // ordinary call's value arguments — and substitute them in.
+        if (!citationLevelPlaceholders_.empty()) {
+            std::map<std::string, LevelPointer> levelAssignment;
+            for (int innerIndex = 0; innerIndex < matchedDepth; ++innerIndex) {
+                if (!bindings[innerIndex]) continue;
+                int outermostPosition = matchedDepth - 1 - innerIndex;
+                int outerSlotCount = outermostPosition;
+                std::vector<ExpressionPointer> domainBindings(outerSlotCount);
+                bool allOuterBound = true;
+                for (int j = 0; j < outerSlotCount; ++j) {
+                    domainBindings[j] = bindings[innerIndex + 1 + j];
+                    if (!domainBindings[j]) { allOuterBound = false; break; }
+                }
+                if (!allOuterBound) continue;
+                ExpressionPointer expectedSlotType = instantiateLemmaBinders(
+                    domainsOutermostFirst[outermostPosition], domainBindings);
+                ExpressionPointer actualType;
+                try {
+                    actualType = inferTypeInLocalContext(
+                        localBinders, bindings[innerIndex]);
+                } catch (const ElaborateError&) {
+                    continue;
+                } catch (const TypeError&) {
+                    continue;
+                }
+                unifyTypes(
+                    weakHeadNormalForm(environment_, expectedSlotType),
+                    weakHeadNormalForm(environment_, actualType),
+                    levelAssignment);
+            }
+            std::vector<std::string> placeholderNames;
+            std::vector<LevelPointer> placeholderLevels;
+            for (const auto& entry : levelAssignment) {
+                if (citationLevelPlaceholders_.count(entry.first)) {
+                    placeholderNames.push_back(entry.first);
+                    placeholderLevels.push_back(entry.second);
+                }
+            }
+            if (!placeholderNames.empty()) {
+                hintTerm = substituteUniverseLevels(
+                    hintTerm, placeholderNames, placeholderLevels);
+                for (auto& binding : bindings) {
+                    if (binding) {
+                        binding = substituteUniverseLevels(
+                            binding, placeholderNames, placeholderLevels);
+                    }
+                }
+            }
         }
 
         // All bindings filled. Build the application: outermost
