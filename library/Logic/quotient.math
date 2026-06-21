@@ -57,24 +57,21 @@ theorem IsEquivalenceRelation.reflexive.{u}
         {T : Type(u)} {R : T → T → Proposition}
         (equivalence : IsEquivalenceRelation(T, R))
         : ∀ (x : T). R(x, x) := {
-  let ⟨reflexivityProof, _, _⟩ := equivalence;
-  reflexivityProof
+  done
 }
 
 theorem IsEquivalenceRelation.symmetric.{u}
         {T : Type(u)} {R : T → T → Proposition}
         (equivalence : IsEquivalenceRelation(T, R))
         : ∀ (x y : T). R(x, y) → R(y, x) := {
-  let ⟨_, symmetryProof, _⟩ := equivalence;
-  symmetryProof
+  done
 }
 
 theorem IsEquivalenceRelation.transitive.{u}
         {T : Type(u)} {R : T → T → Proposition}
         (equivalence : IsEquivalenceRelation(T, R))
         : ∀ (x y z : T). R(x, y) → R(y, z) → R(x, z) := {
-  let ⟨_, _, transitivityProof⟩ := equivalence;
-  transitivityProof
+  done
 }
 
 -- ----------------------------------------------------------------------
@@ -196,36 +193,26 @@ theorem Quotient.equal_implies_equivalent.{u}
         {R : T → T → Proposition}
         {equivalence : IsEquivalenceRelation(T, R)}
         (x y : T)
-        (mkEqualityHypothesis
-            : Equality(Quotient(T, R),
-                            Quotient.class_of(T, R, x),
-                            Quotient.class_of(T, R, y)))
+        (classesEqual
+            : Quotient.class_of(T, R, x) = Quotient.class_of(T, R, y))
         : R(x, y) := {
-    let ⟨reflexivityOfR, symmetryOfR, transitivityOfR⟩ := equivalence;
-    -- Step 1: build the lifted "related to x by R" predicate. Its
-    -- respect-of-R obligation reduces, via propext, to the
-    -- equivalence of `R(x, y1)` and `R(x, y2)` whenever `R(y1, y2)`.
-    let isRelatedToX
-            : Quotient(T, R) → Proposition
-      := Quotient.lift(
-             T, R, Proposition,
-             (z : T) ↦ R(x, z),
-             (y1 y2 : T) (relation_y1_y2 : R(y1, y2)) ↦
-                 Equality.propositional_extensionality(
-                     R(x, y1), R(x, y2),
-                     (relation_x_y1 : R(x, y1)) ↦
-                         transitivityOfR(x, y1, y2,
-                             relation_x_y1, relation_y1_y2),
-                     (relation_x_y2 : R(x, y2)) ↦
-                         transitivityOfR(x, y2, y1,
-                             relation_x_y2,
-                             symmetryOfR(y1, y2, relation_y1_y2))));
-    -- Step 2: `isRelatedToX(mk(x))` reduces definitionally to
-    -- `R(x, x)`. The assumed reflexivity discharges it.
-    let reflexivityAtX : isRelatedToX(Quotient.class_of(T, R, x))
-      := reflexivityOfR(x);
-    -- Step 3: transport along the input equality. After the lift's
-    -- compute rule fires on `mk(y)`, the transported proof has type
-    -- `R(x, y)`.
-    rewrite(mkEqualityHypothesis, reflexivityAtX)
+    -- The predicate "is related to x by R" descends to the quotient: if
+    -- y1 ~ y2 then x ~ y1 ↔ x ~ y2 (forward by transitivity; backward by
+    -- symmetry then transitivity), so `relatedToX([z]) := x ~ z` is
+    -- well-defined.
+    let respectsR : ∀ (y1 y2 : T). R(y1, y2) → (R(x, y1) = R(x, y2)) := {
+      take y1 : T;
+      take y2 : T;
+      suppose R(y1, y2) as relation_y1_y2;
+      claim R(x, y1) → R(x, y2);
+      claim R(x, y2) → R(x, y1);
+      done since Equality.propositional_extensionality
+    };
+    let relatedToX : Quotient(T, R) → Proposition
+      := Quotient.lift(T, R, Proposition, (z : T) ↦ R(x, z), respectsR);
+    -- x ~ x, i.e. relatedToX([x]), by reflexivity.
+    claim relatedToX(Quotient.class_of(T, R, x))
+        since IsEquivalenceRelation.reflexive.{u};
+    -- [x] = [y] carries it to relatedToX([y]), which is x ~ y.
+    done by substituting classesEqual
 }
