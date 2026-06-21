@@ -78,10 +78,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                     cases boundDividesDecision {
                       | Or.introduceLeft(successorPredecessorBoundDivides) =>
                           Or.introduceLeft(
-                              witness successor(predecessorOfBound) with
-                                  ⟨twoLeSuccPredBound,
-                                   done,
-                                   successorPredecessorBoundDivides⟩)
+                              witness successor(predecessorOfBound) with done)
                       | Or.introduceRight(successorPredecessorBoundDoesNotDivide) =>
                           Or.introduceRight(
                               (divisor : Natural)
@@ -179,11 +176,13 @@ theorem Natural.equals_when_less_or_equal_and_not_less_than (a b : Natural)
     in (a = b) as equality:
         equality
     in (∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ a ≤ bPredecessor) as existsProof: {
-        obtain ⟨bPredecessor, bEqualsSuccessor, aLessOrEqualBPredecessor⟩
+        choose bPredecessor such that b = successor(bPredecessor) ∧ a ≤ bPredecessor
             from existsProof;
+        claim a ≤ bPredecessor;
         -- successor(a) ≤ successor(bPredecessor) = b, contradicting the
         -- hypothesis that successor(a) ≰ b.
-        claim successorALessOrEqualB : successor(a) ≤ b by substituting bEqualsSuccessor;
+        claim successorALessOrEqualB : successor(a) ≤ b
+            by substituting (b = successor(bPredecessor));
         absurd(notSuccessorALessOrEqualB(successorALessOrEqualB))
     }
   }
@@ -208,7 +207,7 @@ theorem Natural.classify_divisor_when_no_proper
     in (divisor = 0) as divisorIsZero: {
         -- divisor = 0 → divides(0, successor(predecessorOfN)) means
         -- successor(predecessorOfN) = 0, but successor ≠ zero.
-        obtain ⟨q, equality⟩ from divDivides;
+        choose q such that successor(predecessorOfN) = divisor * q from divDivides;
         calc successor(predecessorOfN)
            = divisor * q
            = 0 * q
@@ -276,19 +275,20 @@ theorem Natural.prime_or_proper_divisor
           ∨ (∀ (divisor : Natural). 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN))
       claim by cases {
         in (∃ (divisor : Natural). 2 ≤ divisor ∧ divisor ≤ predecessorOfN ∧ divisor ∣ successor(predecessorOfN)) as foundDivisor: {
-            obtain ⟨divisor, twoLessOrEqualDivisor,
-                    divisorLessOrEqualPredecessorOfN, divDivides⟩
+            choose divisor such that
+                2 ≤ divisor ∧ divisor ≤ predecessorOfN ∧ divisor ∣ successor(predecessorOfN)
                 from foundDivisor;
-            Or.introduceRight(
-                witness divisor with
-                    ⟨twoLessOrEqualDivisor,
-                     done,
-                     divDivides⟩)
+            claim divisor ≤ predecessorOfN;
+            claim successor(divisor) ≤ successor(predecessorOfN);
+            Or.introduceRight(witness divisor with done)
         }
         in (∀ (divisor : Natural). 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN)) as noProperDivisor:
-            Or.introduceLeft(
-                ⟨atLeastTwo,
-                 (divisor : Natural)
-                     (divDivides : divisor ∣ successor(predecessorOfN)) ↦
-                   done since Natural.classify_divisor_when_no_proper⟩)
+            Or.introduceLeft({
+                claim 2 ≤ successor(predecessorOfN) since atLeastTwo;
+                claim ∀ (divisor : Natural).
+                        divisor ∣ successor(predecessorOfN)
+                        → divisor = 1 ∨ divisor = successor(predecessorOfN)
+                    since Natural.classify_divisor_when_no_proper;
+                done
+              })
       }
