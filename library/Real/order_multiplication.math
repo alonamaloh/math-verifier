@@ -54,16 +54,16 @@ import Real.cauchy_bounded
 import Real.absolute_value
 import Real.absolute_value_order
 
--- The natural-image bound of a sum: coercion turns the definitional natural
--- sum successor(a) + successor(b) = successor(a + successor(b)) into a
--- Rational sum.
-theorem Rational.successor_sum_coercion (a b : Natural)
-        : (successor(a + successor(b)) : Rational)
-          = (successor(a) : Rational) + (successor(b) : Rational) :=
-  calc (successor(a + successor(b)) : Rational)
-     = ((successor(a) + successor(b) : Natural) : Rational)
-     = (successor(a) : Rational) + (successor(b) : Rational)
-           by Rational.from_natural_add_preserves
+-- The natural-image bound of a sum: coercion splits the embedded bound
+-- (a + b + 1) + 1 into the Rational sum (a + 1) + (b + 1).
+theorem Rational.add_one_sum_coercion (a b : Natural)
+        : (((a + b + 1) + 1) : Rational)
+          = ((a + 1) : Rational) + ((b + 1) : Rational) := {
+  claim (a + b + 1) + 1 = (a + 1) + (b + 1);
+  calc (((a + b + 1) + 1) : Rational)
+     = (((a + 1) + (b + 1)) : Rational)
+     = ((a + 1) : Rational) + ((b + 1) : Rational)
+}
 
 -- ----------------------------------------------------------------------
 -- The representative-level core.
@@ -88,10 +88,10 @@ theorem Real.IsNonneg.multiply_at_make
             from Rational.sequence.cauchy_is_naturally_bounded(s, sCauchy);
         obtain ⟨KT, NT, tBounded⟩
             from Rational.sequence.cauchy_is_naturally_bounded(t, tCauchy);
-        let K : Natural := KS + successor(KT);
-        claim Rational.IsNonneg((successor(KT) : Rational))
+        let K : Natural := KS + KT + 1;
+        claim Rational.IsNonneg(((KT + 1) : Rational))
             since Rational.from_natural_is_nonneg;
-        claim Rational.IsNonneg((successor(KS) : Rational))
+        claim Rational.IsNonneg(((KS + 1) : Rational))
             since Rational.from_natural_is_nonneg;
         -- Choose δ with (succ K : ℚ)·δ ≤ ε/2, and tail indices where both
         -- sequences are above -δ.
@@ -119,44 +119,46 @@ theorem Real.IsNonneg.multiply_at_make
               claim aboveNT : NT ≤ m;
               claim -delta < s(m) by sLow(m, aboveN1);
               claim -delta < t(m) by tLow(m, aboveN2);
-              claim Rational.zero ≤ (successor(KT) : Rational)
+              claim Rational.zero ≤ ((KT + 1) : Rational)
                   since Rational.LessOrEqual_zero_of_IsNonneg;
-              claim Rational.zero ≤ (successor(KS) : Rational)
+              claim Rational.zero ≤ ((KS + 1) : Rational)
                   since Rational.LessOrEqual_zero_of_IsNonneg;
-              claim abs(s(m)) ≤ (successor(K) : Rational)
+              claim abs(s(m)) ≤ ((K + 1) : Rational)
                   by calc abs(s(m))
-                        ≤ (successor(KS) : Rational)
+                        ≤ ((KS + 1) : Rational)
                               by sBounded(m, aboveNS)
-                        = (successor(KS) : Rational) + Rational.zero
-                        ≤ (successor(KS) : Rational)
-                              + (successor(KT) : Rational)
+                        = ((KS + 1) : Rational) + Rational.zero
+                        ≤ ((KS + 1) : Rational)
+                              + ((KT + 1) : Rational)
                               by Rational.add_general_LessOrEqual_left
-                        = (successor(K) : Rational);
-              claim abs(t(m)) ≤ (successor(K) : Rational)
+                        = ((K + 1) : Rational)
+                              since Rational.add_one_sum_coercion;
+              claim abs(t(m)) ≤ ((K + 1) : Rational)
                   by calc abs(t(m))
-                        ≤ (successor(KT) : Rational)
+                        ≤ ((KT + 1) : Rational)
                               by tBounded(m, aboveNT)
-                        = (successor(KT) : Rational) + Rational.zero
-                        ≤ (successor(KT) : Rational)
-                              + (successor(KS) : Rational)
+                        = ((KT + 1) : Rational) + Rational.zero
+                        ≤ ((KT + 1) : Rational)
+                              + ((KS + 1) : Rational)
                               by Rational.add_general_LessOrEqual_left
-                        = (successor(KS) : Rational)
-                              + (successor(KT) : Rational)
-                        = (successor(K) : Rational);
+                        = ((KS + 1) : Rational)
+                              + ((KT + 1) : Rational)
+                        = ((K + 1) : Rational)
+                              since Rational.add_one_sum_coercion;
               -- The pointwise product bound, then the ε-budget.
               claim productLow
-                  : -((successor(K) : Rational) * delta) ≤ s(m) * t(m)
+                  : -(((K + 1) : Rational) * delta) ≤ s(m) * t(m)
                   since Rational.product_lower_bound_of_lower_bounds;
-              claim (successor(K) : Rational) * delta < epsilon
-                  by calc (successor(K) : Rational) * delta
+              claim ((K + 1) : Rational) * delta < epsilon
+                  by calc ((K + 1) : Rational) * delta
                         ≤ Rational.halve(epsilon)   by deltaBound
                         < epsilon
                               since Rational.halve_less_than_self;
-              claim -epsilon < -((successor(K) : Rational) * delta)
+              claim -epsilon < -(((K + 1) : Rational) * delta)
                   since Rational.LessThan.negate;
               calc -epsilon
-                 < -((successor(K) : Rational) * delta)
-                       by (-epsilon < -((successor(K) : Rational) * delta))
+                 < -(((K + 1) : Rational) * delta)
+                       by (-epsilon < -(((K + 1) : Rational) * delta))
                  ≤ s(m) * t(m)
                        by productLow
             }
