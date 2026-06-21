@@ -61,6 +61,13 @@ data records — `Ring`, a quotient representative, `Subtype` — **are** tuples
 
 - **Build `A ∧ B`**: state the parts and let the prover conjoin — bare `done`,
   or `claim A since …; claim B since …; done`. Not `⟨proofA, proofB⟩`.
+- **Build a bundle from named proofs** (`IsField`, `IsEquivalenceRelation`, …):
+  `claim <proofTerm>;` for each component, then `done`. `claim` accepts a
+  *proof* (a lemma/hypothesis) and introduces its type as the fact, so you cite
+  the names without restating the long types — and the exact-typed facts let
+  `done` conjoin them directly. So `claim Rational.is_commutative_ring; claim
+  Rational.zero_not_equal_one; claim …; done`, not
+  `⟨Rational.is_commutative_ring, …⟩`.
 - **Build `∃ x. P`**: `witness v with <proof of P(v)>`. Not `⟨v, proof⟩`.
 - **Destructure `∃`**: `choose v such that P from h`. `obtain ⟨…⟩` / `let ⟨…⟩`
   are the same tell — avoid them.
@@ -104,7 +111,8 @@ concept. Lead comments with the math; pull kernel/elaborator mechanics into a
 ## The smell test
 
 If a proof looks like term-soup — nested positional calls, `congruenceOf`,
-raw `rewrite`, `⟨…⟩` over an `And`/`Exists`, anonymous `Or.introduceLeft(…)`
-chains — rewrite it as the mathematician's sentence: state each fact, justify
-it by its reason, and let `claim`/`calc`/`done`/`by_induction`/`choose`/
-`witness` carry the structure.
+raw `rewrite`, `⟨…⟩` over an `And`/`Exists`, `cases <proof> { | Or.introduceLeft
+… }` over a disjunction, anonymous `Or.introduceLeft(…)` chains — rewrite it as
+the mathematician's sentence: state each fact, justify it by its reason, and let
+`claim`/`calc`/`done`/`by_induction`/`choose`/`witness`/`claim by cases { in … }`
+carry the structure.

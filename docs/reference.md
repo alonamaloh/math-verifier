@@ -59,6 +59,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | Form | Meaning |
 |---|---|
 | `claim P;` | assert `P`, auto-proved |
+| `claim <proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — claim its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
 | `claim P by V;` / `claim P since V;` | assert `P`, discharged by `V` |
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
 | `claim P by cases { in A as h: … in B as h: … }` | prove `P` by ∨-elimination |

@@ -406,6 +406,14 @@ returns its final non-`;`-terminated expression.
   substituting <eq>` (narrowed to a supplied equation — `<eq>` may be a
   proof *or* a bare equation `(a = b)`, which is auto-proved), `by cases
   { … }`, `by cases on E { case A: … case B: … }`, `by induction { … }`.
+- **Split a disjunction with `claim by cases { in (LEFT) as x: … in (RIGHT)
+  as y: … }`** — NOT `cases <disjunctionProof> { | Or.introduceLeft(x) => …
+  | Or.introduceRight(y) => … }`. The arms list the disjuncts as propositions
+  (no `Or.introduce*` constructor names), and the auto-prover supplies the
+  covering `LEFT ∨ RIGHT` from whatever's in scope — a hypothesis, a local
+  `claim`, or a re-derived lemma — so the scrutinee never has to be named. (The
+  covering disjunction must be exhaustive, of course; that is the only
+  requirement.)
 - `claim <proofTerm>;` — when the argument is already a **proof** (a
   hypothesis, a cited lemma), `claim` introduces its *type* as the fact,
   with that proof — the mirror of the proposition-as-proof coercion (a

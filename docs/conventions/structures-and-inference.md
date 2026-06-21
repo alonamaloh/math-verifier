@@ -125,6 +125,11 @@ type — the implicit-recovery mechanism pinned by
   `operator (*) on (PAdicCauchySequence, …)` work: `a * b` recovers any
   index (e.g. the prime `p` on the p-adic type) from `a`'s type, so the
   underlying `…multiply` need not be given `(p, primality)` by hand.
+- `operator (∣) on (Ring.carrier, Ring.carrier) := Ring.divides` lets `p ∣ a`
+  recover the ring `s` from `p : Ring.carrier(s)` — exactly as `+`/`*` do.
+  `∣` is an ordinary registry operator (per type), **not** a built-in: it is
+  registered `on (Natural, Natural)` and `on (Ring.carrier, Ring.carrier)`, so
+  `∣` works for any type that registers it, with no elaborator special case.
 - The one requirement is that those structure indices be *implicit* on
   the dispatch function `F` (`{p}` not `(p)`), so `F` is callable as
   `F(a, b)`; the `convention`-prepended `{p}`/`{primality}` satisfy this.
