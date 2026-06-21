@@ -207,11 +207,8 @@ ExpressionPointer Elaborator::tryDisjunctionIntro(
         return nullptr;
     }
 
-std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
-        ExpressionPointer /*goalClosed*/,
-        const std::vector<LocalBinder>& localBinders,
-        uint64_t goalHash,
-        uint64_t goalHashUnreduced) {
+std::vector<Elaborator::ContextFact> Elaborator::collectLocalBinderFacts(
+        const std::vector<LocalBinder>& localBinders) {
         std::vector<ContextFact> facts;
         int N = static_cast<int>(localBinders.size());
         // Local binders (cost 1) — last-bound first, so the most
@@ -229,8 +226,7 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
         // Conjunction elimination: a hypothesis `A ∧ B` makes A and B
         // available as facts in their own right — a mathematician just *has*
         // both, and never "projects a pair". Worklist so nested conjunctions
-        // fully decompose. Kept BEFORE the cite-only cutoff: this is local
-        // context, not a library scan, so it stays on under cite-only.
+        // fully decompose.
         for (size_t cursor = 0; cursor < facts.size() && cursor < 4096;
              ++cursor) {
             ExpressionPointer conjunction = weakHeadNormalForm(
@@ -266,6 +262,19 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
             rightFact.type = rightType;
             facts.push_back(std::move(rightFact));
         }
+        return facts;
+}
+
+std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
+        ExpressionPointer /*goalClosed*/,
+        const std::vector<LocalBinder>& localBinders,
+        uint64_t goalHash,
+        uint64_t goalHashUnreduced) {
+        // Local binders + their conjunction legs (cost 1+). Shared with the
+        // lemma side-condition discharge path so both see the same facts.
+        // Kept BEFORE the cite-only cutoff: this is local context, not a
+        // library scan, so it stays on under cite-only.
+        std::vector<ContextFact> facts = collectLocalBinderFacts(localBinders);
         // Cite-only mode: stop here — local hypotheses only. The global
         // library scan below is exactly the shotgun auto-search we disable,
         // so an unproven goal must be closed by an explicit `by L`.
@@ -997,20 +1006,24 @@ ExpressionPointer Elaborator::tryTransitivityBridge(
         Context openedContext =
             buildContextFromLocalBinders(localBinders);
 
-        // Collect hypothesis edges: (source, target, binderIdx) for
-        // each local binder of type `head(_, _)`.
+        // Collect hypothesis edges: (source, target, proof) for each local
+        // fact of type `head(_, _)`. Drawn from `collectLocalBinderFacts` so a
+        // conjunction hypothesis `(a R b) ∧ …` contributes its `a R b` leg as
+        // an edge (proof = `And.left`/`And.right` projection), exactly like a
+        // separately-stated `a R b` hypothesis.
         struct HypEdge {
-            ExpressionPointer source;
-            ExpressionPointer target;
-            int binderIdx;
+            ExpressionPointer source;  // opened
+            ExpressionPointer target;  // opened
+            ExpressionPointer proof;   // closed at depth N
         };
         std::vector<HypEdge> edges;
-        for (int b = N - 1; b >= 0; --b) {
-            int lift = N - b;
-            ExpressionPointer hTypeOpened = openOverLocalBinders(
-                liftBoundVariables(
-                    localBinders[b].type, lift, 0),
-                localBinders, N);
+        for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
+            ExpressionPointer hTypeOpened;
+            try {
+                hTypeOpened = openOverLocalBinders(fact.type, localBinders, N);
+            } catch (const TypeError&) {
+                continue;
+            }
             auto* hOuter = std::get_if<Application>(
                 &hTypeOpened->node);
             if (!hOuter) continue;
@@ -1021,7 +1034,7 @@ ExpressionPointer Elaborator::tryTransitivityBridge(
                 &hInner->function->node);
             if (!hHead || hHead->name != head->name) continue;
             edges.push_back(
-                {hInner->argument, hOuter->argument, b});
+                {hInner->argument, hOuter->argument, fact.proofTerm});
         }
         if (edges.empty()) return nullptr;
 
@@ -1089,21 +1102,18 @@ ExpressionPointer Elaborator::tryTransitivityBridge(
         }
         if (pathEdges.empty()) return nullptr;
 
-        // Single-edge path: the hypothesis IS the proof.
+        // Single-edge path: the fact IS the proof.
         if (pathEdges.size() == 1) {
-            return makeBoundVariable(
-                N - 1 - edges[pathEdges[0]].binderIdx);
+            return edges[pathEdges[0]].proof;
         }
 
         // Multi-edge path: fold transitive applications. accumulator
         // accProof : H(goalA, accTarget) starts with the first edge.
-        ExpressionPointer accProof = makeBoundVariable(
-            N - 1 - edges[pathEdges[0]].binderIdx);
+        ExpressionPointer accProof = edges[pathEdges[0]].proof;
         ExpressionPointer accTarget = edges[pathEdges[0]].target;
         for (size_t i = 1; i < pathEdges.size(); ++i) {
             const HypEdge& nextEdge = edges[pathEdges[i]];
-            ExpressionPointer nextProof = makeBoundVariable(
-                N - 1 - nextEdge.binderIdx);
+            ExpressionPointer nextProof = nextEdge.proof;
             ExpressionPointer combined = buildTransitiveCall(
                 transitiveName,
                 goalAOpened, accTarget, nextEdge.target,

@@ -1196,6 +1196,18 @@ private:
         uint64_t goalHash,
         uint64_t goalHashUnreduced);
 
+    // The local-context half of `collectContextFacts`, factored out so every
+    // path that scans the local context for a proof — the auto-prover, lemma
+    // side-condition discharge, … — sees the SAME facts. Returns one fact per
+    // local binder (closed at depth `localBinders.size()`, most-recent first)
+    // PLUS the conjunction legs: a hypothesis `A ∧ B` yields `A` and `B` as
+    // facts in their own right (worklist, so nested conjunctions fully
+    // decompose). proofTerm / type are closed in the localBinders scope; open
+    // a fact's type with `openOverLocalBinders(_, localBinders, size())` to
+    // compare it against an opened goal.
+    std::vector<ContextFact> collectLocalBinderFacts(
+        const std::vector<LocalBinder>& localBinders);
+
     // Unified named-fact match. Iterates ALL in-scope facts (local
     // binders + library declarations) by cost; for each, tries
     // `autoFillHintForClaim` to fill any Pi-binders from the goal +

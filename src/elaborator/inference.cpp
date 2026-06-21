@@ -1427,11 +1427,24 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     continue;
                 }
                 bool found = false;
-                for (int j = static_cast<int>(localBinders.size()) - 1;
-                     j >= 0; --j) {
-                    ExpressionPointer candidateType =
-                        openOverLocalBinders(
-                            localBinders[j].type, localBinders, j);
+                // Scan the local context — binders AND their conjunction legs
+                // (the SAME facts the auto-prover sees, via
+                // collectLocalBinderFacts) — for a proof of this side
+                // condition. A hypothesis `A ∧ B` thus discharges a premise of
+                // type `A` or `B` directly, projecting `And.left`/`And.right`,
+                // so a `choose … such that A ∧ B`-bound condition behaves like
+                // separately-stated facts.
+                int N = static_cast<int>(localBinders.size());
+                std::vector<ContextFact> localFacts =
+                    collectLocalBinderFacts(localBinders);
+                for (const ContextFact& fact : localFacts) {
+                    ExpressionPointer candidateType;
+                    try {
+                        candidateType = openOverLocalBinders(
+                            fact.type, localBinders, N);
+                    } catch (const TypeError&) {
+                        continue;
+                    }
                     bool eq;
                     try {
                         eq = isDefinitionallyEqual(
@@ -1441,14 +1454,21 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         eq = false;
                     }
                     if (eq) {
-                        int deBruijnIndex =
-                            static_cast<int>(localBinders.size()) - 1 - j;
-                        elaboratedArgs[i] =
-                            makeBoundVariable(deBruijnIndex);
+                        elaboratedArgs[i] = fact.proofTerm;
+                        // Diagnostic (BY_DISCHARGE_STATS): record the binder
+                        // the proof bottoms out at, peeling any ∧ projections.
+                        ExpressionPointer leaf = fact.proofTerm;
+                        while (auto* app =
+                                   std::get_if<Application>(&leaf->node)) {
+                            leaf = app->argument;
+                        }
+                        int leafIndex = N - 1;
+                        if (auto* bv =
+                                std::get_if<BoundVariable>(&leaf->node)) {
+                            leafIndex = bv->deBruijnIndex;
+                        }
                         lastDischarges_.push_back(
-                            {deBruijnIndex,
-                             static_cast<int>(localBinders.size()),
-                             localBinders[j].name});
+                            {leafIndex, N, fact.source});
                         found = true;
                         break;
                     }
@@ -1487,6 +1507,11 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             Context openedContext =
                 buildContextFromLocalBinders(localBinders);
             int N = static_cast<int>(localBinders.size());
+            // Candidate facts: local binders + their conjunction legs, shared
+            // with the auto-prover and the side-condition discharge above, so
+            // a premise can be unified against an `A ∧ B` hypothesis's leg.
+            std::vector<ContextFact> localFacts =
+                collectLocalBinderFacts(localBinders);
             bool progress = true;
             while (progress && !unresolved.empty()) {
                 progress = false;
@@ -1519,15 +1544,15 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     // check Prop-ness AFTER unification resolves them, which
                     // preserves "never fill a value hole from context".
                     bool filled = false;
-                    std::vector<int> matchedBinders;
+                    std::vector<size_t> matchedFacts;
                     std::map<std::string, ExpressionPointer> firstTrial;
                     auto commitMatch =
-                        [&](size_t slot, int binderIndex,
+                        [&](size_t slot, const ContextFact& fact,
                             const std::map<std::string,
                                            ExpressionPointer>& solved) {
                         // Adopt the newly-solved holes (closed to the
                         // global closed-over-localBinders form) and fill
-                        // this slot with the hypothesis.
+                        // this slot with the fact's proof.
                         for (const auto& entry : solved) {
                             if (assignment.count(entry.first)) continue;
                             ExpressionPointer closedValue;
@@ -1537,18 +1562,28 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                             } catch (...) { closedValue = entry.second; }
                             assignment[entry.first] = closedValue;
                         }
-                        int deBruijnIndex = N - 1 - binderIndex;
-                        elaboratedArgs[slot] =
-                            makeBoundVariable(deBruijnIndex);
+                        elaboratedArgs[slot] = fact.proofTerm;
+                        // Diagnostic (BY_DISCHARGE_STATS): the binder the proof
+                        // bottoms out at, peeling any ∧ projections.
+                        ExpressionPointer leaf = fact.proofTerm;
+                        while (auto* app =
+                                   std::get_if<Application>(&leaf->node)) {
+                            leaf = app->argument;
+                        }
+                        int leafIndex = N - 1;
+                        if (auto* bv =
+                                std::get_if<BoundVariable>(&leaf->node)) {
+                            leafIndex = bv->deBruijnIndex;
+                        }
                         lastDischarges_.push_back(
-                            {deBruijnIndex, N,
-                             localBinders[binderIndex].name});
+                            {leafIndex, N, fact.source});
                         progress = true;
                     };
-                    for (int j = N - 1; j >= 0 && !filled; --j) {
+                    for (size_t f = 0;
+                         f < localFacts.size() && !filled; ++f) {
                         ExpressionPointer candidateType =
                             openOverLocalBinders(
-                                localBinders[j].type, localBinders, j);
+                                localFacts[f].type, localBinders, N);
                         // Trial-unify the slot pattern against the
                         // candidate, solving the slot's remaining holes.
                         std::map<std::string, ExpressionPointer> trial =
@@ -1600,10 +1635,10 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         if (!resolvedIsProp) continue;
                         if (requireUnambiguous) {
                             // Collect instead of committing; resolved below
-                            // once every hypothesis has been considered.
-                            if (matchedBinders.empty()) {
+                            // once every fact has been considered.
+                            if (matchedFacts.empty()) {
                                 firstTrial = trial;
-                                matchedBinders.push_back(j);
+                                matchedFacts.push_back(f);
                             } else {
                                 bool sameInstantiation = true;
                                 for (auto& entry : trial) {
@@ -1621,20 +1656,21 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                                     }
                                 }
                                 if (!sameInstantiation) {
-                                    matchedBinders.push_back(j);
+                                    matchedFacts.push_back(f);
                                 }
                             }
                             continue;
                         }
-                        commitMatch(i, j, trial);
+                        commitMatch(i, localFacts[f], trial);
                         filled = true;
                     }
                     if (requireUnambiguous && !filled) {
-                        if (matchedBinders.size() == 1) {
-                            commitMatch(i, matchedBinders[0], firstTrial);
+                        if (matchedFacts.size() == 1) {
+                            commitMatch(i, localFacts[matchedFacts[0]],
+                                        firstTrial);
                             filled = true;
                             progress = true;
-                        } else if (matchedBinders.size() > 1) {
+                        } else if (matchedFacts.size() > 1) {
                             ExpressionPointer slotShown;
                             try {
                                 slotShown = openOverLocalBinders(
@@ -1672,13 +1708,13 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                                        : std::string(""))
                                 + " is matched by several hypotheses that pin "
                                 "different arguments:";
-                            for (int jj : matchedBinders) {
+                            for (size_t ff : matchedFacts) {
                                 ambiguityReport +=
-                                    "\n    " + localBinders[jj].name + " : "
+                                    "\n    " + localFacts[ff].source + " : "
                                     + prettyPrintInLocalScope(
                                           openOverLocalBinders(
-                                              localBinders[jj].type,
-                                              localBinders, jj),
+                                              localFacts[ff].type,
+                                              localBinders, N),
                                           localBinders);
                             }
                             ambiguityReport +=

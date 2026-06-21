@@ -3,6 +3,10 @@
 --       makes A and B available as facts on their own (no manual projection);
 --   (2) `absurd(<proposition>)` — state the contradictory fact directly; it is
 --       proved from context (e.g. a conjunction leg) and then contradicted.
+--   (3) the legs are available to EVERY context-scanning path (one shared
+--       `collectLocalBinderFacts`), not just the direct-goal prover: a cited
+--       lemma's premise, and a transitivity chain's middle term, discharge
+--       from a conjunction leg the same as from a stand-alone hypothesis.
 
 module Test.conjunction_elim_test
 
@@ -11,6 +15,8 @@ import Logic.basics
 import Equality.basics
 import Natural.basics
 import Natural.peano
+import Natural.order
+import Natural.divisibility
 
 -- (1) A context conjunction's left leg closes the goal by itself.
 theorem conjunction_left_available (a b : Natural)
@@ -29,4 +35,20 @@ theorem conjunction_right_available (a b : Natural)
 theorem absurd_proposition_from_conjunction (k : Natural)
         (both : (0 = successor(k)) ∧ (k = k)) : False := {
   absurd(0 = successor(k))
+}
+
+-- (3) A conjunction leg discharges a CITED LEMMA's side condition — the
+-- lemma-premise path, not just the direct-goal prover. `lt_of_successor_le`
+-- needs `successor(k) ≤ n`, supplied by the left leg.
+theorem conjunction_leg_discharges_lemma_premise (k n : Natural)
+        (bundle : successor(k) ≤ n ∧ k = k) : k < n := {
+  claim k < n
+}
+
+-- (3) A transitivity chain pins its middle term by unifying a premise
+-- against a conjunction leg: `a ∣ b` (left leg) and `b ∣ c` (right leg)
+-- give `a ∣ c`, with `b` solved from the legs.
+theorem conjunction_legs_chain_transitivity (a b c : Natural)
+        (bundle : a ∣ b ∧ b ∣ c) : a ∣ c := {
+  claim a ∣ c
 }
