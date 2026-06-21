@@ -51,9 +51,8 @@ definition IntegralDomain.IsPrimeElement (d : IntegralDomain)
   p ≠ Ring.zero(IntegralDomain.ring(d))
   ∧ ¬(Ring.IsUnit(IntegralDomain.ring(d), p))
   ∧ ((a b : Ring.carrier(IntegralDomain.ring(d)))
-        → Ring.divides(IntegralDomain.ring(d), p, a * b)
-        → Ring.divides(IntegralDomain.ring(d), p, a)
-          ∨ Ring.divides(IntegralDomain.ring(d), p, b))
+        → p ∣ a * b
+        → p ∣ a ∨ p ∣ b)
 
 -- ----------------------------------------------------------------------
 -- A divisor of 1 is a unit (this is just unfolding `Ring.IsUnit`, but the
@@ -80,10 +79,10 @@ theorem IntegralDomain.prime_element_is_irreducible (d : IntegralDomain)
   claim ∀ (a b : Ring.carrier(s)). p = a * b
           → Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b)
       by (a b : Ring.carrier(s)) (pEqualsProduct : p = a * b) ↦ {
-        claim Ring.divides(s, p, a * b);
+        claim p ∣ a * b;
         -- p prime, so it divides one of the factors.
         claim by cases {
-          in (Ring.divides(s, p, a)) as pDividesA: {
+          in (p ∣ a) as pDividesA: {
               choose c such that a = p * c from pDividesA;
               -- cancel nonzero p from p·1 = p = a·b = p·(c·b); then b·c = 1.
               calc p * Ring.one(s) = p = a * b = (p * c) * b = p * (c * b);
@@ -92,7 +91,7 @@ theorem IntegralDomain.prime_element_is_irreducible (d : IntegralDomain)
               claim Ring.IsUnit(s, b) since IntegralDomain.unit_of_one_equals_product;
               done
             }
-          in (Ring.divides(s, p, b)) as pDividesB: {
+          in (p ∣ b) as pDividesB: {
               choose c such that b = p * c from pDividesB;
               calc p * Ring.one(s) = p = a * b = a * (p * c) = p * (c * a);
               claim Ring.one(s) = c * a since IntegralDomain.multiply_cancel_left;
