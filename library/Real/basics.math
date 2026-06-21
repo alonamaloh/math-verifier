@@ -91,7 +91,7 @@ theorem CauchyEquivalent.symmetric
         : CauchyEquivalent(b, a) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨N, aEquivb_at_N⟩ from aEquivb(epsilon, epsilonPositive);
+    choose N as aEquivb_at_N from aEquivb(epsilon, epsilonPositive);
     witness N with
         (m : Natural) (N_leq_m : N ≤ m) ↦
           calc abs(
@@ -101,7 +101,7 @@ theorem CauchyEquivalent.symmetric
                    CauchyRationalSequence.sequenceFunction(a, m)
                    - CauchyRationalSequence.sequenceFunction(b, m))
              < epsilon
-                 by aEquivb_at_N(m, N_leq_m)
+                 since aEquivb_at_N(m, N_leq_m)
   }
 
 -- Algebra helper: (a - b) + (b - c) = a - c.
@@ -117,10 +117,10 @@ theorem CauchyEquivalent.transitive
         : CauchyEquivalent(a, c) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨N_ab, abBound⟩
+    choose N_ab as abBound
         from aEquivb(Rational.halve(epsilon),
                      Rational.halve_positive(epsilon, epsilonPositive));
-    obtain ⟨N_bc, bcBound⟩
+    choose N_bc as bcBound
         from bEquivc(Rational.halve(epsilon),
                      Rational.halve_positive(epsilon, epsilonPositive));
     witness Natural.maximum(N_ab, N_bc) with
@@ -129,8 +129,8 @@ theorem CauchyEquivalent.transitive
           let sa : Rational := CauchyRationalSequence.sequenceFunction(a, m);
           let sb : Rational := CauchyRationalSequence.sequenceFunction(b, m);
           let sc : Rational := CauchyRationalSequence.sequenceFunction(c, m);
-          claim mGeNab : N_ab ≤ m by Natural.le_through_max_left;
-          claim mGeNbc : N_bc ≤ m by Natural.le_through_max_right;
+          claim mGeNab : N_ab ≤ m since Natural.le_through_max_left;
+          claim mGeNbc : N_bc ≤ m since Natural.le_through_max_right;
           claim abs(sa - sb) < Rational.halve(epsilon) by abBound(m, mGeNab);
           claim abs(sb - sc) < Rational.halve(epsilon) by bcBound(m, mGeNbc);
           -- |a-c| = |(a-b)+(b-c)| ≤ |a-b|+|b-c| < ε/2 + ε/2 = ε.
@@ -146,9 +146,11 @@ theorem CauchyEquivalent.transitive
 -- registered as the canonical instance for Real's quotient — so
 -- `Quotient.equal_implies_equivalent(x, y, mkEquality)` recovers the three laws.
 definition Real.equivalence
-        : IsEquivalenceRelation(CauchyRationalSequence, CauchyEquivalent) :=
-  ⟨CauchyEquivalent.reflexive,
-   CauchyEquivalent.symmetric,
-   CauchyEquivalent.transitive⟩
+        : IsEquivalenceRelation(CauchyRationalSequence, CauchyEquivalent) := {
+  claim CauchyEquivalent.reflexive;
+  claim CauchyEquivalent.symmetric;
+  claim CauchyEquivalent.transitive;
+  done
+}
 
 instance Real.equivalence
