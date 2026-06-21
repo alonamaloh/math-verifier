@@ -435,9 +435,26 @@ returns its final non-`;`-terminated expression.
   `And.right`. So after `choose x such that A ∧ B from h;`, both `A` and `B` are
   usable in by-less / `by` / `substituting` steps.
 - `obtain ⟨a, b⟩ from <expr>;` / `let ⟨a, b⟩ := <expr>;` — the tuple
-  destructure, now reserved for **non-existential** structures (records,
-  `Subtype`, …) where naming several components flatly is what's wanted. For an
-  `∃`/`∧`, use `choose` above — the `⟨…⟩` is an implementation tell.
+  destructure, now reserved for genuine **data records** (a quotient
+  representative, `Subtype`, a bundle) where naming several components flatly is
+  what's wanted. For an `∃`/`∧`, use `choose` / the leg-facts above — the `⟨…⟩`
+  is an implementation tell that the connective is encoded as a tuple.
+- **Building a connective — symmetric to destructuring it.** Don't write the
+  constructor tuple either. To prove `A ∧ B`, state the parts and let the prover
+  conjoin: a bare `done`, or `claim A since …; claim B since …; done`. To prove
+  `∃ x. P`, `witness v with <proof of P(v)>`. To project a single axiom out of a
+  bundled proof — associativity from an in-scope `IsGroup`, a leg of `IsRing`
+  brought in by `claim IsRing(…) since <r>.is_ring;` — a bare `done` suffices;
+  the prover decomposes the conjunction and finds the leg. (`⟨proofA, proofB⟩` /
+  `⟨v, proof⟩` are the construction-side tells.) Genuine data records (`Ring`, a
+  representative, `Subtype`) really are tuples, so `⟨…⟩` and `by_representatives x
+  as ⟨a, b⟩` are correct there — the distinction is the *type*: a logical
+  connective vs. a data structure.
+- **Audit:** `make anon-tuple-report` (set `MATH_CHECK_ANON_TUPLES=1`) is the
+  type-aware check that flags every user-written `⟨…⟩` built or destructured at
+  `And`/`Exists`, while leaving data-record tuples, `witness`, and `choose`
+  untouched. (Manifest-scoped; a regular `cic_leak_report` run does NOT see this
+  axis.)
 - `cases by <lemma> { … }` — the same inference for a **case-split**: cite
   `<lemma>` argument-free (premises from context) and case-split on the
   disjunction / inductive it yields. E.g. `cases by

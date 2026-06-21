@@ -46,6 +46,28 @@ linter counts them, and there is always a math-like form:
 | `transport_proposition(…)` | `substituting`, or an element-interface lemma |
 | a positional lemma call | `claim … by <lemma>` / `done by <lemma>` |
 | raw `Subtype.make(…)` | the structure's `construction`/intro form |
+| `⟨pA, pB⟩ : A ∧ B`, `⟨v, p⟩ : ∃…` | see "Connectives aren't tuples" |
+
+## Connectives aren't tuples
+
+`And` and `Exists` happen to be single-constructor inductives, but a reader
+should never see the `⟨…⟩` tuple encoding of a logical connective. (Genuine
+data records — `Ring`, a quotient representative, `Subtype` — **are** tuples;
+`⟨…⟩` and `by_representatives x as ⟨a, b⟩` are fine for those.)
+
+- **Build `A ∧ B`**: state the parts and let the prover conjoin — bare `done`,
+  or `claim A since …; claim B since …; done`. Not `⟨proofA, proofB⟩`.
+- **Build `∃ x. P`**: `witness v with <proof of P(v)>`. Not `⟨v, proof⟩`.
+- **Destructure `∃`**: `choose v such that P from h`. `obtain ⟨…⟩` / `let ⟨…⟩`
+  are the same tell — avoid them.
+- **Use an `∧` hypothesis**: the prover already has both legs in context, so
+  cite the fact / `done` — don't `let ⟨a, b⟩ := h` to name them.
+- **Project one axiom from a bundled proof** (e.g. associativity out of an
+  in-scope `IsGroup`/`IsRing`): a bare `done` — the prover decomposes the
+  conjunction and finds the leg.
+
+Audit with `make anon-tuple-report` (type-aware; opt-in via
+`MATH_CHECK_ANON_TUPLES=1`). Depth: `conventions/proof-style.md`.
 
 ## Layer the file
 
@@ -78,6 +100,7 @@ concept. Lead comments with the math; pull kernel/elaborator mechanics into a
 ## The smell test
 
 If a proof looks like term-soup — nested positional calls, `congruenceOf`,
-raw `rewrite`, anonymous `Or.introduceLeft(…)` chains — rewrite it as the
-mathematician's sentence: state each fact, justify it by its reason, and
-let `claim`/`calc`/`done`/`by_induction` carry the structure.
+raw `rewrite`, `⟨…⟩` over an `And`/`Exists`, anonymous `Or.introduceLeft(…)`
+chains — rewrite it as the mathematician's sentence: state each fact, justify
+it by its reason, and let `claim`/`calc`/`done`/`by_induction`/`choose`/
+`witness` carry the structure.
