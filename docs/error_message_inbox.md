@@ -763,3 +763,52 @@ both: an anonymous standalone `claim q = p1 * c;` re-exposing the leg as a
 cost-1 equality, so the by-less step is cheap *and* hint-free. (Root cause of
 the expense: the new conjunction-leg decomposition in `collectContextEqualities`
 multiplies candidate equalities when many conjunctions are in scope.)
+
+## `since`/`by` citation gaps surfaced rewriting Quotient.equal_implies_equivalent (2026-06-21)
+
+Spike: rewrote `Logic/quotient.math`'s `equal_implies_equivalent` from raw
+plumbing (`let ⟨…⟩ := equivalence`, positional `propositional_extensionality`,
+raw `rewrite`) to the mathematician's argument. Three elaborator gaps blocked
+the most direct phrasing; each has a workaround, but closing them would let such
+proofs read more directly.
+
+### Gap 1 — `since`/`by` does not infer universe arguments
+Citing a universe-polymorphic lemma needs the level supplied by hand:
+`done since IsEquivalenceRelation.transitive.{u}` works, but bare
+`since IsEquivalenceRelation.transitive` errors:
+```
+elaborate error: constant 'IsEquivalenceRelation.transitive' requires 1
+universe argument(s); supply them explicitly with .{...}
+```
+The universe is recoverable from context (the goal/operands fix `T : Type(u)`),
+exactly as it is for an ordinary application. The citation path should infer
+`.{u}` the way application elaboration does, instead of demanding it be written.
+
+### Gap 2 — citation matcher can't recover an *unpinned middle* binder (prover can)
+`done since IsEquivalenceRelation.transitive` for goal `R(x, y2)` fails:
+```
+the `IsEquivalenceRelation.transitive` citation does not prove this goal
+  goal: R x y2
+  the hint's arguments could not be inferred from the goal or discharged from
+  context, or its conclusion does not unify with the goal
+```
+Transitivity's conclusion `R(a, c)` pins `a, c` from the goal but leaves the
+middle `b` free; premise-recovery does not discover `b = y1` from the in-scope
+`R(x, y1)` / `R(y1, y2)`. Workaround: `… recalling (R(y1, y2))` (pins `b`).
+KEY OBSERVATION: the bare auto-prover DOES find it — `claim R(x,y1) → R(x,y2);`
+(no hint) closes by search. So the gap is the *targeted citation matcher's*
+premise discharge for an unpinned binder, not a prover weakness (same root as
+the earlier `by primeDivides` premise-discharge failure in factorization_list).
+Closing it (have `since`/`by` run the same context search the bare prover does
+when a binder is unpinned by the conclusion) would remove the need for
+`recalling` and for many explicit positional calls.
+
+### Gap 3 — a block-bodied lambda passed as an argument loses its expected type
+Writing the `Quotient.lift` respect proof inline as
+`(y1 y2)(rel) ↦ { … ; done since Equality.propositional_extensionality }`
+fails: the final `done` reports "bare `claim`/`done` needs an expected type from
+context (none available)", because the argument's expected type (the lift's
+respect-Pi codomain `R(x,y1) = R(x,y2)`) is not pushed into the block. Workaround:
+hoist to a typed `let respectsR : ∀ … := { … }` — the annotation supplies the
+goal, so the block's intros and final `done` typecheck. Ideally the expected
+type of an argument position would flow into a block-bodied lambda there too.
