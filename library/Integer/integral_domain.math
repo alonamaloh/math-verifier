@@ -41,10 +41,10 @@ theorem Integer.multiply_cancel_right_by_nonzero
         (x y c : Integer) (cNonzero : c ≠ Integer.zero)
         (productEquality : x * c = y * c)
         : x = y := {
-  claim signSplit : Integer.IsNonneg(c) ∨ ∃ (k : Natural). c = -(k : Integer)
+  claim Integer.IsNonneg(c) ∨ ∃ (k : Natural). c = -(k : Integer)
       since Integer.sign_split;
-  cases signSplit {
-    | Or.introduceLeft(cNonneg) => {
+  claim by cases {
+    in (Integer.IsNonneg(c)) as cNonneg: {
         choose n such that c = (n : Integer) from cNonneg;
         claim n ≠ 0 by {
           suppose n = 0 as nIsZero;
@@ -60,7 +60,7 @@ theorem Integer.multiply_cancel_right_by_nonzero
            = y * (n : Integer);
         done since Integer.multiply_cancel_right_by_positive_natural
       }
-    | Or.introduceRight(cNegated) => {
+    in (∃ (k : Natural). c = -(k : Integer)) as cNegated: {
         choose k such that c = -(k : Integer) from cNegated;
         claim k ≠ 0 by {
           suppose k = 0 as kIsZero;
@@ -134,11 +134,11 @@ theorem Integer.IsNonneg_of_product_with_positive
         (pNonneg : Integer.IsNonneg(p))
         (pNonzero : p ≠ Integer.zero)
         : Integer.IsNonneg(a) := {
-  claim signSplit : Integer.IsNonneg(a) ∨ ∃ (k : Natural). a = -(k : Integer)
+  claim Integer.IsNonneg(a) ∨ ∃ (k : Natural). a = -(k : Integer)
       since Integer.sign_split;
-  cases signSplit {
-    | Or.introduceLeft(aNonneg) => aNonneg
-    | Or.introduceRight(aNegated) => {
+  claim by cases {
+    in (Integer.IsNonneg(a)) as aNonneg: aNonneg
+    in (∃ (k : Natural). a = -(k : Integer)) as aNegated: {
         choose k such that a = -(k : Integer) from aNegated;
         claim Integer.IsNonneg((k : Integer)) since Integer.from_natural_is_nonneg;
         claim Integer.IsNonneg((k : Integer) * p) since Integer.multiply_nonneg;
@@ -169,10 +169,10 @@ theorem Integer.IsNonneg_of_product_with_positive
 theorem Integer.absolute_value_eq_zero_implies_zero
         (x : Integer) (absoluteValueZero : abs(x) = Integer.zero)
         : x = Integer.zero := {
-  claim signSplit : Integer.IsNonneg(x) ∨ ∃ (k : Natural). x = -(k : Integer)
+  claim Integer.IsNonneg(x) ∨ ∃ (k : Natural). x = -(k : Integer)
       since Integer.sign_split;
-  cases signSplit {
-    | Or.introduceLeft(xNonneg) => {
+  claim by cases {
+    in (Integer.IsNonneg(x)) as xNonneg: {
         choose k such that x = (k : Integer) from xNonneg;
         calc x
            = (k : Integer)
@@ -180,7 +180,7 @@ theorem Integer.absolute_value_eq_zero_implies_zero
            = abs(x)
            = Integer.zero
       }
-    | Or.introduceRight(xNegated) => {
+    in (∃ (k : Natural). x = -(k : Integer)) as xNegated: {
         choose k such that x = -(k : Integer) from xNegated;
         calc (k : Integer)
            = abs(-(k : Integer))   since Integer.absolute_value_negate
@@ -256,13 +256,12 @@ theorem Integer.absolute_value_minus_one_nonneg
       claim d = Integer.zero since Integer.absolute_value_eq_zero_implies_zero;
       absurd(dNonzero(d = Integer.zero))
   };
-  claim absoluteNaturalSplit
-        : Integer.absolute_value_natural(d) = 0
+  claim Integer.absolute_value_natural(d) = 0
           ∨ ∃ (k : Natural). Integer.absolute_value_natural(d) = successor(k)
       since Natural.zero_or_successor;
-  cases absoluteNaturalSplit {
-    | Or.introduceLeft(isZero) => absurd(absoluteNaturalNonzero(isZero))
-    | Or.introduceRight(isSuccessor) => {
+  claim by cases {
+    in (Integer.absolute_value_natural(d) = 0) as isZero: absurd(absoluteNaturalNonzero(isZero))
+    in (∃ (k : Natural). Integer.absolute_value_natural(d) = successor(k)) as isSuccessor: {
         choose j such that Integer.absolute_value_natural(d) = successor(j) from isSuccessor;
         witness j with
             calc abs(d) + -Integer.one
@@ -279,12 +278,11 @@ theorem Integer.absolute_value_minus_one_nonneg
 theorem Integer.absolute_value_natural_positive_of_nonzero
         (d : Integer) (dNonzero : d ≠ Integer.zero)
         : 1 ≤ Integer.absolute_value_natural(d) := {
-  claim absoluteNaturalSplit
-        : Integer.absolute_value_natural(d) = 0
+  claim Integer.absolute_value_natural(d) = 0
           ∨ ∃ (k : Natural). Integer.absolute_value_natural(d) = successor(k)
       since Natural.zero_or_successor;
-  cases absoluteNaturalSplit {
-    | Or.introduceLeft(isZero) => {
+  claim by cases {
+    in (Integer.absolute_value_natural(d) = 0) as isZero: {
         calc abs(d)
            = (Integer.absolute_value_natural(d) : Integer)  since Integer.absolute_value_natural_is_image
            = ((0 : Natural) : Integer)
@@ -292,7 +290,7 @@ theorem Integer.absolute_value_natural_positive_of_nonzero
         claim d = Integer.zero since Integer.absolute_value_eq_zero_implies_zero;
         absurd(dNonzero(d = Integer.zero))
       }
-    | Or.introduceRight(isSuccessor) => {
+    in (∃ (k : Natural). Integer.absolute_value_natural(d) = successor(k)) as isSuccessor: {
         choose j such that Integer.absolute_value_natural(d) = successor(j) from isSuccessor;
         calc (1 : Natural)
            ≤ successor(j)                          since Natural.successor_positive
