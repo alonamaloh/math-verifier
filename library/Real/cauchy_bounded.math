@@ -40,9 +40,6 @@ theorem Integer.succ_natural_plus_one (K : Natural)
   calc (successor(K) : Integer) + Integer.one
      = ((successor(K) + 1) : Integer)
      = (successor(successor(K)) : Integer)
-            by calc successor(K) + 1
-                  = successor(successor(K) + 0)
-                  = successor(successor(K))
 
 -- (succ K : R) + 1 = (succ (succ K) : R) at Rational. Quotient.equivalent_implies_equal
 -- bridges the small denominator discrepancy (0 + 0 vs 0).
@@ -57,9 +54,9 @@ theorem Rational.succ_natural_plus_one (K : Natural)
       RationalRepresentative.make(
           (successor(successor(K)) : Integer), Integer.one, Integer.one_is_nonzero),
       calc ((successor(K) : Integer) * Integer.one + Integer.one * Integer.one) * Integer.one
-         = Integer.one + (successor(K) : Integer)              by ring
-         = (successor(successor(K)) : Integer)                 by Natural.to_integer.successor_preserves
-         = (successor(successor(K)) : Integer) * (Integer.one * Integer.one)   by ring)
+         = Integer.one + (successor(K) : Integer)
+         = (successor(successor(K)) : Integer)                 since Natural.to_integer.successor_preserves
+         = (successor(successor(K)) : Integer) * (Integer.one * Integer.one))
 
 -- s_m = s_N + (s_m - s_N). Pure ring algebra.
 theorem Rational.split_via_anchor (a b : Rational)
@@ -85,19 +82,18 @@ theorem Rational.sequence.cauchy_is_naturally_bounded
     -- (succ(succ(K_inner)) : R)), N := N (unchanged).
     witness successor(K_inner) with
         (witness N with
-            (m : Natural) (N_leq_m : N ≤ m) ↦
-              -- Chain:
-              -- |s(m)|
-              --   = |s(N) + (s(m) - s(N))|   (split_via_anchor)
-              --   ≤ |s(N)| + |s(m) - s(N)|   (triangle)
-              --   ≤ (succ K_inner : R) + |s(m) - s(N)|   (s_at_N_bound + add_preserves)
-              --   ≤ (succ K_inner : R) + 1   (|s(m)-s(N)| < 1, weakened)
-              --   = (succ (succ K_inner) : R)
+            (m : Natural) (N_leq_m : N ≤ m) ↦ {
+              claim nLeN : N ≤ N since Natural.LessOrEqual.reflexive;
+              claim abs(s(m) - s(N)) < Rational.one since sCauchy_at_N(m, N_leq_m, N, nLeN);
+              claim abs(s(m) - s(N)) ≤ Rational.one since Rational.LessThan.weaken;
+              -- |s(m)| = |s(N) + (s(m)-s(N))| ≤ |s(N)| + |s(m)-s(N)|
+              --        ≤ (succ K_inner : R) + 1 = (succ (succ K_inner) : R).
               calc abs(s(m))
                  = abs(s(N) + (s(m) - s(N)))
                  ≤ abs(s(N)) + abs(s(m) - s(N))
                  ≤ (successor(K_inner) : Rational) + Rational.one
-                      by Rational.LessOrEqual.sum(s_at_N_bound,
-                             Rational.LessThan.weaken(sCauchy_at_N(m, N_leq_m, N, Natural.LessOrEqual.reflexive(N))))
-                 = (successor(successor(K_inner)) : Rational))
+                      by Rational.LessOrEqual.sum
+                 = (successor(successor(K_inner)) : Rational)
+                      since Rational.succ_natural_plus_one
+            })
   }
