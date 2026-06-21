@@ -2,9 +2,9 @@
 --
 -- Order and sign on Rational. Because denominators are now arbitrary
 -- nonzero integers (possibly negative), "n/d ≥ 0" is captured sign-robustly
--- as `Integer.IsNonneg(n · d)`: for d > 0 this is `n ≥ 0`, and for d < 0 it
--- is `n ≤ 0`, exactly as the fraction's value demands. Lift this over the
--- Rational quotient, then derive `LessOrEqual` and the operators.
+-- as `n · d ≥ 0`: for d > 0 this is `n ≥ 0`, and for d < 0 it is `n ≤ 0`,
+-- exactly as the fraction's value demands. Lift this over the Rational
+-- quotient, then derive `LessOrEqual` and the operators.
 
 module Rational.order
 
@@ -31,7 +31,7 @@ import Rational.negation
 -- denominator is non-negative.
 definition Rational.IsNonneg_at_representative
         : RationalRepresentative → Proposition
-  | RationalRepresentative.make(n, d, _) => Integer.IsNonneg(n * d)
+  | RationalRepresentative.make(n, d, _) => n * d ≥ (0 : Integer)
 
 -- Forward direction of the respect: from the cross-multiplication
 -- `n1·d2 = n2·d1` and `n1·d1 ≥ 0`, derive `n2·d2 ≥ 0`. Multiply through by
@@ -64,12 +64,18 @@ theorem Rational.IsNonneg_respect
   | RationalRepresentative.make(n1, d1, d1Nonzero),
     RationalRepresentative.make(n2, d2, d2Nonzero),
     equivalenceHypothesis => {
-      claim Integer.IsNonneg(n1 * d1) → Integer.IsNonneg(n2 * d2)
-          since Rational.IsNonneg_forward_helper;
-      claim Integer.IsNonneg(n2 * d2) → Integer.IsNonneg(n1 * d1) by {
-          suppose Integer.IsNonneg(n2 * d2) as numeratorProductNonneg;
+      claim (0 : Integer) ≤ n1 * d1 → (0 : Integer) ≤ n2 * d2 by {
+          suppose (0 : Integer) ≤ n1 * d1 as firstNumeratorNonneg;
+          claim Integer.IsNonneg(n1 * d1) since Integer.nonneg_of_zero_less_or_equal;
+          claim Integer.IsNonneg(n2 * d2) since Rational.IsNonneg_forward_helper;
+          done since Integer.zero_less_or_equal_of_nonneg
+      };
+      claim (0 : Integer) ≤ n2 * d2 → (0 : Integer) ≤ n1 * d1 by {
+          suppose (0 : Integer) ≤ n2 * d2 as secondNumeratorNonneg;
+          claim Integer.IsNonneg(n2 * d2) since Integer.nonneg_of_zero_less_or_equal;
           calc n2 * d1 = n1 * d2   since equivalenceHypothesis;
-          done since Rational.IsNonneg_forward_helper
+          claim Integer.IsNonneg(n1 * d1) since Rational.IsNonneg_forward_helper;
+          done since Integer.zero_less_or_equal_of_nonneg
       };
       done since Equality.propositional_extensionality
     }
@@ -82,20 +88,25 @@ opaque definition Rational.IsNonneg (x : Rational) : Proposition :=
       x)
 
 -- Boundary lemmas for the opaque `Rational.IsNonneg`. On a fraction n / d,
--- being non-negative is exactly `Integer.IsNonneg(n · d)`. These two are the
--- *only* places that pierce the opacity (the `unfold` collapses the
--- `Quotient.lift`); every consumer cites them by name.
+-- being non-negative is exactly `n · d ≥ 0`, exposed here in the equivalent
+-- `Integer.IsNonneg(n · d)` form the non-negativity machinery is stated with.
+-- These two are the *only* places that pierce the opacity (the `unfold`
+-- collapses the `Quotient.lift`); every consumer cites them by name.
 theorem Rational.IsNonneg.of_numerator_denominator
         (n d : Integer) (denominatorNonzero : d ≠ Integer.zero)
         (productIsNonneg : Integer.IsNonneg(n * d))
-        : Rational.IsNonneg(Rational.fraction(n, d, denominatorNonzero)) :=
+        : Rational.IsNonneg(Rational.fraction(n, d, denominatorNonzero)) := {
+  claim (0 : Integer) ≤ n * d since Integer.zero_less_or_equal_of_nonneg;
   done by unfolding Rational.IsNonneg
+}
 
 theorem Rational.IsNonneg.numerator_denominator
         (n d : Integer) (denominatorNonzero : d ≠ Integer.zero)
         (fractionIsNonneg : Rational.IsNonneg(Rational.fraction(n, d, denominatorNonzero)))
-        : Integer.IsNonneg(n * d) :=
-  done by unfolding Rational.IsNonneg
+        : Integer.IsNonneg(n * d) := {
+  claim (0 : Integer) ≤ n * d by unfolding Rational.IsNonneg;
+  done since Integer.nonneg_of_zero_less_or_equal
+}
 
 -- ≤ on Rational.
 definition Rational.LessOrEqual (x y : Rational) : Proposition :=

@@ -96,12 +96,15 @@ theorem Rational.absolute_value_when_nonneg_at_representative
         : Rational.absolute_value_at_representative(rep)
           = (Quotient.class_of(rep) : Rational) :=
   cases rep refining representativeIsNonneg {
-    | RationalRepresentative.make(n, d, dNonzero) =>
+    | RationalRepresentative.make(n, d, dNonzero) => {
+        claim productNonneg : Integer.IsNonneg(n * d)
+            since Integer.nonneg_of_zero_less_or_equal;
         Quotient.equivalent_implies_equal(
             RationalRepresentative.make(
                 abs(n), abs(d), Integer.absolute_value_nonzero(d, dNonzero)),
             RationalRepresentative.make(n, d, dNonzero),
-            Integer.absolute_value_numerator_cross(n, d, dNonzero, representativeIsNonneg))
+            Integer.absolute_value_numerator_cross(n, d, dNonzero, productNonneg))
+    }
   }
 
 -- |x| = x on Rational when IsNonneg(x). Lift via cases on x.
@@ -109,10 +112,15 @@ theorem Rational.absolute_value_when_nonneg
         (x : Rational) (xIsNonneg : Rational.IsNonneg(x))
         : abs(x) = x :=
   cases x refining xIsNonneg {
-    | RationalRepresentative.make(n, d, dNonzero) =>
+    | RationalRepresentative.make(n, d, dNonzero) => {
+        claim Integer.IsNonneg(n * d)
+            since Rational.IsNonneg.numerator_denominator;
+        claim representativeIsNonneg : (0 : Integer) ≤ n * d
+            since Integer.zero_less_or_equal_of_nonneg;
         Rational.absolute_value_when_nonneg_at_representative(
             RationalRepresentative.make(n, d, dNonzero),
-            Rational.IsNonneg.numerator_denominator(n, d, dNonzero, xIsNonneg))
+            representativeIsNonneg)
+    }
   }
 
 -- |x| = -x on Rational when IsNonneg(-x). From the previous lemma

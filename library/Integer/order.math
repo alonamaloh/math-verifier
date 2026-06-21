@@ -48,6 +48,24 @@ theorem Integer.from_natural_is_nonneg (n : Natural)
         : Integer.IsNonneg((n : Integer)) :=
   witness n with done
 
+-- `IsNonneg(x)` and `0 ≤ x` say the same thing: `IsNonneg` is `∃n. x = (n:ℤ)`
+-- and `0 ≤ x` is `∃n. x = 0 + (n:ℤ)`, identical once `0 + (n:ℤ)` collapses.
+-- These let order-level code speak `≤` while reusing the non-negativity
+-- machinery (closure under +, ·, squares) stated with `IsNonneg`.
+theorem Integer.zero_less_or_equal_of_nonneg (x : Integer)
+        (xNonneg : Integer.IsNonneg(x))
+        : (0 : Integer) ≤ x := {
+  choose n such that x = (n : Integer) from xNonneg;
+  witness n with calc x = (n : Integer) = (0 : Integer) + (n : Integer)
+}
+
+theorem Integer.nonneg_of_zero_less_or_equal (x : Integer)
+        (xNonneg : (0 : Integer) ≤ x)
+        : Integer.IsNonneg(x) := {
+  choose n such that x = (0 : Integer) + (n : Integer) from xNonneg;
+  witness n with calc x = (0 : Integer) + (n : Integer) = (n : Integer)
+}
+
 -- ----------------------------------------------------------------------
 -- ≤ basic properties.
 
