@@ -76,26 +76,23 @@ theorem Polynomial.add_swap_first (r : Ring)
      = (b + (a + c))
 
 -- ----------------------------------------------------------------------
--- ¬(bound ≤ dy) is what guarantees the recursion shrinks; package the
--- Natural step ¬(bound ≤ dy) ⟹ successor(dy) ≤ bound.
+-- ¬(bound ≤ dy) is what guarantees the recursion shrinks: it forces the
+-- strict inequality dy < bound.
 
-theorem Natural.not_le_implies_successor_le (bound dy : Natural)
+theorem Natural.lt_of_not_le (dy bound : Natural)
         (notLessOrEqual : ¬(bound ≤ dy))
-        : successor(dy) ≤ bound :=
-  cases Natural.totality_of_less_or_equal(successor(dy), bound) {
-    | Or.introduceLeft(successorLessOrEqual) => successorLessOrEqual
-    | Or.introduceRight(boundLessOrEqualSuccessor) =>
-        decide bound = successor(dy) {
-          | yes boundIsSuccessor => {
-              claim successorLessOrEqualBound : successor(dy) ≤ bound
-                  by substituting boundIsSuccessor;
-              successorLessOrEqualBound
-            }
-          | no boundNotSuccessor =>
-              absurd(notLessOrEqual(
-                  Natural.less_or_equal_successor_not_equal(bound, dy,
-                      boundLessOrEqualSuccessor, boundNotSuccessor)))
-        }
+        : dy < bound :=
+  cases Natural.totality_of_less_or_equal(dy, bound) {
+    | Or.introduceLeft(dyLessOrEqualBound) => {
+        claim dyNotBound : ¬(dy = bound)
+            by (equal : dy = bound) ↦ {
+                claim boundLessOrEqualDy : bound ≤ dy by substituting equal;
+                notLessOrEqual(boundLessOrEqualDy)
+              };
+        done since Natural.lt_of_le_of_ne
+      }
+    | Or.introduceRight(boundLessOrEqualDy) =>
+        absurd(notLessOrEqual(boundLessOrEqualDy))
   }
 
 -- ----------------------------------------------------------------------
@@ -153,9 +150,7 @@ theorem Polynomial.gcd_bezout (r : Ring)
           | no yNotZero => {
               obtain ⟨degreeY, yDegreeBound, leadingNonzero⟩
                   from Polynomial.exists_degree_of_nonzero(r, y, yNotZero);
-              claim successor(degreeY) ≤ subject
-                  by Natural.not_le_implies_successor_le;
-              claim degreeY < subject by Natural.lt_of_successor_le;
+              claim degreeY < subject by Natural.lt_of_not_le;
               obtain ⟨quotient, remainder, divisionEquation, remainderBound⟩
                   from Polynomial.division_with_remainder(r, commutativity, y, degreeY,
                            yDegreeBound,
