@@ -28,25 +28,26 @@ definition List.range_down : Natural → List(Natural)
 -- `range_down(n)` has exactly n elements.
 theorem List.range_down_length (n : Natural)
         : List.length(Natural, List.range_down(n)) = n :=
+  unfold Natural.add in
   by_induction on n with IH {
-    case zero:
+    case base:
         calc List.length(Natural, List.range_down(0))
            = 0   by List.length_empty
-    case successor(predecessor):
-        calc List.length(Natural, List.range_down(successor(predecessor)))
+    case step(predecessor):
+        calc List.length(Natural, List.range_down(1 + predecessor))
            = 1 + List.length(Natural, List.range_down(predecessor))   by List.length_prepend
            = 1 + predecessor          by substituting IH
-           = successor(predecessor)
   }
 
 -- Completeness: every positive integer ≤ n appears in range_down(n).
--- (Induct on n with j generalised so the bound varies; the successor case
--- splits j = successor(predecessor) (head) vs j ≤ predecessor (tail, by IH).)
+-- (Induct on n with j generalised so the bound varies; the step case
+-- splits j = 1 + predecessor (head) vs j ≤ predecessor (tail, by IH).)
 theorem List.range_down_complete (n : Natural)
         : ∀ (j : Natural). 1 ≤ j → j ≤ n
           → List.member(Natural, j, List.range_down(n)) :=
+  unfold Natural.add in
   by_induction on n with IH {
-    case zero: {
+    case base: {
         take j : Natural;
         suppose 1 ≤ j as lower;
         suppose j ≤ 0 as upper;
@@ -57,26 +58,26 @@ theorem List.range_down_complete (n : Natural)
         claim False by Natural.not_less_or_equal_successor_zero;
         done
       }
-    case successor(predecessor): {
+    case step(predecessor): {
         take j : Natural;
         suppose 1 ≤ j as lower;
-        suppose j ≤ successor(predecessor) as upper;
-        claim decision : j = successor(predecessor) ∨ ¬(j = successor(predecessor))
+        suppose j ≤ 1 + predecessor as upper;
+        claim decision : j = 1 + predecessor ∨ ¬(j = 1 + predecessor)
             by Natural.decides_equality;
         cases decision {
           | Or.introduceLeft(jEqual) => {
-              claim List.member(Natural, successor(predecessor),
-                        List.range_down(successor(predecessor)))
-                  by List.member.here(Natural, successor(predecessor),
+              claim List.member(Natural, 1 + predecessor,
+                        List.range_down(1 + predecessor))
+                  by List.member.here(Natural, 1 + predecessor,
                          List.range_down(predecessor));
-              claim List.member(Natural, j, List.range_down(successor(predecessor)))
+              claim List.member(Natural, j, List.range_down(1 + predecessor))
                   by substituting jEqual;
               done
             }
           | Or.introduceRight(jNotEqual) => {
               claim jLeK : j ≤ predecessor
-                  by Natural.less_or_equal_successor_not_equal;
-              List.member.there(Natural, j, successor(predecessor),
+                  by Natural.le_of_le_one_plus_of_ne;
+              List.member.there(Natural, j, 1 + predecessor,
                   List.range_down(predecessor), IH(j, lower, jLeK))
             }
         }
@@ -86,22 +87,23 @@ theorem List.range_down_complete (n : Natural)
 -- Every member of range_down(n) is positive (the range stops at 1).
 theorem List.range_down_member_positive (n : Natural)
         : ∀ (j : Natural). List.member(Natural, j, List.range_down(n)) → 1 ≤ j :=
+  unfold Natural.add in
   by_induction on n with IH {
-    case zero: {
+    case base: {
         take j : Natural;
         suppose List.member(Natural, j, List.range_down(0)) as mem;
         absurd(List.no_member_empty(Natural, j, mem))
       }
-    case successor(predecessor): {
+    case step(predecessor): {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_down(successor(predecessor))) as mem;
+        suppose List.member(Natural, j, List.range_down(1 + predecessor)) as mem;
         claim invert
-            : j = successor(predecessor)
+            : j = 1 + predecessor
               ∨ List.member(Natural, j, List.range_down(predecessor))
             by List.member_prepend_invert;
         cases invert {
           | Or.introduceLeft(jEqual) => {
-              claim 1 ≤ successor(predecessor) by Natural.successor_positive;
+              claim 1 ≤ 1 + predecessor by Natural.less_or_equal_add_right;
               claim 1 ≤ j by substituting jEqual;
               done
             }
@@ -111,31 +113,32 @@ theorem List.range_down_member_positive (n : Natural)
   }
 
 -- Conversely, every member of range_down(n) is ≤ n. (Needed to show the
--- head successor(k) doesn't recur in range_down(k), i.e. distinctness.)
+-- head element doesn't recur in range_down(k), i.e. distinctness.)
 theorem List.range_down_member_le (n : Natural)
         : ∀ (j : Natural). List.member(Natural, j, List.range_down(n)) → j ≤ n :=
+  unfold Natural.add in
   by_induction on n with IH {
-    case zero: {
+    case base: {
         take j : Natural;
         suppose List.member(Natural, j, List.range_down(0)) as mem;
         absurd(List.no_member_empty(Natural, j, mem))
       }
-    case successor(predecessor): {
+    case step(predecessor): {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_down(successor(predecessor))) as mem;
+        suppose List.member(Natural, j, List.range_down(1 + predecessor)) as mem;
         claim invert
-            : j = successor(predecessor)
+            : j = 1 + predecessor
               ∨ List.member(Natural, j, List.range_down(predecessor))
             by List.member_prepend_invert;
         cases invert {
           | Or.introduceLeft(jEqual) => {
-              claim j ≤ successor(predecessor) by substituting jEqual;
+              claim j ≤ 1 + predecessor by substituting jEqual;
               done
             }
           | Or.introduceRight(memberTail) =>
               calc j
-                 ≤ predecessor             by IH(j, memberTail)
-                 ≤ successor(predecessor)  by Natural.le_successor
+                 ≤ predecessor       by IH(j, memberTail)
+                 ≤ 1 + predecessor   by Natural.less_or_equal_add_left
         }
       }
   }
@@ -158,33 +161,34 @@ theorem List.range_down_split (base count : Natural)
         : List.range_down(base + count)
           = List.append(Natural, List.range_down_offset(base, count),
                 List.range_down(base)) :=
+  unfold Natural.add in
   by_induction on count with IH {
-    case zero:
+    case base:
         -- The offset slice is empty and base + 0 = base.
         calc List.range_down(base + 0)
            = List.range_down(base)   by (base + 0 = base)
            = List.append(Natural, List.range_down_offset(base, 0),
                  List.range_down(base))
-    case successor(predecessorCount):
+    case step(predecessorCount):
         -- Peel the top element base + (1 + count′) off both sides.
-        calc List.range_down(base + successor(predecessorCount))
-           = List.range_down(successor(base + predecessorCount))
-                 by (base + successor(predecessorCount)
-                     = successor(base + predecessorCount))
-           = List.prepend(Natural, successor(base + predecessorCount),
+        calc List.range_down(base + (1 + predecessorCount))
+           = List.range_down(1 + (base + predecessorCount))
+                 by (base + (1 + predecessorCount)
+                     = 1 + (base + predecessorCount))
+           = List.prepend(Natural, 1 + (base + predecessorCount),
                  List.range_down(base + predecessorCount))
-           = List.prepend(Natural, successor(base + predecessorCount),
+           = List.prepend(Natural, 1 + (base + predecessorCount),
                  List.append(Natural,
                      List.range_down_offset(base, predecessorCount),
                      List.range_down(base)))
                  by substituting IH
-           = List.prepend(Natural, base + successor(predecessorCount),
+           = List.prepend(Natural, base + (1 + predecessorCount),
                  List.append(Natural,
                      List.range_down_offset(base, predecessorCount),
                      List.range_down(base)))
-                 by (successor(base + predecessorCount)
-                     = base + successor(predecessorCount))
+                 by (1 + (base + predecessorCount)
+                     = base + (1 + predecessorCount))
            = List.append(Natural,
-                 List.range_down_offset(base, successor(predecessorCount)),
+                 List.range_down_offset(base, 1 + predecessorCount),
                  List.range_down(base))
   }
