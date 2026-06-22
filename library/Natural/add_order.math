@@ -32,12 +32,12 @@ theorem Natural.add_left_monotone (a x y : Natural)
         (lessOrEqual : x ≤ y) : a + x ≤ a + y :=
   unfold Natural.add in
   by_induction on a with IH {
-    case zero:
+    case base:
         -- 0 + x ≡ x and 0 + y ≡ y.
         lessOrEqual
-    case successor(predecessorA): {
-        -- successor(predecessorA) + z ≡ successor(predecessorA + z); apply
-        -- successor monotonicity to the IH.
+    case step(predecessorA): {
+        -- (1 + predecessorA) + z ≡ successor(predecessorA + z) under the
+        -- unfold; apply successor monotonicity to the IH.
         claim predecessorA + x ≤ predecessorA + y since IH;
         done since Natural.successor_less_or_equal_successor
       }
@@ -50,19 +50,20 @@ theorem Natural.add_left_le_cancel (a : Natural)
         : ∀ (x y : Natural). a + x ≤ a + y → x ≤ y :=
   unfold Natural.add in
   by_induction on a with IH {
-    case zero: {
+    case base: {
         take x : Natural;
         take y : Natural;
         -- 0 + x ≡ x, 0 + y ≡ y.
         suppose 0 + x ≤ 0 + y as lessOrEqual;
         lessOrEqual
       }
-    case successor(predecessorA): {
+    case step(predecessorA): {
         take x : Natural;
         take y : Natural;
-        suppose successor(predecessorA) + x ≤ successor(predecessorA) + y
+        suppose (1 + predecessorA) + x ≤ (1 + predecessorA) + y
             as lessOrEqual;
-        -- peel a successor off each side, then recurse via the IH.
+        -- (1 + predecessorA) + z ≡ successor(predecessorA + z) under the
+        -- unfold; peel a successor off each side, then recurse via the IH.
         claim peeled : predecessorA + x ≤ predecessorA + y
             since Natural.less_or_equal_successor_successor_descend;
         done since IH(x, y, peeled)
@@ -89,25 +90,6 @@ theorem Natural.not_successor_less_or_equal_self (n : Natural)
       }
   }
 
--- x ≠ successor(x + c): a number is never its own successor-plus-more.
-theorem Natural.not_equal_successor_add (x c : Natural)
-        : x ≠ successor(x + c) :=
-  unfold Natural.add in
-  by_induction on x with IH {
-    case zero: {
-        -- 0 is never a successor.
-        suppose 0 = successor(0 + c) as equation;
-        absurd(equation)
-      }
-    case successor(k): {
-        suppose successor(k) = successor(successor(k) + c) as equation;
-        -- strip the successor: k = successor(k + c), contradicting the IH.
-        claim k = successor(k + c) since Natural.successor_injective;
-        done since IH
-      }
-  }
-
--- j ≤ successor(m) and j ≠ successor(m) force j ≤ m.
 -- ≤ cancels a successor on both sides: 1 + a ≤ 1 + b implies a ≤ b.
 -- (Subtract: 1 + b = 1 + a + c gives b = a + c.)
 theorem Natural.successor_le_cancel (a b : Natural)
@@ -222,9 +204,9 @@ theorem Natural.add_eq_zero_implies_left_zero (c d : Natural)
         (sumIsZero : c + d = 0) : c = 0 :=
   unfold Natural.add in
   by_induction on c with IH refining sumIsZero {
-    case zero: done
-    case successor(p):
-        -- successor(p) + d ≡ successor(p + d), which can't be 0.
+    case base: done
+    case step(p):
+        -- (1 + p) + d ≡ successor(p + d) under the unfold, which can't be 0.
         absurd(sumIsZero)
   }
 
