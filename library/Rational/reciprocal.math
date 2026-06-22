@@ -50,38 +50,38 @@ definition StrictPositiveRational.value
         : StrictPositiveRational → Rational
   | StrictPositiveRational.make(k, d) => {
       let denominatorNonzero
-            : (successor(d) : Integer) ≠ Integer.zero
-          := done since Integer.from_natural_successor_nonzero;
-      Rational.fraction((successor(k) : Integer), (successor(d) : Integer), denominatorNonzero)
+            : ((d + 1) : Integer) ≠ Integer.zero
+          := done since Integer.from_natural_add_one_nonzero;
+      Rational.fraction(((k + 1) : Integer), ((d + 1) : Integer), denominatorNonzero)
     }
 
--- Reciprocal of a packaged strict positive: swap to succ(d)/succ(k).
+-- Reciprocal of a packaged strict positive: swap to (d+1)/(k+1).
 definition StrictPositiveRational.reciprocal
         : StrictPositiveRational → Rational
   | StrictPositiveRational.make(k, d) => {
       let denominatorNonzero
-            : (successor(k) : Integer) ≠ Integer.zero
-          := done since Integer.from_natural_successor_nonzero;
-      Rational.fraction((successor(d) : Integer), (successor(k) : Integer), denominatorNonzero)
+            : ((k + 1) : Integer) ≠ Integer.zero
+          := done since Integer.from_natural_add_one_nonzero;
+      Rational.fraction(((d + 1) : Integer), ((k + 1) : Integer), denominatorNonzero)
     }
 
--- Multiplicative cancellation: r * (1/r) = 1 for r = succ(k)/succ(d).
+-- Multiplicative cancellation: r * (1/r) = 1 for r = (k+1)/(d+1).
 theorem StrictPositiveRational.reciprocal_multiplied (r : StrictPositiveRational)
         : StrictPositiveRational.value(r)
               * StrictPositiveRational.reciprocal(r)
           = Rational.one :=
   cases r {
     | StrictPositiveRational.make(k, d) => {
-        claim (successor(d) : Integer) ≠ Integer.zero
-            since Integer.from_natural_successor_nonzero;
-        claim (successor(k) : Integer) ≠ Integer.zero
-            since Integer.from_natural_successor_nonzero;
+        claim ((d + 1) : Integer) ≠ Integer.zero
+            since Integer.from_natural_add_one_nonzero;
+        claim ((k + 1) : Integer) ≠ Integer.zero
+            since Integer.from_natural_add_one_nonzero;
         let productDenominatorNonzero
-              : (successor(d) : Integer) * (successor(k) : Integer) ≠ Integer.zero
+              : ((d + 1) : Integer) * ((k + 1) : Integer) ≠ Integer.zero
             := done since Integer.multiply_nonzero;
         calc Rational.fraction(
-                 (successor(k) : Integer) * (successor(d) : Integer),
-                 (successor(d) : Integer) * (successor(k) : Integer),
+                 ((k + 1) : Integer) * ((d + 1) : Integer),
+                 ((d + 1) : Integer) * ((k + 1) : Integer),
                  productDenominatorNonzero)
            = Rational.one
                since Rational.fraction_equal
@@ -95,12 +95,15 @@ theorem Rational.strict_positive_witness_at_representative
         (nIsNonneg : Integer.IsNonneg(n))
         (nNonzero
            : n ≠ Integer.zero)
-        : ∃ (k : Natural). n = (successor(k) : Integer) := {
+        : ∃ (k : Natural). n = ((k + 1) : Integer) := {
     choose a such that n = (a : Integer) as nIsImage from nIsNonneg;
     cases a refining nIsImage {
        | zero =>
            absurd(nNonzero(calc n = (zero : Integer) = Integer.zero))
        | successor(predecessor) =>
-           witness predecessor with nIsImage
+           witness predecessor with
+               calc n
+                  = (successor(predecessor) : Integer)
+                  = ((predecessor + 1) : Integer)        since Natural.add_one
     }
 }

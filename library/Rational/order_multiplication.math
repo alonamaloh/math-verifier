@@ -290,11 +290,11 @@ theorem Rational.reciprocal_of_succ_IsNonneg (K : Natural)
         : Rational.IsNonneg(
               StrictPositiveRational.reciprocal(
                   StrictPositiveRational.make(K, 0))) :=
-  -- The reciprocal is succ(0)/succ(K); sign-witness succ(0)·succ(K) ≥ 0.
+  -- The reciprocal is (0+1)/(K+1); sign-witness (0+1)·(K+1) ≥ 0.
   unfold Rational.IsNonneg in {
-    claim Integer.IsNonneg((successor(0) : Integer)) since Integer.from_natural_is_nonneg;
-    claim Integer.IsNonneg((successor(K) : Integer)) since Integer.from_natural_is_nonneg;
-    claim Integer.IsNonneg((successor(0) : Integer) * (successor(K) : Integer))
+    claim Integer.IsNonneg(((0 + 1) : Integer)) since Integer.from_natural_is_nonneg;
+    claim Integer.IsNonneg(((K + 1) : Integer)) since Integer.from_natural_is_nonneg;
+    claim Integer.IsNonneg(((0 + 1) : Integer) * ((K + 1) : Integer))
         since Integer.multiply_nonneg;
     done since Integer.zero_less_or_equal_of_nonneg
   }
@@ -308,25 +308,26 @@ theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
               : Rational.zero
                 = StrictPositiveRational.reciprocal(
                       StrictPositiveRational.make(K, 0))) ↦ {
-    let successorNonzero : (successor(K) : Integer) ≠ Integer.zero :=
-        done since Integer.from_natural_successor_nonzero;
-    -- Equal classes ⇒ 0·succ(K) = succ(0)·1, i.e. 0 = 1 in ℤ.
+    let denominatorNonzero : ((K + 1) : Integer) ≠ Integer.zero :=
+        done since Integer.from_natural_add_one_nonzero;
+    -- Equal classes ⇒ 0·(K+1) = (0+1)·1, i.e. 0 = 1 in ℤ.
     claim rationalEquivalence
           : RationalEquivalent(
                 RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
                 RationalRepresentative.make(
-                    (successor(0) : Integer), (successor(K) : Integer), successorNonzero))
+                    ((0 + 1) : Integer), ((K + 1) : Integer), denominatorNonzero))
         by Quotient.equal_implies_equivalent(
                RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
                RationalRepresentative.make(
-                   (successor(0) : Integer), (successor(K) : Integer), successorNonzero),
+                   ((0 + 1) : Integer), ((K + 1) : Integer), denominatorNonzero),
                unfold Rational in zeroEqRecip);
-    calc (successor(0) : Integer)
-       = (successor(0) : Integer) * Integer.one
-       = Integer.zero * (successor(K) : Integer)   since rationalEquivalence
-       = (0 : Integer);
-    claim successor(0) = 0 since Natural.to_integer.injective;
-    absurd(successor(0) = 0)
+    calc ((0 + 1) : Integer)
+       = ((0 + 1) : Integer) * Integer.one
+       = Integer.zero * ((K + 1) : Integer)   since rationalEquivalence
+       = Integer.zero                          as addOneZero;
+    claim addOneNonzero : ((0 + 1) : Integer) ≠ Integer.zero
+        since Integer.from_natural_add_one_nonzero;
+    absurd(addOneNonzero(addOneZero))
   }
 
 -- 1/(succ(K)) > 0.
@@ -421,7 +422,21 @@ theorem Rational.multiply_positive_positive
   };
   done
 }
--- δ with (succ(K) : R) · δ ≤ ε. Witness: δ := ε · (1/succ(K)).
+-- The packaged value of make(K, 0) is the integer image (K + 1): denominator
+-- (0 + 1) is one. `fraction_equal` after unfolding the value / cast, with the
+-- cross-equation closed by `(0 + 1 : I) = one`.
+theorem Rational.value_at_zero_is_add_one (K : Natural)
+        : StrictPositiveRational.value(StrictPositiveRational.make(K, 0))
+          = ((K + 1) : Rational) :=
+  unfold StrictPositiveRational.value, Integer.to_rational in {
+    claim denominatorOne : ((0 + 1) : Integer) = Integer.one;
+    claim crossEquation
+          : ((K + 1) : Integer) * Integer.one = ((K + 1) : Integer) * ((0 + 1) : Integer)
+        by substituting denominatorOne;
+    done since Rational.fraction_equal
+  }
+
+-- δ with ((K + 1) : R) · δ ≤ ε. Witness: δ := ε · (1/(K + 1)).
 theorem Rational.divide_by_succ_positive
         (epsilon : Rational) (K : Natural)
         (epsilonPos : Rational.zero < epsilon)
@@ -435,9 +450,10 @@ theorem Rational.divide_by_succ_positive
     claim Rational.zero < StrictPositiveRational.reciprocal(StrictPositiveRational.make(K, 0))
         since Rational.reciprocal_of_succ_positive;
     claim Rational.zero < delta since Rational.multiply_positive_positive;
+    claim StrictPositiveRational.value(StrictPositiveRational.make(K, 0)) = ((K + 1) : Rational)
+        since Rational.value_at_zero_is_add_one;
     -- ((K+1) : R) · (ε · (1/(K+1))) = ε · (((K+1) : R) · (1/(K+1))) = ε · 1 = ε.
     calc ((K + 1) : Rational) * delta
-       = (successor(K) : Rational) * delta            since Natural.add_one
        = StrictPositiveRational.value(StrictPositiveRational.make(K, 0)) * delta
        = epsilon
              * (StrictPositiveRational.value(StrictPositiveRational.make(K, 0))
