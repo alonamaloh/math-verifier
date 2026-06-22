@@ -108,15 +108,18 @@ theorem ComplexNumber.partialSum_pointwise
         (n : Natural)
         : ComplexNumber.partialSum(s, n) = ComplexNumber.partialSum(sequencePrime, n) :=
   by_induction on n with IH {
-    case zero: done
-    case successor(predecessor):
-        calc ComplexNumber.partialSum(s, successor(predecessor))
+    case base: done
+    case step(predecessor):
+        calc ComplexNumber.partialSum(s, 1 + predecessor)
            = ComplexNumber.partialSum(s, predecessor) + s(predecessor)
+                 by ComplexNumber.partialSum_add_one
            = ComplexNumber.partialSum(sequencePrime, predecessor) + s(predecessor)
                  since IH
            = ComplexNumber.partialSum(sequencePrime, predecessor)
              + sequencePrime(predecessor)
                  by pointwiseEqual(predecessor)
+           = ComplexNumber.partialSum(sequencePrime, 1 + predecessor)
+                 by substituting ComplexNumber.partialSum_add_one
   }
 
 -- The bounded variant: agreement below the cut is enough (the terms at
@@ -163,7 +166,7 @@ theorem ComplexNumber.partialSum_add (s t : Natural → ComplexNumber) (n : Natu
         : ComplexNumber.partialSum((k : Natural) ↦ s(k) + t(k), n)
           = ComplexNumber.partialSum(s, n) + ComplexNumber.partialSum(t, n) :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         let zero : ComplexNumber :=
             RingModulo.zero(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial);
@@ -171,16 +174,20 @@ theorem ComplexNumber.partialSum_add (s t : Natural → ComplexNumber) (n : Natu
            = zero
            = zero + zero
       }
-    case successor(predecessor):
-        calc ComplexNumber.partialSum((k : Natural) ↦ s(k) + t(k), successor(predecessor))
+    case step(predecessor):
+        calc ComplexNumber.partialSum((k : Natural) ↦ s(k) + t(k), 1 + predecessor)
            = ComplexNumber.partialSum((k : Natural) ↦ s(k) + t(k), predecessor)
              + (s(predecessor) + t(predecessor))
+                 by ComplexNumber.partialSum_add_one
            = (ComplexNumber.partialSum(s, predecessor)
               + ComplexNumber.partialSum(t, predecessor))
              + (s(predecessor) + t(predecessor))
                  since IH
            = (ComplexNumber.partialSum(s, predecessor) + s(predecessor))
              + (ComplexNumber.partialSum(t, predecessor) + t(predecessor))
+           = ComplexNumber.partialSum(s, 1 + predecessor)
+             + ComplexNumber.partialSum(t, 1 + predecessor)
+                 by substituting ComplexNumber.partialSum_add_one
   }
 
 theorem ComplexNumber.partialSum_scale
@@ -188,7 +195,7 @@ theorem ComplexNumber.partialSum_scale
         : ComplexNumber.partialSum((k : Natural) ↦ c * s(k), n)
           = c * ComplexNumber.partialSum(s, n) :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         let zero : ComplexNumber :=
             RingModulo.zero(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial);
@@ -196,13 +203,16 @@ theorem ComplexNumber.partialSum_scale
            = zero
            = c * zero
       }
-    case successor(predecessor):
-        calc ComplexNumber.partialSum((k : Natural) ↦ c * s(k), successor(predecessor))
+    case step(predecessor):
+        calc ComplexNumber.partialSum((k : Natural) ↦ c * s(k), 1 + predecessor)
            = ComplexNumber.partialSum((k : Natural) ↦ c * s(k), predecessor)
              + c * s(predecessor)
+                 by ComplexNumber.partialSum_add_one
            = c * ComplexNumber.partialSum(s, predecessor) + c * s(predecessor)
                  since IH
            = c * (ComplexNumber.partialSum(s, predecessor) + s(predecessor))
+           = c * ComplexNumber.partialSum(s, 1 + predecessor)
+                 by substituting ComplexNumber.partialSum_add_one
   }
 
 -- Negating every term negates the sum.
@@ -210,7 +220,7 @@ theorem ComplexNumber.partialSum_negate (s : Natural → ComplexNumber) (n : Nat
         : ComplexNumber.partialSum((k : Natural) ↦ -s(k), n)
           = -ComplexNumber.partialSum(s, n) :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         let zero : ComplexNumber :=
             RingModulo.zero(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial);
@@ -218,13 +228,16 @@ theorem ComplexNumber.partialSum_negate (s : Natural → ComplexNumber) (n : Nat
            = zero
            = -zero
       }
-    case successor(predecessor):
-        calc ComplexNumber.partialSum((k : Natural) ↦ -s(k), successor(predecessor))
+    case step(predecessor):
+        calc ComplexNumber.partialSum((k : Natural) ↦ -s(k), 1 + predecessor)
            = ComplexNumber.partialSum((k : Natural) ↦ -s(k), predecessor)
              + -s(predecessor)
+                 by ComplexNumber.partialSum_add_one
            = -ComplexNumber.partialSum(s, predecessor) + -s(predecessor)
                  since IH
            = -(ComplexNumber.partialSum(s, predecessor) + s(predecessor))
+           = -ComplexNumber.partialSum(s, 1 + predecessor)
+                 by substituting ComplexNumber.partialSum_add_one
   }
 
 -- Sums subtract termwise.
@@ -232,7 +245,7 @@ theorem ComplexNumber.partialSum_subtract (s t : Natural → ComplexNumber) (n :
         : ComplexNumber.partialSum((k : Natural) ↦ s(k) - t(k), n)
           = ComplexNumber.partialSum(s, n) - ComplexNumber.partialSum(t, n) :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         let zero : ComplexNumber :=
             RingModulo.zero(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial);
@@ -240,16 +253,20 @@ theorem ComplexNumber.partialSum_subtract (s t : Natural → ComplexNumber) (n :
            = zero
            = zero - zero
       }
-    case successor(predecessor):
-        calc ComplexNumber.partialSum((k : Natural) ↦ s(k) - t(k), successor(predecessor))
+    case step(predecessor):
+        calc ComplexNumber.partialSum((k : Natural) ↦ s(k) - t(k), 1 + predecessor)
            = ComplexNumber.partialSum((k : Natural) ↦ s(k) - t(k), predecessor)
              + (s(predecessor) - t(predecessor))
+                 by ComplexNumber.partialSum_add_one
            = (ComplexNumber.partialSum(s, predecessor)
               - ComplexNumber.partialSum(t, predecessor))
              + (s(predecessor) - t(predecessor))
                  since IH
            = (ComplexNumber.partialSum(s, predecessor) + s(predecessor))
              - (ComplexNumber.partialSum(t, predecessor) + t(predecessor))
+           = ComplexNumber.partialSum(s, 1 + predecessor)
+             - ComplexNumber.partialSum(t, 1 + predecessor)
+                 by substituting ComplexNumber.partialSum_add_one
   }
 
 -- Scaling on the right (a common factor behind every term).
@@ -258,7 +275,7 @@ theorem ComplexNumber.partialSum_scale_right
         : ComplexNumber.partialSum((k : Natural) ↦ s(k) * c, n)
           = ComplexNumber.partialSum(s, n) * c :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         let zero : ComplexNumber :=
             RingModulo.zero(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial);
@@ -266,13 +283,16 @@ theorem ComplexNumber.partialSum_scale_right
            = zero
            = zero * c
       }
-    case successor(predecessor):
-        calc ComplexNumber.partialSum((k : Natural) ↦ s(k) * c, successor(predecessor))
+    case step(predecessor):
+        calc ComplexNumber.partialSum((k : Natural) ↦ s(k) * c, 1 + predecessor)
            = ComplexNumber.partialSum((k : Natural) ↦ s(k) * c, predecessor)
              + s(predecessor) * c
+                 by ComplexNumber.partialSum_add_one
            = ComplexNumber.partialSum(s, predecessor) * c + s(predecessor) * c
                  since IH
            = (ComplexNumber.partialSum(s, predecessor) + s(predecessor)) * c
+           = ComplexNumber.partialSum(s, 1 + predecessor) * c
+                 by substituting ComplexNumber.partialSum_add_one
   }
 
 -- ----------------------------------------------------------------------
