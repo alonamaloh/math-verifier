@@ -59,9 +59,8 @@ definition Real.partialProduct (s : Natural → Real) : Natural → Real
 theorem Real.partialProduct_nonneg (s : Natural → Real) (n : Natural)
         (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
         : Real.zero ≤ Real.partialProduct(s, n) :=
-  unfold Natural.add in
   by_induction on n with IH {
-    case base: {
+    case zero: {
         claim Rational.zero < Rational.one;
         claim Real.zero < (Rational.one : Real)
             since Rational.to_real.positive_preserves;
@@ -69,7 +68,7 @@ theorem Real.partialProduct_nonneg (s : Natural → Real) (n : Natural)
             since Real.LessThan.weaken;
         done
       }
-    case step(predecessor): {
+    case successor(predecessor): {
         claim Real.zero ≤ s(predecessor) by termsNonneg(predecessor);
         claim Real.IsNonneg(Real.partialProduct(s, predecessor))
             since Real.IsNonneg_of_LessOrEqual_zero;
@@ -90,16 +89,15 @@ theorem Real.partialProduct_split (s : Natural → Real) (n k : Natural)
         : Real.partialProduct(s, k + n)
           = Real.partialProduct(s, n)
             * Real.partialProduct((j : Natural) ↦ s(n + j), k) :=
-  unfold Natural.add in
   by_induction on k with IH {
-    case base:
+    case zero:
         calc Real.partialProduct(s, 0 + n)
            = Real.partialProduct(s, n)
            = Real.partialProduct(s, n) * Real.one
            = Real.partialProduct(s, n)
              * Real.partialProduct((j : Natural) ↦ s(n + j), 0)
-    case step(predecessor):
-        calc Real.partialProduct(s, (1 + predecessor) + n)
+    case successor(predecessor):
+        calc Real.partialProduct(s, successor(predecessor) + n)
            = Real.partialProduct(s, predecessor + n) * s(predecessor + n)
            = (Real.partialProduct(s, n)
               * Real.partialProduct((j : Natural) ↦ s(n + j), predecessor))
@@ -111,20 +109,22 @@ theorem Real.partialProduct_split (s : Natural → Real) (n k : Natural)
                  by (predecessor + n = n + predecessor)
            = Real.partialProduct(s, n)
              * Real.partialProduct(
-                   (j : Natural) ↦ s(n + j), 1 + predecessor)
+                   (j : Natural) ↦ s(n + j), successor(predecessor))
   }
 
 -- A constant factor exits as its n-th power.
 theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural)
         : Real.partialProduct((k : Natural) ↦ c * s(k), n)
           = Real.power(c, n) * Real.partialProduct(s, n) :=
-  unfold Natural.add in
   by_induction on n with IH {
-    case base:
+    case zero:
         calc Real.partialProduct((k : Natural) ↦ c * s(k), 0)
            = Real.power(c, 0) * Real.partialProduct(s, 0)
-    case step(predecessor):
-        calc Real.partialProduct((k : Natural) ↦ c * s(k), 1 + predecessor)
+    case successor(predecessor): {
+        claim powerUnfold
+              : Real.power(c, successor(predecessor))
+                = c * Real.power(c, predecessor);
+        calc Real.partialProduct((k : Natural) ↦ c * s(k), successor(predecessor))
            = Real.partialProduct((k : Natural) ↦ c * s(k), predecessor)
              * (c * s(predecessor))
            = (Real.power(c, predecessor) * Real.partialProduct(s, predecessor))
@@ -133,9 +133,10 @@ theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural
            = (c * Real.power(c, predecessor))
              * (Real.partialProduct(s, predecessor) * s(predecessor))
                  by ring
-           = Real.power(c, 1 + predecessor)
+           = Real.power(c, successor(predecessor))
              * (Real.partialProduct(s, predecessor) * s(predecessor))
-                 since Real.power_add_one
+                 since powerUnfold
+      }
   }
 
 -- Products only see the terms' values.
@@ -144,11 +145,10 @@ theorem Real.partialProduct_pointwise
         (pointwiseEqual : ∀ (k : Natural). s(k) = sequencePrime(k))
         (n : Natural)
         : Real.partialProduct(s, n) = Real.partialProduct(sequencePrime, n) :=
-  unfold Natural.add in
   by_induction on n with IH {
-    case base: done
-    case step(predecessor):
-        calc Real.partialProduct(s, 1 + predecessor)
+    case zero: done
+    case successor(predecessor):
+        calc Real.partialProduct(s, successor(predecessor))
            = Real.partialProduct(s, predecessor) * s(predecessor)
            = Real.partialProduct(sequencePrime, predecessor) * s(predecessor)
                  since IH
