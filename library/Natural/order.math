@@ -315,3 +315,54 @@ theorem Natural.lt_of_successor_le (k n : Natural) (h : successor(k) ≤ n) : k 
   calc k
      < successor(k)   since Natural.lt_successor
      ≤ n              since h
+
+-- ── The `+ 1` / `<` public order interface ───────────────────────────
+-- These are the `successor`-free counterparts of the strict-order
+-- bridges above: clean names and statements (only `<`, `≤`, `+ 1`), so
+-- consumers in other modules never have to name the constructor. The
+-- `successor` constructor stays confined to `Natural/`.
+
+-- a < a + 1 — the atomic strict fact, in `+ 1` form (gap 0).
+theorem Natural.lt_add_one (a : Natural) : a < a + 1 := {
+  claim a < 1 + a since Natural.lt_one_plus;
+  done by substituting (ring : a + 1 = 1 + a)
+}
+
+-- k < n  ⟹  k + 1 ≤ n.
+theorem Natural.add_one_le_of_lt (k n : Natural) (h : k < n) : k + 1 ≤ n := {
+  choose gap such that k + (1 + gap) = n from Natural.lt_elim;
+  calc (k + 1) + gap
+     = k + (1 + gap)
+     = n              as shifted;
+  calc k + 1
+     ≤ (k + 1) + gap   since Natural.less_or_equal_add_right
+     = n               since shifted
+}
+
+-- k + 1 ≤ n  ⟹  k < n: k < k + 1 ≤ n.
+theorem Natural.lt_of_add_one_le (k n : Natural) (h : k + 1 ≤ n) : k < n :=
+  calc k
+     < k + 1   since Natural.lt_add_one
+     ≤ n        since h
+
+-- k < n + 1  ⟹  k ≤ n: the gap collapses once the `+ 1` is cancelled.
+theorem Natural.le_of_lt_add_one (k n : Natural) (h : k < n + 1) : k ≤ n := {
+  choose gap such that k + (1 + gap) = n + 1 from Natural.lt_elim;
+  claim (k + gap) + 1 = n + 1;
+  claim k + gap = n since Natural.add_cancel_right;
+  calc k
+     ≤ k + gap   since Natural.less_or_equal_add_right
+     = n
+}
+
+-- a < n  ⟹  a < n + 1 (the strict-order step, `+ 1` form).
+theorem Natural.lt_add_one_of_lt (a n : Natural) (h : a < n) : a < n + 1 :=
+  calc a
+     < n        since h
+     < n + 1    since Natural.lt_add_one
+
+-- a ≤ n  ⟹  a ≤ n + 1 (the weak-order step, `+ 1` form).
+theorem Natural.le_add_one_of_le (a n : Natural) (h : a ≤ n) : a ≤ n + 1 :=
+  calc a
+     ≤ n        since h
+     ≤ n + 1    since Natural.less_or_equal_add_right
