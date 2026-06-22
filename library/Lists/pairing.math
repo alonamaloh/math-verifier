@@ -159,7 +159,7 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
                  → List.has_distinct_inverse_in(A, multiply, one, list, z))
           → List.product(A, multiply, one, list) = one :=
   by_induction on bound with IH {
-    case zero: {
+    case base: {
         take list : List(A);
         cases list {
           | List.empty => {
@@ -171,27 +171,26 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
               calc List.product(A, multiply, one, List.empty(A)) = one
             }
           | List.prepend(head, tail) => {
-              -- A nonempty list has successor length, never ≤ 0.
+              -- A nonempty list has length ≥ 1, never ≤ 0.
               suppose List.length(A, List.prepend(A, head, tail)) ≤ 0 as lengthBound;
               suppose List.Distinct(A, List.prepend(A, head, tail)) as _;
               suppose (z : A) → List.member(A, z, List.prepend(A, head, tail))
                   → List.has_distinct_inverse_in(A, multiply, one,
                         List.prepend(A, head, tail), z) as _;
-              claim successor(List.length(A, tail)) ≤ 0
-                  by calc successor(List.length(A, tail))
-                        = 1 + List.length(A, tail)                       by Natural.one_add
-                        = List.length(A, List.prepend(A, head, tail))    by List.length_prepend
-                        ≤ 0                                              by lengthBound;
-              claim False by Natural.not_less_or_equal_successor_zero;
+              calc (1 : Natural)
+                 ≤ 1 + List.length(A, tail)                       by Natural.less_or_equal_add_right
+                 = List.length(A, List.prepend(A, head, tail))    by List.length_prepend
+                 ≤ 0                                              by lengthBound;
+              claim False since Natural.not_less_or_equal_successor_zero;
               done
             }
         }
       }
-    case successor(boundPredecessor): {
+    case step(boundPredecessor): {
         take list : List(A);
         cases list {
           | List.empty => {
-              suppose List.length(A, List.empty(A)) ≤ successor(boundPredecessor) as _;
+              suppose List.length(A, List.empty(A)) ≤ 1 + boundPredecessor as _;
               suppose List.Distinct(A, List.empty(A)) as _;
               suppose (z : A) → List.member(A, z, List.empty(A))
                   → List.has_distinct_inverse_in(A, multiply, one,
@@ -200,7 +199,7 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
             }
           | List.prepend(head, tail) => {
               suppose List.length(A, List.prepend(A, head, tail))
-                  ≤ successor(boundPredecessor) as lengthBound;
+                  ≤ 1 + boundPredecessor as lengthBound;
               suppose List.Distinct(A, List.prepend(A, head, tail)) as distinct;
               suppose (z : A) → List.member(A, z, List.prepend(A, head, tail))
                   → List.has_distinct_inverse_in(A, multiply, one,
@@ -257,19 +256,18 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
                     = List.length(A,
                           List.prepend(A, head, List.prepend(A, partner, rest)))
                   by List.Permutation.length_invariant;
-              claim successor(successor(List.length(A, rest)))
-                    ≤ successor(boundPredecessor)
-                  by calc successor(successor(List.length(A, rest)))
-                        = successor(1 + List.length(A, rest))                                    by Natural.one_add
-                        = successor(List.length(A, List.prepend(A, partner, rest)))              by List.length_prepend
-                        = 1 + List.length(A, List.prepend(A, partner, rest))                     by Natural.one_add
-                        = List.length(A, List.prepend(A, head, List.prepend(A, partner, rest)))  by List.length_prepend
-                        = List.length(A, List.prepend(A, head, tail))                            by lengthEquation
-                        ≤ successor(boundPredecessor)                                            by lengthBound;
-              claim successor(List.length(A, rest)) ≤ boundPredecessor
-                  by Natural.successor_le_cancel;
-              claim restLengthBound : List.length(A, rest) ≤ boundPredecessor
-                  by Natural.less_or_equal_predecessor_less_or_equal;
+              calc 1 + (1 + List.length(A, rest))
+                 = 1 + List.length(A, List.prepend(A, partner, rest))                      by List.length_prepend
+                 = List.length(A, List.prepend(A, head, List.prepend(A, partner, rest)))   by List.length_prepend
+                 = List.length(A, List.prepend(A, head, tail))                            by lengthEquation
+                 ≤ 1 + boundPredecessor                                                    by lengthBound
+                as twoPlusRestLe;
+              claim onePlusRestLe : 1 + List.length(A, rest) ≤ boundPredecessor
+                  since Natural.le_cancel_one_plus;
+              calc List.length(A, rest)
+                 ≤ 1 + List.length(A, rest)   by Natural.less_or_equal_add_left
+                 ≤ boundPredecessor           by onePlusRestLe
+                as restLengthBound;
 
               -- …and still pairs off: a member of rest keeps its partner,
               -- which can be neither head nor partner (inverses are unique,
