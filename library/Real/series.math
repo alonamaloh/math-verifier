@@ -73,6 +73,13 @@ definition Real.partialSum (s : Natural → Real) : Natural → Real
   | zero => Real.zero
   | successor(n) => Real.partialSum(s, n) + s(n)
 
+-- The recursion characterised in `1 + n` form, so consumers step the
+-- index without naming the raw constructor (`Natural.add` is opaque, so
+-- `1 + n` is not definitionally the constructor form; bridge via `one_add`).
+theorem Real.partialSum_add_one (s : Natural → Real) (n : Natural)
+        : Real.partialSum(s, 1 + n) = Real.partialSum(s, n) + s(n) :=
+  done by substituting Natural.one_add
+
 -- A series converges to a total when its partial sums do.
 definition Real.SeriesConverges
         (s : Natural → Real) (total : Real) : Proposition :=
@@ -86,19 +93,20 @@ theorem Real.geometric_partialSum (r : Real) (n : Natural)
               * Real.partialSum((k : Natural) ↦ Real.power(r, k), n)
           = Real.one - Real.power(r, n) :=
   by_induction on n with IH {
-    case zero:
+    case base:
         calc (Real.one - r)
                  * Real.partialSum((k : Natural) ↦ Real.power(r, k), 0)
            = (Real.one - r) * Real.zero
            = Real.one - Real.one
            = Real.one - Real.power(r, 0)
-    case successor(predecessor):
+    case step(predecessor):
         calc (Real.one - r)
                  * Real.partialSum(
-                       (k : Natural) ↦ Real.power(r, k), successor(predecessor))
+                       (k : Natural) ↦ Real.power(r, k), 1 + predecessor)
            = (Real.one - r)
                  * (Real.partialSum((k : Natural) ↦ Real.power(r, k), predecessor)
                     + Real.power(r, predecessor))
+                 by substituting Real.partialSum_add_one
            = (Real.one - r)
                  * Real.partialSum((k : Natural) ↦ Real.power(r, k), predecessor)
              + (Real.one - r) * Real.power(r, predecessor)
@@ -106,7 +114,8 @@ theorem Real.geometric_partialSum (r : Real) (n : Natural)
              + (Real.one - r) * Real.power(r, predecessor)
                  since IH
            = Real.one - r * Real.power(r, predecessor)
-           = Real.one - Real.power(r, successor(predecessor))
+           = Real.one - Real.power(r, 1 + predecessor)
+                 by substituting Real.power_add_one
   }
 
 -- ----------------------------------------------------------------------
@@ -287,15 +296,18 @@ theorem Real.partialSum_pointwise
         (n : Natural)
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
   by_induction on n with IH {
-    case zero: done
-    case successor(predecessor):
-        calc Real.partialSum(s, successor(predecessor))
+    case base: done
+    case step(predecessor):
+        calc Real.partialSum(s, 1 + predecessor)
            = Real.partialSum(s, predecessor) + s(predecessor)
+                 by Real.partialSum_add_one
            = Real.partialSum(sequencePrime, predecessor) + s(predecessor)
                  since IH
            = Real.partialSum(sequencePrime, predecessor)
              + sequencePrime(predecessor)
                  by pointwiseEqual(predecessor)
+           = Real.partialSum(sequencePrime, 1 + predecessor)
+                 by substituting Real.partialSum_add_one
   }
 
 -- The bounded variant: agreement below the cut is enough (the terms at
@@ -343,15 +355,16 @@ theorem Real.telescoping_partialSum
         : Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), n)
           = t(0) - t(n) :=
   by_induction on n with IH {
-    case zero:
+    case base:
         calc Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), 0)
            = Real.zero
            = t(0) - t(0)    by ring
-    case successor(predecessor):
+    case step(predecessor):
         calc Real.partialSum(
-                 (k : Natural) ↦ t(k) - t(1 + k), successor(predecessor))
+                 (k : Natural) ↦ t(k) - t(1 + k), 1 + predecessor)
            = Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), predecessor)
              + (t(predecessor) - t(1 + predecessor))
+                 by Real.partialSum_add_one
            = (t(0) - t(predecessor)) + (t(predecessor) - t(1 + predecessor))
                  since IH
            = t(0) - t(1 + predecessor)
@@ -366,15 +379,18 @@ theorem Real.partialSum_split (s : Natural → Real) (n k : Natural)
           = Real.partialSum(s, n)
             + Real.partialSum((j : Natural) ↦ s(n + j), k) :=
   by_induction on k with IH {
-    case zero:
+    case base:
         calc Real.partialSum(s, 0 + n)
            = Real.partialSum(s, n)
            = Real.partialSum(s, n) + Real.zero    by ring
            = Real.partialSum(s, n)
              + Real.partialSum((j : Natural) ↦ s(n + j), 0)
-    case successor(predecessor):
-        calc Real.partialSum(s, successor(predecessor) + n)
+    case step(predecessor):
+        calc Real.partialSum(s, (1 + predecessor) + n)
+           = Real.partialSum(s, 1 + (predecessor + n))
+                 by substituting (ring : (1 + predecessor) + n = 1 + (predecessor + n))
            = Real.partialSum(s, predecessor + n) + s(predecessor + n)
+                 by Real.partialSum_add_one
            = (Real.partialSum(s, n)
               + Real.partialSum((j : Natural) ↦ s(n + j), predecessor))
              + s(predecessor + n)
@@ -384,7 +400,12 @@ theorem Real.partialSum_split (s : Natural → Real) (n k : Natural)
              + s(n + predecessor)
                  by (predecessor + n = n + predecessor)
            = Real.partialSum(s, n)
-             + Real.partialSum((j : Natural) ↦ s(n + j), successor(predecessor))
+             + (Real.partialSum((j : Natural) ↦ s(n + j), predecessor)
+                + s(n + predecessor))
+                 by ring
+           = Real.partialSum(s, n)
+             + Real.partialSum((j : Natural) ↦ s(n + j), 1 + predecessor)
+                 by substituting Real.partialSum_add_one
   }
 
 -- Termwise comparison below the cut compares the partial sums.
@@ -421,11 +442,11 @@ theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
         (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
         : Real.zero ≤ Real.partialSum(s, n) :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         claim Real.zero ≤ Real.zero since Real.LessOrEqual.reflexive;
         done
       }
-    case successor(predecessor): {
+    case step(predecessor): {
         claim Real.zero ≤ s(predecessor) by termsNonneg(predecessor);
         calc Real.zero
            = Real.zero + Real.zero    by ring
@@ -433,6 +454,8 @@ theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
                  by Real.add_preserves_LessOrEqual
            ≤ Real.partialSum(s, predecessor) + s(predecessor)
                  by Real.add_preserves_LessOrEqual_left
+           = Real.partialSum(s, 1 + predecessor)
+                 by substituting Real.partialSum_add_one
       }
   }
 
@@ -463,7 +486,7 @@ theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
         : Real.partialSum((j : Natural) ↦ (c : Real), n)
           = ((Rational.linearGrowth(c, n) - Rational.one : Rational) : Real) :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         claim zeroUnfold : Rational.linearGrowth(c, 0) = Rational.one;
         calc Real.partialSum((j : Natural) ↦ (c : Real), 0)
            = (Rational.zero : Real)
@@ -472,13 +495,11 @@ theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
            = ((Rational.linearGrowth(c, 0) - Rational.one : Rational) : Real)
                  by zeroUnfold
       }
-    case successor(predecessor): {
-        claim stepUnfold
-              : Rational.linearGrowth(c, successor(predecessor))
-                = Rational.linearGrowth(c, predecessor) + c;
-        calc Real.partialSum((j : Natural) ↦ (c : Real), successor(predecessor))
+    case step(predecessor): {
+        calc Real.partialSum((j : Natural) ↦ (c : Real), 1 + predecessor)
            = Real.partialSum((j : Natural) ↦ (c : Real), predecessor)
              + (c : Real)
+                 by Real.partialSum_add_one
            = ((Rational.linearGrowth(c, predecessor) - Rational.one
                : Rational) : Real)
              + (c : Real)
@@ -491,9 +512,9 @@ theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
                  by (Rational.linearGrowth(c, predecessor) - Rational.one + c
                      = Rational.linearGrowth(c, predecessor) + c
                        - Rational.one)
-           = ((Rational.linearGrowth(c, successor(predecessor)) - Rational.one
+           = ((Rational.linearGrowth(c, 1 + predecessor) - Rational.one
                : Rational) : Real)
-                 by stepUnfold
+                 by substituting Rational.linearGrowth_add_one
       }
   }
 
@@ -504,38 +525,44 @@ theorem Real.partialSum_add (s t : Natural → Real) (n : Natural)
         : Real.partialSum((k : Natural) ↦ s(k) + t(k), n)
           = Real.partialSum(s, n) + Real.partialSum(t, n) :=
   by_induction on n with IH {
-    case zero:
+    case base:
         calc Real.partialSum((k : Natural) ↦ s(k) + t(k), 0)
            = Real.zero
            = Real.zero + Real.zero
-    case successor(predecessor):
-        calc Real.partialSum((k : Natural) ↦ s(k) + t(k), successor(predecessor))
+    case step(predecessor):
+        calc Real.partialSum((k : Natural) ↦ s(k) + t(k), 1 + predecessor)
            = Real.partialSum((k : Natural) ↦ s(k) + t(k), predecessor)
              + (s(predecessor) + t(predecessor))
+                 by Real.partialSum_add_one
            = (Real.partialSum(s, predecessor) + Real.partialSum(t, predecessor))
              + (s(predecessor) + t(predecessor))
                  since IH
            = (Real.partialSum(s, predecessor) + s(predecessor))
              + (Real.partialSum(t, predecessor) + t(predecessor))
                  by ring
+           = Real.partialSum(s, 1 + predecessor) + Real.partialSum(t, 1 + predecessor)
+                 by substituting Real.partialSum_add_one
   }
 
 theorem Real.partialSum_scale (c : Real) (s : Natural → Real) (n : Natural)
         : Real.partialSum((k : Natural) ↦ c * s(k), n)
           = c * Real.partialSum(s, n) :=
   by_induction on n with IH {
-    case zero:
+    case base:
         calc Real.partialSum((k : Natural) ↦ c * s(k), 0)
            = Real.zero
            = c * Real.zero    by ring
-    case successor(predecessor):
-        calc Real.partialSum((k : Natural) ↦ c * s(k), successor(predecessor))
+    case step(predecessor):
+        calc Real.partialSum((k : Natural) ↦ c * s(k), 1 + predecessor)
            = Real.partialSum((k : Natural) ↦ c * s(k), predecessor)
              + c * s(predecessor)
+                 by Real.partialSum_add_one
            = c * Real.partialSum(s, predecessor) + c * s(predecessor)
                  since IH
            = c * (Real.partialSum(s, predecessor) + s(predecessor))
                  by ring
+           = c * Real.partialSum(s, 1 + predecessor)
+                 by substituting Real.partialSum_add_one
   }
 
 -- Negating every term negates the sum.
@@ -543,18 +570,21 @@ theorem Real.partialSum_negate (s : Natural → Real) (n : Natural)
         : Real.partialSum((k : Natural) ↦ -s(k), n)
           = -Real.partialSum(s, n) :=
   by_induction on n with IH {
-    case zero:
+    case base:
         calc Real.partialSum((k : Natural) ↦ -s(k), 0)
            = Real.zero
            = -Real.zero    by ring
-    case successor(predecessor):
-        calc Real.partialSum((k : Natural) ↦ -s(k), successor(predecessor))
+    case step(predecessor):
+        calc Real.partialSum((k : Natural) ↦ -s(k), 1 + predecessor)
            = Real.partialSum((k : Natural) ↦ -s(k), predecessor)
              + -s(predecessor)
+                 by Real.partialSum_add_one
            = -Real.partialSum(s, predecessor) + -s(predecessor)
                  since IH
            = -(Real.partialSum(s, predecessor) + s(predecessor))
                  by ring
+           = -Real.partialSum(s, 1 + predecessor)
+                 by substituting Real.partialSum_add_one
   }
 
 -- Sums subtract termwise.
@@ -562,20 +592,23 @@ theorem Real.partialSum_subtract (s t : Natural → Real) (n : Natural)
         : Real.partialSum((k : Natural) ↦ s(k) - t(k), n)
           = Real.partialSum(s, n) - Real.partialSum(t, n) :=
   by_induction on n with IH {
-    case zero:
+    case base:
         calc Real.partialSum((k : Natural) ↦ s(k) - t(k), 0)
            = Real.zero
            = Real.zero - Real.zero    by ring
-    case successor(predecessor):
-        calc Real.partialSum((k : Natural) ↦ s(k) - t(k), successor(predecessor))
+    case step(predecessor):
+        calc Real.partialSum((k : Natural) ↦ s(k) - t(k), 1 + predecessor)
            = Real.partialSum((k : Natural) ↦ s(k) - t(k), predecessor)
              + (s(predecessor) - t(predecessor))
+                 by Real.partialSum_add_one
            = (Real.partialSum(s, predecessor) - Real.partialSum(t, predecessor))
              + (s(predecessor) - t(predecessor))
                  since IH
            = (Real.partialSum(s, predecessor) + s(predecessor))
              - (Real.partialSum(t, predecessor) + t(predecessor))
                  by ring
+           = Real.partialSum(s, 1 + predecessor) - Real.partialSum(t, 1 + predecessor)
+                 by substituting Real.partialSum_add_one
   }
 
 -- Scaling on the right (a common factor behind every term).
@@ -583,18 +616,21 @@ theorem Real.partialSum_scale_right (s : Natural → Real) (c : Real) (n : Natur
         : Real.partialSum((k : Natural) ↦ s(k) * c, n)
           = Real.partialSum(s, n) * c :=
   by_induction on n with IH {
-    case zero:
+    case base:
         calc Real.partialSum((k : Natural) ↦ s(k) * c, 0)
            = Real.zero
            = Real.zero * c    by ring
-    case successor(predecessor):
-        calc Real.partialSum((k : Natural) ↦ s(k) * c, successor(predecessor))
+    case step(predecessor):
+        calc Real.partialSum((k : Natural) ↦ s(k) * c, 1 + predecessor)
            = Real.partialSum((k : Natural) ↦ s(k) * c, predecessor)
              + s(predecessor) * c
+                 by Real.partialSum_add_one
            = Real.partialSum(s, predecessor) * c + s(predecessor) * c
                  since IH
            = (Real.partialSum(s, predecessor) + s(predecessor)) * c
                  by ring
+           = Real.partialSum(s, 1 + predecessor) * c
+                 by substituting Real.partialSum_add_one
   }
 
 -- A sum of nonnegative terms vanishes only if every term below the cut
@@ -629,10 +665,11 @@ theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
 theorem Real.partialSum_zero (n : Natural)
         : Real.partialSum((k : Natural) ↦ Real.zero, n) = Real.zero :=
   by_induction on n with IH {
-    case zero: done
-    case successor(predecessor):
-        calc Real.partialSum((k : Natural) ↦ Real.zero, successor(predecessor))
+    case base: done
+    case step(predecessor):
+        calc Real.partialSum((k : Natural) ↦ Real.zero, 1 + predecessor)
            = Real.partialSum((k : Natural) ↦ Real.zero, predecessor) + Real.zero
+                 by Real.partialSum_add_one
            = Real.zero + Real.zero    since IH
            = Real.zero
   }
@@ -673,25 +710,27 @@ theorem Real.abs_partialSum_le (s : Natural → Real) (n : Natural)
         : abs(Real.partialSum(s, n))
           ≤ Real.partialSum((k : Natural) ↦ abs(s(k)), n) :=
   by_induction on n with IH {
-    case zero: {
+    case base: {
         claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
         claim absZero : abs(Real.zero) = Real.zero
             since Real.absolute_value_when_nonneg;
-        calc abs(Real.partialSum(s, zero))
+        calc abs(Real.partialSum(s, 0))
            = abs(Real.zero)
            = Real.zero                                            by absZero
            ≤ Real.zero                                            since Real.LessOrEqual.reflexive
-           = Real.partialSum((k : Natural) ↦ abs(s(k)), zero)
+           = Real.partialSum((k : Natural) ↦ abs(s(k)), 0)
       }
-    case successor(predecessor):
-        calc abs(Real.partialSum(s, successor(predecessor)))
+    case step(predecessor):
+        calc abs(Real.partialSum(s, 1 + predecessor))
            = abs(Real.partialSum(s, predecessor) + s(predecessor))
+                 by substituting Real.partialSum_add_one
            ≤ abs(Real.partialSum(s, predecessor)) + abs(s(predecessor))
                  by Real.triangle_inequality
            ≤ Real.partialSum((k : Natural) ↦ abs(s(k)), predecessor)
              + abs(s(predecessor))
                  by Real.add_preserves_LessOrEqual
-           = Real.partialSum((k : Natural) ↦ abs(s(k)), successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ abs(s(k)), 1 + predecessor)
+                 by substituting Real.partialSum_add_one
   }
 
 -- A window of a sum is bounded by the same window of the absolute
