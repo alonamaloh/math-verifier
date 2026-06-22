@@ -148,6 +148,19 @@ theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
   }
 }
 
+-- The `1 + n` / `<` form of less_or_equal_successor_not_equal: a value
+-- bounded by 1 + m yet distinct from it is bounded by m. Consumers cite
+-- this to descend a successor bound without naming the constructor.
+theorem Natural.le_of_le_one_plus_of_ne (j m : Natural)
+        (lessOrEqual : j ≤ 1 + m) (notEqual : j ≠ 1 + m)
+        : j ≤ m := {
+  claim belowOnePlus : j < 1 + m since Natural.lt_of_le_of_ne;
+  calc j
+     < 1 + m   since belowOnePlus
+     = m + 1;
+  done since Natural.le_of_lt_add_one
+}
+
 -- Cancel a right addend through monus: (a + b) − b = a.
 theorem Natural.monus_add_cancel_right (a b : Natural)
         : Natural.monus(a + b, b) = a :=
@@ -330,3 +343,25 @@ theorem Natural.monus_succ_left (b : Natural)
         }
       }
   }
+
+-- The `1 + n` form of monus_succ_left: peeling a 1 off the minuend below
+-- the diagonal, (1 + a) − b = 1 + (a − b) when b ≤ a, so consumers shift
+-- a successor through monus without naming the constructor.
+theorem Natural.monus_one_plus_left (a b : Natural) (bound : b ≤ a)
+        : Natural.monus(1 + a, b) = 1 + Natural.monus(a, b) :=
+  calc Natural.monus(1 + a, b)
+     = Natural.monus(successor(a), b)   since Natural.one_add
+     = successor(Natural.monus(a, b))   by Natural.monus_succ_left(b, a, bound)
+     = 1 + Natural.monus(a, b)          since Natural.one_add
+
+-- The `1 + n` / `<` form of monus_successor_shift: for j < n,
+-- n − j = 1 + (n − (1 + j)).
+theorem Natural.monus_one_plus_shift (n j : Natural) (inRange : j < n)
+        : Natural.monus(n, j) = 1 + Natural.monus(n, 1 + j) := {
+  claim successorBound : successor(j) ≤ n since Natural.successor_le_of_lt;
+  calc Natural.monus(n, j)
+     = successor(Natural.monus(n, successor(j)))
+           by Natural.monus_successor_shift(n, j, successorBound)
+     = 1 + Natural.monus(n, successor(j))   since Natural.one_add
+     = 1 + Natural.monus(n, 1 + j)          since Natural.one_add
+}
