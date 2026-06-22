@@ -52,7 +52,7 @@ theorem Natural.divides_factorial (d n : Natural)
         : d ∣ Natural.factorial(n) :=
   unfold Natural.add in
   by_induction on n with IH refining dAtMost {
-    case zero: {
+    case base: {
         -- d ≤ 0 contradicts 1 ≤ d.
         claim 1 ≤ 0
             by calc (1 : Natural)
@@ -61,25 +61,25 @@ theorem Natural.divides_factorial (d n : Natural)
         claim impossible : False since Natural.not_less_or_equal_successor_zero;
         absurd(impossible)
       }
-    case successor(predecessor): {
-        claim decision : d = successor(predecessor) ∨ ¬(d = successor(predecessor))
+    case step(predecessor): {
+        claim decision : d = 1 + predecessor ∨ ¬(d = 1 + predecessor)
             since Natural.decides_equality;
         cases decision {
           | Or.introduceLeft(dIsTopFactor) => {
               -- d is the leading factor of (1 + n′)! = (1 + n′) · n′!.
-              claim successor(predecessor)
-                    ∣ successor(predecessor) * Natural.factorial(predecessor)
+              claim (1 + predecessor)
+                    ∣ (1 + predecessor) * Natural.factorial(predecessor)
                   since Natural.divides_self_multiple;
-              claim d ∣ successor(predecessor) * Natural.factorial(predecessor)
+              claim d ∣ (1 + predecessor) * Natural.factorial(predecessor)
                   by substituting dIsTopFactor;
               done
             }
           | Or.introduceRight(dNotTopFactor) => {
               -- d ≤ n′, so d divides n′! and hence the product.
               claim dAtMostPredecessor : d ≤ predecessor
-                  since Natural.less_or_equal_successor_not_equal;
+                  since Natural.le_of_le_one_plus_of_ne;
               claim d ∣ Natural.factorial(predecessor) by IH(dAtMostPredecessor);
-              claim d ∣ successor(predecessor) * Natural.factorial(predecessor)
+              claim d ∣ (1 + predecessor) * Natural.factorial(predecessor)
                   since Natural.divides_multiple_left;
               done
             }
