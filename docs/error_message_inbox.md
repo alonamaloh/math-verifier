@@ -908,3 +908,41 @@ escape that works: drop the name and use the most-recent-∃ form
 or anonymize the claim and let a bare downstream step find it by type. This is
 why Real/multiplication.math (~10 such claims) needs the anonymize-and-such-that
 sweep before it is unused-name-clean.
+
+## `by_induction` 1+n form: mixed `case zero:` + `case step(k):` → unhelpful "expects exactly" message
+
+Hit repeatedly while converting legacy inductions to the successor-free form
+ONE clause at a time (change `case successor(k):`→`case step(k):` but not yet
+`case zero:`→`case base:`, or vice versa). The message:
+```
+library/.../foo.math:80:3: elaborate error: by_induction (1+n) at line 80
+  theorem 'Foo.bar'
+  by_induction (1+n form) expects exactly `case base:` and `case step(k):` clauses
+```
+diagnosis: correct cause but not actionable enough. The block already routed
+to the 1+n path (it saw a `step`/`base` clause), then rejected the sibling
+`case zero:`/`case successor(...)`. The message should NAME the offending
+clause and suggest the rename, e.g. "found `case zero:` in a 1+n block — the
+1+n form uses `case base:` / `case step(k):`; rename `zero`→`base` (and
+`successor(k)`→`step(k)`)". As written it doesn't say which clause is wrong or
+that base/step and zero/successor are different vocabularies, so on a big proof
+you re-scan every clause. (Axes likely lost: actionable, right-location.)
+
+## (resolved, for data) `refining` silently dropped by the 1+n path → confusing downstream type mismatch
+
+Before commit 46c0ce0, `by_induction on n with IH refining h { case base /
+case step(k) }` elaborated but reported, deep in the assembled term:
+```
+this argument has the wrong type for the function it is given to
+  the function expects: j < n
+  but this argument is: j < (successor zero) + predecessor
+```
+diagnosis: the TRUE cause was that `elaborateByInductionOnePlus` ignored
+`cases.refiningNames`, so the refined hypothesis `h` stayed pinned at the
+original `n` while the step goal was at `1 + predecessor`. The message blamed a
+user argument (symptom) instead of saying "`refining` is not supported here" or
+applying it. Now fixed (refining works in the 1+n path), so the message no
+longer appears — recorded only as a data point: a silently-ignored surface
+feature produces a maximally-confusing symptom error. Lesson for future
+surface features: if a clause/modifier can't be honored on a code path, reject
+it explicitly rather than dropping it.

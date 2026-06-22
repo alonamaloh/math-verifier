@@ -576,9 +576,31 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                     continue;
                 }
             }
+            // Reached only for a clause that is neither `base` nor `step` —
+            // most often a not-yet-converted `case zero:` / `case
+            // successor(k):` left from the legacy recursor vocabulary, which a
+            // sibling `base`/`step` clause already routed us onto the 1+n path.
+            std::string offending;
+            if (auto* bareName = std::get_if<SurfacePatternBareName>(
+                    &clause.pattern->node)) {
+                offending = bareName->name;
+            } else if (auto* constructorPattern =
+                    std::get_if<SurfacePatternConstructor>(
+                        &clause.pattern->node)) {
+                offending = constructorPattern->constructorName;
+            }
+            if (offending == "zero" || offending == "successor") {
+                throwElaborate(
+                    "by_induction: a `case " + offending + "` clause is mixed "
+                    "with `case base`/`case step` — these are different "
+                    "induction vocabularies. The `1 + n` form uses `case base:` "
+                    "and `case step(k):`; rename `zero`→`base` and "
+                    "`successor(k)`→`step(k)`. (To keep the raw-recursor form "
+                    "instead, use `case zero`/`case successor` for every clause.)");
+            }
             throwElaborate(
                 "by_induction (1+n form) expects exactly `case base:` and "
-                "`case step(k):` clauses");
+                "`case step(k):` clauses (got a `" + offending + "` clause)");
         }
         if (!baseBody || !stepBody) {
             throwElaborate(
