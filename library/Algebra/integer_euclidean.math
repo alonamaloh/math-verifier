@@ -77,7 +77,7 @@ theorem Integer.positive_natural_of_image_nonzero (m : Natural)
 theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 ≤ m)
         : ∃ (quotient : Integer). ∃ (remainder : Natural).
             a = (m : Integer) * quotient + (remainder : Integer)
-            ∧ successor(remainder) ≤ m := {
+            ∧ remainder < m := {
   cases Integer.sign_split(a) {
     | Or.introduceLeft(aNonneg) => {
         obtain ⟨j, aIsImage⟩ from aNonneg;
@@ -89,11 +89,12 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
                   = ((naturalQuotient * m : Natural) : Integer) + (naturalRemainder : Integer)
                   = (naturalQuotient : Integer) * (m : Integer) + (naturalRemainder : Integer)
                   = (m : Integer) * (naturalQuotient : Integer) + (naturalRemainder : Integer);
+        claim remainderLessThanM : naturalRemainder < m by Natural.lt_of_successor_le;
         ⟨(naturalQuotient : Integer), naturalRemainder,
          ⟨calc a
              = (j : Integer)
              = (m : Integer) * (naturalQuotient : Integer) + (naturalRemainder : Integer),
-          remainderBelow⟩⟩
+          remainderLessThanM⟩⟩
       }
     | Or.introduceRight(aNegative) => {
         obtain ⟨j, aIsNegativeImage⟩ from aNegative;
@@ -107,6 +108,7 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
         decide naturalRemainder = 0 {
           | yes remainderZero => {
               -- a = −(naturalQuotient·m) = m·(−naturalQuotient) + 0.
+              claim zeroBelowM : (0 : Natural) < m by Natural.zero_lt_of_one_le;
               ⟨-(naturalQuotient : Integer), 0,
                ⟨calc a
                    = -(j : Integer)
@@ -115,7 +117,7 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
                    = -((m : Integer) * (naturalQuotient : Integer) + (0 : Integer))
                          by remainderZero
                    = (m : Integer) * (-(naturalQuotient : Integer)) + (0 : Integer),
-                mPositive⟩⟩
+                zeroBelowM⟩⟩
             }
           | no remainderNonzero => {
               claim remainderAtMostM : naturalRemainder ≤ m;
@@ -123,14 +125,13 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
                   from Natural.subtraction_witness(naturalRemainder, m,
                            remainderAtMostM);
               -- mEquation : m = naturalRemainder + gap.
-              claim oneAtMostRemainder : 1 ≤ naturalRemainder;
+              claim 1 ≤ naturalRemainder;
               claim (m : Integer) = (naturalRemainder : Integer) + (gap : Integer);
               claim (gap : Integer)
                     = (m : Integer) + (-(naturalRemainder : Integer));
-              calc successor(gap)
-                        ≤ gap + naturalRemainder
-                              by Natural.successor_less_or_equal_add_at_least_one(
-                                     gap, naturalRemainder, oneAtMostRemainder)
+              calc gap
+                        < gap + naturalRemainder
+                              by Natural.lt_add_of_one_le
                         = naturalRemainder + gap
                         = m as gapBelowM;
               ⟨-((naturalQuotient : Integer) + Integer.one),
@@ -191,7 +192,7 @@ theorem Integer.has_euclidean_division (a b : Integer)
                                           Integer.absolute_value_natural, bIsImage)
                              = m
                                    by Integer.absolute_value_natural_of_natural(m)),
-                      Natural.lt_of_successor_le(remainder, m, remainderBelow))))⟩⟩
+                      remainderBelow)))⟩⟩
       }
     | Or.introduceRight(bNegative) => {
         obtain ⟨m, bIsNegativeImage⟩ from bNegative;
@@ -228,7 +229,7 @@ theorem Integer.has_euclidean_division (a b : Integer)
                                           bIsNegativeImage)
                              = m
                                    by Integer.absolute_value_natural_of_negate_natural(m)),
-                      Natural.lt_of_successor_le(remainder, m, remainderBelow))))⟩⟩
+                      remainderBelow)))⟩⟩
       }
   }
 }

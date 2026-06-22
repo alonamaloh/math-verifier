@@ -31,7 +31,7 @@ import IntegerMod.field
 -- Every class is `make(p, r)` for some natural `r` with `r < p`.
 theorem IntegerMod.exists_natural_representative (p : Natural) (pPositive : 1 ≤ p)
         (c : IntegerMod(p))
-        : ∃ (r : Natural). successor(r) ≤ p
+        : ∃ (r : Natural). r < p
             ∧ c = IntegerMod.make(p, (r : Integer)) :=
   cases c { | x =>
     {
@@ -60,7 +60,7 @@ theorem IntegerMod.exists_natural_representative (p : Natural) (pPositive : 1 �
 -- is a natural multiple of p smaller than p, hence zero.
 theorem Integer.CongruentModulo.equal_of_ordered_below (p i j : Natural)
         (jLessOrEqual : j ≤ i)
-        (iBelow : successor(i) ≤ p)
+        (iBelow : i < p)
         (congruent : Integer.CongruentModulo(p, (i : Integer), (j : Integer)))
         : i = j := {
   -- Write i = j + difference.
@@ -87,13 +87,13 @@ theorem Integer.CongruentModulo.equal_of_ordered_below (p i j : Natural)
            = j
     | Or.introduceRight(pLessOrEqualDifference) => {
         -- Otherwise p ≤ difference ≤ j + difference = i, contradicting i < p.
-        claim successor(i) ≤ i
-            by calc successor(i)
-                  ≤ p                 by iBelow
+        claim i < i
+            by calc i
+                  < p                 by iBelow
                   ≤ difference        by pLessOrEqualDifference
                   ≤ j + difference    by Natural.less_or_equal_add_left
                   = i                 by iEquation;
-        claim False by Natural.not_successor_less_or_equal_self;
+        claim False by Natural.lt_irreflexive;
         done
       }
   }
@@ -102,18 +102,18 @@ theorem Integer.CongruentModulo.equal_of_ordered_below (p i j : Natural)
 -- `make` is injective on the residues 0..p−1: distinct naturals below the
 -- modulus represent distinct classes.
 theorem IntegerMod.make_injective_below_modulus (p i j : Natural)
-        (iBelow : successor(i) ≤ p) (jBelow : successor(j) ≤ p)
+        (iBelow : i < p) (jBelow : j < p)
         (makeEquality
             : IntegerMod.make(p, (i : Integer)) = IntegerMod.make(p, (j : Integer)))
         : i = j := {
   claim Integer.CongruentModulo(p, (i : Integer), (j : Integer))
       by IntegerMod.congruent_of_make_equal;
   -- Order i against j; each order goes through the ordered lemma.
-  claim ordering : successor(i) ≤ j ∨ j ≤ i by Natural.trichotomy;
+  claim ordering : i < j ∨ j ≤ i by Natural.lt_or_le;
   cases ordering {
     | Or.introduceLeft(iStrictlyBelowJ) => {
         -- i < j: swap the roles.
-        claim i ≤ j by Natural.less_or_equal_predecessor_less_or_equal;
+        claim i ≤ j by Natural.LessThan.weaken;
         claim Integer.CongruentModulo(p, (j : Integer), (i : Integer))
             by Integer.CongruentModulo.symmetric;
         claim jEqualsI : j = i
