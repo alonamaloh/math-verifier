@@ -192,18 +192,18 @@ theorem Rational.zero_le_absolute_value (q : Rational)
 -- because |d| ≥ 1. The sign-witness of succ(K) − |q| is
 --   ((succ(K):I)·|d| + (-|n|)·1) · (1·|d|),
 -- which equals ((K:I)·(|d|−1) + |d|) · |d| ≥ 0.
-theorem Rational.absolute_value_le_succ_natural_at_representative
+theorem Rational.absolute_value_le_add_one_natural_at_representative
         (n d : Integer) (dNonzero : d ≠ Integer.zero)
         : Rational.LessOrEqual(
               abs(Rational.fraction(n, d, dNonzero)),
-              (successor(Integer.absolute_value_natural(n)) : Rational)) :=
+              ((Integer.absolute_value_natural(n) + 1) : Rational)) :=
   unfold Rational.IsNonneg in {
     claim absoluteImage : abs(n) = (Integer.absolute_value_natural(n) : Integer)
         since Integer.absolute_value_natural_is_image;
     claim successorImage
-          : (successor(Integer.absolute_value_natural(n)) : Integer)
-            = Integer.one + (Integer.absolute_value_natural(n) : Integer)
-        since Natural.to_integer.successor_preserves;
+          : ((Integer.absolute_value_natural(n) + 1) : Integer)
+            = (Integer.absolute_value_natural(n) : Integer) + Integer.one
+        since Natural.to_integer.add_one_preserves;
     claim Integer.IsNonneg(abs(d) + -Integer.one)
         since Integer.absolute_value_minus_one_nonneg;
     claim Integer.IsNonneg(abs(d)) since Integer.absolute_value_is_nonneg;
@@ -224,13 +224,13 @@ theorem Rational.absolute_value_le_succ_natural_at_representative
                 ((Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one) + abs(d))
                 * abs(d)
         since Integer.zero_less_or_equal_of_nonneg;
-    calc ((successor(Integer.absolute_value_natural(n)) : Integer) * abs(d)
+    calc (((Integer.absolute_value_natural(n) + 1) : Integer) * abs(d)
           + (-abs(n)) * Integer.one) * (Integer.one * abs(d))
-       = ((Integer.one + (Integer.absolute_value_natural(n) : Integer)) * abs(d)
+       = (((Integer.absolute_value_natural(n) : Integer) + Integer.one) * abs(d)
           + (-abs(n)) * Integer.one)
          * (Integer.one * abs(d))
              since successorImage
-       = ((Integer.one + (Integer.absolute_value_natural(n) : Integer)) * abs(d)
+       = (((Integer.absolute_value_natural(n) : Integer) + Integer.one) * abs(d)
           + (-(Integer.absolute_value_natural(n) : Integer)) * Integer.one)
          * (Integer.one * abs(d))
              since absoluteImage
@@ -239,15 +239,23 @@ theorem Rational.absolute_value_le_succ_natural_at_representative
     done by substituting witnessEquation
   }
 
+-- ((n + 1) : Rational) = (n : Rational) + 1. The `n + 1` cast bridge, so
+-- consumers add one to a natural-image bound without naming the constructor.
+theorem Rational.add_one_cast (n : Natural)
+        : ((n + 1) : Rational) = (n : Rational) + Rational.one :=
+  calc ((n + 1) : Rational)
+     = (n : Rational) + ((1 : Natural) : Rational)   since Rational.from_natural_add_preserves
+     = (n : Rational) + Rational.one
+
 -- The headline Archimedean property: for any Rational q, there is a
--- Natural K with |q| ≤ (succ(K) : Rational).
-theorem Rational.absolute_value_le_succ_natural (q : Rational)
+-- Natural K with |q| ≤ ((K + 1) : Rational).
+theorem Rational.absolute_value_le_add_one_natural (q : Rational)
         : ∃ (K : Natural).
-            abs(q) ≤ (successor(K) : Rational) :=
+            abs(q) ≤ ((K + 1) : Rational) :=
   by_representatives q as ⟨n, d, dNonzero⟩ => {
     claim abs(Rational.fraction(n, d, dNonzero))
-            ≤ (successor(Integer.absolute_value_natural(n)) : Rational)
-        since Rational.absolute_value_le_succ_natural_at_representative;
+            ≤ ((Integer.absolute_value_natural(n) + 1) : Rational)
+        since Rational.absolute_value_le_add_one_natural_at_representative;
     witness Integer.absolute_value_natural(n) with done
   }
 

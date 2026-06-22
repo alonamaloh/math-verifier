@@ -33,31 +33,6 @@ import Real.sequence
 -- ----------------------------------------------------------------------
 -- Algebraic helper.
 
--- (succ K : I) + 1 = (succ (succ K) : I).
-theorem Integer.succ_natural_plus_one (K : Natural)
-        : (successor(K) : Integer) + Integer.one
-          = (successor(successor(K)) : Integer) :=
-  calc (successor(K) : Integer) + Integer.one
-     = ((successor(K) + 1) : Integer)
-     = (successor(successor(K)) : Integer)
-
--- (succ K : R) + 1 = (succ (succ K) : R) at Rational. Quotient.equivalent_implies_equal
--- bridges the small denominator discrepancy (0 + 0 vs 0).
-theorem Rational.succ_natural_plus_one (K : Natural)
-        : (successor(K) : Rational) + Rational.one
-          = (successor(successor(K)) : Rational) :=
-  Quotient.equivalent_implies_equal(
-      Rational.add_representatives(
-          RationalRepresentative.make(
-              (successor(K) : Integer), Integer.one, Integer.one_is_nonzero),
-          RationalRepresentative.make(Integer.one, Integer.one, Integer.one_is_nonzero)),
-      RationalRepresentative.make(
-          (successor(successor(K)) : Integer), Integer.one, Integer.one_is_nonzero),
-      calc ((successor(K) : Integer) * Integer.one + Integer.one * Integer.one) * Integer.one
-         = Integer.one + (successor(K) : Integer)
-         = (successor(successor(K)) : Integer)                 since Natural.to_integer.successor_preserves
-         = (successor(successor(K)) : Integer) * (Integer.one * Integer.one))
-
 -- s_m = s_N + (s_m - s_N). Pure ring algebra.
 theorem Rational.split_via_anchor (a b : Rational)
         : a = b + (a - b) := ring
@@ -76,26 +51,23 @@ theorem Rational.sequence.cauchy_is_naturally_bounded
   -- Step 1: apply sCauchy with ε = 1, 0 < 1.
   {
     choose N as sCauchy_at_N from sIsCauchy(Rational.one, Rational.zero_less_one);
-    -- Step 2: get Natural bound K_inner for |s(N)|.
-    choose K_inner as s_at_N_bound from Rational.absolute_value_le_succ_natural(s(N));
-    -- Witness: K := succ(K_inner) (so the final bound is
-    -- (succ(K_inner) + 1 : R) = (succ(succ(K_inner)) : R)), N := N (unchanged).
-    witness successor(K_inner) with
+    -- Step 2: get Natural bound K_inner with |s(N)| ≤ (K_inner + 1 : R).
+    choose K_inner as s_at_N_bound from Rational.absolute_value_le_add_one_natural(s(N));
+    -- Witness: K := K_inner + 1 (final bound ((K_inner + 1) + 1 : R)), N := N.
+    witness (K_inner + 1) with
         (witness N with
             (m : Natural) (N_leq_m : N ≤ m) ↦ {
               claim nLeN : N ≤ N since Natural.LessOrEqual.reflexive;
               claim abs(s(m) - s(N)) < Rational.one since sCauchy_at_N(m, N_leq_m, N, nLeN);
               claim abs(s(m) - s(N)) ≤ Rational.one since Rational.LessThan.weaken;
               -- |s(m)| = |s(N) + (s(m)-s(N))| ≤ |s(N)| + |s(m)-s(N)|
-              --        ≤ (succ K_inner : R) + 1 = (succ (succ K_inner) : R).
+              --        ≤ (K_inner + 1 : R) + 1 = ((K_inner + 1) + 1 : R).
               calc abs(s(m))
                  = abs(s(N) + (s(m) - s(N)))
                  ≤ abs(s(N)) + abs(s(m) - s(N))
-                 ≤ (successor(K_inner) : Rational) + Rational.one
+                 ≤ ((K_inner + 1) : Rational) + Rational.one
                       by Rational.LessOrEqual.sum
-                 = (successor(successor(K_inner)) : Rational)
-                      since Rational.succ_natural_plus_one
-                 = ((successor(K_inner) + 1) : Rational)
-                      since Natural.add_one
+                 = (((K_inner + 1) + 1) : Rational)
+                      since Rational.add_one_cast
             })
   }
