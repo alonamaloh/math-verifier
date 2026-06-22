@@ -195,13 +195,14 @@ theorem Real.exponentialTerm_binomial_split (x y : Real) (k : Natural)
   -- Each summand below the cut: fold the coefficient into the two
   -- reciprocal factorials.
   claim termSplit
-      : ∀ (i : Natural). successor(i) ≤ 1 + k
+      : ∀ (i : Natural). i < 1 + k
         → (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
               * (((Natural.binomial(k, i) : Rational) : Real)
                      * (Real.power(x, i) * Real.power(y, Natural.monus(k, i))))
           = Real.exponentialTerm(x, i)
             * Real.exponentialTerm(y, Natural.monus(k, i))
-      by (i : Natural) (iBelow : successor(i) ≤ 1 + k) ↦ {
+      by (i : Natural) (iLessThan : i < 1 + k) ↦ {
+           claim iBelow : successor(i) ≤ 1 + k by Natural.successor_le_of_lt;
            claim i ≤ k since Natural.successor_le_cancel;
            obtain ⟨d, kSplit⟩ from Natural.subtraction_witness(i, k, (i ≤ k));
            claim kJoin : i + d = k;
@@ -365,11 +366,12 @@ theorem Real.cauchy_product_exchange (a b : Natural → Real)
       -- Below the cut, peeling the successor off n − i absorbs one
       -- diagonal term into each weight.
       claim stepSplit
-          : ∀ (i : Natural). successor(i) ≤ successor(p)
+          : ∀ (i : Natural). i < successor(p)
             → a(i) * Real.partialSum(b, Natural.monus(p, i))
                   + a(i) * b(Natural.monus(p, i))
               = a(i) * Real.partialSum(b, Natural.monus(successor(p), i))
-          by (i : Natural) (iBelow : successor(i) ≤ successor(p)) ↦ {
+          by (i : Natural) (iLessThan : i < successor(p)) ↦ {
+               claim iBelow : successor(i) ≤ successor(p) by Natural.successor_le_of_lt;
                claim i ≤ p since Natural.successor_le_cancel;
                claim monusStep
                    : Natural.monus(successor(p), i)
@@ -485,13 +487,14 @@ theorem Real.cauchy_product_difference_bound (a b : Natural → Real) (n : Natur
              Real.partialSum((k : Natural) ↦ abs(b(k)), n), n);
   -- Each weighted window of B is dominated by the weighted window of Babs.
   claim termBound
-      : ∀ (i : Natural). successor(i) ≤ n
+      : ∀ (i : Natural). i < n
         → abs(a(i) * Real.partialSum(b, n)
                   - a(i) * Real.partialSum(b, Natural.monus(n, i)))
           ≤ abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
             - abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
                   Natural.monus(n, i))
-      by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
+      by (i : Natural) (iLessThan : i < n) ↦ {
+           claim iBelow : successor(i) ≤ n by Natural.successor_le_of_lt;
            claim i ≤ n since Natural.less_or_equal_predecessor_less_or_equal;
            obtain ⟨e, nSplit⟩ from Natural.subtraction_witness(i, n, (i ≤ n));
            claim nJoin : i + e = n;
@@ -768,12 +771,13 @@ theorem Real.cauchy_product_converges
             * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
       by (n : Natural) ↦ {
            claim weightedWindowBelow
-               : ∀ (i : Natural). successor(i) ≤ n
+               : ∀ (i : Natural). i < n
                  → abs(a(i))
                        * Real.partialSum((k : Natural) ↦ abs(b(k)),
                              Natural.monus(n, i))
                    ≤ abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
-               by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
+               by (i : Natural) (iLessThan : i < n) ↦ {
+                    claim iBelow : successor(i) ≤ n by Natural.successor_le_of_lt;
                     claim i ≤ n
                         since Natural.less_or_equal_predecessor_less_or_equal;
                     obtain ⟨e, nSplit⟩
@@ -930,12 +934,13 @@ theorem Real.cauchy_product_converges
                 n + n)
       by (n : Natural) ↦ {
            claim stretchedWindow
-               : ∀ (i : Natural). successor(i) ≤ n
+               : ∀ (i : Natural). i < n
                  → abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
                    ≤ abs(a(i))
                      * Real.partialSum((k : Natural) ↦ abs(b(k)),
                            Natural.monus(n + n, i))
-               by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
+               by (i : Natural) (iLessThan : i < n) ↦ {
+                    claim iBelow : successor(i) ≤ n by Natural.successor_le_of_lt;
                     claim i ≤ n
                         since Natural.less_or_equal_predecessor_less_or_equal;
                     obtain ⟨e, nSplit⟩
