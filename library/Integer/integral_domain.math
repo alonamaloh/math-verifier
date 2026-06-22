@@ -202,32 +202,29 @@ theorem Integer.absolute_value_nonzero
   absurd(xNonzero(x = Integer.zero))
 }
 
--- A successor-natural image is a valid (nonzero) denominator: the common
--- case for denominators built from positive naturals.
-theorem Integer.from_natural_successor_nonzero (k : Natural)
-        : (successor(k) : Integer) ≠ Integer.zero := {
-  suppose (successor(k) : Integer) = Integer.zero as castZero;
-  calc ((successor(k) : Natural) : Integer)
+-- The image of a nonzero natural is a valid (nonzero) denominator: the
+-- common case for denominators built from positive naturals.
+theorem Integer.from_natural_nonzero (k : Natural) (nonzero : ¬(k = 0))
+        : (k : Integer) ≠ Integer.zero := {
+  suppose (k : Integer) = Integer.zero as castZero;
+  calc ((k : Natural) : Integer)
      = Integer.zero
      = ((0 : Natural) : Integer);
-  claim successor(k) = (0 : Natural) since Natural.to_integer.injective;
-  absurd(successor(k) = (0 : Natural))
+  claim kZero : k = (0 : Natural) since Natural.to_integer.injective;
+  nonzero(kZero)
 }
 
--- Same fact stated in `1 + n` form, so consumers never need to spell
--- `successor` in fraction denominators. (`Natural.add` is opaque, so
--- `1 + k` is not definitionally `successor(k)`; bridge via `Natural.one_add`.)
+-- The same fact in `1 + n` form, so consumers never need to spell the
+-- constructor in fraction denominators (`1 + k` is never zero — its left
+-- summand `1` is not).
 theorem Integer.one_plus_natural_nonzero (k : Natural)
         : ((1 + k) : Integer) ≠ Integer.zero := {
-  suppose ((1 + k) : Integer) = Integer.zero as castZero;
-  calc ((1 + k) : Integer)
-     = Integer.zero
-     = ((0 : Natural) : Integer);
-  claim 1 + k = (0 : Natural) since Natural.to_integer.injective;
-  calc successor(k)
-     = 1 + k          since Natural.one_add
-     = (0 : Natural);
-  absurd(successor(k) = (0 : Natural))
+  claim ¬((1 + k : Natural) = 0)
+      by (isZero : (1 + k : Natural) = 0) ↦ {
+           claim oneZero : (1 : Natural) = 0 since Natural.add_eq_zero_left_zero;
+           absurd(oneZero)
+         };
+  done by Integer.from_natural_nonzero
 }
 
 -- The `k + 1` form of the nonzero-denominator fact, for StrictPositiveRational

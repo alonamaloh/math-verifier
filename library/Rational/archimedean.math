@@ -89,7 +89,9 @@ theorem Rational.successor_cast (n : Natural)
   -- (successor n : Integer) no longer folds to Integer.one + (n : Integer)
   -- on its own (Natural.add opaque); bridge it, then split the cast.
   calc (successor(n) : Rational)
-     = ((Integer.one + (n : Integer)) : Rational)                          by substituting Natural.to_integer.successor_preserves
+     = ((n + 1 : Natural) : Rational)                                      by substituting Natural.add_one
+     = (((n : Integer) + Integer.one) : Rational)                          by substituting Natural.to_integer.add_one_preserves
+     = ((Integer.one + (n : Integer)) : Rational)                          by substituting (ring : (n : Integer) + Integer.one = Integer.one + (n : Integer))
      = ((Integer.one : Integer) : Rational) + ((n : Integer) : Rational)   by Integer.to_rational.add_preserves
      = (1 : Rational) + (n : Rational)
 
@@ -115,9 +117,11 @@ theorem Rational.successor_successor_cast (n : Natural)
   {
     claim castSuccessorSuccessor : (successor(successor(n)) : Integer) = Integer.one + Integer.one + (n : Integer)
         by calc (successor(successor(n)) : Integer)
-              = Integer.one + (successor(n) : Integer)              by Natural.to_integer.successor_preserves
-              = Integer.one + (Integer.one + (n : Integer))         by substituting Natural.to_integer.successor_preserves
-              = Integer.one + Integer.one + (n : Integer)           by ring;
+              = ((successor(n) + 1 : Natural) : Integer)            by substituting Natural.add_one
+              = (successor(n) : Integer) + Integer.one             by Natural.to_integer.add_one_preserves
+              = ((n + 1 : Natural) : Integer) + Integer.one        by substituting Natural.add_one
+              = ((n : Integer) + Integer.one) + Integer.one        by substituting Natural.to_integer.add_one_preserves
+              = Integer.one + Integer.one + (n : Integer)          by ring;
     calc (successor(successor(n)) : Rational)
        = ((Integer.one + Integer.one + (n : Integer)) : Rational)            by substituting castSuccessorSuccessor
        = ((Integer.one + Integer.one : Integer) : Rational) + (n : Rational) by Integer.to_rational.add_preserves
