@@ -29,20 +29,23 @@ overload max := Natural.maximum
 
 theorem Natural.left_le_max (a : Natural)
         : ∀ (b : Natural). a ≤ Natural.maximum(a, b) :=
+  unfold Natural.add in
   by_induction on a with IH {
-    case zero: {
+    case base: {
         -- max(0, b) ≡ b, and zero is least.
         take b : Natural;
         done by Natural.zero_least
       }
-    case successor(k): {
+    case step(k): {
         take b : Natural;
-        cases b {
-          | zero =>
-              -- max(s(k), 0) ≡ s(k).
+        -- Under the unfold, 1 + k reduces to the raw constructor and max
+        -- ι-reduces; split b.
+        by_induction on b with innerIH {
+          case base:
+              -- max(1 + k, 0) ≡ 1 + k.
               done
-          | successor(m) => {
-              -- max(s(k), s(m)) ≡ s(max(k, m)); successor-monotone on the IH.
+          case step(m): {
+              -- max(1 + k, 1 + m) ≡ 1 + max(k, m); monotone on the IH.
               claim k ≤ Natural.maximum(k, m) since IH(m);
               done by Natural.successor_less_or_equal_successor
             }
@@ -53,20 +56,21 @@ theorem Natural.left_le_max (a : Natural)
 -- b ≤ max(a, b). Symmetric induction.
 theorem Natural.right_le_max (a : Natural)
         : ∀ (b : Natural). b ≤ Natural.maximum(a, b) :=
+  unfold Natural.add in
   by_induction on a with IH {
-    case zero: {
+    case base: {
         -- max(0, b) ≡ b.
         take b : Natural;
         done
       }
-    case successor(k): {
+    case step(k): {
         take b : Natural;
-        cases b {
-          | zero =>
-              -- max(s(k), 0) ≡ s(k); 0 is least.
+        by_induction on b with innerIH {
+          case base:
+              -- max(1 + k, 0) ≡ 1 + k; 0 is least.
               done by Natural.zero_least
-          | successor(m) => {
-              -- max(s(k), s(m)) ≡ s(max(k, m)); successor-monotone on the IH.
+          case step(m): {
+              -- max(1 + k, 1 + m) ≡ 1 + max(k, m); monotone on the IH.
               claim m ≤ Natural.maximum(k, m) since IH(m);
               done by Natural.successor_less_or_equal_successor
             }
