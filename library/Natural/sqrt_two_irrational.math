@@ -59,14 +59,16 @@ theorem Natural.no_double_square (m : Natural)
     obtain ⟨k, subjectEquation⟩ from twoDividesSubject;
 
     -- k ≥ 1, since otherwise subject = 2·0 = 0 would contradict subject ≥ 1.
-    let kPositive : 1 ≤ k :=
-        cases k with kIsZero {
-          | zero => { absurd(calc successor(0) ≤ subject = 2 * k = 2 * 0 = 0) }
-          | successor(predecessor) => {
-              claim 1 ≤ successor(predecessor) by Natural.successor_positive;
-              done by substituting kIsZero
-            }
-        };
+    let kPositive : 1 ≤ k := {
+        claim k ≠ 0
+            by (kIsZero : k = 0) ↦
+                 absurd(calc (1 : Natural)
+                           ≤ subject   by subjectPositive
+                           = 2 * k     by subjectEquation
+                           = 2 * 0     by substituting kIsZero
+                           = 0         by ring);
+        done by Natural.one_le_of_nonzero
+      };
 
     -- Substituting subject = 2·k and cancelling the leading 2 leaves
     -- n² = 2·k² — a strictly smaller instance of the same equation.
