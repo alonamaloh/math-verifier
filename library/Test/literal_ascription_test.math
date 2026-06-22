@@ -8,6 +8,7 @@
 module Test.literal_ascription_test
 
 import Logic.basics
+import Logic.product
 import Equality.basics
 import Natural.basics
 import Natural.peano
@@ -52,3 +53,23 @@ theorem rational_one_plus_zero_via_ring
 theorem compound_ascription_still_works (d : Natural)
         : ((1 + d) : Integer) = Natural.to_integer(1 + d) :=
   reflexivity(Integer, Natural.to_integer(1 + d))
+
+-- (5) `(x : T)` is a CAST: the inner expression's type is synthesized
+-- bottom-up and the RESULT is coerced — the target type is never
+-- pushed into an operator's operands. So `(n + 1 : Integer)` with a
+-- Natural VARIABLE on the left resolves `+` from `n`'s Natural type
+-- (giving `to_integer(n + 1)`), not Integer's `+`. (Earlier, the
+-- target type was unified into the left operand; only a bare literal
+-- on the left — which ignores expectations — was safe.)
+theorem variable_left_ascription (n : Natural)
+        : ((n + 1) : Integer) = Natural.to_integer(n + 1) :=
+  reflexivity(Integer, Natural.to_integer(n + 1))
+
+-- (6) The operand may be a projection whose component type is fixed by
+-- an unrelated parameter. The `: Integer` must NOT unify that operand
+-- with Integer — doing so used to force `Product(Natural, Natural)` to
+-- `Product(Natural, Integer)` and fail.
+theorem projection_left_ascription (p : Product(Natural, Natural))
+        : ((Product.second(p) + 1) : Integer)
+          = Natural.to_integer(Product.second(p) + 1) :=
+  reflexivity(Integer, Natural.to_integer(Product.second(p) + 1))

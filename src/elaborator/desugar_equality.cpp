@@ -76,22 +76,17 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             return call;
         }
         // Use the outer expected type as a hint for the LEFT operand
-        // only when it's a Constant head — e.g. `Rational`, `Integer`,
-        // `Real`, `PAdic`. For arithmetic operators like `+`, `*`,
-        // `-`, the result type equals the operand type, so the hint
-        // is exactly the operand type. For `≤`, `<`, etc. the result
-        // type is `Proposition` (a Sort, not a Constant), so the
-        // guard skips them. Lets short-form `Quotient.class_of(rep)` fire
-        // on the LEFT of a homogeneous operator when the outer
-        // context provides the carrier head.
-        ExpressionPointer leftExpectedType = nullptr;
-        if (expectedType
-            && std::holds_alternative<Constant>(expectedType->node)) {
-            leftExpectedType = expectedType;
-        }
+        // The LEFT operand is elaborated WITHOUT any expected type: a data
+        // operator's operand types are synthesized bottom-up, so the
+        // operator (`+`, `*`, `≤`, …) is selected from the operands' own
+        // types and NEVER from an enclosing context. In particular an outer
+        // cast like `(expr + 1 : Integer)` does not push `Integer` into
+        // `expr` — it elaborates `expr + 1` in its own type and coerces the
+        // *result*. This keeps a data expression's type independent of
+        // context. (The left operand's actual type is still propagated to
+        // the RIGHT operand below, since the operator is homogeneous.)
         ExpressionPointer leftKernel =
-            elaborateExpression(leftSurface, localBinders,
-                                 leftExpectedType);
+            elaborateExpression(leftSurface, localBinders);
         // Determine the operand type by inferring the type of the left
         // operand. Check the raw inferred type first: if a binder was
         // declared with a named type like `Integer` (which δ-reduces
