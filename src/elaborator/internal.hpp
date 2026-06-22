@@ -1095,6 +1095,20 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // The `refining` counterpart of `elaborateByInductionOnePlus`: revert
+    // the named in-scope hypotheses into the goal (Π over their types),
+    // wrap each `case base:` / `case step(k):` body in matching lambdas,
+    // run the plain `1 + n` induction at the reverted goal, then apply the
+    // actual hypotheses — so a hypothesis depending on the induction
+    // variable is refined per case (at `0` in base, `1 + k` in step, `k`
+    // in the IH), mirroring the legacy `elaborateByInductionUsingReverted`.
+    ExpressionPointer elaborateByInductionOnePlusReverted(
+        const SurfaceCases& cases,
+        const std::vector<std::string>& refiningNames,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
     // Step 2 of the structured-proof feature. Elaborates
     // `claim P [by Hint]` (and the bare-claim trailing form, where
     // the goal is the surrounding expectedType). Auto-fills the

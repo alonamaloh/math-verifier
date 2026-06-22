@@ -450,6 +450,83 @@ ExpressionPointer Elaborator::elaborateByInductionUsingInner(
         return application;
     }
 
+ExpressionPointer Elaborator::elaborateByInductionOnePlusReverted(
+        const SurfaceCases& cases,
+        const std::vector<std::string>& refiningNames,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "by_induction (1+n) refining at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "by_induction needs an expected type from context");
+        }
+        int total = static_cast<int>(localBinders.size());
+        int count = static_cast<int>(refiningNames.size());
+        // Resolve each refining name to its outer BoundVariable index and its
+        // type lifted to the outer (depth = total) scope — exactly as the
+        // legacy `elaborateByInductionUsingReverted` does for the recursor.
+        std::vector<int> boundVariableIndices;
+        std::vector<ExpressionPointer> typesAtOuterDepth;
+        for (const auto& name : refiningNames) {
+            int positionInArray = -1;
+            for (int i = total - 1; i >= 0; --i) {
+                if (localBinders[i].name == name) {
+                    positionInArray = i;
+                    break;
+                }
+            }
+            if (positionInArray < 0) {
+                throwElaborate(
+                    "by_induction ... refining " + name
+                    + ": no binder named '" + name + "' in scope");
+            }
+            boundVariableIndices.push_back(total - 1 - positionInArray);
+            typesAtOuterDepth.push_back(liftBoundVariables(
+                localBinders[positionInArray].type,
+                total - positionInArray, 0));
+        }
+        // Reverted goal: Π(h_1)…Π(h_k). Goal, abstracting each hypothesis
+        // (innermost-first) so earlier ones resolve to the new Π binders.
+        ExpressionPointer revertedGoal = expectedType;
+        for (int i = count - 1; i >= 0; --i) {
+            revertedGoal = abstractOverBoundVariable(
+                revertedGoal, boundVariableIndices[i]);
+            revertedGoal = makePi(refiningNames[i],
+                typesAtOuterDepth[i], std::move(revertedGoal));
+        }
+        // Wrap each `case base:` / `case step(k):` body in
+        // `function (h_1) … (h_k) => body`, and clear refiningNames so the
+        // inner one-plus elaboration sees a plain induction at the reverted
+        // goal. The motive becomes `λn. Π h(n). goal(n)`, so the step's
+        // `IH : motive(k)` is a function expecting the refined hypothesis —
+        // matching how such proofs apply it (`IH(prefixBounded)`).
+        SurfaceCases reverted = cases;
+        reverted.refiningNames.clear();
+        for (auto& clause : reverted.clauses) {
+            SurfaceExpressionPointer wrappedBody = clause.body;
+            for (int i = count - 1; i >= 0; --i) {
+                SurfaceBinder binder;
+                binder.names = {refiningNames[i]};
+                binder.type = nullptr;
+                binder.isImplicit = false;
+                wrappedBody = makeSurfaceLambda(
+                    std::move(binder), std::move(wrappedBody), line, column);
+            }
+            clause.body = std::move(wrappedBody);
+        }
+        ExpressionPointer result = elaborateByInductionOnePlus(
+            reverted, localBinders, revertedGoal, line, column);
+        // Apply the actual hypotheses to unwind the Π chain back to Goal.
+        for (int i = 0; i < count; ++i) {
+            result = makeApplication(std::move(result),
+                makeBoundVariable(boundVariableIndices[i]));
+        }
+        (void)column;
+        return result;
+    }
+
 ExpressionPointer Elaborator::elaborateByInductionOnePlus(
         const SurfaceCases& cases,
         const std::vector<LocalBinder>& localBinders,

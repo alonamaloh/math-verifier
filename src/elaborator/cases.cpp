@@ -989,6 +989,11 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                 }
             }
             if (usesOnePlusVocabulary) {
+                if (!cases.refiningNames.empty()) {
+                    return elaborateByInductionOnePlusReverted(
+                        cases, cases.refiningNames, localBinders,
+                        expectedType, line, column);
+                }
                 return elaborateByInductionOnePlus(
                     cases, localBinders, expectedType, line, column);
             }

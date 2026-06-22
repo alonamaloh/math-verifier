@@ -7,6 +7,7 @@ module Test.one_plus_induction_test
 
 import Natural.basics
 import Natural.arithmetic
+import Natural.order
 import Natural.one_plus_induction
 import Equality.basics
 import Logic.basics
@@ -34,6 +35,22 @@ theorem Test.pi_goal_one_plus (n : Natural) : ∀ (k : Natural). k = k :=
   by_induction on n with IH {
     case base:    (k : Natural) ↦ done
     case step(p): (k : Natural) ↦ done
+  }
+
+-- `refining` with the `1 + n` form: the named hypothesis (whose type
+-- mentions the induction variable) is reverted into the motive, so it is
+-- refined per case — `∀ j. j < 0 → P(j)` in base, `∀ j. j < 1 + k → P(j)`
+-- in step — and the IH becomes a function expecting it. Before the refining
+-- port to `induction_on_one_plus`, the hypothesis stayed pinned at the
+-- original `n`, so `case step`'s body failed to typecheck against the goal.
+theorem Test.refining_one_plus
+        (P : Natural → Proposition)
+        (n : Natural)
+        (hypothesis : ∀ (j : Natural). j < n → P(j))
+        : ∀ (j : Natural). j < n → P(j) :=
+  by_induction on n with IH refining hypothesis {
+    case base:    hypothesis
+    case step(k): hypothesis
   }
 
 -- Regression: a parametric goal `P(k)` (a bound-variable-headed
