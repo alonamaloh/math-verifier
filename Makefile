@@ -285,7 +285,7 @@ leak-ratchet:
 # `successor` is the Natural constructor; outside the Natural/ definitional
 # modules it is leakage — speak `n + 1` / numerals. Re-armed at the measured
 # total; the ratchet only stops growth, the cone refactor drives it down.
-SUCCESSOR_BUDGET ?= 2179
+SUCCESSOR_BUDGET ?= 2166
 
 successor-ratchet:
 	@scripts/cic_leak_report --successor-max $(SUCCESSOR_BUDGET)
