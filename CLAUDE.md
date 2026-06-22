@@ -40,10 +40,10 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   `docs/conventions/algebra-tactics.md`.
 - **Line width: wrap at column 140**, and only when the line genuinely
   needs it — wrapped lines have their own readability cost.
-- **Numeric literals & `1 + n`.** Prefer `0`/`1`/`2` over
-  `zero`/`successor(zero)`/`two`, and `1 + n` over `successor(n)` in
-  expressions (both kernel-defeq). Exceptions and the pattern-position
-  caveat: `docs/conventions/numerals-and-naming.md`.
+- **Numeric literals.** Prefer `0`/`1`/`2` over
+  `zero`/`successor(zero)`/`two` (kernel-defeq). No house preference on
+  `1 + n` vs `n + 1` — write whichever reads naturally (mathematicians
+  usually write `n + 1`). See `docs/conventions/numerals-and-naming.md`.
 
 ## Documentation (`docs/`)
 

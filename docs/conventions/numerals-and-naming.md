@@ -22,58 +22,54 @@ modern screens display 140-column lines without effort. Wrap when
 the line genuinely needs it (a multi-argument function call where
 each arg is itself complex), not because of a column limit.
 
-## Prefer `1 + n` over `successor(n)` in expressions
+## `successor(n)`, `1 + n`, and `n + 1`
 
-`successor(n)` is the Peano constructor; `1 + n` is the same value in
-the carrier's `+`. They are definitionally equal (kernel reduces
-`1 + n = successor(0) + n = successor(0 + n) = successor(n)`), so they
-typecheck interchangeably wherever an EXPRESSION is expected. The `1 + n`
-form reads as math; `successor(...)` reads as bureaucracy.
+`successor(n)` is the Peano constructor; `1 + n` and `n + 1` are the same
+value written with the carrier's `+`. **There is no house preference among
+them** — write whichever reads most naturally (mathematicians usually write
+`n + 1`). The points below are about *mechanics*, not style.
 
-Same applies to deeper successors: prefer `2 + n` over
-`successor(successor(n))`, and `n + 1` is fine when it parses more
-naturally (commutativity is also definitional via `add_commutative` but
-even better, the kernel reduces either form to the constructor chain).
+**They are only propositionally equal, not defeq.** `Natural.add` is
+`opaque`, so the kernel does NOT silently reduce `1 + n` to `successor(n)`.
+The bridge is the lemma `Natural.one_add : 1 + n = successor(n)` (and
+`ring` / `add_commutative` to move between `1 + n` and `n + 1`). Under an
+explicit `unfold Natural.add`, `1 + n` *does* reduce to `successor(n)` —
+but `n + 1` does not, because `add` recurses on its FIRST argument.
 
-A goal stated as `1 ≤ successor(k)` reads better as `1 ≤ 1 + k` or just
-`1 ≤ k + 1`. The corresponding helper `Natural.successor_positive`
-proves it either way.
+This left/right asymmetry is intrinsic to structural recursion and is the
+thing to actually watch: `0 + a ≡ a` is one ι-step but `a + 0 = a` needs
+induction; `successor(k) + b` and `1 + k` reduce, `k + 1` is stuck. **Keep
+any reasoning that leans on it (anything needing `unfold Natural.add` /
+`unfold Natural.multiply`) inside the `Natural/` floor.** Above that floor,
+go through lemmas / `ring` so the asymmetry is invisible — e.g. both
+`t + 0 = t` and `0 + t = t` are just `:= ring`. Opacity + `ring` are
+exactly what make the prover see no difference between the two forms; a
+non-foundational proof that has to `unfold` add to compute is a smell.
 
 **Exception: patterns.** Pattern positions (`| successor(k) => ...`)
-require the bare constructor — the parser doesn't accept `1 + k` there.
-Companion memory: [[prefer_numeric_literals]] covers the related
-`0`/`1`/`2` over `zero`/`successor(zero)`/`two` rule.
+require the bare constructor — the parser accepts neither `1 + k` nor
+`k + 1` there. Companion memory: [[prefer_numeric_literals]] covers the
+related `0`/`1`/`2` over `zero`/`successor(zero)`/`two` rule (that one *is*
+still a preference).
 
-**When `successor(n)` wins anyway.** Two situations where the
-substitution makes the proof *harder* to read, learned the hard way:
+**Where `successor(n)` reads best.** Two cases, learned the hard way:
 
-- **Structural reduction sites.** `Natural.add` and `Natural.multiply`
-  are defined by recursion on the `successor` constructor of the first
-  argument, so `successor(k) + b ≡ successor(k + b)` and
-  `d * successor(q) ≡ d + d * q` are definitional reductions the
-  kernel will perform. Rewrite-matchers and calc-step matchers see the
-  `successor(...)` form structurally, but they don't always see the
-  reduced form behind `1 + k`. Concretely: in
-  `library/Natural/arithmetic.math:60` (`add_commutative`'s successor
-  case), the calc starts at the REDUCED form `successor(predecessor + b)`
-  precisely so a downstream rewrite can find `predecessor + b` as a
-  subterm. Writing `(1 + predecessor) + b` instead breaks that.
-  Foundational Natural arithmetic files (`basics`, `peano`,
-  `arithmetic`, plus `divide`, `divides_subtract`, `divisibility`,
-  `power`) keep `successor(...)` for this reason.
+- **Structural reduction sites in foundational files.** `Natural.add` and
+  `Natural.multiply` reduce on the `successor` constructor of the first
+  argument (`successor(k) + b ≡ successor(k + b)`,
+  `d * successor(q) ≡ d + d * q`). Rewrite/calc matchers see the
+  `successor(...)` form structurally but not always the reduced form
+  behind `1 + k`. In `library/Natural/arithmetic.math` (`add_commutative`'s
+  successor case) the calc starts at the reduced `successor(predecessor + b)`
+  precisely so a downstream rewrite finds `predecessor + b` as a subterm;
+  `(1 + predecessor) + b` would hide it. This is fine — it lives on the
+  `Natural/` floor where the constructor belongs.
 
-- **Structural-atom slots.** When `successor(n)` appears uniformly as a
-  "positive successor" atom (e.g. positive denominator in Rational
-  cross-multiplication), `(succ(d) : Integer)` reads as one concept —
-  "the *d*th positive denominator." `((1 + d) : Integer)` adds an
-  extra paren pair (the inner one is forced by `+`'s precedence under
-  type ascription) and makes the reader parse a sum before recognising
-  the slot. Saw this on `Rational/basics.math:transitive_natural`
-  where the substitution made the proof noticeably noisier.
-
-Rule of thumb: prefer `1 + n` when the `+1` is doing arithmetic work
-the reader cares about (`1 ≤ 1 + k`, `1 + k = succ(k)` reductions).
-Keep `successor(n)` when it's a structural placeholder.
+- **Structural-atom slots.** When `successor(n)` is a "positive successor"
+  atom (e.g. a positive denominator in Rational cross-multiplication),
+  `(successor(d) : Integer)` reads as one concept — "the *d*th positive
+  denominator." `((1 + d) : Integer)` adds a paren pair and makes the
+  reader parse a sum first (saw this on `Rational/basics.math`).
 
 ## Bind a repeated cast with `let`, don't re-ascribe it
 
