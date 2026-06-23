@@ -65,16 +65,16 @@ theorem Real.multiply_positive (x y : Real)
   -- force y = 0, against 0 < y.
   claim zeroNotProduct : ¬(Real.zero = x * y)
       by (zeroEqualsProduct : Real.zero = x * y) ↦ {
-           claim xNotZero : ¬(x = Real.zero);
-           obtain ⟨inverseX, inverseProperty⟩
-               from Real.reciprocal_exists_for_nonzero(x, xNotZero);
-           claim y = Real.zero
-               by calc y
-                     = Real.one * y
-                     = (x * inverseX) * y     since inverseProperty
-                     = inverseX * (x * y)
-                     = inverseX * Real.zero   since zeroEqualsProduct
-                     = Real.zero;
+           claim ¬(x = Real.zero);
+           claim inverseExists : ∃ (inverseX : Real). x * inverseX = Real.one
+               since Real.reciprocal_exists_for_nonzero;
+           choose inverseX as inverseProperty from inverseExists;
+           calc y
+              = Real.one * y
+              = (x * inverseX) * y     since inverseProperty
+              = inverseX * (x * y)
+              = inverseX * Real.zero   since zeroEqualsProduct
+              = Real.zero;
            claim zeroNotY : ¬(Real.zero = y) since Real.LessThan.distinct;
            zeroNotY(calc Real.zero = y)
          };
@@ -91,47 +91,43 @@ definition Real.midpoint (x y : Real) : Real :=
 -- ½ + ½ = 1 identity feeds linear_combination for the algebra.
 theorem Real.midpoint_between (x y : Real) (xLessY : x < y)
         : x < Real.midpoint(x, y) ∧ Real.midpoint(x, y) < y := {
-  claim halfSum
-        : (Rational.one_half : Real) + (Rational.one_half : Real)
-          = (Rational.one : Real)
-      by calc (Rational.one_half : Real) + (Rational.one_half : Real)
-            = ((Rational.one_half + Rational.one_half : Rational) : Real)
-            = (Rational.one : Real)
-                  by Rational.one_half_doubled;
+  calc (Rational.one_half : Real) + (Rational.one_half : Real)
+     = ((Rational.one_half + Rational.one_half : Rational) : Real)
+     = (Rational.one : Real)
+           by Rational.one_half_doubled
+     as halfSum;
   claim Rational.zero < Rational.one_half
       since Rational.one_half_positive;
   claim Real.zero < (Rational.one_half : Real)
       since Rational.to_real.positive_preserves;
-  claim Real.zero < y - x
-      by calc Real.zero
-            = x - x
-            < y - x    by Real.add_preserves_LessThan;
+  calc Real.zero
+     = x - x
+     < y - x    since Real.add_preserves_LessThan;
   claim Real.zero < (y - x) * (Rational.one_half : Real)
       since Real.multiply_positive;
-  claim lowerPart : x < Real.midpoint(x, y)
-      by calc x
-            = x + Real.zero      by ring
-            < x + (y - x) * (Rational.one_half : Real)
-                  by Real.add_left_preserves_LessThan
-            = (x + y) * (Rational.one_half : Real)
-                  by linear_combination(x - x * halfSum);
-  claim -((y - x) * (Rational.one_half : Real)) < Real.zero
-      by calc -((y - x) * (Rational.one_half : Real))
-            = Real.zero - (y - x) * (Rational.one_half : Real)
-                  by ring
-            < (y - x) * (Rational.one_half : Real)
-                  - (y - x) * (Rational.one_half : Real)
-                  by Real.add_preserves_LessThan
-            = Real.zero    by ring;
-  claim upperPart : Real.midpoint(x, y) < y
-      by calc (x + y) * (Rational.one_half : Real)
-            = y - (y - x) * (Rational.one_half : Real)
-                  by linear_combination(y * halfSum - y)
-            = -((y - x) * (Rational.one_half : Real)) + y
-                  by ring
-            < Real.zero + y
-                  by Real.add_preserves_LessThan
-            = y    by ring;
+  calc x
+     = x + Real.zero
+     < x + (y - x) * (Rational.one_half : Real)
+           by Real.add_left_preserves_LessThan
+     = (x + y) * (Rational.one_half : Real)
+           by linear_combination(x - x * halfSum)
+     = Real.midpoint(x, y)
+     as lowerPart;
+  calc -((y - x) * (Rational.one_half : Real))
+     = Real.zero - (y - x) * (Rational.one_half : Real)
+     < (y - x) * (Rational.one_half : Real)
+           - (y - x) * (Rational.one_half : Real)
+           since Real.add_preserves_LessThan
+     = Real.zero;
+  calc Real.midpoint(x, y)
+     = (x + y) * (Rational.one_half : Real)
+     = y - (y - x) * (Rational.one_half : Real)
+           by linear_combination(y * halfSum - y)
+     = -((y - x) * (Rational.one_half : Real)) + y
+     < Real.zero + y
+           since Real.add_preserves_LessThan
+     = y
+     as upperPart;
   And.introduction(lowerPart, upperPart)
 }
 
@@ -140,16 +136,15 @@ theorem Real.midpoint_between (x y : Real) (xLessY : x < y)
 theorem Real.LessThan.multiply_by_positive_right
         (a b c : Real) (aLessB : a < b) (cPositive : Real.zero < c)
         : a * c < b * c := {
-  claim Real.zero < b - a
-      by calc Real.zero
-            = a - a    by ring
-            < b - a    by Real.add_preserves_LessThan;
+  calc Real.zero
+     = a - a
+     < b - a    since Real.add_preserves_LessThan;
   claim Real.zero < (b - a) * c since Real.multiply_positive;
   claim Real.zero < b * c - a * c
       by substituting (ring : b * c - a * c = (b - a) * c);
   calc a * c
-     = Real.zero + a * c           by ring
-     < (b * c - a * c) + a * c     by Real.add_preserves_LessThan
+     = Real.zero + a * c
+     < (b * c - a * c) + a * c     since Real.add_preserves_LessThan
      = b * c                       by ring
 }
 
@@ -159,12 +154,13 @@ theorem Real.right_factor_zero_of_product_zero (x y : Real)
         (productZero : x * y = Real.zero)
         (xNonzero : ¬(x = Real.zero))
         : y = Real.zero := {
-  obtain ⟨inverseX, inverseProperty⟩
-      from Real.reciprocal_exists_for_nonzero(x, xNonzero);
+  claim inverseExists : ∃ (inverseX : Real). x * inverseX = Real.one
+      since Real.reciprocal_exists_for_nonzero;
+  choose inverseX as inverseProperty from inverseExists;
   calc y
      = Real.one * y
      = (x * inverseX) * y     since inverseProperty
-     = inverseX * (x * y)     by ring
+     = inverseX * (x * y)
      = inverseX * Real.zero   since productZero
      = Real.zero
 }
@@ -180,13 +176,12 @@ theorem Real.nonneg_of_multiply_nonneg (c x : Real)
     | no notNonneg => {
         claim x < Real.zero
             since Real.LessThan_of_not_LessOrEqual;
-        claim scaled : x * c < Real.zero * c
+        claim x * c < Real.zero * c
             since Real.LessThan.multiply_by_positive_right;
-        claim c * x < Real.zero
-            by calc c * x
-                  = x * c           by ring
-                  < Real.zero * c   by scaled
-                  = Real.zero       by ring;
+        calc c * x
+           = x * c
+           < Real.zero * c
+           = Real.zero;
         claim Real.zero < Real.zero
             since Real.LessThan.transitive_left;
         claim notSelfEqual : ¬(Real.zero = Real.zero)
@@ -201,18 +196,14 @@ theorem Real.LessOrEqual.multiply_cancel_left_positive
         (cPositive : Real.zero < c)
         (scaledLeq : c * x ≤ c * y)
         : x ≤ y := {
-  claim differenceNonneg : Real.zero ≤ c * y - c * x
-      by calc Real.zero
-            = c * x - c * x    by ring
-            ≤ c * y - c * x    by Real.add_preserves_LessOrEqual;
-  claim Real.zero ≤ c * (y - x)
-      by calc Real.zero
-            ≤ c * y - c * x    by differenceNonneg
-            = c * (y - x)      by ring;
+  calc Real.zero
+     = c * x - c * x
+     ≤ c * y - c * x    since Real.add_preserves_LessOrEqual
+     = c * (y - x);
   claim Real.zero ≤ y - x
       since Real.nonneg_of_multiply_nonneg;
   calc x
-     = Real.zero + x       by ring
-     ≤ (y - x) + x         by Real.add_preserves_LessOrEqual
-     = y                   by ring
+     = Real.zero + x
+     ≤ (y - x) + x         since Real.add_preserves_LessOrEqual
+     = y
 }
