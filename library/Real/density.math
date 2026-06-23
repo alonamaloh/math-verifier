@@ -51,16 +51,34 @@ theorem Real.exists_positive_rational_below
         -- A positive real's representative is not equivalent to the
         -- zero sequence (the quotient bridge closes this from the
         -- refined xPositive), so it is eventually one-sided.
-        claim notEquivalentToZero
-              : ¬CauchyEquivalent(
-                    CauchyRationalSequence.make(seq, seqCauchy),
-                    Rational.to_cauchy_constant(Rational.zero));
-        obtain ⟨lowerBound, boundData⟩
-            from Real.cauchy_sign_eventually(
-                     CauchyRationalSequence.make(seq, seqCauchy),
-                     notEquivalentToZero);
-        obtain ⟨lowerBoundPositive, signData⟩ from boundData;
-        obtain ⟨signIndex, signSplit⟩ from signData;
+        claim ¬CauchyEquivalent(
+                  CauchyRationalSequence.make(seq, seqCauchy),
+                  Rational.to_cauchy_constant(Rational.zero));
+        claim signEventually
+              : ∃ (lowerBound : Rational).
+                  Rational.zero < lowerBound ∧ ∃ (signIndex : Natural).
+                      (∀ (m : Natural). signIndex ≤ m
+                          → lowerBound
+                            ≤ CauchyRationalSequence.sequenceFunction(
+                                  CauchyRationalSequence.make(seq, seqCauchy), m))
+                      ∨ ∀ (m : Natural). signIndex ≤ m
+                          → CauchyRationalSequence.sequenceFunction(
+                                CauchyRationalSequence.make(seq, seqCauchy), m)
+                              ≤ -lowerBound
+          since Real.cauchy_sign_eventually;
+        choose lowerBound as boundData from signEventually;
+        claim Rational.zero < lowerBound;
+        claim signData
+              : ∃ (signIndex : Natural).
+                  (∀ (m : Natural). signIndex ≤ m
+                      → lowerBound
+                        ≤ CauchyRationalSequence.sequenceFunction(
+                              CauchyRationalSequence.make(seq, seqCauchy), m))
+                  ∨ ∀ (m : Natural). signIndex ≤ m
+                      → CauchyRationalSequence.sequenceFunction(
+                            CauchyRationalSequence.make(seq, seqCauchy), m)
+                          ≤ -lowerBound;
+        choose signIndex as signSplit from signData;
         cases signSplit {
           -- seq(m) ≥ lowerBound past signIndex: then (lowerBound : ℝ)
           -- ≤ x, and halve(lowerBound) is the rational we want.
@@ -80,24 +98,23 @@ theorem Real.exists_positive_rational_below
                                  by positiveTail(m, mPastSignIndex);
                              calc -epsilon
                                 < Rational.zero
-                                      by Rational.negate_LessThan_zero_of_positive(
-                                             epsilon, epsilonPositive)
+                                      since Rational.negate_LessThan_zero_of_positive
                                 ≤ seq(m) - lowerBound
                            });
-              claim halvePositive
-                    : Rational.zero < Rational.halve(lowerBound)
+              claim Rational.zero < Rational.halve(lowerBound)
                   since Rational.halve_positive;
               claim Rational.halve(lowerBound) < lowerBound
                   since Rational.halve_less_than_self;
-              witness Rational.halve(lowerBound) with
-                  ⟨halvePositive,
-                   calc (Rational.halve(lowerBound) : Real)
-                      < (lowerBound : Real)
-                            by Rational.to_real.LessThan_preserves
-                      ≤ (Quotient.class_of(
-                             CauchyRationalSequence.make(seq, seqCauchy))
-                         : Real)
-                            by lowerBoundBelowX⟩
+              witness Rational.halve(lowerBound) with {
+                  calc (Rational.halve(lowerBound) : Real)
+                     < (lowerBound : Real)
+                           since Rational.to_real.LessThan_preserves
+                     ≤ (Quotient.class_of(
+                            CauchyRationalSequence.make(seq, seqCauchy))
+                        : Real)
+                           since lowerBoundBelowX;
+                  done
+              }
             }
           -- seq(m) ≤ -lowerBound past signIndex: then x ≤ (−lowerBound
           -- : ℝ) < 0, contradicting 0 < x.
@@ -116,8 +133,7 @@ theorem Real.exists_positive_rational_below
                                  by negativeTail(m, mPastSignIndex);
                              calc -epsilon
                                 < Rational.zero
-                                      by Rational.negate_LessThan_zero_of_positive(
-                                             epsilon, epsilonPositive)
+                                      since Rational.negate_LessThan_zero_of_positive
                                 ≤ -lowerBound - seq(m)
                            });
               claim -lowerBound < Rational.zero
