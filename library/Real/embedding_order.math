@@ -49,8 +49,7 @@ theorem Rational.to_real.LessOrEqual_preserves (a b : Rational)
           calc -epsilon
              < Rational.zero
              ≤ b + -a
-                  by Rational.LessOrEqual_zero_of_IsNonneg(
-                         b + -a, aLessOrEqualB))
+                  since Rational.LessOrEqual_zero_of_IsNonneg)
 
 -- ----------------------------------------------------------------------
 -- Strict order. The weak part is above; distinctness is the embedding's
@@ -63,10 +62,10 @@ theorem Rational.to_real.LessThan_preserves (a b : Rational)
   claim a ≤ b since Rational.LessThan.weaken;
   claim lessOrEqualPart : (a : Real) ≤ (b : Real)
       since Rational.to_real.LessOrEqual_preserves;
-  claim gapPositive : Rational.zero < b - a
-      by calc Rational.zero
-            = a + -a   by ring
-            < b + -a   by Rational.add_preserves_LessThan;
+  calc Rational.zero
+     = a + -a
+     < b + -a   since Rational.add_preserves_LessThan
+    as gapPositive;
   claim notEqualPart : ¬((a : Real) = (b : Real))
       by (coercedEqual : (a : Real) = (b : Real)) ↦ {
           -- Equal classes mean equivalent constant representatives.
@@ -74,16 +73,21 @@ theorem Rational.to_real.LessThan_preserves (a b : Rational)
               : CauchyEquivalent(Rational.to_cauchy_constant(a),
                     Rational.to_cauchy_constant(b));
           -- Evaluate the equivalence at ε = b − a.
-          obtain ⟨N, eventuallyClose⟩ from equivalent(b - a, gapPositive);
+          choose N such that
+              ∀ (m : Natural). N ≤ m →
+                abs(CauchyRationalSequence.sequenceFunction(Rational.to_cauchy_constant(a), m)
+                    - CauchyRationalSequence.sequenceFunction(Rational.to_cauchy_constant(b), m))
+                  < b - a
+              as eventuallyClose
+              from equivalent(b - a, gapPositive);
           claim N ≤ N;
           claim tooClose : abs(a - b) < b - a
               by eventuallyClose(N, (N ≤ N));
           -- But the gap is at most that absolute difference.
-          claim b - a < b - a
-              by calc b - a
-                    ≤ abs(b - a)   by Rational.le_absolute_value
-                    = abs(a - b)   by Rational.absolute_value_subtract_swap(b, a)
-                    < b - a        by tooClose;
+          calc b - a
+             ≤ abs(b - a)   since Rational.le_absolute_value
+             = abs(a - b)   since Rational.absolute_value_subtract_swap
+             < b - a        since tooClose;
           claim notSelfEqual : ¬(b - a = b - a)
               since Rational.LessThan.distinct;
           notSelfEqual(reflexivity(Rational, b - a))
