@@ -103,7 +103,7 @@ theorem Real.cauchy_almost_zero_from_absolute_bound
       -- (halve(ε) - |s(·)|) — i.e., ∀δ > 0, eventually
       -- -δ < halve(ε) - |s(m)|. We instantiate at δ := halve(ε) too.
       claim halvedPositive : Rational.zero < Rational.halve(epsilon);
-      obtain ⟨N, boundAtN⟩
+      choose N as boundAtN
           from (unfold Real.IsNonneg in
                    Real.LessThan.weaken(
                        abs((Quotient.class_of(
@@ -126,6 +126,7 @@ theorem Real.cauchy_almost_zero_from_absolute_bound
           calc absSM
              = -Rational.halve(epsilon) + (absSM + Rational.halve(epsilon))
              < (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+                                                  since Rational.add_preserves_LessThan
              = Rational.halve(epsilon) + Rational.halve(epsilon)
              = epsilon
       }
@@ -148,7 +149,7 @@ theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
     absoluteAlmostZero => {
         take epsilon : Rational;
         take epsilonPositive : Rational.zero < epsilon;
-        obtain ⟨N, absBoundAtN⟩
+        choose N as absBoundAtN
             from absoluteAlmostZero(epsilon, epsilonPositive);
         witness N with {
             take m : Natural;
@@ -170,14 +171,16 @@ theorem Real.eq_of_absolute_value_less_than_all_positive
         (hypothesis : ∀ (epsilon : Rational). Rational.zero < epsilon →
                           abs(x) < (epsilon : Real))
         : x = Real.zero :=
-  cases x refining hypothesis { | s_rep =>
-    Quotient.equivalent_implies_equal(
-        CauchyRationalSequence, CauchyEquivalent,
-        s_rep,
-        Rational.to_cauchy_constant(Rational.zero),
-        CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero(
-            s_rep,
-            Real.cauchy_almost_zero_from_absolute_bound(s_rep, hypothesis))) }
+  cases x refining hypothesis { | s_rep => {
+    claim ∀ (epsilon : Rational). Rational.zero < epsilon →
+            ∃ (N : Natural).
+              ∀ (m : Natural). N ≤ m →
+                abs(CauchyRationalSequence.sequenceFunction(s_rep, m)) < epsilon
+      since Real.cauchy_almost_zero_from_absolute_bound;
+    claim CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero))
+      by CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero;
+    done by Quotient.equivalent_implies_equal
+  } }
 
 -- ----------------------------------------------------------------------
 -- `x - y = 0 → x = y` on Real. A small ring corollary: add y to both
@@ -227,18 +230,19 @@ theorem Real.SequenceConverges.unique
       take epsilon : Rational;
       take epsilonPositive : Rational.zero < epsilon;
       claim halvedEpsilonPositive : Rational.zero < Rational.halve(epsilon);
-      obtain ⟨N1, boundFromL1⟩
+      choose N1 as boundFromL1
           from convergesToL1(Rational.halve(epsilon), halvedEpsilonPositive);
-      obtain ⟨N2, boundFromL2⟩
+      choose N2 as boundFromL2
           from convergesToL2(Rational.halve(epsilon), halvedEpsilonPositive);
       let m : Natural := Natural.maximum(N1, N2);
+      claim N1 ≤ m since Natural.left_le_max;
+      claim N2 ≤ m since Natural.right_le_max;
       -- Pointwise bounds at m. The L1 side has |s - L| swapped to
       -- |L - s| so triangle's two summands share orientation.
       calc abs(L1 - s(m))
               = abs(s(m) - L1)
-              < (Rational.halve(epsilon) : Real)     by boundFromL1(m, Natural.left_le_max(N1, N2));
-      claim abs(s(m) - L2) < (Rational.halve(epsilon) : Real)
-        by boundFromL2(m, Natural.right_le_max(N1, N2));
+              < (Rational.halve(epsilon) : Real);
+      claim abs(s(m) - L2) < (Rational.halve(epsilon) : Real);
       -- |L1 - L2| ≤ |L1 - s(m)| + |s(m) - L2|
       --          < halve(ε) + halve(ε) = ε.
       -- The opening = step rewrites L1 - L2 as (L1 - s(m)) + (s(m) - L2)
@@ -251,8 +255,8 @@ theorem Real.SequenceConverges.unique
          = ((Rational.halve(epsilon) + Rational.halve(epsilon)) : Real)
          = (epsilon : Real)
     };
-  claim differenceIsZero : L1 - L2 = Real.zero;
-  Real.eq_of_sub_eq_zero(L1, L2, differenceIsZero)
+  claim L1 - L2 = Real.zero since Real.eq_of_absolute_value_less_than_all_positive;
+  done
 }
 
 -- ----------------------------------------------------------------------
@@ -269,7 +273,7 @@ definition Real.limit (s : Natural → Real)
       (a b : Real)
       (aIsLimit : Real.SequenceConverges(s, a))
       (bIsLimit : Real.SequenceConverges(s, b)) ↦
-        Real.SequenceConverges.unique(s, a, b, aIsLimit, bIsLimit))
+        done)
 
 theorem Real.limit_converges (s : Natural → Real)
         (convergent : Real.SequenceConvergent(s))
@@ -281,4 +285,4 @@ theorem Real.limit_converges (s : Natural → Real)
       (a b : Real)
       (aIsLimit : Real.SequenceConverges(s, a))
       (bIsLimit : Real.SequenceConverges(s, b)) ↦
-        Real.SequenceConverges.unique(s, a, b, aIsLimit, bIsLimit))
+        done)
