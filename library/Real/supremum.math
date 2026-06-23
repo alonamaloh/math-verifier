@@ -429,56 +429,6 @@ definition Real.bisectionRight
 -- the same witness; no-branch extracts a NEW witness from the
 -- classical "not an upper bound" fact (some y ∈ S satisfies
 -- midpoint ≤ y, otherwise midpoint WOULD have been an upper bound).
--- Step lemma (same shape as bisectionRight_is_upper_bound_step):
--- explicit decision arg lets `cases` do the split without the
--- expensive decide-walker.
-theorem Real.bisectionLeft_below_witness_step
-        (subset : Set(Real))
-        (intervals : Real.BisectionInterval)
-        (predecessorLeftBelowSome
-            : ∃ (y : Real).
-                  y ∈ subset ∧ (Real.BisectionInterval.left(intervals) : Real) ≤ y)
-        (decision
-            : Logic.Decidable(
-                  Real.IsUpperBound(
-                      subset,
-                      (Rational.halve(
-                           Real.BisectionInterval.left(intervals)
-                           + Real.BisectionInterval.right(intervals))
-                       : Real))))
-        : ∃ (y : Real).
-              y ∈ subset ∧ (Real.BisectionInterval.left(
-                       Real.bisectionStepWithDec(subset, intervals, decision))
-                   : Real) ≤ y :=
-  cases decision {
-    | Logic.Decidable.yes(_) =>
-        -- New left = old left. IH applies directly.
-        predecessorLeftBelowSome
-    | Logic.Decidable.no(midNotUpper) => {
-        -- New left = midpoint. IsUpperBound unfolds to
-        -- `∀ (y : Real). y ∈ S → y ≤ midReal`;
-        -- not_forall_implies_exists_not + not_implies_implies_and_not
-        -- give some y with y ∈ S and ¬(y ≤ midReal);
-        -- not_LessOrEqual_implies flips to midReal ≤ y.
-        let midReal : Real :=
-            (Rational.halve(
-                 Real.BisectionInterval.left(intervals)
-                 + Real.BisectionInterval.right(intervals)) : Real);
-        choose witnessReal as witnessImpFails
-            from Logic.not_forall_implies_exists_not(
-                     Real,
-                     (y : Real) ↦
-                         y ∈ subset → y ≤ midReal,
-                     midNotUpper);
-        claim (witnessReal ∈ subset) ∧ ¬(witnessReal ≤ midReal)
-            by Logic.not_implies_implies_and_not;
-        claim witnessReal ∈ subset;
-        claim ¬(witnessReal ≤ midReal);
-        claim midReal ≤ witnessReal   since Real.not_LessOrEqual_implies;
-        witness witnessReal with done
-      }
-  }
-
 theorem Real.bisectionLeft_below_witness
         (subset : Set(Real))
         (initial : Real.BisectionInterval)
@@ -497,10 +447,31 @@ theorem Real.bisectionLeft_below_witness
             (Rational.halve(
                  Real.BisectionInterval.left(intervals)
                  + Real.BisectionInterval.right(intervals)) : Real);
-        Real.bisectionLeft_below_witness_step(
-            subset, intervals, IH,
-            Logic.classical_decidable(
-                Real.IsUpperBound(subset, midReal)))
+        -- Decide whether the midpoint is an upper bound. Yes: the new
+        -- left endpoint is unchanged, below some element by the IH.
+        -- No: the new left endpoint is the midpoint — not an upper
+        -- bound, so some y ∈ S exceeds it.
+        decide Real.IsUpperBound(subset, midReal) {
+          | yes _ => IH
+          | no midNotUpper => {
+              -- IsUpperBound unfolds to `∀ (y : Real). y ∈ S → y ≤ midReal`;
+              -- not_forall_implies_exists_not + not_implies_implies_and_not
+              -- give some y with y ∈ S and ¬(y ≤ midReal);
+              -- not_LessOrEqual_implies flips to midReal ≤ y.
+              choose witnessReal as witnessImpFails
+                  from Logic.not_forall_implies_exists_not(
+                           Real,
+                           (y : Real) ↦
+                               y ∈ subset → y ≤ midReal,
+                           midNotUpper);
+              claim (witnessReal ∈ subset) ∧ ¬(witnessReal ≤ midReal)
+                  by Logic.not_implies_implies_and_not;
+              claim witnessReal ∈ subset;
+              claim ¬(witnessReal ≤ midReal);
+              claim midReal ≤ witnessReal   since Real.not_LessOrEqual_implies;
+              witness witnessReal with done
+            }
+        }
       }
   }
 
@@ -523,30 +494,6 @@ theorem Real.bisectionLeft_below_witness
 -- δ-unfold `bisectionRight(... successor(n))` to find the buried
 -- `classical_decidable(...)`; here the decision is a top-level
 -- binder and `cases` matches it directly.
-theorem Real.bisectionRight_is_upper_bound_step
-        (subset : Set(Real)) (intervals : Real.BisectionInterval)
-        (predecessorRightAbove
-            : Real.IsUpperBound(
-                  subset,
-                  (Real.BisectionInterval.right(intervals) : Real)))
-        (decision
-            : Logic.Decidable(
-                  Real.IsUpperBound(
-                      subset,
-                      (Rational.halve(
-                           Real.BisectionInterval.left(intervals)
-                           + Real.BisectionInterval.right(intervals))
-                       : Real))))
-        : Real.IsUpperBound(
-              subset,
-              (Real.BisectionInterval.right(
-                   Real.bisectionStepWithDec(subset, intervals, decision))
-               : Real)) :=
-  cases decision {
-    | Logic.Decidable.yes(midIsUpper) => midIsUpper
-    | Logic.Decidable.no(_)           => predecessorRightAbove
-  }
-
 theorem Real.bisectionRight_is_upper_bound
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialRightAbove
@@ -562,14 +509,17 @@ theorem Real.bisectionRight_is_upper_bound
     case successor(predecessor): {
         let intervals : Real.BisectionInterval :=
             Real.bisectionIntervals(subset, initial, predecessor);
-        let midReal : Real :=
-            (Rational.halve(
-                 Real.BisectionInterval.left(intervals)
-                 + Real.BisectionInterval.right(intervals)) : Real);
-        Real.bisectionRight_is_upper_bound_step(
-            subset, intervals, IH,
-            Logic.classical_decidable(
-                Real.IsUpperBound(subset, midReal)))
+        -- Decide whether the midpoint is an upper bound. Yes: the new
+        -- right endpoint IS the midpoint, an upper bound by that decision.
+        -- No: the right endpoint is unchanged, an upper bound by the IH.
+        decide Real.IsUpperBound(
+                   subset,
+                   (Rational.halve(
+                        Real.BisectionInterval.left(intervals)
+                        + Real.BisectionInterval.right(intervals)) : Real)) {
+          | yes midIsUpper => midIsUpper
+          | no  _          => IH
+        }
       }
   }
 
@@ -583,49 +533,6 @@ definition Real.bisectionWidth
   | successor(predecessor) =>
       Rational.halve(Real.bisectionWidth(initial, predecessor))
 
--- Step lemma: same shape as the others.
-theorem Real.bisection_width_invariant_step
-        (subset : Set(Real))
-        (intervals : Real.BisectionInterval)
-        (predecessorWidth : Rational)
-        (predecessorWidthInvariant
-            : Real.BisectionInterval.right(intervals)
-                - Real.BisectionInterval.left(intervals)
-              = predecessorWidth)
-        (decision
-            : Logic.Decidable(
-                  Real.IsUpperBound(
-                      subset,
-                      (Rational.halve(
-                           Real.BisectionInterval.left(intervals)
-                           + Real.BisectionInterval.right(intervals))
-                       : Real))))
-        : Real.BisectionInterval.right(
-              Real.bisectionStepWithDec(subset, intervals, decision))
-            - Real.BisectionInterval.left(
-                  Real.bisectionStepWithDec(subset, intervals, decision))
-          = Rational.halve(predecessorWidth) :=
-  cases decision {
-    | Logic.Decidable.yes(_) =>
-        calc Rational.halve(
-                 Real.BisectionInterval.left(intervals)
-                 + Real.BisectionInterval.right(intervals))
-             - Real.BisectionInterval.left(intervals)
-           = Rational.halve(
-                 Real.BisectionInterval.right(intervals)
-                 - Real.BisectionInterval.left(intervals))
-           = Rational.halve(predecessorWidth)
-    | Logic.Decidable.no(_) =>
-        calc Real.BisectionInterval.right(intervals)
-             - Rational.halve(
-                   Real.BisectionInterval.left(intervals)
-                   + Real.BisectionInterval.right(intervals))
-           = Rational.halve(
-                 Real.BisectionInterval.right(intervals)
-                 - Real.BisectionInterval.left(intervals))
-           = Rational.halve(predecessorWidth)
-  }
-
 -- The width invariant: at every step, the difference between right and
 -- left endpoints equals the recursive halving of (b0 - a0).
 theorem Real.bisection_width_invariant
@@ -635,23 +542,40 @@ theorem Real.bisection_width_invariant
             - Real.bisectionLeft(subset, initial, n)
           = Real.bisectionWidth(initial, n) :=
   by_induction on n with IH {
-    case zero:
-        reflexivity(Rational,
-            Real.BisectionInterval.right(initial)
-            - Real.BisectionInterval.left(initial))
+    case zero: done
     case successor(predecessor): {
         let intervals : Real.BisectionInterval :=
             Real.bisectionIntervals(subset, initial, predecessor);
-        let midReal : Real :=
-            (Rational.halve(
-                 Real.BisectionInterval.left(intervals)
-                 + Real.BisectionInterval.right(intervals)) : Real);
-        Real.bisection_width_invariant_step(
-            subset, intervals,
-            Real.bisectionWidth(initial, predecessor),
-            IH,
-            Logic.classical_decidable(
-                Real.IsUpperBound(subset, midReal)))
+        -- Decide whether the midpoint is an upper bound. Either way the
+        -- new width is half the old: the new interval is one half of the
+        -- previous, and the IH equates the old width with
+        -- bisectionWidth(initial, predecessor).
+        decide Real.IsUpperBound(
+                   subset,
+                   (Rational.halve(
+                        Real.BisectionInterval.left(intervals)
+                        + Real.BisectionInterval.right(intervals)) : Real)) {
+          | yes _ =>
+              calc Rational.halve(
+                       Real.BisectionInterval.left(intervals)
+                       + Real.BisectionInterval.right(intervals))
+                   - Real.BisectionInterval.left(intervals)
+                 = Rational.halve(
+                       Real.BisectionInterval.right(intervals)
+                       - Real.BisectionInterval.left(intervals))
+                 = Rational.halve(Real.bisectionWidth(initial, predecessor))
+                       since IH
+          | no _ =>
+              calc Real.BisectionInterval.right(intervals)
+                   - Rational.halve(
+                         Real.BisectionInterval.left(intervals)
+                         + Real.BisectionInterval.right(intervals))
+                 = Rational.halve(
+                       Real.BisectionInterval.right(intervals)
+                       - Real.BisectionInterval.left(intervals))
+                 = Rational.halve(Real.bisectionWidth(initial, predecessor))
+                       since IH
+        }
       }
   }
 
@@ -849,33 +773,6 @@ theorem Real.LessOrEqual_of_pointwise_lower
 -- bisection step preserves this — the new interval is one half of
 -- the previous, and the midpoint lies inside.
 
--- Step lemma: explicit decision arg.
-theorem Real.bisectionLeq_invariant_step
-        (subset : Set(Real)) (intervals : Real.BisectionInterval)
-        (predecessorLeftLeqRight
-            : Real.BisectionInterval.left(intervals)
-              ≤ Real.BisectionInterval.right(intervals))
-        (decision
-            : Logic.Decidable(
-                  Real.IsUpperBound(
-                      subset,
-                      (Rational.halve(
-                           Real.BisectionInterval.left(intervals)
-                           + Real.BisectionInterval.right(intervals))
-                       : Real))))
-        : Real.BisectionInterval.left(
-              Real.bisectionStepWithDec(subset, intervals, decision))
-            ≤ Real.BisectionInterval.right(
-                  Real.bisectionStepWithDec(subset, intervals, decision)) :=
-  cases decision {
-    | Logic.Decidable.yes(_) =>
-        -- New interval [left, midpoint]: left ≤ midpoint = halve(left + right).
-        done since Rational.halve_left_le_sum
-    | Logic.Decidable.no(_) =>
-        -- New interval [midpoint, right]: midpoint = halve(left + right) ≤ right.
-        done since Rational.halve_sum_le_right
-  }
-
 theorem Real.bisectionLeq_invariant
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
@@ -889,44 +786,24 @@ theorem Real.bisectionLeq_invariant
     case successor(predecessor): {
         let intervals : Real.BisectionInterval :=
             Real.bisectionIntervals(subset, initial, predecessor);
-        let midReal : Real :=
-            (Rational.halve(
-                 Real.BisectionInterval.left(intervals)
-                 + Real.BisectionInterval.right(intervals)) : Real);
-        Real.bisectionLeq_invariant_step(
-            subset, intervals, IH,
-            Logic.classical_decidable(
-                Real.IsUpperBound(subset, midReal)))
+        -- Decide whether the midpoint is an upper bound. Yes: the new
+        -- interval is [left, midpoint] with left ≤ halve(left + right).
+        -- No: the new interval is [midpoint, right] with
+        -- halve(left + right) ≤ right. Both use the IH left ≤ right.
+        decide Real.IsUpperBound(
+                   subset,
+                   (Rational.halve(
+                        Real.BisectionInterval.left(intervals)
+                        + Real.BisectionInterval.right(intervals)) : Real)) {
+          | yes _ => done since Rational.halve_left_le_sum
+          | no  _ => done since Rational.halve_sum_le_right
+        }
       }
   }
 
 -- ----------------------------------------------------------------------
 -- Step-monotone: left endpoint goes up, right endpoint goes down.
 -- Both depend on the within-interval invariant at the previous step.
-
--- Step lemma: left(stepWithDec) ≥ left(state).
-theorem Real.bisectionLeft_step_monotone_step
-        (subset : Set(Real)) (intervals : Real.BisectionInterval)
-        (withinInterval
-            : Real.BisectionInterval.left(intervals)
-              ≤ Real.BisectionInterval.right(intervals))
-        (decision
-            : Logic.Decidable(
-                  Real.IsUpperBound(
-                      subset,
-                      (Rational.halve(
-                           Real.BisectionInterval.left(intervals)
-                           + Real.BisectionInterval.right(intervals))
-                       : Real))))
-        : Real.BisectionInterval.left(intervals)
-            ≤ Real.BisectionInterval.left(
-                  Real.bisectionStepWithDec(subset, intervals, decision)) :=
-  cases decision {
-    -- yes-branch keeps left = left(intervals); no-branch advances it to
-    -- the midpoint, which is ≥ left since left ≤ right.
-    | Logic.Decidable.yes(_) => done since Rational.LessOrEqual.reflexive
-    | Logic.Decidable.no(_)  => done since Rational.halve_left_le_sum
-  }
 
 theorem Real.bisectionLeft_step_monotone
         (subset : Set(Real)) (initial : Real.BisectionInterval)
@@ -938,49 +815,27 @@ theorem Real.bisectionLeft_step_monotone
           ≤ Real.bisectionLeft(subset, initial, 1 + n) := {
     let intervals : Real.BisectionInterval :=
         Real.bisectionIntervals(subset, initial, n);
-    let midReal : Real :=
-        (Rational.halve(
-             Real.BisectionInterval.left(intervals)
-             + Real.BisectionInterval.right(intervals)) : Real);
-    -- The step lemma proves left(n) ≤ left(successor(n)); bridge the
-    -- stated index `1 + n` to `successor(n)` so `bisectionLeft` unfolds.
+    -- The within-interval invariant: left(n) ≤ right(n), used by the
+    -- no-branch to place the midpoint above left.
     claim Real.bisectionLeft(subset, initial, n)
             ≤ Real.bisectionRight(subset, initial, n)
       since Real.bisectionLeq_invariant;
+    -- Decide whether the midpoint is an upper bound. Yes: left is
+    -- unchanged. No: left advances to the midpoint, ≥ left since
+    -- left ≤ right. Then bridge the stated index `1 + n` to
+    -- `successor(n)` so `bisectionLeft` unfolds.
     claim
           Real.bisectionLeft(subset, initial, n)
             ≤ Real.bisectionLeft(subset, initial, successor(n))
-      by Real.bisectionLeft_step_monotone_step(
-             subset, intervals,
-             given(Real.bisectionLeft(subset, initial, n)
-                   ≤ Real.bisectionRight(subset, initial, n)),
-             Logic.classical_decidable(
-                 Real.IsUpperBound(subset, midReal)));
+      by decide Real.IsUpperBound(
+                    subset,
+                    (Rational.halve(
+                         Real.BisectionInterval.left(intervals)
+                         + Real.BisectionInterval.right(intervals)) : Real)) {
+           | yes _ => done since Rational.LessOrEqual.reflexive
+           | no  _ => done since Rational.halve_left_le_sum
+         };
     done by substituting Natural.one_add
-  }
-
--- Step lemma: right(stepWithDec) ≤ right(state).
-theorem Real.bisectionRight_step_monotone_step
-        (subset : Set(Real)) (intervals : Real.BisectionInterval)
-        (withinInterval
-            : Real.BisectionInterval.left(intervals)
-              ≤ Real.BisectionInterval.right(intervals))
-        (decision
-            : Logic.Decidable(
-                  Real.IsUpperBound(
-                      subset,
-                      (Rational.halve(
-                           Real.BisectionInterval.left(intervals)
-                           + Real.BisectionInterval.right(intervals))
-                       : Real))))
-        : Real.BisectionInterval.right(
-              Real.bisectionStepWithDec(subset, intervals, decision))
-            ≤ Real.BisectionInterval.right(intervals) :=
-  cases decision {
-    -- yes-branch advances right to the midpoint (≤ right since left ≤ right);
-    -- no-branch keeps right = right(intervals).
-    | Logic.Decidable.yes(_) => done since Rational.halve_sum_le_right
-    | Logic.Decidable.no(_)  => done since Rational.LessOrEqual.reflexive
   }
 
 theorem Real.bisectionRight_step_monotone
@@ -993,24 +848,26 @@ theorem Real.bisectionRight_step_monotone
           ≤ Real.bisectionRight(subset, initial, n) := {
     let intervals : Real.BisectionInterval :=
         Real.bisectionIntervals(subset, initial, n);
-    let midReal : Real :=
-        (Rational.halve(
-             Real.BisectionInterval.left(intervals)
-             + Real.BisectionInterval.right(intervals)) : Real);
-    -- The step lemma proves right(successor(n)) ≤ right(n); bridge the
-    -- stated index `1 + n` to `successor(n)` so `bisectionRight` unfolds.
+    -- The within-interval invariant: left(n) ≤ right(n), used by the
+    -- yes-branch to place the midpoint below right.
     claim Real.bisectionLeft(subset, initial, n)
             ≤ Real.bisectionRight(subset, initial, n)
       since Real.bisectionLeq_invariant;
+    -- Decide whether the midpoint is an upper bound. Yes: right advances
+    -- to the midpoint, ≤ right since left ≤ right. No: right is
+    -- unchanged. Then bridge the stated index `1 + n` to `successor(n)`
+    -- so `bisectionRight` unfolds.
     claim
           Real.bisectionRight(subset, initial, successor(n))
             ≤ Real.bisectionRight(subset, initial, n)
-      by Real.bisectionRight_step_monotone_step(
-             subset, intervals,
-             given(Real.bisectionLeft(subset, initial, n)
-                   ≤ Real.bisectionRight(subset, initial, n)),
-             Logic.classical_decidable(
-                 Real.IsUpperBound(subset, midReal)));
+      by decide Real.IsUpperBound(
+                    subset,
+                    (Rational.halve(
+                         Real.BisectionInterval.left(intervals)
+                         + Real.BisectionInterval.right(intervals)) : Real)) {
+           | yes _ => done since Rational.halve_sum_le_right
+           | no  _ => done since Rational.LessOrEqual.reflexive
+         };
     done by substituting Natural.one_add
   }
 
@@ -1606,13 +1463,13 @@ theorem Real.bisectionLimit_is_least
         (otherBound : Real)
         (otherIsUpper : Real.IsUpperBound(subset, otherBound))
         : Real.bisectionLimit(subset, initial, initialLeftLeqRight)
-          ≤ otherBound :=
-  Real.LessOrEqual_of_pointwise(
-      Real.bisectionLeft(subset, initial),
-      Real.bisectionLeft_is_cauchy(
-          subset, initial, initialLeftLeqRight),
-      otherBound,
-      (n : Natural) ↦ {
+          ≤ otherBound := {
+  -- Every lower endpoint is below some element of S, which otherBound
+  -- caps: bisectionLeft(n) ≤ y ≤ otherBound. So the limit of the lower
+  -- endpoints is ≤ otherBound.
+  claim ∀ (n : Natural).
+            (Real.bisectionLeft(subset, initial, n) : Real) ≤ otherBound
+      by (n : Natural) ↦ {
         claim ∃ (y : Real).
                   y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ y
           since Real.bisectionLeft_below_witness;
@@ -1628,7 +1485,9 @@ theorem Real.bisectionLimit_is_least
         calc (Real.bisectionLeft(subset, initial, n) : Real)
            ≤ witnessY
            ≤ otherBound
-      })
+      };
+  done
+}
 
 -- ----------------------------------------------------------------------
 -- Headline theorem.
