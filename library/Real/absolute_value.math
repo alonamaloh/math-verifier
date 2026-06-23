@@ -57,7 +57,7 @@ theorem Rational.sequence.absolute_value_is_cauchy
     claim sBounded
         : ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < epsilon
-        by sIsCauchy(epsilon, epsilonPositive);
+        since sIsCauchy;
     choose N as sBound from sBounded;
     witness N with
         (m : Natural) (N_leq_m : N ≤ m)
@@ -67,7 +67,6 @@ theorem Rational.sequence.absolute_value_is_cauchy
                    - abs(s(n)))
              ≤ abs(s(m) - s(n))
              < epsilon
-                  by sBound(m, N_leq_m, n, N_leq_n)
   }
 
 -- ----------------------------------------------------------------------
@@ -112,28 +111,20 @@ theorem Real.absolute_value_respects
                 -- which is bounded by |sf(rep, m) - sf(rep', m)| via
                 -- reverse triangle, and that is bounded by ε via
                 -- origAtN.
-                rewrite(
-                    Equality.symmetry(
-                        calc abs(
-                                 CauchyRationalSequence.sequenceFunction(
-                                     CauchyRationalSequence.absolute_value(rep), m)
-                                 - CauchyRationalSequence.sequenceFunction(
-                                     CauchyRationalSequence.absolute_value(rep'), m))
-                           = abs(
-                                 abs(
-                                     CauchyRationalSequence.sequenceFunction(rep, m))
-                                 - abs(
-                                     CauchyRationalSequence.sequenceFunction(rep', m)))),
-                    calc abs(
-                             abs(
-                                 CauchyRationalSequence.sequenceFunction(rep, m))
-                             - abs(
-                                 CauchyRationalSequence.sequenceFunction(rep', m)))
-                       ≤ abs(
-                             CauchyRationalSequence.sequenceFunction(rep, m)
-                             - CauchyRationalSequence.sequenceFunction(rep', m))
-                       < epsilon
-                            by origAtN(m, N_leq_m))
+                calc abs(
+                         CauchyRationalSequence.sequenceFunction(
+                             CauchyRationalSequence.absolute_value(rep), m)
+                         - CauchyRationalSequence.sequenceFunction(
+                             CauchyRationalSequence.absolute_value(rep'), m))
+                   = abs(
+                         abs(
+                             CauchyRationalSequence.sequenceFunction(rep, m))
+                         - abs(
+                             CauchyRationalSequence.sequenceFunction(rep', m)))
+                   ≤ abs(
+                         CauchyRationalSequence.sequenceFunction(rep, m)
+                         - CauchyRationalSequence.sequenceFunction(rep', m))
+                   < epsilon
       }
 
 -- ----------------------------------------------------------------------
@@ -171,41 +162,43 @@ theorem Real.triangle_inequality_at_make
       ((epsilon : Rational)
                (epsilonPositive : Rational.zero < epsilon) ↦
         witness 0 with
-            (m : Natural) (_ : 0 ≤ m) ↦
-              -- Goal (after β/ι on the full chain):
-              --   -ε < (|sx(m)| + |sy(m)|) + -|sx(m) + sy(m)|
-              -- Lower-bounded by 0 via Rational.triangle_inequality,
-              -- and -ε < 0 by negate-of-positive.
+            (m : Natural) (_ : 0 ≤ m) ↦ {
+              -- 0 ≤ (|sx(m)| + |sy(m)|) − |sx(m) + sy(m)| is the triangle
+              -- inequality; −ε < 0 by positivity of ε.
+              claim triangleLe
+                  : abs(sx(m) + sy(m)) ≤ abs(sx(m)) + abs(sy(m))
+                  since Rational.triangle_inequality;
               calc -epsilon
                  < Rational.zero
-                 ≤ (abs(sx(m))
-                    + abs(sy(m)))
+                      since Rational.negate_LessThan_zero_of_positive
+                 = abs(sx(m) + sy(m)) + -abs(sx(m) + sy(m))
+                 ≤ (abs(sx(m)) + abs(sy(m)))
                    + -abs(sx(m) + sy(m))
-                      by Rational.LessOrEqual_zero_of_IsNonneg(
-                             (abs(sx(m))
-                              + abs(sy(m)))
-                             + -abs(sx(m) + sy(m)),
-                             Rational.triangle_inequality(sx(m), sy(m))))
+                      since Rational.add_preserves_LessOrEqual
+            })
 
 -- Triangle on Real. Lift via Quotient.induct_two to the at-make form.
 theorem Real.triangle_inequality (x y : Real)
         : abs(x + y)
           ≤ abs(x) + abs(y) :=
   by_representatives x as repX, y as repY =>
-      Real.triangle_inequality_at_make(repX, repY)
+      done since Real.triangle_inequality_at_make
 
 -- ----------------------------------------------------------------------
 -- |-x| = |x| on Real. Lift the pointwise Rational.absolute_value_negate.
 theorem Real.absolute_value_negate (x : Real)
         : abs(-x) = abs(x) :=
-  cases x { | rep_x =>
-    Real.equal_of_pointwise_sequence(
-        CauchyRationalSequence.absolute_value(
-            CauchyRationalSequence.negate(rep_x)),
-        CauchyRationalSequence.absolute_value(rep_x),
-        (n : Natural) ↦
-          -- sf(abs(neg(rep_x)), n) = |sf(neg(rep_x), n)| = |-sf(rep_x, n)|
-          --                        = |sf(rep_x, n)| = sf(abs(rep_x), n).
+  cases x { | rep_x => {
+    -- Pointwise: sf(abs(neg(rep_x)), n) = |sf(neg(rep_x), n)| = |-sf(rep_x, n)|
+    --                                   = |sf(rep_x, n)| = sf(abs(rep_x), n).
+    claim pointwise
+        : ∀ (n : Natural).
+            CauchyRationalSequence.sequenceFunction(
+                CauchyRationalSequence.absolute_value(
+                    CauchyRationalSequence.negate(rep_x)), n)
+            = CauchyRationalSequence.sequenceFunction(
+                  CauchyRationalSequence.absolute_value(rep_x), n)
+        by (n : Natural) ↦
           calc CauchyRationalSequence.sequenceFunction(
                    CauchyRationalSequence.absolute_value(
                        CauchyRationalSequence.negate(rep_x)), n)
@@ -217,7 +210,9 @@ theorem Real.absolute_value_negate (x : Real)
              = abs(
                    CauchyRationalSequence.sequenceFunction(rep_x, n))
              = CauchyRationalSequence.sequenceFunction(
-                   CauchyRationalSequence.absolute_value(rep_x), n)) }
+                   CauchyRationalSequence.absolute_value(rep_x), n);
+    done since Real.equal_of_pointwise_sequence
+  } }
 
 -- |x - y| = |y - x| on Real. From x - y = -(y - x) plus
 -- Real.absolute_value_negate.
