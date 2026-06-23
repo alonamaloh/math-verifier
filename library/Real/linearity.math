@@ -81,42 +81,24 @@ theorem Real.cauchy_sign_eventually_positive_branch
         : ∀ (m : Natural). signIndex ≤ m
           → lowerBound ≤ sequence(m) :=
   (m : Natural) (mGeSignIndex : signIndex ≤ m) ↦ {
-    claim
-          lowerBound ≤ abs(sequence(m))
-      by apartnessTail(m, mGeSignIndex);
-    claim cauchyAtM
-          : abs(sequence(m) - sequence(signIndex))
-            < lowerBound
-      by cauchyTail(m, mGeSignIndex,
-                    signIndex,
-                    Natural.LessOrEqual.reflexive(signIndex));
-    -- From |diff| < lowerBound: -lowerBound < seq(m) - seq(signIndex)
-    -- (the lower half of the absolute-value bounds).
-    obtain ⟨diffLowerBound, _⟩
-        from Rational.absolute_value_LessThan_bounds(
-                 sequence(m) - sequence(signIndex),
-                 lowerBound,
-                 cauchyAtM);
-    -- Add sequence(signIndex) to both sides of the strict inequality:
-    -- seq(signIndex) + (-lowerBound) < seq(signIndex) + (seq(m) -
-    -- seq(signIndex)) — and ring simplifies both sides.
+    claim lowerBound ≤ abs(sequence(m)) since apartnessTail;
+    claim signIndex ≤ signIndex since Natural.LessOrEqual.reflexive;
+    claim abs(sequence(m) - sequence(signIndex)) < lowerBound since cauchyTail;
+    claim (-lowerBound < sequence(m) - sequence(signIndex))
+            ∧ (sequence(m) - sequence(signIndex) < lowerBound)
+      since Rational.absolute_value_LessThan_bounds;
+    claim -lowerBound < sequence(m) - sequence(signIndex);
     calc sequence(signIndex) - lowerBound
             = sequence(signIndex) + -lowerBound
             < sequence(signIndex) + (sequence(m) - sequence(signIndex))
+                 since Rational.add_left_preserves_LessThan
             = sequence(m);
-    -- seq(signIndex) - lowerBound ≥ 0 (from the hypothesis lowerBound
-    -- ≤ seq(signIndex)).
     claim Rational.zero ≤ sequence(signIndex) - lowerBound;
-    -- Chain: 0 ≤ seq(signIndex) - lowerBound < seq(m).
-    claim Rational.zero < sequence(m);
-    -- IsNonneg(seq(m)) — used to identify |seq(m)| with seq(m).
-    claim Rational.IsNonneg(sequence(m))
-      by Rational.IsNonneg_of_LessOrEqual_zero;
-    -- |seq(m)| = seq(m), so the apartness bound becomes lowerBound ≤
-    -- seq(m).
+    claim Rational.zero < sequence(m) since Rational.LessThan.transitive_left;
+    claim Rational.IsNonneg(sequence(m)) since Rational.IsNonneg_of_LessOrEqual_zero;
     calc lowerBound
        ≤ abs(sequence(m))
-       = sequence(m)
+       = sequence(m) since Rational.absolute_value_when_nonneg
   }
 
 -- Symmetric step lemma (negative branch). seq(signIndex) ≤ -lowerBound
@@ -138,66 +120,30 @@ theorem Real.cauchy_sign_eventually_negative_branch
         : ∀ (m : Natural). signIndex ≤ m
           → sequence(m) ≤ -lowerBound :=
   (m : Natural) (mGeSignIndex : signIndex ≤ m) ↦ {
-    claim apartnessAtM
-          : lowerBound ≤ abs(sequence(m))
-      by apartnessTail(m, mGeSignIndex);
-    claim cauchyAtM
-          : abs(sequence(m) - sequence(signIndex))
-            < lowerBound
-      by cauchyTail(m, mGeSignIndex,
-                    signIndex,
-                    Natural.LessOrEqual.reflexive(signIndex));
-    -- From |diff| < lowerBound: seq(m) - seq(signIndex) < lowerBound
-    -- (the upper half of the absolute-value bounds).
-    obtain ⟨_, diffUpperBound⟩
-        from Rational.absolute_value_LessThan_bounds(
-                 sequence(m) - sequence(signIndex),
-                 lowerBound,
-                 cauchyAtM);
-    -- Add seq(signIndex) to both sides: seq(signIndex) + (seq(m) -
-    -- seq(signIndex)) < seq(signIndex) + lowerBound — LHS simplifies
-    -- to seq(m).
-    claim
-          sequence(m) < sequence(signIndex) + lowerBound
-      by rewrite(
-             (ring : sequence(signIndex) + (sequence(m) - sequence(signIndex))
-                     = sequence(m)),
-             Rational.add_left_preserves_LessThan(
-                 sequence(m) - sequence(signIndex),
-                 lowerBound,
-                 sequence(signIndex),
-                 diffUpperBound));
-    -- seq(signIndex) + lowerBound ≤ -lowerBound + lowerBound = 0
-    -- (from the hypothesis seq(signIndex) ≤ -lowerBound).
-    claim
-          sequence(signIndex) + lowerBound ≤ Rational.zero
-      by rewrite(
-             Rational.add_negate_left(lowerBound),
-             Rational.add_preserves_LessOrEqual(
-                 sequence(signIndex), -lowerBound, lowerBound,
-                 seqAtSignIndexBound));
-    -- Chain: seq(m) < seq(signIndex) + lowerBound ≤ 0.
-    claim sequence(m) < Rational.zero;
-    -- IsNonneg(-seq(m)). seq(m) ≤ 0 unfolds to IsNonneg(0 - seq(m));
-    -- 0 - seq(m) = -seq(m) by ring; rewrite gives IsNonneg(-seq(m)).
-    claim seqAtMLeqZero : sequence(m) ≤ Rational.zero
-      by Rational.LessThan.weaken;
-    claim negSeqAtMIsNonneg : Rational.IsNonneg(-sequence(m))
-      by rewrite(
-             (ring : Rational.zero - sequence(m) = -sequence(m)),
-             seqAtMLeqZero);
-    -- |seq(m)| = -seq(m), so apartness gives lowerBound ≤ -seq(m).
-    claim
-          lowerBound ≤ -sequence(m)
-      by rewrite(
-             Rational.absolute_value_when_negate_nonneg(
-                 sequence(m), negSeqAtMIsNonneg),
-             apartnessAtM);
-    -- Negate both sides: -(-seq(m)) ≤ -lowerBound, i.e., seq(m) ≤
-    -- -lowerBound (after the double-negate reduction).
+    claim lowerBound ≤ abs(sequence(m)) since apartnessTail;
+    claim signIndex ≤ signIndex since Natural.LessOrEqual.reflexive;
+    claim abs(sequence(m) - sequence(signIndex)) < lowerBound since cauchyTail;
+    claim (-lowerBound < sequence(m) - sequence(signIndex))
+            ∧ (sequence(m) - sequence(signIndex) < lowerBound)
+      since Rational.absolute_value_LessThan_bounds;
+    claim sequence(m) - sequence(signIndex) < lowerBound;
+    calc sequence(m)
+            = sequence(signIndex) + (sequence(m) - sequence(signIndex))
+            < sequence(signIndex) + lowerBound
+                 since Rational.add_left_preserves_LessThan;
+    calc sequence(signIndex) + lowerBound
+            ≤ -lowerBound + lowerBound since Rational.add_preserves_LessOrEqual
+            = Rational.zero;
+    claim sequence(m) < Rational.zero since Rational.LessThan.transitive_right;
+    claim sequence(m) ≤ Rational.zero since Rational.LessThan.weaken;
+    claim Rational.zero ≤ -sequence(m) since Rational.LessOrEqual.negate;
+    claim Rational.IsNonneg(-sequence(m)) since Rational.IsNonneg_of_LessOrEqual_zero;
+    calc lowerBound
+            ≤ abs(sequence(m))
+            = -sequence(m) since Rational.absolute_value_when_negate_nonneg;
     calc sequence(m)
        = -(-sequence(m))
-       ≤ -lowerBound
+       ≤ -lowerBound since Rational.LessOrEqual.negate
   }
 
 -- ----------------------------------------------------------------------
@@ -220,104 +166,86 @@ theorem Real.cauchy_sign_eventually
                     → CauchyRationalSequence.sequenceFunction(
                           sequence, m)
                         ≤ -lowerBound := {
-    obtain ⟨lowerBound, apartnessData⟩
-        from Real.cauchy_apartness_from_zero(
-                 sequence, notEquivalentToZero);
-    obtain ⟨apartnessIndex, lowerAndApartness⟩ from apartnessData;
-    let ⟨lowerBoundPositive, apartness⟩ := lowerAndApartness;
-    obtain ⟨cauchyIndex, cauchyAt⟩
-        from CauchyRationalSequence.isCauchy(sequence)(
-                 lowerBound, lowerBoundPositive);
+    claim apartnessExists
+          : ∃ (lowerBound : Rational). ∃ (apartnessIndex : Natural).
+              Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
+                lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m))
+      since Real.cauchy_apartness_from_zero;
+    choose lowerBound as lowerBoundData from apartnessExists;
+    choose apartnessIndex as lowerAndApartness from lowerBoundData;
+    claim lowerBoundPositive : Rational.zero < lowerBound;
+    claim apartness
+          : ∀ (m : Natural). apartnessIndex ≤ m →
+              lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m));
+    claim cauchyExists
+          : ∃ (cauchyIndex : Natural). ∀ (m : Natural). cauchyIndex ≤ m →
+              ∀ (n : Natural). cauchyIndex ≤ n →
+                abs(CauchyRationalSequence.sequenceFunction(sequence, m)
+                    - CauchyRationalSequence.sequenceFunction(sequence, n)) < lowerBound
+      since CauchyRationalSequence.isCauchy;
+    choose cauchyIndex as cauchyAt from cauchyExists;
     let signIndex : Natural :=
         Natural.maximum(apartnessIndex, cauchyIndex);
-    -- Apartness at signIndex (since signIndex ≥ apartnessIndex).
-    claim apartnessAtSignIndex
-          : lowerBound
-            ≤ abs(
-                  CauchyRationalSequence.sequenceFunction(
-                      sequence, signIndex))
-      by apartness(signIndex,
-                   Natural.le_through_max_left(
-                       apartnessIndex, cauchyIndex, signIndex,
-                       Natural.LessOrEqual.reflexive(signIndex)));
-    -- The apartness tail restricted to signIndex onward.
-    claim apartnessTail
-          : ∀ (m : Natural). signIndex ≤ m
+    claim signIndex ≤ signIndex since Natural.LessOrEqual.reflexive;
+    claim apartnessIndex ≤ signIndex since Natural.le_through_max_left;
+    claim lowerBound
+            ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, signIndex))
+      since apartness;
+    claim ∀ (m : Natural). signIndex ≤ m
             → lowerBound
               ≤ abs(
                     CauchyRationalSequence.sequenceFunction(
-                        sequence, m));
-    -- Cauchy modulus restricted similarly.
-    claim cauchyTail
-          : ∀ (m : Natural). signIndex ≤ m
+                        sequence, m))
+      by (m : Natural) (mGeSign : signIndex ≤ m) ↦ {
+           claim apartnessIndex ≤ m since Natural.le_through_max_left;
+           claim lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m))
+             since apartness;
+           done
+         };
+    claim ∀ (m : Natural). signIndex ≤ m
             → ∀ (n : Natural). signIndex ≤ n
             → abs(
                   CauchyRationalSequence.sequenceFunction(sequence, m)
                   - CauchyRationalSequence.sequenceFunction(sequence, n))
-                < lowerBound;
-    -- Case-split on the sign of seq(signIndex). Either it's ≥ 0
-    -- (positive branch) or its negation is (negative branch).
+                < lowerBound
+      by (m : Natural) (mGeSign : signIndex ≤ m)
+         (n : Natural) (nGeSign : signIndex ≤ n) ↦ {
+           claim cauchyIndex ≤ m since Natural.le_through_max_right;
+           claim cauchyIndex ≤ n since Natural.le_through_max_right;
+           claim abs(CauchyRationalSequence.sequenceFunction(sequence, m)
+                     - CauchyRationalSequence.sequenceFunction(sequence, n)) < lowerBound
+             since cauchyAt;
+           done
+         };
     witness lowerBound with And.introduction(
         lowerBoundPositive,
-        witness signIndex with
-            cases Rational.IsNonneg_or_negate_IsNonneg(
-                      CauchyRationalSequence.sequenceFunction(
-                          sequence, signIndex)) {
-              | Or.introduceLeft(seqIsNonneg) =>
-                  ({
-                    claim seqAtSignIndexBound
-                          : lowerBound
-                            ≤ CauchyRationalSequence.sequenceFunction(
-                                  sequence, signIndex)
-                      by rewrite(
-                             Rational.absolute_value_when_nonneg(
-                                 CauchyRationalSequence.sequenceFunction(
-                                     sequence, signIndex),
-                                 seqIsNonneg),
-                             apartnessAtSignIndex);
-                    Or.introduceLeft(
-                        Real.cauchy_sign_eventually_positive_branch(
-                            CauchyRationalSequence.sequenceFunction(sequence),
-                            lowerBound, lowerBoundPositive,
-                            signIndex, seqAtSignIndexBound,
-                            apartnessTail, cauchyTail))
-                  })
-              | Or.introduceRight(seqNegateIsNonneg) =>
-                  ({
-                    -- |seq(signIndex)| = -seq(signIndex); apartness
-                    -- gives lowerBound ≤ -seq(signIndex), then negate
-                    -- both sides for seq(signIndex) ≤ -lowerBound.
-                    claim boundLeqNegSeq
-                          : lowerBound
-                            ≤ -CauchyRationalSequence.sequenceFunction(
-                                   sequence, signIndex)
-                      by rewrite(
-                             Rational.absolute_value_when_negate_nonneg(
-                                 CauchyRationalSequence.sequenceFunction(
-                                     sequence, signIndex),
-                                 seqNegateIsNonneg),
-                             apartnessAtSignIndex);
-                    claim seqAtSignIndexBound
-                          : CauchyRationalSequence.sequenceFunction(
-                                sequence, signIndex)
-                            ≤ -lowerBound
-                      by rewrite(
-                             Rational.negate_negate(
-                                 CauchyRationalSequence.sequenceFunction(
-                                     sequence, signIndex)),
-                             Rational.LessOrEqual.negate(
-                                 lowerBound,
-                                 -CauchyRationalSequence.sequenceFunction(
-                                      sequence, signIndex),
-                                 boundLeqNegSeq));
-                    Or.introduceRight(
-                        Real.cauchy_sign_eventually_negative_branch(
-                            CauchyRationalSequence.sequenceFunction(sequence),
-                            lowerBound, lowerBoundPositive,
-                            signIndex, seqAtSignIndexBound,
-                            apartnessTail, cauchyTail))
-                  })
-            })
+        witness signIndex with claim by cases {
+          in (Rational.IsNonneg(CauchyRationalSequence.sequenceFunction(sequence, signIndex)))
+              as seqIsNonneg: {
+            calc lowerBound
+               ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, signIndex))
+               = CauchyRationalSequence.sequenceFunction(sequence, signIndex)
+                    since Rational.absolute_value_when_nonneg;
+            claim ∀ (m : Natural). signIndex ≤ m
+                    → lowerBound ≤ CauchyRationalSequence.sequenceFunction(sequence, m)
+              since Real.cauchy_sign_eventually_positive_branch;
+            done
+          }
+          in (Rational.IsNonneg(-CauchyRationalSequence.sequenceFunction(sequence, signIndex)))
+              as seqNegateIsNonneg: {
+            calc lowerBound
+               ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, signIndex))
+               = -CauchyRationalSequence.sequenceFunction(sequence, signIndex)
+                    since Rational.absolute_value_when_negate_nonneg;
+            calc CauchyRationalSequence.sequenceFunction(sequence, signIndex)
+               = -(-CauchyRationalSequence.sequenceFunction(sequence, signIndex))
+               ≤ -lowerBound since Rational.LessOrEqual.negate;
+            claim ∀ (m : Natural). signIndex ≤ m
+                    → CauchyRationalSequence.sequenceFunction(sequence, m) ≤ -lowerBound
+              since Real.cauchy_sign_eventually_negative_branch;
+            done
+          }
+        })
 }
 
 -- ----------------------------------------------------------------------
@@ -335,89 +263,85 @@ theorem Real.IsNonneg_or_negate_IsNonneg
         (x : Real)
         : Real.IsNonneg(x) ∨ Real.IsNonneg(-x) :=
   decide x = Real.zero {
-    | yes xEqZero =>
-        -- x = 0 ⇒ IsNonneg(x). Transport IsNonneg_zero along the
-        -- equation in reverse (symmetric direction).
-        Or.introduceLeft(rewrite(Equality.symmetry(xEqZero), Real.IsNonneg_zero))
+    | yes xEqZero => {
+        claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
+        claim Real.IsNonneg(x) by substituting xEqZero;
+        done
+      }
     | no xNotEqZero =>
         cases x refining xNotEqZero { | rep =>
               ({
-                -- Build ¬CauchyEquivalent(rep, constant_zero) by
-                -- contraposing Quotient.equivalent_implies_equal: if equivalent, the
-                -- two quotient-mk's would be equal, contradicting
-                -- mkNotEqZero. Real.zero reduces to mk(to_cauchy_constant
-                -- (Rational.zero)) so the equality types line up.
-                claim notEquivalentToZero
-                      : Not(CauchyEquivalent(
-                                rep,
-                                Rational.to_cauchy_constant(
-                                    Rational.zero)));
-                obtain ⟨lowerBound, lowerAndSignData⟩
-                    from Real.cauchy_sign_eventually(
-                             rep, notEquivalentToZero);
-                let ⟨lowerBoundPositive, signData⟩ := lowerAndSignData;
-                obtain ⟨signIndex, signDisjunction⟩ from signData;
-                
-                (cases signDisjunction {
-                  | Or.introduceLeft(eventuallyPositive) =>
-                      -- Chain: -ε < 0 < lowerBound ≤ seq(m).
-                      Or.introduceLeft(
-                          Real.IsNonneg.of_eventually_nonneg(rep,
-                          (epsilon : Rational)
-                                   (epsilonPositive
-                                        : Rational.zero < epsilon) ↦
-                            witness signIndex with
-                                (m : Natural)
-                                         (mGeSign : signIndex ≤ m) ↦
-                                  calc -epsilon
-                                     < Rational.zero
-                                     < lowerBound
-                                     ≤ CauchyRationalSequence.sequenceFunction(rep, m)
-                                          by eventuallyPositive(m, mGeSign)))
-                  | Or.introduceRight(eventuallyNegative) =>
-                      -- Eventually seq(m) ≤ -lowerBound, so
-                      -- -seq(m) ≥ lowerBound > 0 > -ε. We need
-                      -- IsEventuallyNonneg(negate(rep)), whose
-                      -- sequenceFunction is -sf(rep, m).
-                      Or.introduceRight(
-                          Real.IsNonneg.of_eventually_nonneg(
-                              CauchyRationalSequence.negate(rep),
-                          (epsilon : Rational)
-                                   (epsilonPositive
-                                        : Rational.zero < epsilon) ↦
-                            witness signIndex with
-                                (m : Natural)
-                                         (mGeSign : signIndex ≤ m) ↦ {
-                                  -- seq(m) ≤ -lowerBound, so -seq(m) ≥
-                                  -- lowerBound. Use LessOrEqual.negate.
-                                  claim
-                                        lowerBound
-                                          ≤ -CauchyRationalSequence.sequenceFunction(
-                                                 rep, m)
-                                    by rewrite(
-                                           Rational.negate_negate(
-                                               lowerBound),
-                                           Rational.LessOrEqual.negate(
-                                               CauchyRationalSequence.sequenceFunction(
-                                                   rep, m),
-                                               -lowerBound,
-                                               eventuallyNegative(
-                                                   m, mGeSign)));
-                                  -- The IsEventuallyNonneg target is
-                                  -- on `sequenceFunction(negate(rep))`,
-                                  -- which equals -sequenceFunction(rep, m).
-                                  -- Chain: -ε < 0 < lowerBound ≤ -seq(m).
-                                  rewrite(
-                                      Equality.symmetry(
-                                          CauchyRationalSequence.sequenceFunction_negate(
-                                              rep, m)),
-                                      calc -epsilon
-                                         < Rational.zero
-                                         < lowerBound
-                                         ≤ -CauchyRationalSequence.sequenceFunction(rep, m))
-                                }
-                          ))
-                })
+                claim Not(CauchyEquivalent(
+                            rep,
+                            Rational.to_cauchy_constant(Rational.zero)));
+                claim signEventually
+                      : ∃ (lowerBound : Rational).
+                          Rational.zero < lowerBound ∧ ∃ (signIndex : Natural).
+                              (∀ (m : Natural). signIndex ≤ m
+                                  → lowerBound
+                                    ≤ CauchyRationalSequence.sequenceFunction(rep, m))
+                              ∨ ∀ (m : Natural). signIndex ≤ m
+                                  → CauchyRationalSequence.sequenceFunction(rep, m)
+                                      ≤ -lowerBound
+                  since Real.cauchy_sign_eventually;
+                choose lowerBound as lowerAndSignData from signEventually;
+                claim Rational.zero < lowerBound;
+                claim signData
+                      : ∃ (signIndex : Natural).
+                          (∀ (m : Natural). signIndex ≤ m
+                              → lowerBound
+                                ≤ CauchyRationalSequence.sequenceFunction(rep, m))
+                          ∨ ∀ (m : Natural). signIndex ≤ m
+                              → CauchyRationalSequence.sequenceFunction(rep, m)
+                                  ≤ -lowerBound;
+                choose signIndex from signData;
+                claim by cases {
+                  in (∀ (m : Natural). signIndex ≤ m
+                        → lowerBound ≤ CauchyRationalSequence.sequenceFunction(rep, m))
+                      as eventuallyPositive: {
+                    claim CauchyRationalSequence.IsEventuallyNonneg(rep)
+                      by (epsilon : Rational)
+                         (epsilonPositive : Rational.zero < epsilon) ↦
+                          witness signIndex with
+                              (m : Natural) (mGeSign : signIndex ≤ m) ↦
+                                calc -epsilon
+                                   < Rational.zero
+                                        since Rational.negate_LessThan_zero_of_positive
+                                   < lowerBound
+                                   ≤ CauchyRationalSequence.sequenceFunction(rep, m);
+                    claim Real.IsNonneg((Quotient.class_of(rep) : Real))
+                      since Real.IsNonneg.of_eventually_nonneg;
+                    done
+                  }
+                  in (∀ (m : Natural). signIndex ≤ m
+                        → CauchyRationalSequence.sequenceFunction(rep, m) ≤ -lowerBound)
+                      as eventuallyNegative: {
+                    claim CauchyRationalSequence.IsEventuallyNonneg(CauchyRationalSequence.negate(rep))
+                      by (epsilon : Rational)
+                         (epsilonPositive : Rational.zero < epsilon) ↦
+                          witness signIndex with
+                              (m : Natural) (mGeSign : signIndex ≤ m) ↦ {
+                                claim CauchyRationalSequence.sequenceFunction(rep, m)
+                                        ≤ -lowerBound;
+                                calc lowerBound
+                                   = -(-lowerBound)
+                                   ≤ -CauchyRationalSequence.sequenceFunction(rep, m)
+                                        since Rational.LessOrEqual.negate;
+                                calc -epsilon
+                                   < Rational.zero
+                                        since Rational.negate_LessThan_zero_of_positive
+                                   < lowerBound
+                                   ≤ -CauchyRationalSequence.sequenceFunction(rep, m)
+                                   = CauchyRationalSequence.sequenceFunction(
+                                         CauchyRationalSequence.negate(rep), m)
+                                        since CauchyRationalSequence.sequenceFunction_negate;
+                                done
+                              };
+                    claim Real.IsNonneg(-(Quotient.class_of(rep) : Real))
+                      since Real.IsNonneg.of_eventually_nonneg;
+                    done
+                  }
+                }
               } : Real.IsNonneg((Quotient.class_of(rep) : Real)) ∨ Real.IsNonneg(-(Quotient.class_of(rep) : Real))) }
   }
 
@@ -430,13 +354,14 @@ theorem Real.LessOrEqual.linear
         (x y : Real)
         : x ≤ y ∨ y ≤ x :=
   claim by cases {
-    case Real.IsNonneg(y - x)    as diffNonneg:
-        -- IsNonneg(y - x) ≡ x ≤ y.
-        Or.introduceLeft(x ≤ y, y ≤ x, diffNonneg)
-    case Real.IsNonneg(-(y - x)) as negDiffNonneg:
-        -- IsNonneg(-(y - x)) = IsNonneg(x - y) ≡ y ≤ x. The
-        -- equation -(y - x) = x - y is pure ring.
-        Or.introduceRight(rewrite((ring : -(y - x) = x - y), negDiffNonneg))
+    in (Real.IsNonneg(y - x)) as diffNonneg: {
+        claim x ≤ y;
+        done
+      }
+    in (Real.IsNonneg(-(y - x))) as negDiffNonneg: {
+        claim y ≤ x by substituting (ring : -(y - x) = x - y);
+        done
+      }
   }
 
 -- ----------------------------------------------------------------------
@@ -449,10 +374,9 @@ theorem Real.not_LessOrEqual_implies
         (x y : Real)
         (notXLeqY : Not(x ≤ y))
         : y ≤ x :=
-  cases Real.LessOrEqual.linear(x, y) {
-    | Or.introduceLeft(xLeqY) =>
-        absurd(notXLeqY(xLeqY))
-    | Or.introduceRight(yLeqX) => yLeqX
+  claim by cases {
+    in (x ≤ y) as xLeqY: absurd(notXLeqY(xLeqY))
+    in (y ≤ x) as yLeqX: yLeqX
   }
 
 
@@ -462,9 +386,9 @@ theorem Real.LessOrEqual_of_not_LessThan
         (x y : Real)
         (notLess : Not(y < x))
         : x ≤ y :=
-  cases Real.LessOrEqual.linear(x, y) {
-    | Or.introduceLeft(xLeqY) => xLeqY
-    | Or.introduceRight(yLeqX) =>
+  claim by cases {
+    in (x ≤ y) as xLeqY: xLeqY
+    in (y ≤ x) as yLeqX:
         decide x = y {
           | yes equal => {
               claim x ≤ x since Real.LessOrEqual.reflexive;
@@ -472,10 +396,10 @@ theorem Real.LessOrEqual_of_not_LessThan
               done
             }
           | no notEqual => {
-              claim yNotX : ¬(y = x)
+              claim ¬(y = x)
                   by (yEqualsX : y = x) ↦
-                      notEqual(calc x = y by yEqualsX);
-              claim yLessX : y < x by And.introduction(yLeqX, yNotX);
+                      notEqual(calc x = y);
+              claim yLessX : y < x;
               absurd(notLess(yLessX))
             }
         }
