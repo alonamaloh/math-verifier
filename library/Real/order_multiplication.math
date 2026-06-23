@@ -84,25 +84,36 @@ theorem Real.IsNonneg.multiply_at_make
       (epsilon : Rational)
       (epsilonPositive : Rational.zero < epsilon) ↦ {
         -- Bound both sequences by one naturally-embedded rational B.
-        obtain ⟨KS, NS, sBounded⟩
-            from Rational.sequence.cauchy_is_naturally_bounded(s, sCauchy);
-        obtain ⟨KT, NT, tBounded⟩
-            from Rational.sequence.cauchy_is_naturally_bounded(t, tCauchy);
+        claim sBoundedExists
+              : ∃ (K : Natural). ∃ (N : Natural).
+                  ∀ (m : Natural). N ≤ m → abs(s(m)) ≤ ((K + 1) : Rational)
+            since Rational.sequence.cauchy_is_naturally_bounded;
+        choose KS as sBoundedTail from sBoundedExists;
+        choose NS as sBounded from sBoundedTail;
+        claim tBoundedExists
+              : ∃ (K : Natural). ∃ (N : Natural).
+                  ∀ (m : Natural). N ≤ m → abs(t(m)) ≤ ((K + 1) : Rational)
+            since Rational.sequence.cauchy_is_naturally_bounded;
+        choose KT as tBoundedTail from tBoundedExists;
+        choose NT as tBounded from tBoundedTail;
         let K : Natural := KS + KT + 1;
         claim Rational.IsNonneg(((KT + 1) : Rational))
             since Rational.from_natural_is_nonneg;
         claim Rational.IsNonneg(((KS + 1) : Rational))
             since Rational.from_natural_is_nonneg;
-        -- Choose δ with (succ K : ℚ)·δ ≤ ε/2, and tail indices where both
+        -- Choose δ with (K + 1 : ℚ)·δ ≤ ε/2, and tail indices where both
         -- sequences are above -δ.
-        claim halfPositive : Rational.zero < Rational.halve(epsilon)
+        claim Rational.zero < Rational.halve(epsilon)
             since Rational.halve_positive;
-        obtain ⟨delta, deltaProperties⟩
-            from Rational.divide_by_succ_positive(
-                     Rational.halve(epsilon), K, halfPositive);
-        let ⟨deltaPositive, deltaBound⟩ := deltaProperties;
-        obtain ⟨N1, sLow⟩ from sNonneg(delta, deltaPositive);
-        obtain ⟨N2, tLow⟩ from tNonneg(delta, deltaPositive);
+        claim deltaExists
+              : ∃ (delta : Rational). Rational.zero < delta
+                ∧ Rational.LessOrEqual(((K + 1) : Rational) * delta, Rational.halve(epsilon))
+            since Rational.divide_by_succ_positive;
+        choose delta as deltaProperties from deltaExists;
+        claim deltaPositive : Rational.zero < delta;
+        claim Rational.LessOrEqual(((K + 1) : Rational) * delta, Rational.halve(epsilon));
+        choose N1 as sLow from sNonneg(delta, deltaPositive);
+        choose N2 as tLow from tNonneg(delta, deltaPositive);
         witness Natural.maximum(Natural.maximum(N1, N2),
                     Natural.maximum(NS, NT)) with
             (m : Natural)
@@ -115,52 +126,44 @@ theorem Real.IsNonneg.multiply_at_make
                   since Natural.le_through_max_right;
               claim aboveN1 : N1 ≤ m;
               claim aboveN2 : N2 ≤ m;
-              claim aboveNS : NS ≤ m;
-              claim aboveNT : NT ≤ m;
+              claim NS ≤ m;
+              claim NT ≤ m;
               claim -delta < s(m) by sLow(m, aboveN1);
               claim -delta < t(m) by tLow(m, aboveN2);
               claim Rational.zero ≤ ((KT + 1) : Rational)
                   since Rational.LessOrEqual_zero_of_IsNonneg;
               claim Rational.zero ≤ ((KS + 1) : Rational)
                   since Rational.LessOrEqual_zero_of_IsNonneg;
-              claim abs(s(m)) ≤ ((K + 1) : Rational)
-                  by calc abs(s(m))
-                        ≤ ((KS + 1) : Rational)
-                              by sBounded(m, aboveNS)
-                        = ((KS + 1) : Rational) + Rational.zero
-                        ≤ ((KS + 1) : Rational)
-                              + ((KT + 1) : Rational)
-                              by Rational.add_general_LessOrEqual_left
-                        = ((K + 1) : Rational)
-                              since Rational.add_one_sum_coercion;
-              claim abs(t(m)) ≤ ((K + 1) : Rational)
-                  by calc abs(t(m))
-                        ≤ ((KT + 1) : Rational)
-                              by tBounded(m, aboveNT)
-                        = ((KT + 1) : Rational) + Rational.zero
-                        ≤ ((KT + 1) : Rational)
-                              + ((KS + 1) : Rational)
-                              by Rational.add_general_LessOrEqual_left
-                        = ((KS + 1) : Rational)
-                              + ((KT + 1) : Rational)
-                        = ((K + 1) : Rational)
-                              since Rational.add_one_sum_coercion;
+              calc abs(s(m))
+                 ≤ ((KS + 1) : Rational)
+                 = ((KS + 1) : Rational) + Rational.zero
+                 ≤ ((KS + 1) : Rational)
+                       + ((KT + 1) : Rational)
+                       by Rational.add_general_LessOrEqual_left
+                 = ((K + 1) : Rational)
+                       since Rational.add_one_sum_coercion;
+              calc abs(t(m))
+                 ≤ ((KT + 1) : Rational)
+                 = ((KT + 1) : Rational) + Rational.zero
+                 ≤ ((KT + 1) : Rational)
+                       + ((KS + 1) : Rational)
+                       by Rational.add_general_LessOrEqual_left
+                 = ((KS + 1) : Rational)
+                       + ((KT + 1) : Rational)
+                 = ((K + 1) : Rational)
+                       since Rational.add_one_sum_coercion;
               -- The pointwise product bound, then the ε-budget.
-              claim productLow
-                  : -(((K + 1) : Rational) * delta) ≤ s(m) * t(m)
+              claim -(((K + 1) : Rational) * delta) ≤ s(m) * t(m)
                   since Rational.product_lower_bound_of_lower_bounds;
-              claim ((K + 1) : Rational) * delta < epsilon
-                  by calc ((K + 1) : Rational) * delta
-                        ≤ Rational.halve(epsilon)   by deltaBound
-                        < epsilon
-                              since Rational.halve_less_than_self;
+              calc ((K + 1) : Rational) * delta
+                 ≤ Rational.halve(epsilon)
+                 < epsilon
+                       since Rational.halve_less_than_self;
               claim -epsilon < -(((K + 1) : Rational) * delta)
                   since Rational.LessThan.negate;
               calc -epsilon
                  < -(((K + 1) : Rational) * delta)
-                       by (-epsilon < -(((K + 1) : Rational) * delta))
                  ≤ s(m) * t(m)
-                       by productLow
             }
       })
 
@@ -170,10 +173,13 @@ theorem Real.IsNonneg.multiply (x y : Real)
         (xNonneg : Real.IsNonneg(x)) (yNonneg : Real.IsNonneg(y))
         : Real.IsNonneg(x * y) :=
   cases x refining xNonneg { | repX =>
-      cases y refining yNonneg { | repY =>
-          Real.IsNonneg.multiply_at_make(repX, repY,
-              Real.IsNonneg.eventually_nonneg(repX, xNonneg),
-              Real.IsNonneg.eventually_nonneg(repY, yNonneg)) } }
+      cases y refining yNonneg { | repY => {
+          claim CauchyRationalSequence.IsEventuallyNonneg(repX)
+              by Real.IsNonneg.eventually_nonneg;
+          claim CauchyRationalSequence.IsEventuallyNonneg(repY)
+              by Real.IsNonneg.eventually_nonneg;
+          done
+      } } }
 
 -- Multiplying by a nonnegative factor preserves ≤ (on the right).
 theorem Real.LessOrEqual.multiply_by_nonneg_right (x y c : Real)
@@ -207,82 +213,82 @@ theorem Real.LessOrEqual.multiply_monotone_nonneg (a b c d : Real)
 -- ring rearrangement once |·| is identified with ± its argument.
 theorem Real.absolute_value_multiplicative (x y : Real)
         : abs(x * y) = abs(x) * abs(y) :=
-  cases Real.IsNonneg_or_negate_IsNonneg(x) {
-    | Or.introduceLeft(xNonneg) =>
-        cases Real.IsNonneg_or_negate_IsNonneg(y) {
-          | Or.introduceLeft(yNonneg) => {
-              claim Real.IsNonneg(x * y)
-                  since Real.IsNonneg.multiply;
-              calc abs(x * y)
-                 = x * y
-                 = abs(x) * y
-                 = abs(x) * abs(y)
-            }
-          | Or.introduceRight(negateYNonneg) => {
-              claim Real.IsNonneg(x * -y) since Real.IsNonneg.multiply;
-              claim Real.IsNonneg(-(x * y))
-                  by substituting (ring : x * -y = -(x * y));
-              calc abs(x * y)
-                 = -(x * y)
-                 = x * -y
-                 = abs(x) * -y
-                 = abs(x) * abs(y)
-            }
-        }
-    | Or.introduceRight(negateXNonneg) =>
-        cases Real.IsNonneg_or_negate_IsNonneg(y) {
-          | Or.introduceLeft(yNonneg) => {
-              claim Real.IsNonneg(-x * y) since Real.IsNonneg.multiply;
-              claim Real.IsNonneg(-(x * y))
-                  by substituting (ring : -x * y = -(x * y));
-              calc abs(x * y)
-                 = -(x * y)
-                 = -x * y
-                 = abs(x) * y
-                 = abs(x) * abs(y)
-            }
-          | Or.introduceRight(negateYNonneg) => {
-              claim Real.IsNonneg(x * y)
-                  by {
-                    claim Real.IsNonneg(-x * -y) since Real.IsNonneg.multiply;
-                    claim Real.IsNonneg(x * y)
-                        by substituting (ring : -x * -y = x * y);
-                    done
-                  };
-              calc abs(x * y)
-                 = x * y
-                 = -x * -y
-                 = abs(x) * -y
-                 = abs(x) * abs(y)
-            }
-        }
+  claim by cases {
+    in (Real.IsNonneg(x)) as xNonneg:
+      claim by cases {
+        in (Real.IsNonneg(y)) as yNonneg: {
+            claim Real.IsNonneg(x * y)
+                since Real.IsNonneg.multiply;
+            calc abs(x * y)
+               = x * y
+               = abs(x) * y
+               = abs(x) * abs(y)
+          }
+        in (Real.IsNonneg(-y)) as negateYNonneg: {
+            claim Real.IsNonneg(x * -y) since Real.IsNonneg.multiply;
+            claim Real.IsNonneg(-(x * y))
+                by substituting (ring : x * -y = -(x * y));
+            calc abs(x * y)
+               = -(x * y)
+               = x * -y
+               = abs(x) * -y
+               = abs(x) * abs(y)
+          }
+      }
+    in (Real.IsNonneg(-x)) as negateXNonneg:
+      claim by cases {
+        in (Real.IsNonneg(y)) as yNonneg: {
+            claim Real.IsNonneg(-x * y) since Real.IsNonneg.multiply;
+            claim Real.IsNonneg(-(x * y))
+                by substituting (ring : -x * y = -(x * y));
+            calc abs(x * y)
+               = -(x * y)
+               = -x * y
+               = abs(x) * y
+               = abs(x) * abs(y)
+          }
+        in (Real.IsNonneg(-y)) as negateYNonneg: {
+            claim Real.IsNonneg(x * y)
+                by {
+                  claim Real.IsNonneg(-x * -y) since Real.IsNonneg.multiply;
+                  claim Real.IsNonneg(x * y)
+                      by substituting (ring : -x * -y = x * y);
+                  done
+                };
+            calc abs(x * y)
+               = x * y
+               = -x * -y
+               = abs(x) * -y
+               = abs(x) * abs(y)
+          }
+      }
   }
 
 -- A Real square is nonnegative: at a representative the squared sequence
 -- is pointwise a Rational square (≥ 0), so eventually-nonnegative.
 theorem Real.square_IsNonneg (x : Real)
         : Real.IsNonneg(Real.multiply(x, x)) :=
-  cases x { | c =>
-    Real.IsNonneg.of_eventually_nonneg(
-        CauchyRationalSequence.multiply(c, c),
-    (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦
-      witness 0 with
-          (m : Natural) (zeroLessOrEqualM : 0 ≤ m) ↦
-            rewrite(
-                Equality.symmetry(
-                    CauchyRationalSequence.sequenceFunction_multiply(c, c, m)),
-                Rational.LessThan.transitive_right(
-                    Rational.negate(epsilon), Rational.zero,
-                    Rational.multiply(
-                        CauchyRationalSequence.sequenceFunction(c, m),
-                        CauchyRationalSequence.sequenceFunction(c, m)),
-                    Rational.negate_LessThan_zero_of_positive(epsilon, epsilonPositive),
-                    Rational.LessOrEqual_zero_of_IsNonneg(
-                        Rational.multiply(
-                            CauchyRationalSequence.sequenceFunction(c, m),
-                            CauchyRationalSequence.sequenceFunction(c, m)),
-                        Rational.square_IsNonneg(
-                            CauchyRationalSequence.sequenceFunction(c, m))))) ) }
+  cases x { | c => {
+    claim CauchyRationalSequence.IsEventuallyNonneg(CauchyRationalSequence.multiply(c, c))
+        by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦
+          witness 0 with
+              (m : Natural) (_ : 0 ≤ m) ↦ {
+                claim Rational.IsNonneg(
+                          CauchyRationalSequence.sequenceFunction(c, m)
+                          * CauchyRationalSequence.sequenceFunction(c, m))
+                    since Rational.square_IsNonneg;
+                calc -epsilon
+                   < Rational.zero
+                         since Rational.negate_LessThan_zero_of_positive
+                   ≤ CauchyRationalSequence.sequenceFunction(c, m)
+                         * CauchyRationalSequence.sequenceFunction(c, m)
+                         since Rational.LessOrEqual_zero_of_IsNonneg
+                   = CauchyRationalSequence.sequenceFunction(
+                         CauchyRationalSequence.multiply(c, c), m)
+                         since CauchyRationalSequence.sequenceFunction_multiply
+              };
+    done
+  } }
 
 
 -- |x|·|x| = x·x: the square forgets the sign.
