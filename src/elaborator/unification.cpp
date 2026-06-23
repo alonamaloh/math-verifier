@@ -307,6 +307,7 @@ void Elaborator::unifyConstructorParameters(
                 // all the way to `Quotient`. The loop is bounded by the
                 // chain of transparent definitions, so it terminates.
                 ExpressionPointer current = target;
+                bool matched = false;
                 for (int unfoldStep = 0; unfoldStep < 64; ++unfoldStep) {
                     ExpressionPointer next =
                         unfoldHeadConstantOneStep(current);
@@ -321,7 +322,44 @@ void Elaborator::unifyConstructorParameters(
                         unifyConstructorParameters(
                             pattern, current, metavariableNames,
                             assignment, binderDepth, binderTypeStack);
+                        matched = true;
                         break;
+                    }
+                }
+                // The δ-only loop above reaches a pattern head that is a
+                // transparent-definition alias (RingModulo, …) but STALLS on
+                // a stuck eliminator: e.g. `Real.add(Real.zero, class_of …)`
+                // δ-unfolds to a `Quotient.lift_two` whose first argument is
+                // not yet a `class_of` constructor, so ι cannot fire and the
+                // single-step head never becomes `class_of`. Fall back to the
+                // kernel's WHNF, which performs that ι-reduction (and the δ of
+                // `Real.zero` / `Real.negate` / the `(q : Real)` cast that
+                // exposes the underlying `class_of`). WHNF RESPECTS opacity
+                // (an opaque head is a stuck head — kernel.cpp), so it never
+                // pierces an opaque definition; and because the loop above
+                // has already matched any intermediate transparent alias head
+                // before we reach here, this fallback cannot over-reduce past
+                // a wanted alias (e.g. it cannot blow `RingModulo` past to
+                // `Quotient`). If a goal makes WHNF expensive, sealing the
+                // offending definition `opaque` stops it here.
+                if (!matched) {
+                    ExpressionPointer reduced;
+                    try {
+                        reduced = weakHeadNormalForm(environment_, target);
+                    } catch (const KernelResourceExhausted&) {
+                        reduced = nullptr;
+                    }
+                    if (reduced) {
+                        ExpressionPointer reducedHead = reduced;
+                        while (auto* nestedApp = std::get_if<Application>(
+                                   &reducedHead->node)) {
+                            reducedHead = nestedApp->function;
+                        }
+                        if (headsMatch(patternHead, reducedHead)) {
+                            unifyConstructorParameters(
+                                pattern, reduced, metavariableNames,
+                                assignment, binderDepth, binderTypeStack);
+                        }
                     }
                 }
                 return;

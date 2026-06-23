@@ -152,7 +152,7 @@ tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
 #                     CLEAN_LEAK_BUDGET, so a cleaned file cannot regress.
 CLEAN_MATH_FILES := $(shell grep -vE '^\#|^\s*$$' scripts/clean_manifest.txt)
 CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
-CLEAN_LEAK_BUDGET ?= 187
+CLEAN_LEAK_BUDGET ?= 180
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
