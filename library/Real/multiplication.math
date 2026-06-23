@@ -207,8 +207,7 @@ theorem Rational.sequence.product_is_cauchy
         since Rational.divide_by_succ_positive;
     choose delta_s from deltaSExists;
     claim delta_s_pos : Rational.zero < delta_s;
-    claim delta_s_bound
-        : Rational.LessOrEqual(
+    claim Rational.LessOrEqual(
               ((K_t + 1) : Rational) * delta_s,
               Rational.halve(Rational.halve(epsilon)));
     -- Step 4: get δ_t.
@@ -220,8 +219,7 @@ theorem Rational.sequence.product_is_cauchy
         since Rational.divide_by_succ_positive;
     choose delta_t from deltaTExists;
     claim delta_t_pos : Rational.zero < delta_t;
-    claim delta_t_bound
-        : Rational.LessOrEqual(
+    claim Rational.LessOrEqual(
               ((K_s + 1) : Rational) * delta_t,
               Rational.halve(Rational.halve(epsilon)));
     -- Step 5: apply sCauchy(δ_s) and tCauchy(δ_t). State the existentials
@@ -249,17 +247,11 @@ theorem Rational.sequence.product_is_cauchy
                             Natural.maximum(N_s_bound, N_t_bound),
                             Natural.maximum(N_s, N_t)) ≤ n) ↦
           Rational.sequence.product_is_cauchy_bound(
-              s, t, epsilon,
-              K_s, K_t,
-              delta_s, delta_t,
-              N_s_bound, N_t_bound, N_s, N_t,
-              m, n,
-              m_ge, n_ge,
-              sBound, tBound,
-              sCauchyAt, tCauchyAt,
-              And.introduction(delta_s_pos, delta_s_bound),
-              And.introduction(delta_t_pos, delta_t_bound),
-              epsilonPositive)
+              s := s, t := t,
+              K_s := K_s, K_t := K_t,
+              delta_s := delta_s, delta_t := delta_t,
+              N_s_bound := N_s_bound, N_t_bound := N_t_bound,
+              N_s := N_s, N_t := N_t)
   }
 
 -- The bound chain extracted as a separate theorem to keep the
@@ -427,9 +419,12 @@ theorem Real.multiply_respects_at_rep_y_inner
   -- Reduce to multiply_after_first_respects_at_rep_inner with s_y as
   -- the "fixed" sequence (bounded) and x varying.
   {
-    choose N as boundedY from Real.multiply_after_first_respects_at_rep_inner(
-                 s_y, sCauchy_y, s_x, s_xPrime, sCauchy_x, sCauchy_xPrime,
-                 refinedXEquiv, epsilon, epsilonPositive);
+    claim boundedYExists
+        : ∃ (N : Natural).
+            ∀ (m : Natural). N ≤ m →
+              abs(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)) < epsilon
+        since Real.multiply_after_first_respects_at_rep_inner;
+    choose N as boundedY from boundedYExists;
     witness N with
         (m : Natural) (N_leq_m : N ≤ m) ↦
           calc abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
@@ -453,7 +448,7 @@ theorem Real.multiply_respects_first
                (epsilonPositive : Rational.zero < epsilon) ↦ {
         change ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
                  abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)) < epsilon;
-        done by Real.multiply_respects_at_rep_y_inner
+        done since Real.multiply_respects_at_rep_y_inner
       }
 
 -- Real.multiply: multiply the representative sequences pointwise;
@@ -510,12 +505,12 @@ theorem Rational.to_real.multiply_preserves_equiv (a b : Rational)
 
 theorem Rational.to_real.multiply_preserves (a b : Rational)
         : Rational.to_real(a * b)
-          = Rational.to_real(a) * Rational.to_real(b) :=
-  Quotient.equivalent_implies_equal(
-      CauchyRationalSequence,
-      CauchyEquivalent,
-      Rational.to_cauchy_constant(a * b),
-      CauchyRationalSequence.multiply(
-          Rational.to_cauchy_constant(a),
-          Rational.to_cauchy_constant(b)),
-      Rational.to_real.multiply_preserves_equiv(a, b))
+          = Rational.to_real(a) * Rational.to_real(b) := {
+  claim CauchyEquivalent(
+            Rational.to_cauchy_constant(a * b),
+            CauchyRationalSequence.multiply(
+                Rational.to_cauchy_constant(a),
+                Rational.to_cauchy_constant(b)))
+      since Rational.to_real.multiply_preserves_equiv;
+  done
+}

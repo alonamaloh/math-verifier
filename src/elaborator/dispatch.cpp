@@ -6,6 +6,25 @@
 
 #include "elaborator/internal.hpp"
 
+// The built-in elaborator forms whose LEADING type/relation parameters
+// are supplied by a custom desugar (below in this file) rather than by
+// ordinary application — so named arguments address only the trailing
+// window the desugar consumes (e.g. `Quotient.equivalent_implies_equal`'s
+// `x, y, proof`, with `T, R` recovered from those args' types). For these,
+// the windowed short-list reorder is correct. Every OTHER head is an
+// ordinary lemma whose unsupplied parameters become inference holes.
+static bool isDesugarShortFormHead(const std::string& name) {
+    static const std::set<std::string> names = {
+        "congruenceOf", "reflexivity", "Equality.symmetry",
+        "Equality.transitivity", "rewrite", "simplify", "absurd",
+        "Quotient.class_of", "Quotient.equivalent_implies_equal",
+        "Quotient.lift", "Exists.eliminate", "And.eliminate",
+        "Or.eliminate", "Quotient.induct", "Quotient.induct_two",
+        "Quotient.induct_three",
+    };
+    return names.count(name) > 0;
+}
+
 std::vector<SurfaceExpressionPointer> Elaborator::reorderArgumentsForCall(
         const std::vector<SurfaceArgument>& arguments,
         SurfaceExpressionPointer functionSurface,
@@ -71,6 +90,65 @@ std::vector<SurfaceExpressionPointer> Elaborator::reorderArgumentsForCall(
                 + " user-facing parameters but call supplies "
                 + std::to_string(argCount));
         }
+        // Generic lemmas: a named or partial argument list pins specific
+        // parameters by name and leaves the rest to goal-driven inference.
+        // Build a FULL-ARITY list over the user-facing parameters — named
+        // values at their parameter's slot, positional values in the
+        // leading unfilled slots in order, and a `?` hole at every
+        // unsupplied slot. A fully-applied call yields no holes and
+        // elaborates as an ordinary application; a partial one routes to
+        // the hole solver (`inferCallWithHoles`), which pins data
+        // parameters from the goal and discharges premise parameters from
+        // context. This is what makes `Lemma(x := e)` mean "apply Lemma
+        // with parameter x set to e, everything else inferred" — and it
+        // removes the old window-offset bug where a trailing named arg on
+        // an ordinary lemma was silently applied to the WRONG (leading)
+        // parameter.
+        if (!isDesugarShortFormHead(headIdentifier->qualifiedName)) {
+            std::vector<SurfaceExpressionPointer> full(
+                userParamNames.size());
+            for (const auto& a : arguments) {
+                if (a.name.empty()) continue;
+                int paramIndex = -1;
+                for (size_t i = 0; i < userParamNames.size(); ++i) {
+                    if (userParamNames[i] == a.name) {
+                        paramIndex = static_cast<int>(i);
+                        break;
+                    }
+                }
+                if (paramIndex < 0) {
+                    throwElaborate(
+                        "named arguments: '"
+                        + headIdentifier->qualifiedName
+                        + "' has no parameter named '" + a.name + "'");
+                }
+                if (full[paramIndex]) {
+                    throwElaborate(
+                        "named arguments: parameter '"
+                        + a.name + "' assigned twice");
+                }
+                full[paramIndex] = a.value;
+            }
+            size_t nextSlot = 0;
+            for (const auto& a : arguments) {
+                if (!a.name.empty()) continue;
+                while (nextSlot < full.size() && full[nextSlot]) {
+                    ++nextSlot;
+                }
+                if (nextSlot >= full.size()) {
+                    throwElaborate(
+                        "named arguments: too many positional arguments "
+                        "after named-argument assignments");
+                }
+                full[nextSlot] = a.value;
+                ++nextSlot;
+            }
+            for (auto& slot : full) {
+                if (!slot) slot = makeSurfaceHole(line, 0);
+            }
+            return full;
+        }
+        // Desugar short-forms only, below.
         // Two windows to try: the PREFIX [0..argCount) and the SUFFIX
         // [size-argCount..size). Prefix wins for fully-applied calls
         // and for explicit-parameter calls; suffix wins for desugared

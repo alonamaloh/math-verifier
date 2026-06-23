@@ -10,6 +10,7 @@ import axioms
 import Logic.basics
 import Equality.basics
 import Natural.basics
+import Natural.order
 import Integer.basics
 import Integer.addition
 
@@ -55,3 +56,28 @@ theorem named_args_on_desugar
         : Quotient.class_of(IntegerRepresentative, IntegerEquivalent, rep1)
           = Quotient.class_of(rep2) :=
   Quotient.equivalent_implies_equal(proof := proof, x := rep1, y := rep2)
+
+-- (6) PARTIAL named arguments on an ORDINARY lemma: named args pin only
+-- some parameters; every unsupplied parameter is left to goal-driven
+-- inference (data from the goal, premises discharged from context). Here
+-- `c` / `hc` appear ONLY in a premise, never in the conclusion `a ≤ a`,
+-- so they cannot be inferred and must be named.
+theorem partial_named_pins (a b : Natural) (h : a ≤ b) (c : Natural) (hc : b ≤ c)
+        : a ≤ a :=
+  Natural.LessOrEqual.reflexive(a)
+
+-- COLLISION: the named-arg names equal in-scope locals (`c := c`). The
+-- leading `a, b, h` are inferred (a from the goal; b, h from the context
+-- premises). This previously fell back to positional and silently fed the
+-- trailing args to the WRONG leading parameters.
+theorem partial_named_collision (a b c : Natural) (h : a ≤ b) (hc : b ≤ c)
+        : a ≤ a := {
+  done by partial_named_pins(c := c, hc := hc)
+}
+
+-- Pin a parameter to an ARBITRARY expression (`c := b`), the remaining
+-- premise discharged from context.
+theorem partial_named_expression (a b : Natural) (h : a ≤ b) (hb : b ≤ b)
+        : a ≤ a := {
+  done by partial_named_pins(c := b, hc := hb)
+}
