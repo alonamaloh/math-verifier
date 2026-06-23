@@ -63,12 +63,8 @@ theorem Rational.sequence.product_is_cauchy_bound
         (K_s K_t : Natural)
         (delta_s delta_t : Rational)
         (N_s_bound N_t_bound N_s N_t m n : Natural)
-        (m_ge : Natural.maximum(
-                    Natural.maximum(N_s_bound, N_t_bound),
-                    Natural.maximum(N_s, N_t)) ≤ m)
-        (n_ge : Natural.maximum(
-                    Natural.maximum(N_s_bound, N_t_bound),
-                    Natural.maximum(N_s, N_t)) ≤ n)
+        (m_ge : max(max(N_s_bound, N_t_bound), max(N_s, N_t)) ≤ m)
+        (n_ge : max(max(N_s_bound, N_t_bound), max(N_s, N_t)) ≤ n)
         (sBound : ∀ (m_arg : Natural). N_s_bound ≤ m_arg →
                     abs(s(m_arg))
                       ≤ ((K_s + 1) : Rational))
@@ -116,55 +112,34 @@ theorem Rational.sequence.product_is_cauchy_bound
           ≤ Rational.halve(Rational.halve(epsilon));
   claim ((K_s + 1) : Rational) * delta_t
           ≤ Rational.halve(Rational.halve(epsilon));
-  claim abs(
-            s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
-          ≤ abs(s(m) * (t(m) - t(n)))
-            + abs(t(n) * (s(m) - s(n)))
+  claim abs(s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))) ≤ abs(s(m) * (t(m) - t(n))) + abs(t(n) * (s(m) - s(n)))
     since Rational.triangle_inequality;
-  claim abs(s(m))
-            * abs(t(m) - t(n))
-          ≤ ((K_s + 1) : Rational)
-            * abs(t(m) - t(n))
+  claim abs(s(m)) * abs(t(m) - t(n)) ≤ ((K_s + 1) : Rational) * abs(t(m) - t(n))
     by Rational.LessOrEqual.multiply_by_nonneg_right;
-  claim ((K_s + 1) : Rational)
-            * abs(t(m) - t(n))
-          ≤ ((K_s + 1) : Rational) * delta_t
+  claim ((K_s + 1) : Rational) * abs(t(m) - t(n)) ≤ ((K_s + 1) : Rational) * delta_t
     by Rational.LessOrEqual.multiply_by_nonneg_left;
-  claim abs(t(n))
-            * abs(s(m) - s(n))
-          ≤ ((K_t + 1) : Rational)
-            * abs(s(m) - s(n))
+  claim abs(t(n)) * abs(s(m) - s(n)) ≤ ((K_t + 1) : Rational) * abs(s(m) - s(n))
     by Rational.LessOrEqual.multiply_by_nonneg_right;
-  claim ((K_t + 1) : Rational)
-            * abs(s(m) - s(n))
-          ≤ ((K_t + 1) : Rational) * delta_s
+  claim ((K_t + 1) : Rational) * abs(s(m) - s(n)) ≤ ((K_t + 1) : Rational) * delta_s
     by Rational.LessOrEqual.multiply_by_nonneg_left;
   calc abs(s(m) * (t(m) - t(n)))
-     = abs(s(m))
-         * abs(t(m) - t(n))
-     ≤ ((K_s + 1) : Rational)
-         * abs(t(m) - t(n))
+     = abs(s(m)) * abs(t(m) - t(n))
+     ≤ ((K_s + 1) : Rational) * abs(t(m) - t(n))
      ≤ ((K_s + 1) : Rational) * delta_t
      ≤ Rational.halve(Rational.halve(epsilon));
   calc abs(t(n) * (s(m) - s(n)))
-     = abs(t(n))
-         * abs(s(m) - s(n))
-     ≤ ((K_t + 1) : Rational)
-         * abs(s(m) - s(n))
+     = abs(t(n)) * abs(s(m) - s(n))
+     ≤ ((K_t + 1) : Rational) * abs(s(m) - s(n))
      ≤ ((K_t + 1) : Rational) * delta_s
      ≤ Rational.halve(Rational.halve(epsilon));
-  calc abs(s(m) * (t(m) - t(n)))
-            + abs(t(n) * (s(m) - s(n)))
-       ≤ Rational.halve(Rational.halve(epsilon))
-           + Rational.halve(Rational.halve(epsilon))
-       = Rational.halve(epsilon);
+  calc abs(s(m) * (t(m) - t(n))) + abs(t(n) * (s(m) - s(n)))
+     ≤ Rational.halve(Rational.halve(epsilon)) + Rational.halve(Rational.halve(epsilon))
+     = Rational.halve(epsilon);
   -- Triangle on the regrouped form; then ≤ ε/2 by the two halves; then
   -- < ε by halve_less_than_self. All in one calc chain.
   calc abs(s(m) * t(m) - s(n) * t(n))
-     = abs(
-           s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
-     ≤ abs(s(m) * (t(m) - t(n)))
-           + abs(t(n) * (s(m) - s(n)))
+     = abs(s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
+     ≤ abs(s(m) * (t(m) - t(n))) + abs(t(n) * (s(m) - s(n)))
      ≤ Rational.halve(epsilon)
      < epsilon
 }
@@ -235,19 +210,10 @@ theorem Rational.sequence.product_is_cauchy
         since tIsCauchy(delta_t, delta_t_pos);
     choose N_t as tCauchyAt from tCauchyBound;
     -- Final N := max(N_s_bound, N_t_bound, N_s, N_t).
-    witness Natural.maximum(
-                Natural.maximum(N_s_bound, N_t_bound),
-                Natural.maximum(N_s, N_t)) with
-        (m : Natural)
-                 (m_ge : Natural.maximum(
-                            Natural.maximum(N_s_bound, N_t_bound),
-                            Natural.maximum(N_s, N_t)) ≤ m)
-                 (n : Natural)
-                 (n_ge : Natural.maximum(
-                            Natural.maximum(N_s_bound, N_t_bound),
-                            Natural.maximum(N_s, N_t)) ≤ n) ↦
+    witness max(max(N_s_bound, N_t_bound), max(N_s, N_t)) with
+        (m : Natural) (m_ge : max(max(N_s_bound, N_t_bound), max(N_s, N_t)) ≤ m)
+        (n : Natural) (n_ge : max(max(N_s_bound, N_t_bound), max(N_s, N_t)) ≤ n) ↦
           Rational.sequence.product_is_cauchy_bound(
-              s := s, t := t,
               K_s := K_s, K_t := K_t,
               delta_s := delta_s, delta_t := delta_t,
               N_s_bound := N_s_bound, N_t_bound := N_t_bound,
@@ -367,9 +333,8 @@ theorem Real.multiply_after_first_respects_at_rep_inner
     claim delta_pos : Rational.zero < delta;
     claim Rational.LessOrEqual(((K + 1) : Rational) * delta, Rational.halve(epsilon));
     choose N_y as yEquivAt from refinedYEquiv(delta, delta_pos);
-    witness Natural.maximum(N_x_bound, N_y) with
-        (m : Natural)
-                 (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) ↦ {
+    witness max(N_x_bound, N_y) with
+        (m : Natural) (m_ge_max : max(N_x_bound, N_y) ≤ m) ↦ {
           claim mGeNxBound : N_x_bound ≤ m since Natural.le_through_max_left;
           claim mGeNy : N_y ≤ m since Natural.le_through_max_right;
           claim abs(s_x(m)) ≤ ((K + 1) : Rational) since xBound(m, mGeNxBound);

@@ -237,6 +237,73 @@ void Elaborator::unifyConstructorParameters(
                             }
                         }
                     }
+                    // Higher-order pattern solve: pattern `?F a₁ … aₖ` against
+                    // target `g b₁ … bₖ` of the SAME arity, where each aᵢ is
+                    // either (i) structurally equal to bᵢ — an already-aligned
+                    // rigid argument — or (ii) one of OUR metavariables, which
+                    // we then solve as `?aᵢ := bᵢ`. Under that condition the
+                    // spines line up position-for-position, so the equation
+                    // determines `?F := g` (and the hole args). This is the
+                    // reading a mathematician takes for granted: `?s m` against
+                    // `s m`, with `m` a local, plainly means `?s := s`; and the
+                    // product-Cauchy conclusion `abs((?s ?m)·(?t ?m) − …)` against
+                    // `abs((s m)·(t m) − …)` solves `?s := s, ?t := t, ?m := m`.
+                    //
+                    // The (i)-or-(ii) gate is what keeps it sound. A RIGID aᵢ
+                    // that DIFFERS from bᵢ (or a different arity) means the
+                    // spines do NOT align — e.g. an instance/relation metavar
+                    // `?R rep1 rep2` against `Equality(N, x, y)` — and a blind
+                    // head-solve there would corrupt `?R` into a partial
+                    // application. Rejecting those leaves such metavariables for
+                    // the proper instance/bundle inference path. Any binding
+                    // made here is, as always, re-checked by the kernel's final
+                    // typecheck of the assembled term.
+                    if (!assignment.count(headFreeVariable->name)) {
+                        std::vector<ExpressionPointer> patternArgs;
+                        ExpressionPointer patternCursor = pattern;
+                        while (auto* app = std::get_if<Application>(
+                                   &patternCursor->node)) {
+                            patternArgs.push_back(app->argument);
+                            patternCursor = app->function;
+                        }
+                        std::vector<ExpressionPointer> targetArgs;
+                        ExpressionPointer targetCursor = target;
+                        while (auto* app = std::get_if<Application>(
+                                   &targetCursor->node)) {
+                            targetArgs.push_back(app->argument);
+                            targetCursor = app->function;
+                        }
+                        bool spinesAlign =
+                            !patternArgs.empty()
+                            && patternArgs.size() == targetArgs.size();
+                        for (size_t k = 0; spinesAlign
+                                 && k < patternArgs.size(); ++k) {
+                            if (structurallyEqual(patternArgs[k],
+                                                   targetArgs[k])) {
+                                continue;
+                            }
+                            auto* argFreeVariable = std::get_if<FreeVariable>(
+                                &patternArgs[k]->node);
+                            if (argFreeVariable
+                                && metavariableNames.count(
+                                       argFreeVariable->name)) {
+                                continue;
+                            }
+                            spinesAlign = false;
+                        }
+                        if (spinesAlign) {
+                            unifyConstructorParameters(
+                                patternCursor, targetCursor,
+                                metavariableNames, assignment,
+                                binderDepth, binderTypeStack);
+                            for (size_t k = 0; k < patternArgs.size(); ++k) {
+                                unifyConstructorParameters(
+                                    patternArgs[k], targetArgs[k],
+                                    metavariableNames, assignment,
+                                    binderDepth, binderTypeStack);
+                            }
+                        }
+                    }
                     return;
                 }
             }
