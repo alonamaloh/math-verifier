@@ -1004,6 +1004,12 @@ ExpressionPointer Elaborator::recoverClaimHint(
                 && citedName.find('.') != std::string::npos
                 && !isLocalBinder
                 && !environment_.lookup(citedName)) {
+                if (moduleDeclarationNames_.count(citedName)) {
+                    throwElaborate(
+                        "lemma `" + citedName + "` is declared later in this "
+                        "file — declarations must precede their use; move it "
+                        "above this citation");
+                }
                 throwElaborate(
                     "unknown lemma `" + citedName + "` in `by` citation — "
                     "no declaration by that name is in scope (check the "

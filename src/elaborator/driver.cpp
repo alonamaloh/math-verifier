@@ -225,6 +225,22 @@ void Elaborator::runModule(const SurfaceModule& module) {
         const char* timeFlag = std::getenv("MATH_TIME_DECLARATIONS");
         bool timeDeclarations = timeFlag && timeFlag[0] != '\0'
             && timeFlag[0] != '0';
+        // Collect every declaration name up front so a forward-referencing
+        // `by <Lemma>` citation (a lemma defined later in this same file) gets
+        // a precise hint instead of a misleading "check the spelling".
+        moduleDeclarationNames_.clear();
+        for (const auto& statement : module.statements) {
+            if (auto* d =
+                    std::get_if<SurfaceDefinitionDeclaration>(&statement)) {
+                moduleDeclarationNames_.insert(d->name);
+            } else if (auto* a =
+                    std::get_if<SurfaceAxiomDeclaration>(&statement)) {
+                moduleDeclarationNames_.insert(a->name);
+            } else if (auto* i =
+                    std::get_if<SurfaceInductiveDeclaration>(&statement)) {
+                moduleDeclarationNames_.insert(i->name);
+            }
+        }
         for (const auto& statement : module.statements) {
             if (timeDeclarations) {
                 long long t0 = monotonicNanos();

@@ -4992,6 +4992,11 @@ private:
     Environment& environment_;
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
+    // Every top-level declaration NAME in the module currently being
+    // elaborated, collected up front (before the per-statement loop). Lets a
+    // failed `by <Lemma>` citation tell a *forward reference* — a lemma defined
+    // later in the same file, not yet in `environment_` — apart from a typo.
+    std::unordered_set<std::string> moduleDeclarationNames_;
     // See elaborateModule's docstring. Consulted only by searchSuggestions
     // on a failed proof, to surface unimported library lemmas.
     std::function<const LibrarySearchIndex*()> librarySearchProvider_;
