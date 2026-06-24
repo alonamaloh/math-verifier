@@ -102,7 +102,9 @@ theorem Natural.prime_member_of_divides_product (p : Natural)
           }
         | Or.introduceRight(pDividesTail) => {
             claim allPrimeTail
-                : ∀ (k : Natural). List.member(Natural, k, tail) → Natural.is_prime(k) by sorry;
+                : ∀ (k : Natural). List.member(Natural, k, tail) → Natural.is_prime(k)
+                by (k : Natural) (memberTail : List.member(Natural, k, tail)) ↦
+                    allPrime(k, List.member.there(Natural, k, head, tail, memberTail));
             List.member.there(Natural, p, head, tail,
                 Natural.prime_member_of_divides_product(p, pPrime, tail,
                     allPrimeTail, pDividesTail))
@@ -172,7 +174,7 @@ theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 �
                     cases List.member_prepend_invert(Natural, k, prime, tail,
                               memberProof) {
                       | Or.introduceLeft(kEqualsPrime) =>
-                          sorry
+                          done by substituting kEqualsPrime
                       | Or.introduceRight(memberTail) =>
                           allPrimeTail(k, memberTail)
                     },
@@ -233,9 +235,18 @@ theorem Natural.prime_factorization_unique
           by Natural.multiply_cancel_left;
       -- Recurse and assemble.
       claim allPrimeRest1
-          : ∀ (k : Natural). List.member(Natural, k, rest1) → Natural.is_prime(k) by sorry;
+          : ∀ (k : Natural). List.member(Natural, k, rest1) → Natural.is_prime(k)
+          by (k : Natural) (memberRest1 : List.member(Natural, k, rest1)) ↦
+              allPrime1(k, List.member.there(Natural, k, p, rest1, memberRest1));
       claim allPrimeL2rest
-          : ∀ (k : Natural). List.member(Natural, k, l2rest) → Natural.is_prime(k) by sorry;
+          : ∀ (k : Natural). List.member(Natural, k, l2rest) → Natural.is_prime(k)
+          by (k : Natural) (memberL2rest : List.member(Natural, k, l2rest)) ↦
+              allPrime2(k,
+                  List.Permutation.member_forward(Natural, k,
+                      List.prepend(Natural, p, l2rest), l2,
+                      List.Permutation.symmetric(Natural, l2,
+                          List.prepend(Natural, p, l2rest), permL2),
+                      List.member.there(Natural, k, p, l2rest, memberL2rest)));
       claim restPermutation : List.Permutation(Natural, rest1, l2rest)
           by Natural.prime_factorization_unique(rest1, l2rest, allPrimeRest1,
                  allPrimeL2rest, restProductsEqual);
