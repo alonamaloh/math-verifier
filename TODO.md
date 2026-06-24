@@ -19,6 +19,51 @@ closed under ring ops + the p-adic norm.
   `negate_multiply_negate`. Add more here as concrete-carrier
   proofs find themselves wanting them.
 
+- **Real ε/δ instead of rational ε/δ.** The analysis definitions
+  currently quantify over *rational* epsilons and deltas. The
+  rational and real formulations are equivalent (a real ε can be
+  undercut by a rational one and vice versa), but rational ε/δ is
+  unexpected to a mathematician and buys us nothing. Switch the
+  definitions to real ε/δ.
+
+## Trusted base / axioms
+
+- **Demote `Logic.classical_decidable` from axiom to theorem.**
+  `Logic.classical_decidable : ∀ P. Decidable P` (in `axioms.math`)
+  is redundant — derivable from `Logic.excluded_middle` +
+  `Logic.the` (definite description), both already in the trusted
+  base. The axiom predates `Logic.the` (description added
+  2026-06-12), which is likely why it's still primitive.
+
+  Derivation that works (verified): apply `Logic.the` over the type
+  `Decidable(P)` itself with the constantly-`True` predicate.
+  Existence of an inhabitant comes from a `claim by cases` split on
+  `P` / `Not(P)`, yielding `Decidable.yes` / `Decidable.no`.
+  Uniqueness (any two inhabitants of `Decidable(P)` are equal) is by
+  case analysis on both: matching yes/yes and no/no cases close by
+  reflexivity under definitional proof irrelevance, the cross cases
+  are absurd. `Logic.the` then extracts an actual `Decidable(P)`
+  value.
+
+  Keep the name `Logic.classical_decidable` so call sites are
+  untouched (update references only if the name must change).
+
+  Notes:
+    - Behavior-preserving: both the axiom and a `the`-defined term
+      are kernel-opaque (no ι-reduction), so `decide` / `cases` on
+      the result is equally stuck on a neutral either way. Nothing
+      in the elaborator's reduction behavior should change.
+    - While editing, fix the axiom's comment. It currently calls the
+      decidability axiom "the same content lifted to Type … consistent
+      with excluded middle + propositional extensionality." That
+      undersells it — lifting `P ∨ ¬P` to a Type-level `Decidable P`
+      is *not* derivable from EM + propext alone (the large-elimination
+      restriction blocks it); it specifically needs unique choice.
+      Reword to "derivable from excluded middle + definite description."
+    - After the change, rebuild the full library to confirm nothing
+      consuming `classical_decidable` (the `decide` desugaring, the
+      bisection in `Real/supremum.math`) breaks.
+
 ## Tactics
 
 - **Unify `ring` / `field` / `group` / `monoid` (/ future `semiring`)
