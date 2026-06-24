@@ -367,51 +367,6 @@ uint64_t Elaborator::evalRingMod(
                 }
             }
         }
-        // Scalar-multiply operator at non-Integer carriers — must
-        // mirror tryParseScalarMultiplyOperator. We evaluate the inner
-        // Integer scalar as if it were carrier-embedded (using its own
-        // multi-step coercion via the same Integer→Rational chain that
-        // wraps it inside the operator's δ-unfolded form).
-        if (carrierName == "Rational" || carrierName == "Real") {
-            std::string fromIntegerMultiplyName =
-                carrierName + ".from_integer_multiply";
-            std::string multiplyByIntegerName =
-                carrierName + ".multiply_by_integer";
-            if (auto* outerApp =
-                    std::get_if<Application>(&expression->node)) {
-                if (auto* innerApp =
-                        std::get_if<Application>(&outerApp->function->node)) {
-                    if (auto* head =
-                            std::get_if<Constant>(&innerApp->function->node)) {
-                        ExpressionPointer scalar, atom;
-                        bool match = false;
-                        if (head->name == fromIntegerMultiplyName) {
-                            scalar = innerApp->argument;
-                            atom = outerApp->argument;
-                            match = true;
-                        } else if (head->name == multiplyByIntegerName) {
-                            atom = innerApp->argument;
-                            scalar = outerApp->argument;
-                            match = true;
-                        }
-                        if (match) {
-                            // The Integer-typed scalar uses the
-                            // Integer-carrier chain: just Natural.to_integer.
-                            uint64_t s = evalRingMod(
-                                scalar, "Integer",
-                                "Integer.add", "Integer.multiply",
-                                "Integer.negate", "Integer.subtract",
-                                "Integer.zero", "Integer.one", modulus);
-                            uint64_t a = evalRingMod(
-                                atom, carrierName, addName,
-                                multiplyName, negateName, subtractName,
-                                zeroName, oneName, modulus);
-                            return (uint64_t)(((__uint128_t)s * a) % modulus);
-                        }
-                    }
-                }
-            }
-        }
         // Bare Natural literal / successor — mirrors the normaliser's
         // literal recognition on the Natural carrier.
         if (carrierName == "Natural") {
@@ -2546,10 +2501,6 @@ void Elaborator::populateRingEmbeddingChain(RingNormalisationContext& context) {
                 buildStep("Natural.to_integer", "Integer"));
             context.embeddingChain.push_back(
                 buildStep("Integer.to_rational", "Rational"));
-            context.fromIntegerMultiplyName =
-                "Rational.from_integer_multiply";
-            context.multiplyByIntegerName =
-                "Rational.multiply_by_integer";
         } else if (context.carrierName == "Real") {
             context.embeddingChain.push_back(
                 buildStep("Natural.to_integer", "Integer"));
@@ -2557,10 +2508,6 @@ void Elaborator::populateRingEmbeddingChain(RingNormalisationContext& context) {
                 buildStep("Integer.to_rational", "Rational"));
             context.embeddingChain.push_back(
                 buildStep("Rational.to_real", "Real"));
-            context.fromIntegerMultiplyName =
-                "Real.from_integer_multiply";
-            context.multiplyByIntegerName =
-                "Real.multiply_by_integer";
         }
         // Carriers we don't know about (PAdic, Natural) get an empty
         // chain — literal-recognition simply doesn't fire.
@@ -2661,28 +2608,6 @@ Elaborator::RingPolynomial Elaborator::normaliseToRingPolynomial(
                 return polynomial;
             }
         }
-        // Scalar-multiply operator: `R.from_integer_multiply(n, x)` or
-        // `R.multiply_by_integer(x, n)`. Definitionally δ-reduces to
-        // `(n : R) * x` or `x * (n : R)` respectively. Multiplication is
-        // commutative for polynomials so we can normalize either order
-        // identically.
-        {
-            ExpressionPointer scalarInteger;
-            ExpressionPointer atomExpression;
-            bool scalarOnLeft = false;
-            if (tryParseScalarMultiplyOperator(
-                    expression, context, scalarInteger, atomExpression,
-                    scalarOnLeft)) {
-                (void)scalarOnLeft;
-                ExpressionPointer coercedScalar =
-                    buildCoercedScalarForCarrier(scalarInteger, context);
-                RingPolynomial scalarPoly =
-                    normaliseToRingPolynomial(coercedScalar, context);
-                RingPolynomial atomPoly =
-                    normaliseToRingPolynomial(atomExpression, context);
-                return ringPolynomialMultiply(scalarPoly, atomPoly);
-            }
-        }
         // Bare Natural literal / successor — only on the Natural carrier,
         // whose numerals are constructor towers rather than carrier-named
         // constants. A literal successor^k(zero) is the constant k;
@@ -2706,50 +2631,6 @@ Elaborator::RingPolynomial Elaborator::normaliseToRingPolynomial(
         }
         // Otherwise: an opaque atom.
         return ringPolynomialAtom(context, expression);
-    }
-
-bool Elaborator::tryParseScalarMultiplyOperator(
-        ExpressionPointer expression,
-        const RingNormalisationContext& context,
-        ExpressionPointer& scalarOut,
-        ExpressionPointer& atomOut,
-        bool& scalarOnLeftOut) {
-        if (context.fromIntegerMultiplyName.empty()) return false;
-        auto* outerApp = std::get_if<Application>(&expression->node);
-        if (!outerApp) return false;
-        auto* innerApp =
-            std::get_if<Application>(&outerApp->function->node);
-        if (!innerApp) return false;
-        auto* head = std::get_if<Constant>(&innerApp->function->node);
-        if (!head) return false;
-        if (head->name == context.fromIntegerMultiplyName) {
-            scalarOut = innerApp->argument;
-            atomOut = outerApp->argument;
-            scalarOnLeftOut = true;
-            return true;
-        }
-        if (head->name == context.multiplyByIntegerName) {
-            atomOut = innerApp->argument;
-            scalarOut = outerApp->argument;
-            scalarOnLeftOut = false;
-            return true;
-        }
-        return false;
-    }
-
-ExpressionPointer Elaborator::buildCoercedScalarForCarrier(
-        ExpressionPointer scalarInteger,
-        const RingNormalisationContext& context) {
-        ExpressionPointer cursor = scalarInteger;
-        // chain[0] is Natural→Integer; subsequent steps are Integer→
-        // higher carriers. Wrap with chain[1..n].
-        for (size_t i = 1; i < context.embeddingChain.size(); ++i) {
-            cursor = makeApplication(
-                makeConstant(
-                    context.embeddingChain[i].coercionFunctionName),
-                cursor);
-        }
-        return cursor;
     }
 
 ExpressionPointer Elaborator::buildRingCoefficientExpression(
@@ -3235,43 +3116,6 @@ ExpressionPointer Elaborator::proveEqualsCanonical_impl(
                 polynomialOut = polynomial;
                 return proveIntegerLiteralEqualsCanonical(
                     literalValue, context);
-            }
-        }
-        // Scalar-multiply operator: `R.from_integer_multiply(n, x)` δ-
-        // reduces to `(n : R) * x`; `R.multiply_by_integer(x, n)` to
-        // `x * (n : R)`. Bridge via reflexivity to the unfolded form so
-        // the returned proof's STORED type names the original operator
-        // (callers' downstream unification doesn't have to chase the
-        // δ-reduction).
-        {
-            ExpressionPointer scalarInteger;
-            ExpressionPointer atomExpression;
-            bool scalarOnLeft = false;
-            if (tryParseScalarMultiplyOperator(
-                    expression, context, scalarInteger, atomExpression,
-                    scalarOnLeft)) {
-                ExpressionPointer coercedScalar =
-                    buildCoercedScalarForCarrier(scalarInteger, context);
-                ExpressionPointer unfolded = scalarOnLeft
-                    ? buildRingOp(context.multiplyName, coercedScalar,
-                                    atomExpression)
-                    : buildRingOp(context.multiplyName, atomExpression,
-                                    coercedScalar);
-                ExpressionPointer unfoldProof = proveEqualsCanonical(
-                    unfolded, context, axiomNames, polynomialOut);
-                ExpressionPointer canonicalKernel =
-                    buildCanonicalPolynomial(polynomialOut, context);
-                // expression ≡ unfolded definitionally; reflexivity at
-                // `expression` has stored type `expression = expression`,
-                // which the kernel accepts as `expression = unfolded` at
-                // any application boundary that has to unify the type.
-                ExpressionPointer reflBridge = buildReflexivity(
-                    context.carrierUniverseLevel,
-                    context.carrierType, expression);
-                return buildEqualityTransitivity(
-                    context.carrierUniverseLevel, context.carrierType,
-                    expression, unfolded, canonicalKernel,
-                    reflBridge, unfoldProof);
             }
         }
         // Bare Natural literal / successor — only on the Natural carrier.

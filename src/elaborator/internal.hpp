@@ -2894,14 +2894,6 @@ private:
         std::string zeroName;               // "<carrier>.zero"
         std::string oneName;                // "<carrier>.one"
 
-        // Scalar-multiply operator names. The Integer is on the left
-        // for `fromIntegerMultiplyName`, on the right for
-        // `multiplyByIntegerName`. Empty when the carrier is Integer
-        // itself (the scalar-by-integer case collapses into the
-        // regular multiply path).
-        std::string fromIntegerMultiplyName;
-        std::string multiplyByIntegerName;
-
         // Embedding chain from the literal source (Natural) up to the
         // carrier. INNERMOST FIRST: chain[0] is always
         // "Natural.to_integer" (the literal-bearing step), chain[1]
@@ -3049,30 +3041,6 @@ private:
     // everything else is an atom.
     RingPolynomial normaliseToRingPolynomial(
         ExpressionPointer expression, RingNormalisationContext& context);
-
-    // Match `R.from_integer_multiply(n, x)` or
-    // `R.multiply_by_integer(x, n)` against `expression`. On success,
-    // sets `scalarOut` to the Integer-typed scalar argument,
-    // `atomOut` to the carrier-typed argument, and `scalarOnLeftOut`
-    // to true iff the operator put the scalar on the left (which
-    // δ-unfolds to `(n : R) * x` rather than `x * (n : R)`).
-    bool tryParseScalarMultiplyOperator(
-        ExpressionPointer expression,
-        const RingNormalisationContext& context,
-        ExpressionPointer& scalarOut,
-        ExpressionPointer& atomOut,
-        bool& scalarOnLeftOut);
-
-    // Wrap `scalarInteger` (a kernel expression of type Integer) with
-    // the carrier's "outer coercion chain past Integer" to produce its
-    // canonical form at the carrier. For Rational: returns
-    //   Integer.to_rational(scalarInteger).
-    // For Real: returns
-    //   Rational.to_real(Integer.to_rational(scalarInteger)).
-    // For Integer carrier (chain length 1): returns scalarInteger as-is.
-    ExpressionPointer buildCoercedScalarForCarrier(
-        ExpressionPointer scalarInteger,
-        const RingNormalisationContext& context);
 
     // Build the kernel expression for `1 + 1 + ... + 1` with N copies
     // of `<context.oneName>`, left-associated.  N must be >= 1.
