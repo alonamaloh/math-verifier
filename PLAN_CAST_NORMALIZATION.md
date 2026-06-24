@@ -144,18 +144,48 @@ term, so the composite move lemmas fire directly. **No squash lemmas, no
 named-composite emission needed.** Milestone 1 below is therefore moot and
 struck.
 
-## Milestones
+## Implementation status
 
-1. ~~Resolve the squash subtlety~~ — RESOLVED: no `from_natural` constant,
-   composite lemmas are about the raw chain and fire directly. (struck)
-2. **Fill the move-lemma gaps actually needed by Option A** — none for
-   `+`/`·` (already present). Add `Integer.to_rational.subtract_preserves`
-   if `-` normalization is wanted.
-3. **Option A: cast-aware `ring`/`field`** — push casts to leaves (via the
-   move-lemma registry) + squash numeral casts (`ι(1)=1`, `ι(0)=0`) before
-   atom extraction. Validate on `1 + x + n = 1 + n + x` and friends. This is
-   the headline fix and is buildable now with existing lemmas.
-4. **Reassess Option B** (elaboration-time canonicalization) once A lands.
-5. **Standalone `norm_cast` / `push_cast`** (the elim/reflection direction)
-   — deferred until hypothesis-matching pain is felt; needs the injectivity
-   and Integer→Rational order gaps filled first.
+**The defensive seam is in place.** The reusable core is
+`Elaborator::castPushToLeaves(term, localBinders) -> CastNormalForm
+{term, proof}` (`src/elaborator/cast_normal.cpp`): it drives coercions to
+the leaves and returns both the rewritten term and a proof
+`original = term` (null when nothing moved). Option A consumes both fields;
+a future Option B would consume only `.term` — so switching is a change of
+*caller*, not of the engine. Move lemmas are found by the
+`<coercion>.<op>_preserves` naming convention, confined to one lookup; the
+monus guard is automatic (no `Natural.to_integer.subtract_preserves` exists,
+so Natural `-` is never distributed).
+
+Done:
+1. ~~Squash subtlety~~ — RESOLVED (no `from_natural` constant; struck).
+2. **`Integer.to_rational.subtract_preserves`** — added
+   (Rational/embedding.math), assembled from add + negate.
+3. **Option A wired into `ring`** — a guarded pre-pass at the top of
+   `elaborateRing` (before the scheme/prefix guard) pushes both endpoints,
+   proves the leaf-cast goal recursively (idempotent), and bridges with
+   transitivity. No-op when no coercion-over-op is present, so the whole
+   existing library re-verifies untouched. Validated:
+   `library/Test/cast_ring_test.math` — `1 + x + n = 1 + n + x`, a Natural
+   sum compound, a two-hop mixed Rational+Natural distribution, and Integer
+   subtraction. Numeral squashing (`ι(1)=1`) turned out **unnecessary** for
+   these: identical literal casts appear on both sides, so `ring` matches
+   them as equal atoms without collapsing to `Real.one`.
+
+Open / follow-ups:
+4. **Multiplication × scalar operators** (discovered). `x * n` for
+   `x : Real, n : Natural` does **not** coerce `n` to Real and use
+   `Real.multiply`; it hits the pre-existing scalar operator
+   `(*) on (Real, Integer)` (`Real/multiplication.math:442-443`), giving
+   `Real.multiply_by_integer(x, ι_Integer(n))`. So a multiplicative compound
+   like `x * (n * m)` is not in a form `ring` recognizes. This is a
+   **dispatch-precedence question independent of cast normalization**:
+   should the coercion-join preempt a registered cross-type (scalar)
+   operator, or should `ring` learn to treat `multiply_by_integer` as a ring
+   op? Decide before extending Option A to `field`/products.
+5. **`field` integration** — same pre-pass; needs the reciprocal/division
+   move lemmas (currently MISSING for every coercion) and item 4 resolved.
+6. **Reassess Option B** (elaboration-time canonicalization) once A is
+   proven out on the additive cases in the library sweep.
+7. **Standalone `norm_cast` / `push_cast`** (elim/reflection direction) —
+   deferred; needs the injectivity and Integer→Rational order gaps filled.

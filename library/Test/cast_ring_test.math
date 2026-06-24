@@ -1,0 +1,45 @@
+module Test.cast_ring_test
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.multiplication
+import Real.ring
+
+-- Cast normalization (PLAN_CAST_NORMALIZATION.md, Option A). The join makes
+-- `+` association-sensitive: `1 + n + x` lifts the homogeneous Natural
+-- `1 + n` as a unit (`ι(1 + n)`), while `1 + x + n` lifts each leaf
+-- (`ι(1) + x + ι(n)`). `ring`'s cast pre-pass drives the compound cast to
+-- the leaves so both reach the same atom set.
+
+-- The headline case: the two groupings are equal, and `ring` must see it.
+-- Left lifts each leaf (`ι(1) + x + ι(n)`); right lifts the homogeneous
+-- Natural `1 + n` as a unit (`ι(1 + n)`). The pre-pass distributes it.
+theorem reorder_natural_into_real (x : Real) (n : Natural)
+        : 1 + x + n = 1 + n + x :=
+  ring
+
+-- A compound Natural sum lifted as a unit on one side only.
+theorem sum_compound_cast (x : Real) (n m : Natural)
+        : (n + m) + x = x + n + m :=
+  ring
+
+-- Mixed Rational and Natural operands, both rising to Real; the Natural
+-- compound `q + n`'s cast distributes across two coercion hops.
+theorem mixed_tower (x : Real) (q : Rational) (n : Natural)
+        : (n + q) + x = x + (q + n) :=
+  ring
+
+-- Subtraction distributes too (Integer/Rational/Real have honest `-`).
+theorem subtract_compound_cast (x : Real) (a b : Integer)
+        : (a - b) + x = x + (a - b) :=
+  ring

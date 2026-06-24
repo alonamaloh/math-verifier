@@ -680,6 +680,40 @@ private:
     ExpressionPointer applyCoercionChain(
         ExpressionPointer expr, const std::vector<std::string>& chain);
 
+    // Cast normalization (PLAN_CAST_NORMALIZATION.md). The result of
+    // driving every coercion over a compound subterm down to the leaves:
+    // `term` is the leaf-cast-normalized expression, and `proof` proves
+    // `original = term` — or is null when nothing moved (the common case,
+    // so callers can cheaply detect a no-op and leave the term untouched).
+    struct CastNormalForm {
+        ExpressionPointer term;
+        ExpressionPointer proof;  // original = term, or null if unchanged
+    };
+
+    // Push coercions to the leaves of `term`, using the registered
+    // `<coercion>.<op>_preserves` homomorphism lemmas. Gated by lemma
+    // existence — where no move lemma exists (e.g. Natural monus), the
+    // cast stays put, so the transform is always sound. Reusable core for
+    // both Option A (prover-side preprocessing, current) and a future
+    // Option B (elaboration-time canonicalization): A keeps `proof`, B
+    // would keep only `term`.
+    CastNormalForm castPushToLeaves(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders);
+
+    // Helper for `castPushToLeaves`: normalize `coercionName(inner)`,
+    // distributing the coercion over `inner`'s top operation when the move
+    // lemma exists. `term` is the original `coercionName(inner)` node.
+    CastNormalForm pushCoercion(
+        const std::string& coercionName,
+        ExpressionPointer inner,
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders);
+
+    // Is `name` a primitive coercion function (a hop in some registered
+    // coercion chain)?
+    bool isCoercionFunctionName(const std::string& name) const;
+
     // Does `expressionType` have the given Constant name at its head?
     // Checks the *raw* head first (so a parameter declared as
     // `Rational` matches `Rational`, even though `Rational` δ-reduces
