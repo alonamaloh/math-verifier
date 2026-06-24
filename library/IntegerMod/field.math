@@ -123,7 +123,12 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
     in (∃ (k : Natural). a = -(k : Integer)) as negative: {
         obtain ⟨k, aEqualsNegativeK⟩ from negative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : Integer) = a.
-        claim notDividesK : ¬ Natural.divides(p, k) by sorry;
+        claim notDividesK : ¬ Natural.divides(p, k)
+            by (pDividesK : Natural.divides(p, k)) ↦
+                 notDivides(
+                     rewrite(Equality.symmetry(aEqualsNegativeK),
+                         Integer.divides_negate((p : Integer), (k : Integer),
+                             Integer.divides_of_natural_divides(p, k, pDividesK))));
         obtain ⟨bezoutX, bezoutY, bezoutEquation⟩
             from Natural.bezout_one_when_prime_coprime(p, k, primality,
                      notDividesK);
@@ -150,7 +155,14 @@ theorem IntegerMod.nonzero_invertible (p : Natural)
           → ∃ (y : IntegerMod(p)). x * y = IntegerMod.one(p) :=
   cases x { | a =>
       (notZero : ¬(IntegerMod.make(p, a) = IntegerMod.zero(p))) ↦ {
-        claim notDivides : ¬ Integer.divides((p : Integer), a) by sorry;
+        claim notDivides : ¬ Integer.divides((p : Integer), a)
+            by (pDividesA : Integer.divides((p : Integer), a)) ↦ {
+                 claim congruentToZero : Integer.CongruentModulo(p, a, Integer.zero)
+                     by substituting (ring : a - Integer.zero = a);
+                 notZero(Quotient.equivalent_implies_equal(
+                             Integer, Integer.CongruentModulo(p),
+                             a, Integer.zero, congruentToZero))
+               };
         IntegerMod.invertible_at_representative(p, a, primality, notDivides)
       } }
 
