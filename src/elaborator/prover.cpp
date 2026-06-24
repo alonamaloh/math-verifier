@@ -315,6 +315,14 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
         // inference at use-site isn't wired up).
         for (const auto& entry : environment_.declarations) {
             const std::string& name = entry.first;
+            // The `sorry` axioms (`Internal.sorry.{u}`,
+            // `Internal.sorry_proposition`) inhabit EVERY type /
+            // proposition — they exist solely as the target of the explicit
+            // `sorry` keyword. They must never be reachable by proof SEARCH,
+            // or the auto-prover would silently discharge any goal it cannot
+            // otherwise close with an unsound `sorry` (e.g. proving
+            // `0 ≠ 0`, hence `False`). Keep them out of the candidate pool.
+            if (name.rfind("Internal.sorry", 0) == 0) continue;
             const auto& declaration = entry.second;
             ExpressionPointer declarationType;
             size_t universeParamCount = 0;
