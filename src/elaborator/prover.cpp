@@ -67,10 +67,15 @@ ExpressionPointer Elaborator::tryContradiction(
         if (N == 0) return nullptr;
         int lastIdx = N - 1;
         int lastLift = N - lastIdx;
-        ExpressionPointer lastTypeOpened = openOverLocalBinders(
-            liftBoundVariables(
-                localBinders[lastIdx].type, lastLift, 0),
-            localBinders, N);
+        // WHNF so a folded `Not(P)` (the transparent definition
+        // `P → False`) shows its `Pi` head — otherwise the `Not`/`P`
+        // pair search below sees only an `Application` and misses it.
+        ExpressionPointer lastTypeOpened = weakHeadNormalForm(
+            environment_,
+            openOverLocalBinders(
+                liftBoundVariables(
+                    localBinders[lastIdx].type, lastLift, 0),
+                localBinders, N));
         // Pass 1: most-recent binder is itself `False`.
         {
             auto* asConst = std::get_if<Constant>(
@@ -132,10 +137,12 @@ ExpressionPointer Elaborator::tryContradiction(
         // Case B: last : P. Find some other : Not(P).
         for (int other = N - 2; other >= 0; --other) {
             int lift = N - other;
-            ExpressionPointer otherType = openOverLocalBinders(
-                liftBoundVariables(
-                    localBinders[other].type, lift, 0),
-                localBinders, N);
+            ExpressionPointer otherType = weakHeadNormalForm(
+                environment_,
+                openOverLocalBinders(
+                    liftBoundVariables(
+                        localBinders[other].type, lift, 0),
+                    localBinders, N));
             auto* pi = std::get_if<Pi>(&otherType->node);
             if (!pi) continue;
             auto* codomainConst = std::get_if<Constant>(
