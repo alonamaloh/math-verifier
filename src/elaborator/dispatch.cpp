@@ -1544,13 +1544,8 @@ ExpressionPointer Elaborator::elaborateExpression(
                         auto entry = environment_.coercionRegistry.find(
                             std::make_tuple(innerHead, ascribedHead));
                         if (entry != environment_.coercionRegistry.end()) {
-                            ExpressionPointer call = std::move(inner);
-                            for (const auto& funcName : entry->second) {
-                                call = makeApplication(
-                                    makeConstant(funcName),
-                                    std::move(call));
-                            }
-                            return call;
+                            return applyCoercionChain(std::move(inner),
+                                                        entry->second);
                         }
                     }
                 } catch (const TypeError&) {
@@ -1587,6 +1582,30 @@ ExpressionPointer Elaborator::elaborateExpression(
                 ExpressionPointer rightKernel =
                     elaborateExpression(*binary->right, localBinders,
                                           leftType);
+                // Mixed-type equality (`(n : Natural) = (x : Real)`):
+                // reconcile both sides to their join via the coercion
+                // order, so the `Equality` runs at the common type rather
+                // than forcing the right side into the left's type. See
+                // PLAN_COERCIONS.md.
+                {
+                    ExpressionPointer rightTypeOpen =
+                        inferTypeInLocalContext(localBinders, rightKernel);
+                    ExpressionPointer rightType = closeOverLocalBinders(
+                        rightTypeOpen, localBinders, localBinders.size());
+                    std::string leftHead = headConstantName(leftType);
+                    std::string rightHead = headConstantName(rightType);
+                    if (leftHead != rightHead) {
+                        if (auto combined = combineOperands(
+                                leftHead, rightHead, leftType, rightType)) {
+                            leftKernel = applyCoercionChain(
+                                std::move(leftKernel), combined->coerceLeft);
+                            rightKernel = applyCoercionChain(
+                                std::move(rightKernel),
+                                combined->coerceRight);
+                            leftType = combined->resultType;
+                        }
+                    }
+                }
                 LevelPointer universeLevel =
                     typeUniverseOf(localBinders, leftKernel);
                 ExpressionPointer equalityReference =

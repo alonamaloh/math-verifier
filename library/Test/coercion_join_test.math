@@ -1,0 +1,52 @@
+module Test.coercion_join_test
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.order
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.order
+
+-- Mixed-type arithmetic via the coercion join (PLAN_COERCIONS.md). Each
+-- definition elaborates only if the join rule lifts the lower operand to
+-- Real; the kernel then re-typechecks the resulting term, so a clean
+-- verify is a real test that the inserted coercions are well-typed.
+
+-- A bare Natural literal rides up to the real-typed operand: `1` becomes
+-- `(1 : Real)` because the other operand is Real.
+definition subtract_literal (x : Real) : Real :=
+    x - 1
+
+-- The relation desugars through the same path: `x - 1 > 0` is
+-- `0 < x - 1` with both `1` and `0` lifted to Real.
+definition compare_literal (x : Real) : Proposition :=
+    x - 1 > 0
+
+-- Two genuinely-typed variables: a Rational joins up to a Real.
+definition mixed_variables (q : Rational) (x : Real) : Real :=
+    q + x
+
+-- Symmetric: the lower operand on the right also lifts.
+definition mixed_variables_flipped (x : Real) (q : Rational) : Real :=
+    x + q
+
+-- A multi-hop join: Natural ↪ Integer ↪ Rational ↪ Real, all in one step.
+definition mixed_natural_real (n : Natural) (x : Real) : Real :=
+    n + x
+
+-- Mixed-type equality goes through the `=` desugar hook.
+definition mixed_equality (q : Rational) (x : Real) : Proposition :=
+    q = x

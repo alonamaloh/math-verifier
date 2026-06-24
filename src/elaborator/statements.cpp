@@ -545,6 +545,80 @@ void Elaborator::elaborateCoercionDeclaration(
         }
     }
 
+ExpressionPointer Elaborator::applyCoercionChain(
+        ExpressionPointer expr, const std::vector<std::string>& chain) {
+        for (const auto& functionName : chain) {
+            expr = makeApplication(makeConstant(functionName),
+                                    std::move(expr));
+        }
+        return expr;
+    }
+
+std::optional<Elaborator::CombineResult> Elaborator::combineOperands(
+        const std::string& leftHead, const std::string& rightHead,
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed) {
+        // Homogeneous or untyped-head operands: nothing to reconcile.
+        if (leftHead == rightHead) return std::nullopt;
+        if (leftHead.empty() || rightHead.empty()) return std::nullopt;
+        // `reach(a, b)` — the coercion chain a → b, or nullopt if none.
+        // The registry is transitively closed and diamond-free at
+        // registration, so a present chain is the unique path.
+        auto reach = [&](const std::string& a, const std::string& b)
+                -> std::optional<std::vector<std::string>> {
+            if (a == b) return std::vector<std::string>{};
+            auto it = environment_.coercionRegistry.find(
+                std::make_tuple(a, b));
+            if (it != environment_.coercionRegistry.end()) {
+                return it->second;
+            }
+            return std::nullopt;
+        };
+        // Comparable cases — the join is the upper of the two. Covers the
+        // entire linear tower (`Rational + Real`, `Natural < Real`, …).
+        if (auto chain = reach(leftHead, rightHead)) {
+            return CombineResult{rightTypeClosed, std::move(*chain), {}};
+        }
+        if (auto chain = reach(rightHead, leftHead)) {
+            return CombineResult{leftTypeClosed, {}, std::move(*chain)};
+        }
+        // Incomparable: search for a least common upper bound. Never runs
+        // for a chain; present for forward-compat with a branching order
+        // (e.g. two completions of the rationals — which correctly yield
+        // no common bound, hence nullopt, hence an error at the call).
+        std::set<std::string> uppersLeft{leftHead};
+        std::set<std::string> uppersRight{rightHead};
+        for (const auto& [key, chain] : environment_.coercionRegistry) {
+            (void)chain;
+            const auto& [src, tgt] = key;
+            if (src == leftHead) uppersLeft.insert(tgt);
+            if (src == rightHead) uppersRight.insert(tgt);
+        }
+        std::vector<std::string> commons;
+        for (const auto& candidate : uppersLeft) {
+            if (uppersRight.count(candidate)) commons.push_back(candidate);
+        }
+        if (commons.empty()) return std::nullopt;
+        std::vector<std::string> least;
+        for (const auto& candidate : commons) {
+            bool belowAll = true;
+            for (const auto& other : commons) {
+                if (candidate == other) continue;
+                if (!reach(candidate, other)) { belowAll = false; break; }
+            }
+            if (belowAll) least.push_back(candidate);
+        }
+        if (least.size() != 1) {
+            throwElaborate(
+                "ambiguous common type for operands of type '" + leftHead
+                + "' and '" + rightHead + "'; cast one explicitly");
+        }
+        const std::string& target = least.front();
+        return CombineResult{makeConstant(target),
+                              *reach(leftHead, target),
+                              *reach(rightHead, target)};
+    }
+
 bool Elaborator::typeHasHeadName(ExpressionPointer expressionType,
                            const std::string& expectedName) {
         ExpressionPointer cursor = expressionType;

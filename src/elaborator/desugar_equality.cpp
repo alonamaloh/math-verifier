@@ -121,6 +121,29 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         ExpressionPointer rightTypeRaw =
             inferTypeInLocalContext(localBinders, rightKernel);
         std::string rightTypeName = headConstantName(rightTypeRaw);
+        // Mixed operands: reconcile via the coercion order before the
+        // registry lookup. When a join exists (e.g. `Rational + Real`),
+        // lift the lower operand up to it so the rest of this function
+        // sees a homogeneous pair at the join type — registry dispatch,
+        // implicit-filler inference, and the Natural `<` special case all
+        // then operate on the coerced operands. See PLAN_COERCIONS.md.
+        if (operandTypeName != rightTypeName) {
+            ExpressionPointer rightTypeClosed = closeOverLocalBinders(
+                rightTypeRaw, localBinders, localBinders.size());
+            if (auto combined = combineOperands(
+                    operandTypeName, rightTypeName,
+                    leftTypeClosed, rightTypeClosed)) {
+                leftKernel = applyCoercionChain(
+                    std::move(leftKernel), combined->coerceLeft);
+                rightKernel = applyCoercionChain(
+                    std::move(rightKernel), combined->coerceRight);
+                leftTypeRaw = combined->resultType;
+                leftTypeClosed = combined->resultType;
+                rightTypeRaw = combined->resultType;
+                operandTypeName = headConstantName(combined->resultType);
+                rightTypeName = operandTypeName;
+            }
+        }
         std::string registered = environment_.lookupOperator(
             operatorSymbol, operandTypeName, rightTypeName);
         if (!registered.empty()) {

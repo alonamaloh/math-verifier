@@ -651,6 +651,35 @@ private:
     void elaborateCoercionDeclaration(
         const SurfaceCoercionDeclaration& declaration);
 
+    // Result of reconciling two operand types for a binary operator: the
+    // type `C` the operator runs at, and the coercion chains lifting each
+    // operand up to `C` (empty when that operand is already `C`). See
+    // PLAN_COERCIONS.md.
+    struct CombineResult {
+        ExpressionPointer resultType;
+        std::vector<std::string> coerceLeft;
+        std::vector<std::string> coerceRight;
+    };
+
+    // Reconcile two differing operand-type heads via the coercion order.
+    // Returns a `CombineResult` (the join of the two types, with the
+    // lift chains) only when a non-trivial coercion is needed — i.e. the
+    // heads differ AND a unique join exists. Returns nullopt to mean
+    // "leave the operands as-is": same head, an empty head, or no common
+    // upper bound (the caller then proceeds and the registry lookup
+    // either succeeds homogeneously or errors as before). Throws only on
+    // a genuine ambiguity (two incomparable least upper bounds).
+    std::optional<CombineResult> combineOperands(
+        const std::string& leftHead, const std::string& rightHead,
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed);
+
+    // Wrap `expr` in the coercion-function `chain` (outermost last), e.g.
+    // `[to_integer, to_rational]` builds `to_rational(to_integer(expr))`.
+    // A empty chain returns `expr` unchanged.
+    ExpressionPointer applyCoercionChain(
+        ExpressionPointer expr, const std::vector<std::string>& chain);
+
     // Does `expressionType` have the given Constant name at its head?
     // Checks the *raw* head first (so a parameter declared as
     // `Rational` matches `Rational`, even though `Rational` δ-reduces
