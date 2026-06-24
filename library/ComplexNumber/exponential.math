@@ -566,7 +566,12 @@ theorem ComplexNumber.series_dominated_cauchy
                               ComplexNumber.partialSum(t, n)
                               - ComplexNumber.partialSum(t, m))
                     since ComplexNumber.modulus_subtract_swap;
-                sorry
+                calc ComplexNumber.modulus(
+                         ComplexNumber.partialSum(t, m) - ComplexNumber.partialSum(t, n))
+                   = ComplexNumber.modulus(
+                         ComplexNumber.partialSum(t, n) - ComplexNumber.partialSum(t, m))
+                         since swapped
+                   < (epsilon : Real)
               }
             | Natural.StrictComparison.atLeast(nLeqM) =>
                 oneSided(n, m, nInTail, mInTail, nLeqM)
@@ -917,7 +922,28 @@ theorem ComplexNumber.exponential_zero
                 RingModulo.zero(Real.polynomial_commutative_ring,
                     Complex.definingPolynomial), successor(k))
             = RingModulo.zero(Real.polynomial_commutative_ring,
-                  Complex.definingPolynomial) by sorry;
+                  Complex.definingPolynomial)
+      by {
+        let complexZero : ComplexNumber :=
+            RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial);
+        take k : Natural;
+        claim powerVanishes
+              : ComplexNumber.power(complexZero, successor(k)) = complexZero
+            by calc ComplexNumber.power(complexZero, successor(k))
+                  = complexZero * ComplexNumber.power(complexZero, k)
+                  = complexZero    by ring;
+        calc ComplexNumber.exponentialTerm(complexZero, successor(k))
+           = ComplexNumber.from_real(
+                 (Rational.reciprocal_function(
+                      (Natural.factorial(successor(k)) : Rational)) : Real))
+             * ComplexNumber.power(complexZero, successor(k))
+           = ComplexNumber.from_real(
+                 (Rational.reciprocal_function(
+                      (Natural.factorial(successor(k)) : Rational)) : Real))
+             * complexZero
+                 by powerVanishes
+           = complexZero    by ring
+      };
   claim tailConstant
         : ∀ (p : Natural).
           ComplexNumber.partialSum(
@@ -1008,7 +1034,8 @@ theorem ComplexNumber.exponential_zero
                   = RingModulo.one(Real.polynomial_commutative_ring,
                         Complex.definingPolynomial)
          };
-  claim ComplexNumber.SequenceConverges(
+  claim sumsConvergeToOne
+      : ComplexNumber.SequenceConverges(
               ComplexNumber.partialSum(
                   ComplexNumber.exponentialTerm(
                       RingModulo.zero(Real.polynomial_commutative_ring,
@@ -1081,5 +1108,18 @@ theorem ComplexNumber.exponential_zero
                  < (epsilon : Real)
             }
       };
-  sorry
+  done by ComplexNumber.SequenceConverges.unique(
+              ComplexNumber.partialSum(
+                  ComplexNumber.exponentialTerm(
+                      RingModulo.zero(Real.polynomial_commutative_ring,
+                          Complex.definingPolynomial))),
+              ComplexNumber.exponential(
+                  RingModulo.zero(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial)),
+              RingModulo.one(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial),
+              ComplexNumber.exponential_converges(
+                  RingModulo.zero(Real.polynomial_commutative_ring,
+                      Complex.definingPolynomial)),
+              sumsConvergeToOne)
 }
