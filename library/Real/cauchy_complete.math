@@ -69,19 +69,19 @@ definition Real.eventual_lower_bounds (s : Natural → Real) : Set(Real) :=
 theorem Real.cauchy_tail_gives_lower_bound
         (s : Natural → Real) (N : Natural) (q : Rational)
         (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
-                     → abs(s(m) - s(n)) < (q : Real))
-        : (s(N) - (q : Real)) ∈ Real.eventual_lower_bounds(s) :=
+                     → abs(s(m) - s(n)) < q)
+        : (s(N) - q) ∈ Real.eventual_lower_bounds(s) :=
   witness N with
       (m : Natural) (mInTail : N ≤ m) ↦ {
         claim N ≤ N;
-        claim close : abs(s(m) - s(N)) < (q : Real)
+        claim close : abs(s(m) - s(N)) < q
             by tailClose(m, N, mInTail, (N ≤ N));
         obtain ⟨closeLower, _⟩
             from Real.absolute_value_LessThan_bounds(
                      s(m) - s(N), (q : Real), close);
-        claim s(N) - (q : Real) < s(m)
-            by calc s(N) - (q : Real)
-                  = -(q : Real) + s(N)
+        claim s(N) - q < s(m)
+            by calc s(N) - q
+                  = -q + s(N)
                   < (s(m) - s(N)) + s(N)       by Real.add_preserves_LessThan
                   = s(m)                       by ring;
         done since Real.LessThan.weaken
@@ -90,9 +90,9 @@ theorem Real.cauchy_tail_gives_lower_bound
 theorem Real.cauchy_tail_gives_upper_bound
         (s : Natural → Real) (N : Natural) (q : Rational)
         (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
-                     → abs(s(m) - s(n)) < (q : Real))
+                     → abs(s(m) - s(n)) < q)
         : Real.IsUpperBound(Real.eventual_lower_bounds(s),
-                            s(N) + (q : Real)) :=
+                            s(N) + q) :=
   (t : Real) (tEventual : t ∈ Real.eventual_lower_bounds(s)) ↦ {
     obtain ⟨tailStart, tailLow⟩ from tEventual;
     -- Probe past both tails at once.
@@ -104,20 +104,20 @@ theorem Real.cauchy_tail_gives_upper_bound
     claim tBelowTerm : t ≤ s(Natural.maximum(tailStart, N))
         by tailLow(Natural.maximum(tailStart, N),
                    (tailStart ≤ Natural.maximum(tailStart, N)));
-    claim close : abs(s(Natural.maximum(tailStart, N)) - s(N)) < (q : Real)
+    claim close : abs(s(Natural.maximum(tailStart, N)) - s(N)) < q
         by tailClose(Natural.maximum(tailStart, N), N,
                      (N ≤ Natural.maximum(tailStart, N)), (N ≤ N));
     obtain ⟨_, closeUpper⟩
         from Real.absolute_value_LessThan_bounds(
                  s(Natural.maximum(tailStart, N)) - s(N), (q : Real), close);
-    claim termBelow : s(Natural.maximum(tailStart, N)) < s(N) + (q : Real)
+    claim termBelow : s(Natural.maximum(tailStart, N)) < s(N) + q
         by calc s(Natural.maximum(tailStart, N))
               = (s(Natural.maximum(tailStart, N)) - s(N)) + s(N)   by ring
-              < (q : Real) + s(N)        by Real.add_preserves_LessThan
-              = s(N) + (q : Real)        by ring;
+              < q + s(N)        by Real.add_preserves_LessThan
+              = s(N) + q        by ring;
     calc t
        ≤ s(Natural.maximum(tailStart, N))    by tBelowTerm
-       < s(N) + (q : Real)                   by termBelow;
+       < s(N) + q                   by termBelow;
     done since Real.LessThan.weaken
   }
 
