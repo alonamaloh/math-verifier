@@ -181,10 +181,12 @@ families, per coercion `ι : A → C`:
    `to_rational(to_integer(n))`, so a `norm_cast`-style normalizer can
    cancel stacked casts.
 
-Tier 1 ships without a `norm_cast` tactic, but the casts the join *inserts*
-are exactly the ones a proof then pushes around — so **build the
-`push_cast`/`norm_cast` normalizer as the immediate Tier-1.5 follow-on**,
-fed by these lemma families.
+Tier 1 ships without a `norm_cast` tactic. The casts the join *inserts* are
+mostly at the leaves (already `ring`-friendly), but left-associative grouping
+can still produce compound casts (`ι(1 + n)` from `1 + n + x`) that make
+`ring` association-sensitive. The normalization layer that fixes this — and
+the audit of these lemma families — is its own plan:
+**`PLAN_CAST_NORMALIZATION.md`**.
 
 ## Known limit (on the record)
 

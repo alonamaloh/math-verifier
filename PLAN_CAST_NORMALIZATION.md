@@ -1,0 +1,161 @@
+# Plan: cast normalization (leaf-cast normal form)
+
+Follow-on to `PLAN_COERCIONS.md` (the coercion-join mechanism, Tier 1
+done). The join *inserts* coercions; this plan is about keeping the inserted
+casts in a **canonical form** so that equal expressions stay interchangeable.
+
+## The problem: the join is association-sensitive
+
+`+` is left-associative, so a homogeneous lower-type sub-sum gets evaluated
+in the lower type and lifted *as a unit*, while an interleaved grouping lifts
+each leaf. With `n : Natural`, `x : Real`:
+
+```
+1 + x + n   =  (1 + x) + n   →   ι(1) + x + ι(n)        atoms: { ι(1), x, ι(n) }
+1 + n + x   =  (1 + n) + x   →   ι(1 + n) + x           atoms: { ι(1+n), x }
+```
+
+`1 + n` is Natural+Natural — homogeneous, no cast — so it commits to Natural
+addition and the *whole compound* lifts as `ι(1 + n)`. The two forms are
+equal mathematically but present `ring` with different atom sets, so **`ring`
+cannot prove `1 + x + n = 1 + n + x`** — a trivial commutative-ring identity.
+For a "`ring` first" project this is unacceptable. The blast radius is wider
+than `ring`: a lemma stated in one grouping won't **unify** against the
+other, so hypothesis matching breaks too.
+
+This is unavoidable *at elaboration*: bottom-up, the inner `1 + n` node
+cannot know `x` is coming, so it must commit to Natural. The asymmetric term
+is inherent to the principle we are keeping (context-independent types). The
+fix therefore belongs at a **later normalization layer**, not in the
+type-synthesis rule.
+
+## The invariant: casts live at the leaves
+
+Canonical form = every coercion sits on an atom (variable or literal), never
+wrapping a compound. `ι(1 + n)` is *not* normal; `ι(1) + ι(n)` is. Driving
+casts to the leaves makes both groupings above converge to
+`{ ι(1), ι(n), x }` (and, with numeral squashing, `{ 1, ι(n), x }`). This is
+exactly Mathlib's `push_cast` direction.
+
+## Why it must be lemma-driven (the monus guard)
+
+You cannot blanket-distribute a cast through every operation. Natural
+subtraction is truncated:
+
+```
+ι(3 - 5) = ι(0) = 0     but     ι(3) - ι(5) = -2
+```
+
+So `ι(a - b) = ι(a) - ι(b)` is **false** for `Natural → Integer`/`Real`.
+Distribution is legal *only* through operations where a homomorphism ("move")
+lemma is registered: `+`, `·` everywhere; `-` and negation on
+Integer/Rational/Real; **not** `-` on Natural. The set of registered move
+lemmas *is* the correctness boundary of the normalizer — this is why
+`push_cast`/`norm_cast` are lemma-database tactics, not structural
+recursions.
+
+## Two implementation options
+
+Both apply the same registered move/squash lemmas; they differ in *when*.
+
+### Option A — prover-side preprocessing (recommended first)
+
+Fold push-cast into the `ring`/`field` normalizer: before it extracts its
+atom set, drive all casts to the leaves using the registered move lemmas.
+Dissolves the `1 + x + n` vs `1 + n + x` asymmetry **invisibly** — no tactic
+appears in the proof text, which keeps proofs reading like mathematics.
+Highest value (covers where almost all ring identities go), strict subset of
+"implement the tactics," and the term itself is left untouched.
+
+Limitation: only `ring`/`field` benefit. Manual `calc`/`substitute` and raw
+hypothesis matching still see `ι(1+n)`.
+
+### Option B — elaboration-time canonicalization (more thorough, more invasive)
+
+When the join would wrap a compound operand, have the elaborator emit the
+*distributed* term directly (`ι(1) + ι(n)` instead of `ι(1 + n)`). Legal
+because the user wrote no casts — the elaborator merely *chooses* which of
+two equal terms to build; no transport/proof obligation is incurred, it just
+constructs leaf-cast form. Fixes the asymmetry for **every** consumer at once
+(ring, calc, substitute, matching), not just the prover.
+
+The rewrite is a guarded structural recursion on the built term, gated by the
+same move lemmas with the same monus exclusion: push `ι` through a node only
+where that node's operation has a registered homomorphism for `ι`; otherwise
+leave the cast in place. Costs: slightly larger terms; the elaborator gains a
+rewriting step.
+
+**Decision:** do Option A first (cheap, invisible, covers the common case),
+then reassess whether B is still needed. If hypothesis-matching breakage
+shows up early, B is the cleaner root cure. They share all prerequisites, so
+A is never wasted work.
+
+## Coherence-lemma audit (the gate)
+
+State of the library as of this plan. Naming convention is
+`<coercion>.<op>_preserves`.
+
+### Good news — the move lemmas the `1+x+n` fix needs already exist
+
+Core algebra is **complete** for all three primitive coercions:
+
+| Coercion            | 0 | 1 | + | · | − | negate |
+|---------------------|---|---|---|---|---|--------|
+| `Natural.to_integer`  | ✓ | ✓ | ✓ | ✓ | — (monus, correctly absent) | n/a |
+| `Integer.to_rational` | ✓ | ✓ | ✓ | ✓ | **gap** | ✓ |
+| `Rational.to_real`    | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+(`Natural.to_integer.add_preserves` Integer/embedding.math:46;
+`.multiply_preserves` :63; `Rational.to_real.add_preserves`
+Real/addition.math:227; `.multiply_preserves` Real/multiplication.math:471;
+`.subtract_preserves` Real/negation.math:127; etc.)
+
+So **Option A for `+`/`·` is buildable now** — the exact asymmetry you raised
+is fixable with lemmas already in the library.
+
+### Gaps (needed for completeness / the elim direction)
+
+- **Injectivity (elim):** `Integer.to_rational.injective`,
+  `Rational.to_real.injective` — MISSING. Needed for the standalone
+  `norm_cast` (reflect a goal down to the source type). Not needed for the
+  Option-A ring fix.
+- **Order on `Integer.to_rational`** (`≤`, `<`) — MISSING entirely.
+  (Natural→Integer has `≤`; Rational→Real has `≤`, `<`, and `<`-reflection
+  at Real/embedding_order.math:41/59/110.)
+- **Reciprocal / division** — MISSING for every coercion. Blocks `field`
+  preprocessing on division-heavy goals. Medium priority.
+- **`Integer.to_rational.subtract_preserves`** — MISSING (Integer has honest
+  subtraction, so this is a valid unconditional law; add it).
+
+### The squash subtlety — RESOLVED (no issue)
+
+Initial worry: the join emits the **raw chain**
+`to_real(to_rational(to_integer(n)))`, but the composite lemmas have
+`from_natural` in their names — if `from_natural` were a distinct constant,
+the lemmas wouldn't fire on the chain.
+
+Checked: **there is no `from_natural` constant.** It is only a naming
+convention. The composite lemmas are stated with the surface ascription
+`(a : Rational)` / `(a : Real)` for a Natural `a`
+(Rational/embedding.math:113–128), which elaborates through the *same*
+coercion registry the join uses — so each is literally about the raw chain
+`Integer.to_rational(Natural.to_integer(a))`. The join emits exactly that
+term, so the composite move lemmas fire directly. **No squash lemmas, no
+named-composite emission needed.** Milestone 1 below is therefore moot and
+struck.
+
+## Milestones
+
+1. ~~Resolve the squash subtlety~~ — RESOLVED: no `from_natural` constant,
+   composite lemmas are about the raw chain and fire directly. (struck)
+2. **Fill the move-lemma gaps actually needed by Option A** — none for
+   `+`/`·` (already present). Add `Integer.to_rational.subtract_preserves`
+   if `-` normalization is wanted.
+3. **Option A: cast-aware `ring`/`field`** — push casts to leaves (via the
+   move-lemma registry) + squash numeral casts (`ι(1)=1`, `ι(0)=0`) before
+   atom extraction. Validate on `1 + x + n = 1 + n + x` and friends. This is
+   the headline fix and is buildable now with existing lemmas.
+4. **Reassess Option B** (elaboration-time canonicalization) once A lands.
+5. **Standalone `norm_cast` / `push_cast`** (the elim/reflection direction)
+   — deferred until hypothesis-matching pain is felt; needs the injectivity
+   and Integer→Rational order gaps filled first.
