@@ -1173,18 +1173,42 @@ ExpressionPointer Elaborator::recoverClaimHint(
             "the " + nameQuoted
             + " citation does not prove this goal\n    goal:        "
             + prettyPrintInLocalScope(goalClosed, localBinders);
+        // Split the failure into its two distinguishable causes instead of
+        // listing both every time. Compare the lemma's CONCLUSION head (peel
+        // its Pis) against the goal's head, both WHNF'd so a definitional alias
+        // (`≤` vs `IsNonneg`) doesn't read as a mismatch. Different heads ⇒ the
+        // lemma simply doesn't target this goal; same head ⇒ the conclusion
+        // shape fits but an argument/premise couldn't be pinned.
+        std::string conclusionHead;
         if (hintTerm) {
             ExpressionPointer hintTypeClosed = closeOverLocalBinders(
                 inferTypeInLocalContext(localBinders, hintTerm),
                 localBinders, localBinders.size());
             message += "\n    " + nameQuoted + " has type: "
                 + prettyPrintInLocalScope(hintTypeClosed, localBinders);
+            ExpressionPointer conclusion =
+                weakHeadNormalForm(environment_, hintTypeClosed);
+            while (auto* pi = std::get_if<Pi>(&conclusion->node)) {
+                conclusion = weakHeadNormalForm(environment_, pi->codomain);
+            }
+            conclusionHead = headConstantName(conclusion);
         }
-        message +=
-            "\n  the hint's arguments could not be inferred from the goal "
-            "or discharged from context, or its conclusion does not unify "
-            "with the goal — check the lemma name, and that the goal (or an "
-            "in-scope hypothesis) determines each of its arguments";
+        std::string goalHead = headConstantName(
+            weakHeadNormalForm(environment_, goalClosed));
+        if (!conclusionHead.empty() && !goalHead.empty()
+            && conclusionHead != goalHead) {
+            message +=
+                "\n  its conclusion is about `" + conclusionHead
+                + "` but the goal is about `" + goalHead
+                + "` — this lemma does not target this goal (check the lemma "
+                "name)";
+        } else {
+            message +=
+                "\n  the conclusion shape fits, but an argument could not be "
+                "inferred from the goal or a premise discharged from context — "
+                "check that the goal (or an in-scope hypothesis) determines "
+                "each of the lemma's arguments, or supply them explicitly";
+        }
         throwElaborate(message);
     }
 
