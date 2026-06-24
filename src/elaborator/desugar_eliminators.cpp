@@ -199,13 +199,24 @@ ExpressionPointer Elaborator::desugarAbsurd(
         // Proposition) and `False.eliminate.{u}` (for goals in
         // Type u = Sort u+1). The goal's universe level is the level
         // of the Sort returned by inferType(expectedType).
+        // `expectedType` reaches us in OPENED form on some paths (notably a
+        // `↦`-lambda body, where it is the expected Pi's codomain — see
+        // elaborateLambda) and CLOSED on others. The result we return embeds it
+        // alongside `falseProof`, which is always CLOSED (it comes back from
+        // `elaborateExpression`); mixing an opened goal with a closed proof in
+        // one term leaves the goal's free variables dangling once the
+        // surrounding lambda closes its binder ("unbound internal variable").
+        // Round-trip through open→close to land on a CLOSED form regardless of
+        // which convention the goal arrived in (close-only is NOT idempotent —
+        // it would re-lift an already-closed goal).
         Context openedContext = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            expectedType, localBinders, localBinders.size());
+        ExpressionPointer goalClosed = closeOverLocalBinders(
+            goalOpened, localBinders, localBinders.size());
         ExpressionPointer goalSort = weakHeadNormalForm(
             environment_,
-            inferType(environment_, openedContext,
-                       openOverLocalBinders(
-                           expectedType, localBinders,
-                           localBinders.size())));
+            inferType(environment_, openedContext, goalOpened));
         auto* sortNode = std::get_if<Sort>(&goalSort->node);
         if (!sortNode) {
             throwElaborate(
@@ -213,11 +224,10 @@ ExpressionPointer Elaborator::desugarAbsurd(
         }
         std::optional<int> levelConstant =
             levelAsConstant(sortNode->level);
-
         if (levelConstant && *levelConstant == 0) {
             ExpressionPointer call = makeConstant(
                 "False.eliminate_proposition", {});
-            call = makeApplication(std::move(call), expectedType);
+            call = makeApplication(std::move(call), goalClosed);
             call = makeApplication(std::move(call),
                                     std::move(falseProof));
             return call;
@@ -232,7 +242,7 @@ ExpressionPointer Elaborator::desugarAbsurd(
         ExpressionPointer call = makeConstant(
             "False.eliminate",
             {makeLevelConst(*levelConstant - 1)});
-        call = makeApplication(std::move(call), expectedType);
+        call = makeApplication(std::move(call), goalClosed);
         call = makeApplication(std::move(call), std::move(falseProof));
         return call;
     }
