@@ -184,16 +184,24 @@ to one pipeline:
 
 ### Phases
 
-1. **Elaboration-time normalization** — call `castPushToLeaves(...).term`
+1. ✅ **Elaboration-time normalization** (commit 304d856) — `castPushToLeaves(...).term`
    after the join's `applyCoercionChain` in `desugarArithmeticOperator` and
-   the `=` desugar. Retire the ring pre-pass.
-2. **Delete the scalar operators** + `ring`'s `from_integer_multiply`
-   handling.
-3. **Re-green** — fix any proof whose canonical (leaf-cast) form differs from
-   what it assumed. Expected small, given the join already shadows the scalar
-   path.
+   the `=` desugar; ring pre-pass retired. Library + tests green on first
+   build (no red period — lemma statements and uses normalize identically).
+2. ✅ **Scalar operators + ring's scalar machinery deleted** (commits
+   49b511d, 492eefd) — library defs/operators gone; ring's
+   `tryParseScalarMultiplyOperator`, `buildCoercedScalarForCarrier`, the
+   context name-fields, and the scalar branches in `evalRingMod` /
+   `normaliseToRingPolynomial` / `proveEqualsCanonical` removed (−188 lines).
+   `ring` keeps only its coerced-literal recognition.
+3. ✅ **Re-green** — trivial, as predicted; nothing depended on the shadowed
+   scalar path.
 4. **Library cast sweep** — delete the now-redundant explicit casts across
-   the analysis cone (the payoff).
+   the analysis cone (the payoff). NOT STARTED.
+
+The pipeline is now unified: **join inserts → elaboration normalizes to
+leaf-cast form → ring reads coerced literals as coefficients.** The four
+overlapping subsystems are one.
 
 ## Implementation status
 
