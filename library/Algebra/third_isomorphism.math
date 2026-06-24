@@ -111,7 +111,10 @@ theorem QuotientGroup.collapse_kernel_contains
                     normalSmaller, normalLarger, containment)) := {
   let ⟨_, _, closedUnderInverse⟩ := IsNormalSubgroup.subgroup(G, larger, normalLarger);
   -- a⁻¹ ∈ M, and a⁻¹·e = a⁻¹, so the coset element a⁻¹·e lies in M.
-  claim cosetInLarger : a⁻¹ · Group.identity(G) ∈ larger by sorry;
+  claim cosetInLarger : a⁻¹ · Group.identity(G) ∈ larger by {
+      claim a⁻¹ ∈ larger by closedUnderInverse(a, aInLarger);
+      done by substituting Group.identity_right(G, a⁻¹)
+  };
   Quotient.equivalent_implies_equal(a, Group.identity(G), cosetInLarger)
 }
 
@@ -134,12 +137,20 @@ theorem QuotientGroup.collapse_kernel_only
   let subgroupLarger : IsSubgroup(G, larger)
       := IsNormalSubgroup.subgroup(G, larger, normalLarger);
   let ⟨_, _, closedUnderInverse⟩ := subgroupLarger;
-  -- inKernel : [a]_M = [e]_M; equal cosets ⇒ a⁻¹·e ∈ M (auto: exact-bridge
-  -- via the local equivalenceLarger).
-  note a⁻¹ · Group.identity(G) ∈ larger by sorry;
-  -- a⁻¹·e = a⁻¹, so a⁻¹ ∈ M; close under inverse and undo the involution.
-  note a⁻¹ ∈ larger by sorry;
-  claim by sorry
+  -- inKernel : [a]_M = [e]_M; equal cosets ⇒ a⁻¹·e ∈ M, then closing M under
+  -- inverse and simplifying (a⁻¹·e)⁻¹ = a lands a ∈ M.
+  claim cosetMembership : a⁻¹ · Group.identity(G) ∈ larger
+      by Quotient.equal_implies_equivalent(
+             Group.carrier(G), Group.SameCoset(G, larger),
+             Group.SameCoset.is_equivalence(G, larger, subgroupLarger),
+             a, Group.identity(G), inKernel);
+  claim (a⁻¹ · Group.identity(G))⁻¹ ∈ larger
+      by closedUnderInverse(a⁻¹ · Group.identity(G), cosetMembership);
+  claim memberEquation : a = (a⁻¹ · Group.identity(G))⁻¹
+      by calc a
+            = (a⁻¹)⁻¹                            by Group.inverse_involution_bundled(G, a)
+            = (a⁻¹ · Group.identity(G))⁻¹        by Group.identity_right(G, a⁻¹);
+  done by substituting memberEquation
 }
 
 -- ----------------------------------------------------------------------
