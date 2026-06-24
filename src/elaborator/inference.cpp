@@ -1175,31 +1175,44 @@ ExpressionPointer Elaborator::recoverClaimHint(
             + prettyPrintInLocalScope(goalClosed, localBinders);
         // Split the failure into its two distinguishable causes instead of
         // listing both every time. Compare the lemma's CONCLUSION head (peel
-        // its Pis) against the goal's head, both WHNF'd so a definitional alias
-        // (`≤` vs `IsNonneg`) doesn't read as a mismatch. Different heads ⇒ the
-        // lemma simply doesn't target this goal; same head ⇒ the conclusion
-        // shape fits but an argument/premise couldn't be pinned.
-        std::string conclusionHead;
+        // its Pis) against the goal's head. The DECISION uses WHNF'd heads so a
+        // definitional alias (`≤` vs its `Or`/`IsNonneg` unfolding) doesn't read
+        // as a mismatch; the DISPLAY uses the raw heads so the user sees the
+        // name they wrote (`Natural.LessOrEqual`, not `Or`). Different heads ⇒
+        // the lemma doesn't target this goal; same head ⇒ the conclusion shape
+        // fits but an argument/premise couldn't be pinned.
+        std::string conclusionHeadRaw;
+        std::string conclusionHeadWhnf;
         if (hintTerm) {
             ExpressionPointer hintTypeClosed = closeOverLocalBinders(
                 inferTypeInLocalContext(localBinders, hintTerm),
                 localBinders, localBinders.size());
             message += "\n    " + nameQuoted + " has type: "
                 + prettyPrintInLocalScope(hintTypeClosed, localBinders);
-            ExpressionPointer conclusion =
-                weakHeadNormalForm(environment_, hintTypeClosed);
-            while (auto* pi = std::get_if<Pi>(&conclusion->node)) {
-                conclusion = weakHeadNormalForm(environment_, pi->codomain);
+            // Peel Pis to reach the raw conclusion: WHNF only to *detect* a Pi
+            // head, but descend into the un-normalised codomain so the
+            // conclusion keeps its surface spelling.
+            ExpressionPointer conclusion = hintTypeClosed;
+            while (auto* pi = std::get_if<Pi>(
+                       &weakHeadNormalForm(environment_, conclusion)->node)) {
+                conclusion = pi->codomain;
             }
-            conclusionHead = headConstantName(conclusion);
+            conclusionHeadRaw = headConstantName(conclusion);
+            conclusionHeadWhnf = headConstantName(
+                weakHeadNormalForm(environment_, conclusion));
         }
-        std::string goalHead = headConstantName(
+        std::string goalHeadRaw = headConstantName(goalClosed);
+        std::string goalHeadWhnf = headConstantName(
             weakHeadNormalForm(environment_, goalClosed));
-        if (!conclusionHead.empty() && !goalHead.empty()
-            && conclusionHead != goalHead) {
+        if (!conclusionHeadWhnf.empty() && !goalHeadWhnf.empty()
+            && conclusionHeadWhnf != goalHeadWhnf) {
+            std::string conclusionShown = conclusionHeadRaw.empty()
+                ? conclusionHeadWhnf : conclusionHeadRaw;
+            std::string goalShown =
+                goalHeadRaw.empty() ? goalHeadWhnf : goalHeadRaw;
             message +=
-                "\n  its conclusion is about `" + conclusionHead
-                + "` but the goal is about `" + goalHead
+                "\n  its conclusion is about `" + conclusionShown
+                + "` but the goal is about `" + goalShown
                 + "` — this lemma does not target this goal (check the lemma "
                 "name)";
         } else {
