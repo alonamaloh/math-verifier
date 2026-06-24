@@ -106,9 +106,9 @@ theorem Real.find_index_with_large_value
     claim apartnessIndex ≤ violatingIndex
           ∧ Not(abs(sequence(violatingIndex) - Rational.zero) < epsilon);
     claim apartnessIndex ≤ violatingIndex;
-    -- |sequence(violatingIndex) - 0| = |sequence(violatingIndex)| via
-    -- subtract_zero, so the strict-bound failure transports.
-    claim Not(abs(sequence(violatingIndex)) < epsilon) by sorry;
+    claim Not(abs(sequence(violatingIndex) - Rational.zero) < epsilon);
+    claim offsetCancels : abs(sequence(violatingIndex)) = abs(sequence(violatingIndex) - Rational.zero);
+    claim Not(abs(sequence(violatingIndex)) < epsilon) by substituting offsetCancels;
     claim epsilon ≤ abs(sequence(violatingIndex))
         since Rational.not_LessThan_implies_LessOrEqual;
     witness violatingIndex with done
@@ -166,6 +166,15 @@ theorem Real.cauchy_apartness_from_zero
                               Rational.to_cauchy_constant(Rational.zero),
                               m))
                       < epsilon0);
+    claim noEventualSmallness
+          : Not(∃ (apartnessIndex : Natural).
+                  ∀ (m : Natural). apartnessIndex ≤ m →
+                    abs(
+                        CauchyRationalSequence.sequenceFunction(sequence, m)
+                        - CauchyRationalSequence.sequenceFunction(
+                              Rational.to_cauchy_constant(Rational.zero),
+                              m))
+                      < epsilon0);
     -- Step 2: apply Cauchy at ε₀/2 to get cauchyIndex.
     claim epsilon0HalvedPositive
           : Rational.zero < Rational.halve(epsilon0);
@@ -183,7 +192,15 @@ theorem Real.cauchy_apartness_from_zero
                     - CauchyRationalSequence.sequenceFunction(
                           Rational.to_cauchy_constant(Rational.zero),
                           m))
-                  < epsilon0) by sorry;
+                  < epsilon0)
+        by (eventualSmall : ∀ (m : Natural). cauchyIndex ≤ m →
+                abs(
+                    CauchyRationalSequence.sequenceFunction(sequence, m)
+                    - CauchyRationalSequence.sequenceFunction(
+                          Rational.to_cauchy_constant(Rational.zero),
+                          m))
+                  < epsilon0) ↦
+            noEventualSmallness(witness cauchyIndex with eventualSmall);
     claim ∃ (m : Natural).
             cauchyIndex ≤ m
             ∧ epsilon0 ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m));

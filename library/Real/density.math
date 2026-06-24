@@ -48,12 +48,28 @@ theorem Real.exists_positive_rational_below
         : ∃ (q : Rational). Rational.zero < q ∧ (q : Real) < x := {
   cases x refining xPositive {
     | CauchyRationalSequence.make(seq, seqCauchy) => {
-        -- A positive real's representative is not equivalent to the
-        -- zero sequence (the quotient bridge closes this from the
-        -- refined xPositive), so it is eventually one-sided.
+        claim zeroDistinct
+              : ¬(Real.zero = Real.from_cauchy_sequence(seq, seqCauchy))
+            since Real.LessThan.distinct;
         claim ¬CauchyEquivalent(
                   CauchyRationalSequence.make(seq, seqCauchy),
-                  Rational.to_cauchy_constant(Rational.zero)) by sorry;
+                  Rational.to_cauchy_constant(Rational.zero))
+            by (equivalent : CauchyEquivalent(
+                                 CauchyRationalSequence.make(seq, seqCauchy),
+                                 Rational.to_cauchy_constant(Rational.zero))) ↦ {
+                claim flipped
+                      : CauchyEquivalent(
+                            Rational.to_cauchy_constant(Rational.zero),
+                            CauchyRationalSequence.make(seq, seqCauchy))
+                    since CauchyEquivalent.symmetric;
+                claim Real.zero = Real.from_cauchy_sequence(seq, seqCauchy)
+                    by Quotient.equivalent_implies_equal(
+                           CauchyRationalSequence, CauchyEquivalent,
+                           Rational.to_cauchy_constant(Rational.zero),
+                           CauchyRationalSequence.make(seq, seqCauchy),
+                           flipped);
+                done since zeroDistinct
+              };
         claim signEventually
               : ∃ (lowerBound : Rational).
                   Rational.zero < lowerBound ∧ ∃ (signIndex : Natural).

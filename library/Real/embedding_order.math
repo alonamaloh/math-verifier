@@ -47,7 +47,7 @@ theorem Rational.to_real.LessOrEqual_preserves (a b : Rational)
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦
           calc -epsilon
-             < Rational.zero by sorry
+             < Rational.zero since Rational.negate_LessThan_zero_of_positive
              ≤ b + -a
                   since Rational.LessOrEqual_zero_of_IsNonneg)
 
@@ -68,10 +68,12 @@ theorem Rational.to_real.LessThan_preserves (a b : Rational)
     as gapPositive;
   claim notEqualPart : ¬((a : Real) = (b : Real))
       by (coercedEqual : (a : Real) = (b : Real)) ↦ {
-          -- Equal classes mean equivalent constant representatives.
-          claim equivalent
+          let equivalent
               : CauchyEquivalent(Rational.to_cauchy_constant(a),
-                    Rational.to_cauchy_constant(b)) by sorry;
+                    Rational.to_cauchy_constant(b))
+              := Quotient.equal_implies_equivalent(
+                     CauchyRationalSequence, CauchyEquivalent, Real.equivalence,
+                     Rational.to_cauchy_constant(a), Rational.to_cauchy_constant(b), coercedEqual);
           -- Evaluate the equivalence at ε = b − a.
           choose N such that
               ∀ (m : Natural). N ≤ m →
