@@ -150,7 +150,24 @@ theorem Polynomial.gcd_bezout (r : Ring)
           | no yNotZero => {
               obtain ⟨degreeY, yDegreeBound, leadingNonzero⟩
                   from Polynomial.exists_degree_of_nonzero(r, y, yNotZero);
-              claim degreeY < subject by sorry;
+              -- y has degree degreeY < subject: were subject ≤ degreeY, yBound
+              -- would force the leading coefficient coeffOf(y, degreeY) to zero.
+              claim degreeY < subject by {
+                  cases Natural.lt_trichotomy(degreeY, subject) {
+                    | Or.introduceLeft(degreeYLessThanSubject) => degreeYLessThanSubject
+                    | Or.introduceRight(equalOrGreater) =>
+                        cases equalOrGreater {
+                          | Or.introduceLeft(degreeYEqualsSubject) => {
+                              claim subject ≤ degreeY by substituting degreeYEqualsSubject;
+                              absurd(leadingNonzero(yBound(degreeY, (subject ≤ degreeY))))
+                            }
+                          | Or.introduceRight(subjectLessThanDegreeY) => {
+                              claim subject ≤ degreeY since Natural.LessThan.weaken;
+                              absurd(leadingNonzero(yBound(degreeY, (subject ≤ degreeY))))
+                            }
+                        }
+                  }
+              };
               obtain ⟨quotient, remainder, divisionEquation, remainderBound⟩
                   from Polynomial.division_with_remainder(r, commutativity, y, degreeY,
                            yDegreeBound,

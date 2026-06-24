@@ -35,8 +35,43 @@ import Polynomial.degree_product
 -- Product of constant polynomials: monomial(a,0)·monomial(b,0) = monomial(a·b,0).
 theorem Polynomial.monomial_zero_multiply (r : Ring) (a b : Ring.carrier(r))
         : (Polynomial.monomial(r, a, 0) * Polynomial.monomial(r, b, 0))
-          = Polynomial.monomial(r, (a * b), 0) :=
-  { sorry }
+          = Polynomial.monomial(r, (a * b), 0) := {
+  claim factorThrough
+      : ∀ (k : Natural).
+          (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), k))
+          = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), k)
+      by (k : Natural) ↦ cases k {
+        | zero =>
+            calc (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), 0))
+               = (a * b)
+                     by Polynomial.coefficientOf_monomial_at(r, b, 0)
+               = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), 0)
+                     by Polynomial.coefficientOf_monomial_at(r, (a * b), 0)
+        | successor(m) => {
+            claim successor(m) ≠ 0 since Natural.successor_not_zero;
+            calc (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), successor(m)))
+               = (a * Ring.zero(r))
+                     by Polynomial.coefficientOf_monomial_off(r, b, 0, successor(m), (successor(m) ≠ 0))
+               = Ring.zero(r)
+                     by Ring.multiply_zero_right(r, a)
+               = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), successor(m))
+                     by Polynomial.coefficientOf_monomial_off(r, (a * b), 0, successor(m), (successor(m) ≠ 0))
+          }
+      };
+  Polynomial.equal_of_coefficientOf_equal(r,
+      (Polynomial.monomial(r, a, 0) * Polynomial.monomial(r, b, 0)),
+      Polynomial.monomial(r, (a * b), 0),
+      (k : Natural) ↦
+          calc Polynomial.coefficientOf(r,
+                   (Polynomial.monomial(r, a, 0) * Polynomial.monomial(r, b, 0)), k)
+             = (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), Natural.monus(k, 0)))
+                   by Polynomial.coefficientOf_monomial_multiply(r, a,
+                          Polynomial.monomial(r, b, 0), 0, k, (0 ≤ k))
+             = (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), k))
+                   by Natural.monus_zero(k)
+             = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), k)
+                   by factorThrough(k))
+}
 
 -- A degree-0 polynomial (nonzero constant) over a field is a unit.
 theorem Polynomial.degree_zero_is_unit (r : Ring)
@@ -50,7 +85,29 @@ theorem Polynomial.degree_zero_is_unit (r : Ring)
   obtain ⟨inverse, inverseEquation⟩
       from inverseExistence(Polynomial.coefficientOf(r, p, 0), pNonzero);
   claim p = Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0)
-      by sorry;
+      by Polynomial.equal_of_coefficientOf_equal(r, p,
+             Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0),
+             (k : Natural) ↦ cases k {
+               | zero =>
+                   calc Polynomial.coefficientOf(r, p, 0)
+                      = Polynomial.coefficientOf(r,
+                            Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0), 0)
+                            by Polynomial.coefficientOf_monomial_at(r,
+                                   Polynomial.coefficientOf(r, p, 0), 0)
+               | successor(m) => {
+                   claim successor(0) ≤ successor(m);
+                   claim successor(m) ≠ 0 since Natural.successor_not_zero;
+                   calc Polynomial.coefficientOf(r, p, successor(m))
+                      = Ring.zero(r)
+                            by pBound(successor(m), (successor(0) ≤ successor(m)))
+                      = Polynomial.coefficientOf(r,
+                            Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0),
+                            successor(m))
+                            by Polynomial.coefficientOf_monomial_off(r,
+                                   Polynomial.coefficientOf(r, p, 0), 0, successor(m),
+                                   (successor(m) ≠ 0))
+                 }
+             });
   ⟨Polynomial.monomial(r, inverse, 0),
    calc Polynomial.one(r)
       = Polynomial.monomial(r, Ring.one(r), 0)
