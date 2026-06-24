@@ -24,6 +24,11 @@ void elaborateModule(const SurfaceModule& module,
     elaborator.setReportRedundantCalcSteps(reportRedundantCalcSteps);
     elaborator.setReportRedundantByNonEq(reportRedundantByNonEq);
     elaborator.setReportUnusedNames(reportUnusedNames);
+    // Opt-in cast-redundancy polishing pass (expensive: each cast operand
+    // triggers a speculative re-elaboration). Env-var gated like the other
+    // MATH_* diagnostics: `MATH_CHECK_REDUNDANT_CASTS=1`.
+    elaborator.setReportRedundantCasts(
+        std::getenv("MATH_CHECK_REDUNDANT_CASTS") != nullptr);
     elaborator.setLibrarySearchProvider(std::move(librarySearchProvider));
     elaborator.setGoalAtLine(goalAtLine);
     if (!goalAtReport) {

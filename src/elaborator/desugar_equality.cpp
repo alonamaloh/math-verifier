@@ -6,6 +6,8 @@
 
 #include "elaborator/internal.hpp"
 
+#include <iostream>
+
 ExpressionPointer Elaborator::desugarArithmeticOperator(
         const std::string& operatorSymbol,
         const SurfaceExpression& leftSurface,
@@ -50,6 +52,56 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             return desugarArithmeticOperator(
                 "<", rightSurface, leftSurface, localBinders,
                 expectedType, line);
+        }
+        // `--check-redundant-casts`: an operand written as an explicit
+        // ascription `(e : T)` is noise if the coercion-join would lift the
+        // bare `e` to the same term. Elaborate the operator for real (guarded,
+        // so the recursion runs the normal path), then re-elaborate it with
+        // each operand's ascription stripped; a STRUCTURALLY identical result
+        // means the cast is redundant. Structural (not defeq) equality keeps
+        // us from flagging a cast whose removal would change the term's atom
+        // association (which `ring`/hypothesis-matching can be sensitive to).
+        if (reportRedundantCasts_ && !inRedundantCastProbe_
+            && (std::holds_alternative<SurfaceAscription>(leftSurface.node)
+                || std::holds_alternative<SurfaceAscription>(
+                       rightSurface.node))) {
+            inRedundantCastProbe_ = true;
+            struct ProbeGuard {
+                bool& flag;
+                ~ProbeGuard() { flag = false; }
+            } probeGuard{inRedundantCastProbe_};
+            ExpressionPointer realResult = desugarArithmeticOperator(
+                operatorSymbol, leftSurface, rightSurface, localBinders,
+                expectedType, line);
+            auto probe = [&](bool probeLeft) {
+                const SurfaceExpression& operand =
+                    probeLeft ? leftSurface : rightSurface;
+                auto* ascription =
+                    std::get_if<SurfaceAscription>(&operand.node);
+                if (!ascription) return;
+                ExpressionPointer stripped;
+                try {
+                    stripped = probeLeft
+                        ? desugarArithmeticOperator(
+                              operatorSymbol, *ascription->expression,
+                              rightSurface, localBinders, expectedType, line)
+                        : desugarArithmeticOperator(
+                              operatorSymbol, leftSurface,
+                              *ascription->expression, localBinders,
+                              expectedType, line);
+                } catch (const ElaborateError&) { return; }
+                  catch (const TypeError&) { return; }
+                if (stripped && structurallyEqual(stripped, realResult)) {
+                    std::cerr << "warning: " << moduleName_ << ":"
+                        << operand.line << ":" << operand.column
+                        << ": redundant cast — the `" << operatorSymbol
+                        << "` coercion-join already lifts this operand; "
+                        "drop the `( : …)`\n";
+                }
+            };
+            probe(true);
+            probe(false);
+            return realResult;
         }
         // Logical operators are dispatched first because their operand
         // type is a Proposition (a `Sort`, not a `Constant`), so the

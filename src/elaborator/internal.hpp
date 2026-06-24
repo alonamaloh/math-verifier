@@ -261,6 +261,13 @@ public:
     // `--check-redundant-calc-steps` CLI flag.
     void setReportRedundantCalcSteps(bool flag);
 
+    // When true, every arithmetic-operator operand written as an explicit
+    // ascription `(e : T)` is re-elaborated without the ascription; if the
+    // coercion-join produces the identical operator term, a warning fires (the
+    // cast is noise the join would insert anyway). Drives the
+    // `--check-redundant-casts` CLI flag.
+    void setReportRedundantCasts(bool flag);
+
     // `--goal-at LINE` (poor man's infoview): when LINE >= 1, record the
     // expected type and local context active at the statement at (or
     // nearest before) LINE during elaboration, for dumping afterwards.
@@ -5198,6 +5205,13 @@ private:
     bool reportUnusedNames_ = false;
     bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
+    // When true, an arithmetic-operator operand written as an explicit cast
+    // `(e : T)` is re-elaborated bare; if the coercion-join inserts the same
+    // coercion (the operator term is unchanged), the cast is flagged redundant.
+    // Drives `--check-redundant-casts`. Self-guards against re-entry while the
+    // speculative bare re-elaboration runs.
+    bool reportRedundantCasts_ = false;
+    bool inRedundantCastProbe_ = false;
     // The kernel-step budget below which a speculative redundancy auto-prove
     // counts as "cheap enough to drop the hint". Tied to the expensive-step
     // warn threshold (MATH_AUTOPROVE_WARN): a `by`/calc-step whose by-less

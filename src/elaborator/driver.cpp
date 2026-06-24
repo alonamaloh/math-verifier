@@ -177,6 +177,9 @@ void Elaborator::emitAutoProverProfile() {
     }
 
 void Elaborator::setReportRedundantBy(bool flag) { reportRedundantBy_ = flag; }
+void Elaborator::setReportRedundantCasts(bool flag) {
+    reportRedundantCasts_ = flag;
+}
 
 void Elaborator::setReportUnusedNames(bool flag) { reportUnusedNames_ = flag; }
 
