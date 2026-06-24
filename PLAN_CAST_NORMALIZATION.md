@@ -144,6 +144,57 @@ term, so the composite move lemmas fire directly. **No squash lemmas, no
 named-composite emission needed.** Milestone 1 below is therefore moot and
 struck.
 
+## Unified target (decided: full unification, Option B)
+
+The numeric tower is currently known to **four overlapping subsystems**: the
+coercion registry + join (elaboration), the `castPushToLeaves` prover-side
+pre-pass, `ring`'s internal `embeddingChain` + coerced-literal recognition
+(ring.cpp:2592–2709), and the scalar operators
+(`from_integer_multiply`/`multiply_by_integer`). The target collapses these
+to one pipeline:
+
+- **Join inserts** coercions at mixed operands (done).
+- **Elaboration normalizes** to cast-normal form (casts at the leaves) by
+  calling the `castPushToLeaves` engine at insertion time — keeping only its
+  `.term` (this is the Option-B switch the seam was built for). Every
+  consumer — `ring`, `field`, `calc`, `substitute`, hypothesis matching —
+  then sees one canonical form.
+- **`ring` keeps** only its coerced-literal recognition (`ι(k)` → coefficient
+  `k`); the prover-side pre-pass is retired (terms arrive normal).
+- **Scalar operators deleted**, with `ring`'s now-dead scalar handling.
+
+### Phase 0 findings (instrumented dispatch + ring inventory)
+
+- **The scalar operators are already dead code.** `(2 : Integer) * x`,
+  `x * (2 : Integer)`, `x * n`, and `x * (n·m)` (Real×Natural) **all fire
+  the join** (`combineOperands`, which runs before the registry lookup) and
+  coerce to Real + `Real.multiply`. The `(*) on (Real, Integer)` operators
+  are never reached. So the earlier "scalar wins / dispatch-precedence"
+  worry was a misdiagnosis — it was a missing-`multiply_associative` import
+  in the test, and a misread goal print. Deleting the scalar operators is
+  therefore low-risk, not a re-greening hazard.
+- **`ring` already recognizes coerced literals** through the full chain:
+  `(2 : Integer)` is `Natural.to_integer(succ²(zero))`, so coerced to Real it
+  is the chain over a Natural literal, which `tryParseCarrierEmbeddedNaturalLiteral`
+  reads as coefficient 2. That is why `scalar_multiply_test` passes even with
+  the scalar operators already shadowed.
+- **Net:** the real behavioral change is moving compound-cast pushing
+  (`ι(n+m)` for *variables*) from ring-time to elaboration-time; the scalar
+  deletions are cleanup of already-unreachable code.
+
+### Phases
+
+1. **Elaboration-time normalization** — call `castPushToLeaves(...).term`
+   after the join's `applyCoercionChain` in `desugarArithmeticOperator` and
+   the `=` desugar. Retire the ring pre-pass.
+2. **Delete the scalar operators** + `ring`'s `from_integer_multiply`
+   handling.
+3. **Re-green** — fix any proof whose canonical (leaf-cast) form differs from
+   what it assumed. Expected small, given the join already shadows the scalar
+   path.
+4. **Library cast sweep** — delete the now-redundant explicit casts across
+   the analysis cone (the payoff).
+
 ## Implementation status
 
 **The defensive seam is in place.** The reusable core is

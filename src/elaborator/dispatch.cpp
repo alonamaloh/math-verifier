@@ -1599,9 +1599,17 @@ ExpressionPointer Elaborator::elaborateExpression(
                                 leftHead, rightHead, leftType, rightType)) {
                             leftKernel = applyCoercionChain(
                                 std::move(leftKernel), combined->coerceLeft);
+                            if (!combined->coerceLeft.empty()) {
+                                leftKernel = castPushToLeaves(
+                                    leftKernel, localBinders).term;
+                            }
                             rightKernel = applyCoercionChain(
                                 std::move(rightKernel),
                                 combined->coerceRight);
+                            if (!combined->coerceRight.empty()) {
+                                rightKernel = castPushToLeaves(
+                                    rightKernel, localBinders).term;
+                            }
                             leftType = combined->resultType;
                         }
                     }

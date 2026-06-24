@@ -133,10 +133,23 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             if (auto combined = combineOperands(
                     operandTypeName, rightTypeName,
                     leftTypeClosed, rightTypeClosed)) {
+                // Cast-normal form at elaboration (PLAN_CAST_NORMALIZATION.md,
+                // Option B): when the join coerces a *compound* operand it
+                // would produce `ι(a ⊕ b)`; push the coercion to the leaves
+                // now (`ι(a) ⊕ ι(b)`) so every downstream consumer sees one
+                // canonical form. A no-op on a coerced leaf (`ι(q)`).
                 leftKernel = applyCoercionChain(
                     std::move(leftKernel), combined->coerceLeft);
+                if (!combined->coerceLeft.empty()) {
+                    leftKernel =
+                        castPushToLeaves(leftKernel, localBinders).term;
+                }
                 rightKernel = applyCoercionChain(
                     std::move(rightKernel), combined->coerceRight);
+                if (!combined->coerceRight.empty()) {
+                    rightKernel =
+                        castPushToLeaves(rightKernel, localBinders).term;
+                }
                 leftTypeRaw = combined->resultType;
                 leftTypeClosed = combined->resultType;
                 rightTypeRaw = combined->resultType;
