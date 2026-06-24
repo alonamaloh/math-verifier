@@ -66,7 +66,10 @@ theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) :=
         Rational.to_cauchy_constant(Rational.zero);
     let oneSequence  : CauchyRationalSequence :=
         Rational.to_cauchy_constant(Rational.one);
-    claim cauchyEquivalence : CauchyEquivalent(zeroSequence, oneSequence) by sorry;
+    claim cauchyEquivalence : CauchyEquivalent(zeroSequence, oneSequence)
+        by Quotient.equal_implies_equivalent(
+               CauchyRationalSequence, CauchyEquivalent, Real.equivalence,
+               zeroSequence, oneSequence, zeroEqualsOne);
     choose witnessIndex such that
         ∀ (m : Natural). witnessIndex ≤ m →
           abs(CauchyRationalSequence.sequenceFunction(zeroSequence, m)
@@ -140,7 +143,12 @@ theorem Real.reciprocal_cauchy_sequence_multiplies
                   ?, lowerBoundPositive,
                   ?, apartness);
           -- |underlyingSequence(m)| ≥ lowerBound > 0, so underlyingSequence(m) ≠ 0.
-          claim ¬(underlyingSequence(m) = Rational.zero) by sorry;
+          claim lowerBound ≤ abs(underlyingSequence(m))
+              since apartness(m, apartnessIndexLeqM);
+          claim Rational.zero < abs(underlyingSequence(m))
+              since Rational.LessThan.transitive_right;
+          claim underlyingSequence(m) ≠ Rational.zero
+              since Rational.nonzero_of_absolute_value_positive;
           -- Beyond apartnessIndex the product sequence is identically one,
           -- so its difference from the constant-one sequence has absolute
           -- value zero — trivially below ε.
@@ -182,7 +190,11 @@ theorem Real.reciprocal_exists_for_nonzero
         -- Apartness: ¬(mk(rep) = mk(constant_zero)) → ¬CauchyEquivalent(rep, constant_zero).
         let zeroSequence : CauchyRationalSequence :=
             Rational.to_cauchy_constant(Rational.zero);
-        claim ¬CauchyEquivalent(rep, zeroSequence) by sorry;
+        claim ¬CauchyEquivalent(rep, zeroSequence)
+            by (representativesEquivalent : CauchyEquivalent(rep, zeroSequence)) ↦
+                 xNonzero(Quotient.equivalent_implies_equal(
+                              CauchyRationalSequence, CauchyEquivalent,
+                              rep, zeroSequence, representativesEquivalent));
         choose lowerBound such that
             ∃ (apartnessIndex : Natural).
               Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
