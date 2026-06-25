@@ -392,6 +392,36 @@ ExpressionPointer Elaborator::elaborateCalc(
                 step.line, /*column*/ 0);
             ExpressionPointer nextKernel = elaborateExpression(
                 *step.nextExpression, localBinders, carrierType);
+            // An endpoint whose type sits below the carrier in the
+            // coercion tower (e.g. a bare Rational endpoint in a Real
+            // calc) is lifted up to the carrier here. Passing carrierType
+            // as the expected type does NOT itself trigger a tower
+            // coercion — only ascriptions (dispatch.cpp) and operator
+            // operands (combineOperands) do — so without this a bare
+            // `… ≤ q` against a Real carrier would build a heterogeneous
+            // relation and the endpoint would have to carry an explicit
+            // `(q : Real)` ascription just to typecheck. Mirrors the
+            // `=`-desugaring's mixed-type reconciliation, cast-normal form
+            // included.
+            {
+                ExpressionPointer nextTypeRaw =
+                    inferTypeInLocalContext(localBinders, nextKernel);
+                std::string nextHead = headConstantName(nextTypeRaw);
+                if (!nextHead.empty() && nextHead != carrierTypeName) {
+                    ExpressionPointer nextTypeClosed = closeOverLocalBinders(
+                        nextTypeRaw, localBinders, localBinders.size());
+                    if (auto combined = combineOperands(
+                            nextHead, carrierTypeName,
+                            nextTypeClosed, carrierType)) {
+                        if (!combined->coerceLeft.empty()) {
+                            nextKernel = applyCoercionChain(
+                                std::move(nextKernel), combined->coerceLeft);
+                            nextKernel = castPushToLeaves(
+                                nextKernel, localBinders).term;
+                        }
+                    }
+                }
+            }
             // Build the step's expected proof type from its relation.
             // For ≥/> the relation's arguments are flipped (a ≥ b is
             // proved as b ≤ a; a > b is proved as b < a).

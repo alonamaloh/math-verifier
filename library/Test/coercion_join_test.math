@@ -50,3 +50,29 @@ definition mixed_natural_real (n : Natural) (x : Real) : Real :=
 -- Mixed-type equality goes through the `=` desugar hook.
 definition mixed_equality (q : Rational) (x : Real) : Proposition :=
     q = x
+
+-- A calc endpoint written as a bare lower-tower term rides up to the
+-- carrier, exactly like an operator operand does. The carrier is fixed
+-- Real by the subject `x`; the endpoint `q` is a bare Rational. Without
+-- the endpoint coercion the step would build a heterogeneous
+-- `Real.LessOrEqual(x, q)` and `q` would have to carry an explicit
+-- `(q : Real)` ascription just to typecheck.
+theorem calc_endpoint_rational_rides_up (x : Real) (q : Rational)
+        (h : x ≤ q)
+        : x ≤ q := {
+  calc x
+     ≤ q   by h
+}
+
+-- Faithful to the δ-bound chains in Real/continuity: a strict `<` step
+-- into one endpoint, then a `≤` step into a BARE Rational endpoint. The
+-- bare endpoint must ride up to the Real carrier or the chain is
+-- heterogeneous and fails to typecheck.
+theorem calc_strict_then_bare_endpoint
+        (x : Real) (p q : Rational)
+        (h1 : x < (p : Real)) (h2 : (p : Real) ≤ (q : Real))
+        : x < q := {
+  calc x
+     < p   by h1
+     ≤ q   by h2
+}
