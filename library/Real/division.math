@@ -1,0 +1,67 @@
+-- Real/division.math
+--
+-- Division on the reals: `a / b := a · reciprocal(b)`. Unlike the
+-- Rational `/` (built on the *total* reciprocal_function), `Real.reciprocal`
+-- is partial — it takes the proof that the denominator is nonzero — so the
+-- side condition is genuine. The `/` operator leaves it for the auto-prover
+-- to discharge at the use site (a hypothesis in scope), mirroring
+-- `Integer.divide` / `Rational.divide`, so `a / b` reads plainly while
+-- staying honest. The lemmas keep `bNonzero` as a hypothesis so the `/`
+-- hole resolves to that bound variable — a unifiable slot the citation
+-- matcher binds to whatever proof a use site carries (this kernel has no
+-- definitional proof irrelevance, and `Real.reciprocal` genuinely depends
+-- on its proof argument via `Logic.the`, so a compound proof baked in
+-- would not match across sites).
+
+module Real.division
+
+import Logic.basics
+import Equality.basics
+import Real.basics
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.order
+import Real.apartness
+import Real.reciprocal
+import Real.field
+
+definition Real.divide (a b : Real) (denominatorNonzero : b ≠ Real.zero) : Real :=
+  a * Real.reciprocal(b, denominatorNonzero)
+
+operator (/) on (Real, Real) := Real.divide
+
+-- b · (a / b) = a — the cancellation everything else leans on.
+theorem Real.divide_cancel (a b : Real) (bNonzero : b ≠ Real.zero)
+        : b * (a / b) = a := {
+  claim bReciprocal : b * Real.reciprocal(b, bNonzero) = Real.one
+      since Real.reciprocal_multiplies;
+  calc b * (a / b)
+     = b * (a * Real.reciprocal(b, bNonzero))
+     = a * (b * Real.reciprocal(b, bNonzero))   by ring
+     = a * Real.one                             by substituting bReciprocal
+     = a                                        by ring
+}
+
+-- a / a = 1.
+theorem Real.divide_self (a : Real) (aNonzero : a ≠ Real.zero)
+        : a / a = Real.one := {
+  claim aReciprocal : a * Real.reciprocal(a, aNonzero) = Real.one
+      since Real.reciprocal_multiplies;
+  calc a / a
+     = a * Real.reciprocal(a, aNonzero)
+     = Real.one                                 since aReciprocal
+}
+
+-- (a · b) / b = a.
+theorem Real.multiply_divide_cancel (a b : Real) (bNonzero : b ≠ Real.zero)
+        : (a * b) / b = a := {
+  claim bReciprocal : b * Real.reciprocal(b, bNonzero) = Real.one
+      since Real.reciprocal_multiplies;
+  calc (a * b) / b
+     = (a * b) * Real.reciprocal(b, bNonzero)
+     = a * (b * Real.reciprocal(b, bNonzero))   by ring
+     = a * Real.one                             by substituting bReciprocal
+     = a                                        by ring
+}
