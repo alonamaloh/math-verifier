@@ -1,0 +1,132 @@
+-- ComplexNumber/division.math
+--
+-- Division on ℂ. ℂ = ℝ[x]/(x²+1) is a field (ComplexNumber.is_field), so
+-- every nonzero z has a multiplicative inverse; definite description turns
+-- that into an honest reciprocal function of (z, proof z ≠ 0), exactly as
+-- Real/field.math does for ℝ. Then `a / b := a · reciprocal(b)`, with the
+-- denominator's nonzeroness the side condition the `/` operator leaves to
+-- the auto-prover. The lemmas keep `bNonzero` a hypothesis so the `/` hole
+-- resolves to that bound variable — a unifiable slot the matcher binds to
+-- whatever proof a use site carries.
+--
+-- ℂ's 0 and 1 are the quotient's, spelled `RingModulo.{zero,one}(…)` as in
+-- ComplexNumber.basics / .embedding (ℂ has no shorter alias).
+
+module ComplexNumber.division
+
+import Logic.basics
+import Logic.exists
+import Logic.description
+import Equality.basics
+import Algebra.ring
+import Algebra.field
+import Real.basics
+import Real.algebra
+import Real.instances
+import Real.field
+import Polynomial.basics
+import Polynomial.instances
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import ComplexNumber.basics
+import ComplexNumber.field
+
+-- A multiplicative inverse is unique: two right-inverses of z agree
+-- (associate b across z · a = 1).
+theorem ComplexNumber.inverse_unique (z a b : ComplexNumber)
+        (aInverse : z * a
+              = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        (bInverse : z * b
+              = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        : a = b :=
+  calc a
+     = a * RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+           by ring
+     = a * (z * b)                                       by substituting bInverse
+     = (z * a) * b                                       by ring
+     = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial) * b
+           by substituting aInverse
+     = b                                                 by ring
+
+-- Inverse existence, read off ℂ's field structure.
+theorem ComplexNumber.reciprocal_exists_for_nonzero (z : ComplexNumber)
+        (zNonzero : z ≠ RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        : ∃ (w : ComplexNumber). z * w
+              = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial) := {
+  claim isField
+        : IsField(ComplexNumber, RingModulo.add,
+              RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial),
+              RingModulo.negate, RingModulo.multiply,
+              RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+      since ComplexNumber.is_field;
+  obtain ⟨commutativeRing, zeroNotOne, inverseExistence⟩ from isField;
+  done by inverseExistence(z, zNonzero)
+}
+
+-- THE reciprocal, by definite description.
+definition ComplexNumber.reciprocal (z : ComplexNumber)
+        (zNonzero : z ≠ RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        : ComplexNumber := {
+  claim reciprocalExists : ∃ (w : ComplexNumber). z * w
+            = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      since ComplexNumber.reciprocal_exists_for_nonzero;
+  Logic.the(
+      ComplexNumber,
+      (w : ComplexNumber) ↦ z * w
+            = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial),
+      reciprocalExists,
+      ComplexNumber.inverse_unique(z))
+}
+
+-- z · reciprocal(z) = 1.
+theorem ComplexNumber.reciprocal_multiplies (z : ComplexNumber)
+        (zNonzero : z ≠ RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        : z * ComplexNumber.reciprocal(z, zNonzero)
+              = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial) := {
+  claim reciprocalExists : ∃ (w : ComplexNumber). z * w
+            = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      since ComplexNumber.reciprocal_exists_for_nonzero;
+  Logic.the_satisfies(
+      ComplexNumber,
+      (w : ComplexNumber) ↦ z * w
+            = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial),
+      reciprocalExists,
+      ComplexNumber.inverse_unique(z))
+}
+
+definition ComplexNumber.divide (a b : ComplexNumber)
+        (denominatorNonzero : b ≠ RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        : ComplexNumber :=
+  a * ComplexNumber.reciprocal(b, denominatorNonzero)
+
+operator (/) on (ComplexNumber, ComplexNumber) := ComplexNumber.divide
+
+-- b · (a / b) = a.
+theorem ComplexNumber.divide_cancel (a b : ComplexNumber)
+        (bNonzero : b ≠ RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        : b * (a / b) = a := {
+  claim bReciprocal : b * ComplexNumber.reciprocal(b, bNonzero)
+            = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      since ComplexNumber.reciprocal_multiplies;
+  calc b * (a / b)
+     = b * (a * ComplexNumber.reciprocal(b, bNonzero))
+     = a * (b * ComplexNumber.reciprocal(b, bNonzero))                      by ring
+     = a * RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+           by substituting bReciprocal
+     = a                                                                    by ring
+}
+
+-- a / a = 1.
+theorem ComplexNumber.divide_self (a : ComplexNumber)
+        (aNonzero : a ≠ RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+        : a / a = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial) := {
+  claim aReciprocal : a * ComplexNumber.reciprocal(a, aNonzero)
+            = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      since ComplexNumber.reciprocal_multiplies;
+  calc a / a
+     = a * ComplexNumber.reciprocal(a, aNonzero)
+     = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+           since aReciprocal
+}
