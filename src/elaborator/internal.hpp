@@ -2429,6 +2429,19 @@ private:
         const std::vector<ExpressionPointer>& structurePrefix,
         int line);
 
+    // Combine two equations under a ring operation `<opName>` (a full op
+    // name, e.g. `Real.add`): from `a : aL = aR` and `b : bL = bR` build
+    // `op(aL, bL) = op(aR, bR)` by congruence on each operand then
+    // transitivity. `structurePrefix` is the leading bundle argument for a
+    // bundled-ring op (empty for a concrete carrier).
+    CombinationEquation combineEquationsByOp(
+        const std::string& opName,
+        const CombinationEquation& a,
+        const CombinationEquation& b,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        const std::vector<ExpressionPointer>& structurePrefix);
+
     // `linear_combination(e)` — close a commutative-ring equality goal
     // `goalL = goalR` from a combination `e` of equation hypotheses, when
     // the goal follows by ring algebra: check the bridge `goalL − goalR =
@@ -4252,6 +4265,38 @@ private:
     EqualityComponents extractEqualityComponents(
         ExpressionPointer equalityType, const char* contextLabel,
         int line);
+
+    // The bridge-and-assemble tail shared by `linear_combination` and the
+    // cofactor-synthesising `field` path: check `goalL − goalR = combL −
+    // combR` with the ring normaliser and assemble the proof via
+    // `Ring.equal_of_linear_combination`. Returns the closed proof term.
+    ExpressionPointer assembleLinearCombination(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        const CombinationEquation& comb,
+        int line,
+        const std::vector<LocalBinder>& localBinders,
+        size_t binderCount);
+
+    // Field-clearing by linear-combination cofactor synthesis. Given the
+    // (already divide-unfolded) goal and the reciprocal pairs (each with its
+    // `b · reciprocal(b) = 1` cancellation proof), reduce `goalL − goalR`
+    // modulo the relations `bᵢ·rᵢ = 1` to find ring cofactors `cᵢ` with
+    // `goalL − goalR = Σ cᵢ·(bᵢrᵢ − 1)`, then assemble the proof as a linear
+    // combination. Returns nullopt if the reduction does not fully clear (the
+    // caller then falls back to the contraction path). Unlike contraction,
+    // this clears a denominator against an integer multiplicity — e.g. the
+    // `2` of `x/2 + x/2 = x`, carried as a coefficient, not an atom factor.
+    std::optional<ExpressionPointer> tryFieldByCofactorSynthesis(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        RingNormalisationContext& context,
+        const std::vector<FieldReciprocalPair>& pairs,
+        int line,
+        const std::vector<LocalBinder>& localBinders,
+        size_t binderCount);
 
     // Desugars `Equality.symmetry(equalityProof)` to the full call with
     // the carrier type and endpoint values inferred from the proof's

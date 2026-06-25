@@ -446,6 +446,41 @@ bool Elaborator::ringFastFailAgrees(
         return leftValue == rightValue;
     }
 
+Elaborator::CombinationEquation Elaborator::combineEquationsByOp(
+        const std::string& opName,
+        const CombinationEquation& a,
+        const CombinationEquation& b,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        const std::vector<ExpressionPointer>& structurePrefix) {
+        auto opHead = [&]() {
+            ExpressionPointer head = makeConstant(opName);
+            for (const auto& arg : structurePrefix) {
+                head = makeApplication(std::move(head), arg);
+            }
+            return head;
+        };
+        auto opApply = [&](ExpressionPointer x, ExpressionPointer y) {
+            return makeApplication(
+                makeApplication(opHead(), std::move(x)), std::move(y));
+        };
+        ExpressionPointer newLeft = opApply(a.left, b.left);
+        ExpressionPointer middle = opApply(a.right, b.left);
+        ExpressionPointer newRight = opApply(a.right, b.right);
+        ExpressionPointer lambda1 = makeLambda("_lc_z", carrierType,
+            opApply(makeBoundVariable(0), liftBoundVariables(b.left, 1, 0)));
+        ExpressionPointer step1 = buildEqualityCongruenceSameCarrier(
+            carrierLevel, carrierType, lambda1, a.left, a.right, a.proof);
+        ExpressionPointer lambda2 = makeLambda("_lc_z", carrierType,
+            opApply(liftBoundVariables(a.right, 1, 0), makeBoundVariable(0)));
+        ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
+            carrierLevel, carrierType, lambda2, b.left, b.right, b.proof);
+        ExpressionPointer proof = buildEqualityTransitivity(
+            carrierLevel, carrierType, newLeft, middle, newRight,
+            step1, step2);
+        return {newLeft, newRight, proof};
+    }
+
 Elaborator::CombinationEquation Elaborator::evalLinearCombinationTree(
         const SurfaceExpressionPointer& node,
         const std::vector<LocalBinder>& localBinders,
@@ -465,36 +500,14 @@ Elaborator::CombinationEquation Elaborator::evalLinearCombinationTree(
             }
             return head;
         };
-        auto opApply = [&](const std::string& opName,
-                           ExpressionPointer x, ExpressionPointer y) {
-            return makeApplication(
-                makeApplication(opHead(opName), std::move(x)),
-                std::move(y));
-        };
         // Combine `op(a.left, b.left) = op(a.right, b.right)` from the
-        // child proofs: rewrite the first operand (congruence on slot 1),
-        // then the second (congruence on slot 2), chained by transitivity.
+        // child proofs.
         auto combineBinary = [&](const std::string& opName,
                                  const CombinationEquation& a,
                                  const CombinationEquation& b)
                 -> CombinationEquation {
-            ExpressionPointer newLeft = opApply(opName, a.left, b.left);
-            ExpressionPointer middle = opApply(opName, a.right, b.left);
-            ExpressionPointer newRight = opApply(opName, a.right, b.right);
-            ExpressionPointer lambda1 = makeLambda("_lc_z", carrierType,
-                opApply(opName, makeBoundVariable(0),
-                        liftBoundVariables(b.left, 1, 0)));
-            ExpressionPointer step1 = buildEqualityCongruenceSameCarrier(
-                carrierLevel, carrierType, lambda1, a.left, a.right, a.proof);
-            ExpressionPointer lambda2 = makeLambda("_lc_z", carrierType,
-                opApply(opName, liftBoundVariables(a.right, 1, 0),
-                        makeBoundVariable(0)));
-            ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
-                carrierLevel, carrierType, lambda2, b.left, b.right, b.proof);
-            ExpressionPointer proof = buildEqualityTransitivity(
-                carrierLevel, carrierType, newLeft, middle, newRight,
-                step1, step2);
-            return {newLeft, newRight, proof};
+            return combineEquationsByOp(
+                opName, a, b, carrierType, carrierLevel, structurePrefix);
         };
         if (auto* binary =
                 std::get_if<SurfaceBinaryOperation>(&node->node)) {
@@ -579,6 +592,28 @@ ExpressionPointer Elaborator::elaborateLinearCombination(
             expectedOpened, "linear_combination", line);
         std::string carrierName = headConstantName(goal.carrierType);
         RingScheme scheme = computeRingScheme(goal.carrierType);
+        // Walk the combination tree: a `+`/`*`/`-` expression over
+        // hypotheses (equality proofs) and scalar ring coefficients. Each
+        // node denotes an equation; the walker returns the combined
+        // `combLeft = combRight` and a proof of it. A bare hypothesis is
+        // the degenerate single-leaf tree.
+        CombinationEquation comb = evalLinearCombinationTree(
+            tactic.combination, localBinders, goal.carrierType,
+            goal.carrierUniverseLevel, scheme.opNamespace,
+            scheme.structurePrefix, line);
+        (void)column;
+        return assembleLinearCombination(
+            goal, carrierName, scheme, comb, line, localBinders, binderCount);
+    }
+
+ExpressionPointer Elaborator::assembleLinearCombination(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        const CombinationEquation& comb,
+        int line,
+        const std::vector<LocalBinder>& localBinders,
+        size_t binderCount) {
         // Resolve the carrier's ring operations + IsRing instance (matches
         // `ring`'s normalisation context). For a bundled carrier
         // `CommutativeRing.carrier(c)` the ops carry the leading structure
@@ -618,15 +653,6 @@ ExpressionPointer Elaborator::elaborateLinearCombination(
         auto negateApply = [&](ExpressionPointer x) {
             return makeApplication(negateOp, x);
         };
-        // Walk the combination tree: a `+`/`*`/`-` expression over
-        // hypotheses (equality proofs) and scalar ring coefficients. Each
-        // node denotes an equation; the walker returns the combined
-        // `combLeft = combRight` and a proof of it. A bare hypothesis is
-        // the degenerate single-leaf tree.
-        CombinationEquation comb = evalLinearCombinationTree(
-            tactic.combination, localBinders, goal.carrierType,
-            goal.carrierUniverseLevel, scheme.opNamespace,
-            scheme.structurePrefix, line);
         ExpressionPointer combProof = comb.proof;
         // Bridge: goalL − goalR = combL − combR, proved by the ring
         // normaliser (it is a pure ring identity — no hypotheses). β-reduce
@@ -657,7 +683,6 @@ ExpressionPointer Elaborator::elaborateLinearCombination(
                  bridgeProof}) {
             result = makeApplication(std::move(result), arg);
         }
-        (void)column;
         return closeOverLocalBinders(result, localBinders, binderCount);
     }
 
@@ -6251,6 +6276,155 @@ void Elaborator::collectReciprocalArguments(
         // Other variants: no children to walk.
     }
 
+std::optional<ExpressionPointer> Elaborator::tryFieldByCofactorSynthesis(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        RingNormalisationContext& context,
+        const std::vector<FieldReciprocalPair>& pairs,
+        int line,
+        const std::vector<LocalBinder>& localBinders,
+        size_t binderCount) {
+        if (pairs.empty()) return std::nullopt;
+        std::string addName = scheme.opNamespace + ".add";
+        std::string multiplyName = scheme.opNamespace + ".multiply";
+        // goalDiff = normalise(goalL) − normalise(goalR).
+        RingPolynomial goalDiff =
+            normaliseToRingPolynomial(goal.leftEndpoint, context);
+        RingPolynomial rightPoly =
+            normaliseToRingPolynomial(goal.rightEndpoint, context);
+        ringPolynomialSubtract(goalDiff, rightPoly);
+        ringPolynomialCompact(goalDiff);
+        // For each pair, the cancellation polynomial gᵢ = normalise(bᵢ·rᵢ) − 1
+        // and its leading monomial (the one containing the reciprocal atom).
+        // Normalising `bᵢ·rᵢ` folds a numeral base into the coefficient, so a
+        // numeral denominator's `mᵢ` lands on the leading coefficient — which
+        // is exactly the integer multiplicity contraction can't reach.
+        struct Cancellation {
+            RingPolynomial poly;
+            RingMonomialSignature leadingSig;
+            int leadingCoeff;
+            uint64_t reciprocalHash;
+        };
+        std::vector<Cancellation> cancellations;
+        for (const auto& pair : pairs) {
+            ExpressionPointer product = makeApplication(
+                makeApplication(makeConstant(multiplyName), pair.baseAtom),
+                pair.reciprocalAtom);
+            RingPolynomial g = normaliseToRingPolynomial(product, context);
+            RingPolynomial one = ringPolynomialOne();
+            ringPolynomialSubtract(g, one);
+            ringPolynomialCompact(g);
+            Cancellation cancellation;
+            cancellation.poly = g;
+            cancellation.reciprocalHash = pair.reciprocalHash;
+            cancellation.leadingCoeff = 0;
+            bool found = false;
+            for (const auto& entry : g) {
+                if (std::find(entry.first.begin(), entry.first.end(),
+                              pair.reciprocalHash) != entry.first.end()) {
+                    if (found) return std::nullopt;  // >1 reciprocal monomial
+                    cancellation.leadingSig = entry.first;
+                    cancellation.leadingCoeff = entry.second;
+                    found = true;
+                }
+            }
+            if (!found || cancellation.leadingCoeff == 0) return std::nullopt;
+            cancellations.push_back(std::move(cancellation));
+        }
+        // Multiset subtraction on sorted signatures: `super ⊇ subset`?
+        auto multisetSubtract = [](const RingMonomialSignature& super,
+                                   const RingMonomialSignature& subset,
+                                   RingMonomialSignature& differenceOut)
+                -> bool {
+            differenceOut.clear();
+            size_t i = 0, j = 0;
+            while (i < super.size()) {
+                if (j < subset.size() && super[i] == subset[j]) { ++i; ++j; }
+                else if (j < subset.size() && super[i] > subset[j]) return false;
+                else { differenceOut.push_back(super[i]); ++i; }
+            }
+            return j == subset.size();
+        };
+        auto hasReciprocal = [&](const RingMonomialSignature& sig) -> bool {
+            for (const auto& cancellation : cancellations) {
+                if (std::find(sig.begin(), sig.end(),
+                              cancellation.reciprocalHash) != sig.end())
+                    return true;
+            }
+            return false;
+        };
+        // Reduce goalDiff modulo the relations bᵢ·rᵢ = 1, accumulating one
+        // cofactor polynomial per pair. Each step cancels a reciprocal
+        // occurrence with gᵢ's leading term and feeds back a strictly
+        // lower-reciprocal-degree remainder (the `−1` of gᵢ), so the loop
+        // terminates. A monomial that no relation can reduce leaves a
+        // reciprocal in `work` and the certificate fails — we bail to the
+        // contraction path then.
+        std::vector<RingPolynomial> cofactors(pairs.size());
+        RingPolynomial work = goalDiff;
+        size_t guard = 0;
+        const size_t guardLimit = 1000000;
+        while (true) {
+            bool reduced = false;
+            for (const auto& entry : work) {
+                if (entry.second == 0 || !hasReciprocal(entry.first)) continue;
+                RingMonomialSignature sig = entry.first;
+                int coeff = entry.second;
+                for (size_t i = 0; i < cancellations.size(); ++i) {
+                    const Cancellation& c = cancellations[i];
+                    RingMonomialSignature difference;
+                    if (!multisetSubtract(sig, c.leadingSig, difference))
+                        continue;
+                    if (coeff % c.leadingCoeff != 0) continue;
+                    RingPolynomial t;
+                    t[difference] = coeff / c.leadingCoeff;
+                    ringPolynomialAccumulate(cofactors[i], t);
+                    ringPolynomialCompact(cofactors[i]);
+                    RingPolynomial scaled = ringPolynomialMultiply(t, c.poly);
+                    ringPolynomialSubtract(work, scaled);
+                    ringPolynomialCompact(work);
+                    reduced = true;
+                    break;
+                }
+                if (reduced) break;
+            }
+            if (!reduced) break;
+            if (++guard > guardLimit) return std::nullopt;
+        }
+        // A non-empty remainder (reciprocal-free leftover, or an unreducible
+        // reciprocal monomial) means these cofactors do not certify the goal.
+        if (!work.empty()) return std::nullopt;
+        // Build the combination Σ cofactorsᵢ · eqᵢ where eqᵢ : bᵢ·rᵢ = 1.
+        std::optional<CombinationEquation> comb;
+        for (size_t i = 0; i < pairs.size(); ++i) {
+            if (cofactors[i].empty()) continue;  // cᵢ = 0
+            ExpressionPointer eqLeft = makeApplication(
+                makeApplication(makeConstant(multiplyName), pairs[i].baseAtom),
+                pairs[i].reciprocalAtom);
+            ExpressionPointer eqRight = buildRingOneKernel(context);
+            CombinationEquation eq{eqLeft, eqRight, pairs[i].multipliesProof};
+            ExpressionPointer cExpr =
+                buildCanonicalPolynomial(cofactors[i], context);
+            CombinationEquation scalar{cExpr, cExpr,
+                buildReflexivity(goal.carrierUniverseLevel,
+                                 goal.carrierType, cExpr)};
+            CombinationEquation term = combineEquationsByOp(
+                multiplyName, scalar, eq, goal.carrierType,
+                goal.carrierUniverseLevel, scheme.structurePrefix);
+            comb = comb ? combineEquationsByOp(
+                       addName, *comb, term, goal.carrierType,
+                       goal.carrierUniverseLevel, scheme.structurePrefix)
+                 : term;
+        }
+        // All cofactors zero ⟹ goalDiff is already 0 as a ring identity; this
+        // is a `ring` goal, not a field one — let the contraction path (which
+        // bottoms out in the ring normaliser) take it.
+        if (!comb) return std::nullopt;
+        return assembleLinearCombination(
+            goal, carrierName, scheme, *comb, line, localBinders, binderCount);
+    }
+
 ExpressionPointer Elaborator::elaborateField(
         const SurfaceField& fieldTactic,
         const std::vector<LocalBinder>& localBinders,
@@ -6511,6 +6685,17 @@ ExpressionPointer Elaborator::elaborateField(
                 "`reciprocal_function` (with `reciprocal_function_multiplies`) "
                 "nor a partial `reciprocal` (with `reciprocal_multiplies`) in "
                 "scope — `field` needs one of these reciprocal vocabularies");
+        }
+        // Prefer cofactor synthesis: it clears a denominator against an
+        // integer multiplicity (the `2` of `x/2 + x/2 = x`, carried as a
+        // coefficient), which the factor-cancelling contraction below can't
+        // reach. Fall back to contraction when the reduction doesn't fully
+        // clear (e.g. like-term collisions the linear-combination certificate
+        // doesn't model).
+        if (auto cofactorProof = tryFieldByCofactorSynthesis(
+                goal, carrierName, scheme, context, pairs, line,
+                localBinders, localBinders.size())) {
+            return *cofactorProof;
         }
         // Normalize both sides to ring polynomials.
         RingPolynomial leftPolynomial =
