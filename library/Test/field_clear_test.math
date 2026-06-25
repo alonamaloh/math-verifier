@@ -1,13 +1,23 @@
--- Field-clearing in `ring` / `linear_combination` (prototype, approach B).
+-- Field-clearing: `field` (and `ring` / `linear_combination`) seeing
+-- through `/`.
 --
--- `ring` now δ-unfolds `<carrier>.divide(a, b, _proof)` to `a · reciprocal(b)`
--- in the endpoints it normalises (elaborateRingByNormalisation), so division
--- participates in commutative-ring normalisation as a reciprocal atom. With
--- the matching `b · reciprocal(b) = 1` cancellation supplied to
--- `linear_combination`, field goals like `ε/2 + ε/2 = ε` close — over ℚ
--- (total reciprocal_function) and ℝ (partial reciprocal, proof carried
--- through). The `b ≠ 0` proof rides along on the `/`, so this stays sound in
--- a way that would fail in characteristic 2.
+-- `field` δ-unfolds `<carrier>.divide(a, b, _proof)` to `a · reciprocal(b)`
+-- in both endpoints, so division participates in the ring normaliser as a
+-- reciprocal atom. It then clears each reciprocal against the cancellation
+-- `b · reciprocal(b) = 1`:
+--
+--   * over ℚ the reciprocal is the *total* `reciprocal_function`, whose
+--     cancellation needs a `b ≠ 0` hypothesis — passed as `field(h)`;
+--   * over ℝ the reciprocal is the *partial* `reciprocal(b, proof)`, which
+--     carries its own nonzero proof on the `/`, so `field` (no arguments)
+--     synthesises the cancellation itself.
+--
+-- The contraction clears a reciprocal when its base occurs as an honest
+-- factor of the same monomial (`a / a`, `a · reciprocal(a)`). Clearing a
+-- denominator against an *integer multiplicity* — the `2` of `ε/2 + ε/2`,
+-- which the normaliser carries as a coefficient, not an atom — still needs
+-- the explicit cofactor of `linear_combination` (see `real_half`); a
+-- cofactor-synthesising `field` is the next step.
 
 module Test.field_clear_test
 
@@ -27,18 +37,23 @@ import Real.reciprocal
 import Real.field
 import Real.division
 
--- ℚ: 2 · (1/2) = 1, then ε/2 + ε/2 = ε.
-theorem rational_two_reciprocal
-        : (2 : Rational) * Rational.reciprocal_function((2 : Rational)) = Rational.one := {
-  claim (2 : Rational) ≠ Rational.zero since Rational.two_is_nonzero;
-  done since Rational.reciprocal_function_multiplies
-}
+-- ℝ, partial reciprocal: `field` with no arguments, the nonzero proof
+-- riding on the `/`.
+theorem real_divide_self (a : Real) (aNonzero : a ≠ Real.zero) : a / a = Real.one :=
+  field
 
-theorem rational_half (epsilon : Rational) : epsilon / 2 + epsilon / 2 = epsilon :=
-  linear_combination(epsilon * rational_two_reciprocal)
+theorem real_reciprocal_cancel (a : Real) (aNonzero : a ≠ Real.zero)
+        : a * Real.reciprocal(a, aNonzero) = Real.one :=
+  field
 
--- ℝ: the same, with the nonzero proof threaded through the field reciprocal.
-theorem real_half (epsilon : Real) (twoNonzero : (2 : Real) ≠ Real.zero)
-        : Real.divide(epsilon, (2 : Real), twoNonzero)
-            + Real.divide(epsilon, (2 : Real), twoNonzero) = epsilon :=
-  linear_combination(epsilon * Real.reciprocal_multiplies((2 : Real), twoNonzero))
+-- ℚ, total reciprocal: division still participates (it is unfolded first),
+-- but cancelling needs the `a ≠ 0` hypothesis.
+theorem rational_divide_self (a : Rational) (aNonzero : a ≠ Rational.zero)
+        : a / a = Rational.one :=
+  field(aNonzero)
+
+-- ε/2 + ε/2 = ε: the `2` to be cleared is an integer coefficient, not an
+-- atom factor, so contraction can't reach it — supply the cofactor `ε`
+-- explicitly to `linear_combination`.
+theorem real_half (epsilon : Real) : epsilon / 2 + epsilon / 2 = epsilon :=
+  linear_combination(epsilon * Real.reciprocal_multiplies((2 : Real), Real.two_is_nonzero))

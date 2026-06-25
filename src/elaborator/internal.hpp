@@ -3734,6 +3734,34 @@ private:
         const std::string& reciprocalFunctionName,
         std::unordered_map<uint64_t, ExpressionPointer>& argumentsOut);
 
+    // δ-unfold every `<carrierName>.divide(a, b, _proof)` subterm of
+    // `expression` to `a · <carrierName>.reciprocal(b, _proof)` (the body of
+    // `divide`). The result is definitionally equal to the input, so a proof
+    // built over it still proves the original equality. Used by `ring` (so
+    // `/` participates in normalisation as a reciprocal atom) and by the
+    // partial-reciprocal `field` path.
+    ExpressionPointer unfoldFieldDivides(
+        ExpressionPointer expression, const std::string& carrierName);
+
+    // A partial field reciprocal `<carrierName>.reciprocal(b, proof)`
+    // discovered inside a goal: the whole reciprocal application, its base
+    // `b`, and the carried nonzero `proof` (the second argument).
+    struct PartialReciprocalAtom {
+        ExpressionPointer reciprocalApplication;
+        ExpressionPointer base;
+        ExpressionPointer nonzeroProof;
+    };
+
+    // Walk a kernel expression and accumulate every partial reciprocal
+    // `<carrierName>.reciprocal(b, proof)` application, deduplicating by the
+    // base's hash. Unlike `collectReciprocalArguments`, this captures the
+    // carried nonzero proof so `field` can synthesise the cancellation
+    // without a user-supplied hypothesis.
+    void collectPartialReciprocalAtoms(
+        ExpressionPointer expression,
+        const std::string& reciprocalName,
+        std::unordered_map<uint64_t, PartialReciprocalAtom>& atomsOut);
+
     // `field(h1, h2, ..., hn)` — closes a Rational (or any field with a
     // `reciprocal_function`) equality using `ring` plus the
     // `reciprocal_function_multiplies` law and the user-supplied

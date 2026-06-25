@@ -5377,40 +5377,8 @@ ExpressionPointer Elaborator::elaborateRingByNormalisation(
         // of the original equality). This lets `ring`/`linear_combination`
         // see `ε/2` as `ε · reciprocal(2)` — and, with the matching
         // `b · reciprocal(b) = 1` fact, discharge goals like `ε/2 + ε/2 = ε`.
-        std::function<ExpressionPointer(ExpressionPointer)> unfoldDivides =
-            [&](ExpressionPointer expr) -> ExpressionPointer {
-                ExpressionPointer cursor = expr;
-                int applicationDepth = 0;
-                while (auto* app = std::get_if<Application>(&cursor->node)) {
-                    cursor = app->function;
-                    ++applicationDepth;
-                }
-                if (applicationDepth == 3) {
-                    if (auto* headConstant =
-                            std::get_if<Constant>(&cursor->node)) {
-                        if (headConstant->name
-                                == context.carrierName + ".divide") {
-                            ExpressionPointer unfolded =
-                                unfoldHeadConstantOneStep(expr);
-                            if (unfolded
-                                && !structurallyEqual(unfolded, expr)) {
-                                return unfoldDivides(unfolded);
-                            }
-                        }
-                    }
-                }
-                if (auto* app = std::get_if<Application>(&expr->node)) {
-                    ExpressionPointer fn = unfoldDivides(app->function);
-                    ExpressionPointer arg = unfoldDivides(app->argument);
-                    if (fn.get() != app->function.get()
-                        || arg.get() != app->argument.get()) {
-                        return makeApplication(std::move(fn), std::move(arg));
-                    }
-                }
-                return expr;
-            };
-        leftEndpoint = unfoldDivides(leftEndpoint);
-        rightEndpoint = unfoldDivides(rightEndpoint);
+        leftEndpoint = unfoldFieldDivides(leftEndpoint, context.carrierName);
+        rightEndpoint = unfoldFieldDivides(rightEndpoint, context.carrierName);
         RingPolynomial leftPolynomial =
             normaliseToRingPolynomial(leftEndpoint, context);
         RingPolynomial rightPolynomial =
@@ -6172,6 +6140,80 @@ ExpressionPointer Elaborator::buildPolynomialContractionProof(
             chainProof, sortProof);
     }
 
+ExpressionPointer Elaborator::unfoldFieldDivides(
+        ExpressionPointer expression, const std::string& carrierName) {
+        // `<carrierName>.divide` applied to (a, b, proof) is three
+        // application layers deep; δ-unfold it one step to its body
+        // `a · reciprocal(b, proof)`, then recurse into the result.
+        ExpressionPointer cursor = expression;
+        int applicationDepth = 0;
+        while (auto* app = std::get_if<Application>(&cursor->node)) {
+            cursor = app->function;
+            ++applicationDepth;
+        }
+        if (applicationDepth == 3) {
+            if (auto* headConstant = std::get_if<Constant>(&cursor->node)) {
+                if (headConstant->name == carrierName + ".divide") {
+                    ExpressionPointer unfolded =
+                        unfoldHeadConstantOneStep(expression);
+                    if (unfolded && !structurallyEqual(unfolded, expression)) {
+                        return unfoldFieldDivides(unfolded, carrierName);
+                    }
+                }
+            }
+        }
+        if (auto* app = std::get_if<Application>(&expression->node)) {
+            ExpressionPointer fn =
+                unfoldFieldDivides(app->function, carrierName);
+            ExpressionPointer arg =
+                unfoldFieldDivides(app->argument, carrierName);
+            if (fn.get() != app->function.get()
+                || arg.get() != app->argument.get()) {
+                return makeApplication(std::move(fn), std::move(arg));
+            }
+        }
+        return expression;
+    }
+
+void Elaborator::collectPartialReciprocalAtoms(
+        ExpressionPointer expression,
+        const std::string& reciprocalName,
+        std::unordered_map<uint64_t, PartialReciprocalAtom>& atomsOut) {
+        if (auto* outer = std::get_if<Application>(&expression->node)) {
+            // `<carrier>.reciprocal(b, proof)` is two application layers:
+            // `((reciprocal b) proof)`. The base is the inner argument, the
+            // nonzero proof is the outer argument.
+            if (auto* inner =
+                    std::get_if<Application>(&outer->function->node)) {
+                if (auto* head =
+                        std::get_if<Constant>(&inner->function->node)) {
+                    if (head->name == reciprocalName) {
+                        PartialReciprocalAtom atom;
+                        atom.reciprocalApplication = expression;
+                        atom.base = inner->argument;
+                        atom.nonzeroProof = outer->argument;
+                        atomsOut.emplace(inner->argument->hash, atom);
+                    }
+                }
+            }
+            collectPartialReciprocalAtoms(
+                outer->function, reciprocalName, atomsOut);
+            collectPartialReciprocalAtoms(
+                outer->argument, reciprocalName, atomsOut);
+            return;
+        }
+        if (auto* lam = std::get_if<Lambda>(&expression->node)) {
+            collectPartialReciprocalAtoms(lam->domain, reciprocalName, atomsOut);
+            collectPartialReciprocalAtoms(lam->body, reciprocalName, atomsOut);
+            return;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            collectPartialReciprocalAtoms(pi->domain, reciprocalName, atomsOut);
+            collectPartialReciprocalAtoms(pi->codomain, reciprocalName, atomsOut);
+            return;
+        }
+    }
+
 void Elaborator::collectReciprocalArguments(
         ExpressionPointer expression,
         const std::string& reciprocalFunctionName,
@@ -6234,6 +6276,14 @@ ExpressionPointer Elaborator::elaborateField(
         EqualityComponents goal =
             extractEqualityComponents(expectedTypeOpened, "field", line);
         std::string carrierName = headConstantName(goal.carrierType);
+        // Field-clearing pre-pass: δ-unfold `<carrier>.divide(a, b, proof)`
+        // to `a · reciprocal(b, proof)` in both endpoints (definitionally
+        // equal, so the proof we build still proves the stated goal). This
+        // lets a goal written with `/` participate — over ℚ the reciprocal
+        // is the total `reciprocal_function`, over ℝ the partial `reciprocal`
+        // (which carries the proof we then synthesise the cancellation from).
+        goal.leftEndpoint = unfoldFieldDivides(goal.leftEndpoint, carrierName);
+        goal.rightEndpoint = unfoldFieldDivides(goal.rightEndpoint, carrierName);
         // Set up the ring normaliser context. (The `field` tactic is
         // only used over concrete carriers, so the operation namespace is
         // the carrier head and there is no structure prefix; the bundled-
@@ -6281,20 +6331,27 @@ ExpressionPointer Elaborator::elaborateField(
                 "`field`: carrier `" + carrierName
                 + "` does not have both `.add` and `.multiply` in scope");
         }
+        // Two reciprocal flavours. The total `<carrier>.reciprocal_function`
+        // (ℚ) takes no proof, so cancelling `t · reciprocal_function(t) = 1`
+        // needs a user-supplied `t ≠ 0` hypothesis — the `field(h1, …)` form.
+        // The partial `<carrier>.reciprocal(b, proof)` (ℝ) carries its own
+        // nonzero proof, so `field` synthesises `b · reciprocal(b) = 1` itself
+        // — no arguments, and `/` (δ-unfolded above) just works.
         std::string reciprocalFunctionName =
             carrierName + ".reciprocal_function";
         std::string reciprocalMultipliesName =
             carrierName + ".reciprocal_function_multiplies";
-        if (environment_.lookup(reciprocalFunctionName) == nullptr) {
-            throwElaborate(
-                "`field`: carrier `" + carrierName
-                + "` does not have `reciprocal_function` in scope");
-        }
-        if (environment_.lookup(reciprocalMultipliesName) == nullptr) {
-            throwElaborate(
-                "`field`: carrier `" + carrierName
-                + "` does not have `reciprocal_function_multiplies` in scope");
-        }
+        std::string partialReciprocalName = carrierName + ".reciprocal";
+        std::string partialMultipliesName =
+            carrierName + ".reciprocal_multiplies";
+        bool hasTotalReciprocal =
+            environment_.lookup(reciprocalFunctionName) != nullptr
+            && environment_.lookup(reciprocalMultipliesName) != nullptr;
+        bool hasPartialReciprocal =
+            environment_.lookup(partialReciprocalName) != nullptr
+            && environment_.lookup(partialMultipliesName) != nullptr;
+        std::vector<FieldReciprocalPair> pairs;
+        if (hasTotalReciprocal) {
         // Collect reciprocal_function arguments from both sides.
         std::unordered_map<uint64_t, ExpressionPointer> recipArgsMap;
         collectReciprocalArguments(
@@ -6303,7 +6360,6 @@ ExpressionPointer Elaborator::elaborateField(
             goal.rightEndpoint, reciprocalFunctionName, recipArgsMap);
         // Elaborate user hypotheses. Each h_i should have type
         // ¬(t_i = zero) ≡ (t_i = zero) → False.
-        std::vector<FieldReciprocalPair> pairs;
         std::vector<bool> matchedArguments;
         std::vector<uint64_t> recipArgHashes;
         std::vector<ExpressionPointer> recipArgKernels;
@@ -6414,6 +6470,47 @@ ExpressionPointer Elaborator::elaborateField(
                     "`reciprocal_function(t)` on either side of the "
                     "goal");
             }
+        }
+        } else if (hasPartialReciprocal) {
+            // Partial reciprocal: the nonzero proof rides on each
+            // `reciprocal(b, proof)`, so `field` synthesises the
+            // cancellation itself — no hypotheses, and accepting them
+            // would only mislead.
+            if (!fieldTactic.nonzeroHypotheses.empty()) {
+                throwElaborate(
+                    "`field`: carrier `" + carrierName + "` uses the partial "
+                    "reciprocal `" + partialReciprocalName + "(b, proof)`, "
+                    "which carries its own nonzero proof — call `field` with "
+                    "no arguments (the proof rides on each `/`)");
+            }
+            std::unordered_map<uint64_t, PartialReciprocalAtom> atomsMap;
+            collectPartialReciprocalAtoms(
+                goal.leftEndpoint, partialReciprocalName, atomsMap);
+            collectPartialReciprocalAtoms(
+                goal.rightEndpoint, partialReciprocalName, atomsMap);
+            for (const auto& kv : atomsMap) {
+                const PartialReciprocalAtom& atom = kv.second;
+                // multipliesProof : base · reciprocal(base, proof) = 1,
+                // i.e. `<carrier>.reciprocal_multiplies(base, proof)`.
+                ExpressionPointer multipliesProof =
+                    makeConstant(partialMultipliesName);
+                multipliesProof = makeApplication(multipliesProof, atom.base);
+                multipliesProof =
+                    makeApplication(multipliesProof, atom.nonzeroProof);
+                FieldReciprocalPair pair;
+                pair.baseAtom = atom.base;
+                pair.reciprocalAtom = atom.reciprocalApplication;
+                pair.multipliesProof = multipliesProof;
+                pair.baseHash = atom.base->hash;
+                pair.reciprocalHash = atom.reciprocalApplication->hash;
+                pairs.push_back(pair);
+            }
+        } else {
+            throwElaborate(
+                "`field`: carrier `" + carrierName + "` has neither a total "
+                "`reciprocal_function` (with `reciprocal_function_multiplies`) "
+                "nor a partial `reciprocal` (with `reciprocal_multiplies`) in "
+                "scope — `field` needs one of these reciprocal vocabularies");
         }
         // Normalize both sides to ring polynomials.
         RingPolynomial leftPolynomial =

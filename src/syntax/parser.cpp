@@ -2275,28 +2275,24 @@ private:
         }
         if (current.kind == TokenKind::KeywordField) {
             Token fieldToken = consumeAny();
-            // `field` REQUIRES an argument list of nonzero hypotheses.
-            // The argument list is parsed exactly like a function call.
-            if (peek().kind != TokenKind::LeftParen) {
-                throwHere(
-                    "`field` requires a parenthesized argument list of "
-                    "nonzero hypotheses (e.g. `field(aNonzero, bNonzero)`)");
-            }
-            consumeAny();  // '('
-            if (peek().kind == TokenKind::RightParen) {
-                throwHere(
-                    "`field()` with no arguments is not allowed — supply "
-                    "one nonzero hypothesis per `reciprocal_function` "
-                    "argument appearing in the goal");
-            }
             std::vector<SurfaceExpressionPointer> hypotheses;
-            hypotheses.push_back(parseExpression());
-            while (peek().kind == TokenKind::Comma) {
-                consumeAny();
-                hypotheses.push_back(parseExpression());
+            // `field(h1, …)` lists one nonzero hypothesis per
+            // `reciprocal_function` argument (the total-reciprocal form). A
+            // bare `field` (or `field()`) supplies none: over a partial
+            // reciprocal the nonzero proof rides on each `/`, so the tactic
+            // synthesises the cancellations itself.
+            if (peek().kind == TokenKind::LeftParen) {
+                consumeAny();  // '('
+                if (peek().kind != TokenKind::RightParen) {
+                    hypotheses.push_back(parseExpression());
+                    while (peek().kind == TokenKind::Comma) {
+                        consumeAny();
+                        hypotheses.push_back(parseExpression());
+                    }
+                }
+                expect(TokenKind::RightParen,
+                       "ending `field` argument list");
             }
-            expect(TokenKind::RightParen,
-                   "ending `field` argument list");
             return makeSurfaceField(std::move(hypotheses),
                                      fieldToken.line, fieldToken.column);
         }
