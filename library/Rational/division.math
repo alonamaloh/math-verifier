@@ -1,0 +1,93 @@
+-- Rational/division.math
+--
+-- Division on the rationals: `a / b := a · reciprocal_function(b)`. The
+-- denominator's nonzeroness is a genuine side condition the `/` operator
+-- leaves for the auto-prover to discharge at the use site (a decidable
+-- `2 ≠ 0`, or a hypothesis in scope) — mirroring `Integer.divide` in
+-- Rational/basics, so `epsilon / 2` and `(epsilon / 2) / roof` read
+-- plainly while staying mathematically honest.
+
+module Rational.division
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.reciprocal_function
+import Rational.archimedean
+
+definition Rational.divide
+        (a b : Rational) (denominatorNonzero : b ≠ Rational.zero)
+        : Rational :=
+  a * Rational.reciprocal_function(b)
+
+operator (/) on (Rational, Rational) := Rational.divide
+
+-- 0 < 2 in ℚ — `1 + 1`, each summand above zero.
+theorem Rational.two_positive : Rational.zero < (2 : Rational) :=
+  calc (0 : Rational)
+     = (0 : Rational) + (0 : Rational)
+     < (1 : Rational) + (1 : Rational)
+           since Rational.LessThan.add_strict_strict
+     = (2 : Rational)
+
+-- 2 ≠ 0 in ℚ — the side condition every `/2` use site discharges.
+theorem Rational.two_is_nonzero : (2 : Rational) ≠ Rational.zero := {
+  claim Rational.zero < (2 : Rational) since Rational.two_positive;
+  done since Rational.nonzero_of_positive
+}
+
+-- b · (a / b) = a — the cancellation tolerances lean on. Stated against
+-- an explicit `Rational.divide(a, b, bNonzero)` so the side-condition
+-- proof is a parameter the citation matcher unifies (a kernel without
+-- definitional proof irrelevance cannot reconcile two distinct proofs of
+-- `b ≠ 0` baked into the operator sugar).
+theorem Rational.divide_cancel (a b : Rational) (bNonzero : b ≠ Rational.zero)
+        : b * Rational.divide(a, b, bNonzero) = a := {
+  claim bReciprocal : b * Rational.reciprocal_function(b) = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  calc b * Rational.divide(a, b, bNonzero)
+     = b * (a * Rational.reciprocal_function(b))
+     = a * (b * Rational.reciprocal_function(b))   by ring
+     = a * Rational.one                            by substituting bReciprocal
+     = a                                           by ring
+}
+
+-- a / b is positive when both a and b are.
+theorem Rational.divide_positive (a b : Rational) (bNonzero : b ≠ Rational.zero)
+        (aPositive : Rational.zero < a) (bPositive : Rational.zero < b)
+        : Rational.zero < Rational.divide(a, b, bNonzero) := {
+  claim Rational.zero < Rational.reciprocal_function(b)
+      since Rational.reciprocal_function_positive_of_positive;
+  done since Rational.multiply_positive_positive
+}
+
+-- x / 2 + x / 2 = x — the ε/2 split.
+theorem Rational.divide_two_doubled (x : Rational)
+        (twoNonzero : (2 : Rational) ≠ Rational.zero)
+        : Rational.divide(x, (2 : Rational), twoNonzero)
+            + Rational.divide(x, (2 : Rational), twoNonzero) = x := {
+  claim twoReciprocal
+        : (2 : Rational) * Rational.reciprocal_function((2 : Rational)) = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  calc Rational.divide(x, (2 : Rational), twoNonzero)
+       + Rational.divide(x, (2 : Rational), twoNonzero)
+     = x * Rational.reciprocal_function((2 : Rational))
+       + x * Rational.reciprocal_function((2 : Rational))
+     = x * ((2 : Rational) * Rational.reciprocal_function((2 : Rational)))   by ring
+     = x * Rational.one                                                      by substituting twoReciprocal
+     = x                                                                     by ring
+}

@@ -29,6 +29,7 @@ import Rational.minimum
 import Rational.order_multiplication
 import Rational.reciprocal
 import Rational.reciprocal_function
+import Rational.division
 import Rational.archimedean
 import Integer.basics
 import Integer.embedding
@@ -64,8 +65,8 @@ import Real.supremum
 definition Real.ContinuousAt (f : Real → Real) (x : Real) : Proposition :=
   ∀ (epsilon : Rational). Rational.zero < epsilon →
     ∃ (delta : Rational).
-      Rational.zero < delta ∧ ∀ (y : Real). abs(y - x) < (delta : Real) →
-            abs(f(y) - f(x)) < (epsilon : Real)
+      Rational.zero < delta ∧ ∀ (y : Real). abs(y - x) < delta →
+            abs(f(y) - f(x)) < epsilon
 
 -- f is continuous on the closed interval [a, b]: continuous at every
 -- point of the interval.
@@ -82,9 +83,9 @@ theorem Real.ContinuousAt.constant (c x : Real)
   (epsilonPositive : Rational.zero < epsilon) ↦
     witness epsilon with {
       claim Rational.zero < epsilon;
-      claim ∀ (y : Real). abs(y - x) < (epsilon : Real)
-              → abs(c - c) < (epsilon : Real)
-          by (y : Real) (_ : abs(y - x) < (epsilon : Real)) ↦ {
+      claim ∀ (y : Real). abs(y - x) < epsilon
+              → abs(c - c) < epsilon
+          by (y : Real) (_ : abs(y - x) < epsilon) ↦ {
             calc abs(c - c)
                = abs(Real.zero)
                      by (c - c = Real.zero)
@@ -103,9 +104,9 @@ theorem Real.ContinuousAt.identity (x : Real)
   (epsilonPositive : Rational.zero < epsilon) ↦
     witness epsilon with {
       claim Rational.zero < epsilon;
-      claim ∀ (y : Real). abs(y - x) < (epsilon : Real)
-              → abs(y - x) < (epsilon : Real)
-          by (y : Real) (yClose : abs(y - x) < (epsilon : Real)) ↦ yClose;
+      claim ∀ (y : Real). abs(y - x) < epsilon
+              → abs(y - x) < epsilon
+          by (y : Real) (yClose : abs(y - x) < epsilon) ↦ yClose;
       done
     }
 
@@ -124,37 +125,37 @@ theorem Real.ContinuousAt.add (f g : Real → Real) (x : Real)
                   → abs(f(y) - f(x)) < (Rational.halve(epsilon) : Real)
         as fDeltaProperties
         from fContinuous(Rational.halve(epsilon), halfPositive);
-    claim fClose : ∀ (y : Real). abs(y - x) < (fDelta : Real)
-            → abs(f(y) - f(x)) < (Rational.halve(epsilon) : Real);
+    claim fClose : ∀ (y : Real). abs(y - x) < fDelta
+            → abs(f(y) - f(x)) < Rational.halve(epsilon);
     choose gDelta such that Rational.zero < gDelta
             ∧ ∀ (y : Real). abs(y - x) < (gDelta : Real)
                   → abs(g(y) - g(x)) < (Rational.halve(epsilon) : Real)
         as gDeltaProperties
         from gContinuous(Rational.halve(epsilon), halfPositive);
-    claim gClose : ∀ (y : Real). abs(y - x) < (gDelta : Real)
-            → abs(g(y) - g(x)) < (Rational.halve(epsilon) : Real);
+    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
+            → abs(g(y) - g(x)) < Rational.halve(epsilon);
     claim Rational.zero < min(fDelta, gDelta)
         since Rational.minimum_positive;
     witness min(fDelta, gDelta) with {
-      claim ∀ (y : Real). abs(y - x) < (min(fDelta, gDelta) : Real)
-              → abs((f(y) + g(y)) - (f(x) + g(x))) < (epsilon : Real)
+      claim ∀ (y : Real). abs(y - x) < min(fDelta, gDelta)
+              → abs((f(y) + g(y)) - (f(x) + g(x))) < epsilon
           by (y : Real)
-             (yClose : abs(y - x) < (min(fDelta, gDelta) : Real)) ↦ {
+             (yClose : abs(y - x) < min(fDelta, gDelta)) ↦ {
                claim min(fDelta, gDelta) ≤ fDelta
                    since Rational.minimum_LessOrEqual_left;
                claim min(fDelta, gDelta) ≤ gDelta
                    since Rational.minimum_LessOrEqual_right;
                calc abs(y - x)
                   < (min(fDelta, gDelta) : Real)
-                  ≤ (fDelta : Real)
+                  ≤ fDelta
                   as yCloseF;
                calc abs(y - x)
                   < (min(fDelta, gDelta) : Real)
-                  ≤ (gDelta : Real)
+                  ≤ gDelta
                   as yCloseG;
-               claim abs(f(y) - f(x)) < (Rational.halve(epsilon) : Real)
+               claim abs(f(y) - f(x)) < Rational.halve(epsilon)
                    by fClose(y, yCloseF);
-               claim abs(g(y) - g(x)) < (Rational.halve(epsilon) : Real)
+               claim abs(g(y) - g(x)) < Rational.halve(epsilon)
                    by gClose(y, yCloseG);
                calc abs((f(y) + g(y)) - (f(x) + g(x)))
                   = abs((f(y) - f(x)) + (g(y) - g(x)))
@@ -188,9 +189,9 @@ theorem Real.ContinuousAt.negate (f : Real → Real) (x : Real)
         from fContinuous(epsilon, epsilonPositive);
     witness delta with {
       claim Rational.zero < delta;
-      claim ∀ (y : Real). abs(y - x) < (delta : Real)
-              → abs(-f(y) - -f(x)) < (epsilon : Real)
-          by (y : Real) (yClose : abs(y - x) < (delta : Real)) ↦
+      claim ∀ (y : Real). abs(y - x) < delta
+              → abs(-f(y) - -f(x)) < epsilon
+          by (y : Real) (yClose : abs(y - x) < delta) ↦
             calc abs(-f(y) - -f(x))
                = abs(-(f(y) - f(x)))
                      by substituting
@@ -216,20 +217,20 @@ theorem Real.ContinuousAt.composition (f g : Real → Real) (x : Real)
         as fDeltaProperties
         from fContinuous(epsilon, epsilonPositive);
     claim fDeltaPositive : Rational.zero < fDelta;
-    claim fClose : ∀ (z : Real). abs(z - g(x)) < (fDelta : Real)
-            → abs(f(z) - f(g(x))) < (epsilon : Real);
+    claim fClose : ∀ (z : Real). abs(z - g(x)) < fDelta
+            → abs(f(z) - f(g(x))) < epsilon;
     choose gDelta such that Rational.zero < gDelta
             ∧ ∀ (y : Real). abs(y - x) < (gDelta : Real)
                   → abs(g(y) - g(x)) < (fDelta : Real)
         as gDeltaProperties
         from gContinuous(fDelta, fDeltaPositive);
-    claim gClose : ∀ (y : Real). abs(y - x) < (gDelta : Real)
-            → abs(g(y) - g(x)) < (fDelta : Real);
+    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
+            → abs(g(y) - g(x)) < fDelta;
     witness gDelta with {
       claim Rational.zero < gDelta;
-      claim ∀ (y : Real). abs(y - x) < (gDelta : Real)
-              → abs(f(g(y)) - f(g(x))) < (epsilon : Real)
-          by (y : Real) (yClose : abs(y - x) < (gDelta : Real)) ↦
+      claim ∀ (y : Real). abs(y - x) < gDelta
+              → abs(f(g(y)) - f(g(x))) < epsilon
+          by (y : Real) (yClose : abs(y - x) < gDelta) ↦
             fClose(g(y), gClose(y, yClose));
       done
     }
@@ -257,33 +258,19 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
         : Real.ContinuousAt((y : Real) ↦ f(y) * g(y), x) :=
   (epsilon : Rational)
   (epsilonPositive : Rational.zero < epsilon) ↦ {
-    -- Rational roofs over |f(x)| + 1 and |g(x)|, with room to spare.
-    claim ∃ (q : Rational). abs(f(x)) ≤ (q : Real)
-        since Real.exists_rational_above;
-    choose fBound such that abs(f(x)) ≤ (fBound : Real) as fBoundRoof;
-    claim ∃ (q : Rational). abs(g(x)) ≤ (q : Real)
-        since Real.exists_rational_above;
-    choose gBound such that abs(g(x)) ≤ (gBound : Real) as gBoundRoof;
+    -- Rational roofs over |f(x)| and |g(x)|, each with room to spare: a
+    -- bound plus two, so the roof strictly exceeds a nonnegative quantity.
+    claim ∃ (q : Rational). abs(f(x)) ≤ q since Real.exists_rational_above;
+    choose fBound such that abs(f(x)) ≤ fBound as fBoundRoof;
+    claim ∃ (q : Rational). abs(g(x)) ≤ q since Real.exists_rational_above;
+    choose gBound such that abs(g(x)) ≤ gBound as gBoundRoof;
+    let fRoof : Rational := fBound + Rational.one + Rational.one;
+    let gRoof : Rational := gBound + Rational.one + Rational.one;
     claim Real.zero ≤ abs(f(x)) since Real.absolute_value_nonneg;
     claim Real.zero ≤ abs(g(x)) since Real.absolute_value_nonneg;
-    claim Rational.zero < Rational.one by Rational.zero_less_one;
     claim Real.zero < (Rational.one : Real)
         since Rational.to_real.positive_preserves;
-    claim fRoofCast : ((fBound + Rational.one + Rational.one) : Real)
-                      = ((fBound + Rational.one : Rational) : Real)
-                        + (Rational.one : Real)
-        since Rational.to_real.add_preserves;
-    claim fRoofInnerCast : ((fBound + Rational.one) : Real)
-                           = (fBound : Real) + (Rational.one : Real)
-        since Rational.to_real.add_preserves;
-    claim gRoofCast : ((gBound + Rational.one + Rational.one) : Real)
-                      = ((gBound + Rational.one : Rational) : Real)
-                        + (Rational.one : Real)
-        since Rational.to_real.add_preserves;
-    claim gRoofInnerCast : ((gBound + Rational.one) : Real)
-                           = (gBound : Real) + (Rational.one : Real)
-        since Rational.to_real.add_preserves;
-    -- The roofs are positive (each exceeds a nonnegative quantity by 2).
+    -- The roofs are positive.
     calc Real.zero
        ≤ abs(f(x))
        ≤ (fBound : Real);
@@ -294,12 +281,10 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
              since Real.add_left_preserves_LessThan
        = ((fBound + Rational.one : Rational) : Real)
        = ((fBound + Rational.one : Rational) : Real) + Real.zero
-       < ((fBound + Rational.one : Rational) : Real)
-         + (Rational.one : Real)
+       < ((fBound + Rational.one : Rational) : Real) + (Rational.one : Real)
              since Real.add_left_preserves_LessThan
-       = ((fBound + Rational.one + Rational.one) : Real);
-    claim Rational.zero < fBound + Rational.one + Rational.one
-        since Rational.to_real.LessThan_reflects;
+       = (fRoof : Real);
+    claim Rational.zero < fRoof since Rational.to_real.LessThan_reflects;
     calc Real.zero
        ≤ abs(g(x))
        ≤ (gBound : Real);
@@ -310,88 +295,53 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
              since Real.add_left_preserves_LessThan
        = ((gBound + Rational.one : Rational) : Real)
        = ((gBound + Rational.one : Rational) : Real) + Real.zero
-       < ((gBound + Rational.one : Rational) : Real)
-         + (Rational.one : Real)
+       < ((gBound + Rational.one : Rational) : Real) + (Rational.one : Real)
              since Real.add_left_preserves_LessThan
-       = ((gBound + Rational.one + Rational.one) : Real);
-    claim Rational.zero < gBound + Rational.one + Rational.one
-        since Rational.to_real.LessThan_reflects;
-    -- Scaled tolerances for each factor.
-    claim Rational.zero < Rational.halve(epsilon)
-        since Rational.halve_positive;
-    claim Rational.zero
-            < Rational.reciprocal_function(fBound + Rational.one + Rational.one)
-        since Rational.reciprocal_function_positive_of_positive;
-    claim Rational.zero
-            < Rational.reciprocal_function(gBound + Rational.one + Rational.one)
-        since Rational.reciprocal_function_positive_of_positive;
-    claim gTolerancePositive
-          : Rational.zero
-            < Rational.halve(epsilon)
-              * Rational.reciprocal_function(
-                    fBound + Rational.one + Rational.one)
-        since Rational.multiply_positive_positive;
-    claim fTolerancePositive
-          : Rational.zero
-            < Rational.halve(epsilon)
-              * Rational.reciprocal_function(
-                    gBound + Rational.one + Rational.one)
-        since Rational.multiply_positive_positive;
+       = (gRoof : Real);
+    claim Rational.zero < gRoof since Rational.to_real.LessThan_reflects;
+    claim fRoof ≠ Rational.zero since Rational.nonzero_of_positive;
+    claim gRoof ≠ Rational.zero since Rational.nonzero_of_positive;
+    -- Each factor's tolerance: ε/2, scaled down by the opposite roof.
+    claim Rational.zero < 2 since Rational.two_positive;
+    claim Rational.zero < epsilon / 2 since Rational.divide_positive;
+    let gTolerance : Rational := epsilon / 2 / fRoof;
+    let fTolerance : Rational := epsilon / 2 / gRoof;
+    claim gTolerancePositive : Rational.zero < gTolerance
+        since Rational.divide_positive;
+    claim fTolerancePositive : Rational.zero < fTolerance
+        since Rational.divide_positive;
     -- The three δs: stay within 1 of f(x), and within each scaled
     -- tolerance for the matching factor.
     choose nearDelta such that Rational.zero < nearDelta
-            ∧ ∀ (y : Real). abs(y - x) < (nearDelta : Real)
-                  → abs(f(y) - f(x)) < (Rational.one : Real)
+            ∧ ∀ (y : Real). abs(y - x) < nearDelta → abs(f(y) - f(x)) < Rational.one
         as nearProperties
         from fContinuous(Rational.one, Rational.zero_less_one);
     claim Rational.zero < nearDelta;
-    claim fNear : ∀ (y : Real). abs(y - x) < (nearDelta : Real)
-            → abs(f(y) - f(x)) < (Rational.one : Real);
+    claim fNear : ∀ (y : Real). abs(y - x) < nearDelta
+            → abs(f(y) - f(x)) < Rational.one;
     choose gDelta such that Rational.zero < gDelta
-            ∧ ∀ (y : Real). abs(y - x) < (gDelta : Real)
-                  → abs(g(y) - g(x))
-                    < ((Rational.halve(epsilon)
-                        * Rational.reciprocal_function(
-                              fBound + Rational.one + Rational.one)) : Real)
+            ∧ ∀ (y : Real). abs(y - x) < gDelta → abs(g(y) - g(x)) < gTolerance
         as gDeltaProperties
-        from gContinuous(
-                 Rational.halve(epsilon)
-                 * Rational.reciprocal_function(
-                       fBound + Rational.one + Rational.one),
-                 gTolerancePositive);
+        from gContinuous(gTolerance, gTolerancePositive);
     claim Rational.zero < gDelta;
-    claim gClose : ∀ (y : Real). abs(y - x) < (gDelta : Real)
-            → abs(g(y) - g(x))
-              < ((Rational.halve(epsilon)
-                  * Rational.reciprocal_function(
-                        fBound + Rational.one + Rational.one)) : Real);
+    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
+            → abs(g(y) - g(x)) < gTolerance;
     choose fDelta such that Rational.zero < fDelta
-            ∧ ∀ (y : Real). abs(y - x) < (fDelta : Real)
-                  → abs(f(y) - f(x))
-                    < ((Rational.halve(epsilon)
-                        * Rational.reciprocal_function(
-                              gBound + Rational.one + Rational.one)) : Real)
+            ∧ ∀ (y : Real). abs(y - x) < fDelta → abs(f(y) - f(x)) < fTolerance
         as fDeltaProperties
-        from fContinuous(
-                 Rational.halve(epsilon)
-                 * Rational.reciprocal_function(
-                       gBound + Rational.one + Rational.one),
-                 fTolerancePositive);
+        from fContinuous(fTolerance, fTolerancePositive);
     claim Rational.zero < fDelta;
-    claim fClose : ∀ (y : Real). abs(y - x) < (fDelta : Real)
-            → abs(f(y) - f(x))
-              < ((Rational.halve(epsilon)
-                  * Rational.reciprocal_function(
-                        gBound + Rational.one + Rational.one)) : Real);
+    claim fClose : ∀ (y : Real). abs(y - x) < fDelta
+            → abs(f(y) - f(x)) < fTolerance;
     claim Rational.zero < min(gDelta, fDelta)
         since Rational.minimum_positive;
     claim Rational.zero < min(nearDelta, min(gDelta, fDelta))
         since Rational.minimum_positive;
     witness min(nearDelta, min(gDelta, fDelta)) with {
-      claim ∀ (y : Real). abs(y - x) < (min(nearDelta, min(gDelta, fDelta)) : Real)
-              → abs(f(y) * g(y) - f(x) * g(x)) < (epsilon : Real)
+      claim ∀ (y : Real). abs(y - x) < min(nearDelta, min(gDelta, fDelta))
+              → abs(f(y) * g(y) - f(x) * g(x)) < epsilon
           by (y : Real)
-             (yClose : abs(y - x) < (min(nearDelta, min(gDelta, fDelta)) : Real)) ↦ {
+             (yClose : abs(y - x) < min(nearDelta, min(gDelta, fDelta))) ↦ {
            -- The single δ serves all three continuity facts.
            claim min(nearDelta, min(gDelta, fDelta)) ≤ nearDelta
                since Rational.minimum_LessOrEqual_left;
@@ -407,22 +357,21 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
                since Rational.LessOrEqual.transitive;
            calc abs(y - x)
               < (min(nearDelta, min(gDelta, fDelta)) : Real)
-              ≤ (nearDelta : Real)
+              ≤ nearDelta
                     since Rational.to_real.LessOrEqual_preserves
               as yNear;
            calc abs(y - x)
               < (min(nearDelta, min(gDelta, fDelta)) : Real)
-              ≤ (gDelta : Real)
+              ≤ gDelta
                     since Rational.to_real.LessOrEqual_preserves
               as yCloseG;
            calc abs(y - x)
               < (min(nearDelta, min(gDelta, fDelta)) : Real)
-              ≤ (fDelta : Real)
+              ≤ fDelta
                     since Rational.to_real.LessOrEqual_preserves
               as yCloseF;
            -- |f(y)| sits under its roof.
-           claim abs(f(y) - f(x)) < (Rational.one : Real)
-               by fNear(y, yNear);
+           claim abs(f(y) - f(x)) < Rational.one by fNear(y, yNear);
            claim abs(f(y) - f(x)) ≤ (Rational.one : Real)
                since Real.LessThan.weaken;
            calc abs(f(y))
@@ -436,10 +385,9 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
                     since Real.add_preserves_LessOrEqual_left
               = ((fBound + Rational.one : Rational) : Real)
               = ((fBound + Rational.one : Rational) : Real) + Real.zero
-              ≤ ((fBound + Rational.one : Rational) : Real)
-                + (Rational.one : Real)
+              ≤ ((fBound + Rational.one : Rational) : Real) + (Rational.one : Real)
                     since Real.add_preserves_LessOrEqual_left
-              = ((fBound + Rational.one + Rational.one) : Real);
+              = (fRoof : Real);
            calc abs(g(x))
               ≤ (gBound : Real)
               = (gBound : Real) + Real.zero
@@ -447,110 +395,33 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
                     since Real.add_preserves_LessOrEqual_left
               = ((gBound + Rational.one : Rational) : Real)
               = ((gBound + Rational.one : Rational) : Real) + Real.zero
-              ≤ ((gBound + Rational.one : Rational) : Real)
-                + (Rational.one : Real)
+              ≤ ((gBound + Rational.one : Rational) : Real) + (Rational.one : Real)
                     since Real.add_preserves_LessOrEqual_left
-              = ((gBound + Rational.one + Rational.one) : Real);
-           -- The two error terms, each strictly below ε/2.
+              = (gRoof : Real);
+           -- The two error terms, each strictly below its tolerance.
            claim Real.zero ≤ abs(g(y) - g(x)) since Real.absolute_value_nonneg;
            claim Real.zero ≤ abs(f(y) - f(x)) since Real.absolute_value_nonneg;
-           claim abs(g(y) - g(x))
-                   < ((Rational.halve(epsilon)
-                       * Rational.reciprocal_function(
-                             fBound + Rational.one + Rational.one)) : Real)
-               by gClose(y, yCloseG);
-           claim abs(f(y) - f(x))
-                   < ((Rational.halve(epsilon)
-                       * Rational.reciprocal_function(
-                             gBound + Rational.one + Rational.one)) : Real)
-               by fClose(y, yCloseF);
+           claim abs(g(y) - g(x)) < gTolerance by gClose(y, yCloseG);
+           claim abs(f(y) - f(x)) < fTolerance by fClose(y, yCloseF);
            calc abs(f(y)) * abs(g(y) - g(x))
-              ≤ ((fBound + Rational.one + Rational.one) : Real)
-                * abs(g(y) - g(x))
+              ≤ (fRoof : Real) * abs(g(y) - g(x))
                     since Real.LessOrEqual.multiply_by_nonneg_right
-              = abs(g(y) - g(x))
-                * ((fBound + Rational.one + Rational.one) : Real)
-              < ((Rational.halve(epsilon)
-                  * Rational.reciprocal_function(
-                        fBound + Rational.one + Rational.one)) : Real)
-                * ((fBound + Rational.one + Rational.one) : Real)
+              = abs(g(y) - g(x)) * (fRoof : Real)
+              < (gTolerance : Real) * (fRoof : Real)
                     since Real.LessThan.multiply_by_positive_right
-              = ((fBound + Rational.one + Rational.one) : Real)
-                * ((Rational.halve(epsilon)
-                    * Rational.reciprocal_function(
-                          fBound + Rational.one + Rational.one)) : Real);
+              = (fRoof : Real) * (gTolerance : Real);
            calc abs(g(x)) * abs(f(y) - f(x))
-              ≤ ((gBound + Rational.one + Rational.one) : Real)
-                * abs(f(y) - f(x))
+              ≤ (gRoof : Real) * abs(f(y) - f(x))
                     since Real.LessOrEqual.multiply_by_nonneg_right
-              = abs(f(y) - f(x))
-                * ((gBound + Rational.one + Rational.one) : Real)
-              < ((Rational.halve(epsilon)
-                  * Rational.reciprocal_function(
-                        gBound + Rational.one + Rational.one)) : Real)
-                * ((gBound + Rational.one + Rational.one) : Real)
+              = abs(f(y) - f(x)) * (gRoof : Real)
+              < (fTolerance : Real) * (gRoof : Real)
                     since Real.LessThan.multiply_by_positive_right
-              = ((gBound + Rational.one + Rational.one) : Real)
-                * ((Rational.halve(epsilon)
-                    * Rational.reciprocal_function(
-                          gBound + Rational.one + Rational.one)) : Real);
-           -- Each roof·tolerance collapses to ε/2 at the Rational layer.
-           claim zeroNotFRoof
-                 : ¬(Rational.zero = fBound + Rational.one + Rational.one)
-               since Rational.LessThan.distinct;
-           claim ¬(fBound + Rational.one + Rational.one = Rational.zero)
-               by (roofZero
-                       : fBound + Rational.one + Rational.one
-                         = Rational.zero) ↦
-                    zeroNotFRoof(
-                        calc Rational.zero
-                           = fBound + Rational.one + Rational.one);
-           claim fRoofCancel
-                 : (fBound + Rational.one + Rational.one)
-                       * Rational.reciprocal_function(
-                             fBound + Rational.one + Rational.one)
-                   = Rational.one;
-           calc (fBound + Rational.one + Rational.one)
-                * (Rational.halve(epsilon)
-                   * Rational.reciprocal_function(
-                         fBound + Rational.one + Rational.one))
-              = Rational.halve(epsilon)
-                * ((fBound + Rational.one + Rational.one)
-                   * Rational.reciprocal_function(
-                         fBound + Rational.one + Rational.one))
-                    by ring
-              = Rational.halve(epsilon) * Rational.one
-                    since fRoofCancel
-              = Rational.halve(epsilon)
-              as firstCollapse;
-           claim zeroNotGRoof
-                 : ¬(Rational.zero = gBound + Rational.one + Rational.one)
-               since Rational.LessThan.distinct;
-           claim ¬(gBound + Rational.one + Rational.one = Rational.zero)
-               by (roofZero
-                       : gBound + Rational.one + Rational.one
-                         = Rational.zero) ↦
-                    zeroNotGRoof(
-                        calc Rational.zero
-                           = gBound + Rational.one + Rational.one);
-           claim gRoofCancel
-                 : (gBound + Rational.one + Rational.one)
-                       * Rational.reciprocal_function(
-                             gBound + Rational.one + Rational.one)
-                   = Rational.one;
-           calc (gBound + Rational.one + Rational.one)
-                * (Rational.halve(epsilon)
-                   * Rational.reciprocal_function(
-                         gBound + Rational.one + Rational.one))
-              = Rational.halve(epsilon)
-                * ((gBound + Rational.one + Rational.one)
-                   * Rational.reciprocal_function(
-                         gBound + Rational.one + Rational.one))
-                    by ring
-              = Rational.halve(epsilon) * Rational.one
-                    since gRoofCancel
-              = Rational.halve(epsilon)
-              as secondCollapse;
+              = (gRoof : Real) * (fTolerance : Real);
+           -- Each roof times its scaled tolerance is exactly ε/2.
+           claim fRoofCollapse : fRoof * gTolerance = epsilon / 2
+               since Rational.divide_cancel;
+           claim gRoofCollapse : gRoof * fTolerance = epsilon / 2
+               since Rational.divide_cancel;
            -- Assemble.
            calc abs(f(y) * g(y) - f(x) * g(x))
               = abs(f(y) * (g(y) - g(x)) + g(x) * (f(y) - f(x)))
@@ -562,51 +433,25 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
                     since Real.absolute_value_multiplicative
               = abs(f(y)) * abs(g(y) - g(x)) + abs(g(x)) * abs(f(y) - f(x))
                     since Real.absolute_value_multiplicative
-              < ((fBound + Rational.one + Rational.one) : Real)
-                    * ((Rational.halve(epsilon)
-                        * Rational.reciprocal_function(
-                              fBound + Rational.one + Rational.one)) : Real)
-                + ((gBound + Rational.one + Rational.one) : Real)
-                    * ((Rational.halve(epsilon)
-                        * Rational.reciprocal_function(
-                              gBound + Rational.one + Rational.one)) : Real)
+              < (fRoof : Real) * (gTolerance : Real)
+                + (gRoof : Real) * (fTolerance : Real)
                     since Real.LessThan.add_strict_strict
-              = (((fBound + Rational.one + Rational.one)
-                  * (Rational.halve(epsilon)
-                     * Rational.reciprocal_function(
-                           fBound + Rational.one + Rational.one))
-                  : Rational) : Real)
-                + ((gBound + Rational.one + Rational.one) : Real)
-                    * ((Rational.halve(epsilon)
-                        * Rational.reciprocal_function(
-                              gBound + Rational.one + Rational.one)) : Real)
+              = (fRoof * gTolerance : Real)
+                + (gRoof : Real) * (fTolerance : Real)
                     since Rational.to_real.multiply_preserves
-              = (((fBound + Rational.one + Rational.one)
-                  * (Rational.halve(epsilon)
-                     * Rational.reciprocal_function(
-                           fBound + Rational.one + Rational.one))
-                  : Rational) : Real)
-                + (((gBound + Rational.one + Rational.one)
-                    * (Rational.halve(epsilon)
-                       * Rational.reciprocal_function(
-                             gBound + Rational.one + Rational.one))
-                    : Rational) : Real)
+              = (fRoof * gTolerance : Real)
+                + (gRoof * fTolerance : Real)
                     since Rational.to_real.multiply_preserves
-              = ((Rational.halve(epsilon) : Rational) : Real)
-                + (((gBound + Rational.one + Rational.one)
-                    * (Rational.halve(epsilon)
-                       * Rational.reciprocal_function(
-                             gBound + Rational.one + Rational.one))
-                    : Rational) : Real)
-                    since firstCollapse
-              = ((Rational.halve(epsilon) : Rational) : Real)
-                + ((Rational.halve(epsilon) : Rational) : Real)
-                    since secondCollapse
-              = ((Rational.halve(epsilon) + Rational.halve(epsilon)
-                  : Rational) : Real)
+              = (epsilon / 2 : Real)
+                + (gRoof * fTolerance : Real)
+                    since fRoofCollapse
+              = (epsilon / 2 : Real)
+                + (epsilon / 2 : Real)
+                    since gRoofCollapse
+              = (epsilon / 2 + epsilon / 2 : Real)
                     since Rational.to_real.add_preserves
               = (epsilon : Real)
-                    since Rational.halve_doubled
+                    since Rational.divide_two_doubled
           };
       done
     }
