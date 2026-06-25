@@ -130,6 +130,41 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
                 return fingerprintModularInverse(*value);
             }
         }
+        // `<carrier>.reciprocal(x, _proof)` — the field reciprocal (two
+        // application layers; the proof is the outer argument, stripped).
+        if (auto* inner =
+                std::get_if<Application>(&outer->function->node)) {
+            if (auto* head =
+                    std::get_if<Constant>(&inner->function->node)) {
+                if (head->name == carrierName + ".reciprocal") {
+                    auto value = evaluateFingerprint(
+                        inner->argument, carrierName);
+                    if (!value) return std::nullopt;
+                    return fingerprintModularInverse(*value);
+                }
+            }
+        }
+    }
+    // `<carrier>.divide(a, b, _proof)` → a · b⁻¹ (three application layers).
+    if (auto* a3 = std::get_if<Application>(&expression->node)) {
+        if (auto* a2 = std::get_if<Application>(&a3->function->node)) {
+            if (auto* a1 = std::get_if<Application>(&a2->function->node)) {
+                if (auto* head =
+                        std::get_if<Constant>(&a1->function->node)) {
+                    if (head->name == carrierName + ".divide") {
+                        auto numerator = evaluateFingerprint(
+                            a1->argument, carrierName);
+                        auto denominator = evaluateFingerprint(
+                            a2->argument, carrierName);
+                        if (!numerator || !denominator) return std::nullopt;
+                        auto inverse =
+                            fingerprintModularInverse(*denominator);
+                        if (!inverse) return std::nullopt;
+                        return fingerprintMultiply(*numerator, *inverse);
+                    }
+                }
+            }
+        }
     }
     // Bare Natural literal / successor — mirrors the normaliser's
     // literal recognition on the Natural carrier.
@@ -2629,7 +2664,14 @@ Elaborator::RingPolynomial Elaborator::normaliseToRingPolynomial(
                 return polynomial;
             }
         }
-        // Otherwise: an opaque atom.
+        // `<carrier>.divide(a, b, _proof)` is `a · reciprocal(b)` by
+        // definition; δ-unfold it so division participates in normalisation
+        // (the proof argument is discarded by divide's body). This lets
+        // `linear_combination` discharge field goals like `ε/2 + ε/2 = ε`
+        // once the matching `b · reciprocal(b) = 1` fact is supplied.
+        // Otherwise: an opaque atom. (Field division `<carrier>.divide` is
+        // unfolded up front in elaborateRingByNormalisation, so it never
+        // reaches here as an atom.)
         return ringPolynomialAtom(context, expression);
     }
 
@@ -5328,6 +5370,47 @@ ExpressionPointer Elaborator::elaborateRingByNormalisation(
                 "`ring`: carrier `" + carrierName
                 + "` does not have both `.add` and `.multiply` in scope");
         }
+        // Field-clearing pre-pass: `<carrier>.divide(a, b, _proof)` is
+        // `a · reciprocal(b)` by definition. Unfold every such subterm in the
+        // endpoints so division participates in normalisation (the unfolded
+        // form is definitionally equal, so the proof we build stays a proof
+        // of the original equality). This lets `ring`/`linear_combination`
+        // see `ε/2` as `ε · reciprocal(2)` — and, with the matching
+        // `b · reciprocal(b) = 1` fact, discharge goals like `ε/2 + ε/2 = ε`.
+        std::function<ExpressionPointer(ExpressionPointer)> unfoldDivides =
+            [&](ExpressionPointer expr) -> ExpressionPointer {
+                ExpressionPointer cursor = expr;
+                int applicationDepth = 0;
+                while (auto* app = std::get_if<Application>(&cursor->node)) {
+                    cursor = app->function;
+                    ++applicationDepth;
+                }
+                if (applicationDepth == 3) {
+                    if (auto* headConstant =
+                            std::get_if<Constant>(&cursor->node)) {
+                        if (headConstant->name
+                                == context.carrierName + ".divide") {
+                            ExpressionPointer unfolded =
+                                unfoldHeadConstantOneStep(expr);
+                            if (unfolded
+                                && !structurallyEqual(unfolded, expr)) {
+                                return unfoldDivides(unfolded);
+                            }
+                        }
+                    }
+                }
+                if (auto* app = std::get_if<Application>(&expr->node)) {
+                    ExpressionPointer fn = unfoldDivides(app->function);
+                    ExpressionPointer arg = unfoldDivides(app->argument);
+                    if (fn.get() != app->function.get()
+                        || arg.get() != app->argument.get()) {
+                        return makeApplication(std::move(fn), std::move(arg));
+                    }
+                }
+                return expr;
+            };
+        leftEndpoint = unfoldDivides(leftEndpoint);
+        rightEndpoint = unfoldDivides(rightEndpoint);
         RingPolynomial leftPolynomial =
             normaliseToRingPolynomial(leftEndpoint, context);
         RingPolynomial rightPolynomial =

@@ -1,0 +1,44 @@
+-- Field-clearing in `ring` / `linear_combination` (prototype, approach B).
+--
+-- `ring` now δ-unfolds `<carrier>.divide(a, b, _proof)` to `a · reciprocal(b)`
+-- in the endpoints it normalises (elaborateRingByNormalisation), so division
+-- participates in commutative-ring normalisation as a reciprocal atom. With
+-- the matching `b · reciprocal(b) = 1` cancellation supplied to
+-- `linear_combination`, field goals like `ε/2 + ε/2 = ε` close — over ℚ
+-- (total reciprocal_function) and ℝ (partial reciprocal, proof carried
+-- through). The `b ≠ 0` proof rides along on the `/`, so this stays sound in
+-- a way that would fail in characteristic 2.
+
+module Test.field_clear_test
+
+import Logic.basics
+import Equality.basics
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.ring
+import Rational.reciprocal_function
+import Rational.division
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.ring
+import Real.reciprocal
+import Real.field
+import Real.division
+
+-- ℚ: 2 · (1/2) = 1, then ε/2 + ε/2 = ε.
+theorem rational_two_reciprocal
+        : (2 : Rational) * Rational.reciprocal_function((2 : Rational)) = Rational.one := {
+  claim (2 : Rational) ≠ Rational.zero since Rational.two_is_nonzero;
+  done since Rational.reciprocal_function_multiplies
+}
+
+theorem rational_half (epsilon : Rational) : epsilon / 2 + epsilon / 2 = epsilon :=
+  linear_combination(epsilon * rational_two_reciprocal)
+
+-- ℝ: the same, with the nonzero proof threaded through the field reciprocal.
+theorem real_half (epsilon : Real) (twoNonzero : (2 : Real) ≠ Real.zero)
+        : Real.divide(epsilon, (2 : Real), twoNonzero)
+            + Real.divide(epsilon, (2 : Real), twoNonzero) = epsilon :=
+  linear_combination(epsilon * Real.reciprocal_multiplies((2 : Real), twoNonzero))
