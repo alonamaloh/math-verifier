@@ -60,15 +60,16 @@ import Real.convergence
 import Real.supremum
 import Real.limits
 import Real.continuity
+import Rational.division
 
 -- ----------------------------------------------------------------------
 -- f has derivative L at x.
 definition Real.HasDerivativeAt (f : Real → Real) (x L : Real) : Proposition :=
   ∀ (epsilon : Rational). Rational.zero < epsilon →
     ∃ (delta : Rational).
-      Rational.zero < delta ∧ ∀ (y : Real). abs(y - x) < (delta : Real)
+      Rational.zero < delta ∧ ∀ (y : Real). abs(y - x) < delta
             → abs(f(y) - f(x) - L * (y - x))
-              ≤ (epsilon : Real) * abs(y - x)
+              ≤ epsilon * abs(y - x)
 
 -- ----------------------------------------------------------------------
 -- Constants have derivative zero: the approximation error vanishes.
@@ -78,7 +79,7 @@ theorem Real.HasDerivativeAt.constant (c x : Real)
   (epsilonPositive : Rational.zero < epsilon) ↦
     witness epsilon with
         ⟨epsilonPositive,
-         (y : Real) (_ : abs(y - x) < (epsilon : Real)) ↦ {
+         (y : Real) (_ : abs(y - x) < epsilon) ↦ {
            claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
            claim errorZero
                  : abs(c - c - Real.zero * (y - x)) = Real.zero
@@ -88,16 +89,16 @@ theorem Real.HasDerivativeAt.constant (c x : Real)
                      = Real.zero
                            since Real.absolute_value_when_nonneg;
            claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
-           claim Real.zero < (epsilon : Real)
+           claim Real.zero < epsilon
                since Rational.to_real.positive_preserves;
-           claim Real.zero ≤ (epsilon : Real) since Real.LessThan.weaken;
+           claim Real.zero ≤ epsilon since Real.LessThan.weaken;
            claim Real.IsNonneg((epsilon : Real))
                since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(abs(y - x))
                since Real.IsNonneg_of_LessOrEqual_zero;
-           claim Real.IsNonneg((epsilon : Real) * abs(y - x))
+           claim Real.IsNonneg(epsilon * abs(y - x))
                since Real.IsNonneg.multiply;
-           claim Real.zero ≤ (epsilon : Real) * abs(y - x)
+           claim Real.zero ≤ epsilon * abs(y - x)
                since Real.LessOrEqual_zero_of_IsNonneg;
            done by substituting errorZero
          }⟩
@@ -109,7 +110,7 @@ theorem Real.HasDerivativeAt.identity (x : Real)
   (epsilonPositive : Rational.zero < epsilon) ↦
     witness epsilon with
         ⟨epsilonPositive,
-         (y : Real) (_ : abs(y - x) < (epsilon : Real)) ↦ {
+         (y : Real) (_ : abs(y - x) < epsilon) ↦ {
            claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
            claim errorZero
                  : abs(y - x - Real.one * (y - x)) = Real.zero
@@ -119,16 +120,16 @@ theorem Real.HasDerivativeAt.identity (x : Real)
                      = Real.zero
                            since Real.absolute_value_when_nonneg;
            claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
-           claim Real.zero < (epsilon : Real)
+           claim Real.zero < epsilon
                since Rational.to_real.positive_preserves;
-           claim Real.zero ≤ (epsilon : Real) since Real.LessThan.weaken;
+           claim Real.zero ≤ epsilon since Real.LessThan.weaken;
            claim Real.IsNonneg((epsilon : Real))
                since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(abs(y - x))
                since Real.IsNonneg_of_LessOrEqual_zero;
-           claim Real.IsNonneg((epsilon : Real) * abs(y - x))
+           claim Real.IsNonneg(epsilon * abs(y - x))
                since Real.IsNonneg.multiply;
-           claim Real.zero ≤ (epsilon : Real) * abs(y - x)
+           claim Real.zero ≤ epsilon * abs(y - x)
                since Real.LessOrEqual_zero_of_IsNonneg;
            done by substituting errorZero
          }⟩
@@ -154,24 +155,24 @@ theorem Real.HasDerivativeAt.add (f g : Real → Real) (x fSlope gSlope : Real)
     witness min(fDelta, gDelta) with
         ⟨minimumPositive,
          (y : Real)
-         (yClose : abs(y - x) < (min(fDelta, gDelta) : Real)) ↦ {
+         (yClose : abs(y - x) < min(fDelta, gDelta)) ↦ {
            claim min(fDelta, gDelta) ≤ fDelta
                since Rational.minimum_LessOrEqual_left;
            claim min(fDelta, gDelta) ≤ gDelta
                since Rational.minimum_LessOrEqual_right;
-           claim yCloseF : abs(y - x) < (fDelta : Real)
+           claim yCloseF : abs(y - x) < fDelta
                by calc abs(y - x)
                      < (min(fDelta, gDelta) : Real)   by yClose
                      ≤ (fDelta : Real);
-           claim yCloseG : abs(y - x) < (gDelta : Real)
+           claim yCloseG : abs(y - x) < gDelta
                by calc abs(y - x)
                      < (min(fDelta, gDelta) : Real)   by yClose
                      ≤ (gDelta : Real);
            claim abs(f(y) - f(x) - fSlope * (y - x))
-                   ≤ (Rational.halve(epsilon) : Real) * abs(y - x)
+                   ≤ Rational.halve(epsilon) * abs(y - x)
                by fClose(y, yCloseF);
            claim abs(g(y) - g(x) - gSlope * (y - x))
-                   ≤ (Rational.halve(epsilon) : Real) * abs(y - x)
+                   ≤ Rational.halve(epsilon) * abs(y - x)
                by gClose(y, yCloseG);
            calc abs(f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x))
               = abs((f(y) - f(x) - fSlope * (y - x))
@@ -210,10 +211,10 @@ theorem Real.HasDerivativeAt.negate (f : Real → Real) (x L : Real)
     obtain ⟨deltaPositive, fClose⟩ from deltaProperties;
     witness delta with
         ⟨deltaPositive,
-         (y : Real) (yClose : abs(y - x) < (delta : Real)) ↦ {
+         (y : Real) (yClose : abs(y - x) < delta) ↦ {
            claim fBound
                  : abs(f(y) - f(x) - L * (y - x))
-                   ≤ (epsilon : Real) * abs(y - x)
+                   ≤ epsilon * abs(y - x)
                by fClose(y, yClose);
            calc abs(-f(y) - -f(x) - -L * (y - x))
               = abs(-(f(y) - f(x) - L * (y - x)))
@@ -259,7 +260,7 @@ theorem Real.HasDerivativeAt.scale (c : Real) (f : Real → Real) (x L : Real)
     obtain ⟨deltaPositive, fClose⟩ from deltaProperties;
     witness delta with
         ⟨deltaPositive,
-         (y : Real) (yClose : abs(y - x) < (delta : Real)) ↦ {
+         (y : Real) (yClose : abs(y - x) < delta) ↦ {
            claim Real.zero ≤ abs(c) since Real.absolute_value_nonneg;
            claim Real.zero ≤ abs(f(y) - f(x) - L * (y - x))
                since Real.absolute_value_nonneg;
@@ -330,9 +331,9 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
         ⟨minimumPositive,
          (y : Real)
          (yClose : abs(y - x)
-                   < (min(nearDelta,
-                          epsilon * Rational.reciprocal_function(
-                              Rational.one + slopeRoof)) : Real)) ↦ {
+                   < min(nearDelta,
+                         epsilon * Rational.reciprocal_function(
+                             Rational.one + slopeRoof))) ↦ {
            claim min(nearDelta,
                      epsilon * Rational.reciprocal_function(
                          Rational.one + slopeRoof)) ≤ nearDelta
@@ -343,7 +344,7 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
                    ≤ epsilon * Rational.reciprocal_function(
                          Rational.one + slopeRoof)
                since Rational.minimum_LessOrEqual_right;
-           claim yCloseNear : abs(y - x) < (nearDelta : Real)
+           claim yCloseNear : abs(y - x) < nearDelta
                by calc abs(y - x)
                      < (min(nearDelta,
                             epsilon * Rational.reciprocal_function(
@@ -361,12 +362,12 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
                              Rational.one + slopeRoof)) : Real)
                            since Rational.to_real.LessOrEqual_preserves;
            claim abs(f(y) - f(x) - L * (y - x))
-                   ≤ (Rational.one : Real) * abs(y - x)
+                   ≤ Rational.one * abs(y - x)
                by fClose(y, yCloseNear);
            claim Real.IsNonneg(abs(y - x))
                since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
-           claim abs(L) * abs(y - x) ≤ (slopeRoof : Real) * abs(y - x)
+           claim abs(L) * abs(y - x) ≤ slopeRoof * abs(y - x)
                since Real.LessOrEqual.multiply_by_nonneg_right;
            claim castSum
                  : ((Rational.one + slopeRoof) : Real)
@@ -552,7 +553,7 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
                            by yClose
                      ≤ (gDelta : Real)
                            since Rational.to_real.LessOrEqual_preserves;
-           claim yCloseNear : abs(y - x) < (nearDelta : Real)
+           claim yCloseNear : abs(y - x) < nearDelta
                by calc abs(y - x)
                      < (min(min(fDelta, gDelta),
                             min(nearDelta, differenceDelta)) : Real)
