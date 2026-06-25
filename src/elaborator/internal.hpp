@@ -5212,6 +5212,13 @@ private:
     // speculative bare re-elaboration runs.
     bool reportRedundantCasts_ = false;
     bool inRedundantCastProbe_ = false;
+    // > 0 while elaborating a calc chain. The cast-redundancy check is
+    // suppressed inside a calc: a step endpoint's cast can be redundant for the
+    // step's *relation proposition* (which the join lifts) yet load-bearing for
+    // the calc's term *chaining* (the next term is elaborated against the
+    // carrier as an expected type, which does NOT coerce — only operators and
+    // ascriptions do). Flagging it would be a false positive.
+    int calcDepth_ = 0;
     // The kernel-step budget below which a speculative redundancy auto-prove
     // counts as "cheap enough to drop the hint". Tied to the expensive-step
     // warn threshold (MATH_AUTOPROVE_WARN): a `by`/calc-step whose by-less

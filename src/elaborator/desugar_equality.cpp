@@ -61,7 +61,12 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // means the cast is redundant. Structural (not defeq) equality keeps
         // us from flagging a cast whose removal would change the term's atom
         // association (which `ring`/hypothesis-matching can be sensitive to).
-        if (reportRedundantCasts_ && !inRedundantCastProbe_
+        // Suppressed inside a calc (`calcDepth_`). Residual false positives are
+        // possible where a single source cast is consumed BOTH as an operator
+        // operand (join lifts it) and as a carrier-typed term elsewhere (a bare
+        // calc statement's last endpoint, which the join does not reach) — so
+        // this is a candidate generator: verify a removal by rebuilding.
+        if (reportRedundantCasts_ && !inRedundantCastProbe_ && calcDepth_ == 0
             && (std::holds_alternative<SurfaceAscription>(leftSurface.node)
                 || std::holds_alternative<SurfaceAscription>(
                        rightSurface.node))) {

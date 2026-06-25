@@ -11,6 +11,9 @@ ExpressionPointer Elaborator::elaborateCalcPreorder(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
+        ++calcDepth_;
+        struct CalcDepthGuard { int& d; ~CalcDepthGuard() { --d; } }
+            calcDepthGuard{calcDepth_};
         Frame frame(*this,
             "calc block at line " + std::to_string(line),
             localBinders, expectedType, line, column);
@@ -244,6 +247,9 @@ ExpressionPointer Elaborator::elaborateCalc(
                     calc, localBinders, expectedType, line, column);
             }
         }
+        ++calcDepth_;
+        struct CalcDepthGuard { int& d; ~CalcDepthGuard() { --d; } }
+            calcDepthGuard{calcDepth_};
         Frame frame(*this,
             "calc block at line " + std::to_string(line),
             localBinders, expectedType, line, column);
