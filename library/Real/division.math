@@ -17,12 +17,19 @@ module Real.division
 
 import Logic.basics
 import Equality.basics
+import Rational.basics
+import Rational.order
 import Real.basics
 import Real.addition
 import Real.negation
 import Real.multiplication
 import Real.ring
 import Real.order
+import Real.linearity
+import Real.order_multiplication
+import Real.order_field
+import Real.embedding
+import Real.embedding_order
 import Real.apartness
 import Real.reciprocal
 import Real.field
@@ -52,6 +59,47 @@ theorem Real.divide_self (a : Real) (aNonzero : a ≠ Real.zero)
   calc a / a
      = a * Real.reciprocal(a, aNonzero)
      = Real.one                                 since aReciprocal
+}
+
+-- The reciprocal of a positive real is positive: if it were not, then
+-- recip·x ≤ 0·x = 0, contradicting x·recip = 1 > 0.
+theorem Real.reciprocal_positive (x : Real) (xNonzero : x ≠ Real.zero)
+        (xPositive : Real.zero < x)
+        : Real.zero < Real.reciprocal(x, xNonzero) :=
+  decide Real.zero < Real.reciprocal(x, xNonzero) {
+    | yes recipPositive => recipPositive
+    | no recipNotPositive => {
+        claim Real.reciprocal(x, xNonzero) ≤ Real.zero
+            since Real.LessOrEqual_of_not_LessThan;
+        claim recipMultiplies : x * Real.reciprocal(x, xNonzero) = Real.one
+            since Real.reciprocal_multiplies;
+        claim Real.zero ≤ x since Real.LessThan.weaken;
+        claim Real.reciprocal(x, xNonzero) * x ≤ Real.zero * x
+            since Real.LessOrEqual.multiply_by_nonneg_right;
+        claim Real.one ≤ Real.zero
+            by calc Real.one
+                  = x * Real.reciprocal(x, xNonzero)   since recipMultiplies
+                  = Real.reciprocal(x, xNonzero) * x   by ring
+                  ≤ Real.zero * x
+                  = Real.zero                          by ring;
+        claim Real.zero < Real.one
+            by calc Real.zero
+                  < (Rational.one : Real)
+                        since Rational.to_real.positive_preserves
+                  = Real.one;
+        claim Real.zero < Real.zero since Real.LessThan.transitive_right;
+        claim notSelfEqual : ¬(Real.zero = Real.zero)
+            since Real.LessThan.distinct;
+        absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+      }
+  }
+
+-- a / b is positive when both a and b are.
+theorem Real.divide_positive (a b : Real) (bNonzero : b ≠ Real.zero)
+        (aPositive : Real.zero < a) (bPositive : Real.zero < b)
+        : Real.zero < a / b := {
+  claim Real.zero < Real.reciprocal(b, bNonzero) since Real.reciprocal_positive;
+  done since Real.multiply_positive
 }
 
 -- (a · b) / b = a.
