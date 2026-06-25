@@ -61,6 +61,43 @@ theorem Real.divide_self (a : Real) (aNonzero : a ≠ Real.zero)
      = Real.one                                 since aReciprocal
 }
 
+-- 0 < 1 in ℝ (the embedded Rational one, which is Real.one definitionally).
+theorem Real.zero_less_one : Real.zero < Real.one :=
+  calc Real.zero
+     < (Rational.one : Real)   since Rational.to_real.positive_preserves
+     = Real.one
+
+-- 0 < 2 = 1 + 1.
+theorem Real.two_positive : Real.zero < (2 : Real) := {
+  claim Real.zero < Real.one since Real.zero_less_one;
+  calc Real.zero
+     = Real.zero + Real.zero
+     < Real.one + Real.one     since Real.LessThan.add_strict_strict
+     = (2 : Real)
+}
+
+-- 2 ≠ 0 — the side condition every `/2` use site discharges.
+theorem Real.two_is_nonzero : (2 : Real) ≠ Real.zero :=
+  (twoZero : (2 : Real) = Real.zero) ↦ {
+      claim Real.zero < (2 : Real) since Real.two_positive;
+      claim Real.zero < Real.zero by substituting twoZero;
+      claim notSelfEqual : ¬(Real.zero = Real.zero) since Real.LessThan.distinct;
+      absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+    }
+
+-- x / 2 + x / 2 = x — the ε/2 split.
+theorem Real.divide_two_doubled (x : Real) : x / 2 + x / 2 = x := {
+  claim twoReciprocal
+        : (2 : Real) * Real.reciprocal((2 : Real), Real.two_is_nonzero) = Real.one
+      since Real.reciprocal_multiplies;
+  calc x / 2 + x / 2
+     = x * Real.reciprocal((2 : Real), Real.two_is_nonzero)
+       + x * Real.reciprocal((2 : Real), Real.two_is_nonzero)
+     = x * ((2 : Real) * Real.reciprocal((2 : Real), Real.two_is_nonzero))   by ring
+     = x * Real.one                                                          by substituting twoReciprocal
+     = x                                                                     by ring
+}
+
 -- The reciprocal of a positive real is positive: if it were not, then
 -- recip·x ≤ 0·x = 0, contradicting x·recip = 1 > 0.
 theorem Real.reciprocal_positive (x : Real) (xNonzero : x ≠ Real.zero)

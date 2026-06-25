@@ -1,0 +1,94 @@
+-- Real/minimum.math
+--
+-- The minimum of two reals, by definite description: the unique c that is
+-- ≤ both a and b and equals one of them. ℝ has no decidable order, so we
+-- cannot pattern-match on `a ≤ b`; instead linearity gives existence and
+-- antisymmetry gives uniqueness, and `Logic.the` packages them. The order
+-- facts (min ≤ a, min ≤ b, min ∈ {a, b}) then read straight off
+-- `the_satisfies`. Mirrors Rational.minimum's interface (`min`, the
+-- LessOrEqual lemmas, positivity) so the ε/δ proofs port unchanged.
+
+module Real.minimum
+
+import Logic.basics
+import Logic.exists
+import Logic.description
+import Equality.basics
+import Real.basics
+import Real.order
+import Real.linearity
+
+-- The defining predicate: c is a lower of a, b attained at one of them.
+definition Real.IsMinimum (a b c : Real) : Proposition :=
+  c ≤ a ∧ c ≤ b ∧ (c = a ∨ c = b)
+
+-- Existence: linearity puts the smaller of a, b below both.
+theorem Real.minimum_exists (a b : Real)
+        : ∃ (c : Real). Real.IsMinimum(a, b, c) := {
+  claim aReflexive : a ≤ a since Real.LessOrEqual.reflexive;
+  claim bReflexive : b ≤ b since Real.LessOrEqual.reflexive;
+  claim linear : a ≤ b ∨ b ≤ a since Real.LessOrEqual.linear;
+  cases linear {
+    | Or.introduceLeft(aLeqB) =>
+        witness a with
+            ⟨aReflexive, aLeqB, Or.introduceLeft(reflexivity(Real, a))⟩
+    | Or.introduceRight(bLeqA) =>
+        witness b with
+            ⟨bLeqA, bReflexive, Or.introduceRight(reflexivity(Real, b))⟩
+  }
+}
+
+-- Uniqueness: two minima sit below each other, so antisymmetry equates them.
+theorem Real.minimum_unique (a b c1 c2 : Real)
+        (firstMinimum : Real.IsMinimum(a, b, c1))
+        (secondMinimum : Real.IsMinimum(a, b, c2))
+        : c1 = c2 := {
+  obtain ⟨c1LeqA, c1LeqB, c1Attained⟩ from firstMinimum;
+  obtain ⟨c2LeqA, c2LeqB, c2Attained⟩ from secondMinimum;
+  claim c1 ≤ c2 by {
+    cases c2Attained {
+      | Or.introduceLeft(c2IsA) => calc c1 ≤ a = c2 since c2IsA
+      | Or.introduceRight(c2IsB) => calc c1 ≤ b = c2 since c2IsB
+    }
+  };
+  claim c2 ≤ c1 by {
+    cases c1Attained {
+      | Or.introduceLeft(c1IsA) => calc c2 ≤ a = c1 since c1IsA
+      | Or.introduceRight(c1IsB) => calc c2 ≤ b = c1 since c1IsB
+    }
+  };
+  done since Real.LessOrEqual.antisymmetric
+}
+
+-- THE minimum.
+definition Real.minimum (a b : Real) : Real :=
+  Logic.the(Real, (c : Real) ↦ Real.IsMinimum(a, b, c),
+      Real.minimum_exists(a, b), Real.minimum_unique(a, b))
+
+overload min := Real.minimum
+
+-- min(a, b) attains the defining predicate.
+theorem Real.minimum_satisfies (a b : Real) : Real.IsMinimum(a, b, min(a, b)) :=
+  Logic.the_satisfies(Real, (c : Real) ↦ Real.IsMinimum(a, b, c),
+      Real.minimum_exists(a, b), Real.minimum_unique(a, b))
+
+theorem Real.minimum_LessOrEqual_left (a b : Real) : min(a, b) ≤ a := {
+  obtain ⟨leftBound, rightBound, attained⟩ from Real.minimum_satisfies(a, b);
+  done since leftBound
+}
+
+theorem Real.minimum_LessOrEqual_right (a b : Real) : min(a, b) ≤ b := {
+  obtain ⟨leftBound, rightBound, attained⟩ from Real.minimum_satisfies(a, b);
+  done since rightBound
+}
+
+-- The minimum of two positives is positive (it is one of them).
+theorem Real.minimum_positive (a b : Real)
+        (aPositive : Real.zero < a) (bPositive : Real.zero < b)
+        : Real.zero < min(a, b) := {
+  obtain ⟨leftBound, rightBound, attained⟩ from Real.minimum_satisfies(a, b);
+  cases attained {
+    | Or.introduceLeft(isA) => calc Real.zero < a = min(a, b) since isA
+    | Or.introduceRight(isB) => calc Real.zero < b = min(a, b) since isB
+  }
+}
