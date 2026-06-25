@@ -103,35 +103,36 @@ theorem Real.intermediate_value
                choose epsilon such that Rational.zero < epsilon ∧ (epsilon : Real) < f(c)
                    from given(∃ (q : Rational). Rational.zero < q ∧ (q : Real) < f(c));
                claim epsilonPositive : Rational.zero < epsilon;
-               choose delta such that
-                   Rational.zero < delta ∧ ∀ (y : Real). abs(y - c) < (delta : Real)
-                     → abs(f(y) - f(c)) < (epsilon : Real)
-                   from fContinuousAtC(epsilon, epsilonPositive);
-               claim fClose : ∀ (y : Real). abs(y - c) < (delta : Real) → abs(f(y) - f(c)) < (epsilon : Real);
-               claim Real.zero < (delta : Real)
+               claim epsilonRealPositive : Real.zero < (epsilon : Real)
                    since Rational.to_real.positive_preserves;
+               choose delta such that
+                   Real.zero < delta ∧ ∀ (y : Real). abs(y - c) < delta
+                     → abs(f(y) - f(c)) < (epsilon : Real)
+                   from fContinuousAtC((epsilon : Real), epsilonRealPositive);
+               claim fClose : ∀ (y : Real). abs(y - c) < delta → abs(f(y) - f(c)) < (epsilon : Real);
+               claim Real.zero < delta;
                -- Any candidate above c − δ would sit δ-close to c
                -- (candidates never exceed c), forcing f > 0 there —
                -- impossible for a candidate. So c − δ is an upper bound.
-               claim Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), c - (delta : Real))
+               claim Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), c - delta)
                    by (y : Real) (yInCandidates : y ∈ Real.intermediate_value_candidates(f, a, b)) ↦
-                        decide y ≤ c - (delta : Real) {
+                        decide y ≤ c - delta {
                           | yes below => below
                           | no notBelow => {
                               claim f(y) ≤ Real.zero;
                               claim y ≤ c;
-                              claim c - (delta : Real) < y
+                              claim c - delta < y
                                   since Real.LessThan_of_not_LessOrEqual;
                               -- |y − c| < δ from the two sides.
-                              calc -(delta : Real)
-                                        = (c - (delta : Real)) - c
+                              calc -delta
+                                        = (c - delta) - c
                                         < y - c
                                               since Real.add_preserves_LessThan;
                               calc y - c
                                         ≤ c - c             since Real.add_preserves_LessOrEqual
                                         = Real.zero
-                                        < (delta : Real);
-                              claim yClose : abs(y - c) < (delta : Real)
+                                        < delta;
+                              claim yClose : abs(y - c) < delta
                                   since Real.absolute_value_LessThan_of_bounds;
                               claim abs(f(y) - f(c)) < (epsilon : Real)
                                   by fClose(y, yClose);
@@ -158,8 +159,8 @@ theorem Real.intermediate_value
                               absurd(notSelfEqual(reflexivity(Real, Real.zero)))
                             }
                         };
-               claim c ≤ c - (delta : Real);
-               claim c - (delta : Real) < c
+               claim c ≤ c - delta;
+               claim c - delta < c
                    since Real.subtract_positive_LessThan;
                claim c < c since Real.LessThan.transitive_left;
                claim notSelfEqual : ¬(c = c) since Real.LessThan.distinct;
@@ -188,20 +189,21 @@ theorem Real.intermediate_value
                choose epsilon such that Rational.zero < epsilon ∧ (epsilon : Real) < -f(c)
                    from given(∃ (q : Rational). Rational.zero < q ∧ (q : Real) < -f(c));
                claim epsilonPositive : Rational.zero < epsilon;
-               choose delta such that
-                   Rational.zero < delta ∧ ∀ (y : Real). abs(y - c) < (delta : Real)
-                     → abs(f(y) - f(c)) < (epsilon : Real)
-                   from fContinuousAtC(epsilon, epsilonPositive);
-               claim Rational.zero < delta;
-               claim fClose : ∀ (y : Real). abs(y - c) < (delta : Real) → abs(f(y) - f(c)) < (epsilon : Real);
-               claim Real.zero < (delta : Real)
+               claim epsilonRealPositive : Real.zero < (epsilon : Real)
                    since Rational.to_real.positive_preserves;
+               choose delta such that
+                   Real.zero < delta ∧ ∀ (y : Real). abs(y - c) < delta
+                     → abs(f(y) - f(c)) < (epsilon : Real)
+                   from fContinuousAtC((epsilon : Real), epsilonRealPositive);
+               claim Real.zero < delta;
+               claim fClose : ∀ (y : Real). abs(y - c) < delta → abs(f(y) - f(c)) < (epsilon : Real);
+               claim Real.zero < delta;
                -- Everything δ-close to c keeps f negative.
                claim bandNegative
-                     : ∀ (y : Real). abs(y - c) < (delta : Real)
+                     : ∀ (y : Real). abs(y - c) < delta
                        → f(y) < Real.zero
                    by (y : Real)
-                      (yClose : abs(y - c) < (delta : Real)) ↦ {
+                      (yClose : abs(y - c) < delta) ↦ {
                         claim abs(f(y) - f(c)) < (epsilon : Real)
                             by fClose(y, yClose);
                         claim -(epsilon : Real) < f(y) - f(c) ∧ (f(y) - f(c)) < (epsilon : Real)
@@ -221,54 +223,49 @@ theorem Real.intermediate_value
                             since Real.LessThan.weaken;
                         done since Real.LessThan.transitive_left
                       };
-               -- The half-δ step we probe with, as a real quantity.
-               claim Rational.halve(delta) < delta
-                   since Rational.halve_less_than_self;
-               claim (Rational.halve(delta) : Real) < (delta : Real)
-                   since Rational.to_real.LessThan_preserves;
-               claim Rational.zero < Rational.halve(delta)
-                   since Rational.halve_positive;
-               claim Real.zero < (Rational.halve(delta) : Real)
-                   since Rational.to_real.positive_preserves;
-               claim Real.zero ≤ (Rational.halve(delta) : Real)
-                   since Real.LessThan.weaken;
-               decide c + (Rational.halve(delta) : Real) ≤ b {
+               -- The half-δ step we probe with.
+               claim Real.zero < (2 : Real) since Real.two_positive;
+               claim (2 : Real) ≠ Real.zero since Real.two_is_nonzero;
+               claim Real.zero < delta / 2 since Real.divide_positive;
+               claim Real.zero ≤ delta / 2 since Real.LessThan.weaken;
+               claim delta / 2 < delta since Real.divide_two_less_than_self;
+               decide c + delta / 2 ≤ b {
                  -- c + δ/2 stays inside [a, b]: it is a candidate
                  -- strictly above the upper bound c.
                  | yes insideInterval => {
-                     calc -(delta : Real)
-                               = Real.zero - (delta : Real)
-                               < (delta : Real) - (delta : Real)
+                     calc -delta
+                               = Real.zero - delta
+                               < delta - delta
                                      since Real.add_preserves_LessThan
                                = Real.zero
-                               ≤ (Rational.halve(delta) : Real)
-                               = (c + (Rational.halve(delta) : Real)) - c;
-                     calc (c + (Rational.halve(delta) : Real)) - c
-                               = (Rational.halve(delta) : Real)
-                               < (delta : Real);
+                               ≤ delta / 2
+                               = (c + delta / 2) - c;
+                     calc (c + delta / 2) - c
+                               = delta / 2
+                               < delta;
                      claim candidateClose
-                           : abs((c + (Rational.halve(delta) : Real)) - c)
-                               < (delta : Real)
+                           : abs((c + delta / 2) - c)
+                               < delta
                          since Real.absolute_value_LessThan_of_bounds;
-                     claim f(c + (Rational.halve(delta) : Real)) < Real.zero
+                     claim f(c + delta / 2) < Real.zero
                          by bandNegative(
-                                c + (Rational.halve(delta) : Real),
+                                c + delta / 2,
                                 candidateClose);
-                     claim f(c + (Rational.halve(delta) : Real)) ≤ Real.zero
+                     claim f(c + delta / 2) ≤ Real.zero
                          since Real.LessThan.weaken;
                      calc a
                                ≤ c
                                = Real.zero + c
-                               ≤ (Rational.halve(delta) : Real) + c
+                               ≤ delta / 2 + c
                                      since Real.add_preserves_LessOrEqual
-                               = c + (Rational.halve(delta) : Real);
-                     claim (c + (Rational.halve(delta) : Real)) ∈ Real.intermediate_value_candidates(f, a, b);
-                     claim c + (Rational.halve(delta) : Real) ≤ c;
+                               = c + delta / 2;
+                     claim (c + delta / 2) ∈ Real.intermediate_value_candidates(f, a, b);
+                     claim c + delta / 2 ≤ c;
                      calc c
                                = Real.zero + c
-                               < (Rational.halve(delta) : Real) + c
+                               < delta / 2 + c
                                      since Real.add_preserves_LessThan
-                               = c + (Rational.halve(delta) : Real);
+                               = c + delta / 2;
                      claim c < c since Real.LessThan.transitive_right;
                      claim notSelfEqual : ¬(c = c)
                          since Real.LessThan.distinct;
@@ -277,21 +274,21 @@ theorem Real.intermediate_value
                  -- Otherwise b itself sits inside the δ-band, so
                  -- f(b) < 0 — against f(b) ≥ 0.
                  | no notInside => {
-                     claim b < c + (Rational.halve(delta) : Real)
+                     claim b < c + delta / 2
                          since Real.LessThan_of_not_LessOrEqual;
-                     calc -(delta : Real)
-                               = Real.zero - (delta : Real)
-                               < (delta : Real) - (delta : Real)
+                     calc -delta
+                               = Real.zero - delta
+                               < delta - delta
                                      since Real.add_preserves_LessThan
                                = c - c
                                ≤ b - c
                                      since Real.add_preserves_LessOrEqual;
                      calc b - c
-                               < (c + (Rational.halve(delta) : Real)) - c
+                               < (c + delta / 2) - c
                                      since Real.add_preserves_LessThan
-                               = (Rational.halve(delta) : Real)
-                               < (delta : Real);
-                     claim bClose : abs(b - c) < (delta : Real)
+                               = delta / 2
+                               < delta;
+                     claim bClose : abs(b - c) < delta
                          since Real.absolute_value_LessThan_of_bounds;
                      claim f(b) < Real.zero by bandNegative(b, bClose);
                      claim Real.zero < Real.zero
