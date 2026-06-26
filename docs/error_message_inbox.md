@@ -946,3 +946,58 @@ longer appears — recorded only as a data point: a silently-ignored surface
 feature produces a maximally-confusing symptom error. Lesson for future
 surface features: if a clause/modifier can't be honored on a code path, reject
 it explicitly rather than dropping it.
+
+---
+
+## `calc` leading term defaults a bare numeral to Natural (2026-06-26)
+
+`calc 0 ≤ abs(f(x)) < …` fails with:
+
+```
+this argument has the wrong type for the function it is given to
+  the function expects: Natural
+  but this argument is: Real
+```
+
+**Diagnosis.** The calc elaborator elaborates the leading term (`0`) in
+isolation, *before* the first relation pins the carrier — so `0` defaults to
+Natural, the first relation resolves to `Natural.LessOrEqual`, and the
+Real-typed RHS then mismatches. A bare `0 ≤ abs(f(x))` written as a plain
+operator expression coerces fine (combineOperands joins the operands); only
+the calc leading position misses it. Workaround in use: `calc (0 : Real) ≤ …`.
+**Fix worth doing:** elaborate the first calc relation as a coercion-joined
+binary op (so the leading `0` gets the carrier from the other operand). The
+error is also misleading — it blames the RHS ("argument is Real") when the
+real culprit is the under-typed leading `0`.
+
+## redundant-`by` check vs. performance-load-bearing hints (2026-06-26)
+
+`--check-redundant-by` flags a `by <lemma>` as redundant whenever the
+auto-prover *closes* the step without it — but it does not check *cost*.
+Several `by Real.less_than_add_of_positive` hints on `x < x + 1` roof steps
+were flagged redundant; removing them made the step an *expensive by-less
+proof step* (710k kernel-steps) or pushed the next step past the budget
+("gave up"). So the two checks disagree: one says "remove", the other (on
+removal) says "add a reason". The triage answer is `since`, but that mislabels
+plumbing as illumination. **Suggestion:** have the redundant-`by` check also
+report the by-less cost, or suppress the redundant flag when the by-less cost
+exceeds a threshold — otherwise the polish loop round-trips (add `by` →
+"redundant" → remove → "expensive" → re-add).
+
+## `done by <lemma>` (args dropped) — misleading "about Exists" message (2026-06-26)
+
+Closing `Real.HasDerivativeAt.subtract` with `done by Real.HasDerivativeAt.add`
+(no positional args) fails with:
+
+```
+its conclusion is about `Exists` but the goal is about `Real.HasDerivativeAt`
+— this lemma does not target this goal (check the lemma name)
+```
+
+The lemma name is correct; the real problem is that the second function
+argument (`(y) ↦ -g(y)`) can't be inferred from the goal's `f y - g y`
+(it needs `f y + (-g y)`), so the match never reaches the `HasDerivativeAt`
+head and falls back to comparing the unfolded `Exists` bodies. A bare `done`
+*does* close it (the full search supplies the instantiation). The message
+"check the lemma name" sends you down the wrong path — the lemma is right, the
+inferred argument is wrong.
