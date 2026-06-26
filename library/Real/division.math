@@ -39,6 +39,39 @@ definition Real.divide (a b : Real) (denominatorNonzero : b ≠ Real.zero) : Rea
 
 operator (/) on (Real, Real) := Real.divide
 
+-- A product of nonzero reals is nonzero (no zero divisors): if a·b = 0 with
+-- a ≠ 0, then b = reciprocal(a)·(a·b) = reciprocal(a)·0 = 0.
+theorem Real.multiply_nonzero (a b : Real)
+        (aNonzero : a ≠ Real.zero) (bNonzero : b ≠ Real.zero)
+        : a * b ≠ Real.zero :=
+  (abZero : a * b = Real.zero) ↦ {
+    claim aReciprocal : a * Real.reciprocal(a, aNonzero) = Real.one
+        since Real.reciprocal_multiplies;
+    claim bZero : b = Real.zero
+        by calc b
+              = Real.one * b                              by ring
+              = (a * Real.reciprocal(a, aNonzero)) * b    by substituting aReciprocal
+              = Real.reciprocal(a, aNonzero) * (a * b)    by ring
+              = Real.reciprocal(a, aNonzero) * Real.zero  by substituting abZero
+              = Real.zero                                 by ring;
+    absurd(bNonzero(bZero))
+  }
+
+-- Left cancellation: c ≠ 0 and c·a = c·b give a = b (multiply by 1/c).
+theorem Real.equal_of_multiply_left (a b c : Real) (cNonzero : c ≠ Real.zero)
+        (cancellable : c * a = c * b) : a = b := {
+  claim cReciprocal : c * Real.reciprocal(c, cNonzero) = Real.one
+      since Real.reciprocal_multiplies;
+  calc a
+     = Real.one * a                              by ring
+     = (c * Real.reciprocal(c, cNonzero)) * a    by substituting cReciprocal
+     = Real.reciprocal(c, cNonzero) * (c * a)    by ring
+     = Real.reciprocal(c, cNonzero) * (c * b)    by substituting cancellable
+     = (c * Real.reciprocal(c, cNonzero)) * b    by ring
+     = Real.one * b                              by substituting cReciprocal
+     = b                                         by ring
+}
+
 -- b · (a / b) = a — the cancellation everything else leans on.
 theorem Real.divide_cancel (a b : Real) (bNonzero : b ≠ Real.zero)
         : b * (a / b) = a :=

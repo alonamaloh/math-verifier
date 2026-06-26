@@ -606,14 +606,12 @@ ExpressionPointer Elaborator::elaborateLinearCombination(
             goal, carrierName, scheme, comb, line, localBinders, binderCount);
     }
 
-ExpressionPointer Elaborator::assembleLinearCombination(
+ExpressionPointer Elaborator::buildLinearCombinationProof(
         const EqualityComponents& goal,
         const std::string& carrierName,
         const RingScheme& scheme,
         const CombinationEquation& comb,
-        int line,
-        const std::vector<LocalBinder>& localBinders,
-        size_t binderCount) {
+        int line) {
         // Resolve the carrier's ring operations + IsRing instance (matches
         // `ring`'s normalisation context). For a bundled carrier
         // `CommutativeRing.carrier(c)` the ops carry the leading structure
@@ -683,7 +681,20 @@ ExpressionPointer Elaborator::assembleLinearCombination(
                  bridgeProof}) {
             result = makeApplication(std::move(result), arg);
         }
-        return closeOverLocalBinders(result, localBinders, binderCount);
+        return result;
+    }
+
+ExpressionPointer Elaborator::assembleLinearCombination(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        const CombinationEquation& comb,
+        int line,
+        const std::vector<LocalBinder>& localBinders,
+        size_t binderCount) {
+        return closeOverLocalBinders(
+            buildLinearCombinationProof(goal, carrierName, scheme, comb, line),
+            localBinders, binderCount);
     }
 
 ExpressionPointer Elaborator::elaborateRing(
@@ -6276,15 +6287,13 @@ void Elaborator::collectReciprocalArguments(
         // Other variants: no children to walk.
     }
 
-std::optional<ExpressionPointer> Elaborator::tryFieldByCofactorSynthesis(
+std::optional<ExpressionPointer> Elaborator::synthesizeCofactorProofOpened(
         const EqualityComponents& goal,
         const std::string& carrierName,
         const RingScheme& scheme,
         RingNormalisationContext& context,
         const std::vector<FieldReciprocalPair>& pairs,
-        int line,
-        const std::vector<LocalBinder>& localBinders,
-        size_t binderCount) {
+        int line) {
         if (pairs.empty()) return std::nullopt;
         std::string addName = scheme.opNamespace + ".add";
         std::string multiplyName = scheme.opNamespace + ".multiply";
@@ -6421,8 +6430,106 @@ std::optional<ExpressionPointer> Elaborator::tryFieldByCofactorSynthesis(
         // is a `ring` goal, not a field one — let the contraction path (which
         // bottoms out in the ring normaliser) take it.
         if (!comb) return std::nullopt;
-        return assembleLinearCombination(
-            goal, carrierName, scheme, *comb, line, localBinders, binderCount);
+        return buildLinearCombinationProof(
+            goal, carrierName, scheme, *comb, line);
+    }
+
+std::optional<ExpressionPointer> Elaborator::tryFieldByCofactorSynthesis(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        RingNormalisationContext& context,
+        const std::vector<FieldReciprocalPair>& pairs,
+        int line,
+        const std::vector<LocalBinder>& localBinders,
+        size_t binderCount) {
+        if (pairs.empty()) return std::nullopt;
+        // Direct: reduce `goalL − goalR` modulo `bᵢ·rᵢ = 1`. Works when each
+        // denominator divides the integer multiplicity it appears with
+        // (`x/2 + x/2 = x`, `a/a = 1`).
+        if (auto direct = synthesizeCofactorProofOpened(
+                goal, carrierName, scheme, context, pairs, line)) {
+            return closeOverLocalBinders(*direct, localBinders, binderCount);
+        }
+        // Denominator-clearing fallback (route 1): when the multiplicities
+        // don't divide (mixed denominators like `x/2 + x/3 + x/6 = x`),
+        // multiply both sides through by `D = Π(distinct denominators)`. Over
+        // `D·P = D·Q` the multiplicities are all divisible (D supplies the
+        // missing factors), so cofactor synthesis succeeds; then conclude
+        // `P = Q` by left-cancellation since `D ≠ 0`. Needs the carrier's
+        // `equal_of_multiply_left` and `multiply_nonzero` lemmas.
+        std::string equalLemmaName = carrierName + ".equal_of_multiply_left";
+        std::string multiplyNonzeroName = carrierName + ".multiply_nonzero";
+        if (!environment_.lookup(equalLemmaName)
+            || !environment_.lookup(multiplyNonzeroName)) {
+            return std::nullopt;
+        }
+        std::string multiplyName = scheme.opNamespace + ".multiply";
+        auto multiplyApply = [&](ExpressionPointer x, ExpressionPointer y) {
+            return makeApplication(
+                makeApplication(makeConstant(multiplyName), x), y);
+        };
+        // Pick D as a *small* common multiple of the denominators, not the
+        // full product: the ring normaliser represents coefficients in unary
+        // (it expands `|coef|` unit monomials), so D's magnitude drives the
+        // bridge-proof size cubically. Greedily skip a numeral denominator
+        // that already divides the running product (so `{2,3,6}` clears with
+        // D = 2·3 = 6, not 36). Non-numeral bases (atoms) can't be reasoned
+        // about, so they are always included. The result is a product of a
+        // subset of the bases — `multiply_nonzero` folds their proofs into
+        // `D ≠ 0`, and every denominator divides it.
+        // Process numeral denominators in ascending order so the greedy skip
+        // keeps D minimal (see 2 and 3 before 6, so 6 is recognised as
+        // already covered → D = 6, not 12 or 36). Non-numeral bases (atoms)
+        // can't be reasoned about divisibility-wise, so they are always kept.
+        std::vector<std::pair<int, size_t>> numerals;
+        std::vector<size_t> nonNumerals;
+        for (size_t i = 0; i < pairs.size(); ++i) {
+            int value = 0;
+            if (tryParseCarrierEmbeddedNaturalLiteral(
+                    pairs[i].baseAtom, context, value) && value > 0) {
+                numerals.emplace_back(value, i);
+            } else {
+                nonNumerals.push_back(i);
+            }
+        }
+        std::sort(numerals.begin(), numerals.end());
+        std::vector<size_t> included;
+        long long numeralProduct = 1;
+        for (const auto& [value, i] : numerals) {
+            if (numeralProduct % value == 0) continue;  // already a multiple
+            included.push_back(i);
+            numeralProduct *= value;
+        }
+        for (size_t i : nonNumerals) included.push_back(i);
+        if (included.empty()) return std::nullopt;
+        ExpressionPointer clearing = pairs[included[0]].baseAtom;
+        ExpressionPointer clearingNonzero = pairs[included[0]].nonzeroProof;
+        for (size_t k = 1; k < included.size(); ++k) {
+            const FieldReciprocalPair& pair = pairs[included[k]];
+            ExpressionPointer nextNonzero = makeConstant(multiplyNonzeroName);
+            for (ExpressionPointer arg :
+                    {clearing, pair.baseAtom,
+                     clearingNonzero, pair.nonzeroProof}) {
+                nextNonzero = makeApplication(nextNonzero, arg);
+            }
+            clearing = multiplyApply(clearing, pair.baseAtom);
+            clearingNonzero = nextNonzero;
+        }
+        EqualityComponents clearedGoal = goal;
+        clearedGoal.leftEndpoint = multiplyApply(clearing, goal.leftEndpoint);
+        clearedGoal.rightEndpoint = multiplyApply(clearing, goal.rightEndpoint);
+        auto sub = synthesizeCofactorProofOpened(
+            clearedGoal, carrierName, scheme, context, pairs, line);
+        if (!sub) return std::nullopt;
+        // equal_of_multiply_left(P, Q, D, DNonzero, sub : D·P = D·Q) : P = Q.
+        ExpressionPointer wrapped = makeConstant(equalLemmaName);
+        for (ExpressionPointer arg :
+                {goal.leftEndpoint, goal.rightEndpoint,
+                 clearing, clearingNonzero, *sub}) {
+            wrapped = makeApplication(wrapped, arg);
+        }
+        return closeOverLocalBinders(wrapped, localBinders, binderCount);
     }
 
 ExpressionPointer Elaborator::elaborateField(
@@ -6629,6 +6736,7 @@ ExpressionPointer Elaborator::elaborateField(
             pair.baseAtom = baseAtom;
             pair.reciprocalAtom = reciprocalAtom;
             pair.multipliesProof = multipliesProof;
+            pair.nonzeroProof = hypothesisKernelOpened;
             pair.baseHash = baseHash;
             pair.reciprocalHash = reciprocalAtom->hash;
             pairs.push_back(pair);
@@ -6675,6 +6783,7 @@ ExpressionPointer Elaborator::elaborateField(
                 pair.baseAtom = atom.base;
                 pair.reciprocalAtom = atom.reciprocalApplication;
                 pair.multipliesProof = multipliesProof;
+                pair.nonzeroProof = atom.nonzeroProof;
                 pair.baseHash = atom.base->hash;
                 pair.reciprocalHash = atom.reciprocalApplication->hash;
                 pairs.push_back(pair);

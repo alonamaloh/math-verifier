@@ -3644,6 +3644,7 @@ private:
         ExpressionPointer baseAtom;        // t_i kernel expression
         ExpressionPointer reciprocalAtom;  // reciprocal_function(t_i)
         ExpressionPointer multipliesProof; // proof : t_i * reciprocal_function(t_i) = 1
+        ExpressionPointer nonzeroProof;    // proof : t_i ≠ 0 (for denominator-clearing)
         uint64_t baseHash;
         uint64_t reciprocalHash;
     };
@@ -4266,10 +4267,21 @@ private:
         ExpressionPointer equalityType, const char* contextLabel,
         int line);
 
-    // The bridge-and-assemble tail shared by `linear_combination` and the
-    // cofactor-synthesising `field` path: check `goalL − goalR = combL −
-    // combR` with the ring normaliser and assemble the proof via
-    // `Ring.equal_of_linear_combination`. Returns the closed proof term.
+    // Build the linear-combination proof in OPENED form (over local-binder
+    // FreeVariables): check `goalL − goalR = combL − combR` with the ring
+    // normaliser and assemble via `Ring.equal_of_linear_combination`. The
+    // caller closes it (directly, or after wrapping — e.g. the
+    // denominator-clearing `field` path wraps it in a cancellation lemma).
+    ExpressionPointer buildLinearCombinationProof(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        const CombinationEquation& comb,
+        int line);
+
+    // `buildLinearCombinationProof` then `closeOverLocalBinders`. The
+    // bridge-and-assemble tail shared by `linear_combination` and the direct
+    // cofactor-synthesising `field` path.
     ExpressionPointer assembleLinearCombination(
         const EqualityComponents& goal,
         const std::string& carrierName,
@@ -4279,15 +4291,29 @@ private:
         const std::vector<LocalBinder>& localBinders,
         size_t binderCount);
 
-    // Field-clearing by linear-combination cofactor synthesis. Given the
-    // (already divide-unfolded) goal and the reciprocal pairs (each with its
-    // `b · reciprocal(b) = 1` cancellation proof), reduce `goalL − goalR`
-    // modulo the relations `bᵢ·rᵢ = 1` to find ring cofactors `cᵢ` with
-    // `goalL − goalR = Σ cᵢ·(bᵢrᵢ − 1)`, then assemble the proof as a linear
-    // combination. Returns nullopt if the reduction does not fully clear (the
-    // caller then falls back to the contraction path). Unlike contraction,
-    // this clears a denominator against an integer multiplicity — e.g. the
-    // `2` of `x/2 + x/2 = x`, carried as a coefficient, not an atom factor.
+    // Reduce `goalL − goalR` modulo the relations `bᵢ·rᵢ = 1` to find ring
+    // cofactors `cᵢ` with `goalL − goalR = Σ cᵢ·(bᵢrᵢ − 1)`, then assemble
+    // the linear-combination proof in OPENED form. Returns nullopt if the
+    // reduction does not fully clear (e.g. a denominator does not divide the
+    // integer multiplicity it appears with). Does not close — the caller
+    // closes, possibly after wrapping (the denominator-clearing path wraps).
+    std::optional<ExpressionPointer> synthesizeCofactorProofOpened(
+        const EqualityComponents& goal,
+        const std::string& carrierName,
+        const RingScheme& scheme,
+        RingNormalisationContext& context,
+        const std::vector<FieldReciprocalPair>& pairs,
+        int line);
+
+    // Field-clearing by linear-combination cofactor synthesis. Tries direct
+    // synthesis (`synthesizeCofactorProofOpened`); on failure, multiplies the
+    // goal through by `D = Π(distinct denominators)` — over `D·P = D·Q` the
+    // multiplicities all divide, so synthesis succeeds — and concludes
+    // `P = Q` by left-cancellation (`D ≠ 0`). This clears a denominator
+    // against an integer multiplicity (the `2` of `x/2 + x/2`, carried as a
+    // coefficient, not an atom factor) and handles mixed denominators
+    // (`x/2 + x/3 + x/6 = x`). Returns nullopt if neither path certifies the
+    // goal (the caller then falls back to the contraction path).
     std::optional<ExpressionPointer> tryFieldByCofactorSynthesis(
         const EqualityComponents& goal,
         const std::string& carrierName,
