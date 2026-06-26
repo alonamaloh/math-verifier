@@ -88,12 +88,12 @@ import ComplexNumber.modulus
 import ComplexNumber.modulus_bounds
 
 -- ----------------------------------------------------------------------
--- Convergence and the Cauchy property on ℂ, with rational tolerances
+-- Convergence and the Cauchy property on ℂ, with real tolerances
 -- (mirrors Real.SequenceConverges / Real.SequenceIsCauchy).
 
 definition ComplexNumber.SequenceConverges
         (s : Natural → ComplexNumber) (limit : ComplexNumber) : Proposition :=
-  (epsilon : Rational) → Rational.zero < epsilon →
+  ∀ (epsilon : Real). epsilon > 0 →
     ∃ (N : Natural).
       ∀ (m : Natural). N ≤ m →
         ComplexNumber.modulus(s(m) - limit) < epsilon
@@ -104,7 +104,7 @@ definition ComplexNumber.SequenceConvergent
 
 definition ComplexNumber.SequenceIsCauchy
         (s : Natural → ComplexNumber) : Proposition :=
-  (epsilon : Rational) → Rational.zero < epsilon →
+  ∀ (epsilon : Real). epsilon > 0 →
     ∃ (N : Natural).
       ∀ (m n : Natural). N ≤ m → N ≤ n →
         ComplexNumber.modulus(s(m) - s(n)) < epsilon
@@ -118,8 +118,8 @@ theorem ComplexNumber.SequenceIsCauchy.realPart
         (s : Natural → ComplexNumber)
         (cauchy : ComplexNumber.SequenceIsCauchy(s))
         : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.realPart(s(n))) :=
-  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨threshold, close⟩ from cauchy(epsilon, epsilonPositive);
+  (epsilon : Real) (epsilonPositive : epsilon > 0) ↦ {
+    choose threshold as close from cauchy(epsilon, epsilonPositive);
     witness threshold with
         (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
           claim differencePart
@@ -131,7 +131,7 @@ theorem ComplexNumber.SequenceIsCauchy.realPart
                    since differencePart
              ≤ ComplexNumber.modulus(s(m) - s(n))
                    since ComplexNumber.realPart_bound
-             < (epsilon : Real)
+             < epsilon
                    by close(m, n, aboveM, aboveN)
         }
   }
@@ -140,8 +140,8 @@ theorem ComplexNumber.SequenceIsCauchy.imaginaryPart
         (s : Natural → ComplexNumber)
         (cauchy : ComplexNumber.SequenceIsCauchy(s))
         : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n))) :=
-  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
-    obtain ⟨threshold, close⟩ from cauchy(epsilon, epsilonPositive);
+  (epsilon : Real) (epsilonPositive : epsilon > 0) ↦ {
+    choose threshold as close from cauchy(epsilon, epsilonPositive);
     witness threshold with
         (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
           claim differencePart
@@ -153,7 +153,7 @@ theorem ComplexNumber.SequenceIsCauchy.imaginaryPart
                    since differencePart
              ≤ ComplexNumber.modulus(s(m) - s(n))
                    since ComplexNumber.imaginaryPart_bound
-             < (epsilon : Real)
+             < epsilon
                    by close(m, n, aboveM, aboveN)
         }
   }
@@ -173,27 +173,22 @@ theorem ComplexNumber.cauchy_sequence_converges
   claim imaginaryCauchy
       : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)))
       since ComplexNumber.SequenceIsCauchy.imaginaryPart;
-  obtain ⟨realLimit, realConverges⟩
+  choose realLimit as realConverges
       from Real.cauchy_sequence_converges(
                (n : Natural) ↦ ComplexNumber.realPart(s(n)), realCauchy);
-  obtain ⟨imaginaryLimit, imaginaryConverges⟩
+  choose imaginaryLimit as imaginaryConverges
       from Real.cauchy_sequence_converges(
                (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)), imaginaryCauchy);
   -- The candidate limit reassembles the coordinate limits.
   witness ComplexNumber.ofCoordinates(realLimit, imaginaryLimit) with
-      (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
-        claim halfPositive : Rational.zero < Rational.halve(epsilon)
-            since Rational.halve_positive;
-        obtain ⟨realThreshold, realClose⟩
-            from Real.SequenceConverges.at_rational(
-                     (n : Natural) ↦ ComplexNumber.realPart(s(n)),
-                     realLimit, realConverges)(
-                     Rational.halve(epsilon), halfPositive);
-        obtain ⟨imaginaryThreshold, imaginaryClose⟩
-            from Real.SequenceConverges.at_rational(
-                     (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
-                     imaginaryLimit, imaginaryConverges)(
-                     Rational.halve(epsilon), halfPositive);
+      (epsilon : Real) (epsilonPositive : epsilon > 0) ↦ {
+        claim (2 : Real) > 0 since Real.two_positive;
+        claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
+        claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
+        choose realThreshold as realClose
+            from realConverges(epsilon / 2, halfPositive);
+        choose imaginaryThreshold as imaginaryClose
+            from imaginaryConverges(epsilon / 2, halfPositive);
         witness Natural.maximum(realThreshold, imaginaryThreshold) with
             (m : Natural)
             (aboveMaximum : Natural.maximum(realThreshold, imaginaryThreshold) ≤ m) ↦ {
@@ -202,10 +197,10 @@ theorem ComplexNumber.cauchy_sequence_converges
               claim imaginaryAbove : imaginaryThreshold ≤ m
                   since Natural.le_through_max_right;
               claim abs(ComplexNumber.realPart(s(m)) - realLimit)
-                    < Rational.halve(epsilon)
+                    < epsilon / 2
                   by realClose(m, realAbove);
               claim abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
-                    < Rational.halve(epsilon)
+                    < epsilon / 2
                   by imaginaryClose(m, imaginaryAbove);
               -- The coordinates of the difference s(m) − limit.
               claim realDifference
@@ -258,13 +253,10 @@ theorem ComplexNumber.cauchy_sequence_converges
                  = abs(ComplexNumber.realPart(s(m)) - realLimit)
                        + abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
                        since imaginaryOfLimit
-                 < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
+                 < epsilon / 2 + epsilon / 2
                        since Real.LessThan.add_strict_strict
-                 = ((Rational.halve(epsilon) + Rational.halve(epsilon) : Rational) : Real)
-                       by Rational.to_real.add_preserves(
-                              Rational.halve(epsilon), Rational.halve(epsilon))
-                 = (epsilon : Real)
-                       by Rational.halve_doubled(epsilon)
+                 = epsilon
+                       since Real.divide_two_doubled
             }
       }
 }
