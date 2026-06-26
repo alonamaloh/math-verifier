@@ -128,10 +128,12 @@ theorem Real.HasDerivativeAt.add (f g : Real → Real) (x fSlope gSlope : Real)
     claim (2 : Real) > 0 since Real.two_positive;
     claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
     claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
-    obtain ⟨fDelta, fDeltaProperties⟩ from fDerivative(epsilon / 2, halfPositive);
-    obtain ⟨fDeltaPositive, fClose⟩ from fDeltaProperties;
-    obtain ⟨gDelta, gDeltaProperties⟩ from gDerivative(epsilon / 2, halfPositive);
-    obtain ⟨gDeltaPositive, gClose⟩ from gDeltaProperties;
+    choose fDelta from fDerivative(epsilon / 2, halfPositive);
+    claim fClose : ∀ (y : Real). abs(y - x) < fDelta
+            → abs(f(y) - f(x) - fSlope * (y - x)) ≤ epsilon / 2 * abs(y - x);
+    choose gDelta from gDerivative(epsilon / 2, halfPositive);
+    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
+            → abs(g(y) - g(x) - gSlope * (y - x)) ≤ epsilon / 2 * abs(y - x);
     claim minimumPositive : min(fDelta, gDelta) > 0 since Real.minimum_positive;
     witness min(fDelta, gDelta) with
         ⟨minimumPositive,
@@ -216,16 +218,17 @@ theorem Real.HasDerivativeAt.scale (c : Real) (f : Real → Real) (x L : Real)
         : Real.HasDerivativeAt((y : Real) ↦ c * f(y), x, c * L) :=
   (epsilon : Real)
   (epsilonPositive : epsilon > 0) ↦ {
-    obtain ⟨roof, roofData⟩ from Real.exists_positive_rational_roof(c);
-    obtain ⟨roofPositive, roofBounds⟩ from roofData;
+    choose roof such that Rational.zero < roof ∧ abs(c) ≤ (roof : Real)
+        from Real.exists_positive_rational_roof(c);
     claim roofRealPositive : (roof : Real) > 0
         since Rational.to_real.positive_preserves;
     claim (roof : Real) ≠ 0 since Real.nonzero_of_positive;
     claim tolerancePositive : epsilon / (roof : Real) > 0
         since Real.divide_positive;
-    obtain ⟨delta, deltaProperties⟩
-        from fDerivative(epsilon / (roof : Real), tolerancePositive);
-    obtain ⟨deltaPositive, fClose⟩ from deltaProperties;
+    choose delta from fDerivative(epsilon / (roof : Real), tolerancePositive);
+    claim deltaPositive : delta > 0;
+    claim fClose : ∀ (y : Real). abs(y - x) < delta
+            → abs(f(y) - f(x) - L * (y - x)) ≤ epsilon / (roof : Real) * abs(y - x);
     witness delta with
         ⟨deltaPositive,
          (y : Real) (yClose : abs(y - x) < delta) ↦ {
@@ -260,8 +263,8 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
         : Real.ContinuousAt(f, x) :=
   (epsilon : Real)
   (epsilonPositive : epsilon > 0) ↦ {
-    obtain ⟨slopeRoof, slopeRoofData⟩ from Real.exists_positive_rational_roof(L);
-    obtain ⟨slopeRoofPositive, slopeRoofBounds⟩ from slopeRoofData;
+    choose slopeRoof from Real.exists_positive_rational_roof(L);
+    claim slopeRoofBounds : abs(L) ≤ (slopeRoof : Real);
     claim (1 : Real) > 0 since Real.zero_less_one;
     claim slopeRoofRealPositive : (slopeRoof : Real) > 0
         since Rational.to_real.positive_preserves;
@@ -273,9 +276,9 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
     claim Real.one + (slopeRoof : Real) ≠ 0 since Real.nonzero_of_positive;
     claim tolerancePositive : epsilon / (Real.one + (slopeRoof : Real)) > 0
         since Real.divide_positive;
-    obtain ⟨nearDelta, nearDeltaProperties⟩
-        from fDerivative(Real.one, Real.zero_less_one);
-    obtain ⟨nearDeltaPositive, fClose⟩ from nearDeltaProperties;
+    choose nearDelta from fDerivative(Real.one, Real.zero_less_one);
+    claim fClose : ∀ (y : Real). abs(y - x) < nearDelta
+            → abs(f(y) - f(x) - L * (y - x)) ≤ Real.one * abs(y - x);
     claim minimumPositive
           : min(nearDelta, epsilon / (Real.one + (slopeRoof : Real))) > 0
         since Real.minimum_positive;
@@ -397,18 +400,18 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
     claim differenceTolerancePositive : epsilon / 2 / 2 / slopeRoof > 0
         since Real.divide_positive;
     -- The four δs.
-    obtain ⟨fDelta, fDeltaProperties⟩
-        from fDerivative(epsilon / 2 / gHeadroom, fTolerancePositive);
-    obtain ⟨fDeltaPositive, fClose⟩ from fDeltaProperties;
-    obtain ⟨gDelta, gDeltaProperties⟩
-        from gDerivative(epsilon / 2 / 2 / fRoof, gTolerancePositive);
-    obtain ⟨gDeltaPositive, gClose⟩ from gDeltaProperties;
-    obtain ⟨nearDelta, nearDeltaProperties⟩
-        from gContinuous(Real.one, Real.zero_less_one);
-    obtain ⟨nearDeltaPositive, gNearClose⟩ from nearDeltaProperties;
-    obtain ⟨differenceDelta, differenceDeltaProperties⟩
+    choose fDelta from fDerivative(epsilon / 2 / gHeadroom, fTolerancePositive);
+    claim fClose : ∀ (y : Real). abs(y - x) < fDelta
+            → abs(f(y) - f(x) - fSlope * (y - x)) ≤ epsilon / 2 / gHeadroom * abs(y - x);
+    choose gDelta from gDerivative(epsilon / 2 / 2 / fRoof, gTolerancePositive);
+    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
+            → abs(g(y) - g(x) - gSlope * (y - x)) ≤ epsilon / 2 / 2 / fRoof * abs(y - x);
+    choose nearDelta from gContinuous(Real.one, Real.zero_less_one);
+    claim gNearClose : ∀ (y : Real). abs(y - x) < nearDelta → abs(g(y) - g(x)) < Real.one;
+    choose differenceDelta
         from gContinuous(epsilon / 2 / 2 / slopeRoof, differenceTolerancePositive);
-    obtain ⟨differenceDeltaPositive, gDifferenceClose⟩ from differenceDeltaProperties;
+    claim gDifferenceClose : ∀ (y : Real). abs(y - x) < differenceDelta
+            → abs(g(y) - g(x)) < epsilon / 2 / 2 / slopeRoof;
     claim min(fDelta, gDelta) > 0 since Real.minimum_positive;
     claim min(nearDelta, differenceDelta) > 0 since Real.minimum_positive;
     claim minimumPositive
@@ -615,12 +618,12 @@ theorem Real.HasDerivativeAt.unique (f : Real → Real) (x L1 L2 : Real)
         claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
         claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
         claim quarterPositive : epsilon / 2 / 2 > 0 since Real.divide_positive;
-        obtain ⟨delta1, delta1Properties⟩
-            from firstDerivative(epsilon / 2 / 2, quarterPositive);
-        obtain ⟨delta1Positive, firstClose⟩ from delta1Properties;
-        obtain ⟨delta2, delta2Properties⟩
-            from secondDerivative(epsilon / 2 / 2, quarterPositive);
-        obtain ⟨delta2Positive, secondClose⟩ from delta2Properties;
+        choose delta1 from firstDerivative(epsilon / 2 / 2, quarterPositive);
+        claim firstClose : ∀ (y : Real). abs(y - x) < delta1
+                → abs(f(y) - f(x) - L1 * (y - x)) ≤ epsilon / 2 / 2 * abs(y - x);
+        choose delta2 from secondDerivative(epsilon / 2 / 2, quarterPositive);
+        claim secondClose : ∀ (y : Real). abs(y - x) < delta2
+                → abs(f(y) - f(x) - L2 * (y - x)) ≤ epsilon / 2 / 2 * abs(y - x);
         claim minimumPositive : min(delta1, delta2) > 0 since Real.minimum_positive;
         -- Probing at any point x + d strictly inside the shared δ bounds
         -- the slope gap by ε/2.
