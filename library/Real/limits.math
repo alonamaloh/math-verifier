@@ -186,9 +186,10 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
     choose tRoof such that Rational.zero < tRoof ∧ abs(tLimit) ≤ (tRoof : Real)
         from Real.exists_positive_rational_roof;
     -- The quarter-ε budget for each piece, and the matching tolerances.
-    claim Rational.zero < Rational.halve(epsilon) since Rational.halve_positive;
-    claim Rational.zero < Rational.halve(Rational.halve(epsilon))
-        since Rational.halve_positive;
+    let halfEpsilon : Rational := Rational.halve(epsilon);
+    let quarterEpsilon : Rational := Rational.halve(halfEpsilon);
+    claim Rational.zero < halfEpsilon since Rational.halve_positive;
+    claim Rational.zero < quarterEpsilon since Rational.halve_positive;
     claim Rational.zero ≤ sRoof since Rational.LessThan.weaken;
     claim Rational.one + Rational.zero ≤ Rational.one + sRoof
         since Rational.add_general_LessOrEqual_left;
@@ -204,12 +205,12 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
         since Rational.reciprocal_function_positive_of_positive;
     claim tTolerancePositive
         : Rational.zero
-          < Rational.halve(Rational.halve(epsilon))
+          < quarterEpsilon
                 * Rational.reciprocal_function(Rational.one + sRoof)
         since Rational.multiply_positive_positive;
     claim sTolerancePositive
         : Rational.zero
-          < Rational.halve(Rational.halve(epsilon))
+          < quarterEpsilon
                 * Rational.reciprocal_function(tRoof)
         since Rational.multiply_positive_positive;
     -- Tail indices: s within one unit of its limit (for the roof), and
@@ -218,12 +219,12 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
         from sConverges(Rational.one, (Rational.zero < Rational.one));
     choose tThreshold as tClose
         from tConverges(
-                 Rational.halve(Rational.halve(epsilon))
+                 quarterEpsilon
                      * Rational.reciprocal_function(Rational.one + sRoof),
                  tTolerancePositive);
     choose sThreshold as sClose
         from sConverges(
-                 Rational.halve(Rational.halve(epsilon))
+                 quarterEpsilon
                      * Rational.reciprocal_function(tRoof),
                  sTolerancePositive);
     witness Natural.maximum(unitThreshold, Natural.maximum(tThreshold, sThreshold)) with
@@ -240,19 +241,19 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
           claim abs(s(m) - sLimit) ≤ (Rational.one : Real)
               since Real.LessThan.weaken;
           claim abs(t(m) - tLimit)
-                < ((Rational.halve(Rational.halve(epsilon))
+                < ((quarterEpsilon
                         * Rational.reciprocal_function(Rational.one + sRoof)) : Real)
               by tClose(m, (tThreshold ≤ m));
           claim abs(t(m) - tLimit)
-                ≤ ((Rational.halve(Rational.halve(epsilon))
+                ≤ ((quarterEpsilon
                         * Rational.reciprocal_function(Rational.one + sRoof)) : Real)
               since Real.LessThan.weaken;
           claim abs(s(m) - sLimit)
-                < ((Rational.halve(Rational.halve(epsilon))
+                < ((quarterEpsilon
                         * Rational.reciprocal_function(tRoof)) : Real)
               by sClose(m, (sThreshold ≤ m));
           claim abs(s(m) - sLimit)
-                ≤ ((Rational.halve(Rational.halve(epsilon))
+                ≤ ((quarterEpsilon
                         * Rational.reciprocal_function(tRoof)) : Real)
               since Real.LessThan.weaken;
           -- The roof over |s(m)|: one unit above the roof for |S|.
@@ -278,33 +279,33 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
              = abs(s(m)) * abs(t(m) - tLimit)
                    since Real.absolute_value_multiplicative
              ≤ ((Rational.one + sRoof) : Real)
-                   * ((Rational.halve(Rational.halve(epsilon))
+                   * ((quarterEpsilon
                            * Rational.reciprocal_function(Rational.one + sRoof)) : Real)
                    since Real.LessOrEqual.multiply_monotone_nonneg
              = (((Rational.one + sRoof)
-                     * (Rational.halve(Rational.halve(epsilon))
+                     * (quarterEpsilon
                             * Rational.reciprocal_function(Rational.one + sRoof))) : Real)
                    since Rational.to_real.multiply_preserves
-             = (Rational.halve(Rational.halve(epsilon)) : Real)
+             = (quarterEpsilon : Real)
                    since Rational.scale_reciprocal_collapse;
           calc abs(tLimit * (s(m) - sLimit))
              = abs(tLimit) * abs(s(m) - sLimit)
                    since Real.absolute_value_multiplicative
              ≤ (tRoof : Real)
-                   * ((Rational.halve(Rational.halve(epsilon))
+                   * ((quarterEpsilon
                            * Rational.reciprocal_function(tRoof)) : Real)
                    since Real.LessOrEqual.multiply_monotone_nonneg
              = ((tRoof
-                     * (Rational.halve(Rational.halve(epsilon))
+                     * (quarterEpsilon
                             * Rational.reciprocal_function(tRoof))) : Real)
                    since Rational.to_real.multiply_preserves
-             = (Rational.halve(Rational.halve(epsilon)) : Real)
+             = (quarterEpsilon : Real)
                    since Rational.scale_reciprocal_collapse;
           -- Assemble: split, triangle, two quarters, half < whole.
-          claim Rational.halve(epsilon) < epsilon
+          claim halfEpsilon < epsilon
               since Rational.halve_less_than_self;
           claim halfBelowEpsilon
-              : Rational.halve(epsilon) < (epsilon : Real)
+              : halfEpsilon < (epsilon : Real)
               since Rational.to_real.LessThan_preserves;
           calc abs(s(m) * t(m) - sLimit * tLimit)
              = abs(s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
@@ -313,16 +314,16 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
                            = s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
              ≤ abs(s(m) * (t(m) - tLimit)) + abs(tLimit * (s(m) - sLimit))
                    since Real.triangle_inequality
-             ≤ (Rational.halve(Rational.halve(epsilon)) : Real)
+             ≤ (quarterEpsilon : Real)
                    + abs(tLimit * (s(m) - sLimit))
                    since Real.add_preserves_LessOrEqual
-             ≤ (Rational.halve(Rational.halve(epsilon)) : Real)
-                   + (Rational.halve(Rational.halve(epsilon)) : Real)
+             ≤ (quarterEpsilon : Real)
+                   + (quarterEpsilon : Real)
                    since Real.add_preserves_LessOrEqual_left
-             = ((Rational.halve(Rational.halve(epsilon))
-                     + Rational.halve(Rational.halve(epsilon))) : Real)
+             = ((quarterEpsilon
+                     + quarterEpsilon) : Real)
                    since Rational.to_real.add_preserves
-             = (Rational.halve(epsilon) : Real)
+             = (halfEpsilon : Real)
                    since Rational.halve_doubled
              < (epsilon : Real)
                    since halfBelowEpsilon
