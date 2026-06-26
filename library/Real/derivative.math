@@ -62,9 +62,9 @@ import Real.minimum
 -- ----------------------------------------------------------------------
 -- f has derivative L at x.
 definition Real.HasDerivativeAt (f : Real → Real) (x L : Real) : Proposition :=
-  ∀ (epsilon : Real). Real.zero < epsilon →
+  ∀ (epsilon : Real). epsilon > 0 →
     ∃ (delta : Real).
-      Real.zero < delta ∧ ∀ (y : Real). abs(y - x) < delta
+      delta > 0 ∧ ∀ (y : Real). abs(y - x) < delta
             → abs(f(y) - f(x) - L * (y - x))
               ≤ epsilon * abs(y - x)
 
@@ -73,23 +73,23 @@ definition Real.HasDerivativeAt (f : Real → Real) (x L : Real) : Proposition :
 theorem Real.HasDerivativeAt.constant (c x : Real)
         : Real.HasDerivativeAt((y : Real) ↦ c, x, Real.zero) :=
   (epsilon : Real)
-  (epsilonPositive : Real.zero < epsilon) ↦
+  (epsilonPositive : epsilon > 0) ↦
     witness epsilon with
         ⟨epsilonPositive,
          (y : Real) (_ : abs(y - x) < epsilon) ↦ {
            claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
-           claim errorZero : abs(c - c - Real.zero * (y - x)) = Real.zero
-               by calc abs(c - c - Real.zero * (y - x))
-                     = abs(Real.zero)   by (c - c - Real.zero * (y - x) = Real.zero)
-                     = Real.zero        since Real.absolute_value_when_nonneg;
-           claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ epsilon since Real.LessThan.weaken;
+           claim errorZero : abs(c - c - 0 * (y - x)) = 0
+               by calc abs(c - c - 0 * (y - x))
+                     = abs(Real.zero)   by (c - c - 0 * (y - x) = 0)
+                     = 0                since Real.absolute_value_when_nonneg;
+           claim abs(y - x) ≥ 0 since Real.absolute_value_nonneg;
+           claim epsilon ≥ 0 since Real.LessThan.weaken;
            claim Real.IsNonneg(epsilon) since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(abs(y - x)) since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(epsilon * abs(y - x)) since Real.IsNonneg.multiply;
-           claim Real.zero ≤ epsilon * abs(y - x) since Real.LessOrEqual_zero_of_IsNonneg;
-           calc abs(c - c - Real.zero * (y - x))
-              = Real.zero            since errorZero
+           claim epsilon * abs(y - x) ≥ 0 since Real.LessOrEqual_zero_of_IsNonneg;
+           calc abs(c - c - 0 * (y - x))
+              = 0                    since errorZero
               ≤ epsilon * abs(y - x)
          }⟩
 
@@ -97,23 +97,23 @@ theorem Real.HasDerivativeAt.constant (c x : Real)
 theorem Real.HasDerivativeAt.identity (x : Real)
         : Real.HasDerivativeAt((y : Real) ↦ y, x, Real.one) :=
   (epsilon : Real)
-  (epsilonPositive : Real.zero < epsilon) ↦
+  (epsilonPositive : epsilon > 0) ↦
     witness epsilon with
         ⟨epsilonPositive,
          (y : Real) (_ : abs(y - x) < epsilon) ↦ {
            claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
-           claim errorZero : abs(y - x - Real.one * (y - x)) = Real.zero
-               by calc abs(y - x - Real.one * (y - x))
-                     = abs(Real.zero)   by (y - x - Real.one * (y - x) = Real.zero)
-                     = Real.zero        since Real.absolute_value_when_nonneg;
-           claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ epsilon since Real.LessThan.weaken;
+           claim errorZero : abs(y - x - 1 * (y - x)) = 0
+               by calc abs(y - x - 1 * (y - x))
+                     = abs(Real.zero)   by (y - x - 1 * (y - x) = 0)
+                     = 0                since Real.absolute_value_when_nonneg;
+           claim abs(y - x) ≥ 0 since Real.absolute_value_nonneg;
+           claim epsilon ≥ 0 since Real.LessThan.weaken;
            claim Real.IsNonneg(epsilon) since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(abs(y - x)) since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(epsilon * abs(y - x)) since Real.IsNonneg.multiply;
-           claim Real.zero ≤ epsilon * abs(y - x) since Real.LessOrEqual_zero_of_IsNonneg;
-           calc abs(y - x - Real.one * (y - x))
-              = Real.zero            since errorZero
+           claim epsilon * abs(y - x) ≥ 0 since Real.LessOrEqual_zero_of_IsNonneg;
+           calc abs(y - x - 1 * (y - x))
+              = 0                    since errorZero
               ≤ epsilon * abs(y - x)
          }⟩
 
@@ -124,15 +124,15 @@ theorem Real.HasDerivativeAt.add (f g : Real → Real) (x fSlope gSlope : Real)
         : Real.HasDerivativeAt(
               (y : Real) ↦ f(y) + g(y), x, fSlope + gSlope) :=
   (epsilon : Real)
-  (epsilonPositive : Real.zero < epsilon) ↦ {
-    claim Real.zero < (2 : Real) since Real.two_positive;
-    claim (2 : Real) ≠ Real.zero since Real.two_is_nonzero;
-    claim halfPositive : Real.zero < epsilon / 2 since Real.divide_positive;
+  (epsilonPositive : epsilon > 0) ↦ {
+    claim (2 : Real) > 0 since Real.two_positive;
+    claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
+    claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
     obtain ⟨fDelta, fDeltaProperties⟩ from fDerivative(epsilon / 2, halfPositive);
     obtain ⟨fDeltaPositive, fClose⟩ from fDeltaProperties;
     obtain ⟨gDelta, gDeltaProperties⟩ from gDerivative(epsilon / 2, halfPositive);
     obtain ⟨gDeltaPositive, gClose⟩ from gDeltaProperties;
-    claim minimumPositive : Real.zero < min(fDelta, gDelta) since Real.minimum_positive;
+    claim minimumPositive : min(fDelta, gDelta) > 0 since Real.minimum_positive;
     witness min(fDelta, gDelta) with
         ⟨minimumPositive,
          (y : Real)
@@ -174,9 +174,11 @@ theorem Real.HasDerivativeAt.negate (f : Real → Real) (x L : Real)
         (fDerivative : Real.HasDerivativeAt(f, x, L))
         : Real.HasDerivativeAt((y : Real) ↦ -f(y), x, -L) :=
   (epsilon : Real)
-  (epsilonPositive : Real.zero < epsilon) ↦ {
-    obtain ⟨delta, deltaProperties⟩ from fDerivative(epsilon, epsilonPositive);
-    obtain ⟨deltaPositive, fClose⟩ from deltaProperties;
+  (epsilonPositive : epsilon > 0) ↦ {
+    choose delta from fDerivative(epsilon, epsilonPositive);
+    claim deltaPositive : delta > 0;
+    claim fClose : ∀ (y : Real). abs(y - x) < delta
+            → abs(f(y) - f(x) - L * (y - x)) ≤ epsilon * abs(y - x);
     witness delta with
         ⟨deltaPositive,
          (y : Real) (yClose : abs(y - x) < delta) ↦ {
@@ -213,13 +215,13 @@ theorem Real.HasDerivativeAt.scale (c : Real) (f : Real → Real) (x L : Real)
         (fDerivative : Real.HasDerivativeAt(f, x, L))
         : Real.HasDerivativeAt((y : Real) ↦ c * f(y), x, c * L) :=
   (epsilon : Real)
-  (epsilonPositive : Real.zero < epsilon) ↦ {
+  (epsilonPositive : epsilon > 0) ↦ {
     obtain ⟨roof, roofData⟩ from Real.exists_positive_rational_roof(c);
     obtain ⟨roofPositive, roofBounds⟩ from roofData;
-    claim roofRealPositive : Real.zero < (roof : Real)
+    claim roofRealPositive : (roof : Real) > 0
         since Rational.to_real.positive_preserves;
-    claim (roof : Real) ≠ Real.zero since Real.nonzero_of_positive;
-    claim tolerancePositive : Real.zero < epsilon / (roof : Real)
+    claim (roof : Real) ≠ 0 since Real.nonzero_of_positive;
+    claim tolerancePositive : epsilon / (roof : Real) > 0
         since Real.divide_positive;
     obtain ⟨delta, deltaProperties⟩
         from fDerivative(epsilon / (roof : Real), tolerancePositive);
@@ -227,8 +229,8 @@ theorem Real.HasDerivativeAt.scale (c : Real) (f : Real → Real) (x L : Real)
     witness delta with
         ⟨deltaPositive,
          (y : Real) (yClose : abs(y - x) < delta) ↦ {
-           claim Real.zero ≤ abs(c) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ abs(f(y) - f(x) - L * (y - x))
+           claim abs(c) ≥ 0 since Real.absolute_value_nonneg;
+           claim abs(f(y) - f(x) - L * (y - x)) ≥ 0
                since Real.absolute_value_nonneg;
            claim abs(f(y) - f(x) - L * (y - x))
                    ≤ epsilon / (roof : Real) * abs(y - x)
@@ -257,25 +259,25 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
         (fDerivative : Real.HasDerivativeAt(f, x, L))
         : Real.ContinuousAt(f, x) :=
   (epsilon : Real)
-  (epsilonPositive : Real.zero < epsilon) ↦ {
+  (epsilonPositive : epsilon > 0) ↦ {
     obtain ⟨slopeRoof, slopeRoofData⟩ from Real.exists_positive_rational_roof(L);
     obtain ⟨slopeRoofPositive, slopeRoofBounds⟩ from slopeRoofData;
-    claim Real.zero < Real.one since Real.zero_less_one;
-    claim slopeRoofRealPositive : Real.zero < (slopeRoof : Real)
+    claim (1 : Real) > 0 since Real.zero_less_one;
+    claim slopeRoofRealPositive : (slopeRoof : Real) > 0
         since Rational.to_real.positive_preserves;
-    claim boundPositive : Real.zero < Real.one + (slopeRoof : Real)
+    claim boundPositive : Real.one + (slopeRoof : Real) > 0
         by calc Real.zero
               < Real.one                          since Real.zero_less_one
-              = Real.one + Real.zero
+              = Real.one + 0
               < Real.one + (slopeRoof : Real)     since Real.add_left_preserves_LessThan;
-    claim Real.one + (slopeRoof : Real) ≠ Real.zero since Real.nonzero_of_positive;
-    claim tolerancePositive : Real.zero < epsilon / (Real.one + (slopeRoof : Real))
+    claim Real.one + (slopeRoof : Real) ≠ 0 since Real.nonzero_of_positive;
+    claim tolerancePositive : epsilon / (Real.one + (slopeRoof : Real)) > 0
         since Real.divide_positive;
     obtain ⟨nearDelta, nearDeltaProperties⟩
         from fDerivative(Real.one, Real.zero_less_one);
     obtain ⟨nearDeltaPositive, fClose⟩ from nearDeltaProperties;
     claim minimumPositive
-          : Real.zero < min(nearDelta, epsilon / (Real.one + (slopeRoof : Real)))
+          : min(nearDelta, epsilon / (Real.one + (slopeRoof : Real))) > 0
         since Real.minimum_positive;
     witness min(nearDelta, epsilon / (Real.one + (slopeRoof : Real)))
         with
@@ -298,7 +300,7 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
                      ≤ epsilon / (Real.one + (slopeRoof : Real));
            claim abs(f(y) - f(x) - L * (y - x)) ≤ Real.one * abs(y - x)
                by fClose(y, yCloseNear);
-           claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
+           claim abs(y - x) ≥ 0 since Real.absolute_value_nonneg;
            claim abs(L) ≤ (slopeRoof : Real) since slopeRoofBounds;
            claim abs(L) * abs(y - x) ≤ (slopeRoof : Real) * abs(y - x)
                since Real.LessOrEqual.multiply_by_nonneg_right;
@@ -344,55 +346,55 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
         : Real.HasDerivativeAt(
               (y : Real) ↦ f(y) * g(y), x, fSlope * g(x) + f(x) * gSlope) :=
   (epsilon : Real)
-  (epsilonPositive : Real.zero < epsilon) ↦ {
+  (epsilonPositive : epsilon > 0) ↦ {
     claim gContinuous : Real.ContinuousAt(g, x) since Real.HasDerivativeAt.continuous;
     -- Real roofs over the three bystander factors, each with headroom.
-    let gHeadroom : Real := abs(g(x)) + Real.one + Real.one;
-    let fRoof : Real := abs(f(x)) + Real.one;
-    let slopeRoof : Real := abs(fSlope) + Real.one;
-    claim Real.zero < Real.one since Real.zero_less_one;
-    claim Real.zero ≤ Real.one since Real.LessThan.weaken;
-    claim Real.zero ≤ abs(g(x)) since Real.absolute_value_nonneg;
-    claim Real.zero ≤ abs(f(x)) since Real.absolute_value_nonneg;
-    claim Real.zero ≤ abs(fSlope) since Real.absolute_value_nonneg;
-    claim gHeadroomPositive : Real.zero < gHeadroom
+    let gHeadroom : Real := abs(g(x)) + 1 + 1;
+    let fRoof : Real := abs(f(x)) + 1;
+    let slopeRoof : Real := abs(fSlope) + 1;
+    claim (1 : Real) > 0 since Real.zero_less_one;
+    claim (1 : Real) ≥ 0 since Real.LessThan.weaken;
+    claim abs(g(x)) ≥ 0 since Real.absolute_value_nonneg;
+    claim abs(f(x)) ≥ 0 since Real.absolute_value_nonneg;
+    claim abs(fSlope) ≥ 0 since Real.absolute_value_nonneg;
+    claim gHeadroomPositive : gHeadroom > 0
         by calc Real.zero
               ≤ abs(g(x))
-              = abs(g(x)) + Real.zero
-              < abs(g(x)) + Real.one              since Real.add_left_preserves_LessThan
-              = (abs(g(x)) + Real.one) + Real.zero
-              < (abs(g(x)) + Real.one) + Real.one since Real.add_left_preserves_LessThan;
-    claim fRoofPositive : Real.zero < fRoof
+              = abs(g(x)) + 0
+              < abs(g(x)) + 1              since Real.add_left_preserves_LessThan
+              = (abs(g(x)) + 1) + 0
+              < (abs(g(x)) + 1) + 1 since Real.add_left_preserves_LessThan;
+    claim fRoofPositive : fRoof > 0
         by calc Real.zero
               ≤ abs(f(x))
-              = abs(f(x)) + Real.zero
-              < abs(f(x)) + Real.one              since Real.add_left_preserves_LessThan;
-    claim slopeRoofPositive : Real.zero < slopeRoof
+              = abs(f(x)) + 0
+              < abs(f(x)) + 1              since Real.add_left_preserves_LessThan;
+    claim slopeRoofPositive : slopeRoof > 0
         by calc Real.zero
               ≤ abs(fSlope)
-              = abs(fSlope) + Real.zero
-              < abs(fSlope) + Real.one            since Real.add_left_preserves_LessThan;
+              = abs(fSlope) + 0
+              < abs(fSlope) + 1            since Real.add_left_preserves_LessThan;
     claim fRoofBound : abs(f(x)) ≤ fRoof
         by calc abs(f(x))
-              = abs(f(x)) + Real.zero
-              ≤ abs(f(x)) + Real.one              since Real.add_preserves_LessOrEqual_left;
+              = abs(f(x)) + 0
+              ≤ abs(f(x)) + 1              since Real.add_preserves_LessOrEqual_left;
     claim slopeRoofBound : abs(fSlope) ≤ slopeRoof
         by calc abs(fSlope)
-              = abs(fSlope) + Real.zero
-              ≤ abs(fSlope) + Real.one            since Real.add_preserves_LessOrEqual_left;
-    claim gHeadroom ≠ Real.zero since Real.nonzero_of_positive;
-    claim fRoof ≠ Real.zero since Real.nonzero_of_positive;
-    claim slopeRoof ≠ Real.zero since Real.nonzero_of_positive;
+              = abs(fSlope) + 0
+              ≤ abs(fSlope) + 1            since Real.add_preserves_LessOrEqual_left;
+    claim gHeadroom ≠ 0 since Real.nonzero_of_positive;
+    claim fRoof ≠ 0 since Real.nonzero_of_positive;
+    claim slopeRoof ≠ 0 since Real.nonzero_of_positive;
     -- The three scaled tolerances, all positive.
-    claim Real.zero < (2 : Real) since Real.two_positive;
-    claim (2 : Real) ≠ Real.zero since Real.two_is_nonzero;
-    claim halfPositive : Real.zero < epsilon / 2 since Real.divide_positive;
-    claim quarterPositive : Real.zero < epsilon / 2 / 2 since Real.divide_positive;
-    claim fTolerancePositive : Real.zero < epsilon / 2 / gHeadroom
+    claim (2 : Real) > 0 since Real.two_positive;
+    claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
+    claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
+    claim quarterPositive : epsilon / 2 / 2 > 0 since Real.divide_positive;
+    claim fTolerancePositive : epsilon / 2 / gHeadroom > 0
         since Real.divide_positive;
-    claim gTolerancePositive : Real.zero < epsilon / 2 / 2 / fRoof
+    claim gTolerancePositive : epsilon / 2 / 2 / fRoof > 0
         since Real.divide_positive;
-    claim differenceTolerancePositive : Real.zero < epsilon / 2 / 2 / slopeRoof
+    claim differenceTolerancePositive : epsilon / 2 / 2 / slopeRoof > 0
         since Real.divide_positive;
     -- The four δs.
     obtain ⟨fDelta, fDeltaProperties⟩
@@ -407,10 +409,10 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
     obtain ⟨differenceDelta, differenceDeltaProperties⟩
         from gContinuous(epsilon / 2 / 2 / slopeRoof, differenceTolerancePositive);
     obtain ⟨differenceDeltaPositive, gDifferenceClose⟩ from differenceDeltaProperties;
-    claim Real.zero < min(fDelta, gDelta) since Real.minimum_positive;
-    claim Real.zero < min(nearDelta, differenceDelta) since Real.minimum_positive;
+    claim min(fDelta, gDelta) > 0 since Real.minimum_positive;
+    claim min(nearDelta, differenceDelta) > 0 since Real.minimum_positive;
     claim minimumPositive
-          : Real.zero < min(min(fDelta, gDelta), min(nearDelta, differenceDelta))
+          : min(min(fDelta, gDelta), min(nearDelta, differenceDelta)) > 0
         since Real.minimum_positive;
     witness min(min(fDelta, gDelta), min(nearDelta, differenceDelta)) with
         ⟨minimumPositive,
@@ -473,18 +475,18 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
                by gDifferenceClose(y, yCloseDifference);
            claim abs(g(y) - g(x)) ≤ epsilon / 2 / 2 / slopeRoof since Real.LessThan.weaken;
            -- Nonnegativity bookkeeping.
-           claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ abs(g(y)) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ abs(f(x)) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ abs(fSlope) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ abs(f(y) - f(x) - fSlope * (y - x)) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ abs(g(y) - g(x) - gSlope * (y - x)) since Real.absolute_value_nonneg;
-           claim Real.zero ≤ abs(g(y) - g(x)) since Real.absolute_value_nonneg;
+           claim abs(y - x) ≥ 0 since Real.absolute_value_nonneg;
+           claim abs(g(y)) ≥ 0 since Real.absolute_value_nonneg;
+           claim abs(f(x)) ≥ 0 since Real.absolute_value_nonneg;
+           claim abs(fSlope) ≥ 0 since Real.absolute_value_nonneg;
+           claim abs(f(y) - f(x) - fSlope * (y - x)) ≥ 0 since Real.absolute_value_nonneg;
+           claim abs(g(y) - g(x) - gSlope * (y - x)) ≥ 0 since Real.absolute_value_nonneg;
+           claim abs(g(y) - g(x)) ≥ 0 since Real.absolute_value_nonneg;
            claim abs(y - x) ≤ abs(y - x) since Real.LessOrEqual.reflexive;
            claim Real.IsNonneg(abs(y - x)) since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(abs(g(y) - g(x))) since Real.IsNonneg_of_LessOrEqual_zero;
            claim Real.IsNonneg(abs(y - x) * abs(g(y) - g(x))) since Real.IsNonneg.multiply;
-           claim Real.zero ≤ abs(y - x) * abs(g(y) - g(x))
+           claim abs(y - x) * abs(g(y) - g(x)) ≥ 0
                since Real.LessOrEqual_zero_of_IsNonneg;
            -- The three tolerance collapses.
            claim collapseFirst : gHeadroom * (epsilon / 2 / gHeadroom) = epsilon / 2
@@ -585,13 +587,13 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
 -- From `∀ε > 0. |x| < ε` over the REALS, conclude x = 0. Restrict to
 -- rational ε and hand off to the Cauchy-level lemma.
 theorem Real.eq_of_absolute_value_less_than_all_positive_real (x : Real)
-        (hypothesis : ∀ (epsilon : Real). Real.zero < epsilon → abs(x) < epsilon)
+        (hypothesis : ∀ (epsilon : Real). epsilon > 0 → abs(x) < epsilon)
         : x = Real.zero := {
   claim ∀ (epsilon : Rational). Rational.zero < epsilon → abs(x) < (epsilon : Real)
       by {
         take epsilon : Rational;
         take epsilonPositive : Rational.zero < epsilon;
-        claim epsilonRealPositive : Real.zero < (epsilon : Real)
+        claim epsilonRealPositive : (epsilon : Real) > 0
             since Rational.to_real.positive_preserves;
         done by hypothesis((epsilon : Real), epsilonRealPositive)
       };
@@ -605,30 +607,30 @@ theorem Real.HasDerivativeAt.unique (f : Real → Real) (x L1 L2 : Real)
         (firstDerivative : Real.HasDerivativeAt(f, x, L1))
         (secondDerivative : Real.HasDerivativeAt(f, x, L2))
         : L1 = L2 := {
-  claim ∀ (epsilon : Real). Real.zero < epsilon → abs(L1 - L2) < epsilon
+  claim ∀ (epsilon : Real). epsilon > 0 → abs(L1 - L2) < epsilon
       by {
         take epsilon : Real;
-        take epsilonPositive : Real.zero < epsilon;
-        claim Real.zero < (2 : Real) since Real.two_positive;
-        claim (2 : Real) ≠ Real.zero since Real.two_is_nonzero;
-        claim halfPositive : Real.zero < epsilon / 2 since Real.divide_positive;
-        claim quarterPositive : Real.zero < epsilon / 2 / 2 since Real.divide_positive;
+        take epsilonPositive : epsilon > 0;
+        claim (2 : Real) > 0 since Real.two_positive;
+        claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
+        claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
+        claim quarterPositive : epsilon / 2 / 2 > 0 since Real.divide_positive;
         obtain ⟨delta1, delta1Properties⟩
             from firstDerivative(epsilon / 2 / 2, quarterPositive);
         obtain ⟨delta1Positive, firstClose⟩ from delta1Properties;
         obtain ⟨delta2, delta2Properties⟩
             from secondDerivative(epsilon / 2 / 2, quarterPositive);
         obtain ⟨delta2Positive, secondClose⟩ from delta2Properties;
-        claim minimumPositive : Real.zero < min(delta1, delta2) since Real.minimum_positive;
+        claim minimumPositive : min(delta1, delta2) > 0 since Real.minimum_positive;
         -- Probing at any point x + d strictly inside the shared δ bounds
         -- the slope gap by ε/2.
-        claim probe : ∀ (d : Real). Real.zero < d → d < min(delta1, delta2)
+        claim probe : ∀ (d : Real). d > 0 → d < min(delta1, delta2)
                       → abs(L1 - L2) ≤ epsilon / 2
             by {
               take d : Real;
-              take dPositive : Real.zero < d;
+              take dPositive : d > 0;
               take dSmall : d < min(delta1, delta2);
-              claim Real.zero ≤ d since Real.LessThan.weaken;
+              claim d ≥ 0 since Real.LessThan.weaken;
               claim Real.IsNonneg(d) since Real.IsNonneg_of_LessOrEqual_zero;
               claim distanceEquation : abs(x + d - x) = d
                   by calc abs(x + d - x)
@@ -690,7 +692,7 @@ theorem Real.HasDerivativeAt.unique (f : Real → Real) (x L1 L2 : Real)
                           d, abs(L1 - L2), epsilon / 2, dPositive, commuted)
             };
         -- Instantiate the probe at half the shared δ and squeeze.
-        claim probeValuePositive : Real.zero < min(delta1, delta2) / 2
+        claim probeValuePositive : min(delta1, delta2) / 2 > 0
             since Real.divide_positive;
         claim probeValueSmall : min(delta1, delta2) / 2 < min(delta1, delta2)
             since Real.divide_two_less_than_self;
