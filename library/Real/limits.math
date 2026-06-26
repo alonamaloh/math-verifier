@@ -44,6 +44,7 @@ import Real.linearity
 import Real.absolute_value
 import Real.absolute_value_order
 import Real.order_multiplication
+import Real.division
 import Real.density
 import Real.embedding_order
 import Real.convergence
@@ -53,20 +54,17 @@ import Real.supremum
 -- Constant sequences converge to their value.
 theorem Real.constant_sequence_converges (c : Real)
         : Real.SequenceConverges((n : Natural) ↦ c, c) :=
-  (epsilon : Rational)
-  (epsilonPositive : Rational.zero < epsilon) ↦
+  (epsilon : Real)
+  (epsilonPositive : epsilon > 0) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦ {
+        (m : Natural) (_ : 0 ≤ m) ↦
           calc abs(c - c)
              = abs(Real.zero)
                    by substituting (ring : c - c = Real.zero)
              = Real.zero
                    since Real.absolute_value_when_nonneg
-              as distanceZero;
-          claim Real.zero < epsilon
-              since Rational.to_real.positive_preserves;
-          done by substituting distanceZero
-        }
+             < epsilon
+                   since epsilonPositive
 
 -- ----------------------------------------------------------------------
 -- Sum of limits: each summand within ε/2 puts the sum within ε.
@@ -75,23 +73,20 @@ theorem Real.SequenceConverges.add (s t : Natural → Real)
         (sConverges : Real.SequenceConverges(s, sLimit))
         (tConverges : Real.SequenceConverges(t, tLimit))
         : Real.SequenceConverges((n : Natural) ↦ s(n) + t(n), sLimit + tLimit) :=
-  (epsilon : Rational)
-  (epsilonPositive : Rational.zero < epsilon) ↦ {
-    claim halfPositive : Rational.zero < Rational.halve(epsilon)
-        since Rational.halve_positive;
+  (epsilon : Real)
+  (epsilonPositive : epsilon > 0) ↦ {
+    claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
     choose sThreshold as sClose
-        from sConverges(Rational.halve(epsilon), halfPositive);
+        from sConverges(epsilon / 2, halfPositive);
     choose tThreshold as tClose
-        from tConverges(Rational.halve(epsilon), halfPositive);
+        from tConverges(epsilon / 2, halfPositive);
     witness Natural.maximum(sThreshold, tThreshold) with
         (m : Natural)
         (aboveMaximum : Natural.maximum(sThreshold, tThreshold) ≤ m) ↦ {
           claim sAbove : sThreshold ≤ m since Natural.le_through_max_left;
           claim tAbove : tThreshold ≤ m since Natural.le_through_max_right;
-          claim abs(s(m) - sLimit) < Rational.halve(epsilon)
-              by sClose(m, sAbove);
-          claim abs(t(m) - tLimit) < Rational.halve(epsilon)
-              by tClose(m, tAbove);
+          claim abs(s(m) - sLimit) < epsilon / 2 by sClose(m, sAbove);
+          claim abs(t(m) - tLimit) < epsilon / 2 by tClose(m, tAbove);
           calc abs((s(m) + t(m)) - (sLimit + tLimit))
              = abs((s(m) - sLimit) + (t(m) - tLimit))
                    by substituting
@@ -99,12 +94,10 @@ theorem Real.SequenceConverges.add (s t : Natural → Real)
                            = (s(m) - sLimit) + (t(m) - tLimit))
              ≤ abs(s(m) - sLimit) + abs(t(m) - tLimit)
                    by Real.triangle_inequality
-             < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
+             < epsilon / 2 + epsilon / 2
                    since Real.LessThan.add_strict_strict
-             = ((Rational.halve(epsilon) + Rational.halve(epsilon) : Rational) : Real)
-                   since Rational.to_real.add_preserves
-             = (epsilon : Real)
-                   since Rational.halve_doubled
+             = epsilon
+                   since Real.divide_two_doubled
         }
   }
 
@@ -112,8 +105,8 @@ theorem Real.SequenceConverges.add (s t : Natural → Real)
 theorem Real.SequenceConverges.negate (s : Natural → Real) (sLimit : Real)
         (sConverges : Real.SequenceConverges(s, sLimit))
         : Real.SequenceConverges((n : Natural) ↦ -s(n), -sLimit) :=
-  (epsilon : Rational)
-  (epsilonPositive : Rational.zero < epsilon) ↦ {
+  (epsilon : Real)
+  (epsilonPositive : epsilon > 0) ↦ {
     choose threshold as close from sConverges(epsilon, epsilonPositive);
     witness threshold with
         (m : Natural) (aboveThreshold : threshold ≤ m) ↦
@@ -123,7 +116,7 @@ theorem Real.SequenceConverges.negate (s : Natural → Real) (sLimit : Real)
                        (ring : -s(m) - -sLimit = -(s(m) - sLimit))
              = abs(s(m) - sLimit)
                    since Real.absolute_value_negate
-             < (epsilon : Real)
+             < epsilon
   }
 
 -- ----------------------------------------------------------------------
@@ -134,14 +127,14 @@ theorem Real.SequenceConverges.of_pointwise (s t : Natural → Real)
         (pointwiseEqual : ∀ (n : Natural). s(n) = t(n))
         (sConverges : Real.SequenceConverges(s, limit))
         : Real.SequenceConverges(t, limit) :=
-  (epsilon : Rational)
-  (epsilonPositive : Rational.zero < epsilon) ↦ {
+  (epsilon : Real)
+  (epsilonPositive : epsilon > 0) ↦ {
     choose threshold as close from sConverges(epsilon, epsilonPositive);
     witness threshold with
         (m : Natural) (aboveThreshold : threshold ≤ m) ↦
           calc abs(t(m) - limit)
              = abs(s(m) - limit)    by pointwiseEqual(m)
-             < (epsilon : Real)
+             < epsilon
   }
 
 -- The squeeze at zero: a sequence dominated in absolute value by one
@@ -150,8 +143,8 @@ theorem Real.SequenceConverges.squeeze_zero (v u : Natural → Real)
         (dominated : ∀ (n : Natural). abs(v(n)) ≤ u(n))
         (uVanishes : Real.SequenceConverges(u, Real.zero))
         : Real.SequenceConverges(v, Real.zero) :=
-  (epsilon : Rational)
-  (epsilonPositive : Rational.zero < epsilon) ↦ {
+  (epsilon : Real)
+  (epsilonPositive : epsilon > 0) ↦ {
     choose threshold as close from uVanishes(epsilon, epsilonPositive);
     witness threshold with
         (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
@@ -163,7 +156,7 @@ theorem Real.SequenceConverges.squeeze_zero (v u : Natural → Real)
              ≤ abs(u(m))
              = abs(u(m) - Real.zero)
                    by substituting (ring : u(m) - Real.zero = u(m))
-             < (epsilon : Real)
+             < epsilon
         }
   }
 
@@ -178,6 +171,10 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
         (sConverges : Real.SequenceConverges(s, sLimit))
         (tConverges : Real.SequenceConverges(t, tLimit))
         : Real.SequenceConverges((n : Natural) ↦ s(n) * t(n), sLimit * tLimit) :=
+  -- The error estimate is carried in rational roofs and ε/4 tolerances, so
+  -- the construction is done at a rational tolerance and lifted by density.
+  Real.SequenceConverges.of_rational(
+      (n : Natural) ↦ s(n) * t(n), sLimit * tLimit,
   (epsilon : Rational)
   (epsilonPositive : Rational.zero < epsilon) ↦ {
     -- Rational roofs over the two limits.
@@ -216,14 +213,15 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
     -- Tail indices: s within one unit of its limit (for the roof), and
     -- each sequence within its tolerance.
     choose unitThreshold as sUnitClose
-        from sConverges(Rational.one, (Rational.zero < Rational.one));
+        from Real.SequenceConverges.at_rational(s, sLimit, sConverges)(
+                 Rational.one, (Rational.zero < Rational.one));
     choose tThreshold as tClose
-        from tConverges(
+        from Real.SequenceConverges.at_rational(t, tLimit, tConverges)(
                  quarterEpsilon
                      * Rational.reciprocal_function(Rational.one + sRoof),
                  tTolerancePositive);
     choose sThreshold as sClose
-        from sConverges(
+        from Real.SequenceConverges.at_rational(s, sLimit, sConverges)(
                  quarterEpsilon
                      * Rational.reciprocal_function(tRoof),
                  sTolerancePositive);
@@ -328,7 +326,7 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
              < (epsilon : Real)
                    since halfBelowEpsilon
         }
-  }
+  })
 
 -- ----------------------------------------------------------------------
 -- Monotone convergence. The range of the sequence, as a set.
@@ -390,13 +388,11 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
             Real.IsUpperBound(Real.sequence_range(s), otherBound)
           → limit ≤ otherBound;
   witness limit with
-      (epsilon : Rational)
-      (epsilonPositive : Rational.zero < epsilon) ↦ {
-        claim Real.zero < epsilon
-            since Rational.to_real.positive_preserves;
+      (epsilon : Real)
+      (epsilonPositive : epsilon > 0) ↦ {
         -- Some term rises above limit − ε; otherwise limit − ε would be a
         -- smaller upper bound than the least one.
-        decide ∃ (N : Natural). limit - (epsilon : Real) < s(N) {
+        decide ∃ (N : Natural). limit - epsilon < s(N) {
           | yes termAboveExists => {
               choose N as termAbove from termAboveExists;
               witness N with
@@ -411,9 +407,9 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
                     calc s(m) - limit
                        ≤ limit - limit     since Real.add_preserves_LessOrEqual
                        = Real.zero
-                       < (epsilon : Real);
-                    calc -(epsilon : Real)
-                       = (limit - (epsilon : Real)) - limit
+                       < epsilon;
+                    calc -epsilon
+                       = (limit - epsilon) - limit
                        < s(m) - limit      since Real.add_preserves_LessThan;
                     done since Real.absolute_value_LessThan_of_bounds
                   }
@@ -422,7 +418,7 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
               claim Real.IsUpperBound(Real.sequence_range(s),
                         limit - epsilon)
                   since Real.upper_bound_of_no_term_above;
-              claim limit ≤ limit - (epsilon : Real);
+              claim limit ≤ limit - epsilon;
               claim limit - epsilon < limit
                   since Real.subtract_positive_LessThan;
               claim limit < limit since Real.LessThan.transitive_left;
@@ -442,14 +438,14 @@ theorem Real.SequenceConverges.pointwise
         (pointwiseEqual : ∀ (n : Natural). s(n) = sequencePrime(n))
         (primeConverges : Real.SequenceConverges(sequencePrime, limit))
         : Real.SequenceConverges(s, limit) :=
-  (epsilon : Rational)
-  (epsilonPositive : Rational.zero < epsilon) ↦ {
+  (epsilon : Real)
+  (epsilonPositive : epsilon > 0) ↦ {
     choose N as close from primeConverges(epsilon, epsilonPositive);
     witness N with
         (m : Natural) (aboveThreshold : N ≤ m) ↦
           calc abs(s(m) - limit)
              = abs(sequencePrime(m) - limit)   by substituting pointwiseEqual(m)
-             < (epsilon : Real)
+             < epsilon
   }
 
 -- ----------------------------------------------------------------------
@@ -482,7 +478,9 @@ theorem Real.SequenceConverges.le_of_eventually_le
            claim epsilonPositive : Rational.zero < epsilon by And.left(epsilonData);
            claim epsilon < (limit - bound)
                by And.right(epsilonData);
-           choose M as tailClose from converges(epsilon, epsilonPositive);
+           choose M as tailClose
+               from Real.SequenceConverges.at_rational(s, limit, converges)(
+                        epsilon, epsilonPositive);
            claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
            claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
            claim s(Natural.maximum(N, M)) ≤ bound;
@@ -533,7 +531,9 @@ theorem Real.SequenceConverges.ge_of_eventually_ge
            claim epsilonPositive : Rational.zero < epsilon by And.left(epsilonData);
            claim epsilon < (bound - limit)
                by And.right(epsilonData);
-           choose M as tailClose from converges(epsilon, epsilonPositive);
+           choose M as tailClose
+               from Real.SequenceConverges.at_rational(s, limit, converges)(
+                        epsilon, epsilonPositive);
            claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
            claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
            claim bound ≤ s(Natural.maximum(N, M));

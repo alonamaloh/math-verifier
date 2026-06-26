@@ -35,6 +35,8 @@ import Rational.triangle_more
 import Real.sequence
 import Real.basics
 import Real.embedding
+import Real.embedding_order
+import Real.density
 import Real.addition
 import Real.negation
 import Real.multiplication
@@ -45,12 +47,14 @@ import Real.absolute_value
 
 -- ----------------------------------------------------------------------
 -- ε–N convergence: `s : Natural → Real` converges to `limit : Real`
--- iff for every positive Rational ε, eventually every term of `s` is
--- within ε of the limit (with ε embedded into Real for the comparison).
+-- iff for every positive Real ε, eventually every term of `s` is within
+-- ε of the limit. (ε is a real number, as in continuity and the
+-- derivative; the bridges below mediate the rational tolerances the
+-- Cauchy-rep machinery still speaks.)
 
 definition Real.SequenceConverges
         (s : Natural → Real) (limit : Real) : Proposition :=
-  ∀ (epsilon : Rational). Rational.zero < epsilon →
+  ∀ (epsilon : Real). epsilon > 0 →
     ∃ (N : Natural).
       ∀ (m : Natural). N ≤ m →
         abs(s(m) - limit) < epsilon
@@ -58,6 +62,53 @@ definition Real.SequenceConverges
 -- A sequence is convergent iff some Real is its limit.
 definition Real.SequenceConvergent (s : Natural → Real) : Proposition :=
   ∃ (limit : Real). Real.SequenceConverges(s, limit)
+
+-- ----------------------------------------------------------------------
+-- Bridges between the Real-ε definition and the rational tolerances the
+-- Cauchy-rep machinery speaks. `at_rational` reads a convergence at a
+-- positive rational tolerance (embed it into ℝ); `of_rational` builds a
+-- convergence from a rational-ε bound, using density to slip a rational
+-- under any positive real ε.
+
+-- Convergence holds at every positive RATIONAL tolerance too: instantiate
+-- the Real-ε definition at the embedded rational.
+theorem Real.SequenceConverges.at_rational
+        (s : Natural → Real) (limit : Real)
+        (converges : Real.SequenceConverges(s, limit))
+        : ∀ (epsilon : Rational). Rational.zero < epsilon →
+            ∃ (N : Natural).
+              ∀ (m : Natural). N ≤ m →
+                abs(s(m) - limit) < (epsilon : Real) :=
+  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+    claim (epsilon : Real) > 0 since Rational.to_real.positive_preserves;
+    done by converges((epsilon : Real))
+  }
+
+-- A rational-ε bound suffices for Real-ε convergence: given ε > 0, density
+-- supplies a rational q with 0 < q < ε, and the rational bound at q lands
+-- every tail term below q, hence below ε.
+theorem Real.SequenceConverges.of_rational
+        (s : Natural → Real) (limit : Real)
+        (rationalBound : ∀ (epsilon : Rational). Rational.zero < epsilon →
+            ∃ (N : Natural).
+              ∀ (m : Natural). N ≤ m →
+                abs(s(m) - limit) < (epsilon : Real))
+        : Real.SequenceConverges(s, limit) :=
+  (epsilon : Real) (epsilonPositive : epsilon > 0) ↦ {
+    choose q such that Rational.zero < q ∧ (q : Real) < epsilon
+        as qData
+        from Real.exists_positive_rational_below(epsilon, epsilonPositive);
+    claim qPositive : Rational.zero < q;
+    claim qBelowEpsilon : (q : Real) < epsilon;
+    choose N as boundAtN from rationalBound(q, qPositive);
+    witness N with {
+      take m : Natural;
+      take N_leq_m : N ≤ m;
+      calc abs(s(m) - limit)
+         < (q : Real)        by boundAtN(m, N_leq_m)
+         < epsilon           since qBelowEpsilon
+    }
+  }
 
 -- ----------------------------------------------------------------------
 -- "If |x| < ε for every positive ε, then x = 0" — the analytic
@@ -231,9 +282,11 @@ theorem Real.SequenceConverges.unique
       take epsilonPositive : Rational.zero < epsilon;
       claim halvedEpsilonPositive : Rational.zero < Rational.halve(epsilon);
       choose N1 as boundFromL1
-          from convergesToL1(Rational.halve(epsilon), halvedEpsilonPositive);
+          from Real.SequenceConverges.at_rational(s, L1, convergesToL1)(
+                   Rational.halve(epsilon), halvedEpsilonPositive);
       choose N2 as boundFromL2
-          from convergesToL2(Rational.halve(epsilon), halvedEpsilonPositive);
+          from Real.SequenceConverges.at_rational(s, L2, convergesToL2)(
+                   Rational.halve(epsilon), halvedEpsilonPositive);
       let m : Natural := Natural.maximum(N1, N2);
       claim N1 ≤ m since Natural.left_le_max;
       claim N2 ≤ m since Natural.right_le_max;
@@ -252,6 +305,7 @@ theorem Real.SequenceConverges.unique
          ≤ abs(L1 - s(m)) + abs(s(m) - L2)
          < (Rational.halve(epsilon) : Real)
              + (Rational.halve(epsilon) : Real)
+                 since Real.LessThan.add_strict_strict
          = ((Rational.halve(epsilon) + Rational.halve(epsilon)) : Real)
          = (epsilon : Real)
     };

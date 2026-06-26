@@ -144,6 +144,9 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
                                 nonempty, boundedAbove);
   let ⟨isUpper, isLeast⟩ := isSupremum;
   witness limit with
+      -- Convergence is established at a rational ε (the Cauchy criterion and
+      -- supremum trapping both work with rational tolerances), lifted by density.
+      Real.SequenceConverges.of_rational(s, limit,
       (epsilon : Rational)
       (epsilonPositive : Rational.zero < epsilon) ↦ {
         claim Rational.zero < Rational.halve(epsilon)
@@ -256,7 +259,7 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
                         = s(m) - limit       by ring;
               done since Real.absolute_value_LessThan_of_bounds
             }
-      }
+      })
 }
 
 -- ----------------------------------------------------------------------
@@ -270,7 +273,9 @@ theorem Real.converges_implies_cauchy (s : Natural → Real)
   take epsilonPositive : Rational.zero < epsilon;
   claim halvePositive : Rational.zero < Rational.halve(epsilon)
       since Rational.halve_positive;
-  obtain ⟨N, tailClose⟩ from converges(Rational.halve(epsilon), halvePositive);
+  obtain ⟨N, tailClose⟩
+      from Real.SequenceConverges.at_rational(s, limit, converges)(
+               Rational.halve(epsilon), halvePositive);
   witness N with
       (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
         claim abs(s(m) - limit) < (Rational.halve(epsilon) : Real)
