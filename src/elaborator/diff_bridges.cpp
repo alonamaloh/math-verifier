@@ -784,6 +784,60 @@ ExpressionPointer Elaborator::tryAcRearrangement(
         }
     }
 
+std::string Elaborator::coercionTargetTypeName(
+        const std::string& functionName) const {
+    for (const auto& [key, chain] : environment_.coercionRegistry) {
+        if (chain.size() == 1 && chain[0] == functionName) {
+            return std::get<1>(key);
+        }
+    }
+    return "";
+}
+
+std::optional<std::pair<std::string, int>> Elaborator::asNumeralLiteral(
+        ExpressionPointer term) const {
+    auto endsWith = [](const std::string& name, const char* suffix) {
+        std::string dotted = suffix;
+        return name.size() > dotted.size()
+            && name.compare(name.size() - dotted.size(),
+                            dotted.size(), dotted) == 0;
+    };
+    if (auto* constant = std::get_if<Constant>(&term->node)) {
+        const std::string& name = constant->name;
+        if (name == "zero") return std::make_pair(std::string("Natural"), 0);
+        if (name == "one") return std::make_pair(std::string("Natural"), 1);
+        if (endsWith(name, ".zero"))
+            return std::make_pair(name.substr(0, name.size() - 5), 0);
+        if (endsWith(name, ".one"))
+            return std::make_pair(name.substr(0, name.size() - 4), 1);
+        return std::nullopt;
+    }
+    if (auto* app = std::get_if<Application>(&term->node)) {
+        auto* head = std::get_if<Constant>(&app->function->node);
+        if (!head) return std::nullopt;
+        // A cast tower `ι(inner)` carries the literal up to ι's target
+        // carrier — `Rational.to_real(…0…)` is `0 : Real`.
+        if (isCoercionFunctionName(head->name)) {
+            if (auto inner = asNumeralLiteral(app->argument)) {
+                std::string target = coercionTargetTypeName(head->name);
+                if (!target.empty())
+                    return std::make_pair(target, inner->second);
+            }
+            return std::nullopt;
+        }
+        // `successor(zero)` is the Natural `1` (the source the bare `1`
+        // literal and `Natural.one` both unfold to).
+        if (head->name == "successor" || endsWith(head->name, ".successor")) {
+            if (auto inner = asNumeralLiteral(app->argument)) {
+                if (inner->second == 0 && inner->first == "Natural")
+                    return std::make_pair(std::string("Natural"), 1);
+            }
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
 bool Elaborator::matchAgainstPattern(
         ExpressionPointer pattern,
         ExpressionPointer subject,
@@ -791,6 +845,25 @@ bool Elaborator::matchAgainstPattern(
         std::vector<ExpressionPointer>& bindings,
         int piDepth,
         std::vector<DeferredProjectionMatch>* deferredOut) {
+        // Numeral-literal canonicalisation (symmetric, additive). A `0`/`1`
+        // written bare and lifted into a `to_X(…)` cast tower must match the
+        // same constant written as `<C>.zero`/`<C>.one`, and vice versa, when
+        // a citation's conclusion and the goal happen to choose different
+        // forms. Both sides reduce to `(carrier, value)`; equal pairs match.
+        // A recognised literal is closed, so this is independent of `piDepth`
+        // and binds nothing — it only WIDENS matches (a non-literal, or a
+        // value/carrier mismatch, falls through unchanged). Crucially this
+        // runs BEFORE the structural descent, so when this node is one
+        // argument of a larger application whose OTHER arguments carry
+        // metavariables (`Real.zero < Real.divide(a, b, _)` cited at
+        // `(0 : Real) < gTolerance`), bridging the literal here lets the match
+        // proceed to infer those metavariables instead of aborting on the
+        // literal-form mismatch.
+        if (auto patternLiteral = asNumeralLiteral(pattern)) {
+            if (auto subjectLiteral = asNumeralLiteral(subject)) {
+                if (*patternLiteral == *subjectLiteral) return true;
+            }
+        }
         // Canonical-bundle resolution: pattern `<Structure>.carrier(BV(slot))`
         // against a concrete carrier `subject`. Bind `slot` to the canonical
         // bundle registered for `(Structure, head subject)` — letting an

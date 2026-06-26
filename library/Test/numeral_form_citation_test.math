@@ -16,6 +16,14 @@ import Rational.basics
 import Rational.addition
 import Real.basics
 import Real.embedding
+import Real.addition
+import Real.order
+import Real.absolute_value
+import Real.order_multiplication
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.division
 
 -- A unary predicate carrying the NAMED constant in its statement.
 definition WrapsNamedZero (x : Real) : Proposition := x = Real.zero
@@ -60,4 +68,30 @@ theorem wraps_rational_zero : WrapsRationalZero(Rational.zero) :=
 
 theorem rational_named_closes_bare : WrapsRationalZero((0 : Rational)) := {
   done by wraps_rational_zero
+}
+
+-- The load-bearing case: a `> 0` goal (whose `0` is a cast tower) cited by a
+-- lemma whose conclusion is `Real.zero < …`, where the citation must STILL
+-- infer the lemma's arguments. Here `Real.divide_positive` recovers `a` and
+-- `b` from a `let`-aliased nested quotient. The numeral-canonicalisation in
+-- `matchAgainstPattern` is what lets the `Real.zero`/tower-`0` mismatch on the
+-- comparison's left not abort the argument inference on its right — without
+-- it the citation fails with "an argument could not be inferred". Mirrors the
+-- ε/2/roof tolerance in `Real.ContinuousAt.multiply`.
+theorem divide_positive_through_alias_with_bare_zero
+        (epsilon c : Real) (epsilonPositive : epsilon > 0) : True := {
+  let roof : Real := abs(c) + 1 + 1;
+  claim roofPositive : roof > 0
+      by calc Real.zero
+            ≤ abs(c)                      since Real.absolute_value_nonneg
+            = abs(c) + 0
+            < abs(c) + 1                  since Real.add_left_preserves_LessThan
+            = (abs(c) + 1) + 0
+            < (abs(c) + 1) + 1            since Real.add_left_preserves_LessThan;
+  claim roof ≠ Real.zero since Real.nonzero_of_positive;
+  claim (2 : Real) > 0 since Real.two_positive;
+  claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
+  let tolerance : Real := epsilon / 2 / roof;
+  claim tolerance > 0 since Real.divide_positive;
+  done
 }

@@ -2155,6 +2155,30 @@ private:
         int piDepth = 0,
         std::vector<DeferredProjectionMatch>* deferredOut = nullptr);
 
+    // Recognise a numeral-literal subterm (`0` or `1`) regardless of form,
+    // returning `(carrierTypeName, value)` with `value ∈ {0, 1}`. The two
+    // interchangeable forms a `0`/`1` takes — a named constant `<C>.zero` /
+    // `<C>.one`, and a `to_X(…)` cast tower over the Natural constructors
+    // `zero` / `successor(zero)` (e.g. a bare `0` lifted to ℝ as
+    // `Rational.to_real(Integer.to_rational(Natural.to_integer(zero)))`) —
+    // reduce to the SAME pair. Returns nullopt for anything else (it bottoms
+    // out at the first non-literal subterm, so `successor(BV)` / `to_real(x)`
+    // over a metavariable is not a literal). Such a literal is always closed,
+    // so `matchAgainstPattern` canonicalises it symmetrically on goal and
+    // lemma conclusion: this lets a lemma stated with `Real.zero` match a goal
+    // whose `0` is a cast tower (and vice versa) STRUCTURALLY — load-bearing
+    // when the surrounding match must still infer metavariable arguments
+    // (e.g. citing `Real.divide_positive` at `epsilon / 2 / fRoof > 0`), where
+    // a defeq fallback can't run because the arguments aren't yet solved.
+    std::optional<std::pair<std::string, int>> asNumeralLiteral(
+        ExpressionPointer term) const;
+
+    // The target carrier type of a single-hop coercion function (e.g.
+    // `Rational.to_real` → "Real"), read off the registry's direct edge.
+    // Empty string if `functionName` is not a registered direct coercion.
+    std::string coercionTargetTypeName(
+        const std::string& functionName) const;
+
     // The failure-path fallback for a pattern node `Proj(BV slot)`: defeq
     // when the slot is bound, deferral when it is not (and `deferredOut`
     // is supplied). Returns false when the pattern is not of that shape.
