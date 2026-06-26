@@ -525,12 +525,17 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         call = makeApplication(std::move(call), std::move(leftKernel));
         call = makeApplication(std::move(call), std::move(rightKernel));
         // Discharge any trailing propositional side-condition the operator
-        // function still expects after its two operands — e.g. the
-        // `d ≠ 0` argument of `Rational.fraction` behind `/`. The auto-
-        // prover proves it (a decidable `2 ≠ 0`, or a `b ≠ 0` hypothesis in
-        // scope); this is what lets `/` omit the nonzero witness. An
-        // obligation the prover cannot close is an honest error — you may
-        // not divide without establishing the denominator is nonzero.
+        // function still expects after its two operands — e.g. the `d ≠ 0`
+        // argument behind `/`. This is what lets `/` omit the nonzero witness.
+        return dischargeTrailingSideConditions(
+            std::move(call), localBinders, operatorSymbol, line);
+    }
+
+ExpressionPointer Elaborator::dischargeTrailingSideConditions(
+        ExpressionPointer call,
+        const std::vector<LocalBinder>& localBinders,
+        const std::string& operatorSymbol,
+        int line) {
         for (int discharged = 0; discharged < 8; ++discharged) {
             ExpressionPointer callType =
                 inferTypeInLocalContext(localBinders, call);

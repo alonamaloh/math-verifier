@@ -1902,7 +1902,17 @@ ExpressionPointer Elaborator::elaborateExpression(
                             expression.line, expression.column),
                         std::vector<SurfaceExpressionPointer>{unary->operand},
                         expression.line, expression.column);
-                    return elaborateExpression(*call, localBinders, expectedType);
+                    // Elaborate the bare `f(operand)` then discharge any
+                    // trailing propositional side-condition — a partial
+                    // operator like `Real.reciprocal(x, x≠0)` behind `⁻¹`
+                    // carries the proof as a trailing argument, exactly as
+                    // `Real.divide` does behind `/`. (A total operator like
+                    // `Group.inverse` has none, so this is a no-op there.)
+                    ExpressionPointer reciprocalCall =
+                        elaborateExpression(*call, localBinders);
+                    return dischargeTrailingSideConditions(
+                        std::move(reciprocalCall), localBinders,
+                        unary->opSymbol, expression.line);
                 }
                 throw ElaborateError(
                     "postfix operator '" + unary->opSymbol

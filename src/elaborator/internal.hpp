@@ -4245,6 +4245,18 @@ private:
         ExpressionPointer expectedType,
         int line);
 
+    // Fill any trailing *propositional* side-conditions an operator's
+    // dispatch function still expects after its operands — e.g. the `b ≠ 0`
+    // of `Real.divide` behind `/`, or of `Real.reciprocal` behind postfix
+    // `⁻¹`. Each is closed by the auto-prover (a decidable fact or an
+    // in-scope hypothesis); an obligation it cannot establish is an honest
+    // error. Shared by the binary and postfix operator paths.
+    ExpressionPointer dischargeTrailingSideConditions(
+        ExpressionPointer call,
+        const std::vector<LocalBinder>& localBinders,
+        const std::string& operatorSymbol,
+        int line);
+
     // Desugars `reflexivity(subject)` into
     // `reflexivity.{u}(typeOfSubject, subject)` where u is the subject's
     // type universe. Mirrors how the constructor's signature makes the
