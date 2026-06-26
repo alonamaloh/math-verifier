@@ -1,0 +1,63 @@
+-- A `0`/`1` written as the bare numeral (which elaborates to a `to_X(…)`
+-- cast tower over the Natural constructors) and the same value written as
+-- the named constant `<C>.zero` / `<C>.one` are definitionally equal but
+-- structurally distinct. A lemma stated in one form must still close a
+-- goal phrased in the other, in either citation direction. This works
+-- through the citation layer's definitional-equality check (the cast
+-- coercions are transparent `definition`s, so `Real.zero ≡ (0 : Real)`) —
+-- a regression lock on that interchangeability, not on any one code path.
+
+module Test.numeral_form_citation_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Rational.basics
+import Rational.addition
+import Real.basics
+import Real.embedding
+
+-- A unary predicate carrying the NAMED constant in its statement.
+definition WrapsNamedZero (x : Real) : Proposition := x = Real.zero
+
+theorem wraps_named_zero : WrapsNamedZero(Real.zero) :=
+  reflexivity(Real, Real.zero)
+
+-- Cited at a goal whose `0` is the bare numeral (a `to_real(…)` tower):
+-- the named-form lemma matches the tower-form goal.
+theorem named_lemma_closes_bare_goal : WrapsNamedZero((0 : Real)) := {
+  done by wraps_named_zero
+}
+
+-- The symmetric direction: a lemma carrying the bare numeral, cited at a
+-- goal phrased with the named constant.
+definition WrapsBareZero (x : Real) : Proposition := x = (0 : Real)
+
+theorem wraps_bare_zero : WrapsBareZero((0 : Real)) :=
+  reflexivity(Real, (0 : Real))
+
+theorem bare_lemma_closes_named_goal : WrapsBareZero(Real.zero) := {
+  done by wraps_bare_zero
+}
+
+-- `1` works the same way, in `claim … since` form.
+definition WrapsNamedOne (x : Real) : Proposition := x = Real.one
+
+theorem wraps_named_one : WrapsNamedOne(Real.one) :=
+  reflexivity(Real, Real.one)
+
+theorem named_one_closes_bare_one : WrapsNamedOne((1 : Real)) := {
+  claim WrapsNamedOne((1 : Real)) since wraps_named_one;
+  done
+}
+
+-- And at a different carrier (Rational), to confirm the canonicalisation
+-- tracks the carrier rather than the value alone.
+definition WrapsRationalZero (x : Rational) : Proposition := x = Rational.zero
+
+theorem wraps_rational_zero : WrapsRationalZero(Rational.zero) :=
+  reflexivity(Rational, Rational.zero)
+
+theorem rational_named_closes_bare : WrapsRationalZero((0 : Rational)) := {
+  done by wraps_rational_zero
+}
