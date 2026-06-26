@@ -77,10 +77,9 @@ theorem Real.HasDerivativeAt.constant (c x : Real)
     witness epsilon with
         ⟨epsilonPositive,
          (y : Real) (_ : abs(y - x) < epsilon) ↦ {
-           claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
            calc abs(c - c - 0 * (y - x))
               = abs(Real.zero)   by (c - c - 0 * (y - x) = 0)
-              = 0                since Real.absolute_value_when_nonneg
+              = 0
               as errorZero;
            claim abs(y - x) ≥ 0 since Real.absolute_value_nonneg;
            claim epsilon ≥ 0 since Real.LessThan.weaken;
@@ -101,10 +100,9 @@ theorem Real.HasDerivativeAt.identity (x : Real)
     witness epsilon with
         ⟨epsilonPositive,
          (y : Real) (_ : abs(y - x) < epsilon) ↦ {
-           claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
            calc abs(y - x - 1 * (y - x))
               = abs(Real.zero)   by (y - x - 1 * (y - x) = 0)
-              = 0                since Real.absolute_value_when_nonneg
+              = 0
               as errorZero;
            claim abs(y - x) ≥ 0 since Real.absolute_value_nonneg;
            claim epsilon ≥ 0 since Real.LessThan.weaken;
@@ -266,11 +264,9 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
     claim (1 : Real) > 0 since Real.zero_less_one;
     claim slopeRoofRealPositive : (slopeRoof : Real) > 0
         since Rational.to_real.positive_preserves;
-    claim boundPositive : Real.one + (slopeRoof : Real) > 0
-        by calc Real.zero
-              < Real.one                          since Real.zero_less_one
-              = Real.one + 0
-              < Real.one + (slopeRoof : Real)     since Real.add_left_preserves_LessThan;
+    calc (0 : Real)
+       < Real.one                          by Real.zero_less_one
+       < Real.one + (slopeRoof : Real)     by Real.less_than_add_of_positive;
     claim Real.one + (slopeRoof : Real) ≠ 0 since Real.nonzero_of_positive;
     claim tolerancePositive : epsilon / (Real.one + (slopeRoof : Real)) > 0
         since Real.divide_positive;
@@ -291,14 +287,13 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
            claim min(nearDelta, epsilon / (Real.one + (slopeRoof : Real)))
                    ≤ epsilon / (Real.one + (slopeRoof : Real))
                since Real.minimum_LessOrEqual_right;
-           claim yCloseNear : abs(y - x) < nearDelta
-               by calc abs(y - x)
-                     < min(nearDelta, epsilon / (Real.one + (slopeRoof : Real)))   
-                     ≤ nearDelta;
-           claim yCloseTolerance : abs(y - x) < epsilon / (Real.one + (slopeRoof : Real))
-               by calc abs(y - x)
-                     < min(nearDelta, epsilon / (Real.one + (slopeRoof : Real)))   
-                     ≤ epsilon / (Real.one + (slopeRoof : Real));
+           calc abs(y - x)
+              < min(nearDelta, epsilon / (Real.one + (slopeRoof : Real)))
+              ≤ nearDelta
+              as yCloseNear;
+           calc abs(y - x)
+              < min(nearDelta, epsilon / (Real.one + (slopeRoof : Real)))
+              ≤ epsilon / (Real.one + (slopeRoof : Real));
            claim abs(f(y) - f(x) - L * (y - x)) ≤ Real.one * abs(y - x)
                by fClose(y, yCloseNear);
            claim abs(y - x) ≥ 0 since Real.absolute_value_nonneg;
@@ -358,31 +353,20 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
     claim abs(g(x)) ≥ 0 since Real.absolute_value_nonneg;
     claim abs(f(x)) ≥ 0 since Real.absolute_value_nonneg;
     claim abs(fSlope) ≥ 0 since Real.absolute_value_nonneg;
-    claim gHeadroomPositive : gHeadroom > 0
-        by calc Real.zero
-              ≤ abs(g(x))
-              = abs(g(x)) + 0
-              < abs(g(x)) + 1              since Real.add_left_preserves_LessThan
-              = (abs(g(x)) + 1) + 0
-              < (abs(g(x)) + 1) + 1 since Real.add_left_preserves_LessThan;
-    claim fRoofPositive : fRoof > 0
-        by calc Real.zero
-              ≤ abs(f(x))
-              = abs(f(x)) + 0
-              < abs(f(x)) + 1              since Real.add_left_preserves_LessThan;
-    claim slopeRoofPositive : slopeRoof > 0
-        by calc Real.zero
-              ≤ abs(fSlope)
-              = abs(fSlope) + 0
-              < abs(fSlope) + 1            since Real.add_left_preserves_LessThan;
-    claim fRoofBound : abs(f(x)) ≤ fRoof
-        by calc abs(f(x))
-              = abs(f(x)) + 0
-              ≤ abs(f(x)) + 1              since Real.add_preserves_LessOrEqual_left;
-    claim slopeRoofBound : abs(fSlope) ≤ slopeRoof
-        by calc abs(fSlope)
-              = abs(fSlope) + 0
-              ≤ abs(fSlope) + 1            since Real.add_preserves_LessOrEqual_left;
+    calc (0 : Real)
+       ≤ abs(g(x))
+       < abs(g(x)) + 1            by Real.less_than_add_of_positive
+       < (abs(g(x)) + 1) + 1      by Real.less_than_add_of_positive;
+    calc (0 : Real)
+       ≤ abs(f(x))
+       < abs(f(x)) + 1            by Real.less_than_add_of_positive;
+    calc (0 : Real)
+       ≤ abs(fSlope)
+       < abs(fSlope) + 1          by Real.less_than_add_of_positive;
+    calc abs(f(x))
+       ≤ abs(f(x)) + 1            by Real.less_or_equal_add_of_nonneg;
+    calc abs(fSlope)
+       ≤ abs(fSlope) + 1          by Real.less_or_equal_add_of_nonneg;
     claim gHeadroom ≠ 0 since Real.nonzero_of_positive;
     claim fRoof ≠ 0 since Real.nonzero_of_positive;
     claim slopeRoof ≠ 0 since Real.nonzero_of_positive;
@@ -441,32 +425,30 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
                since Real.LessOrEqual.transitive;
            claim min(min(fDelta, gDelta), min(nearDelta, differenceDelta)) ≤ differenceDelta
                since Real.LessOrEqual.transitive;
-           claim yCloseF : abs(y - x) < fDelta
-               by calc abs(y - x)
-                     < min(min(fDelta, gDelta), min(nearDelta, differenceDelta)) 
-                     ≤ fDelta;
-           claim yCloseG : abs(y - x) < gDelta
-               by calc abs(y - x)
-                     < min(min(fDelta, gDelta), min(nearDelta, differenceDelta)) 
-                     ≤ gDelta;
-           claim yCloseNear : abs(y - x) < nearDelta
-               by calc abs(y - x)
-                     < min(min(fDelta, gDelta), min(nearDelta, differenceDelta)) 
-                     ≤ nearDelta;
-           claim yCloseDifference : abs(y - x) < differenceDelta
-               by calc abs(y - x)
-                     < min(min(fDelta, gDelta), min(nearDelta, differenceDelta)) 
-                     ≤ differenceDelta;
+           calc abs(y - x)
+              < min(min(fDelta, gDelta), min(nearDelta, differenceDelta))
+              ≤ fDelta
+              as yCloseF;
+           calc abs(y - x)
+              < min(min(fDelta, gDelta), min(nearDelta, differenceDelta))
+              ≤ gDelta
+              as yCloseG;
+           calc abs(y - x)
+              < min(min(fDelta, gDelta), min(nearDelta, differenceDelta))
+              ≤ nearDelta
+              as yCloseNear;
+           calc abs(y - x)
+              < min(min(fDelta, gDelta), min(nearDelta, differenceDelta))
+              ≤ differenceDelta
+              as yCloseDifference;
            -- |g(y)| sits under its headroom roof.
            claim abs(g(y) - g(x)) < Real.one by gNearClose(y, yCloseNear);
            claim abs(g(y) - g(x)) ≤ Real.one since Real.LessThan.weaken;
-           claim gHeadroomBound : abs(g(y)) ≤ gHeadroom
-               by calc abs(g(y))
-                     = abs(g(x) + (g(y) - g(x)))            by (g(x) + (g(y) - g(x)) = g(y))
-                     ≤ abs(g(x)) + abs(g(y) - g(x))         since Real.triangle_inequality
-                     ≤ abs(g(x)) + Real.one                 since Real.add_preserves_LessOrEqual_left
-                     = (abs(g(x)) + Real.one) + Real.zero
-                     ≤ (abs(g(x)) + Real.one) + Real.one    since Real.add_preserves_LessOrEqual_left;
+           calc abs(g(y))
+              = abs(g(x) + (g(y) - g(x)))            by (g(x) + (g(y) - g(x)) = g(y))
+              ≤ abs(g(x)) + abs(g(y) - g(x))         since Real.triangle_inequality
+              ≤ abs(g(x)) + 1                        by Real.add_preserves_LessOrEqual_left
+              ≤ (abs(g(x)) + 1) + 1                  by Real.less_or_equal_add_of_nonneg;
            -- The three error bounds delivered by the δs.
            claim abs(f(y) - f(x) - fSlope * (y - x)) ≤ epsilon / 2 / gHeadroom * abs(y - x)
                by fClose(y, yCloseF);
@@ -497,59 +479,53 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
            claim collapseThird : slopeRoof * (epsilon / 2 / 2 / slopeRoof) = epsilon / 2 / 2
                since Real.divide_cancel;
            -- First piece: (f-error)·g(y) ≤ (ε/2)·|y − x|.
-           claim abs((f(y) - f(x) - fSlope * (y - x)) * g(y)) ≤ epsilon / 2 * abs(y - x)
-               by calc abs((f(y) - f(x) - fSlope * (y - x)) * g(y))
-                     = abs(f(y) - f(x) - fSlope * (y - x)) * abs(g(y))
-                           since Real.absolute_value_multiplicative
-                     ≤ (epsilon / 2 / gHeadroom * abs(y - x)) * gHeadroom
-                           since Real.LessOrEqual.multiply_monotone_nonneg
-                     = (gHeadroom * (epsilon / 2 / gHeadroom)) * abs(y - x)
-                           by ring
-                     = epsilon / 2 * abs(y - x)
-                           since collapseFirst;
+           calc abs((f(y) - f(x) - fSlope * (y - x)) * g(y))
+              = abs(f(y) - f(x) - fSlope * (y - x)) * abs(g(y))
+                    since Real.absolute_value_multiplicative
+              ≤ (epsilon / 2 / gHeadroom * abs(y - x)) * gHeadroom
+                    since Real.LessOrEqual.multiply_monotone_nonneg
+              = (gHeadroom * (epsilon / 2 / gHeadroom)) * abs(y - x)
+                    by ring
+              = epsilon / 2 * abs(y - x)
+                    since collapseFirst;
            -- Second piece: f(x)·(g-error) ≤ (ε/4)·|y − x|.
-           claim abs(f(x) * (g(y) - g(x) - gSlope * (y - x))) ≤ epsilon / 2 / 2 * abs(y - x)
-               by calc abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
-                     = abs(f(x)) * abs(g(y) - g(x) - gSlope * (y - x))
-                           since Real.absolute_value_multiplicative
-                     ≤ fRoof * (epsilon / 2 / 2 / fRoof * abs(y - x))
-                           since Real.LessOrEqual.multiply_monotone_nonneg
-                     = (fRoof * (epsilon / 2 / 2 / fRoof)) * abs(y - x)
-                           by ring
-                     = epsilon / 2 / 2 * abs(y - x)
-                           since collapseSecond;
+           calc abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
+              = abs(f(x)) * abs(g(y) - g(x) - gSlope * (y - x))
+                    since Real.absolute_value_multiplicative
+              ≤ fRoof * (epsilon / 2 / 2 / fRoof * abs(y - x))
+                    since Real.LessOrEqual.multiply_monotone_nonneg
+              = (fRoof * (epsilon / 2 / 2 / fRoof)) * abs(y - x)
+                    by ring
+              = epsilon / 2 / 2 * abs(y - x)
+                    since collapseSecond;
            -- Third piece: f′·(y − x)·(g(y) − g(x)) ≤ (ε/4)·|y − x|.
            claim abs(y - x) * abs(g(y) - g(x))
                    ≤ abs(y - x) * (epsilon / 2 / 2 / slopeRoof)
                since Real.LessOrEqual.multiply_monotone_nonneg;
-           claim abs(fSlope * ((y - x) * (g(y) - g(x)))) ≤ epsilon / 2 / 2 * abs(y - x)
-               by calc abs(fSlope * ((y - x) * (g(y) - g(x))))
-                     = abs(fSlope) * abs((y - x) * (g(y) - g(x)))
-                           since Real.absolute_value_multiplicative
-                     = abs(fSlope) * (abs(y - x) * abs(g(y) - g(x)))
-                           since Real.absolute_value_multiplicative
-                     ≤ slopeRoof * (abs(y - x) * (epsilon / 2 / 2 / slopeRoof))
-                           since Real.LessOrEqual.multiply_monotone_nonneg
-                     = (slopeRoof * (epsilon / 2 / 2 / slopeRoof)) * abs(y - x)
-                           by ring
-                     = epsilon / 2 / 2 * abs(y - x)
-                           since collapseThird;
+           calc abs(fSlope * ((y - x) * (g(y) - g(x))))
+              = abs(fSlope) * abs((y - x) * (g(y) - g(x)))
+                    since Real.absolute_value_multiplicative
+              = abs(fSlope) * (abs(y - x) * abs(g(y) - g(x)))
+                    since Real.absolute_value_multiplicative
+              ≤ slopeRoof * (abs(y - x) * (epsilon / 2 / 2 / slopeRoof))
+                    since Real.LessOrEqual.multiply_monotone_nonneg
+              = (slopeRoof * (epsilon / 2 / 2 / slopeRoof)) * abs(y - x)
+                    by ring
+              = epsilon / 2 / 2 * abs(y - x)
+                    since collapseThird;
            -- Assemble: triangle inequality twice, then ε/2 + ε/4 + ε/4.
            claim abs(f(x) * (g(y) - g(x) - gSlope * (y - x))
                        + fSlope * ((y - x) * (g(y) - g(x))))
                    ≤ abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
                      + abs(fSlope * ((y - x) * (g(y) - g(x))))
                by Real.triangle_inequality;
-           claim abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
-                   + abs(fSlope * ((y - x) * (g(y) - g(x))))
-                   ≤ epsilon / 2 / 2 * abs(y - x) + epsilon / 2 / 2 * abs(y - x)
-               by calc abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
-                       + abs(fSlope * ((y - x) * (g(y) - g(x))))
-                     ≤ epsilon / 2 / 2 * abs(y - x)
-                       + abs(fSlope * ((y - x) * (g(y) - g(x))))
-                           by Real.add_preserves_LessOrEqual
-                     ≤ epsilon / 2 / 2 * abs(y - x) + epsilon / 2 / 2 * abs(y - x)
-                           since Real.add_preserves_LessOrEqual_left;
+           calc abs(f(x) * (g(y) - g(x) - gSlope * (y - x)))
+                + abs(fSlope * ((y - x) * (g(y) - g(x))))
+              ≤ epsilon / 2 / 2 * abs(y - x)
+                + abs(fSlope * ((y - x) * (g(y) - g(x))))
+                    by Real.add_preserves_LessOrEqual
+              ≤ epsilon / 2 / 2 * abs(y - x) + epsilon / 2 / 2 * abs(y - x)
+                    since Real.add_preserves_LessOrEqual_left;
            calc abs(f(y) * g(y) - f(x) * g(x)
                     - (fSlope * g(x) + f(x) * gSlope) * (y - x))
               = abs((f(y) - f(x) - fSlope * (y - x)) * g(y)
@@ -633,62 +609,62 @@ theorem Real.HasDerivativeAt.unique (f : Real → Real) (x L1 L2 : Real)
               take dSmall : d < min(delta1, delta2);
               claim d ≥ 0 since Real.LessThan.weaken;
               claim Real.IsNonneg(d) since Real.IsNonneg_of_LessOrEqual_zero;
-              claim distanceEquation : abs(x + d - x) = d
-                  by calc abs(x + d - x)
-                        = abs(d)   by (x + d - x = d)
-                        = d        since Real.absolute_value_when_nonneg;
+              calc abs(x + d - x)
+                 = abs(d)   by (x + d - x = d)
+                 = d        by Real.absolute_value_when_nonneg
+                 as distanceEquation;
               claim min(delta1, delta2) ≤ delta1 since Real.minimum_LessOrEqual_left;
               claim min(delta1, delta2) ≤ delta2 since Real.minimum_LessOrEqual_right;
-              claim probeClose1 : abs(x + d - x) < delta1
-                  by calc abs(x + d - x)
-                        = d
-                        < min(delta1, delta2)    by dSmall
-                        ≤ delta1;
-              claim probeClose2 : abs(x + d - x) < delta2
-                  by calc abs(x + d - x)
-                        = d
-                        < min(delta1, delta2)    by dSmall
-                        ≤ delta2;
+              calc abs(x + d - x)
+                 = d
+                 < min(delta1, delta2)    by dSmall
+                 ≤ delta1
+                 as probeClose1;
+              calc abs(x + d - x)
+                 = d
+                 < min(delta1, delta2)    by dSmall
+                 ≤ delta2
+                 as probeClose2;
               claim abs(f(x + d) - f(x) - L1 * (x + d - x))
                       ≤ epsilon / 2 / 2 * abs(x + d - x)
                   by firstClose(x + d, probeClose1);
               claim abs(f(x + d) - f(x) - L2 * (x + d - x))
                       ≤ epsilon / 2 / 2 * abs(x + d - x)
                   by secondClose(x + d, probeClose2);
-              claim productBound : abs(L1 - L2) * d ≤ epsilon / 2 * d
-                  by calc abs(L1 - L2) * d
-                        = abs(L1 - L2) * abs(x + d - x)
-                              since distanceEquation
-                        = abs((L1 - L2) * (x + d - x))
-                              since Real.absolute_value_multiplicative
-                        = abs((f(x + d) - f(x) - L2 * (x + d - x))
-                              - (f(x + d) - f(x) - L1 * (x + d - x)))
-                              by ((L1 - L2) * (x + d - x)
-                                  = (f(x + d) - f(x) - L2 * (x + d - x))
-                                    - (f(x + d) - f(x) - L1 * (x + d - x)))
-                        ≤ abs(f(x + d) - f(x) - L2 * (x + d - x))
-                          + abs(-(f(x + d) - f(x) - L1 * (x + d - x)))
-                              by Real.triangle_inequality
-                        = abs(f(x + d) - f(x) - L2 * (x + d - x))
-                          + abs(f(x + d) - f(x) - L1 * (x + d - x))
-                              since Real.absolute_value_negate
-                        ≤ epsilon / 2 / 2 * abs(x + d - x)
-                          + abs(f(x + d) - f(x) - L1 * (x + d - x))
-                              by Real.add_preserves_LessOrEqual
-                        ≤ epsilon / 2 / 2 * abs(x + d - x)
-                          + epsilon / 2 / 2 * abs(x + d - x)
-                              since Real.add_preserves_LessOrEqual_left
-                        = (epsilon / 2 / 2 + epsilon / 2 / 2) * abs(x + d - x)
-                              by ring
-                        = epsilon / 2 * abs(x + d - x)
-                              by substituting Real.divide_two_doubled(epsilon / 2)
-                        = epsilon / 2 * d
-                              since distanceEquation;
-              claim commuted : d * abs(L1 - L2) ≤ d * (epsilon / 2)
-                  by calc d * abs(L1 - L2)
-                        = abs(L1 - L2) * d        by ring
-                        ≤ epsilon / 2 * d         by productBound
-                        = d * (epsilon / 2)       by ring;
+              calc abs(L1 - L2) * d
+                 = abs(L1 - L2) * abs(x + d - x)
+                       since distanceEquation
+                 = abs((L1 - L2) * (x + d - x))
+                       since Real.absolute_value_multiplicative
+                 = abs((f(x + d) - f(x) - L2 * (x + d - x))
+                       - (f(x + d) - f(x) - L1 * (x + d - x)))
+                       by ((L1 - L2) * (x + d - x)
+                           = (f(x + d) - f(x) - L2 * (x + d - x))
+                             - (f(x + d) - f(x) - L1 * (x + d - x)))
+                 ≤ abs(f(x + d) - f(x) - L2 * (x + d - x))
+                   + abs(-(f(x + d) - f(x) - L1 * (x + d - x)))
+                       by Real.triangle_inequality
+                 = abs(f(x + d) - f(x) - L2 * (x + d - x))
+                   + abs(f(x + d) - f(x) - L1 * (x + d - x))
+                       since Real.absolute_value_negate
+                 ≤ epsilon / 2 / 2 * abs(x + d - x)
+                   + abs(f(x + d) - f(x) - L1 * (x + d - x))
+                       by Real.add_preserves_LessOrEqual
+                 ≤ epsilon / 2 / 2 * abs(x + d - x)
+                   + epsilon / 2 / 2 * abs(x + d - x)
+                       since Real.add_preserves_LessOrEqual_left
+                 = (epsilon / 2 / 2 + epsilon / 2 / 2) * abs(x + d - x)
+                       by ring
+                 = epsilon / 2 * abs(x + d - x)
+                       by substituting Real.divide_two_doubled(epsilon / 2)
+                 = epsilon / 2 * d
+                       since distanceEquation
+                 as productBound;
+              calc d * abs(L1 - L2)
+                 = abs(L1 - L2) * d        by ring
+                 ≤ epsilon / 2 * d         by productBound
+                 = d * (epsilon / 2)       by ring
+                 as commuted;
               done by Real.LessOrEqual.multiply_cancel_left_positive(
                           d, abs(L1 - L2), epsilon / 2, dPositive, commuted)
             };
