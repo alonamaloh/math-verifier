@@ -218,8 +218,12 @@ theorem Real.HasDerivativeAt.scale (c : Real) (f : Real → Real) (x L : Real)
     claim (roof : Real) ≠ 0 since Real.nonzero_of_positive;
     claim tolerancePositive : epsilon / (roof : Real) > 0
         since Real.divide_positive;
-    choose delta from fDerivative(epsilon / (roof : Real), tolerancePositive);
-    claim deltaPositive : delta > 0;
+    choose delta such that delta > 0
+            ∧ (∀ (y : Real). abs(y - x) < delta
+                → abs(f(y) - f(x) - L * (y - x)) ≤ epsilon / (roof : Real) * abs(y - x))
+        as deltaProperties
+        from fDerivative(epsilon / (roof : Real), tolerancePositive);
+    claim deltaPositive : delta > 0 by And.left(deltaProperties);
     claim fClose : ∀ (y : Real). abs(y - x) < delta
             → abs(f(y) - f(x) - L * (y - x)) ≤ epsilon / (roof : Real) * abs(y - x);
     witness delta with
