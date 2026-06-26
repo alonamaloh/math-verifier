@@ -153,16 +153,14 @@ theorem Real.HasDerivativeAt.add (f g : Real → Real) (x fSlope gSlope : Real)
                           + (g(y) - g(x) - gSlope * (y - x)))
               ≤ abs(f(y) - f(x) - fSlope * (y - x))
                 + abs(g(y) - g(x) - gSlope * (y - x))
-                    by Real.triangle_inequality
+                    since Real.triangle_inequality
               ≤ epsilon / 2 * abs(y - x)
                 + abs(g(y) - g(x) - gSlope * (y - x))
-                    by Real.add_preserves_LessOrEqual
               ≤ epsilon / 2 * abs(y - x) + epsilon / 2 * abs(y - x)
                     since Real.add_preserves_LessOrEqual_left
               = (epsilon / 2 + epsilon / 2) * abs(y - x)
-                    by ring
               = epsilon * abs(y - x)
-                    by substituting Real.divide_two_doubled(epsilon)
+                    since Real.divide_two_doubled
          }⟩
   }
 
@@ -199,10 +197,9 @@ theorem Real.HasDerivativeAt.subtract (f g : Real → Real) (x fSlope gSlope : R
         (gDerivative : Real.HasDerivativeAt(g, x, gSlope))
         : Real.HasDerivativeAt(
               (y : Real) ↦ f(y) - g(y), x, fSlope - gSlope) := {
-  claim negateDerivative : Real.HasDerivativeAt((y : Real) ↦ -g(y), x, -gSlope)
+  claim Real.HasDerivativeAt((y : Real) ↦ -g(y), x, -gSlope)
       since Real.HasDerivativeAt.negate;
-  done by Real.HasDerivativeAt.add(f, (y : Real) ↦ -g(y), x, fSlope, -gSlope,
-             fDerivative, negateDerivative)
+  done
 }
 
 -- Constant multiples scale the derivative: the error picks up a factor
@@ -216,7 +213,7 @@ theorem Real.HasDerivativeAt.scale (c : Real) (f : Real → Real) (x L : Real)
   (epsilonPositive : epsilon > 0) ↦ {
     choose roof such that Rational.zero < roof ∧ abs(c) ≤ (roof : Real)
         from Real.exists_positive_rational_roof(c);
-    claim roofRealPositive : (roof : Real) > 0
+    claim (roof : Real) > 0
         since Rational.to_real.positive_preserves;
     claim (roof : Real) ≠ 0 since Real.nonzero_of_positive;
     claim tolerancePositive : epsilon / (roof : Real) > 0
@@ -245,7 +242,6 @@ theorem Real.HasDerivativeAt.scale (c : Real) (f : Real → Real) (x L : Real)
               ≤ (roof : Real) * (epsilon / (roof : Real) * abs(y - x))
                     since Real.LessOrEqual.multiply_monotone_nonneg
               = ((roof : Real) * (epsilon / (roof : Real))) * abs(y - x)
-                    by ring
               = epsilon * abs(y - x)
                     since collapse
          }⟩
