@@ -257,6 +257,56 @@ ExpressionPointer Elaborator::elaborateCalc(
             *calc.initialExpression, localBinders);
         ExpressionPointer carrierTypeOpen =
             inferTypeInLocalContext(localBinders, previousKernel);
+        // The carrier comes from the FIRST RELATION, not the leading term in
+        // isolation: a bare-numeral leading term (`0`) defaults to Natural,
+        // but the relation's other operand may pin a richer carrier (Real).
+        // Join the two operand types and lift the leading term up the
+        // coercion tower — exactly the reconciliation each later step gets
+        // (the `combineOperands` block in the fold below) — so `calc 0 ≤
+        // abs(x) …` elaborates `0` at the carrier `abs(x)` lives in. (Only
+        // the leading-term lift is done here; a lower-tower RHS is lifted by
+        // the fold.)
+        if (!calc.steps.empty()) {
+            // Best-effort: probe the first relation's right operand for its
+            // carrier. It is re-elaborated properly (with the carrier as the
+            // expected type) in the fold below, so if it cannot stand alone
+            // here — e.g. a `Sum.left(x)` whose other type argument is only
+            // fixed by the expected type — fall back to the leading term's
+            // carrier rather than letting the probe's failure escape.
+            std::string leadingHead = headConstantName(carrierTypeOpen);
+            std::string firstRightHead;
+            ExpressionPointer firstRightTypeOpen = nullptr;
+            try {
+                ExpressionPointer firstRightKernel = elaborateExpression(
+                    *calc.steps[0].nextExpression, localBinders);
+                firstRightTypeOpen =
+                    inferTypeInLocalContext(localBinders, firstRightKernel);
+                firstRightHead = headConstantName(firstRightTypeOpen);
+            } catch (const std::exception&) {
+                firstRightHead.clear();
+                firstRightTypeOpen = nullptr;
+            }
+            if (firstRightTypeOpen
+                && !leadingHead.empty() && !firstRightHead.empty()
+                && leadingHead != firstRightHead) {
+                ExpressionPointer leadingTypeClosed = closeOverLocalBinders(
+                    carrierTypeOpen, localBinders, localBinders.size());
+                ExpressionPointer firstRightTypeClosed = closeOverLocalBinders(
+                    firstRightTypeOpen, localBinders, localBinders.size());
+                if (auto combined = combineOperands(
+                        leadingHead, firstRightHead,
+                        leadingTypeClosed, firstRightTypeClosed)) {
+                    if (!combined->coerceLeft.empty()) {
+                        previousKernel = applyCoercionChain(
+                            std::move(previousKernel), combined->coerceLeft);
+                        previousKernel = castPushToLeaves(
+                            previousKernel, localBinders).term;
+                        carrierTypeOpen = inferTypeInLocalContext(
+                            localBinders, previousKernel);
+                    }
+                }
+            }
+        }
         ExpressionPointer carrierType = closeOverLocalBinders(
             carrierTypeOpen, localBinders, localBinders.size());
         LevelPointer carrierLevel =

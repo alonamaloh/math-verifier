@@ -34,10 +34,13 @@ long long Elaborator::autoProveWarnThreshold() {
 
 namespace {
 // Effort cap (kernel reduction steps) for the speculative re-proof in the
-// redundancy checks. Stricter than the warn threshold on purpose: a hint is
-// only "redundant" if the by-less re-proof is near-free, so cleanup never
-// trades a fast proof for a merely-under-the-warning one. Overridable via
-// MATH_REDUNDANT_BUDGET (0 disables → use the default auto-prove budget).
+// redundancy checks. Deliberately LOW: a hint is "redundant" only when the
+// by-less re-proof is near-instant, so the check flags noise hints (a step
+// the prover closes trivially anyway) and stays silent on hints that save
+// the prover real search — otherwise cleanup round-trips (drop a "redundant"
+// hint, then the step turns into an expensive by-less proof and the hint has
+// to go back). Overridable via MATH_REDUNDANT_BUDGET (0 disables → use the
+// default auto-prove budget).
 long long redundancyBudgetValue() {
     static long long cached = [] {
         if (const char* w = std::getenv("MATH_REDUNDANT_BUDGET")) {
@@ -45,7 +48,7 @@ long long redundancyBudgetValue() {
             long long v = std::strtoll(w, &end, 10);
             if (end != w && v >= 0) return v;
         }
-        return 10000LL;
+        return 1000LL;
     }();
     return cached;
 }
