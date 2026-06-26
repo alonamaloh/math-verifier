@@ -336,26 +336,33 @@ theorem Real.harmonic_doubling_growth (K : Natural)
 -- every bound, eventually and forever.
 theorem Real.harmonic_series_diverges
         : Real.TendsToInfinity(Real.partialSum(Real.harmonic_term)) :=
-  (bound : Rational) ↦ {
-    -- Climb the ladder past the bound: |bound| ≤ (K+1)·½ < lg(½, K+1).
-    claim Rational.IsNonneg(abs(bound))
+  (bound : Real) ↦ {
+    -- A rational roof above the real bound, then climb the ladder past it:
+    -- bound ≤ |bound| ≤ roof ≤ (K+1)·½ < lg(½, K+1).
+    choose roof such that Rational.zero < roof ∧ abs(bound) ≤ (roof : Real)
+        from Real.exists_positive_rational_roof(bound);
+    claim boundBelowRoof : bound ≤ (roof : Real)
+        by calc bound
+              ≤ abs(bound)        since Real.LessOrEqual_absolute_value
+              ≤ (roof : Real);
+    claim Rational.IsNonneg(abs(roof))
         since Rational.absolute_value_IsNonneg;
     claim Rational.zero < Rational.one_half
         since Rational.one_half_positive;
     obtain ⟨K, archBound⟩
         from Rational.archimedean_for_positives(
-                 abs(bound), Rational.one_half,
-                 Rational.absolute_value_IsNonneg(bound),
+                 abs(roof), Rational.one_half,
+                 Rational.absolute_value_IsNonneg(roof),
                  Rational.one_half_positive);
-    claim bound ≤ abs(bound) since Rational.le_absolute_value;
+    claim roof ≤ abs(roof) since Rational.le_absolute_value;
     claim Rational.zero < Rational.one;
     claim growthUnfolded
           : Rational.linearGrowth(Rational.one_half, successor(K))
             = Rational.one + successor(K) * Rational.one_half
         since Rational.linearGrowth_closed_form;
-    claim bound < Rational.linearGrowth(Rational.one_half, successor(K))
-        by calc bound
-              ≤ abs(bound)
+    claim roof < Rational.linearGrowth(Rational.one_half, successor(K))
+        by calc roof
+              ≤ abs(roof)
               ≤ (successor(K) : Rational) * Rational.one_half
                     by archBound
               = Rational.zero + (successor(K) : Rational) * Rational.one_half
@@ -380,11 +387,13 @@ theorem Real.harmonic_series_diverges
                      Real.harmonic_term, Real.harmonic_term_nonneg,
                      Natural.doubling(successor(K)), m, aboveThreshold);
           claim castBound
-                : bound
+                : (roof : Real)
                   < ((Rational.linearGrowth(Rational.one_half, successor(K)))
                      : Real)
               since Rational.to_real.LessThan_preserves;
-          calc (bound : Real)
+          calc bound
+             ≤ (roof : Real)
+                   by boundBelowRoof
              < ((Rational.linearGrowth(Rational.one_half, successor(K)))
                 : Real)
                    by castBound
