@@ -313,15 +313,12 @@ theorem Real.HasDerivativeAt.continuous (f : Real → Real) (x L : Real)
               ≤ 1 * abs(y - x) + (slopeRoof : Real) * abs(y - x)
                     since Real.add_preserves_LessOrEqual_left
               = (1 + (slopeRoof : Real)) * abs(y - x)
-                    by ring
               = abs(y - x) * (1 + (slopeRoof : Real))
-                    by ring
               < (epsilon / (1 + (slopeRoof : Real)))
                 * (1 + (slopeRoof : Real))
                     since Real.LessThan.multiply_by_positive_right
               = (1 + (slopeRoof : Real))
                 * (epsilon / (1 + (slopeRoof : Real)))
-                    by ring
               = epsilon
                     since collapse
          }⟩
@@ -341,7 +338,7 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
   (epsilonPositive : epsilon > 0) ↦ {
     claim gContinuous : Real.ContinuousAt(g, x) since Real.HasDerivativeAt.continuous;
     -- Real roofs over the three bystander factors, each with headroom.
-    let gHeadroom : Real := abs(g(x)) + 1 + 1;
+    let gHeadroom : Real := abs(g(x)) + 1;
     let fRoof : Real := abs(f(x)) + 1;
     let slopeRoof : Real := abs(fSlope) + 1;
     claim (1 : Real) > 0 since Real.zero_less_one;
@@ -351,8 +348,7 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
     claim abs(fSlope) ≥ 0 since Real.absolute_value_nonneg;
     calc 0
        ≤ abs(g(x))
-       < abs(g(x)) + 1            by Real.less_than_add_of_positive
-       < (abs(g(x)) + 1) + 1      by Real.less_than_add_of_positive;
+       < abs(g(x)) + 1            by Real.less_than_add_of_positive;
     calc 0
        ≤ abs(f(x))
        < abs(f(x)) + 1            by Real.less_than_add_of_positive;
@@ -443,8 +439,7 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
            calc abs(g(y))
               = abs(g(x) + (g(y) - g(x)))            by (g(x) + (g(y) - g(x)) = g(y))
               ≤ abs(g(x)) + abs(g(y) - g(x))         since Real.triangle_inequality
-              ≤ abs(g(x)) + 1                        by Real.add_preserves_LessOrEqual_left
-              ≤ (abs(g(x)) + 1) + 1                  by Real.less_or_equal_add_of_nonneg;
+              ≤ abs(g(x)) + 1                        by Real.add_preserves_LessOrEqual_left;
            -- The three error bounds delivered by the δs.
            claim abs(f(y) - f(x) - fSlope * (y - x)) ≤ epsilon / 2 / gHeadroom * abs(y - x)
                by fClose(y, yCloseF);
@@ -481,7 +476,6 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
               ≤ (epsilon / 2 / gHeadroom * abs(y - x)) * gHeadroom
                     since Real.LessOrEqual.multiply_monotone_nonneg
               = (gHeadroom * (epsilon / 2 / gHeadroom)) * abs(y - x)
-                    by ring
               = epsilon / 2 * abs(y - x)
                     since collapseFirst;
            -- Second piece: f(x)·(g-error) ≤ (ε/4)·|y − x|.
@@ -491,7 +485,6 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
               ≤ fRoof * (epsilon / 2 / 2 / fRoof * abs(y - x))
                     since Real.LessOrEqual.multiply_monotone_nonneg
               = (fRoof * (epsilon / 2 / 2 / fRoof)) * abs(y - x)
-                    by ring
               = epsilon / 2 / 2 * abs(y - x)
                     since collapseSecond;
            -- Third piece: f′·(y − x)·(g(y) − g(x)) ≤ (ε/4)·|y − x|.
@@ -506,7 +499,6 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
               ≤ slopeRoof * (abs(y - x) * (epsilon / 2 / 2 / slopeRoof))
                     since Real.LessOrEqual.multiply_monotone_nonneg
               = (slopeRoof * (epsilon / 2 / 2 / slopeRoof)) * abs(y - x)
-                    by ring
               = epsilon / 2 / 2 * abs(y - x)
                     since collapseThird;
            -- Assemble: triangle inequality twice, then ε/2 + ε/4 + ε/4.
@@ -548,7 +540,6 @@ theorem Real.HasDerivativeAt.multiply (f g : Real → Real) (x fSlope gSlope : R
                 + (epsilon / 2 / 2 * abs(y - x) + epsilon / 2 / 2 * abs(y - x))
                     since Real.add_preserves_LessOrEqual_left
               = (epsilon / 2 + (epsilon / 2 / 2 + epsilon / 2 / 2)) * abs(y - x)
-                    by ring
               = (epsilon / 2 + epsilon / 2) * abs(y - x)
                     by substituting Real.divide_two_doubled(epsilon / 2)
               = epsilon * abs(y - x)
@@ -650,16 +641,15 @@ theorem Real.HasDerivativeAt.unique (f : Real → Real) (x L1 L2 : Real)
                    + epsilon / 2 / 2 * abs(x + d - x)
                        since Real.add_preserves_LessOrEqual_left
                  = (epsilon / 2 / 2 + epsilon / 2 / 2) * abs(x + d - x)
-                       by ring
                  = epsilon / 2 * abs(x + d - x)
                        by substituting Real.divide_two_doubled(epsilon / 2)
                  = epsilon / 2 * d
                        since distanceEquation
                  as productBound;
               calc d * abs(L1 - L2)
-                 = abs(L1 - L2) * d        by ring
+                 = abs(L1 - L2) * d
                  ≤ epsilon / 2 * d         by productBound
-                 = d * (epsilon / 2)       by ring
+                 = d * (epsilon / 2)
                  as commuted;
               done by Real.LessOrEqual.multiply_cancel_left_positive(
                           d, abs(L1 - L2), epsilon / 2, dPositive, commuted)
