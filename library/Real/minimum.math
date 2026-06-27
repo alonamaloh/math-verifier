@@ -27,14 +27,16 @@ theorem Real.minimum_exists (a b : Real)
         : ∃ (c : Real). Real.IsMinimum(a, b, c) := {
   claim aReflexive : a ≤ a since Real.LessOrEqual.reflexive;
   claim bReflexive : b ≤ b since Real.LessOrEqual.reflexive;
-  claim linear : a ≤ b ∨ b ≤ a since Real.LessOrEqual.linear;
-  cases linear {
-    | Or.introduceLeft(aLeqB) =>
+  claim a ≤ b ∨ b ≤ a since Real.LessOrEqual.linear;
+  claim by cases {
+    in (a ≤ b) as aLeqB:
         witness a with
-            ⟨aReflexive, aLeqB, Or.introduceLeft(reflexivity(Real, a))⟩
-    | Or.introduceRight(bLeqA) =>
+            And.introduction(aReflexive,
+                And.introduction(aLeqB, Or.introduceLeft(reflexivity(Real, a))))
+    in (b ≤ a) as bLeqA:
         witness b with
-            ⟨bLeqA, bReflexive, Or.introduceRight(reflexivity(Real, b))⟩
+            And.introduction(bLeqA,
+                And.introduction(bReflexive, Or.introduceRight(reflexivity(Real, b))))
   }
 }
 
@@ -43,19 +45,17 @@ theorem Real.minimum_unique (a b c1 c2 : Real)
         (firstMinimum : Real.IsMinimum(a, b, c1))
         (secondMinimum : Real.IsMinimum(a, b, c2))
         : c1 = c2 := {
-  obtain ⟨c1LeqA, c1LeqB, c1Attained⟩ from firstMinimum;
-  obtain ⟨c2LeqA, c2LeqB, c2Attained⟩ from secondMinimum;
-  claim c1 ≤ c2 by {
-    cases c2Attained {
-      | Or.introduceLeft(c2IsA) => calc c1 ≤ a = c2 since c2IsA
-      | Or.introduceRight(c2IsB) => calc c1 ≤ b = c2 since c2IsB
-    }
+  claim c1 ≤ a ∧ c1 ≤ b ∧ (c1 = a ∨ c1 = b) since firstMinimum;
+  claim c2 ≤ a ∧ c2 ≤ b ∧ (c2 = a ∨ c2 = b) since secondMinimum;
+  claim c1 = a ∨ c1 = b;
+  claim c2 = a ∨ c2 = b;
+  claim c1 ≤ c2 by cases {
+    in (c2 = a) as c2IsA: calc c1 ≤ a = c2 since c2IsA
+    in (c2 = b) as c2IsB: calc c1 ≤ b = c2 since c2IsB
   };
-  claim c2 ≤ c1 by {
-    cases c1Attained {
-      | Or.introduceLeft(c1IsA) => calc c2 ≤ a = c1 since c1IsA
-      | Or.introduceRight(c1IsB) => calc c2 ≤ b = c1 since c1IsB
-    }
+  claim c2 ≤ c1 by cases {
+    in (c1 = a) as c1IsA: calc c2 ≤ a = c1 since c1IsA
+    in (c1 = b) as c1IsB: calc c2 ≤ b = c1 since c1IsB
   };
   done since Real.LessOrEqual.antisymmetric
 }
@@ -73,22 +73,26 @@ theorem Real.minimum_satisfies (a b : Real) : Real.IsMinimum(a, b, min(a, b)) :=
       Real.minimum_exists(a, b), Real.minimum_unique(a, b))
 
 theorem Real.minimum_LessOrEqual_left (a b : Real) : min(a, b) ≤ a := {
-  obtain ⟨leftBound, rightBound, attained⟩ from Real.minimum_satisfies(a, b);
-  done since leftBound
+  claim min(a, b) ≤ a ∧ min(a, b) ≤ b ∧ (min(a, b) = a ∨ min(a, b) = b)
+      since Real.minimum_satisfies;
+  done
 }
 
 theorem Real.minimum_LessOrEqual_right (a b : Real) : min(a, b) ≤ b := {
-  obtain ⟨leftBound, rightBound, attained⟩ from Real.minimum_satisfies(a, b);
-  done since rightBound
+  claim min(a, b) ≤ a ∧ min(a, b) ≤ b ∧ (min(a, b) = a ∨ min(a, b) = b)
+      since Real.minimum_satisfies;
+  done
 }
 
 -- The minimum of two positives is positive (it is one of them).
 theorem Real.minimum_positive (a b : Real)
         (aPositive : Real.zero < a) (bPositive : Real.zero < b)
         : Real.zero < min(a, b) := {
-  obtain ⟨leftBound, rightBound, attained⟩ from Real.minimum_satisfies(a, b);
-  cases attained {
-    | Or.introduceLeft(isA) => calc Real.zero < a = min(a, b) since isA
-    | Or.introduceRight(isB) => calc Real.zero < b = min(a, b) since isB
+  claim min(a, b) ≤ a ∧ min(a, b) ≤ b ∧ (min(a, b) = a ∨ min(a, b) = b)
+      since Real.minimum_satisfies;
+  claim min(a, b) = a ∨ min(a, b) = b;
+  claim by cases {
+    in (min(a, b) = a) as isA: calc Real.zero < a = min(a, b) since isA
+    in (min(a, b) = b) as isB: calc Real.zero < b = min(a, b) since isB
   }
 }
