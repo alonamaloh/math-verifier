@@ -57,23 +57,24 @@ theorem Real.intermediate_value
         (fStartsNonpositive : f(a) ≤ 0)
         (fEndsNonnegative : 0 ≤ f(b))
         : ∃ (c : Real). a ≤ c ∧ c ≤ b ∧ f(c) = 0 := {
+  set candidates := Real.intermediate_value_candidates(f, a, b);
   -- a is a candidate, and b bounds all of them, so the supremum exists.
   claim a ≤ a since Real.LessOrEqual.reflexive;
-  claim aInCandidates : a ∈ Real.intermediate_value_candidates(f, a, b);
-  claim bIsUpper : Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), b)
-      by (y : Real) (yInCandidates : y ∈ Real.intermediate_value_candidates(f, a, b)) ↦ {
+  claim aInCandidates : a ∈ candidates;
+  claim bIsUpper : Real.IsUpperBound(candidates, b)
+      by (y : Real) (yInCandidates : y ∈ candidates) ↦ {
            claim a ≤ y ∧ y ≤ b ∧ f(y) ≤ 0;
            done
          };
-  claim Set.IsNonempty(Real, Real.intermediate_value_candidates(f, a, b))
+  claim Set.IsNonempty(Real, candidates)
       by witness a with aInCandidates;
-  claim Real.IsBoundedAbove(Real.intermediate_value_candidates(f, a, b))
+  claim Real.IsBoundedAbove(candidates)
       by witness b with bIsUpper;
-  claim supremumExists : ∃ (s : Real). Real.IsSupremum(Real.intermediate_value_candidates(f, a, b), s)
+  claim supremumExists : ∃ (s : Real). Real.IsSupremum(candidates, s)
       since Real.supremum_exists;
   choose c as isSupremum from supremumExists;
-  claim Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), c);
-  claim ∀ (otherBound : Real). Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), otherBound) → c ≤ otherBound;
+  claim Real.IsUpperBound(candidates, c);
+  claim ∀ (otherBound : Real). Real.IsUpperBound(candidates, otherBound) → c ≤ otherBound;
   claim a ≤ c;
   claim c ≤ b;
   claim fContinuousAtC : Real.ContinuousAt(f, c);
@@ -97,8 +98,8 @@ theorem Real.intermediate_value
       -- Any candidate above c − δ would sit δ-close to c
       -- (candidates never exceed c), forcing f > 0 there —
       -- impossible for a candidate. So c − δ is an upper bound.
-      claim Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), c - delta)
-          by (y : Real) (yInCandidates : y ∈ Real.intermediate_value_candidates(f, a, b)) ↦ {
+      claim Real.IsUpperBound(candidates, c - delta)
+          by (y : Real) (yInCandidates : y ∈ candidates) ↦ {
                suppose c - delta < y for contradiction {
                  claim f(y) ≤ 0;
                  claim y ≤ c;
@@ -229,7 +230,7 @@ theorem Real.intermediate_value
                       ≤ delta / 2 + c
                             since Real.add_preserves_LessOrEqual
                       = c + delta / 2;
-            claim (c + delta / 2) ∈ Real.intermediate_value_candidates(f, a, b);
+            claim (c + delta / 2) ∈ candidates;
             claim c + delta / 2 ≤ c;
             calc c
                       = 0 + c
