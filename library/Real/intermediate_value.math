@@ -91,10 +91,7 @@ theorem Real.intermediate_value
   -- ------------------------------------------------------------------
   -- f(c) ≤ 0: otherwise f stays positive on a δ-band around c, so
   -- c − δ already bounds the candidate set — beating the least bound c.
-  claim f(c) ≤ Real.zero by {
-      suppose Not(f(c) ≤ Real.zero) as notNonpositive for contradiction;
-      claim Real.zero < f(c)
-          since Real.LessThan_of_not_LessOrEqual;
+  suppose f(c) > Real.zero for contradiction {
       -- A rational tolerance inside the gap (0, f(c)).
       claim ∃ (q : Rational). Rational.zero < q ∧ (q : Real) < f(c)
           since Real.exists_positive_rational_below;
@@ -114,45 +111,45 @@ theorem Real.intermediate_value
       -- impossible for a candidate. So c − δ is an upper bound.
       claim Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), c - delta)
           by (y : Real) (yInCandidates : y ∈ Real.intermediate_value_candidates(f, a, b)) ↦ {
-               suppose Not(y ≤ c - delta) as notBelow for contradiction;
-               claim f(y) ≤ Real.zero;
-               claim y ≤ c;
-               claim c - delta < y
-                   since Real.LessThan_of_not_LessOrEqual;
-               -- |y − c| < δ from the two sides.
-               calc -delta
-                         = (c - delta) - c
-                         < y - c
-                               since Real.add_preserves_LessThan;
-               calc y - c
-                         ≤ c - c             since Real.add_preserves_LessOrEqual
-                         = Real.zero
-                         < delta;
-               claim yClose : abs(y - c) < delta
-                   since Real.absolute_value_LessThan_of_bounds;
-               claim abs(f(y) - f(c)) < (epsilon : Real)
-                   by fClose(y, yClose);
-               claim -(epsilon : Real) < f(y) - f(c) ∧ (f(y) - f(c)) < (epsilon : Real)
-                   since Real.absolute_value_LessThan_bounds;
-               -- 0 < f(c) − ε < f(y), yet f(y) ≤ 0.
-               calc Real.zero
-                         = (epsilon : Real) - (epsilon : Real)
-                         < f(c) - (epsilon : Real)
-                               since Real.add_preserves_LessThan;
-               claim Real.zero ≤ f(c) - (epsilon : Real)
-                   since Real.LessThan.weaken;
-               calc f(c) - (epsilon : Real)
-                         = -(epsilon : Real) + f(c)
-                         < (f(y) - f(c)) + f(c)
-                               since Real.add_preserves_LessThan
-                         = f(y);
-               claim Real.zero < f(y)
-                   since Real.LessThan.transitive_left;
-               claim Real.zero < Real.zero
-                   since Real.LessThan.transitive_right;
-               claim notSelfEqual : ¬(Real.zero = Real.zero)
-                   since Real.LessThan.distinct;
-               notSelfEqual(reflexivity(Real, Real.zero))
+               suppose c - delta < y for contradiction {
+                 claim f(y) ≤ Real.zero;
+                 claim y ≤ c;
+                 -- |y − c| < δ from the two sides.
+                 calc -delta
+                           = (c - delta) - c
+                           < y - c
+                                 since Real.add_preserves_LessThan;
+                 calc y - c
+                           ≤ c - c             since Real.add_preserves_LessOrEqual
+                           = Real.zero
+                           < delta;
+                 claim yClose : abs(y - c) < delta
+                     since Real.absolute_value_LessThan_of_bounds;
+                 claim abs(f(y) - f(c)) < (epsilon : Real)
+                     by fClose(y, yClose);
+                 claim -(epsilon : Real) < f(y) - f(c) ∧ (f(y) - f(c)) < (epsilon : Real)
+                     since Real.absolute_value_LessThan_bounds;
+                 -- 0 < f(c) − ε < f(y), yet f(y) ≤ 0.
+                 calc Real.zero
+                           = (epsilon : Real) - (epsilon : Real)
+                           < f(c) - (epsilon : Real)
+                                 since Real.add_preserves_LessThan;
+                 claim Real.zero ≤ f(c) - (epsilon : Real)
+                     since Real.LessThan.weaken;
+                 calc f(c) - (epsilon : Real)
+                           = -(epsilon : Real) + f(c)
+                           < (f(y) - f(c)) + f(c)
+                                 since Real.add_preserves_LessThan
+                           = f(y);
+                 claim Real.zero < f(y)
+                     since Real.LessThan.transitive_left;
+                 claim Real.zero < Real.zero
+                     since Real.LessThan.transitive_right;
+                 claim notSelfEqual : ¬(Real.zero = Real.zero)
+                     since Real.LessThan.distinct;
+                 notSelfEqual(reflexivity(Real, Real.zero))
+               };
+               done since Real.LessOrEqual_of_not_LessThan
              };
       claim c ≤ c - delta;
       claim c - delta < c
@@ -161,15 +158,13 @@ theorem Real.intermediate_value
       claim notSelfEqual : ¬(c = c) since Real.LessThan.distinct;
       notSelfEqual(reflexivity(Real, c))
   };
+  claim f(c) ≤ Real.zero since Real.LessOrEqual_of_not_LessThan;
 
   -- ------------------------------------------------------------------
   -- 0 ≤ f(c): otherwise f stays negative on a δ-band around c. Either
   -- a point just above c is then a candidate beyond the upper bound c,
   -- or b itself lies in the band and f(b) < 0 — both absurd.
-  claim Real.zero ≤ f(c) by {
-      suppose Not(Real.zero ≤ f(c)) as notNonnegative for contradiction;
-      claim f(c) < Real.zero
-          since Real.LessThan_of_not_LessOrEqual;
+  suppose f(c) < Real.zero for contradiction {
       calc Real.zero
                 = f(c) + -f(c)
                 < Real.zero + -f(c)
@@ -291,6 +286,7 @@ theorem Real.intermediate_value
           }
       }
   };
+  claim Real.zero ≤ f(c) since Real.LessOrEqual_of_not_LessThan;
 
   claim f(c) = Real.zero
       since Real.LessOrEqual.antisymmetric;
