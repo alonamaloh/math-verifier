@@ -1,0 +1,87 @@
+-- Tests for the two `suppose` modifiers:
+--   `suppose P [as h] for contradiction;` — assume P, derive False in
+--     the continuation, prove the goal by double-negation elimination
+--     (the assumed P being the negation of the goal).
+--   `suppose P [as h] to prove Q { block };` — prove Q under `h : P`,
+--     adding `P → Q` to the context for the rest of the block.
+
+module Test.suppose_modifiers_test
+
+import Logic.basics
+import Logic.excluded_middle
+
+-- (1) Reductio with a named assumption. Goal `P`; assume `Not(P)` and
+-- reach a contradiction from `notNotP`. `contradiction;` closes the
+-- `False` goal from the (notP, notNotP) pair in scope.
+theorem Test.dne_via_for_contradiction
+        (P : Proposition) (notNotP : Not(Not(P))) : P := {
+  suppose Not(P) as notP for contradiction;
+  contradiction
+}
+
+-- (2) Same, with the assumption left anonymous — `contradiction;` still
+-- finds the supposed `Not(P)` by type.
+theorem Test.dne_via_for_contradiction_anonymous
+        (P : Proposition) (notNotP : Not(Not(P))) : P := {
+  suppose Not(P) for contradiction;
+  contradiction
+}
+
+-- (3) The classic shape: a goal that is not itself a negation, proved by
+-- assuming its negation. Excluded middle for any proposition.
+theorem Test.excluded_middle_via_for_contradiction
+        (P : Proposition) : Or(P, Not(P)) := {
+  suppose Not(Or(P, Not(P))) as notExcluded for contradiction;
+  claim notP : Not(P) by {
+    suppose P as p;
+    notExcluded(Or.introduceLeft(p))
+  };
+  notExcluded(Or.introduceRight(notP))
+}
+
+-- (4) Forward `to prove`: prove `Q` under the hypothesis `P`, binding
+-- `P → Q` into the context, then discharge the real goal with it.
+theorem Test.modus_ponens_via_to_prove
+        (P Q : Proposition) (pq : P → Q) (p : P) : Q := {
+  suppose P as hp to prove Q {
+    pq(hp)
+  };
+  done
+}
+
+-- (5) Forward `for contradiction` (braced): establish `X` by contradiction
+-- as an intermediate step — the block derives False under `Not(X)`, `X`
+-- enters the context (anonymously), and the proof continues at the
+-- original goal `Q`, which `xq` then discharges using the established `X`.
+theorem Test.forward_for_contradiction_then_use
+        (X Q : Proposition) (notNotX : Not(Not(X))) (xq : X → Q) : Q := {
+  suppose Not(X) as notX for contradiction {
+    notNotX(notX)
+  };
+  done by xq
+}
+
+-- (6) The braced block is genuinely scoped: after it, more proof can run
+-- at the original goal. Here the established `X` feeds a second, ordinary
+-- step before the goal is closed.
+theorem Test.forward_for_contradiction_scoped
+        (X : Proposition) (notNotX : Not(Not(X))) : And(X, X) := {
+  suppose Not(X) as notX for contradiction {
+    notNotX(notX)
+  };
+  claim left : X;
+  And.introduction(left, left)
+}
+
+-- (7) Forward `for contradiction` with a *positive* (non-`Not`) assumption
+-- is plain negation-introduction: assuming `P` and deriving False
+-- establishes `Not(P)` (not a double negation), which then discharges the
+-- goal. This is the shape IVT uses (`suppose f(c) > 0 for contradiction`,
+-- then a totality lemma bridges `¬(0 < x)` to `x ≤ 0`).
+theorem Test.forward_for_contradiction_positive
+        (P Q : Proposition) (pImpossible : Not(P)) (notPgivesQ : Not(P) → Q) : Q := {
+  suppose P as p for contradiction {
+    pImpossible(p)
+  };
+  done by notPgivesQ
+}

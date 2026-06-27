@@ -302,6 +302,13 @@ a < c
 
 ## 4. Implication intro: `suppose`
 
+> **Implemented in the current elaborator** (`for contradiction` and
+> `to prove Q { … }` modifiers on `suppose`). The current forms keep `as h`
+> (optional for the modifiers) and the explicit DNE step is inserted as
+> `Logic.by_contradiction` rather than relying on a silent prover coercion —
+> that coercion was deliberately dropped (see `Test/dne_bridge_test`). The
+> rest of this section is the original design note.
+
 Replaces `assume`. Two modes; `to prove` optional:
 
 - **Backward** (current goal is already `P → Q`): `suppose P { … }` peels

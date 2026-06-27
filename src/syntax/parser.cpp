@@ -1003,17 +1003,27 @@ private:
         // `SurfaceChoose` (the elaborator handles the scope lookup).
         struct BlockWrapper {
             enum Kind { TypedLet, PatternLet, Suppose, Choose, Set,
-                        NoteGoal, NoteAssertion, ChangeGoal };
+                        NoteGoal, NoteAssertion, ChangeGoal,
+                        SupposeForContradiction,
+                        SupposeForContradictionForward, SupposeToProve };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet, Suppose
                                                // (when set on Suppose,
                                                // wrap body in cases on
                                                // the introduced binder)
-            std::string name;                  // TypedLet, Suppose, Choose, Set
-            SurfaceExpressionPointer type;     // TypedLet, Suppose, NoteGoal
-            SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set, NoteAssertion
+            std::string name;                  // TypedLet, Suppose, Choose, Set,
+                                               // SupposeForContradiction/ToProve
+                                               // (the assumed hypothesis name)
+            SurfaceExpressionPointer type;     // TypedLet, Suppose, NoteGoal;
+                                               // the assumed P for
+                                               // SupposeForContradiction/ToProve
+            SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set,
+                                               // NoteAssertion; the goal Q for
+                                               // SupposeToProve
             std::string conditionName;         // Choose: optional `as <name>`
-            SurfaceExpressionPointer source;   // Choose: optional `from <source>`
+            SurfaceExpressionPointer source;   // Choose: optional `from <source>`;
+                                               // the `{ block }` for SupposeToProve
+                                               // and SupposeForContradictionForward
             // Only set for TypedLet wrappers that came from `calc … as NAME;`
             // with an explicit user-supplied NAME. Propagated onto the
             // resulting SurfaceLet so the elaborator can emit the
@@ -1299,19 +1309,92 @@ private:
                 // immediately destructure via `cases <fresh> { | <pat>
                 // => body }`. Reads as "suppose ∃x. P(x), say
                 // ⟨w, p⟩." with the destructure inline.
-                wrapper.kind = BlockWrapper::Suppose;
+                //
+                // Two trailing modifiers turn it into a classical or a
+                // forward step:
+                //   `suppose P [as h] for contradiction;` — assume P,
+                //     derive False through the continuation, and prove
+                //     the goal by double-negation elimination.
+                //   `suppose P [as h] to prove Q { block };` — prove Q
+                //     under the assumption P, adding `P → Q` to the
+                //     context for the rest of the block.
                 wrapper.type = parseExpression();
-                expect(TokenKind::KeywordAs,
-                       "after suppose proposition (suppose P as h;)");
-                SurfacePatternPointer asPattern = parsePattern();
-                if (auto* bare = std::get_if<SurfacePatternBareName>(
-                        &asPattern->node)) {
-                    wrapper.name = bare->name;
+                // Optional `as <pattern>` — required for plain suppose,
+                // optional for the modifier forms.
+                SurfacePatternPointer asPattern;
+                if (peek().kind == TokenKind::KeywordAs) {
+                    consumeAny();  // 'as'
+                    asPattern = parsePattern();
+                }
+                // `for`/`to`/`prove` are ordinary identifiers everywhere
+                // except this slot — text-match so they stay usable as
+                // variable names.
+                bool isForContradiction =
+                    peek().kind == TokenKind::Identifier
+                    && peek().lexeme == "for";
+                bool isToProve =
+                    peek().kind == TokenKind::Identifier
+                    && peek().lexeme == "to";
+                if (isForContradiction) {
+                    consumeAny();  // 'for'
+                    expect(TokenKind::KeywordContradiction,
+                           "after 'for' in suppose "
+                           "(suppose P for contradiction;)");
+                    // A braced `{ … }` makes it a forward step: the block
+                    // derives False, the proven fact enters the context,
+                    // and the rest of the proof continues at the original
+                    // goal. Without braces the continuation IS the
+                    // False-derivation and the construct proves the goal.
+                    if (peek().kind == TokenKind::LeftBrace) {
+                        wrapper.kind =
+                            BlockWrapper::SupposeForContradictionForward;
+                        wrapper.source = parseExpression();  // the `{ block }`
+                    } else {
+                        wrapper.kind = BlockWrapper::SupposeForContradiction;
+                    }
+                } else if (isToProve) {
+                    consumeAny();  // 'to'
+                    if (peek().kind != TokenKind::Identifier
+                        || peek().lexeme != "prove") {
+                        throwHere("expected 'prove' after 'to' in suppose "
+                                  "(suppose P to prove Q { … });");
+                    }
+                    consumeAny();  // 'prove'
+                    wrapper.kind = BlockWrapper::SupposeToProve;
+                    wrapper.value = parseExpression();  // the goal Q
+                    if (peek().kind != TokenKind::LeftBrace) {
+                        throwHere("suppose … to prove Q needs a `{ … }` "
+                                  "proof block "
+                                  "(suppose P to prove Q { … });");
+                    }
+                    wrapper.source = parseExpression();  // the `{ block }`
+                } else {
+                    wrapper.kind = BlockWrapper::Suppose;
+                    if (!asPattern) {
+                        throwHere("expected 'as' after suppose proposition "
+                                  "(suppose P as h;)");
+                    }
+                }
+                // Resolve the `as` pattern into a name (bare) or, for
+                // plain suppose, a fresh binder plus destructure pattern.
+                if (asPattern) {
+                    if (auto* bare = std::get_if<SurfacePatternBareName>(
+                            &asPattern->node)) {
+                        wrapper.name = bare->name;
+                    } else if (wrapper.kind == BlockWrapper::Suppose) {
+                        wrapper.name = "_supposed_"
+                            + std::to_string(statementToken.line) + "_"
+                            + std::to_string(statementToken.column);
+                        wrapper.pattern = std::move(asPattern);
+                    } else {
+                        throwHere("suppose … for contradiction / to prove "
+                                  "takes a plain `as <name>`, not a "
+                                  "destructuring pattern");
+                    }
                 } else {
                     wrapper.name = "_supposed_"
                         + std::to_string(statementToken.line) + "_"
                         + std::to_string(statementToken.column);
-                    wrapper.pattern = std::move(asPattern);
                 }
             } else if (isChoose) {
                 wrapper.kind = BlockWrapper::Choose;
@@ -1613,6 +1696,136 @@ private:
                         std::move(result),
                         iterator->line, iterator->column,
                         /*fromStatementIntro=*/true);
+                    break;
+                }
+                case BlockWrapper::SupposeForContradiction: {
+                    // `suppose P as h for contradiction;` proves the goal
+                    // Q by reductio: the continuation derives `False`
+                    // under `h : P`, so `(h : P) ↦ <continuation>` proves
+                    // `Not(P)`. With `P` the negation of the goal this is
+                    // `Not(Not(Q))`, and `Logic.by_contradiction`
+                    // eliminates the double negation — `proposition` is
+                    // implicit, recovered from the goal.
+                    SurfaceBinder binder;
+                    binder.names.push_back(std::move(iterator->name));
+                    binder.type = std::move(iterator->type);
+                    binder.isImplicit = false;
+                    SurfaceExpressionPointer refutation = makeSurfaceLambda(
+                        std::move(binder),
+                        std::move(result),
+                        iterator->line, iterator->column,
+                        /*fromStatementIntro=*/true);
+                    std::vector<SurfaceExpressionPointer> arguments;
+                    arguments.push_back(std::move(refutation));
+                    result = makeSurfaceApplication(
+                        makeSurfaceIdentifier("Logic.by_contradiction", {},
+                                              iterator->line,
+                                              iterator->column),
+                        std::move(arguments),
+                        iterator->line, iterator->column);
+                    break;
+                }
+                case BlockWrapper::SupposeForContradictionForward: {
+                    // `suppose P as h for contradiction { block };` is the
+                    // forward step: the braced block derives False under
+                    // `h : P`, establishing a fact into the context
+                    // (anonymously, for the auto-prover to pick up by type)
+                    // while the rest of the block continues at the original
+                    // goal. What it establishes depends on `P`:
+                    //   * `P = Not(X)` — `(h : Not(X)) ↦ block` proves
+                    //     `Not(Not(X))`, and `Logic.by_contradiction`
+                    //     eliminates the double negation to `X` (the inner
+                    //     proposition, recovered by unifying `P` with
+                    //     `Not(X)`). Reads "suppose ¬X for contradiction;
+                    //     hence X".
+                    //   * `P` not a negation — `(h : P) ↦ (block : False)`
+                    //     is plain negation-introduction, establishing
+                    //     `Not(P)` (a totality lemma then bridges, e.g.
+                    //     `¬(0 < x)` to `x ≤ 0`).
+                    bool assumptionIsNegation = false;
+                    if (auto* unary = std::get_if<SurfaceUnaryOperation>(
+                            &iterator->type->node)) {
+                        assumptionIsNegation = unary->opSymbol == "¬";
+                    } else if (auto* application =
+                                   std::get_if<SurfaceApplication>(
+                                       &iterator->type->node)) {
+                        if (auto* head = std::get_if<SurfaceIdentifier>(
+                                &application->function->node)) {
+                            assumptionIsNegation =
+                                head->qualifiedName == "Not"
+                                && application->arguments.size() == 1;
+                        }
+                    }
+                    SurfaceExpressionPointer body =
+                        std::move(iterator->source);
+                    if (!assumptionIsNegation) {
+                        body = makeSurfaceAscription(
+                            std::move(body),
+                            makeSurfaceIdentifier("False", {},
+                                                  iterator->line,
+                                                  iterator->column),
+                            iterator->line, iterator->column);
+                    }
+                    SurfaceBinder binder;
+                    binder.names.push_back(std::move(iterator->name));
+                    binder.type = std::move(iterator->type);
+                    binder.isImplicit = false;
+                    SurfaceExpressionPointer refutation = makeSurfaceLambda(
+                        std::move(binder),
+                        std::move(body),
+                        iterator->line, iterator->column,
+                        /*fromStatementIntro=*/true);
+                    SurfaceExpressionPointer provenFact;
+                    if (assumptionIsNegation) {
+                        std::vector<SurfaceExpressionPointer> arguments;
+                        arguments.push_back(std::move(refutation));
+                        provenFact = makeSurfaceApplication(
+                            makeSurfaceIdentifier("Logic.by_contradiction", {},
+                                                  iterator->line,
+                                                  iterator->column),
+                            std::move(arguments),
+                            iterator->line, iterator->column);
+                    } else {
+                        provenFact = std::move(refutation);
+                    }
+                    result = makeSurfaceLet(
+                        "_contradiction_fact_"
+                            + std::to_string(iterator->line) + "_"
+                            + std::to_string(iterator->column),
+                        /*type=*/nullptr,
+                        std::move(provenFact),
+                        std::move(result),
+                        iterator->line, iterator->column);
+                    break;
+                }
+                case BlockWrapper::SupposeToProve: {
+                    // `suppose P as h to prove Q { block };` proves Q under
+                    // `h : P`, then binds the resulting `P → Q` into the
+                    // context (anonymously, for the auto-prover to pick up
+                    // by type) for the rest of the block. The block is
+                    // ascribed to Q so it elaborates at that goal.
+                    SurfaceExpressionPointer provedGoal =
+                        makeSurfaceAscription(
+                            std::move(iterator->source),
+                            std::move(iterator->value),
+                            iterator->line, iterator->column);
+                    SurfaceBinder binder;
+                    binder.names.push_back(std::move(iterator->name));
+                    binder.type = std::move(iterator->type);
+                    binder.isImplicit = false;
+                    SurfaceExpressionPointer implication = makeSurfaceLambda(
+                        std::move(binder),
+                        std::move(provedGoal),
+                        iterator->line, iterator->column,
+                        /*fromStatementIntro=*/true);
+                    result = makeSurfaceLet(
+                        "_toprove_"
+                            + std::to_string(iterator->line) + "_"
+                            + std::to_string(iterator->column),
+                        /*type=*/nullptr,
+                        std::move(implication),
+                        std::move(result),
+                        iterator->line, iterator->column);
                     break;
                 }
                 case BlockWrapper::NoteGoal:
