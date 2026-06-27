@@ -44,6 +44,7 @@ import Real.ring
 import Real.algebra
 import Real.order
 import Real.absolute_value
+import Real.division
 
 -- ----------------------------------------------------------------------
 -- ε–N convergence: `s : Natural → Real` converges to `limit : Real`
@@ -97,7 +98,7 @@ theorem Real.SequenceConverges.of_rational
   (epsilon : Real) (epsilonPositive : epsilon > 0) ↦ {
     choose q such that Rational.zero < q ∧ (q : Real) < epsilon
         as qData
-        from Real.exists_positive_rational_below(epsilon, epsilonPositive);
+        from Real.exists_positive_rational_below;
     claim qPositive : Rational.zero < q;
     claim qBelowEpsilon : (q : Real) < epsilon;
     choose N as boundAtN from rationalBound(q, qPositive);
@@ -233,6 +234,22 @@ theorem Real.eq_of_absolute_value_less_than_all_positive
     done by Quotient.equivalent_implies_equal
   } }
 
+-- The same conclusion from a real-ε hypothesis: slip a rational under any
+-- positive real ε and fall back on the rational-ε version.
+theorem Real.eq_of_absolute_value_less_than_all_positive_real (x : Real)
+        (hypothesis : ∀ (epsilon : Real). epsilon > 0 → abs(x) < epsilon)
+        : x = Real.zero := {
+  claim ∀ (epsilon : Rational). Rational.zero < epsilon → abs(x) < (epsilon : Real)
+      by {
+        take epsilon : Rational;
+        take epsilonPositive : Rational.zero < epsilon;
+        claim epsilonRealPositive : (epsilon : Real) > 0
+            since Rational.to_real.positive_preserves;
+        done by hypothesis((epsilon : Real), epsilonRealPositive)
+      };
+  done since Real.eq_of_absolute_value_less_than_all_positive
+}
+
 -- ----------------------------------------------------------------------
 -- `x - y = 0 → x = y` on Real. A small ring corollary: add y to both
 -- sides.
@@ -273,20 +290,16 @@ theorem Real.SequenceConverges.unique
         (convergesToL1 : Real.SequenceConverges(s, L1))
         (convergesToL2 : Real.SequenceConverges(s, L2))
         : L1 = L2 := {
-  -- For every ε > 0, by triangle inequality on (L1 - s(m)) + (s(m) - L2)
-  -- and the two ε/2 bounds, we get |L1 - L2| < ε.
-  claim ∀ (epsilon : Rational). Rational.zero < epsilon
-            → abs(L1 - L2) < epsilon
+  -- For every ε > 0, the triangle inequality on (L1 - s(m)) + (s(m) - L2)
+  -- and the two ε/2 bounds give |L1 - L2| < ε.
+  claim ∀ (epsilon : Real). epsilon > 0 → abs(L1 - L2) < epsilon
     by {
-      take epsilon : Rational;
-      take epsilonPositive : Rational.zero < epsilon;
-      claim halvedEpsilonPositive : Rational.zero < Rational.halve(epsilon);
-      choose N1 as boundFromL1
-          from Real.SequenceConverges.at_rational(s, L1, convergesToL1)(
-                   Rational.halve(epsilon), halvedEpsilonPositive);
-      choose N2 as boundFromL2
-          from Real.SequenceConverges.at_rational(s, L2, convergesToL2)(
-                   Rational.halve(epsilon), halvedEpsilonPositive);
+      take epsilon : Real;
+      take epsilonPositive : epsilon > 0;
+      claim (2 : Real) > 0 since Real.two_positive;
+      claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
+      choose N1 as boundFromL1 from convergesToL1(epsilon / 2, halfPositive);
+      choose N2 as boundFromL2 from convergesToL2(epsilon / 2, halfPositive);
       let m : Natural := Natural.maximum(N1, N2);
       claim N1 ≤ m since Natural.left_le_max;
       claim N2 ≤ m since Natural.right_le_max;
@@ -294,22 +307,17 @@ theorem Real.SequenceConverges.unique
       -- |L - s| so triangle's two summands share orientation.
       calc abs(L1 - s(m))
               = abs(s(m) - L1)
-              < (Rational.halve(epsilon) : Real);
-      claim abs(s(m) - L2) < Rational.halve(epsilon);
-      -- |L1 - L2| ≤ |L1 - s(m)| + |s(m) - L2|
-      --          < halve(ε) + halve(ε) = ε.
-      -- The opening = step rewrites L1 - L2 as (L1 - s(m)) + (s(m) - L2)
-      -- via ring; diff-inference wraps it under abs(·).
+              < epsilon / 2        by boundFromL1(m, (N1 ≤ m));
+      claim abs(s(m) - L2) < epsilon / 2 by boundFromL2(m, (N2 ≤ m));
       calc abs(L1 - L2)
          = abs((L1 - s(m)) + (s(m) - L2))            by (ring : (L1 - s(m)) + (s(m) - L2) = L1 - L2)
          ≤ abs(L1 - s(m)) + abs(s(m) - L2)
-         < (Rational.halve(epsilon) : Real)
-             + (Rational.halve(epsilon) : Real)
+         < epsilon / 2 + epsilon / 2
                  since Real.LessThan.add_strict_strict
-         = ((Rational.halve(epsilon) + Rational.halve(epsilon)) : Real)
-         = (epsilon : Real)
+         = epsilon
+                 by field
     };
-  claim L1 - L2 = Real.zero since Real.eq_of_absolute_value_less_than_all_positive;
+  claim L1 - L2 = Real.zero since Real.eq_of_absolute_value_less_than_all_positive_real;
   done
 }
 

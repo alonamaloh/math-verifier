@@ -175,6 +175,7 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
   -- the construction is done at a rational tolerance and lifted by density.
   Real.SequenceConverges.of_rational(
       (n : Natural) ↦ s(n) * t(n), sLimit * tLimit,
+      rationalBound :=
   (epsilon : Rational)
   (epsilonPositive : Rational.zero < epsilon) ↦ {
     -- Rational roofs over the two limits.
@@ -212,16 +213,23 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
         since Rational.multiply_positive_positive;
     -- Tail indices: s within one unit of its limit (for the roof), and
     -- each sequence within its tolerance.
+    claim sCloseAt : ∀ (tolerance : Rational). Rational.zero < tolerance →
+            ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
+              abs(s(m) - sLimit) < (tolerance : Real)
+        since Real.SequenceConverges.at_rational;
+    claim tCloseAt : ∀ (tolerance : Rational). Rational.zero < tolerance →
+            ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
+              abs(t(m) - tLimit) < (tolerance : Real)
+        since Real.SequenceConverges.at_rational;
     choose unitThreshold as sUnitClose
-        from Real.SequenceConverges.at_rational(s, sLimit, sConverges)(
-                 Rational.one, (Rational.zero < Rational.one));
+        from sCloseAt(Rational.one, (Rational.zero < Rational.one));
     choose tThreshold as tClose
-        from Real.SequenceConverges.at_rational(t, tLimit, tConverges)(
+        from tCloseAt(
                  quarterEpsilon
                      * Rational.reciprocal_function(Rational.one + sRoof),
                  tTolerancePositive);
     choose sThreshold as sClose
-        from Real.SequenceConverges.at_rational(s, sLimit, sConverges)(
+        from sCloseAt(
                  quarterEpsilon
                      * Rational.reciprocal_function(tRoof),
                  sTolerancePositive);
@@ -467,50 +475,42 @@ theorem Real.SequenceConverges.le_of_eventually_le
         (N : Natural)
         (tailBelow : ∀ (m : Natural). N ≤ m → s(m) ≤ bound)
         : limit ≤ bound := {
-  claim ¬(bound < limit)
-      by (above : bound < limit) ↦ {
-           calc Real.zero
-              = bound - bound
-              < limit - bound       since Real.add_preserves_LessThan;
-           choose epsilon such that
-                    Rational.zero < epsilon ∧ (epsilon : Real) < (limit - bound)
-               as epsilonData from Real.exists_positive_rational_below;
-           claim epsilonPositive : Rational.zero < epsilon by And.left(epsilonData);
-           claim epsilon < (limit - bound)
-               by And.right(epsilonData);
-           choose M as tailClose
-               from Real.SequenceConverges.at_rational(s, limit, converges)(
-                        epsilon, epsilonPositive);
-           claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
-           claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
-           claim s(Natural.maximum(N, M)) ≤ bound;
-           claim abs(s(Natural.maximum(N, M)) - limit) < epsilon
-               by tailClose(Natural.maximum(N, M),
-                            (M ≤ Natural.maximum(N, M)));
-           claim bounds : -(epsilon : Real) < (s(Natural.maximum(N, M)) - limit)
-                 ∧ (s(Natural.maximum(N, M)) - limit) < (epsilon : Real)
-               since Real.absolute_value_LessThan_bounds;
-           claim -(epsilon : Real) < s(Natural.maximum(N, M)) - limit
-               by And.left(bounds);
-           calc limit - epsilon
-              = -(epsilon : Real) + limit
-              < (s(Natural.maximum(N, M)) - limit) + limit
-                    since Real.add_preserves_LessThan
-              = s(Natural.maximum(N, M));
-           calc bound + epsilon
-              < bound + (limit - bound)
-                    since Real.add_left_preserves_LessThan
-              = limit;
-           calc bound
-              = (bound + (epsilon : Real)) - (epsilon : Real)
-              < limit - (epsilon : Real)
-                    since Real.add_preserves_LessThan
-              < s(Natural.maximum(N, M));
-           claim bound < bound since Real.LessThan.transitive_right;
-           claim notSelfEqual : ¬(bound = bound)
-               since Real.LessThan.distinct;
-           absurd(notSelfEqual(reflexivity(Real, bound)))
-         };
+  suppose bound < limit as above for contradiction {
+    calc Real.zero
+       = bound - bound
+       < limit - bound       since Real.add_preserves_LessThan;
+    let epsilon : Real := (limit - bound) / 2;
+    claim (2 : Real) > 0 since Real.two_positive;
+    claim epsilonPositive : (limit - bound) / 2 > 0 since Real.divide_positive;
+    claim epsilon < limit - bound since Real.divide_two_less_than_self;
+    choose M as tailClose from converges(epsilon, epsilonPositive);
+    claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
+    claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
+    claim s(Natural.maximum(N, M)) ≤ bound;
+    claim abs(s(Natural.maximum(N, M)) - limit) < epsilon
+        by tailClose(Natural.maximum(N, M), (M ≤ Natural.maximum(N, M)));
+    claim bounds : -epsilon < (s(Natural.maximum(N, M)) - limit)
+          ∧ (s(Natural.maximum(N, M)) - limit) < epsilon
+        since Real.absolute_value_LessThan_bounds;
+    claim -epsilon < s(Natural.maximum(N, M)) - limit by And.left(bounds);
+    calc limit - epsilon
+       = -epsilon + limit
+       < (s(Natural.maximum(N, M)) - limit) + limit
+             since Real.add_preserves_LessThan
+       = s(Natural.maximum(N, M));
+    calc bound + epsilon
+       < bound + (limit - bound)
+             since Real.add_left_preserves_LessThan
+       = limit;
+    calc bound
+       = (bound + epsilon) - epsilon
+       < limit - epsilon
+             since Real.add_preserves_LessThan
+       < s(Natural.maximum(N, M));
+    claim bound < bound since Real.LessThan.transitive_right;
+    claim notSelfEqual : ¬(bound = bound) since Real.LessThan.distinct;
+    absurd(notSelfEqual(reflexivity(Real, bound)))
+  };
   done since Real.LessOrEqual_of_not_LessThan
 }
 
@@ -520,45 +520,37 @@ theorem Real.SequenceConverges.ge_of_eventually_ge
         (N : Natural)
         (tailAbove : ∀ (m : Natural). N ≤ m → bound ≤ s(m))
         : bound ≤ limit := {
-  claim ¬(limit < bound)
-      by (below : limit < bound) ↦ {
-           calc Real.zero
-              = limit - limit
-              < bound - limit       since Real.add_preserves_LessThan;
-           choose epsilon such that
-                    Rational.zero < epsilon ∧ (epsilon : Real) < (bound - limit)
-               as epsilonData from Real.exists_positive_rational_below;
-           claim epsilonPositive : Rational.zero < epsilon by And.left(epsilonData);
-           claim epsilon < (bound - limit)
-               by And.right(epsilonData);
-           choose M as tailClose
-               from Real.SequenceConverges.at_rational(s, limit, converges)(
-                        epsilon, epsilonPositive);
-           claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
-           claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
-           claim bound ≤ s(Natural.maximum(N, M));
-           claim abs(s(Natural.maximum(N, M)) - limit) < epsilon
-               by tailClose(Natural.maximum(N, M),
-                            (M ≤ Natural.maximum(N, M)));
-           claim bounds : -(epsilon : Real) < (s(Natural.maximum(N, M)) - limit)
-                 ∧ (s(Natural.maximum(N, M)) - limit) < (epsilon : Real)
-               since Real.absolute_value_LessThan_bounds;
-           claim s(Natural.maximum(N, M)) - limit < epsilon
-               by And.right(bounds);
-           calc s(Natural.maximum(N, M))
-              = (s(Natural.maximum(N, M)) - limit) + limit
-              < (epsilon : Real) + limit
-                    since Real.add_preserves_LessThan
-              = limit + epsilon;
-           calc s(Natural.maximum(N, M))
-              < limit + (epsilon : Real)
-              < limit + (bound - limit)
-                    since Real.add_left_preserves_LessThan
-              = bound;
-           claim bound < bound since Real.LessThan.transitive_left;
-           claim notSelfEqual : ¬(bound = bound)
-               since Real.LessThan.distinct;
-           absurd(notSelfEqual(reflexivity(Real, bound)))
-         };
+  suppose limit < bound as below for contradiction {
+    calc Real.zero
+       = limit - limit
+       < bound - limit       since Real.add_preserves_LessThan;
+    let epsilon : Real := (bound - limit) / 2;
+    claim (2 : Real) > 0 since Real.two_positive;
+    claim epsilonPositive : (bound - limit) / 2 > 0 since Real.divide_positive;
+    claim epsilon < bound - limit since Real.divide_two_less_than_self;
+    choose M as tailClose from converges(epsilon, epsilonPositive);
+    claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
+    claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
+    claim bound ≤ s(Natural.maximum(N, M));
+    claim abs(s(Natural.maximum(N, M)) - limit) < epsilon
+        by tailClose(Natural.maximum(N, M), (M ≤ Natural.maximum(N, M)));
+    claim bounds : -epsilon < (s(Natural.maximum(N, M)) - limit)
+          ∧ (s(Natural.maximum(N, M)) - limit) < epsilon
+        since Real.absolute_value_LessThan_bounds;
+    claim s(Natural.maximum(N, M)) - limit < epsilon by And.right(bounds);
+    calc s(Natural.maximum(N, M))
+       = (s(Natural.maximum(N, M)) - limit) + limit
+       < epsilon + limit
+             since Real.add_preserves_LessThan
+       = limit + epsilon;
+    calc s(Natural.maximum(N, M))
+       < limit + epsilon
+       < limit + (bound - limit)
+             since Real.add_left_preserves_LessThan
+       = bound;
+    claim bound < bound since Real.LessThan.transitive_left;
+    claim notSelfEqual : ¬(bound = bound) since Real.LessThan.distinct;
+    absurd(notSelfEqual(reflexivity(Real, bound)))
+  };
   done since Real.LessOrEqual_of_not_LessThan
 }
