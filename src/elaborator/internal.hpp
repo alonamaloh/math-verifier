@@ -1313,6 +1313,12 @@ private:
         std::string source;
         ExpressionPointer proofTerm;  // closed in current scope
         ExpressionPointer type;       // closed in current scope
+        // Structural-similarity score to the current goal (head + matching
+        // argument heads); higher = more likely the real match. Used only to
+        // ORDER candidates within a cost tier (a sound reordering — the kernel
+        // still rechecks whatever closes the goal), so the defeq winner is
+        // tried first instead of after a run of head-compatible near-misses.
+        int score = 0;
     };
 
     std::vector<ContextFact> collectContextFacts(

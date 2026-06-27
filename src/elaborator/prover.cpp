@@ -26,6 +26,54 @@ long long autoProveWarnThresholdValue() {
     }();
     return cached;
 }
+
+// Cheap structural fingerprint of an expression's conclusion spine: the head
+// constant name plus the head-constant name of each top-level argument (empty
+// for a non-constant-headed argument). No WHNF, no allocation beyond the small
+// vectors — used only to ORDER auto-prover candidates, never to reject them.
+void spineHeadAndArgHeads(ExpressionPointer expression,
+                          std::string& head,
+                          std::vector<std::string>& argHeads) {
+    std::vector<ExpressionPointer> args;
+    ExpressionPointer cursor = expression;
+    while (auto* app = std::get_if<Application>(&cursor->node)) {
+        args.push_back(app->argument);
+        cursor = app->function;
+    }
+    if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+        head = constant->name;
+    } else {
+        head.clear();
+    }
+    argHeads.clear();
+    for (auto iter = args.rbegin(); iter != args.rend(); ++iter) {
+        argHeads.push_back(applicationHeadConstantName(*iter));
+    }
+}
+
+// Similarity of a candidate fact's conclusion to the goal: 0 when the heads
+// differ (so a head-mismatched fact keeps its tier's recency order), else
+// 1 + (number of argument positions whose head constants agree). Peels the
+// fact type's Pi chain to its conclusion first.
+int structuralSimilarityScore(const std::string& goalHead,
+                              const std::vector<std::string>& goalArgHeads,
+                              ExpressionPointer factType) {
+    if (goalHead.empty()) return 0;
+    ExpressionPointer cursor = factType;
+    while (auto* pi = std::get_if<Pi>(&cursor->node)) cursor = pi->codomain;
+    std::string factHead;
+    std::vector<std::string> factArgHeads;
+    spineHeadAndArgHeads(cursor, factHead, factArgHeads);
+    if (factHead != goalHead) return 0;
+    int score = 1;
+    size_t n = std::min(goalArgHeads.size(), factArgHeads.size());
+    for (size_t i = 0; i < n; ++i) {
+        if (!goalArgHeads[i].empty() && goalArgHeads[i] == factArgHeads[i]) {
+            ++score;
+        }
+    }
+    return score;
+}
 }  // namespace
 
 long long Elaborator::autoProveWarnThreshold() {
@@ -618,9 +666,27 @@ ExpressionPointer Elaborator::tryContextFactMatch(
         uint64_t goalHashUnreduced = spineHash(goalClosed);
         std::vector<ContextFact> facts = collectContextFacts(
             goalClosed, localBinders, goalHash, goalHashUnreduced);
-        std::sort(facts.begin(), facts.end(),
+        // Score each candidate by structural similarity to the goal, then
+        // order by (cost asc, score desc). Within a cost tier the candidate
+        // whose conclusion shares the goal's head + argument heads is tried
+        // first — on a hypothesis-heavy goal the defeq winner is usually one
+        // such match buried behind a run of head-compatible near-misses
+        // (other equalities/inequalities), so this turns ~N failed attempts
+        // before the win into ~1. Stable so recency order is the final
+        // tiebreak (collectLocalBinderFacts emits most-recent first).
+        {
+            std::string goalHead;
+            std::vector<std::string> goalArgHeads;
+            spineHeadAndArgHeads(goalClosed, goalHead, goalArgHeads);
+            for (ContextFact& fact : facts) {
+                fact.score = structuralSimilarityScore(
+                    goalHead, goalArgHeads, fact.type);
+            }
+        }
+        std::stable_sort(facts.begin(), facts.end(),
             [](const ContextFact& a, const ContextFact& b) {
-                return a.cost < b.cost;
+                if (a.cost != b.cost) return a.cost < b.cost;
+                return a.score > b.score;
             });
         // Reset profiling fields each call — only meaningful when
         // autoProveProfileEnabled_, but the writes are cheap.
