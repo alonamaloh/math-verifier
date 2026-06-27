@@ -507,6 +507,25 @@ returns its final non-`;`-terminated expression.
   (kernel sees through it; see the `let` section above).
 - `suppose <proposition> as <name>;` — introduce a hypothesis as a
   step (useful for breaking implication arrows into named pieces).
+- `suppose Not(G) [as h] for contradiction;` — reductio, **terminal**.
+  Assume `Not(G)` (the negation of the goal), derive `False` through the
+  rest of the block (e.g. ending in `contradiction;`), and the goal `G`
+  is closed by double-negation elimination. Reads as "suppose, for
+  contradiction, that …". The `as h` is optional — omit it when the
+  assumption is consumed by the prover rather than named.
+- `suppose Not(X) [as h] for contradiction { … };` — reductio,
+  **forward**. The braces scope the `False`-derivation: assuming
+  `Not(X)`, the block derives `False`, which establishes `X` into the
+  context (anonymously, for the auto-prover to pick up by type), and the
+  proof then **continues at the original goal**. Use this to prove an
+  intermediate fact `X` by contradiction mid-proof; the terminal form is
+  the special case where `X` is the goal and nothing follows. To name the
+  established fact, wrap the terminal form in a claim:
+  `claim hx : X by { suppose Not(X) for contradiction; … };`.
+- `suppose P [as h] to prove Q { … };` — forward implication intro.
+  Prove `Q` under the hypothesis `h : P` inside the block, which adds
+  `P → Q` to the context (anonymously, for the auto-prover to pick up by
+  type) for the rest of the proof. Reads as "suppose `P`; to prove `Q`: …".
 - `take <name> : <type>;` — introduce a Pi-binder of the given type
   from the expected type. Reads as the math-prose "take an arbitrary
   <name> of type <type>" / "let <name> ∈ <type> be given". Use
