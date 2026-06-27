@@ -469,6 +469,34 @@ private:
                 decl.opaque = true;
                 return decl;
             }
+            case TokenKind::KeywordAutomatic: {
+                // `automatic theorem/definition/axiom …` — consume the
+                // modifier and set the flag on the resulting declaration so
+                // the auto-prover may use it unprompted across modules.
+                consumeAny();  // 'automatic'
+                switch (peek().kind) {
+                    case TokenKind::KeywordTheorem: {
+                        SurfaceDefinitionDeclaration decl =
+                            parseDefinitionDeclaration(true);
+                        decl.automatic = true;
+                        return decl;
+                    }
+                    case TokenKind::KeywordDefinition: {
+                        SurfaceDefinitionDeclaration decl =
+                            parseDefinitionDeclaration(false);
+                        decl.automatic = true;
+                        return decl;
+                    }
+                    case TokenKind::KeywordAxiom: {
+                        SurfaceAxiomDeclaration decl = parseAxiomDeclaration();
+                        decl.automatic = true;
+                        return decl;
+                    }
+                    default:
+                        throwHere("expected 'theorem', 'definition', or "
+                                  "'axiom' after 'automatic'");
+                }
+            }
             case TokenKind::KeywordOperator:   return parseOperatorDeclaration();
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
             case TokenKind::KeywordCongruenceUnderBinder:

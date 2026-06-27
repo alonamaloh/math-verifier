@@ -23,7 +23,7 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // was expanded to a TREE on disk — Test/ring_test.mathv was 574 MB of
 // which gzip kept 17 (every shared subterm of the ring certificate
 // written out in full at every occurrence).
-constexpr uint32_t cacheVersion = 8;
+constexpr uint32_t cacheVersion = 9;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -425,6 +425,8 @@ void writeDeclaration(Writer& writer, const Declaration& declaration) {
         writer.writeU8(0);
         writeStringVector(writer, axiom->universeParameters);
         writeExpressionUnit(writer, axiom->type);
+        // Cache format v9 adds the `automatic` byte (Axiom + Definition).
+        writer.writeU8(axiom->automatic ? 1 : 0);
     } else if (auto* definition = std::get_if<Definition>(&declaration)) {
         writer.writeU8(1);
         writeStringVector(writer, definition->universeParameters);
@@ -434,6 +436,7 @@ void writeDeclaration(Writer& writer, const Declaration& declaration) {
         // read this byte; we bumped cacheVersion to 4 to force a
         // rebuild for cleanliness.
         writer.writeU8(static_cast<uint8_t>(definition->opacity));
+        writer.writeU8(definition->automatic ? 1 : 0);  // v9
     } else if (auto* inductive = std::get_if<Inductive>(&declaration)) {
         writer.writeU8(2);
         writeStringVector(writer, inductive->universeParameters);
@@ -467,6 +470,7 @@ Declaration readDeclaration(Reader& reader,
             Axiom axiom;
             axiom.universeParameters = readStringVector(reader);
             axiom.type = readExpressionUnit(reader);
+            axiom.automatic = (reader.readU8() != 0);  // v9
             return axiom;
         }
         case 1: {
@@ -486,12 +490,14 @@ Declaration readDeclaration(Reader& reader,
                 axiom.universeParameters =
                     std::move(definition.universeParameters);
                 axiom.type = std::move(definition.type);
+                axiom.automatic = (reader.readU8() != 0);  // v9
                 return axiom;
             }
             definition.body = readExpressionUnit(reader);
             uint8_t opacityByte = reader.readU8();
             definition.opacity = (opacityByte == 0)
                 ? Opacity::Transparent : Opacity::Opaque;
+            definition.automatic = (reader.readU8() != 0);  // v9
             return definition;
         }
         case 2: {

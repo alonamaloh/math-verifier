@@ -27,6 +27,18 @@ long long autoProveWarnThresholdValue() {
     return cached;
 }
 
+// Whether the auto-prover restricts its unprompted library tier to
+// `automatic`-tagged (or same-module) declarations. TEMP: env-gated during
+// the library migration; will become the default once foundational lemmas
+// are tagged.
+bool automaticRestrictEnabled() {
+    static const bool v = [] {
+        const char* e = std::getenv("MATH_AUTOMATIC");
+        return e && e[0] && e[0] != '0';
+    }();
+    return v;
+}
+
 // Cheap structural fingerprint of an expression's conclusion spine: the head
 // constant name plus the head-constant name of each top-level argument (empty
 // for a non-constant-headed argument). No WHNF, no allocation beyond the small
@@ -384,24 +396,30 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
             const auto& declaration = entry.second;
             ExpressionPointer declarationType;
             size_t universeParamCount = 0;
-            if (auto* def =
-                    std::get_if<Definition>(&declaration)) {
+            // Automatic-visibility filter. A Definition/Axiom from another
+            // module is in the unprompted pool only if it is `automatic`;
+            // declarations of the current module are always visible (the
+            // ".c-file interior"), as are constructors (fundamental, few,
+            // no syntax to tag). Meatier imports need an explicit `by`.
+            bool automaticOk = true;
+            if (auto* def = std::get_if<Definition>(&declaration)) {
                 declarationType = def->type;
-                universeParamCount =
-                    def->universeParameters.size();
-            } else if (auto* ax =
-                           std::get_if<Axiom>(&declaration)) {
+                universeParamCount = def->universeParameters.size();
+                automaticOk = def->automatic
+                    || moduleDeclarationNames_.count(name);
+            } else if (auto* ax = std::get_if<Axiom>(&declaration)) {
                 declarationType = ax->type;
-                universeParamCount =
-                    ax->universeParameters.size();
+                universeParamCount = ax->universeParameters.size();
+                automaticOk = ax->automatic
+                    || moduleDeclarationNames_.count(name);
             } else if (auto* ctor =
                            std::get_if<Constructor>(&declaration)) {
                 declarationType = ctor->type;
-                universeParamCount =
-                    ctor->universeParameters.size();
+                universeParamCount = ctor->universeParameters.size();
             } else {
                 continue;
             }
+            if (automaticRestrictEnabled() && !automaticOk) continue;
             if (universeParamCount != 0) continue;
             bool anyDepthMatches = false;
             ExpressionPointer depthCursor = declarationType;

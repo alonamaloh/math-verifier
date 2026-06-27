@@ -72,8 +72,11 @@ using Context = std::vector<ContextEntry>;
 // At a Constant use site, the caller supplies a matching list of Level
 // arguments; inferType substitutes those into the declaration's type.
 // Most declarations in everyday use have no parameters (empty vector).
+// `automatic` is elaborator-facing metadata (the kernel never reads it):
+// it whitelists the declaration for the auto-prover's unprompted
+// cross-module use. Persisted in the cache so importers see it.
 struct Axiom       { std::vector<std::string> universeParameters;
-                     ExpressionPointer type; };
+                     ExpressionPointer type; bool automatic = false; };
 // `opacity` controls whether the kernel may δ-unfold this definition
 // during reduction. Transparent (default): treated as today — the body
 // is unfolded freely, enabling β/ι to fire on definitions that compute
@@ -85,7 +88,9 @@ struct Axiom       { std::vector<std::string> universeParameters;
 enum class Opacity : uint8_t { Transparent = 0, Opaque = 1 };
 struct Definition  { std::vector<std::string> universeParameters;
                      ExpressionPointer type; ExpressionPointer body;
-                     Opacity opacity = Opacity::Transparent; };
+                     Opacity opacity = Opacity::Transparent;
+                     // See Axiom::automatic.
+                     bool automatic = false; };
 // An Inductive's `kind` is a Pi-chain ending in a Sort. The first
 // `numParameters` Pis bind parameters (uniform across constructors); the
 // remaining Pis bind indices (allowed to vary per constructor). For
@@ -256,7 +261,7 @@ struct Environment {
 // abstracts over; pass {} for a non-polymorphic axiom.
 void addAxiom(Environment& environment, std::string name,
               std::vector<std::string> universeParameters,
-              ExpressionPointer declaredType);
+              ExpressionPointer declaredType, bool automatic = false);
 
 inline void addAxiom(Environment& environment, std::string name,
                      ExpressionPointer declaredType) {
@@ -268,7 +273,8 @@ inline void addAxiom(Environment& environment, std::string name,
 void addDefinition(Environment& environment, std::string name,
                    std::vector<std::string> universeParameters,
                    ExpressionPointer declaredType, ExpressionPointer body,
-                   Opacity opacity = Opacity::Transparent);
+                   Opacity opacity = Opacity::Transparent,
+                   bool automatic = false);
 
 inline void addDefinition(Environment& environment, std::string name,
                           ExpressionPointer declaredType,

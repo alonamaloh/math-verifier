@@ -42,6 +42,7 @@ enum class TokenKind {
     KeywordDone,            // `done` — bare-`claim` synonym; closes the surrounding goal via auto-prover
     KeywordOkay,            // `okay` — same as `done`. Math-professor style (Aroca).
     KeywordOpaque,          // `opaque` — modifier on `definition`; blocks δ-unfolding
+    KeywordAutomatic,       // `automatic` — modifier on theorem/definition; auto-prover may use it unprompted across modules
     KeywordUnfold,          // `unfold X` — surface tactic to opt into δ-unfolding
     KeywordUnfolding,       // `by unfolding X` — δ-unfold X while discharging this step
     KeywordSubstitution,    // `by substitution` — auto-find equality + body

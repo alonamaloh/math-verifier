@@ -45,6 +45,7 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"done",          TokenKind::KeywordDone},
         {"okay",          TokenKind::KeywordOkay},
         {"opaque",        TokenKind::KeywordOpaque},
+        {"automatic",     TokenKind::KeywordAutomatic},
         {"unfold",        TokenKind::KeywordUnfold},
         {"unfolding",     TokenKind::KeywordUnfolding},
         {"substitution",  TokenKind::KeywordSubstitution},
@@ -346,6 +347,7 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordDone:
         case TokenKind::KeywordOkay:
         case TokenKind::KeywordOpaque:
+        case TokenKind::KeywordAutomatic:
         case TokenKind::KeywordUnfold:
         case TokenKind::KeywordUnfolding:
         case TokenKind::KeywordSubstitution:
@@ -402,6 +404,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordDone:          return "'done'";
         case TokenKind::KeywordOkay:          return "'okay'";
         case TokenKind::KeywordOpaque:        return "'opaque'";
+        case TokenKind::KeywordAutomatic:     return "'automatic'";
         case TokenKind::KeywordUnfold:        return "'unfold'";
         case TokenKind::KeywordUnfolding:     return "'unfolding'";
         case TokenKind::KeywordSubstitution:  return "'substitution'";

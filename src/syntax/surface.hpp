@@ -921,6 +921,8 @@ struct SurfaceAxiomDeclaration {
     std::string name;
     std::vector<std::string> universeParameters;
     SurfaceExpressionPointer type;
+    // `automatic axiom …` — see SurfaceDefinitionDeclaration::automatic.
+    bool automatic = false;
 };
 
 // `definition Name.{u} (arguments) : Type := body`  OR
@@ -943,6 +945,13 @@ struct SurfaceDefinitionDeclaration {
     // opacity). Forwarded to the kernel via `addDefinition`'s
     // Opacity parameter.
     bool opaque = false;
+    // `automatic theorem/definition Name … := body` whitelists `Name` for
+    // the auto-prover's UNPROMPTED use across modules: when verifying a
+    // different module, the context-fact scan considers `Name` only if it is
+    // automatic (or declared in that same module). Models "obvious lemmas a
+    // mathematician applies without thinking"; meatier imports need `by`.
+    // Forwarded to the kernel via the declaration's `automatic` flag.
+    bool automatic = false;
     // `construction Name(args) : T := body` — a transparent definition
     // additionally registered as a *canonical constructor* (a named
     // quotient-introduction form). Elaborates identically to a

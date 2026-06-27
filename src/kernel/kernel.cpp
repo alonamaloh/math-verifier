@@ -2085,7 +2085,7 @@ uint64_t kernelAddDeclCount = 0;
 void addAxiom(Environment& environment,
               std::string name,
               std::vector<std::string> universeParameters,
-              ExpressionPointer declaredType) {
+              ExpressionPointer declaredType, bool automatic) {
     validateName(name, "addAxiom: axiom name");
     for (const auto& parameterName : universeParameters) {
         validateName(parameterName, "addAxiom: universe parameter name");
@@ -2105,7 +2105,8 @@ void addAxiom(Environment& environment,
     }
     environment.declarations.emplace(
         std::move(name),
-        Axiom{std::move(universeParameters), std::move(declaredType)});
+        Axiom{std::move(universeParameters), std::move(declaredType),
+              automatic});
 }
 
 void addDefinition(Environment& environment,
@@ -2113,7 +2114,7 @@ void addDefinition(Environment& environment,
                    std::vector<std::string> universeParameters,
                    ExpressionPointer declaredType,
                    ExpressionPointer body,
-                   Opacity opacity) {
+                   Opacity opacity, bool automatic) {
     validateName(name, "addDefinition: definition name");
     for (const auto& parameterName : universeParameters) {
         validateName(parameterName, "addDefinition: universe parameter name");
@@ -2145,7 +2146,7 @@ void addDefinition(Environment& environment,
         std::move(name),
         Definition{std::move(universeParameters),
                    std::move(declaredType), std::move(body),
-                   opacity});
+                   opacity, automatic});
 }
 
 namespace {

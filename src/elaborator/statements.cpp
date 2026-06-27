@@ -655,7 +655,7 @@ void Elaborator::elaborateAxiom(const SurfaceAxiomDeclaration& declaration) {
         try {
             addAxiom(environment_, declaration.name,
                      finalUniverseParameters(declaration.universeParameters),
-                     std::move(type));
+                     std::move(type), declaration.automatic);
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }
@@ -1022,7 +1022,8 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
                           std::move(fullType), std::move(fullBody),
                           declaration.opaque
                               ? Opacity::Opaque
-                              : Opacity::Transparent);
+                              : Opacity::Transparent,
+                          declaration.automatic);
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }
