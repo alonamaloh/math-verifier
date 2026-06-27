@@ -1,5 +1,8 @@
 // Definitions of the pure term-surgery utilities declared in the header.
 #include "elaborator/term_utilities.hpp"
+#include "kernel/subtree_hash.hpp"
+
+#include <unordered_map>
 
 std::string headConstantName(const Environment& environment,
                              ExpressionPointer typeExpression) {
@@ -488,6 +491,39 @@ ExpressionPointer zetaUnfoldLetBinders(
 
 Context buildContextFromLocalBinders(
     const std::vector<LocalBinder>& localBinders) {
+    // Memoized: this is a pure function of `localBinders`, but it is called
+    // O(claims) times per proof with a slowly-growing binder list, and each
+    // build opens every binder against all lower ones — O(N^2) substitutions,
+    // the dominant elaboration cost on big proofs (e.g. Real.derivative's
+    // `multiply`). The opened context is identical whenever the binder
+    // signature (per-binder name + type + value + valueIsProof) matches.
+    // Expression pointers are interned, so pointer identity == structural
+    // identity; we keep the input binders alive in the cache entry, so an
+    // address can never be recycled to a different expression (soundness).
+    struct CacheEntry {
+        std::vector<LocalBinder> signature;  // keeps inputs alive + exact check
+        Context context;
+    };
+    static thread_local std::unordered_map<uint64_t, CacheEntry> cache;
+    uint64_t key = subtree_hash::kSeed;
+    for (const LocalBinder& binder : localBinders) {
+        key = subtree_hash::mix(key, subtree_hash::hashString(binder.name));
+        key = subtree_hash::mix(key, binder.type ? binder.type->hash : 0);
+        key = subtree_hash::mix(key, binder.value ? binder.value->hash : 0);
+        key = subtree_hash::mix(key, binder.valueIsProof ? 1u : 0u);
+    }
+    auto cached = cache.find(key);
+    if (cached != cache.end()) {
+        const std::vector<LocalBinder>& signature = cached->second.signature;
+        bool match = signature.size() == localBinders.size();
+        for (size_t i = 0; match && i < signature.size(); ++i) {
+            match = signature[i].name == localBinders[i].name
+                && signature[i].type.get() == localBinders[i].type.get()
+                && signature[i].value.get() == localBinders[i].value.get()
+                && signature[i].valueIsProof == localBinders[i].valueIsProof;
+        }
+        if (match) return cached->second.context;
+    }
     Context result;
     result.reserve(localBinders.size());
     for (size_t i = 0; i < localBinders.size(); ++i) {
@@ -506,6 +542,10 @@ Context buildContextFromLocalBinders(
         result.push_back({openingNameFor(localBinders, i), openedType,
                           FreeVariableOrigin::Internal, openedValue});
     }
+    // Bound to keep memory in check on pathological runs; the working set of
+    // distinct contexts in a single file is far smaller.
+    if (cache.size() > 100000) cache.clear();
+    cache.insert_or_assign(key, CacheEntry{localBinders, result});
     return result;
 }
 
