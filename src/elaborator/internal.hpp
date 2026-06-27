@@ -5409,18 +5409,13 @@ private:
     // ascriptions do). Flagging it would be a false positive.
     int calcDepth_ = 0;
     // The kernel-step budget below which a speculative redundancy auto-prove
-    // counts as "cheap enough to drop the hint". Tied to the expensive-step
-    // warn threshold (MATH_AUTOPROVE_WARN): a `by`/calc-step whose by-less
-    // re-proof would itself trip the warning is load-bearing for SPEED, not
-    // just correctness, so the redundancy checks must NOT flag it (else they
-    // tell you to delete the very hints that keep proofs fast). Returns the
-    // threshold; 0 means the cost gate is disabled (use the default budget).
-    long long autoProveWarnThreshold();
-
-    // Dedicated (stricter) effort cap for the redundancy checks' speculative
-    // re-proof: a hint is flagged redundant only when removing it leaves a
-    // near-free re-proof. Default 10K kernel-steps; MATH_REDUNDANT_BUDGET
-    // overrides (0 disables → fall back to the default auto-prove budget).
+    // counts as "cheap enough to drop the hint". Deliberately LOW (default
+    // 1000, well under the expensive-step warn threshold MATH_AUTOPROVE_WARN):
+    // a `by`/calc-step whose by-less re-proof costs real search is load-bearing
+    // for SPEED, not just correctness, so the redundancy checks must NOT flag
+    // it (else they tell you to delete the very hints that keep proofs fast).
+    // MATH_REDUNDANT_BUDGET overrides (0 disables → fall back to the default
+    // auto-prove budget).
     long long redundancyBudget();
 
     // RAII: lower the auto-prover effort budget to the redundancy threshold

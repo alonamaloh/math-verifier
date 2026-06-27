@@ -88,10 +88,6 @@ int structuralSimilarityScore(const std::string& goalHead,
 }
 }  // namespace
 
-long long Elaborator::autoProveWarnThreshold() {
-    return autoProveWarnThresholdValue();
-}
-
 namespace {
 // Effort cap (kernel reduction steps) for the speculative re-proof in the
 // redundancy checks. Deliberately LOW: a hint is "redundant" only when the
