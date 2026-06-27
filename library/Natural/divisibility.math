@@ -146,13 +146,35 @@ theorem Natural.divides_one_of_consecutive_multiples
 -- If `d` divides two consecutive numbers `a` and `a + 1`, then `d ∣ 1`.
 -- The witnesses give `a = d · q₁` and `a + 1 = d · q₂`, hence
 -- `(d · q₁) + 1 = d · q₂`; `divides_one_of_consecutive_multiples` finishes.
-theorem Natural.divides_consecutive_implies_divides_one
+theorem Natural.divides_consecutive_implies_one
         (d a : Natural) (dDividesA : d ∣ a) (dDividesSuccessorA : d ∣ successor(a))
-        : d ∣ 1 := {
+        : d = 1 := {
   choose firstQuotient such that a = d * firstQuotient as aEqualsDtimesFirst from dDividesA;
-  choose secondQuotient such that successor(a) = d * secondQuotient as successorAEqualsDtimesSecond from dDividesSuccessorA;
+  choose secondQuotient such that successor(a) = d * secondQuotient
+      as successorAEqualsDtimesSecond from dDividesSuccessorA;
   calc successor(d * firstQuotient)
      = successor(a)
      = d * secondQuotient;
-  done since Natural.divides_one_of_consecutive_multiples
+  claim d ∣ 1 since Natural.divides_one_of_consecutive_multiples;
+  -- d ∣ 1 bounds d above by 1; and d ≠ 0 (else successor(a) = d * q = 0), so
+  -- 1 ≤ d. Antisymmetry then pins d = 1.
+  claim d ≠ 0 by (dIsZero : d = 0) ↦ {
+    claim successor(a) = 0
+        by calc successor(a)
+              = d * secondQuotient
+              = 0 * secondQuotient            by substituting dIsZero
+              = 0;
+    claim impossible : False since Natural.successor_not_zero;
+    impossible
+  };
+  claim 1 ≤ d since Natural.one_le_of_nonzero;
+  claim oneBound : 1 = 0 ∨ d ≤ 1 by Natural.divides_less_or_equal_or_zero;
+  cases oneBound {
+    | Or.introduceLeft(oneIsZero) => {
+        claim impossible : False since Natural.successor_not_zero;
+        absurd(impossible)
+      }
+    | Or.introduceRight(dAtMostOne) =>
+        done since Natural.le_antisymmetric
+  }
 }
