@@ -12,8 +12,8 @@
 --     a point just above c lands in S (beating the upper bound c), or
 --     b itself lies in the band and f(b) < 0 contradicts f(b) ≥ 0.
 -- Everything runs on the sealed Real interface: the supremum from
--- completeness, the two-sided |·| bounds, and rational density for
--- turning the real gap |f(c)| into a rational tolerance.
+-- completeness and the two-sided |·| bounds; the tolerance is just
+-- half the gap, f(c)/2.
 
 module Real.intermediate_value
 
@@ -24,16 +24,6 @@ import Logic.excluded_middle
 import Equality.basics
 import Natural.basics
 import Natural.order
-import Rational.basics
-import Rational.addition
-import Rational.negation
-import Rational.ring
-import Rational.order
-import Rational.order_arithmetic
-import Rational.order_multiplication
-import Rational.halve
-import Rational.positive
-import Rational.linearity
 import Set.basics
 import Real.sequence
 import Real.basics
@@ -92,19 +82,17 @@ theorem Real.intermediate_value
   -- f(c) ≤ 0: otherwise f stays positive on a δ-band around c, so
   -- c − δ already bounds the candidate set — beating the least bound c.
   suppose f(c) > 0 for contradiction {
-      -- A rational tolerance inside the gap (0, f(c)).
-      claim ∃ (q : Rational). 0 < q ∧ (q : Real) < f(c)
-          since Real.exists_positive_rational_below;
-      choose epsilon such that 0 < epsilon ∧ (epsilon : Real) < f(c)
-          from given(∃ (q : Rational). 0 < q ∧ (q : Real) < f(c));
-      claim epsilonPositive : 0 < epsilon;
-      claim epsilonRealPositive : 0 < (epsilon : Real)
-          since Rational.to_real.positive_preserves;
+      -- A tolerance inside the gap (0, f(c)): half of f(c).
+      claim 0 < (2 : Real) since Real.two_positive;
+      claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
+      let epsilon : Real := f(c) / 2;
+      claim epsilonPositive : 0 < epsilon since Real.divide_positive;
+      claim epsilon < f(c) since Real.divide_two_less_than_self;
       choose delta such that
           0 < delta ∧ ∀ (y : Real). abs(y - c) < delta
-            → abs(f(y) - f(c)) < (epsilon : Real)
-          from fContinuousAtC((epsilon : Real), epsilonRealPositive);
-      claim fClose : ∀ (y : Real). abs(y - c) < delta → abs(f(y) - f(c)) < (epsilon : Real);
+            → abs(f(y) - f(c)) < epsilon
+          from fContinuousAtC(epsilon, epsilonPositive);
+      claim fClose : ∀ (y : Real). abs(y - c) < delta → abs(f(y) - f(c)) < epsilon;
       claim 0 < delta;
       -- Any candidate above c − δ would sit δ-close to c
       -- (candidates never exceed c), forcing f > 0 there —
@@ -125,19 +113,19 @@ theorem Real.intermediate_value
                            < delta;
                  claim yClose : abs(y - c) < delta
                      since Real.absolute_value_LessThan_of_bounds;
-                 claim abs(f(y) - f(c)) < (epsilon : Real)
+                 claim abs(f(y) - f(c)) < epsilon
                      by fClose(y, yClose);
-                 claim -(epsilon : Real) < f(y) - f(c) ∧ (f(y) - f(c)) < (epsilon : Real)
+                 claim -epsilon < f(y) - f(c) ∧ (f(y) - f(c)) < epsilon
                      since Real.absolute_value_LessThan_bounds;
                  -- 0 < f(c) − ε < f(y), yet f(y) ≤ 0.
                  calc 0
-                           = (epsilon : Real) - (epsilon : Real)
-                           < f(c) - (epsilon : Real)
+                           = epsilon - epsilon
+                           < f(c) - epsilon
                                  since Real.add_preserves_LessThan;
-                 claim 0 ≤ f(c) - (epsilon : Real)
+                 claim 0 ≤ f(c) - epsilon
                      since Real.LessThan.weaken;
-                 calc f(c) - (epsilon : Real)
-                           = -(epsilon : Real) + f(c)
+                 calc f(c) - epsilon
+                           = -epsilon + f(c)
                            < (f(y) - f(c)) + f(c)
                                  since Real.add_preserves_LessThan
                            = f(y);
@@ -170,49 +158,44 @@ theorem Real.intermediate_value
                 < 0 + -f(c)
                       since Real.add_preserves_LessThan
                 = -f(c);
-      -- A rational tolerance inside the gap (0, −f(c)).
-      claim ∃ (q : Rational). 0 < q ∧ (q : Real) < -f(c)
-          since Real.exists_positive_rational_below;
-      choose epsilon such that 0 < epsilon ∧ (epsilon : Real) < -f(c)
-          from given(∃ (q : Rational). 0 < q ∧ (q : Real) < -f(c));
-      claim epsilonPositive : 0 < epsilon;
-      claim epsilonRealPositive : 0 < (epsilon : Real)
-          since Rational.to_real.positive_preserves;
+      -- A tolerance inside the gap (0, −f(c)): half of −f(c).
+      claim 0 < (2 : Real) since Real.two_positive;
+      claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
+      let epsilon : Real := -f(c) / 2;
+      claim epsilonPositive : 0 < epsilon since Real.divide_positive;
+      claim epsilon < -f(c) since Real.divide_two_less_than_self;
       choose delta such that
           0 < delta ∧ ∀ (y : Real). abs(y - c) < delta
-            → abs(f(y) - f(c)) < (epsilon : Real)
-          from fContinuousAtC((epsilon : Real), epsilonRealPositive);
+            → abs(f(y) - f(c)) < epsilon
+          from fContinuousAtC(epsilon, epsilonPositive);
       claim 0 < delta;
-      claim fClose : ∀ (y : Real). abs(y - c) < delta → abs(f(y) - f(c)) < (epsilon : Real);
-      claim 0 < delta;
+      claim fClose : ∀ (y : Real). abs(y - c) < delta → abs(f(y) - f(c)) < epsilon;
       -- Everything δ-close to c keeps f negative.
       claim bandNegative
             : ∀ (y : Real). abs(y - c) < delta
               → f(y) < 0
           by (y : Real)
              (yClose : abs(y - c) < delta) ↦ {
-               claim abs(f(y) - f(c)) < (epsilon : Real)
+               claim abs(f(y) - f(c)) < epsilon
                    by fClose(y, yClose);
-               claim -(epsilon : Real) < f(y) - f(c) ∧ (f(y) - f(c)) < (epsilon : Real)
+               claim -epsilon < f(y) - f(c) ∧ (f(y) - f(c)) < epsilon
                    since Real.absolute_value_LessThan_bounds;
                -- f(y) < f(c) + ε < f(c) + (−f(c)) = 0.
-               calc f(c) + (epsilon : Real)
-                         = (epsilon : Real) + f(c)
+               calc f(c) + epsilon
+                         = epsilon + f(c)
                          < -f(c) + f(c)
                                since Real.add_preserves_LessThan
                          = 0;
                calc f(y)
                          = (f(y) - f(c)) + f(c)
-                         < (epsilon : Real) + f(c)
+                         < epsilon + f(c)
                                since Real.add_preserves_LessThan
-                         = f(c) + (epsilon : Real);
-               claim f(y) ≤ f(c) + (epsilon : Real)
+                         = f(c) + epsilon;
+               claim f(y) ≤ f(c) + epsilon
                    since Real.LessThan.weaken;
                done since Real.LessThan.transitive_left
              };
       -- The half-δ step we probe with.
-      claim 0 < (2 : Real) since Real.two_positive;
-      claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
       claim 0 < delta / 2 since Real.divide_positive;
       claim 0 ≤ delta / 2 since Real.LessThan.weaken;
       claim delta / 2 < delta since Real.divide_two_less_than_self;
