@@ -43,18 +43,19 @@ operator (/) on (Real, Real) := Real.divide
 -- a ≠ 0, then b = reciprocal(a)·(a·b) = reciprocal(a)·0 = 0.
 theorem Real.multiply_nonzero (a b : Real)
         (aNonzero : a ≠ Real.zero) (bNonzero : b ≠ Real.zero)
-        : a * b ≠ Real.zero :=
-  (abZero : a * b = Real.zero) ↦ {
+        : a * b ≠ Real.zero := {
+  suppose a * b = Real.zero as abZero for contradiction {
     claim aReciprocal : a * a⁻¹ = Real.one since Real.reciprocal_multiplies;
-    claim bZero : b = Real.zero
-        by calc b
-              = Real.one * b              by ring
-              = (a * a⁻¹) * b             by substituting aReciprocal
-              = a⁻¹ * (a * b)             by ring
-              = a⁻¹ * Real.zero           by substituting abZero
-              = Real.zero                 by ring;
+    calc b
+       = Real.one * b              by ring
+       = (a * a⁻¹) * b             by substituting aReciprocal
+       = a⁻¹ * (a * b)             by ring
+       = a⁻¹ * Real.zero           by substituting abZero
+       = Real.zero                 by ring   as bZero;
     absurd(bNonzero(bZero))
-  }
+  };
+  done
+}
 
 -- Left cancellation: c ≠ 0 and c·a = c·b give a = b (multiply by c⁻¹).
 theorem Real.equal_of_multiply_left (a b c : Real) (cNonzero : c ≠ Real.zero)
@@ -133,17 +134,15 @@ theorem Real.reciprocal_positive (x : Real) (xNonzero : x ≠ Real.zero)
         claim Real.zero ≤ x since Real.LessThan.weaken;
         claim Real.reciprocal(x, xNonzero) * x ≤ Real.zero * x
             since Real.LessOrEqual.multiply_by_nonneg_right;
-        claim Real.one ≤ Real.zero
-            by calc Real.one
-                  = x * Real.reciprocal(x, xNonzero)   since recipMultiplies
-                  = Real.reciprocal(x, xNonzero) * x   by ring
-                  ≤ Real.zero * x
-                  = Real.zero                          by ring;
-        claim Real.zero < Real.one
-            by calc Real.zero
-                  < (Rational.one : Real)
-                        since Rational.to_real.positive_preserves
-                  = Real.one;
+        calc Real.one
+           = x * Real.reciprocal(x, xNonzero)   since recipMultiplies
+           = Real.reciprocal(x, xNonzero) * x   by ring
+           ≤ Real.zero * x
+           = Real.zero                          by ring;
+        calc Real.zero
+           < (Rational.one : Real)
+                 since Rational.to_real.positive_preserves
+           = Real.one;
         claim Real.zero < Real.zero since Real.LessThan.transitive_right;
         claim notSelfEqual : ¬(Real.zero = Real.zero)
             since Real.LessThan.distinct;
