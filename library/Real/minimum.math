@@ -1,98 +1,75 @@
 -- Real/minimum.math
 --
--- The minimum of two reals, by definite description: the unique c that is
--- ≤ both a and b and equals one of them. ℝ has no decidable order, so we
--- cannot pattern-match on `a ≤ b`; instead linearity gives existence and
--- antisymmetry gives uniqueness, and `Logic.the` packages them. The order
--- facts (min ≤ a, min ≤ b, min ∈ {a, b}) then read straight off
--- `the_satisfies`. Mirrors Rational.minimum's interface (`min`, the
--- LessOrEqual lemmas, positivity) so the ε/δ proofs port unchanged.
+-- The minimum of two reals in closed form: min(a, b) = (a + b − |a − b|) / 2.
+-- When a ≤ b the |·| is b − a and the formula collapses to a; otherwise to b.
+-- This sidesteps the definite description (ℝ has no decidable order, so a
+-- `decide`-based definition like Rational.minimum is unavailable) and gives
+-- the same interface — `min`, the two LessOrEqual bounds, positivity — so the
+-- ε/δ proofs port unchanged.
 
 module Real.minimum
 
 import Logic.basics
-import Logic.exists
-import axioms
 import Equality.basics
 import Real.basics
 import Real.order
-import Real.linearity
+import Real.order_field
+import Real.division
+import Real.absolute_value_order
 
--- The defining predicate: c is a lower of a, b attained at one of them.
-definition Real.IsMinimum (a b c : Real) : Proposition :=
-  c ≤ a ∧ c ≤ b ∧ (c = a ∨ c = b)
-
--- Existence: linearity puts the smaller of a, b below both.
-theorem Real.minimum_exists (a b : Real)
-        : ∃ (c : Real). Real.IsMinimum(a, b, c) := {
-  claim aReflexive : a ≤ a since Real.LessOrEqual.reflexive;
-  claim bReflexive : b ≤ b since Real.LessOrEqual.reflexive;
-  claim a ≤ b ∨ b ≤ a since Real.LessOrEqual.linear;
-  claim by cases {
-    in (a ≤ b) as aLeqB:
-        witness a with
-            And.introduction(aReflexive,
-                And.introduction(aLeqB, Or.introduceLeft(reflexivity(Real, a))))
-    in (b ≤ a) as bLeqA:
-        witness b with
-            And.introduction(bLeqA,
-                And.introduction(bReflexive, Or.introduceRight(reflexivity(Real, b))))
-  }
-}
-
--- Uniqueness: two minima sit below each other, so antisymmetry equates them.
-theorem Real.minimum_unique (a b c1 c2 : Real)
-        (firstMinimum : Real.IsMinimum(a, b, c1))
-        (secondMinimum : Real.IsMinimum(a, b, c2))
-        : c1 = c2 := {
-  claim c1 ≤ a ∧ c1 ≤ b ∧ (c1 = a ∨ c1 = b) since firstMinimum;
-  claim c2 ≤ a ∧ c2 ≤ b ∧ (c2 = a ∨ c2 = b) since secondMinimum;
-  claim c1 = a ∨ c1 = b;
-  claim c2 = a ∨ c2 = b;
-  claim c1 ≤ c2 by cases {
-    in (c2 = a) as c2IsA: calc c1 ≤ a = c2 since c2IsA
-    in (c2 = b) as c2IsB: calc c1 ≤ b = c2 since c2IsB
-  };
-  claim c2 ≤ c1 by cases {
-    in (c1 = a) as c1IsA: calc c2 ≤ a = c1 since c1IsA
-    in (c1 = b) as c1IsB: calc c2 ≤ b = c1 since c1IsB
-  };
-  done since Real.LessOrEqual.antisymmetric
-}
-
--- THE minimum.
+-- min(a, b): the smaller of the two, read off the absolute value of the gap.
 definition Real.minimum (a b : Real) : Real :=
-  Logic.the(Real, (c : Real) ↦ Real.IsMinimum(a, b, c),
-      Real.minimum_exists(a, b), Real.minimum_unique(a, b))
+  (a + b - abs(a - b)) / 2
 
 overload min := Real.minimum
 
--- min(a, b) attains the defining predicate.
-theorem Real.minimum_satisfies (a b : Real) : Real.IsMinimum(a, b, min(a, b)) :=
-  Logic.the_satisfies(Real, (c : Real) ↦ Real.IsMinimum(a, b, c),
-      Real.minimum_exists(a, b), Real.minimum_unique(a, b))
-
+-- min(a, b) ≤ a: equivalently b − a ≤ |a − b|, which holds since −(a − b) ≤ |a − b|.
 theorem Real.minimum_LessOrEqual_left (a b : Real) : min(a, b) ≤ a := {
-  claim min(a, b) ≤ a ∧ min(a, b) ≤ b ∧ (min(a, b) = a ∨ min(a, b) = b)
-      since Real.minimum_satisfies;
-  done
+  claim (2 : Real) > 0 since Real.two_positive;
+  calc b - a
+     = -(a - b)
+     ≤ abs(a - b)            since Real.negate_LessOrEqual_absolute_value;
+  claim -abs(a - b) ≤ -(b - a) since Real.LessOrEqual.negate;
+  calc 2 * min(a, b)
+     = 2 * ((a + b - abs(a - b)) / 2)
+     = a + b - abs(a - b)         by field
+     ≤ a + b - (b - a)            since Real.add_preserves_LessOrEqual_left
+     = 2 * a;
+  done since Real.LessOrEqual.multiply_cancel_left_positive
 }
 
+-- min(a, b) ≤ b: symmetric — a − b ≤ |a − b|.
 theorem Real.minimum_LessOrEqual_right (a b : Real) : min(a, b) ≤ b := {
-  claim min(a, b) ≤ a ∧ min(a, b) ≤ b ∧ (min(a, b) = a ∨ min(a, b) = b)
-      since Real.minimum_satisfies;
-  done
+  claim (2 : Real) > 0 since Real.two_positive;
+  claim a - b ≤ abs(a - b) since Real.LessOrEqual_absolute_value;
+  claim -abs(a - b) ≤ -(a - b) since Real.LessOrEqual.negate;
+  calc 2 * min(a, b)
+     = 2 * ((a + b - abs(a - b)) / 2)
+     = a + b - abs(a - b)         by field
+     ≤ a + b - (a - b)            since Real.add_preserves_LessOrEqual_left
+     = 2 * b;
+  done since Real.LessOrEqual.multiply_cancel_left_positive
 }
 
--- The minimum of two positives is positive (it is one of them).
+-- The minimum of two positives is positive: |a − b| < a + b, so the numerator
+-- (a + b − |a − b|) is positive and the halved value with it.
 theorem Real.minimum_positive (a b : Real)
         (aPositive : Real.zero < a) (bPositive : Real.zero < b)
         : Real.zero < min(a, b) := {
-  claim min(a, b) ≤ a ∧ min(a, b) ≤ b ∧ (min(a, b) = a ∨ min(a, b) = b)
-      since Real.minimum_satisfies;
-  claim min(a, b) = a ∨ min(a, b) = b;
-  claim by cases {
-    in (min(a, b) = a) as isA: calc Real.zero < a = min(a, b) since isA
-    in (min(a, b) = b) as isB: calc Real.zero < b = min(a, b) since isB
-  }
+  claim (2 : Real) > 0 since Real.two_positive;
+  claim (2 : Real) * a > 0 since Real.multiply_positive;
+  claim (2 : Real) * b > 0 since Real.multiply_positive;
+  calc a - b
+     < (a - b) + (2 : Real) * b   since Real.less_than_add_of_positive
+     = a + b;
+  calc -(a + b)
+     < -(a + b) + (2 : Real) * a  since Real.less_than_add_of_positive
+     = a - b;
+  claim abs(a - b) < a + b since Real.absolute_value_LessThan_of_bounds;
+  calc Real.zero
+     = abs(a - b) - abs(a - b)
+     < (a + b) - abs(a - b)       since Real.add_preserves_LessThan;
+  calc Real.zero
+     < (a + b - abs(a - b)) / 2          since Real.divide_positive
+     = min(a, b)
 }
