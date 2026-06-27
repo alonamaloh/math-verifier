@@ -272,6 +272,26 @@ std::string Elaborator::searchSuggestions(
                         out += "\n        (needs import "
                              + moduleIterator->second + ")";
                     }
+                } else if (const Declaration* declaration =
+                               environment_.lookup(hits[i].name)) {
+                    // In scope but the auto-prover didn't reach for it: if it
+                    // is a non-`automatic` import, that visibility rule is
+                    // exactly why — say so, so the fix (cite it, or mark the
+                    // lemma `automatic`) is discoverable.
+                    bool isAutomatic = false;
+                    if (auto* def = std::get_if<Definition>(declaration)) {
+                        isAutomatic = def->automatic;
+                    } else if (auto* ax = std::get_if<Axiom>(declaration)) {
+                        isAutomatic = ax->automatic;
+                    } else {
+                        isAutomatic = true;  // constructors are always visible
+                    }
+                    if (!isAutomatic
+                        && !moduleDeclarationNames_.count(hits[i].name)) {
+                        out += "\n        (in scope but not `automatic` — "
+                               "cite it as `by " + hits[i].name
+                             + "`, or mark the lemma `automatic`)";
+                    }
                 }
             }
             return out;
