@@ -135,6 +135,15 @@ TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 .PHONY: library library-clean tests error-tests checker-tests \
         clean-check clean-status
 
+# Bare `make` VERIFIES THE LIBRARY — not just builds the kernel binary. The
+# first target in this file is `kernel` (the C++ build), so without this line
+# `make` would default to it and silently skip proof verification: edit a
+# `.math` file, run `make`, see no complaint, and wrongly conclude the change
+# is correct (the stale `.mathv` is never rebuilt). `library` depends on
+# `kernel` through every `.mathv` rule, so this still relinks the binary first
+# when sources changed. Use `make kernel` for a binary-only build.
+.DEFAULT_GOAL := library
+
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
