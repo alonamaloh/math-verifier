@@ -85,16 +85,84 @@ ExpressionPointer abstractOverBoundVariable(
     return expression;
 }
 
+// Single pass of the multi-binder open: walk `term` once, replacing each
+// BoundVariable that refers to one of the `count` opened binders with the
+// corresponding FreeVariable, and shifting the rest down by `count`. This is
+// the fused equivalent of calling openBinder `count` times in a row (which
+// would walk the term `count` times). `freeVars[k]` is the FreeVariable for
+// local-binder index k; they are closed, so no per-depth shifting is needed.
+// Mirrors substitute's depth tracking and structural-sharing fast path, so
+// the result is pointer-identical to the iterated version (FreeVariables are
+// interned).
+static ExpressionPointer openManyBindersPass(
+    ExpressionPointer expression,
+    const std::vector<ExpressionPointer>& freeVars,
+    int depth) {
+    const int count = static_cast<int>(freeVars.size());
+    // No free BoundVariable reaches the opened binders here — unchanged.
+    if (expression->maxFreeBoundVariable < depth) return expression;
+    if (auto* boundVariable = std::get_if<BoundVariable>(&expression->node)) {
+        int effective = boundVariable->deBruijnIndex - depth;
+        if (effective < 0) return expression;
+        if (effective < count) return freeVars[count - 1 - effective];
+        return makeBoundVariable(boundVariable->deBruijnIndex - count);
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        auto newDomain = openManyBindersPass(pi->domain, freeVars, depth);
+        auto newCodomain =
+            openManyBindersPass(pi->codomain, freeVars, depth + 1);
+        if (newDomain == pi->domain && newCodomain == pi->codomain) {
+            return expression;
+        }
+        return makePi(pi->displayHint, std::move(newDomain),
+                      std::move(newCodomain));
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        auto newDomain = openManyBindersPass(lambda->domain, freeVars, depth);
+        auto newBody = openManyBindersPass(lambda->body, freeVars, depth + 1);
+        if (newDomain == lambda->domain && newBody == lambda->body) {
+            return expression;
+        }
+        return makeLambda(lambda->displayHint, std::move(newDomain),
+                          std::move(newBody));
+    }
+    if (auto* application = std::get_if<Application>(&expression->node)) {
+        auto newFunction =
+            openManyBindersPass(application->function, freeVars, depth);
+        auto newArgument =
+            openManyBindersPass(application->argument, freeVars, depth);
+        if (newFunction == application->function
+            && newArgument == application->argument) {
+            return expression;
+        }
+        return makeApplication(std::move(newFunction),
+                               std::move(newArgument));
+    }
+    if (auto* let = std::get_if<Let>(&expression->node)) {
+        auto newType = openManyBindersPass(let->type, freeVars, depth);
+        auto newValue = openManyBindersPass(let->value, freeVars, depth);
+        auto newBody = openManyBindersPass(let->body, freeVars, depth + 1);
+        if (newType == let->type && newValue == let->value
+            && newBody == let->body) {
+            return expression;
+        }
+        return makeLet(let->displayHint, std::move(newType),
+                       std::move(newValue), std::move(newBody));
+    }
+    return expression;  // FreeVariable, Sort, Constant
+}
+
 ExpressionPointer openOverLocalBinders(
     ExpressionPointer term,
     const std::vector<LocalBinder>& localBinders,
     size_t count) {
-    for (size_t i = count; i > 0; --i) {
-        term = openBinder(term,
-                          openingNameFor(localBinders, i - 1),
-                          FreeVariableOrigin::Internal);
+    if (count == 0) return term;
+    std::vector<ExpressionPointer> freeVars;
+    freeVars.reserve(count);
+    for (size_t k = 0; k < count; ++k) {
+        freeVars.push_back(openedLocalBinderReference(localBinders, k));
     }
-    return term;
+    return openManyBindersPass(std::move(term), freeVars, 0);
 }
 
 ExpressionPointer closeOverLocalBinders(
