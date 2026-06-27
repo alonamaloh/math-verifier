@@ -677,7 +677,10 @@ void Elaborator::elaborateAxiom(const SurfaceAxiomDeclaration& declaration) {
         // silently approved; an axiom declared in any other module is
         // flagged so we never accidentally introduce a new unproved
         // assumption.
-        if (moduleName_ != "axioms") {
+        // Skip in the statements-only (interface) pass: it's an internal
+        // build artifact, and the full verification pass re-emits this — so
+        // emitting here just doubles the warning.
+        if (moduleName_ != "axioms" && !statementsOnly_) {
             std::cerr << "warning: axiom '" << declaration.name
                       << "' admitted without proof\n";
         }
