@@ -1093,7 +1093,8 @@ void Elaborator::elaborateTheoremStatementOnly(
 
         environment_.declarations[declaration.name] =
             Definition{finalUniverseParameters(declaration.universeParameters),
-                       fullType, makeSort(0), Opacity::Opaque};
+                       fullType, makeSort(0), Opacity::Opaque,
+                       declaration.automatic};
         invalidateKernelCaches();
         int implicitCount =
             countLeadingImplicitArgumentNames(declaration);

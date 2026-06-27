@@ -212,6 +212,15 @@ build/library/Test/ring_test.mathv: export MATH_HASH_CONS=1
 # so opt the Test/ targets out to keep their output free of expected noise.
 $(TEST_MATHV_FILES): VERIFY_FLAGS += --no-check-unused-names
 
+# The `automatic` auto-prover restriction (on by default) is a library-
+# authoring discipline: across modules the prover only uses `automatic`
+# lemmas unprompted. Test/ fixtures exercise the FULL auto-prover (numeral
+# citation, bare claims drawing on any imported lemma) — that capability is
+# what they verify — so run them with the restriction off, mirroring the
+# unused-name opt-out above.
+$(TEST_MATHV_FILES): export MATH_AUTOMATIC = 0
+$(TEST_MATHV_IFACE_FILES): export MATH_AUTOMATIC = 0
+
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
 # the .mathv prerequisites — listed by the included dependency file —
 # drive `make`'s staleness tracking but are NOT passed to `kernel

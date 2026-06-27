@@ -28,13 +28,13 @@ long long autoProveWarnThresholdValue() {
 }
 
 // Whether the auto-prover restricts its unprompted library tier to
-// `automatic`-tagged (or same-module) declarations. TEMP: env-gated during
-// the library migration; will become the default once foundational lemmas
-// are tagged.
+// `automatic`-tagged (or same-module) declarations. On by default now that
+// the library's foundational lemmas are tagged; opt OUT with
+// MATH_AUTOMATIC=0 (escape hatch for debugging / bisecting).
 bool automaticRestrictEnabled() {
     static const bool v = [] {
         const char* e = std::getenv("MATH_AUTOMATIC");
-        return e && e[0] && e[0] != '0';
+        return !(e && e[0] == '0');
     }();
     return v;
 }

@@ -5210,7 +5210,7 @@ static CacheContents deriveInterfaceCache(const CacheContents& full,
                     name,
                     Definition{definition->universeParameters,
                                definition->type, strippedProofBody,
-                               Opacity::Opaque});
+                               Opacity::Opaque, definition->automatic});
                 continue;
             }
         }
