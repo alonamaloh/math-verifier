@@ -5235,6 +5235,14 @@ static void writeCacheFileIfChanged(const std::string& path,
     std::filesystem::rename(tempPath, path);
 }
 
+// Whether to print the per-file "verified …" success line. Off by default so
+// a library build's output is just warnings/errors; enable with `--verbose`
+// or MATH_VERBOSE. (Warnings and errors always print, on stderr.)
+static bool g_verbose = [] {
+    const char* v = std::getenv("MATH_VERBOSE");
+    return v && v[0] != '\0' && v[0] != '0';
+}();
+
 int verifyWithCache(const std::string& sourcePath,
                     const std::vector<std::string>& dependencyCachePaths,
                     const std::string& outputCachePath,
@@ -5625,9 +5633,11 @@ int verifyWithCache(const std::string& sourcePath,
         }
     }
 
-    std::cout << "verified " << sourcePath << " (module " << moduleName
-              << ", " << cache.declarations.size()
-              << " new declarations)\n";
+    if (g_verbose) {
+        std::cout << "verified " << sourcePath << " (module " << moduleName
+                  << ", " << cache.declarations.size()
+                  << " new declarations)\n";
+    }
     if (std::getenv("MATH_REPORT_ADDDECL")) {
         std::cerr << "[adddecl] " << moduleName
                   << " adddecl_total=" << (kernelAddDeclMicros / 1000)
@@ -5796,8 +5806,10 @@ int verifyFiles(const std::vector<std::string>& filenames) {
         }
         size_t added =
             environment.declarations.size() - declarationCountBefore;
-        std::cout << "verified " << filename << " (module " << moduleName
-                  << ", " << added << " new declarations)\n";
+        if (g_verbose) {
+            std::cout << "verified " << filename << " (module " << moduleName
+                      << ", " << added << " new declarations)\n";
+        }
     }
     return 0;
 }
@@ -6427,6 +6439,11 @@ static int kernelMain(int argc, char* argv[]) {
                 state = State::None;
                 continue;
             }
+            if (argument == "--verbose") {
+                g_verbose = true;
+                state = State::None;
+                continue;
+            }
             if (argument == "--check-redundant-by") {
                 reportRedundantBy = true;
                 state = State::None;
@@ -6572,6 +6589,7 @@ static int kernelMain(int argc, char* argv[]) {
                   << "                  [--check-redundant-by]\n"
                   << "                  [--check-redundant-by-non-eq]\n"
                   << "                  [--check-redundant-calc-steps]\n"
+                  << "                  [--verbose]\n"
                   << "                  [--goal-at LINE]\n"
                   << "                      verify one file, writing a binary\n"
                   << "                      cache. Deps must already be cached.\n"
@@ -6588,6 +6606,9 @@ static int kernelMain(int argc, char* argv[]) {
                   << "                      close unaided within the redundancy budget\n"
                   << "                      (see MATH_REDUNDANT_BUDGET). Tidy-up only;\n"
                   << "                      does not affect cache validity.\n"
+                  << "                      --verbose: print a `verified …` line per\n"
+                  << "                      file (also via MATH_VERBOSE); off by\n"
+                  << "                      default so warnings/errors stand out.\n"
                   << "                      --goal-at LINE: print the goal and local\n"
                   << "                      hypotheses at the proof statement at (or\n"
                   << "                      nearest before) LINE — a poor man's\n"

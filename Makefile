@@ -245,7 +245,7 @@ $(TEST_MATHV_IFACE_FILES): export MATH_AUTOMATIC = 0
 # by `kernel deps`). Cheap (~4% of total work) and proof-independent.
 $(BUILD_DIR)/%.mathv.iface: %.math kernel
 	@mkdir -p $(dir $@)
-	MATH_STATEMENTS_ONLY=1 ./kernel verify --source $< \
+	@MATH_STATEMENTS_ONLY=1 ./kernel verify --source $< \
 	    --output $(BUILD_DIR)/$*.mathv --cache-root $(BUILD_DIR)
 
 # Stage 2 — proofs. Verifies the module's proofs against its own interface
@@ -257,7 +257,7 @@ $(BUILD_DIR)/%.mathv.iface: %.math kernel
 # every other's, so they parallelise freely.
 $(BUILD_DIR)/%.mathv: %.math $(BUILD_DIR)/%.mathv.iface kernel
 	@mkdir -p $(dir $@)
-	./kernel verify --source $< --output $@ --cache-root $(BUILD_DIR) \
+	@./kernel verify --source $< --output $@ --cache-root $(BUILD_DIR) \
 	    --no-interface $(VERIFY_FLAGS)
 
 -include $(BUILD_DIR)/library-depends.mk
@@ -269,7 +269,7 @@ $(BUILD_DIR)/library-depends.mk: $(MATH_FILES) | kernel
 	./kernel deps --cache-root $(BUILD_DIR) $(MATH_FILES) > $@
 
 library-clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)/library $(BUILD_DIR)/library-depends.mk
 
 # ----------------------------------------------------------------------
 # Proof-style leak dashboard (PLAN_LESS_CIC_STYLE.md, Phase 0.2). Counts
