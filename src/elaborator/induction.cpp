@@ -1080,14 +1080,15 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
         // citations that match the FOLDED spelling — e.g. against
         // context facts stated in terms of the let name — keep working
         // exactly as before.
+        std::exception_ptr firstError;
         try {
             ExpressionPointer direct = autoFillHintForClaimCore(
                 hintTerm, hintType, goalClosed, localBinders, line);
             if (direct) return direct;
         } catch (const ElaborateError&) {
-            // fall through to the ζ-unfolded retry
+            firstError = std::current_exception();
         } catch (const TypeError&) {
-            // fall through to the ζ-unfolded retry
+            firstError = std::current_exception();
         }
         ExpressionPointer goalUnfolded =
             zetaUnfoldLetBinders(goalClosed, localBinders);
@@ -1095,7 +1096,11 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
             zetaUnfoldLetBinders(hintType, localBinders);
         if (structurallyEqual(goalUnfolded, goalClosed)
             && structurallyEqual(hintTypeUnfolded, hintType)) {
-            // No lets to see through — re-run once for the real error.
+            // No lets to see through: the ζ-unfolded retry would re-run the
+            // identical match and fail identically. Re-raise the original
+            // error rather than recomputing it (the recompute is the single
+            // costliest redundancy in the context-fact scan's failing path).
+            if (firstError) std::rethrow_exception(firstError);
             return autoFillHintForClaimCore(
                 hintTerm, hintType, goalClosed, localBinders, line);
         }
@@ -1162,7 +1167,10 @@ ExpressionPointer Elaborator::autoFillHintForClaimCore(
         int totalBinders =
             static_cast<int>(domainsOutermostFirst.size());
         if (totalBinders == 0) {
-            // No Pi's and not defeq: nothing more to try.
+            // No Pi's and not defeq: nothing more to try. Under the
+            // speculative scan the message is discarded, so skip the
+            // (pretty-printing) string build entirely.
+            if (inSpeculativeContextScan_) throwElaborate("hint type mismatch");
             throwElaborate(
                 "the `by` hint's type doesn't match the goal "
                 "(claimed `"
@@ -1191,13 +1199,17 @@ ExpressionPointer Elaborator::autoFillHintForClaimCore(
                 bindings = std::move(trialReduced);
                 break;
             }
-            std::vector<ExpressionPointer> trialUnreduced(trialDepth);
-            if (matchAgainstPatternWithDeferredProjections(
-                    cursorsAtDepth[trialDepth], goalClosed,
-                    trialDepth, trialUnreduced)) {
-                matchedDepth = trialDepth;
-                bindings = std::move(trialUnreduced);
-                break;
+            // Skip the un-reduced attempt when the goal needed no WHNF: it
+            // would re-run the identical match against the same pointer.
+            if (goalClosed.get() != goalReduced.get()) {
+                std::vector<ExpressionPointer> trialUnreduced(trialDepth);
+                if (matchAgainstPatternWithDeferredProjections(
+                        cursorsAtDepth[trialDepth], goalClosed,
+                        trialDepth, trialUnreduced)) {
+                    matchedDepth = trialDepth;
+                    bindings = std::move(trialUnreduced);
+                    break;
+                }
             }
             // Third attempt: reduce the conclusion cursor too. The lemma's
             // conclusion may be headed by a `definition` (e.g.
@@ -1210,13 +1222,17 @@ ExpressionPointer Elaborator::autoFillHintForClaimCore(
             // δ/β, leaving those bound variables intact.
             ExpressionPointer cursorReduced = weakHeadNormalForm(
                 environment_, cursorsAtDepth[trialDepth]);
-            std::vector<ExpressionPointer> trialCursorReduced(trialDepth);
-            if (matchAgainstPatternWithDeferredProjections(
-                    cursorReduced, goalReduced,
-                    trialDepth, trialCursorReduced)) {
-                matchedDepth = trialDepth;
-                bindings = std::move(trialCursorReduced);
-                break;
+            // Skip when WHNF was a no-op: the cursor is unchanged, so this
+            // would re-run the first attempt verbatim.
+            if (cursorReduced.get() != cursorsAtDepth[trialDepth].get()) {
+                std::vector<ExpressionPointer> trialCursorReduced(trialDepth);
+                if (matchAgainstPatternWithDeferredProjections(
+                        cursorReduced, goalReduced,
+                        trialDepth, trialCursorReduced)) {
+                    matchedDepth = trialDepth;
+                    bindings = std::move(trialCursorReduced);
+                    break;
+                }
             }
         }
         // The conclusion may be an APPLICATION OF A PEELED BINDER —
@@ -1257,6 +1273,7 @@ ExpressionPointer Elaborator::autoFillHintForClaimCore(
                 totalBinders, totalBinders, std::move(deferred),
                 /*conclusionWasFlexApplication=*/true);
         }
+        if (inSpeculativeContextScan_) throwElaborate("hint conclusion mismatch");
         throwElaborate(
             "the `by` hint's conclusion (`"
             + prettyPrintInLocalScope(

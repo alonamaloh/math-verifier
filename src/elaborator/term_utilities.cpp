@@ -546,9 +546,67 @@ ExpressionPointer substituteBoundVariable(
 }
 
 
+// Read-only test: does `term` (closed over `localBinders`) contain any
+// BoundVariable resolving to a let-valued binder? When it does not,
+// ζ-unfolding is a no-op, so the caller can skip the open/substitute/close
+// round-trip entirely (three allocating tree walks on what may be a large
+// goal). Mirrors the BoundVariable-resolution arithmetic in the recursive
+// `zetaUnfoldLetBinders` below, but allocates nothing.
+static bool referencesLetValuedBinder(
+    ExpressionPointer expression,
+    const std::vector<LocalBinder>& localBinders,
+    int currentDepth) {
+    if (auto* boundVariable =
+            std::get_if<BoundVariable>(&expression->node)) {
+        int index = boundVariable->deBruijnIndex;
+        if (index >= currentDepth) {
+            int arrayIndex = static_cast<int>(localBinders.size())
+                - 1 - (index - currentDepth);
+            if (arrayIndex >= 0
+                && arrayIndex < static_cast<int>(localBinders.size())
+                && localBinders[arrayIndex].value) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return referencesLetValuedBinder(pi->domain, localBinders, currentDepth)
+            || referencesLetValuedBinder(pi->codomain, localBinders,
+                                          currentDepth + 1);
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return referencesLetValuedBinder(lambda->domain, localBinders,
+                                          currentDepth)
+            || referencesLetValuedBinder(lambda->body, localBinders,
+                                          currentDepth + 1);
+    }
+    if (auto* application = std::get_if<Application>(&expression->node)) {
+        return referencesLetValuedBinder(application->function, localBinders,
+                                          currentDepth)
+            || referencesLetValuedBinder(application->argument, localBinders,
+                                          currentDepth);
+    }
+    if (auto* letNode = std::get_if<Let>(&expression->node)) {
+        return referencesLetValuedBinder(letNode->type, localBinders,
+                                          currentDepth)
+            || referencesLetValuedBinder(letNode->value, localBinders,
+                                          currentDepth)
+            || referencesLetValuedBinder(letNode->body, localBinders,
+                                          currentDepth + 1);
+    }
+    return false;
+}
+
 ExpressionPointer zetaUnfoldLetBinders(
     ExpressionPointer term,
     const std::vector<LocalBinder>& localBinders) {
+    // Fast path: if `term` references no let-valued binder, ζ-unfolding
+    // cannot change it. One read-only walk replaces the three allocating
+    // tree copies (open/substitute/close) below — the dominant cost when
+    // the auto-prover's context-fact scan ζ-probes the (unchanged) goal
+    // against many candidate hints.
+    if (!referencesLetValuedBinder(term, localBinders, 0)) return term;
     std::map<std::string, ExpressionPointer> assignment;
     for (size_t i = 0; i < localBinders.size(); ++i) {
         if (localBinders[i].value) {

@@ -483,6 +483,17 @@ private:
     std::string formatErrorWithContext(const std::string& message) const;
 
     [[noreturn]] void throwElaborate(const std::string& message) const {
+        // Inside the auto-prover's speculative context-fact scan every
+        // candidate that fails to match throws here, and the scan catches
+        // and discards the error. Building the contextual breadcrumb
+        // (`formatErrorWithContext` pretty-prints every frame's binder
+        // snapshot — O(frames × binders)) is then pure waste, and on a
+        // hypothesis-heavy goal it dominates the scan's cost. Throw a bare
+        // error instead; a real (propagating) error never originates under
+        // this flag.
+        if (inSpeculativeContextScan_) {
+            throw ElaborateError(message, 0, 0);
+        }
         // Pick up the most recent (innermost) frame that has a known
         // source position; that's the best anchor for an editor to
         // highlight.
