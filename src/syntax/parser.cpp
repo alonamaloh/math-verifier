@@ -135,6 +135,9 @@ SurfaceExpressionPointer substituteSurfaceName(
     SurfaceExpressionPointer expression,
     const std::string& targetName,
     SurfaceExpressionPointer replacement) {
+    // Optional children (e.g. an untyped `let`'s null type) recurse here;
+    // pass them through untouched rather than dereferencing null.
+    if (!expression) return expression;
     const SurfaceExpression& node = *expression;
     int line = expression->line;
     int column = expression->column;
@@ -365,6 +368,49 @@ SurfaceExpressionPointer substituteSurfaceName(
         return makeSurfaceNote(
             sub(note->goalType), sub(note->proposition), sub(note->body),
             line, column, note->changesGoal, sub(note->proof));
+    }
+    if (auto* choose = std::get_if<SurfaceChoose>(&node.node)) {
+        // `choose name [such that predicate] [as conditionName] [from
+        // source]`. `name` scopes over the predicate and the body;
+        // `conditionName` scopes over the body; `source` is in the outer
+        // scope. Guard each binder against shadowing the target.
+        bool nameShadows = choose->name == targetName;
+        bool bodyShadows = nameShadows || choose->conditionName == targetName;
+        SurfaceExpressionPointer newPredicate =
+            (nameShadows || !choose->predicate)
+                ? choose->predicate
+                : substituteSurfaceName(choose->predicate,
+                                         targetName, replacement);
+        SurfaceExpressionPointer newBody =
+            bodyShadows
+                ? choose->body
+                : substituteSurfaceName(choose->body, targetName, replacement);
+        SurfaceExpressionPointer newSource = choose->source
+            ? substituteSurfaceName(choose->source, targetName, replacement)
+            : nullptr;
+        return makeSurfaceChoose(choose->name, std::move(newPredicate),
+                                  std::move(newBody), line, column,
+                                  choose->conditionName, std::move(newSource));
+    }
+    if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
+        // `decide proposition { yes h => … | no n => … }`. The proposition
+        // is in the outer scope; each arm binds its own hypothesis name.
+        SurfaceExpressionPointer newProposition = substituteSurfaceName(
+            decide->proposition, targetName, replacement);
+        SurfaceExpressionPointer newYesBody =
+            decide->yesBinderName == targetName
+                ? decide->yesBody
+                : substituteSurfaceName(decide->yesBody,
+                                         targetName, replacement);
+        SurfaceExpressionPointer newNoBody =
+            decide->noBinderName == targetName
+                ? decide->noBody
+                : substituteSurfaceName(decide->noBody,
+                                         targetName, replacement);
+        return makeSurfaceDecide(std::move(newProposition),
+                                  decide->yesBinderName, std::move(newYesBody),
+                                  decide->noBinderName, std::move(newNoBody),
+                                  line, column);
     }
     // Unhandled node kind: be conservative and return unchanged. If we
     // ever add a new SurfaceExpression variant, the `set` substitution

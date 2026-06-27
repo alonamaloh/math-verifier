@@ -1,0 +1,35 @@
+-- A `set`-bound alias must stay substituted through statement-intro forms
+-- that introduce their own scope — `choose`, `decide`, and the like.
+-- Regression: `substituteSurfaceName` (the engine behind `set`) had no case
+-- for `SurfaceChoose`/`SurfaceDecide`, so it stopped at the first such node
+-- and left the alias unsubstituted past it (an "unknown identifier" error);
+-- worse, descending into those bodies could reach an untyped binding's null
+-- type and segfault. Both are fixed; these pin the behaviour.
+
+module Test.set_through_statements_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Natural.basics
+import Natural.order
+
+-- The alias is used AFTER a `choose`, which binds its own variable.
+theorem Test.set_survives_choose
+        (Q : Proposition) (hQ : Q)
+        (existsNat : ∃ (n : Natural). 1 ≤ n) : Q := {
+  set goalAlias := Q;
+  choose witnessNat such that 1 ≤ witnessNat from existsNat;
+  claim goalAlias;
+  done
+}
+
+-- The alias is used inside both arms of a `decide`.
+theorem Test.set_survives_decide
+        (P Q : Proposition) (hQ : Q) : Q := {
+  set goalAlias := Q;
+  decide P {
+    | yes inhabited => { claim goalAlias; done }
+    | no empty      => { claim goalAlias; done }
+  }
+}
