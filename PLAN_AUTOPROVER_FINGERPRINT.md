@@ -44,6 +44,20 @@ fractions case (Rational.order_multiplication) cite `Quotient.exact` so the
 multiply-lift reduction runs once in the kernel check, not per search
 candidate. Library now warning-free at the default 50K threshold.
 
+**3 LATER WARN SITES CLEANED** (2026-06-27, surfaced after the real-ε
+transition / new ComplexNumber work): `Real.cauchy_complete:248` and `:271`
+were `since Real.negate_flip_LessThan` steps of shape `a < b ⊢ -b < -a`, but
+that lemma (`-a < b ⊢ -b < a`) forces a double-negation reduction during the
+search (91K/99K steps). Added the strict negation-monotone lemma
+`Real.LessThan.negate (x < y → -y < -x)` in `Real/order.math` (mirrors the
+existing `Real.LessOrEqual.negate` and `Rational.LessThan.negate`); both sites
+now cite it directly with no reduction. `ComplexNumber.defining_polynomial:127`
+was a by-less final calc rung hiding `monus(1,1)=0`, `coeff(x,0)=0`,
+`coeff(one,1)=0`, `add(0,0)=0`; split into explicit rungs
+(`by Natural.monus_self(1)`, `by Polynomial.coefficientOf_one_successor`)
+mirroring the sibling `_two`/`_zero` theorems. Library + tests green, no
+expensive warnings.
+
 Optional remaining: local-hypothesis commutativity witness (would close
 RingModulo.multiply_respects' lone `by commutativity`); a library-wide
 collapse of calc chains Phase 4 newly made redundant.
