@@ -194,14 +194,44 @@ public:
 
     template <typename F>
     ExpressionPointer runTactic(const std::string& name, F&& fn) {
-        if (!tacticTimingEnabled_) return fn();
+        if (!tacticTimingEnabled_) {
+            ExpressionPointer result = fn();
+            if (result) lastWinningTactic_ = name;
+            return result;
+        }
         ++tacticStats_[name].invocations;
         long long t0 = monotonicNanos();
         ExpressionPointer result = fn();
         long long t1 = monotonicNanos();
         tacticStats_[name].totalMicros += (t1 - t0) / 1000;
-        if (result) ++tacticStats_[name].successes;
+        if (result) { ++tacticStats_[name].successes; lastWinningTactic_ = name; }
         return result;
+    }
+
+    // For the expensive-by-less-step warning: name what actually closed the
+    // step so the suggested `by` is concrete. Prefers a citable lemma /
+    // hypothesis from a contextFactMatch win; falls back to the strategy
+    // name; empty when nothing nameable (e.g. ring/diff with no single cite).
+    std::string expensiveStepWinnerHint() const {
+        if (lastWinningTactic_ == "contextFactMatch"
+            && !lastWinningDetail_.empty()) {
+            if (lastWinningDetail_.rfind("library ", 0) == 0) {
+                return " (try `by " + lastWinningDetail_.substr(8) + "`)";
+            }
+            if (lastWinningDetail_.rfind("local binder ", 0) == 0) {
+                std::string name = lastWinningDetail_.substr(13);
+                if (name.rfind("_claim_anon", 0) != 0
+                    && name.rfind("_choice", 0) != 0
+                    && name.find(" (") == std::string::npos) {
+                    return " (try `by " + name + "`)";
+                }
+            }
+            return "";
+        }
+        if (!lastWinningTactic_.empty()) {
+            return " (via the " + lastWinningTactic_ + " strategy)";
+        }
+        return "";
     }
 
     // RAII helper to time a scope (e.g. an elaborator function) and
@@ -5290,6 +5320,13 @@ private:
     // returns, then cleared.
     std::string lastContextFactWinner_;
     int lastContextFactCandidateCount_ = 0;
+    // Always-on winner tracking (independent of the profiling path) so the
+    // expensive-by-less-step warning can name what actually closed the step.
+    // `lastWinningTactic_` is set by runTactic on the first success;
+    // `lastWinningDetail_` is the closing fact's source for contextFactMatch
+    // wins (a `library <name>` or `local binder <name>`).
+    std::string lastWinningTactic_;
+    std::string lastWinningDetail_;
     // True while tryContextFactMatch is speculatively scanning candidate
     // facts/lemmas. The citation premise-discharge's defeq fallback (a') in
     // completeCitationFromBindings is gated off during such a scan: it is an

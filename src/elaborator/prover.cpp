@@ -670,6 +670,7 @@ ExpressionPointer Elaborator::tryContextFactMatch(
                     lastContextFactWinner_ = fact.source;
                     lastContextFactCandidateCount_ = triedCount;
                 }
+                lastWinningDetail_ = fact.source;
                 return result;
             }
         }
@@ -1368,6 +1369,8 @@ ExpressionPointer Elaborator::autoProveClaim(
         // "add `by`" message. Inner frames let it propagate untouched.
         if (armedHere) {
             ExpressionPointer proof;
+            lastWinningTactic_.clear();
+            lastWinningDetail_.clear();
             try {
                 proof = autoProveClaimTactics(
                     goalClosed, localBinders, line, transportBudget);
@@ -1386,13 +1389,15 @@ ExpressionPointer Elaborator::autoProveClaim(
                 uint64_t spent = kernelStepsSoFar() - autoProveStepSnapshot_;
                 long long warnAt = autoProveWarnThresholdValue();
                 if (warnAt > 0 && spent > (uint64_t)warnAt) {
+                    std::string winnerHint = expensiveStepWinnerHint();
                     if (autoProveCallerLabel_.empty()) {
                         std::cerr << "warning: " << moduleName_ << ":"
                             << line
                             << ": expensive by-less proof step ("
                             << spent << " kernel-steps) — the auto-prover "
-                            "closed it by search; add an explicit `by "
-                            "<reason>` so the kernel checks it directly "
+                            "closed it by search" << winnerHint
+                            << "; add an explicit `by <reason>` so the "
+                            "kernel checks it directly "
                             "(much faster, and the intent is recorded)\n";
                     } else {
                         std::cerr << "warning: " << moduleName_ << ":"
