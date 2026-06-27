@@ -27,6 +27,7 @@ module axioms
 
 import Logic.basics
 import Equality.basics
+import Logic.exists
 
 -- ----------------------------------------------------------------------
 -- Propositional extensionality.
@@ -100,6 +101,32 @@ axiom Quotient.induct.{u}
       → (motive : Quotient(T, R) → Proposition)
       → (atRepresentative : ∀ (x : T). motive(Quotient.class_of(T, R, x)))
       → ∀ (q : Quotient(T, R)). motive(q)
+
+-- ----------------------------------------------------------------------
+-- Definite description ("the"): from a proof that EXACTLY ONE element
+-- satisfies a predicate, extract that element — together with the fact
+-- that it satisfies the predicate. This is unique choice: strictly
+-- weaker than Hilbert's ε / the axiom of choice, valid in the
+-- set-theoretic model alongside the axioms above, and the standard
+-- bridge from "∃! limit / root / inverse" to an actual FUNCTION.
+-- Without it, CIC's "no large elimination from Prop" rule blocks
+-- turning a functional relation into a function (the unique-choice
+-- wall that the explicit bisection constructions worked around).
+--
+-- Decided 2026-06-12: adopted to support the analysis arc (limits,
+-- exp, sqrt as functions) and Schröder–Bernstein.
+
+axiom Logic.the.{u}
+    : ∀ (T : Type(u)). (P : T → Proposition)
+      → (∃ (x : T). P(x))
+      → (∀ (x y : T). P(x) → P(y) → x = y)
+      → T
+
+axiom Logic.the_satisfies.{u}
+    : ∀ (T : Type(u)). (P : T → Proposition)
+      → ∀ (existence : ∃ (x : T). P(x)).
+      (uniqueness : ∀ (x y : T). P(x) → P(y) → x = y)
+      → P(Logic.the(T, P, existence, uniqueness))
 
 -- ----------------------------------------------------------------------
 -- The `sorry` placeholder. The keyword desugars to a call of one of
