@@ -4424,6 +4424,8 @@ definition Natural.divides (divisor dividend : Natural) : Proposition :=
           (quotient : Natural)
               ↦ Equality.{0}(Natural, dividend, Natural.multiply(divisor, quotient)))
 
+operator (∣) on (Natural, Natural) := Natural.divides
+
 theorem one_divides_one : 1 ∣ 1 :=
   Exists.introduce.{0}(Natural,
       (quotient : Natural)
