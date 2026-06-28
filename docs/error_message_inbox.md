@@ -1001,3 +1001,27 @@ head and falls back to comparing the unfolded `Exists` bodies. A bare `done`
 *does* close it (the full search supplies the instantiation). The message
 "check the lemma name" sends you down the wrong path — the lemma is right, the
 inferred argument is wrong.
+
+### Redundancy checker emits a spurious "elaborate error" on generic-lemma steps — 2026-06-28 (manifest-wide redundant-by sweep)
+note: running `kernel verify --source FILE --cache-root build --check-redundant-by
+--check-redundant-by-non-eq` over the clean manifest, two files print a full
+"elaborate error" block even though they verify fine in the normal build
+(`make clean-check` GREEN) and the kernel still exits 0:
+
+- `library/Real/continuity.math:291` — `Real.ContinuousAt.multiply` step:
+  ```
+  this step's justification proves a different relation than the step claims
+    this step claims:    |f y| * |g y - g x| ≤ fRoof * |g y - g x|
+    but its proof shows: (x y c : Real) → x ≤ y → IsNonneg c → x * c ≤ y * c
+  ```
+- `library/Rational/order_multiplication.math:440` — `Rational.value_at_zero_is_add_one`
+  via `Rational.fraction_equal`: "the conclusion shape fits, but an argument
+  could not be inferred …".
+
+In both, the flagged step is justified by a GENERIC lemma applied so that the
+auto-prover must instantiate/discharge from context. The normal verify does
+this fine; the redundancy check's re-elaboration of the step reports a mismatch
+(it seems to compare the lemma's raw Π-type against the step relation instead of
+the instantiated conclusion). The error is non-fatal (exit 0) but noisy and
+alarming during a polish sweep — it looks like the file is broken when it isn't.
+diagnosis:
