@@ -1136,32 +1136,20 @@ private:
             if (peek().kind == TokenKind::KeywordCalc) {
                 Token calcToken = peek();
                 SurfaceExpressionPointer calcExpression = parseCalc();
-                // A calc that ENDS the block is the block's proof, elaborated
-                // DIRECTLY against the goal — strictly more powerful than
-                // binding it: goal-directed elaboration lifts the calc across a
-                // quotient (`obtain rep from x; calc <rep eqn>` proves a goal
-                // about `x` from a representative equation — see
-                // `Rational.add_zero`), bridges defeq, and inserts coercions; a
-                // standalone binding + auto-close cannot replicate that. The
-                // trailing `;` before `}` is optional punctuation, so a final
-                // `calc … = c` and `calc … = c;` are identical. A calc with
-                // `as NAME`, or a mid-block `;` (more statements after), is
-                // instead a (named/anonymous) binding whose type is recovered
-                // from its endpoints below.
-                bool calcEndsBlock =
-                    peek().kind == TokenKind::RightBrace
-                    || (peek().kind == TokenKind::Semicolon
-                        && tokens_[position_ + 1].kind
-                               == TokenKind::RightBrace);
-                if (calcEndsBlock) {
-                    if (peek().kind == TokenKind::Semicolon) {
-                        consumeAny();  // optional trailing `;`
-                    }
-                    parsedFinalCalc = std::move(calcExpression);
-                    break;
-                }
+                // A calc at statement position is always a binding (named via
+                // `as`, else anonymous); the block's `}` then closes the goal
+                // through the auto-prover — finding the calc's fact by
+                // type-match when the calc IS the goal, or bridging it via
+                // tryCoerceFactToGoal when the goal is what it implies (e.g. a
+                // representative equation to its class equality). There is no
+                // longer a calc-specific "direct path": closing a block is
+                // uniformly the auto-prover. The trailing `;` is optional
+                // punctuation, so `calc … = c` and `calc … = c;` are identical.
+                // The parsedFinalCalc escape only fires when a calc is followed
+                // by none of `as`/`;`/`}` — not a block-statement position.
                 if (peek().kind != TokenKind::KeywordAs
-                    && peek().kind != TokenKind::Semicolon) {
+                    && peek().kind != TokenKind::Semicolon
+                    && peek().kind != TokenKind::RightBrace) {
                     parsedFinalCalc = std::move(calcExpression);
                     break;
                 }
@@ -1180,10 +1168,13 @@ private:
                         + std::to_string(calcToken.line) + "_"
                         + std::to_string(calcToken.column);
                 }
-                // A mid-block calc binding always has its separating `;`
-                // (the final-calc case was handled directly above).
-                expect(TokenKind::Semicolon,
-                       "ending calc statement");
+                // Trailing `;` optional on the block's last calc (before `}`);
+                // required as a separator between statements.
+                if (peek().kind == TokenKind::Semicolon) {
+                    consumeAny();
+                } else if (peek().kind != TokenKind::RightBrace) {
+                    expect(TokenKind::Semicolon, "ending calc statement");
+                }
                 auto* calcNode = std::get_if<SurfaceCalc>(
                     &calcExpression->node);
                 if (!calcNode || calcNode->steps.empty()) {

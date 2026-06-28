@@ -1402,7 +1402,13 @@ ExpressionPointer Elaborator::tryCoerceFactToGoal(
         ExpressionPointer goalOpened = openOverLocalBinders(
             goalClosed, localBinders, N);
         Context context = buildContextFromLocalBinders(localBinders);
-        for (int b = N - 1; b >= 0; --b) {
+        // Only the few most-recent facts: the calc/claim that motivated the
+        // close is the last binding (the unified model makes a final calc the
+        // last fact in scope). Bounding the scan keeps this cheap enough to run
+        // BEFORE the expensive equality battery — which otherwise thrashes on
+        // quotient-arithmetic goals and exhausts the effort budget first.
+        int oldest = N - 4 > 0 ? N - 4 : 0;
+        for (int b = N - 1; b >= oldest; --b) {
             ExpressionPointer factProof = makeBoundVariable(N - 1 - b);
             ExpressionPointer coerced;
             try {
@@ -1821,6 +1827,22 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // Bridge a most-recent fact to the goal via the diff/coercion
+        // machinery (the capability the calc "direct path" had, relocated
+        // here). It runs BEFORE the equality battery on purpose: when the goal
+        // is a quotient-class equality implied by a representative equation we
+        // just proved (`{ obtain rep; calc <rep eqn> }`), the battery would
+        // otherwise WHNF the quotient arithmetic and burn the effort budget,
+        // whereas this closes it cheaply through `fraction_equal`. Bounded to
+        // the last few facts (see tryCoerceFactToGoal), so it stays cheap on
+        // the common case.
+        {
+            ExpressionPointer attempt = runTactic("coerceFactToGoal",
+                [&] { return tryCoerceFactToGoal(
+                    goalClosed, localBinders); });
+            if (attempt) return attempt;
+        }
+
         {
             ExpressionPointer attempt = runTactic("equalityBattery",
                 [&] { return tryAutoProveEqualityGoal(
@@ -1930,18 +1952,6 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             ExpressionPointer attempt = runTactic("symmetryFlip",
                 [&] { return trySymmetryFlip(
                     goalClosed, localBinders, line); });
-            if (attempt) return attempt;
-        }
-
-        // Last resort: bridge an in-scope fact to the goal via the diff/
-        // coercion machinery (e.g. a representative cross-equation to the class
-        // equality it implies). This is the capability the calc "direct path"
-        // had, relocated here so any close — mid-block `claim`, `done`, or the
-        // block's implicit close — reconciles a fact to the goal the same way.
-        {
-            ExpressionPointer attempt = runTactic("coerceFactToGoal",
-                [&] { return tryCoerceFactToGoal(
-                    goalClosed, localBinders); });
             if (attempt) return attempt;
         }
 
