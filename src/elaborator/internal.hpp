@@ -5438,6 +5438,26 @@ private:
             elaborator.autoProveBudgetLimit_ = saved;
         }
     };
+    // A speculative redundancy re-proof can SUCCEED while massively overshooting
+    // the low redundancy budget: the budget is sampled only at candidate
+    // boundaries (autoProveSpend before each candidate), so a SINGLE deep kernel
+    // conversion that closes the by-less step never trips it. Flagging such a
+    // step as "redundant" tells the user to delete a hint that keeps the proof
+    // fast — the by-less re-proof costs real search (e.g. 50k+ kernel-steps).
+    // So after a speculative re-proof succeeds, compare the actual kernel-step
+    // delta against the budget and DISCARD an over-budget win: the hint is
+    // load-bearing for SPEED, not redundant. `stepsBefore` is kernelStepsSoFar()
+    // captured immediately before the re-proof began. Returns true when the
+    // re-proof was too expensive to count as redundant (cap 0 disables → never
+    // too expensive). The unsigned subtraction is guarded against the kernel
+    // counter resetting to a smaller value at public-entry boundaries.
+    bool redundancyReproofWasExpensive(uint64_t stepsBefore) {
+        long long cap = redundancyBudget();
+        if (cap <= 0) return false;
+        uint64_t now = kernelStepsSoFar();
+        uint64_t spent = now >= stepsBefore ? now - stepsBefore : now;
+        return spent >= static_cast<uint64_t>(cap);
+    }
     // Records, for the most recent `inferCallWithHoles` call, every PROOF
     // hole that was discharged from an in-scope hypothesis rather than the
     // goal: (depth = de Bruijn distance from innermost binder, 0 = the

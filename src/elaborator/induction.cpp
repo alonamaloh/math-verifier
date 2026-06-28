@@ -963,6 +963,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             // (the hint is load-bearing for speed) yields no proof. The guard
             // also bounds the bare-citation re-elaboration below (its backward
             // chaining respects autoProveBudgetLimit_).
+            uint64_t stepsBefore = kernelStepsSoFar();
             RedundancyBudgetGuard budgetGuard(*this);
             ExpressionPointer autoAttempt;
             try {
@@ -973,6 +974,14 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             } catch (const TypeError&) {
                 autoAttempt = nullptr;
             } catch (const AutoProverBudgetError&) {
+                autoAttempt = nullptr;
+            }
+            // A single deep conversion can close the bare claim while
+            // overshooting the low budget without tripping it (sampled only at
+            // candidate boundaries); an expensive by-less re-proof means the
+            // hint earns its keep on speed, so don't call it redundant.
+            if (autoAttempt
+                && redundancyReproofWasExpensive(stepsBefore)) {
                 autoAttempt = nullptr;
             }
             if (autoAttempt) {

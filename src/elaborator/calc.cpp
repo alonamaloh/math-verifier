@@ -539,6 +539,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                             || reportRedundantByNonEq_);
                     if (checkThisStep) {
                         ExpressionPointer autoAttempt;
+                        uint64_t stepsBefore = kernelStepsSoFar();
                         RedundancyBudgetGuard budgetGuard(*this);
                         try {
                             if (step.relation == CalcRelation::Equality) {
@@ -548,15 +549,22 @@ ExpressionPointer Elaborator::elaborateCalc(
                                     stepRelationType,
                                     step.line, step.column);
                             } else {
-                                // Non-= step (≤/</≥/>): use only the cheap
-                                // pattern-matching path (tryContextFactMatch
-                                // does a spine-hash lookup over the
-                                // environment, then a bounded
-                                // autoFillHintForClaim per candidate). Still
-                                // expensive for large files — gated behind
-                                // --check-redundant-by-non-eq so default
-                                // builds don't pay the cost.
-                                autoAttempt = tryContextFactMatch(
+                                // Non-= step (≤/</≥/>): re-prove EXACTLY as a
+                                // by-less step would at build time — the full
+                                // autoProveClaim, not the cheap targeted
+                                // tryContextFactMatch. The targeted match jumps
+                                // straight to the closing hypothesis and looks
+                                // near-free, but removing the `by` makes the
+                                // real build run autoProveClaim, whose library
+                                // scan / equality battery can burn 50k+ kernel
+                                // steps before that hypothesis wins. Only the
+                                // faithful path measures the TRUE by-less cost,
+                                // so the budget guard can leave a genuinely
+                                // expensive re-proof unflagged (the hint earns
+                                // its keep on speed). Gated behind
+                                // --check-redundant-by-non-eq; the budget caps
+                                // the search so the check stays bounded.
+                                autoAttempt = autoProveClaim(
                                     stepRelationType, localBinders, step.line);
                             }
                         } catch (const ElaborateError&) {
@@ -568,6 +576,15 @@ ExpressionPointer Elaborator::elaborateCalc(
                             // the hint is load-bearing (for speed at least).
                             // Never escapes — a speculative check must not
                             // fail the build.
+                            autoAttempt = nullptr;
+                        }
+                        // A single deep conversion can close the by-less step
+                        // while overshooting the low budget without tripping it
+                        // (the budget is sampled only at candidate boundaries):
+                        // measure the real cost and don't call an expensive
+                        // re-proof "redundant".
+                        if (autoAttempt
+                            && redundancyReproofWasExpensive(stepsBefore)) {
                             autoAttempt = nullptr;
                         }
                         if (autoAttempt) {
@@ -1147,6 +1164,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                     // Cap the budget so collapsing is only suggested when the
                     // combined step stays cheap (a costly re-proof means the
                     // intermediate is pulling its weight).
+                    uint64_t stepsBefore = kernelStepsSoFar();
                     RedundancyBudgetGuard budgetGuard(*this);
                     try {
                         autoAttempt = autoProveClaim(
@@ -1157,6 +1175,14 @@ ExpressionPointer Elaborator::elaborateCalc(
                     } catch (const ElaborateError&) {
                         autoAttempt = nullptr;
                     } catch (const TypeError&) {
+                        autoAttempt = nullptr;
+                    }
+                    // A single deep conversion can close the combined step
+                    // while overshooting the low budget without tripping it;
+                    // keep the intermediate target when the collapse is
+                    // actually expensive.
+                    if (autoAttempt
+                        && redundancyReproofWasExpensive(stepsBefore)) {
                         autoAttempt = nullptr;
                     }
                 }
