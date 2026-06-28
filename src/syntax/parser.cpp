@@ -1136,14 +1136,18 @@ private:
             if (peek().kind == TokenKind::KeywordCalc) {
                 Token calcToken = peek();
                 SurfaceExpressionPointer calcExpression = parseCalc();
-                // A calc that ENDS the block is the block's final expression,
-                // elaborated directly against the goal. That direct path is
-                // what handles calc chains over `∣`/`⊆`/`≈`, whose relation the
-                // binding-path type synthesis below cannot represent. The
+                // A calc that ENDS the block is the block's proof, elaborated
+                // DIRECTLY against the goal — strictly more powerful than
+                // binding it: goal-directed elaboration lifts the calc across a
+                // quotient (`obtain rep from x; calc <rep eqn>` proves a goal
+                // about `x` from a representative equation — see
+                // `Rational.add_zero`), bridges defeq, and inserts coercions; a
+                // standalone binding + auto-close cannot replicate that. The
                 // trailing `;` before `}` is optional punctuation, so a final
                 // `calc … = c` and `calc … = c;` are identical. A calc with
-                // `as NAME`, or a mid-block `;` with more statements after, is
-                // instead a (named/anonymous) binding.
+                // `as NAME`, or a mid-block `;` (more statements after), is
+                // instead a (named/anonymous) binding whose type is recovered
+                // from its endpoints below.
                 bool calcEndsBlock =
                     peek().kind == TokenKind::RightBrace
                     || (peek().kind == TokenKind::Semicolon
@@ -1195,7 +1199,16 @@ private:
                 bool seenNonStrict = false;
                 bool seenForward = false;
                 bool seenBackward = false;
+                // A generic-preorder step (`∣`, `⊆`, `≈`) carries its operator
+                // in `relationOperator` and leaves `relation` at the Equality
+                // placeholder. Such a chain composes to that operator, absorbing
+                // interleaved `=` steps by transport — so the overall relation
+                // is the generic operator: `p ∣ 0 = b` ⟹ `p ∣ b`.
+                std::string genericRelation;
                 for (const auto& step : calcNode->steps) {
+                    if (!step.relationOperator.empty()) {
+                        genericRelation = step.relationOperator;
+                    }
                     switch (step.relation) {
                         case CalcRelation::LessThan:
                             seenStrict = true;
@@ -1217,8 +1230,10 @@ private:
                             break;
                     }
                 }
-                const char* relationSymbol;
-                if (seenStrict) {
+                std::string relationSymbol;
+                if (!genericRelation.empty()) {
+                    relationSymbol = genericRelation;
+                } else if (seenStrict) {
                     relationSymbol = "<";
                 } else if (seenNonStrict) {
                     relationSymbol = "≤";
