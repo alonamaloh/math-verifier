@@ -1136,6 +1136,26 @@ private:
             if (peek().kind == TokenKind::KeywordCalc) {
                 Token calcToken = peek();
                 SurfaceExpressionPointer calcExpression = parseCalc();
+                // A calc that ENDS the block is the block's final expression,
+                // elaborated directly against the goal. That direct path is
+                // what handles calc chains over `∣`/`⊆`/`≈`, whose relation the
+                // binding-path type synthesis below cannot represent. The
+                // trailing `;` before `}` is optional punctuation, so a final
+                // `calc … = c` and `calc … = c;` are identical. A calc with
+                // `as NAME`, or a mid-block `;` with more statements after, is
+                // instead a (named/anonymous) binding.
+                bool calcEndsBlock =
+                    peek().kind == TokenKind::RightBrace
+                    || (peek().kind == TokenKind::Semicolon
+                        && tokens_[position_ + 1].kind
+                               == TokenKind::RightBrace);
+                if (calcEndsBlock) {
+                    if (peek().kind == TokenKind::Semicolon) {
+                        consumeAny();  // optional trailing `;`
+                    }
+                    parsedFinalCalc = std::move(calcExpression);
+                    break;
+                }
                 if (peek().kind != TokenKind::KeywordAs
                     && peek().kind != TokenKind::Semicolon) {
                     parsedFinalCalc = std::move(calcExpression);
@@ -1156,6 +1176,8 @@ private:
                         + std::to_string(calcToken.line) + "_"
                         + std::to_string(calcToken.column);
                 }
+                // A mid-block calc binding always has its separating `;`
+                // (the final-calc case was handled directly above).
                 expect(TokenKind::Semicolon,
                        "ending calc statement");
                 auto* calcNode = std::get_if<SurfaceCalc>(
