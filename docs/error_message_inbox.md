@@ -1024,4 +1024,24 @@ this fine; the redundancy check's re-elaboration of the step reports a mismatch
 (it seems to compare the lemma's raw Π-type against the step relation instead of
 the instantiated conclusion). The error is non-fatal (exit 0) but noisy and
 alarming during a polish sweep — it looks like the file is broken when it isn't.
-diagnosis:
+diagnosis (PARTIAL, 2026-06-28):
+- `continuity.math:291` — **RESOLVED.** This was the non-`=` redundancy probe
+  running `tryContextFactMatch` instead of the real by-less `autoProveClaim`;
+  that targeted matcher mis-elaborated the `ContinuousAt.multiply` step. The
+  budget-bug fix (probe now mirrors the by-less path) removed it.
+- `order_multiplication.math:440` — **STILL OPEN, different mechanism.** Here the
+  theorem `value_at_zero_is_add_one` proves its goal under `unfold
+  StrictPositiveRational.value, Integer.to_rational in { … }`; the closing
+  `done since fraction_equal` needs `value(make(K,0))` to REDUCE to a
+  `fraction(...)`. Under `--check-redundant-by` a speculative probe earlier in
+  the body appears to leave shared state mismatched so that reduction no longer
+  fires at line 444 and the citation match fails. The leading hypothesis is
+  OPACITY-STATE, not the WHNF/defeq cache: the probe's lemma search runs against
+  a bodyless snapshot with default opacity and the `unfold`'s Transparent
+  override for `value`/`to_rational` is not restored on return (so `value` is
+  seen Opaque → stuck → no `fraction`). RULED OUT: wiping the kernel caches in
+  the `RedundancyBudgetGuard` destructor (mirrors the `unfold … in` cache
+  invalidation at dispatch.cpp:378) did NOT fix it — pointing at the opacity
+  FLAG / snapshot environment, not a stale cache entry. Next: audit how the
+  speculative lemma-search saves/restores `unfoldedInThisDeclaration_` opacity
+  overrides across the snapshot-environment boundary.
