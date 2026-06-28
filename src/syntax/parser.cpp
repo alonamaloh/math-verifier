@@ -1830,16 +1830,20 @@ private:
                                 && application->arguments.size() == 1;
                         }
                     }
+                    // The braced block derives `False` under `h : P` in
+                    // EVERY case, so ascribe it — a bare `done` inside the
+                    // block then finds its goal. When `P = Not(X)` the
+                    // `(h : Not(X)) ↦ (… : False)` lambda has type
+                    // `Not(Not(X))`, which both feeds `Logic.by_contradiction`
+                    // below and pins `proposition = X` from the argument
+                    // itself (no longer leaning on the goal).
                     SurfaceExpressionPointer body =
-                        std::move(iterator->source);
-                    if (!assumptionIsNegation) {
-                        body = makeSurfaceAscription(
-                            std::move(body),
+                        makeSurfaceAscription(
+                            std::move(iterator->source),
                             makeSurfaceIdentifier("False", {},
                                                   iterator->line,
                                                   iterator->column),
                             iterator->line, iterator->column);
-                    }
                     SurfaceBinder binder;
                     binder.names.push_back(std::move(iterator->name));
                     binder.type = std::move(iterator->type);
