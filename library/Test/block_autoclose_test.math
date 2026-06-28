@@ -1,0 +1,21 @@
+module Test.block_autoclose
+
+import Real.order
+
+-- Closing a block engages the auto-prover on the goal — no `done` needed.
+-- And the trailing `;` is pure punctuation: these three are identical.
+theorem close_with_semicolon    (c : Real) (h : c < c) : False := { claim c < c since h; }
+theorem close_without_semicolon (c : Real) (h : c < c) : False := { claim c < c since h }
+theorem close_with_explicit_done (c : Real) (h : c < c) : False := { claim c < c since h; done }
+
+-- A bare close also discharges a goal that is itself an in-scope fact.
+theorem close_finds_goal_fact (P : Proposition) (hp : P) : P := { claim P since hp }
+
+-- A reductio with no `done` anywhere: the inner for-contradiction block
+-- closes its `False` goal on `}`, and the outer block closes the real goal
+-- from the established hypothesis on its own `}`.
+theorem reductio_without_done (a b c : Real) (h : c < c) : a ≤ b := {
+  suppose ¬(a ≤ b) for contradiction {
+    claim c < c since h
+  }
+}

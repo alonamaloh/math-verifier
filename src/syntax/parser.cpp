@@ -1257,14 +1257,19 @@ private:
                 auto* claimNode = std::get_if<SurfaceStructuredClaim>(
                     &claimExpression->node);
                 if (claimNode && claimNode->proposition
-                    && peek().kind == TokenKind::Semicolon) {
-                    // `claim P [by …];` mid-block — stash the proof
-                    // under an anonymous name so subsequent statements'
-                    // auto-prover finds it via structural hypothesis
-                    // match.
+                    && (peek().kind == TokenKind::Semicolon
+                        || peek().kind == TokenKind::RightBrace)) {
+                    // `claim P [by …];` mid-block, OR a final `claim P [by …]`
+                    // immediately before `}` (the trailing `;` is optional —
+                    // pure punctuation). Stash the proof under an anonymous
+                    // name so the auto-prover — whether the next statement's or
+                    // the implicit `done` that closes the block — finds it via
+                    // structural hypothesis match.
                     SurfaceExpressionPointer propositionCopy =
                         claimNode->proposition;
-                    consumeAny();  // ';'
+                    if (peek().kind == TokenKind::Semicolon) {
+                        consumeAny();  // ';'
+                    }
                     BlockWrapper wrapper;
                     wrapper.kind = BlockWrapper::TypedLet;
                     wrapper.name = "_claim_anon_"
@@ -1630,7 +1635,15 @@ private:
               : isChoose ? "ending choose statement"
               : isSet    ? "ending set statement"
                          : "ending let statement in block body";
-            expect(TokenKind::Semicolon, terminator);
+            // The `;` separates statements; on the LAST one (next token is
+            // `}`) it is optional — a trailing `;` is pure punctuation, like a
+            // trailing comma in a list, never a behaviour change. Between
+            // statements it stays required.
+            if (peek().kind == TokenKind::Semicolon) {
+                consumeAny();
+            } else if (peek().kind != TokenKind::RightBrace) {
+                expect(TokenKind::Semicolon, terminator);
+            }
             wrappers.push_back(std::move(wrapper));
         }
         SurfaceExpressionPointer finalExpression;
@@ -1692,16 +1705,23 @@ private:
             if (peek().kind == TokenKind::Semicolon) {
                 consumeAny();
             }
-        } else if (peek().kind == TokenKind::RightBrace
-                   && !wrappers.empty()
-                   && wrappers.back().kind == BlockWrapper::TypedLet) {
-            // A stray trailing `;` on the block's last proof step
-            // (`calc … = c;`, `claim P by …;`) is simply ignored: that step
-            // IS the block's result, exactly as if the `;` weren't there.
-            // (To instead auto-close from the accumulated facts, write `goal`
-            // explicitly as the final line.)
-            finalExpression = std::move(wrappers.back().value);
-            wrappers.pop_back();
+        } else if (peek().kind == TokenKind::RightBrace) {
+            // No explicit final expression: the closing `}` engages the
+            // auto-prover on the block's goal, with every prior step (claims,
+            // calcs, hypotheses) in scope — an implicit `done`. So
+            // `{ …; claim x < x; }` closes a `False` goal, and a plain
+            // `{ …; claim <goal>; }` closes by finding that fact, neither
+            // needing a written `done`. The prior steps stay as bindings (not
+            // popped), so their facts reach the prover. This is literally the
+            // `done` desugaring — `claim goal` — so closing a block, a `claim`,
+            // and a `calc` step all run the one auto-prover, no exception.
+            // An explicit `done`/`okay`/`goal`/proof term still works and is
+            // preferred when an illuminating `since <reason>` is worth keeping.
+            Token brace = peek();
+            finalExpression = makeSurfaceStructuredClaim(
+                makeSurfaceGoal(brace.line, brace.column), /*label=*/"",
+                /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
+                brace.line, brace.column);
         } else {
             finalExpression = parseExpression();
             // Optional trailing semicolon for the final expression.
