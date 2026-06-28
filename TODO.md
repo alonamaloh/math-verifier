@@ -4,27 +4,27 @@ Planned work, in rough priority / dependency order. Once an item
 lands, delete it from this file — the commit history and the project
 state (`README.md`, `CLAUDE.md`) are the record of what was done.
 
+Other living trackers, not duplicated here: `docs/CLEAN_STYLE_PLAN.md`
+(clean-style milestone cones), `docs/error_message_inbox.md` and
+`docs/error_message_corpus.md` (error-message triage), `docs/freek_100.md`
+(famous-theorem checklist), `STRESS_PROBES.md` (diagnostic probes), and
+the `PLAN_*.md` design documents.
+
 ## Library content
 
-The math content roadmap. Real is now closed under field ops AND the
-supremum property (`Real.supremum_exists` in `Real/supremum.math`),
-so it's a complete ordered field — fully formalized. PAdic remains
-closed under ring ops + the p-adic norm.
+Real is closed under field ops AND the supremum property
+(`Real.supremum_exists` in `Real/supremum.math`), so it is a complete
+ordered field — fully formalized — with `ComplexNumber` built on top.
+Rational is an opaque (Integer numerator, nonzero-Integer denominator)
+field-of-fractions quotient.
 
 - **More generic abelian-group / ring / field lemmas** as the
-  Real and PAdic proofs surface them. Foundation in
+  concrete-carrier proofs surface them. Foundation in
   `Algebra/{group_lemmas,ring_lemmas}.math` covers
   `inverse_identity`, `inverse_operation`, `cancel_left/right`,
   `zero_multiply`, `multiply_zero`, `multiply_negate_left/right`,
   `negate_multiply_negate`. Add more here as concrete-carrier
   proofs find themselves wanting them.
-
-- **Real ε/δ instead of rational ε/δ.** The analysis definitions
-  currently quantify over *rational* epsilons and deltas. The
-  rational and real formulations are equivalent (a real ε can be
-  undercut by a rational one and vice versa), but rational ε/δ is
-  unexpected to a mathematician and buys us nothing. Switch the
-  definitions to real ε/δ.
 
 ## Trusted base / axioms
 
@@ -87,8 +87,8 @@ closed under ring ops + the p-adic norm.
   strong-induction proofs should follow v2's style.
 
 - **`by bridge` for pattern-match definitions on quotient reps.**
-  Every binary-op respect proof in `Real/` and `PAdic/` spends ~30
-  lines converting `sequenceFunction(add(rep1, rep2), m)` into
+  Every binary-op respect proof in `Real/` spends ~30 lines
+  converting `sequenceFunction(add(rep1, rep2), m)` into
   `sequenceFunction(rep1, m) + sequenceFunction(rep2, m)` via manual
   `cases` + `reflexivity`. Remedy: a tactic that exposes a
   pattern-match definition's β-reduction as a one-step calc rewrite
@@ -204,94 +204,6 @@ lemma-index lookup by spineHash), the residual items are:
   profile a cold-rebuild — pack the bits only if `substitute` /
   `openBinder` show up in the top 5.
 
-## Rational `/` operator via implicit-prop-arg discharge
-
-Goal: an honest `/` operator on `(Integer, Natural) → Rational` with
-the *actual* denominator (not the denominator-minus-one of the rep
-encoding), so call sites read as math:
-
-    Rational.halve := (1 : Integer) / 2
-    Rational.zero  := (0 : Integer) / 1
-    -- with d : Natural, h : d ≠ 0 in scope:
-    n / d
-
-Underlying function and operator registration:
-
-    definition Rational.divide
-            : (n : Integer) → (d : Natural) → d ≠ 0 → Rational
-      | n, zero,         h => False.eliminate(Rational,
-                                  h(reflexivity(Natural, zero)))
-      | n, successor(k), _ => Quotient.mk(
-                                  RationalRepresentative.make(n, k))
-
-    definition Rational./ (n : Integer) (d : Natural) {h : d ≠ 0}
-            : Rational := Rational.divide(n, d, h)
-    operator (/) on (Integer, Natural) := Rational./
-
-Missing language piece. The existing implicit-args machinery fills
-implicits that are *uniquely determined by another argument's type*
-(e.g. `{T : Type}` from `(x : T)`, or `{primality}` from `x :
-PAdic(p, primality)` once the PAdic migration lands). The `{h : d ≠
-0}` here isn't in any other argument's type — it has to be *proved*.
-New infrastructure: when the elaborator hits an unfilled implicit
-propositional argument of type P, run a discharge protocol —
-
-  1. If P is `n ≠ 0` (or `Not(n = 0)`) and `n` head-WHNFs to
-     `successor(_)`, fill with `Natural.successor_not_zero(_)`.
-     Handles every literal denominator.
-  2. Otherwise scan local hypotheses for a term of type P. Handles
-     `d ≠ 0` already in scope.
-  3. Otherwise route to the existing `by` auto-prover
-     (`CHECK_REDUNDANT_BY=1` lemma-index path) for a library-lemma
-     sweep.
-  4. Otherwise fail with a clear "pass `Rational.divide(n, d, proof)`
-     explicitly" message.
-
-Steps 2 and 3 reuse machinery the `by` desugaring already has. Step 1
-is a few lines of recognition plus a one-liner proof construction. The
-larger change is the routing — detecting an unfilled implicit prop
-arg in the elaborator and threading it into the discharger.
-
-Risks:
-  - Nondeterminism if multiple local hypotheses match. First-match-
-    wins; explicit pass overrides.
-  - Cost on every implicit-prop hole. Need a fast negative path when
-    nothing matches.
-
-Shared payoff: any future operator/function with a side-condition
-implicit that isn't embedded in another arg's type gets covered by
-the same machinery — generalizes beyond `/`.
-
-Migration scope after landing: the literal-rational construction
-sites (`Rational.zero`, `Rational.one`, `Rational.halve`, and ~20
-others surfaced by `grep "Quotient.mk(RationalRepresentative" library/
-Rational/`) collapse to one-line definitions reading as math.
-Abstract-rep sites inside `Quotient.induct` motives in
-`reciprocal_function.math` etc. do *not* migrate — there the rep's
-`+1` offset is structurally what the proof manipulates, and `/` would
-be misleading. Operator and raw constructor will coexist.
-
-Order of operations:
-  1. Discharge protocol in the elaborator (the substantive piece).
-  2. `Rational.divide` + operator registration (~30 lines of library
-     code).
-  3. Sweep the literal-rational construction sites.
-
-## `Algebra/CauchyCompletion`
-
-`Real/*.math` (~2800 lines) and `PAdic/*.math` (~5300 lines) are
-~80% parallel: same Cauchy / bounded definitions, same equivalence
-relation, same Step-1 / Step-2 anchor split in `cauchy_bounded.math`,
-same ε/2-and-triangle pattern in `sum_is_cauchy`, identical lifts
-of ring laws through `equivalent_when_sequenceFunction_equal`. A
-generic completion functor parameterized by a Rational-valued
-seminorm (with triangle inequality and `norm(0) = 0`) could absorb
-1500–2000 lines and force the abstraction textbooks take for
-granted.
-
-Blocked on PAdic's `(p, primality)` becoming implicit so the
-seminorm parameter can carry its own implicits.
-
 ## `ring` / `field` tactics — open follow-ups
 
 Ring v2 (distributivity, AC, 0/1 identity, negation, ±1
@@ -387,7 +299,6 @@ none urgent:
   the bridge in `proveEqualsCanonical_impl` for `subtract` breaks.
   Worth a regression test once any such carrier appears.
 
-
 ## Parallel verification
 
 Optimistic per-theorem parallelism with a thread pool: register
@@ -429,37 +340,9 @@ time to debug the index plumbing.
   mismatch through the nested polymorphic lifts. Manual two-step
   lifts (Integer.add pattern) work fine. Revisit when the universe-
   handling code in the elaborator is more robust.
-- **PAdic `(p, primality)` → implicit args.** NOT mechanical after
-  all. Two blockers found during a sweep attempt:
-    (1) **`Rational.padic_*` and `Rational.sequence.*` callees take
-        Rational/sequence args that don't constrain p**, so dropping
-        the explicit `(p, primality, …)` prefix at those call sites
-        leaves the implicit-args inference with nothing to drive p
-        from. `Rational.padic_absolute_value(q : Rational) : Rational`
-        is the canonical example — q's type has no p. Need either:
-        keep explicit p at those sites, or extend inference to use
-        the surrounding type-position context (works less often than
-        you'd hope: many sites are in calc steps / let-bindings where
-        the expected type is also a plain `Rational`).
-    (2) **The `=` desugar elaborates the LHS without an expected
-        type**, so even `PAdic.add(x, y) = …` (where x : PAdic(p, _))
-        currently fails: inference for `PAdic.add` on the LHS can't
-        see the implicit prefix back-propagated from the RHS. A fix
-        would either pre-elaborate the RHS first to recover a carrier
-        hint, or wire forward inference to use the surrounding
-        equality context. The bug pre-dates the recent elaborator
-        work; it just didn't matter before because PAdic call sites
-        passed `(p, primality)` explicitly.
-  Recommended sequence: fix (2) in the elaborator first (general
-  win), then migrate the inference-friendly subset (PAdic.{add,
-  multiply, negate, subtract} and call sites where p is reachable
-  through args), then revisit Rational.padic_* once an expected-type
-  back-propagation path exists.
-- **`operator (+) on (PAdic, PAdic)`** etc. — unblocked by the
-  above.
 - **Per-block `open NAMESPACE`** for terser long names like
-  `Rational.padic_absolute_value`. Lower priority; the long names
-  are searchable.
+  `Rational.reciprocal_function_positive_of_positive`. Lower
+  priority; the long names are searchable.
 
 ## Index of relevant design decisions
 
