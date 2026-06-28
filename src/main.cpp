@@ -3131,6 +3131,37 @@ void runLexerTests() {
                     && tokens[2].lexeme == "add");
     }
 
+    // Greek (and other Unicode) letters are admitted into identifiers.
+    {
+        auto tokens = lex("ε");
+        EXPECT_TRUE(tokens.size() == 2);
+        EXPECT_TRUE(tokens[0].kind == TokenKind::Identifier
+                    && tokens[0].lexeme == "ε");
+    }
+    // ASCII and Greek letters mix freely within one identifier.
+    {
+        auto tokens = lex("double_α");
+        EXPECT_TRUE(tokens.size() == 2);
+        EXPECT_TRUE(tokens[0].kind == TokenKind::Identifier
+                    && tokens[0].lexeme == "double_α");
+    }
+    // A Greek-letter name never swallows an adjacent Unicode operator: the
+    // letter ranges deliberately exclude every operator code point.
+    {
+        auto kinds = kindsOf("α≤β");
+        std::vector<TokenKind> expected = {
+            TokenKind::Identifier, TokenKind::LessOrEqual,
+            TokenKind::Identifier, TokenKind::EndOfFile};
+        EXPECT_TRUE(kinds == expected);
+    }
+    {
+        auto kinds = kindsOf("α·β");
+        std::vector<TokenKind> expected = {
+            TokenKind::Identifier, TokenKind::CenterDot,
+            TokenKind::Identifier, TokenKind::EndOfFile};
+        EXPECT_TRUE(kinds == expected);
+    }
+
     // Universe-args opener .{ is a single token, distinguishing namespace
     // qualification from universe instantiation.
     {

@@ -1,6 +1,7 @@
 #include "syntax/lexer.hpp"
 
 #include <cctype>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -91,6 +92,49 @@ bool isIdentifierContinuation(char character) {
         || character == '_' || character == '\'';
 }
 
+// Decodes the UTF-8 code point beginning at byte offset `pos`, returning
+// the code point and its byte length. Returns nullopt for a malformed or
+// truncated sequence so the caller falls back to byte-level handling.
+struct Utf8Char { uint32_t codepoint; int length; };
+
+std::optional<Utf8Char> decodeUtf8(const std::string& source, size_t pos) {
+    unsigned char lead = source[pos];
+    int length;
+    uint32_t codepoint;
+    if (lead < 0x80) {
+        return Utf8Char{lead, 1};
+    } else if ((lead & 0xE0) == 0xC0) {
+        length = 2; codepoint = lead & 0x1F;
+    } else if ((lead & 0xF0) == 0xE0) {
+        length = 3; codepoint = lead & 0x0F;
+    } else if ((lead & 0xF8) == 0xF0) {
+        length = 4; codepoint = lead & 0x07;
+    } else {
+        return std::nullopt;
+    }
+    if (pos + length > source.size()) return std::nullopt;
+    for (int i = 1; i < length; ++i) {
+        unsigned char continuation = source[pos + i];
+        if ((continuation & 0xC0) != 0x80) return std::nullopt;
+        codepoint = (codepoint << 6) | (continuation & 0x3F);
+    }
+    return Utf8Char{codepoint, length};
+}
+
+// Whether a non-ASCII code point is a letter we admit into identifiers.
+// The admitted ranges are letter blocks only — Greek above all, but also
+// Latin accents and Cyrillic — and deliberately exclude every block our
+// operators live in (math symbols at U+2200+, the middle dot U+00B7, the
+// superscripts of `⁻¹`), so a name can never swallow an adjacent operator.
+bool isUnicodeIdentifierLetter(uint32_t codepoint) {
+    return (codepoint >= 0x00C0 && codepoint <= 0x00D6)   // Latin-1 letters (À–Ö)
+        || (codepoint >= 0x00D8 && codepoint <= 0x00F6)   //   (Ø–ö, skipping ×)
+        || (codepoint >= 0x00F8 && codepoint <= 0x024F)   //   (ø–, Latin Extended-A/B, skipping ÷)
+        || (codepoint >= 0x0370 && codepoint <= 0x03FF)   // Greek and Coptic
+        || (codepoint >= 0x0400 && codepoint <= 0x04FF)   // Cyrillic
+        || (codepoint >= 0x1F00 && codepoint <= 0x1FFF);  // Greek Extended
+}
+
 // A small state machine. Public entry is run(); everything else is
 // internal helpers. We carry line/column for error messages but use
 // byte offsets for matching — Unicode operators are matched by their
@@ -162,12 +206,21 @@ private:
         int startColumn = column_;
         char character = source_[position_];
 
-        if (isIdentifierStart(character)) {
+        if (isIdentifierStart(character)
+            || unicodeIdentifierLengthAt(position_) > 0) {
             std::string lexeme;
-            while (position_ < source_.size()
-                   && isIdentifierContinuation(source_[position_])) {
-                lexeme.push_back(source_[position_]);
-                advanceOne();
+            while (position_ < source_.size()) {
+                if (isIdentifierContinuation(source_[position_])) {
+                    lexeme.push_back(source_[position_]);
+                    advanceOne();
+                } else if (int length = unicodeIdentifierLengthAt(position_)) {
+                    for (int i = 0; i < length; ++i) {
+                        lexeme.push_back(source_[position_]);
+                        advanceOne();
+                    }
+                } else {
+                    break;
+                }
             }
             auto iterator = keywordTable().find(lexeme);
             TokenKind kind = (iterator != keywordTable().end())
@@ -279,6 +332,20 @@ private:
             }
         }
         return std::nullopt;
+    }
+
+    // Byte length of a Unicode identifier letter starting at `pos`, or 0 if
+    // the bytes there are ASCII, an operator, or a malformed sequence.
+    int unicodeIdentifierLengthAt(size_t pos) const {
+        if (pos >= source_.size()
+            || static_cast<unsigned char>(source_[pos]) < 0x80) {
+            return 0;
+        }
+        auto decoded = decodeUtf8(source_, pos);
+        if (!decoded || !isUnicodeIdentifierLetter(decoded->codepoint)) {
+            return 0;
+        }
+        return decoded->length;
     }
 
     bool matchPrefix(const char* prefix) {
