@@ -89,23 +89,21 @@ automatic theorem Real.two_positive : 0 < (2 : Real) := {
 }
 
 -- 2 ≠ 0 — the side condition every `/2` use site discharges.
-automatic theorem Real.two_is_nonzero : (2 : Real) ≠ 0 :=
-  (twoZero : (2 : Real) = Real.zero) ↦ {
-      claim 0 < (2 : Real) since Real.two_positive;
-      claim Real.zero < Real.zero by substituting twoZero;
-      claim notSelfEqual : ¬(Real.zero = Real.zero) since Real.LessThan.distinct;
-      absurd(notSelfEqual(reflexivity(Real, Real.zero)))
-    }
+automatic theorem Real.two_is_nonzero : (2 : Real) ≠ 0 := {
+  suppose (2 : Real) = Real.zero as twoZero;
+  claim 0 < (2 : Real) since Real.two_positive;
+  claim Real.zero < Real.zero by substituting twoZero;
+  done
+}
 
 -- A positive real is nonzero — the flip of LessThan.distinct the `/`
 -- side conditions want.
 automatic theorem Real.nonzero_of_positive (x : Real) (xPositive : 0 < x)
-        : x ≠ 0 :=
-  (xZero : x = 0) ↦ {
-    claim Real.zero < Real.zero by substituting xZero;
-    claim notSelfEqual : ¬(Real.zero = Real.zero) since Real.LessThan.distinct;
-    absurd(notSelfEqual(reflexivity(Real, Real.zero)))
-  }
+        : x ≠ 0 := {
+  suppose x = 0 as xZero;
+  claim Real.zero < Real.zero by substituting xZero;
+  done
+}
 
 -- x / 2 + x / 2 = x — the ε/2 split.
 theorem Real.divide_two_doubled (x : Real) : x / 2 + x / 2 = x :=
@@ -116,11 +114,8 @@ theorem Real.divide_two_doubled (x : Real) : x / 2 + x / 2 = x :=
 theorem Real.reciprocal_positive (x : Real) (xNonzero : x ≠ 0)
         (xPositive : 0 < x)
         : 0 < Real.reciprocal(x, xNonzero) :=
-  decide 0 < Real.reciprocal(x, xNonzero) {
-    | yes recipPositive => recipPositive
-    | no recipNotPositive => {
-        claim Real.reciprocal(x, xNonzero) ≤ 0
-            since Real.LessOrEqual_of_not_LessThan;
+  {
+    suppose Real.reciprocal(x, xNonzero) ≤ 0 for contradiction {
         claim recipMultiplies : x * Real.reciprocal(x, xNonzero) = 1
             since Real.reciprocal_multiplies;
         claim 0 ≤ x since Real.LessThan.weaken;
@@ -136,10 +131,9 @@ theorem Real.reciprocal_positive (x : Real) (xNonzero : x ≠ 0)
                  since Rational.to_real.positive_preserves
            = 1;
         claim Real.zero < Real.zero since Real.LessThan.transitive_right;
-        claim notSelfEqual : ¬(Real.zero = Real.zero)
-            since Real.LessThan.distinct;
-        absurd(notSelfEqual(reflexivity(Real, Real.zero)))
-      }
+        done
+    };
+    done since Real.LessThan_of_not_LessOrEqual
   }
 
 -- a / b is positive when both a and b are.
