@@ -275,7 +275,8 @@ $(BUILD_DIR)/%.mathv: %.math $(BUILD_DIR)/%.mathv.iface kernel
 # included rule set works whether the user invokes `library` or `tests`.
 $(BUILD_DIR)/library-depends.mk: $(MATH_FILES) | kernel
 	@mkdir -p $(BUILD_DIR)
-	./kernel deps --cache-root $(BUILD_DIR) $(MATH_FILES) > $@
+	@echo "  deps     regenerating $@"
+	@./kernel deps --cache-root $(BUILD_DIR) $(MATH_FILES) > $@
 
 library-clean:
 	rm -rf $(BUILD_DIR)/library $(BUILD_DIR)/library-depends.mk
