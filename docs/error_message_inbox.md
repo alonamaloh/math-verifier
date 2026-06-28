@@ -1029,19 +1029,24 @@ diagnosis (PARTIAL, 2026-06-28):
   running `tryContextFactMatch` instead of the real by-less `autoProveClaim`;
   that targeted matcher mis-elaborated the `ContinuousAt.multiply` step. The
   budget-bug fix (probe now mirrors the by-less path) removed it.
-- `order_multiplication.math:440` — **STILL OPEN, different mechanism.** Here the
-  theorem `value_at_zero_is_add_one` proves its goal under `unfold
-  StrictPositiveRational.value, Integer.to_rational in { … }`; the closing
-  `done since fraction_equal` needs `value(make(K,0))` to REDUCE to a
-  `fraction(...)`. Under `--check-redundant-by` a speculative probe earlier in
-  the body appears to leave shared state mismatched so that reduction no longer
-  fires at line 444 and the citation match fails. The leading hypothesis is
-  OPACITY-STATE, not the WHNF/defeq cache: the probe's lemma search runs against
-  a bodyless snapshot with default opacity and the `unfold`'s Transparent
-  override for `value`/`to_rational` is not restored on return (so `value` is
-  seen Opaque → stuck → no `fraction`). RULED OUT: wiping the kernel caches in
-  the `RedundancyBudgetGuard` destructor (mirrors the `unfold … in` cache
-  invalidation at dispatch.cpp:378) did NOT fix it — pointing at the opacity
-  FLAG / snapshot environment, not a stale cache entry. Next: audit how the
-  speculative lemma-search saves/restores `unfoldedInThisDeclaration_` opacity
-  overrides across the snapshot-environment boundary.
+- `order_multiplication.math:440` — **RESOLVED (commit 89b349d).** The earlier
+  OPACITY-STATE hypothesis here was WRONG and is retracted: `value`/`to_rational`
+  are plain (transparent) `definition`s, so the `unfold` is an opacity no-op and
+  all three (value/to_rational/fraction) read Transparent at the failure. The
+  real cause, found by instrumenting and eliminating ~15 candidate states (every
+  kernel cache incl. always-on inferTypeCache, hash-cons, opacity, the autoprove
+  budget active/limit/tripped, citeOnly, inSpeculativeContextScan, the
+  citation-level placeholder set + allowImplicitCitationLevels_, metavarCounter_,
+  env declaration count, pendingOpacityRestores_, current/auto-bound universe
+  params, goalStack depth): the **inferable-args diagnostic** speculatively
+  re-elaborates a cited lemma BARE (`makeSurfaceIdentifier(name, {})`, no
+  universe args). For a universe-POLYMORPHIC lemma that drives the implicit
+  citation-level placeholder path; when the bare match FAILS (here the earlier
+  bare `Quotient.equal_implies_equivalent`, whose value args were what pinned the
+  levels) it leaves some deep matcher state torn, breaking the later
+  `fraction_equal` citation. Fix: skip the inferable-args check for universe-poly
+  lemmas (the test is ill-posed for them; monomorphic lemmas are unaffected).
+  The exact corrupted byte was never isolated, but the trigger is precise and the
+  fix is verified manifest-wide (0 errors) with a regression guard
+  (scripts/redundancy_probe_test.sh in `make checker-tests`). PROMOTE this whole
+  entry to the corpus and delete from the inbox.
