@@ -1,0 +1,167 @@
+-- Real/division.math
+--
+-- Division on the reals: `a / b := a · reciprocal(b)`. Unlike the
+-- Rational `/` (built on the *total* reciprocal_function), `Real.reciprocal`
+-- is partial — it takes the proof that the denominator is nonzero — so the
+-- side condition is genuine. The `/` operator leaves it for the auto-prover
+-- to discharge at the use site (a hypothesis in scope), mirroring
+-- `Integer.divide` / `Rational.divide`, so `a / b` reads plainly while
+-- staying honest. The lemmas keep `bNonzero` as a hypothesis so the `/`
+-- hole resolves to that bound variable — a unifiable slot the citation
+-- matcher binds to whatever proof a use site carries (this kernel has no
+-- definitional proof irrelevance, and `Real.reciprocal` genuinely depends
+-- on its proof argument via `Logic.the`, so a compound proof baked in
+-- would not match across sites).
+
+module Real.division
+
+import Logic.basics
+import Equality.basics
+import Rational.basics
+import Rational.order
+import Real.basics
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.order
+import Real.linearity
+import Real.order_multiplication
+import Real.order_field
+import Real.embedding
+import Real.embedding_order
+import Real.apartness
+import Real.reciprocal
+import Real.field
+
+definition Real.divide (a b : Real) (denominatorNonzero : b ≠ 0) : Real :=
+  a * Real.reciprocal(b, denominatorNonzero)
+
+operator (/) on (Real, Real) := Real.divide
+
+-- A product of nonzero reals is nonzero (no zero divisors): if a·b = 0 with
+-- a ≠ 0, then b = reciprocal(a)·(a·b) = reciprocal(a)·0 = 0.
+theorem Real.multiply_nonzero (a b : Real)
+        (aNonzero : a ≠ 0) (bNonzero : b ≠ 0)
+        : a * b ≠ 0 := {
+  suppose a * b = 0 as abZero for contradiction {
+    calc b
+       = a⁻¹ * (a * b)      by field
+       = a⁻¹ * 0
+       = 0                  as bZero;
+    absurd(bNonzero(bZero))
+  };
+  done
+}
+
+-- Left cancellation: c ≠ 0 and c·a = c·b give a = b (multiply by c⁻¹).
+theorem Real.equal_of_multiply_left (a b c : Real) (cNonzero : c ≠ 0)
+        (cancellable : c * a = c * b) : a = b := {
+  calc a
+     = c⁻¹ * (c * a)   by field
+     = c⁻¹ * (c * b)
+     = b               by field
+}
+
+-- b · (a / b) = a — the cancellation everything else leans on.
+theorem Real.divide_cancel (a b : Real) (bNonzero : b ≠ 0)
+        : b * (a / b) = a :=
+  field
+
+-- a / a = 1.
+theorem Real.divide_self (a : Real) (aNonzero : a ≠ 0)
+        : a / a = 1 :=
+  field
+
+-- 0 < 1 in ℝ (the embedded Rational one, which is Real.one definitionally).
+theorem Real.zero_less_one : (0 : Real) < 1 :=
+  calc (0 : Real)
+     < (Rational.one : Real)   since Rational.to_real.positive_preserves
+     = 1
+
+-- 0 < 2 = 1 + 1.
+automatic theorem Real.two_positive : 0 < (2 : Real) := {
+  claim (0 : Real) < 1 since Real.zero_less_one;
+  calc (0 : Real)
+     = 0 + 0
+     < 1 + 1     since Real.LessThan.add_strict_strict
+     = 2
+}
+
+-- 2 ≠ 0 — the side condition every `/2` use site discharges.
+automatic theorem Real.two_is_nonzero : (2 : Real) ≠ 0 :=
+  (twoZero : (2 : Real) = Real.zero) ↦ {
+      claim 0 < (2 : Real) since Real.two_positive;
+      claim Real.zero < Real.zero by substituting twoZero;
+      claim notSelfEqual : ¬(Real.zero = Real.zero) since Real.LessThan.distinct;
+      absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+    }
+
+-- A positive real is nonzero — the flip of LessThan.distinct the `/`
+-- side conditions want.
+automatic theorem Real.nonzero_of_positive (x : Real) (xPositive : 0 < x)
+        : x ≠ 0 :=
+  (xZero : x = 0) ↦ {
+    claim Real.zero < Real.zero by substituting xZero;
+    claim notSelfEqual : ¬(Real.zero = Real.zero) since Real.LessThan.distinct;
+    absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+  }
+
+-- x / 2 + x / 2 = x — the ε/2 split.
+theorem Real.divide_two_doubled (x : Real) : x / 2 + x / 2 = x :=
+  field
+
+-- The reciprocal of a positive real is positive: if it were not, then
+-- recip·x ≤ 0·x = 0, contradicting x·recip = 1 > 0.
+theorem Real.reciprocal_positive (x : Real) (xNonzero : x ≠ 0)
+        (xPositive : 0 < x)
+        : 0 < Real.reciprocal(x, xNonzero) :=
+  decide 0 < Real.reciprocal(x, xNonzero) {
+    | yes recipPositive => recipPositive
+    | no recipNotPositive => {
+        claim Real.reciprocal(x, xNonzero) ≤ 0
+            since Real.LessOrEqual_of_not_LessThan;
+        claim recipMultiplies : x * Real.reciprocal(x, xNonzero) = 1
+            since Real.reciprocal_multiplies;
+        claim 0 ≤ x since Real.LessThan.weaken;
+        claim Real.reciprocal(x, xNonzero) * x ≤ 0 * x
+            since Real.LessOrEqual.multiply_by_nonneg_right;
+        calc (1 : Real)
+           = x * Real.reciprocal(x, xNonzero)   since recipMultiplies
+           = Real.reciprocal(x, xNonzero) * x
+           ≤ 0 * x
+           = 0;
+        calc (0 : Real)
+           < (Rational.one : Real)
+                 since Rational.to_real.positive_preserves
+           = 1;
+        claim Real.zero < Real.zero since Real.LessThan.transitive_right;
+        claim notSelfEqual : ¬(Real.zero = Real.zero)
+            since Real.LessThan.distinct;
+        absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+      }
+  }
+
+-- a / b is positive when both a and b are.
+theorem Real.divide_positive (a b : Real) (bNonzero : b ≠ 0)
+        (aPositive : 0 < a) (bPositive : 0 < b)
+        : 0 < a / b := {
+  claim 0 < Real.reciprocal(b, bNonzero) since Real.reciprocal_positive;
+  done since Real.multiply_positive
+}
+
+-- x / 2 < x for positive x (the gap is the other half).
+theorem Real.divide_two_less_than_self (x : Real) (xPositive : 0 < x)
+        : x / 2 < x := {
+  claim 0 < (2 : Real) since Real.two_positive;
+  claim 0 < x / 2 since Real.divide_positive;
+  calc x / 2
+     = x / 2 + 0
+     < x / 2 + x / 2     since Real.add_left_preserves_LessThan
+     = x                 since Real.divide_two_doubled
+}
+
+-- (a · b) / b = a.
+theorem Real.multiply_divide_cancel (a b : Real) (bNonzero : b ≠ 0)
+        : (a * b) / b = a :=
+  field

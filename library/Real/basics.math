@@ -46,13 +46,13 @@ definition CauchyRationalSequence.sequenceFunction
 -- beyond N, |s(m) - t(m)| < ε.
 definition CauchyEquivalent
         (a b : CauchyRationalSequence) : Proposition :=
-  ∀ (epsilon : Rational). Rational.zero < epsilon →
+  ∀ (ε : Rational). Rational.zero < ε →
     ∃ (N : Natural).
       ∀ (m : Natural). N ≤ m →
         abs(
             CauchyRationalSequence.sequenceFunction(a, m)
             - CauchyRationalSequence.sequenceFunction(b, m))
-          < epsilon
+          < ε
 
 -- The Real numbers: equivalence classes of Cauchy rational sequences.
 definition Real : Type(0) :=
@@ -73,13 +73,13 @@ construction Real.from_cauchy_sequence
 theorem CauchyEquivalent.reflexive
         : ∀ (a : CauchyRationalSequence). CauchyEquivalent(a, a)
   | CauchyRationalSequence.make(s, sCauchy) =>
-      (epsilon : Rational)
-               (epsilonPositive : Rational.zero < epsilon) ↦
+      (ε : Rational)
+               (εPositive : Rational.zero < ε) ↦
         witness zero with
             (m : Natural) (_ : zero ≤ m) ↦
               calc abs(s(m) - s(m))
                  = Rational.zero
-                 < epsilon
+                 < ε
 
 -- CauchyEquivalent is symmetric. Use the abstract
 -- `sequenceFunction(...)` projector everywhere rather than
@@ -89,9 +89,9 @@ theorem CauchyEquivalent.symmetric
         (a b : CauchyRationalSequence)
         (aEquivb : CauchyEquivalent(a, b))
         : CauchyEquivalent(b, a) :=
-  (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) ↦ {
-    choose N as aEquivb_at_N from aEquivb(epsilon, epsilonPositive);
+  (ε : Rational)
+           (εPositive : Rational.zero < ε) ↦ {
+    choose N as aEquivb_at_N from aEquivb(ε, εPositive);
     witness N with
         (m : Natural) (N_leq_m : N ≤ m) ↦
           calc abs(
@@ -100,7 +100,7 @@ theorem CauchyEquivalent.symmetric
              = abs(
                    CauchyRationalSequence.sequenceFunction(a, m)
                    - CauchyRationalSequence.sequenceFunction(b, m))
-             < epsilon
+             < ε
                  since aEquivb_at_N(m, N_leq_m)
   }
 
@@ -115,14 +115,14 @@ theorem CauchyEquivalent.transitive
         (aEquivb : CauchyEquivalent(a, b))
         (bEquivc : CauchyEquivalent(b, c))
         : CauchyEquivalent(a, c) :=
-  (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) ↦ {
+  (ε : Rational)
+           (εPositive : Rational.zero < ε) ↦ {
     choose N_ab as abBound
-        from aEquivb(Rational.halve(epsilon),
-                     Rational.halve_positive(epsilon, epsilonPositive));
+        from aEquivb(Rational.halve(ε),
+                     Rational.halve_positive(ε, εPositive));
     choose N_bc as bcBound
-        from bEquivc(Rational.halve(epsilon),
-                     Rational.halve_positive(epsilon, epsilonPositive));
+        from bEquivc(Rational.halve(ε),
+                     Rational.halve_positive(ε, εPositive));
     witness Natural.maximum(N_ab, N_bc) with
         (m : Natural)
                  (m_ge_max : Natural.maximum(N_ab, N_bc) ≤ m) ↦ {
@@ -131,14 +131,14 @@ theorem CauchyEquivalent.transitive
           let sc : Rational := CauchyRationalSequence.sequenceFunction(c, m);
           claim mGeNab : N_ab ≤ m since Natural.le_through_max_left;
           claim mGeNbc : N_bc ≤ m since Natural.le_through_max_right;
-          claim abs(sa - sb) < Rational.halve(epsilon) by abBound(m, mGeNab);
-          claim abs(sb - sc) < Rational.halve(epsilon) by bcBound(m, mGeNbc);
+          claim abs(sa - sb) < Rational.halve(ε) by abBound(m, mGeNab);
+          claim abs(sb - sc) < Rational.halve(ε) by bcBound(m, mGeNbc);
           -- |a-c| = |(a-b)+(b-c)| ≤ |a-b|+|b-c| < ε/2 + ε/2 = ε.
           calc abs(sa - sc)
              = abs((sa - sb) + (sb - sc))
              ≤ abs(sa - sb) + abs(sb - sc)
-             < Rational.halve(epsilon) + Rational.halve(epsilon)
-             = epsilon
+             < Rational.halve(ε) + Rational.halve(ε)
+             = ε
         }
   }
 

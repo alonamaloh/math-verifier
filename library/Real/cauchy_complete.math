@@ -53,22 +53,22 @@ import Real.series
 -- number, as in convergence; the at_rational bridge below mediates the
 -- rational tolerances the supremum machinery still speaks.)
 definition Real.SequenceIsCauchy (s : Natural → Real) : Proposition :=
-  ∀ (epsilon : Real). epsilon > 0 →
+  ∀ (ε : Real). ε > 0 →
     ∃ (N : Natural).
       ∀ (m n : Natural). N ≤ m → N ≤ n →
-        abs(s(m) - s(n)) < epsilon
+        abs(s(m) - s(n)) < ε
 
 -- The Cauchy criterion holds at every positive RATIONAL tolerance too:
 -- instantiate the Real-ε definition at the embedded rational.
 theorem Real.SequenceIsCauchy.at_rational (s : Natural → Real)
         (cauchy : Real.SequenceIsCauchy(s))
-        : ∀ (epsilon : Rational). Rational.zero < epsilon →
+        : ∀ (ε : Rational). Rational.zero < ε →
             ∃ (N : Natural).
               ∀ (m n : Natural). N ≤ m → N ≤ n →
-                abs(s(m) - s(n)) < (epsilon : Real) :=
-  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
-    claim (epsilon : Real) > 0 since Rational.to_real.positive_preserves;
-    done by cauchy((epsilon : Real))
+                abs(s(m) - s(n)) < (ε : Real) :=
+  (ε : Rational) (εPositive : Rational.zero < ε) ↦ {
+    claim (ε : Real) > 0 since Rational.to_real.positive_preserves;
+    done by cauchy((ε : Real))
   }
 
 -- The eventual lower bounds of a sequence: the reals that some tail
@@ -163,79 +163,79 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
       -- Convergence is established at a rational ε (the Cauchy criterion and
       -- supremum trapping both work with rational tolerances), lifted by density.
       Real.SequenceConverges.of_rational(s, limit,
-      (epsilon : Rational)
-      (epsilonPositive : Rational.zero < epsilon) ↦ {
-        claim Rational.zero < Rational.halve(epsilon)
+      (ε : Rational)
+      (εPositive : Rational.zero < ε) ↦ {
+        claim Rational.zero < Rational.halve(ε)
             since Rational.halve_positive;
         claim quarterPositive
-              : Rational.zero < Rational.halve(Rational.halve(epsilon))
+              : Rational.zero < Rational.halve(Rational.halve(ε))
             since Rational.halve_positive;
         choose N as tailClose
             from Real.SequenceIsCauchy.at_rational(s, cauchy)(
-                     Rational.halve(Rational.halve(epsilon)),
+                     Rational.halve(Rational.halve(ε)),
                      quarterPositive);
         -- The supremum is trapped within a quarter-ε of s(N).
-        claim s(N) - (Rational.halve(Rational.halve(epsilon)) : Real)
+        claim s(N) - (Rational.halve(Rational.halve(ε)) : Real)
                 ≤ limit
             by isUpper(
-                   s(N) - (Rational.halve(Rational.halve(epsilon)) : Real),
+                   s(N) - (Rational.halve(Rational.halve(ε)) : Real),
                    Real.cauchy_tail_gives_lower_bound(
-                       s, N, Rational.halve(Rational.halve(epsilon)),
+                       s, N, Rational.halve(Rational.halve(ε)),
                        tailClose));
         claim limit
-                ≤ s(N) + (Rational.halve(Rational.halve(epsilon)) : Real)
+                ≤ s(N) + (Rational.halve(Rational.halve(ε)) : Real)
             by isLeast(
-                   s(N) + (Rational.halve(Rational.halve(epsilon)) : Real),
+                   s(N) + (Rational.halve(Rational.halve(ε)) : Real),
                    Real.cauchy_tail_gives_upper_bound(
-                       s, N, Rational.halve(Rational.halve(epsilon)),
+                       s, N, Rational.halve(Rational.halve(ε)),
                        tailClose));
-        claim Rational.halve(epsilon) < epsilon
+        claim Rational.halve(ε) < ε
             since Rational.halve_less_than_self;
-        claim halveBelowEpsilon
-              : (Rational.halve(epsilon) : Real) < (epsilon : Real)
+        claim halveBelowε
+              : (Rational.halve(ε) : Real) < (ε : Real)
             since Rational.to_real.LessThan_preserves;
         witness N with
             (m : Natural) (mInTail : N ≤ m) ↦ {
               claim N ≤ N;
               claim close
                     : abs(s(m) - s(N))
-                      < (Rational.halve(Rational.halve(epsilon)) : Real)
+                      < (Rational.halve(Rational.halve(ε)) : Real)
                   by tailClose(m, N, mInTail, (N ≤ N));
               obtain ⟨closeLower, closeUpper⟩
                   from Real.absolute_value_LessThan_bounds(
                            s(m) - s(N),
-                           (Rational.halve(Rational.halve(epsilon)) : Real),
+                           (Rational.halve(Rational.halve(ε)) : Real),
                            close);
               -- Both gaps to the limit stay below 2·(ε/4) < ε.
               claim -limit
-                      ≤ -(s(N) - (Rational.halve(Rational.halve(epsilon))
+                      ≤ -(s(N) - (Rational.halve(Rational.halve(ε))
                                   : Real))
                   since Real.LessOrEqual.negate;
-              claim s(m) - limit < (epsilon : Real)
+              claim s(m) - limit < (ε : Real)
                   by calc s(m) - limit
                         ≤ s(m) - (s(N)
-                                  - (Rational.halve(Rational.halve(epsilon))
+                                  - (Rational.halve(Rational.halve(ε))
                                      : Real))
                               since Real.add_preserves_LessOrEqual_left
                         = (s(m) - s(N))
-                          + (Rational.halve(Rational.halve(epsilon)) : Real)
+                          + (Rational.halve(Rational.halve(ε)) : Real)
                               by ring
-                        < (Rational.halve(Rational.halve(epsilon)) : Real)
-                          + (Rational.halve(Rational.halve(epsilon)) : Real)
+                        < (Rational.halve(Rational.halve(ε)) : Real)
+                          + (Rational.halve(Rational.halve(ε)) : Real)
                               by Real.add_preserves_LessThan
-                        = ((Rational.halve(Rational.halve(epsilon))
-                            + Rational.halve(Rational.halve(epsilon))
+                        = ((Rational.halve(Rational.halve(ε))
+                            + Rational.halve(Rational.halve(ε))
                             : Rational) : Real)
                               since Rational.to_real.add_preserves
-                        = (Rational.halve(epsilon) : Real)
-                              by Rational.halve_doubled(Rational.halve(epsilon))
-                        < (epsilon : Real)
-                              by halveBelowEpsilon;
-              claim s(N) - (Rational.halve(Rational.halve(epsilon)) : Real)
+                        = (Rational.halve(ε) : Real)
+                              by Rational.halve_doubled(Rational.halve(ε))
+                        < (ε : Real)
+                              by halveBelowε;
+              claim s(N) - (Rational.halve(Rational.halve(ε)) : Real)
                       < s(m)
-                  by calc s(N) - (Rational.halve(Rational.halve(epsilon))
+                  by calc s(N) - (Rational.halve(Rational.halve(ε))
                                   : Real)
-                        = -(Rational.halve(Rational.halve(epsilon)) : Real)
+                        = -(Rational.halve(Rational.halve(ε)) : Real)
                           + s(N)
                               by ring
                         < (s(m) - s(N)) + s(N)
@@ -243,35 +243,35 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
                         = s(m)
                               by ring;
               claim -s(m)
-                      < -(s(N) - (Rational.halve(Rational.halve(epsilon))
+                      < -(s(N) - (Rational.halve(Rational.halve(ε))
                                   : Real))
                   since Real.LessThan.negate;
-              claim limit - s(m) < (epsilon : Real)
+              claim limit - s(m) < (ε : Real)
                   by calc limit - s(m)
-                        ≤ (s(N) + (Rational.halve(Rational.halve(epsilon))
+                        ≤ (s(N) + (Rational.halve(Rational.halve(ε))
                                    : Real)) - s(m)
                               by Real.add_preserves_LessOrEqual
-                        < (s(N) + (Rational.halve(Rational.halve(epsilon))
+                        < (s(N) + (Rational.halve(Rational.halve(ε))
                                    : Real))
-                          - (s(N) - (Rational.halve(Rational.halve(epsilon))
+                          - (s(N) - (Rational.halve(Rational.halve(ε))
                                      : Real))
                               since Real.add_left_preserves_LessThan
-                        = (Rational.halve(Rational.halve(epsilon)) : Real)
-                          + (Rational.halve(Rational.halve(epsilon)) : Real)
+                        = (Rational.halve(Rational.halve(ε)) : Real)
+                          + (Rational.halve(Rational.halve(ε)) : Real)
                               by ring
-                        = ((Rational.halve(Rational.halve(epsilon))
-                            + Rational.halve(Rational.halve(epsilon))
+                        = ((Rational.halve(Rational.halve(ε))
+                            + Rational.halve(Rational.halve(ε))
                             : Rational) : Real)
                               since Rational.to_real.add_preserves
-                        = (Rational.halve(epsilon) : Real)
-                              by Rational.halve_doubled(Rational.halve(epsilon))
-                        < (epsilon : Real)
-                              by halveBelowEpsilon;
-              claim -(epsilon : Real) < -(limit - s(m))
+                        = (Rational.halve(ε) : Real)
+                              by Rational.halve_doubled(Rational.halve(ε))
+                        < (ε : Real)
+                              by halveBelowε;
+              claim -(ε : Real) < -(limit - s(m))
                   since Real.LessThan.negate;
-              claim -(epsilon : Real) < s(m) - limit
-                  by calc -(epsilon : Real)
-                        < -(limit - s(m))    by (-(epsilon : Real)
+              claim -(ε : Real) < s(m) - limit
+                  by calc -(ε : Real)
+                        < -(limit - s(m))    by (-(ε : Real)
                                                  < -(limit - s(m)))
                         = s(m) - limit       by ring;
               done since Real.absolute_value_LessThan_of_bounds
@@ -287,16 +287,16 @@ theorem Real.converges_implies_cauchy (s : Natural → Real)
         : Real.SequenceIsCauchy(s) := {
   choose limit such that Real.SequenceConverges(s, limit) as converges
       from convergent;
-  take epsilon : Real;
-  take epsilonPositive : epsilon > 0;
+  take ε : Real;
+  take εPositive : ε > 0;
   claim (2 : Real) > 0 since Real.two_positive;
   claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
-  claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
-  choose N as tailClose from converges(epsilon / 2, halfPositive);
+  claim halfPositive : ε / 2 > 0 since Real.divide_positive;
+  choose N as tailClose from converges(ε / 2, halfPositive);
   witness N with
       (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
-        claim abs(s(m) - limit) < epsilon / 2 by tailClose(m, mInTail);
-        claim abs(s(n) - limit) < epsilon / 2 by tailClose(n, nInTail);
+        claim abs(s(m) - limit) < ε / 2 by tailClose(m, mInTail);
+        claim abs(s(n) - limit) < ε / 2 by tailClose(n, nInTail);
         calc abs(s(m) - s(n))
            = abs((s(m) - limit) + (limit - s(n)))
                  by ((s(m) - limit) + (limit - s(n)) = s(m) - s(n))
@@ -304,9 +304,9 @@ theorem Real.converges_implies_cauchy (s : Natural → Real)
                  by Real.triangle_inequality
            = abs(s(m) - limit) + abs(s(n) - limit)
                  since Real.absolute_value_subtract_swap
-           < epsilon / 2 + epsilon / 2
+           < ε / 2 + ε / 2
                  by Real.LessThan.add_strict_strict
-           = epsilon
+           = ε
                  since Real.divide_two_doubled
       }
 }
@@ -319,14 +319,14 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
         (domination : ∀ (k : Natural). abs(t(k)) ≤ b(k))
         (boundCauchy : Real.SequenceIsCauchy(Real.partialSum(b)))
         : Real.SequenceIsCauchy(Real.partialSum(t)) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦ {
-    choose N as tailClose from boundCauchy(epsilon, epsilonPositive);
+  (ε : Real)
+  (εPositive : ε > 0) ↦ {
+    choose N as tailClose from boundCauchy(ε, εPositive);
     -- The ordered case: the gap from index i up to index j ≥ i.
     claim oneSided
           : ∀ (i j : Natural). N ≤ i → N ≤ j → i ≤ j
             → abs(Real.partialSum(t, j) - Real.partialSum(t, i))
-              < epsilon
+              < ε
         by {
           take i : Natural; take j : Natural;
           take iInTail : N ≤ i; take jInTail : N ≤ j;
@@ -389,11 +389,11 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                                    domination(i + k));
           claim bWindowBelow
                 : Real.partialSum(b, j) - Real.partialSum(b, i)
-                  < epsilon
+                  < ε
               by calc Real.partialSum(b, j) - Real.partialSum(b, i)
                     ≤ abs(Real.partialSum(b, j) - Real.partialSum(b, i))
                           by Real.LessOrEqual_absolute_value
-                    < epsilon
+                    < ε
                           by tailClose(j, i, jInTail, iInTail);
           calc abs(Real.partialSum(t, j) - Real.partialSum(t, i))
              = abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
@@ -402,7 +402,7 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                    by tWindowBound
              = Real.partialSum(b, j) - Real.partialSum(b, i)
                    by bWindowValue
-             < epsilon
+             < ε
                    by bWindowBelow
         };
     witness N with
@@ -411,7 +411,7 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
             | Natural.StrictComparison.below(mStrictlyBelowN) => {
                 claim m ≤ n;
                 claim abs(Real.partialSum(t, n) - Real.partialSum(t, m))
-                        < epsilon
+                        < ε
                     by oneSided(m, n, mInTail, nInTail, (m ≤ n));
                 claim swapped
                       : abs(Real.partialSum(t, m) - Real.partialSum(t, n))
@@ -420,7 +420,7 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                 calc abs(Real.partialSum(t, m) - Real.partialSum(t, n))
                    = abs(Real.partialSum(t, n) - Real.partialSum(t, m))
                          since swapped
-                   < epsilon
+                   < ε
               }
             | Natural.StrictComparison.atLeast(nLeqM) =>
                 oneSided(n, m, nInTail, mInTail, nLeqM)

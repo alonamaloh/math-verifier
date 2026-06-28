@@ -55,10 +55,10 @@ import Real.division
 
 definition Real.SequenceConverges
         (s : Natural → Real) (limit : Real) : Proposition :=
-  ∀ (epsilon : Real). epsilon > 0 →
+  ∀ (ε : Real). ε > 0 →
     ∃ (N : Natural).
       ∀ (m : Natural). N ≤ m →
-        abs(s(m) - limit) < epsilon
+        abs(s(m) - limit) < ε
 
 -- A sequence is convergent iff some Real is its limit.
 definition Real.SequenceConvergent (s : Natural → Real) : Proposition :=
@@ -76,13 +76,13 @@ definition Real.SequenceConvergent (s : Natural → Real) : Proposition :=
 theorem Real.SequenceConverges.at_rational
         (s : Natural → Real) (limit : Real)
         (converges : Real.SequenceConverges(s, limit))
-        : ∀ (epsilon : Rational). Rational.zero < epsilon →
+        : ∀ (ε : Rational). Rational.zero < ε →
             ∃ (N : Natural).
               ∀ (m : Natural). N ≤ m →
-                abs(s(m) - limit) < (epsilon : Real) :=
-  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
-    claim (epsilon : Real) > 0 since Rational.to_real.positive_preserves;
-    done by converges((epsilon : Real))
+                abs(s(m) - limit) < (ε : Real) :=
+  (ε : Rational) (εPositive : Rational.zero < ε) ↦ {
+    claim (ε : Real) > 0 since Rational.to_real.positive_preserves;
+    done by converges((ε : Real))
   }
 
 -- A rational-ε bound suffices for Real-ε convergence: given ε > 0, density
@@ -90,24 +90,24 @@ theorem Real.SequenceConverges.at_rational
 -- every tail term below q, hence below ε.
 theorem Real.SequenceConverges.of_rational
         (s : Natural → Real) (limit : Real)
-        (rationalBound : ∀ (epsilon : Rational). Rational.zero < epsilon →
+        (rationalBound : ∀ (ε : Rational). Rational.zero < ε →
             ∃ (N : Natural).
               ∀ (m : Natural). N ≤ m →
-                abs(s(m) - limit) < (epsilon : Real))
+                abs(s(m) - limit) < (ε : Real))
         : Real.SequenceConverges(s, limit) :=
-  (epsilon : Real) (epsilonPositive : epsilon > 0) ↦ {
-    choose q such that Rational.zero < q ∧ (q : Real) < epsilon
+  (ε : Real) (εPositive : ε > 0) ↦ {
+    choose q such that Rational.zero < q ∧ (q : Real) < ε
         as qData
         from Real.exists_positive_rational_below;
     claim qPositive : Rational.zero < q;
-    claim qBelowEpsilon : (q : Real) < epsilon;
+    claim qBelowε : (q : Real) < ε;
     choose N as boundAtN from rationalBound(q, qPositive);
     witness N with {
       take m : Natural;
       take N_leq_m : N ≤ m;
       calc abs(s(m) - limit)
          < (q : Real)        by boundAtN(m, N_leq_m)
-         < epsilon           since qBelowEpsilon
+         < ε           since qBelowε
     }
   }
 
@@ -137,50 +137,50 @@ theorem Real.SequenceConverges.of_rational
 -- the clean one-quantifier shape.
 theorem Real.cauchy_almost_zero_from_absolute_bound
         : ∀ (s_rep : CauchyRationalSequence).
-            (∀ (epsilon : Rational). Rational.zero < epsilon
+            (∀ (ε : Rational). Rational.zero < ε
               → abs((Quotient.class_of(s_rep) : Real))
-                  < epsilon)
-          → ∀ (epsilon : Rational). Rational.zero < epsilon →
+                  < ε)
+          → ∀ (ε : Rational). Rational.zero < ε →
               ∃ (N : Natural).
                 ∀ (m : Natural). N ≤ m →
                   abs(
                       CauchyRationalSequence.sequenceFunction(s_rep, m))
-                    < epsilon
+                    < ε
   | CauchyRationalSequence.make(s, sCauchy),
     almostZeroAtAllPositives,
-    epsilon, epsilonPositive => {
+    ε, εPositive => {
       -- Apply the Real-side hypothesis at halve(ε), giving
       -- |x| < (halve(ε) : Real). After pattern-matching on s_rep, the
       -- Quotient.lift β-chain reduces this to IsEventuallyNonneg
       -- (halve(ε) - |s(·)|) — i.e., ∀δ > 0, eventually
       -- -δ < halve(ε) - |s(m)|. We instantiate at δ := halve(ε) too.
-      claim halvedPositive : Rational.zero < Rational.halve(epsilon);
+      claim halvedPositive : Rational.zero < Rational.halve(ε);
       choose N as boundAtN
           from (unfold Real.IsNonneg in
                    Real.LessThan.weaken(
                        abs((Quotient.class_of(
                            CauchyRationalSequence.make(s, sCauchy)) : Real)),
-                       (Rational.halve(epsilon) : Real),
+                       (Rational.halve(ε) : Real),
                        almostZeroAtAllPositives(
-                           Rational.halve(epsilon), halvedPositive)))(
-                   Rational.halve(epsilon), halvedPositive);
+                           Rational.halve(ε), halvedPositive)))(
+                   Rational.halve(ε), halvedPositive);
       witness N with {
           take m : Natural;
           take N_leq_m : N ≤ m;
-          note goal : abs(s(m)) < epsilon;
+          note goal : abs(s(m)) < ε;
           let absSM : Rational := abs(s(m));
           -- boundAtN gives -halve(ε) < halve(ε) - absSM. Add
           -- (absSM + halve(ε)) to both sides; the LHS becomes absSM
           -- and the RHS becomes halve(ε) + halve(ε), so absSM < ε via
           -- halve_doubled. We walk this as a mixed = / < / = calc.
-          claim -Rational.halve(epsilon) < Rational.halve(epsilon) - absSM
+          claim -Rational.halve(ε) < Rational.halve(ε) - absSM
             by boundAtN(m, N_leq_m);
           calc absSM
-             = -Rational.halve(epsilon) + (absSM + Rational.halve(epsilon))
-             < (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+             = -Rational.halve(ε) + (absSM + Rational.halve(ε))
+             < (Rational.halve(ε) - absSM) + (absSM + Rational.halve(ε))
                                                   since Rational.add_preserves_LessThan
-             = Rational.halve(epsilon) + Rational.halve(epsilon)
-             = epsilon
+             = Rational.halve(ε) + Rational.halve(ε)
+             = ε
       }
     }
 
@@ -190,19 +190,19 @@ theorem Real.cauchy_almost_zero_from_absolute_bound
 -- definition of CauchyEquivalent-to-zero modulo `s(m) - 0 = s(m)`.
 theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
         : ∀ (s_rep : CauchyRationalSequence).
-            (∀ (epsilon : Rational). Rational.zero < epsilon →
+            (∀ (ε : Rational). Rational.zero < ε →
                 ∃ (N : Natural).
                   ∀ (m : Natural). N ≤ m →
                     abs(
                         CauchyRationalSequence.sequenceFunction(s_rep, m))
-                      < epsilon)
+                      < ε)
           → CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero))
   | CauchyRationalSequence.make(s, _),
     absoluteAlmostZero => {
-        take epsilon : Rational;
-        take epsilonPositive : Rational.zero < epsilon;
+        take ε : Rational;
+        take εPositive : Rational.zero < ε;
         choose N as absBoundAtN
-            from absoluteAlmostZero(epsilon, epsilonPositive);
+            from absoluteAlmostZero(ε, εPositive);
         witness N with {
             take m : Natural;
             take N_leq_m : N ≤ m;
@@ -212,7 +212,7 @@ theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
             -- to |s(m)| < ε, which absBoundAtN gives directly.
             calc abs(s(m) - Rational.zero)
                = abs(s(m))             by (ring : s(m) - Rational.zero = s(m))
-               < epsilon               by absBoundAtN(m, N_leq_m)
+               < ε               by absBoundAtN(m, N_leq_m)
         }
     }
 
@@ -220,14 +220,14 @@ theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
 -- conclude `x = Real.zero`. Lift via Quotient.induct.
 theorem Real.eq_of_absolute_value_less_than_all_positive
         (x : Real)
-        (hypothesis : ∀ (epsilon : Rational). Rational.zero < epsilon →
-                          abs(x) < epsilon)
+        (hypothesis : ∀ (ε : Rational). Rational.zero < ε →
+                          abs(x) < ε)
         : x = Real.zero :=
   cases x refining hypothesis { | s_rep => {
-    claim ∀ (epsilon : Rational). Rational.zero < epsilon →
+    claim ∀ (ε : Rational). Rational.zero < ε →
             ∃ (N : Natural).
               ∀ (m : Natural). N ≤ m →
-                abs(CauchyRationalSequence.sequenceFunction(s_rep, m)) < epsilon
+                abs(CauchyRationalSequence.sequenceFunction(s_rep, m)) < ε
       since Real.cauchy_almost_zero_from_absolute_bound;
     claim CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero))
       by CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero;
@@ -237,15 +237,15 @@ theorem Real.eq_of_absolute_value_less_than_all_positive
 -- The same conclusion from a real-ε hypothesis: slip a rational under any
 -- positive real ε and fall back on the rational-ε version.
 theorem Real.eq_of_absolute_value_less_than_all_positive_real (x : Real)
-        (hypothesis : ∀ (epsilon : Real). epsilon > 0 → abs(x) < epsilon)
+        (hypothesis : ∀ (ε : Real). ε > 0 → abs(x) < ε)
         : x = Real.zero := {
-  claim ∀ (epsilon : Rational). Rational.zero < epsilon → abs(x) < (epsilon : Real)
+  claim ∀ (ε : Rational). Rational.zero < ε → abs(x) < (ε : Real)
       by {
-        take epsilon : Rational;
-        take epsilonPositive : Rational.zero < epsilon;
-        claim epsilonRealPositive : (epsilon : Real) > 0
+        take ε : Rational;
+        take εPositive : Rational.zero < ε;
+        claim εRealPositive : (ε : Real) > 0
             since Rational.to_real.positive_preserves;
-        done by hypothesis((epsilon : Real), epsilonRealPositive)
+        done by hypothesis((ε : Real), εRealPositive)
       };
   done since Real.eq_of_absolute_value_less_than_all_positive
 }
@@ -265,12 +265,12 @@ theorem Real.eq_of_sub_eq_zero
 -- Limit uniqueness: if `s` converges to both L1 and L2, then L1 = L2.
 --
 -- Standard ε–N argument: for arbitrary positive Rational ε, split
--- in half to get halvedEpsilon = halve(ε); pick N1 (from s ↦ L1 at
--- halvedEpsilon) and N2 (s ↦ L2 at halvedEpsilon); take m = max(N1, N2);
+-- in half to get halvedε = halve(ε); pick N1 (from s ↦ L1 at
+-- halvedε) and N2 (s ↦ L2 at halvedε); take m = max(N1, N2);
 -- then by triangle inequality,
 --   |L1 - L2| = |(L1 - s(m)) + (s(m) - L2)|
 --             ≤ |L1 - s(m)| + |s(m) - L2|
---             < halvedEpsilon + halvedEpsilon
+--             < halvedε + halvedε
 --             = ε.
 -- Since this holds for every positive Rational ε, eq_of_absolute_value_-
 -- less_than_all_positive gives L1 - L2 = Real.zero; eq_of_sub_eq_zero
@@ -292,14 +292,14 @@ theorem Real.SequenceConverges.unique
         : L1 = L2 := {
   -- For every ε > 0, the triangle inequality on (L1 - s(m)) + (s(m) - L2)
   -- and the two ε/2 bounds give |L1 - L2| < ε.
-  claim ∀ (epsilon : Real). epsilon > 0 → abs(L1 - L2) < epsilon
+  claim ∀ (ε : Real). ε > 0 → abs(L1 - L2) < ε
     by {
-      take epsilon : Real;
-      take epsilonPositive : epsilon > 0;
+      take ε : Real;
+      take εPositive : ε > 0;
       claim (2 : Real) > 0 since Real.two_positive;
-      claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
-      choose N1 as boundFromL1 from convergesToL1(epsilon / 2, halfPositive);
-      choose N2 as boundFromL2 from convergesToL2(epsilon / 2, halfPositive);
+      claim halfPositive : ε / 2 > 0 since Real.divide_positive;
+      choose N1 as boundFromL1 from convergesToL1(ε / 2, halfPositive);
+      choose N2 as boundFromL2 from convergesToL2(ε / 2, halfPositive);
       let m : Natural := Natural.maximum(N1, N2);
       claim N1 ≤ m since Natural.left_le_max;
       claim N2 ≤ m since Natural.right_le_max;
@@ -307,14 +307,14 @@ theorem Real.SequenceConverges.unique
       -- |L - s| so triangle's two summands share orientation.
       calc abs(L1 - s(m))
               = abs(s(m) - L1)
-              < epsilon / 2        by boundFromL1(m, (N1 ≤ m));
-      claim abs(s(m) - L2) < epsilon / 2 by boundFromL2(m, (N2 ≤ m));
+              < ε / 2        by boundFromL1(m, (N1 ≤ m));
+      claim abs(s(m) - L2) < ε / 2 by boundFromL2(m, (N2 ≤ m));
       calc abs(L1 - L2)
          = abs((L1 - s(m)) + (s(m) - L2))            by (ring : (L1 - s(m)) + (s(m) - L2) = L1 - L2)
          ≤ abs(L1 - s(m)) + abs(s(m) - L2)
-         < epsilon / 2 + epsilon / 2
+         < ε / 2 + ε / 2
                  since Real.LessThan.add_strict_strict
-         = epsilon
+         = ε
                  by field
     };
   claim L1 - L2 = Real.zero since Real.eq_of_absolute_value_less_than_all_positive_real;

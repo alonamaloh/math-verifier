@@ -86,30 +86,30 @@ theorem Rational.LessOrEqual.add_cancel_left
 -- excluded_middle on Rational order).
 theorem Real.find_index_with_large_value
         (sequence : Rational.sequence.Sequence)
-        (epsilon : Rational)
+        (ε : Rational)
         (apartnessIndex : Natural)
         (noSmallness
             : Not(∀ (m : Natural). apartnessIndex ≤ m →
                     abs(sequence(m) - Rational.zero)
-                      < epsilon))
+                      < ε))
         : ∃ (m : Natural).
-            apartnessIndex ≤ m ∧ epsilon ≤ abs(sequence(m)) := {
+            apartnessIndex ≤ m ∧ ε ≤ abs(sequence(m)) := {
     choose violatingIndex as notImplicationAtIndex
         from Logic.not_forall_implies_exists_not(
                  Natural,
                  (m : Natural) ↦
                      apartnessIndex ≤ m →
-                       abs(sequence(m) - Rational.zero) < epsilon,
+                       abs(sequence(m) - Rational.zero) < ε,
                  noSmallness);
     -- The failed implication splits into: the index is large, and the value
     -- is not small.
     claim apartnessIndex ≤ violatingIndex
-          ∧ Not(abs(sequence(violatingIndex) - Rational.zero) < epsilon);
+          ∧ Not(abs(sequence(violatingIndex) - Rational.zero) < ε);
     claim apartnessIndex ≤ violatingIndex;
-    claim Not(abs(sequence(violatingIndex) - Rational.zero) < epsilon);
+    claim Not(abs(sequence(violatingIndex) - Rational.zero) < ε);
     claim offsetCancels : abs(sequence(violatingIndex)) = abs(sequence(violatingIndex) - Rational.zero);
-    claim Not(abs(sequence(violatingIndex)) < epsilon) by substituting offsetCancels;
-    claim epsilon ≤ abs(sequence(violatingIndex))
+    claim Not(abs(sequence(violatingIndex)) < ε) by substituting offsetCancels;
+    claim ε ≤ abs(sequence(violatingIndex))
         since Rational.not_LessThan_implies_LessOrEqual;
     witness violatingIndex with done
 }
@@ -141,11 +141,11 @@ theorem Real.cauchy_apartness_from_zero
                                      CauchyRationalSequence.sequenceFunction(
                                          sequence, m)) := {
     -- Step 1: ε₀ exists violating the convergence-to-zero clause.
-    choose epsilon0 as notConvergenceAtEpsilon0
+    choose ε0 as notConvergenceAtε0
         from Logic.not_forall_implies_exists_not(
                  Rational,
-                 (epsilon : Rational) ↦
-                     Rational.zero < epsilon →
+                 (ε : Rational) ↦
+                     Rational.zero < ε →
                        ∃ (apartnessIndex : Natural).
                          ∀ (m : Natural). apartnessIndex ≤ m →
                            abs(
@@ -155,9 +155,9 @@ theorem Real.cauchy_apartness_from_zero
                                      Rational.to_cauchy_constant(
                                          Rational.zero),
                                      m))
-                             < epsilon,
+                             < ε,
                  notEquivalentToZero);
-    claim (Rational.zero < epsilon0)
+    claim (Rational.zero < ε0)
           ∧ Not(∃ (apartnessIndex : Natural).
                   ∀ (m : Natural). apartnessIndex ≤ m →
                     abs(
@@ -165,7 +165,7 @@ theorem Real.cauchy_apartness_from_zero
                         - CauchyRationalSequence.sequenceFunction(
                               Rational.to_cauchy_constant(Rational.zero),
                               m))
-                      < epsilon0);
+                      < ε0);
     claim noEventualSmallness
           : Not(∃ (apartnessIndex : Natural).
                   ∀ (m : Natural). apartnessIndex ≤ m →
@@ -174,13 +174,13 @@ theorem Real.cauchy_apartness_from_zero
                         - CauchyRationalSequence.sequenceFunction(
                               Rational.to_cauchy_constant(Rational.zero),
                               m))
-                      < epsilon0);
+                      < ε0);
     -- Step 2: apply Cauchy at ε₀/2 to get cauchyIndex.
-    claim epsilon0HalvedPositive
-          : Rational.zero < Rational.halve(epsilon0);
+    claim ε0HalvedPositive
+          : Rational.zero < Rational.halve(ε0);
     choose cauchyIndex as cauchyAtHalved
         from CauchyRationalSequence.isCauchy(sequence)(
-                 Rational.halve(epsilon0), epsilon0HalvedPositive);
+                 Rational.halve(ε0), ε0HalvedPositive);
     -- Step 3: find m₀ ≥ cauchyIndex with |sequenceFunction(sequence, m₀)| ≥ ε₀.
     -- noEventualSmallness rules out every index witness; specialise at
     -- cauchyIndex by wrapping a hypothetical eventual-smallness with
@@ -192,35 +192,35 @@ theorem Real.cauchy_apartness_from_zero
                     - CauchyRationalSequence.sequenceFunction(
                           Rational.to_cauchy_constant(Rational.zero),
                           m))
-                  < epsilon0)
+                  < ε0)
         by (eventualSmall : ∀ (m : Natural). cauchyIndex ≤ m →
                 abs(
                     CauchyRationalSequence.sequenceFunction(sequence, m)
                     - CauchyRationalSequence.sequenceFunction(
                           Rational.to_cauchy_constant(Rational.zero),
                           m))
-                  < epsilon0) ↦
+                  < ε0) ↦
             noEventualSmallness(witness cauchyIndex with eventualSmall);
     claim ∃ (m : Natural).
             cauchyIndex ≤ m
-            ∧ epsilon0 ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m));
+            ∧ ε0 ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m));
     choose largeIndex such that
         cauchyIndex ≤ largeIndex
-        ∧ epsilon0 ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, largeIndex))
+        ∧ ε0 ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, largeIndex))
         as largeIndexProperties;
     claim cauchyIndexLeqLarge : cauchyIndex ≤ largeIndex;
-    claim epsilon0 ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, largeIndex));
+    claim ε0 ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, largeIndex));
     -- Final assembly: lowerBound = ε₀/2, apartnessIndex = cauchyIndex.
-    witness Rational.halve(epsilon0) with
+    witness Rational.halve(ε0) with
         witness cauchyIndex with
             And.introduction(
-                Rational.zero < Rational.halve(epsilon0),
+                Rational.zero < Rational.halve(ε0),
                 ∀ (m : Natural). cauchyIndex ≤ m →
-                  Rational.halve(epsilon0)
+                  Rational.halve(ε0)
                     ≤ abs(
                           CauchyRationalSequence.sequenceFunction(
                               sequence, m)),
-                epsilon0HalvedPositive,
+                ε0HalvedPositive,
                 (m : Natural)
                          (cauchyIndexLeqM : cauchyIndex ≤ m) ↦
                   -- Step 4: ε₀/2 ≤ |sf(sequence, m)|.
@@ -238,7 +238,7 @@ theorem Real.cauchy_apartness_from_zero
                                     sequence, largeIndex)
                                 - CauchyRationalSequence.sequenceFunction(
                                       sequence, m))
-                            < Rational.halve(epsilon0)
+                            < Rational.halve(ε0)
                       by cauchyAtHalved(
                              largeIndex, cauchyIndexLeqLarge,
                              m, cauchyIndexLeqM);
@@ -247,7 +247,7 @@ theorem Real.cauchy_apartness_from_zero
                                     sequence, largeIndex)
                                 - CauchyRationalSequence.sequenceFunction(
                                       sequence, m))
-                            ≤ Rational.halve(epsilon0);
+                            ≤ Rational.halve(ε0);
                     -- |s(li)| = |(s(li) - s(m)) + s(m)| ≤ |s(li) - s(m)| + |s(m)|.
                     calc abs(
                              CauchyRationalSequence.sequenceFunction(
@@ -274,7 +274,7 @@ theorem Real.cauchy_apartness_from_zero
                            since Rational.triangle_inequality;
                     -- Chain: ε₀ ≤ |s(li)| ≤ |s(li)-s(m)| + |s(m)|
                     --              ≤ ε₀/2 + |s(m)|.
-                    calc epsilon0
+                    calc ε0
                             ≤ abs(
                                   CauchyRationalSequence.sequenceFunction(
                                       sequence, largeIndex))
@@ -286,15 +286,15 @@ theorem Real.cauchy_apartness_from_zero
                               + abs(
                                     CauchyRationalSequence.sequenceFunction(
                                         sequence, m))
-                            ≤ Rational.halve(epsilon0)
+                            ≤ Rational.halve(ε0)
                               + abs(
                                     CauchyRationalSequence.sequenceFunction(
                                         sequence, m));
                     -- Rewrite ε₀ as ε₀/2 + ε₀/2 to expose cancellation
                     -- on the left.
-                    calc Rational.halve(epsilon0) + Rational.halve(epsilon0)
-                            = epsilon0
-                            ≤ Rational.halve(epsilon0)
+                    calc Rational.halve(ε0) + Rational.halve(ε0)
+                            = ε0
+                            ≤ Rational.halve(ε0)
                                   + abs(
                                         CauchyRationalSequence.sequenceFunction(
                                             sequence, m));

@@ -455,14 +455,14 @@ theorem ComplexNumber.series_dominated_cauchy
         (domination : ∀ (k : Natural). ComplexNumber.modulus(t(k)) ≤ b(k))
         (boundCauchy : Real.SequenceIsCauchy(Real.partialSum(b)))
         : ComplexNumber.SequenceIsCauchy(ComplexNumber.partialSum(t)) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦ {
-    choose N as tailClose from boundCauchy(epsilon, epsilonPositive);
+  (ε : Real)
+  (εPositive : ε > 0) ↦ {
+    choose N as tailClose from boundCauchy(ε, εPositive);
     claim oneSided
           : ∀ (i j : Natural). N ≤ i → N ≤ j → i ≤ j
             → ComplexNumber.modulus(
                   ComplexNumber.partialSum(t, j) - ComplexNumber.partialSum(t, i))
-              < epsilon
+              < ε
         by {
           take i : Natural; take j : Natural;
           take iInTail : N ≤ i; take jInTail : N ≤ j;
@@ -530,11 +530,11 @@ theorem ComplexNumber.series_dominated_cauchy
                                    domination(i + k));
           claim bWindowBelow
                 : Real.partialSum(b, j) - Real.partialSum(b, i)
-                  < epsilon
+                  < ε
               by calc Real.partialSum(b, j) - Real.partialSum(b, i)
                     ≤ abs(Real.partialSum(b, j) - Real.partialSum(b, i))
                           by Real.LessOrEqual_absolute_value
-                    < epsilon
+                    < ε
                           by tailClose(j, i, jInTail, iInTail);
           calc ComplexNumber.modulus(
                    ComplexNumber.partialSum(t, j) - ComplexNumber.partialSum(t, i))
@@ -545,7 +545,7 @@ theorem ComplexNumber.series_dominated_cauchy
                    by tWindowBound
              = Real.partialSum(b, j) - Real.partialSum(b, i)
                    by bWindowValue
-             < epsilon
+             < ε
                    by bWindowBelow
         };
     witness N with
@@ -556,7 +556,7 @@ theorem ComplexNumber.series_dominated_cauchy
                 claim ComplexNumber.modulus(
                             ComplexNumber.partialSum(t, n)
                             - ComplexNumber.partialSum(t, m))
-                        < epsilon
+                        < ε
                     by oneSided(m, n, mInTail, nInTail, (m ≤ n));
                 claim swapped
                       : ComplexNumber.modulus(
@@ -571,7 +571,7 @@ theorem ComplexNumber.series_dominated_cauchy
                    = ComplexNumber.modulus(
                          ComplexNumber.partialSum(t, n) - ComplexNumber.partialSum(t, m))
                          since swapped
-                   < epsilon
+                   < ε
               }
             | Natural.StrictComparison.atLeast(nLeqM) =>
                 oneSided(n, m, nInTail, mInTail, nLeqM)
@@ -599,30 +599,30 @@ theorem ComplexNumber.eq_of_subtract_zero (z w : ComplexNumber)
 -- A complex number with arbitrarily small modulus is zero.
 theorem ComplexNumber.eq_zero_of_modulus_less_than_all_positive
         (u : ComplexNumber)
-        (hypothesis : ∀ (epsilon : Real). epsilon > 0 →
-                          ComplexNumber.modulus(u) < epsilon)
+        (hypothesis : ∀ (ε : Real). ε > 0 →
+                          ComplexNumber.modulus(u) < ε)
         : u = RingModulo.zero(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial) := {
   claim realSmall
-      : ∀ (epsilon : Rational). Rational.zero < epsilon
-        → abs(ComplexNumber.realPart(u)) < (epsilon : Real)
-      by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
-           claim (epsilon : Real) > 0 since Rational.to_real.positive_preserves;
+      : ∀ (ε : Rational). Rational.zero < ε
+        → abs(ComplexNumber.realPart(u)) < (ε : Real)
+      by (ε : Rational) (εPositive : Rational.zero < ε) ↦ {
+           claim (ε : Real) > 0 since Rational.to_real.positive_preserves;
            claim abs(ComplexNumber.realPart(u)) ≤ ComplexNumber.modulus(u)
                since ComplexNumber.realPart_bound;
-           claim ComplexNumber.modulus(u) < (epsilon : Real)
-               by hypothesis((epsilon : Real));
+           claim ComplexNumber.modulus(u) < (ε : Real)
+               by hypothesis((ε : Real));
            done since Real.LessThan.transitive_left
          };
   claim imaginarySmall
-      : ∀ (epsilon : Rational). Rational.zero < epsilon
-        → abs(ComplexNumber.imaginaryPart(u)) < (epsilon : Real)
-      by (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
-           claim (epsilon : Real) > 0 since Rational.to_real.positive_preserves;
+      : ∀ (ε : Rational). Rational.zero < ε
+        → abs(ComplexNumber.imaginaryPart(u)) < (ε : Real)
+      by (ε : Rational) (εPositive : Rational.zero < ε) ↦ {
+           claim (ε : Real) > 0 since Rational.to_real.positive_preserves;
            claim abs(ComplexNumber.imaginaryPart(u)) ≤ ComplexNumber.modulus(u)
                since ComplexNumber.imaginaryPart_bound;
-           claim ComplexNumber.modulus(u) < (epsilon : Real)
-               by hypothesis((epsilon : Real));
+           claim ComplexNumber.modulus(u) < (ε : Real)
+               by hypothesis((ε : Real));
            done since Real.LessThan.transitive_left
          };
   claim ComplexNumber.realPart(u) = Real.zero
@@ -651,26 +651,26 @@ theorem ComplexNumber.SequenceConverges.unique
         (converges2 : ComplexNumber.SequenceConverges(s, limit2))
         : limit1 = limit2 := {
   claim differenceSmall
-      : ∀ (epsilon : Real). epsilon > 0
-        → ComplexNumber.modulus(limit1 - limit2) < epsilon
-      by (epsilon : Real) (epsilonPositive : epsilon > 0) ↦ {
+      : ∀ (ε : Real). ε > 0
+        → ComplexNumber.modulus(limit1 - limit2) < ε
+      by (ε : Real) (εPositive : ε > 0) ↦ {
            claim (2 : Real) > 0 since Real.two_positive;
            claim (2 : Real) ≠ 0 since Real.two_is_nonzero;
-           claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
-           choose threshold1 as close1 from converges1(epsilon / 2, halfPositive);
-           choose threshold2 as close2 from converges2(epsilon / 2, halfPositive);
+           claim halfPositive : ε / 2 > 0 since Real.divide_positive;
+           choose threshold1 as close1 from converges1(ε / 2, halfPositive);
+           choose threshold2 as close2 from converges2(ε / 2, halfPositive);
            claim threshold1 ≤ Natural.maximum(threshold1, threshold2)
                since Natural.left_le_max;
            claim threshold2 ≤ Natural.maximum(threshold1, threshold2)
                since Natural.right_le_max;
            claim ComplexNumber.modulus(
                      s(Natural.maximum(threshold1, threshold2)) - limit1)
-                 < epsilon / 2
+                 < ε / 2
                by close1(Natural.maximum(threshold1, threshold2),
                       (threshold1 ≤ Natural.maximum(threshold1, threshold2)));
            claim ComplexNumber.modulus(
                      s(Natural.maximum(threshold1, threshold2)) - limit2)
-                 < epsilon / 2
+                 < ε / 2
                by close2(Natural.maximum(threshold1, threshold2),
                       (threshold2 ≤ Natural.maximum(threshold1, threshold2)));
            claim differenceSplits
@@ -701,9 +701,9 @@ theorem ComplexNumber.SequenceConverges.unique
                 + ComplexNumber.modulus(
                       s(Natural.maximum(threshold1, threshold2)) - limit2)
                     since swapFirst
-              < epsilon / 2 + epsilon / 2
+              < ε / 2 + ε / 2
                     since Real.LessThan.add_strict_strict
-              = epsilon
+              = ε
                     since Real.divide_two_doubled
          };
   claim limit1 - limit2
@@ -1043,8 +1043,8 @@ theorem ComplexNumber.exponential_zero
               RingModulo.one(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial))
       by {
-        take epsilon : Real;
-        take epsilonPositive : epsilon > 0;
+        take ε : Real;
+        take εPositive : ε > 0;
         witness 1 with
             (m : Natural) (oneBelow : 1 ≤ m) ↦ {
               choose c as mSplit from Natural.subtraction_witness(1, m, oneBelow);
@@ -1103,7 +1103,7 @@ theorem ComplexNumber.exponential_zero
                            Complex.definingPolynomial))
                  = Real.zero
                        by ComplexNumber.modulus_zero
-                 < epsilon
+                 < ε
             }
       };
   done by ComplexNumber.SequenceConverges.unique(

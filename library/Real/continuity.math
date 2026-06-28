@@ -38,10 +38,10 @@ import Real.minimum
 -- f is continuous at x: for every positive tolerance ε there is a positive
 -- δ such that f moves points δ-close to x to points ε-close to f(x).
 definition Real.ContinuousAt (f : Real → Real) (x : Real) : Proposition :=
-  ∀ (epsilon : Real). epsilon > 0 →
-    ∃ (delta : Real).
-      delta > 0 ∧ ∀ (y : Real). abs(y - x) < delta →
-            abs(f(y) - f(x)) < epsilon
+  ∀ (ε : Real). ε > 0 →
+    ∃ (δ : Real).
+      δ > 0 ∧ ∀ (y : Real). abs(y - x) < δ →
+            abs(f(y) - f(x)) < ε
 
 -- f is continuous on the closed interval [a, b]: continuous at every
 -- point of the interval.
@@ -54,28 +54,28 @@ definition Real.ContinuousOn
 -- since the image never moves at all.
 theorem Real.ContinuousAt.constant (c x : Real)
         : Real.ContinuousAt((y : Real) ↦ c, x) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦
-    witness epsilon with {
-      claim epsilon > 0;
-      claim ∀ (y : Real). abs(y - x) < epsilon → abs(c - c) < epsilon
-          by (y : Real) (_ : abs(y - x) < epsilon) ↦
+  (ε : Real)
+  (εPositive : ε > 0) ↦
+    witness ε with {
+      claim ε > 0;
+      claim ∀ (y : Real). abs(y - x) < ε → abs(c - c) < ε
+          by (y : Real) (_ : abs(y - x) < ε) ↦
             calc abs(c - c)
                = abs(Real.zero)        by (c - c = 0)
                = 0
-               < epsilon;
+               < ε;
       done
     }
 
 -- The identity is continuous: δ = ε verbatim.
 theorem Real.ContinuousAt.identity (x : Real)
         : Real.ContinuousAt((y : Real) ↦ y, x) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦
-    witness epsilon with {
-      claim epsilon > 0;
-      claim ∀ (y : Real). abs(y - x) < epsilon → abs(y - x) < epsilon
-          by (y : Real) (yClose : abs(y - x) < epsilon) ↦ yClose;
+  (ε : Real)
+  (εPositive : ε > 0) ↦
+    witness ε with {
+      claim ε > 0;
+      claim ∀ (y : Real). abs(y - x) < ε → abs(y - x) < ε
+          by (y : Real) (yClose : abs(y - x) < ε) ↦ yClose;
       done
     }
 
@@ -85,34 +85,34 @@ theorem Real.ContinuousAt.add (f g : Real → Real) (x : Real)
         (fContinuous : Real.ContinuousAt(f, x))
         (gContinuous : Real.ContinuousAt(g, x))
         : Real.ContinuousAt((y : Real) ↦ f(y) + g(y), x) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦ {
+  (ε : Real)
+  (εPositive : ε > 0) ↦ {
     claim (2 : Real) > 0 since Real.two_positive;
-    claim halfPositive : epsilon / 2 > 0 since Real.divide_positive;
-    choose fDelta such that fDelta > 0
-            ∧ ∀ (y : Real). abs(y - x) < fDelta → abs(f(y) - f(x)) < epsilon / 2
-        as fDeltaProperties
-        from fContinuous(epsilon / 2, halfPositive);
-    claim fClose : ∀ (y : Real). abs(y - x) < fDelta
-            → abs(f(y) - f(x)) < epsilon / 2;
-    choose gDelta such that gDelta > 0
-            ∧ ∀ (y : Real). abs(y - x) < gDelta → abs(g(y) - g(x)) < epsilon / 2
-        as gDeltaProperties
-        from gContinuous(epsilon / 2, halfPositive);
-    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
-            → abs(g(y) - g(x)) < epsilon / 2;
-    claim min(fDelta, gDelta) > 0 since Real.minimum_positive;
-    witness min(fDelta, gDelta) with {
-      claim ∀ (y : Real). abs(y - x) < min(fDelta, gDelta)
-              → abs((f(y) + g(y)) - (f(x) + g(x))) < epsilon
+    claim halfPositive : ε / 2 > 0 since Real.divide_positive;
+    choose fδ such that fδ > 0
+            ∧ ∀ (y : Real). abs(y - x) < fδ → abs(f(y) - f(x)) < ε / 2
+        as fδProperties
+        from fContinuous(ε / 2, halfPositive);
+    claim fClose : ∀ (y : Real). abs(y - x) < fδ
+            → abs(f(y) - f(x)) < ε / 2;
+    choose gδ such that gδ > 0
+            ∧ ∀ (y : Real). abs(y - x) < gδ → abs(g(y) - g(x)) < ε / 2
+        as gδProperties
+        from gContinuous(ε / 2, halfPositive);
+    claim gClose : ∀ (y : Real). abs(y - x) < gδ
+            → abs(g(y) - g(x)) < ε / 2;
+    claim min(fδ, gδ) > 0 since Real.minimum_positive;
+    witness min(fδ, gδ) with {
+      claim ∀ (y : Real). abs(y - x) < min(fδ, gδ)
+              → abs((f(y) + g(y)) - (f(x) + g(x))) < ε
           by (y : Real)
-             (yClose : abs(y - x) < min(fDelta, gDelta)) ↦ {
-               claim min(fDelta, gDelta) ≤ fDelta since Real.minimum_LessOrEqual_left;
-               claim min(fDelta, gDelta) ≤ gDelta since Real.minimum_LessOrEqual_right;
-               calc abs(y - x) < min(fDelta, gDelta) ≤ fDelta as yCloseF;
-               calc abs(y - x) < min(fDelta, gDelta) ≤ gDelta as yCloseG;
-               claim abs(f(y) - f(x)) < epsilon / 2 by fClose(y, yCloseF);
-               claim abs(g(y) - g(x)) < epsilon / 2 by gClose(y, yCloseG);
+             (yClose : abs(y - x) < min(fδ, gδ)) ↦ {
+               claim min(fδ, gδ) ≤ fδ since Real.minimum_LessOrEqual_left;
+               claim min(fδ, gδ) ≤ gδ since Real.minimum_LessOrEqual_right;
+               calc abs(y - x) < min(fδ, gδ) ≤ fδ as yCloseF;
+               calc abs(y - x) < min(fδ, gδ) ≤ gδ as yCloseG;
+               claim abs(f(y) - f(x)) < ε / 2 by fClose(y, yCloseF);
+               claim abs(g(y) - g(x)) < ε / 2 by gClose(y, yCloseG);
                calc abs((f(y) + g(y)) - (f(x) + g(x)))
                   = abs((f(y) - f(x)) + (g(y) - g(x)))
                         by substituting
@@ -120,9 +120,9 @@ theorem Real.ContinuousAt.add (f g : Real → Real) (x : Real)
                                 = (f(y) - f(x)) + (g(y) - g(x)))
                   ≤ abs(f(y) - f(x)) + abs(g(y) - g(x))
                         since Real.triangle_inequality
-                  < epsilon / 2 + epsilon / 2
+                  < ε / 2 + ε / 2
                         since Real.LessThan.add_strict_strict
-                  = epsilon
+                  = ε
                         since Real.divide_two_doubled
           };
       done
@@ -134,22 +134,22 @@ theorem Real.ContinuousAt.add (f g : Real → Real) (x : Real)
 theorem Real.ContinuousAt.negate (f : Real → Real) (x : Real)
         (fContinuous : Real.ContinuousAt(f, x))
         : Real.ContinuousAt((y : Real) ↦ -f(y), x) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦ {
-    choose delta such that delta > 0
-            ∧ ∀ (y : Real). abs(y - x) < delta → abs(f(y) - f(x)) < epsilon
-        as deltaProperties
-        from fContinuous(epsilon, epsilonPositive);
-    witness delta with {
-      claim delta > 0;
-      claim ∀ (y : Real). abs(y - x) < delta → abs(-f(y) - -f(x)) < epsilon
-          by (y : Real) (yClose : abs(y - x) < delta) ↦
+  (ε : Real)
+  (εPositive : ε > 0) ↦ {
+    choose δ such that δ > 0
+            ∧ ∀ (y : Real). abs(y - x) < δ → abs(f(y) - f(x)) < ε
+        as δProperties
+        from fContinuous(ε, εPositive);
+    witness δ with {
+      claim δ > 0;
+      claim ∀ (y : Real). abs(y - x) < δ → abs(-f(y) - -f(x)) < ε
+          by (y : Real) (yClose : abs(y - x) < δ) ↦
             calc abs(-f(y) - -f(x))
                = abs(-(f(y) - f(x)))
                      by substituting (ring : -f(y) - -f(x) = -(f(y) - f(x)))
                = abs(f(y) - f(x))
                      since Real.absolute_value_negate
-               < epsilon;
+               < ε;
       done
     }
   }
@@ -160,26 +160,26 @@ theorem Real.ContinuousAt.composition (f g : Real → Real) (x : Real)
         (gContinuous : Real.ContinuousAt(g, x))
         (fContinuous : Real.ContinuousAt(f, g(x)))
         : Real.ContinuousAt((y : Real) ↦ f(g(y)), x) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦ {
-    choose fDelta such that fDelta > 0
-            ∧ ∀ (z : Real). abs(z - g(x)) < fDelta → abs(f(z) - f(g(x))) < epsilon
-        as fDeltaProperties
-        from fContinuous(epsilon, epsilonPositive);
-    claim fDeltaPositive : fDelta > 0;
-    claim fClose : ∀ (z : Real). abs(z - g(x)) < fDelta
-            → abs(f(z) - f(g(x))) < epsilon;
-    choose gDelta such that gDelta > 0
-            ∧ ∀ (y : Real). abs(y - x) < gDelta → abs(g(y) - g(x)) < fDelta
-        as gDeltaProperties
-        from gContinuous(fDelta, fDeltaPositive);
-    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
-            → abs(g(y) - g(x)) < fDelta;
-    witness gDelta with {
-      claim gDelta > 0;
-      claim ∀ (y : Real). abs(y - x) < gDelta
-              → abs(f(g(y)) - f(g(x))) < epsilon
-          by (y : Real) (yClose : abs(y - x) < gDelta) ↦
+  (ε : Real)
+  (εPositive : ε > 0) ↦ {
+    choose fδ such that fδ > 0
+            ∧ ∀ (z : Real). abs(z - g(x)) < fδ → abs(f(z) - f(g(x))) < ε
+        as fδProperties
+        from fContinuous(ε, εPositive);
+    claim fδPositive : fδ > 0;
+    claim fClose : ∀ (z : Real). abs(z - g(x)) < fδ
+            → abs(f(z) - f(g(x))) < ε;
+    choose gδ such that gδ > 0
+            ∧ ∀ (y : Real). abs(y - x) < gδ → abs(g(y) - g(x)) < fδ
+        as gδProperties
+        from gContinuous(fδ, fδPositive);
+    claim gClose : ∀ (y : Real). abs(y - x) < gδ
+            → abs(g(y) - g(x)) < fδ;
+    witness gδ with {
+      claim gδ > 0;
+      claim ∀ (y : Real). abs(y - x) < gδ
+              → abs(f(g(y)) - f(g(x))) < ε
+          by (y : Real) (yClose : abs(y - x) < gδ) ↦
             fClose(g(y), gClose(y, yClose));
       done
     }
@@ -205,8 +205,8 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
         (fContinuous : Real.ContinuousAt(f, x))
         (gContinuous : Real.ContinuousAt(g, x))
         : Real.ContinuousAt((y : Real) ↦ f(y) * g(y), x) :=
-  (epsilon : Real)
-  (epsilonPositive : epsilon > 0) ↦ {
+  (ε : Real)
+  (εPositive : ε > 0) ↦ {
     let fRoof : Real := abs(f(x)) + 1;
     let gRoof : Real := abs(g(x)) + 1;
     claim (1 : Real) > 0 since Real.zero_less_one;
@@ -226,55 +226,55 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
     claim gRoof ≠ Real.zero since Real.nonzero_of_positive;
     -- Each factor's tolerance: ε/2, scaled down by the opposite roof.
     claim (2 : Real) > 0 since Real.two_positive;
-    claim epsilon / 2 > 0 since Real.divide_positive;
-    let gTolerance : Real := epsilon / 2 / fRoof;
-    let fTolerance : Real := epsilon / 2 / gRoof;
+    claim ε / 2 > 0 since Real.divide_positive;
+    let gTolerance : Real := ε / 2 / fRoof;
+    let fTolerance : Real := ε / 2 / gRoof;
     claim gTolerancePositive : gTolerance > 0 since Real.divide_positive;
     claim fTolerancePositive : fTolerance > 0 since Real.divide_positive;
     -- The three δs: stay within 1 of f(x), and within each scaled
     -- tolerance for the matching factor.
-    choose nearDelta such that nearDelta > 0
-            ∧ ∀ (y : Real). abs(y - x) < nearDelta → abs(f(y) - f(x)) < 1
+    choose nearδ such that nearδ > 0
+            ∧ ∀ (y : Real). abs(y - x) < nearδ → abs(f(y) - f(x)) < 1
         as nearProperties
         from fContinuous((1 : Real), Real.zero_less_one);
-    claim nearDelta > 0;
-    claim fNear : ∀ (y : Real). abs(y - x) < nearDelta
+    claim nearδ > 0;
+    claim fNear : ∀ (y : Real). abs(y - x) < nearδ
             → abs(f(y) - f(x)) < 1;
-    choose gDelta such that gDelta > 0
-            ∧ ∀ (y : Real). abs(y - x) < gDelta → abs(g(y) - g(x)) < gTolerance
-        as gDeltaProperties
+    choose gδ such that gδ > 0
+            ∧ ∀ (y : Real). abs(y - x) < gδ → abs(g(y) - g(x)) < gTolerance
+        as gδProperties
         from gContinuous(gTolerance, gTolerancePositive);
-    claim gDelta > 0;
-    claim gClose : ∀ (y : Real). abs(y - x) < gDelta
+    claim gδ > 0;
+    claim gClose : ∀ (y : Real). abs(y - x) < gδ
             → abs(g(y) - g(x)) < gTolerance;
-    choose fDelta such that fDelta > 0
-            ∧ ∀ (y : Real). abs(y - x) < fDelta → abs(f(y) - f(x)) < fTolerance
-        as fDeltaProperties
+    choose fδ such that fδ > 0
+            ∧ ∀ (y : Real). abs(y - x) < fδ → abs(f(y) - f(x)) < fTolerance
+        as fδProperties
         from fContinuous(fTolerance, fTolerancePositive);
-    claim fDelta > 0;
-    claim fClose : ∀ (y : Real). abs(y - x) < fDelta
+    claim fδ > 0;
+    claim fClose : ∀ (y : Real). abs(y - x) < fδ
             → abs(f(y) - f(x)) < fTolerance;
-    claim min(gDelta, fDelta) > 0 since Real.minimum_positive;
-    claim min(nearDelta, min(gDelta, fDelta)) > 0 since Real.minimum_positive;
-    witness min(nearDelta, min(gDelta, fDelta)) with {
-      claim ∀ (y : Real). abs(y - x) < min(nearDelta, min(gDelta, fDelta))
-              → abs(f(y) * g(y) - f(x) * g(x)) < epsilon
+    claim min(gδ, fδ) > 0 since Real.minimum_positive;
+    claim min(nearδ, min(gδ, fδ)) > 0 since Real.minimum_positive;
+    witness min(nearδ, min(gδ, fδ)) with {
+      claim ∀ (y : Real). abs(y - x) < min(nearδ, min(gδ, fδ))
+              → abs(f(y) * g(y) - f(x) * g(x)) < ε
           by (y : Real)
-             (yClose : abs(y - x) < min(nearDelta, min(gDelta, fDelta))) ↦ {
+             (yClose : abs(y - x) < min(nearδ, min(gδ, fδ))) ↦ {
            -- The single δ serves all three continuity facts.
-           claim min(nearDelta, min(gDelta, fDelta)) ≤ nearDelta
+           claim min(nearδ, min(gδ, fδ)) ≤ nearδ
                since Real.minimum_LessOrEqual_left;
-           claim min(nearDelta, min(gDelta, fDelta)) ≤ min(gDelta, fDelta)
+           claim min(nearδ, min(gδ, fδ)) ≤ min(gδ, fδ)
                since Real.minimum_LessOrEqual_right;
-           claim min(gDelta, fDelta) ≤ gDelta since Real.minimum_LessOrEqual_left;
-           claim min(gDelta, fDelta) ≤ fDelta since Real.minimum_LessOrEqual_right;
-           claim min(nearDelta, min(gDelta, fDelta)) ≤ gDelta
+           claim min(gδ, fδ) ≤ gδ since Real.minimum_LessOrEqual_left;
+           claim min(gδ, fδ) ≤ fδ since Real.minimum_LessOrEqual_right;
+           claim min(nearδ, min(gδ, fδ)) ≤ gδ
                since Real.LessOrEqual.transitive;
-           claim min(nearDelta, min(gDelta, fDelta)) ≤ fDelta
+           claim min(nearδ, min(gδ, fδ)) ≤ fδ
                since Real.LessOrEqual.transitive;
-           calc abs(y - x) < min(nearDelta, min(gDelta, fDelta)) ≤ nearDelta as yNear;
-           calc abs(y - x) < min(nearDelta, min(gDelta, fDelta)) ≤ gDelta as yCloseG;
-           calc abs(y - x) < min(nearDelta, min(gDelta, fDelta)) ≤ fDelta as yCloseF;
+           calc abs(y - x) < min(nearδ, min(gδ, fδ)) ≤ nearδ as yNear;
+           calc abs(y - x) < min(nearδ, min(gδ, fδ)) ≤ gδ as yCloseG;
+           calc abs(y - x) < min(nearδ, min(gδ, fδ)) ≤ fδ as yCloseF;
            -- |f(y)| sits under its roof.
            claim abs(f(y) - f(x)) < 1 by fNear(y, yNear);
            claim abs(f(y) - f(x)) ≤ 1 since Real.LessThan.weaken;
@@ -302,8 +302,8 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
                     since Real.LessThan.multiply_by_positive_right
               = gRoof * fTolerance;
            -- Each roof times its scaled tolerance is exactly ε/2.
-           claim fRoofCollapse : fRoof * gTolerance = epsilon / 2 since Real.divide_cancel;
-           claim gRoofCollapse : gRoof * fTolerance = epsilon / 2 since Real.divide_cancel;
+           claim fRoofCollapse : fRoof * gTolerance = ε / 2 since Real.divide_cancel;
+           claim gRoofCollapse : gRoof * fTolerance = ε / 2 since Real.divide_cancel;
            -- Assemble.
            calc abs(f(y) * g(y) - f(x) * g(x))
               = abs(f(y) * (g(y) - g(x)) + g(x) * (f(y) - f(x)))
@@ -317,11 +317,11 @@ theorem Real.ContinuousAt.multiply (f g : Real → Real) (x : Real)
                     since Real.absolute_value_multiplicative
               < fRoof * gTolerance + gRoof * fTolerance
                     since Real.LessThan.add_strict_strict
-              = epsilon / 2 + gRoof * fTolerance
+              = ε / 2 + gRoof * fTolerance
                     since fRoofCollapse
-              = epsilon / 2 + epsilon / 2
+              = ε / 2 + ε / 2
                     since gRoofCollapse
-              = epsilon
+              = ε
                     since Real.divide_two_doubled
           };
       done

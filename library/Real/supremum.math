@@ -192,7 +192,7 @@ theorem Real.exists_rational_below_at_make
         -- through `LessOrEqual` → `IsNonneg` of the difference) to:
         -- `∀ ε > 0. ∃ M. ∀ m ≥ M. seq(m) - (seq(N) - 1) > -ε`. Take
         -- M = N and chain -ε < 0 < seq(m) - (seq(N) - 1).
-        let epsilon ∈ Rational with (0 : Rational) < epsilon;
+        let ε ∈ Rational with (0 : Rational) < ε;
         witness N with {
           let m ∈ Natural with N ≤ m;
           claim N ≤ N   since Natural.LessOrEqual.reflexive;
@@ -211,7 +211,7 @@ theorem Real.exists_rational_below_at_make
                   = seq(m) - (seq(N) - (1 : Rational));
           -- Close -ε < seq(m) - (seq(N) - 1) by chaining through 0:
           -- -ε < 0 (since ε > 0) and 0 < ... by the calc above.
-          calc -epsilon
+          calc -ε
              < (0 : Rational)        since Rational.negate_LessThan_zero_of_positive
              < seq(m) - (seq(N) - (1 : Rational))
         }
@@ -237,8 +237,8 @@ theorem Real.exists_rational_above_at_make
           from seqIsCauchy((1 : Rational), Rational.zero_less_one);
       witness seq(N) + (1 : Rational) with
           unfold Real.IsNonneg in
-          ((epsilon : Rational)
-                   (epsilonPositive : (0 : Rational) < epsilon) ↦
+          ((ε : Rational)
+                   (εPositive : (0 : Rational) < ε) ↦
             witness N with
                 (m : Natural) (mGeN : N ≤ m) ↦ {
                   claim N ≤ N   since Natural.LessOrEqual.reflexive;
@@ -261,7 +261,7 @@ theorem Real.exists_rational_above_at_make
                                since Rational.add_preserves_LessThan
                           = (seq(N) + (1 : Rational)) - seq(m);
                   -- Chain: -ε < 0 < (seq(N) + 1) - seq(m).
-                  calc -epsilon
+                  calc -ε
                      < (0 : Rational)        since Rational.negate_LessThan_zero_of_positive
                      < (seq(N) + (1 : Rational)) - seq(m)
                 })
@@ -616,13 +616,13 @@ theorem Real.LessOrEqual_of_pointwise_at_make
         : Real.from_cauchy_sequence(s, sIsCauchy)
             ≤ Real.from_cauchy_sequence(b, bIsCauchy) :=
   unfold Real.IsNonneg in
-  ((epsilon : Rational)
-           (epsilonPositive : (0 : Rational) < epsilon) ↦ {
-    claim halvedPositive : (0 : Rational) < Rational.halve(epsilon);
+  ((ε : Rational)
+           (εPositive : (0 : Rational) < ε) ↦ {
+    claim halvedPositive : (0 : Rational) < Rational.halve(ε);
     choose N_s as sCauchyAt
-        from sIsCauchy(Rational.halve(epsilon), halvedPositive);
+        from sIsCauchy(Rational.halve(ε), halvedPositive);
     choose N_b as bMinusSAt
-        from pointwiseLeq(N_s)(Rational.halve(epsilon), halvedPositive);
+        from pointwiseLeq(N_s)(Rational.halve(ε), halvedPositive);
     witness Natural.maximum(N_s, N_b) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_b) ≤ m) ↦ {
@@ -630,34 +630,34 @@ theorem Real.LessOrEqual_of_pointwise_at_make
           claim m_geq_N_b : N_b ≤ m;
           claim N_s ≤ N_s   since Natural.LessOrEqual.reflexive;
           -- |s(m) - s(N_s)| < halve(ε)
-          claim abs(s(m) - s(N_s)) < Rational.halve(epsilon)
+          claim abs(s(m) - s(N_s)) < Rational.halve(ε)
             by sCauchyAt(m, m_geq_N_s, N_s, given(N_s ≤ N_s));
-          claim (-Rational.halve(epsilon) < s(m) - s(N_s))
-                  ∧ (s(m) - s(N_s) < Rational.halve(epsilon))
+          claim (-Rational.halve(ε) < s(m) - s(N_s))
+                  ∧ (s(m) - s(N_s) < Rational.halve(ε))
             since Rational.absolute_value_LessThan_bounds;
-          claim s(m) - s(N_s) < Rational.halve(epsilon);
+          claim s(m) - s(N_s) < Rational.halve(ε);
           -- Flip: -halve(ε) < s(N_s) - s(m). LessThan.negate gives
           -- -halve(ε) < -(s(m) - s(N_s)) = s(N_s) - s(m).
-          calc -Rational.halve(epsilon)
+          calc -Rational.halve(ε)
                   < -(s(m) - s(N_s))   since Rational.LessThan.negate
                   = s(N_s) - s(m);
           -- bMinusSAt at m: -halve(ε) < b(m) - s(N_s)
           claim
-                -Rational.halve(epsilon) < b(m) - s(N_s)
+                -Rational.halve(ε) < b(m) - s(N_s)
             by bMinusSAt(m, m_geq_N_b);
           -- Chain the two ε/2 bounds end-to-end and simplify:
           --   -ε = -halve(ε) + -halve(ε)
           --      < (b(m) - s(N_s)) + -halve(ε)            (bBound)
           --      ≤ (b(m) - s(N_s)) + (s(N_s) - s(m))      (sFlippedBound, weakened)
           --      = b(m) - s(m).
-          claim -Rational.halve(epsilon) ≤ s(N_s) - s(m)
+          claim -Rational.halve(ε) ≤ s(N_s) - s(m)
             since Rational.LessThan.weaken;
-          calc -epsilon
-             = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+          calc -ε
+             = -(Rational.halve(ε) + Rational.halve(ε))
                   since Rational.halve_doubled
-             = -Rational.halve(epsilon) + -Rational.halve(epsilon)
+             = -Rational.halve(ε) + -Rational.halve(ε)
                   since Rational.negate_add
-             < (b(m) - s(N_s)) + -Rational.halve(epsilon)
+             < (b(m) - s(N_s)) + -Rational.halve(ε)
                   since Rational.add_preserves_LessThan
              ≤ (b(m) - s(N_s)) + (s(N_s) - s(m))
                   since Rational.add_general_LessOrEqual_left
@@ -705,16 +705,16 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
         : Real.from_cauchy_sequence(b, bIsCauchy)
             ≤ Real.from_cauchy_sequence(s, sIsCauchy) :=
   unfold Real.IsNonneg in
-  ((epsilon : Rational)
-           (epsilonPositive : (0 : Rational) < epsilon) ↦ {
-    claim halvedPositive : (0 : Rational) < Rational.halve(epsilon);
+  ((ε : Rational)
+           (εPositive : (0 : Rational) < ε) ↦ {
+    claim halvedPositive : (0 : Rational) < Rational.halve(ε);
     choose N_s as sCauchyAt
-        from sIsCauchy(Rational.halve(epsilon), halvedPositive);
+        from sIsCauchy(Rational.halve(ε), halvedPositive);
     -- pointwiseGeq(N_s) : mk(make(b, _)) ≤ (s(N_s) : Real)
     --   = Real.IsNonneg((s(N_s) : Real) - mk(make(b, _)))
     --   = IsEventuallyNonneg(λj. s(N_s) - b(j))
     choose N_b as sNsMinusBAt
-        from pointwiseGeq(N_s)(Rational.halve(epsilon), halvedPositive);
+        from pointwiseGeq(N_s)(Rational.halve(ε), halvedPositive);
     witness Natural.maximum(N_s, N_b) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_b) ≤ m) ↦ {
@@ -722,29 +722,29 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
           claim m_geq_N_b : N_b ≤ m;
           claim N_s ≤ N_s   since Natural.LessOrEqual.reflexive;
           -- |s(m) - s(N_s)| < halve(ε)
-          claim abs(s(m) - s(N_s)) < Rational.halve(epsilon)
+          claim abs(s(m) - s(N_s)) < Rational.halve(ε)
             by sCauchyAt(m, m_geq_N_s, N_s, given(N_s ≤ N_s));
           -- Lower bound: -halve(ε) < s(m) - s(N_s)  (lower half of |·| bounds).
-          claim (-Rational.halve(epsilon) < s(m) - s(N_s))
-                  ∧ (s(m) - s(N_s) < Rational.halve(epsilon))
+          claim (-Rational.halve(ε) < s(m) - s(N_s))
+                  ∧ (s(m) - s(N_s) < Rational.halve(ε))
             since Rational.absolute_value_LessThan_bounds;
-          claim -Rational.halve(epsilon) < s(m) - s(N_s);
+          claim -Rational.halve(ε) < s(m) - s(N_s);
           -- pointwiseGeq at m: -halve(ε) < s(N_s) - b(m).
-          claim -Rational.halve(epsilon) < s(N_s) - b(m)
+          claim -Rational.halve(ε) < s(N_s) - b(m)
             by sNsMinusBAt(m, m_geq_N_b);
           -- Chain the two ε/2 bounds end-to-end and simplify:
           --   -ε = -halve(ε) + -halve(ε)
           --      < (s(m) - s(N_s)) + -halve(ε)            (sLowerBound)
           --      ≤ (s(m) - s(N_s)) + (s(N_s) - b(m))      (sBBound, weakened)
           --      = s(m) - b(m).
-          claim -Rational.halve(epsilon) ≤ s(N_s) - b(m)
+          claim -Rational.halve(ε) ≤ s(N_s) - b(m)
             since Rational.LessThan.weaken;
-          calc -epsilon
-             = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+          calc -ε
+             = -(Rational.halve(ε) + Rational.halve(ε))
                   since Rational.halve_doubled
-             = -Rational.halve(epsilon) + -Rational.halve(epsilon)
+             = -Rational.halve(ε) + -Rational.halve(ε)
                   since Rational.negate_add
-             < (s(m) - s(N_s)) + -Rational.halve(epsilon)
+             < (s(m) - s(N_s)) + -Rational.halve(ε)
                   since Rational.add_preserves_LessThan
              ≤ (s(m) - s(N_s)) + (s(N_s) - b(m))
                   since Rational.add_general_LessOrEqual_left
@@ -1118,19 +1118,19 @@ theorem Real.exists_bisectionWidth_below
             : Rational.IsNonneg(
                   Real.BisectionInterval.right(initial)
                   - Real.BisectionInterval.left(initial)))
-        (epsilon : Rational)
-        (epsilonPositive : (0 : Rational) < epsilon)
+        (ε : Rational)
+        (εPositive : (0 : Rational) < ε)
         : ∃ (N : Natural).
-              Real.bisectionWidth(initial, N) < epsilon := {
+              Real.bisectionWidth(initial, N) < ε := {
   claim ∃ (K : Natural).
             (Real.BisectionInterval.right(initial)
              - Real.BisectionInterval.left(initial))
-            ≤ (successor(K) : Rational) * epsilon
+            ≤ (successor(K) : Rational) * ε
     since Rational.archimedean_for_positives;
   choose K as archBound from given(∃ (K : Natural).
             (Real.BisectionInterval.right(initial)
              - Real.BisectionInterval.left(initial))
-            ≤ (successor(K) : Rational) * epsilon);
+            ≤ (successor(K) : Rational) * ε);
   claim
         Real.bisectionWidth(initial, successor(K))
             * (successor(successor(K)) : Rational)
@@ -1154,21 +1154,21 @@ theorem Real.exists_bisectionWidth_below
           since Rational.add_preserves_LessThan;
   claim (0 : Rational)
           < ((successor(successor(K)) : Rational)
-             - (successor(K) : Rational)) * epsilon
+             - (successor(K) : Rational)) * ε
     since Rational.multiply_positive_positive;
-  calc (successor(K) : Rational) * epsilon
-     = (0 : Rational) + (successor(K) : Rational) * epsilon
+  calc (successor(K) : Rational) * ε
+     = (0 : Rational) + (successor(K) : Rational) * ε
      < ((successor(successor(K)) : Rational)
-        - (successor(K) : Rational)) * epsilon
-       + (successor(K) : Rational) * epsilon
+        - (successor(K) : Rational)) * ε
+       + (successor(K) : Rational) * ε
           since Rational.add_preserves_LessThan
-     = (successor(successor(K)) : Rational) * epsilon;
+     = (successor(successor(K)) : Rational) * ε;
   calc Real.bisectionWidth(initial, successor(K))
             * (successor(successor(K)) : Rational)
-          ≤ (successor(K) : Rational) * epsilon
+          ≤ (successor(K) : Rational) * ε
                since Rational.LessOrEqual.transitive
-          < (successor(successor(K)) : Rational) * epsilon
-          = epsilon * (successor(successor(K)) : Rational);
+          < (successor(successor(K)) : Rational) * ε
+          = ε * (successor(successor(K)) : Rational);
   witness successor(K) with
       done since Rational.LessThan.multiply_cancel_right_positive
 }
@@ -1263,19 +1263,19 @@ theorem Real.bisectionLeft_is_cauchy
               ≤ Real.BisectionInterval.right(initial))
         : Rational.sequence.IsCauchy(
               Real.bisectionLeft(subset, initial)) :=
-  (epsilon : Rational)
-           (epsilonPositive : (0 : Rational) < epsilon) ↦ {
-    claim ∃ (N : Natural). Real.bisectionWidth(initial, N) < epsilon
+  (ε : Rational)
+           (εPositive : (0 : Rational) < ε) ↦ {
+    claim ∃ (N : Natural). Real.bisectionWidth(initial, N) < ε
       since Real.exists_bisectionWidth_below;
-    choose N as widthBelowEpsilon
-        from given(∃ (N : Natural). Real.bisectionWidth(initial, N) < epsilon);
+    choose N as widthBelowε
+        from given(∃ (N : Natural). Real.bisectionWidth(initial, N) < ε);
     witness N with
         (m : Natural) (NLeqM : N ≤ m)
                  (n : Natural) (NLeqN : N ≤ n) ↦
           calc abs(Real.bisectionLeft(subset, initial, m)
                     - Real.bisectionLeft(subset, initial, n))
              ≤ Real.bisectionWidth(initial, N)
-             < epsilon
+             < ε
   }
 
 -- ----------------------------------------------------------------------
@@ -1365,14 +1365,14 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                     subset, initial, initialLeftLeqRight)
   | CauchyRationalSequence.make(yseq, yIsCauchy), yInSubset =>
   unfold Real.IsNonneg in
-  ((epsilon : Rational)
-           (epsilonPositive : (0 : Rational) < epsilon) ↦ {
-    claim halvedPositive : (0 : Rational) < Rational.halve(epsilon);
+  ((ε : Rational)
+           (εPositive : (0 : Rational) < ε) ↦ {
+    claim halvedPositive : (0 : Rational) < Rational.halve(ε);
     claim ∃ (N : Natural).
-              Real.bisectionWidth(initial, N) < Rational.halve(epsilon)
+              Real.bisectionWidth(initial, N) < Rational.halve(ε)
       since Real.exists_bisectionWidth_below;
     choose K as widthBelow from given(∃ (N : Natural).
-              Real.bisectionWidth(initial, N) < Rational.halve(epsilon));
+              Real.bisectionWidth(initial, N) < Rational.halve(ε));
     claim Real.IsUpperBound(
               subset, (Real.bisectionRight(subset, initial, K) : Real))
       since Real.bisectionRight_is_upper_bound;
@@ -1380,7 +1380,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
           : Real.from_cauchy_sequence(yseq, yIsCauchy)
             ≤ (Real.bisectionRight(subset, initial, K) : Real);
     choose M as pointwiseAt
-        from yLeqRightK(Rational.halve(epsilon), halvedPositive);
+        from yLeqRightK(Rational.halve(ε), halvedPositive);
     witness Natural.maximum(K, M) with
         (j : Natural)
                  (jGeMax : Natural.maximum(K, M) ≤ j) ↦ {
@@ -1390,10 +1390,10 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                 Real.bisectionLeft(subset, initial, K)
                   ≤ Real.bisectionLeft(subset, initial, j)
             since Real.bisectionLeft_le_at_le;
-          claim -Rational.halve(epsilon) < -Real.bisectionWidth(initial, K)
+          claim -Rational.halve(ε) < -Real.bisectionWidth(initial, K)
             since Rational.LessThan.negate;
           claim
-                -Rational.halve(epsilon)
+                -Rational.halve(ε)
                   < Real.bisectionRight(subset, initial, K) - yseq(j)
             by pointwiseAt(j, j_geq_M);
           -- Algebraic bridge: (right(K) - yseq(j)) + -width(K)
@@ -1412,15 +1412,15 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
              = Real.bisectionLeft(subset, initial, K) - yseq(j);
           -- Chain the two ε/2 bounds end-to-end, bridge by widthBridge,
           -- then weaken K → j on the left endpoint.
-          claim -Rational.halve(epsilon) ≤ -Real.bisectionWidth(initial, K)
+          claim -Rational.halve(ε) ≤ -Real.bisectionWidth(initial, K)
             since Rational.LessThan.weaken;
-          calc -epsilon
-             = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+          calc -ε
+             = -(Rational.halve(ε) + Rational.halve(ε))
                   since Rational.halve_doubled
-             = -Rational.halve(epsilon) + -Rational.halve(epsilon)
+             = -Rational.halve(ε) + -Rational.halve(ε)
                   since Rational.negate_add
              < (Real.bisectionRight(subset, initial, K) - yseq(j))
-                 + -Rational.halve(epsilon)
+                 + -Rational.halve(ε)
                   since Rational.add_preserves_LessThan
              ≤ (Real.bisectionRight(subset, initial, K) - yseq(j))
                  + -Real.bisectionWidth(initial, K)
