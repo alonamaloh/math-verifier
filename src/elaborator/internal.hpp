@@ -2031,16 +2031,6 @@ private:
             ExpressionPointer goalClosed,
             const std::vector<LocalBinder>& localBinders);
 
-    // Bridge an in-scope fact to the goal via coerceToExpectedTypeViaDiff —
-    // the same diff/coercion the calc "direct path" applies to reconcile a
-    // proof to the expected type (e.g. a representative cross-equation to the
-    // class equality it implies, through `fraction_equal`). Relocating it here
-    // lets a `claim`/`done`/block-close do the bridge anywhere, so the calc
-    // direct path is no longer special.
-    ExpressionPointer tryCoerceFactToGoal(
-            ExpressionPointer goalClosed,
-            const std::vector<LocalBinder>& localBinders);
-
     ExpressionPointer tryDiffWrapForEqualityGoal(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer hintTerm,

@@ -1138,12 +1138,12 @@ private:
                 SurfaceExpressionPointer calcExpression = parseCalc();
                 // A calc at statement position is always a binding (named via
                 // `as`, else anonymous); the block's `}` then closes the goal
-                // through the auto-prover — finding the calc's fact by
-                // type-match when the calc IS the goal, or bridging it via
-                // tryCoerceFactToGoal when the goal is what it implies (e.g. a
-                // representative equation to its class equality). There is no
-                // longer a calc-specific "direct path": closing a block is
-                // uniformly the auto-prover. The trailing `;` is optional
+                // through the auto-prover, finding the calc's fact by
+                // type-match. (A representative cross-equation is bridged to its
+                // class equality by the `by_representatives` eliminator, not by
+                // a calc-specific path.) There is no longer a calc-specific
+                // "direct path": closing a block is uniformly the auto-prover.
+                // The trailing `;` is optional
                 // punctuation, so `calc … = c` and `calc … = c;` are identical.
                 // The parsedFinalCalc escape only fires when a calc is followed
                 // by none of `as`/`;`/`}` — not a block-statement position.
