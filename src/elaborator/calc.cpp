@@ -683,11 +683,20 @@ ExpressionPointer Elaborator::elaborateCalc(
                                 ? std::get_if<SurfaceIdentifier>(
                                       &surfApp->function->node)
                                 : nullptr;
+                            const Declaration* citedDeclaration = head
+                                ? environment_.lookup(head->qualifiedName)
+                                : nullptr;
+                            // Skip universe-POLYMORPHIC lemmas: the bare
+                            // re-elaboration below (no universe args) forces the
+                            // implicit-citation-level placeholder path, which
+                            // corrupts elaborator state when its match fails.
+                            // See the companion guard in elaborateStructuredClaim.
                             if (surfApp && !surfApp->arguments.empty()
                                 && head && head->universeArgs.empty()
                                 && head->qualifiedName != "congruenceOf"
-                                && environment_.lookup(head->qualifiedName)
-                                       != nullptr) {
+                                && citedDeclaration
+                                && universeParameterCount(*citedDeclaration)
+                                       == 0) {
                                 ExpressionPointer bareAttempt = nullptr;
                                 try {
                                     SurfaceExpressionPointer bare =

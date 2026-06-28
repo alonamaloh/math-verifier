@@ -184,6 +184,7 @@ clean-check: $(CLEAN_MATHV_FILES)
 # equality came back false.
 checker-tests: library $(TEST_MATHV_FILES)
 	@./kernel verify 	    --source library/Test/redundant_check_cache_isolation_test.math 	    --output build/checker-tests.mathv --cache-root build 	    --check-redundant-by --no-check-unused-names > /dev/null 2>&1 	  && echo "checker-tests: PASS" 	  || { echo "checker-tests: FAIL — a clean file broke under --check-redundant-by"; exit 1; }
+	@bash scripts/redundancy_probe_test.sh
 
 # Error-message regression suite: each library/ErrorTest/<name>.math is an
 # intentionally-broken proof paired with a <name>.expected sidecar listing

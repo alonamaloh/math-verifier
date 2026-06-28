@@ -1022,10 +1022,25 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                     ? std::get_if<SurfaceIdentifier>(
                           &surfApp->function->node)
                     : nullptr;
+                const Declaration* citedDeclaration =
+                    head ? environment_.lookup(head->qualifiedName) : nullptr;
+                // Skip universe-POLYMORPHIC lemmas. The speculative re-elaborate
+                // below cites the lemma BARE (`makeSurfaceIdentifier(name, {})`,
+                // no universe args), which forces the implicit-citation-level
+                // placeholder path (`_cite_u_N` wildcards resolved post-match).
+                // When that match FAILS — which it does precisely when the
+                // stripped value arguments were what pinned the universe levels
+                // — it leaves elaborator state subtly corrupted, breaking a
+                // later citation in the same file (e.g. a `since fraction_equal`
+                // whose premise discharge then fails). For a monomorphic lemma
+                // the bare citation needs no levels, so the path is never taken.
+                // The check is a marginal "you can drop the args" hint; declining
+                // it for universe-poly lemmas costs almost nothing.
                 if (surfApp && !surfApp->arguments.empty()
                     && head && head->universeArgs.empty()
                     && head->qualifiedName != "congruenceOf"
-                    && environment_.lookup(head->qualifiedName) != nullptr) {
+                    && citedDeclaration
+                    && universeParameterCount(*citedDeclaration) == 0) {
                     ExpressionPointer bareAttempt = nullptr;
                     try {
                         SurfaceExpressionPointer bare =
