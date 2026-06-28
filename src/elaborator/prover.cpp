@@ -1388,6 +1388,44 @@ ExpressionPointer Elaborator::trySymmetryFlip(
         return wrap;
     }
 
+ExpressionPointer Elaborator::tryCoerceFactToGoal(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders) {
+        // Try each in-scope fact, most-recent first (the calc/claim that
+        // motivated this close is usually last), bridging its proof to the
+        // goal with the same coerceToExpectedTypeViaDiff the calc direct path
+        // uses. The bridge's own prefilter bails fast on facts that can't fire,
+        // so iterating every binder is bounded. Returns the bridged proof of
+        // the goal, or nullptr.
+        int N = static_cast<int>(localBinders.size());
+        if (N == 0) return nullptr;
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, N);
+        Context context = buildContextFromLocalBinders(localBinders);
+        for (int b = N - 1; b >= 0; --b) {
+            ExpressionPointer factProof = makeBoundVariable(N - 1 - b);
+            ExpressionPointer coerced;
+            try {
+                coerced = coerceToExpectedTypeViaDiff(
+                    localBinders, factProof, goalClosed);
+            } catch (const ElaborateError&) { continue; }
+              catch (const TypeError&) { continue; }
+            // coerceToExpectedTypeViaDiff returns its input unchanged when it
+            // can't bridge; only a different term is a candidate proof.
+            if (!coerced || coerced.get() == factProof.get()) continue;
+            try {
+                ExpressionPointer coercedType = inferTypeInLocalContext(
+                    localBinders, coerced);
+                if (isDefinitionallyEqual(environment_, context,
+                        coercedType, goalOpened)) {
+                    return coerced;
+                }
+            } catch (const ElaborateError&) { continue; }
+              catch (const TypeError&) { continue; }
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::autoProveClaim(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -1892,6 +1930,18 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             ExpressionPointer attempt = runTactic("symmetryFlip",
                 [&] { return trySymmetryFlip(
                     goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
+        // Last resort: bridge an in-scope fact to the goal via the diff/
+        // coercion machinery (e.g. a representative cross-equation to the class
+        // equality it implies). This is the capability the calc "direct path"
+        // had, relocated here so any close — mid-block `claim`, `done`, or the
+        // block's implicit close — reconciles a fact to the goal the same way.
+        {
+            ExpressionPointer attempt = runTactic("coerceFactToGoal",
+                [&] { return tryCoerceFactToGoal(
+                    goalClosed, localBinders); });
             if (attempt) return attempt;
         }
 
