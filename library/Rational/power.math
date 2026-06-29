@@ -122,14 +122,16 @@ theorem Rational.linearGrowth_closed_form
         calc Rational.linearGrowth(step, 0)
            = Rational.one
            = Rational.one + (0 : Rational) * step
-    case successor(predecessor):
+    case successor(predecessor): {
+        claim successorCast : (successor(predecessor) : Rational) = (1 : Rational) + (predecessor : Rational)
+            since Rational.successor_cast;
         calc Rational.linearGrowth(step, successor(predecessor))
            = Rational.linearGrowth(step, predecessor) + step
            = (Rational.one + (predecessor : Rational) * step) + step
                  since IH
            = Rational.one + (successor(predecessor) : Rational) * step
-                 by linear_combination(
-                        step - step * Rational.successor_cast(predecessor))
+                 by linear_combination(step - step * successorCast)
+      }
   }
 
 -- ----------------------------------------------------------------------
@@ -202,39 +204,34 @@ theorem Rational.power_decay_witness
         (εPositive : Rational.zero < ε)
         : ∃ (N : Natural). Rational.power(c, N) < ε := {
   -- The gap h := 1 − c is positive.
-  claim Rational.zero < Rational.one - c
-      by calc Rational.zero
-            = c - c
-            < Rational.one - c;
+  calc Rational.zero
+     = c - c
+     < Rational.one - c;
   claim Rational.zero ≤ Rational.one - c
       since Rational.LessThan.weaken;
   claim c + (Rational.one - c) = Rational.one;
-  claim productPositive : Rational.zero < ε * (Rational.one - c)
+  claim Rational.zero < ε * (Rational.one - c)
       since Rational.multiply_positive_positive;
   -- Archimedes: some multiple of ε·h reaches 1 …
   claim Rational.zero < Rational.one;
   claim Rational.zero ≤ Rational.one since Rational.LessThan.weaken;
-  claim oneIsNonneg : Rational.IsNonneg(Rational.one)
+  claim Rational.IsNonneg(Rational.one)
       since Rational.IsNonneg_of_LessOrEqual_zero;
-  choose K as archBound from Rational.archimedean_for_positives(
-               Rational.one, ε * (Rational.one - c),
-               oneIsNonneg, productPositive);
+  choose K such that Rational.one ≤ (successor(K) : Rational) * (ε * (Rational.one - c))
+      from Rational.archimedean_for_positives;
   -- … so at N = K+1 the scaled linear factor exceeds 1 strictly.
   claim lgClosed
         : Rational.linearGrowth(Rational.one - c, successor(K))
           = Rational.one + successor(K) * (Rational.one - c)
       since Rational.linearGrowth_closed_form;
-  claim Rational.one
-          < ε * Rational.linearGrowth(Rational.one - c, successor(K))
-      by calc Rational.one
-            = Rational.one + Rational.zero
-            < Rational.one + ε
-                  by Rational.add_left_preserves_LessThan
-            ≤ (successor(K) : Rational) * (ε * (Rational.one - c))
-                  + ε
-                  by Rational.add_preserves_LessOrEqual
-            = ε * Rational.linearGrowth(Rational.one - c, successor(K))
-                  by linear_combination(ε - ε * lgClosed);
+  calc Rational.one
+     = Rational.one + Rational.zero
+     < Rational.one + ε
+           by Rational.add_left_preserves_LessThan
+     ≤ (successor(K) : Rational) * (ε * (Rational.one - c)) + ε
+           by Rational.add_preserves_LessOrEqual
+     = ε * Rational.linearGrowth(Rational.one - c, successor(K))
+           by linear_combination(ε - ε * lgClosed);
   -- Bernoulli at N, then cancel the (positive) linear factor.
   claim Rational.power(c, successor(K))
               * Rational.linearGrowth(Rational.one - c, successor(K))
