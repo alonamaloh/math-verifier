@@ -92,6 +92,21 @@ def main():
     print()
     report("structural milestone", STRUCTURAL_MILESTONES)
 
+    # Advisory: the leak/anon axes are necessary, not sufficient — they do not
+    # see `successor` leaking outside Natural/ (its own deferred ratchet, kept
+    # out of clean-check). Surface it for manifest files so "leak-clean" is not
+    # mistaken for "reads like math". Not gated; this is the read-it signal.
+    successor_per_file = rep.get("successor_outside_natural", {}).get("per_file", {})
+    flagged = sorted(((successor_per_file[f], f) for f in manifest
+                      if successor_per_file.get(f)), reverse=True)
+    if flagged:
+        total = sum(count for count, _ in flagged)
+        print(f"\nadvisory — `successor` outside Natural/ in {len(flagged)} manifest "
+              f"file(s), {total} tokens (deferred floor debt, NOT gated; a high count "
+              f"flags a proof to re-read):")
+        for count, path in flagged:
+            print(f"  {count:5d}  {path}")
+
     rc = 0
     if args.gate:
         missing = cone(args.gate) - manifest

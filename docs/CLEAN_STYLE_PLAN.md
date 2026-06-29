@@ -33,6 +33,20 @@ Adding a file to the manifest is a one-line edit *after* it is cleaned; bump
 `CLEAN_LEAK_BUDGET` (and, if it carries intended connective-`⟨…⟩` residuals,
 `CLEAN_ANON_BUDGET`) only by the file's documented intended residuals.
 
+**The two ratchets are necessary, not sufficient.** A leak count of 0 (plus 0
+anonymous tuples) is where the readability read *starts*, not proof a file is
+done — "leak-clean" ≠ "clean". Two things neither axis sees: a pattern-match
+`cases <value> { | zero => … | successor(k) => … }` in a proof (discouraged in
+`proof-style.md` in favour of a proposition split that keeps the scrutinee
+abstract, but with no scanner), and `successor` leaking outside `Natural/` (its
+own deferred ratchet, kept out of `clean-check` per the
+successor-elimination campaign). A file can score 0/0 and still read like
+machine output — e.g. `IntegerMod/euler_fermat.math` once did, with a
+pattern-match `cases n` and 27 `successor` tokens. So before adding a file,
+*read it*; `scripts/clean_status.py` prints an advisory `successor`-outside-
+`Natural/` count per manifest file (a high count is a re-read signal), and a
+human/LLM pass against the readability bar is the real gate.
+
 ## The milestone ladder (vertical slices)
 
 Rather than clean horizontally by layer, we chase **headline theorems** whose
