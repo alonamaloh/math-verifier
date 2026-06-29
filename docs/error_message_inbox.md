@@ -450,7 +450,15 @@ redundant-by checker's speculative re-proof and the in-place by-less
 proof disagree (checker false-positive), and (2) the by-less prover
 should prefer a candidate whose conclusion matches the DECLARED claim
 type exactly, not just up to the relation head. Kept the explicit hint.
-diagnosis:
+diagnosis: NO LONGER REPRODUCES (verified 2026-06-28). The live instance is
+`ComplexNumber/exponential_addition.math:633` (`claim Real.zero ≤ aModulus(j)
+by ComplexNumber.modulus_nonneg(a(j))`, the same aModulus/bModulus shape clash).
+The redundant-by checker still flags it — and removing the `by` and rebuilding
+now VERIFIES CLEAN (exit 0). So issue (2) is fixed: the by-less prover's
+candidate ordering (structuralSimilarityScore in tryContextFactMatch, prover.cpp:
+~696 — head + arg-head similarity to the goal) now prefers the aModulus witness
+over the same-shaped bModulus one, so the bare claim gets the right-typed term
+and the checker's verdict is correct. Not a false positive anymore.
 
 ### (false positive) redundant-by flags a self-recursive pattern-match call — 2026-06-12
 note: inside the pattern-match definition of
@@ -463,7 +471,12 @@ in the by-less prover's scope during its definition. So the checker's
 speculative environment (which apparently HAS the name) diverges from the
 real elaboration environment. The redundant-by check should run in the
 same environment the proof elaborates in, or skip recursive self-calls.
-diagnosis:
+diagnosis: NO LONGER REPRODUCES (verified 2026-06-28). The recursive self-call
+(now `ComplexNumber/exponential_addition.math:275`, `… by
+ComplexNumber.cauchy_product_exchange(a, b, p)`) is NOT flagged by
+--check-redundant-by at all — the checker's probe no longer sees the
+being-defined name as closing the goal, so the speculative/real environment
+divergence is gone. No action needed.
 
 ---
 
