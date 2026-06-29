@@ -20,6 +20,7 @@ module Algebra.irreducible
 import Logic.basics
 import Logic.exists
 import Logic.sum
+import Logic.excluded_middle
 import Equality.basics
 import Algebra.monoid
 import Algebra.group
@@ -62,6 +63,52 @@ theorem IntegralDomain.unit_of_one_equals_product (d : IntegralDomain)
         (oneEquation : Ring.one(IntegralDomain.ring(d)) = b * c)
         : Ring.IsUnit(IntegralDomain.ring(d), b) :=
   witness c with oneEquation
+
+-- ----------------------------------------------------------------------
+-- The contrapositive packaging the two-squares descent wants: a nonzero
+-- non-unit that is NOT irreducible has a genuine factorization into two
+-- non-units. Quarantines the failed-universal peeling so consumers can
+-- simply `choose` the factors.
+theorem IntegralDomain.reducible_factorization (d : IntegralDomain)
+        (p : Ring.carrier(IntegralDomain.ring(d)))
+        (notZero : p ≠ Ring.zero(IntegralDomain.ring(d)))
+        (notUnit : ¬(Ring.IsUnit(IntegralDomain.ring(d), p)))
+        (notIrreducible : ¬(IntegralDomain.IsIrreducible(d, p)))
+        : ∃ (a b : Ring.carrier(IntegralDomain.ring(d))).
+            p = a * b
+            ∧ ¬(Ring.IsUnit(IntegralDomain.ring(d), a))
+            ∧ ¬(Ring.IsUnit(IntegralDomain.ring(d), b)) := {
+  let s : Ring := IntegralDomain.ring(d);
+  -- p is nonzero and a non-unit, so the only way it fails to be irreducible
+  -- is that some factorization has no unit factor.
+  claim ¬(∀ (a b : Ring.carrier(s)). p = a * b → Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b)) by {
+    suppose ∀ (a b : Ring.carrier(s)). p = a * b → Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b) as factorClause;
+    claim IntegralDomain.IsIrreducible(d, p);
+    done since notIrreducible
+  };
+  choose a such that
+      ¬(∀ (b : Ring.carrier(s)). p = a * b → Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b))
+      from Logic.not_forall_implies_exists_not(
+               predicate := (a : Ring.carrier(s)) ↦ (∀ (b : Ring.carrier(s)). p = a * b
+                   → Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b)));
+  choose b such that ¬(p = a * b → Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b))
+      from Logic.not_forall_implies_exists_not(
+               predicate := (b : Ring.carrier(s)) ↦ (p = a * b
+                   → Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b)));
+  claim p = a * b ∧ ¬(Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b)) by Logic.not_implies_implies_and_not;
+  claim p = a * b;
+  claim ¬(Ring.IsUnit(s, a)) by {
+    suppose Ring.IsUnit(s, a) as aUnit;
+    claim Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b);
+    done
+  };
+  claim ¬(Ring.IsUnit(s, b)) by {
+    suppose Ring.IsUnit(s, b) as bUnit;
+    claim Ring.IsUnit(s, a) ∨ Ring.IsUnit(s, b);
+    done
+  };
+  witness a with witness b with done
+}
 
 -- ----------------------------------------------------------------------
 -- Prime ⟹ irreducible in an integral domain.
