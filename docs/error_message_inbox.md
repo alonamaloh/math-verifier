@@ -16,6 +16,48 @@ Workflow:
 
 Keep entries here only until triaged — the corpus is the durable record.
 
+## Staleness sweep — 2026-06-29
+
+Re-reproduced every open entry against the current build. Most were already
+fixed by intervening work but never closed. **VERIFIED FIXED (stale — the bad
+message no longer reproduces; safe to delete):**
+
+- `claim by cases` picks a higher-order IH instead of the local disjunction —
+  the source search now type-matches the in-scope disjunction.
+- Citation boundary: ring argument only under projections — capability limit is
+  genuine, but the MESSAGE is good (side-by-side goal/lemma + actionable tail).
+- Hint citation won't flip an equality inside `Not` — symmetric form now tried.
+- citation does not see through a local `let` (continuity repro) — ζ-unfolds now.
+- `claim X by decide P { … }` rejected as a failed citation — `decide` accepted
+  as a `by`-hint now.
+- (warning) refining-list names count as unused — refining uses now counted.
+- named-arg `Lemma(a := a)` colliding with an in-scope local — resolves correctly.
+- argument-free `by <Lemma>` in an `=` calc step "proves a different relation" —
+  routed through `autoFillHintForClaim` (whole-conclusion + congruence cases).
+- `choose … from <h>` doesn't count the source as a use — fixed (warnings.cpp).
+- Stack-overflow SIGSEGV with kernel caches disabled — fixed (depth guards + 512MB
+  stack); cache-off redundancy check now exits cleanly.
+- Gap 1 / Gap 2 / Gap 3 (universe-arg inference / unpinned middle binder /
+  block-bodied lambda expected type) — all three capabilities now WORK and are
+  regression-locked by `library/Test/citation_universe_inference_test.math`.
+
+**STILL BROKEN (the real shortlist):**
+
+- `obtain ⟨a,b,c⟩` with too many components → `cases at line N: index 0 of
+  scrutinee type must be a local variable` — leaks an internal refining message
+  instead of "pattern has 3 components but the source provides 2". (Old repro
+  `probe_obtain_arity.math` no longer on disk; no `.expected`.)
+- `obtain`/`cases` on a `let`-bound scrutinee (e.g. a `Set`) → `cases scrutinee:
+  type's head is not an inductive constant after normalisation` — jargon, wrong
+  location, never says the `let` is the blocker (and the citation matcher DOES
+  ζ-unfold a let now — the cases/obtain scrutinee path doesn't).
+- `calc` step `by <lemma>` when subtraction doesn't surface as `+ -` → "this
+  step's justification proves a different relation than the step claims" with no
+  hint that an unreduced `subtract` head (a `+ -`/`ring` bridge) is the obstacle.
+- BORDERLINE: `?` hole in an And-tuple proof slot → "could not infer hole(s) …
+  provide explicitly" — actually a reasonable message for a genuinely-undetermined
+  proof-term hole; probably not a bug.
+
 <!-- captures are appended below this line -->
 
 ### `claim by cases` can pick a higher-order IH instead of the local disjunction — 2026-06-20 (baby `Or` cleanup)
