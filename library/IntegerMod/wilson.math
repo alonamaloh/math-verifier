@@ -92,19 +92,18 @@ theorem IntegerMod.no_zero_divisors (p : Natural) (primality : Natural.is_prime(
         (xNonzero : ¬(x = IntegerMod.zero(p)))
         (productZero : x * y = IntegerMod.zero(p))
         : y = IntegerMod.zero(p) := {
-  obtain ⟨inverse, inverseEquation⟩
-      from IntegerMod.nonzero_invertible(p, primality, x, xNonzero);
-  -- inverseEquation : x · inverse = one. Commute to inverse · x = one.
-  claim inverseLeft : inverse * x = IntegerMod.one(p)
-      by calc inverse * x
-            = x * inverse           by IntegerMod.multiply_commutative
-            = IntegerMod.one(p);
+  claim ∃ (inverse : IntegerMod(p)). x * inverse = IntegerMod.one(p)
+      by IntegerMod.nonzero_invertible;
+  choose inverse such that x * inverse = IntegerMod.one(p);
+  calc inverse * x
+     = x * inverse
+     = IntegerMod.one(p)                   as inverseLeft;
   calc y
-     = IntegerMod.one(p) * y               by IntegerMod.multiply_identity_left
+     = IntegerMod.one(p) * y
      = (inverse * x) * y                   by substituting inverseLeft
-     = inverse * (x * y)                   by IntegerMod.multiply_associative
+     = inverse * (x * y)
      = inverse * IntegerMod.zero(p)        by substituting productZero
-     = IntegerMod.zero(p)                  by IntegerMod.multiply_zero
+     = IntegerMod.zero(p)
 }
 
 -- ----------------------------------------------------------------------
@@ -127,41 +126,23 @@ theorem IntegerMod.square_one_iff (p : Natural) (primality : Natural.is_prime(p)
         (x : IntegerMod(p))
         (squareIsOne : x * x = IntegerMod.one(p))
         : x = IntegerMod.one(p) ∨ x = IntegerMod.negate(IntegerMod.one(p)) := {
-  -- Using x·x = 1, the difference of squares is 1 − 1 = 0.
-  claim factorsZero
-      : (x - IntegerMod.one(p)) * (x + IntegerMod.one(p)) = IntegerMod.zero(p)
-      by calc (x - IntegerMod.one(p)) * (x + IntegerMod.one(p))
-            = x * x - IntegerMod.one(p)                 by IntegerMod.difference_of_squares
-            = IntegerMod.one(p) - IntegerMod.one(p)     by substituting squareIsOne
-            = IntegerMod.zero(p)                        by IntegerMod.add_negate_right;
-  -- A product is zero, so one factor is zero. Case-split classically on
-  -- whether the left factor x − 1 vanishes.
+  calc (x - IntegerMod.one(p)) * (x + IntegerMod.one(p))
+     = x * x - IntegerMod.one(p)
+     = IntegerMod.one(p) - IntegerMod.one(p)     by substituting squareIsOne
+     = IntegerMod.zero(p)                        by IntegerMod.add_negate_right;
   claim by cases {
     in (x - IntegerMod.one(p) = IntegerMod.zero(p)) as leftZero:
-        -- x − 1 = 0 ⟹ x = 1 (add 1 back).
-        Or.introduceLeft(
-            calc x
-               = (x - IntegerMod.one(p)) + IntegerMod.one(p)
-                     by IntegerMod.subtract_add_cancel
-               = IntegerMod.zero(p) + IntegerMod.one(p)
-                     by substituting leftZero
-               = IntegerMod.one(p)
-                     by IntegerMod.add_identity_left)
-    in (Not(x - IntegerMod.one(p) = IntegerMod.zero(p))) as leftNonzero: {
-        -- x − 1 ≠ 0, so the other factor x + 1 must vanish (no zero
-        -- divisors), giving x = −1.
+        calc x
+           = (x - IntegerMod.one(p)) + IntegerMod.one(p)
+           = IntegerMod.zero(p) + IntegerMod.one(p)    by substituting leftZero
+           = IntegerMod.one(p)
+    in (x - IntegerMod.one(p) ≠ IntegerMod.zero(p)) as leftNonzero: {
         claim rightZero : x + IntegerMod.one(p) = IntegerMod.zero(p)
-            by IntegerMod.no_zero_divisors(p, primality,
-                   x - IntegerMod.one(p), x + IntegerMod.one(p),
-                   leftNonzero, factorsZero);
-        Or.introduceRight(
-            calc x
-               = (x + IntegerMod.one(p)) - IntegerMod.one(p)
-                     by IntegerMod.add_subtract_cancel
-               = IntegerMod.zero(p) - IntegerMod.one(p)
-                     by substituting rightZero
-               = IntegerMod.negate(IntegerMod.one(p))
-                     by IntegerMod.zero_subtract)
+            since IntegerMod.no_zero_divisors;
+        calc x
+           = (x + IntegerMod.one(p)) - IntegerMod.one(p)
+           = IntegerMod.zero(p) - IntegerMod.one(p)    by substituting rightZero
+           = IntegerMod.negate(IntegerMod.one(p))
     }
   }
 }
@@ -206,9 +187,10 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
         : ∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, rest)
           → List.has_distinct_inverse_in(IntegerMod(p), IntegerMod.multiply,
                 IntegerMod.one(p), rest, z) :=
-  (z : IntegerMod(p)) (zMemberRest : List.member(IntegerMod(p), z, rest)) ↦ {
+  {
+    take z : IntegerMod(p);
+    suppose List.member(IntegerMod(p), z, rest) as zMemberRest;
     let minusOne : IntegerMod(p) := IntegerMod.negate(IntegerMod.one(p));
-    -- z is a nonzero class, so it has a field inverse w, also nonzero.
     claim List.member(IntegerMod(p), z,
               List.prepend(IntegerMod(p), IntegerMod.one(p),
                   List.prepend(IntegerMod(p), minusOne, rest)))
@@ -222,93 +204,84 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
         since List.Permutation.symmetric;
     claim List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n))
         since List.Permutation.member_forward;
-    claim ¬(z = IntegerMod.zero(p))
+    claim z ≠ IntegerMod.zero(p)
         since IntegerMod.residues_member_nonzero;
-    obtain ⟨w, zTimesWIsOne⟩ by IntegerMod.nonzero_invertible;
-    claim ¬(w = IntegerMod.zero(p))
-        by (wZero : w = IntegerMod.zero(p)) ↦ {
-            claim IntegerMod.one(p) = IntegerMod.zero(p)
-                by calc IntegerMod.one(p)
-                      = z * w                   by zTimesWIsOne
-                      = z * IntegerMod.zero(p)  by substituting wZero
-                      = IntegerMod.zero(p);
-            claim IntegerMod.zero(p) = IntegerMod.one(p)
-                by calc IntegerMod.zero(p) = IntegerMod.one(p)
-                      by (IntegerMod.one(p) = IntegerMod.zero(p));
-            claim False by IntegerMod.zero_not_one;
-            done
+    claim ∃ (w : IntegerMod(p)). z * w = IntegerMod.one(p)
+        by IntegerMod.nonzero_invertible;
+    choose w such that z * w = IntegerMod.one(p) as zTimesWIsOne;
+    claim w ≠ IntegerMod.zero(p)
+        by {
+            suppose w = IntegerMod.zero(p) as wZero;
+            calc IntegerMod.zero(p)
+               = z * IntegerMod.zero(p)
+               = z * w                   by substituting wZero
+               = IntegerMod.one(p);
+            done since IntegerMod.zero_not_one
           };
-    -- So w is itself on the residue list, hence in 1 :: −1 :: rest.
     claim List.member(IntegerMod(p), w, IntegerMod.residues_up_to(p, n))
         since IntegerMod.residues_complete;
     claim List.member(IntegerMod(p), w,
               List.prepend(IntegerMod(p), IntegerMod.one(p),
                   List.prepend(IntegerMod(p), minusOne, rest)))
         since List.Permutation.member_forward;
-    -- w ≠ 1: otherwise z = z·1 = 1, but 1 ∉ rest.
-    claim ¬(w = IntegerMod.one(p))
-        by (wIsOne : w = IntegerMod.one(p)) ↦ {
+    claim w ≠ IntegerMod.one(p)
+        by {
+            suppose w = IntegerMod.one(p) as wIsOne;
             claim zTimesOneIsOne : z * IntegerMod.one(p) = IntegerMod.one(p)
                 by substituting wIsOne;
-            claim zIsOne : z = IntegerMod.one(p)
-                by calc z
-                      = z * IntegerMod.one(p)
-                      = IntegerMod.one(p)       by zTimesOneIsOne;
-            claim oneMemberRest
-                : List.member(IntegerMod(p), IntegerMod.one(p), rest)
+            calc z
+               = z * IntegerMod.one(p)
+               = IntegerMod.one(p)       by zTimesOneIsOne
+               as zIsOne;
+            claim List.member(IntegerMod(p), IntegerMod.one(p), rest)
                 by substituting zIsOne;
-            oneNotInRest(oneMemberRest)
+            done since oneNotInRest
           };
-    -- w ≠ −1: otherwise z = z·(−1)·(−1) = 1·(−1) = −1, but −1 ∉ rest.
-    claim ¬(w = minusOne)
-        by (wIsMinusOne : w = minusOne) ↦ {
+    claim w ≠ minusOne
+        by {
+            suppose w = minusOne as wIsMinusOne;
             claim zTimesMinusOne : z * minusOne = IntegerMod.one(p)
                 by substituting wIsMinusOne;
             claim minusOneSquare : minusOne * minusOne = IntegerMod.one(p)
                 since IntegerMod.negate_one_multiply_negate_one;
-            claim zIsMinusOne : z = minusOne
-                by calc z
-                      = z * IntegerMod.one(p)
-                      = z * (minusOne * minusOne)
-                            by substituting minusOneSquare
-                      = (z * minusOne) * minusOne
-                      = IntegerMod.one(p) * minusOne
-                            by substituting zTimesMinusOne
-                      = minusOne;
-            claim minusOneMemberRest : List.member(IntegerMod(p), minusOne, rest)
+            calc z
+               = z * IntegerMod.one(p)
+               = z * (minusOne * minusOne)    by substituting minusOneSquare
+               = (z * minusOne) * minusOne
+               = IntegerMod.one(p) * minusOne by substituting zTimesMinusOne
+               = minusOne
+               as zIsMinusOne;
+            claim List.member(IntegerMod(p), minusOne, rest)
                 by substituting zIsMinusOne;
-            negateOneNotInRest(minusOneMemberRest)
+            done since negateOneNotInRest
           };
-    -- w ≠ z: a self-paired z would satisfy z² = 1, i.e. z = ±1 — not in rest.
-    claim wNotZ : ¬(w = z)
-        by (wIsZ : w = z) ↦ {
-            claim z * z = IntegerMod.one(p) by rewrite(wIsZ, zTimesWIsOne);
-            claim zSelfInverse
-                : z = IntegerMod.one(p) ∨ z = IntegerMod.negate(IntegerMod.one(p))
+    claim w ≠ z
+        by {
+            suppose w = z as wIsZ;
+            calc z * z
+               = z * w
+               = IntegerMod.one(p);
+            claim z = IntegerMod.one(p) ∨ z = IntegerMod.negate(IntegerMod.one(p))
                 since IntegerMod.square_one_iff;
-            cases zSelfInverse {
-              | Or.introduceLeft(zIsOne) => {
-                  claim oneMemberRest
-                      : List.member(IntegerMod(p), IntegerMod.one(p), rest)
+            claim by cases {
+              in (z = IntegerMod.one(p)) as zIsOne: {
+                  claim List.member(IntegerMod(p), IntegerMod.one(p), rest)
                       by substituting zIsOne;
-                  oneNotInRest(oneMemberRest)
+                  done since oneNotInRest
                 }
-              | Or.introduceRight(zIsMinusOne) => {
-                  claim minusOneMemberRest
-                      : List.member(IntegerMod(p), minusOne, rest)
+              in (z = IntegerMod.negate(IntegerMod.one(p))) as zIsMinusOne: {
+                  claim List.member(IntegerMod(p), minusOne, rest)
                       by substituting zIsMinusOne;
-                  negateOneNotInRest(minusOneMemberRest)
+                  done since negateOneNotInRest
                 }
             }
           };
-    -- So w sits in rest, and is the required distinct inverse of z.
     claim List.member(IntegerMod(p), w,
               List.prepend(IntegerMod(p), minusOne, rest))
         since List.member_of_prepend_not_head;
-    claim wMemberRest : List.member(IntegerMod(p), w, rest)
+    claim List.member(IntegerMod(p), w, rest)
         since List.member_of_prepend_not_head;
-    witness w with
-        And.introduction(wMemberRest, And.introduction(zTimesWIsOne, wNotZ))
+    witness w with done
   }
 
 -- ----------------------------------------------------------------------
@@ -321,47 +294,47 @@ theorem IntegerMod.wilson_product (p n : Natural)
           = IntegerMod.negate(IntegerMod.one(p)) := {
   let minusOne : IntegerMod(p) := IntegerMod.negate(IntegerMod.one(p));
   claim 1 ≤ n by Natural.less_or_equal_predecessor_less_or_equal;
-  -- Pull the class 1 to the front of the residue list…
-  claim oneMember
-      : List.member(IntegerMod(p), IntegerMod.one(p),
+  claim List.member(IntegerMod(p), IntegerMod.one(p),
             IntegerMod.residues_up_to(p, n))
       since IntegerMod.one_member_residues;
-  obtain ⟨afterOne, oneExtracted⟩
-      from List.Permutation.extract(IntegerMod(p), IntegerMod.one(p),
-               IntegerMod.residues_up_to(p, n), oneMember);
-  -- …then −1 (a different class, since p ≥ 3) to the front of the rest.
+  claim ∃ (afterOne : List(IntegerMod(p))).
+            List.Permutation(IntegerMod(p), IntegerMod.residues_up_to(p, n),
+                List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne))
+      by List.Permutation.extract;
+  choose afterOne such that
+      List.Permutation(IntegerMod(p), IntegerMod.residues_up_to(p, n),
+          List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne))
+      as oneExtracted;
   claim List.member(IntegerMod(p), minusOne, IntegerMod.residues_up_to(p, n))
       since IntegerMod.negate_one_member_residues;
   claim List.member(IntegerMod(p), minusOne,
             List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne))
       since List.Permutation.member_forward;
-  claim ¬(minusOne = IntegerMod.one(p))
-      by (minusOneIsOne : minusOne = IntegerMod.one(p)) ↦ {
-          claim IntegerMod.one(p) = IntegerMod.negate(IntegerMod.one(p))
-              by calc IntegerMod.one(p)
-                    = IntegerMod.negate(IntegerMod.one(p)) by minusOneIsOne;
-          claim False since IntegerMod.one_not_negate_one;
-          done
+  claim minusOne ≠ IntegerMod.one(p)
+      by {
+          suppose minusOne = IntegerMod.one(p) as minusOneIsOne;
+          calc IntegerMod.one(p)
+             = IntegerMod.negate(IntegerMod.one(p)) by minusOneIsOne;
+          done since IntegerMod.one_not_negate_one
         };
-  claim minusOneInAfterOne : List.member(IntegerMod(p), minusOne, afterOne)
+  claim List.member(IntegerMod(p), minusOne, afterOne)
       since List.member_of_prepend_not_head;
-  obtain ⟨rest, minusOneExtracted⟩
-      from List.Permutation.extract(IntegerMod(p), minusOne, afterOne,
-               minusOneInAfterOne);
-  -- Together: the residues permute to 1 :: −1 :: rest.
+  claim ∃ (rest : List(IntegerMod(p))).
+            List.Permutation(IntegerMod(p), afterOne,
+                List.prepend(IntegerMod(p), minusOne, rest))
+      by List.Permutation.extract;
+  choose rest such that
+      List.Permutation(IntegerMod(p), afterOne,
+          List.prepend(IntegerMod(p), minusOne, rest));
+  claim List.Permutation(IntegerMod(p),
+            List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne),
+            List.prepend(IntegerMod(p), IntegerMod.one(p),
+                List.prepend(IntegerMod(p), minusOne, rest)))
+      since List.Permutation.skip;
   claim List.Permutation(IntegerMod(p), IntegerMod.residues_up_to(p, n),
             List.prepend(IntegerMod(p), IntegerMod.one(p),
                 List.prepend(IntegerMod(p), minusOne, rest)))
-      by List.Permutation.transitive(IntegerMod(p),
-             IntegerMod.residues_up_to(p, n),
-             List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne),
-             List.prepend(IntegerMod(p), IntegerMod.one(p),
-                 List.prepend(IntegerMod(p), minusOne, rest)),
-             oneExtracted,
-             List.Permutation.skip(IntegerMod(p), IntegerMod.one(p), afterOne,
-                 List.prepend(IntegerMod(p), minusOne, rest),
-                 minusOneExtracted));
-  -- Distinctness travels along the permutation, so 1 and −1 do not recur.
+      since List.Permutation.transitive;
   claim List.Distinct(IntegerMod(p), IntegerMod.residues_up_to(p, n))
       since IntegerMod.residues_distinct;
   claim List.Distinct(IntegerMod(p),
@@ -379,31 +352,32 @@ theorem IntegerMod.wilson_product (p n : Natural)
   claim List.Distinct(IntegerMod(p), rest)
       since List.Distinct.tail_distinct;
   claim ¬(List.member(IntegerMod(p), IntegerMod.one(p), rest))
-      by (oneInRest : List.member(IntegerMod(p), IntegerMod.one(p), rest)) ↦
-          oneNotInMinusOneRest(
-              List.member.there(IntegerMod(p), IntegerMod.one(p), minusOne,
-                  rest, oneInRest));
-  -- The remaining classes pair off with their inverses and collapse to 1.
+      by {
+          suppose List.member(IntegerMod(p), IntegerMod.one(p), rest) as oneInRest;
+          claim List.member(IntegerMod(p), IntegerMod.one(p),
+                    List.prepend(IntegerMod(p), minusOne, rest));
+          done since oneNotInMinusOneRest
+        };
   claim (z : IntegerMod(p)) → List.member(IntegerMod(p), z, rest)
         → List.has_distinct_inverse_in(IntegerMod(p), IntegerMod.multiply,
               IntegerMod.one(p), rest, z)
       since IntegerMod.wilson_pairing;
+  claim ∀ (a b c : IntegerMod(p)). (a * b) * c = a * (b * c)
+      since IntegerMod.multiply_associative;
+  claim ∀ (a b : IntegerMod(p)). a * b = b * a
+      since IntegerMod.multiply_commutative;
+  claim ∀ (a : IntegerMod(p)). IntegerMod.one(p) * a = a
+      since IntegerMod.multiply_identity_left;
   claim restProductOne
       : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p), rest)
         = IntegerMod.one(p)
-      by List.product_one_of_paired_inverses
-         recalling IntegerMod.multiply_associative(p),
-             IntegerMod.multiply_commutative(p),
-             IntegerMod.multiply_identity_left(p);
-  -- Multiply everything back together: 1 · (−1) · 1 = −1.
+      since List.product_one_of_paired_inverses;
   claim productPermutation
       : IntegerMod.residues_product(p, n)
         = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
               List.prepend(IntegerMod(p), IntegerMod.one(p),
                   List.prepend(IntegerMod(p), minusOne, rest)))
-      by List.Permutation.product_invariant
-         recalling IntegerMod.multiply_associative(p),
-             IntegerMod.multiply_commutative(p);
+      since List.Permutation.product_invariant;
   calc IntegerMod.residues_product(p, n)
      = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
            List.prepend(IntegerMod(p), IntegerMod.one(p),
@@ -415,9 +389,7 @@ theorem IntegerMod.wilson_product (p n : Natural)
      = IntegerMod.one(p) * (minusOne * IntegerMod.one(p))
            by substituting restProductOne
      = minusOne * IntegerMod.one(p)
-           by IntegerMod.multiply_identity_left(p, minusOne * IntegerMod.one(p))
      = minusOne
-           by IntegerMod.multiply_identity_right(p, minusOne)
 }
 
 -- ----------------------------------------------------------------------
@@ -427,10 +399,13 @@ theorem IntegerMod.residues_product_is_factorial (p top : Natural)
           = IntegerMod.make(p, (Natural.factorial(top) : Integer)) :=
   by_induction on top with IH {
     case zero:
-        -- Both sides are the class of 1.
         calc IntegerMod.residues_product(p, 0)
            = IntegerMod.make(p, (Natural.factorial(0) : Integer))
-    case successor(predecessor):
+    case successor(predecessor): {
+        claim castProduct
+            : ((successor(predecessor) * Natural.factorial(predecessor) : Natural) : Integer)
+              = (successor(predecessor) : Integer) * (Natural.factorial(predecessor) : Integer)
+            since Natural.to_integer.multiply_preserves;
         calc IntegerMod.residues_product(p, successor(predecessor))
            = IntegerMod.residue(p, successor(predecessor))
                  * IntegerMod.residues_product(p, predecessor)
@@ -442,9 +417,9 @@ theorem IntegerMod.residues_product_is_factorial (p top : Natural)
            = IntegerMod.make(p,
                  ((successor(predecessor) * Natural.factorial(predecessor)
                      : Natural) : Integer))
-                 by Natural.to_integer.multiply_preserves(successor(predecessor),
-                        Natural.factorial(predecessor))
+                 by substituting castProduct
            = IntegerMod.make(p, (Natural.factorial(successor(predecessor)) : Integer))
+      }
   }
 
 -- ----------------------------------------------------------------------
@@ -454,12 +429,16 @@ theorem IntegerMod.wilson (p n : Natural)
         (pEquation : p = 1 + n)
         (nAtLeastTwo : 2 ≤ n)
         : IntegerMod.make(p, (Natural.factorial(n) : Integer))
-          = IntegerMod.negate(IntegerMod.one(p)) :=
+          = IntegerMod.negate(IntegerMod.one(p)) := {
+  claim IntegerMod.residues_product(p, n)
+        = IntegerMod.make(p, (Natural.factorial(n) : Integer))
+      since IntegerMod.residues_product_is_factorial;
+  claim IntegerMod.residues_product(p, n) = IntegerMod.negate(IntegerMod.one(p))
+      since IntegerMod.wilson_product;
   calc IntegerMod.make(p, (Natural.factorial(n) : Integer))
      = IntegerMod.residues_product(p, n)
-           by IntegerMod.residues_product_is_factorial(p, n)
      = IntegerMod.negate(IntegerMod.one(p))
-           by IntegerMod.wilson_product(p, n, primality, pEquation, nAtLeastTwo)
+}
 
 -- The same statement as an Integer divisibility: p ∣ n! + 1.
 theorem Natural.wilson_divides (p n : Natural)
@@ -468,19 +447,18 @@ theorem Natural.wilson_divides (p n : Natural)
         (nAtLeastTwo : 2 ≤ n)
         : Integer.divides((p : Integer),
               (Natural.factorial(n) : Integer) + Integer.one) := {
-  claim IntegerMod.make(p, (Natural.factorial(n) : Integer))
-      = IntegerMod.make(p, -Integer.one)
-      by calc IntegerMod.make(p, (Natural.factorial(n) : Integer))
-            = IntegerMod.negate(IntegerMod.one(p))   by IntegerMod.wilson
-            = IntegerMod.make(p, -Integer.one);
+  calc IntegerMod.make(p, (Natural.factorial(n) : Integer))
+     = IntegerMod.negate(IntegerMod.one(p))   since IntegerMod.wilson
+     = IntegerMod.make(p, -Integer.one);
   claim congruent
       : Integer.CongruentModulo(p, (Natural.factorial(n) : Integer), -Integer.one)
-      by IntegerMod.congruent_of_make_equal;
-  -- p ∣ n! − (−1), and n! − (−1) = n! + 1.
-  obtain ⟨quotient, differenceEquation⟩ from congruent;
+      since IntegerMod.congruent_of_make_equal;
+  choose quotient such that
+      (Natural.factorial(n) : Integer) - (-Integer.one) = (p : Integer) * quotient
+      as differenceEquation from congruent;
   witness quotient with
       calc (Natural.factorial(n) : Integer) + Integer.one
-         = (Natural.factorial(n) : Integer) - (-Integer.one)   by ring
+         = (Natural.factorial(n) : Integer) - (-Integer.one)
          = (p : Integer) * quotient                            by differenceEquation
 }
 
@@ -497,23 +475,22 @@ theorem Natural.wilson (p n : Natural)
         -- n = 0 would make p = 1, which is not prime.
         claim 2 ≤ p since Natural.is_prime.at_least_two;
         claim 2 ≤ 1 + 0 by substituting pEquation;
-        claim 2 ≤ 1 by substituting Natural.add_zero(1);
+        claim 2 ≤ 1 by substituting (1 + 0 = 1);
         claim impossible : False since Natural.not_two_less_or_equal_one;
         absurd(impossible)
       }
     | successor(m) =>
         cases m refining pEquation {
           | zero => {
-              -- p = 2: 1! + 1 = 2 divides itself.  factorial(1) reduces to 1,
-              -- and p = 1 + 1 casts to 1 + 1 over the integers.
-              claim castP : (p : Integer) = Integer.one + Integer.one
-                  by calc (p : Integer)
-                        = ((1 + 1 : Natural) : Integer)
-                              by substituting pEquation
-                        = ((1 : Natural) : Integer) + ((1 : Natural) : Integer)
-                              by Natural.to_integer.add_preserves(1, 1)
-                        = Integer.one + Integer.one
-                              by substituting Natural.to_integer.one_preserves;
+              -- p = 2: 1! + 1 = 2 divides itself.
+              claim ((1 + 1 : Natural) : Integer)
+                    = ((1 : Natural) : Integer) + ((1 : Natural) : Integer)
+                  since Natural.to_integer.add_preserves;
+              calc (p : Integer)
+                 = ((1 + 1 : Natural) : Integer)
+                 = ((1 : Natural) : Integer) + ((1 : Natural) : Integer)
+                 = Integer.one + Integer.one
+                 as castP;
               witness Integer.one with
                   calc (Natural.factorial(1) : Integer) + Integer.one
                      = ((1 : Natural) : Integer) + Integer.one
@@ -540,54 +517,49 @@ theorem Natural.divisor_one_or_self_of_divides_factorial_plus_one
         (wilsonDivides : Natural.divides(p, Natural.factorial(n) + 1))
         (divisor : Natural) (dividesP : divisor ∣ p)
         : divisor = 1 ∨ divisor = p := {
-  claim decision : divisor = p ∨ ¬(divisor = p)
+  claim divisor = p ∨ ¬(divisor = p)
       since Natural.decides_equality;
-  cases decision {
-    | Or.introduceLeft(isP) => done since isP
-    | Or.introduceRight(notP) => {
-        -- divisor ≤ p, and not p itself, so divisor ≤ n.
-        claim bound : p = 0 ∨ divisor ≤ p
-            by Natural.divides_less_or_equal_or_zero;
-        cases bound {
-          | Or.introduceLeft(pZero) => {
+  claim by cases {
+    in (divisor = p) as isP: done since isP
+    in (divisor ≠ p) as notP: {
+        claim p = 0 ∨ divisor ≤ p
+            since Natural.divides_less_or_equal_or_zero;
+        claim by cases {
+          in (p = 0) as pZero: {
               claim 2 ≤ 0 by substituting pZero;
               claim impossible : False
                   since Natural.not_less_or_equal_successor_zero;
               absurd(impossible)
             }
-          | Or.introduceRight(divisorAtMostP) => {
-              claim divisor ≤ successor(n)
-                  by calc divisor
-                        ≤ p             by divisorAtMostP
-                        = 1 + n         by pEquation
-                        = successor(n)  by substituting Natural.one_add(n);
-              claim ¬(divisor = successor(n))
-                  by (isTop : divisor = successor(n)) ↦ {
-                      claim isPAgain : divisor = p
-                          by calc divisor
-                                = successor(n)   by isTop
-                                = 1 + n          by substituting Natural.one_add(n)
-                                = p              by pEquation;
-                      notP(isPAgain)
+          in (divisor ≤ p) as divisorAtMostP: {
+              calc divisor
+                 ≤ p             by divisorAtMostP
+                 = 1 + n
+                 = successor(n);
+              claim divisor ≠ successor(n)
+                  by {
+                      suppose divisor = successor(n) as isTop;
+                      calc divisor
+                         = successor(n)
+                         = 1 + n
+                         = p;
+                      done since notP
                     };
               claim divisor ≤ n
                   since Natural.less_or_equal_successor_not_equal;
-              -- divisor ≥ 1: a divisor of the positive p is not 0.
-              claim ¬(divisor = 0)
-                  by (isZero : divisor = 0) ↦ {
-                      obtain ⟨quotient, pProduct⟩ from dividesP;
-                      claim pZero : p = 0
-                          by calc p
-                                = divisor * quotient   by pProduct
-                                = 0 * quotient         by substituting isZero
-                                = 0;
+              claim divisor ≠ 0
+                  by {
+                      suppose divisor = 0 as isZero;
+                      choose quotient such that p = divisor * quotient from dividesP;
+                      calc p
+                         = divisor * quotient
+                         = 0 * quotient   by substituting isZero
+                         = 0
+                         as pZero;
                       claim 2 ≤ 0 by substituting pZero;
-                      claim impossible : False
-                          since Natural.not_less_or_equal_successor_zero;
-                      impossible
+                      done since Natural.not_less_or_equal_successor_zero
                     };
               claim 1 ≤ divisor since Natural.geq_one_when_not_zero;
-              -- divisor divides n! + 1 through p, so it is 1.
               claim divisor ∣ Natural.factorial(n) + 1
                   since Natural.divides_transitive;
               claim divisor = 1
@@ -607,17 +579,17 @@ theorem Natural.prime_of_divides_factorial_plus_one (p n : Natural)
         (wilsonDivides : Natural.divides(p, Natural.factorial(n) + 1))
         : Natural.is_prime(p) := {
   claim oneAddOne : 1 + 1 ≤ 1 + n since Natural.add_left_monotone;
-  claim pAtLeastTwo : 2 ≤ p
-      by calc (2 : Natural)
-            = 1 + 1   by substituting Natural.add_one(1)
-            ≤ 1 + n   by oneAddOne
-            = p       by pEquation;
-  claim divisorCondition
-      : ∀ (divisor : Natural). divisor ∣ p → divisor = 1 ∨ divisor = p
-      by (divisor : Natural) (dividesP : divisor ∣ p) ↦ {
-          done by Natural.divisor_one_or_self_of_divides_factorial_plus_one
+  calc (2 : Natural)
+     = 1 + 1
+     ≤ 1 + n   by oneAddOne
+     = p;
+  claim ∀ (divisor : Natural). divisor ∣ p → divisor = 1 ∨ divisor = p
+      by {
+          take divisor : Natural;
+          suppose divisor ∣ p as dividesP;
+          done since Natural.divisor_one_or_self_of_divides_factorial_plus_one
         };
-  And.introduction(pAtLeastTwo, divisorCondition)
+  done
 }
 
 -- ----------------------------------------------------------------------
@@ -630,11 +602,11 @@ theorem IntegerMod.multiply_nonzero (p : Natural)
         (x y : IntegerMod(p))
         (xNonzero : ¬(x = IntegerMod.zero(p)))
         (yNonzero : ¬(y = IntegerMod.zero(p)))
-        : ¬(x * y = IntegerMod.zero(p)) :=
-  (productZero : x * y = IntegerMod.zero(p)) ↦ {
-    claim yZero : y = IntegerMod.zero(p) since IntegerMod.no_zero_divisors;
-    yNonzero(yZero)
-  }
+        : x * y ≠ IntegerMod.zero(p) := {
+  suppose x * y = IntegerMod.zero(p) as productZero;
+  claim y = IntegerMod.zero(p) since IntegerMod.no_zero_divisors;
+  done since yNonzero
+}
 
 -- Cancel a nonzero factor: c·u = c·v implies u = v (multiply by c⁻¹).
 theorem IntegerMod.multiply_cancel_left (p : Natural)
@@ -643,17 +615,18 @@ theorem IntegerMod.multiply_cancel_left (p : Natural)
         (cNonzero : ¬(c = IntegerMod.zero(p)))
         (equation : c * u = c * v)
         : u = v := {
-  obtain ⟨inverse, inverseEquation⟩ by IntegerMod.nonzero_invertible;
-  claim inverseLeft : inverse * c = IntegerMod.one(p)
-      by calc inverse * c
-            = c * inverse           by IntegerMod.multiply_commutative
-            = IntegerMod.one(p);
+  claim ∃ (inverse : IntegerMod(p)). c * inverse = IntegerMod.one(p)
+      by IntegerMod.nonzero_invertible;
+  choose inverse such that c * inverse = IntegerMod.one(p);
+  calc inverse * c
+     = c * inverse
+     = IntegerMod.one(p)        as inverseLeft;
   calc u
-     = IntegerMod.one(p) * u    by IntegerMod.multiply_identity_left
+     = IntegerMod.one(p) * u
      = (inverse * c) * u        by substituting inverseLeft
-     = inverse * (c * u)        by IntegerMod.multiply_associative
+     = inverse * (c * u)
      = inverse * (c * v)        by substituting equation
-     = (inverse * c) * v        by IntegerMod.multiply_associative
+     = (inverse * c) * v
      = IntegerMod.one(p) * v    by substituting inverseLeft
-     = v                        by IntegerMod.multiply_identity_left
+     = v
 }
