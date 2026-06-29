@@ -89,6 +89,13 @@ Constructor patterns with arguments (e.g. `successor(predecessor)`) are reconstr
 
 ## `decide P { yes m => … | no n => … }` — classical case-split
 
+> **Import:** `decide` desugars to `cases Logic.classical_decidable(P)`,
+> which is now a **theorem** in `Natural.classical_decidable` (no longer an
+> axiom in `axioms.math` — it's derived from excluded middle + `Logic.the`).
+> A module using `decide` must reach that file; an `unknown identifier
+> 'Logic.classical_decidable'` means you need `import
+> Natural.classical_decidable`.
+
 The canonical form for classical case-splits. Replaces both:
 
 - `cases Logic.excluded_middle(P) { | Or.introduceLeft(m) => … | Or.introduceRight(n) => … }` (for plain "P or not P" reasoning at the proposition level), AND
@@ -507,6 +514,14 @@ returns its final non-`;`-terminated expression.
   (kernel sees through it; see the `let` section above).
 - `suppose <proposition> as <name>;` — introduce a hypothesis as a
   step (useful for breaking implication arrows into named pieces).
+- **Introduce a goal's `∀`/`→` binders with `take`/`suppose`, not a
+  restated-type lambda.** For a goal `∀ (a b : T). P(a) → P(b) → C`, open the
+  proof with `by { take a; take b; suppose P(a) as ha; suppose P(b) as hb;
+  … }` — NOT `by (a b : T) (ha : P(a)) (hb : P(b)) ↦ { … }`, which
+  bureaucratically restates every binder's type straight from the statement.
+  The intros read like "take a, b; suppose ha, hb" and never duplicate the
+  signature. (Binders the prover later consumes by type — e.g. an `as`-named
+  disjunction fed to a `by cases` — don't trip the unused-name check.)
 - `suppose Not(G) [as h] for contradiction;` — reductio, **terminal**.
   Assume `Not(G)` (the negation of the goal), derive `False` through the
   rest of the block (e.g. ending in `contradiction;`), and the goal `G`

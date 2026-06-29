@@ -269,6 +269,14 @@ Limits:
   match — diff inference catches cases like `v_p((1+dx)*(1+dy))` (the
   lemma's LHS) vs `v_p(1+dy+dx*(1+dy))` (the step's slot) where
   multiplication reduces structurally.
+- **Subtraction must surface the same way on both sides.** `a - b`
+  (`subtract(a, b)`) and `a + -b` (`add(a, -b)`) print alike and are
+  ring-equal, but the structural diff treats them as DISTINCT heads — so a
+  lemma stated with `+ -` won't bridge a step written with `-` (or vice
+  versa), and the rejection looks inexplicable because both relations print
+  identically. The elaborator now hints at this ("this step involves
+  subtraction …"). Fix: write both endpoints the same way, or close the step
+  with `ring` (or a `by substituting` bridge).
 
 ## Rewrite under a binder — `by ((x) ↦ …)` in calc
 
