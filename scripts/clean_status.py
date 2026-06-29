@@ -2,9 +2,12 @@
 """clean_status.py — dashboard + ratchet for the clean-style manifest.
 
 `scripts/clean_manifest.txt` lists the files held to clean ("reads like math")
-style. This script reports progress of that growing set toward the milestone
-theorems (FTA → ℚ-field → ℝ-field → IVT), each of which is GREEN once its whole
-import cone is in the manifest.
+style. This script reports progress of that growing set toward the goal
+theorems, each of which is GREEN once its whole import cone is in the manifest.
+
+The goal set is the Freek-100 entries the library has verified, read straight
+from the canonical index `docs/freek_100.md` (so the dashboard never goes stale
+as new entries land), plus a couple of structural field milestones.
 
   scripts/clean_status.py                 # dashboard
   scripts/clean_status.py --ratchet N     # exit 1 if manifest residual leaks > N
@@ -28,12 +31,35 @@ def cone(root):
     visit(root)
     return seen
 
-MILESTONES = [
-    ("FTA (unique factorization)", "library/Algebra/unique_factorization.math"),
-    ("Q is a field",               "library/Rational/field.math"),
-    ("R is a field",               "library/Real/field.math"),
-    ("IVT",                        "library/Real/intermediate_value.math"),
+# Structural milestones that are not Freek entries but anchor the manifest cones.
+STRUCTURAL_MILESTONES = [
+    ("ℚ is a field", ["library/Rational/field.math"]),
+    ("ℝ is a field", ["library/Real/field.math"]),
 ]
+
+def freek_milestones(index="docs/freek_100.md"):
+    """Parse the Freek-100 index table into (label, [files]) milestones.
+
+    Each row is `| # | theorem | declaration | file(s) |`; a row may name more
+    than one file, in which case the milestone's cone is the union of theirs.
+    """
+    milestones = []
+    for line in open(index):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 4 or not cells[0].isdigit():
+            continue
+        number, theorem = cells[0], cells[1]
+        files = re.findall(r'library/[\w/]+\.math', cells[-1])
+        if files:
+            milestones.append((f"#{number} {theorem}", files))
+    milestones.sort(key=lambda m: int(m[0].split()[0][1:]))
+    return milestones
+
+def cone_of(roots):
+    union = set()
+    for root in roots:
+        union |= cone(root)
+    return union
 
 def main():
     ap = argparse.ArgumentParser()
@@ -49,14 +75,22 @@ def main():
 
     print(f"clean manifest: {len(manifest)} files, {manifest_leaks} residual leaks "
           f"(intended boundaries)\n")
-    print(f"{'milestone':30s} {'cone':>5s} {'in set':>7s}  status")
-    for name, root in MILESTONES:
-        if not os.path.exists(root):
-            continue
-        c = cone(root)
-        cov = len(c & manifest)
-        status = "GREEN" if cov == len(c) else f"{100 * cov // len(c)}%"
-        print(f"{name:30s} {len(c):5d} {cov:7d}  {status}")
+
+    def report(title, milestones):
+        print(f"{title:48s} {'cone':>5s} {'in set':>7s}  status")
+        for name, roots in milestones:
+            roots = [r for r in roots if os.path.exists(r)]
+            if not roots:
+                continue
+            c = cone_of(roots)
+            cov = len(c & manifest)
+            status = "GREEN" if cov == len(c) else f"{100 * cov // len(c)}%"
+            label = name if len(name) <= 48 else name[:45] + "..."
+            print(f"{label:48s} {len(c):5d} {cov:7d}  {status}")
+
+    report("Freek-100 theorem", freek_milestones())
+    print()
+    report("structural milestone", STRUCTURAL_MILESTONES)
 
     rc = 0
     if args.gate:
