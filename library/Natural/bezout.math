@@ -63,10 +63,9 @@ definition Natural.has_bezout
 
 theorem Natural.has_bezout_zero_right (a : Natural)
         : Natural.has_bezout(a, 0) := {
-    calc (a : Integer) * Integer.one + (0 : Integer) * Integer.zero
-              = (a : Integer)    as combined;
-    claim isGcd : Natural.is_gcd(a, a, 0) by Natural.is_gcd_zero_right;
-    ⟨a, Integer.one, Integer.zero, combined, isGcd⟩
+    calc (a : Integer) * Integer.one + (0 : Integer) * Integer.zero = (a : Integer);
+    claim Natural.is_gcd(a, a, 0) by Natural.is_gcd_zero_right;
+    witness a with witness Integer.one with witness Integer.zero with done
 }
 
 -- ----------------------------------------------------------------------
@@ -140,34 +139,38 @@ theorem Integer.bezout_substitute
 theorem Natural.has_bezout_successor_step
         (predB : Natural) (a : Natural)
         (inductionHypothesis :
-            ∀ (k : Natural). successor(k) ≤ successor(predB)
+            ∀ (k : Natural). k < successor(predB)
             → ∀ (aPrime : Natural). Natural.has_bezout(aPrime, k))
         : Natural.has_bezout(a, successor(predB)) := {
     claim 1 ≤ successor(predB);
     claim quotientRemainder
           : Natural.has_quotient_remainder(successor(predB), a)
         by Natural.divide_with_remainder;
-    obtain ⟨q, r, decomposition, remainderBelowDivisor⟩
-        from quotientRemainder;
-    claim hasBezoutForBR : Natural.has_bezout(successor(predB), r);
-    obtain ⟨gcdValue, xPrime, yPrime, recursedEquation, isGcdForBR⟩
-        from hasBezoutForBR;
-    -- Lift the natural decomposition `a = q · successor(predB) + r`
-    -- to the integer level.
+    -- Divide a by the (positive) divisor: a = q · successor(predB) + r.
+    choose q from quotientRemainder;
+    choose r such that a = q * successor(predB) + r ∧ successor(r) ≤ successor(predB);
+    claim a = q * successor(predB) + r;
+    claim successor(r) ≤ successor(predB);
+    claim r < successor(predB);
+    -- Recurse on the remainder: bx′ + ry′ = g with is_gcd(g, successor(predB), r).
+    claim hasBezoutForBR : Natural.has_bezout(successor(predB), r) since inductionHypothesis;
+    choose gcdValue from hasBezoutForBR;
+    choose xPrime such that
+        ∃ (secondCoefficient : Integer).
+            (successor(predB) : Integer) * xPrime + (r : Integer) * secondCoefficient = (gcdValue : Integer)
+            ∧ Natural.is_gcd(gcdValue, successor(predB), r);
+    choose yPrime such that
+        (successor(predB) : Integer) * xPrime + (r : Integer) * yPrime = (gcdValue : Integer)
+        ∧ Natural.is_gcd(gcdValue, successor(predB), r);
+    claim (successor(predB) : Integer) * xPrime + (r : Integer) * yPrime = (gcdValue : Integer);
+    claim Natural.is_gcd(gcdValue, successor(predB), r);
+    -- Lift the decomposition to ℤ and substitute r = a − q·successor(predB).
     claim (a : Integer) = (q : Integer) * (successor(predB) : Integer) + (r : Integer);
-    -- Plug into the substitution lemma to get the new linear-
-    -- combination identity for (a, successor(predB)).
-    claim newLinearCombinationIdentity
-          : (a : Integer) * yPrime + (successor(predB) : Integer) * (xPrime - (q : Integer) * yPrime) = (gcdValue : Integer);
-    -- Lift the gcd from (successor(predB), r) to (a, successor(predB))
-    -- via is_gcd_remainder_lift.
-    claim isGcdForAB : Natural.is_gcd(gcdValue, a, successor(predB))
-        by Natural.is_gcd_remainder_lift;
-    ⟨gcdValue,
-     yPrime,
-     (xPrime - (q : Integer) * yPrime),
-     newLinearCombinationIdentity,
-     isGcdForAB⟩
+    claim (a : Integer) * yPrime + (successor(predB) : Integer) * (xPrime - (q : Integer) * yPrime) = (gcdValue : Integer);
+    claim Natural.is_gcd(gcdValue, a, successor(predB)) by Natural.is_gcd_remainder_lift;
+    witness gcdValue with
+        witness yPrime with
+        witness (xPrime - (q : Integer) * yPrime) with done
 }
 
 -- ----------------------------------------------------------------------
@@ -176,26 +179,25 @@ theorem Natural.has_bezout_successor_step
 
 theorem Natural.has_bezout_step (b : Natural)
         (inductionHypothesis :
-            ∀ (k : Natural). successor(k) ≤ b
+            ∀ (k : Natural). k < b
             → ∀ (aPrime : Natural). Natural.has_bezout(aPrime, k))
         : ∀ (a : Natural). Natural.has_bezout(a, b) :=
   cases b refining inductionHypothesis {
-    | zero =>
-        (a : Natural) ↦ { done by Natural.has_bezout_zero_right }
-    | successor(predB) =>
-        (a : Natural) ↦ { done by Natural.has_bezout_successor_step }
+    | zero => { take a : Natural; done by Natural.has_bezout_zero_right }
+    | successor(predB) => { take a : Natural; done by Natural.has_bezout_successor_step }
   }
 
 -- ----------------------------------------------------------------------
 -- Main theorem: Bezout's identity.
 theorem Natural.bezout (a b : Natural)
         : Natural.has_bezout(a, b) :=
+  -- Strong induction on the second operand, generalised over the first so
+  -- the recursive call may switch operands. (`k < bArgument` is definitionally
+  -- `successor(k) ≤ bArgument`, so the step's hypothesis matches directly.)
   (by_induction on b using Natural.strong_induction
        with bArgument, inductionHypothesis {
-     done by Natural.has_bezout_step(bArgument,
-         (k : Natural) (successorKLessOrEqualB : successor(k) ≤ bArgument) ↦
-             inductionHypothesis(k,
-                 Natural.lt_of_successor_le(k, bArgument, successorKLessOrEqualB)))
+     take aPrime : Natural;
+     done by Natural.has_bezout_step
    }
    : ∀ (aPrime : Natural). Natural.has_bezout(aPrime, b)
    )(a)
