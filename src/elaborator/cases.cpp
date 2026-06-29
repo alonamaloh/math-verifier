@@ -1085,10 +1085,42 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         }
         auto* constant = std::get_if<Constant>(&cursor->node);
         if (!constant) {
+            // The scrutinee's type may mention a local `let`-bound alias that
+            // kernel WHNF can't ζ-unfold (it only knows `environment_`, not the
+            // local context) — e.g. `obtain` on `hq : Q` where `let Q := P ∧ P`,
+            // or on `y ∈ s` for a `let`-bound set `s`. Unfold local lets and
+            // retry the decompose before giving up (the citation matcher does
+            // the same), so the obtain just works instead of erroring.
+            ExpressionPointer closedType = closeOverLocalBinders(
+                scrutineeTypeOpened, localBinders, localBinders.size());
+            ExpressionPointer unfoldedClosed =
+                zetaUnfoldLetBinders(closedType, localBinders);
+            if (unfoldedClosed != closedType) {
+                scrutineeTypeOpened = weakHeadNormalForm(
+                    environment_,
+                    openOverLocalBinders(unfoldedClosed, localBinders,
+                                         localBinders.size()));
+                inductiveArguments.clear();
+                cursor = scrutineeTypeOpened;
+                while (auto* application =
+                           std::get_if<Application>(&cursor->node)) {
+                    inductiveArguments.insert(inductiveArguments.begin(),
+                                               application->argument);
+                    cursor = weakHeadNormalForm(
+                        environment_, application->function);
+                }
+                constant = std::get_if<Constant>(&cursor->node);
+            }
+        }
+        if (!constant) {
             throw ElaborateError(
                 "cases scrutinee at line " + std::to_string(line)
-                + ": type's head is not an inductive constant after "
-                "normalisation");
+                + ": its type does not reduce to an inductive — after "
+                "normalisation the head is '"
+                + prettyPrintInLocalScope(scrutineeTypeOpened, localBinders)
+                + "'. `cases`/`obtain` need an inductive type (∃, ∧, an "
+                "`inductive`, …); the head here is a definition or alias that "
+                "did not unfold.");
         }
         // Quotient is not an inductive — it's an axiomatic kernel
         // primitive eliminated via `Quotient.induct`. When the scrutinee
@@ -1149,8 +1181,15 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
             if (!boundVariable) {
                 throw ElaborateError(
                     "cases at line " + std::to_string(line)
-                    + ": index " + std::to_string(k)
-                    + " of scrutinee type must be a local variable");
+                    + ": cannot destructure a value of type '" + constant->name
+                    + "' — its index #" + std::to_string(k) + " ("
+                    + prettyPrintInLocalScope(indexClosed, localBinders)
+                    + ") is not a plain variable, and only an indexed type "
+                    "whose indices are distinct local variables can be matched. "
+                    "Often this means an `obtain ⟨…⟩` / `⟨…⟩` pattern has MORE "
+                    "components than the source provides, so a trailing "
+                    "component is trying to destructure a proof — drop the "
+                    "extra component(s).");
             }
             int idx = boundVariable->deBruijnIndex;
             if (idx < 0

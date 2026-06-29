@@ -1101,13 +1101,55 @@ ExpressionPointer Elaborator::elaborateCalc(
                 // isDefinitionallyEqual above) — so it owns the message.
                 // Report it as mathematics rather than laundering it
                 // through rethrowKernelError's "kernel: " path (WS1).
-                throwElaborate(
+                std::string mismatchMessage =
                     "this step's justification proves a different relation "
                     "than the step claims\n"
                     "    this step claims:    "
                     + prettyPrintForDisplay(stepRelationTypeOpened) + "\n"
                     "    but its proof shows: "
-                    + prettyPrintForDisplay(stepProofType));
+                    + prettyPrintForDisplay(stepProofType);
+                // When the step involves subtraction, a common cause is that
+                // the two sides express it differently — `a - b` on one side,
+                // `a + -b` on the other. These print ALIKE and are ring-equal,
+                // but the structural matcher treats `subtract(a,b)` and
+                // `add(a,-b)` as distinct, so a lemma stated one way won't
+                // bridge a step written the other. The printed relations then
+                // look bridgeable yet the step is rejected — hint at the real
+                // obstacle.
+                std::function<bool(const ExpressionPointer&)>
+                    mentionsSubtractOrNegate =
+                    [&](const ExpressionPointer& e) -> bool {
+                        if (!e) return false;
+                        if (auto* c = std::get_if<Constant>(&e->node)) {
+                            const std::string& n = c->name;
+                            auto endsWith = [&](const std::string& s) {
+                                return n.size() >= s.size()
+                                    && n.compare(n.size() - s.size(),
+                                                 s.size(), s) == 0;
+                            };
+                            return endsWith("subtract") || endsWith("negate");
+                        }
+                        if (auto* a = std::get_if<Application>(&e->node))
+                            return mentionsSubtractOrNegate(a->function)
+                                || mentionsSubtractOrNegate(a->argument);
+                        if (auto* p = std::get_if<Pi>(&e->node))
+                            return mentionsSubtractOrNegate(p->domain)
+                                || mentionsSubtractOrNegate(p->codomain);
+                        if (auto* l = std::get_if<Lambda>(&e->node))
+                            return mentionsSubtractOrNegate(l->domain)
+                                || mentionsSubtractOrNegate(l->body);
+                        return false;
+                    };
+                if (mentionsSubtractOrNegate(stepRelationTypeOpened)) {
+                    mismatchMessage +=
+                        "\n  note: this step involves subtraction — `a - b` and "
+                        "`a + -b` print alike and are ring-equal, but the matcher "
+                        "treats `subtract(a,b)` and `add(a,-b)` as DISTINCT, so a "
+                        "lemma stated one way won't bridge a step written the "
+                        "other. Write both sides the same way, or close the step "
+                        "with `ring` (or a `by substituting` bridge).";
+                }
+                throwElaborate(mismatchMessage);
             }
             steps.push_back({step.relation, stepProofKernel});
             endpointKernels.push_back(nextKernel);

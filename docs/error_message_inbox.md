@@ -41,22 +41,18 @@ message no longer reproduces; safe to delete):**
   block-bodied lambda expected type) — all three capabilities now WORK and are
   regression-locked by `library/Test/citation_universe_inference_test.math`.
 
-**STILL BROKEN (the real shortlist):**
+**STILL BROKEN → NOW ALL FIXED (2026-06-29, corpus #19–21):**
 
-- `obtain ⟨a,b,c⟩` with too many components → `cases at line N: index 0 of
-  scrutinee type must be a local variable` — leaks an internal refining message
-  instead of "pattern has 3 components but the source provides 2". (Old repro
-  `probe_obtain_arity.math` no longer on disk; no `.expected`.)
-- `obtain`/`cases` on a `let`-bound scrutinee (e.g. a `Set`) → `cases scrutinee:
-  type's head is not an inductive constant after normalisation` — jargon, wrong
-  location, never says the `let` is the blocker (and the citation matcher DOES
-  ζ-unfold a let now — the cases/obtain scrutinee path doesn't).
-- `calc` step `by <lemma>` when subtraction doesn't surface as `+ -` → "this
-  step's justification proves a different relation than the step claims" with no
-  hint that an unreduced `subtract` head (a `+ -`/`ring` bridge) is the obstacle.
-- BORDERLINE: `?` hole in an And-tuple proof slot → "could not infer hole(s) …
-  provide explicitly" — actually a reasonable message for a genuinely-undetermined
-  proof-term hole; probably not a bug.
+- `obtain ⟨a,b,c⟩` with too many components — FIXED (corpus #19): names the type
+  it tried to destructure + the over-long-pattern cause.
+- `obtain`/`cases` on a `let`-bound scrutinee — FIXED (corpus #20): the scrutinee
+  path now ζ-unfolds local lets, so it WORKS; the residual non-inductive case got
+  a clear message.
+- `calc` step mixing `a - b` / `a + -b` — FIXED (corpus #21): the relation
+  mismatch now hints that subtraction is structurally distinct (try `ring`).
+- BORDERLINE (left as-is): `?` hole in an And-tuple proof slot → "could not infer
+  hole(s) … provide explicitly" — a reasonable message for a genuinely-undetermined
+  proof-term hole; not a bug.
 
 <!-- captures are appended below this line -->
 

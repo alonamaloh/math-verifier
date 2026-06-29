@@ -492,3 +492,45 @@ each improvement is measured and protected against regression.
 - **Edge:** with a trailing catch-all clause the shadow detection doesn't fire;
   you get a "missing pattern case for constructor 'zero'" coverage message
   instead — milder, left as-is.
+
+### 19. Over-long `obtain ⟨…⟩` leaks an internal index message — FIXED
+
+- **Trigger:** an `obtain`/`⟨…⟩` pattern with more components than the source
+  provides, e.g. `obtain ⟨q, r, extra⟩ from (h : d ∣ n)` (a witness + a proof,
+  i.e. 2). Repro: `library/ErrorTest/obtain_too_many_components.math`.
+- **Was:** `cases at line N: index 0 of scrutinee type must be a local variable`
+  — the trailing component right-nests onto the equality proof `n = d·q`, and the
+  internal "indices of an indexed inductive must be variables" check leaks. 0 on
+  cause/actionable.
+- **Now:** names the type being wrongly destructured and the cause: "cannot
+  destructure a value of type 'Equality' — its index #0 (d * q) is not a plain
+  variable … Often this means an `obtain ⟨…⟩` pattern has MORE components than
+  the source provides … drop the extra component(s)." (cases.cpp)
+
+### 20. `obtain`/`cases` on a `let`-bound scrutinee — FIXED (capability + message)
+
+- **Trigger:** a scrutinee whose type mentions a local `let`-bound alias, e.g.
+  `obtain ⟨a,b⟩ from hq` where `let Q := P ∧ P; hq : Q`, or `y ∈ s` for a
+  `let`-bound set. Repros: `library/Test/obtain_through_let.math` (now works),
+  `library/ErrorTest/cases_scrutinee_not_inductive.math` (still-bad case).
+- **Was:** `cases scrutinee at line N: type's head is not an inductive constant
+  after normalisation` — kernel WHNF only knows `environment_`, so it can't
+  ζ-unfold a *local* let; the head stayed an alias. Jargon, no mention of the let.
+- **Now:** the scrutinee path ζ-unfolds local lets (via `zetaUnfoldLetBinders`)
+  and retries, so the obtain just WORKS. If the type still isn't inductive (e.g.
+  a function type), the message names the normalised head and says an inductive
+  is required and the head "did not unfold." (cases.cpp)
+
+### 21. calc `=` step mixing `a - b` and `a + -b` — FIXED (hint)
+
+- **Trigger:** a calc `=` step whose sides express subtraction differently —
+  `a - b` (subtract) vs `a + -b` (add-of-negate) — cited by a lemma that can't
+  bridge them. Repro: `library/ErrorTest/calc_subtraction_mismatch_hint.math`.
+- **Was:** "this step's justification proves a different relation than the step
+  claims" with the two relations printed — but they PRINT ALIKE (`+ -b` renders
+  as `- b`), so the user can't see why it's rejected (internally `subtract(a,b)`
+  ≠ `add(a,-b)` to the structural matcher).
+- **Now:** when the step relation mentions a subtract/negate head, appends:
+  "this step involves subtraction — `a - b` and `a + -b` print alike and are
+  ring-equal, but the matcher treats `subtract(a,b)` and `add(a,-b)` as DISTINCT
+  … write both sides the same way, or close with `ring`." (calc.cpp)
