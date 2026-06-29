@@ -16,10 +16,19 @@ readability, not terseness. (Depth: `docs/conventions/`.)
 
 - **Default to the auto-prover** (a by-less `calc`/`claim` step). Reach for
   a hint only when it fails.
-- When you do hint, **justify the step by its reason, not the plumbing
-  lemma**. Prefer `since <lemma>` for an illuminating reason (the IH, the
-  operative lemma) — kept for the reader even if the prover doesn't need it
-  — over a bare closer.
+- **The by-less prover sees only `automatic` lemmas** (plus the local
+  context and the ring/field/equality battery) — it no longer sweeps every
+  imported lemma. So the threshold for a `by` is now sharp and mechanical:
+  **add `by <lemma>` exactly when the lemma is *not* `automatic`**, and
+  otherwise leave the step bare. Don't annotate a step the prover already
+  closes — `since triangle_inequality`, `since weaken`, `since
+  add_preserves` are the kind of "obvious" facts a mathematician never
+  spells out; if they're `automatic`, drop them. When a *non*-automatic
+  lemma is needed at many sites and is itself obvious, prefer **marking it
+  `automatic`** over naming it at every call (mind the prover-perturbation
+  risk — test the whole build). `since` is now reserved for the rare case
+  where a *non-obvious strategic reason* genuinely helps the reader and the
+  prover doesn't need it; it is not for routine plumbing.
 - **`ring` / `field` first** for any commutative-ring / field identity.
   Reach for hand-written associativity/congruence only after they fail.
 
