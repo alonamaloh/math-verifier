@@ -45,12 +45,23 @@ linter counts them, and there is always a math-like form:
 | `Equality.symmetry(eq)` | a reversed by-less `calc` step |
 | `transport_proposition(…)` | `substituting`, or an element-interface lemma |
 | a positional lemma call | `claim … by <lemma>` / `done by <lemma>` |
+| **`claim T by calc …`** | **a bare `calc …;`** (or `calc … as NAME;`) |
 | raw `Subtype.make(…)` | the structure's `construction`/intro form |
 | `⟨pA, pB⟩ : A ∧ B`, `⟨v, p⟩ : ∃…` | see "Connectives aren't tuples" |
 | `Not(a = b)`, `¬(a = b)` | `a ≠ b` (the operator desugars to it) |
 
 `a ≠ b` is the surface spelling of `Not(a = b)`; prefer it everywhere — in
 hypotheses, claims, and goals — over the raw `¬(…)` / `Not(…)` forms.
+
+**Never write `claim … by calc …` (or `claim NAME : T by calc …`).** This is
+an anti-pattern, with no exceptions. A `calc` at statement position *is*
+already a claim: it binds its `first <relation> last` endpoints into context
+(anonymously, found by type-match), so wrapping it in a `claim` only restates
+what the chain concludes — pure repetition, and the linter counts it as a CIC
+leak (`claim-by-calc`). Write the bare `calc …;`, and add `as NAME` only when a
+later step references the result *by name*. The same goes for the whole-proof
+case: when a `calc` is the entire proof, return it directly (`:= calc …`),
+never `:= { claim goal by calc … }`. Full mechanics: `conventions/calc-and-rewrite.md`.
 
 ## Connectives aren't tuples
 

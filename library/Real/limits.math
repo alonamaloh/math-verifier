@@ -59,7 +59,7 @@ theorem Real.constant_sequence_converges (c : Real)
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦
           calc abs(c - c)
-             = abs(Real.zero)
+             = abs((0 : Real))
                    by substituting (ring : c - c = 0)
              = 0
                    since Real.absolute_value_when_nonneg
@@ -140,98 +140,69 @@ theorem Real.SequenceConverges.of_pointwise (s t : Natural → Real)
 -- that vanishes also vanishes.
 theorem Real.SequenceConverges.squeeze_zero (v u : Natural → Real)
         (dominated : ∀ (n : Natural). abs(v(n)) ≤ u(n))
-        (uVanishes : Real.SequenceConverges(u, Real.zero))
-        : Real.SequenceConverges(v, Real.zero) :=
+        (uVanishes : Real.SequenceConverges(u, (0 : Real)))
+        : Real.SequenceConverges(v, (0 : Real)) :=
   (ε : Real)
   (εPositive : ε > 0) ↦ {
     choose threshold as close from uVanishes(ε, εPositive);
     witness threshold with
         (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
           claim u(m) ≤ abs(u(m)) since Real.LessOrEqual_absolute_value;
-          calc abs(v(m) - Real.zero)
+          calc abs(v(m) - 0)
              = abs(v(m))
-                   by substituting (ring : v(m) - Real.zero = v(m))
+                   by substituting (ring : v(m) - 0 = v(m))
              ≤ u(m)
              ≤ abs(u(m))
-             = abs(u(m) - Real.zero)
-                   by substituting (ring : u(m) - Real.zero = u(m))
+             = abs(u(m) - 0)
+                   by substituting (ring : u(m) - 0 = u(m))
              < ε
         }
   }
 
 -- ----------------------------------------------------------------------
 -- Product of limits. The difference splits as
---   s(m)·t(m) − S·T = s(m)·(t(m) − T) + T·(s(m) − S);
--- a rational roof over |s(m)| (one unit above a roof for |S|, once s is
--- within 1 of S) and one over |T| turn each piece into roof · tolerance,
--- and the tolerances are chosen so each piece stays below ε/4.
+--   s(m)·t(m) − S·T = s(m)·(t(m) − T) + T·(s(m) − S).
+-- Roof each factor over its limit — |s(m)| ≤ 1 + |S| once s is within 1 of
+-- S, and |T| ≤ 1 + |T| — and pick each tolerance as ε/4 over the opposite
+-- roof, so each piece is bounded by roof · (ε/4)/roof = ε/4. The whole
+-- estimate lives in ℝ: the complete ordered field divides, so no descent to
+-- a rational tolerance is needed.
 theorem Real.SequenceConverges.multiply (s t : Natural → Real)
         (sLimit tLimit : Real)
         (sConverges : Real.SequenceConverges(s, sLimit))
         (tConverges : Real.SequenceConverges(t, tLimit))
         : Real.SequenceConverges((n : Natural) ↦ s(n) * t(n), sLimit * tLimit) :=
-  -- The error estimate is carried in rational roofs and ε/4 tolerances, so
-  -- the construction is done at a rational tolerance and lifted by density.
-  Real.SequenceConverges.of_rational(
-      (n : Natural) ↦ s(n) * t(n), sLimit * tLimit,
-      rationalBound :=
-  (ε : Rational)
-  (εPositive : Rational.zero < ε) ↦ {
-    -- Rational roofs over the two limits.
-    choose sRoof such that Rational.zero < sRoof ∧ abs(sLimit) ≤ (sRoof : Real)
-        from Real.exists_positive_rational_roof;
-    choose tRoof such that Rational.zero < tRoof ∧ abs(tLimit) ≤ (tRoof : Real)
-        from Real.exists_positive_rational_roof;
-    -- The quarter-ε budget for each piece, and the matching tolerances.
-    let halfε : Rational := Rational.halve(ε);
-    let quarterε : Rational := Rational.halve(halfε);
-    claim Rational.zero < halfε since Rational.halve_positive;
-    claim Rational.zero < quarterε since Rational.halve_positive;
-    claim Rational.zero ≤ sRoof since Rational.LessThan.weaken;
-    claim Rational.one + Rational.zero ≤ Rational.one + sRoof
-        since Rational.add_general_LessOrEqual_left;
-    claim Rational.one ≤ Rational.one + sRoof
-        by substituting (ring : Rational.one + Rational.zero = Rational.one);
-    claim Rational.zero < Rational.one;
-    claim Rational.zero < Rational.one + sRoof
-        since Rational.LessThan.transitive_right;
-    claim Rational.zero < Rational.reciprocal_function(Rational.one + sRoof)
-        since Rational.reciprocal_function_positive_of_positive;
-    claim Rational.zero < tRoof;
-    claim Rational.zero < Rational.reciprocal_function(tRoof)
-        since Rational.reciprocal_function_positive_of_positive;
-    claim tTolerancePositive
-        : Rational.zero
-          < quarterε
-                * Rational.reciprocal_function(Rational.one + sRoof)
-        since Rational.multiply_positive_positive;
-    claim sTolerancePositive
-        : Rational.zero
-          < quarterε
-                * Rational.reciprocal_function(tRoof)
-        since Rational.multiply_positive_positive;
-    -- Tail indices: s within one unit of its limit (for the roof), and
-    -- each sequence within its tolerance.
-    claim sCloseAt : ∀ (tolerance : Rational). Rational.zero < tolerance →
-            ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
-              abs(s(m) - sLimit) < (tolerance : Real)
-        since Real.SequenceConverges.at_rational;
-    claim tCloseAt : ∀ (tolerance : Rational). Rational.zero < tolerance →
-            ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
-              abs(t(m) - tLimit) < (tolerance : Real)
-        since Real.SequenceConverges.at_rational;
-    choose unitThreshold as sUnitClose
-        from sCloseAt(Rational.one, (Rational.zero < Rational.one));
-    choose tThreshold as tClose
-        from tCloseAt(
-                 quarterε
-                     * Rational.reciprocal_function(Rational.one + sRoof),
-                 tTolerancePositive);
-    choose sThreshold as sClose
-        from sCloseAt(
-                 quarterε
-                     * Rational.reciprocal_function(tRoof),
-                 sTolerancePositive);
+  (ε : Real)
+  (εPositive : ε > 0) ↦ {
+    -- A positive roof over each limit, one unit above its absolute value.
+    let sBound : Real := 1 + abs(sLimit);
+    let tBound : Real := 1 + abs(tLimit);
+    claim abs(sLimit) ≥ 0 since Real.absolute_value_nonneg;
+    claim abs(tLimit) ≥ 0 since Real.absolute_value_nonneg;
+    claim onePositive : (0 : Real) < 1 since Real.zero_less_one;
+    claim (0 : Real) ≤ 1 since Real.LessThan.weaken;
+    calc (0 : Real)
+       < 1                since Real.zero_less_one
+       = 1 + 0
+       ≤ 1 + abs(sLimit)  since Real.add_preserves_LessOrEqual_left;
+    calc (0 : Real)
+       < 1                since Real.zero_less_one
+       = 1 + 0
+       ≤ 1 + abs(tLimit)  since Real.add_preserves_LessOrEqual_left;
+    claim sBound ≠ 0 since Real.nonzero_of_positive;
+    claim tBound ≠ 0 since Real.nonzero_of_positive;
+    calc abs(tLimit)
+       = 0 + abs(tLimit)
+       ≤ 1 + abs(tLimit)   since Real.add_preserves_LessOrEqual;
+    -- Each piece gets a quarter of ε, divided by the opposite roof.
+    claim ε / 4 > 0 since Real.divide_positive;
+    claim tTolerancePositive : (ε / 4) / sBound > 0 since Real.divide_positive;
+    claim sTolerancePositive : (ε / 4) / tBound > 0 since Real.divide_positive;
+    -- Tails: s within one unit of its limit (to roof |s(m)|), and each
+    -- sequence within its tolerance.
+    choose unitThreshold as sUnitClose from sConverges((1 : Real), onePositive);
+    choose tThreshold as tClose from tConverges((ε / 4) / sBound, tTolerancePositive);
+    choose sThreshold as sClose from sConverges((ε / 4) / tBound, sTolerancePositive);
     witness Natural.maximum(unitThreshold, Natural.maximum(tThreshold, sThreshold)) with
         (m : Natural)
         (aboveAll : Natural.maximum(unitThreshold,
@@ -241,76 +212,32 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
               since Natural.le_through_max_right;
           claim tThreshold ≤ m since Natural.le_through_max_left;
           claim sThreshold ≤ m since Natural.le_through_max_right;
-          claim abs(s(m) - sLimit) < Rational.one
-              by sUnitClose(m, (unitThreshold ≤ m));
-          claim abs(s(m) - sLimit) ≤ (Rational.one : Real)
-              since Real.LessThan.weaken;
-          claim abs(t(m) - tLimit)
-                < ((quarterε
-                        * Rational.reciprocal_function(Rational.one + sRoof)) : Real)
-              by tClose(m, (tThreshold ≤ m));
-          claim abs(t(m) - tLimit)
-                ≤ ((quarterε
-                        * Rational.reciprocal_function(Rational.one + sRoof)) : Real)
-              since Real.LessThan.weaken;
-          claim abs(s(m) - sLimit)
-                < ((quarterε
-                        * Rational.reciprocal_function(tRoof)) : Real)
-              by sClose(m, (sThreshold ≤ m));
-          claim abs(s(m) - sLimit)
-                ≤ ((quarterε
-                        * Rational.reciprocal_function(tRoof)) : Real)
-              since Real.LessThan.weaken;
-          -- The roof over |s(m)|: one unit above the roof for |S|.
-          calc abs(s(m))
-             = abs((s(m) - sLimit) + sLimit)
-                   by substituting
-                       (ring : s(m) = (s(m) - sLimit) + sLimit)
-             ≤ abs(s(m) - sLimit) + abs(sLimit)
-             ≤ (Rational.one : Real) + abs(sLimit)
-                   since Real.add_preserves_LessOrEqual
-             ≤ (Rational.one : Real) + (sRoof : Real)
-                   since Real.add_preserves_LessOrEqual_left
-             = ((Rational.one + sRoof) : Real)
-                   since Rational.to_real.add_preserves;
-          -- Nonnegativity of the absolute values feeding the products.
           claim abs(s(m)) ≥ 0 since Real.absolute_value_nonneg;
-          claim abs(tLimit) ≥ 0 since Real.absolute_value_nonneg;
           claim abs(t(m) - tLimit) ≥ 0 since Real.absolute_value_nonneg;
           claim abs(s(m) - sLimit) ≥ 0 since Real.absolute_value_nonneg;
+          -- |s(m)| ≤ sBound, since s is within one unit of its limit.
+          claim abs(s(m) - sLimit) < 1 by sUnitClose(m, (unitThreshold ≤ m));
+          claim abs(s(m) - sLimit) ≤ 1 since Real.LessThan.weaken;
+          calc abs(s(m))
+             = abs((s(m) - sLimit) + sLimit)
+                   by substituting (ring : s(m) = (s(m) - sLimit) + sLimit)
+             ≤ abs(s(m) - sLimit) + abs(sLimit)   since Real.triangle_inequality
+             ≤ 1 + abs(sLimit)                    since Real.add_preserves_LessOrEqual;
+          -- Each tolerance is realised at m, then weakened to ≤.
+          claim abs(t(m) - tLimit) < (ε / 4) / sBound by tClose(m, (tThreshold ≤ m));
+          claim abs(t(m) - tLimit) ≤ (ε / 4) / sBound since Real.LessThan.weaken;
+          claim abs(s(m) - sLimit) < (ε / 4) / tBound by sClose(m, (sThreshold ≤ m));
+          claim abs(s(m) - sLimit) ≤ (ε / 4) / tBound since Real.LessThan.weaken;
           -- Each piece collapses to a quarter of ε.
           calc abs(s(m) * (t(m) - tLimit))
-             = abs(s(m)) * abs(t(m) - tLimit)
-                   since Real.absolute_value_multiplicative
-             ≤ ((Rational.one + sRoof) : Real)
-                   * ((quarterε
-                           * Rational.reciprocal_function(Rational.one + sRoof)) : Real)
-                   since Real.LessOrEqual.multiply_monotone_nonneg
-             = (((Rational.one + sRoof)
-                     * (quarterε
-                            * Rational.reciprocal_function(Rational.one + sRoof))) : Real)
-                   since Rational.to_real.multiply_preserves
-             = (quarterε : Real)
-                   since Rational.scale_reciprocal_collapse;
+             = abs(s(m)) * abs(t(m) - tLimit)   since Real.absolute_value_multiplicative
+             ≤ sBound * ((ε / 4) / sBound)      since Real.LessOrEqual.multiply_monotone_nonneg
+             = ε / 4;
           calc abs(tLimit * (s(m) - sLimit))
-             = abs(tLimit) * abs(s(m) - sLimit)
-                   since Real.absolute_value_multiplicative
-             ≤ (tRoof : Real)
-                   * ((quarterε
-                           * Rational.reciprocal_function(tRoof)) : Real)
-                   since Real.LessOrEqual.multiply_monotone_nonneg
-             = ((tRoof
-                     * (quarterε
-                            * Rational.reciprocal_function(tRoof))) : Real)
-                   since Rational.to_real.multiply_preserves
-             = (quarterε : Real)
-                   since Rational.scale_reciprocal_collapse;
+             = abs(tLimit) * abs(s(m) - sLimit)   since Real.absolute_value_multiplicative
+             ≤ tBound * ((ε / 4) / tBound)        since Real.LessOrEqual.multiply_monotone_nonneg
+             = ε / 4;
           -- Assemble: split, triangle, two quarters, half < whole.
-          claim halfε < ε
-              since Rational.halve_less_than_self;
-          claim halfBelowε
-              : halfε < (ε : Real)
-              since Rational.to_real.LessThan_preserves;
           calc abs(s(m) * t(m) - sLimit * tLimit)
              = abs(s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
                    by substituting
@@ -318,21 +245,14 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
                            = s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
              ≤ abs(s(m) * (t(m) - tLimit)) + abs(tLimit * (s(m) - sLimit))
                    since Real.triangle_inequality
-             ≤ (quarterε : Real)
-                   + abs(tLimit * (s(m) - sLimit))
+             ≤ ε / 4 + abs(tLimit * (s(m) - sLimit))
                    since Real.add_preserves_LessOrEqual
-             ≤ (quarterε : Real)
-                   + (quarterε : Real)
+             ≤ ε / 4 + ε / 4
                    since Real.add_preserves_LessOrEqual_left
-             = ((quarterε
-                     + quarterε) : Real)
-                   since Rational.to_real.add_preserves
-             = (halfε : Real)
-                   since Rational.halve_doubled
-             < (ε : Real)
-                   since halfBelowε
+             = ε / 2   by field
+             < ε       since Real.divide_two_less_than_self
         }
-  })
+  }
 
 -- ----------------------------------------------------------------------
 -- Monotone convergence. The range of the sequence, as a set.
@@ -359,12 +279,12 @@ theorem Real.subtract_positive_LessThan (x ε : Real)
         (εPositive : ε > 0)
         : x - ε < x := {
   calc -ε
-     = Real.zero + -ε
+     = 0 + -ε
      < ε + -ε     since Real.add_preserves_LessThan
-     = Real.zero;
+     = 0;
   calc x - ε
      = -ε + x
-     < Real.zero + x      since Real.add_preserves_LessThan
+     < 0 + x      since Real.add_preserves_LessThan
      = x
 }
 
@@ -412,7 +332,7 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
                     claim s(m) ≤ limit;
                     calc s(m) - limit
                        ≤ limit - limit     since Real.add_preserves_LessOrEqual
-                       = Real.zero
+                       = 0
                        < ε;
                     calc -ε
                        = (limit - ε) - limit
@@ -473,7 +393,7 @@ theorem Real.SequenceConverges.le_of_eventually_le
         (tailBelow : ∀ (m : Natural). N ≤ m → s(m) ≤ bound)
         : limit ≤ bound := {
   suppose bound < limit as above for contradiction {
-    calc Real.zero
+    calc 0
        = bound - bound
        < limit - bound       since Real.add_preserves_LessThan;
     let ε : Real := (limit - bound) / 2;
@@ -517,7 +437,7 @@ theorem Real.SequenceConverges.ge_of_eventually_ge
         (tailAbove : ∀ (m : Natural). N ≤ m → bound ≤ s(m))
         : bound ≤ limit := {
   suppose limit < bound as below for contradiction {
-    calc Real.zero
+    calc 0
        = limit - limit
        < bound - limit       since Real.add_preserves_LessThan;
     let ε : Real := (bound - limit) / 2;
