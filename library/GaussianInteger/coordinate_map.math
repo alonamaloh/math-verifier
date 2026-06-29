@@ -37,7 +37,7 @@ import GaussianInteger.defining_polynomial_vanishes
 --
 -- From p − p' = (x²+1)·cofactor we get p = p' + (x²+1)·cofactor, so by
 -- additivity coords(p) = coords(p') ⊕ coords((x²+1)·cofactor) = coords(p').
-theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
+theorem GaussianInteger.coords_descends_mod_x2_plus_1
         (p p' : Polynomial(Integer, Integer.zero))
         (congruent : Ring.CongruentModulo(Integer.polynomial_ring, GaussianInteger.definingPolynomial, p, p'))
         : GaussianInteger.coordinatesOfPolynomial(p)
@@ -61,7 +61,7 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
   -- coords of the (x²+1)-multiple vanish.
   claim modCoordinates
       : coords(GaussianInteger.definingPolynomial * cofactor) = Product.make(Integer.zero, Integer.zero)
-      since GaussianInteger.coordinatesOfPolynomial_definingPolynomial_multiply;
+      since GaussianInteger.coords_defining_polynomial_mul_zero;
   -- coords(p) = coords(p' + (x²+1)·cofactor) = coords(p') ⊕ (0,0) = coords(p').
   calc coords(p)
      = coords(p' + GaussianInteger.definingPolynomial * cofactor)
@@ -69,7 +69,7 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
      = Product.make(
            Product.first(coords(p')) + Product.first(coords(GaussianInteger.definingPolynomial * cofactor)),
            Product.second(coords(p')) + Product.second(coords(GaussianInteger.definingPolynomial * cofactor)))
-           since GaussianInteger.coordinatesOfPolynomial_add
+           since GaussianInteger.coords_add
      = Product.make(Product.first(coords(p')), Product.second(coords(p')))
            by {
              -- each coordinate gains 0 from the vanishing multiple
@@ -89,6 +89,16 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
 -- The coordinate map on ℤ[i]: (re, im) of a Gaussian integer.
 definition GaussianInteger.coordinates : GaussianInteger → Pair(Integer, Integer)
   by representatives p ↦ GaussianInteger.coordinatesOfPolynomial(p)
-  well_defined by GaussianInteger.coordinatesOfPolynomial_respects_congruence
+  well_defined by GaussianInteger.coords_descends_mod_x2_plus_1
 
 overload coords := GaussianInteger.coordinates
+
+-- The named projections: real and imaginary parts of a Gaussian integer.
+definition GaussianInteger.realPart (p : GaussianInteger) : Integer :=
+  Product.first(GaussianInteger.coordinates(p))
+
+definition GaussianInteger.imaginaryPart (p : GaussianInteger) : Integer :=
+  Product.second(GaussianInteger.coordinates(p))
+
+overload re := GaussianInteger.realPart
+overload im := GaussianInteger.imaginaryPart

@@ -64,7 +64,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
         claim cIsZero : c = Integer.zero by allZero(0);
         claim restCoordinates : coords(rest) = Product.make(Integer.zero, Integer.zero)
             since IH((i : Natural) ↦ allZero(successor(i)));
-        -- coords(c :: rest) = (c − im(rest), re(rest)) = (0, 0).
+        -- coords(c :: rest) = (c − Product.second(coords(rest)), Product.first(coords(rest))) = (0, 0).
         calc c - Product.second(coords(rest))
            = c - Product.second(Product.make(Integer.zero, Integer.zero))
                  since restCoordinates
@@ -81,7 +81,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
 -- lists with the same coefficient at every index have equal coordinates.
 -- Each branch returns an explicit term checked against the goal by
 -- definitional unfolding of `coordinatesOfCoefficients` on a `cons`/`nil`.
-theorem GaussianInteger.coordinatesOfCoefficients_respects
+theorem GaussianInteger.coords_extensional
         (a : Polynomial.Coefficients(Integer))
         : ∀ (b : Polynomial.Coefficients(Integer)).
           Polynomial.ExtensionallyEqual(Integer, Integer.zero, a, b)
@@ -116,7 +116,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_respects
               claim headsEqual : c = d by extensionallyEqual(0);
               claim tailCoordinates : coords(rest) = coords(restB)
                   since IH(restB, (i : Natural) ↦ extensionallyEqual(successor(i)));
-              -- coords(c :: rest) = (c − im(rest), re(rest)), likewise for d :: restB.
+              -- coords(c :: rest) = (c − Product.second(coords(rest)), Product.first(coords(rest))), likewise for d :: restB.
               calc c - Product.second(coords(rest))
                  = d - Product.second(coords(rest))   by headsEqual
                  = d - Product.second(coords(restB))  by tailCoordinates;
@@ -139,7 +139,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_respects
 definition GaussianInteger.coordinatesOfPolynomial
         : Polynomial(Integer, Integer.zero) → Pair(Integer, Integer)
   by representatives a ↦ GaussianInteger.coordinatesOfCoefficients(a)
-  well_defined by GaussianInteger.coordinatesOfCoefficients_respects
+  well_defined by GaussianInteger.coords_extensional
 
 -- `coords` also abbreviates the polynomial-level coordinate map.
 overload coords := GaussianInteger.coordinatesOfPolynomial
