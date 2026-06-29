@@ -26,21 +26,25 @@ definition Cantor.diagonal (X : Type(0)) (f : X → Set(X)) : Set(X) :=
 -- No surjection X → Set(X) exists.
 theorem Cantor.no_surjection_onto_powerset (X : Type(0))
         (f : X → Set(X))
-        : Not(Function.IsSurjective(X, Set(X), f)) :=
-  (surjective : Function.IsSurjective(X, Set(X), f)) ↦ {
-    -- By surjectivity some d maps onto the diagonal.
-    obtain ⟨d, imageIsDiagonal⟩ from surjective(Cantor.diagonal(X, f));
-    -- "d ∈ diagonal" is by definition "d ∉ f(d)", and f(d) = diagonal lets
-    -- membership move between the two sets. So "d ∈ f(d)" is equivalent to
-    -- its own negation — absurd.
-    Not.self_negation_absurd(d ∈ f(d),
-        (inImage : d ∈ f(d)) ↦
-            Set.transport_member(d, f(d), Cantor.diagonal(X, f),
-                imageIsDiagonal, inImage),
-        (notInImage : Not(d ∈ f(d))) ↦
-            Set.transport_member(d, Cantor.diagonal(X, f), f(d),
-                Equality.symmetry(imageIsDiagonal), notInImage))
-  }
+        : Not(Function.IsSurjective(X, Set(X), f)) := {
+  suppose Function.IsSurjective(X, Set(X), f) as surjective;
+  choose d such that f(d) = Cantor.diagonal(X, f) as imageIsDiagonal
+       from surjective(Cantor.diagonal(X, f));
+
+  -- Because f(d) is the diagonal, membership in f(d) is the same as
+  -- membership in { x | x ∉ f(x) } — so "d ∈ f(d)" and "d ∉ f(d)" each
+  -- entail the other, and d ∈ f(d) is equivalent to its own negation.
+  claim d ∈ f(d) → d ∈ Cantor.diagonal(X, f) by {
+    suppose d ∈ f(d) as selfMember;
+    Set.transport_member(d, f(d), Cantor.diagonal(X, f), imageIsDiagonal, selfMember)
+  };
+  claim d ∈ Cantor.diagonal(X, f) → d ∈ f(d) by {
+    suppose d ∈ Cantor.diagonal(X, f) as selfNonmember;
+    claim diagonalIsImage : Cantor.diagonal(X, f) = f(d) by imageIsDiagonal;
+    Set.transport_member(d, Cantor.diagonal(X, f), f(d), diagonalIsImage, selfNonmember)
+  };
+  done by Not.self_negation_absurd
+}
 
 -- ----------------------------------------------------------------------
 -- The other half of "Set(X) is strictly bigger than X": X does embed
@@ -55,9 +59,11 @@ definition Set.singleton (X : Type(0)) (x : X) : Set(X) :=
 -- x ↦ {x} is injective: if {x} = {y} then, since x ∈ {x}, also x ∈ {y},
 -- i.e. x = y.
 theorem Set.singleton_is_injective (X : Type(0))
-        : Function.IsInjective(X, Set(X), Set.singleton(X)) :=
-  (x y : X) (singletonsEqual : Set.singleton(X, x) = Set.singleton(X, y)) ↦
-    -- Move "x is a member" along {x} = {y}: x ∈ {x} holds (x = x), so
-    -- x ∈ {y}, which is x = y.
-    Set.transport_member(x, Set.singleton(X, x), Set.singleton(X, y),
-        singletonsEqual, reflexivity(X, x))
+        : Function.IsInjective(X, Set(X), Set.singleton(X)) := {
+  take x : X;
+  take y : X;
+  suppose Set.singleton(X, x) = Set.singleton(X, y) as singletonsEqual;
+  claim x ∈ Set.singleton(X, x);
+  claim x ∈ Set.singleton(X, y) by Set.transport_member;
+  done
+}
