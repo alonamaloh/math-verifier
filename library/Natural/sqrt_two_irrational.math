@@ -33,12 +33,10 @@ import Natural.strong_recursion
 -- number-theoretic fact the descent rests on.
 
 theorem Natural.two_divides_root (m : Natural) (squareEven : 2 ∣ (m * m)) : 2 ∣ m := {
-  -- 2 is prime, so dividing the product m·m forces it to divide a factor.
-  claim eitherFactor : (2 ∣ m) ∨ (2 ∣ m) by Natural.prime_divides_product;
-  cases eitherFactor {
-    | Or.introduceLeft(fromFactor)  => fromFactor
-    | Or.introduceRight(fromFactor) => fromFactor
-  }
+  -- 2 is prime, so dividing the product m·m forces it to divide a factor —
+  -- and here both factors are m.
+  claim (2 ∣ m) ∨ (2 ∣ m) by Natural.prime_divides_product;
+  done by Or.self
 }
 
 -- ----------------------------------------------------------------------
@@ -56,28 +54,28 @@ theorem Natural.no_double_square (m : Natural)
     -- 2 divides subject², hence — 2 being prime — divides subject itself.
     claim 2 ∣ (subject * subject);
     claim twoDividesSubject : 2 ∣ subject;
-    obtain ⟨k, subjectEquation⟩ from twoDividesSubject;
+    choose k such that subject = 2 * k as subjectEquation from twoDividesSubject;
 
     -- k ≥ 1, since otherwise subject = 2·0 = 0 would contradict subject ≥ 1.
     let kPositive : 1 ≤ k := {
-        claim k ≠ 0
-            by (kIsZero : k = 0) ↦
-                 absurd(calc (1 : Natural)
-                           ≤ subject   by subjectPositive
-                           = 2 * k     by subjectEquation
-                           = 2 * 0     by substituting kIsZero
-                           = 0         by ring);
+        claim k ≠ 0 by {
+            suppose k = 0 as kIsZero;
+            absurd(calc (1 : Natural)
+                      ≤ subject   by subjectPositive
+                      = 2 * k
+                      = 2 * 0
+                      = 0)
+          };
         done by Natural.one_le_of_nonzero
       };
 
     -- Substituting subject = 2·k and cancelling the leading 2 leaves
     -- n² = 2·k² — a strictly smaller instance of the same equation.
     claim 1 ≤ 2;
-    claim 2 * (2 * (k * k)) = 2 * (n * n)
-        by calc 2 * (2 * (k * k))
-              = (2 * k) * (2 * k)
-              = subject * subject
-              = 2 * (n * n);
+    calc 2 * (2 * (k * k))
+       = (2 * k) * (2 * k)
+       = subject * subject
+       = 2 * (n * n);
     claim 2 * (k * k) = n * n;
     claim descendedEquation : n * n = 2 * (k * k);
 
@@ -85,17 +83,16 @@ theorem Natural.no_double_square (m : Natural)
     -- gives subject² ≤ n² < 2·n² = subject², which is absurd.)
     cases Natural.compare_strict(n, subject) {
       | Natural.StrictComparison.below(nBelowSubject) => {
-          claim n < subject by Natural.lt_of_successor_le;
+          claim n < subject;
           inductionHypothesis(n, (n < subject), k, nPositive, kPositive, descendedEquation)
         }
       | Natural.StrictComparison.atLeast(subjectAtMostN) => {
           claim subject * subject ≤ subject * n;
           claim n * subject ≤ n * n;
-          claim subject * subject ≤ n * n
-              by calc subject * subject
-                    ≤ subject * n
-                    = n * subject
-                    ≤ n * n;
+          calc subject * subject
+             ≤ subject * n
+             = n * subject
+             ≤ n * n;
           claim 1 ≤ n * n;
           claim successor(n * n) ≤ 2 * (n * n) by Natural.successor_less_or_equal_multiply;
           claim 2 * (n * n) ≤ n * n by substituting equation;
@@ -111,6 +108,10 @@ theorem Natural.no_double_square (m : Natural)
 theorem Natural.sqrt_two_irrational
         : ¬ ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n) := {
   suppose ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n) as solutionExists;
-  obtain ⟨m, n, mPositive, nPositive, equation⟩ from solutionExists;
+  choose m from solutionExists;
+  choose n such that 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n);
+  claim 1 ≤ m;
+  claim 1 ≤ n;
+  claim m * m = 2 * (n * n);
   done
 }

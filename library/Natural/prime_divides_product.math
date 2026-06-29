@@ -48,58 +48,24 @@ import Integer.sign
 theorem Natural.divides_one_implies_equals_one
         (d : Natural) (dividesOne : d ∣ 1)
         : d = 1 := {
-  let ⟨q, oneEqDTimesQ⟩ := dividesOne;
-  -- oneEqDTimesQ : 1 = d * q.
-  cases d with dEq {
-     | zero => {
-         -- d = 0, so 1 = d·q = 0·q = 0; contradiction.
-         absurd(
-             calc successor(0)
-                = d * q
-                = 0 * q
-                = 0)
-       }
-     | successor(predD) => {
-         claim successor(0) = successor(predD) * q
-             by substituting dEq;
-         -- successor(predD) * q reduces to q + predD * q.
-         -- 1 = q + predD * q. Case-split q to derive `successor predD = 1`,
-         -- then transport back to `d = 1` via `Equality.symmetry(dEq)`.
-         let successorPredDEqualsOne : successor(predD) = 1 :=
-           cases q with qEq {
-              | zero => {
-                  -- q = 0, so 1 = (predD+1)·q = (predD+1)·0 = 0, contradiction.
-                  absurd(
-                      calc successor(0)
-                         = successor(predD) * q
-                         = successor(predD) * 0
-                         = 0)
-                }
-              | successor(predQ) => unfold Natural.add in {
-                  claim successor(0)
-                          = successor(predD) * successor(predQ)
-                      by substituting qEq;
-                  -- successor(predD) * successor(predQ) reduces to
-                  --   successor(predQ) + predD * successor(predQ).
-                  -- That successor expands to
-                  --   successor(predQ + predD * successor(predQ)).
-                  -- 1 = successor(0), so predQ + predD * successor(predQ) = 0.
-                  -- Hence predD * successor(predQ) = 0 (right zero),
-                  -- and since successor(predQ) ≥ 1, predD = 0.
-                  -- So d = successor(0) = 1.
-                  claim predQ + predD * successor(predQ) = 0
-                    by Natural.successor_injective;
-                  claim productZero : predD * successor(predQ) = 0
-                    since Natural.add_eq_zero_right_zero;
-                  claim predD * (predQ + 1) = 0 by productZero;
-                  claim predDZero : predD = 0
-                    since Natural.multiply_add_one_eq_zero_left_zero;
-                  done by substituting predDZero
-                }
-           };
-         successorPredDEqualsOne
-       }
-   }
+  -- A divisor of 1 is bounded by 1, and a zero divisor would force 1 = 0;
+  -- so d = 1.
+  claim (1 : Natural) = 0 ∨ d ≤ 1;
+  claim by cases {
+    in ((1 : Natural) = 0) as oneEqualsZero: absurd(oneEqualsZero)
+    in (d ≤ 1) as dAtMostOne:
+        cases d refining dAtMostOne, dividesOne {
+          | zero => {
+              choose quotient such that (1 : Natural) = 0 * quotient from dividesOne;
+              absurd(calc (1 : Natural) = 0 * quotient = 0)
+            }
+          | successor(dPredecessor) => {
+              claim dPredecessor ≤ 0;
+              claim dPredecessor = 0;
+              done
+            }
+        }
+  }
 }
 
 -- ----------------------------------------------------------------------
@@ -115,20 +81,26 @@ theorem Natural.bezout_one_when_prime_coprime
         : ∃ (x : Integer). ∃ (y : Integer).
             (p : Integer) * x + (a : Integer) * y = (1 : Integer) := {
     claim bezoutWitness : Natural.has_bezout(p, a) by Natural.bezout;
-    obtain ⟨g, x, y, bezoutEquation, isgcd⟩ from bezoutWitness;
-    let ⟨gDividesP, gDividesA, _⟩ := isgcd;
-    let ⟨_, divisorClassification⟩ := primality;
-    claim (g = 1) ∨ (g = p)
-        by divisorClassification(g, gDividesP)
+    choose g from bezoutWitness;
+    choose x such that
+        ∃ (secondCoefficient : Integer).
+            (p : Integer) * x + (a : Integer) * secondCoefficient = (g : Integer)
+            ∧ Natural.is_gcd(g, p, a);
+    choose y such that
+        (p : Integer) * x + (a : Integer) * y = (g : Integer)
+        ∧ Natural.is_gcd(g, p, a);
+    claim g ∣ p;
+    claim g = 1 ∨ g = p;
     claim by cases {
       in (g = 1) as gEqOne:
-          ⟨x, y,
-           calc (p : Integer) * x + (a : Integer) * y
-              = (g : Integer)
-              = ((1 : Natural) : Integer)⟩
+          witness x with witness y with
+              calc (p : Integer) * x + (a : Integer) * y
+                 = (g : Integer)
+                 = ((1 : Natural) : Integer)
       in (g = p) as gEqP: {
-          claim pDividesA : Natural.divides(p, a) by substituting gEqP;
-          absurd(notDividesA(pDividesA))
+          claim Natural.divides(p, a) by substituting gEqP;
+          claim False;
+          done
         }
     }
 }
@@ -149,9 +121,9 @@ theorem Natural.natural_eq_negate_natural_implies_first_zero
     -- `(b : Integer) = -(m : Integer)` is `from_difference(b, 0) =
     -- from_difference(0, m)`; the boundary reads it back as `b + m = 0 + 0`.
     calc b + m
-       = 0 + 0     by Integer.difference_equal_implies(b, 0, 0, m, equality)
-       = 0         by Natural.add_zero;
-    done by Natural.add_eq_zero_left_zero
+       = 0 + 0
+       = 0;
+    done
 }
 
 -- ----------------------------------------------------------------------
@@ -168,10 +140,11 @@ theorem Natural.prime_divides_product_when_coprime
         (notDividesA : ¬ Natural.divides(p, a))
         (productDivides : p ∣ a * b)
         : p ∣ b := {
-    obtain ⟨x, y, bezoutEquation⟩
-        by Natural.bezout_one_when_prime_coprime;
-    obtain ⟨productQuotient, productEquation⟩ from productDivides;
-    -- productEquation : a * b = p * productQuotient.
+    choose x such that
+        ∃ (y : Integer). (p : Integer) * x + (a : Integer) * y = (1 : Integer)
+        from Natural.bezout_one_when_prime_coprime;
+    choose y such that (p : Integer) * x + (a : Integer) * y = (1 : Integer);
+    choose productQuotient such that a * b = p * productQuotient from productDivides;
 
     -- Step 1: multiply the Bezout combination by (b : Integer).
     -- (p*x + a*y) * b = 1 * b = b, distributed gives p*x*b + a*y*b = b.
@@ -210,8 +183,9 @@ theorem Natural.prime_divides_product_when_coprime
     claim by cases {
       in (Integer.IsNonneg(
               x * (b : Integer) + (productQuotient : Integer) * y)) as zIsNonneg: {
-        obtain ⟨coefficient, zEqCoefficient⟩ from zIsNonneg;
-        -- zEqCoefficient : x*b + k*y = (coefficient : Integer).
+        choose coefficient such that
+            x * (b : Integer) + (productQuotient : Integer) * y = (coefficient : Integer)
+            from zIsNonneg;
         -- (b : Int) = (p : Int) * (coefficient : Int) = (p*coefficient : Int).
         -- Inject to Natural: b = p * coefficient.
         calc (b : Integer)
@@ -222,13 +196,14 @@ theorem Natural.prime_divides_product_when_coprime
            = (p * coefficient : Integer);
         claim bEqualsProduct : b = p * coefficient
             by Natural.to_integer.injective;
-        ⟨coefficient, bEqualsProduct⟩
+        witness coefficient with bEqualsProduct
       }
       in (∃ (negativePart : Natural).
               x * (b : Integer) + (productQuotient : Integer) * y
                 = -(negativePart : Integer)) as zIsNegated: {
-        obtain ⟨negativePart, zEqNegated⟩ from zIsNegated;
-        -- zEqNegated : x*b + k*y = -(negativePart : Integer).
+        choose negativePart such that
+            x * (b : Integer) + (productQuotient : Integer) * y = -(negativePart : Integer)
+            from zIsNegated;
         -- (b : Int) = (p : Int) * -(negativePart : Int) = -((p * negativePart) : Int).
         calc (b : Integer)
            = (p : Integer)
@@ -260,7 +235,7 @@ theorem Natural.prime_divides_product
     in (p ∣ a) as pDividesA:
         done
     in (p ∤ a) as notDividesA: {
-        claim p ∣ b by Natural.prime_divides_product_when_coprime;
+        claim p ∣ b;
         done
       }
   }
