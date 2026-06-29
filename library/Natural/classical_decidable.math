@@ -1,0 +1,124 @@
+module Natural.classical_decidable
+
+-- Demotes `Logic.classical_decidable` from an axiom to a THEOREM: classical
+-- (Type-level) decidability is derivable from excluded middle + the
+-- definite-description axiom `Logic.the`, so it need not be assumed.
+--
+-- The naive route — `cases excluded_middle(P)` into a `Decidable(P)` value —
+-- is blocked by CIC's no-large-elimination-from-Prop rule (`P ∨ ¬P` is a
+-- Proposition). The standard workaround: encode the decision as an indicator
+-- n ∈ {0,1} with `Q(n) := (n = 1 ∧ P) ∨ (n = 0 ∧ ¬P)`, which has a UNIQUE
+-- solution under EM; `Logic.the` extracts that n as an honest Natural, and the
+-- Type-level decision is then a structural match on n (allowed) rather than a
+-- forbidden elimination of the Prop disjunction.
+--
+-- Lives in the Natural layer (not Logic/) because the construction needs
+-- `Natural`; the declared name stays `Logic.classical_decidable` since the
+-- `decide` tactic desugars to `cases Logic.classical_decidable(P)`.
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+-- Read the classical decision off the indicator n (1 ⇒ P, 0 ⇒ ¬P) and its
+-- evidence. Currying n before the evidence makes the evidence's type refine to
+-- the branch's n automatically.
+definition Logic.decidable_from_indicator (P : Proposition)
+        : ∀ (n : Natural).
+            ((n = 1 ∧ P) ∨ (n = 0 ∧ Not(P))) → Logic.Decidable(P)
+  | zero => (evidence : ((0 : Natural) = 1 ∧ P) ∨ ((0 : Natural) = 0 ∧ Not(P))) ↦ {
+        claim notP : Not(P) by cases {
+          in ((0 : Natural) = 1 ∧ P) as leftCase: {
+              claim (0 : Natural) = 1;
+              claim (0 : Natural) ≠ 1 since Natural.zero_not_successor;
+              claim False;
+              done
+          }
+          in ((0 : Natural) = 0 ∧ Not(P)) as rightCase: { done }
+        };
+        Logic.Decidable.no(notP)
+    }
+  | successor(predecessor) =>
+      (evidence : (successor(predecessor) = 1 ∧ P)
+                 ∨ (successor(predecessor) = 0 ∧ Not(P))) ↦ {
+        claim p : P by cases {
+          in (successor(predecessor) = 1 ∧ P) as leftCase: { done }
+          in (successor(predecessor) = 0 ∧ Not(P)) as rightCase: {
+              claim successor(predecessor) = 0;
+              claim successor(predecessor) ≠ 0 since Natural.successor_not_zero;
+              claim False;
+              done
+          }
+        };
+        Logic.Decidable.yes(p)
+    }
+
+-- The full demotion: classical decidability from excluded middle + the
+-- definite-description axiom. `the` launders the classical choice of the
+-- indicator into an honest Natural; the helper reads the decision off it.
+theorem Logic.classical_decidable (P : Proposition) : Logic.Decidable(P) := {
+  claim existence : ∃ (n : Natural). (n = 1 ∧ P) ∨ (n = 0 ∧ Not(P))
+      by cases {
+        in (P) as holds: witness 1 with { claim (1 : Natural) = 1 ∧ P; done }
+        in (Not(P)) as notHolds: witness 0 with { claim (0 : Natural) = 0 ∧ Not(P); done }
+      };
+  claim uniqueness
+      : ∀ (a b : Natural).
+          ((a = 1 ∧ P) ∨ (a = 0 ∧ Not(P)))
+          → ((b = 1 ∧ P) ∨ (b = 0 ∧ Not(P)))
+          → a = b
+      by {
+           take a : Natural;
+           take b : Natural;
+           suppose (a = 1 ∧ P) ∨ (a = 0 ∧ Not(P)) as qa;
+           suppose (b = 1 ∧ P) ∨ (b = 0 ∧ Not(P)) as qb;
+           claim a = b by cases {
+             in (a = 1 ∧ P) as aOne: {
+                 claim a = b by cases {
+                   in (b = 1 ∧ P) as bOne: {
+                       claim a = 1;
+                       claim b = 1;
+                       done
+                   }
+                   in (b = 0 ∧ Not(P)) as bZero: {
+                       claim P;
+                       claim Not(P);
+                       claim False;
+                       done
+                   }
+                 };
+                 done
+             }
+             in (a = 0 ∧ Not(P)) as aZero: {
+                 claim a = b by cases {
+                   in (b = 1 ∧ P) as bOne: {
+                       claim P;
+                       claim Not(P);
+                       claim False;
+                       done
+                   }
+                   in (b = 0 ∧ Not(P)) as bZero: {
+                       claim a = 0;
+                       claim b = 0;
+                       done
+                   }
+                 };
+                 done
+             }
+           };
+           done
+         };
+  let indicator : Natural :=
+      Logic.the(Natural,
+          (n : Natural) ↦ (n = 1 ∧ P) ∨ (n = 0 ∧ Not(P)),
+          existence, uniqueness);
+  claim indicatorEvidence
+        : (indicator = 1 ∧ P) ∨ (indicator = 0 ∧ Not(P))
+      by Logic.the_satisfies(Natural,
+          (n : Natural) ↦ (n = 1 ∧ P) ∨ (n = 0 ∧ Not(P)),
+          existence, uniqueness);
+  Logic.decidable_from_indicator(P, indicator, indicatorEvidence)
+}
