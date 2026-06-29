@@ -91,28 +91,8 @@ theorem Real.partialProduct_split (s : Natural → Real) (n k : Natural)
         : Real.partialProduct(s, k + n)
           = Real.partialProduct(s, n)
             * Real.partialProduct((j : Natural) ↦ s(n + j), k) :=
-  by_induction on k with IH {
-    case zero:
-        calc Real.partialProduct(s, 0 + n)
-           = Real.partialProduct(s, n)
-           = Real.partialProduct(s, n) * Real.one
-           = Real.partialProduct(s, n)
-             * Real.partialProduct((j : Natural) ↦ s(n + j), 0)
-    case successor(predecessor):
-        calc Real.partialProduct(s, successor(predecessor) + n)
-           = Real.partialProduct(s, predecessor + n) * s(predecessor + n)
-           = (Real.partialProduct(s, n)
-              * Real.partialProduct((j : Natural) ↦ s(n + j), predecessor))
-             * s(predecessor + n)
-                 since IH
-           = (Real.partialProduct(s, n)
-              * Real.partialProduct((j : Natural) ↦ s(n + j), predecessor))
-             * s(n + predecessor)
-                 by (predecessor + n = n + predecessor)
-           = Real.partialProduct(s, n)
-             * Real.partialProduct(
-                   (j : Natural) ↦ s(n + j), successor(predecessor))
-  }
+  Algebra.indexedAggregate_split(associativity := Real.multiply_associative,
+      identityRight := Real.multiply_one)
 
 -- A constant factor exits as its n-th power.
 theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural)
@@ -147,14 +127,4 @@ theorem Real.partialProduct_pointwise
         (pointwiseEqual : ∀ (k : Natural). s(k) = sequencePrime(k))
         (n : Natural)
         : Real.partialProduct(s, n) = Real.partialProduct(sequencePrime, n) :=
-  by_induction on n with IH {
-    case zero: done
-    case successor(predecessor):
-        calc Real.partialProduct(s, successor(predecessor))
-           = Real.partialProduct(s, predecessor) * s(predecessor)
-           = Real.partialProduct(sequencePrime, predecessor) * s(predecessor)
-                 since IH
-           = Real.partialProduct(sequencePrime, predecessor)
-             * sequencePrime(predecessor)
-                 by pointwiseEqual(predecessor)
-  }
+  Algebra.indexedAggregate_pointwise(pointwiseEqual := pointwiseEqual)

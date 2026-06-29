@@ -253,18 +253,7 @@ theorem Real.partialSum_pointwise
         (pointwiseEqual : ∀ (k : Natural). s(k) = sequencePrime(k))
         (n : Natural)
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
-  by_induction on n with IH {
-    case base: done
-    case step(predecessor):
-        calc Real.partialSum(s, 1 + predecessor)
-           = Real.partialSum(s, predecessor) + s(predecessor)
-           = Real.partialSum(sequencePrime, predecessor) + s(predecessor)
-                 since IH
-           = Real.partialSum(sequencePrime, predecessor)
-             + sequencePrime(predecessor)
-                 by pointwiseEqual(predecessor)
-           = Real.partialSum(sequencePrime, 1 + predecessor)
-  }
+  Algebra.indexedAggregate_pointwise(pointwiseEqual := pointwiseEqual)
 
 -- The bounded variant: agreement below the cut is enough (the terms at
 -- or above n are never read). What the unbounded version cannot give
@@ -274,28 +263,7 @@ theorem Real.partialSum_pointwise_below
         (s sequencePrime : Natural → Real) (n : Natural)
         (pointwiseEqual : ∀ (k : Natural). k < n → s(k) = sequencePrime(k))
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
-  by_induction on n with IH refining pointwiseEqual {
-    case base: done
-    case step(predecessor): {
-        claim predecessorBelow : predecessor < 1 + predecessor since Natural.lt_one_plus;
-        claim tailEqual
-            : Real.partialSum(s, predecessor)
-              = Real.partialSum(sequencePrime, predecessor)
-            by IH((k : Natural) (kBelow : k < predecessor) ↦ {
-                 claim kBelowStep : k < 1 + predecessor since Natural.lt_transitive;
-                 done by pointwiseEqual(k, kBelowStep)
-               });
-        claim headEqual : s(predecessor) = sequencePrime(predecessor)
-            since pointwiseEqual(predecessor, predecessorBelow);
-        calc Real.partialSum(s, 1 + predecessor)
-           = Real.partialSum(s, predecessor) + s(predecessor)
-           = Real.partialSum(sequencePrime, predecessor) + s(predecessor)
-                 since tailEqual
-           = Real.partialSum(sequencePrime, predecessor) + sequencePrime(predecessor)
-                 since headEqual
-           = Real.partialSum(sequencePrime, 1 + predecessor)
-      }
-  }
+  Algebra.indexedAggregate_pointwise_below(pointwiseEqual := pointwiseEqual)
 
 -- A telescoping sum collapses to its boundary terms.
 theorem Real.telescoping_partialSum
@@ -326,32 +294,8 @@ theorem Real.partialSum_split (s : Natural → Real) (n k : Natural)
         : Real.partialSum(s, k + n)
           = Real.partialSum(s, n)
             + Real.partialSum((j : Natural) ↦ s(n + j), k) :=
-  by_induction on k with IH {
-    case base:
-        calc Real.partialSum(s, 0 + n)
-           = Real.partialSum(s, n)
-           = Real.partialSum(s, n) + Real.zero
-           = Real.partialSum(s, n)
-             + Real.partialSum((j : Natural) ↦ s(n + j), 0)
-    case step(predecessor):
-        calc Real.partialSum(s, (1 + predecessor) + n)
-           = Real.partialSum(s, 1 + (predecessor + n))
-           = Real.partialSum(s, predecessor + n) + s(predecessor + n)
-           = (Real.partialSum(s, n)
-              + Real.partialSum((j : Natural) ↦ s(n + j), predecessor))
-             + s(predecessor + n)
-                 since IH
-           = (Real.partialSum(s, n)
-              + Real.partialSum((j : Natural) ↦ s(n + j), predecessor))
-             + s(n + predecessor)
-                 by (predecessor + n = n + predecessor)
-           = Real.partialSum(s, n)
-             + (Real.partialSum((j : Natural) ↦ s(n + j), predecessor)
-                + s(n + predecessor))
-           = Real.partialSum(s, n)
-             + Real.partialSum((j : Natural) ↦ s(n + j), 1 + predecessor)
-                 by substituting Real.partialSum_add_one
-  }
+  Algebra.indexedAggregate_split(associativity := Real.add_associative,
+      identityRight := Real.add_zero)
 
 -- Termwise comparison below the cut compares the partial sums.
 theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
@@ -457,45 +401,15 @@ theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
 theorem Real.partialSum_add (s t : Natural → Real) (n : Natural)
         : Real.partialSum((k : Natural) ↦ s(k) + t(k), n)
           = Real.partialSum(s, n) + Real.partialSum(t, n) :=
-  by_induction on n with IH {
-    case base:
-        calc Real.partialSum((k : Natural) ↦ s(k) + t(k), 0)
-           = Real.zero
-           = Real.zero + Real.zero
-    case step(predecessor):
-        calc Real.partialSum((k : Natural) ↦ s(k) + t(k), 1 + predecessor)
-           = Real.partialSum((k : Natural) ↦ s(k) + t(k), predecessor)
-             + (s(predecessor) + t(predecessor))
-                 by Real.partialSum_add_one
-           = (Real.partialSum(s, predecessor) + Real.partialSum(t, predecessor))
-             + (s(predecessor) + t(predecessor))
-                 since IH
-           = (Real.partialSum(s, predecessor) + s(predecessor))
-             + (Real.partialSum(t, predecessor) + t(predecessor))
-                 by ring
-           = Real.partialSum(s, 1 + predecessor) + Real.partialSum(t, 1 + predecessor)
-                 by substituting Real.partialSum_add_one
-  }
+  Algebra.indexedAggregate_add(associativity := Real.add_associative,
+      commutativity := Real.add_commutative, identityLeft := Real.zero_add)
 
 theorem Real.partialSum_scale (c : Real) (s : Natural → Real) (n : Natural)
         : Real.partialSum((k : Natural) ↦ c * s(k), n)
           = c * Real.partialSum(s, n) :=
-  by_induction on n with IH {
-    case base:
-        calc Real.partialSum((k : Natural) ↦ c * s(k), 0)
-           = Real.zero
-           = c * Real.zero
-    case step(predecessor):
-        calc Real.partialSum((k : Natural) ↦ c * s(k), 1 + predecessor)
-           = Real.partialSum((k : Natural) ↦ c * s(k), predecessor)
-             + c * s(predecessor)
-                 by Real.partialSum_add_one
-           = c * Real.partialSum(s, predecessor) + c * s(predecessor)
-                 since IH
-           = c * (Real.partialSum(s, predecessor) + s(predecessor))
-           = c * Real.partialSum(s, 1 + predecessor)
-                 by substituting Real.partialSum_add_one
-  }
+  Algebra.indexedAggregate_scale(
+      distributes := (x : Real) (y : Real) ↦ (ring : c * (x + y) = c * x + c * y),
+      scaleIdentity := (ring : c * Real.zero = Real.zero))
 
 -- Negating every term negates the sum.
 theorem Real.partialSum_negate (s : Natural → Real) (n : Natural)
@@ -609,29 +523,7 @@ theorem Real.partialSum_pointwise_bounded
         (termsEqual : ∀ (j : Natural). j < n
                       → s(j) = sequencePrime(j))
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
-  by_induction on n with IH refining termsEqual {
-    case base: done
-    case step(predecessor): {
-        claim predecessorBelow : predecessor < 1 + predecessor since Natural.lt_one_plus;
-        claim prefixEqual
-              : ∀ (j : Natural). j < predecessor
-                → s(j) = sequencePrime(j)
-            by (j : Natural) (jBelow : j < predecessor) ↦ {
-                 claim jBelowStep : j < 1 + predecessor since Natural.lt_transitive;
-                 done since termsEqual(j, jBelowStep)
-               };
-        claim topEqual : s(predecessor) = sequencePrime(predecessor)
-            since termsEqual(predecessor, predecessorBelow);
-        calc Real.partialSum(s, 1 + predecessor)
-           = Real.partialSum(s, predecessor) + s(predecessor)
-           = Real.partialSum(sequencePrime, predecessor) + s(predecessor)
-                 by IH(prefixEqual)
-           = Real.partialSum(sequencePrime, predecessor)
-             + sequencePrime(predecessor)
-                 since topEqual
-           = Real.partialSum(sequencePrime, 1 + predecessor)
-      }
-  }
+  Algebra.indexedAggregate_pointwise_below(pointwiseEqual := termsEqual)
 
 -- ----------------------------------------------------------------------
 -- The triangle inequality for partial sums: |Σ s(k)| ≤ Σ |s(k)|.

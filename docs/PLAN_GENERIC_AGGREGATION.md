@@ -16,6 +16,19 @@
   via `commutative_monoid_interchange`, `_scale`, `_constant` = monoid
   power). Library green; elaborator untouched. Order lemmas + telescoping
   (need an ordered field / inverses) deferred to Stage 2 in `Real/`.
+- **Stage 2** — done. `Real.partialSum` / `Real.partialProduct` are now
+  defined as the additive / multiplicative `indexedAggregate` instances
+  (defeq to the old recursions, so all ~12 consumers stay green untouched).
+  The algebraic lemmas (`_pointwise`, `_pointwise_below`,
+  `_pointwise_bounded`, `_split`, `_add`, `_scale`; product `_pointwise`,
+  `_split`) are thin wrappers citing the generic toolkit — passing Real's
+  monoid laws (`add_associative`, `add_zero`, …) by name and the `_scale`
+  distributivity/`c·0` obligations via `ring`. Stayed Real (order / group /
+  Rational-specific, no generic analogue yet): `_nonneg`,
+  `_monotone_of_nonneg`, `_le_pointwise`, `_zero_term`, `_window_bound`,
+  `abs_partialSum_le`, `telescoping`, `_negate`, `_subtract`,
+  `_scale_right`, `_constant_cast`, `partialProduct_nonneg`,
+  `partialProduct_scale`. Library green.
 
 ## Why
 
