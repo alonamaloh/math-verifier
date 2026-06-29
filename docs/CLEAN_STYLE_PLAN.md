@@ -33,6 +33,19 @@ Adding a file to the manifest is a one-line edit *after* it is cleaned; bump
 `CLEAN_LEAK_BUDGET` (and, if it carries intended connective-`⟨…⟩` residuals,
 `CLEAN_ANON_BUDGET`) only by the file's documented intended residuals.
 
+**The manifest is the highest-standard set, and it is the *only* such list.**
+A file joins it only after someone has **read the proof** and judged it reads
+like a textbook — passing the ratchets is the precondition, not the gate.
+Adding a line asserts the read happened. We deliberately keep *one* list rather
+than a separate "reviewed" file: the ratchets already give the manifest the
+automated regression guard a hand-maintained list can't, and a second list
+would only create a "scores clean but unread" gray zone (which is how
+`arithmetic_geometric_mean` — leak/anon-clean yet carrying an inlined-15× `cases
+k` piecewise term — slipped in). The re-read worklist is not a list either: it
+is the per-file successor-outside-`Natural/` advisory that `scripts/clean_status.py`
+prints (high count first). Some seed/score-only entries still owe their
+confirming read; that backlog is worked as part of the cleaning loop.
+
 **The two ratchets are necessary, not sufficient.** A leak count of 0 (plus 0
 anonymous tuples) is where the readability read *starts*, not proof a file is
 done — "leak-clean" ≠ "clean". Two things neither axis sees: a pattern-match
