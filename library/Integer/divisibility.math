@@ -44,7 +44,7 @@ definition Integer.divides (divisor dividend : Integer) : Proposition :=
 -- is a ring identity.
 theorem Integer.divides_zero (d : Integer)
         : Integer.divides(d, Integer.zero) :=
-  ⟨Integer.zero, (ring : Integer.zero = d * Integer.zero)⟩
+  witness Integer.zero with (ring : Integer.zero = d * Integer.zero)
 
 -- Divisibility is preserved by addition: if d | x and d | y, then
 -- d | (x + y). Witnesses combine additively; `x + y = d*(qx + qy)`
@@ -53,34 +53,34 @@ theorem Integer.divides_add (d x y : Integer)
         (dDividesX : Integer.divides(d, x))
         (dDividesY : Integer.divides(d, y))
         : Integer.divides(d, x + y) := {
-  obtain ⟨quotientX, xEquation⟩ from dDividesX;
-  obtain ⟨quotientY, yEquation⟩ from dDividesY;
-  ⟨quotientX + quotientY,
-   calc x + y
-      = d * quotientX + d * quotientY
-      = d * (quotientX + quotientY)⟩
+  choose quotientX such that x = d * quotientX as xEquation from dDividesX;
+  choose quotientY such that y = d * quotientY as yEquation from dDividesY;
+  witness quotientX + quotientY with
+      calc x + y
+         = d * quotientX + d * quotientY
+         = d * (quotientX + quotientY)
 }
 
 -- Divisibility is preserved by negation: if d | x then d | (−x).
 theorem Integer.divides_negate (d x : Integer)
         (dDividesX : Integer.divides(d, x))
         : Integer.divides(d, -x) := {
-  obtain ⟨quotientX, xEquation⟩ from dDividesX;
-  ⟨-quotientX,
-   calc -x
-      = -(d * quotientX)
-      = d * -quotientX⟩
+  choose quotientX such that x = d * quotientX as xEquation from dDividesX;
+  witness -quotientX with
+      calc -x
+         = -(d * quotientX)
+         = d * -quotientX
 }
 
 -- d | x implies d divides any multiple x * c. Witness is qx * c.
 theorem Integer.divides_multiply_right (d x c : Integer)
         (dDividesX : Integer.divides(d, x))
         : Integer.divides(d, x * c) := {
-  obtain ⟨quotientX, xEquation⟩ from dDividesX;
-  ⟨quotientX * c,
-   calc x * c
-      = (d * quotientX) * c
-      = d * (quotientX * c)⟩
+  choose quotientX such that x = d * quotientX as xEquation from dDividesX;
+  witness quotientX * c with
+      calc x * c
+         = (d * quotientX) * c
+         = d * (quotientX * c)
 }
 
 -- ----------------------------------------------------------------------
@@ -91,23 +91,22 @@ theorem Integer.divides_multiply_right (d x c : Integer)
 -- distance(n, 0) = n.
 theorem Integer.absolute_value_natural_of_natural (n : Natural)
         : Integer.absolute_value_natural((n : Integer)) = n :=
-  Natural.distance_zero_right(n)
+  done since Natural.distance_zero_right
 
 -- The natural-valued absolute value is multiplicative. Derived from
 -- the Integer-valued multiplicativity through the image bridge and
 -- injectivity of the Natural embedding.
 theorem Integer.absolute_value_natural_multiplicative (x y : Integer)
         : Integer.absolute_value_natural(x * y)
-          = Integer.absolute_value_natural(x) * Integer.absolute_value_natural(y) :=
-  Natural.to_integer.injective(
-      Integer.absolute_value_natural(x * y),
-      Integer.absolute_value_natural(x) * Integer.absolute_value_natural(y),
-      calc (Integer.absolute_value_natural(x * y) : Integer)
-         = abs(x * y)
-         = abs(x) * abs(y)
-         = (Integer.absolute_value_natural(x) : Integer)
-               * (Integer.absolute_value_natural(y) : Integer)
-         = (Integer.absolute_value_natural(x) * Integer.absolute_value_natural(y) : Integer))
+          = Integer.absolute_value_natural(x) * Integer.absolute_value_natural(y) := {
+  calc (Integer.absolute_value_natural(x * y) : Integer)
+     = abs(x * y)
+     = abs(x) * abs(y)
+     = (Integer.absolute_value_natural(x) : Integer)
+           * (Integer.absolute_value_natural(y) : Integer)
+     = (Integer.absolute_value_natural(x) * Integer.absolute_value_natural(y) : Integer);
+  done since Natural.to_integer.injective
+}
 
 -- Forward bridge: Natural divisibility embeds into Integer
 -- divisibility. The witness embeds and `multiply_preserves` lines up
@@ -115,11 +114,11 @@ theorem Integer.absolute_value_natural_multiplicative (x y : Integer)
 theorem Integer.divides_of_natural_divides (n m : Natural)
         (naturalDivides : Natural.divides(n, m))
         : Integer.divides((n : Integer), (m : Integer)) := {
-  obtain ⟨quotient, mEquation⟩ from naturalDivides;
-  ⟨(quotient : Integer),
-   calc (m : Integer)
-      = ((n * quotient : Natural) : Integer)
-      = (n : Integer) * (quotient : Integer)⟩
+  choose quotient such that m = n * quotient as mEquation from naturalDivides;
+  witness (quotient : Integer) with
+      calc (m : Integer)
+         = ((n * quotient : Natural) : Integer)
+         = (n : Integer) * (quotient : Integer)
 }
 
 -- Backward bridge: Integer divisibility between images of Naturals
@@ -129,14 +128,15 @@ theorem Integer.divides_of_natural_divides (n m : Natural)
 theorem Integer.natural_divides_of_integer_divides (n m : Natural)
         (integerDivides : Integer.divides((n : Integer), (m : Integer)))
         : Natural.divides(n, m) := {
-  obtain ⟨quotient, mEquation⟩ from integerDivides;
-  ⟨Integer.absolute_value_natural(quotient),
-   calc m
-      = Integer.absolute_value_natural((m : Integer))
-      = Integer.absolute_value_natural((n : Integer) * quotient)
-      = Integer.absolute_value_natural((n : Integer))
-            * Integer.absolute_value_natural(quotient)
-      = n * Integer.absolute_value_natural(quotient)⟩
+  choose quotient such that (m : Integer) = (n : Integer) * quotient as mEquation
+      from integerDivides;
+  witness Integer.absolute_value_natural(quotient) with
+      calc m
+         = Integer.absolute_value_natural((m : Integer))
+         = Integer.absolute_value_natural((n : Integer) * quotient)
+         = Integer.absolute_value_natural((n : Integer))
+               * Integer.absolute_value_natural(quotient)
+         = n * Integer.absolute_value_natural(quotient)
 }
 
 -- Transitivity: a ∣ b and b ∣ c give a ∣ c, with the product of the two
@@ -145,11 +145,11 @@ theorem Integer.divides_transitive (a b c : Integer)
         (aDividesB : Integer.divides(a, b))
         (bDividesC : Integer.divides(b, c))
         : Integer.divides(a, c) := {
-  obtain ⟨firstQuotient, bEquation⟩ from aDividesB;
-  obtain ⟨secondQuotient, cEquation⟩ from bDividesC;
+  choose firstQuotient such that b = a * firstQuotient as bEquation from aDividesB;
+  choose secondQuotient such that c = b * secondQuotient as cEquation from bDividesC;
   witness firstQuotient * secondQuotient with
     calc c
-       = b * secondQuotient                  by cEquation
+       = b * secondQuotient
        = (a * firstQuotient) * secondQuotient by substituting bEquation
-       = a * (firstQuotient * secondQuotient) by ring
+       = a * (firstQuotient * secondQuotient)
 }
