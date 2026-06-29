@@ -267,6 +267,16 @@ scrutinee's type. (Workaround that landed: pattern on the first argument
 only; recurse on the second via a helper theorem that takes the previous
 row as a Pi-hypothesis.)
 rubric (0/1): cause 0 · location 0 · actionable 0 · folded-types 1 · no-jargon 1
+RESOLVED (verified 2026-06-28) — the "reject/warn" option landed: a bare name
+in a non-first slot that shadows a constructor of the matched type is now
+reported AT the pattern: "pattern variable `zero` at position 2 shadows
+constructor `zero` of `Natural` — a bare name in a non-first pattern slot binds
+a NEW variable … Rename the binder, or move the constructor pattern to the first
+(scrutinee) position." Cause/location/actionable all 1 now. Locked in by
+`library/ErrorTest/pattern_shadows_constructor.{math,expected}`; promoted to
+corpus #18. (Edge note: with a trailing catch-all clause the detection doesn't
+fire and you get a "missing pattern case for constructor 'zero'" coverage
+message instead — milder, left as-is.)
 
 ---
 ### (RESOLVED same day) redundant-`by` warning didn't say WHICH claim — 2026-06-12 (binomial push)

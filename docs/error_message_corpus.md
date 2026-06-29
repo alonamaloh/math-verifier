@@ -468,3 +468,27 @@ each improvement is measured and protected against regression.
 - **Note:** a general "relocated foundational name → import hint" table would
   scale this if more names move out of `axioms.math`; one special-case is enough
   for now (it's the only such name the `decide` desugar emits).
+
+### 18. Constructor name shadowed by a binder in a non-first pattern slot — FIXED
+
+- **Trigger:** a bare constructor name in a non-first slot of a multi-argument
+  pattern definition, e.g. `| successor(i), zero => …` (intending `zero` as the
+  `Natural` constructor). Repro:
+  `library/ErrorTest/pattern_shadows_constructor.math`.
+- **Was (symptom):** the bare `zero` parsed as a FRESH BINDER shadowing the
+  constructor; the arm then proved a statement about a variable, surfacing far
+  away as a baffling "expected: X / but this case gives: X" with byte-identical
+  printouts. Scored 0 on cause, location, actionable — cost ~5 rounds of
+  debugging when first hit.
+- **Diagnosis:** only the FIRST pattern slot is matched structurally; a bare
+  name elsewhere is a binder, never a constructor match. The clash was silent.
+- **Now:** the pattern elaborator detects a binder whose name is a constructor
+  of the matched type and rejects it at the pattern: "pattern variable `zero`
+  at position 2 shadows constructor `zero` of `Natural` — a bare name in a
+  non-first pattern slot binds a NEW variable, it does not match the constructor.
+  Rename the binder, or move the constructor pattern to the first (scrutinee)
+  position." Score: cause **1**, location **1**, actionable **1**, types **1**,
+  jargon **1**. 5/5.
+- **Edge:** with a trailing catch-all clause the shadow detection doesn't fire;
+  you get a "missing pattern case for constructor 'zero'" coverage message
+  instead — milder, left as-is.

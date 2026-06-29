@@ -1,16 +1,13 @@
--- A bare name in a non-first pattern slot that matches a constructor of
--- the slot's type binds a NEW variable (it does not match the
--- constructor) — historically a silent footgun producing "expected X /
--- got X" mysteries. Must be rejected with a message naming the
--- shadowed constructor.
-
+-- A bare constructor name in a NON-FIRST pattern slot binds a fresh variable
+-- (shadowing the constructor) rather than matching it. The elaborator must
+-- name this footgun explicitly — it once surfaced as a baffling distant
+-- type mismatch with byte-identical printouts.
 module ErrorTest.pattern_shadows_constructor
 
 import Logic.basics
-import Equality.basics
 import Natural.basics
-import Natural.peano
 
-theorem ErrorTest.shadowed : (a b : Natural) → b = b
-  | zero, zero => reflexivity(Natural, zero)
-  | successor(i), b => reflexivity(Natural, b)
+definition ErrorTest.f : Natural → Natural → Natural
+  | successor(i), zero => i
+  | successor(i), successor(j) => j
+  | zero, b => b
