@@ -18,13 +18,12 @@ import Equality.basics
 import Logic.basics
 import Logic.exists
 
--- d = 0 does not divide 2: the witness equality `2 = 0 * q` reduces
+-- d = 0 does not divide 2: the witness equality `2 = 0 · q` reduces
 -- definitionally to `2 = 0` (multiply pattern-matches on its first
 -- argument), which is impossible.
 theorem Natural.zero_not_divides_two (zeroDividesTwo : 0 ∣ 2) : False := {
-  obtain ⟨quotient, equalityProof⟩ from zeroDividesTwo;
-  -- equalityProof : 2 = 0 * quotient ≡ 2 = 0.
-  absurd(equalityProof)
+  choose quotient such that 2 = 0 * quotient from zeroDividesTwo;
+  absurd(calc (2 : Natural) = 0 * quotient = 0)
 }
 
 -- d ≥ 3 does not divide 2. After applying multiply_successor, the RHS
@@ -35,6 +34,8 @@ theorem Natural.three_plus_not_divides_two_via_quotient
         (equalityProof
             : 2 = successor(successor(successor(predecessor3))) * quotient)
         : False :=
+  -- Implementation note: `unfold Natural.add` exposes the leading three
+  -- successors of `succ³(predecessor3) + …` so `two_not_three_plus` matches.
   unfold Natural.add in
   cases quotient refining equalityProof {
     | zero => {
@@ -62,7 +63,8 @@ theorem Natural.three_plus_not_divides_two (predecessor3 : Natural)
         (dividesProof
             : Natural.divides(successor(successor(successor(predecessor3))), 2))
         : False := {
-  obtain ⟨quotient, equalityProof⟩ from dividesProof;
+  choose quotient such that 2 = successor(successor(successor(predecessor3))) * quotient
+       from dividesProof;
   done by Natural.three_plus_not_divides_two_via_quotient
 }
 
@@ -115,7 +117,9 @@ automatic theorem Natural.divisor_two_is_one_or_two (divisor : Natural)
       }
   }
 
--- And finally: 2 is prime.
-theorem Natural.is_prime_two : Natural.is_prime(2) :=
-  ⟨done,
-   Natural.divisor_two_is_one_or_two⟩
+-- And finally: 2 is prime — 2 ≥ 2, and its only divisors are 1 and 2.
+theorem Natural.is_prime_two : Natural.is_prime(2) := {
+  claim 2 ≤ 2;
+  claim Natural.divisor_two_is_one_or_two;
+  done
+}
