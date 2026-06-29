@@ -145,22 +145,24 @@ theorem Real.avoidStepWithDecision_ordered
                 Real.avoidStepWithDecision(state, point, decision))
             < Real.NestedInterval.right(
                   Real.avoidStepWithDecision(state, point, decision))
-  | Real.NestedInterval.make(a, b) =>
-      (point : Real)
-      (decision : Logic.Decidable(
-           point ≤ Real.midpoint(a, Real.midpoint(a, b))))
-      (ordered : a < b) ↦ {
-        obtain ⟨aBelowMid, midBelowB⟩
-            from Real.midpoint_between(a, b, ordered);
-        obtain ⟨aBelowFirst, _⟩
-            from Real.midpoint_between(a, Real.midpoint(a, b), aBelowMid);
-        obtain ⟨_, thirdBelowB⟩
-            from Real.midpoint_between(Real.midpoint(a, b), b, midBelowB);
-        cases decision {
-          | Logic.Decidable.yes(_) => thirdBelowB
-          | Logic.Decidable.no(_)  => aBelowFirst
-        }
+  | Real.NestedInterval.make(a, b) => {
+      take point : Real;
+      take decision : Logic.Decidable(
+          point ≤ Real.midpoint(a, Real.midpoint(a, b)));
+      suppose a < b as ordered;
+      claim a < Real.midpoint(a, b) ∧ Real.midpoint(a, b) < b
+          by Real.midpoint_between;
+      claim a < Real.midpoint(a, Real.midpoint(a, b))
+              ∧ Real.midpoint(a, Real.midpoint(a, b)) < Real.midpoint(a, b)
+          by Real.midpoint_between;
+      claim Real.midpoint(a, b) < Real.midpoint(Real.midpoint(a, b), b)
+              ∧ Real.midpoint(Real.midpoint(a, b), b) < b
+          by Real.midpoint_between;
+      cases decision {
+        | Logic.Decidable.yes(_) => done
+        | Logic.Decidable.no(_)  => done
       }
+    }
 
 -- The step nests: the left end can only grow, the right only shrink.
 theorem Real.avoidStepWithDecision_nested
@@ -178,42 +180,34 @@ theorem Real.avoidStepWithDecision_nested
                         Real.avoidStepWithDecision(state, point, decision)) ∧ Real.NestedInterval.right(
                     Real.avoidStepWithDecision(state, point, decision))
                   ≤ Real.NestedInterval.right(state)
-  | Real.NestedInterval.make(a, b) =>
-      (point : Real)
-      (decision : Logic.Decidable(
-           point ≤ Real.midpoint(a, Real.midpoint(a, b))))
-      (ordered : a < b) ↦ {
-        obtain ⟨aBelowMid, midBelowB⟩
-            from Real.midpoint_between(a, b, ordered);
-        obtain ⟨_, firstBelowMid⟩
-            from Real.midpoint_between(a, Real.midpoint(a, b), aBelowMid);
-        obtain ⟨midBelowThird, _⟩
-            from Real.midpoint_between(Real.midpoint(a, b), b, midBelowB);
-        cases decision {
-          | Logic.Decidable.yes(_) => {
-              claim a ≤ Real.midpoint(a, b) since Real.LessThan.weaken;
-              claim Real.midpoint(a, b)
-                      ≤ Real.midpoint(Real.midpoint(a, b), b)
-                  since Real.LessThan.weaken;
-              calc a
-                 ≤ Real.midpoint(a, b)
-                 ≤ Real.midpoint(Real.midpoint(a, b), b)   as aLeqThird;
-              claim bLeqB : b ≤ b since Real.LessOrEqual.reflexive;
-              And.introduction(aLeqThird, bLeqB)
-            }
-          | Logic.Decidable.no(_) => {
-              claim aLeqA : a ≤ a since Real.LessOrEqual.reflexive;
-              claim Real.midpoint(a, Real.midpoint(a, b))
-                      ≤ Real.midpoint(a, b)
-                  since Real.LessThan.weaken;
-              claim Real.midpoint(a, b) ≤ b since Real.LessThan.weaken;
-              calc Real.midpoint(a, Real.midpoint(a, b))
-                 ≤ Real.midpoint(a, b)
-                 ≤ b   as firstLeqB;
-              And.introduction(aLeqA, firstLeqB)
-            }
-        }
+  | Real.NestedInterval.make(a, b) => {
+      take point : Real;
+      take decision : Logic.Decidable(
+          point ≤ Real.midpoint(a, Real.midpoint(a, b)));
+      suppose a < b as ordered;
+      claim a < Real.midpoint(a, b) ∧ Real.midpoint(a, b) < b
+          by Real.midpoint_between;
+      claim a < Real.midpoint(a, Real.midpoint(a, b))
+              ∧ Real.midpoint(a, Real.midpoint(a, b)) < Real.midpoint(a, b)
+          by Real.midpoint_between;
+      claim Real.midpoint(a, b) < Real.midpoint(Real.midpoint(a, b), b)
+              ∧ Real.midpoint(Real.midpoint(a, b), b) < b
+          by Real.midpoint_between;
+      cases decision {
+        | Logic.Decidable.yes(_) => {
+            calc a
+               ≤ Real.midpoint(a, b)                       since Real.LessThan.weaken
+               ≤ Real.midpoint(Real.midpoint(a, b), b)     since Real.LessThan.weaken;
+            done
+          }
+        | Logic.Decidable.no(_) => {
+            calc Real.midpoint(a, Real.midpoint(a, b))
+               ≤ Real.midpoint(a, b)                       since Real.LessThan.weaken
+               ≤ b                                         since Real.LessThan.weaken;
+            done
+          }
       }
+    }
 
 -- The step avoids the point: it ends up strictly outside the new
 -- interval, on one side or the other.
@@ -231,38 +225,34 @@ theorem Real.avoidStepWithDecision_avoids
                            Real.avoidStepWithDecision(state, point, decision)) ∨ Real.NestedInterval.right(
                    Real.avoidStepWithDecision(state, point, decision))
                  < point
-  | Real.NestedInterval.make(a, b) =>
-      (point : Real)
-      (decision : Logic.Decidable(
-           point ≤ Real.midpoint(a, Real.midpoint(a, b))))
-      (ordered : a < b) ↦ {
-        obtain ⟨aBelowMid, midBelowB⟩
-            from Real.midpoint_between(a, b, ordered);
-        obtain ⟨_, firstBelowMid⟩
-            from Real.midpoint_between(a, Real.midpoint(a, b), aBelowMid);
-        obtain ⟨midBelowThird, _⟩
-            from Real.midpoint_between(Real.midpoint(a, b), b, midBelowB);
-        cases decision {
-          | Logic.Decidable.yes(pointLow) => {
-              -- point ≤ ¼ < ½ < ¾ = new left end.
-              claim Real.midpoint(a, Real.midpoint(a, b))
-                      ≤ Real.midpoint(a, b)
-                  since Real.LessThan.weaken;
-              claim Real.midpoint(a, Real.midpoint(a, b))
-                      < Real.midpoint(Real.midpoint(a, b), b)
-                  since Real.LessThan.transitive_left;
-              claim point < Real.midpoint(Real.midpoint(a, b), b)
-                  since Real.LessThan.transitive_left;
-              done
-            }
-          | Logic.Decidable.no(pointHigh) => {
-              -- ¼ = new right end < point.
-              claim Real.midpoint(a, Real.midpoint(a, b)) < point
-                  since Real.LessThan_of_not_LessOrEqual;
-              done
-            }
-        }
+  | Real.NestedInterval.make(a, b) => {
+      take point : Real;
+      take decision : Logic.Decidable(
+          point ≤ Real.midpoint(a, Real.midpoint(a, b)));
+      suppose a < b as ordered;
+      claim a < Real.midpoint(a, b) ∧ Real.midpoint(a, b) < b
+          by Real.midpoint_between;
+      claim a < Real.midpoint(a, Real.midpoint(a, b))
+              ∧ Real.midpoint(a, Real.midpoint(a, b)) < Real.midpoint(a, b)
+          by Real.midpoint_between;
+      claim Real.midpoint(a, b) < Real.midpoint(Real.midpoint(a, b), b)
+              ∧ Real.midpoint(Real.midpoint(a, b), b) < b
+          by Real.midpoint_between;
+      cases decision {
+        | Logic.Decidable.yes(_) => {
+            calc point
+               ≤ Real.midpoint(a, Real.midpoint(a, b))
+               ≤ Real.midpoint(a, b)                       since Real.LessThan.weaken
+               < Real.midpoint(Real.midpoint(a, b), b);
+            done
+          }
+        | Logic.Decidable.no(_) => {
+            claim Real.midpoint(a, Real.midpoint(a, b)) < point
+                since Real.LessThan_of_not_LessOrEqual;
+            done
+          }
       }
+    }
 
 -- The classical wrappers: avoidStep is the core at the classical
 -- decision, so each lemma instantiates directly.
@@ -272,14 +262,7 @@ theorem Real.avoidStep_ordered
                      < Real.NestedInterval.right(state))
         : Real.NestedInterval.left(Real.avoidStep(state, point))
           < Real.NestedInterval.right(Real.avoidStep(state, point)) :=
-  Real.avoidStepWithDecision_ordered(
-      state, point,
-      Logic.classical_decidable(
-          point ≤ Real.midpoint(
-                      Real.NestedInterval.left(state),
-                      Real.midpoint(Real.NestedInterval.left(state),
-                                    Real.NestedInterval.right(state)))),
-      ordered)
+  { done by Real.avoidStepWithDecision_ordered }
 
 theorem Real.avoidStep_nested
         (state : Real.NestedInterval) (point : Real)
@@ -288,28 +271,14 @@ theorem Real.avoidStep_nested
         : Real.NestedInterval.left(state)
                 ≤ Real.NestedInterval.left(Real.avoidStep(state, point)) ∧ Real.NestedInterval.right(Real.avoidStep(state, point))
                 ≤ Real.NestedInterval.right(state) :=
-  Real.avoidStepWithDecision_nested(
-      state, point,
-      Logic.classical_decidable(
-          point ≤ Real.midpoint(
-                      Real.NestedInterval.left(state),
-                      Real.midpoint(Real.NestedInterval.left(state),
-                                    Real.NestedInterval.right(state)))),
-      ordered)
+  { done by Real.avoidStepWithDecision_nested }
 
 theorem Real.avoidStep_avoids
         (state : Real.NestedInterval) (point : Real)
         (ordered : Real.NestedInterval.left(state)
                      < Real.NestedInterval.right(state))
         : point < Real.NestedInterval.left(Real.avoidStep(state, point)) ∨ Real.NestedInterval.right(Real.avoidStep(state, point)) < point :=
-  Real.avoidStepWithDecision_avoids(
-      state, point,
-      Logic.classical_decidable(
-          point ≤ Real.midpoint(
-                      Real.NestedInterval.left(state),
-                      Real.midpoint(Real.NestedInterval.left(state),
-                                    Real.NestedInterval.right(state)))),
-      ordered)
+  { done since Real.avoidStepWithDecision_avoids }
 
 -- ----------------------------------------------------------------------
 -- The avoiding interval sequence for a listing f, and its end sequences.
@@ -338,9 +307,11 @@ theorem Real.avoidingIntervals_ordered (f : Natural → Real) (n : Natural)
             since Rational.to_real.positive_preserves;
         done
       }
-    case successor(predecessor):
-        Real.avoidStep_ordered(
-            Real.avoidingIntervals(f, predecessor), f(predecessor), IH)
+    case successor(predecessor): {
+        done by Real.avoidStep_ordered(
+            state := Real.avoidingIntervals(f, predecessor),
+            point := f(predecessor))
+      }
   }
 
 -- Left ends grow along the sequence (k steps at a time, then at ≤).
@@ -354,15 +325,18 @@ theorem Real.avoidingLeft_le_subsequent
         done
       }
     case successor(predecessor): {
-        obtain ⟨leftGrows, _⟩
-            from Real.avoidStep_nested(
-                     Real.avoidingIntervals(f, predecessor + N),
-                     f(predecessor + N),
-                     Real.avoidingIntervals_ordered(f, predecessor + N));
+        claim Real.avoidingLeft(f, predecessor + N) < Real.avoidingRight(f, predecessor + N)
+            since Real.avoidingIntervals_ordered;
+        claim Real.avoidingLeft(f, predecessor + N)
+                ≤ Real.avoidingLeft(f, successor(predecessor + N))
+              ∧ Real.avoidingRight(f, successor(predecessor + N))
+                ≤ Real.avoidingRight(f, predecessor + N)
+            by Real.avoidStep_nested(
+                state := Real.avoidingIntervals(f, predecessor + N),
+                point := f(predecessor + N));
         calc Real.avoidingLeft(f, N)
            ≤ Real.avoidingLeft(f, predecessor + N)        since IH
            ≤ Real.avoidingLeft(f, successor(predecessor + N))
-                 since leftGrows
            = Real.avoidingLeft(f, successor(predecessor) + N)
                  by substituting Natural.successor_add
       }
@@ -379,15 +353,18 @@ theorem Real.avoidingRight_le_subsequent
         done
       }
     case successor(predecessor): {
-        obtain ⟨_, rightShrinks⟩
-            from Real.avoidStep_nested(
-                     Real.avoidingIntervals(f, predecessor + N),
-                     f(predecessor + N),
-                     Real.avoidingIntervals_ordered(f, predecessor + N));
+        claim Real.avoidingLeft(f, predecessor + N) < Real.avoidingRight(f, predecessor + N)
+            since Real.avoidingIntervals_ordered;
+        claim Real.avoidingLeft(f, predecessor + N)
+                ≤ Real.avoidingLeft(f, successor(predecessor + N))
+              ∧ Real.avoidingRight(f, successor(predecessor + N))
+                ≤ Real.avoidingRight(f, predecessor + N)
+            by Real.avoidStep_nested(
+                state := Real.avoidingIntervals(f, predecessor + N),
+                point := f(predecessor + N));
         calc Real.avoidingRight(f, successor(predecessor) + N)
            = Real.avoidingRight(f, successor(predecessor + N))
-                 by substituting Natural.successor_add
-           ≤ Real.avoidingRight(f, predecessor + N)       since rightShrinks
+           ≤ Real.avoidingRight(f, predecessor + N)
            ≤ Real.avoidingRight(f, N)                     since IH
       }
   }
@@ -395,7 +372,7 @@ theorem Real.avoidingRight_le_subsequent
 theorem Real.avoidingLeft_le_at_le
         (f : Natural → Real) (N m : Natural) (NLeqM : N ≤ m)
         : Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, m) := {
-  obtain ⟨k, mEq⟩ by Natural.le_to_add;
+  choose k such that m = k + N from Natural.le_to_add;
   claim Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, k + N);
   claim by substitution
 }
@@ -403,7 +380,7 @@ theorem Real.avoidingLeft_le_at_le
 theorem Real.avoidingRight_le_at_le
         (f : Natural → Real) (N m : Natural) (NLeqM : N ≤ m)
         : Real.avoidingRight(f, m) ≤ Real.avoidingRight(f, N) := {
-  obtain ⟨k, mEq⟩ by Natural.le_to_add;
+  choose k such that m = k + N from Natural.le_to_add;
   claim Real.avoidingRight(f, k + N) ≤ Real.avoidingRight(f, N);
   claim by substitution
 }
@@ -431,10 +408,10 @@ theorem Real.avoidingLeft_le_avoidingRight
 -- The step at index n throws f(n) out of interval n+1.
 theorem Real.avoiding_avoids (f : Natural → Real) (n : Natural)
         : f(n) < Real.avoidingLeft(f, 1 + n) ∨ Real.avoidingRight(f, 1 + n) < f(n) := {
+  claim Real.avoidingLeft(f, n) < Real.avoidingRight(f, n)
+      since Real.avoidingIntervals_ordered;
   claim f(n) < Real.avoidingLeft(f, successor(n)) ∨ Real.avoidingRight(f, successor(n)) < f(n)
-      by Real.avoidStep_avoids(
-             Real.avoidingIntervals(f, n), f(n),
-             Real.avoidingIntervals_ordered(f, n));
+      since Real.avoidStep_avoids(state := Real.avoidingIntervals(f, n), point := f(n));
   done by substituting Natural.one_add
 }
 
@@ -443,65 +420,68 @@ theorem Real.avoiding_avoids (f : Natural → Real) (n : Natural)
 -- ends, which every interval (hence no f(n)) contains.
 theorem Real.enumeration_misses_a_real (f : Natural → Real)
         : ∃ (x : Real). ∀ (n : Natural). ¬(f(n) = x) := {
-  claim nonempty
-        : Set.IsNonempty(Real, Real.sequence_range(Real.avoidingLeft(f)))
-      by ⟨Real.avoidingLeft(f, 0),
-          ⟨0, reflexivity(Real, Real.avoidingLeft(f, 0))⟩⟩;
-  claim boundedAbove
-        : Real.IsBoundedAbove(Real.sequence_range(Real.avoidingLeft(f)))
-      by ⟨Real.avoidingRight(f, 0),
-          (y : Real)
-          (yInRange : y ∈ Real.sequence_range(Real.avoidingLeft(f))) ↦ {
-            obtain ⟨m, termEqualsY⟩ from yInRange;
-            claim Real.avoidingLeft(f, m) ≤ Real.avoidingRight(f, 0)
-                by Real.avoidingLeft_le_avoidingRight(f, m, 0);
-            done by substituting termEqualsY
-          }⟩;
-  obtain ⟨x, isSupremum⟩
-      from Real.supremum_exists(
-               Real.sequence_range(Real.avoidingLeft(f)),
-               nonempty, boundedAbove);
-  let ⟨isUpper, isLeast⟩ := isSupremum;
-  witness x with
-      (n : Natural) (fnEqualsX : f(n) = x) ↦ {
-        -- x is trapped in interval n+1 …
-        claim Real.avoidingLeft(f, 1 + n) ≤ x
-            by isUpper(Real.avoidingLeft(f, 1 + n),
-                   ⟨1 + n, reflexivity(Real, Real.avoidingLeft(f, 1 + n))⟩);
-        claim laterRightBounds
-              : Real.IsUpperBound(
-                    Real.sequence_range(Real.avoidingLeft(f)),
-                    Real.avoidingRight(f, 1 + n))
-            by (y : Real)
-               (yInRange : y ∈ Real.sequence_range(Real.avoidingLeft(f))) ↦ {
-                 obtain ⟨m, termEqualsY⟩ from yInRange;
-                 claim Real.avoidingLeft(f, m) ≤ Real.avoidingRight(f, 1 + n)
-                     by Real.avoidingLeft_le_avoidingRight(f, m, 1 + n);
-                 done by substituting termEqualsY
-               };
-        claim x ≤ Real.avoidingRight(f, 1 + n)
-            by isLeast(Real.avoidingRight(f, 1 + n), laterRightBounds);
-        -- … but f(n) is strictly outside it.
-        cases Real.avoiding_avoids(f, n) {
-          | Or.introduceLeft(fnBelowInterval) => {
-              claim f(n) < x since Real.LessThan.transitive_right;
-              claim notEqual : ¬(f(n) = x) since Real.LessThan.distinct;
-              notEqual(fnEqualsX)
-            }
-          | Or.introduceRight(intervalBelowFn) => {
-              claim x < f(n) since Real.LessThan.transitive_left;
-              claim notEqual : ¬(x = f(n)) since Real.LessThan.distinct;
-              notEqual(calc x = f(n) by fnEqualsX)
-            }
+  claim Set.IsNonempty(Real, Real.sequence_range(Real.avoidingLeft(f)))
+      by witness Real.avoidingLeft(f, 0)
+             with (witness 0 with reflexivity(Real, Real.avoidingLeft(f, 0)));
+  claim Real.IsBoundedAbove(Real.sequence_range(Real.avoidingLeft(f)))
+      by witness Real.avoidingRight(f, 0) with {
+           take y : Real;
+           suppose y ∈ Real.sequence_range(Real.avoidingLeft(f)) as yInRange;
+           choose m such that Real.avoidingLeft(f, m) = y as termEqualsY from yInRange;
+           claim Real.avoidingLeft(f, m) ≤ Real.avoidingRight(f, 0)
+               since Real.avoidingLeft_le_avoidingRight;
+           done by substituting termEqualsY
+         };
+  choose x such that Real.IsSupremum(Real.sequence_range(Real.avoidingLeft(f)), x)
+      from Real.supremum_exists;
+  claim Real.IsUpperBound(Real.sequence_range(Real.avoidingLeft(f)), x);
+  claim ∀ (otherBound : Real).
+            Real.IsUpperBound(Real.sequence_range(Real.avoidingLeft(f)), otherBound)
+          → x ≤ otherBound;
+  witness x with {
+    take n : Natural;
+    suppose f(n) = x as fnEqualsX;
+    -- x is trapped in interval n+1: every left end is ≤ x ≤ every right end.
+    claim Real.avoidingLeft(f, 1 + n) ∈ Real.sequence_range(Real.avoidingLeft(f))
+        by witness 1 + n with reflexivity(Real, Real.avoidingLeft(f, 1 + n));
+    claim Real.avoidingLeft(f, 1 + n) ≤ x;
+    claim Real.IsUpperBound(
+              Real.sequence_range(Real.avoidingLeft(f)),
+              Real.avoidingRight(f, 1 + n))
+        by {
+          take y : Real;
+          suppose y ∈ Real.sequence_range(Real.avoidingLeft(f)) as yInRange;
+          choose m such that Real.avoidingLeft(f, m) = y as termEqualsY from yInRange;
+          claim Real.avoidingLeft(f, m) ≤ Real.avoidingRight(f, 1 + n)
+              since Real.avoidingLeft_le_avoidingRight;
+          done by substituting termEqualsY
+        };
+    claim x ≤ Real.avoidingRight(f, 1 + n);
+    -- … but f(n) is strictly outside interval n+1, so f(n) ≠ x.
+    claim f(n) < Real.avoidingLeft(f, 1 + n) ∨ Real.avoidingRight(f, 1 + n) < f(n)
+        since Real.avoiding_avoids;
+    claim by cases {
+      in (f(n) < Real.avoidingLeft(f, 1 + n)) as fnBelowInterval: {
+          claim f(n) < x since Real.LessThan.transitive_right;
+          claim f(n) < f(n) by substituting fnEqualsX;
+          done
         }
-      }
+      in (Real.avoidingRight(f, 1 + n) < f(n)) as intervalBelowFn: {
+          claim x < f(n) since Real.LessThan.transitive_left;
+          claim x < x by substituting fnEqualsX;
+          done
+        }
+    }
+  }
 }
 
 -- Freek #22: the continuum is not denumerable.
-theorem Real.not_enumerable : Not(IsEnumerable(Real)) :=
-  (enumerable : IsEnumerable(Real)) ↦ {
-    obtain ⟨f, fSurjective⟩ from enumerable;
-    obtain ⟨x, xAvoidsListing⟩ from Real.enumeration_misses_a_real(f);
-    obtain ⟨n, fnEqualsX⟩ from fSurjective(x);
-    xAvoidsListing(n, fnEqualsX)
-  }
+theorem Real.not_enumerable : Not(IsEnumerable(Real)) := {
+  suppose IsEnumerable(Real) as enumerable;
+  choose f such that Function.IsSurjective(Natural, Real, f) as fSurjective from enumerable;
+  choose x such that ∀ (n : Natural). ¬(f(n) = x) as xAvoidsListing
+      from Real.enumeration_misses_a_real;
+  choose n such that f(n) = x as fnEqualsX from fSurjective(x);
+  claim ¬(f(n) = x) since xAvoidsListing;
+  done
+}
