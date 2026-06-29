@@ -441,3 +441,30 @@ each improvement is measured and protected against regression.
   (the "add `by <proof>`" tail), types **1**, jargon **1**. 5/5 — keep as a
   positive exemplar; the only gap is it can't *know* an opaque head blocked the
   reduction, which would have named the cause directly.
+
+### 17. `decide` without `import Natural.classical_decidable` — FIXED
+
+- **Trigger:** the `decide` tactic in a module that does not (transitively)
+  import `Natural.classical_decidable`. Repro:
+  `library/ErrorTest/decide_missing_classical_decidable.math`.
+- **Was (symptom):**
+  ```
+  elaborate error: unknown identifier 'Logic.classical_decidable' at line N
+  ```
+  Scored 0 on cause and actionable: `decide` desugars to
+  `cases Logic.classical_decidable(P)` (cases.cpp), so the failing name is one
+  the user never typed — a baffling "unknown identifier" pointing at a `decide`
+  for a name that isn't in the source. Newly possible because
+  `Logic.classical_decidable` was demoted from a universally-imported axiom in
+  `axioms.math` to a theorem in `Natural.classical_decidable` (it needs
+  `Natural`), so it is no longer in every module's import closure.
+- **Diagnosis:** `elaborateIdentifier`'s unknown-identifier throw (inference.cpp)
+  reported the desugared name verbatim with no hint about where it now lives.
+- **Now:** the throw special-cases `Logic.classical_decidable` and appends
+  "is a theorem in `Natural.classical_decidable` (the `decide` tactic desugars
+  to it) — add `import Natural.classical_decidable`". Score: cause **1**,
+  location **1** (points at the `decide`), actionable **1**, types n/a,
+  jargon **1**.
+- **Note:** a general "relocated foundational name → import hint" table would
+  scale this if more names move out of `axioms.math`; one special-case is enough
+  for now (it's the only such name the `decide` desugar emits).
