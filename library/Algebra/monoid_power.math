@@ -1,0 +1,30 @@
+-- Algebra/monoid_power.math
+--
+-- Iterated monoid operation: `Monoid.power(A, op, e, x, k)` is `op`
+-- applied k times onto the identity `e` — `x · (x · … · (x · e))`, k
+-- factors of `x`, the empty product being `e`. Like `List.product`, it
+-- takes the operation and identity explicitly rather than a bundled
+-- monoid, so it applies uniformly to `R.multiply` / `R.one` (powers in a
+-- ring) or `R.add` / `R.zero` (the n-fold multiple `n · x`) for any
+-- carrier. `Real.power` becomes its multiplicative instance.
+
+module Algebra.monoid_power
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+
+definition Monoid.power (A : Type(0)) (operation : A → A → A) (identity : A)
+        (base : A) : Natural → A
+  | zero => identity
+  | successor(predecessor) =>
+      operation(base, Monoid.power(A, operation, identity, base, predecessor))
+
+-- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
+-- not definitionally the constructor; bridge via `one_add`).
+theorem Monoid.power_add_one (A : Type(0)) (operation : A → A → A) (identity : A)
+        (base : A) (n : Natural)
+        : Monoid.power(A, operation, identity, base, 1 + n)
+          = operation(base, Monoid.power(A, operation, identity, base, n)) :=
+  done by substituting Natural.one_add

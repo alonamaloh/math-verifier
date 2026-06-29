@@ -25,6 +25,24 @@ definition List.range_down : Natural → List(Natural)
   | successor(predecessor) =>
       List.prepend(Natural, successor(predecessor), List.range_down(predecessor))
 
+-- The ascending counterpart `range_up(n) = [0, 1, …, n−1]`, grown at the
+-- tail so the fold-product reads the largest index last. That matches the
+-- left-fold recursion of `Algebra.indexedAggregate`, letting the
+-- list-product bridge there reassociate without commutativity.
+definition List.range_up : Natural → List(Natural)
+  | zero => List.empty(Natural)
+  | successor(predecessor) =>
+      List.append(Natural, List.range_up(predecessor),
+          List.prepend(Natural, predecessor, List.empty(Natural)))
+
+-- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
+-- not definitionally the constructor; bridge via `one_add`).
+theorem List.range_up_add_one (n : Natural)
+        : List.range_up(1 + n)
+          = List.append(Natural, List.range_up(n),
+                List.prepend(Natural, n, List.empty(Natural))) :=
+  done by substituting Natural.one_add
+
 -- `range_down(n)` has exactly n elements.
 theorem List.range_down_length (n : Natural)
         : List.length(Natural, List.range_down(n)) = n :=

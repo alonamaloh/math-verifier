@@ -1,0 +1,326 @@
+-- Algebra/aggregation.math
+--
+-- Carrier-generic finite aggregation `Algebra.indexedAggregate(A, op, e,
+-- s, n)` — the analysis-friendly *function + bound* interface (recursion
+-- on n, reading s(0), …, s(n−1)), backed by the `Lists` fold-product.
+-- `Real.partialSum` / `Real.partialProduct` become its additive /
+-- multiplicative instances at Real; the algebraic toolkit (split,
+-- pointwise, linearity, the constant block) is proved once here over a
+-- commutative monoid and inherited.
+--
+-- Like `List.product`, the operation and identity are explicit arguments
+-- and the monoid laws travel as ordinary hypotheses, so the layer never
+-- drags a bundle through; the Real wrappers supply Real's proven laws.
+
+module Algebra.aggregation
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.range
+import Algebra.monoid_power
+
+-- Σ/Π_{k<n} s(k): identity on the empty range, otherwise the aggregate of
+-- the first n terms combined with s(n).
+definition Algebra.indexedAggregate (A : Type(0)) (operation : A → A → A)
+        (identity : A) (s : Natural → A) : Natural → A
+  | zero => identity
+  | successor(n) =>
+      operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n))
+
+-- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
+-- not definitionally the constructor; bridge via `one_add`).
+theorem Algebra.indexedAggregate_add_one (A : Type(0)) (operation : A → A → A)
+        (identity : A) (s : Natural → A) (n : Natural)
+        : Algebra.indexedAggregate(A, operation, identity, s, 1 + n)
+          = operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n)) :=
+  done by substituting Natural.one_add
+
+-- ----------------------------------------------------------------------
+-- The Lists bridge: the aggregate is the fold-product over the mapped
+-- ascending range. `range_up` grows at the tail, so the head-recursive
+-- `List.product` and the tail-recursive `indexedAggregate` line up by
+-- reassociation alone — no commutativity needed here.
+theorem Algebra.indexedAggregate_eq_list_product (A : Type(0))
+        (operation : A → A → A) (identity : A)
+        (associativity
+            : ∀ (a b c : A). operation(operation(a, b), c) = operation(a, operation(b, c)))
+        (identityLeft : ∀ (a : A). operation(identity, a) = a)
+        (identityRight : ∀ (a : A). operation(a, identity) = a)
+        (s : Natural → A) (n : Natural)
+        : Algebra.indexedAggregate(A, operation, identity, s, n)
+          = List.product(A, operation, identity,
+                List.map(Natural, A, s, List.range_up(n))) :=
+  by_induction on n with IH {
+    case base: done
+    case step(predecessor):
+        calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
+                       s(predecessor))
+                 by Algebra.indexedAggregate_add_one
+           = operation(List.product(A, operation, identity,
+                           List.map(Natural, A, s, List.range_up(predecessor))),
+                       s(predecessor))
+                 since IH
+           = operation(List.product(A, operation, identity,
+                           List.map(Natural, A, s, List.range_up(predecessor))),
+                       operation(s(predecessor), identity))
+                 by identityRight(s(predecessor))
+           = operation(List.product(A, operation, identity,
+                           List.map(Natural, A, s, List.range_up(predecessor))),
+                       List.product(A, operation, identity,
+                           List.map(Natural, A, s,
+                               List.prepend(Natural, predecessor, List.empty(Natural)))))
+           = List.product(A, operation, identity,
+                 List.append(A,
+                     List.map(Natural, A, s, List.range_up(predecessor)),
+                     List.map(Natural, A, s,
+                         List.prepend(Natural, predecessor, List.empty(Natural)))))
+                 by List.product_append
+           = List.product(A, operation, identity,
+                 List.map(Natural, A, s,
+                     List.append(Natural, List.range_up(predecessor),
+                         List.prepend(Natural, predecessor, List.empty(Natural)))))
+                 by List.map_append
+           = List.product(A, operation, identity,
+                 List.map(Natural, A, s, List.range_up(1 + predecessor)))
+                 by List.range_up_add_one
+  }
+
+-- ----------------------------------------------------------------------
+-- The aggregate only sees the terms' values.
+theorem Algebra.indexedAggregate_pointwise (A : Type(0)) (operation : A → A → A)
+        (identity : A) (s sequencePrime : Natural → A)
+        (pointwiseEqual : ∀ (k : Natural). s(k) = sequencePrime(k))
+        (n : Natural)
+        : Algebra.indexedAggregate(A, operation, identity, s, n)
+          = Algebra.indexedAggregate(A, operation, identity, sequencePrime, n) :=
+  by_induction on n with IH {
+    case base: done
+    case step(predecessor):
+        calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
+                       s(predecessor))
+                 by Algebra.indexedAggregate_add_one
+           = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
+                       s(predecessor))
+                 since IH
+           = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
+                       sequencePrime(predecessor))
+                 by pointwiseEqual(predecessor)
+           = Algebra.indexedAggregate(A, operation, identity, sequencePrime, 1 + predecessor)
+                 by Algebra.indexedAggregate_add_one
+  }
+
+-- Agreement below the cut is enough — the terms at or above n are never
+-- read. (What the unbounded version cannot give when the identity fails
+-- past the cut, e.g. binomial coefficients that overflow to zero.)
+theorem Algebra.indexedAggregate_pointwise_below (A : Type(0)) (operation : A → A → A)
+        (identity : A) (s sequencePrime : Natural → A) (n : Natural)
+        (pointwiseEqual : ∀ (k : Natural). k < n → s(k) = sequencePrime(k))
+        : Algebra.indexedAggregate(A, operation, identity, s, n)
+          = Algebra.indexedAggregate(A, operation, identity, sequencePrime, n) :=
+  by_induction on n with IH refining pointwiseEqual {
+    case base: done
+    case step(predecessor): {
+        claim predecessorBelow : predecessor < 1 + predecessor since Natural.lt_one_plus;
+        claim prefixEqual
+              : ∀ (k : Natural). k < predecessor → s(k) = sequencePrime(k)
+            by (k : Natural) (kBelow : k < predecessor) ↦ {
+                 claim kBelowStep : k < 1 + predecessor since Natural.lt_transitive;
+                 done by pointwiseEqual(k, kBelowStep)
+               };
+        claim topEqual : s(predecessor) = sequencePrime(predecessor)
+            since pointwiseEqual(predecessor, predecessorBelow);
+        calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
+                       s(predecessor))
+                 by Algebra.indexedAggregate_add_one
+           = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
+                       s(predecessor))
+                 by IH(prefixEqual)
+           = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
+                       sequencePrime(predecessor))
+                 since topEqual
+           = Algebra.indexedAggregate(A, operation, identity, sequencePrime, 1 + predecessor)
+                 by Algebra.indexedAggregate_add_one
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Splitting at a cut: the part below n, then the block of k terms shifted
+-- past n.
+theorem Algebra.indexedAggregate_split (A : Type(0)) (operation : A → A → A)
+        (identity : A)
+        (associativity
+            : ∀ (a b c : A). operation(operation(a, b), c) = operation(a, operation(b, c)))
+        (identityRight : ∀ (a : A). operation(a, identity) = a)
+        (s : Natural → A) (n k : Natural)
+        : Algebra.indexedAggregate(A, operation, identity, s, k + n)
+          = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
+                      Algebra.indexedAggregate(A, operation, identity,
+                          (j : Natural) ↦ s(n + j), k)) :=
+  by_induction on k with IH {
+    case base:
+        calc Algebra.indexedAggregate(A, operation, identity, s, 0 + n)
+           = Algebra.indexedAggregate(A, operation, identity, s, n)
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, n), identity)
+                 by identityRight(Algebra.indexedAggregate(A, operation, identity, s, n))
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
+                       Algebra.indexedAggregate(A, operation, identity,
+                           (j : Natural) ↦ s(n + j), 0))
+    case step(predecessor):
+        calc Algebra.indexedAggregate(A, operation, identity, s, (1 + predecessor) + n)
+           = Algebra.indexedAggregate(A, operation, identity, s, 1 + (predecessor + n))
+                 by ((1 + predecessor) + n = 1 + (predecessor + n))
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor + n),
+                       s(predecessor + n))
+                 by Algebra.indexedAggregate_add_one
+           = operation(operation(Algebra.indexedAggregate(A, operation, identity, s, n),
+                                 Algebra.indexedAggregate(A, operation, identity,
+                                     (j : Natural) ↦ s(n + j), predecessor)),
+                       s(predecessor + n))
+                 since IH
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
+                       operation(Algebra.indexedAggregate(A, operation, identity,
+                                     (j : Natural) ↦ s(n + j), predecessor),
+                                 s(predecessor + n)))
+                 by associativity(Algebra.indexedAggregate(A, operation, identity, s, n),
+                        Algebra.indexedAggregate(A, operation, identity,
+                            (j : Natural) ↦ s(n + j), predecessor),
+                        s(predecessor + n))
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
+                       operation(Algebra.indexedAggregate(A, operation, identity,
+                                     (j : Natural) ↦ s(n + j), predecessor),
+                                 s(n + predecessor)))
+                 by (predecessor + n = n + predecessor)
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
+                       Algebra.indexedAggregate(A, operation, identity,
+                           (j : Natural) ↦ s(n + j), 1 + predecessor))
+                 by Algebra.indexedAggregate_add_one
+  }
+
+-- ----------------------------------------------------------------------
+-- The interchange (medial) law of a commutative monoid, the rearrangement
+-- behind termwise linearity: (a · b) · (c · d) = (a · c) · (b · d).
+theorem Algebra.commutative_monoid_interchange (A : Type(0)) (operation : A → A → A)
+        (associativity
+            : ∀ (a b c : A). operation(operation(a, b), c) = operation(a, operation(b, c)))
+        (commutativity : ∀ (a b : A). operation(a, b) = operation(b, a))
+        (a b c d : A)
+        : operation(operation(a, b), operation(c, d))
+          = operation(operation(a, c), operation(b, d)) :=
+  calc operation(operation(a, b), operation(c, d))
+     = operation(operation(operation(a, b), c), d)   by associativity(operation(a, b), c, d)
+     = operation(operation(a, operation(b, c)), d)   by associativity(a, b, c)
+     = operation(operation(a, operation(c, b)), d)   by commutativity(b, c)
+     = operation(operation(operation(a, c), b), d)   by associativity(a, c, b)
+     = operation(operation(a, c), operation(b, d))   by associativity(operation(a, c), b, d)
+
+-- Linearity: the aggregate splits over termwise combination.
+theorem Algebra.indexedAggregate_add (A : Type(0)) (operation : A → A → A)
+        (identity : A)
+        (associativity
+            : ∀ (a b c : A). operation(operation(a, b), c) = operation(a, operation(b, c)))
+        (commutativity : ∀ (a b : A). operation(a, b) = operation(b, a))
+        (identityLeft : ∀ (a : A). operation(identity, a) = a)
+        (s t : Natural → A) (n : Natural)
+        : Algebra.indexedAggregate(A, operation, identity,
+              (k : Natural) ↦ operation(s(k), t(k)), n)
+          = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
+                      Algebra.indexedAggregate(A, operation, identity, t, n)) :=
+  by_induction on n with IH {
+    case base:
+        calc Algebra.indexedAggregate(A, operation, identity,
+                 (k : Natural) ↦ operation(s(k), t(k)), 0)
+           = identity
+           = operation(identity, identity)   by identityLeft(identity)
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, 0),
+                       Algebra.indexedAggregate(A, operation, identity, t, 0))
+    case step(predecessor):
+        calc Algebra.indexedAggregate(A, operation, identity,
+                 (k : Natural) ↦ operation(s(k), t(k)), 1 + predecessor)
+           = operation(Algebra.indexedAggregate(A, operation, identity,
+                           (k : Natural) ↦ operation(s(k), t(k)), predecessor),
+                       operation(s(predecessor), t(predecessor)))
+                 by Algebra.indexedAggregate_add_one
+           = operation(operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
+                                 Algebra.indexedAggregate(A, operation, identity, t, predecessor)),
+                       operation(s(predecessor), t(predecessor)))
+                 since IH
+           = operation(operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
+                                 s(predecessor)),
+                       operation(Algebra.indexedAggregate(A, operation, identity, t, predecessor),
+                                 t(predecessor)))
+                 by Algebra.commutative_monoid_interchange
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor),
+                       operation(Algebra.indexedAggregate(A, operation, identity, t, predecessor),
+                                 t(predecessor)))
+                 by Algebra.indexedAggregate_add_one
+           = operation(Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor),
+                       Algebra.indexedAggregate(A, operation, identity, t, 1 + predecessor))
+                 by Algebra.indexedAggregate_add_one
+  }
+
+-- A scalar that distributes over the aggregated operation pulls out.
+theorem Algebra.indexedAggregate_scale (A : Type(0)) (operation : A → A → A)
+        (identity : A) (scale : A → A → A) (c : A)
+        (distributes
+            : ∀ (x y : A). scale(c, operation(x, y)) = operation(scale(c, x), scale(c, y)))
+        (scaleIdentity : scale(c, identity) = identity)
+        (s : Natural → A) (n : Natural)
+        : Algebra.indexedAggregate(A, operation, identity,
+              (k : Natural) ↦ scale(c, s(k)), n)
+          = scale(c, Algebra.indexedAggregate(A, operation, identity, s, n)) :=
+  by_induction on n with IH {
+    case base:
+        calc Algebra.indexedAggregate(A, operation, identity,
+                 (k : Natural) ↦ scale(c, s(k)), 0)
+           = identity
+           = scale(c, identity)   since scaleIdentity
+           = scale(c, Algebra.indexedAggregate(A, operation, identity, s, 0))
+    case step(predecessor):
+        calc Algebra.indexedAggregate(A, operation, identity,
+                 (k : Natural) ↦ scale(c, s(k)), 1 + predecessor)
+           = operation(Algebra.indexedAggregate(A, operation, identity,
+                           (k : Natural) ↦ scale(c, s(k)), predecessor),
+                       scale(c, s(predecessor)))
+                 by Algebra.indexedAggregate_add_one
+           = operation(scale(c, Algebra.indexedAggregate(A, operation, identity, s, predecessor)),
+                       scale(c, s(predecessor)))
+                 since IH
+           = scale(c, operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
+                                s(predecessor)))
+                 by distributes(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
+                        s(predecessor))
+           = scale(c, Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor))
+                 by Algebra.indexedAggregate_add_one
+  }
+
+-- A constant block aggregates to its monoid power.
+theorem Algebra.indexedAggregate_constant (A : Type(0)) (operation : A → A → A)
+        (identity : A)
+        (commutativity : ∀ (a b : A). operation(a, b) = operation(b, a))
+        (c : A) (n : Natural)
+        : Algebra.indexedAggregate(A, operation, identity, (k : Natural) ↦ c, n)
+          = Monoid.power(A, operation, identity, c, n) :=
+  by_induction on n with IH {
+    case base: done
+    case step(predecessor):
+        calc Algebra.indexedAggregate(A, operation, identity, (k : Natural) ↦ c, 1 + predecessor)
+           = operation(Algebra.indexedAggregate(A, operation, identity, (k : Natural) ↦ c, predecessor), c)
+                 by Algebra.indexedAggregate_add_one
+           = operation(Monoid.power(A, operation, identity, c, predecessor), c)
+                 since IH
+           = operation(c, Monoid.power(A, operation, identity, c, predecessor))
+                 by commutativity(Monoid.power(A, operation, identity, c, predecessor), c)
+           = Monoid.power(A, operation, identity, c, 1 + predecessor)
+                 by Monoid.power_add_one
+  }

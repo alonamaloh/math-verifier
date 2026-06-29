@@ -1,5 +1,22 @@
 # Plan: carrier-generic finite sum/product, on the Lists fold
 
+## Status
+
+- **Stage 0** — decided. Carrier for binomial: `IsCommutativeRing` for now
+  (no `IsCommutativeSemiring` yet; subtraction merely unused), tighten later.
+  Range orientation: a new **ascending** `List.range_up(n) = [0,…,n−1]`,
+  grown at the tail so `List.product`'s head-recursion and
+  `indexedAggregate`'s tail-recursion line up by reassociation alone (the
+  bridge needs no commutativity).
+- **Stage 1** — done. `Algebra/monoid_power.math` (`Monoid.power` +
+  `power_add_one`); `Lists/range.math` gains `range_up` + `range_up_add_one`;
+  `Algebra/aggregation.math` has `indexedAggregate`, the `List.product`
+  bridge (`indexedAggregate_eq_list_product`), and the commutative-monoid
+  toolkit (`_add_one`, `_pointwise`, `_pointwise_below`, `_split`, `_add`
+  via `commutative_monoid_interchange`, `_scale`, `_constant` = monoid
+  power). Library green; elaborator untouched. Order lemmas + telescoping
+  (need an ordered field / inverses) deferred to Stage 2 in `Real/`.
+
 ## Why
 
 `Real.partialSum` / `Real.partialProduct` (series.math, finite_products.math)
