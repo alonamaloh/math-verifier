@@ -42,10 +42,11 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
         (congruent : Ring.CongruentModulo(Integer.polynomial_ring, GaussianInteger.definingPolynomial, p, p'))
         : GaussianInteger.coordinatesOfPolynomial(p)
           = GaussianInteger.coordinatesOfPolynomial(p') := {
-  obtain ⟨cofactor, differenceEquation⟩ from congruent;
-  -- differenceEquation : p + (−p') = (x²+1)·cofactor. Rearrange to
-  -- p = p' + (x²+1)·cofactor (a group rearrangement; the reversed steps
-  -- name the law they undo).
+  choose cofactor such that
+      p + (-p') = GaussianInteger.definingPolynomial * cofactor
+      as differenceEquation from congruent;
+  -- Rearrange p + (−p') = (x²+1)·cofactor to p = p' + (x²+1)·cofactor
+  -- (a group rearrangement; the reversed steps name the law they undo).
   calc p
             = p + Polynomial.zero(Integer.ring_bundle)
                   since Polynomial.add_identity_right
@@ -60,7 +61,7 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
   -- coords of the (x²+1)-multiple vanish.
   claim modCoordinates
       : coords(GaussianInteger.definingPolynomial * cofactor) = Product.make(Integer.zero, Integer.zero)
-      since GaussianInteger.coordinatesOfPolynomial_definingPolynomial_multiply(cofactor);
+      since GaussianInteger.coordinatesOfPolynomial_definingPolynomial_multiply;
   -- coords(p) = coords(p' + (x²+1)·cofactor) = coords(p') ⊕ (0,0) = coords(p').
   calc coords(p)
      = coords(p' + GaussianInteger.definingPolynomial * cofactor)
@@ -68,7 +69,7 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
      = Product.make(
            Product.first(coords(p')) + Product.first(coords(GaussianInteger.definingPolynomial * cofactor)),
            Product.second(coords(p')) + Product.second(coords(GaussianInteger.definingPolynomial * cofactor)))
-           since GaussianInteger.coordinatesOfPolynomial_add(p', GaussianInteger.definingPolynomial * cofactor)
+           since GaussianInteger.coordinatesOfPolynomial_add
      = Product.make(Product.first(coords(p')), Product.second(coords(p')))
            by {
              -- each coordinate gains 0 from the vanishing multiple
@@ -81,7 +82,7 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
              done
            }
      = coords(p')
-           since GaussianInteger.product_eta(coords(p'))
+           since GaussianInteger.product_eta
 }
 
 -- ----------------------------------------------------------------------

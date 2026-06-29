@@ -52,38 +52,29 @@ overload coords := GaussianInteger.coordinatesOfCoefficients
 -- ----------------------------------------------------------------------
 -- An all-zero coefficient list has coordinates (0, 0).
 theorem GaussianInteger.coordinatesOfCoefficients_all_zero
-        : ∀ (a : Polynomial.Coefficients(Integer)).
-          (∀ (i : Natural). Polynomial.nth(Integer, Integer.zero, a, i) = Integer.zero)
-          → GaussianInteger.coordinatesOfCoefficients(a)
-            = Product.make(Integer.zero, Integer.zero)
-  | Polynomial.Coefficients.nil =>
-      (allZero
-          : ∀ (i : Natural). Polynomial.nth(Integer, Integer.zero,
-                Polynomial.Coefficients.nil(Integer), i) = Integer.zero) ↦
-        reflexivity(Pair(Integer, Integer), Product.make(Integer.zero, Integer.zero))
-  | Polynomial.Coefficients.cons(c, rest) =>
-      (allZero
-          : ∀ (i : Natural). Polynomial.nth(Integer, Integer.zero,
-                Polynomial.Coefficients.cons(Integer, c, rest), i) = Integer.zero) ↦ {
+        (a : Polynomial.Coefficients(Integer))
+        (allZero : ∀ (i : Natural).
+            Polynomial.nth(Integer, Integer.zero, a, i) = Integer.zero)
+        : GaussianInteger.coordinatesOfCoefficients(a)
+          = Product.make(Integer.zero, Integer.zero) :=
+  by_induction on a with IH refining allZero {
+    case Polynomial.Coefficients.nil:
+        done
+    case Polynomial.Coefficients.cons(c, rest): {
         claim cIsZero : c = Integer.zero by allZero(0);
-        claim restCoordinates
-            : coords(rest) = Product.make(Integer.zero, Integer.zero)
-            by GaussianInteger.coordinatesOfCoefficients_all_zero(rest,
-                   (i : Natural) ↦ allZero(successor(i)));
+        claim restCoordinates : coords(rest) = Product.make(Integer.zero, Integer.zero)
+            since IH((i : Natural) ↦ allZero(successor(i)));
         -- coords(c :: rest) = (c − im(rest), re(rest)) = (0, 0).
-        -- real coordinate
         calc c - Product.second(coords(rest))
            = c - Product.second(Product.make(Integer.zero, Integer.zero))
                  since restCoordinates
            = c - Integer.zero
-           = Integer.zero - Integer.zero
-                 by substituting cIsZero
-           = Integer.zero
-                 by ring;
-        -- imaginary coordinate
+           = Integer.zero - Integer.zero   by substituting cIsZero
+           = Integer.zero;
         claim Product.first(coords(rest)) = Integer.zero by restCoordinates;
         done
-      }
+    }
+  }
 
 -- ----------------------------------------------------------------------
 -- Coordinates respect extensional equality of coefficient lists: two
@@ -91,50 +82,47 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
 -- Each branch returns an explicit term checked against the goal by
 -- definitional unfolding of `coordinatesOfCoefficients` on a `cons`/`nil`.
 theorem GaussianInteger.coordinatesOfCoefficients_respects
-        : ∀ (a b : Polynomial.Coefficients(Integer)).
+        (a : Polynomial.Coefficients(Integer))
+        : ∀ (b : Polynomial.Coefficients(Integer)).
           Polynomial.ExtensionallyEqual(Integer, Integer.zero, a, b)
           → GaussianInteger.coordinatesOfCoefficients(a)
-            = GaussianInteger.coordinatesOfCoefficients(b)
-  | Polynomial.Coefficients.nil =>
-      (b : Polynomial.Coefficients(Integer))
-      (extensionallyEqual : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
-          Polynomial.Coefficients.nil(Integer), b)) ↦ {
+            = GaussianInteger.coordinatesOfCoefficients(b) :=
+  by_induction on a with IH {
+    case Polynomial.Coefficients.nil: {
+        take b : Polynomial.Coefficients(Integer);
+        suppose Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+            Polynomial.Coefficients.nil(Integer), b) as extensionallyEqual;
         -- b agrees with the empty list at every index, so b is all-zero too.
-        claim bAllZero
-            : ∀ (i : Natural). Polynomial.nth(Integer, Integer.zero, b, i) = Integer.zero
-            by (i : Natural) ↦
-                 calc Polynomial.nth(Integer, Integer.zero, b, i)
-                    = Integer.zero   since extensionallyEqual(i);
+        claim ∀ (i : Natural). Polynomial.nth(Integer, Integer.zero, b, i) = Integer.zero by {
+            take i : Natural;
+            done since extensionallyEqual(i)
+          };
         calc coords(Polynomial.Coefficients.nil(Integer))
            = Product.make(Integer.zero, Integer.zero)
-           = coords(b)
-                 since GaussianInteger.coordinatesOfCoefficients_all_zero(b, bAllZero)
-      }
-  | Polynomial.Coefficients.cons(c, rest) =>
-      (b : Polynomial.Coefficients(Integer))
-      (extensionallyEqual : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
-          Polynomial.Coefficients.cons(Integer, c, rest), b)) ↦
+           = coords(b)   since GaussianInteger.coordinatesOfCoefficients_all_zero
+    }
+    case Polynomial.Coefficients.cons(c, rest): {
+        take b : Polynomial.Coefficients(Integer);
+        suppose Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+            Polynomial.Coefficients.cons(Integer, c, rest), b) as extensionallyEqual;
         cases b {
-          | Polynomial.Coefficients.nil =>
-              GaussianInteger.coordinatesOfCoefficients_all_zero(
-                  Polynomial.Coefficients.cons(Integer, c, rest),
-                  (i : Natural) ↦ extensionallyEqual(i))
+          | Polynomial.Coefficients.nil => {
+              claim ∀ (i : Natural).
+                  Polynomial.nth(Integer, Integer.zero,
+                      Polynomial.Coefficients.cons(Integer, c, rest), i) = Integer.zero;
+              done
+            }
           | Polynomial.Coefficients.cons(d, restB) => {
               claim headsEqual : c = d by extensionallyEqual(0);
-              claim tailCoordinates
-                  : coords(rest) = coords(restB)
-                  by GaussianInteger.coordinatesOfCoefficients_respects(rest, restB,
-                         (i : Natural) ↦ extensionallyEqual(successor(i)));
+              claim tailCoordinates : coords(rest) = coords(restB)
+                  since IH(restB, (i : Natural) ↦ extensionallyEqual(successor(i)));
               -- coords(c :: rest) = (c − im(rest), re(rest)), likewise for d :: restB.
-              -- real coordinate: c − im(rest) = d − im(restB)
               calc c - Product.second(coords(rest))
                  = d - Product.second(coords(rest))   by headsEqual
                  = d - Product.second(coords(restB))  by tailCoordinates;
-              -- imaginary coordinate: re(rest) = re(restB)
-              claim Product.first(coords(rest)) = Product.first(coords(restB))
-                  by tailCoordinates;
-              -- assemble through the explicit pair forms (keeps both endpoints
-              -- cheap make(…) so the prover never unfolds the recursive coords)
+              claim Product.first(coords(rest)) = Product.first(coords(restB));
+              -- Assemble through the explicit make(…) forms so the prover never
+              -- unfolds the recursive coords.
               calc coords(Polynomial.Coefficients.cons(Integer, c, rest))
                  = Product.make(
                        c - Product.second(coords(rest)), Product.first(coords(rest)))
@@ -143,6 +131,8 @@ theorem GaussianInteger.coordinatesOfCoefficients_respects
                  = coords(Polynomial.Coefficients.cons(Integer, d, restB))
             }
         }
+    }
+  }
 
 -- ----------------------------------------------------------------------
 -- The coordinate map on ℤ[x] (lifting over the polynomial quotient).
