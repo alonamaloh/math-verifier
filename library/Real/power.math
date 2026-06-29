@@ -75,14 +75,14 @@ theorem Real.power_add_one (base : Real) (n : Natural)
 
 -- Powers of a nonnegative base are nonnegative.
 theorem Real.power_nonneg
-        (base : Real) (baseNonneg : Real.zero ≤ base) (n : Natural)
-        : Real.zero ≤ Real.power(base, n) :=
+        (base : Real) (baseNonneg : base ≥ Real.zero) (n : Natural)
+        : Real.power(base, n) ≥ Real.zero :=
   by_induction on n with IH {
     case base: {
-        claim Rational.zero < Rational.one;
-        claim Real.zero < (Rational.one : Real)
+        claim Rational.one > Rational.zero;
+        claim (Rational.one : Real) > Real.zero
             since Rational.to_real.positive_preserves;
-        claim Real.zero ≤ (Rational.one : Real)
+        claim (Rational.one : Real) ≥ Real.zero
             since Real.LessThan.weaken;
         done
       }
@@ -93,7 +93,7 @@ theorem Real.power_nonneg
             since Real.IsNonneg_of_LessOrEqual_zero;
         claim Real.IsNonneg(base * Real.power(base, predecessor))
             since Real.IsNonneg.multiply;
-        claim Real.zero ≤ base * Real.power(base, predecessor)
+        claim base * Real.power(base, predecessor) ≥ Real.zero
             since Real.LessOrEqual_zero_of_IsNonneg;
         done by substituting Real.power_add_one
       }
@@ -104,10 +104,10 @@ theorem Real.absolute_value_power (x : Real) (n : Natural)
         : abs(Real.power(x, n)) = Real.power(abs(x), n) :=
   by_induction on n with IH {
     case base: {
-        claim Rational.zero < Rational.one;
-        claim Real.zero < (Rational.one : Real)
+        claim Rational.one > Rational.zero;
+        claim (Rational.one : Real) > Real.zero
             since Rational.to_real.positive_preserves;
-        claim Real.zero ≤ Real.one since Real.LessThan.weaken;
+        claim Real.one ≥ Real.zero since Real.LessThan.weaken;
         claim Real.IsNonneg(Real.one)
             since Real.IsNonneg_of_LessOrEqual_zero;
         claim abs(Real.one) = Real.one
@@ -123,14 +123,13 @@ theorem Real.absolute_value_power (x : Real) (n : Natural)
            = abs(x) * Real.power(abs(x), predecessor)
                  since IH
            = Real.power(abs(x), 1 + predecessor)
-                 by substituting Real.power_add_one
   }
 
 -- Powers compare through the embedding: a rational upper bound on the
 -- base bounds every power by the cast of the rational power.
 theorem Real.power_le_cast_power
         (q : Real) (c : Rational) (n : Natural)
-        (qNonneg : Real.zero ≤ q) (qBound : q ≤ (c : Real))
+        (qNonneg : q ≥ Real.zero) (qBound : q ≤ (c : Real))
         : Real.power(q, n) ≤ (Rational.power(c, n) : Real) :=
   by_induction on n with IH {
     case base: {
@@ -138,7 +137,7 @@ theorem Real.power_le_cast_power
         done
       }
     case step(predecessor): {
-        claim Real.zero ≤ Real.power(q, predecessor)
+        claim Real.power(q, predecessor) ≥ Real.zero
             since Real.power_nonneg;
         claim Real.IsNonneg(Real.power(q, predecessor))
             since Real.IsNonneg_of_LessOrEqual_zero;
@@ -147,7 +146,6 @@ theorem Real.power_le_cast_power
             since Real.IsNonneg_of_LessOrEqual_zero;
         calc Real.power(q, 1 + predecessor)
            = q * Real.power(q, predecessor)
-                 by Real.power_add_one
            ≤ (c : Real) * Real.power(q, predecessor)
                  since Real.LessOrEqual.multiply_by_nonneg_right
            = Real.power(q, predecessor) * (c : Real)
@@ -157,7 +155,6 @@ theorem Real.power_le_cast_power
            = ((c * Rational.power(c, predecessor) : Rational) : Real)
                  since Rational.to_real.multiply_preserves
            = (Rational.power(c, 1 + predecessor) : Real)
-                 by substituting Rational.power_add_one
       }
   }
 
@@ -165,72 +162,60 @@ theorem Real.power_le_cast_power
 -- The tail estimate: past some index, every power of q sits below any
 -- given positive rational tolerance.
 theorem Real.power_eventually_below
-        (q : Real) (qNonneg : Real.zero ≤ q) (qBelowOne : q < Real.one)
-        (ε : Rational) (εPositive : Rational.zero < ε)
+        (q : Real) (qNonneg : q ≥ Real.zero) (qBelowOne : q < Real.one)
+        (ε : Rational) (εPositive : ε > Rational.zero)
         : ∃ (N : Natural). ∀ (m : Natural). N ≤ m
             → Real.power(q, m) < (ε : Real) := {
   -- A rational gap inside (0, 1 − q), giving the bound c := 1 − gap
   -- with q ≤ (c : ℝ) and c < 1.
-  claim gapPositive : Real.zero < Real.one - q
-      by calc Real.zero
-            = q - q
-            < Real.one - q      by Real.add_preserves_LessThan;
-  obtain ⟨gap, gapData⟩
-      from Real.exists_positive_rational_below(Real.one - q, gapPositive);
-  let ⟨gapRationalPositive, gapBelow⟩ := gapData;
+  calc Real.zero
+     = q - q
+     < Real.one - q      by Real.add_preserves_LessThan;
+  choose gap such that Rational.zero < gap ∧ (gap : Real) < Real.one - q
+      from Real.exists_positive_rational_below;
   -- The cast of 1 − gap is 1 − (gap : ℝ).
-  claim castSubtract
-        : ((Rational.one - gap) : Real) = Real.one - (gap : Real)
-      by calc ((Rational.one - gap) : Real)
-            = (Rational.one : Real) + ((-gap : Rational) : Real)
-                  by Rational.to_real.add_preserves(Rational.one, -gap)
-            = (Rational.one : Real) + -(gap : Real)
-                  by Rational.to_real.negate_preserves(gap)
-            = Real.one - (gap : Real);
+  calc ((Rational.one - gap) : Real)
+     = (Rational.one : Real) + ((-gap : Rational) : Real)
+     = (Rational.one : Real) + -(gap : Real)
+     = Real.one - (gap : Real)
+     as castSubtract;
   -- q ≤ 1 − (gap : ℝ) = (c : ℝ).
-  claim q + (gap : Real) < Real.one
-      by calc q + (gap : Real)
-            < q + (Real.one - q)    by Real.add_left_preserves_LessThan
-            = Real.one              by ring;
-  claim q < Real.one - (gap : Real)
-      by calc q
-            = (q + (gap : Real)) - (gap : Real)    by ring
-            < Real.one - (gap : Real)              by Real.add_preserves_LessThan;
+  calc q + (gap : Real)
+     < q + (Real.one - q)    by Real.add_left_preserves_LessThan
+     = Real.one              by ring;
+  calc q
+     = (q + (gap : Real)) - (gap : Real)    by ring
+     < Real.one - (gap : Real)              by Real.add_preserves_LessThan;
   claim q ≤ Real.one - (gap : Real) since Real.LessThan.weaken;
   claim q ≤ ((Rational.one - gap) : Real)
       by substituting castSubtract;
   -- c < 1 at the Rational level, reflected through the embedding.
-  claim Real.one - q ≤ Real.one
-      by calc Real.one - q
-            = Real.zero + (Real.one - q)    by ring
-            ≤ q + (Real.one - q)            by Real.add_preserves_LessOrEqual
-            = Real.one                      by ring;
-  claim (gap : Real) < (Rational.one : Real)
-      by calc (gap : Real)
-            < Real.one - q     by gapBelow
-            ≤ Real.one;
+  calc Real.one - q
+     = Real.zero + (Real.one - q)    by ring
+     ≤ q + (Real.one - q)            by Real.add_preserves_LessOrEqual
+     = Real.one;
+  calc (gap : Real)
+     < Real.one - q
+     ≤ Real.one
+     = (Rational.one : Real);
   claim gap < Rational.one since Rational.to_real.LessThan_reflects;
   claim gap ≤ Rational.one since Rational.LessThan.weaken;
   claim -Rational.one ≤ -gap since Rational.LessOrEqual.negate;
-  claim cNonneg : Rational.zero ≤ Rational.one - gap
-      by calc Rational.zero
-            = -Rational.one + Rational.one     by ring
-            ≤ -gap + Rational.one              by Rational.add_preserves_LessOrEqual
-            = Rational.one - gap               by ring;
+  calc Rational.zero
+     = -Rational.one + Rational.one
+     ≤ -gap + Rational.one              by Rational.add_preserves_LessOrEqual
+     = Rational.one - gap;
   claim -gap < Rational.zero
       since Rational.negate_LessThan_zero_of_positive;
-  claim cBelowOne : Rational.one - gap < Rational.one
-      by calc Rational.one - gap
-            = -gap + Rational.one             by ring
-            < Rational.zero + Rational.one    by Rational.add_preserves_LessThan
-            = Rational.one                    by ring;
+  calc Rational.one - gap
+     = -gap + Rational.one             by ring
+     < Rational.zero + Rational.one    by Rational.add_preserves_LessThan
+     = Rational.one;
   claim Rational.one - gap ≤ Rational.one
       since Rational.LessThan.weaken;
   -- Decay at the Rational layer, then transfer the whole tail.
-  obtain ⟨N, decayAtN⟩
-      from Rational.power_decay_witness(
-               Rational.one - gap, ε,
-               cNonneg, cBelowOne, εPositive);
+  choose N such that Rational.power(Rational.one - gap, N) < ε
+      from Rational.power_decay_witness;
   witness N with
       (m : Natural) (NLeqM : N ≤ m) ↦ {
         claim Rational.power(Rational.one - gap, m)
@@ -248,30 +233,29 @@ theorem Real.power_eventually_below
 
 -- Powers of q with 0 ≤ q < 1 converge to zero.
 theorem Real.power_converges_zero
-        (q : Real) (qNonneg : Real.zero ≤ q) (qBelowOne : q < Real.one)
+        (q : Real) (qNonneg : q ≥ Real.zero) (qBelowOne : q < Real.one)
         : Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), Real.zero) :=
   -- The decay tolerance lives at the rational layer (`power_eventually_below`),
   -- so build at a rational ε and lift by density.
   Real.SequenceConverges.of_rational(
       (n : Natural) ↦ Real.power(q, n), Real.zero,
-  (ε : Rational) (εPositive : Rational.zero < ε) ↦ {
-    obtain ⟨N, tailBelow⟩
-        from Real.power_eventually_below(
-                 q, qNonneg, qBelowOne, ε, εPositive);
+      rationalBound := (ε : Rational) (εPositive : ε > Rational.zero) ↦ {
+    choose N such that ∀ (m : Natural). N ≤ m → Real.power(q, m) < (ε : Real)
+        as tailBelow
+        from Real.power_eventually_below;
     witness N with
         (m : Natural) (NLeqM : N ≤ m) ↦ {
-          claim Real.power(q, m) < (ε : Real) by tailBelow(m, NLeqM);
-          claim Real.zero ≤ Real.power(q, m) since Real.power_nonneg;
+          claim Real.power(q, m) < (ε : Real) since tailBelow;
+          claim Real.power(q, m) ≥ Real.zero since Real.power_nonneg;
           claim Real.IsNonneg(Real.power(q, m))
               since Real.IsNonneg_of_LessOrEqual_zero;
-          claim absEqual : abs(Real.power(q, m) - Real.zero) = Real.power(q, m)
-              by calc abs(Real.power(q, m) - Real.zero)
-                    = abs(Real.power(q, m))
-                          by substituting
-                              (ring : Real.power(q, m) - Real.zero
-                                  = Real.power(q, m))
-                    = Real.power(q, m)
-                          since Real.absolute_value_when_nonneg;
+          calc abs(Real.power(q, m) - Real.zero)
+             = abs(Real.power(q, m))
+                   by substituting
+                       (ring : Real.power(q, m) - Real.zero = Real.power(q, m))
+             = Real.power(q, m)
+                   since Real.absolute_value_when_nonneg
+             as absEqual;
           done by substituting absEqual
         }
   })
@@ -290,13 +274,10 @@ theorem Real.power_add (x : Real) (exponent1 exponent2 : Natural)
     case step(predecessor):
         calc Real.power(x, (1 + predecessor) + exponent2)
            = Real.power(x, 1 + (predecessor + exponent2))
-                 by substituting (ring : (1 + predecessor) + exponent2 = 1 + (predecessor + exponent2))
            = x * Real.power(x, predecessor + exponent2)
-                 by Real.power_add_one
            = x * (Real.power(x, predecessor) * Real.power(x, exponent2))
                  since IH
            = (x * Real.power(x, predecessor)) * Real.power(x, exponent2)
-                 by ring
            = Real.power(x, 1 + predecessor) * Real.power(x, exponent2)
                  by substituting Real.power_add_one
   }
@@ -311,7 +292,6 @@ theorem Real.power_product (x y : Real) (n : Natural)
     case step(predecessor):
         calc Real.power(x * y, 1 + predecessor)
            = (x * y) * Real.power(x * y, predecessor)
-                 by Real.power_add_one
            = (x * y) * (Real.power(x, predecessor) * Real.power(y, predecessor))
                  since IH
            = (x * Real.power(x, predecessor)) * (y * Real.power(y, predecessor))
@@ -323,7 +303,7 @@ theorem Real.power_product (x y : Real) (n : Natural)
 
 -- Powers preserve the order between nonnegative bases.
 theorem Real.power_monotone (u v : Real) (n : Natural)
-        (uNonneg : Real.zero ≤ u) (uLeqV : u ≤ v)
+        (uNonneg : u ≥ Real.zero) (uLeqV : u ≤ v)
         : Real.power(u, n) ≤ Real.power(v, n) :=
   by_induction on n with IH {
     case base: {
@@ -332,41 +312,37 @@ theorem Real.power_monotone (u v : Real) (n : Natural)
       }
     case step(predecessor): {
         calc Real.zero ≤ u ≤ v;
-        claim Real.zero ≤ Real.power(u, predecessor)
+        claim Real.power(u, predecessor) ≥ Real.zero
             since Real.power_nonneg;
         claim Real.IsNonneg(Real.power(u, predecessor))
             since Real.IsNonneg_of_LessOrEqual_zero;
         claim Real.IsNonneg(v) since Real.IsNonneg_of_LessOrEqual_zero;
         calc Real.power(u, 1 + predecessor)
            = u * Real.power(u, predecessor)
-                 by Real.power_add_one
            ≤ v * Real.power(u, predecessor)
                  since Real.LessOrEqual.multiply_by_nonneg_right
            = Real.power(u, predecessor) * v
-                 by ring
            ≤ Real.power(v, predecessor) * v
                  since Real.LessOrEqual.multiply_by_nonneg_right
            = v * Real.power(v, predecessor)
-                 by ring
            = Real.power(v, 1 + predecessor)
-                 by substituting Real.power_add_one
       }
   }
 
 theorem Real.power_positive (x : Real) (n : Natural)
-        (xPositive : Real.zero < x)
-        : Real.zero < Real.power(x, n) :=
+        (xPositive : x > Real.zero)
+        : Real.power(x, n) > Real.zero :=
   by_induction on n with IH {
     case base: {
-        claim Rational.zero < Rational.one;
-        claim Real.zero < (Rational.one : Real)
+        claim Rational.one > Rational.zero;
+        claim (Rational.one : Real) > Real.zero
             since Rational.to_real.positive_preserves;
         done
       }
     case step(predecessor): {
-        claim Real.zero < x * Real.power(x, predecessor)
+        claim x * Real.power(x, predecessor) > Real.zero
             since Real.multiply_positive;
-        claim Real.zero < Real.power(x, 1 + predecessor)
+        claim Real.power(x, 1 + predecessor) > Real.zero
             by substituting Real.power_add_one;
         done
       }
