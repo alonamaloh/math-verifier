@@ -280,64 +280,66 @@ theorem IntegerMod.euler_fermat (n : Natural)
 
 -- ----------------------------------------------------------------------
 -- Euler's theorem over the integers (Freek #10): gcd(a, n) = 1 gives
--- a^φ(n) ≡ 1 (mod n) — coprimality is the only hypothesis. The
--- degenerate moduli hold on their own: φ(0) = 0 makes a^φ(0) = 1
--- on the nose, and everything is congruent mod 1.
+-- a^φ(n) ≡ 1 (mod n). The degenerate moduli hold on their own — φ(0) = 0
+-- makes a^φ(0) = 1 on the nose, and everything is congruent mod 1 — while
+-- for n ≥ 2 the class of a is a unit and the modular form applies.
 theorem Natural.euler_fermat (n a : Natural)
         (coprime : Natural.coprime(a, n))
         : Integer.CongruentModulo(n,
-              (Natural.power(Natural.totient(n), a) : Integer), Integer.one) :=
-  cases n refining coprime {
-    | zero => {
-        -- φ(0) = 0 (the coprime-residue list of 0 is empty), so a^φ(0) = a^0 = 1.
-        calc Natural.totient(0)
+              (Natural.power(Natural.totient(n), a) : Integer), Integer.one) := {
+  claim n = 0 ∨ ∃ (m : Natural). n = m + 1 since Natural.zero_or_add_one;
+  claim by cases {
+    in (n = 0) as nIsZero: {
+        calc Natural.totient(n)
+            = Natural.totient(0)
             = List.length(Natural, Natural.coprime_residues(0))
             = 0
           as totientZero;
-        calc Natural.power(Natural.totient(0), a)
+        calc Natural.power(Natural.totient(n), a)
             = Natural.power(0, a)   since totientZero
             = 1
           as powerIsOne;
         witness Integer.zero with
-            calc (Natural.power(Natural.totient(0), a) : Integer) - Integer.one
-               = ((1 : Natural) : Integer) - Integer.one
-                     by substituting powerIsOne
-               = ((0 : Natural) : Integer) * Integer.zero
-                     by ring
+            calc (Natural.power(Natural.totient(n), a) : Integer) - Integer.one
+               = ((1 : Natural) : Integer) - Integer.one   by substituting powerIsOne
+               = (n : Integer) * Integer.zero              by ring
       }
-    | successor(m) =>
-        cases m refining coprime {
-          | zero =>
-              -- n = 1 divides everything.
-              witness (Natural.power(Natural.totient(1), a) : Integer) - Integer.one with
-                  calc (Natural.power(Natural.totient(1), a) : Integer) - Integer.one
+    in (∃ (m : Natural). n = m + 1) as nPositive: {
+        choose m such that n = m + 1 as nEquation from nPositive;
+        claim m = 0 ∨ ∃ (k : Natural). m = k + 1 since Natural.zero_or_add_one;
+        claim by cases {
+          in (m = 0) as mIsZero: {
+              calc n = m + 1
+                   = 1   by substituting mIsZero
+                as nIsOne;
+              witness (Natural.power(Natural.totient(n), a) : Integer) - Integer.one with
+                  calc (Natural.power(Natural.totient(n), a) : Integer) - Integer.one
                      = ((1 : Natural) : Integer)
-                           * ((Natural.power(Natural.totient(1), a) : Integer)
-                               - Integer.one)
+                           * ((Natural.power(Natural.totient(n), a) : Integer) - Integer.one)
                            by ring
-          | successor(k) => {
-              -- n ≥ 2: the class of a is a unit, and Euler applies.
-              claim 1 ≤ successor(k) since Natural.successor_positive;
-              claim 2 ≤ successor(successor(k))
-                  since Natural.successor_less_or_equal_successor;
-              claim IntegerMod.is_unit(
-                        IntegerMod.make(successor(successor(k)), (a : Integer)))
+                     = (n : Integer)
+                           * ((Natural.power(Natural.totient(n), a) : Integer) - Integer.one)
+                           by substituting nIsOne
+            }
+          in (∃ (k : Natural). m = k + 1) as mPositive: {
+              choose k such that m = k + 1 as mEquation from mPositive;
+              claim 1 ≤ m by substituting mEquation;
+              calc (2 : Natural)
+                 = 1 + 1
+                 ≤ m + 1   by Natural.add_one_le_add_one_of_le
+                 = n;
+              claim IntegerMod.is_unit(IntegerMod.make(n, (a : Integer)))
                   since IntegerMod.unit_of_coprime;
               claim classPower
-                  : IntegerMod.power(successor(successor(k)),
-                        IntegerMod.make(successor(successor(k)), (a : Integer)),
-                        Natural.totient(successor(successor(k))))
-                    = IntegerMod.one(successor(successor(k)))
+                  : IntegerMod.power(n, IntegerMod.make(n, (a : Integer)), Natural.totient(n))
+                    = IntegerMod.one(n)
                   since IntegerMod.euler_fermat;
-              calc IntegerMod.make(successor(successor(k)),
-                        (Natural.power(Natural.totient(successor(successor(k))), a)
-                            : Integer))
-                  = IntegerMod.power(successor(successor(k)),
-                        IntegerMod.make(successor(successor(k)), (a : Integer)),
-                        Natural.totient(successor(successor(k))))
-                  = IntegerMod.one(successor(successor(k)))
-                        since classPower;
+              calc IntegerMod.make(n, (Natural.power(Natural.totient(n), a) : Integer))
+                  = IntegerMod.power(n, IntegerMod.make(n, (a : Integer)), Natural.totient(n))
+                  = IntegerMod.one(n)   since classPower;
               done since IntegerMod.congruent_of_make_equal
             }
         }
+      }
   }
+}
