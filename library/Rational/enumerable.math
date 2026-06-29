@@ -37,131 +37,92 @@ import Integer.enumerable
 import Rational.basics
 
 -- Shared witness step: given any positive-denominator form
--- numCanonical / succ(k) equal to a target rational, the listing
--- `(i, k) ↦ integerListing(i) / succ(k)` hits it.
+-- numCanonical / (k + 1) equal to a target rational, the listing
+-- `(i, k) ↦ integerListing(i) / (k + 1)` hits it.
 theorem Rational.enumeration_witness
         (integerListing : Natural → Integer)
         (integerSurjective : Function.IsSurjective(Natural, Integer, integerListing))
         (pairListing : Natural → Product(Natural, Natural))
         (pairSurjective : Function.IsSurjective(Natural, Product(Natural, Natural), pairListing))
         (target : Rational) (numCanonical : Integer) (k : Natural)
-        (targetEquation
-            : target
-              = Rational.fraction(
-                    numCanonical, ((k + 1) : Integer),
-                    Integer.from_natural_add_one_nonzero(k)))
+        (targetEquation : target = numCanonical / ((k + 1) : Integer))
         : ∃ (listIndex : Natural).
-            Rational.fraction(
-                integerListing(Product.first(pairListing(listIndex))),
-                ((Product.second(pairListing(listIndex)) + 1) : Integer),
-                Integer.from_natural_add_one_nonzero(
-                    Product.second(pairListing(listIndex))))
+            integerListing(Product.first(pairListing(listIndex)))
+            / ((Product.second(pairListing(listIndex)) + 1) : Integer)
             = target := {
-  choose i as integerHit from integerSurjective(numCanonical);
-  choose listIndex as pairHit from pairSurjective(Product.make(i, k));
+  choose i such that integerListing(i) = numCanonical as integerHit from integerSurjective(numCanonical);
+  choose listIndex such that pairListing(listIndex) = Product.make(i, k) as pairHit
+      from pairSurjective(Product.make(i, k));
   witness listIndex with
-      calc Rational.fraction(
-               integerListing(Product.first(pairListing(listIndex))),
-               ((Product.second(pairListing(listIndex)) + 1) : Integer),
-               Integer.from_natural_add_one_nonzero(
-                   Product.second(pairListing(listIndex))))
-         = Rational.fraction(
-               integerListing(Product.first(Product.make(i, k))),
-               ((Product.second(Product.make(i, k)) + 1) : Integer),
-               Integer.from_natural_add_one_nonzero(
-                   Product.second(Product.make(i, k))))
-               by substituting pairHit
-         = Rational.fraction(
-               numCanonical, ((k + 1) : Integer),
-               Integer.from_natural_add_one_nonzero(k))
-               by substituting integerHit
-         = target   by Equality.symmetry(targetEquation)
+      calc integerListing(Product.first(pairListing(listIndex)))
+           / ((Product.second(pairListing(listIndex)) + 1) : Integer)
+         = integerListing(Product.first(Product.make(i, k)))
+           / ((Product.second(Product.make(i, k)) + 1) : Integer)   by substituting pairHit
+         = numCanonical / ((k + 1) : Integer)                       by substituting integerHit
+         = target
 }
 
 -- Freek #3: ℚ is denumerable. Enumerate via (i, k) ↦ integerListing(i) /
--- succ(k); every rational has a positive-denominator form, found by
+-- (k + 1); every rational has a positive-denominator form, found by
 -- sign-splitting the denominator.
 theorem Rational.is_enumerable : IsEnumerable(Rational) := {
-  choose integerListing as integerSurjective from Integer.is_enumerable;
-  choose pairListing as pairSurjective from Natural.pairs_enumerable;
+  choose integerListing such that Function.IsSurjective(Natural, Integer, integerListing) as integerSurjective
+      from Integer.is_enumerable;
+  choose pairListing such that Function.IsSurjective(Natural, Pair(Natural, Natural), pairListing) as pairSurjective
+      from Natural.pairs_enumerable;
   witness ((listIndex : Natural) ↦
-      Rational.fraction(
-          integerListing(Product.first(pairListing(listIndex))),
-          ((Product.second(pairListing(listIndex)) + 1) : Integer),
-          Integer.from_natural_add_one_nonzero(
-              Product.second(pairListing(listIndex)))))
-  with
-      (target : Rational) ↦
-        cases target {
-          | RationalRepresentative.make(numerator, denominator, denominatorNonzero) =>
-              cases Integer.sign_split(denominator) {
-                | Or.introduceLeft(denominatorNonneg) => {
-                    choose m as denominatorImage from denominatorNonneg;
-                    cases Natural.zero_or_add_one(m) {
-                      | Or.introduceLeft(mIsZero) => {
-                          claim denominatorZero : denominator = Integer.zero
-                              by calc denominator
-                                    = (m : Integer)              by denominatorImage
-                                    = ((0 : Natural) : Integer)  by substituting mIsZero
-                                    = Integer.zero               by Natural.to_integer.zero_preserves;
-                          absurd(denominatorNonzero(denominatorZero))
-                        }
-                      | Or.introduceRight(mIsSuccessor) => {
-                          choose k as mEqualsSuccessor from mIsSuccessor;
-                          claim targetEquation
-                                : Rational.fraction(numerator, denominator, denominatorNonzero)
-                                  = Rational.fraction(
-                                        numerator, ((k + 1) : Integer),
-                                        Integer.from_natural_add_one_nonzero(k))
-                              by Quotient.equivalent_implies_equal(
-                                     RationalRepresentative, RationalEquivalent,
-                                     RationalRepresentative.make(numerator, denominator, denominatorNonzero),
-                                     RationalRepresentative.make(
-                                         numerator, ((k + 1) : Integer),
-                                         Integer.from_natural_add_one_nonzero(k)),
-                                     calc numerator * ((k + 1) : Integer)
-                                        = numerator * (m : Integer)        by substituting mEqualsSuccessor
-                                        = numerator * denominator          by substituting denominatorImage);
-                          Rational.enumeration_witness(
-                              integerListing, integerSurjective, pairListing, pairSurjective,
-                              Rational.fraction(numerator, denominator, denominatorNonzero), numerator, k, targetEquation)
-                        }
-                    }
-                  }
-                | Or.introduceRight(denominatorNegated) => {
-                    choose m as denominatorImage from denominatorNegated;
-                    cases Natural.zero_or_add_one(m) {
-                      | Or.introduceLeft(mIsZero) => {
-                          claim denominatorZero : denominator = Integer.zero
-                              by calc denominator
-                                    = -(m : Integer)              by denominatorImage
-                                    = -((0 : Natural) : Integer)  by substituting mIsZero
-                                    = Integer.zero                by ring;
-                          absurd(denominatorNonzero(denominatorZero))
-                        }
-                      | Or.introduceRight(mIsSuccessor) => {
-                          choose k as mEqualsSuccessor from mIsSuccessor;
-                          claim targetEquation
-                                : Rational.fraction(numerator, denominator, denominatorNonzero)
-                                  = Rational.fraction(
-                                        -numerator, ((k + 1) : Integer),
-                                        Integer.from_natural_add_one_nonzero(k))
-                              by Quotient.equivalent_implies_equal(
-                                     RationalRepresentative, RationalEquivalent,
-                                     RationalRepresentative.make(numerator, denominator, denominatorNonzero),
-                                     RationalRepresentative.make(
-                                         -numerator, ((k + 1) : Integer),
-                                         Integer.from_natural_add_one_nonzero(k)),
-                                     calc numerator * ((k + 1) : Integer)
-                                        = numerator * (m : Integer)        by substituting mEqualsSuccessor
-                                        = -numerator * -(m : Integer)      by ring
-                                        = -numerator * denominator         by substituting denominatorImage);
-                          Rational.enumeration_witness(
-                              integerListing, integerSurjective, pairListing, pairSurjective,
-                              Rational.fraction(numerator, denominator, denominatorNonzero), -numerator, k, targetEquation)
-                        }
-                    }
-                  }
+      integerListing(Product.first(pairListing(listIndex)))
+      / ((Product.second(pairListing(listIndex)) + 1) : Integer))
+  with {
+    take target as RationalRepresentative.make(numerator, denominator, denominatorNonzero) : Rational;
+    claim Integer.IsNonneg(denominator) ∨ ∃ (k : Natural). denominator = -(k : Integer)
+        since Integer.sign_split;
+    claim by cases {
+      in (Integer.IsNonneg(denominator)) as denominatorNonneg: {
+          choose m such that denominator = (m : Integer) as denominatorImage from denominatorNonneg;
+          claim m = 0 ∨ ∃ (k : Natural). m = k + 1 since Natural.zero_or_add_one;
+          claim by cases {
+            in (m = 0) as mIsZero: {
+                calc denominator
+                   = (m : Integer)
+                   = ((0 : Natural) : Integer)  by substituting mIsZero
+                   = Integer.zero;
+                absurd(denominatorNonzero(denominator = Integer.zero))
               }
+            in (∃ (k : Natural). m = k + 1) as mIsSuccessor: {
+                choose k such that m = k + 1 as mEqualsSuccessor from mIsSuccessor;
+                calc numerator * ((k + 1) : Integer)
+                   = numerator * (m : Integer)   by substituting mEqualsSuccessor
+                   = numerator * denominator;
+                claim Rational.fraction(numerator, denominator, denominatorNonzero)
+                      = numerator / ((k + 1) : Integer);
+                done since Rational.enumeration_witness
+              }
+          }
         }
+      in (∃ (k : Natural). denominator = -(k : Integer)) as denominatorNegated: {
+          choose m such that denominator = -(m : Integer) as denominatorImage from denominatorNegated;
+          claim m = 0 ∨ ∃ (k : Natural). m = k + 1 since Natural.zero_or_add_one;
+          claim by cases {
+            in (m = 0) as mIsZero: {
+                calc denominator
+                   = -(m : Integer)
+                   = -((0 : Natural) : Integer)  by substituting mIsZero
+                   = Integer.zero;
+                absurd(denominatorNonzero(denominator = Integer.zero))
+              }
+            in (∃ (k : Natural). m = k + 1) as mIsSuccessor: {
+                choose k such that m = k + 1 as mEqualsSuccessor from mIsSuccessor;
+                calc numerator * ((k + 1) : Integer)
+                   = numerator * (m : Integer)    by substituting mEqualsSuccessor
+                   = -numerator * -(m : Integer)  by ring
+                   = -numerator * denominator     by substituting denominatorImage;
+                claim Rational.fraction(numerator, denominator, denominatorNonzero)
+                      = -numerator / ((k + 1) : Integer);
+                done since Rational.enumeration_witness
+              }
+          }
+        }
+    }
+  }
 }
