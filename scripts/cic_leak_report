@@ -108,6 +108,17 @@ SUCCESSOR_CATEGORY = "successor (outside Natural/)"
 SUCCESSOR_RE = re.compile(r"\bsuccessor\b")
 NATURAL_DIR_PREFIX = os.path.join("library", "Natural") + os.sep
 
+# A numeral literal annotated `: Natural` — `(1 : Natural)`, `(0 : Natural)`,
+# … — is pure redundancy: a bare numeral already IS a Natural in this system
+# (numerals default to Natural), and coercion injects it into Integer / Rational
+# / Real where a wider type is wanted, so the annotation never carries
+# information. This regex also catches the inner half of a nested cast
+# `((1 : Natural) : Integer)`, which should read `(1 : Integer)` (or just `1`).
+# Only numerals match — `(k : Natural)` binders are untouched. Tracked
+# separately (advisory, not gated), so it never inflates the CIC-leak total.
+NUMERAL_NATURAL_CATEGORY = "numeral annotated `: Natural`"
+NUMERAL_NATURAL_RE = re.compile(r"\(\s*\d+\s*:\s*Natural\s*\)")
+
 # A qualified or bare name immediately followed by `(`. We only count it when
 # the name is a known `theorem` (so definitions, constructors, and type
 # formers are excluded); any positional-argument arity counts.
@@ -268,7 +279,8 @@ def scan_file(path, theorem_names):
     successor_count = (
         0 if rel.startswith(NATURAL_DIR_PREFIX)
         else len(SUCCESSOR_RE.findall(body)))
-    return leaks, arity, successor_count
+    numeral_natural_count = len(NUMERAL_NATURAL_RE.findall(body))
+    return leaks, arity, successor_count, numeral_natural_count
 
 
 def main():
@@ -296,9 +308,11 @@ def main():
     per_file = {}            # rel_path -> {category: count}   (counted leaks)
     per_file_anti = {}       # rel_path -> {arity: count}       (informational)
     per_file_successor = {}  # rel_path -> successor count       (separate tally)
+    per_file_numeral = {}    # rel_path -> (numeral : Natural) count (separate)
     category_totals = {name: 0 for name in category_names}
     anti_totals = {"1 arg": 0, "2 args": 0, ">=3 args": 0}
     successor_total = 0
+    numeral_total = 0
     foundational_count = 0
 
     for dirpath, _dirs, files in os.walk(LIBRARY_ROOT):
@@ -312,7 +326,7 @@ def main():
             if is_foundational(rel, exact, prefixes):
                 foundational_count += 1
                 continue
-            leaks, antis, successor_count = scan_file(full, theorem_names)
+            leaks, antis, successor_count, numeral_count = scan_file(full, theorem_names)
             if sum(leaks.values()) > 0:
                 per_file[rel] = leaks
                 for name, count in leaks.items():
@@ -324,6 +338,9 @@ def main():
             if successor_count > 0:
                 per_file_successor[rel] = successor_count
                 successor_total += successor_count
+            if numeral_count > 0:
+                per_file_numeral[rel] = numeral_count
+                numeral_total += numeral_count
 
     total = sum(category_totals.values())
     anti_total = sum(anti_totals.values())
@@ -344,6 +361,10 @@ def main():
             "successor_outside_natural": {
                 "total": successor_total,
                 "per_file": dict(sorted(per_file_successor.items())),
+            },
+            "numeral_annotated_natural": {
+                "total": numeral_total,
+                "per_file": dict(sorted(per_file_numeral.items())),
             },
         }, indent=2, ensure_ascii=False))
     else:
@@ -382,6 +403,19 @@ def main():
         if args.by_file and per_file_successor:
             print("  Per-file (most first):")
             for rel, count in sorted(per_file_successor.items(),
+                                     key=lambda kv: kv[1], reverse=True):
+                print(f"  {count:4d}  {rel}")
+
+        print("\nnumeral annotated `: Natural` (redundant — `1` already IS a"
+              " Natural; coercion widens it; target 0)")
+        print("=" * 62)
+        print(f"  {numeral_total:5d}  across {len(per_file_numeral)} files")
+        print("        hint: drop the annotation (`(1 : Natural)` -> `1`); for a"
+              " nested cast `((1 : Natural) : Integer)` write `(1 : Integer)`."
+              " These flag OLD proofs — re-think them, don't strip mechanically.")
+        if args.by_file and per_file_numeral:
+            print("  Per-file (most first):")
+            for rel, count in sorted(per_file_numeral.items(),
                                      key=lambda kv: kv[1], reverse=True):
                 print(f"  {count:4d}  {rel}")
 
