@@ -474,6 +474,18 @@ theorem Real.means_inequality_double (m : Natural)
 -- scaled values m·s(k) and, as the last entry, the plain sum A — its
 -- sum telescopes to (m+1)·A and its product to A·mᵐ·Π, so the (m+1)
 -- inequality collapses onto the m one after cancelling (m+1)ᵐ⁺¹ and A.
+-- The augmented scaled row used to fold an (m+1)-term mean back to an
+-- m-term one: slot 0 carries the whole sum A = Σ_{<m} s, and slot j+1
+-- carries m·s(j). Over m+1 slots its sum telescopes to (m+1)·A and its
+-- product is A·mᵐ·Π, so the (m+1)-case applied to it yields the m-case.
+definition Real.augmentedScaledRow (s : Natural → Real) (m : Natural)
+        : Natural → Real :=
+  (k : Natural) ↦
+    cases k {
+      | zero => Real.partialSum(s, m)
+      | successor(j) => ((m : Rational) : Real) * s(j)
+    }
+
 theorem Real.means_inequality_predecessor (m : Natural)
         (atSuccessor : Real.MeansInequalityAt(successor(m)))
         : Real.MeansInequalityAt(m) :=
@@ -489,13 +501,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
     claim Real.zero ≤ ((m : Rational) : Real);
     claim Real.IsNonneg(((m : Rational) : Real))
         since Real.IsNonneg_of_LessOrEqual_zero;
-    -- The augmented scaled row.
-    claim ∀ (k : Natural).
-              Real.zero
-              ≤ ((cases k {
-                    | zero => Real.partialSum(s, m)
-                    | successor(j) => ((m : Rational) : Real) * s(j)
-                  } : Real))
+    claim ∀ (k : Natural). Real.zero ≤ Real.augmentedScaledRow(s, m, k)
         by (k : Natural) ↦
              cases k {
                | zero => ANonneg
@@ -512,21 +518,9 @@ theorem Real.means_inequality_predecessor (m : Natural)
              };
     claim applied
           : Real.power(((successor(m) : Rational) : Real), successor(m))
-            * Real.partialProduct(
-                  (k : Natural) ↦
-                      cases k {
-                        | zero => Real.partialSum(s, m)
-                        | successor(j) => ((m : Rational) : Real) * s(j)
-                      },
-                  successor(m))
+            * Real.partialProduct(Real.augmentedScaledRow(s, m), successor(m))
             ≤ Real.power(
-                  Real.partialSum(
-                      (k : Natural) ↦
-                          cases k {
-                            | zero => Real.partialSum(s, m)
-                            | successor(j) => ((m : Rational) : Real) * s(j)
-                          },
-                      successor(m)),
+                  Real.partialSum(Real.augmentedScaledRow(s, m), successor(m)),
                   successor(m))
         since atSuccessor;
     -- The augmented sum telescopes to (m+1)·A.
@@ -541,68 +535,33 @@ theorem Real.means_inequality_predecessor (m : Natural)
                 since Real.from_natural_one_preserves
         as succCast;
     claim ∀ (j : Natural).
-              ((cases 1 + j {
-                  | zero => Real.partialSum(s, m)
-                  | successor(j2) => ((m : Rational) : Real) * s(j2)
-                } : Real))
-              = ((m : Rational) : Real) * s(j)
+              Real.augmentedScaledRow(s, m, 1 + j) = ((m : Rational) : Real) * s(j)
         by (j : Natural) ↦
-             calc ((cases 1 + j {
-                      | zero => Real.partialSum(s, m)
-                      | successor(j2) => ((m : Rational) : Real) * s(j2)
-                    } : Real))
-                = ((cases successor(j) {
-                      | zero => Real.partialSum(s, m)
-                      | successor(j2) => ((m : Rational) : Real) * s(j2)
-                    } : Real))
-                = ((m : Rational) : Real) * s(j);
+             calc Real.augmentedScaledRow(s, m, 1 + j)
+                = ((m : Rational) : Real) * s(j)   by substituting Natural.one_add;
     calc Real.partialSum(
-             (k : Natural) ↦
-                 cases k {
-                   | zero => Real.partialSum(s, m)
-                   | successor(j) => ((m : Rational) : Real) * s(j)
-                 },
+             Real.augmentedScaledRow(s, m),
              successor(m))
               = Real.partialSum(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     m + 1)
                     by indexEquation
               = Real.partialSum(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     1)
                 + Real.partialSum(
-                      (j : Natural) ↦
-                          cases 1 + j {
-                            | zero => Real.partialSum(s, m)
-                            | successor(j2) => ((m : Rational) : Real) * s(j2)
-                          },
+                      (j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j),
                       m)
                     since Real.partialSum_split
               = Real.partialSum(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     1)
                 + Real.partialSum(
                       (j : Natural) ↦ ((m : Rational) : Real) * s(j),
                       m)
                     since Real.partialSum_pointwise
               = Real.partialSum(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     1)
                 + ((m : Rational) : Real) * Real.partialSum(s, m)
                     since Real.partialSum_scale
@@ -615,53 +574,28 @@ theorem Real.means_inequality_predecessor (m : Natural)
         as sumValue;
     -- The augmented product telescopes to A·mᵐ·Π.
     calc Real.partialProduct(
-             (k : Natural) ↦
-                 cases k {
-                   | zero => Real.partialSum(s, m)
-                   | successor(j) => ((m : Rational) : Real) * s(j)
-                 },
+             Real.augmentedScaledRow(s, m),
              successor(m))
               = Real.partialProduct(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     m + 1)
                     by indexEquation
               = Real.partialProduct(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     1)
                 * Real.partialProduct(
-                      (j : Natural) ↦
-                          cases 1 + j {
-                            | zero => Real.partialSum(s, m)
-                            | successor(j2) =>
-                                ((m : Rational) : Real) * s(j2)
-                          },
+                      (j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j),
                       m)
                     since Real.partialProduct_split
               = Real.partialProduct(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     1)
                 * Real.partialProduct(
                       (j : Natural) ↦ ((m : Rational) : Real) * s(j),
                       m)
                     since Real.partialProduct_pointwise
               = Real.partialProduct(
-                    (k : Natural) ↦
-                        cases k {
-                          | zero => Real.partialSum(s, m)
-                          | successor(j) => ((m : Rational) : Real) * s(j)
-                        },
+                    Real.augmentedScaledRow(s, m),
                     1)
                 * (Real.power(((m : Rational) : Real), m)
                    * Real.partialProduct(s, m))
@@ -688,23 +622,10 @@ theorem Real.means_inequality_predecessor (m : Natural)
             * (Real.power(((m : Rational) : Real), m)
                * Real.partialProduct(s, m)))
               = Real.power(((successor(m) : Rational) : Real), successor(m))
-                * Real.partialProduct(
-                      (k : Natural) ↦
-                          cases k {
-                            | zero => Real.partialSum(s, m)
-                            | successor(j) => ((m : Rational) : Real) * s(j)
-                          },
-                      successor(m))
+                * Real.partialProduct(Real.augmentedScaledRow(s, m), successor(m))
                     by productValue
               ≤ Real.power(
-                    Real.partialSum(
-                        (k : Natural) ↦
-                            cases k {
-                              | zero => Real.partialSum(s, m)
-                              | successor(j) =>
-                                  ((m : Rational) : Real) * s(j)
-                            },
-                        successor(m)),
+                    Real.partialSum(Real.augmentedScaledRow(s, m), successor(m)),
                     successor(m))
                     by applied
               = Real.power(
