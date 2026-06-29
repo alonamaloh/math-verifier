@@ -87,12 +87,10 @@ theorem IntegerMod.unit_residues_complete (n : Natural)
       from IntegerMod.exists_natural_representative;
   claim r < n;
   claim cEquation : c = IntegerMod.make(n, (r : Integer));
-  -- The representative inherits the unit, hence is coprime to n.
   claim IntegerMod.is_unit(IntegerMod.make(n, (r : Integer)))
       by substituting cEquation;
   claim Natural.coprime(r, n)
       since IntegerMod.coprime_of_unit_representative;
-  -- r ≠ 0: gcd(0, n) = n would force n = 1.
   claim r ≠ 0 by {
       suppose r = 0 as rZero;
       claim Natural.coprime(0, n) by substituting rZero;
@@ -102,7 +100,6 @@ theorem IntegerMod.unit_residues_complete (n : Natural)
     };
   claim 1 ≤ r;
   claim r ≤ n;
-  -- So r survives the coprime filter of [1..n], and its class is listed.
   claim List.member(Natural, r, List.range_down(n))
       since List.range_down_complete;
   claim List.member(Natural, r, Natural.coprime_residues(n))
@@ -170,7 +167,6 @@ theorem IntegerMod.scaled_unit_residue_member (n : Natural)
             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
                 IntegerMod.unit_residues(n))))
         : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n)) := {
-  -- z = x·u with u a listed unit, so z is a unit, hence listed.
   claim scaledExists : ∃ (u : IntegerMod(n)).
         List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
         ∧ IntegerMod.multiply_by(n, x, u) = z
@@ -220,7 +216,6 @@ theorem IntegerMod.euler_fermat (n : Natural)
                 IntegerMod.unit_residues(n)),
             IntegerMod.unit_residues(n))
       since List.permutation_of_distinct_inclusion;
-  -- Multiply out both sides of the permutation.
   claim ∀ (u v w : IntegerMod(n)). (u * v) * w = u * (v * w)
       since IntegerMod.multiply_associative;
   claim ∀ (u v : IntegerMod(n)). u * v = v * u
@@ -243,7 +238,6 @@ theorem IntegerMod.euler_fermat (n : Natural)
               IntegerMod.unit_residues(n))
               since productEquation
       as scaledProduct;
-  -- Cancel the product of all units — itself a unit.
   claim ∀ (z : IntegerMod(n)).
         List.member(IntegerMod(n), z, IntegerMod.unit_residues(n))
         → IntegerMod.is_unit(z)
@@ -252,25 +246,21 @@ theorem IntegerMod.euler_fermat (n : Natural)
             List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
                 IntegerMod.unit_residues(n)))
       since IntegerMod.product_unit;
-  calc List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
-            IntegerMod.unit_residues(n))
-            * IntegerMod.power(n, x,
-                  List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
-        = IntegerMod.power(n, x,
-              List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
-              * List.product(IntegerMod(n), IntegerMod.multiply,
-                    IntegerMod.one(n), IntegerMod.unit_residues(n))
+  calc IntegerMod.power(n, x,
+            List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
+            * List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                  IntegerMod.unit_residues(n))
         = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
               IntegerMod.unit_residues(n))
               by scaledProduct
-        = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
-              IntegerMod.unit_residues(n)) * IntegerMod.one(n)
-              by IntegerMod.multiply_identity_right;
+        = IntegerMod.one(n)
+              * List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                    IntegerMod.unit_residues(n))
+              by IntegerMod.multiply_identity_left;
   claim IntegerMod.power(n, x,
             List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
         = IntegerMod.one(n)
-      since IntegerMod.multiply_cancel_left_of_unit;
-  -- The list has exactly φ(n) elements.
+      since IntegerMod.multiply_cancel_right_of_unit;
   claim lengthValue
       : List.length(IntegerMod(n), IntegerMod.unit_residues(n))
         = Natural.totient(n)
