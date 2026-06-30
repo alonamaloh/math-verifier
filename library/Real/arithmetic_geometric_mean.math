@@ -78,39 +78,21 @@ theorem Real.geometric_mean_le_arithmetic_mean
         (xNonneg : 0 ≤ x) (yNonneg : 0 ≤ y)
         (gNonneg : 0 ≤ g)
         (gSquare : g * g = x * y)
-        : g ≤ (x + y) * (Rational.one_half : Real) := {
-  let mean : Real := (x + y) * (Rational.one_half : Real);
-  let halfDiff : Real := (x - y) * (Rational.one_half : Real);
-  calc (Rational.one_half : Real) + (Rational.one_half : Real)
-        = ((Rational.one_half + Rational.one_half) : Real)   since Rational.to_real.add_preserves
-        = (Rational.one : Real)                               by Rational.one_half_doubled
-      as halfSum;
-  claim Rational.zero < Rational.one_half since Rational.one_half_positive;
-  claim 0 < (Rational.one_half : Real) since Rational.to_real.positive_preserves;
-  claim 0 ≤ (Rational.one_half : Real) since Real.LessThan.weaken;
+        : g ≤ (x + y) / 2 := {
+  let mean : Real := (x + y) / 2;
+  let halfDiff : Real := (x - y) / 2;
   -- The mean is nonnegative.
   calc (0 : Real)
         = 0 + 0
         ≤ x + 0   by Real.add_preserves_LessOrEqual
         ≤ x + y    since Real.add_preserves_LessOrEqual_left;
-  claim Real.IsNonneg(x + y) since Real.IsNonneg_of_LessOrEqual_zero;
-  claim Real.IsNonneg((Rational.one_half : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
-  claim Real.IsNonneg(mean) since Real.IsNonneg.multiply;
-  claim 0 ≤ mean since Real.LessOrEqual_zero_of_IsNonneg;
-  -- The square gap: mean² − x·y = ((x − y)/2)².
-  claim gapIdentity
-        : ((x + y) * (Rational.one_half : Real)) * ((x + y) * (Rational.one_half : Real)) - x * y
-          = ((x - y) * (Rational.one_half : Real)) * ((x - y) * (Rational.one_half : Real))
-      by linear_combination(
-             x * y * ((Rational.one_half : Real) + (Rational.one_half : Real) + Real.one) * halfSum);
+  claim 0 < (2 : Real) since Real.two_positive;
+  claim 0 ≤ mean since Real.divide_nonneg;
+  -- g² ≤ mean², via the square gap mean² − x·y = ((x − y)/2)².
+  claim productValue : x * y = ((x + y) / 2) * ((x + y) / 2) - ((x - y) / 2) * ((x - y) / 2)
+      by field;
   claim Real.IsNonneg(halfDiff * halfDiff) since Real.square_IsNonneg;
   claim 0 ≤ halfDiff * halfDiff since Real.LessOrEqual_zero_of_IsNonneg;
-  -- g² ≤ mean².
-  claim productValue
-        : x * y
-          = ((x + y) * (Rational.one_half : Real)) * ((x + y) * (Rational.one_half : Real))
-            - ((x - y) * (Rational.one_half : Real)) * ((x - y) * (Rational.one_half : Real))
-      by linear_combination(Real.zero - gapIdentity);
   calc -(halfDiff * halfDiff)
         = 0 - halfDiff * halfDiff   by ring
         ≤ halfDiff * halfDiff - halfDiff * halfDiff   by Real.add_preserves_LessOrEqual
@@ -142,15 +124,14 @@ theorem Real.arithmetic_geometric_mean_two
         (x y : Real)
         (xNonneg : 0 ≤ x) (yNonneg : 0 ≤ y)
         : ∃ (g : Real).
-            0 ≤ g ∧ g * g = x * y ∧ g ≤ (x + y) * (Rational.one_half : Real) := {
+            0 ≤ g ∧ g * g = x * y ∧ g ≤ (x + y) / 2 := {
   claim Real.IsNonneg(x) since Real.IsNonneg_of_LessOrEqual_zero;
   claim Real.IsNonneg(y) since Real.IsNonneg_of_LessOrEqual_zero;
   claim Real.IsNonneg(x * y) since Real.IsNonneg.multiply;
   claim 0 ≤ x * y since Real.LessOrEqual_zero_of_IsNonneg;
   choose g such that 0 ≤ g ∧ g * g = x * y from Real.square_root_exists;
   witness g with {
-    claim g ≤ (x + y) * (Rational.one_half : Real)
-        since Real.geometric_mean_le_arithmetic_mean;
+    claim g ≤ (x + y) / 2 since Real.geometric_mean_le_arithmetic_mean;
     done
   }
 }
