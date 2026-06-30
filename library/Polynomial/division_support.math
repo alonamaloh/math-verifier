@@ -6,7 +6,7 @@
 --   * Small Natural facts the standard library happens not to carry yet
 --     (successor-≤ inversion, ¬(successor(m) ≤ m), the monus/add cancel
 --     law, the ≤-successor split).
---   * `Polynomial.Sum.single_point`: a sum whose summand vanishes off a
+--   * `Ring.Sum.single_point`: a sum whose summand vanishes off a
 --     single index j (with j ≤ n) collapses to its value at j. This is
 --     what turns the convolution for a monomial times a polynomial into
 --     a single product.
@@ -27,7 +27,7 @@ import Natural.decide
 import Natural.add_order
 import Algebra.ring
 import Algebra.ring_bundle
-import Polynomial.summation
+import Algebra.ring_summation
 import Polynomial.commutative
 
 -- ----------------------------------------------------------------------
@@ -57,28 +57,28 @@ theorem Natural.degree_bound_helper (d j i : Natural)
 -- Single-point summation.
 
 -- A sum whose summand vanishes everywhere on 0..n is zero.
-theorem Polynomial.Sum.vanishes_below (r : Ring)
+theorem Ring.Sum.vanishes_below (r : Ring)
         (h : Natural → Ring.carrier(r)) (n : Natural)
         (vanish : ∀ (i : Natural). i ≤ n → h(i) = Ring.zero(r))
-        : Polynomial.Sum(r, h, n) = Ring.zero(r) :=
-  calc Polynomial.Sum(r, h, n)
-     = Polynomial.Sum(r, (i : Natural) ↦ Ring.zero(r), n)
+        : Ring.Sum(r, h, n) = Ring.zero(r) :=
+  calc Ring.Sum(r, h, n)
+     = Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), n)
      = Ring.zero(r)
-           by Polynomial.Sum.zero
+           by Ring.Sum.zero
 
 -- A sum whose summand vanishes off a single index j ≤ n equals h(j).
-theorem Polynomial.Sum.single_point (r : Ring)
+theorem Ring.Sum.single_point (r : Ring)
         (h : Natural → Ring.carrier(r)) (j : Natural) (n : Natural)
         : j ≤ n
           → (∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r))
-          → Polynomial.Sum(r, h, n) = h(j) :=
+          → Ring.Sum(r, h, n) = h(j) :=
   by_induction on n with IH {
     case zero:
       (jLessOrEqualZero : j ≤ 0)
                (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦ {
         claim jEqualsZero : j = 0
             by Natural.less_or_equal_zero_implies_equals_zero(j, jLessOrEqualZero);
-        calc Polynomial.Sum(r, h, 0)
+        calc Ring.Sum(r, h, 0)
            = h(0)
            = h(j)   by jEqualsZero
       }
@@ -87,8 +87,8 @@ theorem Polynomial.Sum.single_point (r : Ring)
                (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦
           decide j = successor(m) {
             | yes jEqualsSuccessor => {
-                claim Polynomial.Sum(r, h, m) = Ring.zero(r)
-                    by Polynomial.Sum.vanishes_below(r, h, m,
+                claim Ring.Sum(r, h, m) = Ring.zero(r)
+                    by Ring.Sum.vanishes_below(r, h, m,
                            (i : Natural) (iLessOrEqualM : i ≤ m) ↦
                                vanish(i,
                                    (iEqualsJ : i = j) ↦
@@ -96,8 +96,8 @@ theorem Polynomial.Sum.single_point (r : Ring)
                                            calc successor(m) = j   by jEqualsSuccessor
                                                              = i   by iEqualsJ
                                                              ≤ m   by iLessOrEqualM)));
-                calc Polynomial.Sum(r, h, successor(m))
-                   = (Polynomial.Sum(r, h, m) + h(successor(m)))
+                calc Ring.Sum(r, h, successor(m))
+                   = (Ring.Sum(r, h, m) + h(successor(m)))
                    = (Ring.zero(r) + h(successor(m)))
                    = h(successor(m))
                    = h(j)
@@ -110,8 +110,8 @@ theorem Polynomial.Sum.single_point (r : Ring)
                     by vanish(successor(m),
                            (successorEqualsJ : successor(m) = j) ↦
                                jNotEqualsSuccessor(Equality.symmetry(successorEqualsJ)));
-                calc Polynomial.Sum(r, h, successor(m))
-                   = (Polynomial.Sum(r, h, m) + h(successor(m)))
+                calc Ring.Sum(r, h, successor(m))
+                   = (Ring.Sum(r, h, m) + h(successor(m)))
                    = (h(j) + h(successor(m)))
                          by IH(jLessOrEqualM, vanish)
                    = (h(j) + Ring.zero(r))

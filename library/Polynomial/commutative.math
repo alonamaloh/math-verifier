@@ -25,7 +25,7 @@ import Polynomial.basics
 import Polynomial.addition
 import Polynomial.negation
 import Polynomial.additive_group
-import Polynomial.summation
+import Algebra.ring_summation
 import Polynomial.multiplication
 import Polynomial.multiply_laws
 import Polynomial.instances
@@ -61,48 +61,48 @@ theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
 }
 
 -- Sum respects pointwise equality on the summation range 0..n.
-theorem Polynomial.Sum.extensional_range (r : Ring)
+theorem Ring.Sum.extensional_range (r : Ring)
         (f g : Natural → Ring.carrier(r))
         : ∀ (n : Natural).
           (∀ (i : Natural). i ≤ n → f(i) = g(i))
-          → Polynomial.Sum(r, f, n) = Polynomial.Sum(r, g, n)
+          → Ring.Sum(r, f, n) = Ring.Sum(r, g, n)
   | zero => (h : ∀ (i : Natural). i ≤ 0 → f(i) = g(i)) ↦
       h(0, Natural.LessOrEqual.reflexive(0))
   | successor(k) => (h : ∀ (i : Natural). i ≤ successor(k) → f(i) = g(i)) ↦
-      calc Polynomial.Sum(r, f, successor(k))
-         = (Polynomial.Sum(r, f, k) + f(successor(k)))
-         = (Polynomial.Sum(r, g, k) + f(successor(k)))
-             by Polynomial.Sum.extensional_range(r, f, g, k,
+      calc Ring.Sum(r, f, successor(k))
+         = (Ring.Sum(r, f, k) + f(successor(k)))
+         = (Ring.Sum(r, g, k) + f(successor(k)))
+             by Ring.Sum.extensional_range(r, f, g, k,
                     (i : Natural) (smaller : i ≤ k) ↦
                         h(i, (calc i
                                  ≤ k             by smaller
                                  ≤ successor(k)  by Natural.le_successor)))
-         = (Polynomial.Sum(r, g, k) + g(successor(k)))
+         = (Ring.Sum(r, g, k) + g(successor(k)))
              by h(successor(k), Natural.LessOrEqual.reflexive(successor(k)))
-         = Polynomial.Sum(r, g, successor(k))
+         = Ring.Sum(r, g, successor(k))
 
 -- Register the range-restricted variant too: a `Sum(r,f,n) = Sum(r,g,n)`
 -- step also closes from `(i) => i ≤ n => f(i) = g(i)`. The elaborator
 -- tries Sum.extensional first (fails on the 2-binder lambda) then this.
-congruence_under_binder Polynomial.Sum := Polynomial.Sum.extensional_range
+congruence_under_binder Ring.Sum := Ring.Sum.extensional_range
 
 -- ----------------------------------------------------------------------
 -- Sum reflection: Σ_{i=0}^{n} f(i) = Σ_{i=0}^{n} f(n−i).
 
-theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
+theorem Ring.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
         (n : Natural)
-        : Polynomial.Sum(r, f, n)
-          = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(n, i)), n) :=
+        : Ring.Sum(r, f, n)
+          = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(n, i)), n) :=
   by_induction on n with IH {
     -- Base: monus(0, 0) = 0, so both sides are f(0).
     case zero: done by substituting Natural.monus_zero_left
     case successor(k): {
         -- The tail reindexes by monus_succ_succ, pointwise over the range.
         claim tailReindex
-            : Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k)
-              = Polynomial.Sum(r,
+            : Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k)
+              = Ring.Sum(r,
                     (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))), k)
-          by Polynomial.Sum.extensional_range(r,
+          by Ring.Sum.extensional_range(r,
                  (i : Natural) ↦ f(Natural.monus(k, i)),
                  (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))),
                  k,
@@ -112,20 +112,20 @@ theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
                             by substituting Natural.monus_succ_succ);
         -- Peel f(succ k) = f(monus(succ k, 0)) off the top, reindex the
         -- tail, then Sum.shift re-rolls head and tail into one Σ.
-        calc Polynomial.Sum(r, f, successor(k))
-           = (Polynomial.Sum(r, f, k) + f(successor(k)))
-           = (f(successor(k)) + Polynomial.Sum(r, f, k))
+        calc Ring.Sum(r, f, successor(k))
+           = (Ring.Sum(r, f, k) + f(successor(k)))
+           = (f(successor(k)) + Ring.Sum(r, f, k))
            = (f(successor(k))
-              + Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
+              + Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
            = (f(Natural.monus(successor(k), 0))
-              + Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
+              + Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
                by substituting Natural.monus_succ_zero
            = (f(Natural.monus(successor(k), 0))
-              + Polynomial.Sum(r,
+              + Ring.Sum(r,
                     (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))), k))
                by substituting tailReindex
-           = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(successor(k), i)), successor(k))
-               by Polynomial.Sum.shift(r,
+           = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(successor(k), i)), successor(k))
+               by Ring.Sum.shift(r,
                       (i : Natural) ↦ f(Natural.monus(successor(k), i)), k)
   }
   }
@@ -141,15 +141,15 @@ theorem Polynomial.Coefficients.multiply_commutative (r : Ring)
               Polynomial.Coefficients.multiply(r, q, p)) :=
   (k : Natural) ↦
       calc Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, q), k)
-         = Polynomial.Sum(r,
+         = Ring.Sum(r,
                (i : Natural) ↦
                    (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k)
                by Polynomial.nth_multiply
-         = Polynomial.Sum(r,
+         = Ring.Sum(r,
                (i : Natural) ↦
                    (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, Natural.monus(k, Natural.monus(k, i)))), k)
-               by Polynomial.Sum.reverse
-         = Polynomial.Sum(r,
+               by Ring.Sum.reverse
+         = Ring.Sum(r,
                (i : Natural) ↦
                    (Polynomial.coefficient(q, i) * Polynomial.coefficient(p, Natural.monus(k, i))), k)
                by ((i : Natural) (smaller : i ≤ k) ↦

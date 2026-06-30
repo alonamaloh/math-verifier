@@ -20,7 +20,7 @@ import Polynomial.basics
 import Polynomial.addition
 import Polynomial.negation
 import Polynomial.additive_group
-import Polynomial.summation
+import Algebra.ring_summation
 import Polynomial.multiplication
 
 -- ----------------------------------------------------------------------
@@ -40,27 +40,27 @@ theorem Polynomial.Coefficients.multiply_distributivity_left (r : Ring)
                        Polynomial.Coefficients.multiply(r, p, q),
                        Polynomial.Coefficients.multiply(r, p, s)), k)
              = (Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, q), k) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, s), k))
-             = (Polynomial.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, s), k))
+             = (Ring.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, s), k))
                    by Polynomial.nth_multiply(r, p, q, k)
-             = (Polynomial.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k) + Polynomial.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k))
+             = (Ring.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k) + Ring.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k))
                    by Polynomial.nth_multiply(r, p, s, k)
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        ((Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))) + (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i)))), k)
-                   by Polynomial.Sum.add(r,
+                   by Ring.Sum.add(r,
                               (i : Natural) ↦
                                   (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))),
                               (i : Natural) ↦
                                   (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))),
                               k)
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        (Polynomial.coefficient(p, i) * (Polynomial.coefficient(q, Natural.monus(k, i)) + Polynomial.coefficient(s, Natural.monus(k, i)))), k)
                    by ((i : Natural) ↦
                           Ring.distributivity_left(r, Polynomial.coefficient(p, i),
                                   Polynomial.coefficient(q, Natural.monus(k, i)),
                                   Polynomial.coefficient(s, Natural.monus(k, i))))
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        (Polynomial.coefficient(p, i) * Polynomial.coefficient(Polynomial.Coefficients.add(r, q, s), Natural.monus(k, i))), k)
                    by ((i : Natural) ↦
@@ -100,27 +100,27 @@ theorem Polynomial.Coefficients.multiply_distributivity_right (r : Ring)
                        Polynomial.Coefficients.multiply(r, p, s),
                        Polynomial.Coefficients.multiply(r, q, s)), k)
              = (Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, s), k) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, q, s), k))
-             = (Polynomial.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, q, s), k))
+             = (Ring.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, q, s), k))
                    by Polynomial.nth_multiply(r, p, s, k)
-             = (Polynomial.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k) + Polynomial.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(q, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k))
+             = (Ring.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k) + Ring.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(q, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k))
                    by Polynomial.nth_multiply(r, q, s, k)
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        ((Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))) + (Polynomial.coefficient(q, i) * Polynomial.coefficient(s, Natural.monus(k, i)))), k)
-                   by Polynomial.Sum.add(r,
+                   by Ring.Sum.add(r,
                               (i : Natural) ↦
                                   (Polynomial.coefficient(p, i) * Polynomial.coefficient(s, Natural.monus(k, i))),
                               (i : Natural) ↦
                                   (Polynomial.coefficient(q, i) * Polynomial.coefficient(s, Natural.monus(k, i))),
                               k)
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        ((Polynomial.coefficient(p, i) + Polynomial.coefficient(q, i)) * Polynomial.coefficient(s, Natural.monus(k, i))), k)
                    by ((i : Natural) ↦
                               Ring.distributivity_right(r, Polynomial.coefficient(p, i),
                                       Polynomial.coefficient(q, i),
                                       Polynomial.coefficient(s, Natural.monus(k, i))))
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        (Polynomial.coefficient(Polynomial.Coefficients.add(r, p, q), i) * Polynomial.coefficient(s, Natural.monus(k, i))), k)
                    by ((i : Natural) ↦
@@ -280,19 +280,19 @@ theorem Polynomial.Coefficients.scale_multiply (r : Ring) (a : Ring.carrier(r))
   (k : Natural) ↦
       calc Polynomial.coefficient(Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.multiply(r, q, s)), k)
              = (a * Polynomial.coefficient(Polynomial.Coefficients.multiply(r, q, s), k))
-             = (a * Polynomial.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(q, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k))
+             = (a * Ring.Sum(r, (i : Natural) ↦ (Polynomial.coefficient(q, i) * Polynomial.coefficient(s, Natural.monus(k, i))), k))
                    by Polynomial.nth_multiply(r, q, s, k)
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        (a * (Polynomial.coefficient(q, i) * Polynomial.coefficient(s, Natural.monus(k, i)))), k)
-                   by Polynomial.Sum.scale_left
-             = Polynomial.Sum(r,
+                   by Ring.Sum.scale_left
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        ((a * Polynomial.coefficient(q, i)) * Polynomial.coefficient(s, Natural.monus(k, i))), k)
                    by ((i : Natural) ↦
                               Ring.multiply_associative(r, a, Polynomial.coefficient(q, i),
                                       Polynomial.coefficient(s, Natural.monus(k, i))))
-             = Polynomial.Sum(r,
+             = Ring.Sum(r,
                    (i : Natural) ↦
                        (Polynomial.coefficient(Polynomial.Coefficients.scale(r, a, q), i) * Polynomial.coefficient(s, Natural.monus(k, i))), k)
                    by ((i : Natural) ↦
@@ -321,18 +321,18 @@ theorem Polynomial.Coefficients.shift_multiply (r : Ring)
                = Polynomial.coefficient(Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, y, s)), 0)
         | successor(predecessor) =>
               calc Polynomial.coefficient(Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.shift(r, y), s), successor(predecessor))
-                 = Polynomial.Sum(r,
+                 = Ring.Sum(r,
                        (i : Natural) ↦
                            (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), i) * Polynomial.coefficient(s, Natural.monus(successor(predecessor), i))), successor(predecessor))
                      by Polynomial.nth_multiply
-                 = ((Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 0) * Polynomial.coefficient(s, successor(predecessor))) + Polynomial.Sum(r, (j : Natural) ↦ (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), successor(j)) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
-                     by Polynomial.Sum.convolution_shift(r,
+                 = ((Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 0) * Polynomial.coefficient(s, successor(predecessor))) + Ring.Sum(r, (j : Natural) ↦ (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), successor(j)) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
+                     by Ring.Sum.convolution_shift(r,
                             (i : Natural) ↦ Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), i),
                             (m : Natural) ↦ Polynomial.coefficient(s, m),
                             predecessor)
-                 = ((Ring.zero(r) * Polynomial.coefficient(s, successor(predecessor))) + Polynomial.Sum(r, (j : Natural) ↦ (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
-                 = (Ring.zero(r) + Polynomial.Sum(r, (j : Natural) ↦ (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
-                 = Polynomial.Sum(r,
+                 = ((Ring.zero(r) * Polynomial.coefficient(s, successor(predecessor))) + Ring.Sum(r, (j : Natural) ↦ (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
+                 = (Ring.zero(r) + Ring.Sum(r, (j : Natural) ↦ (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
+                 = Ring.Sum(r,
                        (j : Natural) ↦
                            (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor)
                  = Polynomial.coefficient(Polynomial.Coefficients.multiply(r, y, s), predecessor)
