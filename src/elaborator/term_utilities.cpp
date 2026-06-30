@@ -252,10 +252,13 @@ ExpressionPointer abstractStructuralOccurrenceMasked(
     ExpressionPointer target,
     int currentDepth,
     int& positionCounter,
-    uint32_t mask) {
+    uint32_t mask,
+    const StructuralNodeMatcher* nodeMatches) {
     ExpressionPointer shiftedTarget =
         currentDepth == 0 ? target : shift(target, currentDepth);
-    if (structurallyEqual(expression, shiftedTarget)) {
+    if (structurallyEqual(expression, shiftedTarget)
+        || (nodeMatches && *nodeMatches
+            && (*nodeMatches)(expression, shiftedTarget))) {
         int thisIndex = positionCounter++;
         if (thisIndex < 32 && (mask & (1u << thisIndex))) {
             return makeBoundVariable(currentDepth);
@@ -287,17 +290,21 @@ ExpressionPointer abstractStructuralOccurrenceMasked(
     // position indices between children and breaking the mask.
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
         auto newDomain = abstractStructuralOccurrenceMasked(
-            pi->domain, target, currentDepth, positionCounter, mask);
+            pi->domain, target, currentDepth, positionCounter, mask,
+            nodeMatches);
         auto newCodomain = abstractStructuralOccurrenceMasked(
-            pi->codomain, target, currentDepth + 1, positionCounter, mask);
+            pi->codomain, target, currentDepth + 1, positionCounter, mask,
+            nodeMatches);
         return makePi(pi->displayHint,
             std::move(newDomain), std::move(newCodomain));
     }
     if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
         auto newDomain = abstractStructuralOccurrenceMasked(
-            lambda->domain, target, currentDepth, positionCounter, mask);
+            lambda->domain, target, currentDepth, positionCounter, mask,
+            nodeMatches);
         auto newBody = abstractStructuralOccurrenceMasked(
-            lambda->body, target, currentDepth + 1, positionCounter, mask);
+            lambda->body, target, currentDepth + 1, positionCounter, mask,
+            nodeMatches);
         return makeLambda(lambda->displayHint,
             std::move(newDomain), std::move(newBody));
     }
@@ -305,19 +312,22 @@ ExpressionPointer abstractStructuralOccurrenceMasked(
             std::get_if<Application>(&expression->node)) {
         auto newFn = abstractStructuralOccurrenceMasked(
             application->function, target, currentDepth,
-            positionCounter, mask);
+            positionCounter, mask, nodeMatches);
         auto newArg = abstractStructuralOccurrenceMasked(
             application->argument, target, currentDepth,
-            positionCounter, mask);
+            positionCounter, mask, nodeMatches);
         return makeApplication(std::move(newFn), std::move(newArg));
     }
     if (auto* let = std::get_if<Let>(&expression->node)) {
         auto newType = abstractStructuralOccurrenceMasked(
-            let->type, target, currentDepth, positionCounter, mask);
+            let->type, target, currentDepth, positionCounter, mask,
+            nodeMatches);
         auto newValue = abstractStructuralOccurrenceMasked(
-            let->value, target, currentDepth, positionCounter, mask);
+            let->value, target, currentDepth, positionCounter, mask,
+            nodeMatches);
         auto newBody = abstractStructuralOccurrenceMasked(
-            let->body, target, currentDepth + 1, positionCounter, mask);
+            let->body, target, currentDepth + 1, positionCounter, mask,
+            nodeMatches);
         return makeLet(let->displayHint,
             std::move(newType), std::move(newValue), std::move(newBody));
     }
@@ -328,10 +338,13 @@ ExpressionPointer abstractStructuralOccurrence(
     ExpressionPointer expression,
     ExpressionPointer target,
     int currentDepth,
-    int& occurrenceCount) {
+    int& occurrenceCount,
+    const StructuralNodeMatcher* nodeMatches) {
     ExpressionPointer shiftedTarget =
         currentDepth == 0 ? target : shift(target, currentDepth);
-    if (structurallyEqual(expression, shiftedTarget)) {
+    if (structurallyEqual(expression, shiftedTarget)
+        || (nodeMatches && *nodeMatches
+            && (*nodeMatches)(expression, shiftedTarget))) {
         occurrenceCount++;
         return makeBoundVariable(currentDepth);
     }
@@ -346,9 +359,10 @@ ExpressionPointer abstractStructuralOccurrence(
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
         int before = occurrenceCount;
         auto newDomain = abstractStructuralOccurrence(
-            pi->domain, target, currentDepth, occurrenceCount);
+            pi->domain, target, currentDepth, occurrenceCount, nodeMatches);
         auto newCodomain = abstractStructuralOccurrence(
-            pi->codomain, target, currentDepth + 1, occurrenceCount);
+            pi->codomain, target, currentDepth + 1, occurrenceCount,
+            nodeMatches);
         if (occurrenceCount == before
             && newDomain.get() == pi->domain.get()
             && newCodomain.get() == pi->codomain.get()) {
@@ -360,9 +374,11 @@ ExpressionPointer abstractStructuralOccurrence(
     if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
         int before = occurrenceCount;
         auto newDomain = abstractStructuralOccurrence(
-            lambda->domain, target, currentDepth, occurrenceCount);
+            lambda->domain, target, currentDepth, occurrenceCount,
+            nodeMatches);
         auto newBody = abstractStructuralOccurrence(
-            lambda->body, target, currentDepth + 1, occurrenceCount);
+            lambda->body, target, currentDepth + 1, occurrenceCount,
+            nodeMatches);
         if (occurrenceCount == before
             && newDomain.get() == lambda->domain.get()
             && newBody.get() == lambda->body.get()) {
@@ -376,10 +392,10 @@ ExpressionPointer abstractStructuralOccurrence(
         int before = occurrenceCount;
         auto newFn = abstractStructuralOccurrence(
             application->function, target,
-            currentDepth, occurrenceCount);
+            currentDepth, occurrenceCount, nodeMatches);
         auto newArg = abstractStructuralOccurrence(
             application->argument, target,
-            currentDepth, occurrenceCount);
+            currentDepth, occurrenceCount, nodeMatches);
         if (occurrenceCount == before
             && newFn.get() == application->function.get()
             && newArg.get() == application->argument.get()) {
@@ -391,11 +407,12 @@ ExpressionPointer abstractStructuralOccurrence(
     if (auto* let = std::get_if<Let>(&expression->node)) {
         int before = occurrenceCount;
         auto newType = abstractStructuralOccurrence(
-            let->type, target, currentDepth, occurrenceCount);
+            let->type, target, currentDepth, occurrenceCount, nodeMatches);
         auto newValue = abstractStructuralOccurrence(
-            let->value, target, currentDepth, occurrenceCount);
+            let->value, target, currentDepth, occurrenceCount, nodeMatches);
         auto newBody = abstractStructuralOccurrence(
-            let->body, target, currentDepth + 1, occurrenceCount);
+            let->body, target, currentDepth + 1, occurrenceCount,
+            nodeMatches);
         if (occurrenceCount == before
             && newType.get() == let->type.get()
             && newValue.get() == let->value.get()

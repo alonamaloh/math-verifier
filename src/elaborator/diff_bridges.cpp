@@ -838,6 +838,71 @@ std::optional<std::pair<std::string, int>> Elaborator::asNumeralLiteral(
     return std::nullopt;
 }
 
+bool Elaborator::numeralAwareStructurallyEqual(
+        ExpressionPointer left, ExpressionPointer right) const {
+    if (structurallyEqual(left, right)) return true;
+    // Numeral escape at this position: two definitionally-equal numerals in
+    // different surface forms (a coercion tower vs an opaque `T.one`/`T.zero`)
+    // compare equal, exactly as `matchAgainstPattern` canonicalises them.
+    if (auto leftLiteral = asNumeralLiteral(left)) {
+        if (auto rightLiteral = asNumeralLiteral(right)) {
+            if (*leftLiteral == *rightLiteral) return true;
+        }
+    }
+    if (left->node.index() != right->node.index()) return false;
+    if (auto* leftPi = std::get_if<Pi>(&left->node)) {
+        auto* rightPi = std::get_if<Pi>(&right->node);
+        return numeralAwareStructurallyEqual(leftPi->domain, rightPi->domain)
+            && numeralAwareStructurallyEqual(leftPi->codomain,
+                                             rightPi->codomain);
+    }
+    if (auto* leftLambda = std::get_if<Lambda>(&left->node)) {
+        auto* rightLambda = std::get_if<Lambda>(&right->node);
+        return numeralAwareStructurallyEqual(leftLambda->domain,
+                                             rightLambda->domain)
+            && numeralAwareStructurallyEqual(leftLambda->body,
+                                             rightLambda->body);
+    }
+    if (auto* leftApplication = std::get_if<Application>(&left->node)) {
+        auto* rightApplication = std::get_if<Application>(&right->node);
+        return numeralAwareStructurallyEqual(leftApplication->function,
+                                             rightApplication->function)
+            && numeralAwareStructurallyEqual(leftApplication->argument,
+                                             rightApplication->argument);
+    }
+    if (auto* leftLet = std::get_if<Let>(&left->node)) {
+        auto* rightLet = std::get_if<Let>(&right->node);
+        return numeralAwareStructurallyEqual(leftLet->type, rightLet->type)
+            && numeralAwareStructurallyEqual(leftLet->value, rightLet->value)
+            && numeralAwareStructurallyEqual(leftLet->body, rightLet->body);
+    }
+    // BoundVariable, FreeVariable, Sort, Constant: no children to bridge,
+    // and the leading `structurallyEqual` already ruled them equal-or-not.
+    return false;
+}
+
+bool Elaborator::containsNumeralLiteral(ExpressionPointer term) const {
+    if (asNumeralLiteral(term)) return true;
+    if (auto* pi = std::get_if<Pi>(&term->node)) {
+        return containsNumeralLiteral(pi->domain)
+            || containsNumeralLiteral(pi->codomain);
+    }
+    if (auto* lambda = std::get_if<Lambda>(&term->node)) {
+        return containsNumeralLiteral(lambda->domain)
+            || containsNumeralLiteral(lambda->body);
+    }
+    if (auto* application = std::get_if<Application>(&term->node)) {
+        return containsNumeralLiteral(application->function)
+            || containsNumeralLiteral(application->argument);
+    }
+    if (auto* let = std::get_if<Let>(&term->node)) {
+        return containsNumeralLiteral(let->type)
+            || containsNumeralLiteral(let->value)
+            || containsNumeralLiteral(let->body);
+    }
+    return false;
+}
+
 bool Elaborator::matchAgainstPattern(
         ExpressionPointer pattern,
         ExpressionPointer subject,

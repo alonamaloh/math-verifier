@@ -95,3 +95,26 @@ theorem divide_positive_through_alias_with_bare_zero
   claim tolerance > 0 since Real.divide_positive;
   done
 }
+
+-- The same interchangeability through `by substituting` (not just citation).
+-- A predicate reaches a numeral via the coercion `(n : Rational) : Real`; at
+-- `n = 1` that argument is `Natural.to_rational(1) : Real`, which the OPAQUE
+-- Rational quotient cannot WHNF-reduce to the `(1 : Rational)` ⤳ `Rational.one`
+-- form the hypothesis carries. The occurrence search bridges them by numeral
+-- value (mirroring the citation matcher), so the rewrite still fires — and the
+-- bare-numeral guard keeps it from rewriting unrelated `1`s elsewhere.
+definition AbsCoercedFixed (n : Natural) : Proposition :=
+  Real.absolute_value(((n : Rational) : Real)) = ((n : Rational) : Real)
+
+theorem abs_coerced_via_rational_form
+        (hypothesis :
+            Real.absolute_value(((1 : Rational) : Real)) = ((1 : Rational) : Real))
+        : AbsCoercedFixed(1) :=
+  done by substituting hypothesis
+
+-- The single Natural→Real coercion form must close it too (it always did).
+theorem abs_coerced_via_natural_form
+        (hypothesis :
+            Real.absolute_value(((1 : Natural) : Real)) = ((1 : Natural) : Real))
+        : AbsCoercedFixed(1) :=
+  done by substituting hypothesis

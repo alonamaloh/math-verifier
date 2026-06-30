@@ -122,6 +122,24 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                 goalForms.push_back(goalForced);
             }
         }
+        // Last-resort form: head-only WHNF unfolds a predicate head
+        // (`MeansInequalityAt(1)`, `Qpred(1)`) to expose its body WITHOUT
+        // δ-reducing the coercion towers inside it — so an endpoint numeral
+        // like `(1 : Rational)` (⤳ the opaque `Rational.one`) can still be
+        // matched, via the numeral bridge, against the body's
+        // `Natural.to_rational(1)`. Deep WHNF above dissolves both into raw
+        // quotient representatives, losing the recognisable literal on the
+        // goal side. Tried LAST so proofs that already match in the surface
+        // or deep form keep their existing (cheaper) motive shape.
+        ExpressionPointer goalHeadWhnf =
+            weakHeadNormalForm(environment_, goalClosed);
+        bool headWhnfIsNovel = goalHeadWhnf.get() != goalClosed.get();
+        for (const ExpressionPointer& existing : goalForms) {
+            if (goalHeadWhnf.get() == existing.get()) headWhnfIsNovel = false;
+        }
+        if (headWhnfIsNovel) {
+            goalForms.push_back(goalHeadWhnf);
+        }
         // For each candidate, both directions, try the bridge.
         // Track per-attempt outcomes so we can produce a useful
         // diagnostic when nothing closes — the user wants to know
@@ -150,28 +168,68 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     (direction == 0) ? eq.rhs : eq.lhs;
                 ExpressionPointer toSide =
                     (direction == 0) ? eq.lhs : eq.rhs;
+                // When the endpoint contains a numeral literal, bridge it to
+                // any definitionally-equal numeral form in the goal — e.g. an
+                // endpoint `f((1 : Rational))` (where `(1 : Rational)` ⤳ the
+                // opaque `Rational.one`) against a goal `f(Natural.to_rational(1))`,
+                // which an opaque Rational cannot WHNF-reduce to `Rational.one`.
+                // Mirrors the citation matcher's `asNumeralLiteral`
+                // canonicalisation. Gated on the endpoint actually carrying a
+                // numeral, so non-numeral rewrites pay nothing.
+                StructuralNodeMatcher numeralBridge =
+                    [this](const ExpressionPointer& candidate,
+                           const ExpressionPointer& shiftedTarget) -> bool {
+                        return numeralAwareStructurallyEqual(
+                            candidate, shiftedTarget);
+                    };
+                // Engage the bridge only when the endpoint CONTAINS a numeral
+                // but is not ITSELF a bare numeral literal. Bridging a bare
+                // endpoint (`Rational.one`, `(2 : Rational)`) would let it
+                // match — and catastrophically rewrite — every same-valued
+                // numeral hiding elsewhere in the goal (e.g. the `1` inside
+                // `reciprocal_function((successor 0) : Rational)`). An endpoint
+                // that merely carries a numeral inside a larger structure
+                // (`f((1 : Rational))`) is safe: the whole structure must match.
+                const StructuralNodeMatcher* numeralBridgePtr =
+                    (containsNumeralLiteral(fromSide)
+                     && !asNumeralLiteral(fromSide))
+                        ? &numeralBridge : nullptr;
                 // Find the goal form (surface, else deep-WHNF) in which
                 // the endpoint occurs, and how many times.
                 ExpressionPointer chosenForm;
                 int occurrences = 0;
                 int surfaceCount = 0;
                 int deepCount = 0;
-                for (size_t formIdx = 0;
-                     formIdx < goalForms.size(); ++formIdx) {
-                    int formOccurrences = 0;
-                    abstractStructuralOccurrence(
-                        goalForms[formIdx], fromSide,
-                        /*currentDepth=*/0, formOccurrences);
-                    if (formIdx == 0) {
-                        surfaceCount = formOccurrences;
-                    } else {
-                        deepCount = formOccurrences;
+                // The numeral bridge is a LAST-RESORT widening: pass 0 searches
+                // structurally only, pass 1 retries with the bridge. A proof
+                // that already matches the endpoint structurally never sees the
+                // bridge, so its occurrence set (and motive shape) is unchanged
+                // — the widening only rescues endpoints that match NOWHERE
+                // structurally (a numeral hidden behind an opaque coercion).
+                const StructuralNodeMatcher* activeBridge = nullptr;
+                for (int bridgePass = 0; bridgePass < 2; ++bridgePass) {
+                    const StructuralNodeMatcher* bridge =
+                        (bridgePass == 0) ? nullptr : numeralBridgePtr;
+                    if (bridgePass == 1 && !numeralBridgePtr) break;
+                    for (size_t formIdx = 0;
+                         formIdx < goalForms.size(); ++formIdx) {
+                        int formOccurrences = 0;
+                        abstractStructuralOccurrence(
+                            goalForms[formIdx], fromSide,
+                            /*currentDepth=*/0, formOccurrences, bridge);
+                        if (bridgePass == 0 && formIdx == 0) {
+                            surfaceCount = formOccurrences;
+                        } else if (bridgePass == 0) {
+                            deepCount = formOccurrences;
+                        }
+                        if (formOccurrences > 0) {
+                            chosenForm = goalForms[formIdx];
+                            occurrences = formOccurrences;
+                            activeBridge = bridge;
+                            break;
+                        }
                     }
-                    if (formOccurrences > 0) {
-                        chosenForm = goalForms[formIdx];
-                        occurrences = formOccurrences;
-                        break;
-                    }
+                    if (occurrences > 0) break;
                 }
                 SubstAttempt attempt;
                 attempt.direction = (direction == 0)
@@ -323,7 +381,7 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                         ExpressionPointer maskedBody =
                             abstractStructuralOccurrenceMasked(
                                 chosenForm, fromSide, /*currentDepth=*/0,
-                                counter, mask);
+                                counter, mask, activeBridge);
                         ExpressionPointer result =
                             tryCloseAndBuild(maskedBody, /*budget=*/0);
                         if (result) return result;
@@ -335,7 +393,8 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                 {
                     int counter = 0;
                     ExpressionPointer allBody = abstractStructuralOccurrence(
-                        chosenForm, fromSide, /*currentDepth=*/0, counter);
+                        chosenForm, fromSide, /*currentDepth=*/0, counter,
+                        activeBridge);
                     ExpressionPointer result =
                         tryCloseAndBuild(allBody, /*budget=*/1);
                     if (result) return result;

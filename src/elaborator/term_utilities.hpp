@@ -20,6 +20,7 @@
 #include "kernel/level.hpp"
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -124,18 +125,34 @@ bool referencesBoundBelowThreshold(ExpressionPointer expression,
 
 bool containsFreeVariable(const ExpressionPointer& expression);
 
+// An optional extra notion of "this subterm IS the rewrite target" layered
+// on top of plain `structurallyEqual` during the occurrence search. The
+// occurrence walker is purely structural, so two definitionally-equal but
+// syntactically-distinct forms of the same endpoint — most importantly a
+// numeral written one way (`(1 : Rational)` ⤳ `Rational.one`) versus the
+// same numeral reached through a coercion tower (`Natural.to_rational(1)`,
+// which an OPAQUE quotient like Rational cannot WHNF-reduce to `Rational.one`)
+// — would not be recognised as occurrences. The citation matcher already
+// bridges these via `asNumeralLiteral`; supplying that same bridge here lets
+// `by substituting` see them too. `nullptr` (the default) means structural-
+// only, exactly as before.
+using StructuralNodeMatcher =
+    std::function<bool(const ExpressionPointer&, const ExpressionPointer&)>;
+
 ExpressionPointer abstractStructuralOccurrenceMasked(
     ExpressionPointer expression,
     ExpressionPointer target,
     int currentDepth,
     int& positionCounter,
-    uint32_t mask);
+    uint32_t mask,
+    const StructuralNodeMatcher* nodeMatches = nullptr);
 
 ExpressionPointer abstractStructuralOccurrence(
     ExpressionPointer expression,
     ExpressionPointer target,
     int currentDepth,
-    int& occurrenceCount);
+    int& occurrenceCount,
+    const StructuralNodeMatcher* nodeMatches = nullptr);
 
 
 // ---- more pure term helpers (defs in .cpp) ----

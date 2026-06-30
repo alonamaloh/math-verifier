@@ -2220,6 +2220,22 @@ private:
     std::optional<std::pair<std::string, int>> asNumeralLiteral(
         ExpressionPointer term) const;
 
+    // Structural equality that additionally bridges numeral literals: at
+    // every corresponding position, two terms compare equal if they are the
+    // same numeral (`asNumeralLiteral`), even when written in different
+    // surface forms (an opaque `Rational.one` vs the coercion tower
+    // `Natural.to_rational(1)`). Used by the `by substituting` occurrence
+    // search so a numeral hiding inside an endpoint (`f((1 : Rational))`
+    // vs `f(Natural.to_rational(1))`) is still found, the same way the
+    // citation matcher already bridges numerals.
+    bool numeralAwareStructurallyEqual(
+        ExpressionPointer left, ExpressionPointer right) const;
+
+    // Does any subterm of `term` parse as a numeral literal? A cheap
+    // pre-filter so `numeralAwareStructurallyEqual` is only wired into the
+    // occurrence search when it could actually widen a match.
+    bool containsNumeralLiteral(ExpressionPointer term) const;
+
     // The target carrier type of a single-hop coercion function (e.g.
     // `Rational.to_real` → "Real"), read off the registry's direct edge.
     // Empty string if `functionName` is not a registered direct coercion.
