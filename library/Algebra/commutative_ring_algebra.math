@@ -6,10 +6,12 @@
 -- `theorem foo (c : CommutativeRing) (a b : CommutativeRing.carrier(c)) :
 --  a * (b + c) = … := ring`.
 --
--- Each operation/law delegates to the underlying ring
+-- Each operation delegates to the underlying ring
 -- `CommutativeRing.ring(c)` and is therefore definitionally equal to the
--- corresponding `Ring.*` form; multiplicative commutativity is the
--- bundle's own `CommutativeRing.commutative` field. Grouping every law
+-- corresponding `Ring.*` form; the laws are then discharged from the
+-- bundled `IsRing` instance (`CommutativeRing.is_ring`), with
+-- multiplicative commutativity coming from the bundle's own
+-- `CommutativeRing.commutative` field. Grouping every law
 -- under one namespace with the single index `c` is what lets `ring`
 -- treat a commutative-ring carrier uniformly (operation namespace
 -- `CommutativeRing`, structure prefix `[c]`) — including
@@ -58,63 +60,77 @@ operator (-) on (CommutativeRing.carrier, CommutativeRing.carrier) := Commutativ
 operator (*) on (CommutativeRing.carrier, CommutativeRing.carrier) := CommutativeRing.multiply
 
 -- ----------------------------------------------------------------------
--- Laws. Each delegates to the underlying ring's flattened projection
--- (definitionally equal through the operation delegations above);
--- `multiply_commutative` is the bundle's commutativity field.
+-- The bundled IsRing instance, in the CommutativeRing operation vocabulary
+-- (definitionally the underlying ring's). Registered as a forgetful
+-- instance so every law below projects from it: a bare `done` discharges
+-- the direct ring axioms, and the abstract derived ring lemmas
+-- (`Ring.zero_multiply`, `Ring.multiply_negate_*`) cite by name.
+definition CommutativeRing.is_ring (c : CommutativeRing)
+        : IsRing(CommutativeRing.carrier(c), CommutativeRing.add,
+                 CommutativeRing.zero(c), CommutativeRing.negate,
+                 CommutativeRing.multiply, CommutativeRing.one(c)) :=
+  Ring.is_ring(CommutativeRing.ring(c))
+
+instance CommutativeRing.is_ring
+
+-- ----------------------------------------------------------------------
+-- Laws. The direct ring axioms are projected from the registered instance
+-- by the auto-prover; `multiply_commutative` is the bundle's commutativity
+-- field.
 
 theorem CommutativeRing.add_associative (c : CommutativeRing)
         (x y z : CommutativeRing.carrier(c))
         : (x + y) + z = x + (y + z) :=
-  Ring.add_associative(CommutativeRing.ring(c), x, y, z)
+  done
 
 theorem CommutativeRing.add_commutative (c : CommutativeRing)
         (x y : CommutativeRing.carrier(c))
         : x + y = y + x :=
-  Ring.add_commutative(CommutativeRing.ring(c), x, y)
+  done
 
 theorem CommutativeRing.zero_add (c : CommutativeRing) (x : CommutativeRing.carrier(c))
         : CommutativeRing.zero(c) + x = x :=
-  Ring.zero_add(CommutativeRing.ring(c), x)
+  done
 
 theorem CommutativeRing.add_zero (c : CommutativeRing) (x : CommutativeRing.carrier(c))
         : x + CommutativeRing.zero(c) = x :=
-  Ring.add_zero(CommutativeRing.ring(c), x)
+  done
 
 theorem CommutativeRing.add_negate_left (c : CommutativeRing) (x : CommutativeRing.carrier(c))
         : -x + x = CommutativeRing.zero(c) :=
-  Ring.add_negate_left(CommutativeRing.ring(c), x)
+  done
 
 theorem CommutativeRing.add_negate_right (c : CommutativeRing) (x : CommutativeRing.carrier(c))
         : x + -x = CommutativeRing.zero(c) :=
-  Ring.add_negate_right(CommutativeRing.ring(c), x)
+  done
 
 theorem CommutativeRing.multiply_associative (c : CommutativeRing)
         (x y z : CommutativeRing.carrier(c))
         : (x * y) * z = x * (y * z) :=
-  Ring.multiply_associative(CommutativeRing.ring(c), x, y, z)
+  done
 
 theorem CommutativeRing.multiply_commutative (c : CommutativeRing)
         (x y : CommutativeRing.carrier(c))
         : x * y = y * x :=
-  CommutativeRing.commutative(c)(x, y)
+  done by CommutativeRing.commutative
 
 theorem CommutativeRing.one_multiply (c : CommutativeRing) (x : CommutativeRing.carrier(c))
         : CommutativeRing.one(c) * x = x :=
-  Ring.one_multiply(CommutativeRing.ring(c), x)
+  done
 
 theorem CommutativeRing.multiply_one (c : CommutativeRing) (x : CommutativeRing.carrier(c))
         : x * CommutativeRing.one(c) = x :=
-  Ring.multiply_one(CommutativeRing.ring(c), x)
+  done
 
 theorem CommutativeRing.distributivity_left (c : CommutativeRing)
         (x y z : CommutativeRing.carrier(c))
         : x * (y + z) = x * y + x * z :=
-  Ring.distributivity_left(CommutativeRing.ring(c), x, y, z)
+  done
 
 theorem CommutativeRing.distributivity_right (c : CommutativeRing)
         (x y z : CommutativeRing.carrier(c))
         : (x + y) * z = x * z + y * z :=
-  Ring.distributivity_right(CommutativeRing.ring(c), x, y, z)
+  done
 
 -- Negation laws the `ring` normaliser uses when pushing negation through
 -- a canonical form. Proved from the additive (abelian) group of the
@@ -122,27 +138,18 @@ theorem CommutativeRing.distributivity_right (c : CommutativeRing)
 
 theorem CommutativeRing.negate_negate (c : CommutativeRing) (a : CommutativeRing.carrier(c))
         : -(-a) = a := {
-  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(CommutativeRing.ring(c));
-  let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-  Group.inverse_involution(CommutativeRing.carrier(c), Ring.add,
-      Ring.zero(CommutativeRing.ring(c)), Ring.negate, additiveGroup, a)
+  claim IsRing(CommutativeRing.carrier(c), CommutativeRing.add, CommutativeRing.zero(c),
+               CommutativeRing.negate, CommutativeRing.multiply, CommutativeRing.one(c)) since CommutativeRing.is_ring;
+  done since Group.inverse_involution
 }
 
 theorem CommutativeRing.negate_add (c : CommutativeRing) (a b : CommutativeRing.carrier(c))
         : -(a + b) = -a + -b := {
-  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(CommutativeRing.ring(c));
-  AbelianGroup.inverse_operation(CommutativeRing.carrier(c), Ring.add,
-      Ring.zero(CommutativeRing.ring(c)), Ring.negate, additiveAbelianGroup, a, b)
+  claim IsRing(CommutativeRing.carrier(c), CommutativeRing.add, CommutativeRing.zero(c),
+               CommutativeRing.negate, CommutativeRing.multiply, CommutativeRing.one(c)) since CommutativeRing.is_ring;
+  claim IsAbelianGroup(CommutativeRing.carrier(c), CommutativeRing.add, CommutativeRing.zero(c), CommutativeRing.negate);
+  done since AbelianGroup.inverse_operation
 }
-
--- The bundled IsRing instance, in the CommutativeRing operation vocabulary
--- (definitionally the underlying ring's). Used by the abstract derived
--- ring lemmas (`Ring.zero_multiply`, `Ring.multiply_negate_*`).
-definition CommutativeRing.is_ring (c : CommutativeRing)
-        : IsRing(CommutativeRing.carrier(c), CommutativeRing.add,
-                 CommutativeRing.zero(c), CommutativeRing.negate,
-                 CommutativeRing.multiply, CommutativeRing.one(c)) :=
-  Ring.is_ring(CommutativeRing.ring(c))
 
 -- Derived multiplicative laws in the CommutativeRing vocabulary, from
 -- the abstract ring lemmas at the bundled instance. The `ring`
@@ -150,31 +157,29 @@ definition CommutativeRing.is_ring (c : CommutativeRing)
 -- when a goal mentions zero or negation under multiplication.
 
 theorem CommutativeRing.zero_multiply (c : CommutativeRing) (x : CommutativeRing.carrier(c))
-        : CommutativeRing.zero(c) * x = CommutativeRing.zero(c) :=
-  Ring.zero_multiply(CommutativeRing.carrier(c), CommutativeRing.add,
-      CommutativeRing.zero(c), CommutativeRing.negate,
-      CommutativeRing.multiply, CommutativeRing.one(c),
-      CommutativeRing.is_ring(c), x)
+        : CommutativeRing.zero(c) * x = CommutativeRing.zero(c) := {
+  claim IsRing(CommutativeRing.carrier(c), CommutativeRing.add, CommutativeRing.zero(c),
+               CommutativeRing.negate, CommutativeRing.multiply, CommutativeRing.one(c)) since CommutativeRing.is_ring;
+  done since Ring.zero_multiply
+}
 
 theorem CommutativeRing.multiply_zero (c : CommutativeRing) (x : CommutativeRing.carrier(c))
-        : x * CommutativeRing.zero(c) = CommutativeRing.zero(c) :=
-  Ring.multiply_zero(CommutativeRing.carrier(c), CommutativeRing.add,
-      CommutativeRing.zero(c), CommutativeRing.negate,
-      CommutativeRing.multiply, CommutativeRing.one(c),
-      CommutativeRing.is_ring(c), x)
+        : x * CommutativeRing.zero(c) = CommutativeRing.zero(c) := {
+  claim IsRing(CommutativeRing.carrier(c), CommutativeRing.add, CommutativeRing.zero(c),
+               CommutativeRing.negate, CommutativeRing.multiply, CommutativeRing.one(c)) since CommutativeRing.is_ring;
+  done since Ring.multiply_zero
+}
 
-theorem CommutativeRing.multiply_negate_left (c : CommutativeRing)
-        (a b : CommutativeRing.carrier(c))
-        : -a * b = -(a * b) :=
-  Ring.multiply_negate_left(CommutativeRing.carrier(c), CommutativeRing.add,
-      CommutativeRing.zero(c), CommutativeRing.negate,
-      CommutativeRing.multiply, CommutativeRing.one(c),
-      CommutativeRing.is_ring(c), a, b)
+theorem CommutativeRing.multiply_negate_left (c : CommutativeRing) (a b : CommutativeRing.carrier(c))
+        : -a * b = -(a * b) := {
+  claim IsRing(CommutativeRing.carrier(c), CommutativeRing.add, CommutativeRing.zero(c),
+               CommutativeRing.negate, CommutativeRing.multiply, CommutativeRing.one(c)) since CommutativeRing.is_ring;
+  done since Ring.multiply_negate_left
+}
 
-theorem CommutativeRing.multiply_negate_right (c : CommutativeRing)
-        (a b : CommutativeRing.carrier(c))
-        : a * -b = -(a * b) :=
-  Ring.multiply_negate_right(CommutativeRing.carrier(c), CommutativeRing.add,
-      CommutativeRing.zero(c), CommutativeRing.negate,
-      CommutativeRing.multiply, CommutativeRing.one(c),
-      CommutativeRing.is_ring(c), a, b)
+theorem CommutativeRing.multiply_negate_right (c : CommutativeRing) (a b : CommutativeRing.carrier(c))
+        : a * -b = -(a * b) := {
+  claim IsRing(CommutativeRing.carrier(c), CommutativeRing.add, CommutativeRing.zero(c),
+               CommutativeRing.negate, CommutativeRing.multiply, CommutativeRing.one(c)) since CommutativeRing.is_ring;
+  done since Ring.multiply_negate_right
+}
