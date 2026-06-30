@@ -22,6 +22,14 @@ definition Polynomial.Sum (r : Ring) (f : Natural → Ring.carrier(r))
   | zero          => f(0)
   | successor(k)  => Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k)))
 
+-- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
+-- not definitionally the constructor; bridge via the automatic `one_add`,
+-- which is also what `by_induction` uses to present its successor goals).
+theorem Polynomial.Sum.add_one (r : Ring) (f : Natural → Ring.carrier(r))
+        (n : Natural)
+        : Polynomial.Sum(r, f, 1 + n) = (Polynomial.Sum(r, f, n) + f(1 + n)) :=
+  done by substituting Natural.one_add
+
 -- The sum of the constant-zero function is zero.
 theorem Polynomial.Sum.zero (r : Ring) (n : Natural)
         : Polynomial.Sum(r, (i : Natural) ↦ Ring.zero(r), n)
@@ -73,6 +81,21 @@ theorem Polynomial.Sum.shift (r : Ring) (f : Natural → Ring.carrier(r))
            = (f(0) + (Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), k) + f(successor(successor(k)))))
            = (f(0) + Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), successor(k)))
   }
+
+-- The `1 + n` form of the shift, for consumers that keep `Natural` opaque
+-- (no `successor` in expressions): Σ_{i=0}^{1+n} f(i) = f(0) + Σ_{j=0}^{n} f(1+j).
+theorem Polynomial.Sum.shift_one_plus (r : Ring) (f : Natural → Ring.carrier(r))
+        (n : Natural)
+        : Polynomial.Sum(r, f, 1 + n)
+          = (f(0) + Polynomial.Sum(r, (j : Natural) ↦ f(1 + j), n)) := {
+  calc Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), n)
+     = Polynomial.Sum(r, (j : Natural) ↦ f(1 + j), n)
+         by (i : Natural) ↦ { done by substituting Natural.one_add }
+     as reindex;
+  calc Polynomial.Sum(r, f, 1 + n)
+     = (f(0) + Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), n))   by Polynomial.Sum.shift(n := n)
+     = (f(0) + Polynomial.Sum(r, (j : Natural) ↦ f(1 + j), n))          by substituting reindex
+}
 
 -- Σ (f+g) = Σ f + Σ g. The successor step rearranges with the
 -- four-term swap on the bundle.
