@@ -18,6 +18,8 @@ import Logic.excluded_middle
 import Equality.basics
 import Natural.basics
 import Natural.order
+import Natural.add_order
+import Natural.one_plus_induction
 import Integer.basics
 import Integer.embedding
 import Rational.basics
@@ -77,7 +79,7 @@ theorem Real.geometric_mean_le_arithmetic_mean
         (gSquare : g * g = x * y)
         : g ≤ (x + y) * (Rational.one_half : Real) := {
   calc (Rational.one_half : Real) + (Rational.one_half : Real)
-        = ((Rational.one_half + Rational.one_half : Rational) : Real)
+        = ((Rational.one_half + Rational.one_half) : Real)
               since Rational.to_real.add_preserves
         = (Rational.one : Real)
               by Rational.one_half_doubled
@@ -202,15 +204,15 @@ theorem Real.arithmetic_geometric_mean_two
 
 definition Real.MeansInequalityAt (n : Natural) : Proposition :=
   (s : Natural → Real) → (∀ (j : Natural). Real.zero ≤ s(j))
-  → Real.power(((n : Rational) : Real), n) * Real.partialProduct(s, n)
+  → Real.power((n : Real), n) * Real.partialProduct(s, n)
     ≤ Real.power(Real.partialSum(s, n), n)
 
 theorem Real.means_inequality_one : Real.MeansInequalityAt(1) :=
   (s : Natural → Real) (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j)) ↦ {
     claim Real.zero ≤ s(0);
-    calc Real.power(((successor(0) : Rational) : Real), 1)
+    calc Real.power(((1 : Natural) : Real), 1)
             * Real.partialProduct(s, 1)
-          = (((successor(0) : Rational) : Real) * Real.one)
+          = (((1 : Natural) : Real) * Real.one)
             * (Real.one * s(0))
           = (Real.one * Real.one) * (Real.one * s(0))
           = (Real.zero + s(0)) * Real.one
@@ -230,9 +232,9 @@ theorem Real.means_inequality_double (m : Natural)
   (s : Natural → Real) (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j)) ↦ {
     claim shiftNonneg : ∀ (j : Natural). Real.zero ≤ s(m + j)
         by (j : Natural) ↦ termsNonneg(m + j);
-    claim Real.power(((m : Rational) : Real), m) * Real.partialProduct(s, m)
+    claim Real.power((m : Real), m) * Real.partialProduct(s, m)
             ≤ Real.power(Real.partialSum(s, m), m);
-    claim Real.power(((m : Rational) : Real), m)
+    claim Real.power((m : Real), m)
             * Real.partialProduct((j : Natural) ↦ s(m + j), m)
             ≤ Real.power(Real.partialSum((j : Natural) ↦ s(m + j), m), m)
         by atHalf((j : Natural) ↦ s(m + j), shiftNonneg);
@@ -247,10 +249,10 @@ theorem Real.means_inequality_double (m : Natural)
         since Rational.from_natural_IsNonneg;
     claim Rational.zero ≤ (m : Rational)
         since Rational.LessOrEqual_zero_of_IsNonneg;
-    claim (Rational.zero : Real) ≤ ((m : Rational) : Real)
+    claim (Rational.zero : Real) ≤ (m : Real)
         since Rational.to_real.LessOrEqual_preserves;
-    claim Real.zero ≤ ((m : Rational) : Real);
-    claim Real.zero ≤ Real.power(((m : Rational) : Real), m)
+    claim Real.zero ≤ (m : Real);
+    claim Real.zero ≤ Real.power((m : Real), m)
         since Real.power_nonneg;
     claim Rational.zero < Rational.one;
     claim Real.zero < (Rational.one : Real)
@@ -267,7 +269,7 @@ theorem Real.means_inequality_double (m : Natural)
     -- IsNonneg forms for the multiplications.
     claim Real.IsNonneg(Real.power(Real.one + Real.one, m))
         since Real.IsNonneg_of_LessOrEqual_zero;
-    claim Real.IsNonneg(Real.power(((m : Rational) : Real), m))
+    claim Real.IsNonneg(Real.power((m : Real), m))
         since Real.IsNonneg_of_LessOrEqual_zero;
     claim Real.IsNonneg(Real.partialProduct((j : Natural) ↦ s(m + j), m))
         since Real.IsNonneg_of_LessOrEqual_zero;
@@ -278,13 +280,13 @@ theorem Real.means_inequality_double (m : Natural)
               * Real.power(Real.one + Real.one, m))
         since Real.IsNonneg.multiply;
     claim Real.IsNonneg(
-              Real.power(((m : Rational) : Real), m)
+              Real.power((m : Real), m)
               * Real.partialProduct((j : Natural) ↦ s(m + j), m))
         since Real.IsNonneg.multiply;
     claim Real.IsNonneg(
                 (Real.power(Real.one + Real.one, m)
                  * Real.power(Real.one + Real.one, m))
-                * (Real.power(((m : Rational) : Real), m)
+                * (Real.power((m : Real), m)
                    * Real.partialProduct((j : Natural) ↦ s(m + j), m)))
         since Real.IsNonneg.multiply;
     claim Real.IsNonneg(
@@ -372,51 +374,51 @@ theorem Real.means_inequality_double (m : Natural)
                  since Real.IsNonneg.multiply;
              done since Real.LessOrEqual_zero_of_IsNonneg };
     -- The chain.
-    calc Real.power((((m + m : Natural) : Rational) : Real), m + m)
+    calc Real.power(((m + m : Natural) : Real), m + m)
          * Real.partialProduct(s, m + m)
-       = Real.power(((m : Rational) : Real) + ((m : Rational) : Real), m + m)
+       = Real.power((m : Real) + (m : Real), m + m)
          * Real.partialProduct(s, m + m)
              since Real.from_natural_add_preserves
-       = Real.power(((m : Rational) : Real) + ((m : Rational) : Real), m + m)
+       = Real.power((m : Real) + (m : Real), m + m)
          * (Real.partialProduct(s, m)
             * Real.partialProduct((j : Natural) ↦ s(m + j), m))
              by Real.partialProduct_split
-       = Real.power((Real.one + Real.one) * ((m : Rational) : Real), m + m)
+       = Real.power((Real.one + Real.one) * (m : Real), m + m)
          * (Real.partialProduct(s, m)
             * Real.partialProduct((j : Natural) ↦ s(m + j), m))
-             by (((m : Rational) : Real) + ((m : Rational) : Real)
-                 = (Real.one + Real.one) * ((m : Rational) : Real))
+             by ((m : Real) + (m : Real)
+                 = (Real.one + Real.one) * (m : Real))
        = (Real.power(Real.one + Real.one, m + m)
-          * Real.power(((m : Rational) : Real), m + m))
+          * Real.power((m : Real), m + m))
          * (Real.partialProduct(s, m)
             * Real.partialProduct((j : Natural) ↦ s(m + j), m))
              by Real.power_product
        = ((Real.power(Real.one + Real.one, m)
            * Real.power(Real.one + Real.one, m))
-          * Real.power(((m : Rational) : Real), m + m))
+          * Real.power((m : Real), m + m))
          * (Real.partialProduct(s, m)
             * Real.partialProduct((j : Natural) ↦ s(m + j), m))
              by Real.power_add
        = ((Real.power(Real.one + Real.one, m)
            * Real.power(Real.one + Real.one, m))
-          * (Real.power(((m : Rational) : Real), m)
-             * Real.power(((m : Rational) : Real), m)))
+          * (Real.power((m : Real), m)
+             * Real.power((m : Real), m)))
          * (Real.partialProduct(s, m)
             * Real.partialProduct((j : Natural) ↦ s(m + j), m))
              by Real.power_add
-       = (Real.power(((m : Rational) : Real), m) * Real.partialProduct(s, m))
+       = (Real.power((m : Real), m) * Real.partialProduct(s, m))
          * ((Real.power(Real.one + Real.one, m)
              * Real.power(Real.one + Real.one, m))
-            * (Real.power(((m : Rational) : Real), m)
+            * (Real.power((m : Real), m)
                * Real.partialProduct((j : Natural) ↦ s(m + j), m)))
              by ring
        ≤ Real.power(Real.partialSum(s, m), m)
          * ((Real.power(Real.one + Real.one, m)
              * Real.power(Real.one + Real.one, m))
-            * (Real.power(((m : Rational) : Real), m)
+            * (Real.power((m : Real), m)
                * Real.partialProduct((j : Natural) ↦ s(m + j), m)))
              since Real.LessOrEqual.multiply_by_nonneg_right
-       = (Real.power(((m : Rational) : Real), m)
+       = (Real.power((m : Real), m)
           * Real.partialProduct((j : Natural) ↦ s(m + j), m))
          * ((Real.power(Real.one + Real.one, m)
              * Real.power(Real.one + Real.one, m))
@@ -483,7 +485,7 @@ definition Real.augmentedScaledRow (s : Natural → Real) (m : Natural)
   (k : Natural) ↦
     cases k {
       | zero => Real.partialSum(s, m)
-      | successor(j) => ((m : Rational) : Real) * s(j)
+      | successor(j) => (m : Real) * s(j)
     }
 
 theorem Real.means_inequality_predecessor (m : Natural)
@@ -496,10 +498,10 @@ theorem Real.means_inequality_predecessor (m : Natural)
         since Rational.from_natural_IsNonneg;
     claim Rational.zero ≤ (m : Rational)
         since Rational.LessOrEqual_zero_of_IsNonneg;
-    claim (Rational.zero : Real) ≤ ((m : Rational) : Real)
+    claim (Rational.zero : Real) ≤ (m : Real)
         since Rational.to_real.LessOrEqual_preserves;
-    claim Real.zero ≤ ((m : Rational) : Real);
-    claim Real.IsNonneg(((m : Rational) : Real))
+    claim Real.zero ≤ (m : Real);
+    claim Real.IsNonneg((m : Real))
         since Real.IsNonneg_of_LessOrEqual_zero;
     claim ∀ (k : Natural). Real.zero ≤ Real.augmentedScaledRow(s, m, k)
         by (k : Natural) ↦
@@ -509,15 +511,15 @@ theorem Real.means_inequality_predecessor (m : Natural)
                    claim Real.zero ≤ s(j);
                    claim Real.IsNonneg(s(j))
                        since Real.IsNonneg_of_LessOrEqual_zero;
-                   claim Real.IsNonneg(((m : Rational) : Real) * s(j))
+                   claim Real.IsNonneg((m : Real) * s(j))
                        since Real.IsNonneg.multiply;
-                   claim Real.zero ≤ ((m : Rational) : Real) * s(j)
+                   claim Real.zero ≤ (m : Real) * s(j)
                        since Real.LessOrEqual_zero_of_IsNonneg;
                    done
                  }
              };
     claim applied
-          : Real.power(((successor(m) : Rational) : Real), successor(m))
+          : Real.power((successor(m) : Real), successor(m))
             * Real.partialProduct(Real.augmentedScaledRow(s, m), successor(m))
             ≤ Real.power(
                   Real.partialSum(Real.augmentedScaledRow(s, m), successor(m)),
@@ -525,20 +527,20 @@ theorem Real.means_inequality_predecessor (m : Natural)
         since atSuccessor;
     -- The augmented sum telescopes to (m+1)·A.
     claim indexEquation : successor(m) = m + 1;
-    let successorCastReal : Real := ((successor(m) : Rational) : Real);
+    let successorCastReal : Real := (successor(m) : Real);
     calc successorCastReal
           = (((1 : Rational) + (m : Rational)) : Real)
                 since Rational.successor_cast
-          = (((1 : Rational)) : Real) + ((m : Rational) : Real)
+          = (((1 : Rational)) : Real) + (m : Real)
                 since Rational.to_real.add_preserves
-          = Real.one + ((m : Rational) : Real)
+          = Real.one + (m : Real)
                 since Real.from_natural_one_preserves
         as succCast;
     claim ∀ (j : Natural).
-              Real.augmentedScaledRow(s, m, 1 + j) = ((m : Rational) : Real) * s(j)
+              Real.augmentedScaledRow(s, m, 1 + j) = (m : Real) * s(j)
         by (j : Natural) ↦
              calc Real.augmentedScaledRow(s, m, 1 + j)
-                = ((m : Rational) : Real) * s(j)   by substituting Natural.one_add;
+                = (m : Real) * s(j)   by substituting Natural.one_add;
     calc Real.partialSum(
              Real.augmentedScaledRow(s, m),
              successor(m))
@@ -557,17 +559,17 @@ theorem Real.means_inequality_predecessor (m : Natural)
                     Real.augmentedScaledRow(s, m),
                     1)
                 + Real.partialSum(
-                      (j : Natural) ↦ ((m : Rational) : Real) * s(j),
+                      (j : Natural) ↦ (m : Real) * s(j),
                       m)
                     since Real.partialSum_pointwise
               = Real.partialSum(
                     Real.augmentedScaledRow(s, m),
                     1)
-                + ((m : Rational) : Real) * Real.partialSum(s, m)
+                + (m : Real) * Real.partialSum(s, m)
                     since Real.partialSum_scale
               = (Real.zero + Real.partialSum(s, m))
-                + ((m : Rational) : Real) * Real.partialSum(s, m)
-              = (Real.one + ((m : Rational) : Real)) * Real.partialSum(s, m)
+                + (m : Real) * Real.partialSum(s, m)
+              = (Real.one + (m : Real)) * Real.partialSum(s, m)
                     by ring
               = successorCastReal * Real.partialSum(s, m)
                     by succCast
@@ -591,37 +593,37 @@ theorem Real.means_inequality_predecessor (m : Natural)
                     Real.augmentedScaledRow(s, m),
                     1)
                 * Real.partialProduct(
-                      (j : Natural) ↦ ((m : Rational) : Real) * s(j),
+                      (j : Natural) ↦ (m : Real) * s(j),
                       m)
                     since Real.partialProduct_pointwise
               = Real.partialProduct(
                     Real.augmentedScaledRow(s, m),
                     1)
-                * (Real.power(((m : Rational) : Real), m)
+                * (Real.power((m : Real), m)
                    * Real.partialProduct(s, m))
                     since Real.partialProduct_scale
               = (Real.one * Real.partialSum(s, m))
-                * (Real.power(((m : Rational) : Real), m)
+                * (Real.power((m : Real), m)
                    * Real.partialProduct(s, m))
               = Real.partialSum(s, m)
-                * (Real.power(((m : Rational) : Real), m)
+                * (Real.power((m : Real), m)
                    * Real.partialProduct(s, m))
                     by ring
         as productValue;
     -- Cancel the positive (m+1)ᵐ⁺¹.
     claim Rational.zero < (successor(m) : Rational)
         since Rational.successor_cast_positive;
-    claim (Rational.zero : Real) < ((successor(m) : Rational) : Real)
+    claim (Rational.zero : Real) < (successor(m) : Real)
         since Rational.to_real.LessThan_preserves;
-    claim Real.zero < ((successor(m) : Rational) : Real);
+    claim Real.zero < (successor(m) : Real);
     claim Real.zero
-            < Real.power(((successor(m) : Rational) : Real), successor(m))
+            < Real.power((successor(m) : Real), successor(m))
         since Real.power_positive;
-    calc Real.power(((successor(m) : Rational) : Real), successor(m))
+    calc Real.power((successor(m) : Real), successor(m))
          * (Real.partialSum(s, m)
-            * (Real.power(((m : Rational) : Real), m)
+            * (Real.power((m : Real), m)
                * Real.partialProduct(s, m)))
-              = Real.power(((successor(m) : Rational) : Real), successor(m))
+              = Real.power((successor(m) : Real), successor(m))
                 * Real.partialProduct(Real.augmentedScaledRow(s, m), successor(m))
                     by productValue
               ≤ Real.power(
@@ -632,11 +634,11 @@ theorem Real.means_inequality_predecessor (m : Natural)
                     successorCastReal * Real.partialSum(s, m),
                     successor(m))
                     by sumValue
-              = Real.power(((successor(m) : Rational) : Real), successor(m))
+              = Real.power((successor(m) : Real), successor(m))
                 * Real.power(Real.partialSum(s, m), successor(m));
     claim cancelled
           : Real.partialSum(s, m)
-            * (Real.power(((m : Rational) : Real), m)
+            * (Real.power((m : Real), m)
                * Real.partialProduct(s, m))
             ≤ Real.power(Real.partialSum(s, m), successor(m))
         since Real.LessOrEqual.multiply_cancel_left_positive;
@@ -649,7 +651,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                 claim Real.zero < (Rational.one : Real)
                     since Rational.to_real.positive_preserves;
                 claim Real.one ≤ Real.one since Real.LessOrEqual.reflexive;
-                calc Real.power(((0 : Rational) : Real), 0)
+                calc Real.power((0 : Real), 0)
                      * Real.partialProduct(s, 0)
                    = Real.one * Real.partialProduct(s, 0)
                    = Real.one * Real.one
@@ -657,7 +659,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                     as leftValue;
                 claim rightValue
                       : Real.power(Real.partialSum(s, 0), 0) = Real.one;
-                calc Real.power(((0 : Rational) : Real), 0)
+                calc Real.power((0 : Real), 0)
                      * Real.partialProduct(s, 0)
                    = Real.one
                          by leftValue
@@ -683,11 +685,11 @@ theorem Real.means_inequality_predecessor (m : Natural)
                               successor(mPredecessor))
                     since Real.power_nonneg;
                 calc Real.power(
-                         ((successor(mPredecessor) : Rational) : Real),
+                         (successor(mPredecessor) : Real),
                          successor(mPredecessor))
                      * Real.partialProduct(s, successor(mPredecessor))
                    = Real.power(
-                         ((successor(mPredecessor) : Rational) : Real),
+                         (successor(mPredecessor) : Real),
                          successor(mPredecessor))
                      * Real.zero
                          by productZero
@@ -706,7 +708,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
           };
           claim Real.zero < Real.partialSum(s, m);
           calc Real.partialSum(s, m)
-               * (Real.power(((m : Rational) : Real), m)
+               * (Real.power((m : Real), m)
                   * Real.partialProduct(s, m))
              ≤ Real.power(Real.partialSum(s, m), successor(m))
                    by cancelled
@@ -773,7 +775,7 @@ theorem Real.means_inequality_downward (difference : Natural)
 theorem Real.arithmetic_mean_geometric_mean (n : Natural)
         (s : Natural → Real)
         (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
-        : Real.power(((n : Rational) : Real), n) * Real.partialProduct(s, n)
+        : Real.power((n : Real), n) * Real.partialProduct(s, n)
           ≤ Real.power(Real.partialSum(s, n), n) := {
   claim n ≤ Natural.doubling(n) since Natural.le_doubling;
   choose difference such that Natural.doubling(n) = difference + n
