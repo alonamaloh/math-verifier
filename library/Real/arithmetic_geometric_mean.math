@@ -79,99 +79,57 @@ theorem Real.geometric_mean_le_arithmetic_mean
         (gNonneg : 0 ≤ g)
         (gSquare : g * g = x * y)
         : g ≤ (x + y) * (Rational.one_half : Real) := {
+  let mean : Real := (x + y) * (Rational.one_half : Real);
+  let halfDiff : Real := (x - y) * (Rational.one_half : Real);
   calc (Rational.one_half : Real) + (Rational.one_half : Real)
-        = ((Rational.one_half + Rational.one_half) : Real)
-              since Rational.to_real.add_preserves
-        = (Rational.one : Real)
-              by Rational.one_half_doubled
+        = ((Rational.one_half + Rational.one_half) : Real)   since Rational.to_real.add_preserves
+        = (Rational.one : Real)                               by Rational.one_half_doubled
       as halfSum;
   claim Rational.zero < Rational.one_half since Rational.one_half_positive;
-  claim 0 < (Rational.one_half : Real)
-      since Rational.to_real.positive_preserves;
+  claim 0 < (Rational.one_half : Real) since Rational.to_real.positive_preserves;
   claim 0 ≤ (Rational.one_half : Real) since Real.LessThan.weaken;
   -- The mean is nonnegative.
   calc (0 : Real)
         = 0 + 0
-        ≤ x + 0            by Real.add_preserves_LessOrEqual
-        ≤ x + y                    since Real.add_preserves_LessOrEqual_left;
+        ≤ x + 0   by Real.add_preserves_LessOrEqual
+        ≤ x + y    since Real.add_preserves_LessOrEqual_left;
   claim Real.IsNonneg(x + y) since Real.IsNonneg_of_LessOrEqual_zero;
-  claim Real.IsNonneg((Rational.one_half : Real))
-      since Real.IsNonneg_of_LessOrEqual_zero;
-  claim Real.IsNonneg((x + y) * (Rational.one_half : Real))
-      since Real.IsNonneg.multiply;
-  claim 0 ≤ (x + y) * (Rational.one_half : Real)
-      since Real.LessOrEqual_zero_of_IsNonneg;
+  claim Real.IsNonneg((Rational.one_half : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(mean) since Real.IsNonneg.multiply;
+  claim 0 ≤ mean since Real.LessOrEqual_zero_of_IsNonneg;
   -- The square gap: mean² − x·y = ((x − y)/2)².
   claim gapIdentity
-        : ((x + y) * (Rational.one_half : Real))
-              * ((x + y) * (Rational.one_half : Real))
-          - x * y
-          = ((x - y) * (Rational.one_half : Real))
-            * ((x - y) * (Rational.one_half : Real))
+        : ((x + y) * (Rational.one_half : Real)) * ((x + y) * (Rational.one_half : Real)) - x * y
+          = ((x - y) * (Rational.one_half : Real)) * ((x - y) * (Rational.one_half : Real))
       by linear_combination(
-             x * y
-             * ((Rational.one_half : Real) + (Rational.one_half : Real)
-                + Real.one)
-             * halfSum);
-  claim Real.IsNonneg(
-            ((x - y) * (Rational.one_half : Real))
-            * ((x - y) * (Rational.one_half : Real)))
-      since Real.square_IsNonneg;
-  claim 0
-          ≤ ((x - y) * (Rational.one_half : Real))
-            * ((x - y) * (Rational.one_half : Real))
-      since Real.LessOrEqual_zero_of_IsNonneg;
+             x * y * ((Rational.one_half : Real) + (Rational.one_half : Real) + Real.one) * halfSum);
+  claim Real.IsNonneg(halfDiff * halfDiff) since Real.square_IsNonneg;
+  claim 0 ≤ halfDiff * halfDiff since Real.LessOrEqual_zero_of_IsNonneg;
   -- g² ≤ mean².
   claim productValue
         : x * y
-          = ((x + y) * (Rational.one_half : Real))
-                * ((x + y) * (Rational.one_half : Real))
-            - ((x - y) * (Rational.one_half : Real))
-                * ((x - y) * (Rational.one_half : Real))
+          = ((x + y) * (Rational.one_half : Real)) * ((x + y) * (Rational.one_half : Real))
+            - ((x - y) * (Rational.one_half : Real)) * ((x - y) * (Rational.one_half : Real))
       by linear_combination(Real.zero - gapIdentity);
-  calc -(((x - y) * (Rational.one_half : Real))
-          * ((x - y) * (Rational.one_half : Real)))
-        = 0
-          - ((x - y) * (Rational.one_half : Real))
-            * ((x - y) * (Rational.one_half : Real))
-              by ring
-        ≤ ((x - y) * (Rational.one_half : Real))
-            * ((x - y) * (Rational.one_half : Real))
-          - ((x - y) * (Rational.one_half : Real))
-            * ((x - y) * (Rational.one_half : Real))
-              by Real.add_preserves_LessOrEqual
-        = 0
-              by ring;
+  calc -(halfDiff * halfDiff)
+        = 0 - halfDiff * halfDiff   by ring
+        ≤ halfDiff * halfDiff - halfDiff * halfDiff   by Real.add_preserves_LessOrEqual
+        = 0   by ring;
   calc g * g
-        = x * y
-              by gSquare
-        = ((x + y) * (Rational.one_half : Real))
-            * ((x + y) * (Rational.one_half : Real))
-          + -(((x - y) * (Rational.one_half : Real))
-              * ((x - y) * (Rational.one_half : Real)))
-              since productValue
-        ≤ ((x + y) * (Rational.one_half : Real))
-            * ((x + y) * (Rational.one_half : Real))
-          + 0
-              since Real.add_preserves_LessOrEqual_left
-        = ((x + y) * (Rational.one_half : Real))
-            * ((x + y) * (Rational.one_half : Real));
+        = x * y   by gSquare
+        = mean * mean + -(halfDiff * halfDiff)   since productValue
+        ≤ mean * mean + 0                         since Real.add_preserves_LessOrEqual_left
+        = mean * mean;
   -- Nonnegative numbers compare like their squares.
   {
-    suppose (x + y) * (Rational.one_half : Real) < g for contradiction {
-        claim 0 < g
-            since Real.LessThan.transitive_left;
-        claim (x + y) * (Rational.one_half : Real) ≤ g
-            since Real.LessThan.weaken;
-        calc ((x + y) * (Rational.one_half : Real))
-                * ((x + y) * (Rational.one_half : Real))
-              ≤ g * ((x + y) * (Rational.one_half : Real))
-                    since Real.LessOrEqual.multiply_by_nonneg_right
-              = ((x + y) * (Rational.one_half : Real)) * g
-              < g * g
-                    since Real.LessThan.multiply_by_positive_right;
-        claim g * g < g * g
-            since Real.LessThan.transitive_left;
+    suppose mean < g for contradiction {
+        claim 0 < g since Real.LessThan.transitive_left;
+        claim mean ≤ g since Real.LessThan.weaken;
+        calc mean * mean
+              ≤ g * mean   since Real.LessOrEqual.multiply_by_nonneg_right
+              = mean * g
+              < g * g       since Real.LessThan.multiply_by_positive_right;
+        claim g * g < g * g since Real.LessThan.transitive_left;
         done
     };
     done since Real.LessOrEqual_of_not_LessThan
