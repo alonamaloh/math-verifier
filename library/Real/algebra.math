@@ -34,7 +34,7 @@ import Real.ring
 -- equality is exactly Rational.multiply_commutative.
 theorem Real.multiply_commutative
         (x y : Real)
-        : Real.multiply(x, y) = Real.multiply(y, x) :=
+        : x * y = y * x :=
   by_representatives x as ⟨sx, sx_cauchy⟩, y as ⟨sy, sy_cauchy⟩ => {
     let a : CauchyRationalSequence := CauchyRationalSequence.make(sx, sx_cauchy);
     let b : CauchyRationalSequence := CauchyRationalSequence.make(sy, sy_cauchy);
@@ -47,8 +47,7 @@ theorem Real.multiply_commutative
 -- equality is Rational.multiply_associative.
 automatic theorem Real.multiply_associative
         (x y z : Real)
-        : Real.multiply(Real.multiply(x, y), z)
-          = Real.multiply(x, Real.multiply(y, z)) :=
+        : x * y * z = x * (y * z) :=
   by_representatives x as ⟨sx, sx_cauchy⟩, y as ⟨sy, sy_cauchy⟩,
                      z as ⟨sz, sz_cauchy⟩ => {
     let a : CauchyRationalSequence := CauchyRationalSequence.make(sx, sx_cauchy);
@@ -63,7 +62,7 @@ automatic theorem Real.multiply_associative
 -- sequenceFunction reduce and the equality is Rational.one_multiply.
 theorem Real.one_multiply
         (x : Real)
-        : Real.multiply(Real.one, x) = x :=
+        : Real.one * x = x :=
   cases x { | rep_x =>
     Real.equal_of_pointwise_sequence(
         CauchyRationalSequence.multiply(
@@ -80,9 +79,9 @@ theorem Real.one_multiply
 -- x * 1 = x via multiply_commutative + one_multiply.
 automatic theorem Real.multiply_one
         (x : Real)
-        : Real.multiply(x, Real.one) = x :=
-  calc Real.multiply(x, Real.one)
-     = Real.multiply(Real.one, x)
+        : x * Real.one = x :=
+  calc x * Real.one
+     = Real.one * x
      = x
 
 -- Multiplicative annihilation (`0 · x = 0` and `x · 0 = 0`) is derived
@@ -94,8 +93,7 @@ automatic theorem Real.multiply_one
 -- (proved by the auto-prover).
 theorem Real.distributivity_left
         (x y z : Real)
-        : Real.multiply(x, Real.add(y, z))
-          = Real.add(Real.multiply(x, y), Real.multiply(x, z)) :=
+        : x * (y + z) = x * y + x * z :=
   cases x { | rep_x =>
     cases y { | rep_y =>
       cases z { | rep_z =>
@@ -130,12 +128,11 @@ theorem Real.distributivity_left
 -- multiply_commutative + distributivity_left.
 theorem Real.distributivity_right
         (x y z : Real)
-        : Real.multiply(Real.add(x, y), z)
-          = Real.add(Real.multiply(x, z), Real.multiply(y, z)) :=
-  calc Real.multiply(Real.add(x, y), z)
-     = Real.multiply(z, Real.add(x, y))
-     = Real.add(Real.multiply(z, x), Real.multiply(z, y))
-     = Real.add(Real.multiply(x, z), Real.multiply(y, z))
+        : (x + y) * z = x * z + y * z :=
+  calc (x + y) * z
+     = z * (x + y)
+     = z * x + z * y
+     = x * z + y * z
 
 -- Negation distributes over subtraction: -(a - b) = b - a. Lives here
 -- (not in ring.math) because `ring` needs `Real.multiplication` in
@@ -146,7 +143,7 @@ theorem Real.negate_subtract (a b : Real) : -(a - b) = b - a := ring
 -- ring would loop here — multiply_negate_left is itself one of the
 -- axioms ring's coefficient handling depends on.
 theorem Real.multiply_negate_left (x y : Real)
-        : Real.multiply(-x, y) = -Real.multiply(x, y) :=
+        : (-x) * y = -(x * y) :=
   by_representatives x as ⟨sx, sx_cauchy⟩, y as ⟨sy, sy_cauchy⟩ => {
     let a : CauchyRationalSequence := CauchyRationalSequence.make(sx, sx_cauchy);
     let b : CauchyRationalSequence := CauchyRationalSequence.make(sy, sy_cauchy);
@@ -158,13 +155,12 @@ theorem Real.multiply_negate_left (x y : Real)
 
 -- x * (-y) = -(x * y). Reduce to multiply_negate_left via commutativity.
 theorem Real.multiply_negate_right (x y : Real)
-        : Real.multiply(x, -y) = -Real.multiply(x, y) :=
-  calc Real.multiply(x, -y)
-     = Real.multiply(-y, x)
-     = -Real.multiply(x, y)
+        : x * (-y) = -(x * y) :=
+  calc x * (-y)
+     = (-y) * x
+     = -(x * y)
 
 -- Distribution over subtraction on the right: (a - b) * c = a*c - b*c.
 -- Now ring CAN handle it — multiply_negate_left is in its index.
 theorem Real.subtract_multiply_distribute (a b c : Real)
-        : Real.multiply(a - b, c)
-          = Real.multiply(a, c) - Real.multiply(b, c) := ring
+        : (a - b) * c = a * c - b * c := ring
