@@ -2678,6 +2678,9 @@ private:
         if (current.kind == TokenKind::KeywordDecide) {
             return parseDecideExpression();
         }
+        if (current.kind == TokenKind::KeywordIf) {
+            return parseIfExpression();
+        }
         if (isIdentifierLike(current.kind)) {
             return parseQualifiedIdentifier();
         }
@@ -3008,6 +3011,26 @@ private:
             std::move(yesBinderName), std::move(yesBody),
             std::move(noBinderName), std::move(noBody),
             decideToken.line, decideToken.column);
+    }
+
+    // `if P then a else b` — surface sugar for
+    // `decide P { | yes _ => a | no _ => b }`. A value-level conditional on
+    // any (classically decidable) proposition P, so a definition branches on
+    // a mathematical condition rather than a constructor pattern. `then` and
+    // `else` are keywords, so `parseExpression` for P / a / b stops cleanly
+    // at each.
+    SurfaceExpressionPointer parseIfExpression() {
+        Token ifToken = consumeAny();  // 'if'
+        SurfaceExpressionPointer proposition = parseExpression();
+        expect(TokenKind::KeywordThen, "after `if P`");
+        SurfaceExpressionPointer yesBody = parseExpression();
+        expect(TokenKind::KeywordElse, "after `if P then a`");
+        SurfaceExpressionPointer noBody = parseExpression();
+        return makeSurfaceDecide(
+            std::move(proposition),
+            std::string("_"), std::move(yesBody),
+            std::string("_"), std::move(noBody),
+            ifToken.line, ifToken.column);
     }
 
     // Parses an optional `refining <name>[, <name>]*` clause used by

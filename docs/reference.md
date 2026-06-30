@@ -86,7 +86,13 @@ cases e with eq { | pat => … }         -- also bind eq : e = pat
 cases e refining h { | pat => … }      -- generalise scrutinee-dependent h
 cases by L { | C(args) => … }          -- split a lemma's disjunction (args inferred)
 decide P { | yes m => … | no n => … }  -- classical Type-valued case-split
+if P then a else b                     -- value-level conditional (sugar for `decide P { yes _ => a | no _ => b }`)
 ```
+`if P then a else b` branches a definition on any (classically decidable)
+proposition `P` — a mathematical condition, not a constructor pattern. Reason
+about the result by re-deciding the same `P` (in each branch the value
+reduces). It is non-computational (goes through `classical_decidable`), so it
+defines and proves but does not reduce on closed inputs.
 Inside `by_induction`, the recursion is the local hypothesis `IH`; apply it
 (`IH(args)`) — not a lemma call.
 

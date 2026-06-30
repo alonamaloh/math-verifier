@@ -71,6 +71,9 @@ enum class TokenKind {
     KeywordTake,            // `take h : T;` — introduce a Pi-binder (math-style "take an arbitrary h : T")
     KeywordNote,            // `note goal : T;` / `note P;` — elaboration-time assertion / goal restatement
     KeywordChange,          // `change T;` — replace the goal by a definitionally-equal T
+    KeywordIf,              // `if P then a else b` — value-level conditional (sugar for `decide`)
+    KeywordThen,            // the `then` of an `if … then … else …`
+    KeywordElse,            // the `else` of an `if … then … else …`
 
     // Punctuation
     LeftParen, RightParen,
