@@ -31,6 +31,10 @@ import GaussianInteger.coordinates
 import GaussianInteger.coordinate_map
 import GaussianInteger.coordinate_multiplicative
 import GaussianInteger.norm
+import Rational.basics
+import Rational.embedding
+import Real.basics
+import Real.embedding
 
 -- Sanity: simple two-occurrence rewrite whose RHS mentions the binders.
 theorem subst_simple_freevar (z w : Natural) (eq : z * w = w * z)
@@ -58,3 +62,19 @@ theorem subst_nested_freevar_multioccurrence (z w : GaussianInteger)
            * Product.second(GaussianInteger.gaussianProduct(coords(z), coords(w)))
          by substituting eq
 }
+
+-- Regression: `by substituting <eq>` rewriting a `Natural` variable that
+-- sits under the `Natural → Integer → Rational → Real` coercion tower.
+-- `substituting` tries both rewrite directions and several goal forms,
+-- including a deep-WHNF one. That deep form δ-reduces the transparent
+-- `Integer.from_difference` construction past the OPAQUE `Integer` boundary,
+-- leaving a raw `Quotient.class_of IntegerRepresentative` where `Integer.to_rational`
+-- expects an `Integer`. The stray-numeral (`0`) rewrite direction matched
+-- inside that expansion and built an ill-typed goal; the prover then assembled
+-- a proof term that only the FINAL kernel check rejected ("expects: Integer /
+-- but this argument is: Quotient.{0} IntegerRepresentative …"). The fix
+-- type-checks each rewritten goal, so the bad (form, direction) is skipped and
+-- the intended `m → 0` rewrite (well-typed) closes via `pf`.
+theorem subst_through_coercion_tower
+        (m : Natural) (h : m = 0) (target : Real) (pf : (0 : Real) = target)
+        : (m : Real) = target := done by substituting h

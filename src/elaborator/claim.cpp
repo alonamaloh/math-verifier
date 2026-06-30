@@ -288,6 +288,25 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                         int budget) -> ExpressionPointer {
                     ExpressionPointer rewrittenGoal = substitute(
                         abstractedBody, 0, toSide);
+                    // A rewrite is valid only if it yields a WELL-TYPED goal.
+                    // The deep-WHNF / opaque-forcing goal forms above δ-reduce
+                    // a transparent `construction` (e.g. `Integer.from_difference`)
+                    // past an opaque boundary, leaving a raw `Quotient.class_of`
+                    // where the surrounding consumer expects the opaque type
+                    // (`Integer`). Such a form is well-typed under opacity-IGNORING
+                    // defeq but ILL-TYPED under the normal inferType — and the
+                    // wrong rewrite direction (rewriting a stray numeral inside
+                    // that expansion) lands there. Type-check the result so the
+                    // bad (form, direction) is skipped cleanly instead of handed
+                    // to the prover, which would build a proof term that only the
+                    // FINAL kernel check rejects (an opaque-boundary leak).
+                    try {
+                        inferTypeInLocalContext(localBinders, rewrittenGoal);
+                    } catch (const ElaborateError&) {
+                        return nullptr;
+                    } catch (const TypeError&) {
+                        return nullptr;
+                    }
                     // Fast path: the rewrite alone settled the goal. A
                     // directly-supplied equality usually rewrites one side
                     // of an `a = b` step onto the other, leaving `a = a` —
