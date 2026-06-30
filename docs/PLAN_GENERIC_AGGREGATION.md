@@ -61,9 +61,14 @@
     `Real.commutative_ring` / `ComplexNumber.commutative_ring` bundles.
     ~1800 lines of duplicated induction removed; statements unchanged so all
     consumers are untouched. `Real.ring` moved to `Real/ring_bundle.math`.
-- **Stage 4** — AGM already rides on the generic toolkit transitively (its
-  `Real.partialProduct` was re-backed in Stage 2); the order-bearing steps
-  stay Real. No dedicated work expected beyond confirmation.
+- **Stage 4** — done (no code changes). AGM rides on the generic toolkit
+  transitively: it uses `Real.partialSum`/`partialProduct` (re-backed onto
+  `indexedAggregate` in Stage 2) and their lemmas — the algebraic ones it
+  cites (`_split`, `_pointwise`, `_scale`) are the generic wrappers, and the
+  order/power ones (`_nonneg`, `_zero_term`, `partialProduct_scale`) stay
+  Real, exactly as planned. Verified: it never reinvented its own Sum/Product.
+
+**All stages complete.** Library + tests green.
 
 ## Why
 
