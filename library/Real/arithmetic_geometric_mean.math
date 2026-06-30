@@ -231,20 +231,21 @@ theorem Real.means_inequality_double (m : Natural)
         (atHalf : Real.MeansInequalityAt(m))
         : Real.MeansInequalityAt(m + m) :=
   (s : Natural → Real) (termsNonneg : ∀ (j : Natural). 0 ≤ s(j)) ↦ {
+    let firstSum : Real := Real.partialSum(s, m);
+    let secondSum : Real := Real.partialSum((j : Natural) ↦ s(m + j), m);
+    let firstProduct : Real := Real.partialProduct(s, m);
+    let secondProduct : Real := Real.partialProduct((j : Natural) ↦ s(m + j), m);
     claim shiftNonneg : ∀ (j : Natural). 0 ≤ s(m + j)
         by (j : Natural) ↦ termsNonneg(m + j);
-    claim Real.power((m : Real), m) * Real.partialProduct(s, m)
-            ≤ Real.power(Real.partialSum(s, m), m);
-    claim Real.power((m : Real), m)
-            * Real.partialProduct((j : Natural) ↦ s(m + j), m)
-            ≤ Real.power(Real.partialSum((j : Natural) ↦ s(m + j), m), m)
+    claim Real.power(m, m) * firstProduct ≤ Real.power(firstSum, m);
+    claim Real.power(m, m) * secondProduct ≤ Real.power(secondSum, m)
         by atHalf((j : Natural) ↦ s(m + j), shiftNonneg);
     -- Nonnegativity inventory.
-    claim 0 ≤ Real.partialSum(s, m)
+    claim 0 ≤ firstSum
         since Real.partialSum_nonneg;
-    claim 0 ≤ Real.partialSum((j : Natural) ↦ s(m + j), m)
+    claim 0 ≤ secondSum
         since Real.partialSum_nonneg;
-    claim 0 ≤ Real.partialProduct((j : Natural) ↦ s(m + j), m)
+    claim 0 ≤ secondProduct
         since Real.partialProduct_nonneg;
     claim Rational.IsNonneg((m : Rational))
         since Rational.from_natural_IsNonneg;
@@ -253,7 +254,7 @@ theorem Real.means_inequality_double (m : Natural)
     claim (Rational.zero : Real) ≤ (m : Real)
         since Rational.to_real.LessOrEqual_preserves;
     claim 0 ≤ (m : Real);
-    claim 0 ≤ Real.power((m : Real), m)
+    claim 0 ≤ Real.power(m, m)
         since Real.power_nonneg;
     claim Rational.zero < Rational.one;
     claim 0 < (Rational.one : Real)
@@ -266,185 +267,88 @@ theorem Real.means_inequality_double (m : Natural)
           = 2;
     claim 0 ≤ Real.power(2, m)
         since Real.power_nonneg;
-    claim 0 ≤ Real.power(Real.partialSum(s, m), m)
+    claim 0 ≤ Real.power(firstSum, m)
         since Real.power_nonneg;
     -- IsNonneg forms for the multiplications.
-    claim Real.IsNonneg(Real.power(2, m))
-        since Real.IsNonneg_of_LessOrEqual_zero;
-    claim Real.IsNonneg(Real.power((m : Real), m))
-        since Real.IsNonneg_of_LessOrEqual_zero;
-    claim Real.IsNonneg(Real.partialProduct((j : Natural) ↦ s(m + j), m))
-        since Real.IsNonneg_of_LessOrEqual_zero;
-    claim Real.IsNonneg(Real.power(Real.partialSum(s, m), m))
-        since Real.IsNonneg_of_LessOrEqual_zero;
-    claim Real.IsNonneg(Real.power(2, m) * Real.power(2, m))
+    claim Real.IsNonneg(Real.power(2, m)) since Real.IsNonneg_of_LessOrEqual_zero;
+    claim Real.IsNonneg(Real.power(m, m)) since Real.IsNonneg_of_LessOrEqual_zero;
+    claim Real.IsNonneg(secondProduct) since Real.IsNonneg_of_LessOrEqual_zero;
+    claim Real.IsNonneg(Real.power(firstSum, m)) since Real.IsNonneg_of_LessOrEqual_zero;
+    claim Real.IsNonneg(Real.power(2, m) * Real.power(2, m)) since Real.IsNonneg.multiply;
+    claim Real.IsNonneg(Real.power(m, m) * secondProduct) since Real.IsNonneg.multiply;
+    claim Real.IsNonneg((Real.power(2, m) * Real.power(2, m)) * (Real.power(m, m) * secondProduct))
         since Real.IsNonneg.multiply;
-    claim Real.IsNonneg(Real.power((m : Real), m) * Real.partialProduct((j : Natural) ↦ s(m + j), m))
-        since Real.IsNonneg.multiply;
-    claim Real.IsNonneg((Real.power(2, m) * Real.power(2, m))
-              * (Real.power((m : Real), m) * Real.partialProduct((j : Natural) ↦ s(m + j), m)))
-        since Real.IsNonneg.multiply;
-    claim Real.IsNonneg((Real.power(2, m) * Real.power(2, m)) * Real.power(Real.partialSum(s, m), m))
+    claim Real.IsNonneg((Real.power(2, m) * Real.power(2, m)) * Real.power(firstSum, m))
         since Real.IsNonneg.multiply;
     -- The two-variable square gap on the half-sums.
-    claim Real.IsNonneg((Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
-              * (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m)))
+    claim Real.IsNonneg((firstSum - secondSum) * (firstSum - secondSum))
         since Real.square_IsNonneg;
-    claim 0 ≤ (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
-              * (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
+    claim 0 ≤ (firstSum - secondSum) * (firstSum - secondSum)
         since Real.LessOrEqual_zero_of_IsNonneg;
-    calc -((Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
-           * (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m)))
-          = 0 - (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
-              * (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
+    calc -((firstSum - secondSum) * (firstSum - secondSum))
+          = 0 - (firstSum - secondSum) * (firstSum - secondSum)
                 by ring
-          ≤ (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
-            * (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
-            - (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
-              * (Real.partialSum(s, m) - Real.partialSum((j : Natural) ↦ s(m + j), m))
+          ≤ (firstSum - secondSum) * (firstSum - secondSum)
+            - (firstSum - secondSum) * (firstSum - secondSum)
                 by Real.add_preserves_LessOrEqual
           = 0
                 by ring;
-    calc ((2 : Real) * (2 : Real))
-          * (Real.partialSum(s, m)
-             * Real.partialSum((j : Natural) ↦ s(m + j), m))
-        = (Real.partialSum(s, m)
-           + Real.partialSum((j : Natural) ↦ s(m + j), m))
-          * (Real.partialSum(s, m)
-             + Real.partialSum((j : Natural) ↦ s(m + j), m))
-          + -((Real.partialSum(s, m)
-               - Real.partialSum((j : Natural) ↦ s(m + j), m))
-              * (Real.partialSum(s, m)
-                 - Real.partialSum((j : Natural) ↦ s(m + j), m)))
+    calc ((2 : Real) * (2 : Real)) * (firstSum * secondSum)
+        = (firstSum + secondSum) * (firstSum + secondSum)
+          + -((firstSum - secondSum) * (firstSum - secondSum))
               by ring
-        ≤ (Real.partialSum(s, m)
-           + Real.partialSum((j : Natural) ↦ s(m + j), m))
-          * (Real.partialSum(s, m)
-             + Real.partialSum((j : Natural) ↦ s(m + j), m))
-          + 0
+        ≤ (firstSum + secondSum) * (firstSum + secondSum) + 0
               since Real.add_preserves_LessOrEqual_left
-        = (Real.partialSum(s, m)
-           + Real.partialSum((j : Natural) ↦ s(m + j), m))
-          * (Real.partialSum(s, m)
-             + Real.partialSum((j : Natural) ↦ s(m + j), m));
-    claim 0
-            ≤ ((2 : Real) * (2 : Real))
-              * (Real.partialSum(s, m)
-                 * Real.partialSum((j : Natural) ↦ s(m + j), m))
-        by { claim Real.IsNonneg(2)
-                 since Real.IsNonneg_of_LessOrEqual_zero;
-             claim Real.IsNonneg((2 : Real) * (2 : Real))
-                 since Real.IsNonneg.multiply;
-             claim Real.IsNonneg(Real.partialSum(s, m))
-                 since Real.IsNonneg_of_LessOrEqual_zero;
-             claim Real.IsNonneg(
-                       Real.partialSum((j : Natural) ↦ s(m + j), m))
-                 since Real.IsNonneg_of_LessOrEqual_zero;
-             claim Real.IsNonneg(
-                       Real.partialSum(s, m)
-                       * Real.partialSum((j : Natural) ↦ s(m + j), m))
-                 since Real.IsNonneg.multiply;
-             claim Real.IsNonneg(
-                       ((2 : Real) * (2 : Real))
-                       * (Real.partialSum(s, m)
-                          * Real.partialSum((j : Natural) ↦ s(m + j), m)))
+        = (firstSum + secondSum) * (firstSum + secondSum);
+    claim 0 ≤ ((2 : Real) * (2 : Real)) * (firstSum * secondSum)
+        by { claim Real.IsNonneg(2) since Real.IsNonneg_of_LessOrEqual_zero;
+             claim Real.IsNonneg((2 : Real) * (2 : Real)) since Real.IsNonneg.multiply;
+             claim Real.IsNonneg(firstSum) since Real.IsNonneg_of_LessOrEqual_zero;
+             claim Real.IsNonneg(secondSum) since Real.IsNonneg_of_LessOrEqual_zero;
+             claim Real.IsNonneg(firstSum * secondSum) since Real.IsNonneg.multiply;
+             claim Real.IsNonneg(((2 : Real) * (2 : Real)) * (firstSum * secondSum))
                  since Real.IsNonneg.multiply;
              done since Real.LessOrEqual_zero_of_IsNonneg };
     -- The chain.
-    calc Real.power(((m + m : Natural) : Real), m + m)
-         * Real.partialProduct(s, m + m)
-       = Real.power((m : Real) + (m : Real), m + m)
-         * Real.partialProduct(s, m + m)
+    calc Real.power(m + m, m + m) * Real.partialProduct(s, m + m)
+       = Real.power((m : Real) + (m : Real), m + m) * Real.partialProduct(s, m + m)
              since Real.from_natural_add_preserves
-       = Real.power((m : Real) + (m : Real), m + m)
-         * (Real.partialProduct(s, m)
-            * Real.partialProduct((j : Natural) ↦ s(m + j), m))
+       = Real.power((m : Real) + (m : Real), m + m) * (firstProduct * secondProduct)
              by Real.partialProduct_split
-       = Real.power(2 * (m : Real), m + m)
-         * (Real.partialProduct(s, m)
-            * Real.partialProduct((j : Natural) ↦ s(m + j), m))
-             by ((m : Real) + (m : Real)
-                 = 2 * (m : Real))
-       = (Real.power(2, m + m)
-          * Real.power((m : Real), m + m))
-         * (Real.partialProduct(s, m)
-            * Real.partialProduct((j : Natural) ↦ s(m + j), m))
+       = Real.power(2 * (m : Real), m + m) * (firstProduct * secondProduct)
+             by ((m : Real) + (m : Real) = 2 * (m : Real))
+       = (Real.power(2, m + m) * Real.power(m, m + m)) * (firstProduct * secondProduct)
              by Real.power_product
-       = ((Real.power(2, m)
-           * Real.power(2, m))
-          * Real.power((m : Real), m + m))
-         * (Real.partialProduct(s, m)
-            * Real.partialProduct((j : Natural) ↦ s(m + j), m))
+       = ((Real.power(2, m) * Real.power(2, m)) * Real.power(m, m + m)) * (firstProduct * secondProduct)
              by Real.power_add
-       = ((Real.power(2, m)
-           * Real.power(2, m))
-          * (Real.power((m : Real), m)
-             * Real.power((m : Real), m)))
-         * (Real.partialProduct(s, m)
-            * Real.partialProduct((j : Natural) ↦ s(m + j), m))
+       = ((Real.power(2, m) * Real.power(2, m)) * (Real.power(m, m) * Real.power(m, m)))
+         * (firstProduct * secondProduct)
              by Real.power_add
-       = (Real.power((m : Real), m) * Real.partialProduct(s, m))
-         * ((Real.power(2, m)
-             * Real.power(2, m))
-            * (Real.power((m : Real), m)
-               * Real.partialProduct((j : Natural) ↦ s(m + j), m)))
+       = (Real.power(m, m) * firstProduct)
+         * ((Real.power(2, m) * Real.power(2, m)) * (Real.power(m, m) * secondProduct))
              by ring
-       ≤ Real.power(Real.partialSum(s, m), m)
-         * ((Real.power(2, m)
-             * Real.power(2, m))
-            * (Real.power((m : Real), m)
-               * Real.partialProduct((j : Natural) ↦ s(m + j), m)))
+       ≤ Real.power(firstSum, m)
+         * ((Real.power(2, m) * Real.power(2, m)) * (Real.power(m, m) * secondProduct))
              since Real.LessOrEqual.multiply_by_nonneg_right
-       = (Real.power((m : Real), m)
-          * Real.partialProduct((j : Natural) ↦ s(m + j), m))
-         * ((Real.power(2, m)
-             * Real.power(2, m))
-            * Real.power(Real.partialSum(s, m), m))
+       = (Real.power(m, m) * secondProduct)
+         * ((Real.power(2, m) * Real.power(2, m)) * Real.power(firstSum, m))
              by ring
-       ≤ Real.power(Real.partialSum((j : Natural) ↦ s(m + j), m), m)
-         * ((Real.power(2, m)
-             * Real.power(2, m))
-            * Real.power(Real.partialSum(s, m), m))
+       ≤ Real.power(secondSum, m)
+         * ((Real.power(2, m) * Real.power(2, m)) * Real.power(firstSum, m))
              since Real.LessOrEqual.multiply_by_nonneg_right
-       = (Real.power(2, m)
-          * Real.power(2, m))
-         * (Real.power(Real.partialSum(s, m), m)
-            * Real.power(Real.partialSum((j : Natural) ↦ s(m + j), m), m))
+       = (Real.power(2, m) * Real.power(2, m))
+         * (Real.power(firstSum, m) * Real.power(secondSum, m))
              by ring
        = Real.power((2 : Real) * (2 : Real), m)
-         * (Real.power(Real.partialSum(s, m), m)
-            * Real.power(Real.partialSum((j : Natural) ↦ s(m + j), m), m))
+         * (Real.power(firstSum, m) * Real.power(secondSum, m))
              by Real.power_product
-       = Real.power((2 : Real) * (2 : Real), m)
-         * Real.power(
-               Real.partialSum(s, m)
-               * Real.partialSum((j : Natural) ↦ s(m + j), m),
-               m)
+       = Real.power((2 : Real) * (2 : Real), m) * Real.power(firstSum * secondSum, m)
              by Real.power_product
-       = Real.power(
-             ((2 : Real) * (2 : Real))
-             * (Real.partialSum(s, m)
-                * Real.partialSum((j : Natural) ↦ s(m + j), m)),
-             m)
-       ≤ Real.power(
-             (Real.partialSum(s, m)
-              + Real.partialSum((j : Natural) ↦ s(m + j), m))
-             * (Real.partialSum(s, m)
-                + Real.partialSum((j : Natural) ↦ s(m + j), m)),
-             m)
+       = Real.power(((2 : Real) * (2 : Real)) * (firstSum * secondSum), m)
+       ≤ Real.power((firstSum + secondSum) * (firstSum + secondSum), m)
              since Real.power_monotone
-       = Real.power(
-             Real.partialSum(s, m)
-             + Real.partialSum((j : Natural) ↦ s(m + j), m),
-             m)
-         * Real.power(
-               Real.partialSum(s, m)
-               + Real.partialSum((j : Natural) ↦ s(m + j), m),
-               m)
-       = Real.power(
-             Real.partialSum(s, m)
-             + Real.partialSum((j : Natural) ↦ s(m + j), m),
-             m + m)
+       = Real.power(firstSum + secondSum, m) * Real.power(firstSum + secondSum, m)
+       = Real.power(firstSum + secondSum, m + m)
        = Real.power(Real.partialSum(s, m + m), m + m)
              by Real.partialSum_split
   }
@@ -599,18 +503,18 @@ theorem Real.means_inequality_predecessor (m : Natural)
               = Real.partialProduct(
                     Real.augmentedScaledRow(s, m),
                     1)
-                * (Real.power((m : Real), m)
+                * (Real.power(m, m)
                    * Real.partialProduct(s, m))
                     since Real.partialProduct_scale
               = (1 * Real.augmentedScaledRow(s, m, 0))
-                * (Real.power((m : Real), m)
+                * (Real.power(m, m)
                    * Real.partialProduct(s, m))
               = (1 * Real.partialSum(s, m))
-                * (Real.power((m : Real), m)
+                * (Real.power(m, m)
                    * Real.partialProduct(s, m))
                     by substituting Real.augmentedScaledRow_zero
               = Real.partialSum(s, m)
-                * (Real.power((m : Real), m)
+                * (Real.power(m, m)
                    * Real.partialProduct(s, m))
                     by ring
         as productValue;
@@ -625,7 +529,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
         since Real.power_positive;
     calc Real.power((1 + m : Real), 1 + m)
          * (Real.partialSum(s, m)
-            * (Real.power((m : Real), m)
+            * (Real.power(m, m)
                * Real.partialProduct(s, m)))
               = Real.power((1 + m : Real), 1 + m)
                 * Real.partialProduct(Real.augmentedScaledRow(s, m), 1 + m)
@@ -642,7 +546,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
                 * Real.power(Real.partialSum(s, m), 1 + m);
     claim cancelled
           : Real.partialSum(s, m)
-            * (Real.power((m : Real), m)
+            * (Real.power(m, m)
                * Real.partialProduct(s, m))
             ≤ Real.power(Real.partialSum(s, m), 1 + m)
         since Real.LessOrEqual.multiply_cancel_left_positive;
@@ -653,7 +557,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
           then
               -- With m = 0 every exponent is 0, so each power is 1 and the
               -- empty product is 1, collapsing both sides to 1.
-              calc Real.power((m : Real), m) * Real.partialProduct(s, m)
+              calc Real.power(m, m) * Real.partialProduct(s, m)
                  = Real.power(0, 0) * Real.partialProduct(s, 0)
                        by substituting (m = 0)
                  = 1 * 1
@@ -684,8 +588,8 @@ theorem Real.means_inequality_predecessor (m : Natural)
                   since Real.partialSum_nonneg;
               claim 0 ≤ Real.power(Real.partialSum(s, m), m)
                   since Real.power_nonneg;
-              calc Real.power((m : Real), m) * Real.partialProduct(s, m)
-                 = Real.power((m : Real), m) * 0
+              calc Real.power(m, m) * Real.partialProduct(s, m)
+                 = Real.power(m, m) * 0
                        by productZero
                  = 0
                        by ring
@@ -699,7 +603,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
           };
           claim 0 < Real.partialSum(s, m);
           calc Real.partialSum(s, m)
-               * (Real.power((m : Real), m)
+               * (Real.power(m, m)
                   * Real.partialProduct(s, m))
              ≤ Real.power(Real.partialSum(s, m), 1 + m)
                    by cancelled
