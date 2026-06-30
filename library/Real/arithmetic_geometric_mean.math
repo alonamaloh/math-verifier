@@ -673,60 +673,60 @@ theorem Real.means_inequality_predecessor (m : Natural)
     -- Cancel A — or collapse when A vanishes.
     decide Real.partialSum(s, m) = Real.zero {
       | yes sumZero =>
-          cases m refining sumZero, termsNonneg {
-            | zero => {
-                claim Rational.zero < Rational.one;
-                claim Real.zero < (Rational.one : Real)
-                    since Rational.to_real.positive_preserves;
-                claim Real.one ≤ Real.one since Real.LessOrEqual.reflexive;
-                calc Real.power((0 : Real), 0)
-                     * Real.partialProduct(s, 0)
-                   = Real.one * Real.partialProduct(s, 0)
-                   = Real.one * Real.one
-                   = Real.one
-                    as leftValue;
-                claim rightValue
-                      : Real.power(Real.partialSum(s, 0), 0) = Real.one;
-                calc Real.power((0 : Real), 0)
-                     * Real.partialProduct(s, 0)
-                   = Real.one
-                         by leftValue
-                   ≤ Real.power(Real.partialSum(s, 0), 0)
-                         by substituting rightValue
-              }
-            | successor(mPredecessor) => {
-                claim lastTermZero : s(mPredecessor) = Real.zero
-                    since Real.partialSum_zero_term;
-                calc Real.partialProduct(s, successor(mPredecessor))
-                   = Real.partialProduct(s, mPredecessor)
-                     * s(mPredecessor)
-                   = Real.partialProduct(s, mPredecessor) * Real.zero
-                         by lastTermZero
-                   = Real.zero
-                         by ring
-                    as productZero;
-                claim Real.zero ≤ Real.partialSum(s, successor(mPredecessor))
-                    since Real.partialSum_nonneg;
-                claim Real.zero
-                        ≤ Real.power(
-                              Real.partialSum(s, successor(mPredecessor)),
-                              successor(mPredecessor))
-                    since Real.power_nonneg;
-                calc Real.power(
-                         (successor(mPredecessor) : Real),
-                         successor(mPredecessor))
-                     * Real.partialProduct(s, successor(mPredecessor))
-                   = Real.power(
-                         (successor(mPredecessor) : Real),
-                         successor(mPredecessor))
-                     * Real.zero
-                         by productZero
-                   = Real.zero
-                         by ring
-                   ≤ Real.power(
-                         Real.partialSum(s, successor(mPredecessor)),
-                         successor(mPredecessor))
-              }
+          if m = 0
+          then {
+              -- With m = 0 every exponent is 0, so each power is 1 — and the
+              -- empty product is 1 — independent of the base, which keeps the
+              -- substitution off the `(m : Real)` cast tower.
+              claim powerExponentZero : ∀ (x : Real). Real.power(x, m) = Real.one
+                  by (x : Real) ↦
+                       calc Real.power(x, m)
+                          = Real.power(x, 0)   by substituting (m = 0)
+                          = Real.one;
+              calc Real.partialProduct(s, m)
+                 = Real.partialProduct(s, 0)   by substituting (m = 0)
+                 = Real.one
+                as productOne;
+              claim baseOne : Real.power((m : Real), m) = Real.one
+                  since powerExponentZero;
+              claim rightOne : Real.power(Real.partialSum(s, m), m) = Real.one
+                  since powerExponentZero;
+              calc Real.power((m : Real), m) * Real.partialProduct(s, m)
+                 = Real.one * Real.partialProduct(s, m)   by baseOne
+                 = Real.one * Real.one                     by productOne
+                 = Real.one
+                 ≤ Real.power(Real.partialSum(s, m), m)    by substituting rightOne
+          }
+          else {
+              claim 1 ≤ m since Natural.one_le_of_nonzero;
+              choose mPredecessor such that m = 1 + mPredecessor
+                  from Natural.subtraction_witness;
+              calc mPredecessor
+                 < 1 + mPredecessor   since Natural.lt_one_plus
+                 = m                  by substituting (m = 1 + mPredecessor)
+                as mPredecessorBelow;
+              claim lastTermZero : s(mPredecessor) = Real.zero
+                  since Real.partialSum_zero_term;
+              calc Real.partialProduct(s, m)
+                 = Real.partialProduct(s, 1 + mPredecessor)
+                       by substituting (m = 1 + mPredecessor)
+                 = Real.partialProduct(s, mPredecessor) * s(mPredecessor)
+                       by Real.partialProduct_add_one
+                 = Real.partialProduct(s, mPredecessor) * Real.zero
+                       by lastTermZero
+                 = Real.zero
+                       by ring
+                as productZero;
+              claim Real.zero ≤ Real.partialSum(s, m)
+                  since Real.partialSum_nonneg;
+              claim Real.zero ≤ Real.power(Real.partialSum(s, m), m)
+                  since Real.power_nonneg;
+              calc Real.power((m : Real), m) * Real.partialProduct(s, m)
+                 = Real.power((m : Real), m) * Real.zero
+                       by productZero
+                 = Real.zero
+                       by ring
+                 ≤ Real.power(Real.partialSum(s, m), m)
           }
       | no sumNonzero => {
           claim Real.zero ≠ Real.partialSum(s, m) by {
@@ -763,16 +763,19 @@ theorem Real.means_inequality_doubling (k : Natural)
 -- … every index sits below some power of two …
 theorem Natural.le_doubling (n : Natural) : n ≤ Natural.doubling(n) :=
   by_induction on n with IH {
-    case zero: done
-    case successor(predecessor): {
+    case base: done
+    case step(predecessor): {
         claim 1 ≤ Natural.doubling(predecessor)
             since Natural.doubling_at_least_one;
-        calc successor(predecessor)
-           ≤ successor(Natural.doubling(predecessor))
-                 since Natural.successor_less_or_equal_successor
+        calc 1 + predecessor
+           = predecessor + 1
+           ≤ Natural.doubling(predecessor) + 1
+                 since Natural.le_add_preserves_left
            = 1 + Natural.doubling(predecessor)
            ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
                  since Natural.le_add_preserves_left
+           = Natural.doubling(1 + predecessor)
+                 by Natural.doubling_one_plus
       }
   }
 
