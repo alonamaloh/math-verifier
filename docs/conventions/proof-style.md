@@ -212,6 +212,15 @@ Concretely:
   form. Even a two-step calc is usually clearer than the equivalent
   `Equality.transitivity(...)`.
 
+- **Bind a repeated long subexpression with `let`.** When the same verbose
+  term (`Real.partialSum((j : Natural) ↦ s(m + j), m)`, `(x + y) / 2`) recurs,
+  a `let secondSum : Real := …` / `let mean := …` collapses every line that
+  uses it and makes the algebra legible — `(firstSum - secondSum) * (firstSum
+  - secondSum)`, `mean < g → g * g < g * g`. This is the main lever for
+  *un-chopping* a proof that has sprawled across many narrow lines (and pairs
+  with the column-140 rule — merge first, bind to shorten). Mechanics and the
+  `ring`/`field`-don't-unfold-`let` caveat live in `numerals-and-naming.md`.
+
 - **A comment is an admission of defeat — make the *proof* carry the
   reasoning.** The aspiration (borrowed from good C++ practice) is that the
   proof reads like the mathematics on its own; a comment is a signal that a

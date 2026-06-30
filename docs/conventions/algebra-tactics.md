@@ -23,7 +23,20 @@ real limitation:
   identity isn't a polynomial relation). Same for any reciprocal
   reasoning — use the `field(h1, h2, …)` tactic instead, which extends
   ring with `t_i * reciprocal_function(t_i) = 1` side-relations from
-  the supplied nonzero-hypotheses.
+  the supplied nonzero-hypotheses. `field` also clears small *literal*
+  denominators automatically (`2 ≠ 0` etc. are discharged for you): the
+  square-gap identity `x*y = ((x+y)/2) * ((x+y)/2) - ((x-y)/2) * ((x-y)/2)`
+  is a one-line `by field`, replacing the `Rational.one_half` +
+  `linear_combination` + `halfSum` scaffolding it used to need. Prefer
+  writing a mean as `(x + y) / 2`, not `(x + y) * (Rational.one_half :
+  Real)`, so `field` (and the reader) see the division directly.
+- **`let`-bound values are atoms to `ring`/`field`/`linear_combination`.**
+  These normalisers do NOT ζ-unfold a local `let`, so an identity that is
+  only true *after* unfolding — `mean * mean - x*y = halfDiff * halfDiff`
+  with `let mean := (x+y)/2` — won't close; write that one claim in the
+  explicit `((x+y)/2) * …` form. The *matcher* does unfold `let`s, so
+  `since <lemma>` and relation steps over a `let` are fine; only the
+  algebra normalisers are blind. See `numerals-and-naming.md`.
 - **`ring` requires the carrier's `.add`, `.multiply`, and ring laws
   in scope.** For Real proofs, that typically means importing
   `Real.addition`, `Real.multiplication`, `Real.negation`, `Real.ring`,
@@ -48,14 +61,18 @@ real limitation:
   `Rational.to_real` for Real. The named constants `Integer.one` /
   `Rational.one` etc. are also recognized as literal 1.
 
-- **Bare-literal Rational/Real (not multiplied).** Each numeric
-  literal still parses as a Natural — bare `1 + 1` for a Rational
-  target fails, and `x + 2` for `x : Integer/Rational/Real` errors
-  (no implicit coercion: the user writes `(2 : Integer)` to say which
-  `2` they mean). For a Rational two, write `Rational.one +
-  Rational.one` or ascribe `(2 : Integer) * x` (scalar pattern). The
-  literal default stays Natural by design — coercions are explicit
-  only, never inferred from a neighbouring operand.
+- **Bare literals and the carrier.** A numeric literal parses as a
+  `Natural`; whether it then lifts to the ring's carrier depends on the
+  *position* (full rules in `numerals-and-naming.md`). In an
+  operator-operand or function-argument position against a higher-tower
+  operand it **does** coerce now: `x + 2` for `x : Real` lifts `2` to
+  `(2 : Real)` via the coercion-join, and `Real.power(2, m)` lifts the
+  base. But as a `linear_combination` **coefficient** it does not —
+  write the carrier explicitly there, `(2 : Integer) * h`, never bare
+  `2`. And mind that `1 + 1`, `Real.one + Real.one`, and `(2 : Real)`
+  (the tower) are three *different terms* — all ring-equal, but they do
+  NOT match structurally, so don't mix them across a `≤`-step or a lemma
+  citation (the `2`-vs-`1+1` rule in `numerals-and-naming.md`).
 
 When the goal is `(ring : Foo = Bar)` and you intend to `rewrite` with
 it, double-check the direction: `rewrite(eq, term)` looks for the LHS
