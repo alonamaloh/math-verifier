@@ -128,6 +128,23 @@ theorem Rational.successor_successor_cast (n : Natural)
        = (1 : Rational) + (1 : Rational) + (n : Rational)
   }
 
+-- The `1 + n` forms of the cast lemmas. `Natural.add` is opaque, so a goal
+-- phrased with `1 + n` does not reduce to `successor(n)` on its own — a
+-- consumer that wants to keep `successor` out of its statements cites these
+-- instead, and the `successor` token stays confined to this layer.
+theorem Rational.one_plus_cast (n : Natural)
+        : (1 + n : Rational) = (1 : Rational) + (n : Rational) :=
+  calc (1 + n : Rational)
+     = (successor(n) : Rational)              since Natural.one_add
+     = (1 : Rational) + (n : Rational)        since Rational.successor_cast
+
+theorem Rational.one_plus_cast_positive (n : Natural)
+        : (0 : Rational) < (1 + n : Rational) := {
+  claim (0 : Rational) < (successor(n) : Rational)
+      since Rational.successor_cast_positive;
+  done by substituting Natural.one_add
+}
+
 
 -- ----------------------------------------------------------------------
 -- Positive rationals are nonzero — the flip of LessThan.distinct that
