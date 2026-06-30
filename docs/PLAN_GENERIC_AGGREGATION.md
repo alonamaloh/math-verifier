@@ -42,15 +42,21 @@
   level + the Lists bridge).
   - Done: `Algebra/ring_power.math` (`Ring.power` + `power_add_one`),
     `Algebra/ring_from_natural.math` (`Ring.from_natural` + `_one`, `_add`).
-  - Remaining: `Polynomial/binomial.math` — the commutative-ring binomial
-    theorem `power(a+b, n) = Σ_{k≤n} from_natural(C(n,k))·(aᵏ·bⁿ⁻ᵏ)` over
-    `CommutativeRing`, via `Polynomial.Sum` + `Ring.power` + the existing
-    `ring`. Proof mapped (Pascal step: a-copy = `a·Bₚ` cleanly; b-copy
-    collapses via `shift`+overflow; the pointwise Pascal identity splits at
-    `j<p` vs `j≥p`). Likely wants a bounded `Polynomial.Sum.extensional_below`
-    (and possibly a split-at-cut). Then `Real.binomial_theorem` and
-    `ComplexNumber.binomial_theorem` (~830 + ~1195 near-duplicate lines)
-    become instances.
+  - Done: `Polynomial/binomial.math` — `CommutativeRing.binomial_theorem`
+    `(a+b)ⁿ = Σ_{k≤n} from_natural(C(n,k))·(aᵏ·bⁿ⁻ᵏ)` over `CommutativeRing`,
+    via `Polynomial.Sum` + `Ring.power` + `Ring.from_natural` + `ring` (commit
+    bfb1fec; `let R` cleanup 65d2813). Supporting: `Ring.power`/`from_natural`,
+    `monus_one_plus_shift`, `Sum.add_one`/`Sum.shift_one_plus`. **No
+    elaborator change** — `ring` already drives `CommutativeRing.carrier`, and
+    `let R` does not hide commutativity (earlier claim was wrong; failures were
+    content bugs + the `1+n`↔`successor` citation-matcher asymmetry, handled by
+    `1 +`-form wrapper lemmas — see [[one_plus_vs_plus_one_asymmetry]]).
+  - Remaining: make `Real.binomial_theorem` and
+    `ComplexNumber.binomial_theorem` (~830 + ~1195 near-duplicate inductions)
+    *instances* of the generic theorem — package Real/Complex as
+    `CommutativeRing` bundles and bridge `partialSum`↔`Polynomial.Sum`,
+    `Real.power`↔`Ring.power`, the Rational-cast coefficient↔`from_natural`.
+    That's the ~2000-line dedup payoff.
 - **Stage 4** — AGM already rides on the generic toolkit transitively (its
   `Real.partialProduct` was re-backed in Stage 2); the order-bearing steps
   stay Real. No dedicated work expected beyond confirmation.
