@@ -130,22 +130,21 @@ theorem Algebra.indexedAggregate_pointwise_below (A : Type(0)) (operation : A �
   by_induction on n with IH refining pointwiseEqual {
     case base: done
     case step(predecessor): {
-        claim predecessorBelow : predecessor < 1 + predecessor since Natural.lt_one_plus;
-        claim prefixEqual
-              : ∀ (k : Natural). k < predecessor → s(k) = sequencePrime(k)
-            by (k : Natural) (kBelow : k < predecessor) ↦ {
-                 claim kBelowStep : k < 1 + predecessor since Natural.lt_transitive;
-                 done by pointwiseEqual(k, kBelowStep)
-               };
-        claim topEqual : s(predecessor) = sequencePrime(predecessor)
-            since pointwiseEqual(predecessor, predecessorBelow);
+        claim predecessor < 1 + predecessor since Natural.lt_one_plus;
+        claim ∀ (k : Natural). k < predecessor → s(k) = sequencePrime(k) by {
+            take k : Natural;
+            suppose k < predecessor as kBelow;
+            claim k < 1 + predecessor since Natural.lt_transitive;
+            done by pointwiseEqual
+          };
+        claim topEqual : s(predecessor) = sequencePrime(predecessor) since pointwiseEqual;
         calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
                        s(predecessor))
                  by Algebra.indexedAggregate_add_one
            = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
                        s(predecessor))
-                 by IH(prefixEqual)
+                 by IH
            = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
                        sequencePrime(predecessor))
                  since topEqual
