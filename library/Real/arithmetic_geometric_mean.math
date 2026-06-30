@@ -392,6 +392,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
         (atSuccessor : Real.MeansInequalityAt(1 + m))
         : Real.MeansInequalityAt(m) :=
   (s : Natural → Real) (termsNonneg : ∀ (j : Natural). 0 ≤ s(j)) ↦ {
+    let augmentedRow : Natural → Real := Real.augmentedScaledRow(s, m);
     claim 0 ≤ Real.partialSum(s, m)
         since Real.partialSum_nonneg;
     claim Rational.IsNonneg((m : Rational))
@@ -403,119 +404,67 @@ theorem Real.means_inequality_predecessor (m : Natural)
     claim 0 ≤ (m : Real);
     claim Real.IsNonneg((m : Real))
         since Real.IsNonneg_of_LessOrEqual_zero;
-    claim ∀ (k : Natural). 0 ≤ Real.augmentedScaledRow(s, m, k)
-        by (k : Natural) ↦
-             if k = 0
-             then {
-               claim 0 ≤ Real.partialSum(s, m)
-                   since Real.partialSum_nonneg;
-               done
-             }
-             else {
-               claim 0 ≤ s(Natural.monus(k, 1));
-               claim Real.IsNonneg(s(Natural.monus(k, 1)))
-                   since Real.IsNonneg_of_LessOrEqual_zero;
-               claim Real.IsNonneg((m : Real) * s(Natural.monus(k, 1)))
-                   since Real.IsNonneg.multiply;
-               claim 0 ≤ (m : Real) * s(Natural.monus(k, 1))
-                   since Real.LessOrEqual_zero_of_IsNonneg;
-               done
-             };
+    claim ∀ (k : Natural). 0 ≤ Real.augmentedScaledRow(s, m, k) by {
+        take k : Natural;
+        if k = 0
+        then {
+          claim 0 ≤ Real.partialSum(s, m) since Real.partialSum_nonneg;
+          done
+        }
+        else {
+          claim 0 ≤ s(Natural.monus(k, 1));
+          claim Real.IsNonneg(s(Natural.monus(k, 1))) since Real.IsNonneg_of_LessOrEqual_zero;
+          claim Real.IsNonneg((m : Real) * s(Natural.monus(k, 1))) since Real.IsNonneg.multiply;
+          claim 0 ≤ (m : Real) * s(Natural.monus(k, 1)) since Real.LessOrEqual_zero_of_IsNonneg;
+          done
+        }
+    };
     claim applied
-          : Real.power((1 + m : Real), 1 + m)
-            * Real.partialProduct(Real.augmentedScaledRow(s, m), 1 + m)
-            ≤ Real.power(
-                  Real.partialSum(Real.augmentedScaledRow(s, m), 1 + m),
-                  1 + m)
+          : Real.power((1 + m : Real), 1 + m) * Real.partialProduct(augmentedRow, 1 + m)
+            ≤ Real.power(Real.partialSum(augmentedRow, 1 + m), 1 + m)
         since atSuccessor;
     -- The augmented sum telescopes to (m+1)·A.
     claim indexEquation : 1 + m = m + 1;
     let onePlusMReal : Real := (1 + m : Real);
     calc onePlusMReal
-          = (((1 : Rational) + (m : Rational)) : Real)
-                since Rational.one_plus_cast
-          = (((1 : Rational)) : Real) + (m : Real)
-                since Rational.to_real.add_preserves
-          = 1 + (m : Real)
-                since Real.from_natural_one_preserves
+          = (((1 : Rational) + (m : Rational)) : Real)   since Rational.one_plus_cast
+          = (((1 : Rational)) : Real) + (m : Real)        since Rational.to_real.add_preserves
+          = 1 + (m : Real)                                 since Real.from_natural_one_preserves
         as succCast;
-    claim ∀ (j : Natural).
-              Real.augmentedScaledRow(s, m, 1 + j) = (m : Real) * s(j)
-        by (j : Natural) ↦ Real.augmentedScaledRow_one_plus(s, m, j);
-    calc Real.partialSum(
-             Real.augmentedScaledRow(s, m),
-             1 + m)
-              = Real.partialSum(
-                    Real.augmentedScaledRow(s, m),
-                    m + 1)
-                    by indexEquation
-              = Real.partialSum(
-                    Real.augmentedScaledRow(s, m),
-                    1)
-                + Real.partialSum(
-                      (j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j),
-                      m)
+    claim ∀ (j : Natural). Real.augmentedScaledRow(s, m, 1 + j) = (m : Real) * s(j) by {
+        take j : Natural;
+        done since Real.augmentedScaledRow_one_plus
+    };
+    calc Real.partialSum(augmentedRow, 1 + m)
+              = Real.partialSum(augmentedRow, m + 1)   by indexEquation
+              = Real.partialSum(augmentedRow, 1)
+                + Real.partialSum((j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j), m)
                     since Real.partialSum_split
-              = Real.partialSum(
-                    Real.augmentedScaledRow(s, m),
-                    1)
-                + Real.partialSum(
-                      (j : Natural) ↦ (m : Real) * s(j),
-                      m)
+              = Real.partialSum(augmentedRow, 1) + Real.partialSum((j : Natural) ↦ (m : Real) * s(j), m)
                     since Real.partialSum_pointwise
-              = Real.partialSum(
-                    Real.augmentedScaledRow(s, m),
-                    1)
-                + (m : Real) * Real.partialSum(s, m)
+              = Real.partialSum(augmentedRow, 1) + (m : Real) * Real.partialSum(s, m)
                     since Real.partialSum_scale
-              = (0 + Real.augmentedScaledRow(s, m, 0))
-                + (m : Real) * Real.partialSum(s, m)
-              = (0 + Real.partialSum(s, m))
-                + (m : Real) * Real.partialSum(s, m)
+              = (0 + Real.augmentedScaledRow(s, m, 0)) + (m : Real) * Real.partialSum(s, m)
+              = (0 + Real.partialSum(s, m)) + (m : Real) * Real.partialSum(s, m)
                     by substituting Real.augmentedScaledRow_zero
-              = (1 + (m : Real)) * Real.partialSum(s, m)
-                    by ring
-              = onePlusMReal * Real.partialSum(s, m)
-                    by succCast
+              = (1 + (m : Real)) * Real.partialSum(s, m)   by ring
+              = onePlusMReal * Real.partialSum(s, m)        by succCast
         as sumValue;
     -- The augmented product telescopes to A·mᵐ·Π.
-    calc Real.partialProduct(
-             Real.augmentedScaledRow(s, m),
-             1 + m)
-              = Real.partialProduct(
-                    Real.augmentedScaledRow(s, m),
-                    m + 1)
-                    by indexEquation
-              = Real.partialProduct(
-                    Real.augmentedScaledRow(s, m),
-                    1)
-                * Real.partialProduct(
-                      (j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j),
-                      m)
+    calc Real.partialProduct(augmentedRow, 1 + m)
+              = Real.partialProduct(augmentedRow, m + 1)   by indexEquation
+              = Real.partialProduct(augmentedRow, 1)
+                * Real.partialProduct((j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j), m)
                     since Real.partialProduct_split
-              = Real.partialProduct(
-                    Real.augmentedScaledRow(s, m),
-                    1)
-                * Real.partialProduct(
-                      (j : Natural) ↦ (m : Real) * s(j),
-                      m)
+              = Real.partialProduct(augmentedRow, 1)
+                * Real.partialProduct((j : Natural) ↦ (m : Real) * s(j), m)
                     since Real.partialProduct_pointwise
-              = Real.partialProduct(
-                    Real.augmentedScaledRow(s, m),
-                    1)
-                * (Real.power(m, m)
-                   * Real.partialProduct(s, m))
+              = Real.partialProduct(augmentedRow, 1) * (Real.power(m, m) * Real.partialProduct(s, m))
                     since Real.partialProduct_scale
-              = (1 * Real.augmentedScaledRow(s, m, 0))
-                * (Real.power(m, m)
-                   * Real.partialProduct(s, m))
-              = (1 * Real.partialSum(s, m))
-                * (Real.power(m, m)
-                   * Real.partialProduct(s, m))
+              = (1 * Real.augmentedScaledRow(s, m, 0)) * (Real.power(m, m) * Real.partialProduct(s, m))
+              = (1 * Real.partialSum(s, m)) * (Real.power(m, m) * Real.partialProduct(s, m))
                     by substituting Real.augmentedScaledRow_zero
-              = Real.partialSum(s, m)
-                * (Real.power(m, m)
-                   * Real.partialProduct(s, m))
+              = Real.partialSum(s, m) * (Real.power(m, m) * Real.partialProduct(s, m))
                     by ring
         as productValue;
     -- Cancel the positive (m+1)ᵐ⁺¹.
@@ -524,30 +473,16 @@ theorem Real.means_inequality_predecessor (m : Natural)
     claim (Rational.zero : Real) < (1 + m : Real)
         since Rational.to_real.LessThan_preserves;
     claim 0 < (1 + m : Real);
-    claim 0
-            < Real.power((1 + m : Real), 1 + m)
-        since Real.power_positive;
+    claim 0 < Real.power((1 + m : Real), 1 + m) since Real.power_positive;
     calc Real.power((1 + m : Real), 1 + m)
-         * (Real.partialSum(s, m)
-            * (Real.power(m, m)
-               * Real.partialProduct(s, m)))
-              = Real.power((1 + m : Real), 1 + m)
-                * Real.partialProduct(Real.augmentedScaledRow(s, m), 1 + m)
+         * (Real.partialSum(s, m) * (Real.power(m, m) * Real.partialProduct(s, m)))
+              = Real.power((1 + m : Real), 1 + m) * Real.partialProduct(augmentedRow, 1 + m)
                     by productValue
-              ≤ Real.power(
-                    Real.partialSum(Real.augmentedScaledRow(s, m), 1 + m),
-                    1 + m)
-                    by applied
-              = Real.power(
-                    onePlusMReal * Real.partialSum(s, m),
-                    1 + m)
-                    by sumValue
-              = Real.power((1 + m : Real), 1 + m)
-                * Real.power(Real.partialSum(s, m), 1 + m);
+              ≤ Real.power(Real.partialSum(augmentedRow, 1 + m), 1 + m)   by applied
+              = Real.power(onePlusMReal * Real.partialSum(s, m), 1 + m)   by sumValue
+              = Real.power((1 + m : Real), 1 + m) * Real.power(Real.partialSum(s, m), 1 + m);
     claim cancelled
-          : Real.partialSum(s, m)
-            * (Real.power(m, m)
-               * Real.partialProduct(s, m))
+          : Real.partialSum(s, m) * (Real.power(m, m) * Real.partialProduct(s, m))
             ≤ Real.power(Real.partialSum(s, m), 1 + m)
         since Real.LessOrEqual.multiply_cancel_left_positive;
     -- Cancel A — or collapse when A vanishes.
@@ -602,13 +537,9 @@ theorem Real.means_inequality_predecessor (m : Natural)
               done
           };
           claim 0 < Real.partialSum(s, m);
-          calc Real.partialSum(s, m)
-               * (Real.power(m, m)
-                  * Real.partialProduct(s, m))
-             ≤ Real.power(Real.partialSum(s, m), 1 + m)
-                   by cancelled
-             = Real.partialSum(s, m)
-               * Real.power(Real.partialSum(s, m), m);
+          calc Real.partialSum(s, m) * (Real.power(m, m) * Real.partialProduct(s, m))
+             ≤ Real.power(Real.partialSum(s, m), 1 + m)   by cancelled
+             = Real.partialSum(s, m) * Real.power(Real.partialSum(s, m), m);
           done since Real.LessOrEqual.multiply_cancel_left_positive
         }
     }
@@ -620,8 +551,7 @@ theorem Real.means_inequality_doubling (k : Natural)
   by_induction on k with IH {
     case base: Real.means_inequality_one
     case step(predecessor): {
-        claim Real.MeansInequalityAt(
-                  Natural.doubling(predecessor) + Natural.doubling(predecessor))
+        claim Real.MeansInequalityAt(Natural.doubling(predecessor) + Natural.doubling(predecessor))
             since Real.means_inequality_double;
         done by substituting Natural.doubling_one_plus(k := predecessor)
       }
