@@ -51,12 +51,16 @@
     `let R` does not hide commutativity (earlier claim was wrong; failures were
     content bugs + the `1+n`↔`successor` citation-matcher asymmetry, handled by
     `1 +`-form wrapper lemmas — see [[one_plus_vs_plus_one_asymmetry]]).
-  - Remaining: make `Real.binomial_theorem` and
-    `ComplexNumber.binomial_theorem` (~830 + ~1195 near-duplicate inductions)
-    *instances* of the generic theorem — package Real/Complex as
-    `CommutativeRing` bundles and bridge `partialSum`↔`Polynomial.Sum`,
-    `Real.power`↔`Ring.power`, the Rational-cast coefficient↔`from_natural`.
-    That's the ~2000-line dedup payoff.
+  - Done (dedup): the ring finite-sum + binomial moved BELOW Real into
+    `Algebra/` (Real is a sibling of Polynomial, so the generic must be in
+    Algebra to serve both): `Polynomial.Sum`→`Ring.Sum` in
+    `Algebra/ring_summation.math`, binomial in `Algebra/binomial.math`.
+    `Real.binomial_theorem` (892→124) and `ComplexNumber.binomial_theorem`
+    (1195→151) are now instances via three bridges each (powers, the
+    finite sum over 1+n terms, the Natural-coefficient cast), with
+    `Real.commutative_ring` / `ComplexNumber.commutative_ring` bundles.
+    ~1800 lines of duplicated induction removed; statements unchanged so all
+    consumers are untouched. `Real.ring` moved to `Real/ring_bundle.math`.
 - **Stage 4** — AGM already rides on the generic toolkit transitively (its
   `Real.partialProduct` was re-backed in Stage 2); the order-bearing steps
   stay Real. No dedicated work expected beyond confirmation.
