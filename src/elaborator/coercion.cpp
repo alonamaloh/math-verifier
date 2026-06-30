@@ -23,6 +23,39 @@ ExpressionPointer Elaborator::acceptCoercionIfClosed(
         return wrapped;
     }
 
+ExpressionPointer Elaborator::coerceToExpectedTypeViaRegistry(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer expectedTypeClosed) {
+        if (environment_.coercionRegistry.empty()) return term;
+        try {
+            ExpressionPointer termTypeOpened =
+                inferTypeInLocalContext(localBinders, term);
+            ExpressionPointer expectedTypeOpened = openOverLocalBinders(
+                expectedTypeClosed, localBinders, localBinders.size());
+            Context context = buildContextFromLocalBinders(localBinders);
+            if (isDefinitionallyEqual(environment_, context,
+                                       termTypeOpened, expectedTypeOpened)) {
+                return term;
+            }
+            // The registry is keyed on the source-level type head name
+            // (`Natural`, `Integer`, …), not the unfolded representation, so
+            // match on the raw head. `headConstantName` peels Applications so
+            // parameterised types report their head.
+            std::string termHead = headConstantName(termTypeOpened);
+            std::string expectedHead = headConstantName(expectedTypeOpened);
+            if (termHead.empty() || expectedHead.empty()) return term;
+            auto entry = environment_.coercionRegistry.find(
+                std::make_tuple(termHead, expectedHead));
+            if (entry == environment_.coercionRegistry.end()) return term;
+            return applyCoercionChain(std::move(term), entry->second);
+        } catch (const TypeError&) {
+            // term's type couldn't be inferred — leave it for the
+            // authoritative use-site check to report.
+            return term;
+        }
+    }
+
 ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,

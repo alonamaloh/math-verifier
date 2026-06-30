@@ -1899,6 +1899,18 @@ private:
         ExpressionPointer term,
         ExpressionPointer expectedTypeClosed);
 
+    // Insert a user-declared coercion (the `coercion (S, T) := F` registry,
+    // transitively closed) when `term`'s type is `S` and the expected type
+    // is `T`. This is the same lookup the `(e : T)` ascription path runs, so
+    // a coercion target reached at an ASCRIPTION is also reached in ARGUMENT
+    // position: `Real.power(0, 0)` lifts the Natural `0` to `Real` exactly as
+    // `(0 : Real)` would. Returns the coerced term, or `term` unchanged when
+    // the types already agree or no registered chain bridges them.
+    ExpressionPointer coerceToExpectedTypeViaRegistry(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer expectedTypeClosed);
+
     // Coerce a Proposition-valued term into a proof of itself when
     // the term equals the expected type. Returns nullptr if either
     // (a) the term isn't of type Proposition, or (b) the term isn't

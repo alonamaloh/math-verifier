@@ -1240,6 +1240,14 @@ ExpressionPointer Elaborator::elaborateExpression(
                     argumentTerm = coerceToExpectedTypeViaDiff(
                         localBinders, argumentTerm,
                         argumentExpectedType);
+                    // Also insert a user-declared registry coercion (the
+                    // numeral/tower casts), so a bare `0` / `1 + 1` in an
+                    // argument whose domain is `Real` lifts exactly as the
+                    // `(0 : Real)` ascription would — no surprises, since it
+                    // only fires when the types don't already agree.
+                    argumentTerm = coerceToExpectedTypeViaRegistry(
+                        localBinders, argumentTerm,
+                        argumentExpectedType);
                     checkRedundantCongruenceOfWrapper(
                         argument, localBinders, argumentExpectedType,
                         "function-call argument");
