@@ -31,12 +31,11 @@ theorem NaturalsBelow.value_below_successor (k : Natural) (element : NaturalsBel
 
 definition NaturalsBelow.inclusion (k : Natural) (element : NaturalsBelow(k))
         : NaturalsBelow(successor(k)) :=
-  NaturalsBelow.make(NaturalsBelow.value(element),
-      NaturalsBelow.value_below_successor(k, element))
+  NaturalsBelow.make(NaturalsBelow.value(element), NaturalsBelow.value_below_successor)
 
 -- The top element of NaturalsBelow(successor(k)): value k.
 definition NaturalsBelow.top (k : Natural) : NaturalsBelow(successor(k)) :=
-  NaturalsBelow.make(k, Natural.lt_successor(k))
+  NaturalsBelow.make(k, Natural.lt_successor)
 
 -- ----------------------------------------------------------------------
 -- The redirect. Given an injection f : NaturalsBelow(1+k) → NaturalsBelow(1+n')
@@ -62,36 +61,28 @@ theorem NaturalsBelow.pigeonhole_top_value_below (k n' : Natural)
         : successor(NaturalsBelow.value(f(NaturalsBelow.top(k)))) ≤ n' := {
   let imageValue : Natural := NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)));
   let topValue : Natural := NaturalsBelow.value(f(NaturalsBelow.top(k)));
-  claim imageValue ≤ n'
-      by Natural.less_or_equal_successor_successor_descend(
-             imageValue, n',
-             Natural.successor_le_of_lt(imageValue, successor(n'),
-                 NaturalsBelow.below(f(NaturalsBelow.inclusion(k, i)))));
+  claim imageValue < successor(n') since NaturalsBelow.below;
+  claim imageValue ≤ n' since Natural.less_or_equal_successor_successor_descend;
   -- imageValue is both ≤ n' and (atLeast) ≥ n', so it equals n'.
   claim imageValue = n' since Natural.le_antisymmetric;
-  claim topValueBelow : topValue ≤ n'
-      by Natural.less_or_equal_successor_successor_descend(
-             topValue, n',
-             Natural.successor_le_of_lt(topValue, successor(n'),
-                 NaturalsBelow.below(f(NaturalsBelow.top(k)))));
+  claim topValue < successor(n') since NaturalsBelow.below;
+  claim topValue ≤ n' since Natural.less_or_equal_successor_successor_descend;
   -- n' ≠ topValue: otherwise top and inclusion i collide under f.
-  claim notEqual : ¬(n' = topValue) by {
+  claim ¬(n' = topValue) by {
     suppose n' = topValue as _;
     -- topValue = n' = imageValue, so f(top) and f(incl i) share a value,
     -- hence are equal; injectivity forces top = incl i, i.e. k = value i.
     claim topValue = imageValue;
-    claim imagesEqual : f(NaturalsBelow.top(k)) = f(NaturalsBelow.inclusion(k, i))
-        since NaturalsBelow.equal_of_value;
-    claim NaturalsBelow.top(k) = NaturalsBelow.inclusion(k, i)
-        by inj(NaturalsBelow.top(k), NaturalsBelow.inclusion(k, i), imagesEqual);
+    claim f(NaturalsBelow.top(k)) = f(NaturalsBelow.inclusion(k, i)) since NaturalsBelow.equal_of_value;
+    claim NaturalsBelow.top(k) = NaturalsBelow.inclusion(k, i) by inj;
     calc NaturalsBelow.value(NaturalsBelow.top(k))
               = NaturalsBelow.value(NaturalsBelow.inclusion(k, i));
     calc NaturalsBelow.value(i)
               < k
-              = NaturalsBelow.value(i) as belowSelf;
-    absurd(Natural.lt_irreflexive(NaturalsBelow.value(i), belowSelf))
+              = NaturalsBelow.value(i);
+    done since Natural.lt_irreflexive
   };
-  Natural.less_or_equal_not_equal_successor(topValue, n', topValueBelow, notEqual)
+  done since Natural.less_or_equal_not_equal_successor
 }
 
 -- The redirect map itself: branch on how f(inclusion i) compares to n'.
@@ -102,12 +93,12 @@ definition NaturalsBelow.pigeonhole_redirect (k n' : Natural)
   (i : NaturalsBelow(k)) ↦
     cases Natural.compare_strict(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n') {
       | Natural.StrictComparison.below(strictlyBelow) =>
-          NaturalsBelow.make(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))),
-              Natural.lt_of_successor_le(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n', strictlyBelow))
+          NaturalsBelow.make(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), Natural.lt_of_successor_le)
       | Natural.StrictComparison.atLeast(atLeast) =>
           NaturalsBelow.make(NaturalsBelow.value(f(NaturalsBelow.top(k))),
-              Natural.lt_of_successor_le(NaturalsBelow.value(f(NaturalsBelow.top(k))), n',
-                  NaturalsBelow.pigeonhole_top_value_below(k, n', f, inj, i, atLeast)))
+              { claim successor(NaturalsBelow.value(f(NaturalsBelow.top(k)))) ≤ n'
+                    since NaturalsBelow.pigeonhole_top_value_below;
+                done by Natural.lt_of_successor_le })
     }
 
 -- Reading off the redirect's value. Branching on the comparison reduces
