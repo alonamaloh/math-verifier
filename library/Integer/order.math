@@ -13,6 +13,7 @@ import Equality.basics
 import Natural.basics
 import Natural.arithmetic
 import Natural.order
+import Natural.subtraction
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
@@ -95,6 +96,42 @@ theorem Integer.LessThan.weaken (a b : Integer) (aLessThanB : a < b) : a ≤ b :
   claim selfBound : a ≤ a + Integer.one
       by witness (1 : Natural) with (a + Integer.one = a + ((1 : Natural) : Integer));
   done since Integer.LessOrEqual.transitive
+}
+
+-- ----------------------------------------------------------------------
+-- The Natural→Integer embedding preserves order (the ℕ→ℤ rung of the tower).
+
+-- a ≤ b ⟹ (a:ℤ) ≤ (b:ℤ): with b = a + k, the difference is the image of k.
+theorem Natural.to_integer.LessOrEqual_preserves (n m : Natural) (nLeqM : n ≤ m)
+        : (n : Integer) ≤ (m : Integer) := {
+  choose k such that m = n + k from Natural.subtraction_witness;
+  witness k with
+      calc (m : Integer)
+         = (n + k : Integer)
+         = (n : Integer) + (k : Integer)   since Natural.to_integer.add_preserves
+}
+
+-- a < b ⟹ (a:ℤ) < (b:ℤ): a + 1 ≤ b preserves to (a:ℤ) + 1 ≤ (b:ℤ), which is `<`.
+theorem Natural.to_integer.LessThan_preserves (a b : Natural) (aLessThanB : a < b)
+        : (a : Integer) < (b : Integer) := {
+  claim aAddOneLeB : a + 1 ≤ b since Natural.add_one_le_of_lt;
+  claim ((a + 1 : Natural) : Integer) ≤ (b : Integer)
+      since Natural.to_integer.LessOrEqual_preserves;
+  claim castAddOne : ((a + 1 : Natural) : Integer) = (a : Integer) + Integer.one
+      since Natural.to_integer.add_one_preserves;
+  claim (a : Integer) + Integer.one ≤ (b : Integer) by substituting castAddOne;
+  done
+}
+
+-- 0 < n ⟹ 0 < (n:ℤ). Automatic: the ℕ→ℤ rung of the positivity tower the
+-- division/nonzero discharge walks.
+automatic theorem Natural.to_integer.positive_preserves (n : Natural) (nPositive : 0 < n)
+        : Integer.zero < (n : Integer) := {
+  claim ((0 : Natural) : Integer) < (n : Integer)
+      since Natural.to_integer.LessThan_preserves;
+  claim zeroCast : ((0 : Natural) : Integer) = Integer.zero
+      since Natural.to_integer.zero_preserves;
+  done by substituting zeroCast
 }
 
 -- ----------------------------------------------------------------------
