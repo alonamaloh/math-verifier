@@ -20,10 +20,20 @@ import Natural.multiply_order
 import Natural.decide
 import Natural.divisibility
 
--- factorial(0) = 1, factorial(successor n) = successor(n) · factorial(n).
+-- factorial(0) = 1, factorial(1 + n) = (1 + n) · factorial(n).
 definition Natural.factorial : Natural → Natural
-  | zero         => 1
-  | successor(n) => successor(n) * Natural.factorial(n)
+  | 0     => 1
+  | 1 + n => (1 + n) * Natural.factorial(n)
+
+-- The recurrence as a citeable equation. `Natural.add` is opaque, so
+-- `factorial(1 + n)` does not reduce on its own (the argument never becomes a
+-- `successor`); this bridges through `one_add` so consumers cite `(n+1)! =
+-- (n+1)·n!` in `1 + n` form.
+theorem Natural.factorial_add_one (n : Natural)
+        : Natural.factorial(1 + n) = (1 + n) * Natural.factorial(n) :=
+  calc Natural.factorial(1 + n)
+     = Natural.factorial(successor(n))   by substituting Natural.one_add
+     = (1 + n) * Natural.factorial(n)
 
 -- Every factorial value is at least 1: by induction, the empty product is
 -- 1 and a successor times a positive number is again a successor.
