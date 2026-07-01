@@ -20,6 +20,7 @@ import Equality.basics
 import Rational.basics
 import Rational.order
 import Rational.halve
+import Rational.reciprocal_function
 import Real.basics
 import Real.addition
 import Real.negation
@@ -197,6 +198,26 @@ theorem Real.one_divide_antitone (a b : Real)
      = 1 / a                      by field
 }
 
+-- The ℚ→ℝ boundary: a rational reciprocal casts to the honest real
+-- division 1/x. Both multiply the cast of x to 1, and multiplication by
+-- a nonzero real cancels. (Kept here, at the boundary, so analysis
+-- modules upstream can speak honest `/` throughout.)
+theorem Rational.to_real.reciprocal_preserves (x : Rational)
+        (xNonzero : x ≠ Rational.zero) (castNonzero : (x : Real) ≠ Real.zero)
+        : ((Rational.reciprocal_function(x)) : Real) = 1 / (x : Real) := {
+  claim recipMultiplies : x * Rational.reciprocal_function(x) = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  calc (x : Real) * ((Rational.reciprocal_function(x)) : Real)
+     = ((x * Rational.reciprocal_function(x) : Rational) : Real)
+           since Rational.to_real.multiply_preserves
+     = ((Rational.one : Rational) : Real)
+           since recipMultiplies
+     = 1
+     = (x : Real) * (1 / (x : Real))
+           since Real.divide_cancel;
+  done since Real.equal_of_multiply_left
+}
+
 -- The embedded rational one-half is 1/2: both double to 1.
 theorem Real.one_half_cast : (Rational.one_half : Real) = 1 / (2 : Real) := {
   calc (2 : Real) * (Rational.one_half : Real)
@@ -233,3 +254,11 @@ theorem Real.divide_two_less_than_self (x : Real) (xPositive : 0 < x)
 theorem Real.multiply_divide_cancel (a b : Real) (bNonzero : b ≠ 0)
         : (a * b) / b = a :=
   field
+
+-- Scaling a reciprocal is division by the same denominator.
+theorem Real.multiply_one_divide (a b : Real) (bNonzero : b ≠ 0)
+        : a * (1 / b) = a / b :=
+  calc a * (1 / b)
+     = a * (1 * Real.reciprocal(b, bNonzero))
+     = a * Real.reciprocal(b, bNonzero)         by ring
+     = a / b
