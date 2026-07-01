@@ -83,18 +83,15 @@ definition Real.exponentialTerm (x : Real) (k : Natural) : Real :=
 
 -- ----------------------------------------------------------------------
 -- The factorial's rational cast is positive (so its reciprocal is
--- honest): factorial(k) = 1 + c for some c, and successor casts are
--- positive.
+-- honest): factorial(k) = 1 + c for some c, and 1 + c casts positively.
 theorem Rational.factorial_cast_positive (k : Natural)
         : Rational.zero < Natural.factorial(k) := {
   claim 1 ≤ Natural.factorial(k) since Natural.factorial_positive;
-  obtain ⟨c, factorialSplit⟩
+  choose c such that Natural.factorial(k) = 1 + c as factorialSplit
       from Natural.subtraction_witness(1, Natural.factorial(k),
                                        (1 ≤ Natural.factorial(k)));
-  claim factorialAsSuccessor : Natural.factorial(k) = successor(c);
-  claim Rational.zero < successor(c)
-      since Rational.successor_cast_positive;
-  done by substituting factorialAsSuccessor
+  claim (0 : Rational) < (1 + c : Rational) since Rational.one_plus_cast_positive;
+  done by substituting factorialSplit
 }
 
 -- ----------------------------------------------------------------------
@@ -1010,15 +1007,12 @@ definition Real.e : Real := Real.exponential(Real.one)
 -- A concrete taste: e exceeds 2 — already the third partial sum
 -- 1 + 1 + 1/2 does.
 theorem Real.e_above_two : Real.one + Real.one < Real.e := {
-  claim zeroCast : ((0 : Natural) : Rational) = Rational.zero;
+  claim oneCast : ((1 : Natural) : Rational) = Rational.one;
   claim castTwo : ((2 : Natural) : Rational) = Rational.one + Rational.one
       by calc ((2 : Natural) : Rational)
-            = Rational.one + Rational.one + ((0 : Natural) : Rational)
-                  by Rational.successor_successor_cast(0)
-            = Rational.one + Rational.one + Rational.zero
-                  by zeroCast
-            = Rational.one + Rational.one
-                  by ring;
+            = ((1 + 1 : Natural) : Rational)              by (2 = 1 + 1)
+            = Rational.one + ((1 : Natural) : Rational)   since Rational.one_plus_cast
+            = Rational.one + Rational.one                 by substituting oneCast;
   claim factorialOne : Natural.factorial(1) = 1
       by calc Natural.factorial(1)
             = (1 + 0) * Natural.factorial(0)
