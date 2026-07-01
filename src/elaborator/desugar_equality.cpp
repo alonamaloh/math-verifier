@@ -531,6 +531,146 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             std::move(call), localBinders, operatorSymbol, line);
     }
 
+ExpressionPointer Elaborator::tryProvePositive(
+        ExpressionPointer value, ExpressionPointer zeroTerm,
+        const std::string& typeName,
+        const std::vector<LocalBinder>& localBinders, int line) {
+        // Inspect the raw form (NOT WHNF): the coercions are plain definitions,
+        // so weak-head-normalising would unfold them and hide the cast head.
+        // Peel a coercion `to_<Target>(inner)` (off both value and zeroTerm) and
+        // apply the matching per-hop positive_preserves rung.
+        auto* valueApp = std::get_if<Application>(&value->node);
+        auto* zeroApp = std::get_if<Application>(&zeroTerm->node);
+        if (valueApp && zeroApp) {
+            auto* castConstant =
+                std::get_if<Constant>(&valueApp->function->node);
+            auto* zeroCastConstant =
+                std::get_if<Constant>(&zeroApp->function->node);
+            if (castConstant && zeroCastConstant
+                && castConstant->name == zeroCastConstant->name) {
+                std::string lemma;
+                std::string innerType;
+                if (castConstant->name == "Rational.to_real") {
+                    lemma = "Rational.to_real.positive_preserves";
+                    innerType = "Rational";
+                } else if (castConstant->name == "Integer.to_rational") {
+                    lemma = "Integer.to_rational.positive_preserves";
+                    innerType = "Integer";
+                } else if (castConstant->name == "Natural.to_integer") {
+                    lemma = "Natural.to_integer.positive_preserves";
+                    innerType = "Natural";
+                }
+                if (!lemma.empty() && environment_.lookup(lemma)) {
+                    ExpressionPointer inner = valueApp->argument;
+                    ExpressionPointer innerZero = zeroApp->argument;
+                    ExpressionPointer innerProof = tryProvePositive(
+                        inner, innerZero, innerType, localBinders, line);
+                    if (!innerProof) return nullptr;
+                    ExpressionPointer proof = makeConstant(lemma, {});
+                    proof = makeApplication(proof, inner);
+                    proof = makeApplication(proof, innerProof);
+                    return proof;
+                }
+            }
+        }
+        // Base: hand `zeroTerm < value` to the auto-prover (shallow now — one
+        // level of positivity, using the goal's own well-formed zero). `value`
+        // and `zeroTerm` are CLOSED, so the goal is already in the form
+        // autoProveClaim expects.
+        if (!environment_.lookup(typeName + ".LessThan")) return nullptr;
+        ExpressionPointer goalClosed = makeApplication(
+            makeApplication(makeConstant(typeName + ".LessThan", {}), zeroTerm),
+            value);
+        // The general prover first.
+        try {
+            ExpressionPointer r = autoProveClaim(goalClosed, localBinders, line);
+            if (r) return r;
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        } catch (const AutoProverBudgetError&) {
+        }
+        // Natural base: `0 < value` = `zero_lt_of_one_le(value, «1 ≤ value»)`.
+        // The `1 ≤ value` premise IS auto-provable (e.g. `less_or_equal_add_right`
+        // for `1 + k`); constructing the application directly avoids relying on
+        // the automatic path reaching `0 < _` through the opaque `<`.
+        if (typeName == "Natural"
+            && environment_.lookup("Natural.zero_lt_of_one_le")) {
+            ExpressionPointer natOne = makeApplication(
+                makeConstant("successor", {}), makeConstant("zero", {}));
+            ExpressionPointer oneLeClosed = makeApplication(
+                makeApplication(makeConstant("Natural.LessOrEqual", {}), natOne),
+                value);
+            ExpressionPointer oneLeProof = nullptr;
+            try {
+                oneLeProof = autoProveClaim(oneLeClosed, localBinders, line);
+            } catch (const ElaborateError&) {
+                oneLeProof = nullptr;
+            } catch (const TypeError&) {
+                oneLeProof = nullptr;
+            } catch (const AutoProverBudgetError&) {
+                oneLeProof = nullptr;
+            }
+            if (oneLeProof) {
+                ExpressionPointer p =
+                    makeConstant("Natural.zero_lt_of_one_le", {});
+                p = makeApplication(p, value);
+                p = makeApplication(p, oneLeProof);
+                return p;
+            }
+        }
+        return nullptr;
+    }
+
+ExpressionPointer Elaborator::tryProveNonzero(
+        ExpressionPointer obligationClosed,
+        const std::vector<LocalBinder>& localBinders, int line) {
+        int N = static_cast<int>(localBinders.size());
+        ExpressionPointer goalOpened =
+            openOverLocalBinders(obligationClosed, localBinders, N);
+        ExpressionPointer goalWhnf =
+            weakHeadNormalForm(environment_, goalOpened);
+        auto* notPi = std::get_if<Pi>(&goalWhnf->node);
+        if (!notPi || referencesBoundVariable(notPi->codomain, 0)) {
+            return nullptr;
+        }
+        ExpressionPointer codomainWhnf = weakHeadNormalForm(
+            environment_, shift(notPi->codomain, -1));
+        auto* codomainConstant = std::get_if<Constant>(&codomainWhnf->node);
+        if (!codomainConstant || codomainConstant->name != "False") {
+            return nullptr;
+        }
+        EqualityComponents equality;
+        try {
+            equality = extractEqualityComponents(
+                notPi->domain, "nonzero tactic", line);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
+        std::string typeName = headConstantName(equality.carrierType);
+        if (typeName.empty()) return nullptr;
+        std::string nonzeroLemma = typeName + ".nonzero_of_positive";
+        if (!environment_.lookup(nonzeroLemma)) return nullptr;
+        // The endpoints were extracted from the OPENED goal (kernel-operation
+        // form); the proof must be CLOSED — that is what autoProveClaim's base
+        // results are and what the discharge site applies onto `call`. Close
+        // them here so the whole proof is assembled in one convention.
+        ExpressionPointer valueClosed = closeOverLocalBinders(
+            equality.leftEndpoint, localBinders, N);
+        ExpressionPointer zeroClosed = closeOverLocalBinders(
+            equality.rightEndpoint, localBinders, N);
+        ExpressionPointer positivity = tryProvePositive(
+            valueClosed, zeroClosed, typeName, localBinders, line);
+        if (!positivity) return nullptr;
+        // `<T>.nonzero_of_positive(b, positivity) : b ≠ T.zero` — the kernel
+        // checks this against the obligation `b ≠ <the goal's zero>` up to defeq.
+        ExpressionPointer proof = makeConstant(nonzeroLemma, {});
+        proof = makeApplication(proof, valueClosed);
+        proof = makeApplication(proof, positivity);
+        return proof;
+    }
+
 ExpressionPointer Elaborator::dischargeTrailingSideConditions(
         ExpressionPointer call,
         const std::vector<LocalBinder>& localBinders,
@@ -548,8 +688,32 @@ ExpressionPointer Elaborator::dischargeTrailingSideConditions(
             if (!typeIsProposition(obligationContext, pi->domain)) break;
             ExpressionPointer obligationClosed = closeOverLocalBinders(
                 pi->domain, localBinders, localBinders.size());
-            ExpressionPointer proof =
-                autoProveClaim(obligationClosed, localBinders, line);
+            // The general auto-prover first — its proof is what existing sites
+            // (and lemmas that bake in the nonzero witness via `Logic.the`)
+            // expect, so it must stay authoritative wherever it succeeds. Only
+            // when it can't discharge (e.g. a cast denominator, defeated by the
+            // backward-chain depth cap) do we fall back to the dedicated
+            // structural `≠ 0` prover.
+            ExpressionPointer proof = nullptr;
+            int savedAutoProveDepth = autoProveDepth_;
+            int savedBackwardChainingDepth = backwardChainingDepth_;
+            try {
+                proof = autoProveClaim(obligationClosed, localBinders, line);
+            } catch (const AutoProverBudgetError&) {
+                proof = nullptr;
+            } catch (const ElaborateError&) {
+                proof = nullptr;
+            } catch (const TypeError&) {
+                proof = nullptr;
+            }
+            if (!proof) {
+                // A caught failure above may have left the prover's depth
+                // counters unbalanced; restore them so the structural fallback
+                // runs from a clean state.
+                autoProveDepth_ = savedAutoProveDepth;
+                backwardChainingDepth_ = savedBackwardChainingDepth;
+                proof = tryProveNonzero(obligationClosed, localBinders, line);
+            }
             if (!proof) {
                 throwElaborate(
                     "operator '" + operatorSymbol + "' leaves the side "

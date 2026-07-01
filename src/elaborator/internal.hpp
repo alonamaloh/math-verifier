@@ -1632,6 +1632,27 @@ private:
         int line,
         int transportBudget = 1);
 
+    // Dedicated `≠ 0` prover for operator side-conditions (the `/`
+    // denominator). It walks the cast tower structurally — peeling
+    // `to_real`/`to_rational`/`to_integer` and applying the per-hop
+    // `positive_preserves` rungs explicitly, then `nonzero_of_positive` —
+    // rather than searching, so it isn't bounded by the backward-chain depth
+    // cap and doesn't perturb the general prover. Returns a CLOSED proof
+    // (the storage convention — see the representation note above; this is
+    // what the discharge site applies onto the call, and what the embedded
+    // autoProveClaim base results are) or nullptr if the shape isn't handled.
+    ExpressionPointer tryProveNonzero(
+        ExpressionPointer obligationClosed,
+        const std::vector<LocalBinder>& localBinders, int line);
+    // Proof of `zeroTerm < value` — value and zeroTerm CLOSED, proof CLOSED —
+    // by peeling casts off both in parallel + the positivity tower, with a
+    // shallow `autoProveClaim` at the base. `zeroTerm` is the goal's own zero
+    // (so the base goal is well-formed).
+    ExpressionPointer tryProvePositive(
+        ExpressionPointer value, ExpressionPointer zeroTerm,
+        const std::string& typeName,
+        const std::vector<LocalBinder>& localBinders, int line);
+
     // The tactic-dispatch body of autoProveClaim. Split out so the
     // outermost (budget-owning) frame can wrap it in a single try/catch
     // that enriches a raw AutoProverBudgetError with the goal + search
