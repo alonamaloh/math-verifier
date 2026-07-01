@@ -236,6 +236,33 @@ automatic theorem Integer.from_natural_add_one_nonzero (k : Natural)
   done by substituting kAddOne
 }
 
+-- a < b are distinct: a = b would give a + 1 ≤ a, i.e. a = (a + 1) + n for some
+-- natural n, so 1 + n = 0 — impossible. (Lives here, not in Integer/order, for
+-- the `one_plus_natural_nonzero` witness of the contradiction.)
+theorem Integer.LessThan.distinct (a b : Integer) (aLessThanB : a < b) : a ≠ b := {
+  suppose a = b for contradiction {
+    claim successorBound : a + Integer.one ≤ b since aLessThanB;
+    claim successorBoundSelf : a + Integer.one ≤ a by substituting (a = b);
+    choose n such that a = (a + Integer.one) + (n : Integer) as chooseEquation
+        from successorBoundSelf;
+    claim sumZero : Integer.one + (n : Integer) = Integer.zero
+        by calc Integer.one + (n : Integer)
+              = ((a + Integer.one) + (n : Integer)) - a
+              = a - a   by substituting chooseEquation
+              = Integer.zero;
+    claim ((1 + n) : Integer) = Integer.zero
+        by calc ((1 + n) : Integer)
+              = ((1 : Natural) : Integer) + ((n : Natural) : Integer)
+                    since Natural.to_integer.add_preserves
+              = Integer.one + (n : Integer)
+                    since Natural.to_integer.one_preserves
+              = Integer.zero
+                    by sumZero;
+    claim ((1 + n) : Integer) ≠ Integer.zero since Integer.one_plus_natural_nonzero;
+    done
+  }
+}
+
 -- |x| ≥ 0: the absolute value is the image of a natural.
 automatic theorem Integer.absolute_value_is_nonneg (x : Integer)
         : Integer.IsNonneg(abs(x)) := {

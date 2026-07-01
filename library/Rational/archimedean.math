@@ -134,6 +134,32 @@ theorem Integer.to_rational.injective (a b : Integer)
      = b
 }
 
+-- ℤ→ℚ preserves <: the ≤ part is preserved, and strictness survives because
+-- ℤ→ℚ is injective (Rational `<` is `≤ ∧ ≠`).
+theorem Integer.to_rational.LessThan_preserves (a b : Integer) (aLessThanB : a < b)
+        : (a : Rational) < (b : Rational) := {
+  claim a ≤ b since Integer.LessThan.weaken;
+  claim (a : Rational) ≤ (b : Rational) since Integer.to_rational.LessOrEqual_preserves;
+  claim aNotEqualB : a ≠ b since Integer.LessThan.distinct;
+  claim (a : Rational) ≠ (b : Rational) by {
+    suppose (a : Rational) = (b : Rational) as castEqual;
+    claim a = b since Integer.to_rational.injective;
+    done
+  };
+  done
+}
+
+-- ℤ→ℚ preserves positivity: preserve `0 < i` as `(0:ℚ) < (i:ℚ)`, then rewrite the
+-- image of 0.
+theorem Integer.to_rational.positive_preserves (i : Integer) (iPositive : Integer.zero < i)
+        : Rational.zero < (i : Rational) := {
+  claim ((0 : Integer) : Rational) < (i : Rational)
+      since Integer.to_rational.LessThan_preserves;
+  claim zeroCast : ((0 : Integer) : Rational) = Rational.zero
+      since Integer.to_rational.zero_preserves;
+  done by substituting zeroCast
+}
+
 -- (successor(n) : Rational) = (1 : Rational) + (n : Rational). The cast
 -- of (succ(n) : Integer) reduces definitionally to Integer.one + (n :
 -- Integer); applying Integer.to_rational.add_preserves bridges to the
