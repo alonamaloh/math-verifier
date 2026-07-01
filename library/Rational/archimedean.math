@@ -216,7 +216,7 @@ theorem Rational.archimedean_for_positives
         (c ε : Rational)
         (cNonneg : Rational.IsNonneg(c))
         (εPositive : (0 : Rational) < ε)
-        : ∃ (K : Natural). c ≤ (successor(K) : Rational) * ε := {
+        : ∃ (K : Natural). c ≤ (1 + K : Rational) * ε := {
   claim (0 : Rational) < Rational.reciprocal_function(ε);
   claim (0 : Rational) ≤ Rational.reciprocal_function(ε)
     since Rational.LessThan.weaken;
@@ -233,10 +233,10 @@ theorem Rational.archimedean_for_positives
   calc c * Rational.reciprocal_function(ε)
           = abs(c * Rational.reciprocal_function(ε))
           ≤ ((K + 1) : Rational)
-          = (successor(K) : Rational)   since Natural.add_one;
+          = (1 + K : Rational)   by (K + 1 = 1 + K);
   claim Rational.LessOrEqual((0 : Rational), ε);
   claim (c * Rational.reciprocal_function(ε)) * ε
-          ≤ (successor(K) : Rational) * ε;
+          ≤ (1 + K : Rational) * ε;
   claim ε ≠ (0 : Rational) since Rational.nonzero_of_positive;
   calc (c * Rational.reciprocal_function(ε)) * ε
           = c * (ε * Rational.reciprocal_function(ε))
@@ -245,7 +245,22 @@ theorem Rational.archimedean_for_positives
   witness K with
       calc c
          = (c * Rational.reciprocal_function(ε)) * ε
-         ≤ (successor(K) : Rational) * ε
+         ≤ (1 + K : Rational) * ε
+}
+
+-- The `successor(K)` face of the same bound, for consumers still phrased with
+-- the constructor. (Temporary: delete once they migrate to the `1 + K` form.)
+theorem Rational.archimedean_for_positives_successor
+        (c ε : Rational)
+        (cNonneg : Rational.IsNonneg(c))
+        (εPositive : (0 : Rational) < ε)
+        : ∃ (K : Natural). c ≤ (successor(K) : Rational) * ε := {
+  choose K such that c ≤ (1 + K : Rational) * ε as bound
+      from Rational.archimedean_for_positives;
+  witness K with
+      calc c
+         ≤ (1 + K : Rational) * ε          by bound
+         = (successor(K) : Rational) * ε   since Natural.one_add
 }
 
 -- ----------------------------------------------------------------------
@@ -314,7 +329,7 @@ theorem Rational.scaled_reciprocal_successor_eventually_below
       since Rational.LessThan.weaken;
   claim archimedeanWitness
       : ∃ (K : Natural). c ≤ (successor(K) : Rational) * Rational.halve(ε)
-      since Rational.archimedean_for_positives;
+      since Rational.archimedean_for_positives_successor;
   choose K as archBound from archimedeanWitness;
   witness K with
       (m : Natural) (KLeqM : K ≤ m) ↦ {

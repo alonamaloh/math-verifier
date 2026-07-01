@@ -69,15 +69,14 @@ import Real.series
 -- The harmonic terms 1/(n+1), and the doubling index ladder 2ᴷ.
 
 definition Real.harmonic_term (n : Natural) : Real :=
-  (Rational.reciprocal_function((successor(n) : Rational)) : Real)
+  (Rational.reciprocal_function((1 + n : Rational)) : Real)
 
 definition Natural.doubling : Natural → Natural
-  | zero => 1
-  | successor(K) => Natural.doubling(K) + Natural.doubling(K)
+  | 0 => 1
+  | 1 + K => Natural.doubling(K) + Natural.doubling(K)
 
--- The `1 +` form of the recursion rule: `doubling` reduces on a `successor`
--- pattern, so a consumer phrasing the index as `1 + k` (to keep `successor`
--- out of its statements) bridges through this instead.
+-- The recursion rule as a citeable equation. `Natural.add` is opaque, so
+-- `doubling(1 + k)` does not reduce on its own; this bridges through `one_add`.
 theorem Natural.doubling_one_plus (k : Natural)
         : Natural.doubling(1 + k) = Natural.doubling(k) + Natural.doubling(k) :=
   calc Natural.doubling(1 + k)
@@ -87,27 +86,26 @@ theorem Natural.doubling_one_plus (k : Natural)
 theorem Natural.doubling_at_least_one (K : Natural)
         : 1 ≤ Natural.doubling(K) :=
   by_induction on K with IH {
-    case zero: done
-    case successor(predecessor): {
-        claim Natural.doubling(predecessor)
-                ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
-            since Natural.less_or_equal_add_left;
+    case base: done
+    case step(predecessor):
         calc 1
            ≤ Natural.doubling(predecessor)    since IH
            ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
-      }
+                 since Natural.less_or_equal_add_left
+           = Natural.doubling(1 + predecessor)
+                 since Natural.doubling_one_plus
   }
 
 -- Every harmonic term is nonnegative.
 theorem Real.harmonic_term_nonneg (j : Natural)
         : Real.zero ≤ Real.harmonic_term(j) := {
-  claim successor(j) > Rational.zero
-      since Rational.successor_cast_positive;
-  claim Rational.reciprocal_function((successor(j) : Rational)) > Rational.zero
+  claim (1 + j : Rational) > Rational.zero
+      since Rational.one_plus_cast_positive;
+  claim Rational.reciprocal_function((1 + j : Rational)) > Rational.zero
       since Rational.reciprocal_function_positive_of_positive;
-  claim Rational.reciprocal_function((successor(j) : Rational)) ≥ Rational.zero
+  claim Rational.reciprocal_function((1 + j : Rational)) ≥ Rational.zero
       since Rational.LessThan.weaken;
-  claim (Rational.reciprocal_function((successor(j) : Rational)) : Real) ≥ Rational.zero
+  claim (Rational.reciprocal_function((1 + j : Rational)) : Real) ≥ Rational.zero
       since Rational.to_real.LessOrEqual_preserves;
   done
 }
@@ -115,18 +113,22 @@ theorem Real.harmonic_term_nonneg (j : Natural)
 -- ----------------------------------------------------------------------
 -- Each of the p terms past index p is at least 1/(2p).
 theorem Real.harmonic_term_block_bound (p j : Natural)
-        (jBelow : successor(j) ≤ p)
+        (jBelow : j < p)
         : Rational.reciprocal_function(((p + p : Natural) : Rational))
-          ≤ (Rational.reciprocal_function((successor(p + j) : Rational)) : Real) := {
-  -- index bound at the Natural layer: p + j + 1 = p + (j + 1) ≤ 2p
-  claim successor(p + j) ≤ p + p;
+          ≤ (Rational.reciprocal_function((1 + (p + j) : Rational)) : Real) := {
+  -- index bound at the Natural layer: 1 + (p + j) = p + (j + 1) ≤ 2p
+  claim jPlusOne : j + 1 ≤ p since Natural.add_one_le_of_lt;
+  claim 1 + (p + j) ≤ p + p
+      by calc 1 + (p + j)
+            = p + (j + 1)   by (1 + (p + j) = p + (j + 1))
+            ≤ p + p         since Natural.add_left_monotone;
   -- cast it and flip through the reciprocal
-  claim successor(p + j) ≤ ((p + p : Natural) : Rational)
+  claim (1 + (p + j) : Rational) ≤ ((p + p : Natural) : Rational)
       since Rational.from_natural_le_preserves;
-  claim successor(p + j) > Rational.zero
-      since Rational.successor_cast_positive;
+  claim (1 + (p + j) : Rational) > Rational.zero
+      since Rational.one_plus_cast_positive;
   claim Rational.reciprocal_function(((p + p : Natural) : Rational))
-          ≤ Rational.reciprocal_function((successor(p + j) : Rational))
+          ≤ Rational.reciprocal_function((1 + (p + j) : Rational))
       since Rational.reciprocal_function_antitone;
   done since Rational.to_real.LessOrEqual_preserves
 }
@@ -144,7 +146,6 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
       by {
         take j : Natural;
         suppose j < p as jBelow;
-        claim successor(j) ≤ p;
         done since Real.harmonic_term_block_bound
       };
   -- Summing that comparison over the block.
@@ -170,12 +171,12 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
   -- p·(1/(2p)) = ½ at the Rational layer.
   claim doubled : ((p + p : Natural) : Rational) = p + p
       since Rational.from_natural_add_preserves;
-  claim successor(0) > Rational.zero
-      since Rational.successor_cast_positive;
-  claim successor(0) ≤ (p : Rational)
-      since Rational.from_natural_le_preserves;
+  choose q such that p = 1 + q as pSplit
+      from Natural.subtraction_witness(1, p, pPositive);
   claim (p : Rational) > Rational.zero
-      since Rational.LessThan.transitive_right;
+      by { claim (0 : Rational) < (1 + q : Rational)
+               since Rational.one_plus_cast_positive;
+           done by substituting pSplit };
   calc Rational.zero
      = Rational.zero + Rational.zero
      < (p : Rational) + (p : Rational)
@@ -256,29 +257,29 @@ theorem Real.harmonic_doubling_growth (K : Natural)
         : (Rational.linearGrowth(Rational.one_half, K))
           ≤ Real.partialSum(Real.harmonic_term, Natural.doubling(K)) :=
   by_induction on K with IH {
-    case zero: {
+    case base: {
         -- S(1) = 1/1 = 1, and the ladder starts at 1.
-        claim s0Equation : (successor(0) : Rational) = Rational.one;
-        claim successor(0) > Rational.zero
-            since Rational.successor_cast_positive;
-        claim (successor(0) : Rational) ≠ Rational.zero;
+        claim s0Equation : (1 + 0 : Rational) = Rational.one;
+        claim (1 + 0 : Rational) > Rational.zero
+            since Rational.one_plus_cast_positive;
+        claim (1 + 0 : Rational) ≠ Rational.zero;
         claim s0Cancel
-              : successor(0)
-                    * Rational.reciprocal_function((successor(0) : Rational))
+              : (1 + 0 : Rational)
+                    * Rational.reciprocal_function((1 + 0 : Rational))
                 = Rational.one;
-        calc Rational.reciprocal_function((successor(0) : Rational))
+        calc Rational.reciprocal_function((1 + 0 : Rational))
            = Rational.one
-             * Rational.reciprocal_function((successor(0) : Rational))
-           = (successor(0) : Rational)
-             * Rational.reciprocal_function((successor(0) : Rational))
+             * Rational.reciprocal_function((1 + 0 : Rational))
+           = (1 + 0 : Rational)
+             * Rational.reciprocal_function((1 + 0 : Rational))
                  since s0Equation
            = Rational.one
                  since s0Cancel
            as recipOne;
         calc Real.partialSum(Real.harmonic_term, Natural.doubling(0))
            = Real.zero
-             + (Rational.reciprocal_function((successor(0) : Rational)) : Real)
-           = (Rational.reciprocal_function((successor(0) : Rational)) : Real)
+             + (Rational.reciprocal_function((1 + 0 : Rational)) : Real)
+           = (Rational.reciprocal_function((1 + 0 : Rational)) : Real)
            = (Rational.one : Real)
                  by recipOne
            as sumValue;
@@ -286,7 +287,7 @@ theorem Real.harmonic_doubling_growth (K : Natural)
             since Real.LessOrEqual.reflexive;
         done by substituting sumValue
       }
-    case successor(predecessor): {
+    case step(predecessor): {
         claim 1 ≤ Natural.doubling(predecessor)
             since Natural.doubling_at_least_one;
         claim blockBound
@@ -298,10 +299,11 @@ theorem Real.harmonic_doubling_growth (K : Natural)
                       Natural.doubling(predecessor)
                       + Natural.doubling(predecessor))
             since Real.harmonic_doubling_bound;
-        calc ((Rational.linearGrowth(Rational.one_half, successor(predecessor)))
+        calc ((Rational.linearGrowth(Rational.one_half, 1 + predecessor))
               : Real)
            = ((Rational.linearGrowth(Rational.one_half, predecessor)
                + Rational.one_half : Rational) : Real)
+                 since Rational.linearGrowth_add_one
            = ((Rational.linearGrowth(Rational.one_half, predecessor))
               : Real)
              + (Rational.one_half : Real)
@@ -313,6 +315,8 @@ theorem Real.harmonic_doubling_growth (K : Natural)
                  Real.harmonic_term,
                  Natural.doubling(predecessor) + Natural.doubling(predecessor))
                  by blockBound
+           = Real.partialSum(Real.harmonic_term, Natural.doubling(1 + predecessor))
+                 since Natural.doubling_one_plus
       }
   }
 
@@ -334,52 +338,52 @@ theorem Real.harmonic_series_diverges
         since Rational.absolute_value_IsNonneg;
     claim Rational.one_half > Rational.zero
         since Rational.one_half_positive;
-    choose K such that abs(roof) ≤ (successor(K) : Rational) * Rational.one_half
+    choose K such that abs(roof) ≤ (1 + K : Rational) * Rational.one_half
         as archBound
         from Rational.archimedean_for_positives;
     claim roof ≤ abs(roof) since Rational.le_absolute_value;
     claim Rational.one > Rational.zero;
     claim growthUnfolded
-          : Rational.linearGrowth(Rational.one_half, successor(K))
-            = Rational.one + successor(K) * Rational.one_half
+          : Rational.linearGrowth(Rational.one_half, 1 + K)
+            = Rational.one + (1 + K : Rational) * Rational.one_half
         since Rational.linearGrowth_closed_form;
     calc roof
        ≤ abs(roof)
-       ≤ (successor(K) : Rational) * Rational.one_half
+       ≤ (1 + K : Rational) * Rational.one_half
              by archBound
-       = Rational.zero + (successor(K) : Rational) * Rational.one_half
-       < Rational.one + (successor(K) : Rational) * Rational.one_half
+       = Rational.zero + (1 + K : Rational) * Rational.one_half
+       < Rational.one + (1 + K : Rational) * Rational.one_half
              by Rational.add_preserves_LessThan
-       = Rational.linearGrowth(Rational.one_half, successor(K))
+       = Rational.linearGrowth(Rational.one_half, 1 + K)
              since growthUnfolded;
-    witness Natural.doubling(successor(K)) with
+    witness Natural.doubling(1 + K) with
         (m : Natural)
-        (aboveThreshold : Natural.doubling(successor(K)) ≤ m) ↦ {
+        (aboveThreshold : Natural.doubling(1 + K) ≤ m) ↦ {
           claim ladder
-                : ((Rational.linearGrowth(Rational.one_half, successor(K)))
+                : ((Rational.linearGrowth(Rational.one_half, 1 + K))
                    : Real)
                   ≤ Real.partialSum(
-                        Real.harmonic_term, Natural.doubling(successor(K)))
+                        Real.harmonic_term, Natural.doubling(1 + K))
               since Real.harmonic_doubling_growth;
           claim Real.harmonic_term_nonneg;
           claim tail
                 : Real.partialSum(
-                      Real.harmonic_term, Natural.doubling(successor(K)))
+                      Real.harmonic_term, Natural.doubling(1 + K))
                   ≤ Real.partialSum(Real.harmonic_term, m)
               by Real.partialSum_monotone_of_nonneg;
           claim castBound
                 : (roof : Real)
-                  < ((Rational.linearGrowth(Rational.one_half, successor(K)))
+                  < ((Rational.linearGrowth(Rational.one_half, 1 + K))
                      : Real)
               since Rational.to_real.LessThan_preserves;
           calc bound
              ≤ (roof : Real)
                    by boundBelowRoof
-             < ((Rational.linearGrowth(Rational.one_half, successor(K)))
+             < ((Rational.linearGrowth(Rational.one_half, 1 + K))
                 : Real)
                    by castBound
              ≤ Real.partialSum(
-                   Real.harmonic_term, Natural.doubling(successor(K)))
+                   Real.harmonic_term, Natural.doubling(1 + K))
                    by ladder
              ≤ Real.partialSum(Real.harmonic_term, m)
                    by tail
