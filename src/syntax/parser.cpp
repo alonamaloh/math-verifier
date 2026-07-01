@@ -2045,6 +2045,31 @@ private:
             return makeSurfacePatternTuple(std::move(components),
                                             openAngle.line, openAngle.column);
         }
+        // Numeral patterns: `0` matches `zero` and `1 + n` matches
+        // `successor(n)`; in general `N` and `N + p` desugar to N `successor`
+        // wrappers around `zero` / the inner pattern `p`. This lets structural
+        // recursion over a Natural read `| 0 => … | 1 + n => …` without naming
+        // the constructors (the same `1 + n` form `by_induction` presents).
+        if (peek().kind == TokenKind::NumericLiteral) {
+            Token numeralToken = consumeAny();
+            int successorCount = std::stoi(numeralToken.lexeme);
+            SurfacePatternPointer inner;
+            if (peek().kind == TokenKind::Plus) {
+                consumeAny();  // '+'
+                inner = parsePattern();
+            } else {
+                inner = makeSurfacePatternBareName(
+                    "zero", numeralToken.line, numeralToken.column);
+            }
+            for (int i = 0; i < successorCount; ++i) {
+                std::vector<SurfacePatternPointer> wrapped;
+                wrapped.push_back(std::move(inner));
+                inner = makeSurfacePatternConstructor(
+                    "successor", std::move(wrapped),
+                    numeralToken.line, numeralToken.column);
+            }
+            return inner;
+        }
         if (!isIdentifierLike(peek().kind)) {
             throwHere("expected pattern");
         }

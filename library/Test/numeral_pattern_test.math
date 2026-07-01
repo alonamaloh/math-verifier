@@ -1,0 +1,43 @@
+-- Numeral patterns in `definition` clauses. The parser (parsePattern)
+-- desugars a numeral pattern `N` to N `successor` wrappers around `zero`,
+-- and `N + p` to N wrappers around the inner pattern `p` — so `| 0 =>`
+-- matches `zero`, `| 1 + n =>` matches `successor(n)`, and structural
+-- recursion over a Natural reads `| 0 => … | 1 + n => …` without naming
+-- the constructors (the same `1 + n` form `by_induction` presents).
+
+module Test.numeral_pattern_test
+
+import Natural.basics
+import Equality.basics
+import Logic.basics
+
+-- `| 0 =>` / `| 1 + n =>`: the two-case Natural split. `1 + n` binds the
+-- predecessor, so this is `predecessor` without a `successor` token, and it
+-- reduces on concrete arguments exactly as `| zero => | successor(n) =>` would.
+definition Test.predecessor : Natural → Natural
+  | 0     => 0
+  | 1 + n => n
+
+theorem Test.predecessor_zero  : Test.predecessor(0) = 0 := done
+theorem Test.predecessor_one   : Test.predecessor(1) = 0 := done
+theorem Test.predecessor_three : Test.predecessor(3) = 2 := done
+
+-- Recursion through a `| 1 + n =>` clause — the shape `indexedAggregate`,
+-- `Ring.Sum`, and `Monoid.power` use: the recursive call is on the bound
+-- predecessor `n`, which the termination checker sees shrink.
+definition Test.countDown : Natural → Natural
+  | 0     => 0
+  | 1 + n => Test.countDown(n)
+
+theorem Test.countDown_zero : Test.countDown(0) = 0 := done
+theorem Test.countDown_one  : Test.countDown(1) = Test.countDown(0) := done
+
+-- A bare numeral pattern: `| 1 =>` matches `successor(zero)`, sitting before
+-- the general `| 1 + n =>` (specific clause wins).
+definition Test.isOne : Natural → Natural
+  | 1     => 1
+  | 0     => 0
+  | 1 + n => 0
+
+theorem Test.isOne_one  : Test.isOne(1) = 1 := done
+theorem Test.isOne_zero : Test.isOne(0) = 0 := done
