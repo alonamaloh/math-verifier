@@ -1049,6 +1049,13 @@ ExpressionPointer Elaborator::recoverClaimHint(
         // that mentions a bare `(a) → (b) → …` function type — the single
         // most confusing failure when a `by`/`done`/`goal` citation can't
         // infer its arguments or cites the wrong lemma.
+        // Diagnostic captured from the primary `by`-hint elaboration so the
+        // failure message can explain WHY the proof didn't apply — its own
+        // elaboration error, or the type it actually produced — instead of the
+        // bare "an argument could not be inferred". Especially important for
+        // tactic hints like `by_induction`, whose internal case-body errors are
+        // otherwise swallowed by the fall-through below.
+        std::string byHintFailureDetail;
         try {
             ExpressionPointer coerced = coerceToExpectedTypeViaDiff(
                 localBinders,
@@ -1064,10 +1071,20 @@ ExpressionPointer Elaborator::recoverClaimHint(
                           coercedTypeOpened, goalOpened)) {
                 return coerced;
             }
-        } catch (const ElaborateError&) {
-            // fall through to the symmetry-inside-Not bridge below
-        } catch (const TypeError&) {
-            // fall through to the symmetry-inside-Not bridge below
+            byHintFailureDetail =
+                "the `by` proof elaborated but has type:\n        "
+                + prettyPrintInLocalScope(
+                      closeOverLocalBinders(coercedTypeOpened, localBinders,
+                                            localBinders.size()),
+                      localBinders);
+        } catch (const ElaborateError& error) {
+            byHintFailureDetail =
+                std::string("the `by` proof did not elaborate:\n    ")
+                + error.what();
+        } catch (const TypeError& error) {
+            byHintFailureDetail =
+                std::string("the `by` proof did not typecheck:\n    ")
+                + error.what();
         }
 
         // Symmetry bridge inside Not: the goal is ¬(a = b) and the
@@ -1234,6 +1251,9 @@ ExpressionPointer Elaborator::recoverClaimHint(
                 "inferred from the goal or a premise discharged from context — "
                 "check that the goal (or an in-scope hypothesis) determines "
                 "each of the lemma's arguments, or supply them explicitly";
+        }
+        if (!byHintFailureDetail.empty()) {
+            message += "\n  " + byHintFailureDetail;
         }
         throwElaborate(message);
     }

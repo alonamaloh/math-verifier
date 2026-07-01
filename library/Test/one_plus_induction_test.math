@@ -53,6 +53,18 @@ theorem Test.refining_one_plus
     case step(k): hypothesis
   }
 
+-- ∀-target scrutinee: the induction variable is bound by the GOAL's
+-- leading `∀`, not a local parameter — `by_induction on j` peels the Pi,
+-- runs the induction with `j` in scope, and re-wraps in a lambda. The raw
+-- recursor (`case zero`/`case successor`) always handled this; the `1 + n`
+-- form needed the Pi-introduction added to `elaborateByInductionOnePlus`.
+theorem Test.forall_target_one_plus : ∀ (j : Natural). j + 0 = j :=
+  unfold Natural.add in
+  by_induction on j with IH {
+    case base:    done
+    case step(k): done
+  }
+
 -- Regression: a parametric goal `P(k)` (a bound-variable-headed
 -- application) with a nested `cases` in the step body. This exposed the
 -- base-binder de Bruijn bug — the step type is extracted from under the

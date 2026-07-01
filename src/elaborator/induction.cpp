@@ -539,6 +539,40 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                 "by_induction needs an expected type from context");
         }
 
+        // Support `by_induction on j` where `j` is a ∀-bound variable of the
+        // GOAL rather than a local binder — e.g. `claim ∀ (j : T). P(j) by
+        // by_induction on j`. Introduce it: peel the leading Pi, run the
+        // induction against the body with `j` in scope (now the innermost
+        // local binder, so `pi->codomain`'s de Bruijn references line up), and
+        // re-wrap the result in a lambda. Without this the scrutinee lookup
+        // below fails with "unknown identifier" — the raw-recursor path never
+        // needed it because its callers don't reach this branch with a bare ∀.
+        if (auto* scrutineeId = std::get_if<SurfaceIdentifier>(
+                &cases.scrutinee->node)) {
+            bool scrutineeIsLocalBinder = false;
+            for (const auto& binder : localBinders) {
+                if (binder.name == scrutineeId->qualifiedName) {
+                    scrutineeIsLocalBinder = true;
+                    break;
+                }
+            }
+            if (!scrutineeIsLocalBinder) {
+                ExpressionPointer goalWhnf =
+                    weakHeadNormalForm(environment_, expectedType);
+                if (auto* pi = std::get_if<Pi>(&goalWhnf->node)) {
+                    if (pi->displayHint == scrutineeId->qualifiedName) {
+                        std::vector<LocalBinder> introduced = localBinders;
+                        introduced.push_back(
+                            {pi->displayHint, pi->domain});
+                        ExpressionPointer inner = elaborateByInductionOnePlus(
+                            cases, introduced, pi->codomain, line, column);
+                        return makeLambda(
+                            pi->displayHint, pi->domain, inner);
+                    }
+                }
+            }
+        }
+
         // --- Extract the `case base:` and `case step(k):` clause bodies.
         // The parser appended the IH name to the `step` constructor pattern,
         // so its arguments are [predecessor, IH].
