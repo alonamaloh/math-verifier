@@ -46,25 +46,25 @@ theorem NaturalsBelow.below_extends (m n value : Natural) (belowM : value < m)
 -- A value below n, shifted up by m, is below m + n: the right block.
 theorem NaturalsBelow.below_shifts (m n value : Natural) (belowN : value < n)
         : m + value < m + n := {
-  claim successor(value) ≤ n;
-  done by Natural.lt_of_successor_le
+  claim value + 1 ≤ n since Natural.add_one_le_of_lt;
+  done by Natural.lt_of_add_one_le
 }
 
 -- Conversely, a value at least m and below m + n drops below n once shifted
--- down by m. Rewrite the bound as `m + successor(value − m) ≤ m + n` using
+-- down by m. Rewrite the bound as `m + ((value − m) + 1) ≤ m + n` using
 -- `value = m + (value − m)`, then cancel m on the left.
 theorem NaturalsBelow.below_unshifts (m n value : Natural)
         (atLeast : m ≤ value) (belowSum : value < m + n)
         : Natural.monus(value, m) < n := {
-  claim successor(value) ≤ m + n;
-  claim successor(Natural.monus(value, m)) ≤ n by {
-    calc m + successor(Natural.monus(value, m))
-              = successor(m + Natural.monus(value, m))
-              = successor(value)
+  claim value + 1 ≤ m + n since Natural.add_one_le_of_lt;
+  claim Natural.monus(value, m) + 1 ≤ n by {
+    calc m + (Natural.monus(value, m) + 1)
+              = (m + Natural.monus(value, m)) + 1
+              = value + 1
               ≤ m + n;
     claim
   };
-  done by Natural.lt_of_successor_le
+  done by Natural.lt_of_add_one_le
 }
 
 -- ----------------------------------------------------------------------
@@ -159,12 +159,17 @@ theorem NaturalsBelow.sum_round_trip_right (m n : Natural)
 
 -- The two yardsticks laid end to end form one.
 theorem NaturalsBelow.sum_equinumerous (m n : Natural)
-        : Equinumerous(DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n)) :=
+        : Equinumerous(DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n)) := {
+  claim leftInverse : ∀ (s : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n))).
+        NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, s)) = s
+      since NaturalsBelow.sum_round_trip_left;
+  claim rightInverse : ∀ (element : NaturalsBelow(m + n)).
+        NaturalsBelow.sum_into(m, n, NaturalsBelow.sum_out_of(m, n, element)) = element
+      since NaturalsBelow.sum_round_trip_right;
   witness NaturalsBelow.sum_into(m, n) with
     witness NaturalsBelow.sum_out_of(m, n) with
-      And.introduction(
-          { done by NaturalsBelow.sum_round_trip_left },
-          { done by NaturalsBelow.sum_round_trip_right })
+      And.introduction(leftInverse, rightInverse)
+}
 
 -- ----------------------------------------------------------------------
 -- Disjoint union respects sameness of size, then the sum rule itself.
