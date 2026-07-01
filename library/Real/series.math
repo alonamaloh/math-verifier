@@ -395,6 +395,37 @@ theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
       }
   }
 
+-- A constant block sums to (its length)·(the constant), at the Real level.
+theorem Real.partialSum_constant (c : Real) (n : Natural)
+        : Real.partialSum((j : Natural) ↦ c, n) = (n : Real) * c :=
+  by_induction on n with IH {
+    case base: {
+        claim castZero : ((0 : Natural) : Real) = Real.zero
+            since Real.from_natural_zero_preserves;
+        calc Real.partialSum((j : Natural) ↦ c, 0)
+           = Real.zero
+           = 0 * c                          by ring
+           = ((0 : Natural) : Real) * c     since castZero
+      }
+    case step(predecessor): {
+        -- The cast of 1 is Real.one definitionally, so the split is the
+        -- additive leg alone.
+        claim castStep
+              : ((1 + predecessor : Natural) : Real)
+                = Real.one + (predecessor : Real)
+            by Real.from_natural_add_preserves(m1 := 1);
+        calc Real.partialSum((j : Natural) ↦ c, 1 + predecessor)
+           = Real.partialSum((j : Natural) ↦ c, predecessor) + c
+                 by Real.partialSum_add_one
+           = (predecessor : Real) * c + c
+                 since IH
+           = (Real.one + (predecessor : Real)) * c
+                 by ring
+           = ((1 + predecessor : Natural) : Real) * c
+                 since castStep
+      }
+  }
+
 -- ----------------------------------------------------------------------
 -- Linearity of partial sums: they split over termwise sums and pull
 -- out constant factors.

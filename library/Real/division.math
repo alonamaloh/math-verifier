@@ -19,6 +19,7 @@ import Logic.basics
 import Equality.basics
 import Rational.basics
 import Rational.order
+import Rational.halve
 import Real.basics
 import Real.addition
 import Real.negation
@@ -171,6 +172,50 @@ theorem Real.divide_nonneg (a b : Real) (bNonzero : b ≠ 0)
   claim Real.IsNonneg(Real.reciprocal(b, bNonzero)) since Real.IsNonneg_of_LessOrEqual_zero;
   claim Real.IsNonneg(a * Real.reciprocal(b, bNonzero)) since Real.IsNonneg.multiply;
   done since Real.LessOrEqual_zero_of_IsNonneg
+}
+
+-- Taking reciprocals reverses the order among positives: a ≤ b gives
+-- 1/b ≤ 1/a. Multiply a ≤ b by the nonnegative (1/a)·(1/b) and cancel
+-- each factor against its reciprocal.
+theorem Real.one_divide_antitone (a b : Real)
+        (aNonzero : a ≠ 0) (bNonzero : b ≠ 0)
+        (aPositive : a > 0) (aLessOrEqualB : a ≤ b)
+        : 1 / b ≤ 1 / a := {
+  claim b > 0 since Real.LessThan.transitive_right;
+  claim (1 : Real) > 0 since Real.zero_less_one;
+  claim 1 / a > 0 since Real.divide_positive;
+  claim 1 / b > 0 since Real.divide_positive;
+  claim (1 / a) * (1 / b) > 0 since Real.multiply_positive;
+  claim (1 / a) * (1 / b) ≥ 0 since Real.LessThan.weaken;
+  claim Real.IsNonneg((1 / a) * (1 / b))
+      since Real.IsNonneg_of_LessOrEqual_zero;
+  claim a * ((1 / a) * (1 / b)) ≤ b * ((1 / a) * (1 / b))
+      since Real.LessOrEqual.multiply_by_nonneg_right;
+  calc 1 / b
+     = a * ((1 / a) * (1 / b))    by field
+     ≤ b * ((1 / a) * (1 / b))
+     = 1 / a                      by field
+}
+
+-- The embedded rational one-half is 1/2: both double to 1.
+theorem Real.one_half_cast : (Rational.one_half : Real) = 1 / (2 : Real) := {
+  calc (2 : Real) * (Rational.one_half : Real)
+     = (1 + 1) * (Rational.one_half : Real)
+           by ((2 : Real) = 1 + 1)
+     = (Rational.one_half : Real) + (Rational.one_half : Real)
+           by ring
+     = ((Rational.one_half + Rational.one_half : Rational) : Real)
+           since Rational.to_real.add_preserves
+     = ((Rational.one : Rational) : Real)
+           since Rational.one_half_doubled
+     = 1
+     as doubledCast;
+  claim doubledDivided : (2 : Real) * (1 / (2 : Real)) = 1
+      since Real.divide_cancel;
+  calc (2 : Real) * (Rational.one_half : Real)
+     = 1                            by doubledCast
+     = (2 : Real) * (1 / (2 : Real))   by doubledDivided;
+  done since Real.equal_of_multiply_left
 }
 
 -- x / 2 < x for positive x (the gap is the other half).
