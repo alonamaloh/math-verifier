@@ -95,6 +95,45 @@ theorem Rational.from_natural_IsNonneg (n : Natural)
       unfolding Rational.IsNonneg
 }
 
+-- The Integer analogue: a nonnegative integer casts to a nonnegative rational.
+-- (i : Rational) is the representative (i, 1), whose IsNonneg predicate is
+-- i · 1 ≥ 0, i.e. i ≥ 0.
+theorem Rational.from_integer_IsNonneg (i : Integer) (iNonneg : Integer.IsNonneg(i))
+        : Rational.IsNonneg((i : Rational)) := {
+  claim (0 : Integer) ≤ i since Integer.zero_less_or_equal_of_nonneg;
+  done by substituting (ring : i * Integer.one = i) unfolding Rational.IsNonneg
+}
+
+-- ℤ→ℚ preserves ≤: with b = a + n (n : Natural), the difference (b:ℚ) - (a:ℚ)
+-- is the image of the nonnegative integer b - a, hence IsNonneg — which is
+-- exactly (a:ℚ) ≤ (b:ℚ).
+theorem Integer.to_rational.LessOrEqual_preserves (a b : Integer) (aLeqB : a ≤ b)
+        : (a : Rational) ≤ (b : Rational) := {
+  choose n such that b = a + (n : Integer) from aLeqB;
+  claim differenceEquation : b - a = (n : Integer);
+  claim Integer.IsNonneg(b - a) by substituting differenceEquation;
+  claim Rational.IsNonneg(((b - a) : Rational)) since Rational.from_integer_IsNonneg;
+  claim castDifference : ((b - a) : Rational) = (b : Rational) - (a : Rational)
+      since Integer.to_rational.subtract_preserves;
+  claim Rational.IsNonneg((b : Rational) - (a : Rational))
+      by substituting castDifference;
+  done
+}
+
+-- ℤ→ℚ is injective: the casts are fraction(a, 1) and fraction(b, 1), so their
+-- equality cross-multiplies to a · 1 = b · 1. (The keystone for the strict rung
+-- `LessThan_preserves`: Rational `<` is `≤ ∧ ≠`, and injectivity carries the ≠.)
+theorem Integer.to_rational.injective (a b : Integer)
+        (castEqual : (a : Rational) = (b : Rational))
+        : a = b := {
+  claim crossMultiply : a * Integer.one = b * Integer.one
+      since Rational.fraction_equal_implies;
+  calc a
+     = a * Integer.one
+     = b * Integer.one   by crossMultiply
+     = b
+}
+
 -- (successor(n) : Rational) = (1 : Rational) + (n : Rational). The cast
 -- of (succ(n) : Integer) reduces definitionally to Integer.one + (n :
 -- Integer); applying Integer.to_rational.add_preserves bridges to the
