@@ -28,12 +28,12 @@ import Lists.range
 import Algebra.monoid_power
 
 -- Σ/Π_{k<n} s(k): identity on the empty range, otherwise the aggregate of
--- the first n terms combined with s(n).
+-- the first n terms combined with s(n). Built from the generic
+-- `Natural.recurse`, so the aggregation never names Natural's constructors —
+-- at one past k it combines the running aggregate with the new term s(k).
 definition Algebra.indexedAggregate (A : Type(0)) (operation : A → A → A)
-        (identity : A) (s : Natural → A) : Natural → A
-  | zero => identity
-  | successor(n) =>
-      operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n))
+        (identity : A) (s : Natural → A) : Natural → A :=
+  Natural.recurse(A, identity, (k : Natural) (aggregate : A) ↦ operation(aggregate, s(k)))
 
 -- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
 -- not definitionally the constructor; bridge via `one_add`).

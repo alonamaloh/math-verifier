@@ -34,3 +34,16 @@ definition Natural.multiply : Natural → Natural → Natural
 -- Operator overloads: `+` and `*` on Naturals route here.
 operator (+) on (Natural, Natural) := Natural.add
 operator (*) on (Natural, Natural) := Natural.multiply
+
+-- Primitive recursion, packaged once so downstream definitions (Σ, Π,
+-- powers, aggregation) can recurse over a Natural without naming its
+-- constructors: `recurse(A, base, step)` is the function that is `base` at
+-- 0 and, at one past `n`, applies `step` to that `n` and the value already
+-- computed there.
+--
+-- Definitional reduction rules:
+--   recurse(A, base, step, zero)          ≡ base
+--   recurse(A, base, step, successor(n))  ≡ step(n, recurse(A, base, step, n))
+definition Natural.recurse (A : Type(0)) (base : A) (step : Natural → A → A) : Natural → A
+  | zero          =>  base
+  | successor(n)  =>  step(n, Natural.recurse(A, base, step, n))
