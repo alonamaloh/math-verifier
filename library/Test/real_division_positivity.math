@@ -3,14 +3,15 @@ module Test.real_division_positivity
 -- Honest (partial) division on Real is ergonomic when the denominator is
 -- manifestly positive: the `/` operator's `b ≠ 0` obligation is discharged by
 -- the auto-prover, which routes `b ≠ 0` through the automatic
--- `Real.nonzero_of_positive` and recursively proves `0 < b`. For that to reach
--- a cast denominator, the positivity chain must be automatic — here
--- `Rational.one_plus_cast_positive` (ℚ) and `Rational.to_real.positive_preserves`
--- (ℚ→ℝ). This exercises the whole path for a bound variable, no local hypothesis.
+-- `Real.nonzero_of_positive` and recursively proves `0 < b`. For a CAST
+-- denominator this needs the positivity tower automatic — the ℕ→ℚ rung
+-- (`Rational.from_natural_positive`) and the ℚ→ℝ rung
+-- (`Rational.to_real.positive_preserves`).
 
 import Logic.basics
 import Equality.basics
 import Natural.basics
+import Natural.order
 import Rational.basics
 import Rational.embedding
 import Rational.order
@@ -24,17 +25,19 @@ import Real.reciprocal
 import Real.field
 import Real.division
 
--- 0 < (1 + k : Real), automatic (ℕ→ℚ→ℝ positivity chain).
+-- Generic: ANY positive natural casts to a positive/nonzero real, and can be
+-- divided by — for a bound variable, discharged from the hypothesis alone.
+theorem Test.generic_positive (n : Natural) (nPositive : 0 < n)
+        : Real.zero < ((n : Natural) : Real) :=
+  done
+
+definition Test.generic_reciprocal (n : Natural) (nPositive : 0 < n) : Real :=
+  (1 : Real) / ((n : Natural) : Real)
+
+-- The `1 + k` special case (no hypothesis — positivity of 1 + k is automatic).
 theorem Test.one_plus_positive (k : Natural)
         : Real.zero < ((1 + k : Natural) : Real) :=
   done
 
--- (1 + k : Real) ≠ 0, via nonzero_of_positive recursively proving positivity.
-theorem Test.one_plus_nonzero (k : Natural)
-        : ((1 + k : Natural) : Real) ≠ Real.zero :=
-  done
-
--- The payoff: a series term `k ↦ 1/(k+1)` written honestly in Real, with the
--- `≠ 0` side-condition discharged automatically for the bound k.
 definition Test.reciprocal_term (k : Natural) : Real :=
   (1 : Real) / ((1 + k : Natural) : Real)
