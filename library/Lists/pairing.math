@@ -41,13 +41,11 @@ theorem List.Permutation.pair_collapse (A : Type(0))
   calc List.product(A, multiply, one, list)
      = List.product(A, multiply, one,
            List.prepend(A, x, List.prepend(A, y, rest)))
-           by List.Permutation.product_invariant
      = multiply(x, multiply(y, List.product(A, multiply, one, rest)))
      = multiply(multiply(x, y), List.product(A, multiply, one, rest))
            by Equality.symmetry(
                   associativity(x, y, List.product(A, multiply, one, rest)))
      = multiply(one, List.product(A, multiply, one, rest))
-           by substituting pairsToOne
      = List.product(A, multiply, one, rest)
            by identityLeft(List.product(A, multiply, one, rest))
 
@@ -93,8 +91,7 @@ theorem List.paired_inverses_drop_pair (A : Type(0))
     -- z sits in the original list, so it has a partner w there.
     claim List.member(A, z,
               List.prepend(A, head, List.prepend(A, partner, rest)))
-        by List.member.there(A, z, head, List.prepend(A, partner, rest),
-               List.member.there(A, z, partner, rest, zMemberRest));
+        by List.member.there;
     claim List.Permutation(A,
               List.prepend(A, head, List.prepend(A, partner, rest)), list)
         by List.Permutation.symmetric;
@@ -115,7 +112,7 @@ theorem List.paired_inverses_drop_pair (A : Type(0))
             claim multiply(partner, head) = one
                 by calc multiply(partner, head)
                       = multiply(head, partner)   by commutativity(head, partner)
-                      = one                       by headPairsToOne;
+                      = one;
             claim zEqualsPartner : z = partner
                 by shared_inverse_equal;
             claim partnerMemberRest : List.member(A, partner, rest)
@@ -179,10 +176,9 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
                         List.prepend(A, head, tail), z) as _;
               calc (1 : Natural)
                  ≤ 1 + List.length(A, tail)                       by Natural.less_or_equal_add_right
-                 = List.length(A, List.prepend(A, head, tail))    by List.length_prepend
+                 = List.length(A, List.prepend(A, head, tail))
                  ≤ 0                                              by lengthBound;
-              claim False by Natural.not_less_or_equal_successor_zero;
-              done
+              claim False; done
             }
         }
       }
@@ -206,9 +202,7 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
                         List.prepend(A, head, tail), z) as paired;
 
               -- The head has a partner elsewhere in the list — in the tail.
-              claim headMember
-                  : List.member(A, head, List.prepend(A, head, tail))
-                  by List.member.here(A, head, tail);
+              claim headMember : List.member(A, head, List.prepend(A, head, tail));
               obtain ⟨partner, partnerProperties⟩ from paired(head, headMember);
               let ⟨partnerMember, partnerInverseProperties⟩ := partnerProperties;
               let ⟨headPairsToOne, partnerNotHead⟩ := partnerInverseProperties;
@@ -220,9 +214,7 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
               obtain ⟨rest, tailPermutation⟩
                   from List.Permutation.extract(A, partner, tail, partnerInTail);
               claim List.Permutation(A, List.prepend(A, head, tail),
-                        List.prepend(A, head, List.prepend(A, partner, rest)))
-                  by List.Permutation.skip(A, head, tail,
-                         List.prepend(A, partner, rest), tailPermutation);
+                        List.prepend(A, head, List.prepend(A, partner, rest)));
 
               -- The pair {head, partner} multiplies to one and drops out.
               claim productCollapse
@@ -251,18 +243,15 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
 
               -- …and shorter: |list| = 2 + |rest|, so |rest| fits the
               -- smaller bound.
-              claim lengthEquation
-                  : List.length(A, List.prepend(A, head, tail))
+              claim List.length(A, List.prepend(A, head, tail))
                     = List.length(A,
-                          List.prepend(A, head, List.prepend(A, partner, rest)))
-                  by List.Permutation.length_invariant;
+                          List.prepend(A, head, List.prepend(A, partner, rest)));
               calc 1 + (1 + List.length(A, rest))
-                 = 1 + List.length(A, List.prepend(A, partner, rest))                      by List.length_prepend
-                 = List.length(A, List.prepend(A, head, List.prepend(A, partner, rest)))   by List.length_prepend
-                 = List.length(A, List.prepend(A, head, tail))                            by lengthEquation
-                 ≤ 1 + boundPredecessor                                                    by lengthBound;
-              claim onePlusRestLe : 1 + List.length(A, rest) ≤ boundPredecessor
-                  by Natural.le_cancel_one_plus;
+                 = 1 + List.length(A, List.prepend(A, partner, rest))
+                 = List.length(A, List.prepend(A, head, List.prepend(A, partner, rest)))
+                 = List.length(A, List.prepend(A, head, tail))
+                 ≤ 1 + boundPredecessor   by lengthBound;
+              claim onePlusRestLe : 1 + List.length(A, rest) ≤ boundPredecessor;
               calc List.length(A, rest)
                  ≤ 1 + List.length(A, rest)   by Natural.less_or_equal_add_left
                  ≤ boundPredecessor           by onePlusRestLe
@@ -300,5 +289,5 @@ theorem List.product_one_of_paired_inverses (A : Type(0))
             → List.has_distinct_inverse_in(A, multiply, one, list, z))
         : List.product(A, multiply, one, list) = one := {
   claim List.length(A, list) ≤ List.length(A, list);
-  done by List.product_one_of_paired_inverses_bounded
+  done
 }
