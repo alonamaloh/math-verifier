@@ -459,46 +459,54 @@ translation into it.)
 
 #### 3. Recognition and elaboration algorithm
 
-Given a parsed ellipsis expression with prefix terms `t₁ … tₖ`,
-operator `op`, and general term `g`:
+(DECIDED 2026-07-02, replacing the earlier fresh-variable/probe
+draft after working the example corpus of §3.3.) Two complementary
+mechanisms, both deterministic, tried in order:
 
-**Step 1 — identify the index variable.** Collect the variables
-occurring in `g` that do not occur in any prefix term. Each such
-variable `v` is a **candidate index**. (Variables shared with the
-prefix are parameters, e.g. `x` in `x + x^2 + ... + x^n`.)
+**Mechanism 1 — anti-unification (structural anchors, symbolic
+bounds).** Match the LAST prefix term `tₖ` against the general term
+`g` (it is the term most likely to share `g`'s shape). The positions
+where they differ must all hold one consistent pair
+(`⟨value at tₖ⟩`, `⟨value at g⟩`) =: (jₖ, hi); the term function `f`
+is `g` with those positions abstracted; `lo := jₖ − (k−1)` (numeral
+arithmetic, k small). Then verify the earlier prefix terms downward:
+`t_{k−1} ≡ f(lo + k − 2)`, …, `t₁ ≡ f(lo)`, each by defeq → tier-2
+ground evaluation → **one pass of registered characterizing
+equations** (the rewrite index; bounded and index-driven, not search
+— this is what lets `x ≡ x^1` and `1 ≡ x^0` verify against opaque
+`power`). This mechanism is the one-metavariable case of
+`matchAgainstPattern` and handles symbolic bounds
+(`a(m) + a(m+1) + … + a(n)` → lo = m), shared-parameter indices
+(`binomial(n,0) + … + binomial(n,n)` — no fresh variable exists),
+and ground ranges (`1 + 2 + … + 10`).
 
-**Step 2 — abstract the general term.** For each candidate `v`,
-let `f_v := λ v. g`.
+**Mechanism 2 — the 0/1 evaluation probe (arithmetic anchors).**
+When anti-unification fails structurally (`2 + 4 + … + 2*n`: the
+numeral `2` is not literally `2*⟨_⟩`), abstract `g` over its fresh
+variable and test `f(0) ≡ t₁` and `f(1) ≡ t₁` by ground evaluation,
+verifying the rest of the prefix for whichever start matches.
+Starting indices beyond {0, 1} are not probed in v1.
 
-**Step 3 — solve for the starting index.** Find `i₀` such that
-`f_v(i₀)` is definitionally/ground-evaluation equal to `t₁`
-(tier-1 defeq, then tier-2 evaluation; see §7 on why this is cheap).
-Search strategy: try to solve syntactically first — if `g` is `v`
-itself, `i₀ = t₁`; if `g` mentions `v` once, invert the arithmetic
-around it when the inversion is exact; otherwise fall back to trying
-small candidate values `i₀ ∈ {0, 1, 2, t₁-adjacent values}` by
-evaluation. If no `i₀` is found for a candidate `v`, that candidate
-is eliminated.
+**Ambiguity is a loud error** at every stage, per the house rule:
+two consistent (lo, hi) readings, or both probe starts matching
+(possible with a single prefix term: `0 + … + k*(k−1)` matches
+lo = 0 and lo = 1), name every surviving candidate and point at the
+explicit binder form. Zero candidates: "general term does not
+generate the prefix", showing the nearest-miss `f(lo), f(lo+1)`
+against the written terms.
 
-**Step 4 — verify the remaining prefix.** Check
-`f_v(i₀ + 1) ≡ t₂`, `f_v(i₀ + 2) ≡ t₃`, … by ground evaluation. Any
-mismatch eliminates the candidate. This is the "prefix terms must
-match the shape of the general term" rule, enforced mechanically.
-
-**Step 5 — ambiguity check.** If exactly one candidate `(v, i₀)`
-survives, elaborate to `Fold(op, λv. g, i₀, upperBound)` where
-`upperBound` is the general term's index position evaluated at the
-top — i.e. the fold runs `v` from `i₀` to the value that makes
-`f_v(v)` equal the written general term, which is `v` itself as
-written (the general term is literally the last term, so the upper
-bound is the written index expression; when the index appears
-compositely, the upper bound is the index variable's own range end —
-see §3.1). If **zero** candidates survive: error, "ellipsis general
-term does not generate the prefix", showing `f(i₀)`, `f(i₀+1)` for
-the nearest-miss candidate next to the written prefix terms. If
-**two or more** survive: error, "ellipsis is ambiguous between index
-⟨v₁⟩ and ⟨v₂⟩; write the explicit form", per the house principle
-that ambiguity is a loud error, never a silent pick.
+**Upper bounds and the half-open rule.** The written general term is
+the last term, so the range is inclusive lo..hi with **count
+`(1 + hi) ∸ lo`** — monus, whose clamping gives exactly the right
+empty range when a symbolic lo exceeds hi. One special case, decided:
+an upper bound of the syntactic shape `E − 1` is **half-open
+notation** — range [lo, E), count `E ∸ lo` — so that
+`a(0) + a(1) + … + a(n-1)` denotes the empty sum at `n = 0` (the
+naive inclusive reading gives count 1 there: `1 + (0∸1) ∸ 0 = 1`,
+which is wrong). Literal lo ∈ {0, 1} yields monus-free counts
+(`1 + n` and `n`); symbolic lo keeps the monus in the count slot
+only, and peel lemmas surface `lo ≤ hi` side conditions exactly
+where the mathematics needs them.
 
 ##### 3.1 Upper bound, precisely
 
@@ -524,16 +532,50 @@ holds). Document this in LANGUAGE.md — it occasionally surprises —
 and make the pretty-printer's behavior at small symbolic ranges
 consistent (§8).
 
+##### 3.3 Example corpus (the seed for the feature-test file)
+
+| expression | mechanism | reading |
+|---|---|---|
+| `1 + 2 + ... + n` | anti-unify (`1` vs `n`) | lo 1, hi n, f = id |
+| `a(0) + a(1) + ... + a(n)` | anti-unify | lo 0, hi n |
+| `a(m) + a(m+1) + ... + a(n)` | anti-unify | symbolic lo = m; count `(1+n) ∸ m`, empty when m > n for free |
+| `a(0) + ... + a(n-1)` | anti-unify + half-open rule | count n; empty at n = 0 |
+| `2 + 4 + ... + 2*n` | probe (f(1) = 2) | lo 1, hi n |
+| `1 + 3 + 5 + ... + (2*n - 1)` | probe (monus ground-evaluates) | lo 1, hi n |
+| `1/1 + 1/2 + ... + 1/n` | anti-unify (`1/1` vs `1/n`) | the written `1/1` is what makes the shape visible — the discipline matches practice |
+| `x + x^2 + ... + x^n` | anti-unify on `x^2`, verify `x ≡ x^1` via characterizing equation | lo 1, hi n |
+| `binomial(n,0) + ... + binomial(n,n)` | anti-unify (no fresh variable exists) | lo 0, hi n, f = λv. binomial(n,v) — the binomial-theorem display |
+| `1 + 2 + ... + 10` | anti-unify | ground range; harmless, allowed |
+| `a(1,1) + ... + a(n,n)` | anti-unify, consistent pair at both positions | the diagonal, λv. a(v,v) |
+| `n + (n-1) + ... + 1` | — | rejected in v1 by the downward verification (t₁ ≠ f(lo)); see §10 for the future-work door |
+
 #### 4. Elaboration target and library work
 
 The ground-truth form is a single generic fold over a registered
 operation:
 
-- `Fold(op, identity, f, i₀, N)` — library definition, generic over
-  the carrier, defined by recursion on the range length. Build on the
-  existing `Algebra/aggregation.math` machinery; `Real.partialSum` /
-  `Real.partialProduct` and friends should be redefined as (or proved
-  equal to) instances of it so the whole library speaks one fold.
+- **DECIDED (2026-07-02): `Fold(op, identity, f, i₀, count)` — lower
+  bound plus COUNT, recursion on the count.** This is the only
+  convention with no monus and no side conditions in the definition
+  or the characterizing lemmas (peel-last
+  `Fold(f, i₀, 1+c) = Fold(f, i₀, c) op f(i₀+c)`, peel-first
+  `Fold(f, i₀, 1+c) = f(i₀) op Fold(f, 1+i₀, c)`, empty
+  `Fold(f, i₀, 0) = identity` — all unconditional), while keeping
+  `i₀` as DATA in the term, which makes the §8 printer trivial
+  (read i₀ and count off the term) instead of pattern-extracting
+  offsets from a lambda body. The display semantics stay inclusive
+  `f(i₀) op … op f(hi)`; the count is the kernel spelling only.
+  Rejected alternatives, for the record: a two-ended inclusive
+  primitive (monus or `i₀ ≤ N` guards infect every lemma, and the
+  half-open rule of §3 has no home — it gets `a(0)+…+a(n-1)` wrong
+  at n = 0); offset-in-the-term-function over the existing
+  count-only fold (works, but buries i₀ in a lambda the printer
+  must reverse-engineer forever); Ring.Sum's inclusive-from-f(0)
+  form (cannot represent the empty range at all — it is the problem,
+  not a candidate). `Algebra.indexedAggregate` becomes the `i₀ = 0`
+  instance; `Real.partialSum`/`partialProduct` re-home mechanically;
+  `Ring.Sum(f, n)` retires as `Fold(f, 0, 1 + n)`, turning the
+  off-by-one bridge lemma into a definition.
 - **Fold-capable operation registry.** An operation qualifies by
   registering (op, identity, associativity proof). `+` and `*` on
   each numeric carrier register at instance-declaration time.
@@ -598,18 +640,45 @@ of a relation, and the whole relation elaborates as a proposition.**
 - Consequences of the restriction, stated so the implementer doesn't
   "fix" them: `(1/2 + 1/4 + ...) + 1` is illegal in v1 (no series in
   term position); `... = S` with `S` itself a series is illegal
-  (one side only); inequalities `t₁ + ... + g + ... ≤ B` MAY be
-  supported as `∀N. Fold(...) ≤ B`-style or via a limit predicate —
-  **DECIDE** which reading, or reject in v1.
+  (one side only); inequalities `t₁ + ... + g + ... ≤ B` are
+  **rejected in v1** (DECIDED 2026-07-02 — see the v2 note below for
+  why the question largely evaporates later).
 
-**Deferred (v2):** series in term position via an elaborator-emitted
-convergence side condition, discharged by a tier-4 judgment family
-(`ConvergesTo` rules keyed by the head symbol of the term function:
-geometric, p-series with p > 1, comparison against a registered
-majorant). This slots into the Part-B rule index design unchanged —
-`(ConvergesTo, power)` etc. — but requires the sum-of-series algebra
-(limit of sum = sum of limits) to be in the library first. Do not
-build in v1.
+**Deferred (v2) — and the extended-reals direction (owner,
+2026-07-02).** The v2 design should be built on a two-point
+completion ℝ̄ = ℝ ∪ {−∞, +∞} (order and limits only — ℝ̄ is not a
+ring; `ring`/`field` never touch it; ±∞ case splits are A4 `by
+cases` + tier-4 food). What it buys, precisely:
+- **One limit predicate instead of two.** `ConvergesTo` and
+  `TendsToInfinity` unify into convergence in ℝ̄'s order topology;
+  `… = infinity` stops being a keyword hack and becomes an ordinary
+  equation inside the predicate (`infinity` is just a term of ℝ̄).
+- **On the monotone/nonneg fragment the totality questions
+  evaporate**, exactly as hoped: a series with eventually-nonneg
+  terms ALWAYS has a value in [0, +∞] (monotone convergence), so
+  nonneg series can eventually be a TOTAL function into [0, ∞] —
+  term position legal with NO convergence side conditions on that
+  fragment (the measure-theory move; cf. mathlib's ℝ≥0∞ experience,
+  where this totalization is what makes series automation pleasant).
+  The signed case then routes through absolute convergence. On this
+  fragment the candidate inequality readings (∀N over partial sums /
+  limit ≤ B / limsup ≤ B) all coincide — which is why deciding the
+  v1 reading would have been wasted work.
+- **What does NOT evaporate:** oscillating series
+  (`1 − 1 + 1 − …`) have no limit even in ℝ̄, so a single total
+  "value of any series" remains impossible — defining it as limsup
+  would make `1 − 1 + 1 − … = 1` a true equation, which is worse
+  than partiality. Hence the trailing-ellipsis form stays a
+  RELATION-position proposition in v2 too; what changes is that the
+  predicate is one, the ±∞ equations are honest, and the nonneg
+  fragment gets total term-position sums.
+- Implied library ladder: ℝ̄ with order + the ℝ ↪ ℝ̄ embedding
+  packet (B3), limsup/liminf (independently wanted for analysis),
+  the unified limit predicate, then [0,∞]-valued total sums.
+  Convergence side conditions for the general signed term-position
+  case stay a tier-4 judgment family
+  (`(ConvergesTo, power)` geometric rules etc.) as previously
+  sketched. Do not build any of this in v1.
 
 #### 7. Interaction with the rest of the plan
 
@@ -677,8 +746,19 @@ round-trip test over the library's fold expressions.
   for a monotonicity ∀). This is a genuinely good future feature and
   composes with B4, but it elaborates to a ∀-statement, not a fold —
   a separate plan item, not a rider on this one.
-- Descending ranges (`n + (n-1) + ... + 1`). Reasonable v2; needs a
-  direction rule in §3; reject with a clear message in v1.
+- **Descending ranges — not in v1, door explicitly open (owner,
+  2026-07-02).** The motivating display is the polynomial:
+  `a(n)*x^n + ... + a(1)*x^1 + a(0)*x^0`, and the harder textbook
+  form `a(n)*x^n + ... + a(1)*x + a(0)`, whose trailing terms only
+  match the general term through characterizing equations
+  (`x^1 = x`, `a(0)*x^0 = a(0)` via power_one/power_zero/multiply
+  laws) — i.e. the same normalization-assisted verification §3
+  already uses, pointed at the tail instead of the head. Note the
+  kernel form doesn't care about direction (a descending display is
+  `λj. f(hi ∸ j)` reindexing — recognizer/printer work only), so
+  nothing decided now forecloses it. In v1, reject with a clear
+  message; the §3 downward verification already rejects it
+  automatically (t₁ ≠ f(lo)).
 
 #### 11. Suggested implementation order
 
