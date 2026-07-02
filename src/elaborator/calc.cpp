@@ -582,9 +582,10 @@ ExpressionPointer Elaborator::elaborateCalc(
                             step.stepProofIsExplanation,
                             classifyAttempt != nullptr, step.line);
                     }
+                    // `since` is NOT exempt here either — per the C1
+                    // decision it is a dying synonym of `by`.
                     bool checkThisStep = !fromFactCitation
                         && reportRedundantBy_
-                        && !step.stepProofIsExplanation
                         && (step.relation == CalcRelation::Equality
                             || reportRedundantByNonEq_);
                     if (checkThisStep) {
