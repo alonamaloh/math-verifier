@@ -21,15 +21,37 @@ struct TypeError : std::runtime_error {
     // pair (e.g. "internal" errors, name-collision errors).
     ExpressionPointer expectedType;
     ExpressionPointer actualType;
+    // For the Application mismatch case: the function and argument
+    // TERMS (not just their types), so the caller can say WHICH
+    // application failed inside a large assembled term.
+    ExpressionPointer offendingFunction;
+    ExpressionPointer offendingArgument;
 };
 
 // `opaque` is HARD by default: the demand-point force-unfold retries (kernel
 // defeq/inferType bridge, elaborator deep-WHNF / cases-on-expression / tuple-
 // lambda-Pi intro) refuse to expand an opaque head, so the only way to see
-// through one is an explicit `unfold X in …`. Returns true for every opaque
-// constant; kept as the single decision point for a possible future
-// `reducible` opt-in. (Formerly gated by the MATH_HARD_OPAQUE env var.)
-bool isHardOpaqueConstant(const std::string& name);
+// through one is an explicit `unfold X in …`. True for every opaque VALUE
+// definition; false for an opaque QUOTIENT-TYPE ALIAS (body literally
+// `Quotient(T, R)`), whose leaf-defeq bridge home-file constructions rely
+// on (see the implementation comment). Kept as the single decision point
+// for a possible future `reducible` opt-in. (Formerly gated by the
+// MATH_HARD_OPAQUE env var.)
+struct Environment;
+bool isHardOpaqueConstant(const Environment& environment,
+                          const std::string& name);
+
+// While alive, the quotient-type-alias defeq bridge is enabled on this
+// thread (see isHardOpaqueConstant). The kernel arms it around
+// inferType's application argument-vs-domain check; elaborator code may
+// arm it around a final kernel re-check of an assembled term. It is
+// NEVER armed during the auto-prover's speculative equality search.
+struct AliasBridgeScope {
+    AliasBridgeScope();
+    ~AliasBridgeScope();
+private:
+    bool saved;
+};
 
 // A reduction ran out of its resource budget — the recursion-depth bound
 // or the WHNF fuel limit — before reaching a normal form. Distinct from a

@@ -599,6 +599,17 @@ private:
             message += actualLabel;
             message += prettyPrintForDisplay(error.actualType);
         }
+        // Name the exact application that failed — inside a large
+        // assembled term (a cases motive, an eliminator call) the
+        // types alone don't say WHERE the mismatch sits.
+        if (error.offendingFunction) {
+            message += "\n    in the application of: ";
+            message += prettyPrintForDisplay(error.offendingFunction);
+        }
+        if (error.offendingArgument) {
+            message += "\n    to the argument:       ";
+            message += prettyPrintForDisplay(error.offendingArgument);
+        }
         // Anchor the error at the innermost frame that knows its source
         // position (the calc step / argument / theorem currently being
         // elaborated). Without this a kernel TypeError reported `:1:1` with

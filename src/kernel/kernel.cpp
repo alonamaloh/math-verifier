@@ -1430,12 +1430,54 @@ ExpressionPointer deltaReduceLetFreeVariables(ExpressionPointer expression,
 // the kernel/elaborator demand-point bridges — the only way to see through one
 // is an explicit `unfold X in …`. (During the predictability experiment this
 // was gated per-name by the MATH_HARD_OPAQUE env var; that gate is now retired
-// and hard is the standing behaviour for every opaque definition. This remains
-// the single decision point should a future `reducible` marker want to opt a
-// specific definition back into δ-reduction.)
+// and hard is the standing behaviour for every opaque VALUE definition. This
+// remains the single decision point should a future `reducible` marker want
+// to opt a specific definition back into δ-reduction.)
+//
+// EXCEPTION (D Phase-1, 2026-07-02): an opaque QUOTIENT-TYPE ALIAS — a
+// definition whose body is literally `Quotient(T, R)` (the same class
+// `engageOpaqueQuotientAlias` recognizes: Integer, Rational, the sealed
+// Real) — is SOFT. Its home file's constructions are elaborated with the
+// alias engaged, so their stored bodies apply `Quotient.lift`-typed
+// functions to alias-typed arguments; a consumer that unfolds such a
+// transparent construction (a cases motive re-check, a normalized goal)
+// then needs the leaf defeq `Alias ≡ Quotient(T, R)` or the term does not
+// re-typecheck. The value-definition predictability argument does not
+// apply: a TYPE alias has no goal shape to preserve at the leaf-defeq
+// stage — WHNF still keeps the alias spelling everywhere.
 // External-linkage so the elaborator (normalization.cpp) can call it.
-bool isHardOpaqueConstant(const std::string& /*name*/) {
+// The alias bridge is scoped: it fires only inside TYPE-CHECKING defeq
+// (inferType's application argument-vs-domain check), where refusing it
+// makes a stored home-file construction un-recheckable. It stays OFF
+// during the prover's speculative equality search — there the bridge is
+// semantically optional (a lemma citation always exists) and measurably
+// multiplies search cost (observed: previously-cheap by-less steps
+// exhausting the prover budget). RAII-scoped via AliasBridgeScope below.
+thread_local bool aliasBridgeEnabled = false;
+
+bool isHardOpaqueConstant(const Environment& environment,
+                          const std::string& name) {
+    if (!aliasBridgeEnabled) return true;
+    auto* declaration = environment.lookup(name);
+    auto* definition =
+        declaration ? std::get_if<Definition>(declaration) : nullptr;
+    if (!definition) return true;
+    ExpressionPointer body = definition->body;
+    while (auto* application = std::get_if<Application>(&body->node)) {
+        body = application->function;
+    }
+    auto* headConstant = std::get_if<Constant>(&body->node);
+    if (headConstant && headConstant->name == "Quotient") {
+        return false;
+    }
     return true;
+}
+
+AliasBridgeScope::AliasBridgeScope() : saved(aliasBridgeEnabled) {
+    aliasBridgeEnabled = true;
+}
+AliasBridgeScope::~AliasBridgeScope() {
+    aliasBridgeEnabled = saved;
 }
 
 // True if any entry in `context` is a let-style binder (carries a value).
@@ -1474,9 +1516,10 @@ ExpressionPointer unfoldOpaqueHeadOnce(const Environment& environment,
     if (!definition || definition->opacity != Opacity::Opaque) {
         return nullptr;
     }
-    // Opaque is hard: refuse even the demand-point retry — only an explicit
-    // `unfold X in …` may see through an opaque head.
-    if (isHardOpaqueConstant(constant->name)) {
+    // Opaque VALUE definitions are hard: refuse even the demand-point retry —
+    // only an explicit `unfold X in …` may see through one. Quotient-type
+    // aliases are soft (see isHardOpaqueConstant).
+    if (isHardOpaqueConstant(environment, constant->name)) {
         return nullptr;
     }
     if (definition->universeParameters.size()
@@ -2021,6 +2064,12 @@ ExpressionPointer inferTypeWork(const Environment& environment,
                       closeBinder(bodyType, introducedName));
     }
     if (auto* application = std::get_if<Application>(&expression->node)) {
+        // Type-checking is where the quotient-alias defeq bridge is armed:
+        // a stored home-file construction applies `Quotient.lift`-typed
+        // functions to alias-typed arguments, so re-checking it demands the
+        // leaf fact `Alias ≡ Quotient(T, R)`. (Never armed in the prover's
+        // equality search — see AliasBridgeScope.)
+        AliasBridgeScope aliasBridge;
         auto functionType = weakHeadNormalForm(
             environment,
             inferType(environment, context, application->function));
@@ -2049,6 +2098,8 @@ ExpressionPointer inferTypeWork(const Environment& environment,
             TypeError error("Application: argument type does not match Pi domain");
             error.expectedType = functionAsPi->domain;
             error.actualType = argumentType;
+            error.offendingFunction = application->function;
+            error.offendingArgument = application->argument;
             throw error;
         }
         return substitute(functionAsPi->codomain, 0, application->argument);

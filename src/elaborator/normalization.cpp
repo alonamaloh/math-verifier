@@ -69,7 +69,7 @@ const Definition* Elaborator::opaqueHeadDefinition(const ExpressionPointer& whnf
         // Opaque is hard: never force-unfolded by the elaborator's demand-point
         // retries (deep-WHNF for `by substituting`, cases-on-expression,
         // tuple/lambda/Pi intro against an opaque type) — only `unfold X in …`.
-        if (isHardOpaqueConstant(constant->name)) return nullptr;
+        if (isHardOpaqueConstant(environment_, constant->name)) return nullptr;
         if (outConstant) *outConstant = constant;
         return def;
     }
