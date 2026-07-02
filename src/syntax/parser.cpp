@@ -89,6 +89,7 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::NotSubsetOf:
         case TokenKind::Approx:
         case TokenKind::InverseSuperscript:
+        case TokenKind::Bang:
             return true;
         default:
             return false;
@@ -2554,11 +2555,12 @@ private:
         }
         // Postfix operators bind tighter than any binary operator and
         // attach to the application/atom just parsed. `g⁻¹` wraps `g`;
-        // `a · b⁻¹` parses as `a · (b⁻¹)`; `g⁻¹⁻¹` chains.
+        // `a · b⁻¹` parses as `a · (b⁻¹)`; `g⁻¹⁻¹` chains; `k!` likewise.
         auto base = parseApplication();
-        while (peek().kind == TokenKind::InverseSuperscript) {
+        while (peek().kind == TokenKind::InverseSuperscript
+               || peek().kind == TokenKind::Bang) {
             Token op = consumeAny();
-            base = makeSurfaceUnaryOperation("⁻¹", std::move(base),
+            base = makeSurfaceUnaryOperation(op.lexeme, std::move(base),
                                               op.line, op.column);
         }
         return base;

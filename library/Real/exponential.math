@@ -78,24 +78,24 @@ import Real.cauchy_complete
 -- ----------------------------------------------------------------------
 -- The k-th term of the exponential series: (1/k!) · xᵏ.
 definition Real.exponentialTerm (x : Real) (k : Natural) : Real :=
-  (1 / (Natural.factorial(k) : Real)) * Real.power(x, k)
+  (1 / (k! : Real)) * Real.power(x, k)
 
 -- ----------------------------------------------------------------------
 -- The factorial's cast is positive (so dividing by it is honest).
 theorem Real.factorial_cast_positive (k : Natural)
-        : (Natural.factorial(k) : Real) > 0 := {
-  claim 1 ≤ Natural.factorial(k) since Natural.factorial_positive;
-  claim Natural.factorial(k) > 0 since Natural.zero_lt_of_one_le;
+        : (k! : Real) > 0 := {
+  claim 1 ≤ k! since Natural.factorial_positive;
+  claim k! > 0 since Natural.zero_lt_of_one_le;
   done since Real.from_natural_positive
 }
 
 -- … and at the Rational layer, for the consumers still working there.
 theorem Rational.factorial_cast_positive (k : Natural)
-        : Rational.zero < Natural.factorial(k) := {
-  claim 1 ≤ Natural.factorial(k) since Natural.factorial_positive;
-  choose c such that Natural.factorial(k) = 1 + c as factorialSplit
-      from Natural.subtraction_witness(1, Natural.factorial(k),
-                                       (1 ≤ Natural.factorial(k)));
+        : Rational.zero < k! := {
+  claim 1 ≤ k! since Natural.factorial_positive;
+  choose c such that k! = 1 + c as factorialSplit
+      from Natural.subtraction_witness(1, k!,
+                                       (1 ≤ k!));
   claim (0 : Rational) < (1 + c : Rational) since Rational.one_plus_cast_positive;
   done by substituting factorialSplit
 }
@@ -105,57 +105,57 @@ theorem Rational.factorial_cast_positive (k : Natural)
 -- term(x, k+1) = (1/(k+1)) · x · term(x, k).
 theorem Real.exponentialTerm_successor (x : Real) (k : Natural)
         : Real.exponentialTerm(x, 1 + k)
-          = (1 / ((1 + k : Natural) : Real))
+          = (1 / (1 + k : Real))
             * (x * Real.exponentialTerm(x, k)) := {
   claim factorialStep
-        : (Natural.factorial(1 + k) : Real)
-          = ((1 + k : Natural) : Real) * (Natural.factorial(k) : Real)
-      by calc (Natural.factorial(1 + k) : Real)
-            = (((1 + k) * Natural.factorial(k) : Natural) : Real)
+        : ((1 + k)! : Real)
+          = (1 + k : Real) * (k! : Real)
+      by calc ((1 + k)! : Real)
+            = ((1 + k) * k! : Real)
                   since Natural.factorial_add_one
-            = ((1 + k : Natural) : Real) * (Natural.factorial(k) : Real)
+            = (1 + k : Real) * (k! : Real)
                   since Real.from_natural_multiply_preserves;
-  claim ((1 + k : Natural) : Real) > 0
+  claim (1 + k : Real) > 0
       since Real.one_plus_cast_positive;
-  claim (Natural.factorial(k) : Real) > 0
+  claim (k! : Real) > 0
       since Real.factorial_cast_positive;
-  claim (Natural.factorial(1 + k) : Real) > 0
+  claim ((1 + k)! : Real) > 0
       since Real.factorial_cast_positive;
-  claim ((1 + k : Natural) : Real) ≠ 0;
-  claim (Natural.factorial(k) : Real) ≠ 0;
-  claim (Natural.factorial(1 + k) : Real) ≠ 0;
+  claim (1 + k : Real) ≠ 0;
+  claim (k! : Real) ≠ 0;
+  claim ((1 + k)! : Real) ≠ 0;
   claim productCancel
-        : (((1 + k : Natural) : Real) * (Natural.factorial(k) : Real))
-              * ((1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real)))
+        : ((1 + k : Real) * (k! : Real))
+              * ((1 / (1 + k : Real)) * (1 / (k! : Real)))
           = 1
       by field;
   claim factorialCancel
-        : (Natural.factorial(1 + k) : Real) * (1 / (Natural.factorial(1 + k) : Real)) = 1
+        : ((1 + k)! : Real) * (1 / ((1 + k)! : Real)) = 1
       since Real.divide_cancel;
-  calc 1 / (Natural.factorial(1 + k) : Real)
-     = 1 * (1 / (Natural.factorial(1 + k) : Real))
-     = ((((1 + k : Natural) : Real) * (Natural.factorial(k) : Real))
-        * ((1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real))))
-       * (1 / (Natural.factorial(1 + k) : Real))
+  calc 1 / ((1 + k)! : Real)
+     = 1 * (1 / ((1 + k)! : Real))
+     = (((1 + k : Real) * (k! : Real))
+        * ((1 / (1 + k : Real)) * (1 / (k! : Real))))
+       * (1 / ((1 + k)! : Real))
            since productCancel
-     = ((Natural.factorial(1 + k) : Real)
-        * ((1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real))))
-       * (1 / (Natural.factorial(1 + k) : Real))
+     = (((1 + k)! : Real)
+        * ((1 / (1 + k : Real)) * (1 / (k! : Real))))
+       * (1 / ((1 + k)! : Real))
            since factorialStep
-     = ((Natural.factorial(1 + k) : Real) * (1 / (Natural.factorial(1 + k) : Real)))
-       * ((1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real)))
-     = 1 * ((1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real)))
+     = (((1 + k)! : Real) * (1 / ((1 + k)! : Real)))
+       * ((1 / (1 + k : Real)) * (1 / (k! : Real)))
+     = 1 * ((1 / (1 + k : Real)) * (1 / (k! : Real)))
            since factorialCancel
-     = (1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real))
+     = (1 / (1 + k : Real)) * (1 / (k! : Real))
      as reciprocalSplit;
   calc Real.exponentialTerm(x, 1 + k)
-     = (1 / (Natural.factorial(1 + k) : Real)) * Real.power(x, 1 + k)
-     = ((1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real))) * Real.power(x, 1 + k)
+     = (1 / ((1 + k)! : Real)) * Real.power(x, 1 + k)
+     = ((1 / (1 + k : Real)) * (1 / (k! : Real))) * Real.power(x, 1 + k)
            since reciprocalSplit
-     = ((1 / ((1 + k : Natural) : Real)) * (1 / (Natural.factorial(k) : Real))) * (x * Real.power(x, k))
+     = ((1 / (1 + k : Real)) * (1 / (k! : Real))) * (x * Real.power(x, k))
            since Real.power_add_one
-     = (1 / ((1 + k : Natural) : Real)) * (x * ((1 / (Natural.factorial(k) : Real)) * Real.power(x, k)))
-     = (1 / ((1 + k : Natural) : Real)) * (x * Real.exponentialTerm(x, k))
+     = (1 / (1 + k : Real)) * (x * ((1 / (k! : Real)) * Real.power(x, k)))
+     = (1 / (1 + k : Real)) * (x * Real.exponentialTerm(x, k))
 }
 
 -- ----------------------------------------------------------------------
@@ -164,20 +164,20 @@ theorem Real.exponentialTerm_successor (x : Real) (k : Natural)
 
 theorem Real.exponentialTerm_zero (x : Real)
         : Real.exponentialTerm(x, 0) = Real.one := {
-  claim castOne : (Natural.factorial(0) : Real) = 1;
-  claim (Natural.factorial(0) : Real) > 0 since Real.factorial_cast_positive;
-  claim (Natural.factorial(0) : Real) ≠ 0;
-  claim cancel : (Natural.factorial(0) : Real) * (1 / (Natural.factorial(0) : Real)) = 1
+  claim castOne : (0! : Real) = 1;
+  claim (0! : Real) > 0 since Real.factorial_cast_positive;
+  claim (0! : Real) ≠ 0;
+  claim cancel : (0! : Real) * (1 / (0! : Real)) = 1
       since Real.divide_cancel;
-  calc 1 / (Natural.factorial(0) : Real)
-     = 1 * (1 / (Natural.factorial(0) : Real))
-     = (Natural.factorial(0) : Real) * (1 / (Natural.factorial(0) : Real))
+  calc 1 / (0! : Real)
+     = 1 * (1 / (0! : Real))
+     = (0! : Real) * (1 / (0! : Real))
            since castOne
      = 1
            since cancel
      as reciprocalOne;
   calc Real.exponentialTerm(x, 0)
-     = (1 / (Natural.factorial(0) : Real)) * Real.power(x, 0)
+     = (1 / (0! : Real)) * Real.power(x, 0)
      = 1 * Real.power(x, 0)
            by reciprocalOne
      = Real.power(x, 0)
@@ -186,26 +186,26 @@ theorem Real.exponentialTerm_zero (x : Real)
 
 theorem Real.exponentialTerm_one (x : Real)
         : Real.exponentialTerm(x, 1) = x := {
-  claim factorialOne : Natural.factorial(1) = 1
-      by calc Natural.factorial(1)
-            = (1 + 0) * Natural.factorial(0)
+  claim factorialOne : 1! = 1
+      by calc 1!
+            = (1 + 0) * 0!
             = 1;
-  claim castOne : (Natural.factorial(1) : Real) = 1
+  claim castOne : (1! : Real) = 1
       by substituting factorialOne;
-  claim (Natural.factorial(1) : Real) > 0 since Real.factorial_cast_positive;
-  claim (Natural.factorial(1) : Real) ≠ 0;
-  claim cancel : (Natural.factorial(1) : Real) * (1 / (Natural.factorial(1) : Real)) = 1
+  claim (1! : Real) > 0 since Real.factorial_cast_positive;
+  claim (1! : Real) ≠ 0;
+  claim cancel : (1! : Real) * (1 / (1! : Real)) = 1
       since Real.divide_cancel;
-  calc 1 / (Natural.factorial(1) : Real)
-     = 1 * (1 / (Natural.factorial(1) : Real))
-     = (Natural.factorial(1) : Real) * (1 / (Natural.factorial(1) : Real))
+  calc 1 / (1! : Real)
+     = 1 * (1 / (1! : Real))
+     = (1! : Real) * (1 / (1! : Real))
            since castOne
      = 1
            since cancel
      as reciprocalOne;
   claim Real.power(x, 1) = x * Real.one;
   calc Real.exponentialTerm(x, 1)
-     = (1 / (Natural.factorial(1) : Real)) * Real.power(x, 1)
+     = (1 / (1! : Real)) * Real.power(x, 1)
      = 1 * Real.power(x, 1)
            by reciprocalOne
      = Real.one * (x * Real.one)
@@ -215,16 +215,16 @@ theorem Real.exponentialTerm_one (x : Real)
 theorem Real.exponentialTerm_nonneg (x : Real)
         (xNonneg : Real.zero ≤ x) (k : Natural)
         : Real.zero ≤ Real.exponentialTerm(x, k) := {
-  claim (Natural.factorial(k) : Real) > 0 since Real.factorial_cast_positive;
+  claim (k! : Real) > 0 since Real.factorial_cast_positive;
   claim (1 : Real) > 0 since Real.zero_less_one;
-  claim 1 / (Natural.factorial(k) : Real) > 0 since Real.divide_positive;
-  claim Real.zero ≤ 1 / (Natural.factorial(k) : Real) since Real.LessThan.weaken;
-  claim Real.IsNonneg(1 / (Natural.factorial(k) : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim 1 / (k! : Real) > 0 since Real.divide_positive;
+  claim Real.zero ≤ 1 / (k! : Real) since Real.LessThan.weaken;
+  claim Real.IsNonneg(1 / (k! : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
   claim Real.zero ≤ Real.power(x, k) since Real.power_nonneg;
   claim Real.IsNonneg(Real.power(x, k)) since Real.IsNonneg_of_LessOrEqual_zero;
-  claim Real.IsNonneg((1 / (Natural.factorial(k) : Real)) * Real.power(x, k))
+  claim Real.IsNonneg((1 / (k! : Real)) * Real.power(x, k))
       since Real.IsNonneg.multiply;
-  claim Real.zero ≤ (1 / (Natural.factorial(k) : Real)) * Real.power(x, k)
+  claim Real.zero ≤ (1 / (k! : Real)) * Real.power(x, k)
       since Real.LessOrEqual_zero_of_IsNonneg;
   done
 }
@@ -258,30 +258,30 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
   -- Past K, one series step multiplies the term by at most 1/2.
   claim ratioBound
         : ∀ (k : Natural). K ≤ k
-          → abs(x) * (1 / ((1 + k : Natural) : Real)) ≤ (Rational.one_half : Real)
+          → abs(x) * (1 / (1 + k : Real)) ≤ (Rational.one_half : Real)
       by {
         take k : Natural;
         take KBelowIndex : K ≤ k;
         claim 1 + K ≤ 1 + k since Natural.add_left_monotone;
-        claim ((1 + K : Natural) : Real) ≤ ((1 + k : Natural) : Real) since Real.from_natural_le_preserves;
-        claim ((1 + K : Natural) : Real) > 0 since Real.one_plus_cast_positive;
-        claim ((1 + k : Natural) : Real) > 0 since Real.one_plus_cast_positive;
-        claim ((1 + K : Natural) : Real) ≠ 0;
-        claim ((1 + k : Natural) : Real) ≠ 0;
-        claim 1 / ((1 + k : Natural) : Real) ≤ 1 / ((1 + K : Natural) : Real) since Real.one_divide_antitone;
-        claim cancel : ((1 + K : Natural) : Real) * (1 / ((1 + K : Natural) : Real)) = 1 since Real.divide_cancel;
+        claim (1 + K : Real) ≤ (1 + k : Real) since Real.from_natural_le_preserves;
+        claim (1 + K : Real) > 0 since Real.one_plus_cast_positive;
+        claim (1 + k : Real) > 0 since Real.one_plus_cast_positive;
+        claim (1 + K : Real) ≠ 0;
+        claim (1 + k : Real) ≠ 0;
+        claim 1 / (1 + k : Real) ≤ 1 / (1 + K : Real) since Real.one_divide_antitone;
+        claim cancel : (1 + K : Real) * (1 / (1 + K : Real)) = 1 since Real.divide_cancel;
         claim (1 : Real) > 0 since Real.zero_less_one;
-        claim 1 / ((1 + K : Natural) : Real) > 0 since Real.divide_positive;
-        claim Real.zero ≤ 1 / ((1 + K : Natural) : Real) since Real.LessThan.weaken;
-        claim Real.IsNonneg(1 / ((1 + K : Natural) : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
-        claim roofsCast : (xRoof : Real) + (xRoof : Real) ≤ ((1 + K : Natural) : Real)
+        claim 1 / (1 + K : Real) > 0 since Real.divide_positive;
+        claim Real.zero ≤ 1 / (1 + K : Real) since Real.LessThan.weaken;
+        claim Real.IsNonneg(1 / (1 + K : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
+        claim roofsCast : (xRoof : Real) + (xRoof : Real) ≤ (1 + K : Real)
             by calc (xRoof : Real) + (xRoof : Real)
                   = ((xRoof + xRoof : Rational) : Real)    since Rational.to_real.add_preserves
                   ≤ (((K + 1) : Rational) : Real)          since Rational.to_real.LessOrEqual_preserves
-                  = ((1 + K : Natural) : Real)             by ((K + 1 : Natural) = 1 + K);
-        claim doubleBound : ((xRoof : Real) + (xRoof : Real)) * (1 / ((1 + K : Natural) : Real)) ≤ 1
-            by calc ((xRoof : Real) + (xRoof : Real)) * (1 / ((1 + K : Natural) : Real))
-                  ≤ ((1 + K : Natural) : Real) * (1 / ((1 + K : Natural) : Real))    since Real.LessOrEqual.multiply_by_nonneg_right
+                  = (1 + K : Real)             by ((K + 1 : Natural) = 1 + K);
+        claim doubleBound : ((xRoof : Real) + (xRoof : Real)) * (1 / (1 + K : Real)) ≤ 1
+            by calc ((xRoof : Real) + (xRoof : Real)) * (1 / (1 + K : Real))
+                  ≤ (1 + K : Real) * (1 / (1 + K : Real))    since Real.LessOrEqual.multiply_by_nonneg_right
                   = 1                                                                since cancel;
         claim halvesToOne : (Rational.one_half : Real) + (Rational.one_half : Real) = 1
             by calc (Rational.one_half : Real) + (Rational.one_half : Real)
@@ -292,19 +292,19 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
         claim (Rational.one_half : Real) > 0 since Rational.to_real.positive_preserves;
         claim Real.zero ≤ (Rational.one_half : Real) since Real.LessThan.weaken;
         claim Real.IsNonneg((Rational.one_half : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
-        claim roofHalf : (xRoof : Real) * (1 / ((1 + K : Natural) : Real)) ≤ (Rational.one_half : Real)
-            by calc (xRoof : Real) * (1 / ((1 + K : Natural) : Real))
-                  = ((xRoof : Real) * (1 / ((1 + K : Natural) : Real))) * 1
-                  = ((xRoof : Real) * (1 / ((1 + K : Natural) : Real))) * ((Rational.one_half : Real) + (Rational.one_half : Real))
+        claim roofHalf : (xRoof : Real) * (1 / (1 + K : Real)) ≤ (Rational.one_half : Real)
+            by calc (xRoof : Real) * (1 / (1 + K : Real))
+                  = ((xRoof : Real) * (1 / (1 + K : Real))) * 1
+                  = ((xRoof : Real) * (1 / (1 + K : Real))) * ((Rational.one_half : Real) + (Rational.one_half : Real))
                         since halvesToOne
-                  = (((xRoof : Real) + (xRoof : Real)) * (1 / ((1 + K : Natural) : Real))) * (Rational.one_half : Real)
+                  = (((xRoof : Real) + (xRoof : Real)) * (1 / (1 + K : Real))) * (Rational.one_half : Real)
                   ≤ 1 * (Rational.one_half : Real)    since Real.LessOrEqual.multiply_by_nonneg_right
                   = (Rational.one_half : Real);
         claim Real.zero ≤ abs(x) since Real.absolute_value_nonneg;
-        claim 1 / ((1 + k : Natural) : Real) > 0 since Real.divide_positive;
-        claim Real.zero ≤ 1 / ((1 + k : Natural) : Real) since Real.LessThan.weaken;
-        calc abs(x) * (1 / ((1 + k : Natural) : Real))
-           ≤ (xRoof : Real) * (1 / ((1 + K : Natural) : Real))    since Real.LessOrEqual.multiply_monotone_nonneg
+        claim 1 / (1 + k : Real) > 0 since Real.divide_positive;
+        claim Real.zero ≤ 1 / (1 + k : Real) since Real.LessThan.weaken;
+        calc abs(x) * (1 / (1 + k : Real))
+           ≤ (xRoof : Real) * (1 / (1 + K : Real))    since Real.LessOrEqual.multiply_monotone_nonneg
            ≤ (Rational.one_half : Real)                           by roofHalf
       };
   -- Geometric decay of the terms past K, by induction on the offset.
@@ -338,43 +338,43 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                claim K ≤ predecessor + K by substituting indexCommute;
                claim stepEquation
                      : Real.exponentialTerm(x, 1 + (predecessor + K))
-                       = (1 / ((1 + (predecessor + K) : Natural) : Real)) * (x * Real.exponentialTerm(x, predecessor + K))
+                       = (1 / (1 + (predecessor + K) : Real)) * (x * Real.exponentialTerm(x, predecessor + K))
                    since Real.exponentialTerm_successor;
-               claim ((1 + (predecessor + K) : Natural) : Real) > 0 since Real.one_plus_cast_positive;
+               claim (1 + (predecessor + K) : Real) > 0 since Real.one_plus_cast_positive;
                claim (1 : Real) > 0 since Real.zero_less_one;
-               claim 1 / ((1 + (predecessor + K) : Natural) : Real) > 0 since Real.divide_positive;
-               claim Real.zero ≤ 1 / ((1 + (predecessor + K) : Natural) : Real) since Real.LessThan.weaken;
-               claim Real.IsNonneg(1 / ((1 + (predecessor + K) : Natural) : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
+               claim 1 / (1 + (predecessor + K) : Real) > 0 since Real.divide_positive;
+               claim Real.zero ≤ 1 / (1 + (predecessor + K) : Real) since Real.LessThan.weaken;
+               claim Real.IsNonneg(1 / (1 + (predecessor + K) : Real)) since Real.IsNonneg_of_LessOrEqual_zero;
                claim absoluteStep
                      : abs(Real.exponentialTerm(x, 1 + (predecessor + K)))
-                       = (1 / ((1 + (predecessor + K) : Natural) : Real))
+                       = (1 / (1 + (predecessor + K) : Real))
                          * (abs(x) * abs(Real.exponentialTerm(x, predecessor + K)))
                    by calc abs(Real.exponentialTerm(x, 1 + (predecessor + K)))
-                         = abs((1 / ((1 + (predecessor + K) : Natural) : Real)) * (x * Real.exponentialTerm(x, predecessor + K)))
+                         = abs((1 / (1 + (predecessor + K) : Real)) * (x * Real.exponentialTerm(x, predecessor + K)))
                                since stepEquation
-                         = abs(1 / ((1 + (predecessor + K) : Natural) : Real)) * abs(x * Real.exponentialTerm(x, predecessor + K))
+                         = abs(1 / (1 + (predecessor + K) : Real)) * abs(x * Real.exponentialTerm(x, predecessor + K))
                                since Real.absolute_value_multiplicative
-                         = abs(1 / ((1 + (predecessor + K) : Natural) : Real))
+                         = abs(1 / (1 + (predecessor + K) : Real))
                            * (abs(x) * abs(Real.exponentialTerm(x, predecessor + K)))
                                since Real.absolute_value_multiplicative
-                         = (1 / ((1 + (predecessor + K) : Natural) : Real))
+                         = (1 / (1 + (predecessor + K) : Real))
                            * (abs(x) * abs(Real.exponentialTerm(x, predecessor + K)))
                                since Real.absolute_value_when_nonneg;
                claim Real.zero ≤ abs(x) since Real.absolute_value_nonneg;
                claim Real.zero ≤ abs(Real.exponentialTerm(x, predecessor + K)) since Real.absolute_value_nonneg;
                claim Real.IsNonneg(abs(x)) since Real.IsNonneg_of_LessOrEqual_zero;
-               claim Real.IsNonneg(abs(x) * (1 / ((1 + (predecessor + K) : Natural) : Real))) since Real.IsNonneg.multiply;
-               claim Real.zero ≤ abs(x) * (1 / ((1 + (predecessor + K) : Natural) : Real))
+               claim Real.IsNonneg(abs(x) * (1 / (1 + (predecessor + K) : Real))) since Real.IsNonneg.multiply;
+               claim Real.zero ≤ abs(x) * (1 / (1 + (predecessor + K) : Real))
                    since Real.LessOrEqual_zero_of_IsNonneg;
-               claim abs(x) * (1 / ((1 + (predecessor + K) : Natural) : Real)) ≤ (Rational.one_half : Real)
+               claim abs(x) * (1 / (1 + (predecessor + K) : Real)) ≤ (Rational.one_half : Real)
                    by ratioBound(predecessor + K, (K ≤ predecessor + K));
                calc abs(Real.exponentialTerm(x, (1 + predecessor) + K))
                   = abs(Real.exponentialTerm(x, 1 + (predecessor + K)))
                         by substituting ((1 + predecessor) + K = 1 + (predecessor + K))
-                  = (1 / ((1 + (predecessor + K) : Natural) : Real))
+                  = (1 / (1 + (predecessor + K) : Real))
                     * (abs(x) * abs(Real.exponentialTerm(x, predecessor + K)))
                         since absoluteStep
-                  = (abs(x) * (1 / ((1 + (predecessor + K) : Natural) : Real)))
+                  = (abs(x) * (1 / (1 + (predecessor + K) : Real)))
                     * abs(Real.exponentialTerm(x, predecessor + K))
                   ≤ (Rational.one_half : Real)
                     * (abs(Real.exponentialTerm(x, K)) * Real.power((Rational.one_half : Real), predecessor))
@@ -735,8 +735,8 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
                   = Real.zero * Real.power(Real.zero, k)
                   = Real.zero    by ring;
         calc Real.exponentialTerm(Real.zero, successor(k))
-           = (1 / (Natural.factorial(successor(k)) : Real)) * Real.power(Real.zero, successor(k))
-           = (1 / (Natural.factorial(successor(k)) : Real)) * Real.zero
+           = (1 / (successor(k)! : Real)) * Real.power(Real.zero, successor(k))
+           = (1 / (successor(k)! : Real)) * Real.zero
                  by powerVanishes
            = Real.zero
                  by ring
@@ -874,28 +874,28 @@ definition Real.e : Real := Real.exponential(Real.one)
 -- A concrete taste: e exceeds 2 — already the third partial sum
 -- 1 + 1 + 1/2 does.
 theorem Real.e_above_two : Real.one + Real.one < Real.e := {
-  claim factorialOne : Natural.factorial(1) = 1
-      by calc Natural.factorial(1)
-            = (1 + 0) * Natural.factorial(0)
+  claim factorialOne : 1! = 1
+      by calc 1!
+            = (1 + 0) * 0!
             = 1;
-  claim factorialTwo : Natural.factorial(2) = 2
-      by calc Natural.factorial(2)
-            = 2 * Natural.factorial(1)
+  claim factorialTwo : 2! = 2
+      by calc 2!
+            = 2 * 1!
             = 2 * 1 by substituting factorialOne
             = 2 by ring;
-  claim factorialTwoCast : (Natural.factorial(2) : Real) = (2 : Real) by substituting factorialTwo;
-  claim (Natural.factorial(2) : Real) > 0 since Real.factorial_cast_positive;
-  claim (Natural.factorial(2) : Real) ≠ 0;
+  claim factorialTwoCast : (2! : Real) = (2 : Real) by substituting factorialTwo;
+  claim (2! : Real) > 0 since Real.factorial_cast_positive;
+  claim (2! : Real) ≠ 0;
   claim cancelTwo : (2 : Real) * (1 / (2 : Real)) = 1 since Real.divide_cancel;
-  claim factorialCancel : (Natural.factorial(2) : Real) * (1 / (Natural.factorial(2) : Real)) = 1 since Real.divide_cancel;
-  claim recipTwo : 1 / (Natural.factorial(2) : Real) = 1 / (2 : Real)
-      by calc 1 / (Natural.factorial(2) : Real)
-            = 1 * (1 / (Natural.factorial(2) : Real))
-            = ((2 : Real) * (1 / (2 : Real))) * (1 / (Natural.factorial(2) : Real))
+  claim factorialCancel : (2! : Real) * (1 / (2! : Real)) = 1 since Real.divide_cancel;
+  claim recipTwo : 1 / (2! : Real) = 1 / (2 : Real)
+      by calc 1 / (2! : Real)
+            = 1 * (1 / (2! : Real))
+            = ((2 : Real) * (1 / (2 : Real))) * (1 / (2! : Real))
                   since cancelTwo
-            = ((Natural.factorial(2) : Real) * (1 / (2 : Real))) * (1 / (Natural.factorial(2) : Real))
+            = ((2! : Real) * (1 / (2 : Real))) * (1 / (2! : Real))
                   since factorialTwoCast
-            = ((Natural.factorial(2) : Real) * (1 / (Natural.factorial(2) : Real))) * (1 / (2 : Real))
+            = ((2! : Real) * (1 / (2! : Real))) * (1 / (2 : Real))
             = 1 * (1 / (2 : Real))
                   since factorialCancel
             = 1 / (2 : Real);
@@ -906,7 +906,7 @@ theorem Real.e_above_two : Real.one + Real.one < Real.e := {
             = Real.one                           by ring;
   claim termTwo : Real.exponentialTerm(Real.one, 2) = 1 / (2 : Real)
       by calc Real.exponentialTerm(Real.one, 2)
-            = (1 / (Natural.factorial(2) : Real)) * Real.power(Real.one, 2)
+            = (1 / (2! : Real)) * Real.power(Real.one, 2)
             = (1 / (2 : Real)) * Real.power(Real.one, 2)
                   by recipTwo
             = (1 / (2 : Real)) * Real.one

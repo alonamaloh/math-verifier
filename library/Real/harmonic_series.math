@@ -72,7 +72,7 @@ import Real.series
 -- The harmonic terms 1/(n+1), and the doubling index ladder 2ᴷ.
 
 definition Real.harmonic_term (n : Natural) : Real :=
-  1 / ((1 + n : Natural) : Real)
+  1 / (1 + n : Real)
 
 definition Natural.doubling : Natural → Natural
   | 0 => 1
@@ -102,7 +102,7 @@ theorem Natural.doubling_at_least_one (K : Natural)
 -- Every harmonic term is nonnegative.
 theorem Real.harmonic_term_nonneg (j : Natural)
         : Real.zero ≤ Real.harmonic_term(j) := {
-  claim ((1 + j : Natural) : Real) > 0
+  claim (1 + j : Real) > 0
       since Real.one_plus_cast_positive;
   claim (1 : Real) > 0 since Real.zero_less_one;
   claim Real.harmonic_term(j) > 0 since Real.divide_positive;
@@ -112,9 +112,9 @@ theorem Real.harmonic_term_nonneg (j : Natural)
 -- ----------------------------------------------------------------------
 -- Each of the p terms past index p is at least 1/(2p).
 theorem Real.harmonic_term_block_bound (p j : Natural)
-        (doubledNonzero : ((p + p : Natural) : Real) ≠ 0)
+        (doubledNonzero : (p + p : Real) ≠ 0)
         (jBelow : j < p)
-        : 1 / ((p + p : Natural) : Real) ≤ Real.harmonic_term(p + j) := {
+        : 1 / (p + p : Real) ≤ Real.harmonic_term(p + j) := {
   -- index bound at the Natural layer: 1 + (p + j) = p + (j + 1) ≤ 2p
   claim jPlusOne : j + 1 ≤ p since Natural.add_one_le_of_lt;
   claim 1 + (p + j) ≤ p + p
@@ -122,9 +122,9 @@ theorem Real.harmonic_term_block_bound (p j : Natural)
             = p + (j + 1)   by (1 + (p + j) = p + (j + 1))
             ≤ p + p         since Natural.add_left_monotone;
   -- cast it and flip through the reciprocal
-  claim ((1 + (p + j) : Natural) : Real) ≤ ((p + p : Natural) : Real)
+  claim (1 + (p + j) : Real) ≤ (p + p : Real)
       since Real.from_natural_le_preserves;
-  claim ((1 + (p + j) : Natural) : Real) > 0
+  claim (1 + (p + j) : Real) > 0
       since Real.one_plus_cast_positive;
   done since Real.one_divide_antitone
 }
@@ -140,13 +140,13 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
      ≤ p         by pPositive
      ≤ p + p     since Natural.less_or_equal_add_right;
   claim p + p > 0 since Natural.zero_lt_of_one_le;
-  claim ((p + p : Natural) : Real) > 0
+  claim (p + p : Real) > 0
       since Real.from_natural_positive;
-  claim doubledNonzero : ((p + p : Natural) : Real) ≠ 0
+  claim doubledNonzero : (p + p : Real) ≠ 0
       since Real.nonzero_of_positive;
   -- Each of the p shifted terms beats the constant 1/(2p).
   claim ∀ (j : Natural). j < p
-        → 1 / ((p + p : Natural) : Real) ≤ Real.harmonic_term(p + j)
+        → 1 / (p + p : Real) ≤ Real.harmonic_term(p + j)
       by {
         take j : Natural;
         suppose j < p as jBelow;
@@ -154,32 +154,32 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
       };
   -- Summing that comparison over the block.
   claim Real.partialSum(
-              (j : Natural) ↦ 1 / ((p + p : Natural) : Real), p)
+              (j : Natural) ↦ 1 / (p + p : Real), p)
           ≤ Real.partialSum((j : Natural) ↦ Real.harmonic_term(p + j), p)
       by Real.partialSum_le_pointwise;
   -- The constant block is worth exactly ½: p copies of 1/(2p).
   claim constantValue
         : Real.partialSum(
-              (j : Natural) ↦ 1 / ((p + p : Natural) : Real), p)
-          = (p : Real) * (1 / ((p + p : Natural) : Real))
+              (j : Natural) ↦ 1 / (p + p : Real), p)
+          = (p : Real) * (1 / (p + p : Real))
       since Real.partialSum_constant;
-  claim doubled : ((p + p : Natural) : Real) = (p : Real) + (p : Real)
+  claim doubled : (p + p : Real) = (p : Real) + (p : Real)
       since Real.from_natural_add_preserves;
   claim doubledCancel
-        : ((p + p : Natural) : Real) * (1 / ((p + p : Natural) : Real)) = 1
+        : (p + p : Real) * (1 / (p + p : Real)) = 1
       since Real.divide_cancel;
-  calc (1 / (2 : Real)) * ((p + p : Natural) : Real)
+  calc (1 / (2 : Real)) * (p + p : Real)
      = (1 / (2 : Real)) * ((p : Real) + (p : Real))    since doubled
      = (p : Real) * (1 / (2 : Real) + 1 / (2 : Real))
      = (p : Real) * 1                                  since Real.divide_two_doubled
      = (p : Real)
      as halfOfDoubled;
-  calc (p : Real) * (1 / ((p + p : Natural) : Real))
-     = ((1 / (2 : Real)) * ((p + p : Natural) : Real))
-       * (1 / ((p + p : Natural) : Real))
+  calc (p : Real) * (1 / (p + p : Real))
+     = ((1 / (2 : Real)) * (p + p : Real))
+       * (1 / (p + p : Real))
            since halfOfDoubled
      = (1 / (2 : Real))
-       * (((p + p : Natural) : Real) * (1 / ((p + p : Natural) : Real)))
+       * ((p + p : Real) * (1 / (p + p : Real)))
      = (1 / (2 : Real)) * 1
            since doubledCancel
      = 1 / (2 : Real)
@@ -187,11 +187,11 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
   -- Assemble: trade ½ for the constant block, compare, and merge.
   calc Real.partialSum(Real.harmonic_term, p) + 1 / (2 : Real)
      = Real.partialSum(Real.harmonic_term, p)
-       + (p : Real) * (1 / ((p + p : Natural) : Real))
+       + (p : Real) * (1 / (p + p : Real))
            since scaledReciprocal
      = Real.partialSum(Real.harmonic_term, p)
        + Real.partialSum(
-             (j : Natural) ↦ 1 / ((p + p : Natural) : Real), p)
+             (j : Natural) ↦ 1 / (p + p : Real), p)
            since constantValue
      ≤ Real.partialSum(Real.harmonic_term, p)
        + Real.partialSum((j : Natural) ↦ Real.harmonic_term(p + j), p)
@@ -207,14 +207,14 @@ theorem Real.harmonic_doubling_growth (K : Natural)
   by_induction on K with IH {
     case base: {
         -- S(1) = 1/1 = 1, and the ladder starts at 1.
-        claim castOne : ((1 + 0 : Natural) : Real) = 1;
+        claim castOne : (1 + 0 : Real) = 1;
         claim cancel
-              : ((1 + 0 : Natural) : Real) * (1 / ((1 + 0 : Natural) : Real))
+              : (1 + 0 : Real) * (1 / (1 + 0 : Real))
                 = 1
             since Real.divide_cancel;
-        calc 1 / ((1 + 0 : Natural) : Real)
-           = 1 * (1 / ((1 + 0 : Natural) : Real))
-           = ((1 + 0 : Natural) : Real) * (1 / ((1 + 0 : Natural) : Real))
+        calc 1 / (1 + 0 : Real)
+           = 1 * (1 / (1 + 0 : Real))
+           = (1 + 0 : Real) * (1 / (1 + 0 : Real))
                  since castOne
            = 1
                  since cancel

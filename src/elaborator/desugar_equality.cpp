@@ -409,6 +409,54 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 // the ring form — so no built-in special case is needed here.
             }
         }
+        // Expected-type fallback: the operands' own types resolve no
+        // operator, but the ambient expected type E has a homogeneous
+        // registration (op, E, E) and BOTH operands coerce into E — lift
+        // them and dispatch at E. This is what lets `1 / 2` and `1 / k!`
+        // elaborate as REAL division in a Real-typed position: the
+        // operands are naturals, nothing below the fields divides, and
+        // the surrounding type is the mathematician's intent. Purely
+        // additive — this point is reached only where elaboration
+        // previously errored, so no existing dispatch changes.
+        if (targetFunction.empty() && expectedType) {
+            std::string expectedName = headConstantName(expectedType);
+            if (!expectedName.empty() && expectedName != operandTypeName) {
+                std::string registeredAtExpected = environment_.lookupOperator(
+                    operatorSymbol, expectedName, expectedName);
+                auto chainTo = [&](const std::string& from)
+                        -> std::optional<std::vector<std::string>> {
+                    if (from == expectedName) {
+                        return std::vector<std::string>{};
+                    }
+                    auto it = environment_.coercionRegistry.find(
+                        std::make_tuple(from, expectedName));
+                    if (it != environment_.coercionRegistry.end()) {
+                        return it->second;
+                    }
+                    return std::nullopt;
+                };
+                auto leftChain = chainTo(operandTypeName);
+                auto rightChain = chainTo(rightTypeName);
+                if (!registeredAtExpected.empty() && leftChain && rightChain) {
+                    leftKernel = applyCoercionChain(
+                        std::move(leftKernel), *leftChain);
+                    if (!leftChain->empty()) {
+                        leftKernel =
+                            castPushToLeaves(leftKernel, localBinders).term;
+                    }
+                    rightKernel = applyCoercionChain(
+                        std::move(rightKernel), *rightChain);
+                    if (!rightChain->empty()) {
+                        rightKernel =
+                            castPushToLeaves(rightKernel, localBinders).term;
+                    }
+                    leftTypeClosed = expectedType;
+                    operandTypeName = expectedName;
+                    rightTypeName = expectedName;
+                    targetFunction = registeredAtExpected;
+                }
+            }
+        }
         if (targetFunction.empty()) {
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' is not supported for "

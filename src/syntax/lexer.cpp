@@ -269,6 +269,9 @@ private:
             case '>':  advanceOne(); return {TokenKind::Greater,     ">", startLine, startColumn};
             case '=':  advanceOne(); return {TokenKind::Equal,       "=", startLine, startColumn};
             case '?':  advanceOne(); return {TokenKind::Question,    "?", startLine, startColumn};
+            // Reached only when the character after '!' is not '=' — the
+            // multi-char pass above already claimed "!=" as NotEqual.
+            case '!':  advanceOne(); return {TokenKind::Bang,        "!", startLine, startColumn};
         }
 
         throw LexError("Unexpected character '" + std::string(1, character)
@@ -534,6 +537,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Caret:                return "'^'";
         case TokenKind::CenterDot:            return "'·'";
         case TokenKind::InverseSuperscript:   return "'⁻¹'";
+        case TokenKind::Bang:                 return "'!'";
         case TokenKind::Less:                 return "'<'";
         case TokenKind::Greater:              return "'>'";
         case TokenKind::LessOrEqual:          return "'<=' or '≤'";

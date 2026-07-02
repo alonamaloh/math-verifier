@@ -25,28 +25,32 @@ definition Natural.factorial : Natural → Natural
   | 0     => 1
   | 1 + n => (1 + n) * Natural.factorial(n)
 
+-- The textbook postfix notation: `k!`. (`!=` still lexes as ≠, so write
+-- `k! = 1` with the usual spaces around `=`.)
+operator (!) on (Natural) := Natural.factorial
+
 -- The recurrence as a citeable equation. `Natural.add` is opaque, so
--- `factorial(1 + n)` does not reduce on its own (the argument never becomes a
+-- `(1 + n)!` does not reduce on its own (the argument never becomes a
 -- `successor`); this bridges through `one_add` so consumers cite `(n+1)! =
 -- (n+1)·n!` in `1 + n` form.
 theorem Natural.factorial_add_one (n : Natural)
-        : Natural.factorial(1 + n) = (1 + n) * Natural.factorial(n) :=
-  calc Natural.factorial(1 + n)
-     = Natural.factorial(successor(n))   by substituting Natural.one_add
-     = (1 + n) * Natural.factorial(n)
+        : (1 + n)! = (1 + n) * n! :=
+  calc (1 + n)!
+     = successor(n)!   by substituting Natural.one_add
+     = (1 + n) * n!
 
 -- Every factorial value is at least 1: by induction, the empty product is
 -- 1 and a successor times a positive number is again a successor.
 -- Automatic: the base fact the `/`-discharge walks to for 1/k! denominators.
-automatic theorem Natural.factorial_positive (n : Natural) : 1 ≤ Natural.factorial(n) :=
+automatic theorem Natural.factorial_positive (n : Natural) : 1 ≤ n! :=
   unfold Natural.add in
   by_induction on n with IH {
     case base:
         done
     case step(predecessor): {
         claim 1 ≤ 1 + predecessor since Natural.less_or_equal_add_right;
-        claim 1 ≤ Natural.factorial(predecessor) since IH;
-        claim productPositive : 1 ≤ (1 + predecessor) * Natural.factorial(predecessor)
+        claim 1 ≤ predecessor! since IH;
+        claim productPositive : 1 ≤ (1 + predecessor) * predecessor!
             since Natural.multiply_at_least_one;
         productPositive
     }
@@ -55,7 +59,7 @@ automatic theorem Natural.factorial_positive (n : Natural) : 1 ≤ Natural.facto
 -- Every 1 ≤ d ≤ n appears as a factor of n!.
 theorem Natural.divides_factorial (d n : Natural)
         (dPositive : 1 ≤ d) (dAtMost : d ≤ n)
-        : d ∣ Natural.factorial(n) :=
+        : d ∣ n! :=
   unfold Natural.add in
   by_induction on n with IH refining dAtMost {
     case base: {
@@ -71,17 +75,17 @@ theorem Natural.divides_factorial (d n : Natural)
         cases decision {
           | Or.introduceLeft(dIsTopFactor) => {
               claim (1 + predecessor)
-                    ∣ (1 + predecessor) * Natural.factorial(predecessor)
+                    ∣ (1 + predecessor) * predecessor!
                   since Natural.divides_self_multiple;
-              claim d ∣ (1 + predecessor) * Natural.factorial(predecessor)
+              claim d ∣ (1 + predecessor) * predecessor!
                   by substituting dIsTopFactor;
               done
             }
           | Or.introduceRight(dNotTopFactor) => {
               claim dAtMostPredecessor : d ≤ predecessor
                   since Natural.le_of_le_one_plus_of_ne;
-              claim d ∣ Natural.factorial(predecessor) since IH(dAtMostPredecessor);
-              claim d ∣ (1 + predecessor) * Natural.factorial(predecessor)
+              claim d ∣ predecessor! since IH(dAtMostPredecessor);
+              claim d ∣ (1 + predecessor) * predecessor!
                   since Natural.divides_multiple_left;
               done
             }
@@ -93,12 +97,11 @@ theorem Natural.divides_factorial (d n : Natural)
 -- consecutive numbers n! and n! + 1, hence divides 1.
 theorem Natural.small_divisor_of_factorial_plus_one_is_one (d n : Natural)
         (dPositive : 1 ≤ d) (dAtMost : d ≤ n)
-        (dividesFactorialPlusOne : d ∣ Natural.factorial(n) + 1)
+        (dividesFactorialPlusOne : d ∣ n! + 1)
         : d = 1 :=
   unfold Natural.add in {
-  claim d ∣ Natural.factorial(n) since Natural.divides_factorial;
-  claim successorEquation
-      : Natural.factorial(n) + 1 = successor(Natural.factorial(n));
-  claim d ∣ successor(Natural.factorial(n)) by substituting successorEquation;
+  claim d ∣ n! since Natural.divides_factorial;
+  claim successorEquation : n! + 1 = successor(n!);
+  claim d ∣ successor(n!) by substituting successorEquation;
   done since Natural.divides_consecutive_implies_one
 }
