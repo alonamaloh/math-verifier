@@ -2606,6 +2606,17 @@ private:
                 auto general = parseMultiplicative();
                 std::vector<SurfaceExpressionPointer> prefix;
                 flattenEllipsisPrefix(left, sym, prefix);
+                // Trailing `op ...` after the general term: an infinite
+                // SERIES (`1/2 + 1/4 + ... + g + ... = S`), legal only as
+                // one side of an equality.
+                if (peek().kind == op.kind
+                    && peekAt(1).kind == TokenKind::Ellipsis) {
+                    consumeAny();  // the operator
+                    consumeAny();  // '...'
+                    return makeSurfaceSeriesFold(
+                        sym, std::move(prefix), std::move(general),
+                        op.line, op.column);
+                }
                 return makeSurfaceEllipsisFold(
                     sym, std::move(prefix), std::move(general),
                     op.line, op.column);
@@ -2643,6 +2654,14 @@ private:
                 auto general = parsePower();
                 std::vector<SurfaceExpressionPointer> prefix;
                 flattenEllipsisPrefix(left, sym, prefix);
+                if (peek().kind == op.kind
+                    && peekAt(1).kind == TokenKind::Ellipsis) {
+                    consumeAny();  // the operator
+                    consumeAny();  // '...'
+                    return makeSurfaceSeriesFold(
+                        sym, std::move(prefix), std::move(general),
+                        op.line, op.column);
+                }
                 return makeSurfaceEllipsisFold(
                     sym, std::move(prefix), std::move(general),
                     op.line, op.column);

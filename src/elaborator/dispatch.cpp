@@ -1584,9 +1584,37 @@ ExpressionPointer Elaborator::elaborateExpression(
                                           expression.line,
                                           expression.column);
         }
+        if (std::get_if<SurfaceSeriesFold>(&expression.node)) {
+            throwElaborate(
+                "an infinite series may only appear as one full side of "
+                "an equality (`t1 + t2 + ... + g + ... = S` or "
+                "`... = infinity`); series in term position and series "
+                "inequalities are not supported in this version");
+        }
         if (auto* binary =
                 std::get_if<SurfaceBinaryOperation>(&expression.node)) {
             if (binary->opSymbol == "=") {
+                // A series on one side: the whole relation is a
+                // convergence proposition (A8 step 6).
+                auto* leftSeries =
+                    std::get_if<SurfaceSeriesFold>(&binary->left->node);
+                auto* rightSeries =
+                    std::get_if<SurfaceSeriesFold>(&binary->right->node);
+                if (leftSeries && rightSeries) {
+                    throwElaborate(
+                        "a series may appear on only one side of the "
+                        "relation");
+                }
+                if (leftSeries) {
+                    return elaborateSeriesRelation(
+                        *leftSeries, binary->right, localBinders,
+                        expectedType, expression.line, expression.column);
+                }
+                if (rightSeries) {
+                    return elaborateSeriesRelation(
+                        *rightSeries, binary->left, localBinders,
+                        expectedType, expression.line, expression.column);
+                }
                 // Desugar `a = b` to `Equality.{u}(typeOfA, a, b)`.
                 // The inferred type may contain Internal-origin FreeVars
                 // introduced by our opening; close them back so the
@@ -2810,7 +2838,8 @@ ExpressionPointer Elaborator::elaborateEllipsisFold(
             }
             throwElaborate(
                 "ambiguous ellipsis: " + listing + " all generate the "
-                "written prefix — write the explicit form "
+                "written prefix — write one more prefix term to pin the "
+                "start, or use the explicit form "
                 "(sum k from LO to HI of BODY)");
         }
         if (identityReadingLo && survivors.empty()) {
@@ -2849,7 +2878,8 @@ ExpressionPointer Elaborator::elaborateEllipsisFold(
             }
             throwElaborate(
                 "ambiguous ellipsis: " + listing + " all generate the "
-                "written prefix — write the explicit form "
+                "written prefix — write one more prefix term to pin the "
+                "start, or use the explicit form "
                 "(sum k from LO to HI of BODY)");
         }
         throwElaborate(
@@ -2863,4 +2893,145 @@ ExpressionPointer Elaborator::elaborateEllipsisFold(
                                        : "\n    " + mismatchDetail)
             + "\n    Write the explicit form "
             "(sum k from LO to HI of BODY)");
+    }
+
+ExpressionPointer Elaborator::elaborateSeriesRelation(
+        const SurfaceSeriesFold& series,
+        const SurfaceExpressionPointer& otherSide,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this, "series relation (… " + series.operatorSymbol
+                    + " ... = …) at line " + std::to_string(line));
+        if (series.operatorSymbol != "+") {
+            throwElaborate(
+                "series relations are defined for `+` (sums at Real) in "
+                "this version; found `" + series.operatorSymbol + "`");
+        }
+        size_t k = series.prefixTerms.size();
+        const SurfaceExpressionPointer& last = series.prefixTerms[k - 1];
+        const SurfaceExpressionPointer& general = series.generalTerm;
+
+        // Fresh index and partial-fold-count names.
+        std::vector<std::string> usedNames;
+        collectSurfaceIdentifiers(general, usedNames);
+        for (const auto& term : series.prefixTerms) {
+            collectSurfaceIdentifiers(term, usedNames);
+        }
+        for (const auto& binder : localBinders) {
+            usedNames.push_back(binder.name);
+        }
+        auto isUsed = [&](const std::string& candidate) {
+            for (const auto& name : usedNames) {
+                if (name == candidate) return true;
+            }
+            return false;
+        };
+        std::string indexName = "k";
+        for (int suffix = 0; isUsed(indexName); ++suffix) {
+            indexName = "k" + std::to_string(suffix);
+        }
+        std::string countName = "N";
+        for (int suffix = 0;
+             isUsed(countName) || countName == indexName; ++suffix) {
+            countName = "N" + std::to_string(suffix);
+        }
+
+        // Recognition: mechanism 1 (structural anchors) only in this
+        // version — the series' index is typically a display-only letter
+        // with no binding, so the probe's in-scope-candidate story does
+        // not apply.
+        std::vector<std::pair<SurfaceExpressionPointer,
+                              SurfaceExpressionPointer>> pairs;
+        SurfaceExpressionPointer fBody = surfaceAntiUnify(
+            last, general, indexName, pairs);
+        bool consistent = !pairs.empty();
+        for (size_t i = 1; i < pairs.size() && consistent; ++i) {
+            consistent = surfaceStructurallyEqual(pairs[i].first,
+                                                  pairs[0].first)
+                && surfaceStructurallyEqual(pairs[i].second,
+                                            pairs[0].second);
+        }
+        if (!consistent) {
+            throwElaborate(
+                "could not read the series: the general term `"
+                + surfaceToDisplayString(general)
+                + "` does not anti-unify with the last written term `"
+                + surfaceToDisplayString(last)
+                + "` at one consistent position. Spell the terms so the "
+                "index positions line up (e.g. `1/2 + 1/4 + ... + "
+                "1/Real.power(k, 2) + ...` with explicit prefix "
+                "spellings)");
+        }
+        // lo := lastIndex − (k − 1), and only literal 0/1 in this version
+        // (those are the monus-free partial-fold counts).
+        SurfaceExpressionPointer lo;
+        const SurfaceExpressionPointer& lastIndex = pairs[0].first;
+        if (k == 1) {
+            lo = lastIndex;
+        } else if (auto lastValue = surfaceNumeralValue(lastIndex)) {
+            if (*lastValue >= k - 1) {
+                lo = makeSurfaceNumericLiteral(
+                    std::to_string(*lastValue - (k - 1)), line, column);
+            }
+        }
+        auto loValue = lo ? surfaceNumeralValue(lo) : std::nullopt;
+        if (!loValue || *loValue > 1) {
+            throwElaborate(
+                "series lower bounds are literal 0 or 1 in this version "
+                "(the display's first term must sit at index 0 or 1)");
+        }
+        // Verify the earlier written terms at Real.
+        ExpressionPointer realType = makeConstant("Real");
+        for (size_t i = 0; i + 1 < k; ++i) {
+            SurfaceExpressionPointer expected = substituteSurfaceIdentifier(
+                fBody, indexName,
+                makeSurfaceNumericLiteral(std::to_string(*loValue + i),
+                                          line, column));
+            if (!ellipsisTermsMatch(series.prefixTerms[i], expected,
+                                     realType, localBinders)) {
+                throwElaborate(
+                    "the series' general term does not generate the "
+                    "written prefix: term " + std::to_string(i + 1)
+                    + " should be `" + surfaceToDisplayString(expected)
+                    + "` but the display has `"
+                    + surfaceToDisplayString(series.prefixTerms[i]) + "`");
+            }
+        }
+        // Target predicate.
+        bool toInfinity = false;
+        if (auto* identifier =
+                std::get_if<SurfaceIdentifier>(&otherSide->node)) {
+            toInfinity = identifier->qualifiedName == "infinity"
+                || identifier->qualifiedName == "∞";
+        }
+        const char* target = toInfinity
+            ? "Real.TendsToInfinity" : "Real.SequenceConverges";
+        if (!environment_.lookup(target)) {
+            throwElaborate(std::string("a series relation elaborates to `")
+                + target + "` — import "
+                + (toInfinity ? "Real.limits" : "Real.convergence"));
+        }
+        // λ(N : Natural). the partial fold of N terms: at lo = 1 the
+        // inclusive binder-form upper bound N gives count N; at lo = 0
+        // the half-open `N - 1` does.
+        SurfaceExpressionPointer hi = *loValue == 1
+            ? makeSurfaceIdentifier(countName, {}, line, column)
+            : makeSurfaceBinaryOperation(
+                  "-", makeSurfaceIdentifier(countName, {}, line, column),
+                  makeSurfaceNumericLiteral("1", line, column),
+                  line, column);
+        SurfaceExpressionPointer foldSurface = makeSurfaceFoldBinder(
+            series.operatorSymbol, indexName, lo, hi, fBody, line, column);
+        SurfaceBinder countBinder{
+            {countName},
+            makeSurfaceIdentifier("Natural", {}, line, column), false};
+        SurfaceExpressionPointer sequence = makeSurfaceLambda(
+            countBinder, foldSurface, line, column);
+        std::vector<SurfaceExpressionPointer> arguments{sequence};
+        if (!toInfinity) arguments.push_back(otherSide);
+        SurfaceExpressionPointer call = makeSurfaceApplication(
+            makeSurfaceIdentifier(target, {}, line, column),
+            std::move(arguments), line, column);
+        return elaborateExpression(*call, localBinders, expectedType);
     }

@@ -1,0 +1,56 @@
+-- Feature test: trailing-ellipsis series relations (A8 step 6, §6 v1).
+--
+--   t₁ + t₂ + ... + g + ... = S           SequenceConverges of partial folds
+--   t₁ + t₂ + ... + g + ... = infinity    TendsToInfinity
+--
+-- The display recognizes like step 4 (mechanism 1, Real carrier,
+-- lo ∈ {0,1}); the relation elaborates to a convergence proposition on
+-- λN. Algebra.Fold(Real, +, 0, f, lo, N) — definitionally the library's
+-- partial-sum form, so hypotheses in either spelling interchange.
+
+module Test.series_relation_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.monus
+import Algebra.monoid
+import Algebra.aggregation
+import Rational.basics
+import Rational.embedding
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.order
+import Real.absolute_value
+import Real.power
+import Real.sequence
+import Real.convergence
+import Real.series
+import Real.limits
+
+-- Convergence shape at lo = 0: the desugared proposition is defeq to
+-- SeriesConverges of the term function (partialSum = the same fold).
+theorem Test.series_shape (S : Real)
+        (h : Real.SeriesConverges((k : Natural) ↦ Real.power(2, k), S))
+        : Real.power(2, 0) + Real.power(2, 1) + ... + Real.power(2, k) + ... = S :=
+  h
+
+-- And back: the notation proves the library-spelled proposition.
+theorem Test.series_shape_back (S : Real)
+        (h : Real.power(2, 0) + Real.power(2, 1) + ... + Real.power(2, k) + ... = S)
+        : Real.SeriesConverges((k : Natural) ↦ Real.power(2, k), S) :=
+  h
+
+-- Divergence shape at lo = 1.
+theorem Test.divergence_shape
+        (h : Real.TendsToInfinity(
+                 (N : Natural) ↦
+                     Algebra.Fold(Real, Real.add, Real.zero,
+                         (k : Natural) ↦ Real.power(2, k), 1, N)))
+        : Real.power(2, 1) + Real.power(2, 2) + ... + Real.power(2, k) + ... = infinity :=
+  h

@@ -494,8 +494,26 @@ of them; the explicit binder form is always the escape hatch.
   `1 + 2 + ... + n` displays three terms but denotes the fold over
   `1 … n`, which at `n = 1` has one term and at `n = 0` is empty
   (the operation's identity).
-- Ellipsis over relations (`a(1) ≤ ... ≤ a(n)`), descending ranges,
-  and trailing-ellipsis series are not in this version.
+- Ellipsis over relations (`a(1) ≤ ... ≤ a(n)`) and descending ranges
+  are not in this version.
+
+### Series relations
+
+```
+Real.power(2, 0) + Real.power(2, 1) + ... + Real.power(2, k) + ... = S
+t₁ + t₂ + ... + g + ... = infinity
+```
+
+A trailing `+ ...` makes the display an **infinite series**, legal
+only as one full side of an equality. The relation elaborates to a
+convergence proposition on the partial folds —
+`Real.SequenceConverges(λN. Σ_{first N terms}, S)`, definitionally
+the library's `SeriesConverges`/`partialSum` spelling — or
+`Real.TendsToInfinity(…)` when the other side is `infinity` (a
+contextual keyword, never a term). This version: sums at Real, first
+term at index 0 or 1, recognition by the structural mechanism (spell
+the prefix so the index positions line up). Series in term position
+and series inequalities are errors.
 
 ## Common mistakes and how to avoid them
 

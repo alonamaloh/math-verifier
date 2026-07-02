@@ -1156,6 +1156,18 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // A series relation `t₁ op … op g op ... = S` (A8 step 6, §6 v1):
+    // recognize (index, f, lo) from the display (mechanism 1, Real
+    // carrier, lo ∈ {0, 1}), and elaborate to
+    // Real.SequenceConverges(λN. partial folds, S) — or
+    // Real.TendsToInfinity(λN. …) when the other side is `infinity`.
+    ExpressionPointer elaborateSeriesRelation(
+        const SurfaceSeriesFold& series,
+        const SurfaceExpressionPointer& otherSide,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
     // True when the two elaborated carrier elements agree: kernel defeq,
     // else both ground-evaluate to the same Natural. Used by the ellipsis
     // recognizer's prefix verification.

@@ -191,6 +191,17 @@ struct SurfaceEllipsisFold {
     SurfaceExpressionPointer generalTerm;
 };
 
+// Trailing-ellipsis series (A8 step 6, §6 v1): `t₁ op … op g op ...` —
+// an infinite series. Legal ONLY as one full side of an equality; the
+// relation elaborates to Real.SequenceConverges(partial folds, S) or,
+// with `infinity` on the other side, Real.TendsToInfinity. Anywhere
+// else this node is the §9 term-position error.
+struct SurfaceSeriesFold {
+    std::string operatorSymbol;
+    std::vector<SurfaceExpressionPointer> prefixTerms;
+    SurfaceExpressionPointer generalTerm;
+};
+
 // The explicit fold binder form (A8 step 2):
 //   `sum k from LO to HI of BODY`        — operatorSymbol "+"
 //   `product k from LO to HI of BODY`    — operatorSymbol "*"
@@ -557,7 +568,7 @@ struct SurfaceExpression {
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation, SurfaceFoldBinder,
-        SurfaceEllipsisFold,
+        SurfaceEllipsisFold, SurfaceSeriesFold,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
         SurfaceRing, SurfaceGroup, SurfaceField, SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
@@ -664,6 +675,16 @@ inline SurfaceExpressionPointer makeSurfaceBinaryOperation(
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceBinaryOperation{std::move(opSymbol),
                                 std::move(left), std::move(right)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceSeriesFold(
+    std::string operatorSymbol,
+    std::vector<SurfaceExpressionPointer> prefixTerms,
+    SurfaceExpressionPointer generalTerm, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceSeriesFold{std::move(operatorSymbol),
+                           std::move(prefixTerms),
+                           std::move(generalTerm)},
         line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceEllipsisFold(

@@ -30,6 +30,16 @@ ExpressionPointer Elaborator::elaborateIdentifier(
         const Declaration* environmentDeclaration =
             environment_.lookup(identifier.qualifiedName);
         if (!isCurrentDeclaration && !environmentDeclaration) {
+            // §9 error 7: `infinity` is a contextual keyword, legal only
+            // as the other side of a trailing-ellipsis series relation.
+            if (identifier.qualifiedName == "infinity"
+                || identifier.qualifiedName == "∞") {
+                throwElaborate(
+                    "'" + identifier.qualifiedName + "' is only legal as "
+                    "the right-hand side of a series relation "
+                    "(t1 + t2 + ... + g + ... = infinity); it is not a "
+                    "term");
+            }
             std::string message =
                 "unknown identifier '" + identifier.qualifiedName
                 + "' at line " + std::to_string(line)
