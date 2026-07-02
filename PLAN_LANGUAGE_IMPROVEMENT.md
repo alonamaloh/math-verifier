@@ -330,6 +330,347 @@ needed.
 
 ---
 
+### A8. Ellipsis notation for folds and series
+
+(Contributed 2026-07-02; specified to implementation depth.) The
+one-sentence summary: **the general term is the definition; the
+prefix terms are verification.** Everything else follows from taking
+that sentence seriously.
+
+#### 1. Motivation
+
+Mathematicians write `1 + 2 + ... + n = n(n+1)/2`, not
+`Fold(+, identity, 1, n, λk. k) = n(n+1)/2`. Blackboard ellipsis is
+normally too ambiguous to formalize (`2, 4, 8, ...` — powers of two or
+even numbers?), but a small discipline removes the ambiguity entirely:
+the term after the ellipsis, written with an explicit variable, IS the
+general term; the concrete terms before the ellipsis exist only so a
+reader (and the elaborator) can confirm they instantiate it. Under
+that rule the notation is not a heuristic — it is a deterministic
+surface form for an ordinary fold, and it can appear in statements,
+in calc chains, in goals, and in printed output.
+
+A trailing ellipsis extends the notation to infinite series
+(`1/2 + 1/4 + ... + 1/2^n + ...` — the limit of the partial folds).
+This is a genuine semantic extension, not sugar, and is treated
+separately in §6.
+
+#### 2. Surface syntax
+
+##### 2.1 Finite folds
+
+```
+<t₁> <op> <t₂> [<op> <t₃>] <op> ... <op> <general>
+```
+
+- `<op>` is one binary operation, the same at every position,
+  drawn from the registered fold-capable operations (§4). Mixed
+  operators in one ellipsis expression are a parse error.
+- `<t₁> … <tₖ>` are the **prefix terms**: concrete expressions, at
+  least one, typically two or three. They contain no occurrence of
+  the index variable.
+- `...` is a literal token (also accept the Unicode ellipsis `…`).
+- `<general>` is the **general term**: an expression containing at
+  least one variable that does not occur in the prefix terms. It is
+  the anchor of the whole notation.
+
+Examples that must parse and elaborate:
+
+```
+1 + 2 + ... + n
+1 + 2 + 3 + ... + n
+2 + 4 + ... + 2 * n
+1 + 3 + 5 + ... + (2 * n - 1)
+1 * 2 * ... * n                       -- factorial as a fold
+f(1) + f(2) + ... + f(n)
+1/1 + 1/2 + ... + 1/n                 -- general term 1/n, index n itself
+a(0) + a(1) + ... + a(n)              -- starting index 0
+x + x^2 + ... + x^n                   -- index in the exponent
+```
+
+##### 2.2 Infinite series (trailing ellipsis)
+
+```
+<t₁> <op> <t₂> <op> ... <op> <general> <op> ...
+```
+
+Same shape, with a final `<op> ...` after the general term. See §6
+for the (restricted) contexts where this form is legal.
+
+##### 2.3 The explicit form
+
+The ellipsis form is sugar over an explicit surface form, which must
+exist independently — as the escape hatch when inference fails or is
+ambiguous, and as the documented meaning of the sugar:
+
+```
+sum k from 1 to n of f(k)
+product k from 1 to n of f(k)
+fold (<op>) k from i₀ to n of f(k)      -- general registered op
+```
+
+(Exact keyword spelling is a surface decision for the implementer to
+propose; the requirement is that an explicit binder form exists, is
+documented in LANGUAGE.md, and that the ellipsis form is defined by
+translation into it.)
+
+#### 3. Recognition and elaboration algorithm
+
+Given a parsed ellipsis expression with prefix terms `t₁ … tₖ`,
+operator `op`, and general term `g`:
+
+**Step 1 — identify the index variable.** Collect the variables
+occurring in `g` that do not occur in any prefix term. Each such
+variable `v` is a **candidate index**. (Variables shared with the
+prefix are parameters, e.g. `x` in `x + x^2 + ... + x^n`.)
+
+**Step 2 — abstract the general term.** For each candidate `v`,
+let `f_v := λ v. g`.
+
+**Step 3 — solve for the starting index.** Find `i₀` such that
+`f_v(i₀)` is definitionally/ground-evaluation equal to `t₁`
+(tier-1 defeq, then tier-2 evaluation; see §7 on why this is cheap).
+Search strategy: try to solve syntactically first — if `g` is `v`
+itself, `i₀ = t₁`; if `g` mentions `v` once, invert the arithmetic
+around it when the inversion is exact; otherwise fall back to trying
+small candidate values `i₀ ∈ {0, 1, 2, t₁-adjacent values}` by
+evaluation. If no `i₀` is found for a candidate `v`, that candidate
+is eliminated.
+
+**Step 4 — verify the remaining prefix.** Check
+`f_v(i₀ + 1) ≡ t₂`, `f_v(i₀ + 2) ≡ t₃`, … by ground evaluation. Any
+mismatch eliminates the candidate. This is the "prefix terms must
+match the shape of the general term" rule, enforced mechanically.
+
+**Step 5 — ambiguity check.** If exactly one candidate `(v, i₀)`
+survives, elaborate to `Fold(op, λv. g, i₀, upperBound)` where
+`upperBound` is the general term's index position evaluated at the
+top — i.e. the fold runs `v` from `i₀` to the value that makes
+`f_v(v)` equal the written general term, which is `v` itself as
+written (the general term is literally the last term, so the upper
+bound is the written index expression; when the index appears
+compositely, the upper bound is the index variable's own range end —
+see §3.1). If **zero** candidates survive: error, "ellipsis general
+term does not generate the prefix", showing `f(i₀)`, `f(i₀+1)` for
+the nearest-miss candidate next to the written prefix terms. If
+**two or more** survive: error, "ellipsis is ambiguous between index
+⟨v₁⟩ and ⟨v₂⟩; write the explicit form", per the house principle
+that ambiguity is a loud error, never a silent pick.
+
+##### 3.1 Upper bound, precisely
+
+The written general term is the fold's **last term**, so the fold's
+range is `v = i₀ … V` where `V` is the value of the index variable as
+it appears free in the surrounding statement. Concretely: in
+`1 + 2 + ... + n`, the index variable is `n` itself and the range is
+`1 … n`. In `1 + 3 + ... + (2*m - 1)`, the index variable is `m`, the
+range is `1 … m`, and the term function is `λm. 2m − 1` — note the
+**stride comes for free**: no stride-inference machinery exists or is
+needed, because anchoring on the general term makes "odd numbers" a
+term function over a unit-step index. Implementers must NOT add
+consecutive-difference stride guessing; it reintroduces exactly the
+ambiguity this design eliminates.
+
+##### 3.2 Degenerate ranges
+
+The displayed prefix does not constrain the range. `1 + 2 + ... + n`
+shows three terms but denotes `Fold(+, id, 1, n)`, which is
+meaningful at `n = 1` (one term) and `n = 0` (empty fold = the
+operation's identity, so `0`, and the identity `0 = 0·1/2` still
+holds). Document this in LANGUAGE.md — it occasionally surprises —
+and make the pretty-printer's behavior at small symbolic ranges
+consistent (§8).
+
+#### 4. Elaboration target and library work
+
+The ground-truth form is a single generic fold over a registered
+operation:
+
+- `Fold(op, identity, f, i₀, N)` — library definition, generic over
+  the carrier, defined by recursion on the range length. Build on the
+  existing `Algebra/aggregation.math` machinery; `Real.partialSum` /
+  `Real.partialProduct` and friends should be redefined as (or proved
+  equal to) instances of it so the whole library speaks one fold.
+- **Fold-capable operation registry.** An operation qualifies by
+  registering (op, identity, associativity proof). `+` and `*` on
+  each numeric carrier register at instance-declaration time.
+  Registration without an identity/associativity certificate is an
+  error. Two registrations for the same operator symbol on the same
+  carrier: declaration-time error (canonical, never searched).
+- **Characterizing lemmas, registered in the rewrite index** — this
+  is what makes the notation usable in proofs rather than merely
+  pretty in statements:
+  - `Fold(op, f, i₀, i₀) = f(i₀)` (singleton)
+  - `Fold(op, f, i₀, N+1) = Fold(op, f, i₀, N) op f(N+1)` (peel last)
+  - `Fold(op, f, i₀, N) = f(i₀) op Fold(op, f, i₀+1, N)` (peel first)
+  - `Fold(op, f, i₀, i₀−1) = identity` (empty range, however ranges
+    are represented)
+  - index-shift / split-range lemmas as needed by the library.
+
+  With these in the index, the calc step every induction proof needs
+  closes by-less. **Acceptance test** (must verify with no `since` on
+  the first step):
+
+  ```
+  1 + 2 + ... + (n + 1)
+     = (1 + 2 + ... + n) + (n + 1)
+     = n * (n + 1) / 2 + (n + 1)        -- IH, statement-addressable
+     = (n + 1) * (n + 2) / 2            -- ring
+  ```
+
+  The proof reads in the same notation as the statement. That is the
+  whole payoff; if this calc needs annotations, the feature has
+  failed its purpose.
+
+#### 5. Where the notation may appear
+
+Finite ellipsis folds are ordinary terms: legal in theorem
+statements, definitions, calc steps, `suppose` headers, anywhere a
+term of the carrier type is legal. They are pure sugar — no
+proposition is generated by the notation itself beyond the shape
+verification at elaboration time (which is a compile-time check, not
+a proof obligation).
+
+#### 6. Trailing ellipsis: infinite series
+
+A trailing `<op> ...` changes the meaning from a value to a **limit
+of partial folds**, and limits are partial — `1/2 + 1/4 + ... +
+1/2^n + ...` has a value; `1 + 1/2 + ... + 1/n + ...` does not. To
+keep partiality out of the term language, version 1 restricts the
+form:
+
+**Rule: an infinite-series expression is legal only as one full side
+of a relation, and the whole relation elaborates as a proposition.**
+
+- `t₁ op … op g op ... = S` elaborates to
+  `ConvergesTo(λN. Fold(op, f, i₀, N), S)`.
+- `t₁ op … op g op ... = infinity` elaborates to
+  `TendsToInfinity(λN. Fold(op, f, i₀, N))`.
+  `infinity` (and `∞`) is a **contextual keyword** legal only in this
+  position; it is never a term of Real, and using it elsewhere is a
+  parse error with a message saying so.
+- Both target predicates are library definitions on sequences
+  (`Real/sequence.math` has the substrate; `eventually` from A6 is
+  the natural vocabulary for their definitions).
+- Consequences of the restriction, stated so the implementer doesn't
+  "fix" them: `(1/2 + 1/4 + ...) + 1` is illegal in v1 (no series in
+  term position); `... = S` with `S` itself a series is illegal
+  (one side only); inequalities `t₁ + ... + g + ... ≤ B` MAY be
+  supported as `∀N. Fold(...) ≤ B`-style or via a limit predicate —
+  **DECIDE** which reading, or reject in v1.
+
+**Deferred (v2):** series in term position via an elaborator-emitted
+convergence side condition, discharged by a tier-4 judgment family
+(`ConvergesTo` rules keyed by the head symbol of the term function:
+geometric, p-series with p > 1, comparison against a registered
+majorant). This slots into the Part-B rule index design unchanged —
+`(ConvergesTo, power)` etc. — but requires the sum-of-series algebra
+(limit of sum = sum of limits) to be in the library first. Do not
+build in v1.
+
+#### 7. Interaction with the rest of the plan
+
+- **Tier-2 dependency.** Steps 3–4 of the recognition algorithm are
+  ground evaluation — precisely Part B's tier 2. Implement B1/B2's
+  evaluation tier before this feature; the shape check then costs
+  nearly nothing and shares its code.
+- **Rewrite index (B2/B4).** The characterizing lemmas of §4 register
+  exactly like any other rewrite/monotonicity lemma. No new index
+  machinery.
+- **Keyword-free calc (A1).** Ellipsis terms inside relation chains
+  must parse unambiguously: the chain separators are the relations
+  (`=`, `≤`, …) and the ellipsis operator is arithmetic (`+`, `*`),
+  so there is no grammar conflict, but add parser tests for an
+  ellipsis fold as a calc endpoint on both sides.
+- **Statement-addressable facts (A2).** A fact stated with ellipsis
+  notation and the same fact stated with explicit `Fold` must be the
+  same fact for context lookup — guaranteed if the sugar desugars at
+  parse/elaboration time and hashing happens on kernel terms (it
+  does).
+- **`--explain` / errors (C2).** Every error from §3 must show the
+  candidate term function and the evaluated prefix side by side.
+
+#### 8. Printing (round-trip)
+
+Goals, errors, and `--explain` output involving `Fold` should print
+in ellipsis form whenever a faithful rendering exists — users write
+in this notation and must not debug in another one. Printing rule:
+render `Fold(op, λv. g, i₀, N)` as `g[v↦i₀] op g[v↦i₀+1] op ... op
+g[v↦N]` with the first two terms ground-evaluated for display, i.e.
+`1 + 2 + ... + n`, provided the evaluated prefix terms are small
+literals; otherwise fall back to the explicit binder form. Never
+print a prefix the recognizer of §3 would not re-accept
+(round-trip property: parse(print(e)) elaborates to e). Add a
+round-trip test over the library's fold expressions.
+
+#### 9. Errors (all must exist, with these shapes)
+
+1. Mixed operators: "ellipsis requires a single operation; found `+`
+   and `*`".
+2. No index candidate: "general term contains no variable absent
+   from the prefix; write the explicit form".
+3. Prefix mismatch: "general term `2*k` with start `k = 1` generates
+   `2, 4, 6, ...` but the prefix is `2, 4, 7`" — show generated vs
+   written.
+4. Ambiguity: "ambiguous between index `m` (start 1) and index `j`
+   (start 0); write the explicit form" — list every surviving
+   candidate.
+5. Unregistered operation: "`⊕` is not registered as fold-capable;
+   register (op, identity, associativity) or use explicit recursion".
+6. Series in term position (v1): "an infinite series may only appear
+   as one side of a relation".
+7. `infinity` outside a series relation: "'infinity' is only legal as
+   the right-hand side of a series relation".
+
+#### 10. Non-goals for v1 (do not build)
+
+- Stride inference from consecutive differences (§3.1 — the general
+  term already carries the stride).
+- Series in term position; algebra on series expressions (§6, v2).
+- Double/nested ellipses (`(1+..+n) * (1+..+m)` is fine — two
+  independent folds — but `a(1,1) + ... + a(n,m)` matrix-style is
+  out).
+- Ellipsis over **relations** (`a(1) ≤ a(2) ≤ ... ≤ a(n)` as sugar
+  for a monotonicity ∀). This is a genuinely good future feature and
+  composes with B4, but it elaborates to a ∀-statement, not a fold —
+  a separate plan item, not a rider on this one.
+- Descending ranges (`n + (n-1) + ... + 1`). Reasonable v2; needs a
+  direction rule in §3; reject with a clear message in v1.
+
+#### 11. Suggested implementation order
+
+1. Generic `Fold` + operation registry + characterizing lemmas in the
+   library; re-express `partialSum`/`partialProduct`/`aggregation`
+   over it. (Pure library work; independently valuable.)
+2. Explicit binder form (`sum k from … to … of …`) in the surface
+   language, elaborating to `Fold`.
+3. Register characterizing lemmas in the rewrite index; make the §4
+   acceptance calc close by-less **using the explicit form**.
+4. Ellipsis recognizer (§3) desugaring to the explicit form; error
+   suite of §9.
+5. Printer round-trip (§8).
+6. Trailing-ellipsis series relations (§6 v1).
+
+Each step lands with LANGUAGE.md/reference.md updates and a
+`library/Test/` feature file, per C4.
+
+#### 12. Acceptance criteria
+
+- `theorem Natural.triangular_sum : (n : Natural) → 1 + 2 + ... + n =
+  n * (n + 1) / 2` states, and its induction proof's peel-last calc
+  step closes with no `since` (§4).
+- `1 * 2 * ... * n` proves equal to `factorial(n)` by induction with
+  the same by-less peel step.
+- `1/1 + 1/2 + ... + 1/n + ... = infinity` states and elaborates to
+  `TendsToInfinity` of the harmonic partial sums (proving it is
+  library work, not part of this feature's acceptance — and the
+  library already proves harmonic divergence, so the existing theorem
+  can be restated in the new notation as the test).
+- Every error in §9 is exercised by an `ErrorTest/` file.
+- Round-trip test passes over all fold expressions in the library.
+
+---
+
 ## Part B — the auto-prover: tiered, deterministic discharge
 
 **Constraint (hard-won):** global search over imported theorems was
@@ -793,6 +1134,11 @@ down.
    eliminator export and the unified `by cases` land as one design;
    Phase 3 (`Natural`) comes after the A-construct sweep so the bulk
    is touched once (C6 cost model).
+10. **A8** (ellipsis folds/series): its steps 1–3 (generic `Fold` +
+    registry + characterizing lemmas, explicit binder form) are
+    independently valuable and can start any time; the ellipsis
+    recognizer waits for the tier-2 evaluator (step 2 above), and the
+    series relations (§6) wait for A6 (step 7).
 
 ## Reference target
 
