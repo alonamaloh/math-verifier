@@ -111,6 +111,95 @@ import ComplexNumber.series
 import ComplexNumber.binomial_theorem
 
 -- ----------------------------------------------------------------------
+-- The coefficient identity at ℚ: 1/(i+d)! · C(i+d, i) = 1/i! · 1/d!.
+-- The cast of `Natural.binomial_factorial` clears all denominators.
+-- (Kept at the ℚ layer for this file's reciprocal-based coefficients;
+-- the Real series now use honest `/` and Real.binomial_reciprocal_split.)
+theorem Rational.binomial_reciprocal_split (i d : Natural)
+        : Rational.reciprocal_function((Natural.factorial(i + d) : Rational)) * (Natural.binomial(i + d, i) : Rational)
+          = Rational.reciprocal_function((Natural.factorial(i) : Rational))
+            * Rational.reciprocal_function((Natural.factorial(d) : Rational)) := {
+  -- The closed form, cast into ℚ.
+  claim castSplit
+      : (Natural.binomial(i + d, i) : Rational)
+            * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+        = (Natural.factorial(i + d) : Rational)
+      by calc (Natural.binomial(i + d, i) : Rational)
+                  * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+            = (Natural.binomial(i + d, i) : Rational)
+                  * ((Natural.factorial(i) * Natural.factorial(d) : Natural) : Rational)
+                  by Rational.from_natural_multiply_preserves(Natural.factorial(i), Natural.factorial(d))
+            = ((Natural.binomial(i + d, i) * (Natural.factorial(i) * Natural.factorial(d)) : Natural) : Rational)
+                  by Rational.from_natural_multiply_preserves(
+                         Natural.binomial(i + d, i), Natural.factorial(i) * Natural.factorial(d))
+            = ((Natural.factorial(i + d) : Natural) : Rational)
+                  by Natural.binomial_factorial(i, d);
+  -- All three factorial casts are positive, hence nonzero.
+  claim Rational.zero < (Natural.factorial(i) : Rational) since Rational.factorial_cast_positive;
+  claim ¬(Rational.zero = (Natural.factorial(i) : Rational)) since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(i) : Rational) = Rational.zero);
+  claim Rational.zero < (Natural.factorial(d) : Rational) since Rational.factorial_cast_positive;
+  claim ¬(Rational.zero = (Natural.factorial(d) : Rational)) since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(d) : Rational) = Rational.zero);
+  claim Rational.zero < (Natural.factorial(i + d) : Rational) since Rational.factorial_cast_positive;
+  claim ¬(Rational.zero = (Natural.factorial(i + d) : Rational)) since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(i + d) : Rational) = Rational.zero);
+  claim Rational.zero < (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)
+      since Rational.multiply_positive_positive;
+  claim ¬(Rational.zero = (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+      since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational) = Rational.zero);
+  -- The cancellations.
+  claim productCancel
+      : ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+            * Rational.reciprocal_function((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+        = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  claim wholeCancel
+      : (Natural.factorial(i + d) : Rational)
+            * Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+        = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  claim recipProduct
+      : Rational.reciprocal_function((Natural.factorial(i) : Rational))
+            * Rational.reciprocal_function((Natural.factorial(d) : Rational))
+        = Rational.reciprocal_function((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+      since Rational.reciprocal_function_product;
+  -- Multiply by 1 = (i!·d!)·(1/(i!·d!)), absorb the closed form, cancel.
+  calc Rational.reciprocal_function((Natural.factorial(i + d) : Rational)) * (Natural.binomial(i + d, i) : Rational)
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * ((Natural.binomial(i + d, i) : Rational) * Rational.one)
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * ((Natural.binomial(i + d, i) : Rational)
+                  * (((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+                         * Rational.reciprocal_function(
+                               (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))))
+           since productCancel
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * (((Natural.binomial(i + d, i) : Rational)
+                   * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)))
+                  * Rational.reciprocal_function(
+                        (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)))
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * ((Natural.factorial(i + d) : Rational)
+                  * Rational.reciprocal_function(
+                        (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)))
+           since castSplit
+     = ((Natural.factorial(i + d) : Rational)
+            * Rational.reciprocal_function((Natural.factorial(i + d) : Rational)))
+           * Rational.reciprocal_function(
+                 (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+     = Rational.one
+           * Rational.reciprocal_function(
+                 (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+           since wholeCancel
+     = Rational.reciprocal_function((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+     = Rational.reciprocal_function((Natural.factorial(i) : Rational))
+           * Rational.reciprocal_function((Natural.factorial(d) : Rational))
+           since recipProduct
+}
+
+-- ----------------------------------------------------------------------
 -- The k-th exponential term at z + w is the k-th Cauchy-product
 -- diagonal of the two series. The coefficient identity is the rational
 -- fact Rational.binomial_reciprocal_split, carried into ℂ through the

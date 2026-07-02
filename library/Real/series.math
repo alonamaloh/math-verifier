@@ -37,7 +37,7 @@ import Rational.triangle_more
 import Rational.positive
 import Rational.linearity
 import Rational.reciprocal
-import Rational.reciprocal_function
+import Rational.division
 import Rational.archimedean
 import Rational.power
 import Algebra.ring_lemmas
@@ -154,32 +154,28 @@ theorem Real.geometric_series_converges
              ≤ abs(L)                       since absLNonneg
              < ((B + Rational.one) : Real)  since absStrictRoof;
           claim B + Rational.one > Rational.zero since Rational.to_real.LessThan_reflects;
+          claim roofNonzero : B + Rational.one ≠ Rational.zero;
           -- The scaled tolerance ε/(B + 1), and the decay tail below it.
-          claim Rational.reciprocal_function(B + Rational.one) > Rational.zero
-              since Rational.reciprocal_function_positive_of_positive;
-          claim ε * Rational.reciprocal_function(B + Rational.one) > Rational.zero;
+          claim ε / (B + Rational.one) > Rational.zero
+              since Rational.divide_positive;
           choose N such that
               ∀ (m : Natural). N ≤ m →
                 Real.power(abs(r), m)
-                < ((ε * Rational.reciprocal_function(B + Rational.one)) : Real)
+                < ((ε / (B + Rational.one)) : Real)
               as tailBelow
               from Real.power_eventually_below;
           -- Scaling back: (ε/(B + 1))·(B + 1) = ε.
-          claim B + Rational.one ≠ Rational.zero;
-          claim recipProduct
-                : (B + Rational.one) * Rational.reciprocal_function(B + Rational.one)
-                  = Rational.one;
-          calc (ε * Rational.reciprocal_function(B + Rational.one)) * (B + Rational.one)
-             = ε * ((B + Rational.one) * Rational.reciprocal_function(B + Rational.one))
-                   by ring
-             = ε * Rational.one    since recipProduct
+          claim (B + Rational.one) * (ε / (B + Rational.one)) = ε
+              since Rational.divide_cancel;
+          calc (ε / (B + Rational.one)) * (B + Rational.one)
+             = (B + Rational.one) * (ε / (B + Rational.one))    by ring
              = ε
              as toleranceProduct;
           witness N with {
             take m : Natural;
             take NLeqM : N ≤ m;
             claim Real.power(abs(r), m)
-                  < ((ε * Rational.reciprocal_function(B + Rational.one)) : Real)
+                  < ((ε / (B + Rational.one)) : Real)
                 by tailBelow(m, NLeqM);
             -- Sₘ = (1 − rᵐ)·L, so the error is exactly |r|ᵐ·|L|.
             calc Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
@@ -212,10 +208,10 @@ theorem Real.geometric_series_converges
                ≤ ((B + Rational.one) : Real) * Real.power(abs(r), m)
                      since Real.LessOrEqual.multiply_by_nonneg_right
                = Real.power(abs(r), m) * ((B + Rational.one) : Real)
-               < ((ε * Rational.reciprocal_function(B + Rational.one)) : Real)
+               < ((ε / (B + Rational.one)) : Real)
                      * ((B + Rational.one) : Real)
                      since Real.LessThan.multiply_by_positive_right
-               = (((ε * Rational.reciprocal_function(B + Rational.one))
+               = (((ε / (B + Rational.one))
                    * (B + Rational.one) : Rational) : Real)
                = (ε : Real)                                          by toleranceProduct
                as finalBound;
