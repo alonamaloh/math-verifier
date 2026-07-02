@@ -5740,6 +5740,30 @@ private:
     };
     bool parseSignJudgment(ExpressionPointer proposition,
                            SignJudgment& out) const;
+    // B4 order-monotonicity rule index (PLAN tier 5 extension). A lemma
+    // whose conclusion is `R(f(…a…), f(…b…))` — the SAME constant head
+    // and arity on both sides, R a LessOrEqual/LessThan relation —
+    // registers here, keyed by (kind, relation, head). Admission: every
+    // premise that is itself an order judgment must relate two bare
+    // lemma binders, so discharge is structural recursion (the match
+    // binds them to goal subterms). Reuses the SignRule record shape.
+    struct OrderJudgment {
+        std::string kindTag;        // "le" | "lt"
+        std::string relationName;   // e.g. "Real.LessOrEqual"
+        ExpressionPointer leftSide;
+        ExpressionPointer rightSide;
+    };
+    bool parseOrderJudgment(ExpressionPointer proposition,
+                            OrderJudgment& out) const;
+    std::unordered_map<std::string, std::vector<SignRule>>
+        monotonicityRuleIndex_;
+    int monotonicityRuleConflicts_ = 0;
+    void registerMonotonicityRule(const std::string& theoremName,
+                                  ExpressionPointer typeExpr);
+    ExpressionPointer tryMonotonicityRecursion(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth);
     // Bucket key for a judgment, or "" when the subject is not
     // indexable (bare variable / non-constant head).
     std::string signRuleKey(const SignJudgment& judgment) const;

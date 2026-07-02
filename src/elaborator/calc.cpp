@@ -1608,6 +1608,7 @@ void Elaborator::registerAlgebraicShape(const std::string& theoremName,
                                   ExpressionPointer typeExpr) {
         registerGenericRewriteLemma(theoremName, typeExpr);
         registerSignJudgmentRule(theoremName, typeExpr);
+        registerMonotonicityRule(theoremName, typeExpr);
     }
 
 void Elaborator::registerGenericRewriteLemma(const std::string& theoremName,

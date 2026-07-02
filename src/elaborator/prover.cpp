@@ -1819,6 +1819,18 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // B4 monotonicity recursion — a `≤`/`<` goal whose two sides
+        // share a constant head dispatches on that head's registered
+        // monotonicity rules; order premises recurse structurally, so
+        // nested congruence steps (f(g a) ≤ f(g b) from a ≤ b) close
+        // without hints, at parity with `=` steps.
+        {
+            ExpressionPointer attempt = runTactic("monotonicityRecursion",
+                [&] { return tryMonotonicityRecursion(
+                    goalClosed, localBinders, 12); });
+            if (attempt) return attempt;
+        }
+
         {
             ExpressionPointer attempt = runTactic("conjunctionIntro",
                 [&] { return tryConjunctionIntro(
@@ -2024,6 +2036,10 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             return trySignJudgmentRecursion(
                 goalClosed, localBinders, 12,
                 /*allowFormBridge=*/true);
+        });
+        runProfiled("monotonicityRecursion", [&] {
+            return tryMonotonicityRecursion(
+                goalClosed, localBinders, 12);
         });
         runProfiled("conjunctionIntro", [&] {
             return tryConjunctionIntro(

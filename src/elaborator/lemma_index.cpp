@@ -851,3 +851,228 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
     return nullptr;
 }
 
+
+// ----------------------------------------------------------------------
+// B4: order-monotonicity index — `≤`/`<` calc steps close by-less the
+// way `=` steps do, through per-head monotonicity rules.
+
+bool Elaborator::parseOrderJudgment(ExpressionPointer proposition,
+                                    OrderJudgment& out) const {
+    std::vector<ExpressionPointer> spineArgs;
+    ExpressionPointer head = proposition;
+    while (auto* application = std::get_if<Application>(&head->node)) {
+        spineArgs.push_back(application->argument);
+        head = application->function;
+    }
+    if (spineArgs.size() < 2) return false;
+    auto* constant = std::get_if<Constant>(&head->node);
+    if (!constant) return false;
+    auto endsWith = [&](const char* suffix) {
+        std::string s(suffix);
+        return constant->name.size() >= s.size()
+            && constant->name.compare(constant->name.size() - s.size(),
+                                      s.size(), s) == 0;
+    };
+    if (endsWith(".LessOrEqual") || constant->name == "LessOrEqual") {
+        out.kindTag = "le";
+    } else if (endsWith(".LessThan") || constant->name == "LessThan") {
+        out.kindTag = "lt";
+    } else {
+        return false;
+    }
+    out.relationName = constant->name;
+    // Spine args were collected innermost-first: the relation's two
+    // operands are the LAST two applications.
+    out.rightSide = spineArgs[0];
+    out.leftSide = spineArgs[1];
+    return true;
+}
+
+namespace {
+// The head constant of an application spine, or "" for anything else
+// (bare variables, lambdas, …).
+std::string spineHeadConstantName(ExpressionPointer expression) {
+    while (auto* application =
+               std::get_if<Application>(&expression->node)) {
+        expression = application->function;
+    }
+    if (auto* constant = std::get_if<Constant>(&expression->node)) {
+        return constant->name;
+    }
+    return "";
+}
+} // namespace
+
+void Elaborator::registerMonotonicityRule(const std::string& theoremName,
+                                          ExpressionPointer typeExpr) {
+    const Declaration* declaration = environment_.lookup(theoremName);
+    if (!declaration) return;
+    auto* asDefinition = std::get_if<Definition>(declaration);
+    if (!asDefinition) return;
+    if (!asDefinition->universeParameters.empty()) return;
+    std::vector<ExpressionPointer> rawDomains;
+    ExpressionPointer cursor = typeExpr;
+    while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+        rawDomains.push_back(pi->domain);
+        cursor = pi->codomain;
+    }
+    OrderJudgment conclusion;
+    if (!parseOrderJudgment(cursor, conclusion)) return;
+    std::string leftHead = spineHeadConstantName(conclusion.leftSide);
+    std::string rightHead = spineHeadConstantName(conclusion.rightSide);
+    if (leftHead.empty() || leftHead != rightHead) return;
+    // Identical sides state reflexivity, not monotonicity.
+    if (structurallyEqual(conclusion.leftSide,
+                          conclusion.rightSide)) {
+        return;
+    }
+    // Admission: an order-judgment premise must relate two bare lemma
+    // binders — the conclusion match then binds them to goal subterms,
+    // making discharge structural descent, not search.
+    for (const auto& domain : rawDomains) {
+        OrderJudgment premise;
+        if (parseOrderJudgment(domain, premise)) {
+            if (!std::holds_alternative<BoundVariable>(
+                    premise.leftSide->node)
+                || !std::holds_alternative<BoundVariable>(
+                       premise.rightSide->node)) {
+                return;
+            }
+        }
+    }
+    std::string key = conclusion.kindTag + "\x1f"
+        + conclusion.relationName + "\x1f" + leftHead;
+    if (!monotonicityRuleIndex_[key].empty()) {
+        ++monotonicityRuleConflicts_;
+    }
+    int binderCount = static_cast<int>(rawDomains.size());
+    std::vector<ExpressionPointer> binderTypes(binderCount);
+    for (int peelIdx = 0; peelIdx < binderCount; ++peelIdx) {
+        int conclusionIdx = binderCount - 1 - peelIdx;
+        binderTypes[conclusionIdx] = liftBoundVariables(
+            rawDomains[peelIdx], binderCount - peelIdx, 0);
+    }
+    SignRule rule;
+    rule.lemmaName = theoremName;
+    rule.binderCount = binderCount;
+    rule.conclusion = cursor;
+    rule.binderTypes = std::move(binderTypes);
+    static const bool debugEnabled = [] {
+        const char* flag = std::getenv("MATH_MONO_INDEX_DEBUG");
+        return flag && flag[0] != '\0' && flag[0] != '0';
+    }();
+    if (debugEnabled) {
+        std::cerr << "[mono-index] registered " << theoremName
+            << " under (" << conclusion.kindTag << ", "
+            << conclusion.relationName << ", " << leftHead << ")\n";
+    }
+    monotonicityRuleIndex_[key].push_back(std::move(rule));
+}
+
+ExpressionPointer Elaborator::tryMonotonicityRecursion(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth) {
+    if (depth <= 0) return nullptr;
+    OrderJudgment judgment;
+    if (!parseOrderJudgment(goalClosed, judgment)) return nullptr;
+    std::string leftHead = spineHeadConstantName(judgment.leftSide);
+    if (leftHead.empty()
+        || leftHead != spineHeadConstantName(judgment.rightSide)) {
+        return nullptr;
+    }
+    std::string key = judgment.kindTag + "\x1f" + judgment.relationName
+        + "\x1f" + leftHead;
+    auto bucket = monotonicityRuleIndex_.find(key);
+    if (bucket == monotonicityRuleIndex_.end()) return nullptr;
+    Context openedContext = buildContextFromLocalBinders(localBinders);
+    for (const SignRule& rule : bucket->second) {
+        std::vector<ExpressionPointer> bindings(rule.binderCount);
+        if (!matchAgainstPattern(rule.conclusion, goalClosed,
+                                 rule.binderCount, bindings)) {
+            continue;
+        }
+        bool dischargedAll = true;
+        for (int i = rule.binderCount - 1; i >= 0; --i) {
+            if (bindings[i]) continue;
+            if (!binderReferencesAllBound(rule.binderTypes[i],
+                                          bindings)) {
+                dischargedAll = false;
+                break;
+            }
+            ExpressionPointer slotType = instantiateLemmaBinders(
+                rule.binderTypes[i], bindings);
+            ExpressionPointer proof;
+            OrderJudgment premise;
+            if (parseOrderJudgment(slotType, premise)) {
+                // Structural nesting first (f(g a) ≤ f(g b) peels twice),
+                // then the 0-anchored sign machinery.
+                proof = tryMonotonicityRecursion(
+                    slotType, localBinders, depth - 1);
+                if (!proof) {
+                    proof = trySignJudgmentRecursion(
+                        slotType, localBinders, depth - 1,
+                        /*allowFormBridge=*/true);
+                }
+            }
+            if (!proof) {
+                ExpressionPointer slotTypeOpened = openOverLocalBinders(
+                    slotType, localBinders, localBinders.size());
+                ExpressionPointer slotTypeNormalised;
+                try {
+                    slotTypeNormalised = weakHeadNormalForm(
+                        environment_, slotTypeOpened);
+                } catch (const TypeError&) {
+                    dischargedAll = false;
+                    break;
+                }
+                for (int j = static_cast<int>(localBinders.size()) - 1;
+                     j >= 0; --j) {
+                    ExpressionPointer candidateType =
+                        openOverLocalBinders(
+                            localBinders[j].type, localBinders, j);
+                    bool equal;
+                    try {
+                        equal = isDefinitionallyEqual(environment_,
+                            openedContext, candidateType,
+                            slotTypeNormalised);
+                    } catch (const TypeError&) {
+                        equal = false;
+                    }
+                    if (equal) {
+                        proof = makeBoundVariable(
+                            static_cast<int>(localBinders.size())
+                            - 1 - j);
+                        break;
+                    }
+                }
+            }
+            if (!proof) {
+                dischargedAll = false;
+                break;
+            }
+            bindings[i] = std::move(proof);
+        }
+        if (!dischargedAll) continue;
+        bool allBound = true;
+        for (const auto& binding : bindings) {
+            if (!binding) { allBound = false; break; }
+        }
+        if (!allBound) continue;
+        ExpressionPointer call = makeConstant(rule.lemmaName, {});
+        for (int i = rule.binderCount - 1; i >= 0; --i) {
+            call = makeApplication(std::move(call), bindings[i]);
+        }
+        static const bool debugEnabled = [] {
+            const char* flag = std::getenv("MATH_MONO_INDEX_DEBUG");
+            return flag && flag[0] != '\0' && flag[0] != '0';
+        }();
+        if (debugEnabled) {
+            std::cerr << "[mono-index] " << moduleName_
+                << ": rule " << rule.lemmaName
+                << " closes " << prettyPrint(goalClosed) << "\n";
+        }
+        return call;
+    }
+    return nullptr;
+}
