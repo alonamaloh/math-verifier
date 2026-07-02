@@ -42,6 +42,21 @@ theorem Algebra.indexedAggregate_add_one (A : Type(0)) (operation : A → A → 
           = operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n)) :=
   done by substituting Natural.one_add
 
+-- The empty range aggregates to the identity (the base case, definitional).
+theorem Algebra.indexedAggregate_zero (A : Type(0)) (operation : A → A → A)
+        (identity : A) (s : Natural → A)
+        : Algebra.indexedAggregate(A, operation, identity, s, 0) = identity :=
+  done
+
+-- A singleton range aggregates to its one term.
+theorem Algebra.indexedAggregate_one (A : Type(0)) (operation : A → A → A)
+        (identity : A) (s : Natural → A)
+        (identityLeft : ∀ (a : A). operation(identity, a) = a)
+        : Algebra.indexedAggregate(A, operation, identity, s, 1) = s(0) :=
+  calc Algebra.indexedAggregate(A, operation, identity, s, 1)
+     = operation(identity, s(0))
+     = s(0)   by identityLeft(s(0))
+
 -- ----------------------------------------------------------------------
 -- The Lists bridge: the aggregate is the fold-product over the mapped
 -- ascending range. `range_up` grows at the tail, so the head-recursive
@@ -204,6 +219,28 @@ theorem Algebra.indexedAggregate_split (A : Type(0)) (operation : A → A → A)
                            (j : Natural) ↦ s(n + j), 1 + predecessor))
                  by Algebra.indexedAggregate_add_one
   }
+
+-- Peel the first term: the split at cut 1, with the singleton collapsed.
+theorem Algebra.indexedAggregate_shift (A : Type(0)) (operation : A → A → A)
+        (identity : A)
+        (associativity
+            : ∀ (a b c : A). operation(operation(a, b), c) = operation(a, operation(b, c)))
+        (identityLeft : ∀ (a : A). operation(identity, a) = a)
+        (identityRight : ∀ (a : A). operation(a, identity) = a)
+        (s : Natural → A) (n : Natural)
+        : Algebra.indexedAggregate(A, operation, identity, s, 1 + n)
+          = operation(s(0), Algebra.indexedAggregate(A, operation, identity,
+                (j : Natural) ↦ s(1 + j), n)) :=
+  calc Algebra.indexedAggregate(A, operation, identity, s, 1 + n)
+     = Algebra.indexedAggregate(A, operation, identity, s, n + 1)
+           by (1 + n = n + 1)
+     = operation(Algebra.indexedAggregate(A, operation, identity, s, 1),
+                 Algebra.indexedAggregate(A, operation, identity,
+                     (j : Natural) ↦ s(1 + j), n))
+           since Algebra.indexedAggregate_split
+     = operation(s(0), Algebra.indexedAggregate(A, operation, identity,
+                     (j : Natural) ↦ s(1 + j), n))
+           since Algebra.indexedAggregate_one
 
 -- ----------------------------------------------------------------------
 -- The interchange (medial) law of a commutative monoid, the rearrangement
