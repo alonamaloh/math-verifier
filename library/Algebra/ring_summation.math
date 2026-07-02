@@ -1,9 +1,10 @@
 -- Algebra/ring_summation.math
 --
 -- A finite summation operator `Ring.Sum(r, f, n) = f(0) + f(1) + … + f(n)`
--- over a bundled ring. Used by the polynomial development (convolution) and
--- by the generic binomial theorem; it is a plain ring sum, not specific to
--- polynomials, hence the `Ring.` namespace.
+-- over a bundled ring: the additive instance of `Algebra.Fold`, reading the
+-- 1 + n terms f(0), …, f(n). Used by the polynomial development (convolution)
+-- and by the generic binomial theorem; it is a plain ring sum, not specific
+-- to polynomials, hence the `Ring.` namespace.
 
 module Algebra.ring_summation
 
@@ -11,34 +12,53 @@ import Logic.basics
 import Equality.basics
 import Natural.basics
 import Natural.peano
+import Natural.arithmetic
 import Natural.monus
+import Algebra.aggregation
 import Algebra.ring_bundle
 
--- Σ_{i=0}^{n} f(i). Recurses on the upper bound, adding the new top
--- term on the right.
-definition Ring.Sum (r : Ring) (f : Natural → Ring.carrier(r))
-        : Natural → Ring.carrier(r)
-  | zero          => f(0)
-  | successor(k)  => Ring.add(r, Ring.Sum(r, f, k), f(successor(k)))
+-- Σ_{i=0}^{n} f(i): the fold of the ring's addition over the inclusive
+-- range — `1 + n` terms starting at 0.
+definition Ring.Sum (r : Ring) (f : Natural → Ring.carrier(r)) (n : Natural)
+        : Ring.carrier(r) :=
+  Algebra.Fold(Ring.carrier(r), Ring.add, Ring.zero(r), f, 0, 1 + n)
 
--- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
--- not definitionally the constructor; bridge via the automatic `one_add`,
--- which is also what `by_induction` uses to present its successor goals).
+-- The base case as an equation: the sum up to 0 is the single term f(0).
+-- (The count `1 + n` is a stuck term, so this is a lemma, not a reduction.)
+theorem Ring.Sum.base (r : Ring) (f : Natural → Ring.carrier(r))
+        : Ring.Sum(r, f, 0) = f(0) :=
+  calc Ring.Sum(r, f, 0)
+     = Algebra.Fold(Ring.carrier(r), Ring.add, Ring.zero(r), f, 0, 1)   by (1 + 0 = 1)
+     = f(0)   by Algebra.Fold_one
+
+-- The recursion in `1 + n` form: peel the top term.
 theorem Ring.Sum.add_one (r : Ring) (f : Natural → Ring.carrier(r))
         (n : Natural)
         : Ring.Sum(r, f, 1 + n) = (Ring.Sum(r, f, n) + f(1 + n)) :=
-  done by substituting Natural.one_add
+  calc Ring.Sum(r, f, 1 + n)
+     = (Ring.Sum(r, f, n) + f(0 + (1 + n)))   by Algebra.Fold_add_one
+     = (Ring.Sum(r, f, n) + f(1 + n))         by (0 + (1 + n) = 1 + n)
+
+-- The same peel in constructor form, for the polynomial layer's
+-- `case successor(k)` inductions.
+theorem Ring.Sum.successor (r : Ring) (f : Natural → Ring.carrier(r))
+        (k : Natural)
+        : Ring.Sum(r, f, successor(k)) = (Ring.Sum(r, f, k) + f(successor(k))) :=
+  calc Ring.Sum(r, f, successor(k))
+     = Ring.Sum(r, f, 1 + k)
+     = (Ring.Sum(r, f, k) + f(1 + k))
+     = (Ring.Sum(r, f, k) + f(successor(k)))    by substituting Natural.one_add
 
 -- The sum of the constant-zero function is zero.
 theorem Ring.Sum.zero (r : Ring) (n : Natural)
         : Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), n)
           = Ring.zero(r) :=
   by_induction on n with IH {
-    case zero: reflexivity(Ring.carrier(r), Ring.zero(r))
-    case successor(k):
-        calc Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), successor(k))
-           = (Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), k) + Ring.zero(r))
-           = (Ring.zero(r) + Ring.zero(r))
+    case base: done
+    case step(k):
+        calc Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), 1 + k)
+           = (Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), k) + Ring.zero(r))   by Ring.Sum.add_one
+           = (Ring.zero(r) + Ring.zero(r))   by IH
            = Ring.zero(r)
   }
 
@@ -47,53 +67,44 @@ theorem Ring.Sum.extensional (r : Ring)
         (f g : Natural → Ring.carrier(r))
         (pointwise : ∀ (i : Natural). f(i) = g(i))
         (n : Natural)
-        : Ring.Sum(r, f, n) = Ring.Sum(r, g, n) :=
-  by_induction on n with IH {
-    case zero: pointwise(0)
-    case successor(k):
-        calc Ring.Sum(r, f, successor(k))
-           = (Ring.Sum(r, f, k) + f(successor(k)))
-           = (Ring.Sum(r, g, k) + f(successor(k)))
-           = (Ring.Sum(r, g, k) + g(successor(k)))   by pointwise(successor(k))
-           = Ring.Sum(r, g, successor(k))
-  }
+        : Ring.Sum(r, f, n) = Ring.Sum(r, g, n) := {
+  claim ∀ (j : Natural). j ≥ 0 → f(j) = g(j)
+      by (j : Natural) (jLower : j ≥ 0) ↦ pointwise(j);
+  done by Algebra.Fold_pointwise
+}
 
 -- Register Sum.extensional as the rewrite-under-Σ congruence lemma: a
 -- calc step `Ring.Sum(r, f, n) = Ring.Sum(r, g, n)` is dischargeable from
 -- the pointwise `(i) => f(i) = g(i)` written as its `by` proof.
 congruence_under_binder Ring.Sum := Ring.Sum.extensional
 
--- Peel the first term: Σ_{i=0}^{n+1} f(i) = f(0) + Σ_{j=0}^{n} f(j+1).
+-- Peel the first term: Σ_{i=0}^{1+n} f(i) = f(0) + Σ_{j=0}^{n} f(1+j).
 -- The workhorse for the convolution recursion (it exposes the i=0
 -- term and reindexes the rest to start from the tail of the list).
-theorem Ring.Sum.shift (r : Ring) (f : Natural → Ring.carrier(r))
-        (n : Natural)
-        : Ring.Sum(r, f, successor(n))
-          = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n)) :=
-  by_induction on n with IH {
-    case zero:
-        reflexivity(Ring.carrier(r), (f(0) + f(1)))
-    case successor(k):
-        calc Ring.Sum(r, f, successor(successor(k)))
-           = (Ring.Sum(r, f, successor(k)) + f(successor(successor(k))))
-           = ((f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), k)) + f(successor(successor(k))))
-           = (f(0) + (Ring.Sum(r, (j : Natural) ↦ f(successor(j)), k) + f(successor(successor(k)))))
-           = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), successor(k)))
-  }
-
--- The `1 + n` form of the shift, for consumers that keep `Natural` opaque
--- (no `successor` in expressions): Σ_{i=0}^{1+n} f(i) = f(0) + Σ_{j=0}^{n} f(1+j).
 theorem Ring.Sum.shift_one_plus (r : Ring) (f : Natural → Ring.carrier(r))
         (n : Natural)
         : Ring.Sum(r, f, 1 + n)
-          = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(1 + j), n)) := {
-  calc Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n)
-     = Ring.Sum(r, (j : Natural) ↦ f(1 + j), n)
-         by (i : Natural) ↦ { done by substituting Natural.one_add }
-     as reindex;
+          = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(1 + j), n)) :=
   calc Ring.Sum(r, f, 1 + n)
-     = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n))   by Ring.Sum.shift(n := n)
-     = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(1 + j), n))          by substituting reindex
+     = (f(0) + Algebra.Fold(Ring.carrier(r), Ring.add, Ring.zero(r), f, 1 + 0, 1 + n))
+           by Algebra.Fold_shift
+     = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(1 + j), n))
+           by substituting Algebra.Fold_rebase
+
+-- The constructor form of the shift, for the polynomial layer's
+-- `case successor(k)` inductions.
+theorem Ring.Sum.shift (r : Ring) (f : Natural → Ring.carrier(r))
+        (n : Natural)
+        : Ring.Sum(r, f, successor(n))
+          = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n)) := {
+  calc Ring.Sum(r, (j : Natural) ↦ f(1 + j), n)
+     = Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n)
+         by (j : Natural) ↦ { done by substituting Natural.one_add }
+     as reindex;
+  calc Ring.Sum(r, f, successor(n))
+     = Ring.Sum(r, f, 1 + n)                                       by substituting Natural.one_add
+     = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(1 + j), n))           by Ring.Sum.shift_one_plus
+     = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n))    by substituting reindex
 }
 
 -- Σ (f+g) = Σ f + Σ g. The successor step rearranges with the
@@ -103,13 +114,16 @@ theorem Ring.Sum.add (r : Ring) (f g : Natural → Ring.carrier(r))
         : Ring.Sum(r, (i : Natural) ↦ (f(i) + g(i)), n)
           = (Ring.Sum(r, f, n) + Ring.Sum(r, g, n)) :=
   by_induction on n with IH {
-    case zero: reflexivity(Ring.carrier(r), (f(0) + g(0)))
-    case successor(k):
-        calc Ring.Sum(r, (i : Natural) ↦ (f(i) + g(i)), successor(k))
-           = (Ring.Sum(r, (i : Natural) ↦ (f(i) + g(i)), k) + (f(successor(k)) + g(successor(k))))
-           = ((Ring.Sum(r, f, k) + Ring.Sum(r, g, k)) + (f(successor(k)) + g(successor(k))))
-           = ((Ring.Sum(r, f, k) + f(successor(k))) + (Ring.Sum(r, g, k) + g(successor(k))))
-           = (Ring.Sum(r, f, successor(k)) + Ring.Sum(r, g, successor(k)))
+    case base:
+        calc Ring.Sum(r, (i : Natural) ↦ (f(i) + g(i)), 0)
+           = (f(0) + g(0))                             by Ring.Sum.base
+           = (Ring.Sum(r, f, 0) + Ring.Sum(r, g, 0))
+    case step(k):
+        calc Ring.Sum(r, (i : Natural) ↦ (f(i) + g(i)), 1 + k)
+           = (Ring.Sum(r, (i : Natural) ↦ (f(i) + g(i)), k) + (f(1 + k) + g(1 + k)))   by Ring.Sum.add_one
+           = ((Ring.Sum(r, f, k) + Ring.Sum(r, g, k)) + (f(1 + k) + g(1 + k)))         by IH
+           = ((Ring.Sum(r, f, k) + f(1 + k)) + (Ring.Sum(r, g, k) + g(1 + k)))
+           = (Ring.Sum(r, f, 1 + k) + Ring.Sum(r, g, 1 + k))                           by substituting Ring.Sum.add_one
   }
 
 -- Pull a left constant through the sum: c · Σ f = Σ (c · f).
@@ -118,13 +132,16 @@ theorem Ring.Sum.scale_left (r : Ring) (c : Ring.carrier(r))
         : (c * Ring.Sum(r, f, n))
           = Ring.Sum(r, (i : Natural) ↦ (c * f(i)), n) :=
   by_induction on n with IH {
-    case zero: reflexivity(Ring.carrier(r), (c * f(0)))
-    case successor(k):
-        calc (c * Ring.Sum(r, f, successor(k)))
-           = (c * (Ring.Sum(r, f, k) + f(successor(k))))
-           = ((c * Ring.Sum(r, f, k)) + (c * f(successor(k))))
-           = (Ring.Sum(r, (i : Natural) ↦ (c * f(i)), k) + (c * f(successor(k))))
-           = Ring.Sum(r, (i : Natural) ↦ (c * f(i)), successor(k))
+    case base:
+        calc (c * Ring.Sum(r, f, 0))
+           = (c * f(0))                                    by substituting Ring.Sum.base
+           = Ring.Sum(r, (i : Natural) ↦ (c * f(i)), 0)    by Ring.Sum.base
+    case step(k):
+        calc (c * Ring.Sum(r, f, 1 + k))
+           = (c * (Ring.Sum(r, f, k) + f(1 + k)))                             by substituting Ring.Sum.add_one
+           = ((c * Ring.Sum(r, f, k)) + (c * f(1 + k)))
+           = (Ring.Sum(r, (i : Natural) ↦ (c * f(i)), k) + (c * f(1 + k)))    by IH
+           = Ring.Sum(r, (i : Natural) ↦ (c * f(i)), 1 + k)                   by Ring.Sum.add_one
   }
 
 -- Pull a right constant through the sum: (Σ f) · c = Σ (f · c).
@@ -133,13 +150,16 @@ theorem Ring.Sum.scale_right (r : Ring)
         : (Ring.Sum(r, f, n) * c)
           = Ring.Sum(r, (i : Natural) ↦ (f(i) * c), n) :=
   by_induction on n with IH {
-    case zero: reflexivity(Ring.carrier(r), (f(0) * c))
-    case successor(k):
-        calc (Ring.Sum(r, f, successor(k)) * c)
-           = ((Ring.Sum(r, f, k) + f(successor(k))) * c)
-           = ((Ring.Sum(r, f, k) * c) + (f(successor(k)) * c))
-           = (Ring.Sum(r, (i : Natural) ↦ (f(i) * c), k) + (f(successor(k)) * c))
-           = Ring.Sum(r, (i : Natural) ↦ (f(i) * c), successor(k))
+    case base:
+        calc (Ring.Sum(r, f, 0) * c)
+           = (f(0) * c)                                     by substituting Ring.Sum.base
+           = Ring.Sum(r, (i : Natural) ↦ (f(i) * c), 0)     by Ring.Sum.base
+    case step(k):
+        calc (Ring.Sum(r, f, 1 + k) * c)
+           = ((Ring.Sum(r, f, k) + f(1 + k)) * c)                             by substituting Ring.Sum.add_one
+           = ((Ring.Sum(r, f, k) * c) + (f(1 + k) * c))
+           = (Ring.Sum(r, (i : Natural) ↦ (f(i) * c), k) + (f(1 + k) * c))    by IH
+           = Ring.Sum(r, (i : Natural) ↦ (f(i) * c), 1 + k)                   by Ring.Sum.add_one
   }
 
 -- ----------------------------------------------------------------------
@@ -156,8 +176,9 @@ theorem Ring.Sum.convolution_zero (r : Ring)
         (A B : Natural → Ring.carrier(r))
         : Ring.Sum(r, (i : Natural) ↦ (A(i) * B(Natural.monus(0, i))), 0)
           = (A(0) * B(0)) :=
-  -- Σ over 0 is the i = 0 term, and monus(0, 0) = 0.
-  done by substituting Natural.monus_zero_left
+  calc Ring.Sum(r, (i : Natural) ↦ (A(i) * B(Natural.monus(0, i))), 0)
+     = (A(0) * B(Natural.monus(0, 0)))   by Ring.Sum.base
+     = (A(0) * B(0))
 
 theorem Ring.Sum.convolution_shift (r : Ring)
         (A B : Natural → Ring.carrier(r)) (k : Natural)

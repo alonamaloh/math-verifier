@@ -447,6 +447,27 @@ theorem Algebra.Fold_shift (A : Type(0)) (operation : A → A → A)
      = operation(f(start), Algebra.Fold(A, operation, identity, f, 1 + start, c))
            by (start + 1 = 1 + start)
 
+-- Rebasing the range: reading f from 1 + start is reading f(1 + ·) from
+-- start. Pure index arithmetic — no monoid law is needed.
+theorem Algebra.Fold_rebase (A : Type(0)) (operation : A → A → A)
+        (identity : A) (f : Natural → A) (start c : Natural)
+        : Algebra.Fold(A, operation, identity, f, 1 + start, c)
+          = Algebra.Fold(A, operation, identity, (j : Natural) ↦ f(1 + j), start, c) :=
+  by_induction on c with IH {
+    case base: done
+    case step(predecessor):
+        calc Algebra.Fold(A, operation, identity, f, 1 + start, 1 + predecessor)
+           = operation(Algebra.Fold(A, operation, identity, f, 1 + start, predecessor),
+                       f((1 + start) + predecessor))
+           = operation(Algebra.Fold(A, operation, identity, (j : Natural) ↦ f(1 + j), start, predecessor),
+                       f((1 + start) + predecessor))
+                 by IH
+           = operation(Algebra.Fold(A, operation, identity, (j : Natural) ↦ f(1 + j), start, predecessor),
+                       f(1 + (start + predecessor)))
+                 by ((1 + start) + predecessor = 1 + (start + predecessor))
+           = Algebra.Fold(A, operation, identity, (j : Natural) ↦ f(1 + j), start, 1 + predecessor)
+  }
+
 -- The fold only sees the terms' values at or above its lower bound.
 theorem Algebra.Fold_pointwise (A : Type(0)) (operation : A → A → A)
         (identity : A) (f g : Natural → A) (start : Natural)
