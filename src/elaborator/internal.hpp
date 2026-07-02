@@ -5664,7 +5664,11 @@ private:
         // conclusion-frame de Bruijn index (see RewriteLemma).
         std::vector<ExpressionPointer> binderTypes;
     };
-    std::unordered_multimap<std::string, SignRule> signRuleIndex_;
+    // Per-key vector so alternatives are tried in REGISTRATION order
+    // (declaration order) — deterministic dispatch, first full
+    // discharge wins.
+    std::unordered_map<std::string, std::vector<SignRule>>
+        signRuleIndex_;
     int signRuleConflicts_ = 0;
     // A parsed sign judgment: `kindTag` ∈ {"zle", "zlt", "neq0"},
     // `relationName` the relation head (e.g. "Real.LessOrEqual",

@@ -604,7 +604,7 @@ void Elaborator::registerSignJudgmentRule(const std::string& theoremName,
     // closes `x·x` unconditionally — same (judgment, head) key): the
     // lookup tries them in registration order, first full discharge
     // wins. Track the multiplicity for the eventual audit.
-    if (signRuleIndex_.find(key) != signRuleIndex_.end()) {
+    if (!signRuleIndex_[key].empty()) {
         ++signRuleConflicts_;
     }
     int binderCount = static_cast<int>(rawDomains.size());
@@ -619,7 +619,7 @@ void Elaborator::registerSignJudgmentRule(const std::string& theoremName,
     rule.binderCount = binderCount;
     rule.conclusion = cursor;
     rule.binderTypes = std::move(binderTypes);
-    signRuleIndex_.emplace(std::move(key), std::move(rule));
+    signRuleIndex_[key].push_back(std::move(rule));
 }
 
 ExpressionPointer Elaborator::trySignJudgmentRecursion(
@@ -644,10 +644,9 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
             true);
     }
     for (const auto& [key, bridgeHop] : probes) {
-    auto range = signRuleIndex_.equal_range(key);
-    for (auto iterator = range.first; iterator != range.second;
-         ++iterator) {
-        const SignRule& rule = iterator->second;
+    auto bucket = signRuleIndex_.find(key);
+    if (bucket == signRuleIndex_.end()) continue;
+    for (const SignRule& rule : bucket->second) {
         std::vector<ExpressionPointer> bindings(rule.binderCount);
         if (!matchAgainstPattern(rule.conclusion, goalClosed,
                                  rule.binderCount, bindings)) {
