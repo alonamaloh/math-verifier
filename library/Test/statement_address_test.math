@@ -1,0 +1,47 @@
+-- Feature test: A2 stage 1 — statement-addressable facts.
+--
+-- A PROPOSITION written where a function or a `choose` source is
+-- expected addresses the in-scope fact with that statement (matched up
+-- to definitional equality; two matching facts is a loud error). Names
+-- become documentation: anonymous facts participate fully.
+
+module Test.statement_address_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- Applying a universal fact by its statement, no name involved.
+theorem Test.apply_universal (P : Natural → Proposition) (m : Natural)
+        (universal : ∀ (k : Natural). P(k))
+        : P(m) :=
+  (∀ (k : Natural). P(k))(m)
+
+-- The addressed fact may be anonymous — introduced by a bare claim
+-- (derived here from a differently-stated hypothesis, so exactly one
+-- in-scope fact carries the addressed statement).
+theorem Test.apply_anonymous (P : Natural → Proposition) (m : Natural)
+        (conditional : ∀ (k : Natural). 0 ≤ k → P(k))
+        : P(m) := {
+  claim ∀ (j : Natural). P(j) by (j : Natural) ↦ conditional(j, (0 ≤ j));
+  (∀ (k : Natural). P(k))(m)
+}
+
+-- Two-argument application through a conditional universal.
+theorem Test.apply_conditional (P : Natural → Proposition) (n : Natural)
+        (conditional : ∀ (k : Natural). n ≤ k → P(k))
+        (bound : n ≤ 1 + n)
+        : P(1 + n) :=
+  (∀ (k : Natural). n ≤ k → P(k))(1 + n, bound)
+
+-- `choose … from <statement>`: the existential is addressed by
+-- restating it (alpha-renaming is fine — the match is defeq).
+theorem Test.choose_by_statement (Q : Natural → Proposition)
+        (existential : ∃ (w : Natural). Q(w))
+        : ∃ (v : Natural). Q(v) := {
+  choose w as qw from ∃ (anything : Natural). Q(anything);
+  witness w with qw
+}

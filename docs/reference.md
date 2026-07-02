@@ -129,6 +129,11 @@ End each with `;`; the block returns its final non-`;` expression.
 - `by L` (argument-free): cite lemma `L`; its explicit
   arguments are inferred from the goal and premises discharged from
   context. Use this instead of applying `L` to positional arguments.
+- **Statement addressing (A2)**: a PROPOSITION in function position —
+  `(∀ (k : Natural). P(k))(m)` — or as a `choose` source addresses
+  the in-scope fact with that statement (defeq match, anonymous facts
+  included); two matching facts is a loud error naming both. `given (P)`
+  is the same lookup as a bare term.
 - `?` — a hole in a function-call argument position, solved by unification
   from the goal/other arguments (does not invoke the auto-prover).
 - `recalling f, g` after a `by` hint — bring extra named facts into

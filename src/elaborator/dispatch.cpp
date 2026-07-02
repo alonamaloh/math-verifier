@@ -619,6 +619,50 @@ ExpressionPointer Elaborator::elaborateExpression(
             // supplied positional arguments.
             auto* headIdentifier = std::get_if<SurfaceIdentifier>(
                 &application->function->node);
+            // A2 (statement-addressable facts), stage 1: a PROPOSITION
+            // in function position addresses the in-scope fact with that
+            // statement — `(∀ (k : Natural). P(k))(m)` applies the
+            // universal hypothesis without naming it. Matched up to
+            // defeq; two facts with the statement is a loud error (the
+            // `given(...)` lookup provides both behaviours, so this is a
+            // desugar onto it). Probed only for compound heads — a name
+            // is already an address — and only when the head elaborates
+            // as a Proposition value.
+            if (!headIdentifier
+                && !std::get_if<SurfaceLambda>(
+                       &application->function->node)
+                && !std::get_if<SurfaceGiven>(
+                       &application->function->node)) {
+                bool functionIsProposition = false;
+                try {
+                    ExpressionPointer probe = elaborateExpression(
+                        *application->function, localBinders);
+                    ExpressionPointer probeType = weakHeadNormalForm(
+                        environment_,
+                        openOverLocalBinders(
+                            inferTypeInLocalContext(localBinders, probe),
+                            localBinders, localBinders.size()));
+                    auto* sort = std::get_if<Sort>(&probeType->node);
+                    auto* level = sort
+                        ? std::get_if<LevelConst>(&sort->level->node)
+                        : nullptr;
+                    functionIsProposition = level && level->value == 0;
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {
+                } catch (const AutoProverBudgetError&) {
+                }
+                if (functionIsProposition) {
+                    SurfaceExpressionPointer addressed =
+                        makeSurfaceApplication(
+                            makeSurfaceGiven(application->function,
+                                             expression.line,
+                                             expression.column),
+                            application->arguments,
+                            expression.line, expression.column);
+                    return elaborateExpression(*addressed, localBinders,
+                                                expectedType);
+                }
+            }
             // Reorder named arguments into positional order. If no
             // named arguments are present, the result is just the
             // positional values in their original order. After this

@@ -85,6 +85,7 @@ ExpressionPointer Elaborator::elaborateChoose(
             // by elaborating the source and inspecting its type, so applied
             // terms aren't mistaken for lemmas.
             bool sourceIsExistential = false;
+            bool sourceIsStatement = false;
             try {
                 ExpressionPointer sourceTerm = elaborateExpression(
                     *choose.source, localBinders);
@@ -100,10 +101,37 @@ ExpressionPointer Elaborator::elaborateChoose(
                         std::get_if<Constant>(&head->node)) {
                     sourceIsExistential = headConstant->name == "Exists";
                 }
+                // A2 (statement-addressable facts): the source may be a
+                // PROPOSITION — `choose w from ∃ (v : T). P(v);`
+                // addresses the in-scope fact with that statement. Its
+                // type is then the Proposition sort; wrap it in the
+                // `given(...)` lookup so the destructure below sees the
+                // fact itself (defeq-matched, ambiguity a loud error).
+                if (!sourceIsExistential) {
+                    auto* sort = std::get_if<Sort>(&sourceType->node);
+                    auto* level = sort
+                        ? std::get_if<LevelConst>(&sort->level->node)
+                        : nullptr;
+                    if (level && level->value == 0) {
+                        ExpressionPointer statementHead = weakHeadNormalForm(
+                            environment_, openOverLocalBinders(
+                                sourceTerm, localBinders, N));
+                        while (auto* app = std::get_if<Application>(
+                                   &statementHead->node)) {
+                            statementHead = app->function;
+                        }
+                        auto* statementConstant =
+                            std::get_if<Constant>(&statementHead->node);
+                        sourceIsStatement = statementConstant
+                            && statementConstant->name == "Exists";
+                    }
+                }
             } catch (const ElaborateError&) {
             } catch (const TypeError&) {
             }
-            if (sourceIsExistential) {
+            if (sourceIsStatement) {
+                scrutinee = makeSurfaceGiven(choose.source, line, column);
+            } else if (sourceIsExistential) {
                 scrutinee = choose.source;
             } else if (!choose.predicate) {
                 // Lemma source, no `such that`: cite the lemma argument-free
