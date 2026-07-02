@@ -1153,6 +1153,24 @@ down.
   rewrites — the risk surface is only whatever consumers currently
   get from transparent δ-reduction rather than stated theorems, which
   the opacity flip will enumerate directly.
+  *Spike result (2026-07-02: flipped `Real` to `opaque definition`,
+  keep-going build, then reverted).* **7 files fail, everything else —
+  including all of ComplexNumber/ — verifies.** Two failure shapes:
+  (a) construction files (`addition`, `embedding_order`, `field`,
+  `triangular_series`-adjacent): declared type says `Real` /
+  `Rational.to_real(…)`, the proof's inferred type spells the reduced
+  `Quotient.class_of(…)` form — home-file reconciliation, the
+  mechanical `unfolding`/boundary-lemma bill;
+  (b) consumers (`continuity`, `derivative`, `limits`): "the function
+  expects `Quotient.{0} CauchyRationalSequence CauchyEquivalent` but
+  this argument is `Real`" — an imported interface type carries the
+  REDUCED spelling, i.e. the opaque-quotient-alias machinery that
+  already serves Integer/Rational does not engage for `Real`'s alias
+  in the interface-normalization path. (b) is an ELABORATOR gap, not
+  proof debt, and is the concrete first work item of Phase 1; fix it
+  and the Phase-0 bill shrinks to the handful of home-file
+  reconciliations in (a). Cost measured: bounded and small, matching
+  the `Natural.multiply` spike precedent.
 - **Phase 1 — language support** (`interface module` /
   `implementation module … implements`, scoped opacity, obligation
   check, export view); migrate the ℝ prototype onto it.
