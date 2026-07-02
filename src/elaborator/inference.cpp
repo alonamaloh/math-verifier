@@ -1561,6 +1561,35 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         found = true;
                     }
                 }
+                // Fallback 2: not a stated hypothesis and no forgetful
+                // instance — but the bare prover may close it
+                // near-instantly from `automatic` lemmas / the tier stack
+                // (`start ≤ start + c` via less_or_equal_add_right; the
+                // A7 known-gap fix). Budget-capped like the redundancy
+                // re-proof; skipped inside the speculative context scan,
+                // where it would multiply per-candidate cost (and whose
+                // flag also breaks any prover→scan→discharge recursion),
+                // and for slots still mentioning unresolved holes.
+                if (!found && !inSpeculativeContextScan_
+                    && !containsNamedFreeVariable(slotType,
+                                                  dischargeMetavars)) {
+                    RedundancyBudgetGuard budgetGuard(*this);
+                    ExpressionPointer proved;
+                    try {
+                        proved = autoProveClaim(
+                            slotType, localBinders, line);
+                    } catch (const ElaborateError&) {
+                        proved = nullptr;
+                    } catch (const TypeError&) {
+                        proved = nullptr;
+                    } catch (const AutoProverBudgetError&) {
+                        proved = nullptr;
+                    }
+                    if (proved) {
+                        elaboratedArgs[i] = std::move(proved);
+                        found = true;
+                    }
+                }
                 if (!found) remaining.push_back(i);
             }
             unresolved = std::move(remaining);

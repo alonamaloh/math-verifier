@@ -1541,6 +1541,53 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                     progress = true;
                 }
             }
+            // (c) Bare-prover fallback for fully-determined Proposition
+            // premises still unbound after the fixpoint: not a stated
+            // hypothesis, but the premise may close near-instantly from
+            // `automatic` lemmas / the tier stack (`start ≤ start + c`
+            // via less_or_equal_add_right — the A7 known-gap fix).
+            // Budget-capped like the redundancy re-proof; skipped under
+            // the speculative context scan, where it would multiply
+            // per-candidate cost (and whose flag also breaks the
+            // prover → scan → citation-fill recursion). Single pass —
+            // a proof slot cannot pin data slots, so no fixpoint needed.
+            if (!inSpeculativeContextScan_) {
+                for (int innerIndex = 0; innerIndex < matchedDepth;
+                     ++innerIndex) {
+                    if (bindings[innerIndex]) continue;
+                    ExpressionPointer domain =
+                        domainInPatternScope(innerIndex);
+                    if (referencesUnfilled(domain, 0)) continue;
+                    ExpressionPointer concretePremise =
+                        instantiateLemmaBinders(domain, bindings);
+                    ExpressionPointer concreteOpened;
+                    try {
+                        concreteOpened = weakHeadNormalForm(
+                            environment_,
+                            openOverLocalBinders(
+                                concretePremise, localBinders, N));
+                    } catch (const TypeError&) {
+                        continue;
+                    }
+                    if (!typeIsProposition(openedContext,
+                                           concreteOpened)) {
+                        continue;
+                    }
+                    RedundancyBudgetGuard budgetGuard(*this);
+                    ExpressionPointer proved;
+                    try {
+                        proved = autoProveClaim(
+                            concretePremise, localBinders, 0);
+                    } catch (const ElaborateError&) {
+                        proved = nullptr;
+                    } catch (const TypeError&) {
+                        proved = nullptr;
+                    } catch (const AutoProverBudgetError&) {
+                        proved = nullptr;
+                    }
+                    if (proved) bindings[innerIndex] = proved;
+                }
+            }
         }
 
         // Fill any of the `matchedDepth` peeled-binder slots not

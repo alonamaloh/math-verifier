@@ -361,14 +361,17 @@ needed.
   defeq / cast-normalization) are filled automatically;
   `no_smaller_solution(n, k)` supplies `n < m`, `1 ≤ n`, `1 ≤ k` from
   context. This generalizes `?` from goal-driven to context-driven.
-  *Known gap (hit in the field, 2026-07-02):* the current citation
-  premise-discharge scans LOCAL hypotheses only — it does not consult
-  `automatic` lemmas, so `by pointwiseEqual` fails to discharge a
-  premise like `start ≤ start + c` even though
-  `Natural.less_or_equal_add_right` is automatic and the bare claim
-  closes instantly. The workaround is stating the fact as a bare
-  claim first; the fix is routing the discharge scan through the same
-  tier stack the bare prover uses.
+  *Gap found and FIXED same day (2026-07-02):* citation
+  premise-discharge used to scan LOCAL hypotheses only — `by
+  pointwiseEqual` couldn't discharge `start ≤ start + c` even though
+  `Natural.less_or_equal_add_right` is automatic. Now both discharge
+  paths (`completeCitationFromBindings` step (c) and
+  `inferCallWithHoles` step 5b) fall back to a budget-capped bare
+  prover for fully-determined Proposition premises, gated off the
+  speculative context scan (which both bounds cost and breaks the
+  prover→scan→citation recursion). Feature test:
+  `Test/citation_automatic_discharge_test.math`; the scaffolding
+  claim in `Fold_pointwise` is gone.
 - **`let` in definition bodies + module-local `open`.** Definitions
   like `bisectionStepWithDec` repeat 4-line subexpressions; allow
   `let` in definition bodies and a file-scoped
