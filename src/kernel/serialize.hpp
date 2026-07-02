@@ -111,6 +111,17 @@ struct CachedForgetfulRegistration {
     std::string premiseStructureName;
 };
 
+// Fold-capable-operation registry entry added by this file:
+// `fold_operation (sym) on Carrier := witness`, stored with the resolved
+// operation and identity head names (see Environment::foldOperationRegistry).
+struct CachedFoldOperationRegistration {
+    std::string operatorSymbol;
+    std::string carrierName;
+    std::string operationName;
+    std::string identityName;
+    std::string witnessName;
+};
+
 // The full contents of a .mathv file, prior to (de)serialization.
 struct CacheContents {
     std::string sourcePath;
@@ -136,6 +147,8 @@ struct CacheContents {
     std::vector<CachedBundleRegistration> bundleRegistrations;
     // Forgetful (derived) instance registry entries added by this file.
     std::vector<CachedForgetfulRegistration> forgetfulRegistrations;
+    // Fold-capable-operation registry entries added by this file.
+    std::vector<CachedFoldOperationRegistration> foldOperationRegistrations;
 };
 
 // Write `contents` to `path`. Throws SerializationError on I/O failure.

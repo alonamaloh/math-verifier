@@ -499,6 +499,8 @@ private:
                 }
             }
             case TokenKind::KeywordOperator:   return parseOperatorDeclaration();
+            case TokenKind::KeywordFoldOperation:
+                return parseFoldOperationDeclaration();
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
             case TokenKind::KeywordCongruenceUnderBinder:
                 return parseCongruenceDeclaration();
@@ -572,6 +574,41 @@ private:
                       "dispatch target");
         }
         declaration.functionName = consumeQualifiedNameString();
+        return declaration;
+    }
+
+    // `fold_operation (<symbol>) on <Carrier> := <witness>`
+    //
+    // Registers the operation behind `<symbol>` on `<Carrier>` as
+    // fold-capable, certified by `<witness> : IsMonoid(Carrier, op, id)`.
+    SurfaceFoldOperationDeclaration parseFoldOperationDeclaration() {
+        consumeAny();  // 'fold_operation'
+        SurfaceFoldOperationDeclaration declaration;
+        expect(TokenKind::LeftParen,
+               "expected '(' before operator symbol in fold_operation "
+               "declaration");
+        if (peek().kind == TokenKind::Identifier
+            || peek().kind == TokenKind::EndOfFile) {
+            throwHere("expected an operator symbol like '+' or '*' "
+                      "inside the parentheses");
+        }
+        declaration.operatorSymbol = consumeAny().lexeme;
+        expect(TokenKind::RightParen,
+               "expected ')' after operator symbol");
+        expect(TokenKind::KeywordOn,
+               "expected 'on' after operator symbol in fold_operation "
+               "declaration");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a carrier type name after 'on'");
+        }
+        declaration.carrierName = consumeQualifiedNameString();
+        expect(TokenKind::Assign,
+               "expected ':=' before the IsMonoid witness name");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected the name of an IsMonoid(Carrier, op, id) "
+                      "witness after ':='");
+        }
+        declaration.witnessName = consumeQualifiedNameString();
         return declaration;
     }
 

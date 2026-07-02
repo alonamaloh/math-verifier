@@ -23,7 +23,8 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // was expanded to a TREE on disk — Test/ring_test.mathv was 574 MB of
 // which gzip kept 17 (every shared subterm of the ring certificate
 // written out in full at every occurrence).
-constexpr uint32_t cacheVersion = 9;
+// Version 10 adds the fold-operation registry section at the tail.
+constexpr uint32_t cacheVersion = 10;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -618,6 +619,15 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
         writer.writeU32(static_cast<uint32_t>(entry.premiseIndex));
         writer.writeString(entry.premiseStructureName);
     }
+    writer.writeU32(
+        static_cast<uint32_t>(contents.foldOperationRegistrations.size()));
+    for (const auto& entry : contents.foldOperationRegistrations) {
+        writer.writeString(entry.operatorSymbol);
+        writer.writeString(entry.carrierName);
+        writer.writeString(entry.operationName);
+        writer.writeString(entry.identityName);
+        writer.writeString(entry.witnessName);
+    }
     if (!output) {
         throw SerializationError("write failed (final flush): " + path);
     }
@@ -738,6 +748,17 @@ CacheContents readCacheFile(const std::string& path,
         entry.premiseIndex = static_cast<int>(reader.readU32());
         entry.premiseStructureName = reader.readString();
         contents.forgetfulRegistrations.push_back(std::move(entry));
+    }
+    uint32_t foldOperationCount = reader.readU32();
+    contents.foldOperationRegistrations.reserve(foldOperationCount);
+    for (uint32_t i = 0; i < foldOperationCount; ++i) {
+        CachedFoldOperationRegistration entry;
+        entry.operatorSymbol = reader.readString();
+        entry.carrierName = reader.readString();
+        entry.operationName = reader.readString();
+        entry.identityName = reader.readString();
+        entry.witnessName = reader.readString();
+        contents.foldOperationRegistrations.push_back(std::move(entry));
     }
     return contents;
 }

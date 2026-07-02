@@ -13,6 +13,11 @@ A catalogue of surface constructs. For depth see `docs/conventions/`.
 | `opaque definition N … ` | definition the kernel won't unfold; reason via its characterising lemmas |
 | `inductive N (params) : Sort where \| C : … ` | an inductive type and its constructors |
 | `axiom N : T` | assumed without proof |
+| `operator (sym) on (T1, T2) := F` | infix/postfix operator dispatch |
+| `instance N` | register the canonical structure instance/bundle for N's carrier |
+| `coercion (S, T) := F` | canonical embedding S ↪ T |
+| `congruence_under_binder F := L` | rewrite-under-binder lemma for head F |
+| `fold_operation (sym) on T := W` | register `sym` on `T` as fold-capable; `W : IsMonoid(T, op, id)` must certify the same `op` the operator registry dispatches to (canonical per (sym, T); feeds the fold binder form and ellipsis notation) |
 
 Pattern-match definition: `definition f : A → B \| pat1 => e1 \| pat2 => e2`.
 

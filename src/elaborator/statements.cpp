@@ -112,6 +112,11 @@ void Elaborator::elaborateTopStatementDispatch(
             elaborateInstanceDeclaration(*instance);
             return;
         }
+        if (auto* foldOperation =
+                std::get_if<SurfaceFoldOperationDeclaration>(&statement)) {
+            elaborateFoldOperationDeclaration(*foldOperation);
+            return;
+        }
         throw ElaborateError("unhandled top-level statement variant");
     }
 
@@ -290,6 +295,91 @@ void Elaborator::elaborateInstanceDeclaration(
         entry.parameterCount = parameterCount;
         entry.universeParameters = declarationUniverseParameters(*decl);
         environment_.canonicalInstanceRegistry[key] = std::move(entry);
+    }
+
+void Elaborator::elaborateFoldOperationDeclaration(
+        const SurfaceFoldOperationDeclaration& declaration) {
+        Frame frame(*this, "fold_operation (" + declaration.operatorSymbol
+                    + ") on " + declaration.carrierName);
+        const Declaration* witness =
+            environment_.lookup(declaration.witnessName);
+        if (!witness) {
+            throwElaborate("fold_operation: unknown witness '"
+                           + declaration.witnessName + "'");
+        }
+        ExpressionPointer type = declarationType(*witness);
+        if (!type) {
+            throwElaborate("fold_operation: could not determine the type "
+                           "of witness '" + declaration.witnessName + "'");
+        }
+        // The witness must be a ground (unparameterized) proof of
+        // `IsMonoid(Carrier, operation, identity)` — read the three
+        // arguments straight off the application spine.
+        std::vector<ExpressionPointer> reversedArguments;
+        ExpressionPointer cursor = type;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            reversedArguments.push_back(application->argument);
+            cursor = application->function;
+        }
+        if (headConstantName(cursor) != "IsMonoid"
+            || reversedArguments.size() != 3) {
+            throwElaborate(
+                "fold_operation: witness '" + declaration.witnessName
+                + "' must prove IsMonoid(Carrier, operation, identity) "
+                "with a concrete carrier (no parameters)");
+        }
+        ExpressionPointer carrierArgument = reversedArguments[2];
+        ExpressionPointer operationArgument = reversedArguments[1];
+        ExpressionPointer identityArgument = reversedArguments[0];
+        std::string carrierName = headConstantName(carrierArgument);
+        if (carrierName != declaration.carrierName) {
+            throwElaborate(
+                "fold_operation: declared carrier '"
+                + declaration.carrierName + "' does not match the "
+                "witness's carrier '" + carrierName + "'");
+        }
+        std::string operationName = headConstantName(operationArgument);
+        std::string identityName = headConstantName(identityArgument);
+        if (operationName == "<unknown>" || identityName == "<unknown>") {
+            throwElaborate(
+                "fold_operation: the witness's operation and identity "
+                "must be named constants (e.g. Real.add, Real.zero)");
+        }
+        // The declared symbol must dispatch to the certified operation on
+        // this carrier — the registration may not contradict the operator
+        // registry.
+        auto operatorEntry = environment_.operatorRegistry.find(
+            std::make_tuple(declaration.operatorSymbol,
+                            carrierName, carrierName));
+        if (operatorEntry == environment_.operatorRegistry.end()) {
+            throwElaborate(
+                "fold_operation: no `operator (" + declaration.operatorSymbol
+                + ") on (" + carrierName + ", " + carrierName + ")` is "
+                "registered — declare the operator first");
+        }
+        if (operatorEntry->second != operationName) {
+            throwElaborate(
+                "fold_operation: `" + declaration.operatorSymbol + "` on "
+                + carrierName + " dispatches to '" + operatorEntry->second
+                + "', but the witness certifies '" + operationName + "'");
+        }
+        auto key = std::make_tuple(declaration.operatorSymbol, carrierName);
+        auto existing = environment_.foldOperationRegistry.find(key);
+        if (existing != environment_.foldOperationRegistry.end()
+            && existing->second.witnessName != declaration.witnessName) {
+            throwElaborate(
+                "fold_operation ambiguity: (" + declaration.operatorSymbol
+                + ", " + carrierName + ") is already registered via '"
+                + existing->second.witnessName + "'; refusing to also "
+                "register '" + declaration.witnessName
+                + "' (reject-on-ambiguity)");
+        }
+        Environment::FoldOperation entry;
+        entry.operationName = operationName;
+        entry.identityName = identityName;
+        entry.witnessName = declaration.witnessName;
+        environment_.foldOperationRegistry[key] = std::move(entry);
     }
 
 void Elaborator::elaborateOperatorDeclaration(

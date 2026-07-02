@@ -25,6 +25,7 @@ import Lists.list
 import Lists.map
 import Lists.append
 import Lists.range
+import Algebra.monoid
 import Algebra.monoid_power
 
 -- The generic fold with an explicit lower bound:
@@ -473,3 +474,28 @@ theorem Algebra.indexedAggregate_is_fold (A : Type(0)) (operation : A → A → 
         : Algebra.indexedAggregate(A, operation, identity, s, n)
           = Algebra.Fold(A, operation, identity, s, 0, n) :=
   done
+
+-- ----------------------------------------------------------------------
+-- Fold-capable operations on Natural. A `fold_operation` registration
+-- certifies (operation, identity, monoid laws) for an operator symbol on
+-- a carrier; the registry feeds the fold binder form and the ellipsis
+-- notation. Each numeric carrier registers its `+` and `*` where its
+-- monoid laws live.
+
+definition Natural.add_is_monoid : IsMonoid(Natural, Natural.add, 0) := {
+  claim Natural.add_associative;
+  claim Natural.zero_add;
+  claim Natural.add_zero;
+  done
+}
+
+fold_operation (+) on Natural := Natural.add_is_monoid
+
+definition Natural.multiply_is_monoid : IsMonoid(Natural, Natural.multiply, 1) := {
+  claim Natural.multiply_associative;
+  claim Natural.one_multiply;
+  claim Natural.multiply_one;
+  done
+}
+
+fold_operation (*) on Natural := Natural.multiply_is_monoid

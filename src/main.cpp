@@ -5138,6 +5138,14 @@ void loadCacheRecursive(Environment& environment,
         environment.forgetfulInstanceRegistry[entry.conclusionStructureName]
             .push_back(std::move(forgetful));
     }
+    for (const auto& entry : contents.foldOperationRegistrations) {
+        Environment::FoldOperation operation;
+        operation.operationName = entry.operationName;
+        operation.identityName = entry.identityName;
+        operation.witnessName = entry.witnessName;
+        environment.foldOperationRegistry[std::make_tuple(
+            entry.operatorSymbol, entry.carrierName)] = std::move(operation);
+    }
     alreadyLoaded.insert(cachePath);
 }
 
@@ -5414,6 +5422,10 @@ int verifyWithCache(const std::string& sourcePath,
             forgetfulBefore.insert(std::make_tuple(structure, entry.termName));
         }
     }
+    std::set<std::tuple<std::string, std::string>> foldOperationsBefore;
+    for (const auto& [key, _] : environment.foldOperationRegistry) {
+        foldOperationsBefore.insert(key);
+    }
 
     // A lazy whole-library snapshot for failing-proof suggestions: built
     // (once) only if a proof actually fails, so successful builds — the
@@ -5616,6 +5628,17 @@ int verifyWithCache(const std::string& sourcePath,
             entry.premiseIndex = forgetful.premiseIndex;
             entry.premiseStructureName = forgetful.premiseStructureName;
             cache.forgetfulRegistrations.push_back(std::move(entry));
+        }
+    }
+    for (const auto& [key, operation] : environment.foldOperationRegistry) {
+        if (!foldOperationsBefore.count(key)) {
+            CachedFoldOperationRegistration entry;
+            entry.operatorSymbol = std::get<0>(key);
+            entry.carrierName = std::get<1>(key);
+            entry.operationName = operation.operationName;
+            entry.identityName = operation.identityName;
+            entry.witnessName = operation.witnessName;
+            cache.foldOperationRegistrations.push_back(std::move(entry));
         }
     }
 

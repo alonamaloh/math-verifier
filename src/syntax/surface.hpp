@@ -1050,6 +1050,18 @@ struct SurfaceInstanceDeclaration {
     std::string name;
 };
 
+// `fold_operation (<symbol>) on <Carrier> := <witness>` — registers the
+// operation behind `<symbol>` on `<Carrier>` as fold-capable, certified
+// by `<witness> : IsMonoid(Carrier, operation, identity)`. The registry
+// feeds the fold binder form and the ellipsis recognizer (A8); like the
+// instance registries it is canonical per (symbol, carrier) and rejects
+// a second registration rather than searching.
+struct SurfaceFoldOperationDeclaration {
+    std::string operatorSymbol;
+    std::string carrierName;
+    std::string witnessName;
+};
+
 using SurfaceTopStatement = std::variant<
     SurfaceImportDeclaration, SurfaceUsingDeclaration,
     SurfaceInductiveDeclaration, SurfaceAxiomDeclaration,
@@ -1058,7 +1070,8 @@ using SurfaceTopStatement = std::variant<
     SurfaceCongruenceDeclaration,
     SurfaceCoercionDeclaration,
     SurfaceConventionDeclaration,
-    SurfaceInstanceDeclaration
+    SurfaceInstanceDeclaration,
+    SurfaceFoldOperationDeclaration
 >;
 
 struct SurfaceModule {

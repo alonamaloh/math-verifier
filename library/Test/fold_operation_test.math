@@ -1,0 +1,44 @@
+-- Feature test: the `fold_operation` registry (A8 step 1c of
+-- PLAN_LANGUAGE_IMPROVEMENT.md).
+--
+-- A registration `fold_operation (sym) on T := W` is accepted exactly
+-- when `W : IsMonoid(T, op, id)` and the operator registry dispatches
+-- `sym` on `(T, T)` to the same `op`. This file exercises:
+--   * a fresh registration in-module (Integer `+`, whose witness is
+--     proved here from the automatic ring laws);
+--   * idempotent re-registration with the same witness (allowed);
+--   * cross-module replay: Natural `+`/`*` register in
+--     Algebra.aggregation, and the ErrorTest fold_operation_duplicate
+--     proves the imported registration is live by colliding with it.
+module Test.fold_operation_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Algebra.monoid
+import Algebra.aggregation
+import Integer.ring
+
+definition Test.integer_add_is_monoid
+        : IsMonoid(Integer, Integer.add, Integer.zero) := {
+  claim Integer.add_associative;
+  claim Integer.add_identity_left;
+  claim Integer.add_identity_right;
+  done
+}
+
+fold_operation (+) on Integer := Test.integer_add_is_monoid
+
+-- Re-registering the SAME witness is idempotent, not an ambiguity.
+fold_operation (+) on Integer := Test.integer_add_is_monoid
+
+definition Test.integer_multiply_is_monoid
+        : IsMonoid(Integer, Integer.multiply, Integer.one) := {
+  claim Integer.multiply_associative;
+  claim Integer.multiply_identity_left;
+  claim Integer.multiply_identity_right;
+  done
+}
+
+fold_operation (*) on Integer := Test.integer_multiply_is_monoid

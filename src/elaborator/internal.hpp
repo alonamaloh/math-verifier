@@ -668,6 +668,13 @@ private:
     void elaborateInstanceDeclaration(
         const SurfaceInstanceDeclaration& declaration);
 
+    // Validate and register a `fold_operation (sym) on T := W`
+    // declaration. `W` must prove `IsMonoid(T, operation, identity)` for
+    // the same operation the operator registry dispatches `sym` to on
+    // `(T, T)`; the (sym, T) key is canonical (reject-on-ambiguity).
+    void elaborateFoldOperationDeclaration(
+        const SurfaceFoldOperationDeclaration& declaration);
+
     // Validate and register an `operator (sym) on (T1, T2) := F`
     // declaration. The function `F` must exist in scope and have type
     // `T1 → T2 → R` for some result type `R`. `T1` and `T2` must each

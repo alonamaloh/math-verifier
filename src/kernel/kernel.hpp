@@ -205,6 +205,22 @@ struct Environment {
     std::map<std::string, std::vector<ForgetfulInstance>>
         forgetfulInstanceRegistry;
 
+    // Fold-capable operations: `(operator symbol, carrier head) →
+    // {operation, identity, IsMonoid witness}`, populated by
+    // `fold_operation (+) on T := W;`. The certificate is a proof of
+    // `IsMonoid(T, operation, identity)`; the registry feeds the fold
+    // binder form and the ellipsis recognizer (A8). Canonical per key —
+    // a second registration for the same (symbol, carrier) is rejected
+    // at declaration time. Surface-elaborator concern; the kernel never
+    // reads it. Persisted across modules like the other registries.
+    struct FoldOperation {
+        std::string operationName;
+        std::string identityName;
+        std::string witnessName;
+    };
+    std::map<std::tuple<std::string, std::string>, FoldOperation>
+        foldOperationRegistry;
+
     const Declaration* lookup(const std::string& name) const {
         auto iterator = declarations.find(name);
         return iterator == declarations.end() ? nullptr : &iterator->second;

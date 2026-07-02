@@ -414,6 +414,27 @@ kernel's automatic reduction (e.g. `Natural.monus`, `Natural.power`).
 Skip when proofs about the function are computational (e.g.
 `Natural.distance` — opacity was tried and reverted).
 
+## Registrations
+
+Top-level declarations that feed elaborator registries (all canonical:
+a conflicting second registration is a declaration-time error, never a
+search):
+
+- `operator (sym) on (T1, T2) := F` — infix dispatch (`on (T)` for a
+  postfix operator).
+- `overload alias := F` — add `F` to the overload set `alias`.
+- `coercion (S, T) := F` — canonical embedding `S ↪ T`.
+- `instance N` — canonical structure instance (`N : IsGroup(T, …)`),
+  bundle (`N : Ring`), or forgetful derivation, keyed by carrier.
+- `congruence_under_binder F := L` — rewrite-under-binder lemma for
+  calc steps whose endpoints differ inside a lambda under head `F`.
+- `fold_operation (sym) on T := W` — register the operation behind
+  `sym` on `T` as **fold-capable**, certified by
+  `W : IsMonoid(T, operation, identity)`. The elaborator checks the
+  witness's operation is exactly what the operator registry dispatches
+  `sym` to on `(T, T)`. The registry feeds the fold binder form and
+  the ellipsis notation for sums/products.
+
 ## Common mistakes and how to avoid them
 
 ### Don't write nested `Equality.transitivity` — write `calc`
