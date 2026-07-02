@@ -44,7 +44,7 @@ the suggested order at the end of the plan.
 | 5 | A2 statement addressability + A7 `contradiction` kit | not started | |
 | 6 | A3/A4/A5 construct distillation | not started | |
 | 7 | A6 `eventually` | not started | |
-| 8 | C1–C6 (continuous; C4 with each construct) | not started | |
+| 8 | C1–C6 (continuous; C4 with each construct) | **in progress** | C1 elaborator side done 2026-07-02 (cb21629: since = unexempted synonym of by); next: the since→by sweep + breadcrumb deletion (elaborator-driven rewrite per C6, scoped to the clean manifest first) |
 | 9 | D: sealed structures (Phase 0 ℝ prototype first) | **spike done; design decided** | Phase-0 flip-measure-revert 2026-07-02 (7-file bill; the Real quotient-alias elaborator gap = Phase 1's first item); interface = closure-not-minimality, LUB canonical + Cauchy exported (D7) |
 | 10 | A8: Fold library → binder form → recognizer → series | **in progress** | step 1a done 2026-07-02 (42e9865): `indexedAggregate_zero`/`_one`/`_shift` named (peel-first via `_split` at cut 1 — shorter than the `Ring.Sum.shift` induction, same hypothesis set). Next: the `i₀` lower bound + range-convention unification + the op registry |
 
