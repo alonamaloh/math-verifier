@@ -661,6 +661,27 @@ round-trip test over the library's fold expressions.
 
 #### 11. Suggested implementation order
 
+**Groundwork survey (2026-07-02).** The generic fold largely EXISTS:
+`Algebra.indexedAggregate(A, op, identity, s, n)` (aggregation.math:32)
+is carrier-generic with loose `(op, identity, laws)` arguments, and
+`Real.partialSum`/`partialProduct` are already thin instances of it;
+`Ring.Sum` (ring_summation.math:19) is a second, bundled fold with an
+INCOMPATIBLE range convention (inclusive `0..n` vs count-based `k<n`;
+bridge lemma `Real.partialSum_eq_ring_sum` carries the off-by-one).
+Step-1 work is therefore: (a) unify on one convention with a genuine
+`i₀` lower bound (no existing fold has one); (b) add the missing named
+characterizing lemmas — singleton and peel-first exist only on
+`Ring.Sum` (`Ring.Sum.shift`), empty-range is definitional-but-unnamed
+everywhere; peel-last (`_add_one`) and split exist on all three;
+(c) build the fold-capability registry on the `instance` precedent
+(`instance CommutativeRing.is_ring`, keyed by carrier — see
+commutative_ring_algebra.math:69) — no `(op, identity, associativity)`
+registry exists today, laws travel as per-lemma hypotheses;
+`congruence_under_binder Ring.Sum := Ring.Sum.extensional`
+(ring_summation.math:64) is the precedent for registering fold lemmas
+into elaborator machinery. ~19 files consume partialSum/Product, ~15
+consume Ring.Sum — the re-expression sweep is real but bounded.
+
 1. Generic `Fold` + operation registry + characterizing lemmas in the
    library; re-express `partialSum`/`partialProduct`/`aggregation`
    over it. (Pure library work; independently valuable.)
@@ -1123,6 +1144,15 @@ down.
   on a Real, no `CauchyRationalSequence` reached through ℝ. Files that
   break enumerate exactly the missing boundary lemmas — that list is
   the deliverable, and it sizes Phase 1 before any syntax is built.
+  *Survey result (2026-07-02): the boundary already holds by
+  convention.* Every construction-piercing site sits inside Real/'s
+  own ~20 construction/boundary files (22 Real-destructures across 11
+  of them; 72 `CauchyRationalSequence.make` sites); the other 24
+  Real/ files, the IVT cone, exponential, and all of ComplexNumber/
+  contain ZERO construction vocabulary. So Phase 0 needs no consumer
+  rewrites — the risk surface is only whatever consumers currently
+  get from transparent δ-reduction rather than stated theorems, which
+  the opacity flip will enumerate directly.
 - **Phase 1 — language support** (`interface module` /
   `implementation module … implements`, scoped opacity, obligation
   check, export view); migrate the ℝ prototype onto it.
