@@ -98,8 +98,12 @@ notation needs no announcement.
   later step references the name textually; the lint for unused names
   stays.
 
-**DECIDE:** whether `claim`/`calc` remain parse-accepted (linted) or
-are removed outright after migration.
+**DECIDED-BY-DEFERRAL (owner, 2026-07-02):** the question of whether
+`claim`/`calc` stay parse-accepted is answered by the migration
+itself. Current expectation: they add no value and are removed
+outright once the sweep is done. If specific proofs read worse
+without them, revisit then — with the evidence in hand — and keep one
+or both. Do not relitigate before the migration.
 
 ---
 
@@ -269,22 +273,39 @@ constructor-driven.
 P(N)`, and single-constructor/quotient `cases` all destructure. Three
 overlapping spellings plus one masquerading case-analysis.
 
-**Design.**
-- One construct: `obtain <witnesses> with <property>;` — witness names
-  first, property stated inline (and thereafter statement-addressable
-  per A2), source inferred by type-match against in-scope facts, with
-  `from <fact-or-name>` for disambiguation.
-  Example: `obtain k with m = 2 * k;` (source: the in-scope `2 ∣ m`).
-- Patterns flatten **nested ∃/∧ in one step**:
-  `obtain m, n with 1 ≤ m ∧ 1 ≤ n ∧ m*m = 2*(n*n) from solutionExists;`
-  Conjunctions added to context are also registered
+**Design (DECIDED 2026-07-02: the surviving keyword is `choose`).**
+The original objection was never to a keyword — it was to `⟨w, p⟩`
+angle-bracket patterns revealing that `∃`/`∧` are tuples under the
+hood. The unified construct states the property as a proposition, so
+both spellings were acceptable; `choose … such that` wins on prose
+("choose ε > 0 such that …" is the textbook idiom for the dominant
+use, existential instantiation) and on migration cost (the library
+already speaks it; `obtain` is a residue). The consciously accepted
+cost: the intro/elim pair is asymmetric (`witness E with P`
+introduces, `choose w such that P` eliminates).
+
+- One construct for LOGIC: `choose <witnesses> such that <property>
+  [as <name>] [from <fact-or-name>];` — witness names first, property
+  stated inline (and thereafter statement-addressable per A2), source
+  inferred by type-match against in-scope facts when `from` is
+  omitted. Example: `choose k such that m = 2 * k;` (source: the
+  in-scope `2 ∣ m`). After A2, `as <name>` is pure documentation.
+- Witness lists flatten **nested ∃/∧ in one step**:
+  `choose m, n such that 1 ≤ m ∧ 1 ≤ n ∧ m*m = 2*(n*n) from
+  solutionExists;`. Conjunctions added to context are also registered
   conjunct-by-conjunct (already implemented — keep).
+- **The Prop/data boundary, made explicit:** `choose` is for `∃`/`∧`
+  elimination only. A genuine data record IS honestly tuple-shaped,
+  so pattern binders (`let ⟨a, b⟩ := r;`, `take x as ⟨a, b⟩`) remain
+  the right destructuring there — revealing real structure leaks
+  nothing false. The angle-bracket ban is a ban on spelling LOGIC as
+  tuples, not on destructuring data.
 - Quotient representatives get the mathematical name:
   `take x as representative (a, b);` — replacing constructor-spelled
   `cases x { | Representative.make(a,b) => … }` for the
   single-"branch" use. `by_representatives` and quotient `cases`
   forms route here.
-- `choose` survives, if at all, as a linted synonym.
+- `obtain` parses as a linted synonym for one sweep, then is removed.
 
 ---
 
@@ -304,8 +325,8 @@ needed.
   `eventually (m): { … }` / `eventually (m): <calc>` proves an
   eventual goal from eventual hypotheses, entering a scope where each
   eventual hypothesis is usable at the bound variable `m`;
-  (iii) hypothesis position: `choose N with eventually (m). Q(m) from
-  h;` when the threshold itself is needed.
+  (iii) hypothesis position: `choose N such that eventually (m). Q(m)
+  from h;` when the threshold itself is needed.
 - Monotone: `eventually P` + `∀m. P(m) → Q(m)` (or a prover-bridgeable
   gap) gives `eventually Q`.
 - Library side: define the predicate in `Real/sequence.math` (or a
@@ -330,11 +351,11 @@ needed.
   stated form is reachable by rewriting. Replaces most
   `by substituting` incantations with the transformed statement
   itself on the page.
-- **`since <lemma>` as a whole proof body** — the prover does the
+- **`by <lemma>` as a whole proof body** — the prover does the
   logical plumbing between the goal and the lemma's form: intros,
   ∃/∧ flattening, `Or.self`, argument discharge from context. Pure
   logic-shuffling with no mathematical content should never be on the
-  page. (`sqrt_two_irrational := since no_double_square`.)
+  page. (`sqrt_two_irrational := by no_double_square`.)
 - **Hypothesis discharge at call sites.** When applying a lemma or an
   IH, arguments whose types are propositions already in scope (up to
   defeq / cast-normalization) are filled automatically;
@@ -922,14 +943,30 @@ Reading, against the expectations above:
 ### C1. Synonym reduction
 
 One canonical spelling per intent; others parse-accepted + linted
-during migration, then removed. Current pairs to resolve: `by` vs
-`since` (proposal: `since <lemma>` = citation/hint, `by { … }` =
-sub-proof; a `since` the prover didn't need is lint-removable, a `by`
-is not); `obtain`/`choose`/`take as` (→ A5); `take` vs raw `↦`
-lambdas at proof top level (→ `take`; lambdas only in terms);
-`decide` (→ deleted by A4 `otherwise`); `done` (→ restate-the-goal,
-A1); the `done by substituting X unfolding Y` sub-language (→ A7
-`from`, `suffices by definition of`).
+during migration, then removed.
+
+**DECIDED (2026-07-02): `by` and `since` unify on `by`.** With
+`automatic` scoping the silent prover is boring by construction
+(standard tactics over local + `automatic` facts, `--explain` as the
+accountability backstop), so "kept explanation, exempt from the
+redundancy lint" no longer earns a keyword. `since` becomes a linted
+synonym for one sweep, then dies; `byIsExplanation` /
+`stepProofIsExplanation` and the redundancy exemption are deleted
+from the elaborator. The citation-vs-sub-proof distinction the old
+proposal wanted is already carried by the hint's SHAPE (identifier vs
+`{ … }` block) — the lint can differentiate without a second keyword.
+A reader-load-bearing redundant justification migrates to a stated
+fact (A1) or to `note P [by V];`, the designated verified comment.
+Consequence to schedule deliberately: un-exempting the former `since`
+sites makes `--check-redundant-by` flag the whole closes-today bucket
+(~42% of hinted sites) — that IS the C6 breadcrumb-deletion
+work-list, scoped per the clean manifest.
+
+Remaining pairs: `obtain`/`choose`/`take as` (→ A5, decided);
+`take` vs raw `↦` lambdas at proof top level (→ `take`; lambdas only
+in terms); `decide` (→ deleted by A4 `otherwise`); `done` (→
+restate-the-goal, A1); the `done by substituting X unfolding Y`
+sub-language (→ A7 `from`, `suffices by definition of`).
 
 ### C2. Error messages for the keyword-free world
 
@@ -1283,7 +1320,7 @@ keep this in the repo as the acceptance test for the migration):
 ```
 theorem Natural.two_divides_root (m : Natural) (squareEven : 2 ∣ m * m)
         : 2 ∣ m :=
-  since Natural.prime_divides_product
+  by Natural.prime_divides_product
 
 theorem Natural.no_double_square (m n : Natural)
         (mPositive : 1 ≤ m) (nPositive : 1 ≤ n)
@@ -1291,8 +1328,8 @@ theorem Natural.no_double_square (m n : Natural)
   by_strong_induction on m with no_smaller_solution;
   suppose m * m = 2 * (n * n) as equation;
 
-  2 ∣ m  since Natural.two_divides_root;
-  obtain k with m = 2 * k;
+  2 ∣ m  by Natural.two_divides_root;
+  choose k such that m = 2 * k;
 
   suppose k = 0 for contradiction {
     then m = 2 * 0 = 0;
@@ -1313,7 +1350,7 @@ theorem Natural.no_double_square (m n : Natural)
 
 theorem Natural.sqrt_two_irrational
         : ¬ ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n) :=
-  since Natural.no_double_square
+  by Natural.no_double_square
 ```
 
 And the analytic acceptance test, `LessOrEqual_of_pointwise_lower`
@@ -1330,10 +1367,10 @@ theorem Real.LessOrEqual_of_pointwise_lower
       by definition of Real.LessOrEqual;
   take ε > 0;
 
-  choose N with eventually (m). abs(s(m) - s(N)) < ε/2
+  choose N such that eventually (m). abs(s(m) - s(N)) < ε/2
       from sIsCauchy;
   eventually (m). -ε/2 < s(N) - b(m)
-      since pointwiseLower(N), by definition of Real.LessOrEqual;
+      by pointwiseLower(N), by definition of Real.LessOrEqual;
 
   eventually (m):
     -ε = -ε/2 + -ε/2
@@ -1380,11 +1417,10 @@ of the design:
    or gate on the symbolic-coefficient rewrite.
 7. **A7:** `decide` disappears from the proof surface; the value-level
    machinery underneath `if … then … else` in definitions survives.
-8. **DECIDE (convention reversals, want a conscious call):** C1 swaps
-   the current `by`/`since` redundancy roles (today `since` is the
-   redundancy-exempt kept hint); A5's `obtain … with` displaces
-   `choose … such that`, reversing the earlier readability ruling.
-   Both defensible, neither an accident to drift into.
+8. **DECIDED (owner, 2026-07-02):** both convention questions are
+   settled — `by`/`since` unify on `by` (C1), and the destructuring
+   construct keeps `choose … such that` with `obtain` retired (A5).
+   See those sections for the rationale and consequences.
 
 ---
 
