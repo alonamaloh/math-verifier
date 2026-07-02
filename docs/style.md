@@ -21,14 +21,15 @@ readability, not terseness. (Depth: `docs/conventions/`.)
   imported lemma. So the threshold for a `by` is now sharp and mechanical:
   **add `by <lemma>` exactly when the lemma is *not* `automatic`**, and
   otherwise leave the step bare. Don't annotate a step the prover already
-  closes — `since triangle_inequality`, `since weaken`, `since
-  add_preserves` are the kind of "obvious" facts a mathematician never
-  spells out; if they're `automatic`, drop them. When a *non*-automatic
-  lemma is needed at many sites and is itself obvious, prefer **marking it
-  `automatic`** over naming it at every call (mind the prover-perturbation
-  risk — test the whole build). `since` is now reserved for the rare case
-  where a *non-obvious strategic reason* genuinely helps the reader and the
-  prover doesn't need it; it is not for routine plumbing.
+  closes — `by triangle_inequality`, `by weaken`, `by add_preserves` are
+  the kind of "obvious" facts a mathematician never spells out; if
+  they're `automatic`, drop them. When a *non*-automatic lemma is needed
+  at many sites and is itself obvious, prefer **marking it `automatic`**
+  over naming it at every call (mind the prover-perturbation risk — test
+  the whole build). A redundant `by` is kept only for the rare
+  *non-obvious strategic reason* that genuinely helps the reader
+  (accepting the checker's warning); never for routine plumbing.
+  (`since`, the old exempt-explanation keyword, is retired.)
 - **`ring` / `field` first** for any commutative-ring / field identity.
   Reach for hand-written associativity/congruence only after they fail.
 
@@ -80,7 +81,7 @@ data records — `Ring`, a quotient representative, `Subtype` — **are** tuples
 `⟨…⟩` and `by_representatives x as ⟨a, b⟩` are fine for those.)
 
 - **Build `A ∧ B`**: state the parts and let the prover conjoin — bare `done`,
-  or `claim A since …; claim B since …; done`. Not `⟨proofA, proofB⟩`.
+  or `claim A by …; claim B by …; done`. Not `⟨proofA, proofB⟩`.
 - **Build a bundle from named proofs** (`IsField`, `IsEquivalenceRelation`, …):
   `claim <proofTerm>;` for each component, then `done`. `claim` accepts a
   *proof* (a lemma/hypothesis) and introduces its type as the fact, so you cite

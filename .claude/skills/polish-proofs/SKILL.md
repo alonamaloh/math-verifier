@@ -50,13 +50,18 @@ is a large readability win.)
 
 ## 3. Triage each finding — by readability, not by chasing zero
 
+(`since` is RETIRED (2026-07-02): it now parses as a plain synonym of
+`by` with no exemption and is being swept out of the sources — never
+write it. A hint you deliberately keep will stay flagged; that standing
+warning is the accepted cost until the stated-fact form lands.)
+
 | Finding | Resolution |
 |---|---|
 | Redundant `by ring` / `by <plumbing lemma>` on a calc step | **By-less it.** The calc already shows the intermediate forms; mechanism citations are noise. |
-| Redundant `by` on a step citing the **induction hypothesis** | **`since IH`** — keep the marker for where induction lands. |
-| Redundant `by <Lemma>` where the *named result is the insight* (a closed form, `absolute_value_multiplicative`, a `partition` equation, …) | **`since <Lemma>`** (argument-free) — keep the explanation; `since` is exempt from the check. |
+| Redundant `by` on a step citing the **induction hypothesis** | **Keep `by IH`** (accept the warning) — the marker for where induction lands. |
+| Redundant `by <Lemma>` where the *named result is the insight* (a closed form, `absolute_value_multiplicative`, a `partition` equation, …) | **Keep `by <Lemma>`** (argument-free; accept the warning) — the explanation is reader-load-bearing. |
 | Redundant `by` on a claim citing a self-evident fact (`0 < 1`) | **Bare claim.** The statement is its own explanation. |
-| Redundant `by` whose removal makes the prover **search expensively** (watch for the expensive-step warning re-appearing) | **Keep the hint as `since ring` / `since <reason>`** — performance-load-bearing, and `since` silences the checker. |
+| Redundant `by` whose removal makes the prover **search expensively** (watch for the expensive-step warning re-appearing) | **Keep the hint** — performance-load-bearing. |
 | `unused name` on a claim/calc-`as` | **Anonymize** (`claim T by V;` / drop the `as`) — unless the name is referenced later by name, or appears in a `cases … refining` list (known false positive: refining usage doesn't count — leave the name). |
 | Redundant `by <binder>` where the binder is an `obtain`/`suppose`/lambda hypothesis used nowhere else | **Leave it** — by-less'ing just moves the warning to an unused binder. |
 | A whole claim the prover derives without its stated proof | Try **deleting the scaffolding entirely** (the checker sometimes reveals a 5-line derivation is unnecessary); keep the claim itself only if it documents a milestone. |

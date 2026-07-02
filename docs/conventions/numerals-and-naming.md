@@ -148,7 +148,7 @@ as the mathematics — `(firstSum - secondSum) * (firstSum - secondSum)`,
 `mean < g → g * g < g * g` — and the file shrank ~25%.
 
 **Caveat — `let` is ζ-transparent *except to `ring`/`field`*.** The kernel
-unfolds the `let` for def-eq, and the matcher unfolds it too (so `since <lemma>`,
+unfolds the `let` for def-eq, and the matcher unfolds it too (so `by <lemma>`,
 `IsNonneg(…)` decomposition, relation steps, and `by substituting` all see
 through the name to its value). But `ring` / `field` / `linear_combination`
 treat a `let`-bound value as an opaque **atom** — they do NOT unfold it. So a

@@ -35,7 +35,7 @@ real limitation:
   only true *after* unfolding — `mean * mean - x*y = halfDiff * halfDiff`
   with `let mean := (x+y)/2` — won't close; write that one claim in the
   explicit `((x+y)/2) * …` form. The *matcher* does unfold `let`s, so
-  `since <lemma>` and relation steps over a `let` are fine; only the
+  `by <lemma>` and relation steps over a `let` are fine; only the
   algebra normalisers are blind. See `numerals-and-naming.md`.
 - **`ring` requires the carrier's `.add`, `.multiply`, and ring laws
   in scope.** For Real proofs, that typically means importing

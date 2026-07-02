@@ -206,9 +206,10 @@ lemma; `by <lemma> recalling (<fact>)` names the **lemma** and supplies
 the fact for its premise. Prefer the former when a single simple fact
 carries the step; reach for the latter when a combining lemma is needed.
 
-## Redundant- and unused-hint exemptions: `since` and `note`
+## The verified comment: `note`
 
-See `proof-style.md`. In short: `since <proof>` is `by <proof>` that the
-redundant-`by` check never flags (a kept explanation); `note P [by V];`
-is a `claim` that does *not* add the fact to the context (a verified
-comment), so it's outside both the unused and redundant checks.
+See `proof-style.md`. In short: `note P [by V];` is a `claim` that does
+*not* add the fact to the context (a verified comment), so it's outside
+both the unused and redundant checks. (`since <proof>` — formerly the
+redundancy-exempt spelling of `by` — is retired; it still parses as a
+plain synonym until the sweep finishes, but never write it.)

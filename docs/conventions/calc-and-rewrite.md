@@ -390,9 +390,9 @@ Two caveats remain:
 
 - **Function-valued `let`s are not β-reduced after ζ.** `let f := (k) ↦
   g(k);` makes `f(i)` unfold to `(λk. g k) i`, NOT to `g(i)` — so `ring`
-  and `since`/citation matching treat `f(i)` and `g(i)` as distinct
+  and `by`-citation matching treat `f(i)` and `g(i)` as distinct
   atoms (the unfold substitutes the value but stops short of β). Either
   do the algebra in the `g(i)` form and let a by-less `=` step fold to
   `f(i)` (the full defeq path *does* β-reduce), or pass explicit
-  arguments through the let (`by lemma(g(i))`, not argument-free
-  `since`).
+  arguments through the let (`by lemma(g(i))`, not an argument-free
+  citation).

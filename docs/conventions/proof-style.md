@@ -203,7 +203,7 @@ Concretely:
   proof that explains each step in *named mathematical steps* is better
   than a 10-line proof that requires unwinding three nested
   `Quotient.lift` calls in your head to follow. But the explanation
-  belongs in the proof code — a `calc` chain, named `claim`s, `since`
+  belongs in the proof code — a `calc` chain, named `claim`s, `by`
   citations — not in a comment narrating what the code should already say
   (see the comment maxim below).
 
@@ -227,8 +227,8 @@ Concretely:
   step wasn't saying enough. Triage every comment:
   - **A "what" comment is defeat.** `-- b divides 0 (every n divides 0)` over a
     bare `claim b ∣ 0;` puts the *reason* in prose, not code. Push it into the
-    proof — `claim b ∣ 0 since Natural.divides_zero;` — and delete the comment.
-    The lever is almost always a `since <named-lemma>`, a named `claim`, a
+    proof — `claim b ∣ 0 by Natural.divides_zero;` — and delete the comment.
+    The lever is almost always a `by <named-lemma>`, a named `claim`, a
     `calc` form, or `take`/`suppose`. (A claim stays bare only when a
     *tactic/computation* closes it — `ring`, defeq, the equality battery —
     where there is no lemma to name; see "don't justify routine computation".)
@@ -333,7 +333,7 @@ reach for the math-like form instead:
     induction in a comment AND counts as a direct call. Write it
     `by_induction on a with IH refining b, c, h { case zero: … case
     successor(predecessor): … }` instead: the hypothesis is the named local
-    `IH`, cited argument-free like any fact (`done since IH` / `done by IH`),
+    `IH`, cited argument-free like any fact (`done by IH`),
     so the recursion both reads as induction and is no longer a lemma call.
     Example — `Natural.add_cancel_left` (`library/Natural/arithmetic.math`):
     ```
@@ -341,7 +341,7 @@ reach for the math-like form instead:
       case zero: equalityHypothesis
       case successor(predecessor): {
         claim predecessor + b = predecessor + c;   -- strip the successor
-        done since IH
+        done by IH
       }
     }
     ```
@@ -360,14 +360,14 @@ reach for the math-like form instead:
     outer binders; `IH` (or `IH(<refined-hyp>)`) is the named hypothesis.
   - **Closers.** `done` and `okay` are precisely `claim goal` — a claim
     whose proposition is the `goal` (the expected type). A bare `done`/`okay`
-    discharges the goal by lookup; each also takes an optional `by <hint>`
-    (prover needs it) or `since <reason>` (kept explanation). `goal` itself is
-    only the NAME of the type being proved — a type reference (`claim goal`,
-    `note goal : T`), NOT a standalone closer (`goal by …` is rejected; write
-    `done by …` / `okay by …` / `claim goal by …`). Prefer **`since`** for an
-    illuminating reason — the induction hypothesis, the operative lemma —
-    **even when a bare closer would succeed**: we keep the explanation for the
-    reader regardless of how strong the auto-prover gets.
+    discharges the goal by lookup; each also takes an optional `by <hint>`.
+    `goal` itself is only the NAME of the type being proved — a type
+    reference (`claim goal`, `note goal : T`), NOT a standalone closer
+    (`goal by …` is rejected; write `done by …` / `okay by …` /
+    `claim goal by …`). Keep an illuminating `by <reason>` — the induction
+    hypothesis, the operative lemma — **even when a bare closer would
+    succeed** (accepting the redundancy warning): we keep the explanation
+    for the reader regardless of how strong the auto-prover gets.
   - Transitivity / a "`x` is strictly below itself" contradiction reads as
     an inequality **`≤`-calc**, never a positional `transitive` call:
     ```
@@ -476,10 +476,10 @@ returns its final non-`;`-terminated expression.
   is an implementation tell that the connective is encoded as a tuple.
 - **Building a connective — symmetric to destructuring it.** Don't write the
   constructor tuple either. To prove `A ∧ B`, state the parts and let the prover
-  conjoin: a bare `done`, or `claim A since …; claim B since …; done`. To prove
+  conjoin: a bare `done`, or `claim A by …; claim B by …; done`. To prove
   `∃ x. P`, `witness v with <proof of P(v)>`. To project a single axiom out of a
   bundled proof — associativity from an in-scope `IsGroup`, a leg of `IsRing`
-  brought in by `claim IsRing(…) since <r>.is_ring;` — a bare `done` suffices;
+  brought in by `claim IsRing(…) by <r>.is_ring;` — a bare `done` suffices;
   the prover decomposes the conjunction and finds the leg. (`⟨proofA, proofB⟩` /
   `⟨v, proof⟩` are the construction-side tells.) Genuine data records (`Ring`, a
   representative, `Subtype`) really are tuples, so `⟨…⟩` and `by_representatives x
@@ -506,7 +506,7 @@ returns its final non-`;`-terminated expression.
   `multiply_at_least_one` among many in-scope facts) it may not terminate in
   budget; keep those explicit.
 - **Proving a disjunction `A ∨ B`.** State the true disjunct and let the
-  auto-prover introduce the `∨`: `claim A since <reason>; done` (or `by`),
+  auto-prover introduce the `∨`: `claim A by <reason>; done`,
   NOT the raw constructor `Or.introduceLeft(<proof of A>)`. `done`'s
   disjunction-introduction picks whichever disjunct is in context. (Same for
   proving a universal: prefer `take x; …` — introduce the variable — over a
@@ -576,13 +576,14 @@ returns its final non-`;`-terminated expression.
   for the reader, it is never flagged unused or redundant. Use it to keep
   an intermediate fact visible even when the surrounding proof would close
   without it.
-- `since <proof>` — exactly `by <proof>` (same elaboration and
-  type-checking), except `--check-redundant-by` never flags it. Use it on
-  a calc step (`… = b since <reason>`) or a claim (`claim P since <reason>`)
-  to keep a load-bearing hint the auto-prover doesn't strictly need but
-  that explains the step to the reader. Mnemonic: `by` = the prover uses
-  it, `since` = the author explains it. (`note` is the *non-binding*
-  counterpart — a comment; `claim … since` keeps the fact in context.)
+- `since <proof>` — **retired** (2026-07-02): now a plain synonym of
+  `by` with no redundancy-check exemption, kept parse-accepted only
+  until the migration sweep finishes, then deleted. Never write it in
+  new proofs. Its old job — "a kept explanation the prover doesn't
+  need" — is served by `note P [by <proof>];` (the verified comment)
+  or, for the rare step where the named result *is* the insight, by
+  keeping the `by <Lemma>` and accepting the redundancy warning (the
+  author's keep-decision is the exemption now).
 - `change <type>;` — the *active* counterpart of `note goal`: assert
   `<type>` is definitionally equal to the current goal AND replace the
   goal by `<type>` for the rest of the block (the body is elaborated at
@@ -615,10 +616,13 @@ So, in order of preference for a step the auto-prover can close:
 2. **`note P [by …];`** — surface an intermediate fact for the reader
    without binding it into context (the proof closes without it). The
    "observe that …" aside.
-3. **`claim P since <proof>;`** / `… = b since <proof>` — keep a
-   load-bearing-looking citation the prover doesn't strictly need but
-   that explains the step. `since` (not `by`) signals "the author is
-   explaining," and the redundant-`by` check leaves it alone.
+3. **`claim P by <Lemma>;`** / `… = b by <Lemma>` *kept despite the
+   redundancy warning* — for the rare step where the named result
+   itself is the insight (the induction hypothesis, a closed form, a
+   big-name theorem). The redundant-`by` check will flag it; keeping
+   it anyway is the author's judgment call, and that judgment — not a
+   keyword — is what marks the hint as reader-load-bearing. (`since`,
+   the old keyword for this, is retired.)
 
 When the prover **cannot** close the step without help, the citation
 isn't an explanation — it's load-bearing. Prefer, in order:
@@ -826,11 +830,12 @@ rewriter.
   **by-less**. The calc already shows the intermediate form; the citation
   was noise.
 - **Redundant `by` on a *claim* that names the operative lemma** (often
-  with a long positional argument list) → rewrite as argument-free
-  **`since <Lemma>`**. `since` names the insight, drops the clutter, and is
-  *exempt* from the redundant-`by` check (it signals "the author is
-  explaining"). Prefer this over baring the claim, which would read as an
-  unexplained assertion.
+  with a long positional argument list) → go **argument-free** (`by
+  <Lemma>`) and then decide: if the named result is genuinely the
+  insight (IH, a closed form, a big-name theorem), **keep it** and
+  accept the persistent warning; otherwise **bare the claim** — the
+  stated proposition is its own explanation. (The old `since <Lemma>`
+  resolution is retired; there is no exempt keyword anymore.)
 
 **The cascade — expect it, and settle it.** Removing a `by` (or going
 argument-free) makes the auto-prover pick the needed fact out of context by
@@ -846,16 +851,16 @@ argument-free) makes the auto-prover pick the needed fact out of context by
    it too.
 
 Re-run the check after editing; the cascade is finite and converges to
-by-less routine steps + anonymous intermediate facts + `since`-cited
-operative lemmas. Stop short of churning when removal would *worsen*
+by-less routine steps + anonymous intermediate facts + a few kept
+`by`-cited operative lemmas (flagged, deliberately). Stop short of churning when removal would *worsen*
 things: by-less'ing a step that cites an `obtain`/`suppose` binder just
 moves the warning to an "unused binder" (use `as _`, or leave it); and a
 genuinely informative reduction *chain* in a `calc` is worth keeping even
 when the prover could skip it.
 
-**`by` vs `since` vs `note` — the mnemonic.** `by` = the prover needs it.
-`since` = a kept explanation the prover does *not* need (exempt from the
-redundant-`by` check). `note P [by …];` = a verified comment that is **not
-added to the context** — so never use `note` for a fact a later step must
-consume by type-match (it won't be there); use an anonymous `claim` for
-that.
+**`by` vs `note` — the mnemonic.** `by` = the prover needs it (or the
+author insists the reader does — a kept, flagged hint). `note P [by …];`
+= a verified comment that is **not added to the context** — so never use
+`note` for a fact a later step must consume by type-match (it won't be
+there); use an anonymous `claim` for that. (`since` is retired; it was
+the exempt-explanation keyword.)

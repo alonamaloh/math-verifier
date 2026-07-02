@@ -28,7 +28,7 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   are fine.
 - **A comment is an admission of defeat.** The proof should carry the
   reasoning itself: a comment explaining *what* a step does is a signal the
-  step wasn't saying enough — push it into the code (`since <named-lemma>`, a
+  step wasn't saying enough — push it into the code (`by <named-lemma>`, a
   named `claim`, a `calc` form) and delete the comment. A one-line *why*
   comment (a non-obvious strategy) may still earn its place, for now; kernel
   mechanics stay quarantined as `-- Implementation note:` in the foundational
@@ -75,8 +75,8 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   read this BEFORE writing proofs); `cases`/`by_induction` over
   pattern-match; `cases ... with`; `decide`; statement-level sugar
   (`claim`/`goal`/`obtain`/`choose`/`take`/`suppose`/`let`/`note`/
-  `change`/`unfold`); `since` (kept hint) and `note … by` (verified
-  comment); CIC-noise-reduction idioms; and the **redundancy-check
+  `change`/`unfold`); `note … by` (the verified comment; `since` is
+  retired); CIC-noise-reduction idioms; and the **redundancy-check
   polishing workflow** (`--check-redundant-by`… + the unused-name cascade
   and how to settle it).
 - **structures-and-inference.md** — name-bound `convention`s, implicit

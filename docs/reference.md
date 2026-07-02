@@ -60,12 +60,12 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 |---|---|
 | `claim P;` | assert `P`, auto-proved |
 | `claim <proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — claim its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
-| `claim P by V;` / `claim P since V;` | assert `P`, discharged by `V` |
+| `claim P by V;` | assert `P`, discharged by `V` (`since V` still parses as a dying synonym — never write it) |
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
 | `claim P by cases { in A as h: … in B as h: … }` | prove `P` by ∨-elimination |
 | `claim P by substituting eq;` | prove `P` by rewriting with `eq` |
 | `claim goal [by V]` | close the current goal (type from context) |
-| `done` / `okay` | ≡ `claim goal`; bare or with `by`/`since` |
+| `done` / `okay` | ≡ `claim goal`; bare or with `by` |
 | `note P [by V];` | a *checked comment*: verify `P` holds, then **discard** it — unlike `claim`, it does NOT bind `P`, so later steps don't see it |
 | `note goal : T;` | a checked assertion that the goal is (defeq) `T`; non-binding, goal unchanged |
 | `change T;` | replace the goal by a defeq `T` (this *does* change the proof state) |
@@ -119,12 +119,12 @@ End each with `;`; the block returns its final non-`;` expression.
 
 ## Inference & citation
 
-- `by L` / `since L` (argument-free): cite lemma `L`; its explicit
+- `by L` (argument-free): cite lemma `L`; its explicit
   arguments are inferred from the goal and premises discharged from
   context. Use this instead of applying `L` to positional arguments.
 - `?` — a hole in a function-call argument position, solved by unification
   from the goal/other arguments (does not invoke the auto-prover).
-- `recalling f, g` after a `by`/`since` hint — bring extra named facts into
+- `recalling f, g` after a `by` hint — bring extra named facts into
   the discharge scope.
 - A context hypothesis `A ∧ B` makes both `A` and `B` available as facts
   (conjunction-elimination, recursive) — no manual `And.left`/`And.right`.

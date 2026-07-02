@@ -110,19 +110,19 @@ not `Natural.add_successor(a, b)`. The system infers the arguments from the
 shape of the step. This is the heart of the preferred style — you cite the
 operative fact, not the call.
 
-There are two flavours of citation:
-
-- **`by <lemma>`** — "the prover needs this hint to close the step."
-- **`since <lemma>`** — "the prover does *not* need it, but I am keeping
-  the reason for the reader." Prefer `since` when the lemma is illuminating
-  (an induction hypothesis, the key lemma) even though a bare step would
-  also succeed.
+The citation keyword is **`by <lemma>`**. Usually it means "the prover
+needs this hint to close the step", but it is also right to keep a `by`
+the prover doesn't strictly need when the lemma is illuminating (an
+induction hypothesis, the key lemma) — the redundancy checker will flag
+it, and keeping it anyway is a deliberate author's call. (An older
+keyword `since` marked exactly those kept explanations; it is retired
+and being swept away.)
 
 ## Stating intermediate facts: `claim`
 
 `claim P` asserts `P` and adds it to the context, where the automatic
 prover and later steps can use it. By default the prover discharges it; a
-`by`/`since` hint helps when needed:
+`by` hint helps when needed:
 
 ```
 theorem Tutorial.two_divides_six : 2 ∣ 6 := {
@@ -186,7 +186,7 @@ Two things to keep in mind:
 
 To close the current goal, write `done` or `okay`. They are precisely
 `claim goal` — a claim whose statement is "the goal" (the type the context
-expects). Like any claim they take an optional `by`/`since`:
+expects). Like any claim they take an optional `by`:
 
 ```
   claim divisorPositive : 1 ≤ d by Natural.some_lemma;
