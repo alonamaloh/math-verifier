@@ -78,7 +78,6 @@ theorem Algebra.indexedAggregate_eq_list_product (A : Type(0))
         calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
                        s(predecessor))
-                 by Algebra.indexedAggregate_add_one
            = operation(List.product(A, operation, identity,
                            List.map(Natural, A, s, List.range_up(predecessor))),
                        s(predecessor))
@@ -97,15 +96,12 @@ theorem Algebra.indexedAggregate_eq_list_product (A : Type(0))
                      List.map(Natural, A, s, List.range_up(predecessor)),
                      List.map(Natural, A, s,
                          List.prepend(Natural, predecessor, List.empty(Natural)))))
-                 by List.product_append
            = List.product(A, operation, identity,
                  List.map(Natural, A, s,
                      List.append(Natural, List.range_up(predecessor),
                          List.prepend(Natural, predecessor, List.empty(Natural)))))
-                 by List.map_append
            = List.product(A, operation, identity,
                  List.map(Natural, A, s, List.range_up(1 + predecessor)))
-                 by List.range_up_add_one
   }
 
 -- ----------------------------------------------------------------------
@@ -122,7 +118,6 @@ theorem Algebra.indexedAggregate_pointwise (A : Type(0)) (operation : A → A �
         calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
                        s(predecessor))
-                 by Algebra.indexedAggregate_add_one
            = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
                        s(predecessor))
                  by IH
@@ -130,7 +125,6 @@ theorem Algebra.indexedAggregate_pointwise (A : Type(0)) (operation : A → A �
                        sequencePrime(predecessor))
                  by pointwiseEqual(predecessor)
            = Algebra.indexedAggregate(A, operation, identity, sequencePrime, 1 + predecessor)
-                 by Algebra.indexedAggregate_add_one
   }
 
 -- Agreement below the cut is enough — the terms at or above n are never
@@ -144,26 +138,23 @@ theorem Algebra.indexedAggregate_pointwise_below (A : Type(0)) (operation : A �
   by_induction on n with IH refining pointwiseEqual {
     case base: done
     case step(predecessor): {
-        claim predecessor < 1 + predecessor by Natural.lt_one_plus;
+        claim predecessor < 1 + predecessor;
         claim ∀ (k : Natural). k < predecessor → s(k) = sequencePrime(k) by {
             take k : Natural;
             suppose k < predecessor as kBelow;
             claim k < 1 + predecessor by Natural.lt_transitive;
-            done by pointwiseEqual
+            done
           };
-        claim topEqual : s(predecessor) = sequencePrime(predecessor) by pointwiseEqual;
+        claim s(predecessor) = sequencePrime(predecessor);
         calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
                        s(predecessor))
-                 by Algebra.indexedAggregate_add_one
            = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
                        s(predecessor))
                  by IH
            = operation(Algebra.indexedAggregate(A, operation, identity, sequencePrime, predecessor),
                        sequencePrime(predecessor))
-                 by topEqual
            = Algebra.indexedAggregate(A, operation, identity, sequencePrime, 1 + predecessor)
-                 by Algebra.indexedAggregate_add_one
       }
   }
 
@@ -195,7 +186,6 @@ theorem Algebra.indexedAggregate_split (A : Type(0)) (operation : A → A → A)
                  by ((1 + predecessor) + n = 1 + (predecessor + n))
            = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor + n),
                        s(predecessor + n))
-                 by Algebra.indexedAggregate_add_one
            = operation(operation(Algebra.indexedAggregate(A, operation, identity, s, n),
                                  Algebra.indexedAggregate(A, operation, identity,
                                      (j : Natural) ↦ s(n + j), predecessor)),
@@ -240,7 +230,6 @@ theorem Algebra.indexedAggregate_shift (A : Type(0)) (operation : A → A → A)
            by Algebra.indexedAggregate_split
      = operation(s(0), Algebra.indexedAggregate(A, operation, identity,
                      (j : Natural) ↦ s(1 + j), n))
-           by Algebra.indexedAggregate_one
 
 -- ----------------------------------------------------------------------
 -- The interchange (medial) law of a commutative monoid, the rearrangement
@@ -298,10 +287,8 @@ theorem Algebra.indexedAggregate_add (A : Type(0)) (operation : A → A → A)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor),
                        operation(Algebra.indexedAggregate(A, operation, identity, t, predecessor),
                                  t(predecessor)))
-                 by Algebra.indexedAggregate_add_one
            = operation(Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor),
                        Algebra.indexedAggregate(A, operation, identity, t, 1 + predecessor))
-                 by Algebra.indexedAggregate_add_one
   }
 
 -- A scalar that distributes over the aggregated operation pulls out.
@@ -319,7 +306,7 @@ theorem Algebra.indexedAggregate_scale (A : Type(0)) (operation : A → A → A)
         calc Algebra.indexedAggregate(A, operation, identity,
                  (k : Natural) ↦ scale(c, s(k)), 0)
            = identity
-           = scale(c, identity)   by scaleIdentity
+           = scale(c, identity)
            = scale(c, Algebra.indexedAggregate(A, operation, identity, s, 0))
     case step(predecessor):
         calc Algebra.indexedAggregate(A, operation, identity,
@@ -336,7 +323,6 @@ theorem Algebra.indexedAggregate_scale (A : Type(0)) (operation : A → A → A)
                  by distributes(Algebra.indexedAggregate(A, operation, identity, s, predecessor),
                         s(predecessor))
            = scale(c, Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor))
-                 by Algebra.indexedAggregate_add_one
   }
 
 -- A constant block aggregates to its monoid power.
@@ -357,7 +343,6 @@ theorem Algebra.indexedAggregate_constant (A : Type(0)) (operation : A → A →
            = operation(c, Monoid.power(A, operation, identity, c, predecessor))
                  by commutativity(Monoid.power(A, operation, identity, c, predecessor), c)
            = Monoid.power(A, operation, identity, c, 1 + predecessor)
-                 by Monoid.power_add_one
   }
 
 -- ----------------------------------------------------------------------
@@ -418,7 +403,6 @@ theorem Algebra.Fold_split (A : Type(0)) (operation : A → A → A)
                  by (c + (1 + predecessor) = 1 + (c + predecessor))
            = operation(Algebra.Fold(A, operation, identity, f, start, c + predecessor),
                        f(start + (c + predecessor)))
-                 by Algebra.Fold_add_one
            = operation(operation(Algebra.Fold(A, operation, identity, f, start, c),
                                  Algebra.Fold(A, operation, identity, f, start + c, predecessor)),
                        f(start + (c + predecessor)))
@@ -435,7 +419,6 @@ theorem Algebra.Fold_split (A : Type(0)) (operation : A → A → A)
                  by (start + (c + predecessor) = (start + c) + predecessor)
            = operation(Algebra.Fold(A, operation, identity, f, start, c),
                        Algebra.Fold(A, operation, identity, f, start + c, 1 + predecessor))
-                 by Algebra.Fold_add_one
   }
 
 -- Peel the first term: the split at cut 1, with the singleton collapsed.
@@ -453,7 +436,6 @@ theorem Algebra.Fold_shift (A : Type(0)) (operation : A → A → A)
                  Algebra.Fold(A, operation, identity, f, start + 1, c))
            by Algebra.Fold_split
      = operation(f(start), Algebra.Fold(A, operation, identity, f, start + 1, c))
-           by Algebra.Fold_one
      = operation(f(start), Algebra.Fold(A, operation, identity, f, 1 + start, c))
            by (start + 1 = 1 + start)
 
@@ -470,12 +452,10 @@ theorem Algebra.Fold_pointwise (A : Type(0)) (operation : A → A → A)
         claim f(start + predecessor) = g(start + predecessor) by pointwiseEqual;
         calc Algebra.Fold(A, operation, identity, f, start, 1 + predecessor)
            = operation(Algebra.Fold(A, operation, identity, f, start, predecessor), f(start + predecessor))
-                 by Algebra.Fold_add_one
            = operation(Algebra.Fold(A, operation, identity, g, start, predecessor), f(start + predecessor))
                  by IH
            = operation(Algebra.Fold(A, operation, identity, g, start, predecessor), g(start + predecessor))
            = Algebra.Fold(A, operation, identity, g, start, 1 + predecessor)
-                 by Algebra.Fold_add_one
       }
   }
 
@@ -490,11 +470,9 @@ theorem Algebra.indexedAggregate_is_fold (A : Type(0)) (operation : A → A → 
     case step(predecessor):
         calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor), s(predecessor))
-                 by Algebra.indexedAggregate_add_one
            = operation(Algebra.Fold(A, operation, identity, s, 0, predecessor), s(predecessor))
                  by IH
            = operation(Algebra.Fold(A, operation, identity, s, 0, predecessor), s(0 + predecessor))
                  by (0 + predecessor = predecessor)
            = Algebra.Fold(A, operation, identity, s, 0, 1 + predecessor)
-                 by Algebra.Fold_add_one
   }
