@@ -1931,16 +1931,34 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 // slotType is already in closed-over-localBinders form (Step
                 // 5b opens it with openOverLocalBinders), which is exactly the
                 // `goalClosed` autoProveClaim expects.
+                //
+                // The depth bump MUST unwind on every exit path. This used to
+                // be a bare ++/-- pair whose catch list missed
+                // AutoProverBudgetError: each budget-tripped discharge attempt
+                // (routine under the redundancy checker's 1000-step probes)
+                // leaked one increment, and once the leaks crossed
+                // kBackwardChainDepthCap (= 2) premise discharge silently shut
+                // off for the REST OF THE FILE — later real citations then
+                // failed with "premise could not be discharged" even though
+                // they verify in isolation.
                 ExpressionPointer proof = nullptr;
                 ++backwardChainingDepth_;
+                struct DepthDecrement {
+                    int& d;
+                    ~DepthDecrement() { --d; }
+                } depthDecrement{backwardChainingDepth_};
                 try {
                     proof = autoProveClaim(slotType, localBinders, line);
                 } catch (const ElaborateError&) {
                     proof = nullptr;
                 } catch (const TypeError&) {
                     proof = nullptr;
+                } catch (const AutoProverBudgetError&) {
+                    // A tripped budget just means this premise has no cheap
+                    // discharge; the slot stays unresolved rather than
+                    // aborting the whole citation.
+                    proof = nullptr;
                 }
-                --backwardChainingDepth_;
                 if (proof) {
                     elaboratedArgs[i] = proof;
                 } else {
