@@ -28,6 +28,28 @@ design, implementation notes, and open decisions. Anything marked
 
 ---
 
+## Status ledger
+
+Implementation spans many sessions. **Every session that works on this
+plan updates this table before it ends** (status + commits); deeper
+findings go into the owning section as a dated note. Steps refer to
+the suggested order at the end of the plan.
+
+| Step | Workstream | Status | Record |
+|------|------------|--------|--------|
+| 1 | B5 classifier (instrument hinted claims/calc steps) | **in progress** | started 2026-07-02 |
+| 2 | B1–B3 tier skeleton, context index, cast tier | not started | |
+| 3 | A1 keyword-free claims/calc | not started | |
+| 4 | B4 order automation in calc | not started | |
+| 5 | A2 statement addressability + A7 `contradiction` kit | not started | |
+| 6 | A3/A4/A5 construct distillation | not started | |
+| 7 | A6 `eventually` | not started | |
+| 8 | C1–C6 (continuous; C4 with each construct) | not started | |
+| 9 | D: sealed structures (Phase 0 ℝ prototype first) | not started | |
+| 10 | A8: Fold library → binder form → recognizer → series | not started | |
+
+---
+
 ## Part A — the statement language
 
 ### A1. Keyword-free claims and calc (drop `claim` and `calc`)
