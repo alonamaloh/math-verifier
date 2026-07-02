@@ -46,7 +46,7 @@ the suggested order at the end of the plan.
 | 7 | A6 `eventually` | not started | |
 | 8 | C1–C6 (continuous; C4 with each construct) | not started | |
 | 9 | D: sealed structures (Phase 0 ℝ prototype first) | not started | |
-| 10 | A8: Fold library → binder form → recognizer → series | not started | |
+| 10 | A8: Fold library → binder form → recognizer → series | **in progress** | step 1a done 2026-07-02 (42e9865): `indexedAggregate_zero`/`_one`/`_shift` named (peel-first via `_split` at cut 1 — shorter than the `Ring.Sum.shift` induction, same hypothesis set). Next: the `i₀` lower bound + range-convention unification + the op registry |
 
 ---
 
