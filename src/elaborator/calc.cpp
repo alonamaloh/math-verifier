@@ -579,11 +579,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                         emitHintClassification(
                             "calc", relationLabel, stepRelationType,
                             step.stepProof.get(),
-                            step.stepProofIsExplanation,
                             classifyAttempt != nullptr, step.line);
                     }
-                    // `since` is NOT exempt here either — per the C1
-                    // decision it is a dying synonym of `by`.
                     bool checkThisStep = !fromFactCitation
                         && reportRedundantBy_
                         && (step.relation == CalcRelation::Equality
@@ -1025,7 +1022,7 @@ ExpressionPointer Elaborator::elaborateCalc(
             // we descend the (previous, next) diff to the innermost differing
             // subterm, solve the lemma's arguments against that subterm, and
             // let the diff bridge wrap the result in the congruence. Lets the
-            // user write `since add_negate_left` on `p + 0 = p + ((-p')+p')`
+            // user write `by add_negate_left` on `p + 0 = p + ((-p')+p')`
             // instead of spelling out `add_negate_left(ring, p')`.
             if (step.stepProof
                 && step.relation == CalcRelation::Equality
@@ -1096,7 +1093,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                 }
             }
             // Orientation retry. A citation whose conclusion has a bare
-            // metavariable on one side — e.g. argument-free `since x + 0 = x`
+            // metavariable on one side — e.g. argument-free `by x + 0 = x`
             // on a REVERSED step `p = p + 0` — infers its arguments against
             // the goal and binds that side to the wrong endpoint, proving the
             // wrong equation. If the proof still doesn't match, re-elaborate

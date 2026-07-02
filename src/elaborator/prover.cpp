@@ -1486,7 +1486,7 @@ ExpressionPointer Elaborator::autoProveClaim(
                             << spent << " kernel-steps) inside "
                             << autoProveCallerLabel_
                             << " — the hint made the prover search; prefer "
-                            "`since <fact>` or a more direct hint so the "
+                            "`by <fact>` or a more direct hint so the "
                             "kernel checks the step directly\n";
                     }
                 }

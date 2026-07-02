@@ -576,12 +576,11 @@ returns its final non-`;`-terminated expression.
   for the reader, it is never flagged unused or redundant. Use it to keep
   an intermediate fact visible even when the surrounding proof would close
   without it.
-- `since <proof>` — **retired** (2026-07-02): now a plain synonym of
-  `by` with no redundancy-check exemption, kept parse-accepted only
-  until the migration sweep finishes, then deleted. Never write it in
-  new proofs. Its old job — "a kept explanation the prover doesn't
-  need" — is served by `note P [by <proof>];` (the verified comment)
-  or, for the rare step where the named result *is* the insight, by
+- `since <proof>` — **removed from the language** (2026-07-02): it no
+  longer parses at all. Never write it in new proofs. Its old job — "a
+  kept explanation the prover doesn't need" — is served by
+  `note P [by <proof>];` (the verified comment) or, for the rare step
+  where the named result *is* the insight, by
   keeping the `by <Lemma>` and accepting the redundancy warning (the
   author's keep-decision is the exemption now).
 - `change <type>;` — the *active* counterpart of `note goal`: assert
@@ -622,7 +621,8 @@ So, in order of preference for a step the auto-prover can close:
    big-name theorem). The redundant-`by` check will flag it; keeping
    it anyway is the author's judgment call, and that judgment — not a
    keyword — is what marks the hint as reader-load-bearing. (`since`,
-   the old keyword for this, is retired.)
+   the old keyword for this, was removed (2026-07-02) and no longer
+   parses.)
 
 When the prover **cannot** close the step without help, the citation
 isn't an explanation — it's load-bearing. Prefer, in order:
@@ -862,5 +862,6 @@ when the prover could skip it.
 author insists the reader does — a kept, flagged hint). `note P [by …];`
 = a verified comment that is **not added to the context** — so never use
 `note` for a fact a later step must consume by type-match (it won't be
-there); use an anonymous `claim` for that. (`since` is retired; it was
-the exempt-explanation keyword.)
+there); use an anonymous `claim` for that. (`since` — the old
+exempt-explanation keyword — was removed (2026-07-02) and no longer
+parses.)

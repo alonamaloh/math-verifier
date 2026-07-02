@@ -560,7 +560,6 @@ void Elaborator::emitHintClassification(
         const char* relationLabel,
         ExpressionPointer goalClosed,
         const SurfaceExpression* hint,
-        bool hintIsExplanation,
         bool bareCloses,
         int line) {
     if (!goalClosed) return;
@@ -638,7 +637,7 @@ void Elaborator::emitHintClassification(
     std::cerr << "[classify-hint]\t" << moduleName_ << ":" << line
         << "\tkind=" << kind
         << "\trel=" << relationLabel
-        << "\t" << (hintIsExplanation ? "since" : "by")
+        << "\t" << "by"
         << "\tcloses=" << (bareCloses ? 1 : 0)
         << "\tneg=" << negations
         << "\thead=" << (headName.empty() ? "<none>" : headName)

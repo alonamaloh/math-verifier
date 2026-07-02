@@ -29,7 +29,7 @@ readability, not terseness. (Depth: `docs/conventions/`.)
   the whole build). A redundant `by` is kept only for the rare
   *non-obvious strategic reason* that genuinely helps the reader
   (accepting the checker's warning); never for routine plumbing.
-  (`since`, the old exempt-explanation keyword, is retired.)
+  (`since`, the old exempt-explanation keyword, has been removed.)
 - **`ring` / `field` first** for any commutative-ring / field identity.
   Reach for hand-written associativity/congruence only after they fail.
 

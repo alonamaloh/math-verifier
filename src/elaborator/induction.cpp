@@ -980,8 +980,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
 
         // B5 classifier (`MATH_CLASSIFY_HINTS`): record this hinted claim's
         // shape for the tier-sizing report. The `closes` bit is the same
-        // budget-capped speculative re-proof the redundancy check runs —
-        // here for `since` hints too (classification, not a warning), and
+        // budget-capped speculative re-proof the redundancy check runs;
         // skipped for `unfolding` hints, whose transparency flip makes the
         // speculative success spurious (see the exemption note below).
         if (classifyHintsEnabled()) {
@@ -1006,14 +1005,13 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             }
             emitHintClassification(
                 "claim", "-", goalClosed, claim.byHint.get(),
-                claim.byIsExplanation, classifyAttempt != nullptr, line);
+                classifyAttempt != nullptr, line);
         }
 
         // `--check-redundant-by`: speculatively run the bare-`claim`
         // auto-prover on the same goal. If it would also discharge
-        // the goal, warn that the hint is redundant. `since` is NOT
-        // exempt: per the C1 decision (PLAN_LANGUAGE_IMPROVEMENT.md,
-        // 2026-07-02) it is a dying synonym of `by`, and a
+        // the goal, warn that the hint is redundant. (The old `since`
+        // exemption is gone with the keyword — C1/C6; a
         // reader-load-bearing justification belongs in a stated fact
         // or a `note`, not an unlintable hint.
         //
@@ -1098,7 +1096,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                 // When that match FAILS — which it does precisely when the
                 // stripped value arguments were what pinned the universe levels
                 // — it leaves elaborator state subtly corrupted, breaking a
-                // later citation in the same file (e.g. a `since fraction_equal`
+                // later citation in the same file (e.g. a `by fraction_equal`
                 // whose premise discharge then fails). For a monomorphic lemma
                 // the bare citation needs no levels, so the path is never taken.
                 // The check is a marginal "you can drop the args" hint; declining

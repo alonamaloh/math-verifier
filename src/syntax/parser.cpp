@@ -286,7 +286,7 @@ SurfaceExpressionPointer substituteSurfaceName(
         std::vector<SurfaceCalcStep> newSteps;
         for (const auto& step : calc->steps) {
             // Whole-struct copy preserves relation, relationOperator,
-            // stepProofIsExplanation, line, column — and any future field;
+            // line, column — and any future field;
             // only the rewritten sub-expressions are overwritten.
             SurfaceCalcStep newStep = step;
             newStep.nextExpression = substituteSurfaceName(
@@ -354,8 +354,7 @@ SurfaceExpressionPointer substituteSurfaceName(
             std::move(newProposition), structured->label,
             std::move(newByHint), structured->byCases,
             std::move(newArms), line, column,
-            structured->byInduction, structured->bySubstitution,
-            structured->byIsExplanation);
+            structured->byInduction, structured->bySubstitution);
     }
     if (auto* note = std::get_if<SurfaceNote>(&node.node)) {
         // `note goal : T;` / `note P [by V];` / `change T;` — recurse into
@@ -1782,7 +1781,7 @@ private:
             // `done` desugaring — `claim goal` — so closing a block, a `claim`,
             // and a `calc` step all run the one auto-prover, no exception.
             // An explicit `done`/`okay`/`goal`/proof term still works and is
-            // preferred when an illuminating `since <reason>` is worth keeping.
+            // preferred when an illuminating `by <reason>` is worth keeping.
             Token brace = peek();
             finalExpression = makeSurfaceStructuredClaim(
                 makeSurfaceGoal(brace.line, brace.column), /*label=*/"",
@@ -3361,13 +3360,6 @@ private:
             if (peek().kind == TokenKind::KeywordBy) {
                 consumeAny();  // 'by'
                 step.stepProof = parseCalcStepProof();
-            } else if (peek().kind == TokenKind::KeywordSince) {
-                // `since <proof>` — elaborated like `by`, but the proof is
-                // an intentional explanation, so the redundant-`by` check
-                // leaves it alone.
-                consumeAny();  // 'since'
-                step.stepProof = parseCalcStepProof();
-                step.stepProofIsExplanation = true;
             } else {
                 step.stepProof = nullptr;
             }
@@ -3401,7 +3393,7 @@ private:
         Token claimToken = consumeAny();  // 'claim' / 'done' / 'okay'
         // `done` and `okay` are math-style closers, synonyms of `goal`:
         // they take no proposition (it comes from the expected type) but DO
-        // accept an optional `by <hint>` / `since <proof>` — so `done by IH`
+        // accept an optional `by <hint>` — so `done by IH`
         // and `okay by add_zero` read as "…and we're done, by <reason>".
         // A bare `done` / `okay` still means "discharge the goal by lookup".
         bool isBareCloser =
@@ -3411,11 +3403,10 @@ private:
             // `done` / `okay` are precisely `claim goal`: a claim whose
             // proposition is the `goal` type-reference (resolved from the
             // expected type). They accept the same optional `by <hint>` /
-            // `since <proof>` tail, so `done by IH` ≡ `claim goal by IH`.
+            // `by <hint>` tail, so `done by IH` ≡ `claim goal by IH`.
             SurfaceExpressionPointer goalProposition =
                 makeSurfaceGoal(claimToken.line, claimToken.column);
-            if (peek().kind == TokenKind::KeywordBy
-                || peek().kind == TokenKind::KeywordSince) {
+            if (peek().kind == TokenKind::KeywordBy) {
                 return parseStructuredClaimTail(
                     claimToken, std::move(goalProposition));
             }
@@ -3448,16 +3439,8 @@ private:
         bool byCases = false;
         bool byInduction = false;
         bool bySubstitution = false;
-        bool byIsExplanation = false;
         std::vector<SurfaceStructuredClaimArm> arms;
-        if (peek().kind == TokenKind::KeywordSince) {
-            // `claim P since <proof>` — elaborated like `by <proof>` but
-            // exempt from the redundant-`by` check (an explanation kept for
-            // the reader). Only the plain-proof form; no cases/substitution.
-            consumeAny();  // 'since'
-            byHint = parseUnfoldingWrap(parseRecallingWrap(parseExpression()));
-            byIsExplanation = true;
-        } else if (peek().kind == TokenKind::KeywordBy) {
+        if (peek().kind == TokenKind::KeywordBy) {
             Token byToken = consumeAny();  // 'by'
             // `unfolding X[, …]` is a postfix transparency modifier that
             // piles onto ANY hint (a plain lemma, a structured claim, or —
@@ -3487,7 +3470,7 @@ private:
             std::move(proposition), std::move(label),
             std::move(byHint), byCases, std::move(arms),
             claimToken.line, claimToken.column, byInduction,
-            bySubstitution, byIsExplanation);
+            bySubstitution);
     }
 
     // `<hint> recalling <fact>, <fact>, …` — bring extra named facts into

@@ -2291,7 +2291,6 @@ private:
         const char* relationLabel,    // "=", "<=", "<" for calc; "-" for claim
         ExpressionPointer goalClosed, // the hinted goal / step proposition
         const SurfaceExpression* hint,
-        bool hintIsExplanation,       // `since` (true) vs `by` (false)
         bool bareCloses,
         int line);
 

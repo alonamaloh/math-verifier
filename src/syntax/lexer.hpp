@@ -49,7 +49,6 @@ enum class TokenKind {
     KeywordSubstitution,    // `by substitution` — auto-find equality + body
     KeywordSubstituting,    // `by substituting <eq>` — narrow to specified equality
     KeywordRecalling,       // `by <lemma> recalling <fact>, …` — facts in discharge scope
-    KeywordSince,           // `since <proof>` — like `by`, but exempt from the redundant-`by` check
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step

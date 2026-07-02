@@ -1373,7 +1373,7 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                         << ": ⟨…⟩ destructures a '" << constant->name
                         << "' — a logical connective, not publicly a tuple;"
                            " use `choose … such that …` (for ∃) or take the"
-                           " conjuncts via `done`/`since`/`by cases` (for ∧)"
+                           " conjuncts via `done`/`by cases` (for ∧)"
                            " instead of exposing its tuple encoding\n";
                 }
                 if (inductive->constructorNames.size() != 1) {

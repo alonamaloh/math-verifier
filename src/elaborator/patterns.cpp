@@ -1610,8 +1610,7 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 std::move(rewrittenArms),
                 node.line, node.column,
                 claim->byInduction,
-                claim->bySubstitution,
-                claim->byIsExplanation);
+                claim->bySubstitution);
             return rewrittenNode;
         }
         if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {

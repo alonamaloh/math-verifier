@@ -115,8 +115,8 @@ needs this hint to close the step", but it is also right to keep a `by`
 the prover doesn't strictly need when the lemma is illuminating (an
 induction hypothesis, the key lemma) — the redundancy checker will flag
 it, and keeping it anyway is a deliberate author's call. (An older
-keyword `since` marked exactly those kept explanations; it is retired
-and being swept away.)
+keyword `since` marked exactly those kept explanations; it has been
+removed from the language.)
 
 ## Stating intermediate facts: `claim`
 
@@ -246,11 +246,11 @@ theorem Tutorial.add_zero (n : Natural) : n + 0 = n :=
     case successor(k):
         calc successor(k) + 0
            = successor(k + 0)
-           = successor(k)        since IH
+           = successor(k)        by IH
   }
 ```
 
-Here `IH` has type `k + 0 = k`, and `since IH` tells the reader the last
+Here `IH` has type `k + 0 = k`, and `by IH` tells the reader the last
 step rests on it. Two common extensions:
 
 - **`refining h`** — when a hypothesis `h`'s type mentions the variable you

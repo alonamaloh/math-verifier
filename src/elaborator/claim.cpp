@@ -313,7 +313,7 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     // close that with reflexivity, no prover call. (The
                     // prover route costs tens of thousands of kernel steps
                     // per DIRECTION on real files; this path is what makes
-                    // `by substituting <eq>` as cheap as `since <eq>`.)
+                    // `by substituting <eq>` as cheap as `by <eq>`.)
                     {
                         bool plainEquality = true;
                         EqualityComponents components;

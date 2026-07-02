@@ -94,7 +94,7 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
             // equivalence (`RationalEquivalent`, `IntegerEquivalent`). WHNF
             // once to expose the head so the diff-wrap strategy (which WHNFs
             // internally, line 34) still fires; without this the prefilter
-            // bails and `done since h` cannot bridge `R b a` from `h : R a b`.
+            // bails and `done by h` cannot bridge `R b a` from `h : R a b`.
             expectedCouldFire = headIsEqualityConstant(
                 weakHeadNormalForm(
                     environment_,

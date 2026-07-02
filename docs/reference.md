@@ -47,12 +47,11 @@ expressions (kernel-defeq; pattern positions keep `successor`).
 ```
 calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
        ≤ c                  -- '≤'/'∣' step: argument-free `by L`, or by-less
-       < d   since R   as NAME
+       < d   by R      as NAME
 ```
 - Mixed relations compose (`=`,`≤`,`<`,`≥`,`>`,`∣`).
 - A by-less step is closed by the auto-prover.
-- `by L` justifies a step; `since R` is the same but kept as explanation
-  (exempt from the redundant-`by` lint). `as NAME` binds the step's fact.
+- `by L` justifies a step. `as NAME` binds the step's fact.
 - `substituting eq` / `rewrite(eq)` rewrite by an equality (prefer
   `substituting`; raw `rewrite` is a counted CIC leak). `eq` may be a
   proof, a proposition (`substituting (x = head)` — proved in place), or
@@ -65,7 +64,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 |---|---|
 | `claim P;` | assert `P`, auto-proved |
 | `claim <proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — claim its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
-| `claim P by V;` | assert `P`, discharged by `V` (`since V` still parses as a dying synonym — never write it) |
+| `claim P by V;` | assert `P`, discharged by `V` |
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
 | `claim P by cases { in A as h: … in B as h: … }` | prove `P` by ∨-elimination |
 | `claim P by substituting eq;` | prove `P` by rewriting with `eq` |

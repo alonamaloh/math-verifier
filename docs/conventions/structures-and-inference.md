@@ -211,5 +211,5 @@ carries the step; reach for the latter when a combining lemma is needed.
 See `proof-style.md`. In short: `note P [by V];` is a `claim` that does
 *not* add the fact to the context (a verified comment), so it's outside
 both the unused and redundant checks. (`since <proof>` — formerly the
-redundancy-exempt spelling of `by` — is retired; it still parses as a
-plain synonym until the sweep finishes, but never write it.)
+redundancy-exempt spelling of `by` — was removed from the language
+(2026-07-02) and no longer parses.)
