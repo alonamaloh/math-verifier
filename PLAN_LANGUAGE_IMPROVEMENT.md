@@ -38,7 +38,7 @@ the suggested order at the end of the plan.
 | Step | Workstream | Status | Record |
 |------|------------|--------|--------|
 | 1 | B5 classifier (instrument hinted claims/calc steps) | **done** | 2026-07-02; `MATH_CLASSIFY_HINTS` + `scripts/hint_classification_report.py`; findings in B5 (64.6% absorbable of 5807 sites) |
-| 2 | B1–B3 tier skeleton, context index, cast tier | **in progress** | tier-4 sign index v1 (21b1cb4) + v1.1 IsNonneg/alternatives/form-bridges: closes-today 36.2%→42.3% (+352 sites). B3 cast retry landed (test-proven; yield compounds with future families). Per-key vectors landed (deterministic order). **B1 stage 1a landed (2b3bdbd): context-fact memo — derivative 37s→5.0s, continuity→1.4s, full library re-verify 25.5s wall.** Next: `= 0` zeroness family, B1 stages 2–3 (statement-hash lookup = the A2 spine) |
+| 2 | B1–B3 tier skeleton, context index, cast tier | **in progress** | tier-4 sign index v1 (21b1cb4) + v1.1 IsNonneg/alternatives/form-bridges: closes-today 36.2%→42.3% (+352 sites). B3 cast retry landed (test-proven; yield compounds with future families). Per-key vectors landed. **B1 stage-1a memo tried and REVERTED (73ae506): A/B showed zero effect — the 2026-06-27 perf session already satisfied tier-0's speed rationale (derivative ~4.9s, continuity ~1.3s, full re-verify 25.5s wall today). B1's remaining value = the A2 statement-address spine + derived-fact blackboard, not speed.** Next: `= 0` zeroness family, A2 spine design |
 | 3 | A1 keyword-free claims/calc | not started | |
 | 4 | B4 order automation in calc | not started | |
 | 5 | A2 statement addressability + A7 `contradiction` kit | not started | |
@@ -924,6 +924,16 @@ plan that avoids an elaborator-wide refactor:
    still demands it** after 1–2 — i.e., only if hashing the binder
    vector itself shows up hot. Do not start with the invasive
    refactor.
+
+*Correction (2026-07-02, A/B-measured):* stage 1 was implemented and
+REVERTED — it has zero effect, because the 2026-06-27 perf session
+(context memoization + fused binder opening, see the
+`verification_perf_autoprover_scan` memory) already removed the
+scan's hot cost; the fact-list rebuild itself is cheap. So tier-0's
+PERF motivation is already satisfied; what remains valuable here is
+stage 2 — the statement-hash lookup structure — justified as the A2
+statement-address spine and the derived-fact blackboard, not as an
+optimization. Build it when A2 lands, not before.
 
 ### B2. The judgment-rule index (tier 4)
 
