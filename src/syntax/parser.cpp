@@ -2569,12 +2569,19 @@ private:
                 out.push_back(binary->right);
                 return;
             }
-            static const char* sameLevel[] = {"+", "-", "*", "/", "·"};
-            for (const char* other : sameLevel) {
-                if (binary->opSymbol == other) {
-                    throwHere("ellipsis requires a single operation; found `"
-                              + symbol + "` and `" + binary->opSymbol + "`");
-                }
+            // Only a SAME-PRECEDENCE sibling operator is a mixed chain
+            // (`1 + 2 - ... - n`). A tighter-binding operator is a
+            // legitimate leaf (`1*0 + ... + k*(k-1)`, `1/1 + 1/2 + …`).
+            auto precedenceGroup = [](const std::string& op) {
+                if (op == "+" || op == "-") return 1;
+                if (op == "*" || op == "/" || op == "·") return 2;
+                return 0;
+            };
+            if (precedenceGroup(binary->opSymbol) != 0
+                && precedenceGroup(binary->opSymbol)
+                       == precedenceGroup(symbol)) {
+                throwHere("ellipsis requires a single operation; found `"
+                          + symbol + "` and `" + binary->opSymbol + "`");
             }
         }
         out.push_back(node);
