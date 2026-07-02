@@ -119,7 +119,7 @@ theorem Real.partialSum_pair (s : Natural → Real) (N : Natural)
                  (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), 0)
       }
     case successor(p): {
-        claim indexStep : 2 * successor(p) = successor(successor(2 * p)) by ring;
+        claim indexStep : 2 * successor(p) = successor(successor(2 * p));
         calc Real.partialSum(s, 2 * successor(p))
            = Real.partialSum(s, successor(successor(2 * p)))
                  by indexStep
@@ -139,7 +139,6 @@ theorem Real.partialSum_pair (s : Natural → Real) (N : Natural)
            = Real.partialSum(
                  (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), p)
              + (s(2 * p) + s(successor(2 * p)))
-                 by ring
            = Real.partialSum(
                  (m : Natural) ↦ s(2 * m) + s(successor(2 * m)),
                  1 + p)
@@ -161,16 +160,13 @@ theorem Real.power_negate_parity (y : Real)
           Real.power(-y, 2 * m) = Real.power(y, 2 * m) ∧ Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)))
   | zero => {
       claim twoTimesZero : 2 * 0 = 0;
-      claim evenPart
-          : Real.power(-y, 2 * 0) = Real.power(y, 2 * 0)
+      claim Real.power(-y, 2 * 0) = Real.power(y, 2 * 0)
           by calc Real.power(-y, 2 * 0)
                 = Real.power(-y, 0)        by twoTimesZero
                 = Real.one
                 = Real.power(y, 0)
                 = Real.power(y, 2 * 0)     by twoTimesZero;
-      claim oddPart
-          : Real.power(-y, successor(2 * 0))
-            = -(Real.power(y, successor(2 * 0)))
+      claim Real.power(-y, successor(2 * 0)) = -(Real.power(y, successor(2 * 0)))
           by {
             claim succTwoTimesZero : successor(2 * 0) = 1;
             calc Real.power(-y, successor(2 * 0))
@@ -178,23 +174,18 @@ theorem Real.power_negate_parity (y : Real)
                = (-y) * Real.power(-y, 0)
                = (-y) * Real.one
                = -(y * Real.one)
-                     by ring
                = -(y * Real.power(y, 0))
                = -(Real.power(y, 1))
                = -(Real.power(y, successor(2 * 0)))
                      by succTwoTimesZero
           };
-      done by And.introduction(evenPart, oddPart)
+      done by And.introduction
     }
   | successor(m) => {
       obtain ⟨evenAt, oddAt⟩ from Real.power_negate_parity(y, m);
-      claim indexEven : 2 * successor(m) = successor(successor(2 * m)) by ring;
-      claim indexOdd
-          : successor(2 * successor(m))
-            = successor(successor(successor(2 * m)))
-          by ring;
-      claim evenPart
-          : Real.power(-y, 2 * successor(m)) = Real.power(y, 2 * successor(m))
+      claim indexEven : 2 * successor(m) = successor(successor(2 * m));
+      claim indexOdd : successor(2 * successor(m)) = successor(successor(successor(2 * m)));
+      claim Real.power(-y, 2 * successor(m)) = Real.power(y, 2 * successor(m))
           by calc Real.power(-y, 2 * successor(m))
                 = Real.power(-y, successor(successor(2 * m)))
                       by indexEven
@@ -206,9 +197,7 @@ theorem Real.power_negate_parity (y : Real)
                 = Real.power(y, successor(successor(2 * m)))
                 = Real.power(y, 2 * successor(m))
                       by indexEven;
-      claim oddPart
-          : Real.power(-y, successor(2 * successor(m)))
-            = -(Real.power(y, successor(2 * successor(m))))
+      claim Real.power(-y, successor(2 * successor(m))) = -(Real.power(y, successor(2 * successor(m))))
           by calc Real.power(-y, successor(2 * successor(m)))
                 = Real.power(-y, successor(successor(successor(2 * m))))
                       by indexOdd
@@ -220,7 +209,7 @@ theorem Real.power_negate_parity (y : Real)
                 = -(Real.power(y, successor(successor(successor(2 * m)))))
                 = -(Real.power(y, successor(2 * successor(m))))
                       by indexOdd;
-      done by And.introduction(evenPart, oddPart)
+      done by And.introduction
     }
 
 -- The two projections, as standalone facts.
@@ -249,10 +238,10 @@ theorem Real.SequenceConverges.subsequence_double
         (N : Natural) (aboveThreshold : threshold ≤ N) ↦ {
           claim doubleAbove : threshold ≤ 2 * N
               by {
-                claim N ≤ N + N by Natural.less_or_equal_add_right;
-                claim twoN : 2 * N = N + N by ring;
+                claim N ≤ N + N;
+                claim twoN : 2 * N = N + N;
                 claim N ≤ 2 * N by substituting twoN;
-                done by Natural.LessOrEqual.transitive
+                done
               };
           done by close(2 * N, doubleAbove)
         }
@@ -329,12 +318,7 @@ theorem Real.cosine_paired_series_converges (x : Real)
                                   ComplexNumber.i * ComplexNumber.from_real(x),
                                   successor(2 * m))),
                     N)
-                    by Real.partialSum_pair(
-                           (k : Natural) ↦
-                               ComplexNumber.realPart(
-                                   ComplexNumber.exponentialTerm(
-                                       ComplexNumber.i * ComplexNumber.from_real(x), k)),
-                           N)
+                    by Real.partialSum_pair
               = Real.partialSum(
                     (m : Natural) ↦
                         ComplexNumber.realPart(
@@ -382,7 +366,6 @@ theorem Real.cosine_paired_series_converges (x : Real)
                                       ComplexNumber.exponentialTerm(
                                           ComplexNumber.i * ComplexNumber.from_real(x),
                                           2 * m))
-                                    by ring
                            },
                            N);
   done by Real.SequenceConverges.of_pointwise(
@@ -472,12 +455,7 @@ theorem Real.sine_paired_series_converges (x : Real)
                                   ComplexNumber.i * ComplexNumber.from_real(x),
                                   successor(2 * m))),
                     N)
-                    by Real.partialSum_pair(
-                           (k : Natural) ↦
-                               ComplexNumber.imaginaryPart(
-                                   ComplexNumber.exponentialTerm(
-                                       ComplexNumber.i * ComplexNumber.from_real(x), k)),
-                           N)
+                    by Real.partialSum_pair
               = Real.partialSum(
                     (m : Natural) ↦
                         ComplexNumber.imaginaryPart(
@@ -526,7 +504,6 @@ theorem Real.sine_paired_series_converges (x : Real)
                                       ComplexNumber.exponentialTerm(
                                           ComplexNumber.i * ComplexNumber.from_real(x),
                                           successor(2 * m)))
-                                    by ring
                            },
                            N);
   done by Real.SequenceConverges.of_pointwise(
@@ -552,18 +529,13 @@ theorem Real.sine_paired_series_converges (x : Real)
 -- factor ≥ 1, so a! ≤ (a+1)!; the general case chains those.
 theorem Natural.factorial_le_succ (n : Natural)
         : Natural.factorial(n) ≤ Natural.factorial(successor(n)) := {
-  claim oneLeSucc : 1 ≤ successor(n);
-  claim scaled
-      : Natural.factorial(n) * 1 ≤ Natural.factorial(n) * successor(n)
-      by Natural.multiply_monotone_left(
-             Natural.factorial(n), 1, successor(n), oneLeSucc);
+  claim 1 ≤ successor(n);
+  claim scaled : Natural.factorial(n) * 1 ≤ Natural.factorial(n) * successor(n);
   calc Natural.factorial(n)
      = Natural.factorial(n) * 1
-           by ring
      ≤ Natural.factorial(n) * successor(n)
            by scaled
      = successor(n) * Natural.factorial(n)
-           by ring
      = Natural.factorial(successor(n))
 }
 
@@ -571,8 +543,7 @@ theorem Natural.factorial_le_succ (n : Natural)
 theorem Natural.factorial_le_add (a : Natural)
         : ∀ (k : Natural). Natural.factorial(a) ≤ Natural.factorial(k + a)
   | zero => {
-      claim Natural.factorial(a) ≤ Natural.factorial(a)
-          by Natural.LessOrEqual.reflexive;
+      claim Natural.factorial(a) ≤ Natural.factorial(a);
       done by substituting Natural.zero_add(a)
     }
   | successor(p) => {

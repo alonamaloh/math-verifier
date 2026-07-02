@@ -90,7 +90,7 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
                   = ((naturalQuotient * m : Natural) : Integer) + (naturalRemainder : Integer)
                   = (naturalQuotient : Integer) * (m : Integer) + (naturalRemainder : Integer)
                   = (m : Integer) * (naturalQuotient : Integer) + (naturalRemainder : Integer);
-        claim remainderLessThanM : naturalRemainder < m by Natural.lt_of_successor_le;
+        claim remainderLessThanM : naturalRemainder < m;
         ⟨(naturalQuotient : Integer), naturalRemainder,
          ⟨calc a
              = (j : Integer)
@@ -109,7 +109,7 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
         decide naturalRemainder = 0 {
           | yes remainderZero => {
               -- a = −(naturalQuotient·m) = m·(−naturalQuotient) + 0.
-              claim zeroBelowM : (0 : Natural) < m by Natural.zero_lt_of_one_le;
+              claim zeroBelowM : (0 : Natural) < m;
               ⟨-(naturalQuotient : Integer), 0,
                ⟨calc a
                    = -(j : Integer)
@@ -165,22 +165,18 @@ theorem Integer.has_euclidean_division (a b : Integer)
   cases Integer.sign_split(b) {
     | Or.introduceLeft(bNonneg) => {
         obtain ⟨m, bIsImage⟩ from bNonneg;
-        claim mImageNonzero : ¬((m : Integer) = Integer.zero)
+        claim ¬((m : Integer) = Integer.zero)
             by (mImageZero : (m : Integer) = Integer.zero) ↦
-                 bNonzero(calc b = (m : Integer) by bIsImage
-                                 = Integer.zero by mImageZero);
-        claim mPositive : 1 ≤ m
-            by Integer.positive_natural_of_image_nonzero(m, mImageNonzero);
+                 bNonzero(calc b = (m : Integer)
+                                 = Integer.zero);
+        claim mPositive : 1 ≤ m;
         obtain ⟨quotient, remainder, aEquation, remainderBelow⟩
             from Integer.divide_by_positive(a, m, mPositive);
         ⟨quotient, (remainder : Integer),
          ⟨calc a
              = (m : Integer) * quotient + (remainder : Integer)
                    by aEquation
-             = b * quotient + (remainder : Integer)
-                   by congruenceOf(
-                          (z : Integer) ↦ z * quotient + (remainder : Integer),
-                          Equality.symmetry(bIsImage)),
+             = b * quotient + (remainder : Integer) by bIsImage,
           Or.introduceRight(
               rewrite(
                   Equality.symmetry(
@@ -189,22 +185,17 @@ theorem Integer.has_euclidean_division (a b : Integer)
                       Equality.symmetry(
                           calc Integer.absolute_value_natural(b)
                              = Integer.absolute_value_natural((m : Integer))
-                                   by congruenceOf(
-                                          Integer.absolute_value_natural, bIsImage)
-                             = m
-                                   by Integer.absolute_value_natural_of_natural(m)),
+                             = m),
                       remainderBelow)))⟩⟩
       }
     | Or.introduceRight(bNegative) => {
         obtain ⟨m, bIsNegativeImage⟩ from bNegative;
-        claim mImageNonzero : ¬((m : Integer) = Integer.zero)
+        claim ¬((m : Integer) = Integer.zero)
             by (mImageZero : (m : Integer) = Integer.zero) ↦
-                 bNonzero(calc b = -(m : Integer) by bIsNegativeImage
-                                 = -(Integer.zero)
-                                       by congruenceOf((z : Integer) ↦ -z, mImageZero)
-                                 = Integer.zero by ring);
-        claim mPositive : 1 ≤ m
-            by Integer.positive_natural_of_image_nonzero(m, mImageNonzero);
+                 bNonzero(calc b = -(m : Integer)
+                                 = -(Integer.zero) by mImageZero
+                                 = Integer.zero);
+        claim mPositive : 1 ≤ m;
         obtain ⟨quotient, remainder, aEquation, remainderBelow⟩
             from Integer.divide_by_positive(a, m, mPositive);
         ⟨-quotient, (remainder : Integer),
@@ -213,10 +204,7 @@ theorem Integer.has_euclidean_division (a b : Integer)
                    by aEquation
              = (-(m : Integer)) * (-quotient) + (remainder : Integer)
                    by ring
-             = b * (-quotient) + (remainder : Integer)
-                   by congruenceOf(
-                          (z : Integer) ↦ z * (-quotient) + (remainder : Integer),
-                          Equality.symmetry(bIsNegativeImage)),
+             = b * (-quotient) + (remainder : Integer) by bIsNegativeImage,
           Or.introduceRight(
               rewrite(
                   Equality.symmetry(
@@ -225,11 +213,7 @@ theorem Integer.has_euclidean_division (a b : Integer)
                       Equality.symmetry(
                           calc Integer.absolute_value_natural(b)
                              = Integer.absolute_value_natural(-(m : Integer))
-                                   by congruenceOf(
-                                          Integer.absolute_value_natural,
-                                          bIsNegativeImage)
-                             = m
-                                   by Integer.absolute_value_natural_of_negate_natural(m)),
+                             = m),
                       remainderBelow)))⟩⟩
       }
   }

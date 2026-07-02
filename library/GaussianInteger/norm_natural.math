@@ -44,7 +44,6 @@ theorem Integer.add_nonneg (a b : Integer)
          = (j : Integer) + (k : Integer)
                by substitution
          = ((j + k : Natural) : Integer)
-               by Natural.to_integer.add_preserves
 }
 
 -- A non-negative integer is its own natural absolute value (as an integer).
@@ -52,10 +51,10 @@ theorem Integer.absolute_value_natural_of_nonneg (x : Integer) (xNonneg : Intege
         : (Integer.absolute_value_natural(x) : Integer) = x := {
   obtain ⟨n, xImage⟩ from xNonneg;
   calc (Integer.absolute_value_natural(x) : Integer)
-     = abs(x)             by Integer.absolute_value_natural_is_image
+     = abs(x)
      = abs((n : Integer))  by substituting xImage
-     = (n : Integer)       by Integer.absolute_value_of_natural
-     = x                   by xImage
+     = (n : Integer)
+     = x
 }
 
 -- The embedding reflects ≤: (a : ℤ) ≤ (b : ℤ) ⟹ a ≤ b.
@@ -69,21 +68,18 @@ theorem Natural.to_integer.LessOrEqual_reflects (a b : Natural)
                   by ring
             = (a : Integer) + (gap : Integer)
                   by substituting gapImage
-            = ((a + gap : Natural) : Integer)
-                  by Natural.to_integer.add_preserves;
+            = ((a + gap : Natural) : Integer);
   claim bEquation : b = a + gap by Natural.to_integer.injective;
-  claim a ≤ a + gap by Natural.less_or_equal_add_right;
+  claim a ≤ a + gap;
   done by substituting bEquation
 }
 
 -- N(z) = re² + im² is non-negative.
 theorem GaussianInteger.normInteger_nonneg (z : GaussianInteger)
         : Integer.IsNonneg(GaussianInteger.normInteger(z)) := {
-  claim Integer.IsNonneg(Product.first(coords(z)) * Product.first(coords(z)))
-      by Integer.square_is_nonneg;
-  claim Integer.IsNonneg(Product.second(coords(z)) * Product.second(coords(z)))
-      by Integer.square_is_nonneg;
-  done by Integer.add_nonneg
+  claim Integer.IsNonneg(Product.first(coords(z)) * Product.first(coords(z)));
+  claim Integer.IsNonneg(Product.second(coords(z)) * Product.second(coords(z)));
+  done
 }
 
 -- The Natural-valued norm.
@@ -93,8 +89,8 @@ definition GaussianInteger.normNatural (z : GaussianInteger) : Natural :=
 -- (normNatural z : ℤ) = normInteger z.
 theorem GaussianInteger.normNatural_is_normInteger (z : GaussianInteger)
         : (GaussianInteger.normNatural(z) : Integer) = GaussianInteger.normInteger(z) := {
-  claim Integer.IsNonneg(GaussianInteger.normInteger(z)) by GaussianInteger.normInteger_nonneg;
-  done by Integer.absolute_value_natural_of_nonneg
+  claim Integer.IsNonneg(GaussianInteger.normInteger(z));
+  done
 }
 
 -- b ≠ 0 ⟹ normNatural b ≥ 1 (else N(b) = 0 forces b = 0).
@@ -105,14 +101,12 @@ theorem GaussianInteger.normNatural_positive (b : GaussianInteger)
     let _ : GaussianInteger.normInteger(b) = Integer.zero :=
         calc GaussianInteger.normInteger(b)
               = (GaussianInteger.normNatural(b) : Integer)
-                    by GaussianInteger.normNatural_is_normInteger
               = (0 : Integer)
                     by normZero
-              = Integer.zero
-                    by Natural.to_integer.zero_preserves;
+              = Integer.zero;
     claim b = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
         by GaussianInteger.eq_zero_of_norm_zero;
-    done by bNonzero
+    done
   };
-  done by Natural.geq_one_when_not_zero
+  done
 }
