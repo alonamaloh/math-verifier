@@ -1,7 +1,11 @@
-# PLAN_LANGUAGE_IMPROVEMENTS.md — the declarative endgame
+# PLAN_LANGUAGE_IMPROVEMENT.md — the declarative endgame
 
 This plan distills a design review of the surface language (July 2026)
-into concrete workstreams. The organizing principle, stated once:
+into concrete workstreams. It is now the **single forward plan for the
+language**: it absorbs `PLAN_LUX_TRANSITION.md` (the 2026-06 transition
+plan, largely landed — see the lineage section at the end) and
+`PLAN_INTERFACE_IMPLEMENTATION.md` (the 2026-06-21 sealed-structures
+design, now Part D). The organizing principle, stated once:
 
 > **Every block in the language announces or concludes with an explicit
 > proposition.** A proof is a sequence of stated facts; the elaborator's
@@ -10,11 +14,13 @@ into concrete workstreams. The organizing principle, stated once:
 > isn't on the page — but plumbing that carries no mathematical content
 > should never be on the page either.
 
-The plan has three parts: (A) the statement language — collapsing the
+The plan has four parts: (A) the statement language — collapsing the
 construct zoo into a small core; (B) the auto-prover — a tiered,
 deterministic discharge engine that eliminates breadcrumb claims without
 reintroducing global theorem search; (C) supporting work — lints,
-diagnostics, documentation, migration.
+diagnostics, documentation, migration; (D) interface and implementation
+— module-level abstraction barriers so a type's construction is a sealed
+detail behind an axiomatic interface.
 
 Workstreams are ordered by leverage. Within each item: motivation,
 design, implementation notes, and open decisions. Anything marked
@@ -224,6 +230,14 @@ statement-head inside a `by cases` / `by induction` block — so it
 needs no global reservation and cannot collide with identifiers.
 The older `in (P):` experiments should be migrated, not kept as a
 synonym.
+
+**Interface interplay (Part D):** over a sealed `Natural` (D4) the
+structural clause is spelled `case n = k + 1 for some k:` and routes
+through the *exported* induction/coverage principle, never the
+constructor; the auto-generated coverage lemmas of this section become
+interface obligations. Same clause grammar, one more reason the
+recursor-emission must be principle-driven rather than
+constructor-driven.
 
 ---
 
@@ -508,11 +522,36 @@ carrier/op/identity/inverse/proof call sites are a raw-CIC tell.
 
 ### C6. Migration mechanics
 
-- Old spellings parse + lint for one full library sweep; scripted
-  rewrites where mechanical (`claim P since L;` → `P since L;`;
-  `decide P { yes h => A | no h => B }` → `by cases { case P: A
-  otherwise: B }`; breadcrumb-claim deletion driven by the B5
-  classifier).
+(The load-bearing lessons here are inherited from the Lux transition,
+which executed a sweep of this shape in June 2026.)
+
+- **The cost model: touch the bulk exactly once.** The analysis bulk
+  (`Real/` + `ComplexNumber/`, ~40% of the library) must be migrated in
+  ONE coordinated pass after the constructs are settled on smaller
+  layers — sweeping construct-by-construct re-touches the same proof
+  bodies repeatedly, and each extra touch re-derives the same reasoning
+  in a changing syntax. Corollary: land the A-constructs first, sweep
+  second.
+- **Strictly bottom-up by dependency layer**, `make -j 16 tests` green
+  after each coherent group, one reviewable commit per group:
+  Natural/Integer/IntegerMod → Rational → Lists/Set → Polynomial →
+  Real/ComplexNumber/GaussianInteger. The June sweep confirmed no file
+  is a self-contained migration — interface changes cascade both down
+  (structural matchers in consumers) and up (lemmas stated in the old
+  form) — so partial-layer migrations strand consumers.
+- **The mechanical/semantic split.** Syntax mapping (`claim P since L;`
+  → `P since L;`; `decide P { yes h => A | no h => B }` → `by cases {
+  case P: A otherwise: B }`; numeral rewrites; tuple sugar) absorbs
+  ~60–70% of per-file churn and is safe to automate because the kernel
+  re-checks every rewrite — a wrong transform fails to verify, the
+  safety net is exact. The semantic residue (choosing minimal citation
+  sets, characterising lemmas, restructuring term-position helpers) is
+  human/LLM work under any strategy. Breadcrumb-claim deletion is
+  driven by the B5 classifier.
+- **The rewriter is the elaborator, not a text script.** Ad-hoc
+  sed/perl passes over `.math` files are banned (they make a mess);
+  mechanical rewrites ride the parser/elaborator, which is also the
+  only thing that can respect nesting, comments, and layout.
 - The redundancy tooling becomes the style enforcer in the
   keyword-free world: distinguish "unused and unenlightening"
   (delete) from "unused but reader-load-bearing" (keep; the old
@@ -521,6 +560,212 @@ carrier/op/identity/inverse/proof call sites are a raw-CIC tell.
 - Editor/highlighting: with keywords gone, layout and punctuation
   carry structure; update the editor recipes so statements,
   justifications, and block structure are visually loud.
+
+---
+
+## Part D — interface and implementation (sealed structures)
+
+(Absorbs `PLAN_INTERFACE_IMPLEMENTATION.md`, 2026-06-21, and the
+opacity workstream of the Lux transition. The discipline is the
+disciplined-C++ one: consumers compile against a header; the
+translation unit is never seen.)
+
+### D1. Goal and principle
+
+Give the library true **abstraction barriers**: a type and its
+operations are presented to consumers as an *axiomatic interface* — a
+fixed set of operations and proven properties — while the construction
+lives behind a seal the rest of the library cannot see through.
+
+- Consumers see ℝ the way Spivak presents it — a complete ordered field
+  with a ℚ ↪ ℝ embedding — and nothing else. Swapping the Cauchy
+  construction for Dedekind cuts must be invisible to every consumer.
+- Consumers see `Natural` through `0`/`1`/`+`/`*`/`<`/induction and a
+  lemma collection from which anything they need is provable;
+  **`successor` is not exported at all.** The implementation file uses
+  it heavily — that is its job.
+
+**Sealed, proven, not assumed.** The interface's "axioms" are theorems
+*proved about the construction*, then sealed. The interface costs zero
+trust: it hides representation and proofs; it admits nothing. This is
+strictly better than an axiomatic foundation — the ergonomics of
+axioms with the soundness of a construction.
+
+### D2. Where we already are
+
+The library has been converging on this by convention; Part D makes it
+a checkable artifact. Already in place: `opaque definition` +
+characterising lemmas (`docs/conventions/opaque.md`); Integer and
+Rational as opaque quotients behind `difference_equal` /
+`fraction_equal` boundaries; algebraic bundles as the semantic version
+(an abstract `Ring` consumer can only use the axioms); and the
+`successor`-outside-`Natural/` campaign as a lint-enforced prototype of
+exactly this barrier. Two opacity spikes measured the retrofit cost
+(sealing `Natural.LessThan`: 3 files broke; sealing `Natural.multiply`:
+8 home-file unfolds + 2 downstream files) — every break a mechanical
+defeq-exploit fix, none structural. **Transform, do not greenfield.**
+
+What's missing: (a) sealing the *carrier type itself* (so the quotient
+cannot be unfolded or `by_representatives`-ed), (b) bundling a whole
+interface — type + operations + obligations — as one importable unit
+with real operators rather than bundle-projection noise, (c)
+kernel-level rather than lint-level enforcement.
+
+### D3. Surface design
+
+Two module kinds plus a sealing relation. The interface module declares
+the public view — abstract `type`, abstract operation `constant`s,
+operator wiring, optionally transparent derived definitions, and
+theorem *signatures* (the obligations):
+
+```
+interface module Real
+  type Real
+  constant Real.zero : Real
+  constant Real.add  : Real → Real → Real
+  constant Real.LessOrEqual : Real → Real → Proposition
+  constant Rational.to_real : Rational → Real
+  operator (+) on (Real, Real) := Real.add
+  …
+  definition Real.LessThan (x y : Real) := Real.LessOrEqual(x, y) ∧ x ≠ y
+  definition Real.IsSupremum (S : Set(Real)) (s : Real) := …
+
+  theorem Real.is_ordered_field : IsOrderedField(Real, …)
+  theorem Real.complete : ∀ (S : Set(Real)). Real.IsNonempty(S) →
+            Real.HasUpperBound(S) → ∃ (s : Real). Real.IsSupremum(S, s)
+  theorem Rational.to_real.preserves_add : …    -- the hom + order + injectivity packet
+```
+
+Deliberately NOT in the interface (consumers derive them): Archimedean
+property, density, IVT, suprema of specific sets. Minimality is the
+point, and doubles as the acceptance test (D6).
+
+The implementation module provides the opaque construction and
+discharges every obligation:
+
+```
+implementation module Real.cauchy implements Real
+  definition Real := Quotient(CauchyRationalSequence, CauchyEquivalent)
+  definition Real.add := …
+  theorem Real.is_ordered_field := <proof using representatives>
+  theorem Real.complete := <the Cauchy-completeness proof>
+```
+
+`implements` is checked at module load: every interface constant/type
+has a matching definition of definitionally-equal type; every theorem
+signature has a matching proof; the set is complete. Downstream,
+`import Real` sees only the interface view — bodies sealed (no
+δ-reduction), carrier never unfolding to the quotient. The
+implementation module is not on the ordinary import path.
+
+### D4. Eliminator export — the Natural interface
+
+ℝ has no eliminator problem (nothing eliminates a real). `Natural` is
+the opposite: **induction IS the interface.** The interface exports an
+induction principle stated without the constructor; the implementation
+discharges it with the raw recursor:
+
+```
+interface module Natural
+  type Natural
+  constant Natural.zero : Natural
+  constant Natural.add  : Natural → Natural → Natural
+  -- NB: successor is NOT exported. Naturals are built from 0, 1, +.
+
+  theorem Natural.induction
+        : ∀ (P : Natural → Proposition).
+            P(0) → (∀ (k : Natural). P(k) → P(k + 1)) → ∀ (n : Natural). P(n)
+```
+
+`by induction on n { case n = 0: … case n = k + 1 for some k, with
+IH : P(k): … }` (A4's unified clause syntax) desugars to the exported
+principle; `| successor(k) =>` patterns disappear from user space. This
+is the deep resolution of the successor-confinement campaign: the lint
+barrier becomes a kernel barrier, and the one construct the lint could
+never remove — constructor patterns — is removed by the eliminator
+export. Recursive *definitions* in user space ride the numeral-pattern
+recursion (`0` / `1 + n` patterns, already landed) re-based on the
+exported recursor.
+
+Semantics: **module-scoped opacity** (a body transparent inside its
+implementation module, opaque everywhere else — a small generalization
+of the existing per-definition flag) plus the obligation check (reusing
+the ordinary theorem-signature match). No kernel-soundness change; the
+kernel still checks every proof in full.
+
+### D5. Enforcement: the kernel seal retires the lints
+
+The leak/successor linters are advisory; a sealed type is enforced by
+the kernel — a consumer *cannot* δ-unfold ℝ to the quotient even by
+accident. Once a type is sealed, its lint retires. **Interim ratchet
+(until then):** re-arm the leak-report baseline after each migration
+group and wire a no-increase check into `make check` — carrier
+constructors outside the owning module, non-opaque definitions outside
+the foundational allowlist, opacity piercings: the number only goes
+down.
+
+### D6. Phased plan
+
+- **Phase 0 — sealed-ℝ prototype with today's machinery (no language
+  change).** Make the carrier and operations opaque outside their
+  defining files, route consumers through the field/order/completeness
+  theorems, and re-verify the whole IVT cone (`intermediate_value.math`
+  + imports) using only the interface: no `by_representatives`/`cases`
+  on a Real, no `CauchyRationalSequence` reached through ℝ. Files that
+  break enumerate exactly the missing boundary lemmas — that list is
+  the deliverable, and it sizes Phase 1 before any syntax is built.
+- **Phase 1 — language support** (`interface module` /
+  `implementation module … implements`, scoped opacity, obligation
+  check, export view); migrate the ℝ prototype onto it.
+- **Phase 2 — eliminator export**, then seal `Integer` (already an
+  opaque quotient; modest eliminator needs).
+- **Phase 3 — `Natural`** (D4): the hardest and last, where this part
+  and the successor campaign converge. Prep work already queued:
+  sealing `Natural.multiply`/`factorial` behind characterising lemmas
+  (reference implementation exists on the field-of-fractions branch).
+- **Phase 4 — the rest**: ℂ on a sealed ℝ, finite fields, polynomials.
+
+### D7. Costs, risks, open questions
+
+- **Loss of defeq.** Every ι/δ-reduction consumers lean on becomes a
+  propositional boundary lemma — the same bill Integer/Rational already
+  paid, just larger. Phase 0 measures it; the mitigation is a generous,
+  well-named boundary-lemma set published *with* the interface.
+- **Numerals.** `0`/`1`/`2`/`k + 1` for sealed types must elaborate via
+  interface constants, not constructors, and `ring`/`field` must still
+  see numerals. Note the Part-B interaction: over a sealed `Natural`,
+  tier-2 ground evaluation cannot ι-reduce — it must be lemma-emitting.
+- **Tactics over sealed carriers.** `ring`/`field` already work over
+  abstract bundles, so the path exists; verify they fire through the
+  interface axioms.
+- **Interface minimality vs convenience.** Every lemma promoted into an
+  interface is a promise to all future implementations — but "a
+  collection of lemmas from which you can prove anything you need"
+  also means extension must stay *cheap*: the discipline is "extend the
+  interface (and discharge the new obligation), never bypass it."
+  **DECIDE:** LUB vs Cauchy-completeness as ℝ's primitive completeness
+  axiom (equivalent over an Archimedean ordered field; LUB is Spivak's
+  — proposal: LUB in the interface, equivalence proved once).
+- **Uniqueness.** A complete ordered field is unique up to unique
+  isomorphism; stating (eventually proving) categoricity makes "swap
+  the construction" a theorem rather than a hope.
+
+### D8. Integration with Parts A–C
+
+- **A4:** structural-case exhaustiveness lemmas are interface
+  obligations; clause syntax `case n = k + 1 for some k:` routes
+  through the exported principle (note in A4).
+- **B1/B2:** interface theorems are the natural `automatic` set —
+  stated in dischargeable (proper-subterm-premise) form they feed the
+  tier-4 judgment index directly; implementation internals are never
+  automatic. An interface style rule: prefer stating obligations in
+  rule-admissible form.
+- **B3:** the embedding hom/order packet in an interface (`to_real.
+  preserves_*`) IS the morphism packet cast normalization consumes —
+  one declaration serves both.
+- **C6:** interface conversion of a layer and its syntax migration are
+  the same touch — schedule them together so the bulk is still touched
+  once.
 
 ---
 
@@ -540,6 +785,14 @@ carrier/op/identity/inverse/proof call sites are a raw-CIC tell.
 7. **A6** (`eventually`) — library + elaborator; unblocks rewriting
    Real/PAdic/ComplexNumber proofs at a fraction of current length.
 8. **C1–C6** interleaved throughout; C4 with every landed construct.
+9. **Part D** runs as a second track: **Phase 0 (sealed-ℝ prototype)
+   is library-only and can start immediately** — its
+   missing-boundary-lemma list is cheap information, like the B5
+   classifier. The `Natural.multiply`/`factorial` sealing (Phase-3
+   prep) likewise. Language support (D Phases 1–2) waits for A4 so the
+   eliminator export and the unified `by cases` land as one design;
+   Phase 3 (`Natural`) comes after the A-construct sweep so the bulk
+   is touched once (C6 cost model).
 
 ## Reference target
 
@@ -614,3 +867,71 @@ kernel (every construct and every tier emits kernel-rechecked terms);
 embeddings and dispatch rules are canonical, never searched; ambiguity
 is always a loud error, never a silent pick; and nothing appears on
 the page that a mathematician wouldn't write — in either direction.
+
+---
+
+## Review pins (2026-07-02 code-check)
+
+A read of the current elaborator/parser against this plan confirmed
+its factual claims and produced these amendments; treat them as part
+of the design:
+
+1. **A4:** keep `refining` / `cases … with eq` parse-accepted until
+   the substitution rule survives the full migration (~85 uses).
+   Substitution into arbitrary hypothesis types has historically hit
+   opacity walls; delete the escape hatches only after the general
+   rule is proven on the whole library.
+2. **A2 × B1:** dedup is hash-based but statement-matching is
+   defeq-based, so a user-stated fact and a silently derived one can
+   both match. Rule: statement-addressing prefers user-stated facts;
+   ambiguity errors fire only on ties among user-stated ones.
+3. **B1:** derived environment-level facts never export across the
+   file boundary — whether a file verifies must not depend on what
+   side conditions another file's proofs happened to derive.
+4. **A1:** rhetorical connectives may affect which proof is found and
+   how fast, never *whether* one is found. Pin this as an invariant or
+   the "noise word" story is false.
+5. **B2 boundary rule, explicit:** fact *search* is scoped by
+   `automatic`; syntactic *indexes* may be global (precedent: the
+   rewrite index already seeds from every imported equality lemma).
+6. **Tier 6** must respect the unary-coefficient ceiling of the ring
+   normaliser (proof size O(Σ|coefficient|)) — meter it accordingly,
+   or gate on the symbolic-coefficient rewrite.
+7. **A7:** `decide` disappears from the proof surface; the value-level
+   machinery underneath `if … then … else` in definitions survives.
+8. **DECIDE (convention reversals, want a conscious call):** C1 swaps
+   the current `by`/`since` redundancy roles (today `since` is the
+   redundancy-exempt kept hint); A5's `obtain … with` displaces
+   `choose … such that`, reversing the earlier readability ruling.
+   Both defensible, neither an accident to drift into.
+
+---
+
+## Lineage, document map, and the Lux rename
+
+**Folded into this plan and deleted** (git history is the record):
+
+- `PLAN_LUX_TRANSITION.md` (2026-06) — the transition executed and
+  merged to main 2026-06-19. Landed and recorded there: the induction
+  keystone, the opacity spikes (→ D2's "transform, do not greenfield"),
+  the cite-only validation (superseded by the `automatic`-tier model
+  Part B builds on), the baby library, the bottom-up sweep discipline
+  (→ C6). Its `1 + n`-keystone framing was reframed 2026-06-22 into
+  "confine the constructor asymmetry to the `Natural/` floor" — whose
+  final form is D4's kernel seal.
+- `PLAN_INTERFACE_IMPLEMENTATION.md` (2026-06-21) — now Part D,
+  updated with the A4/B/C6 integration points.
+
+`LUX_PLAN.md` (the old destination spec) is already gone; this
+document is the destination spec. Still-current companions:
+`LANGUAGE.md` (the as-is idiom reference — C4's completeness target),
+`PLAN_KERNEL.md`, `PLAN_COERCIONS.md`, `PLAN_CAST_NORMALIZATION.md`
+(B3's precursor), `PLAN_AUTOPROVER_FINGERPRINT.md` /
+`PLAN_READABILITY.md` / `PLAN_LESS_CIC_STYLE.md` (shipped-infrastructure
+records).
+
+**The rename.** The language becomes **Lux** when the reference target
+above verifies in its idealized form (end of step 6) — the moment the
+surface actually looks like the new language. Renaming earlier would
+brand transitional syntax and force a second identity migration; at
+the gate, docs, error messages, and editor recipes migrate once.
