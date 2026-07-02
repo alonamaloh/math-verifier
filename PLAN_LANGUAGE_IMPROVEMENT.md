@@ -44,7 +44,7 @@ the suggested order at the end of the plan.
 | 5 | A2 statement addressability + A7 `contradiction` kit | not started | |
 | 6 | A3/A4/A5 construct distillation | not started | |
 | 7 | A6 `eventually` | not started | |
-| 8 | C1–C6 (continuous; C4 with each construct) | **in progress** | C1 elaborator side done 2026-07-02 (cb21629: since = unexempted synonym of by); next: the since→by sweep + breadcrumb deletion (elaborator-driven rewrite per C6, scoped to the clean manifest first) |
+| 8 | C1–C6 (continuous; C4 with each construct) | **in progress** | C1 elaborator side done 2026-07-02 (cb21629). **since→by sweep + breadcrumb deletion DONE for the clean manifest** (2026-07-03). Sweep: 8d1783c (`kernel rewrite --since-to-by`, the lexer-driven C6 rewriter) + 3f23ee7 (1820 sites / 124 files). Docs/skill retaught post-C1 (1176f93). Breadcrumb pass: --check-redundant-by flagged 1133 sites in 117 files; 5 parallel-agent batches (631e253, 88ce001, a6b7332, 85cc493, abaea54) deleted ~1050 routine hints, kept ~70 deliberately (IH, split/partition equations, archimedean/IVT/Bezout-class citations; zero performance-restores needed), settled the unused-name cascade, and fixed the 4 pre-existing claim-by-calc leaks that had clean-check failing at 208/205 → **manifest floor now 204, budget resynced, library+tests+both ratchets green**. Remaining C6 work: the library-wide since sweep (~1100 sites outside the manifest, mechanical) + breadcrumb pass there, then delete the keyword + `stepProofIsExplanation`/`byIsExplanation` plumbing. Operational note: parallel agents + shared build/ works — agents refresh stale stage-1 interfaces with the MATH_STATEMENTS_ONLY rule (stale-cache exit code is inconsistent; key off the message text) |
 | 9 | D: sealed structures (Phase 0 ℝ prototype first) | **spike done; design decided** | Phase-0 flip-measure-revert 2026-07-02 (7-file bill; the Real quotient-alias elaborator gap = Phase 1's first item); interface = closure-not-minimality, LUB canonical + Cauchy exported (D7) |
 | 10 | A8: Fold library → binder form → recognizer → series | **in progress** | step 1a done (42e9865): indexedAggregate `_zero`/`_one`/`_shift`. **Step 1b done (0cb6791): `Algebra.Fold(op, id, f, start, count)` with the full unconditional lemma set (zero/add_one/one/split/shift/pointwise) + the indexedAggregate bridge; consumers untouched.** Next: op registry (`instance` precedent), re-home partialSum/Ring.Sum (step 1c), then the explicit binder form |
 
@@ -593,6 +593,25 @@ operation:
   Registration without an identity/associativity certificate is an
   error. Two registrations for the same operator symbol on the same
   carrier: declaration-time error (canonical, never searched).
+
+  *Step-1c design note (2026-07-02).* The certificate is exactly
+  `IsMonoid(carrier, op, identity)` (Algebra/monoid.math — assoc +
+  both identity laws, precisely what the Fold lemma set consumes as
+  per-lemma hypotheses today). Surface form mirrors the `operator`
+  declaration, since the key is the same (symbol, carrier) shape:
+  `fold_operation (+) on Real := Real.add_is_monoid;` where the RHS
+  names a proof of `IsMonoid(Real, Real.add, Real.zero)`. Elaborator
+  checks at declaration time: (1) the RHS type is IsMonoid applied to
+  (carrier, op, identity); (2) the symbol resolves to that same `op`
+  on that carrier in the operator registry; (3) the (symbol, carrier)
+  key is unregistered (reject-on-ambiguity, like the instance
+  registries). Stored as `foldOperationRegistry : (symbol, carrier) →
+  {operationName, identityName, monoidWitnessName}` on Environment,
+  serialized in the cache like `instanceRegistrations`. Consumers are
+  steps 2–4 (binder form, rewrite-index registration, recognizer);
+  step 1c itself validates via declaration-time error tests + a
+  Test/ feature file exercising registration for +/* on the numeric
+  carriers.
 - **Characterizing lemmas, registered in the rewrite index** — this
   is what makes the notation usable in proofs rather than merely
   pretty in statements:
