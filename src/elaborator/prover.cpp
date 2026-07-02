@@ -275,6 +275,28 @@ ExpressionPointer Elaborator::tryDisjunctionIntro(
 
 std::vector<Elaborator::ContextFact> Elaborator::collectLocalBinderFacts(
         const std::vector<LocalBinder>& localBinders) {
+        // B1 tier-0 stage 1a: exact-context memo (see the cache's
+        // declaration comment). Consecutive claims in one block hit
+        // the same context repeatedly; the rebuild below is what the
+        // ε-δ profiling showed dominating.
+        uint64_t cacheKey = 1469598103934665603ull;
+        for (const LocalBinder& binder : localBinders) {
+            cacheKey ^= binder.type ? binder.type->hash : 0;
+            cacheKey *= 1099511628211ull;
+        }
+        auto cached = localFactCache_.find(cacheKey);
+        if (cached != localFactCache_.end()
+            && cached->second.binderTypes.size() == localBinders.size()) {
+            bool identical = true;
+            for (size_t b = 0; b < localBinders.size(); ++b) {
+                if (cached->second.binderTypes[b].get()
+                        != localBinders[b].type.get()) {
+                    identical = false;
+                    break;
+                }
+            }
+            if (identical) return cached->second.facts;
+        }
         std::vector<ContextFact> facts;
         int N = static_cast<int>(localBinders.size());
         // Local binders (cost 1) — last-bound first, so the most
@@ -328,6 +350,16 @@ std::vector<Elaborator::ContextFact> Elaborator::collectLocalBinderFacts(
             rightFact.type = rightType;
             facts.push_back(std::move(rightFact));
         }
+        if (localFactCache_.size() >= 512) {
+            localFactCache_.clear();
+        }
+        LocalFactCacheEntry entry;
+        entry.binderTypes.reserve(localBinders.size());
+        for (const LocalBinder& binder : localBinders) {
+            entry.binderTypes.push_back(binder.type);
+        }
+        entry.facts = facts;
+        localFactCache_[cacheKey] = std::move(entry);
         return facts;
 }
 

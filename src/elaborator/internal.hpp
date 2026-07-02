@@ -5611,6 +5611,19 @@ private:
     // "<X>|<Y>" (a flat string so std::unordered_map works).
     mutable std::unordered_map<std::string, bool>
         unfoldExposesHeadCache_;
+    // B1 tier-0 stage 1a (PLAN_LANGUAGE_IMPROVEMENT.md): memo for
+    // `collectLocalBinderFacts`, which otherwise rebuilds the fact
+    // list — WHNF-decomposing every conjunction hypothesis — on every
+    // auto-prover call (the measured dominant cost of ε-δ files).
+    // Keyed by the ordered hash of the binder types; a hit is
+    // verified by per-position pointer identity of the (refcounted,
+    // so alive and stable) type expressions, making the cache exact.
+    // Cleared wholesale when it exceeds a small cap.
+    struct LocalFactCacheEntry {
+        std::vector<ExpressionPointer> binderTypes;
+        std::vector<ContextFact> facts;
+    };
+    std::unordered_map<uint64_t, LocalFactCacheEntry> localFactCache_;
     // Phase 3 lemma index. Each registered rewrite lemma — anything of
     // shape `Π x₁ … xₙ. Equality.{u}(carrier, LHS, RHS)` with no
     // universe parameters — is keyed by `spineHash(LHS)` (and again by
