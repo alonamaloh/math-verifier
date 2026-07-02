@@ -46,7 +46,7 @@ the suggested order at the end of the plan.
 | 7 | A6 `eventually` | not started | |
 | 8 | C1–C6 (continuous; C4 with each construct) | **in progress** | C1 elaborator side done 2026-07-02 (cb21629: since = unexempted synonym of by); next: the since→by sweep + breadcrumb deletion (elaborator-driven rewrite per C6, scoped to the clean manifest first) |
 | 9 | D: sealed structures (Phase 0 ℝ prototype first) | **spike done; design decided** | Phase-0 flip-measure-revert 2026-07-02 (7-file bill; the Real quotient-alias elaborator gap = Phase 1's first item); interface = closure-not-minimality, LUB canonical + Cauchy exported (D7) |
-| 10 | A8: Fold library → binder form → recognizer → series | **in progress** | step 1a done 2026-07-02 (42e9865): `indexedAggregate_zero`/`_one`/`_shift` named (peel-first via `_split` at cut 1 — shorter than the `Ring.Sum.shift` induction, same hypothesis set). Next: the `i₀` lower bound + range-convention unification + the op registry |
+| 10 | A8: Fold library → binder form → recognizer → series | **in progress** | step 1a done (42e9865): indexedAggregate `_zero`/`_one`/`_shift`. **Step 1b done (0cb6791): `Algebra.Fold(op, id, f, start, count)` with the full unconditional lemma set (zero/add_one/one/split/shift/pointwise) + the indexedAggregate bridge; consumers untouched.** Next: op registry (`instance` precedent), re-home partialSum/Ring.Sum (step 1c), then the explicit binder form |
 
 ---
 
@@ -361,6 +361,14 @@ needed.
   defeq / cast-normalization) are filled automatically;
   `no_smaller_solution(n, k)` supplies `n < m`, `1 ≤ n`, `1 ≤ k` from
   context. This generalizes `?` from goal-driven to context-driven.
+  *Known gap (hit in the field, 2026-07-02):* the current citation
+  premise-discharge scans LOCAL hypotheses only — it does not consult
+  `automatic` lemmas, so `by pointwiseEqual` fails to discharge a
+  premise like `start ≤ start + c` even though
+  `Natural.less_or_equal_add_right` is automatic and the bare claim
+  closes instantly. The workaround is stating the fact as a bare
+  claim first; the fix is routing the discharge scan through the same
+  tier stack the bare prover uses.
 - **`let` in definition bodies + module-local `open`.** Definitions
   like `bisectionStepWithDec` repeat 4-line subexpressions; allow
   `let` in definition bodies and a file-scoped
