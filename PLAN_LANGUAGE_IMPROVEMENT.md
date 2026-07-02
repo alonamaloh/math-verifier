@@ -45,7 +45,7 @@ the suggested order at the end of the plan.
 | 6 | A3/A4/A5 construct distillation | not started | |
 | 7 | A6 `eventually` | not started | |
 | 8 | C1–C6 (continuous; C4 with each construct) | not started | |
-| 9 | D: sealed structures (Phase 0 ℝ prototype first) | not started | |
+| 9 | D: sealed structures (Phase 0 ℝ prototype first) | **spike done; design decided** | Phase-0 flip-measure-revert 2026-07-02 (7-file bill; the Real quotient-alias elaborator gap = Phase 1's first item); interface = closure-not-minimality, LUB canonical + Cauchy exported (D7) |
 | 10 | A8: Fold library → binder form → recognizer → series | **in progress** | step 1a done 2026-07-02 (42e9865): `indexedAggregate_zero`/`_one`/`_shift` named (peel-first via `_split` at cut 1 — shorter than the `Ring.Sum.shift` induction, same hypothesis set). Next: the `i₀` lower bound + range-convention unification + the op registry |
 
 ---
@@ -663,7 +663,20 @@ cases` + tier-4 food). What it buys, precisely:
   The signed case then routes through absolute convergence. On this
   fragment the candidate inequality readings (∀N over partial sums /
   limit ≤ B / limsup ≤ B) all coincide — which is why deciding the
-  v1 reading would have been wasted work.
+  v1 reading would have been wasted work. Note this needs only
+  ADDITION and sup on [0, ∞], both total without any convention.
+- **ℝ̄ arithmetic stays PARTIAL (owner, 2026-07-02).** No `0·∞ = 0`
+  convention — it is as unmathematical as `1/0 = 0`, which this
+  library already refuses. Undefined combinations (`∞ − ∞`, `0·∞`,
+  `∞ + (−∞)`) carry proof obligations that the operation makes
+  sense, in the same spirit as honest division's nonzero
+  obligations — and dischargeable by the same machinery: a tier-4
+  `IsFinite`-style judgment family mirrors the structural `nonzero`
+  tactic, so the obligations stay off the page in the common cases.
+  Accepted cost, stated honestly: more side conditions than the
+  convention route (mathlib chose totality for a reason), but the
+  house already made this trade for `/` and built the discharge
+  machinery that makes it pleasant; consistency wins.
 - **What does NOT evaporate:** oscillating series
   (`1 − 1 + 1 − …`) have no limit even in ℝ̄, so a single total
   "value of any series" remains impossible — defining it as limsup
@@ -1202,9 +1215,14 @@ interface module Real
   theorem Rational.to_real.preserves_add : …    -- the hom + order + injectivity packet
 ```
 
-Deliberately NOT in the interface (consumers derive them): Archimedean
-property, density, IVT, suprema of specific sets. Minimality is the
-point, and doubles as the acceptance test (D6).
+What the interface exports is decided by CLOSURE over consumer needs,
+not minimality (see the D7 decision): theorems consumers genuinely
+reach for (density, Archimedean, Cauchy completeness) may be exported
+alongside the core even though they are derivable, because they are
+proved either way and buildability is the criterion. Whole-theorem
+consumers like IVT stay outside. The acceptance test (D6) is
+accordingly closure — no consumer needs anything off the list — which
+is what the Phase-0 spike measured.
 
 The implementation module provides the opaque construction and
 discharges every obligation:
@@ -1331,14 +1349,28 @@ down.
 - **Tactics over sealed carriers.** `ring`/`field` already work over
   abstract bundles, so the path exists; verify they fire through the
   interface axioms.
-- **Interface minimality vs convenience.** Every lemma promoted into an
-  interface is a promise to all future implementations — but "a
-  collection of lemmas from which you can prove anything you need"
-  also means extension must stay *cheap*: the discipline is "extend the
-  interface (and discharge the new obligation), never bypass it."
-  **DECIDE:** LUB vs Cauchy-completeness as ℝ's primitive completeness
-  axiom (equivalent over an Archimedean ordered field; LUB is Spivak's
-  — proposal: LUB in the interface, equivalence proved once).
+- **Interface minimality vs convenience — DECIDED (owner,
+  2026-07-02): buildability wins.** Nothing is ever assumed — every
+  interface entry is proved from the construction — so the question
+  was only which proved statements to export. The criterion is "easy
+  to build on top of," not axiomatic purity: the interface is the
+  CLOSURE of what consumers actually need (operationally: the
+  headline theorems the construction files already export — exactly
+  what the Phase-0 spike validated), not a minimal axiom set.
+  Concretely for completeness: **LUB (Spivak's form) is the
+  canonical completeness statement, and Cauchy completeness is
+  exported alongside it** — both proofs already exist
+  (supremum.math, cauchy_complete.math), so this costs nothing
+  today; the eventual nicety is re-deriving Cauchy completeness over
+  the interface rather than the construction (cauchy_complete.math
+  is already construction-vocabulary-free, so this is nearly true
+  now). A future alternative implementation discharges LUB and
+  derives Cauchy via the (then-generic) equivalence. The minimal
+  core (ordered field + LUB + embedding packet) remains identified
+  — not as the export boundary, but as the statement of the
+  categoricity theorem below. Extension discipline unchanged:
+  extend the interface and discharge the new obligation, never
+  bypass it.
 - **Uniqueness.** A complete ordered field is unique up to unique
   isomorphism; stating (eventually proving) categoricity makes "swap
   the construction" a theorem rather than a hope.
