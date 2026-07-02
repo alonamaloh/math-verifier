@@ -2548,7 +2548,30 @@ bool Elaborator::ellipsisTermsMatch(
     } catch (...) { /* fall through to ground evaluation */ }
     auto writtenValue = evaluateGroundNatural(writtenKernel);
     auto expectedValue = evaluateGroundNatural(expectedKernel);
-    return writtenValue && expectedValue && *writtenValue == *expectedValue;
+    if (writtenValue && expectedValue) {
+        return *writtenValue == *expectedValue;
+    }
+    // Final tier — one pass of registered characterizing equations, as a
+    // budget-capped bare-prover probe on the equality (§3: what lets
+    // `x ≡ x^1` verify against opaque `power` via the automatic
+    // power_one). Truth-only: the proof term is discarded.
+    try {
+        RedundancyBudgetGuard budgetGuard(*this);
+        LevelPointer universe = typeUniverseOf(localBinders, writtenKernel);
+        ExpressionPointer equality = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("Equality", {universe}), carrierType),
+                writtenKernel),
+            expectedKernel);
+        ExpressionPointer proof =
+            autoProveClaim(equality, localBinders, written->line);
+        return proof != nullptr;
+    } catch (const ElaborateError&) {
+    } catch (const TypeError&) {
+    } catch (const AutoProverBudgetError&) {
+    }
+    return false;
 }
 
 ExpressionPointer Elaborator::elaborateEllipsisFold(
