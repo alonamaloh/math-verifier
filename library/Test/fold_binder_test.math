@@ -94,14 +94,28 @@ theorem Test.sum_ground : (sum k from 1 to 3 of k) = 6 :=
      = ((0 + (1 + 0)) + (1 + 1)) + (1 + 2)
      = 6
 
--- Peel the top term with Fold_add_one (count 1 + n at lower bound 0).
+-- Peel the top term. A8 step 3: with `Algebra.Fold_add_one`/`Fold_zero`
+-- automatic, the peel-last step closes BY-LESS — the acceptance
+-- criterion for the fold notation being usable in proofs.
 theorem Test.sum_peel (s : Natural → Natural) (n : Natural)
         : (sum k from 0 to 1 + n of s(k))
           = (sum k from 0 to n of s(k)) + s(1 + n) :=
   calc (sum k from 0 to 1 + n of s(k))
-     = Natural.add(Algebra.Fold(Natural, Natural.add, 0, s, 0, 1 + n), s(0 + (1 + n)))
-           by Algebra.Fold_add_one
-     = (sum k from 0 to n of s(k)) + s(1 + n)   by (0 + (1 + n) = 1 + n)
+     = (sum k from 0 to n of s(k)) + s(1 + n)
+
+-- The §12 acceptance shape at Natural (times-2 form, no division):
+-- 2·(1 + 2 + … + n) = n(n+1) by induction, every step by-less or IH.
+theorem Test.triangular_times_two (n : Natural)
+        : 2 * (sum k from 1 to n of k) = n * (1 + n) :=
+  by_induction on n with IH {
+    case base: done
+    case step(p):
+        calc 2 * (sum k from 1 to 1 + p of k)
+           = 2 * ((sum k from 1 to p of k) + (1 + p))
+           = 2 * (sum k from 1 to p of k) + 2 * (1 + p)
+           = p * (1 + p) + 2 * (1 + p)   by IH
+           = (1 + p) * (1 + (1 + p))
+  }
 
 -- ----------------------------------------------------------------------
 -- `sum`, `product`, `to`, `of` remain ordinary identifiers.
