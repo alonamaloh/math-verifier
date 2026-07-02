@@ -374,6 +374,114 @@ bool endsWith(const std::string& text, const std::string& suffix) {
                         suffix.size(), suffix) == 0;
 }
 
+// Rebuild `term` with the subtree that IS `target` (pointer identity)
+// replaced. `replacement(depth)` supplies the substitute for the binder
+// depth at which the target was found — used both to splice in a
+// same-frame term (lifted under any crossed binders) and to abstract a
+// hole (BV at the crossing depth).
+template <typename Replacement>
+ExpressionPointer rebuildAtPointer(const ExpressionPointer& term,
+                                   const ExpressionPointer& target,
+                                   const Replacement& replacement,
+                                   int depth) {
+    if (term.get() == target.get()) return replacement(depth);
+    if (auto* application = std::get_if<Application>(&term->node)) {
+        return makeApplication(
+            rebuildAtPointer(application->function, target,
+                             replacement, depth),
+            rebuildAtPointer(application->argument, target,
+                             replacement, depth));
+    }
+    if (auto* pi = std::get_if<Pi>(&term->node)) {
+        return makePi(pi->displayHint,
+            rebuildAtPointer(pi->domain, target, replacement, depth),
+            rebuildAtPointer(pi->codomain, target, replacement,
+                             depth + 1));
+    }
+    if (auto* lambda = std::get_if<Lambda>(&term->node)) {
+        return makeLambda(lambda->displayHint,
+            rebuildAtPointer(lambda->domain, target, replacement, depth),
+            rebuildAtPointer(lambda->body, target, replacement,
+                             depth + 1));
+    }
+    if (auto* let = std::get_if<Let>(&term->node)) {
+        return makeLet(let->displayHint,
+            rebuildAtPointer(let->type, target, replacement, depth),
+            rebuildAtPointer(let->value, target, replacement, depth),
+            rebuildAtPointer(let->body, target, replacement, depth + 1));
+    }
+    return term;
+}
+
+// Abstract the subtree that IS `target` (pointer identity) out of
+// `term`, producing the body of a one-binder motive lambda: the target
+// becomes the motive's variable (BV(depth) under `depth` crossed
+// binders), and every OTHER BoundVariable free at the current depth —
+// a reference into the enclosing local frame — shifts up by one to
+// make room for the motive binder. Internal bound references are
+// untouched.
+ExpressionPointer abstractAtPointer(const ExpressionPointer& term,
+                                    const ExpressionPointer& target,
+                                    int depth) {
+    if (term.get() == target.get()) return makeBoundVariable(depth);
+    if (auto* bv = std::get_if<BoundVariable>(&term->node)) {
+        if (bv->deBruijnIndex >= depth) {
+            return makeBoundVariable(bv->deBruijnIndex + 1);
+        }
+        return term;
+    }
+    if (auto* application = std::get_if<Application>(&term->node)) {
+        return makeApplication(
+            abstractAtPointer(application->function, target, depth),
+            abstractAtPointer(application->argument, target, depth));
+    }
+    if (auto* pi = std::get_if<Pi>(&term->node)) {
+        return makePi(pi->displayHint,
+            abstractAtPointer(pi->domain, target, depth),
+            abstractAtPointer(pi->codomain, target, depth + 1));
+    }
+    if (auto* lambda = std::get_if<Lambda>(&term->node)) {
+        return makeLambda(lambda->displayHint,
+            abstractAtPointer(lambda->domain, target, depth),
+            abstractAtPointer(lambda->body, target, depth + 1));
+    }
+    if (auto* let = std::get_if<Let>(&term->node)) {
+        return makeLet(let->displayHint,
+            abstractAtPointer(let->type, target, depth),
+            abstractAtPointer(let->value, target, depth),
+            abstractAtPointer(let->body, target, depth + 1));
+    }
+    return term;
+}
+
+// Does any Constant in `term` satisfy the predicate?
+template <typename NamePredicate>
+bool containsConstantWhere(const ExpressionPointer& term,
+                           const NamePredicate& predicate) {
+    if (!term) return false;
+    if (auto* constant = std::get_if<Constant>(&term->node)) {
+        return predicate(constant->name);
+    }
+    if (auto* application = std::get_if<Application>(&term->node)) {
+        return containsConstantWhere(application->function, predicate)
+            || containsConstantWhere(application->argument, predicate);
+    }
+    if (auto* pi = std::get_if<Pi>(&term->node)) {
+        return containsConstantWhere(pi->domain, predicate)
+            || containsConstantWhere(pi->codomain, predicate);
+    }
+    if (auto* lambda = std::get_if<Lambda>(&term->node)) {
+        return containsConstantWhere(lambda->domain, predicate)
+            || containsConstantWhere(lambda->body, predicate);
+    }
+    if (auto* let = std::get_if<Let>(&term->node)) {
+        return containsConstantWhere(let->type, predicate)
+            || containsConstantWhere(let->value, predicate)
+            || containsConstantWhere(let->body, predicate);
+    }
+    return false;
+}
+
 } // namespace
 
 bool Elaborator::parseSignJudgment(ExpressionPointer proposition,
@@ -630,6 +738,116 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
         }
         return call;
     }
+    }
+
+    // ---- B3 cast retry ---------------------------------------------
+    // No rule fired and the subject carries casts: push them to the
+    // leaves (lemma-mediated, proof-carrying), retry — first a direct
+    // defeq scan of the local hypotheses at the normalized form, then
+    // the index — and transport the result back along the
+    // normalization equality. The normalized subject is cast-normal,
+    // so a nested retry is a no-op and the recursion terminates.
+    if (containsConstantWhere(judgment.subject,
+            [&](const std::string& name) {
+                return isCoercionFunctionName(name);
+            })) {
+        CastNormalForm normalized{};
+        try {
+            normalized = castPushToLeaves(judgment.subject, localBinders);
+        } catch (const ElaborateError&) {
+            normalized.proof = nullptr;
+        } catch (const TypeError&) {
+            normalized.proof = nullptr;
+        }
+        if (normalized.proof) {
+            ExpressionPointer normalizedGoal = rebuildAtPointer(
+                goalClosed, judgment.subject,
+                [&](int holeDepth) {
+                    return liftBoundVariables(
+                        normalized.term, holeDepth, 0);
+                }, 0);
+            // Direct hypothesis at the normalized spelling first (the
+            // structural pre-tactic scan saw only the ORIGINAL form).
+            ExpressionPointer proofAtNormalized;
+            {
+                Context openedContext =
+                    buildContextFromLocalBinders(localBinders);
+                ExpressionPointer normalizedOpened = openOverLocalBinders(
+                    normalizedGoal, localBinders, localBinders.size());
+                for (int j = static_cast<int>(localBinders.size()) - 1;
+                     j >= 0; --j) {
+                    ExpressionPointer candidateType = openOverLocalBinders(
+                        localBinders[j].type, localBinders, j);
+                    bool equal;
+                    try {
+                        equal = isDefinitionallyEqual(environment_,
+                            openedContext, candidateType,
+                            normalizedOpened);
+                    } catch (const TypeError&) {
+                        equal = false;
+                    }
+                    if (equal) {
+                        proofAtNormalized = makeBoundVariable(
+                            static_cast<int>(localBinders.size())
+                            - 1 - j);
+                        break;
+                    }
+                }
+            }
+            if (!proofAtNormalized) {
+                proofAtNormalized = trySignJudgmentRecursion(
+                    normalizedGoal, localBinders, depth - 1,
+                    allowFormBridge);
+            }
+            if (proofAtNormalized) {
+                try {
+                    ExpressionPointer carrier = closeOverLocalBinders(
+                        inferTypeInLocalContext(localBinders,
+                                                judgment.subject),
+                        localBinders, localBinders.size());
+                    LevelPointer level = typeUniverseOf(
+                        localBinders, judgment.subject);
+                    ExpressionPointer motive = makeLambda(
+                        "_sign_z", carrier,
+                        abstractAtPointer(goalClosed, judgment.subject,
+                                          0));
+                    // normalized.proof : subject = normalized.term;
+                    // flip it, then transport P(normalized) to
+                    // P(subject) — which β-reduces to the goal.
+                    ExpressionPointer flipped = makeConstant(
+                        "Equality.symmetry", {level});
+                    flipped = makeApplication(flipped, carrier);
+                    flipped = makeApplication(flipped, judgment.subject);
+                    flipped = makeApplication(flipped, normalized.term);
+                    flipped = makeApplication(flipped, normalized.proof);
+                    ExpressionPointer transported = makeConstant(
+                        "Equality.transport_proposition", {level});
+                    transported = makeApplication(transported, carrier);
+                    transported = makeApplication(transported, motive);
+                    transported = makeApplication(transported,
+                                                  normalized.term);
+                    transported = makeApplication(transported,
+                                                  judgment.subject);
+                    transported = makeApplication(transported, flipped);
+                    transported = makeApplication(transported,
+                                                  proofAtNormalized);
+                    static const bool debugRetry = [] {
+                        const char* flag =
+                            std::getenv("MATH_SIGN_INDEX_DEBUG");
+                        return flag && flag[0] != '\0'
+                            && flag[0] != '0';
+                    }();
+                    if (debugRetry) {
+                        std::cerr << "[sign-index] " << moduleName_
+                            << ": cast retry closes "
+                            << prettyPrint(goalClosed) << "\n";
+                    }
+                    return transported;
+                } catch (const TypeError&) {
+                } catch (const ElaborateError&) {
+                }
+            }
+        }
     }
     return nullptr;
 }
