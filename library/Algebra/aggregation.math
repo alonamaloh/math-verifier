@@ -27,12 +27,20 @@ import Lists.append
 import Lists.range
 import Algebra.monoid_power
 
--- Σ/Π_{k<n} s(k): identity on the empty range, otherwise the aggregate of
--- the first n terms combined with s(n).
-definition Algebra.indexedAggregate (A : Type(0)) (operation : A → A → A)
-        (identity : A) (s : Natural → A) : Natural → A
+-- The generic fold with an explicit lower bound:
+-- `Fold(A, op, e, f, start, count)` reads f(start), …, f(start + count − 1)
+-- by recursion on the count, so the empty-range, peel-last and peel-first
+-- laws are all unconditional. Every other aggregate in the library is an
+-- instance of this one.
+definition Algebra.Fold (A : Type(0)) (operation : A → A → A)
+        (identity : A) (f : Natural → A) (start : Natural) : Natural → A
   | 0     => identity
-  | 1 + n => operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n))
+  | 1 + c => operation(Algebra.Fold(A, operation, identity, f, start, c), f(start + c))
+
+-- Σ/Π_{k<n} s(k): the `start = 0` instance of the fold.
+definition Algebra.indexedAggregate (A : Type(0)) (operation : A → A → A)
+        (identity : A) (s : Natural → A) (n : Natural) : A :=
+  Algebra.Fold(A, operation, identity, s, 0, n)
 
 -- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
 -- not definitionally the constructor; bridge via `one_add`).
@@ -40,7 +48,11 @@ theorem Algebra.indexedAggregate_add_one (A : Type(0)) (operation : A → A → 
         (identity : A) (s : Natural → A) (n : Natural)
         : Algebra.indexedAggregate(A, operation, identity, s, 1 + n)
           = operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n)) :=
-  done by substituting Natural.one_add
+  calc Algebra.indexedAggregate(A, operation, identity, s, 1 + n)
+     = operation(Algebra.Fold(A, operation, identity, s, 0, n), s(0 + n))
+           by substituting Natural.one_add
+     = operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n))
+           by (0 + n = n)
 
 -- The empty range aggregates to the identity (the base case, definitional).
 theorem Algebra.indexedAggregate_zero (A : Type(0)) (operation : A → A → A)
@@ -54,7 +66,8 @@ theorem Algebra.indexedAggregate_one (A : Type(0)) (operation : A → A → A)
         (identityLeft : ∀ (a : A). operation(identity, a) = a)
         : Algebra.indexedAggregate(A, operation, identity, s, 1) = s(0) :=
   calc Algebra.indexedAggregate(A, operation, identity, s, 1)
-     = operation(identity, s(0))
+     = operation(identity, s(0 + 0))
+     = operation(identity, s(0))   by (0 + 0 = 0)
      = s(0)   by identityLeft(s(0))
 
 -- ----------------------------------------------------------------------
@@ -346,14 +359,8 @@ theorem Algebra.indexedAggregate_constant (A : Type(0)) (operation : A → A →
   }
 
 -- ----------------------------------------------------------------------
--- The generic fold with an explicit lower bound:
--- `Fold(A, op, e, f, start, count)` reads f(start), …, f(start + count − 1)
--- by recursion on the count, so the empty-range, peel-last and peel-first
--- laws are all unconditional. `indexedAggregate` is its `start = 0` instance.
-definition Algebra.Fold (A : Type(0)) (operation : A → A → A)
-        (identity : A) (f : Natural → A) (start : Natural) : Natural → A
-  | 0     => identity
-  | 1 + c => operation(Algebra.Fold(A, operation, identity, f, start, c), f(start + c))
+-- The characterizing laws of `Algebra.Fold` (defined at the top of this
+-- file): empty range, peel-last, singleton, split, peel-first, pointwise.
 
 -- The empty range folds to the identity (the base case, definitional).
 theorem Algebra.Fold_zero (A : Type(0)) (operation : A → A → A)
@@ -459,20 +466,10 @@ theorem Algebra.Fold_pointwise (A : Type(0)) (operation : A → A → A)
       }
   }
 
--- The aggregate is the fold from 0: the bound-only interface re-read with an
--- explicit lower bound.
+-- The aggregate is the fold from 0 — definitionally, since the aggregate
+-- is now defined as that instance.
 theorem Algebra.indexedAggregate_is_fold (A : Type(0)) (operation : A → A → A)
         (identity : A) (s : Natural → A) (n : Natural)
         : Algebra.indexedAggregate(A, operation, identity, s, n)
           = Algebra.Fold(A, operation, identity, s, 0, n) :=
-  by_induction on n with IH {
-    case base: done
-    case step(predecessor):
-        calc Algebra.indexedAggregate(A, operation, identity, s, 1 + predecessor)
-           = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor), s(predecessor))
-           = operation(Algebra.Fold(A, operation, identity, s, 0, predecessor), s(predecessor))
-                 by IH
-           = operation(Algebra.Fold(A, operation, identity, s, 0, predecessor), s(0 + predecessor))
-                 by (0 + predecessor = predecessor)
-           = Algebra.Fold(A, operation, identity, s, 0, 1 + predecessor)
-  }
+  done

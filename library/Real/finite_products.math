@@ -57,6 +57,11 @@ import Real.power
 definition Real.partialProduct (s : Natural → Real) (n : Natural) : Real :=
   Algebra.indexedAggregate(Real, Real.multiply, Real.one, s, n)
 
+-- The recursion unfold: one more factor is the (n)-th term.
+theorem Real.partialProduct_add_one (s : Natural → Real) (n : Natural)
+        : Real.partialProduct(s, 1 + n) = Real.partialProduct(s, n) * s(n) :=
+  done by Algebra.indexedAggregate_add_one
+
 -- Products of nonnegative terms are nonnegative.
 theorem Real.partialProduct_nonneg (s : Natural → Real) (n : Natural)
         (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
@@ -76,7 +81,10 @@ theorem Real.partialProduct_nonneg (s : Natural → Real) (n : Natural)
                   Real.partialProduct(s, predecessor) * s(predecessor));
         claim Real.zero
                 ≤ Real.partialProduct(s, predecessor) * s(predecessor);
-        done
+        claim Real.partialProduct(s, 1 + predecessor)
+                = Real.partialProduct(s, predecessor) * s(predecessor)
+            by Real.partialProduct_add_one;
+        done by substituting Natural.one_add
       }
   }
 
@@ -87,11 +95,6 @@ theorem Real.partialProduct_split (s : Natural → Real) (n k : Natural)
             * Real.partialProduct((j : Natural) ↦ s(n + j), k) :=
   Algebra.indexedAggregate_split(associativity := Real.multiply_associative,
       identityRight := Real.multiply_one)
-
--- The recursion unfold: one more factor is the (n)-th term.
-theorem Real.partialProduct_add_one (s : Natural → Real) (n : Natural)
-        : Real.partialProduct(s, 1 + n) = Real.partialProduct(s, n) * s(n) :=
-  done by substituting Natural.one_add
 
 -- A constant factor exits as its n-th power.
 theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural)
