@@ -900,6 +900,31 @@ Cheapest first, strict budgets, first success wins:
   global search structurally cannot recur. Tier 6 is the only genuine
   search and it is metered.
 
+**Tier-0 implementation staging (design note, 2026-07-02).** The
+obstacle: `localBinders` is a plain `std::vector<LocalBinder>` passed
+by value/reference through every elaboration path — there is no
+single push/pop chokepoint to hang an incremental index on, and
+`collectLocalBinderFacts` (prover.cpp) currently rebuilds the fact
+list, WHNF-decomposing every conjunction hypothesis, on EVERY
+auto-prover call (the measured dominant cost in ε-δ files). Staged
+plan that avoids an elaborator-wide refactor:
+1. **Memoized fact collection, keyed by binder-prefix hash.** Compute
+   a running order-sensitive hash of the binder types; cache
+   decomposed fact lists per (depth, prefix-hash). Binder vectors
+   grow monotonically within a block, so a cache hit on a prefix
+   reuses its facts and decomposes only the new binders. Pure
+   retrofit inside `collectLocalBinderFacts`; no caller changes.
+2. **Statement-hash lookup map on top** of the cached fact list
+   (statement hash → fact), giving O(1) tier-0 lookup — and this
+   same map IS the A2 statement-address structure and the
+   derived-fact blackboard's spine (one structure, three consumers,
+   as designed above). Respect the de Bruijn depth caveat: key
+   within the per-depth cache, not one flat map.
+3. **Push/pop discipline (RAII context object) only if profiling
+   still demands it** after 1–2 — i.e., only if hashing the binder
+   vector itself shows up hot. Do not start with the invasive
+   refactor.
+
 ### B2. The judgment-rule index (tier 4)
 
 - Generalize the rewrite-lemma index: at declaration time (and
