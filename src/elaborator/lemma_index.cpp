@@ -918,18 +918,39 @@ void Elaborator::registerMonotonicityRule(const std::string& theoremName,
     }
     OrderJudgment conclusion;
     if (!parseOrderJudgment(cursor, conclusion)) return;
-    std::string leftHead = spineHeadConstantName(conclusion.leftSide);
-    std::string rightHead = spineHeadConstantName(conclusion.rightSide);
-    if (leftHead.empty() || leftHead != rightHead) return;
+    // Each side keys by its spine-head constant, or "*" when it is a
+    // bare lemma binder (`x < x + e`, `negate(x) < 0`,
+    // `abs(x+y) ≤ abs(x) + abs(y)` all admit). Both sides bare is
+    // transitivity-shaped — search territory, not an index rule.
+    auto sideKey = [](ExpressionPointer side) -> std::string {
+        if (std::holds_alternative<BoundVariable>(side->node)) {
+            return "*";
+        }
+        return spineHeadConstantName(side);
+    };
+    std::string leftKey = sideKey(conclusion.leftSide);
+    std::string rightKey = sideKey(conclusion.rightSide);
+    if (leftKey.empty() || rightKey.empty()) return;
+    if (leftKey == "*" && rightKey == "*") return;
     // Identical sides state reflexivity, not monotonicity.
     if (structurallyEqual(conclusion.leftSide,
                           conclusion.rightSide)) {
         return;
     }
-    // Admission: an order-judgment premise must relate two bare lemma
-    // binders — the conclusion match then binds them to goal subterms,
-    // making discharge structural descent, not search.
+    // Admission: a premise that is a SIGN judgment (`0 < c`, `c ≠ 0`)
+    // follows the sign index's rule — bare-binder subject; any other
+    // order-judgment premise must relate two bare lemma binders. Either
+    // way the conclusion match binds them to goal subterms, so
+    // discharge is structural descent, not search.
     for (const auto& domain : rawDomains) {
+        SignJudgment signPremise;
+        if (parseSignJudgment(domain, signPremise)) {
+            if (!std::holds_alternative<BoundVariable>(
+                    signPremise.subject->node)) {
+                return;
+            }
+            continue;
+        }
         OrderJudgment premise;
         if (parseOrderJudgment(domain, premise)) {
             if (!std::holds_alternative<BoundVariable>(
@@ -941,7 +962,8 @@ void Elaborator::registerMonotonicityRule(const std::string& theoremName,
         }
     }
     std::string key = conclusion.kindTag + "\x1f"
-        + conclusion.relationName + "\x1f" + leftHead;
+        + conclusion.relationName + "\x1f" + leftKey + "\x1f"
+        + rightKey;
     if (!monotonicityRuleIndex_[key].empty()) {
         ++monotonicityRuleConflicts_;
     }
@@ -964,7 +986,8 @@ void Elaborator::registerMonotonicityRule(const std::string& theoremName,
     if (debugEnabled) {
         std::cerr << "[mono-index] registered " << theoremName
             << " under (" << conclusion.kindTag << ", "
-            << conclusion.relationName << ", " << leftHead << ")\n";
+            << conclusion.relationName << ", " << leftKey << ", "
+            << rightKey << ")\n";
     }
     monotonicityRuleIndex_[key].push_back(std::move(rule));
 }
@@ -977,15 +1000,26 @@ ExpressionPointer Elaborator::tryMonotonicityRecursion(
     OrderJudgment judgment;
     if (!parseOrderJudgment(goalClosed, judgment)) return nullptr;
     std::string leftHead = spineHeadConstantName(judgment.leftSide);
-    if (leftHead.empty()
-        || leftHead != spineHeadConstantName(judgment.rightSide)) {
-        return nullptr;
+    std::string rightHead = spineHeadConstantName(judgment.rightSide);
+    if (leftHead.empty() && rightHead.empty()) return nullptr;
+    // Exact two-headed rules first, then the one-sided (starred) rules
+    // whose bare side the match binds to the goal's other operand.
+    std::vector<std::string> probeKeys;
+    std::string prefix = judgment.kindTag + "\x1f"
+        + judgment.relationName + "\x1f";
+    if (!leftHead.empty() && !rightHead.empty()) {
+        probeKeys.push_back(prefix + leftHead + "\x1f" + rightHead);
     }
-    std::string key = judgment.kindTag + "\x1f" + judgment.relationName
-        + "\x1f" + leftHead;
-    auto bucket = monotonicityRuleIndex_.find(key);
-    if (bucket == monotonicityRuleIndex_.end()) return nullptr;
+    if (!rightHead.empty()) {
+        probeKeys.push_back(prefix + "*\x1f" + rightHead);
+    }
+    if (!leftHead.empty()) {
+        probeKeys.push_back(prefix + leftHead + "\x1f*");
+    }
     Context openedContext = buildContextFromLocalBinders(localBinders);
+    for (const std::string& key : probeKeys) {
+    auto bucket = monotonicityRuleIndex_.find(key);
+    if (bucket == monotonicityRuleIndex_.end()) continue;
     for (const SignRule& rule : bucket->second) {
         std::vector<ExpressionPointer> bindings(rule.binderCount);
         if (!matchAgainstPattern(rule.conclusion, goalClosed,
@@ -1073,6 +1107,7 @@ ExpressionPointer Elaborator::tryMonotonicityRecursion(
                 << " closes " << prettyPrint(goalClosed) << "\n";
         }
         return call;
+    }
     }
     return nullptr;
 }
