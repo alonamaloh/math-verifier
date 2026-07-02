@@ -38,7 +38,7 @@ the suggested order at the end of the plan.
 | Step | Workstream | Status | Record |
 |------|------------|--------|--------|
 | 1 | B5 classifier (instrument hinted claims/calc steps) | **done** | 2026-07-02; `MATH_CLASSIFY_HINTS` + `scripts/hint_classification_report.py`; findings in B5 (64.6% absorbable of 5807 sites) |
-| 2 | B1–B3 tier skeleton, context index, cast tier | **in progress** | tier-4 sign index v1 (21b1cb4) + v1.1 IsNonneg/alternatives/form-bridges: closes-today 36.2%→42.3% (+352 sites), sign buckets 529→272. B3 cast retry landed (correct, test-proven; day-one yield ~nil — residual cast buckets are equalities/content, value compounds with future families). Next: `= 0` zeroness family, B1 context hash index, per-key vector for deterministic try-order |
+| 2 | B1–B3 tier skeleton, context index, cast tier | **in progress** | tier-4 sign index v1 (21b1cb4) + v1.1 IsNonneg/alternatives/form-bridges: closes-today 36.2%→42.3% (+352 sites). B3 cast retry landed (test-proven; yield compounds with future families). Per-key vectors landed (deterministic order). **B1 stage 1a landed (2b3bdbd): context-fact memo — derivative 37s→5.0s, continuity→1.4s, full library re-verify 25.5s wall.** Next: `= 0` zeroness family, B1 stages 2–3 (statement-hash lookup = the A2 spine) |
 | 3 | A1 keyword-free claims/calc | not started | |
 | 4 | B4 order automation in calc | not started | |
 | 5 | A2 statement addressability + A7 `contradiction` kit | not started | |
