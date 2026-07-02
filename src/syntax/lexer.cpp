@@ -269,8 +269,6 @@ private:
             case '>':  advanceOne(); return {TokenKind::Greater,     ">", startLine, startColumn};
             case '=':  advanceOne(); return {TokenKind::Equal,       "=", startLine, startColumn};
             case '?':  advanceOne(); return {TokenKind::Question,    "?", startLine, startColumn};
-            // Reached only when the character after '!' is not '=' — the
-            // multi-char pass above already claimed "!=" as NotEqual.
             case '!':  advanceOne(); return {TokenKind::Bang,        "!", startLine, startColumn};
         }
 
@@ -287,7 +285,6 @@ private:
             {"->",  TokenKind::Arrow},
             {"<=",  TokenKind::LessOrEqual},
             {">=",  TokenKind::GreaterOrEqual},
-            {"!=",  TokenKind::NotEqual},
             {"/\\", TokenKind::LogicalAnd},
             {"\\/", TokenKind::LogicalOr},
             {".{",  TokenKind::DotLeftBrace},
@@ -543,7 +540,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::LessOrEqual:          return "'<=' or '≤'";
         case TokenKind::GreaterOrEqual:       return "'>=' or '≥'";
         case TokenKind::Equal:                return "'='";
-        case TokenKind::NotEqual:             return "'!=' or '≠'";
+        case TokenKind::NotEqual:             return "'≠'";
         case TokenKind::LogicalAnd:           return "'/\\' or '∧'";
         case TokenKind::LogicalOr:            return "'\\/' or '∨'";
         case TokenKind::LogicalNot:           return "'¬'";
