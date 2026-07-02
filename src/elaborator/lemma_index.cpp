@@ -340,3 +340,248 @@ ExpressionPointer Elaborator::tryClassifyDiff(
         return nullptr;
     }
 
+// ---- B2 sign-judgment rule index (tier 4) -------------------------------
+// See the SignRule declaration comment in internal.hpp. Registration
+// mirrors registerGenericRewriteLemma's binder handling; discharge
+// mirrors tryLemmaIndexLookup's precondition pass, except that a
+// premise which is ITSELF a sign judgment recurses into the index —
+// that recursion is what turns per-composite sign breadcrumbs
+// (`0 < ε/2 · roof` etc.) into a single silent procedure.
+
+namespace {
+
+// Application-spine head constant name + spine arguments (outermost
+// last). Local copy — the equivalent helper in warnings.cpp is
+// file-static by design (each elaborator slice stays self-contained).
+std::string signSpineHead(ExpressionPointer term,
+                          std::vector<ExpressionPointer>& arguments) {
+    arguments.clear();
+    ExpressionPointer cursor = term;
+    while (auto* application = std::get_if<Application>(&cursor->node)) {
+        arguments.push_back(application->argument);
+        cursor = application->function;
+    }
+    std::reverse(arguments.begin(), arguments.end());
+    if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+        return constant->name;
+    }
+    return std::string();
+}
+
+bool endsWith(const std::string& text, const std::string& suffix) {
+    return text.size() >= suffix.size()
+        && text.compare(text.size() - suffix.size(),
+                        suffix.size(), suffix) == 0;
+}
+
+} // namespace
+
+bool Elaborator::parseSignJudgment(ExpressionPointer proposition,
+                                   SignJudgment& out) const {
+    if (!proposition) return false;
+    std::vector<ExpressionPointer> arguments;
+    std::string head = signSpineHead(proposition, arguments);
+    if (head == "Not" && arguments.size() == 1) {
+        std::vector<ExpressionPointer> equalityArguments;
+        std::string equalityHead =
+            signSpineHead(arguments[0], equalityArguments);
+        if (equalityHead != "Equality" || equalityArguments.size() != 3) {
+            return false;
+        }
+        auto leftNumeral = asNumeralLiteral(equalityArguments[1]);
+        auto rightNumeral = asNumeralLiteral(equalityArguments[2]);
+        if (rightNumeral && rightNumeral->second == 0
+            && !(leftNumeral && leftNumeral->second == 0)) {
+            out = {"neq0", "Equality", equalityArguments[1]};
+            return true;
+        }
+        if (leftNumeral && leftNumeral->second == 0
+            && !(rightNumeral && rightNumeral->second == 0)) {
+            out = {"neq0", "Equality", equalityArguments[2]};
+            return true;
+        }
+        return false;
+    }
+    if (arguments.size() == 2) {
+        bool weak = endsWith(head, ".LessOrEqual");
+        bool strict = endsWith(head, ".LessThan");
+        if (!weak && !strict) return false;
+        auto leftNumeral = asNumeralLiteral(arguments[0]);
+        if (leftNumeral && leftNumeral->second == 0) {
+            out = {weak ? "zle" : "zlt", head, arguments[1]};
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+std::string Elaborator::signRuleKey(const SignJudgment& judgment) const {
+    // Numeral subjects key by canonical (carrier, value) so ground base
+    // facts (`0 < 1`, `0 < 2`) register and match across spellings.
+    std::string subjectTag;
+    if (auto numeral = asNumeralLiteral(judgment.subject)) {
+        subjectTag = "num:" + numeral->first + ":"
+            + std::to_string(numeral->second);
+    } else {
+        std::vector<ExpressionPointer> arguments;
+        std::string head = signSpineHead(judgment.subject, arguments);
+        if (head.empty()) return std::string();
+        subjectTag = head;
+    }
+    return judgment.kindTag + "\x1f" + judgment.relationName + "\x1f"
+        + subjectTag;
+}
+
+void Elaborator::registerSignJudgmentRule(const std::string& theoremName,
+                                          ExpressionPointer typeExpr) {
+    const Declaration* declaration = environment_.lookup(theoremName);
+    if (!declaration) return;
+    auto* asDefinition = std::get_if<Definition>(declaration);
+    if (!asDefinition) return;
+    if (!asDefinition->universeParameters.empty()) return;
+    std::vector<ExpressionPointer> rawDomains;
+    ExpressionPointer cursor = typeExpr;
+    while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+        rawDomains.push_back(pi->domain);
+        cursor = pi->codomain;
+    }
+    SignJudgment conclusion;
+    if (!parseSignJudgment(cursor, conclusion)) return;
+    std::string key = signRuleKey(conclusion);
+    if (key.empty()) return;
+    // Admission criterion: a premise that is itself a sign judgment
+    // must have a bare lemma-binder as its subject — the conclusion
+    // match then binds it to a proper subterm of the goal's subject,
+    // so discharge is guaranteed structural descent.
+    for (const auto& domain : rawDomains) {
+        SignJudgment premise;
+        if (parseSignJudgment(domain, premise)
+            && !std::holds_alternative<BoundVariable>(
+                   premise.subject->node)) {
+            return;
+        }
+    }
+    if (signRuleIndex_.find(key) != signRuleIndex_.end()) {
+        ++signRuleConflicts_;
+        return;
+    }
+    int binderCount = static_cast<int>(rawDomains.size());
+    std::vector<ExpressionPointer> binderTypes(binderCount);
+    for (int peelIdx = 0; peelIdx < binderCount; ++peelIdx) {
+        int conclusionIdx = binderCount - 1 - peelIdx;
+        binderTypes[conclusionIdx] = liftBoundVariables(
+            rawDomains[peelIdx], binderCount - peelIdx, 0);
+    }
+    SignRule rule;
+    rule.lemmaName = theoremName;
+    rule.binderCount = binderCount;
+    rule.conclusion = cursor;
+    rule.binderTypes = std::move(binderTypes);
+    signRuleIndex_.emplace(std::move(key), std::move(rule));
+}
+
+ExpressionPointer Elaborator::trySignJudgmentRecursion(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth) {
+    if (depth <= 0) return nullptr;
+    SignJudgment judgment;
+    if (!parseSignJudgment(goalClosed, judgment)) return nullptr;
+    std::string key = signRuleKey(judgment);
+    if (key.empty()) return nullptr;
+    auto range = signRuleIndex_.equal_range(key);
+    for (auto iterator = range.first; iterator != range.second;
+         ++iterator) {
+        const SignRule& rule = iterator->second;
+        std::vector<ExpressionPointer> bindings(rule.binderCount);
+        if (!matchAgainstPattern(rule.conclusion, goalClosed,
+                                 rule.binderCount, bindings)) {
+            continue;
+        }
+        // Fill the binders the conclusion match left open,
+        // outer-to-inner (a binder type may reference outer binders):
+        // sign-judgment premises recurse into the index; anything else
+        // discharges from a local hypothesis, exactly like
+        // tryLemmaIndexLookup's precondition pass.
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        bool dischargedAll = true;
+        for (int i = rule.binderCount - 1; i >= 0; --i) {
+            if (bindings[i]) continue;
+            if (!binderReferencesAllBound(rule.binderTypes[i],
+                                          bindings)) {
+                dischargedAll = false;
+                break;
+            }
+            ExpressionPointer slotType = instantiateLemmaBinders(
+                rule.binderTypes[i], bindings);
+            ExpressionPointer proof;
+            SignJudgment premise;
+            if (parseSignJudgment(slotType, premise)) {
+                proof = trySignJudgmentRecursion(
+                    slotType, localBinders, depth - 1);
+            }
+            if (!proof) {
+                ExpressionPointer slotTypeOpened = openOverLocalBinders(
+                    slotType, localBinders, localBinders.size());
+                ExpressionPointer slotTypeNormalised;
+                try {
+                    slotTypeNormalised = weakHeadNormalForm(
+                        environment_, slotTypeOpened);
+                } catch (const TypeError&) {
+                    dischargedAll = false;
+                    break;
+                }
+                for (int j =
+                         static_cast<int>(localBinders.size()) - 1;
+                     j >= 0; --j) {
+                    ExpressionPointer candidateType =
+                        openOverLocalBinders(
+                            localBinders[j].type, localBinders, j);
+                    bool equal;
+                    try {
+                        equal = isDefinitionallyEqual(environment_,
+                            openedContext, candidateType,
+                            slotTypeNormalised);
+                    } catch (const TypeError&) {
+                        equal = false;
+                    }
+                    if (equal) {
+                        proof = makeBoundVariable(
+                            static_cast<int>(localBinders.size())
+                            - 1 - j);
+                        break;
+                    }
+                }
+            }
+            if (!proof) {
+                dischargedAll = false;
+                break;
+            }
+            bindings[i] = std::move(proof);
+        }
+        if (!dischargedAll) continue;
+        bool allBound = true;
+        for (const auto& binding : bindings) {
+            if (!binding) { allBound = false; break; }
+        }
+        if (!allBound) continue;
+        ExpressionPointer call = makeConstant(rule.lemmaName, {});
+        for (int i = rule.binderCount - 1; i >= 0; --i) {
+            call = makeApplication(std::move(call), bindings[i]);
+        }
+        static const bool debugEnabled = [] {
+            const char* flag = std::getenv("MATH_SIGN_INDEX_DEBUG");
+            return flag && flag[0] != '\0' && flag[0] != '0';
+        }();
+        if (debugEnabled) {
+            std::cerr << "[sign-index] " << moduleName_
+                << ": rule " << rule.lemmaName
+                << " closes " << prettyPrint(goalClosed) << "\n";
+        }
+        return call;
+    }
+    return nullptr;
+}
+

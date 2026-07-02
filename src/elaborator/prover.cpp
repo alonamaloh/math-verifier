@@ -1804,6 +1804,20 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // B2 sign-judgment recursion — syntax-directed positivity: a
+        // 0-anchored sign goal (`0 ≤ f(…)`, `0 < f(…)`, `f(…) ≠ 0`)
+        // dispatches on its subject's head symbol to the (single)
+        // registered rule and recurses on the subject's arguments.
+        // Deterministic and linear in the subject term; placed after
+        // the direct-hypothesis match (so stated facts still win) and
+        // before the expensive context/library scans.
+        {
+            ExpressionPointer attempt = runTactic("signJudgmentRecursion",
+                [&] { return trySignJudgmentRecursion(
+                    goalClosed, localBinders, 12); });
+            if (attempt) return attempt;
+        }
+
         {
             ExpressionPointer attempt = runTactic("conjunctionIntro",
                 [&] { return tryConjunctionIntro(
@@ -2004,6 +2018,10 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("localFactExactMatch", [&] {
             return tryLocalFactExactMatch(goalClosed, localBinders);
+        });
+        runProfiled("signJudgmentRecursion", [&] {
+            return trySignJudgmentRecursion(
+                goalClosed, localBinders, 12);
         });
         runProfiled("conjunctionIntro", [&] {
             return tryConjunctionIntro(

@@ -5644,6 +5644,47 @@ private:
         bool reverseDirection = false;
     };
     std::unordered_multimap<uint64_t, RewriteLemma> lemmaIndex_;
+    // B2 sign-judgment rule index (PLAN_LANGUAGE_IMPROVEMENT.md tier 4).
+    // A lemma whose conclusion is a 0-anchored sign judgment — `0 ≤ f(…)`,
+    // `0 < f(…)`, or `¬(f(…) = 0)` — over a Constant-headed (or numeral)
+    // subject registers here, keyed by (judgment kind, relation name,
+    // subject head). Admission criterion: every premise that is itself a
+    // sign judgment must have a bare lemma-binder as its subject, so
+    // discharge is structural recursion on the goal's subject — a
+    // procedure, not a search. First registration per key wins;
+    // conflicts are counted (declaration-time error once the library's
+    // duplicates are cleaned up).
+    struct SignRule {
+        std::string lemmaName;
+        int binderCount = 0;
+        // Full conclusion proposition in closed-over-binders form
+        // (BV(0..n-1) = lemma binders, BV(0) innermost).
+        ExpressionPointer conclusion;
+        // Binder types lifted into the conclusion's frame, indexed by
+        // conclusion-frame de Bruijn index (see RewriteLemma).
+        std::vector<ExpressionPointer> binderTypes;
+    };
+    std::unordered_multimap<std::string, SignRule> signRuleIndex_;
+    int signRuleConflicts_ = 0;
+    // A parsed sign judgment: `kindTag` ∈ {"zle", "zlt", "neq0"},
+    // `relationName` the relation head (e.g. "Real.LessOrEqual",
+    // "Equality" for neq0), `subject` the non-zero side.
+    struct SignJudgment {
+        std::string kindTag;
+        std::string relationName;
+        ExpressionPointer subject;
+    };
+    bool parseSignJudgment(ExpressionPointer proposition,
+                           SignJudgment& out) const;
+    // Bucket key for a judgment, or "" when the subject is not
+    // indexable (bare variable / non-constant head).
+    std::string signRuleKey(const SignJudgment& judgment) const;
+    void registerSignJudgmentRule(const std::string& theoremName,
+                                  ExpressionPointer typeExpr);
+    ExpressionPointer trySignJudgmentRecursion(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth);
     // Context frames describing what the elaborator is currently doing.
     // Each frame is a short phrase like "while elaborating cases at
     // line 42". `Frame` is an RAII guard that pushes on construction

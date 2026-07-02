@@ -1,0 +1,50 @@
+-- Feature test: the B2 sign-judgment rule index (tier 4 of
+-- PLAN_LANGUAGE_IMPROVEMENT.md Part B).
+--
+-- `Test.boxed` is OPAQUE, so no defeq/unfolding path can see the sign
+-- of a boxed value — only the registered rule `Test.boxed_positive`
+-- (conclusion `boxed(x) > 0`, premise `x > 0` on a bare binder) can.
+-- The nested goals exercise the structural recursion: the outer
+-- premise recurses into the index, the innermost discharges from the
+-- local hypothesis. The nonzero variant exercises the `¬(_ = 0)`
+-- judgment form.
+module Test.sign_index_test
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.order
+
+opaque definition Test.boxed (x : Rational) : Rational := x
+
+theorem Test.boxed_positive (x : Rational) (xPositive : x > 0) : Test.boxed(x) > 0 := {
+  done by xPositive unfolding Test.boxed
+}
+
+theorem Test.boxed_nonzero (x : Rational) (xNonzero : x ≠ 0) : Test.boxed(x) ≠ 0 := {
+  done by xNonzero unfolding Test.boxed
+}
+
+-- One level: the rule fires with its premise discharged from context.
+theorem Test.sign_rule_fires (y : Rational) (yPositive : y > 0) : Test.boxed(y) > 0 := {
+  done
+}
+
+-- Three levels: the premise chain recurses through the index.
+theorem Test.sign_rule_recurses (y : Rational) (yPositive : y > 0)
+        : Test.boxed(Test.boxed(Test.boxed(y))) > 0 := {
+  done
+}
+
+-- The nonzero judgment recurses the same way.
+theorem Test.nonzero_rule_recurses (y : Rational) (yNonzero : y ≠ 0)
+        : Test.boxed(Test.boxed(y)) ≠ 0 := {
+  done
+}
