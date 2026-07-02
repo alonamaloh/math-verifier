@@ -42,7 +42,7 @@ theorem Natural.binomial_overflow (n : Natural)
         (k : Natural) (overflow : successor(0) ≤ k) ↦
           cases k refining overflow {
             | zero => {
-                claim False since Natural.not_less_or_equal_successor_zero;
+                claim False by Natural.not_less_or_equal_successor_zero;
                 done
               }
             | successor(kPredecessor) => done
@@ -51,27 +51,27 @@ theorem Natural.binomial_overflow (n : Natural)
         (k : Natural) (overflow : successor(successor(nPredecessor)) ≤ k) ↦
           cases k refining overflow {
             | zero => {
-                claim False since Natural.not_less_or_equal_successor_zero;
+                claim False by Natural.not_less_or_equal_successor_zero;
                 done
               }
             | successor(kPredecessor) => {
                 claim innerOverflow : successor(nPredecessor) ≤ kPredecessor
-                    since Natural.successor_le_cancel;
+                    by Natural.successor_le_cancel;
                 claim outerOverflow
                       : successor(nPredecessor) ≤ successor(kPredecessor);
                 claim firstZero : Natural.binomial(nPredecessor, kPredecessor) = 0
-                    since IH(kPredecessor, innerOverflow);
+                    by IH(kPredecessor, innerOverflow);
                 claim secondZero
                       : Natural.binomial(nPredecessor, successor(kPredecessor)) = 0
-                    since IH(successor(kPredecessor), outerOverflow);
+                    by IH(successor(kPredecessor), outerOverflow);
                 calc Natural.binomial(
                          successor(nPredecessor), successor(kPredecessor))
                    = Natural.binomial(nPredecessor, kPredecessor)
                      + Natural.binomial(nPredecessor, successor(kPredecessor))
                    = 0 + Natural.binomial(nPredecessor, successor(kPredecessor))
-                         since firstZero
+                         by firstZero
                    = 0 + 0
-                         since secondZero
+                         by secondZero
                    = 0
               }
           }
@@ -104,12 +104,12 @@ theorem Natural.binomial_factorial_row (i : Natural)
       claim i + 0 = i;
       claim successor(i + 0) ≤ successor(i);
       claim overflow : Natural.binomial(i + 0, successor(i)) = 0
-          since Natural.binomial_overflow;
+          by Natural.binomial_overflow;
       claim diagonal
           : Natural.binomial(i + 0, i)
                 * (Natural.factorial(i) * Natural.factorial(0))
             = Natural.factorial(i + 0)
-          since previousRow(0);
+          by previousRow(0);
       claim factorialStep
           : Natural.factorial(successor(i)) = successor(i) * Natural.factorial(i);
       calc Natural.binomial(successor(i) + 0, successor(i))
@@ -118,15 +118,15 @@ theorem Natural.binomial_factorial_row (i : Natural)
                * (Natural.factorial(successor(i)) * Natural.factorial(0))
          = (Natural.binomial(i + 0, i) + 0)
                * (Natural.factorial(successor(i)) * Natural.factorial(0))
-               since overflow
+               by overflow
          = (Natural.binomial(i + 0, i) + 0)
                * ((successor(i) * Natural.factorial(i)) * Natural.factorial(0))
-               since factorialStep
+               by factorialStep
          = successor(i + 0)
                * (Natural.binomial(i + 0, i)
                       * (Natural.factorial(i) * Natural.factorial(0)))
          = successor(i + 0) * Natural.factorial(i + 0)
-               since diagonal
+               by diagonal
          = Natural.factorial(successor(i) + 0)
     }
   | successor(m) => unfold Natural.add in {
@@ -134,7 +134,7 @@ theorem Natural.binomial_factorial_row (i : Natural)
           : Natural.binomial(i + successor(m), i)
                 * (Natural.factorial(i) * Natural.factorial(successor(m)))
             = Natural.factorial(i + successor(m))
-          since previousRow(successor(m));
+          by previousRow(successor(m));
       claim columnStep
           : Natural.binomial(successor(i) + m, successor(i))
                 * (Natural.factorial(successor(i)) * Natural.factorial(m))
@@ -156,35 +156,35 @@ theorem Natural.binomial_factorial_row (i : Natural)
          = Natural.binomial(i + successor(m), i)
                * ((successor(i) * Natural.factorial(i))
                       * Natural.factorial(successor(m)))
-               since factorialI
+               by factorialI
          = successor(i)
                * (Natural.binomial(i + successor(m), i)
                       * (Natural.factorial(i) * Natural.factorial(successor(m))))
          = successor(i) * Natural.factorial(i + successor(m))
-               since rowStep
+               by rowStep
         as firstTerm;
       calc Natural.binomial(successor(i) + m, successor(i))
                * (Natural.factorial(successor(i)) * Natural.factorial(successor(m)))
          = Natural.binomial(successor(i) + m, successor(i))
                * (Natural.factorial(successor(i))
                       * (successor(m) * Natural.factorial(m)))
-               since factorialM
+               by factorialM
          = successor(m)
                * (Natural.binomial(successor(i) + m, successor(i))
                       * (Natural.factorial(successor(i)) * Natural.factorial(m)))
          = successor(m) * Natural.factorial(successor(i) + m)
-               since columnStep
+               by columnStep
         as secondTerm;
       calc Natural.binomial(successor(i) + successor(m), successor(i))
                * (Natural.factorial(successor(i)) * Natural.factorial(successor(m)))
          = (Natural.binomial(i + successor(m), i)
                 + Natural.binomial(i + successor(m), successor(i)))
                * (Natural.factorial(successor(i)) * Natural.factorial(successor(m)))
-               since pascal
+               by pascal
          = (Natural.binomial(i + successor(m), i)
                 + Natural.binomial(successor(i) + m, successor(i)))
                * (Natural.factorial(successor(i)) * Natural.factorial(successor(m)))
-               since secondShape
+               by secondShape
          = Natural.binomial(i + successor(m), i)
                * (Natural.factorial(successor(i)) * Natural.factorial(successor(m)))
            + Natural.binomial(successor(i) + m, successor(i))
@@ -192,10 +192,10 @@ theorem Natural.binomial_factorial_row (i : Natural)
          = successor(i) * Natural.factorial(i + successor(m))
            + Natural.binomial(successor(i) + m, successor(i))
                * (Natural.factorial(successor(i)) * Natural.factorial(successor(m)))
-               since firstTerm
+               by firstTerm
          = successor(i) * Natural.factorial(i + successor(m))
            + successor(m) * Natural.factorial(successor(i) + m)
-               since secondTerm
+               by secondTerm
          = successor(i) * Natural.factorial(i + successor(m))
            + successor(m) * Natural.factorial(i + successor(m))
          = (successor(i) + successor(m)) * Natural.factorial(i + successor(m))
@@ -211,12 +211,12 @@ theorem Natural.binomial_factorial (j : Natural)
   by_induction on j with previousRow {
     case zero: (n : Natural) ↦ {
         claim edge : Natural.binomial(0 + n, 0) = 1
-            since Natural.binomial_zero_right;
+            by Natural.binomial_zero_right;
         calc Natural.binomial(0 + n, 0)
                  * (Natural.factorial(0) * Natural.factorial(n))
            = 1 * (Natural.factorial(0) * Natural.factorial(n))
-                 since edge
+                 by edge
            = Natural.factorial(0 + n)
       }
-    case successor(i): done since Natural.binomial_factorial_row
+    case successor(i): done by Natural.binomial_factorial_row
   }

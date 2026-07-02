@@ -83,7 +83,7 @@ definition Natural.doubling : Natural → Natural
 theorem Natural.doubling_one_plus (k : Natural)
         : Natural.doubling(1 + k) = Natural.doubling(k) + Natural.doubling(k) :=
   calc Natural.doubling(1 + k)
-     = Natural.doubling(successor(k))            since Natural.one_add
+     = Natural.doubling(successor(k))            by Natural.one_add
      = Natural.doubling(k) + Natural.doubling(k)
 
 theorem Natural.doubling_at_least_one (K : Natural)
@@ -92,21 +92,21 @@ theorem Natural.doubling_at_least_one (K : Natural)
     case base: done
     case step(predecessor):
         calc 1
-           ≤ Natural.doubling(predecessor)    since IH
+           ≤ Natural.doubling(predecessor)    by IH
            ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
-                 since Natural.less_or_equal_add_left
+                 by Natural.less_or_equal_add_left
            = Natural.doubling(1 + predecessor)
-                 since Natural.doubling_one_plus
+                 by Natural.doubling_one_plus
   }
 
 -- Every harmonic term is nonnegative.
 theorem Real.harmonic_term_nonneg (j : Natural)
         : Real.zero ≤ Real.harmonic_term(j) := {
   claim (1 + j : Real) > 0
-      since Real.one_plus_cast_positive;
-  claim (1 : Real) > 0 since Real.zero_less_one;
-  claim Real.harmonic_term(j) > 0 since Real.divide_positive;
-  done since Real.LessThan.weaken
+      by Real.one_plus_cast_positive;
+  claim (1 : Real) > 0 by Real.zero_less_one;
+  claim Real.harmonic_term(j) > 0 by Real.divide_positive;
+  done by Real.LessThan.weaken
 }
 
 -- ----------------------------------------------------------------------
@@ -116,17 +116,17 @@ theorem Real.harmonic_term_block_bound (p j : Natural)
         (jBelow : j < p)
         : 1 / (p + p : Real) ≤ Real.harmonic_term(p + j) := {
   -- index bound at the Natural layer: 1 + (p + j) = p + (j + 1) ≤ 2p
-  claim j + 1 ≤ p since Natural.add_one_le_of_lt;
+  claim j + 1 ≤ p by Natural.add_one_le_of_lt;
   claim 1 + (p + j) ≤ p + p
       by calc 1 + (p + j)
             = p + (j + 1)   by (1 + (p + j) = p + (j + 1))
-            ≤ p + p         since Natural.add_left_monotone;
+            ≤ p + p         by Natural.add_left_monotone;
   -- cast it and flip through the reciprocal
   claim (1 + (p + j) : Real) ≤ (p + p : Real)
-      since Real.from_natural_le_preserves;
+      by Real.from_natural_le_preserves;
   claim (1 + (p + j) : Real) > 0
-      since Real.one_plus_cast_positive;
-  done since Real.one_divide_antitone
+      by Real.one_plus_cast_positive;
+  done by Real.one_divide_antitone
 }
 
 -- ----------------------------------------------------------------------
@@ -138,19 +138,19 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
   -- 2p is a positive, hence nonzero, denominator.
   calc 1
      ≤ p         by pPositive
-     ≤ p + p     since Natural.less_or_equal_add_right;
-  claim p + p > 0 since Natural.zero_lt_of_one_le;
+     ≤ p + p     by Natural.less_or_equal_add_right;
+  claim p + p > 0 by Natural.zero_lt_of_one_le;
   claim (p + p : Real) > 0
-      since Real.from_natural_positive;
+      by Real.from_natural_positive;
   claim (p + p : Real) ≠ 0
-      since Real.nonzero_of_positive;
+      by Real.nonzero_of_positive;
   -- Each of the p shifted terms beats the constant 1/(2p).
   claim ∀ (j : Natural). j < p
         → 1 / (p + p : Real) ≤ Real.harmonic_term(p + j)
       by {
         take j : Natural;
         suppose j < p as jBelow;
-        done since Real.harmonic_term_block_bound
+        done by Real.harmonic_term_block_bound
       };
   -- Summing that comparison over the block.
   claim Real.partialSum(
@@ -162,37 +162,37 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
         : Real.partialSum(
               (j : Natural) ↦ 1 / (p + p : Real), p)
           = (p : Real) * (1 / (p + p : Real))
-      since Real.partialSum_constant;
+      by Real.partialSum_constant;
   claim doubled : (p + p : Real) = (p : Real) + (p : Real)
-      since Real.from_natural_add_preserves;
+      by Real.from_natural_add_preserves;
   claim doubledCancel
         : (p + p : Real) * (1 / (p + p : Real)) = 1
-      since Real.divide_cancel;
+      by Real.divide_cancel;
   calc (1 / (2 : Real)) * (p + p : Real)
-     = (1 / (2 : Real)) * ((p : Real) + (p : Real))    since doubled
+     = (1 / (2 : Real)) * ((p : Real) + (p : Real))    by doubled
      = (p : Real) * (1 / (2 : Real) + 1 / (2 : Real))
-     = (p : Real) * 1                                  since Real.divide_two_doubled
+     = (p : Real) * 1                                  by Real.divide_two_doubled
      = (p : Real)
      as halfOfDoubled;
   calc (p : Real) * (1 / (p + p : Real))
      = ((1 / (2 : Real)) * (p + p : Real))
        * (1 / (p + p : Real))
-           since halfOfDoubled
+           by halfOfDoubled
      = (1 / (2 : Real))
        * ((p + p : Real) * (1 / (p + p : Real)))
      = (1 / (2 : Real)) * 1
-           since doubledCancel
+           by doubledCancel
      = 1 / (2 : Real)
      as scaledReciprocal;
   -- Assemble: trade ½ for the constant block, compare, and merge.
   calc Real.partialSum(Real.harmonic_term, p) + 1 / (2 : Real)
      = Real.partialSum(Real.harmonic_term, p)
        + (p : Real) * (1 / (p + p : Real))
-           since scaledReciprocal
+           by scaledReciprocal
      = Real.partialSum(Real.harmonic_term, p)
        + Real.partialSum(
              (j : Natural) ↦ 1 / (p + p : Real), p)
-           since constantValue
+           by constantValue
      ≤ Real.partialSum(Real.harmonic_term, p)
        + Real.partialSum((j : Natural) ↦ Real.harmonic_term(p + j), p)
            by Real.add_preserves_LessOrEqual_left
@@ -211,13 +211,13 @@ theorem Real.harmonic_doubling_growth (K : Natural)
         claim cancel
               : (1 + 0 : Real) * (1 / (1 + 0 : Real))
                 = 1
-            since Real.divide_cancel;
+            by Real.divide_cancel;
         calc 1 / (1 + 0 : Real)
            = 1 * (1 / (1 + 0 : Real))
            = (1 + 0 : Real) * (1 / (1 + 0 : Real))
-                 since castOne
+                 by castOne
            = 1
-                 since cancel
+                 by cancel
            as recipOne;
         calc Real.partialSum(Real.harmonic_term, Natural.doubling(0))
            = Real.zero + Real.harmonic_term(0)
@@ -226,12 +226,12 @@ theorem Real.harmonic_doubling_growth (K : Natural)
                  by recipOne
            as sumValue;
         claim Rational.one ≤ (Rational.one : Real)
-            since Real.LessOrEqual.reflexive;
+            by Real.LessOrEqual.reflexive;
         done by substituting sumValue
       }
     case step(predecessor): {
         claim 1 ≤ Natural.doubling(predecessor)
-            since Natural.doubling_at_least_one;
+            by Natural.doubling_at_least_one;
         claim blockBound
               : Real.partialSum(
                     Real.harmonic_term, Natural.doubling(predecessor))
@@ -240,20 +240,20 @@ theorem Real.harmonic_doubling_growth (K : Natural)
                       Real.harmonic_term,
                       Natural.doubling(predecessor)
                       + Natural.doubling(predecessor))
-            since Real.harmonic_doubling_bound;
+            by Real.harmonic_doubling_bound;
         calc ((Rational.linearGrowth(Rational.one_half, 1 + predecessor))
               : Real)
            = ((Rational.linearGrowth(Rational.one_half, predecessor)
                + Rational.one_half : Rational) : Real)
-                 since Rational.linearGrowth_add_one
+                 by Rational.linearGrowth_add_one
            = ((Rational.linearGrowth(Rational.one_half, predecessor))
               : Real)
              + (Rational.one_half : Real)
-                 since Rational.to_real.add_preserves
+                 by Rational.to_real.add_preserves
            = ((Rational.linearGrowth(Rational.one_half, predecessor))
               : Real)
              + 1 / (2 : Real)
-                 since Real.one_half_cast
+                 by Real.one_half_cast
            ≤ Real.partialSum(Real.harmonic_term, Natural.doubling(predecessor))
              + 1 / (2 : Real)
                  by Real.add_preserves_LessOrEqual
@@ -262,7 +262,7 @@ theorem Real.harmonic_doubling_growth (K : Natural)
                  Natural.doubling(predecessor) + Natural.doubling(predecessor))
                  by blockBound
            = Real.partialSum(Real.harmonic_term, Natural.doubling(1 + predecessor))
-                 since Natural.doubling_one_plus
+                 by Natural.doubling_one_plus
       }
   }
 
@@ -277,22 +277,22 @@ theorem Real.harmonic_series_diverges
     choose roof such that roof > Rational.zero ∧ abs(bound) ≤ (roof : Real)
         from Real.exists_positive_rational_roof;
     calc bound
-       ≤ abs(bound)        since Real.LessOrEqual_absolute_value
+       ≤ abs(bound)        by Real.LessOrEqual_absolute_value
        ≤ (roof : Real)
        as boundBelowRoof;
     claim Rational.IsNonneg(abs(roof))
-        since Rational.absolute_value_IsNonneg;
+        by Rational.absolute_value_IsNonneg;
     claim Rational.one_half > Rational.zero
-        since Rational.one_half_positive;
+        by Rational.one_half_positive;
     choose K such that abs(roof) ≤ (1 + K : Rational) * Rational.one_half
         as archBound
         from Rational.archimedean_for_positives;
-    claim roof ≤ abs(roof) since Rational.le_absolute_value;
+    claim roof ≤ abs(roof) by Rational.le_absolute_value;
     claim Rational.one > Rational.zero;
     claim growthUnfolded
           : Rational.linearGrowth(Rational.one_half, 1 + K)
             = Rational.one + (1 + K : Rational) * Rational.one_half
-        since Rational.linearGrowth_closed_form;
+        by Rational.linearGrowth_closed_form;
     calc roof
        ≤ abs(roof)
        ≤ (1 + K : Rational) * Rational.one_half
@@ -301,7 +301,7 @@ theorem Real.harmonic_series_diverges
        < Rational.one + (1 + K : Rational) * Rational.one_half
              by Rational.add_preserves_LessThan
        = Rational.linearGrowth(Rational.one_half, 1 + K)
-             since growthUnfolded;
+             by growthUnfolded;
     witness Natural.doubling(1 + K) with
         (m : Natural)
         (aboveThreshold : Natural.doubling(1 + K) ≤ m) ↦ {
@@ -310,7 +310,7 @@ theorem Real.harmonic_series_diverges
                    : Real)
                   ≤ Real.partialSum(
                         Real.harmonic_term, Natural.doubling(1 + K))
-              since Real.harmonic_doubling_growth;
+              by Real.harmonic_doubling_growth;
           claim Real.harmonic_term_nonneg;
           claim tail
                 : Real.partialSum(
@@ -321,7 +321,7 @@ theorem Real.harmonic_series_diverges
                 : (roof : Real)
                   < ((Rational.linearGrowth(Rational.one_half, 1 + K))
                      : Real)
-              since Rational.to_real.LessThan_preserves;
+              by Rational.to_real.LessThan_preserves;
           calc bound
              ≤ (roof : Real)
                    by boundBelowRoof

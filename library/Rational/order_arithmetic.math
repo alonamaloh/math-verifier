@@ -41,11 +41,11 @@ import Rational.positive
 -- IsNonneg(0). Rational.zero is 0/1, whose sign-witness 0·1 = 0 is
 -- non-negative; cite the boundary lemma on that witness.
 theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) := {
-  claim Integer.IsNonneg(Integer.zero * Integer.one) since {
-      claim Integer.IsNonneg(Integer.zero) since Integer.zero_is_nonneg;
+  claim Integer.IsNonneg(Integer.zero * Integer.one) by {
+      claim Integer.IsNonneg(Integer.zero) by Integer.zero_is_nonneg;
       done by substituting (ring : Integer.zero * Integer.one = Integer.zero)
   };
-  done since Rational.IsNonneg.of_numerator_denominator
+  done by Rational.IsNonneg.of_numerator_denominator
 }
 
 -- 0 ≤ q ↔ IsNonneg(q) was already in `Rational.positive`. We mirror
@@ -79,13 +79,13 @@ theorem Rational.IsNonneg.add (p q : Rational)
   (cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1, _) =>
     cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2, _) => {
       claim Integer.IsNonneg((n1 * d1) * (d2 * d2))
-          since Integer.multiply_nonneg recalling (Integer.IsNonneg(d2 * d2));
+          by Integer.multiply_nonneg recalling (Integer.IsNonneg(d2 * d2));
       claim Integer.IsNonneg((n2 * d2) * (d1 * d1))
-          since Integer.multiply_nonneg recalling (Integer.IsNonneg(d1 * d1));
+          by Integer.multiply_nonneg recalling (Integer.IsNonneg(d1 * d1));
       claim Integer.IsNonneg((n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1))
-          since Integer.IsNonneg.add;
+          by Integer.IsNonneg.add;
       claim (0 : Integer) ≤ (n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1)
-          since Integer.zero_less_or_equal_of_nonneg;
+          by Integer.zero_less_or_equal_of_nonneg;
       done by substituting
           (ring : (n1 * d2 + n2 * d1) * (d1 * d2)
                   = (n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1))
@@ -103,21 +103,21 @@ theorem Rational.IsNonneg_and_negate_IsNonneg_implies_zero
   cases q refining qIsNonneg, negQIsNonneg {
     | RationalRepresentative.make(n, d, dNonzero) => {
         claim Integer.IsNonneg(n * d)
-            since Rational.IsNonneg.numerator_denominator;
-        claim Integer.IsNonneg(-(n * d)) since {
+            by Rational.IsNonneg.numerator_denominator;
+        claim Integer.IsNonneg(-(n * d)) by {
             claim Integer.IsNonneg((-n) * d)
-                since Rational.IsNonneg.numerator_denominator;
+                by Rational.IsNonneg.numerator_denominator;
             done by substituting (ring : (-n) * d = -(n * d))
         };
         claim n * d = Integer.zero
-            since Integer.nonneg_and_negate_nonneg_implies_zero;
+            by Integer.nonneg_and_negate_nonneg_implies_zero;
         calc n * d = Integer.zero = Integer.zero * d;
         claim n = Integer.zero
-            since Integer.multiply_cancel_right_by_nonzero;
+            by Integer.multiply_cancel_right_by_nonzero;
         calc Rational.fraction(n, d, dNonzero)
            = Rational.fraction(Integer.zero, d, dNonzero)
            = Rational.zero
-                 since Quotient.equivalent_implies_equal(
+                 by Quotient.equivalent_implies_equal(
                         RationalRepresentative.make(Integer.zero, d, dNonzero),
                         RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
                         (ring : Integer.zero * Integer.one = Integer.zero * d))
@@ -133,7 +133,7 @@ theorem Rational.LessOrEqual.antisymmetric
         : x = y := {
   claim Rational.IsNonneg(-(y - x)) by substituting (x - y = -(y - x));
   claim y - x = Rational.zero
-    since Rational.IsNonneg_and_negate_IsNonneg_implies_zero;
+    by Rational.IsNonneg_and_negate_IsNonneg_implies_zero;
   calc x
      = Rational.zero + x
      = (y - x) + x
@@ -170,7 +170,7 @@ theorem Rational.LessThan.distinct
 -- (the textbook "but a < a, contradiction") without a citation.
 automatic theorem Rational.LessThan.irreflexive (a : Rational) : ¬(a < a) := {
   suppose a < a as selfLess;
-  claim aDistinct : a ≠ a since Rational.LessThan.distinct;
+  claim aDistinct : a ≠ a by Rational.LessThan.distinct;
   aDistinct(reflexivity(Rational, a))
 }
 
@@ -188,9 +188,9 @@ theorem Rational.LessThan.lift
         (injection : fx = fy → x = y)
         (xLessThanY : x < y)
         : fx < fy := {
-  claim x ≤ y since Rational.LessThan.weaken;
-  claim fx ≤ fy since weak;
-  claim xDistinct : x ≠ y since Rational.LessThan.distinct;
+  claim x ≤ y by Rational.LessThan.weaken;
+  claim fx ≤ fy by weak;
+  claim xDistinct : x ≠ y by Rational.LessThan.distinct;
   claim fx ≠ fy by (fxEqFy : fx = fy) ↦ xDistinct(injection(fxEqFy));
   done
 }
@@ -281,10 +281,10 @@ automatic theorem Rational.LessThan.add_strict_strict
         (a b h : Rational)
         (aLessH : a < h) (bLessH : b < h)
         : a + b < h + h := {
-  claim b ≤ h since Rational.LessThan.weaken;
+  claim b ≤ h by Rational.LessThan.weaken;
   calc a + b
      < h + b
-     ≤ h + h   since Rational.add_preserves_LessOrEqual_left
+     ≤ h + h   by Rational.add_preserves_LessOrEqual_left
 }
 
 -- 0 < x → -x < 0. Used wherever an ε-argument needs the symmetric
@@ -308,9 +308,9 @@ automatic theorem Rational.LessOrEqual.negate
 -- Strict order reverses under negation: x < y → -y < -x.
 automatic theorem Rational.LessThan.negate
         (x y : Rational) (xLessY : x < y) : -y < -x := {
-  claim x ≤ y since Rational.LessThan.weaken;
-  claim -y ≤ -x since Rational.LessOrEqual.negate;
-  claim xDistinct : x ≠ y since Rational.LessThan.distinct;
+  claim x ≤ y by Rational.LessThan.weaken;
+  claim -y ≤ -x by Rational.LessOrEqual.negate;
+  claim xDistinct : x ≠ y by Rational.LessThan.distinct;
   claim -y ≠ -x by (negEqual : -y = -x) ↦ xDistinct(claim x = y by substituting (ring : x = -(-x)));
   done
 }
@@ -330,7 +330,7 @@ theorem Rational.nonzero_of_absolute_value_positive
         : q ≠ Rational.zero :=
   (qIsZero : q = Rational.zero) ↦ {
     claim zeroDistinctFromAbsolute : Rational.zero ≠ abs(q)
-        since Rational.LessThan.distinct;
+        by Rational.LessThan.distinct;
     calc abs(q) = abs(Rational.zero) = Rational.zero;
     absurd(zeroDistinctFromAbsolute(claim Rational.zero = abs(q)))
   }

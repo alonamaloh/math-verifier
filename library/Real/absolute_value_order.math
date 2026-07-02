@@ -52,22 +52,22 @@ theorem Real.LessOrEqual_absolute_value_at_make
                (εPositive : Rational.zero < ε) ↦
         witness 0 with
             (m : Natural) (_ : 0 ≤ m) ↦ {
-              claim s(m) ≤ abs(s(m)) since Rational.le_absolute_value;
+              claim s(m) ≤ abs(s(m)) by Rational.le_absolute_value;
               claim Rational.IsNonneg(abs(s(m)) + -(s(m)));
               calc -ε
-                 < Rational.zero   since Rational.negate_LessThan_zero_of_positive
-                 ≤ abs(s(m)) + -(s(m))   since Rational.LessOrEqual_zero_of_IsNonneg
+                 < Rational.zero   by Rational.negate_LessThan_zero_of_positive
+                 ≤ abs(s(m)) + -(s(m))   by Rational.LessOrEqual_zero_of_IsNonneg
             })
 
 theorem Real.LessOrEqual_absolute_value (x : Real) : x ≤ abs(x) :=
   by_representatives x as rep =>
-      done since Real.LessOrEqual_absolute_value_at_make
+      done by Real.LessOrEqual_absolute_value_at_make
 
 -- -x ≤ |x|: apply the previous bound at -x and fold |-x| = |x|.
 theorem Real.negate_LessOrEqual_absolute_value (x : Real) : -x ≤ abs(x) :=
   calc -x
-     ≤ abs(-x)   since Real.LessOrEqual_absolute_value
-     = abs(x)    since Real.absolute_value_negate
+     ≤ abs(-x)   by Real.LessOrEqual_absolute_value
+     = abs(x)    by Real.absolute_value_negate
 
 -- ----------------------------------------------------------------------
 -- |x| ≤ x when x ≥ 0. Pointwise: a nonnegativity bound -δ < s(m) gives
@@ -85,7 +85,7 @@ theorem Real.absolute_value_LessOrEqual_of_nonneg_at_make
       (ε : Rational)
       (εPositive : Rational.zero < ε) ↦ {
         claim halfPositive : Rational.zero < Rational.halve(ε)
-            since Rational.halve_positive;
+            by Rational.halve_positive;
         choose N as eventuallyAboveHalf
             from eventuallyNonneg(Rational.halve(ε), halfPositive);
         witness N with
@@ -95,7 +95,7 @@ theorem Real.absolute_value_LessOrEqual_of_nonneg_at_make
               -- Goal: -ε < s(m) + -|s(m)|; ε is twice the slack δ.
               calc -ε
                  = -(Rational.halve(ε) + Rational.halve(ε))
-                 < s(m) + -abs(s(m))   since Rational.subtract_absolute_value_lower_bound
+                 < s(m) + -abs(s(m))   by Rational.subtract_absolute_value_lower_bound
             }
       })
 
@@ -103,8 +103,8 @@ theorem Real.absolute_value_LessOrEqual_of_nonneg (x : Real)
         (xNonneg : Real.IsNonneg(x))
         : abs(x) ≤ x :=
   cases x refining xNonneg { | rep => {
-      claim CauchyRationalSequence.IsEventuallyNonneg(rep) since Real.IsNonneg.eventually_nonneg;
-      done since Real.absolute_value_LessOrEqual_of_nonneg_at_make
+      claim CauchyRationalSequence.IsEventuallyNonneg(rep) by Real.IsNonneg.eventually_nonneg;
+      done by Real.absolute_value_LessOrEqual_of_nonneg_at_make
   } }
 
 -- ----------------------------------------------------------------------
@@ -113,24 +113,24 @@ theorem Real.absolute_value_LessOrEqual_of_nonneg (x : Real)
 theorem Real.absolute_value_when_nonneg (x : Real)
         (xNonneg : Real.IsNonneg(x))
         : abs(x) = x := {
-  claim abs(x) ≤ x since Real.absolute_value_LessOrEqual_of_nonneg;
-  claim x ≤ abs(x) since Real.LessOrEqual_absolute_value;
-  done since Real.LessOrEqual.antisymmetric
+  claim abs(x) ≤ x by Real.absolute_value_LessOrEqual_of_nonneg;
+  claim x ≤ abs(x) by Real.LessOrEqual_absolute_value;
+  done by Real.LessOrEqual.antisymmetric
 }
 
 -- The absolute value of zero is zero. A routine fact the auto-prover finds
 -- on its own, so a trivial `abs(Real.zero) = 0` step needs no hint.
 automatic theorem Real.absolute_value_zero : abs(Real.zero) = Real.zero := {
-  claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
-  done since Real.absolute_value_when_nonneg
+  claim Real.IsNonneg(Real.zero) by Real.IsNonneg_zero;
+  done by Real.absolute_value_when_nonneg
 }
 
 theorem Real.absolute_value_when_negate_nonneg (x : Real)
         (negateNonneg : Real.IsNonneg(-x))
         : abs(x) = -x :=
   calc abs(x)
-     = abs(-x)   since Real.absolute_value_negate
-     = -x        since Real.absolute_value_when_nonneg
+     = abs(-x)   by Real.absolute_value_negate
+     = -x        by Real.absolute_value_when_nonneg
 
 -- ----------------------------------------------------------------------
 -- Reflecting a strict bound through negation: -a < b gives -b < a
@@ -139,7 +139,7 @@ theorem Real.negate_flip_LessThan (a b : Real)
         (lowerBound : -a < b)
         : -b < a := {
   claim -a + (a + -b) < b + (a + -b)
-      since Real.add_preserves_LessThan;
+      by Real.add_preserves_LessThan;
   calc -b
      = -a + (a + -b)
      < b + (a + -b)
@@ -155,12 +155,12 @@ theorem Real.absolute_value_LessThan_of_bounds (x c : Real)
   claim by cases {
     in (Real.IsNonneg(x)) as xNonneg:
         calc abs(x)
-           = x   since Real.absolute_value_when_nonneg
+           = x   by Real.absolute_value_when_nonneg
            < c
     in (Real.IsNonneg(-x)) as negateNonneg: {
-        claim -x < c since Real.negate_flip_LessThan;
+        claim -x < c by Real.negate_flip_LessThan;
         calc abs(x)
-           = -x   since Real.absolute_value_when_negate_nonneg
+           = -x   by Real.absolute_value_when_negate_nonneg
            < c
       }
   }
@@ -169,12 +169,12 @@ theorem Real.absolute_value_LessThan_bounds (x c : Real)
         (absoluteBound : abs(x) < c)
         : -c < x ∧ x < c := {
   calc x
-     ≤ abs(x)   since Real.LessOrEqual_absolute_value
+     ≤ abs(x)   by Real.LessOrEqual_absolute_value
      < c   as upperBound;
   calc -x
-     ≤ abs(x)   since Real.negate_LessOrEqual_absolute_value
+     ≤ abs(x)   by Real.negate_LessOrEqual_absolute_value
      < c;
-  claim lowerBound : -c < x since Real.negate_flip_LessThan;
+  claim lowerBound : -c < x by Real.negate_flip_LessThan;
   And.introduction(lowerBound, upperBound)
 }
 
@@ -182,13 +182,13 @@ theorem Real.absolute_value_LessThan_bounds (x c : Real)
 theorem Real.absolute_value_nonneg (x : Real) : Real.zero ≤ abs(x) :=
   claim by cases {
     in (Real.IsNonneg(x)) as xNonneg: {
-        claim Real.zero ≤ x since Real.LessOrEqual_zero_of_IsNonneg;
-        claim absEquation : abs(x) = x since Real.absolute_value_when_nonneg;
+        claim Real.zero ≤ x by Real.LessOrEqual_zero_of_IsNonneg;
+        claim absEquation : abs(x) = x by Real.absolute_value_when_nonneg;
         done by substituting absEquation
       }
     in (Real.IsNonneg(-x)) as negateNonneg: {
-        claim Real.zero ≤ -x since Real.LessOrEqual_zero_of_IsNonneg;
-        claim absEquation : abs(x) = -x since Real.absolute_value_when_negate_nonneg;
+        claim Real.zero ≤ -x by Real.LessOrEqual_zero_of_IsNonneg;
+        claim absEquation : abs(x) = -x by Real.absolute_value_when_negate_nonneg;
         done by substituting absEquation
       }
   }

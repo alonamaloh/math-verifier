@@ -196,14 +196,14 @@ theorem Real.avoidStepWithDecision_nested
       cases decision {
         | Logic.Decidable.yes(_) => {
             calc a
-               ≤ Real.midpoint(a, b)                       since Real.LessThan.weaken
-               ≤ Real.midpoint(Real.midpoint(a, b), b)     since Real.LessThan.weaken;
+               ≤ Real.midpoint(a, b)                       by Real.LessThan.weaken
+               ≤ Real.midpoint(Real.midpoint(a, b), b)     by Real.LessThan.weaken;
             done
           }
         | Logic.Decidable.no(_) => {
             calc Real.midpoint(a, Real.midpoint(a, b))
-               ≤ Real.midpoint(a, b)                       since Real.LessThan.weaken
-               ≤ b                                         since Real.LessThan.weaken;
+               ≤ Real.midpoint(a, b)                       by Real.LessThan.weaken
+               ≤ b                                         by Real.LessThan.weaken;
             done
           }
       }
@@ -242,13 +242,13 @@ theorem Real.avoidStepWithDecision_avoids
         | Logic.Decidable.yes(_) => {
             calc point
                ≤ Real.midpoint(a, Real.midpoint(a, b))
-               ≤ Real.midpoint(a, b)                       since Real.LessThan.weaken
+               ≤ Real.midpoint(a, b)                       by Real.LessThan.weaken
                < Real.midpoint(Real.midpoint(a, b), b);
             done
           }
         | Logic.Decidable.no(_) => {
             claim Real.midpoint(a, Real.midpoint(a, b)) < point
-                since Real.LessThan_of_not_LessOrEqual;
+                by Real.LessThan_of_not_LessOrEqual;
             done
           }
       }
@@ -278,7 +278,7 @@ theorem Real.avoidStep_avoids
         (ordered : Real.NestedInterval.left(state)
                      < Real.NestedInterval.right(state))
         : point < Real.NestedInterval.left(Real.avoidStep(state, point)) ∨ Real.NestedInterval.right(Real.avoidStep(state, point)) < point :=
-  { done since Real.avoidStepWithDecision_avoids }
+  { done by Real.avoidStepWithDecision_avoids }
 
 -- ----------------------------------------------------------------------
 -- The avoiding interval sequence for a listing f, and its end sequences.
@@ -304,7 +304,7 @@ theorem Real.avoidingIntervals_ordered (f : Natural → Real) (n : Natural)
         -- I₀ = [0, 1].
         claim Rational.zero < Rational.one;
         claim Real.zero < Rational.one
-            since Rational.to_real.positive_preserves;
+            by Rational.to_real.positive_preserves;
         done
       }
     case successor(predecessor): {
@@ -321,12 +321,12 @@ theorem Real.avoidingLeft_le_subsequent
   by_induction on k with IH {
     case zero: {
         claim Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, N)
-            since Real.LessOrEqual.reflexive;
+            by Real.LessOrEqual.reflexive;
         done
       }
     case successor(predecessor): {
         claim Real.avoidingLeft(f, predecessor + N) < Real.avoidingRight(f, predecessor + N)
-            since Real.avoidingIntervals_ordered;
+            by Real.avoidingIntervals_ordered;
         claim Real.avoidingLeft(f, predecessor + N)
                 ≤ Real.avoidingLeft(f, successor(predecessor + N))
               ∧ Real.avoidingRight(f, successor(predecessor + N))
@@ -335,7 +335,7 @@ theorem Real.avoidingLeft_le_subsequent
                 state := Real.avoidingIntervals(f, predecessor + N),
                 point := f(predecessor + N));
         calc Real.avoidingLeft(f, N)
-           ≤ Real.avoidingLeft(f, predecessor + N)        since IH
+           ≤ Real.avoidingLeft(f, predecessor + N)        by IH
            ≤ Real.avoidingLeft(f, successor(predecessor + N))
            = Real.avoidingLeft(f, successor(predecessor) + N)
                  by substituting Natural.successor_add
@@ -349,12 +349,12 @@ theorem Real.avoidingRight_le_subsequent
   by_induction on k with IH {
     case zero: {
         claim Real.avoidingRight(f, N) ≤ Real.avoidingRight(f, N)
-            since Real.LessOrEqual.reflexive;
+            by Real.LessOrEqual.reflexive;
         done
       }
     case successor(predecessor): {
         claim Real.avoidingLeft(f, predecessor + N) < Real.avoidingRight(f, predecessor + N)
-            since Real.avoidingIntervals_ordered;
+            by Real.avoidingIntervals_ordered;
         claim Real.avoidingLeft(f, predecessor + N)
                 ≤ Real.avoidingLeft(f, successor(predecessor + N))
               ∧ Real.avoidingRight(f, successor(predecessor + N))
@@ -365,7 +365,7 @@ theorem Real.avoidingRight_le_subsequent
         calc Real.avoidingRight(f, successor(predecessor) + N)
            = Real.avoidingRight(f, successor(predecessor + N))
            ≤ Real.avoidingRight(f, predecessor + N)
-           ≤ Real.avoidingRight(f, N)                     since IH
+           ≤ Real.avoidingRight(f, N)                     by IH
       }
   }
 
@@ -396,7 +396,7 @@ theorem Real.avoidingLeft_le_avoidingRight
           ≤ Real.avoidingLeft(f, Natural.maximum(m, n));
   claim Real.avoidingLeft(f, Natural.maximum(m, n))
           ≤ Real.avoidingRight(f, Natural.maximum(m, n))
-      since Real.LessThan.weaken;
+      by Real.LessThan.weaken;
   claim Real.avoidingRight(f, Natural.maximum(m, n))
           ≤ Real.avoidingRight(f, n);
   calc Real.avoidingLeft(f, m)
@@ -409,9 +409,9 @@ theorem Real.avoidingLeft_le_avoidingRight
 theorem Real.avoiding_avoids (f : Natural → Real) (n : Natural)
         : f(n) < Real.avoidingLeft(f, 1 + n) ∨ Real.avoidingRight(f, 1 + n) < f(n) := {
   claim Real.avoidingLeft(f, n) < Real.avoidingRight(f, n)
-      since Real.avoidingIntervals_ordered;
+      by Real.avoidingIntervals_ordered;
   claim f(n) < Real.avoidingLeft(f, successor(n)) ∨ Real.avoidingRight(f, successor(n)) < f(n)
-      since Real.avoidStep_avoids(state := Real.avoidingIntervals(f, n), point := f(n));
+      by Real.avoidStep_avoids(state := Real.avoidingIntervals(f, n), point := f(n));
   done by substituting Natural.one_add
 }
 
@@ -429,7 +429,7 @@ theorem Real.enumeration_misses_a_real (f : Natural → Real)
            suppose y ∈ Real.sequence_range(Real.avoidingLeft(f)) as yInRange;
            choose m such that Real.avoidingLeft(f, m) = y as termEqualsY from yInRange;
            claim Real.avoidingLeft(f, m) ≤ Real.avoidingRight(f, 0)
-               since Real.avoidingLeft_le_avoidingRight;
+               by Real.avoidingLeft_le_avoidingRight;
            done by substituting termEqualsY
          };
   choose x such that Real.IsSupremum(Real.sequence_range(Real.avoidingLeft(f)), x)
@@ -453,21 +453,21 @@ theorem Real.enumeration_misses_a_real (f : Natural → Real)
           suppose y ∈ Real.sequence_range(Real.avoidingLeft(f)) as yInRange;
           choose m such that Real.avoidingLeft(f, m) = y as termEqualsY from yInRange;
           claim Real.avoidingLeft(f, m) ≤ Real.avoidingRight(f, 1 + n)
-              since Real.avoidingLeft_le_avoidingRight;
+              by Real.avoidingLeft_le_avoidingRight;
           done by substituting termEqualsY
         };
     claim x ≤ Real.avoidingRight(f, 1 + n);
     -- … but f(n) is strictly outside interval n+1, so f(n) ≠ x.
     claim f(n) < Real.avoidingLeft(f, 1 + n) ∨ Real.avoidingRight(f, 1 + n) < f(n)
-        since Real.avoiding_avoids;
+        by Real.avoiding_avoids;
     claim by cases {
       in (f(n) < Real.avoidingLeft(f, 1 + n)) as fnBelowInterval: {
-          claim f(n) < x since Real.LessThan.transitive_right;
+          claim f(n) < x by Real.LessThan.transitive_right;
           claim f(n) < f(n) by substituting fnEqualsX;
           done
         }
       in (Real.avoidingRight(f, 1 + n) < f(n)) as intervalBelowFn: {
-          claim x < f(n) since Real.LessThan.transitive_left;
+          claim x < f(n) by Real.LessThan.transitive_left;
           claim x < x by substituting fnEqualsX;
           done
         }
@@ -482,6 +482,6 @@ theorem Real.not_enumerable : Not(IsEnumerable(Real)) := {
   choose x such that ∀ (n : Natural). ¬(f(n) = x) as xAvoidsListing
       from Real.enumeration_misses_a_real;
   choose n such that f(n) = x as fnEqualsX from fSurjective(x);
-  claim ¬(f(n) = x) since xAvoidsListing;
+  claim ¬(f(n) = x) by xAvoidsListing;
   done
 }
