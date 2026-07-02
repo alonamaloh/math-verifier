@@ -38,7 +38,7 @@ the suggested order at the end of the plan.
 | Step | Workstream | Status | Record |
 |------|------------|--------|--------|
 | 1 | B5 classifier (instrument hinted claims/calc steps) | **done** | 2026-07-02; `MATH_CLASSIFY_HINTS` + `scripts/hint_classification_report.py`; findings in B5 (64.6% absorbable of 5807 sites) |
-| 2 | B1–B3 tier skeleton, context index, cast tier | not started | |
+| 2 | B1–B3 tier skeleton, context index, cast tier | **in progress** | tier-4 sign index landed 2026-07-02 (21b1cb4, +180 sites absorbed); next: IsNonneg/zero judgment families, B3 cast retry, B1 context hash index |
 | 3 | A1 keyword-free claims/calc | not started | |
 | 4 | B4 order automation in calc | not started | |
 | 5 | A2 statement addressability + A7 `contradiction` kit | not started | |
@@ -807,6 +807,25 @@ Cheapest first, strict budgets, first success wins:
 - Also index totality/trichotomy lemmas (`a ≤ b ∨ b < a`, constructor
   coverage) under a coverage judgment — this is what makes A4's
   exhaustiveness obligations discharge silently.
+
+**v1 landed (2026-07-02, commit 21b1cb4).** Judgments: `0 ≤ f(…)`,
+`0 < f(…)`, `f(…) ≠ 0` over Constant-headed or numeral subjects;
+registration hooks `registerAlgebraicShape` (so seeding and fresh
+declarations share one funnel); admission = sign-judgment premises on
+bare lemma binders; conflicts first-wins-and-counted (the
+declaration-time error waits for a library duplicate cleanup); tactic
+sits after `localFactExactMatch`; `MATH_SIGN_INDEX_DEBUG` traces rule
+firings. Feature test: depth-3 recursion through an opaque wrapper.
+Measured day-one yield (classifier, library-only): closes-today
+36.2% → 39.1% (+180 sites); tier-4 sign 312 → 263, sign-cast
+217 → 147. The residue decomposes as: (a) ~90 sites of
+IsNonneg-form plumbing (`IsNonneg_of_LessOrEqual_zero` and kin) —
+extend the judgment vocabulary to unary predicates and route across
+the bridge lemmas; (b) the sign-cast bucket, blocked on tier 3
+(subjects carrying non-numeral casts don't match rules stated on the
+bare carrier); (c) `f(…) = 0` zeroness equalities (the classifier
+counts them sign-shaped; a `zero` judgment family would take them);
+(d) whatever the conflict counter is masking — audit it.
 
 ### B3. Cast normalization (tier 3)
 
