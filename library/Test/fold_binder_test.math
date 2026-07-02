@@ -1,0 +1,113 @@
+-- Feature test: the explicit fold binder form (A8 step 2 of
+-- PLAN_LANGUAGE_IMPROVEMENT.md).
+--
+--   sum k from LO to HI of BODY          -- (+) via the registry
+--   product k from LO to HI of BODY      -- (*) via the registry
+--   fold (op) k from LO to HI of BODY    -- any registered operator
+--
+-- The form elaborates through the `fold_operation` registry to
+-- `Algebra.Fold(carrier, op, identity, λk. BODY, LO, count)`. Count rules
+-- exercised below: inclusive `(1 + HI) ∸ LO` with monus-free literal
+-- LO ∈ {0, 1}, and the half-open `E - 1` upper bound. `sum`, `product`,
+-- `fold`, `to`, `of` stay ordinary identifiers elsewhere.
+
+module Test.fold_binder_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.monus
+import Algebra.monoid
+import Algebra.aggregation
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.ring
+import Integer.negation
+import Integer.instances
+
+-- ----------------------------------------------------------------------
+-- The three heads elaborate, at two carriers (Natural via the
+-- registrations in Algebra.aggregation, Integer via Integer.instances).
+
+-- Inclusive from 0: count is the monus-free `1 + n`.
+theorem Test.sum_from_zero_is_fold (s : Natural → Natural) (n : Natural)
+        : (sum k from 0 to n of s(k))
+          = Algebra.Fold(Natural, Natural.add, 0, s, 0, 1 + n) :=
+  done
+
+-- Inclusive from 1: count is the monus-free `n`.
+theorem Test.sum_from_one_is_fold (s : Natural → Natural) (n : Natural)
+        : (sum k from 1 to n of s(k))
+          = Algebra.Fold(Natural, Natural.add, 0, s, 1, n) :=
+  done
+
+-- Half-open `n - 1` upper bound from 0: count is `n`, so the range is
+-- [0, n) and the sum is empty at n = 0.
+theorem Test.sum_half_open_is_fold (s : Natural → Natural) (n : Natural)
+        : (sum k from 0 to n - 1 of s(k))
+          = Algebra.Fold(Natural, Natural.add, 0, s, 0, n) :=
+  done
+
+theorem Test.sum_half_open_empty (s : Natural → Natural)
+        : (sum k from 0 to 0 - 1 of s(k)) = 0 :=
+  done
+
+-- Symbolic lower bound: the count keeps the monus.
+theorem Test.sum_symbolic_low_is_fold (s : Natural → Natural) (m n : Natural)
+        : (sum k from m to n of s(k))
+          = Algebra.Fold(Natural, Natural.add, 0, s, m, Natural.monus(1 + n, m)) :=
+  done
+
+-- product resolves (*) on the carrier.
+theorem Test.product_is_fold (s : Natural → Natural) (n : Natural)
+        : (product k from 1 to n of s(k))
+          = Algebra.Fold(Natural, Natural.multiply, 1, s, 1, n) :=
+  done
+
+-- The general head with an explicit registered operator.
+theorem Test.fold_head_is_fold (s : Natural → Natural) (n : Natural)
+        : (fold (+) k from 0 to n of s(k))
+          = Algebra.Fold(Natural, Natural.add, 0, s, 0, 1 + n) :=
+  done
+
+-- Carrier resolution reads the body's type: an Integer body picks the
+-- Integer registration.
+theorem Test.integer_sum_is_fold (s : Natural → Integer) (n : Natural)
+        : (sum k from 0 to n of s(k))
+          = Algebra.Fold(Integer, Integer.add, Integer.zero, s, 0, 1 + n) :=
+  done
+
+-- ----------------------------------------------------------------------
+-- The form is usable: ground evaluation and a peel through the Fold
+-- lemma set.
+
+-- Ground evaluation: the count is a constructor numeral, so the Fold
+-- recursion unrolls by defeq; the leftover opaque-add index arithmetic
+-- (`1 + 0`, `1 + 1`, `1 + 2`) is the auto-prover's numeral bookkeeping.
+-- (A single closed identity like `1 + 2 + … + 10 = 55` in one step is
+-- step 4's tier-2 ground evaluator, not this form's job.)
+theorem Test.sum_ground : (sum k from 1 to 3 of k) = 6 :=
+  calc (sum k from 1 to 3 of k)
+     = ((0 + (1 + 0)) + (1 + 1)) + (1 + 2)
+     = 6
+
+-- Peel the top term with Fold_add_one (count 1 + n at lower bound 0).
+theorem Test.sum_peel (s : Natural → Natural) (n : Natural)
+        : (sum k from 0 to 1 + n of s(k))
+          = (sum k from 0 to n of s(k)) + s(1 + n) :=
+  calc (sum k from 0 to 1 + n of s(k))
+     = Natural.add(Algebra.Fold(Natural, Natural.add, 0, s, 0, 1 + n), s(0 + (1 + n)))
+           by Algebra.Fold_add_one
+     = (sum k from 0 to n of s(k)) + s(1 + n)   by (0 + (1 + n) = 1 + n)
+
+-- ----------------------------------------------------------------------
+-- `sum`, `product`, `to`, `of` remain ordinary identifiers.
+
+theorem Test.product_still_an_identifier (n : Natural) : n * 1 = n := {
+  let product : Natural := n * 1;
+  claim product = n;
+  done
+}

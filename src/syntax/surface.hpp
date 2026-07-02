@@ -177,6 +177,27 @@ struct SurfaceUnaryOperation {
     SurfaceExpressionPointer operand;
 };
 
+// The explicit fold binder form (A8 step 2):
+//   `sum k from LO to HI of BODY`        — operatorSymbol "+"
+//   `product k from LO to HI of BODY`    — operatorSymbol "*"
+//   `fold (op) k from LO to HI of BODY`  — any registered operator
+// Elaborates through the `fold_operation` registry to
+// `Algebra.Fold(carrier, op, identity, λk. BODY, LO, count)`, where the
+// carrier is the body's type and count follows the inclusive rule
+// `(1 + HI) ∸ LO` (monus-free when LO is a literal 0 or 1) — except an
+// upper bound WRITTEN as `E - 1`, which is half-open notation for the
+// range [LO, E) with count `E ∸ LO` (so `a(0) + … + a(n-1)` is empty at
+// n = 0). `sum`/`product`/`fold`/`to`/`of` stay ordinary identifiers
+// everywhere else; only the `<word> <ident> from` shape (with `(op)`
+// after `fold`) is claimed.
+struct SurfaceFoldBinder {
+    std::string operatorSymbol;
+    std::string binderName;
+    SurfaceExpressionPointer lowerBound;
+    SurfaceExpressionPointer upperBound;   // as written; `E - 1` = half-open
+    SurfaceExpressionPointer body;
+};
+
 // Anonymous tuple expression `⟨a, b, ...⟩`. The elaborator picks the
 // constructor based on the expected type — `And.introduction(a, b)` when
 // the goal is `And(_, _)`, `Exists.introduce(a, b)` for `Exists(_, _)`,
@@ -521,7 +542,7 @@ struct SurfaceExpression {
         SurfaceIdentifier, SurfaceNumericLiteral,
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
-        SurfaceBinaryOperation, SurfaceUnaryOperation,
+        SurfaceBinaryOperation, SurfaceUnaryOperation, SurfaceFoldBinder,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
         SurfaceRing, SurfaceGroup, SurfaceField, SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
@@ -619,6 +640,16 @@ inline SurfaceExpressionPointer makeSurfaceBinaryOperation(
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceBinaryOperation{std::move(opSymbol),
                                 std::move(left), std::move(right)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceFoldBinder(
+    std::string operatorSymbol, std::string binderName,
+    SurfaceExpressionPointer lowerBound, SurfaceExpressionPointer upperBound,
+    SurfaceExpressionPointer body, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceFoldBinder{std::move(operatorSymbol), std::move(binderName),
+                           std::move(lowerBound), std::move(upperBound),
+                           std::move(body)},
         line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceUnaryOperation(

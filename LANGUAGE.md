@@ -435,6 +435,34 @@ search):
   `sym` to on `(T, T)`. The registry feeds the fold binder form and
   the ellipsis notation for sums/products.
 
+## The fold binder form
+
+```
+sum k from 0 to n of s(k)             -- Σ_{k=0}^{n} s(k)
+product k from 1 to n of k            -- Π_{k=1}^{n} k
+fold (+) k from m to n of s(k)        -- any registered operator
+```
+
+An ordinary term (legal anywhere a carrier element is), elaborating
+through the `fold_operation` registry to
+`Algebra.Fold(carrier, op, identity, λk. body, lo, count)`. The
+carrier is the body's type; `(head-operator, carrier)` must be
+registered or the form is an error naming the missing registration.
+
+- **Range and count.** The range is inclusive `lo … hi`; the count is
+  `(1 + hi) ∸ lo`, monus-free when `lo` is a literal `0` (count
+  `1 + hi`) or `1` (count `hi`).
+- **Half-open `E - 1`.** An upper bound *written* `E - 1` is half-open
+  notation for `[lo, E)` with count `E ∸ lo`, so
+  `sum k from 0 to n - 1 of s(k)` is the empty sum at `n = 0`.
+- `sum`, `product`, `fold`, `to`, `of` remain ordinary identifiers
+  everywhere else; only the `sum k from` / `fold (op) k from` shape is
+  claimed. The body extends as far right as an expression can —
+  parenthesise the whole form to continue an enclosing expression:
+  `(sum k from 0 to n of s(k)) + 1`.
+- The form does not coerce its carrier: where the context expects a
+  different type, write the cast (or `Algebra.Fold`) explicitly.
+
 ## Common mistakes and how to avoid them
 
 ### Don't write nested `Equality.transitivity` — write `calc`

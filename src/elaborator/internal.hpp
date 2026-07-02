@@ -1123,6 +1123,17 @@ private:
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType = nullptr);
 
+    // The fold binder form `sum k from LO to HI of BODY` (and
+    // product/fold variants): resolve the carrier from the body's type,
+    // look up (operator, carrier) in the fold_operation registry, build
+    // the count per the inclusive/(half-open `E - 1`) rules, and
+    // elaborate the assembled `Algebra.Fold(…)` call.
+    ExpressionPointer elaborateFoldBinder(
+        const SurfaceFoldBinder& fold,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
     // `by_strong_induction on E with subject, ih { body }` —
     // single-step strong induction. Extract the scrutinee's carrier
     // type, build `<CarrierTypeName>.strong_induction` as the

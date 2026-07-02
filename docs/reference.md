@@ -18,6 +18,7 @@ A catalogue of surface constructs. For depth see `docs/conventions/`.
 | `coercion (S, T) := F` | canonical embedding S ↪ T |
 | `congruence_under_binder F := L` | rewrite-under-binder lemma for head F |
 | `fold_operation (sym) on T := W` | register `sym` on `T` as fold-capable; `W : IsMonoid(T, op, id)` must certify the same `op` the operator registry dispatches to (canonical per (sym, T); feeds the fold binder form and ellipsis notation) |
+| `sum k from LO to HI of BODY` | Σ over the inclusive range as an ordinary term: `Algebra.Fold(carrier, +, 0, λk. BODY, LO, (1 + HI) ∸ LO)` via the fold_operation registry (monus-free count for literal LO ∈ {0,1}); `product … of …` is (*), `fold (op) k from … to … of …` any registered op; an upper bound written `E - 1` is half-open `[LO, E)` |
 
 Pattern-match definition: `definition f : A → B \| pat1 => e1 \| pat2 => e2`.
 

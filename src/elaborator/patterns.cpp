@@ -1522,6 +1522,20 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                        outerBinderCount),
                 node.line, node.column);
         }
+        if (auto* foldBinder = std::get_if<SurfaceFoldBinder>(&node.node)) {
+            return makeSurfaceFoldBinder(
+                foldBinder->operatorSymbol, foldBinder->binderName,
+                rewriteRecursiveCalls(foldBinder->lowerBound, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                rewriteRecursiveCalls(foldBinder->upperBound, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                rewriteRecursiveCalls(foldBinder->body, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
         if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
             return makeSurfaceUnaryOperation(
                 unary->opSymbol,

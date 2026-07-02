@@ -236,6 +236,21 @@ SurfaceExpressionPointer substituteSurfaceName(
             substituteSurfaceName(unary->operand, targetName, replacement),
             line, column);
     }
+    if (auto* foldBinder = std::get_if<SurfaceFoldBinder>(&node.node)) {
+        // The index variable shadows `targetName` inside the body only.
+        SurfaceExpressionPointer newBody =
+            foldBinder->binderName == targetName
+                ? foldBinder->body
+                : substituteSurfaceName(foldBinder->body,
+                                         targetName, replacement);
+        return makeSurfaceFoldBinder(
+            foldBinder->operatorSymbol, foldBinder->binderName,
+            substituteSurfaceName(foldBinder->lowerBound,
+                                   targetName, replacement),
+            substituteSurfaceName(foldBinder->upperBound,
+                                   targetName, replacement),
+            std::move(newBody), line, column);
+    }
     if (auto* tuple = std::get_if<SurfaceAnonymousTuple>(&node.node)) {
         std::vector<SurfaceExpressionPointer> newComponents;
         for (const auto& component : tuple->components) {
@@ -2650,8 +2665,84 @@ private:
         return argument;
     }
 
+    // `sum k from LO to HI of BODY` / `product k from LO to HI of BODY` /
+    // `fold (op) k from LO to HI of BODY` — the explicit fold binder form.
+    // `to` and `of` are text-matched identifiers (the `suppose … to prove`
+    // treatment), so they stay usable as variable names; the bounds parse
+    // as full expressions and stop at them naturally (no juxtaposition
+    // application exists). The body takes the longest expression to the
+    // right — parenthesise the whole form to continue an enclosing
+    // expression: `(sum k from 0 to n of f(k)) + 1`.
+    SurfaceExpressionPointer parseFoldBinder() {
+        Token head = consumeAny();  // 'sum' / 'product' / 'fold'
+        std::string operatorSymbol;
+        if (head.lexeme == "sum") {
+            operatorSymbol = "+";
+        } else if (head.lexeme == "product") {
+            operatorSymbol = "*";
+        } else {
+            expect(TokenKind::LeftParen,
+                   "after 'fold' (fold (op) k from LO to HI of BODY)");
+            if (peek().kind == TokenKind::Identifier
+                || peek().kind == TokenKind::EndOfFile) {
+                throwHere("expected an operator symbol like '+' or '*' "
+                          "inside the parentheses of `fold (op)`");
+            }
+            operatorSymbol = consumeAny().lexeme;
+            expect(TokenKind::RightParen,
+                   "after the operator symbol in `fold (op)`");
+        }
+        if (peek().kind != TokenKind::Identifier) {
+            throwHere("expected the bound index variable "
+                      "(sum k from LO to HI of BODY)");
+        }
+        std::string binderName = consumeAny().lexeme;
+        expect(TokenKind::KeywordFrom,
+               "before the lower bound (sum k from LO to HI of BODY)");
+        SurfaceExpressionPointer lowerBound = parseExpression();
+        if (peek().kind != TokenKind::Identifier || peek().lexeme != "to") {
+            throwHere("expected 'to' between the fold bounds "
+                      "(sum k from LO to HI of BODY)");
+        }
+        consumeAny();  // 'to'
+        SurfaceExpressionPointer upperBound = parseExpression();
+        if (peek().kind != TokenKind::Identifier || peek().lexeme != "of") {
+            throwHere("expected 'of' before the fold body "
+                      "(sum k from LO to HI of BODY)");
+        }
+        consumeAny();  // 'of'
+        SurfaceExpressionPointer body = parseExpression();
+        return makeSurfaceFoldBinder(
+            std::move(operatorSymbol), std::move(binderName),
+            std::move(lowerBound), std::move(upperBound), std::move(body),
+            head.line, head.column);
+    }
+
     SurfaceExpressionPointer parseAtom() {
         const Token& current = peek();
+        // The fold binder form (A8): `sum k from … to … of …`,
+        // `product k from … to … of …`, `fold (op) k from … to … of …`.
+        // `sum`/`product`/`fold` stay ordinary identifiers everywhere
+        // else (the library uses `product` as a local name), so the form
+        // is claimed by lookahead only: head word, then a bound-variable
+        // identifier (after `(op)` for `fold`), then the `from` keyword —
+        // a shape no other expression can start with (there is no
+        // juxtaposition application).
+        if (current.kind == TokenKind::Identifier
+            && (current.lexeme == "sum" || current.lexeme == "product")
+            && peekAt(1).kind == TokenKind::Identifier
+            && peekAt(2).kind == TokenKind::KeywordFrom) {
+            return parseFoldBinder();
+        }
+        if (current.kind == TokenKind::Identifier
+            && current.lexeme == "fold"
+            && peekAt(1).kind == TokenKind::LeftParen
+            && peekAt(2).kind != TokenKind::Identifier
+            && peekAt(3).kind == TokenKind::RightParen
+            && peekAt(4).kind == TokenKind::Identifier
+            && peekAt(5).kind == TokenKind::KeywordFrom) {
+            return parseFoldBinder();
+        }
         // `sorry` and `ring` must short-circuit before the
         // identifier-like path because they're also contextual
         // keywords (so they can appear as name segments inside
@@ -4061,6 +4152,14 @@ private:
     // Token-stream helpers.
 
     const Token& peek() const { return tokens_[position_]; }
+
+    // Lookahead k tokens past the cursor, clamped to the trailing
+    // EndOfFile token so deep lookahead near the end is safe.
+    const Token& peekAt(size_t k) const {
+        size_t index = position_ + k;
+        if (index >= tokens_.size()) index = tokens_.size() - 1;
+        return tokens_[index];
+    }
 
     const Token& consumeAny() {
         const Token& token = tokens_[position_];

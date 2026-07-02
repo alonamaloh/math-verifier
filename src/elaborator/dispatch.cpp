@@ -1571,6 +1571,12 @@ ExpressionPointer Elaborator::elaborateExpression(
         if (std::get_if<SurfaceProposition>(&expression.node)) {
             return makeProposition();
         }
+        if (auto* foldBinder =
+                std::get_if<SurfaceFoldBinder>(&expression.node)) {
+            return elaborateFoldBinder(*foldBinder, localBinders,
+                                        expectedType,
+                                        expression.line, expression.column);
+        }
         if (auto* binary =
                 std::get_if<SurfaceBinaryOperation>(&expression.node)) {
             if (binary->opSymbol == "=") {
@@ -2011,3 +2017,162 @@ ExpressionPointer Elaborator::elaborateExpression(
         throw ElaborateError("unhandled surface expression variant");
     }
 
+
+ExpressionPointer Elaborator::elaborateFoldBinder(
+        const SurfaceFoldBinder& fold,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this, "fold binder ("
+            + (fold.operatorSymbol == "+" ? std::string("sum")
+               : fold.operatorSymbol == "*" ? std::string("product")
+               : "fold (" + fold.operatorSymbol + ")")
+            + " " + fold.binderName + " from … to … of …)");
+        // The carrier is the body's type: elaborate `λ(k : Natural). BODY`
+        // bottom-up and read the Pi codomain. (The lambda is re-elaborated
+        // inside the assembled call below; the duplicate pass is cheap and
+        // keeps the assembly a plain surface application.)
+        SurfaceExpressionPointer indexType =
+            makeSurfaceIdentifier("Natural", {}, line, column);
+        SurfaceBinder binder{{fold.binderName}, indexType, false};
+        SurfaceExpressionPointer lambda =
+            makeSurfaceLambda(binder, fold.body, line, column);
+        ExpressionPointer lambdaKernel =
+            elaborateExpression(*lambda, localBinders);
+        ExpressionPointer lambdaType =
+            inferTypeInLocalContext(localBinders, lambdaKernel);
+        ExpressionPointer lambdaTypeWhnf =
+            weakHeadNormalForm(environment_, lambdaType);
+        auto* pi = std::get_if<Pi>(&lambdaTypeWhnf->node);
+        if (!pi) {
+            throwElaborate("fold binder: the body did not elaborate to a "
+                           "function of the index (internal)");
+        }
+        if (referencesBoundVariable(pi->codomain, 0)) {
+            throwElaborate(
+                "fold binder: the body's type depends on the index variable "
+                "`" + fold.binderName + "` — the fold needs one carrier "
+                "type for every term");
+        }
+        std::string carrierName = headConstantName(pi->codomain);
+        auto entry = environment_.foldOperationRegistry.find(
+            std::make_tuple(fold.operatorSymbol, carrierName));
+        if (entry == environment_.foldOperationRegistry.end()) {
+            throwElaborate(
+                "no `fold_operation (" + fold.operatorSymbol + ") on "
+                + carrierName + "` is registered — the fold binder form "
+                "needs the (operator, identity, monoid-laws) certificate; "
+                "declare `fold_operation (" + fold.operatorSymbol + ") on "
+                + carrierName + " := <IsMonoid witness>` (the numeric "
+                "carriers register +/* in their instances files)");
+        }
+        if (!environment_.lookup("Algebra.Fold")) {
+            throwElaborate(
+                "the fold binder form elaborates to `Algebra.Fold` — "
+                "import Algebra.aggregation");
+        }
+        // Count. Inclusive range LO..HI has count `(1 + HI) ∸ LO`,
+        // monus-free when LO is a literal 0 or 1. An upper bound WRITTEN
+        // `E - 1` is half-open notation for [LO, E): count `E ∸ LO` — so
+        // `sum k from 0 to n - 1 of s(k)` is the empty sum at n = 0.
+        auto isLiteral = [](const SurfaceExpressionPointer& e,
+                            const char* digits) {
+            auto* numeral = std::get_if<SurfaceNumericLiteral>(&e->node);
+            return numeral && numeral->digits == digits;
+        };
+        SurfaceExpressionPointer halfOpenBound;
+        if (auto* upperOp =
+                std::get_if<SurfaceBinaryOperation>(&fold.upperBound->node)) {
+            if (upperOp->opSymbol == "-" && isLiteral(upperOp->right, "1")) {
+                halfOpenBound = upperOp->left;
+            }
+        }
+        SurfaceExpressionPointer count;
+        if (halfOpenBound) {
+            if (isLiteral(fold.lowerBound, "0")) {
+                count = halfOpenBound;
+            } else {
+                count = makeSurfaceApplication(
+                    makeSurfaceIdentifier("Natural.monus", {}, line, column),
+                    std::vector<SurfaceExpressionPointer>{
+                        halfOpenBound, fold.lowerBound},
+                    line, column);
+            }
+        } else if (isLiteral(fold.lowerBound, "0")) {
+            count = makeSurfaceBinaryOperation(
+                "+", makeSurfaceNumericLiteral("1", line, column),
+                fold.upperBound, line, column);
+        } else if (isLiteral(fold.lowerBound, "1")) {
+            count = fold.upperBound;
+        } else {
+            count = makeSurfaceApplication(
+                makeSurfaceIdentifier("Natural.monus", {}, line, column),
+                std::vector<SurfaceExpressionPointer>{
+                    makeSurfaceBinaryOperation(
+                        "+", makeSurfaceNumericLiteral("1", line, column),
+                        fold.upperBound, line, column),
+                    fold.lowerBound},
+                line, column);
+        }
+        // Carrier, operation and identity come from the WITNESS TYPE as
+        // core expressions (closed and global). The registry's stored
+        // names are head constants only — enough for lookup, but a
+        // composite identity (Natural's `1` = successor(zero)) has no
+        // one-name spelling, so the term is assembled in core directly.
+        const Declaration* witness =
+            environment_.lookup(entry->second.witnessName);
+        if (!witness) {
+            throwElaborate("fold binder: the registered IsMonoid witness '"
+                           + entry->second.witnessName
+                           + "' is not in scope (internal)");
+        }
+        ExpressionPointer witnessType = declarationType(*witness);
+        std::vector<ExpressionPointer> reversedArguments;
+        ExpressionPointer cursor = witnessType;
+        while (auto* application = std::get_if<Application>(&cursor->node)) {
+            reversedArguments.push_back(application->argument);
+            cursor = application->function;
+        }
+        if (reversedArguments.size() != 3) {
+            throwElaborate("fold binder: the registered witness '"
+                           + entry->second.witnessName
+                           + "' does not have an IsMonoid(carrier, "
+                           "operation, identity) type (internal)");
+        }
+        ExpressionPointer carrierCore = reversedArguments[2];
+        ExpressionPointer operationCore = reversedArguments[1];
+        ExpressionPointer identityCore = reversedArguments[0];
+        ExpressionPointer naturalType = makeConstant("Natural");
+        ExpressionPointer lowerKernel = elaborateExpression(
+            *fold.lowerBound, localBinders, naturalType);
+        ExpressionPointer countKernel = elaborateExpression(
+            *count, localBinders, naturalType);
+        // `Algebra.Fold(A, op, identity, λk. BODY, LO, count)`, assembled
+        // in core: every piece is either global (carrier/op/identity) or
+        // an elaborateExpression result over the same localBinders, so
+        // the closed-over-binders representation is uniform.
+        ExpressionPointer term = makeApplication(makeApplication(
+            makeApplication(makeApplication(makeApplication(makeApplication(
+                makeConstant("Algebra.Fold"), carrierCore), operationCore),
+                identityCore), lambdaKernel), lowerKernel), countKernel);
+        if (expectedType) {
+            // The binder form produces a carrier element; v1 does not
+            // coerce it. If the context wants a different type, write the
+            // cast (or `Algebra.Fold`) explicitly.
+            bool matches = false;
+            try {
+                ExpressionPointer termType =
+                    inferTypeInLocalContext(localBinders, term);
+                Context context = buildContextFromLocalBinders(localBinders);
+                matches = isDefinitionallyEqual(
+                    environment_, context, termType, expectedType);
+            } catch (...) { matches = false; }
+            if (!matches) {
+                throwElaborate(
+                    "the fold binder form has carrier type `"
+                    + prettyPrint(carrierCore) + "`, which is not the "
+                    "expected type here — write the cast explicitly");
+            }
+        }
+        return term;
+    }
