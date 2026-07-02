@@ -1,4 +1,5 @@
 #include "kernel/printer.hpp"
+#include "kernel/kernel.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -169,6 +170,12 @@ void writeAtomic(std::ostringstream& output,
         return;
     }
     if (auto* constant = std::get_if<Constant>(&expression->node)) {
+        // The bare Natural zero constructor prints as the numeral.
+        if (constant->name == "zero"
+            && constant->universeArguments.empty()) {
+            output << "0";
+            return;
+        }
         output << constant->name;
         if (!constant->universeArguments.empty()) {
             output << ".{";
@@ -231,6 +238,152 @@ void writeAtPrecedence(std::ostringstream& output,
         return;
     }
     if (auto* application = std::get_if<Application>(&expression->node)) {
+        // Numeral compression: a pure `successor^n(zero)` chain prints as
+        // the digit string `n` — the spelling users write. (Purely
+        // syntactic prettification, like the operator table below.)
+        {
+            unsigned long long count = 0;
+            ExpressionPointer cursor = expression;
+            bool pure = true;
+            while (true) {
+                if (auto* app = std::get_if<Application>(&cursor->node)) {
+                    auto* head = std::get_if<Constant>(&app->function->node);
+                    if (head && head->name == "successor") {
+                        ++count;
+                        cursor = app->argument;
+                        continue;
+                    }
+                    pure = false;
+                    break;
+                }
+                auto* constant = std::get_if<Constant>(&cursor->node);
+                pure = constant && constant->name == "zero";
+                break;
+            }
+            if (pure) {
+                output << count;
+                return;
+            }
+        }
+        // Ellipsis rendering for folds (A8 §8): a faithful
+        // `Algebra.Fold(A, op, id, λv. g, lo, count)` prints as
+        // `g[v↦lo] op g[v↦lo+1] op ... op g[v↦hi]` — the notation users
+        // write, and one the recognizer re-accepts. Faithfulness gates:
+        // the body mentions the index; the op renders as `+` or `*`;
+        // (lo, count) invert to a display range (lo ground with
+        // `count = 1 + HI`, lo = 1 with any count = HI, or both ground
+        // with count ≥ 3). Anything else falls through to the plain
+        // application form (the explicit spelling).
+        {
+            std::vector<ExpressionPointer> spineArgs;
+            ExpressionPointer spineHead = expression;
+            while (auto* app = std::get_if<Application>(&spineHead->node)) {
+                spineArgs.push_back(app->argument);
+                spineHead = app->function;
+            }
+            std::reverse(spineArgs.begin(), spineArgs.end());
+            auto* foldHead = std::get_if<Constant>(&spineHead->node);
+            if (foldHead && foldHead->name == "Algebra.Fold"
+                && spineArgs.size() == 6) {
+                auto groundNumeral = [](ExpressionPointer cursor)
+                        -> std::optional<unsigned long long> {
+                    unsigned long long count = 0;
+                    while (true) {
+                        if (auto* app = std::get_if<Application>(
+                                &cursor->node)) {
+                            auto* head = std::get_if<Constant>(
+                                &app->function->node);
+                            if (head && head->name == "successor") {
+                                ++count;
+                                cursor = app->argument;
+                                continue;
+                            }
+                            return std::nullopt;
+                        }
+                        auto* constant =
+                            std::get_if<Constant>(&cursor->node);
+                        if (constant && constant->name == "zero") {
+                            return count;
+                        }
+                        return std::nullopt;
+                    }
+                };
+                auto makeNumeral = [](unsigned long long value) {
+                    ExpressionPointer result = makeConstant("zero");
+                    for (unsigned long long i = 0; i < value; ++i) {
+                        result = makeApplication(
+                            makeConstant("successor"), result);
+                    }
+                    return result;
+                };
+                auto* lambda = std::get_if<Lambda>(&spineArgs[3]->node);
+                auto* opConstant = std::get_if<Constant>(
+                    &spineArgs[1]->node);
+                std::optional<BinaryOperatorInfo> opInfo;
+                if (opConstant) {
+                    opInfo = classifyBinaryOperator(opConstant->name);
+                }
+                std::string opSymbol =
+                    opInfo ? std::string(opInfo->symbol) : std::string();
+                int opPrecedence = opInfo ? opInfo->precedence : 0;
+                auto loValue = groundNumeral(spineArgs[4]);
+                if (lambda && loValue
+                    && (opSymbol == "+" || opSymbol == "*")
+                    && mentionsBoundVariable(lambda->body, 0)) {
+                    // Invert the count to the display upper bound.
+                    ExpressionPointer hi;
+                    const ExpressionPointer& count = spineArgs[5];
+                    if (auto countValue = groundNumeral(count)) {
+                        if (*countValue >= 3) {
+                            hi = makeNumeral(*loValue + *countValue - 1);
+                        }
+                    } else if (*loValue == 1) {
+                        hi = count;   // count = HI at lo = 1
+                    } else {
+                        // count = 1 + HI (at ground lo): a Natural.add
+                        // spine whose first argument is the numeral 1.
+                        std::vector<ExpressionPointer> countArgs;
+                        ExpressionPointer countHead = count;
+                        while (auto* app = std::get_if<Application>(
+                                   &countHead->node)) {
+                            countArgs.push_back(app->argument);
+                            countHead = app->function;
+                        }
+                        std::reverse(countArgs.begin(), countArgs.end());
+                        auto* addHead =
+                            std::get_if<Constant>(&countHead->node);
+                        if (addHead && addHead->name == "Natural.add"
+                            && countArgs.size() == 2) {
+                            auto one = groundNumeral(countArgs[0]);
+                            if (one && *one == 1) hi = countArgs[1];
+                        }
+                    }
+                    if (hi) {
+                        bool wrap = precedence > opPrecedence;
+                        if (wrap) output << "(";
+                        int operandPrecedence = opPrecedence + 1;
+                        writeAtPrecedence(
+                            output,
+                            substitute(lambda->body, 0,
+                                       makeNumeral(*loValue)),
+                            stack, operandPrecedence);
+                        output << " " << opSymbol << " ";
+                        writeAtPrecedence(
+                            output,
+                            substitute(lambda->body, 0,
+                                       makeNumeral(*loValue + 1)),
+                            stack, operandPrecedence);
+                        output << " " << opSymbol << " ... "
+                               << opSymbol << " ";
+                        writeAtPrecedence(
+                            output, substitute(lambda->body, 0, hi),
+                            stack, operandPrecedence);
+                        if (wrap) output << ")";
+                        return;
+                    }
+                }
+            }
+        }
         // Try infix / prefix rendering for the well-known operator
         // shapes before falling through to the bare `f x y` form.
         //
