@@ -38,7 +38,7 @@ the suggested order at the end of the plan.
 | Step | Workstream | Status | Record |
 |------|------------|--------|--------|
 | 1 | B5 classifier (instrument hinted claims/calc steps) | **done** | 2026-07-02; `MATH_CLASSIFY_HINTS` + `scripts/hint_classification_report.py`; findings in B5 (64.6% absorbable of 5807 sites) |
-| 2 | B1–B3 tier skeleton, context index, cast tier | **in progress** | tier-4 sign index landed 2026-07-02 (21b1cb4, +180 sites absorbed); next: IsNonneg/zero judgment families, B3 cast retry, B1 context hash index |
+| 2 | B1–B3 tier skeleton, context index, cast tier | **in progress** | tier-4 sign index v1 (21b1cb4) + v1.1 IsNonneg judgments, ordered alternatives, form bridges (2026-07-02): closes-today 36.2%→42.3% (+352 sites), sign buckets 529→272. Next: `= 0` zeroness family, B3 cast retry, B1 context hash index, per-key vector for deterministic try-order |
 | 3 | A1 keyword-free claims/calc | not started | |
 | 4 | B4 order automation in calc | not started | |
 | 5 | A2 statement addressability + A7 `contradiction` kit | not started | |

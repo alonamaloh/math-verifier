@@ -1814,7 +1814,8 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
         {
             ExpressionPointer attempt = runTactic("signJudgmentRecursion",
                 [&] { return trySignJudgmentRecursion(
-                    goalClosed, localBinders, 12); });
+                    goalClosed, localBinders, 12,
+                    /*allowFormBridge=*/true); });
             if (attempt) return attempt;
         }
 
@@ -2021,7 +2022,8 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("signJudgmentRecursion", [&] {
             return trySignJudgmentRecursion(
-                goalClosed, localBinders, 12);
+                goalClosed, localBinders, 12,
+                /*allowFormBridge=*/true);
         });
         runProfiled("conjunctionIntro", [&] {
             return tryConjunctionIntro(

@@ -1,0 +1,51 @@
+-- Feature test: sign-index form bridges + ordered rule alternatives
+-- (B2 v1.1). `Real.IsNonneg` goals route through the IsNonneg-form
+-- rules (`IsNonneg.multiply` / `IsNonneg.add`); the same (judgment,
+-- head) key holds ordered alternatives (`IsNonneg.multiply` with
+-- premises vs the unconditional `square_IsNonneg`); and a `≥ 0` goal
+-- crosses the form bridge (`LessOrEqual_zero_of_IsNonneg`) into the
+-- IsNonneg form, where the recursion continues on the shrunken
+-- subject. Run with MATH_SIGN_INDEX_DEBUG=1 to see the rule trail.
+module Test.sign_index_bridge_test
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.order
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.order
+import Real.order_multiplication
+
+-- Direct IsNonneg rule, premises discharged from the context.
+theorem Test.product_nonneg (x y : Real)
+        (xNonneg : Real.IsNonneg(x)) (yNonneg : Real.IsNonneg(y))
+        : Real.IsNonneg(x * y) := {
+  done
+}
+
+-- Ordered alternatives: `IsNonneg.multiply` cannot discharge
+-- `IsNonneg(z)` for an arbitrary z, so the unconditional
+-- `square_IsNonneg` (same key) closes it.
+theorem Test.square_nonneg (z : Real) : Real.IsNonneg(z * z) := {
+  done
+}
+
+-- Form bridge: the `≥ 0` goal crosses into IsNonneg form, then the
+-- rule chain (add, multiply-from-context, square) finishes the job.
+theorem Test.sum_of_products_nonneg (x y : Real)
+        (xNonneg : Real.IsNonneg(x)) (yNonneg : Real.IsNonneg(y))
+        : x * y + y * y ≥ 0 := {
+  done
+}

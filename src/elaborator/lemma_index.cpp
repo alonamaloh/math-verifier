@@ -413,6 +413,11 @@ bool Elaborator::parseSignJudgment(ExpressionPointer proposition,
         }
         return false;
     }
+    // Unary nonnegativity predicates (`Real.IsNonneg(x)`).
+    if (arguments.size() == 1 && endsWith(head, ".IsNonneg")) {
+        out = {"nonneg", head, arguments[0]};
+        return true;
+    }
     return false;
 }
 
@@ -448,23 +453,51 @@ void Elaborator::registerSignJudgmentRule(const std::string& theoremName,
     }
     SignJudgment conclusion;
     if (!parseSignJudgment(cursor, conclusion)) return;
-    std::string key = signRuleKey(conclusion);
-    if (key.empty()) return;
     // Admission criterion: a premise that is itself a sign judgment
     // must have a bare lemma-binder as its subject — the conclusion
     // match then binds it to a proper subterm of the goal's subject,
     // so discharge is guaranteed structural descent.
+    bool hasJudgmentPremise = false;
+    std::string premiseKindTag;
     for (const auto& domain : rawDomains) {
         SignJudgment premise;
-        if (parseSignJudgment(domain, premise)
-            && !std::holds_alternative<BoundVariable>(
-                   premise.subject->node)) {
-            return;
+        if (parseSignJudgment(domain, premise)) {
+            if (!std::holds_alternative<BoundVariable>(
+                    premise.subject->node)) {
+                return;
+            }
+            hasJudgmentPremise = true;
+            premiseKindTag = premise.kindTag + "\x1f"
+                + premise.relationName;
         }
     }
+    std::string key;
+    if (std::holds_alternative<BoundVariable>(conclusion.subject->node)) {
+        // Conclusion on a bare binder: a FORM BRIDGE (e.g.
+        // `IsNonneg(x) → 0 ≤ x`) — same subject, different judgment
+        // form. Registered under the wildcard subject tag; consulted
+        // only when no subject-headed rule fires, and never twice in a
+        // row (see trySignJudgmentRecursion). A same-form "bridge"
+        // (`0 ≤ x → 0 ≤ x` shapes) is useless and would only burn
+        // depth — skip it.
+        if (!hasJudgmentPremise) return;
+        if (premiseKindTag == conclusion.kindTag + "\x1f"
+                + conclusion.relationName) {
+            return;
+        }
+        key = conclusion.kindTag + "\x1f" + conclusion.relationName
+            + "\x1f*";
+    } else {
+        key = signRuleKey(conclusion);
+    }
+    if (key.empty()) return;
+    // Multiple rules per key are legitimate ordered alternatives
+    // (`IsNonneg.multiply` needs both factors nonneg; `square_IsNonneg`
+    // closes `x·x` unconditionally — same (judgment, head) key): the
+    // lookup tries them in registration order, first full discharge
+    // wins. Track the multiplicity for the eventual audit.
     if (signRuleIndex_.find(key) != signRuleIndex_.end()) {
         ++signRuleConflicts_;
-        return;
     }
     int binderCount = static_cast<int>(rawDomains.size());
     std::vector<ExpressionPointer> binderTypes(binderCount);
@@ -484,12 +517,25 @@ void Elaborator::registerSignJudgmentRule(const std::string& theoremName,
 ExpressionPointer Elaborator::trySignJudgmentRecursion(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
-        int depth) {
+        int depth,
+        bool allowFormBridge) {
     if (depth <= 0) return nullptr;
     SignJudgment judgment;
     if (!parseSignJudgment(goalClosed, judgment)) return nullptr;
-    std::string key = signRuleKey(judgment);
-    if (key.empty()) return nullptr;
+    // Subject-headed rules first; if none fires and we didn't just
+    // arrive via a bridge, try the form bridges into this judgment
+    // (same subject, other form — e.g. `0 ≤ x·y` via `IsNonneg(x·y)`).
+    // A bridge's own judgment premise recurses with bridges disallowed,
+    // so two bridges can never chain — no form ping-pong.
+    std::vector<std::pair<std::string, bool>> probes;
+    std::string directKey = signRuleKey(judgment);
+    if (!directKey.empty()) probes.emplace_back(directKey, false);
+    if (allowFormBridge) {
+        probes.emplace_back(
+            judgment.kindTag + "\x1f" + judgment.relationName + "\x1f*",
+            true);
+    }
+    for (const auto& [key, bridgeHop] : probes) {
     auto range = signRuleIndex_.equal_range(key);
     for (auto iterator = range.first; iterator != range.second;
          ++iterator) {
@@ -520,7 +566,8 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
             SignJudgment premise;
             if (parseSignJudgment(slotType, premise)) {
                 proof = trySignJudgmentRecursion(
-                    slotType, localBinders, depth - 1);
+                    slotType, localBinders, depth - 1,
+                    /*allowFormBridge=*/!bridgeHop);
             }
             if (!proof) {
                 ExpressionPointer slotTypeOpened = openOverLocalBinders(
@@ -578,9 +625,11 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
         if (debugEnabled) {
             std::cerr << "[sign-index] " << moduleName_
                 << ": rule " << rule.lemmaName
+                << (bridgeHop ? " (form bridge)" : "")
                 << " closes " << prettyPrint(goalClosed) << "\n";
         }
         return call;
+    }
     }
     return nullptr;
 }

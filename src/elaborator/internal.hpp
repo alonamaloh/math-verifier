@@ -5681,10 +5681,15 @@ private:
     std::string signRuleKey(const SignJudgment& judgment) const;
     void registerSignJudgmentRule(const std::string& theoremName,
                                   ExpressionPointer typeExpr);
+    // `allowFormBridge`: whether a form-bridge rule (conclusion on a
+    // bare binder, e.g. `IsNonneg(x) → 0 ≤ x`) may fire at this level.
+    // A bridge's own premise recurses with it false, so bridges never
+    // chain — the subject must strictly shrink between form switches.
     ExpressionPointer trySignJudgmentRecursion(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
-        int depth);
+        int depth,
+        bool allowFormBridge);
     // Context frames describing what the elaborator is currently doing.
     // Each frame is a short phrase like "while elaborating cases at
     // line 42". `Frame` is an RAII guard that pushes on construction
