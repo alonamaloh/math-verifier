@@ -1522,6 +1522,21 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                        outerBinderCount),
                 node.line, node.column);
         }
+        if (auto* ellipsis = std::get_if<SurfaceEllipsisFold>(&node.node)) {
+            std::vector<SurfaceExpressionPointer> newPrefix;
+            for (const auto& term : ellipsis->prefixTerms) {
+                newPrefix.push_back(
+                    rewriteRecursiveCalls(term, thisDeclName,
+                                           recursiveArgToHypothesis,
+                                           outerBinderCount));
+            }
+            return makeSurfaceEllipsisFold(
+                ellipsis->operatorSymbol, std::move(newPrefix),
+                rewriteRecursiveCalls(ellipsis->generalTerm, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
         if (auto* foldBinder = std::get_if<SurfaceFoldBinder>(&node.node)) {
             return makeSurfaceFoldBinder(
                 foldBinder->operatorSymbol, foldBinder->binderName,

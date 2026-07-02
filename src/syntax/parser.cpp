@@ -251,6 +251,18 @@ SurfaceExpressionPointer substituteSurfaceName(
                                    targetName, replacement),
             std::move(newBody), line, column);
     }
+    if (auto* ellipsis = std::get_if<SurfaceEllipsisFold>(&node.node)) {
+        std::vector<SurfaceExpressionPointer> newPrefix;
+        for (const auto& term : ellipsis->prefixTerms) {
+            newPrefix.push_back(
+                substituteSurfaceName(term, targetName, replacement));
+        }
+        return makeSurfaceEllipsisFold(
+            ellipsis->operatorSymbol, std::move(newPrefix),
+            substituteSurfaceName(ellipsis->generalTerm,
+                                   targetName, replacement),
+            line, column);
+    }
     if (auto* tuple = std::get_if<SurfaceAnonymousTuple>(&node.node)) {
         std::vector<SurfaceExpressionPointer> newComponents;
         for (const auto& component : tuple->components) {
@@ -2543,13 +2555,55 @@ private:
         return left;
     }
 
+    // Flatten a left-associated chain of `symbol` nodes into the ellipsis
+    // prefix list. A node under a DIFFERENT operator at the same
+    // precedence level is the §9 mixed-operator error; any non-operator
+    // node is a single prefix term.
+    void flattenEllipsisPrefix(const SurfaceExpressionPointer& node,
+                               const std::string& symbol,
+                               std::vector<SurfaceExpressionPointer>& out) {
+        if (auto* binary =
+                std::get_if<SurfaceBinaryOperation>(&node->node)) {
+            if (binary->opSymbol == symbol) {
+                flattenEllipsisPrefix(binary->left, symbol, out);
+                out.push_back(binary->right);
+                return;
+            }
+            static const char* sameLevel[] = {"+", "-", "*", "/", "·"};
+            for (const char* other : sameLevel) {
+                if (binary->opSymbol == other) {
+                    throwHere("ellipsis requires a single operation; found `"
+                              + symbol + "` and `" + binary->opSymbol + "`");
+                }
+            }
+        }
+        out.push_back(node);
+    }
+
     SurfaceExpressionPointer parseAdditive() {
         auto left = parseMultiplicative();
         while (peek().kind == TokenKind::Plus
                || peek().kind == TokenKind::Minus) {
             Token op = consumeAny();
-            auto right = parseMultiplicative();
             const char* sym = (op.kind == TokenKind::Plus) ? "+" : "-";
+            if (peek().kind == TokenKind::Ellipsis) {
+                // `t₁ op … op ... op g` — ellipsis fold notation.
+                consumeAny();  // '...'
+                if (peek().kind != op.kind) {
+                    throwHere(std::string("after `...` expected `") + sym
+                              + "` and the general term "
+                              "(t₁ " + sym + " … " + sym + " ... " + sym
+                              + " g)");
+                }
+                consumeAny();  // the operator after '...'
+                auto general = parseMultiplicative();
+                std::vector<SurfaceExpressionPointer> prefix;
+                flattenEllipsisPrefix(left, sym, prefix);
+                return makeSurfaceEllipsisFold(
+                    sym, std::move(prefix), std::move(general),
+                    op.line, op.column);
+            }
+            auto right = parseMultiplicative();
             left = makeSurfaceBinaryOperation(sym, std::move(left),
                                                std::move(right),
                                                op.line, op.column);
@@ -2569,6 +2623,22 @@ private:
                 case TokenKind::Slash:     sym = "/"; break;
                 case TokenKind::CenterDot: sym = "·"; break;
                 default: break;
+            }
+            if (peek().kind == TokenKind::Ellipsis) {
+                consumeAny();  // '...'
+                if (peek().kind != op.kind) {
+                    throwHere(std::string("after `...` expected `") + sym
+                              + "` and the general term "
+                              "(t₁ " + sym + " … " + sym + " ... " + sym
+                              + " g)");
+                }
+                consumeAny();  // the operator after '...'
+                auto general = parsePower();
+                std::vector<SurfaceExpressionPointer> prefix;
+                flattenEllipsisPrefix(left, sym, prefix);
+                return makeSurfaceEllipsisFold(
+                    sym, std::move(prefix), std::move(general),
+                    op.line, op.column);
             }
             auto right = parsePower();
             left = makeSurfaceBinaryOperation(sym, std::move(left),
@@ -4188,6 +4258,16 @@ private:
 };
 
 }  // namespace
+
+// External-linkage wrapper over the file-local substituteSurfaceName
+// worker (whose pattern helpers live in the anonymous namespace above).
+SurfaceExpressionPointer substituteSurfaceIdentifier(
+    SurfaceExpressionPointer expression,
+    const std::string& targetName,
+    SurfaceExpressionPointer replacement) {
+    return substituteSurfaceName(std::move(expression), targetName,
+                                 std::move(replacement));
+}
 
 SurfaceExpressionPointer parseExpression(const std::vector<Token>& tokens) {
     ParserImpl parser(tokens);

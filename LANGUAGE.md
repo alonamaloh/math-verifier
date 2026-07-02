@@ -463,6 +463,40 @@ registered or the form is an error naming the missing registration.
 - The form does not coerce its carrier: where the context expects a
   different type, write the cast (or `Algebra.Fold`) explicitly.
 
+## Ellipsis notation
+
+```
+1 + 2 + ... + n                                  -- Σ_{k=1}^{n} k
+a(m) + a(m+1) + ... + a(n)                       -- symbolic bounds
+a(0) + ... + a(n - 1)                            -- half-open: empty at n = 0
+2 + 4 + ... + 2*n                                -- stride via the term function
+1 * 2 * ... * n                                  -- products too
+```
+
+`t₁ op … op ... op g` is sugar for the fold binder form. The
+**general term is the last term**; the recognizer reads the index and
+term function by anti-unifying the last written prefix term against
+`g` (the positions where they differ are the index), falling back to
+evaluating `g` at 0 and 1 when the anchor is arithmetic rather than
+structural (`2 + 4 + …`: the literal `2` is not literally `2·⟨_⟩`).
+The written prefix is then verified term by term — a display that
+does not match its general term is an error showing generated vs
+written, and a display with several readings is an error naming all
+of them; the explicit binder form is always the escape hatch.
+
+- All terms must be under ONE operator (`1 + 2 - ... - n` is
+  rejected), and `(op, carrier)` must be `fold_operation`-registered.
+- `-` inside an ellipsis display is blackboard monus: it is verified
+  by ground evaluation and desugars to `Natural.monus`
+  (`1 + 3 + ... + (2*n - 1)` works; `-` still has no standalone
+  Natural elaboration).
+- **The prefix does not constrain the range** (§ degenerate ranges):
+  `1 + 2 + ... + n` displays three terms but denotes the fold over
+  `1 … n`, which at `n = 1` has one term and at `n = 0` is empty
+  (the operation's identity).
+- Ellipsis over relations (`a(1) ≤ ... ≤ a(n)`), descending ranges,
+  and trailing-ellipsis series are not in this version.
+
 ## Common mistakes and how to avoid them
 
 ### Don't write nested `Equality.transitivity` — write `calc`

@@ -1145,6 +1145,26 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // Ellipsis fold notation `t₁ op … op ... op g` (A8 step 4): recognize
+    // (index, term function, lo, hi) by anti-unification against the last
+    // prefix term, falling back to the 0/1 evaluation probe; verify the
+    // written prefix; desugar to the explicit binder form. All failures
+    // are loud errors pointing at the explicit form.
+    ExpressionPointer elaborateEllipsisFold(
+        const SurfaceEllipsisFold& fold,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
+    // True when the two elaborated carrier elements agree: kernel defeq,
+    // else both ground-evaluate to the same Natural. Used by the ellipsis
+    // recognizer's prefix verification.
+    bool ellipsisTermsMatch(
+        const SurfaceExpressionPointer& written,
+        const SurfaceExpressionPointer& expected,
+        ExpressionPointer carrierType,
+        const std::vector<LocalBinder>& localBinders);
+
     // `by_strong_induction on E with subject, ih { body }` —
     // single-step strong induction. Extract the scrutinee's carrier
     // type, build `<CarrierTypeName>.strong_induction` as the

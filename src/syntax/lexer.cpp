@@ -259,7 +259,17 @@ private:
             case ':':  advanceOne(); return {TokenKind::Colon,       ":", startLine, startColumn};
             case ';':  advanceOne(); return {TokenKind::Semicolon,   ";", startLine, startColumn};
             case '|':  advanceOne(); return {TokenKind::Pipe,        "|", startLine, startColumn};
-            case '.':  advanceOne(); return {TokenKind::Dot,         ".", startLine, startColumn};
+            case '.':
+                // `...` — the ellipsis of fold notation (`1 + 2 + ... + n`).
+                // Three dots exactly; a lone `.` stays the qualified-name dot.
+                if (position_ + 2 < source_.size()
+                    && source_[position_ + 1] == '.'
+                    && source_[position_ + 2] == '.') {
+                    advanceOne(); advanceOne(); advanceOne();
+                    return {TokenKind::Ellipsis, "...",
+                            startLine, startColumn};
+                }
+                advanceOne(); return {TokenKind::Dot,         ".", startLine, startColumn};
             case '+':  advanceOne(); return {TokenKind::Plus,        "+", startLine, startColumn};
             case '-':  advanceOne(); return {TokenKind::Minus,       "-", startLine, startColumn};
             case '*':  advanceOne(); return {TokenKind::Star,        "*", startLine, startColumn};
@@ -523,6 +533,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Semicolon:            return "';'";
         case TokenKind::Pipe:                 return "'|'";
         case TokenKind::Dot:                  return "'.'";
+        case TokenKind::Ellipsis:             return "'...'";
         case TokenKind::DotLeftBrace:         return "'.{'";
         case TokenKind::Assign:               return "':='";
         case TokenKind::FatArrow:             return "'=>'";

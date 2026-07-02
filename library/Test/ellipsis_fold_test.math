@@ -1,0 +1,107 @@
+-- Feature test: ellipsis fold notation (A8 step 4 of
+-- PLAN_LANGUAGE_IMPROVEMENT.md) — the §3.3 corpus.
+--
+--   t₁ op t₂ op ... op g
+--
+-- recognizes (index, term function, lo, hi) by anti-unification against
+-- the last prefix term (mechanism 1), falling back to the 0/1
+-- evaluation probe (mechanism 2), verifies the written prefix, and
+-- desugars to the explicit binder form (hence Algebra.Fold through the
+-- fold_operation registry, with the half-open `E - 1` upper-bound rule).
+
+module Test.ellipsis_fold_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.monus
+import Algebra.monoid
+import Algebra.aggregation
+import Natural.binomial
+
+-- Mechanism 1: `1` vs `n` anti-unify at the whole term; lo 1, hi n,
+-- f = identity.
+theorem Test.triangular_shape (n : Natural)
+        : (1 + 2 + ... + n)
+          = Algebra.Fold(Natural, Natural.add, 0, (k : Natural) ↦ k, 1, n) :=
+  done
+
+-- Mechanism 1 under an application: a(0) + a(1) + ... + a(n).
+theorem Test.applied_shape (a : Natural → Natural) (n : Natural)
+        : (a(0) + a(1) + ... + a(n))
+          = Algebra.Fold(Natural, Natural.add, 0, (k : Natural) ↦ a(k), 0, 1 + n) :=
+  done
+
+-- Symbolic lower bound: a(m) + a(m+1) + ... + a(n); count (1+n) ∸ m.
+theorem Test.symbolic_low (a : Natural → Natural) (m n : Natural)
+        : (a(m) + a(m + 1) + ... + a(n))
+          = Algebra.Fold(Natural, Natural.add, 0, (k : Natural) ↦ a(k), m, Natural.monus(1 + n, m)) :=
+  done
+
+-- Half-open upper bound: a(0) + ... + a(n-1); count n, empty at n = 0.
+theorem Test.half_open (a : Natural → Natural) (n : Natural)
+        : (a(0) + ... + a(n - 1))
+          = Algebra.Fold(Natural, Natural.add, 0, (k : Natural) ↦ a(k), 0, n) :=
+  done
+
+-- Mechanism 2 (0/1 probe): 2 + 4 + ... + 2*n — the numeral 2 is not
+-- literally 2*⟨_⟩, so anti-unification fails structurally and the probe
+-- finds f(1) = 2 at index n.
+theorem Test.evens_probe (n : Natural)
+        : (2 + 4 + ... + 2 * n)
+          = Algebra.Fold(Natural, Natural.add, 0, (k : Natural) ↦ 2 * k, 1, n) :=
+  done
+
+-- Shared-parameter index — no fresh variable exists in the prefix:
+-- binomial(n, 0) + ... + binomial(n, n), the binomial-theorem display.
+theorem Test.binomial_display (n : Natural)
+        : (Natural.binomial(n, 0) + ... + Natural.binomial(n, n))
+          = Algebra.Fold(Natural, Natural.add, 0,
+                (k : Natural) ↦ Natural.binomial(n, k), 0, 1 + n) :=
+  done
+
+-- Odd numbers via the probe: the general term's `- 1` is blackboard
+-- monus, ground-evaluated at the surface (it has no Natural
+-- elaboration); the stride comes from the term function, for free.
+theorem Test.odds_probe (n : Natural)
+        : (1 + 3 + 5 + ... + (2 * n - 1))
+          = Algebra.Fold(Natural, Natural.add, 0,
+                (k : Natural) ↦ Natural.monus(2 * k, 1), 1, n) :=
+  done
+
+-- Ground range: 1 + 2 + ... + 10 (harmless, allowed).
+theorem Test.ground_range
+        : (1 + 2 + ... + 10)
+          = Algebra.Fold(Natural, Natural.add, 0, (k : Natural) ↦ k, 1, 10) :=
+  done
+
+-- Products: 1 * 2 * ... * n is the factorial shape.
+theorem Test.factorial_shape (n : Natural)
+        : (1 * 2 * ... * n)
+          = Algebra.Fold(Natural, Natural.multiply, 1, (k : Natural) ↦ k, 1, n) :=
+  done
+
+-- The diagonal: a(1,1) + ... + a(n,n) — the SAME pair at both positions.
+theorem Test.diagonal (a : Natural → Natural → Natural) (n : Natural)
+        : (a(1, 1) + ... + a(n, n))
+          = Algebra.Fold(Natural, Natural.add, 0,
+                (k : Natural) ↦ a(k, k), 1, n) :=
+  done
+
+-- ----------------------------------------------------------------------
+-- The notation is usable in proofs: the §12 acceptance shape, stated and
+-- proved entirely in ellipsis notation (times-2 form at Natural), the
+-- peel-last step by-less via the automatic Fold equations.
+theorem Test.triangular_times_two (n : Natural)
+        : 2 * (1 + 2 + ... + n) = n * (1 + n) :=
+  by_induction on n with IH {
+    case base: done
+    case step(p):
+        calc 2 * (1 + 2 + ... + (1 + p))
+           = 2 * ((1 + 2 + ... + p) + (1 + p))
+           = 2 * (1 + 2 + ... + p) + 2 * (1 + p)
+           = p * (1 + p) + 2 * (1 + p)   by IH
+           = (1 + p) * (1 + (1 + p))
+  }

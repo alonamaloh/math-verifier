@@ -177,6 +177,20 @@ struct SurfaceUnaryOperation {
     SurfaceExpressionPointer operand;
 };
 
+// Ellipsis fold notation (A8 step 4): `t₁ op t₂ op ... op g` — the
+// blackboard spelling of a fold. The parser collects the prefix terms
+// (one or more, all under the SAME operator) and the general term; the
+// elaborator recognizes (index variable, term function, lo, hi) by
+// anti-unification against the last prefix term, falling back to the
+// 0/1 evaluation probe, verifies the written prefix downward, and
+// desugars to a SurfaceFoldBinder. Ambiguity and mismatches are loud
+// errors pointing at the explicit binder form.
+struct SurfaceEllipsisFold {
+    std::string operatorSymbol;
+    std::vector<SurfaceExpressionPointer> prefixTerms;
+    SurfaceExpressionPointer generalTerm;
+};
+
 // The explicit fold binder form (A8 step 2):
 //   `sum k from LO to HI of BODY`        — operatorSymbol "+"
 //   `product k from LO to HI of BODY`    — operatorSymbol "*"
@@ -543,6 +557,7 @@ struct SurfaceExpression {
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation, SurfaceFoldBinder,
+        SurfaceEllipsisFold,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
         SurfaceRing, SurfaceGroup, SurfaceField, SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
@@ -553,6 +568,15 @@ struct SurfaceExpression {
     int line = 0;
     int column = 0;
 };
+
+// Substitutes free occurrences of identifier `targetName` in `expression`
+// with `replacement`, respecting binder shadowing. Defined in parser.cpp
+// (wrapping its file-local worker); used by the elaborator's ellipsis
+// fold recognition.
+SurfaceExpressionPointer substituteSurfaceIdentifier(
+    SurfaceExpressionPointer expression,
+    const std::string& targetName,
+    SurfaceExpressionPointer replacement);
 
 // -------- builders --------
 
@@ -640,6 +664,16 @@ inline SurfaceExpressionPointer makeSurfaceBinaryOperation(
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceBinaryOperation{std::move(opSymbol),
                                 std::move(left), std::move(right)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceEllipsisFold(
+    std::string operatorSymbol,
+    std::vector<SurfaceExpressionPointer> prefixTerms,
+    SurfaceExpressionPointer generalTerm, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceEllipsisFold{std::move(operatorSymbol),
+                             std::move(prefixTerms),
+                             std::move(generalTerm)},
         line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceFoldBinder(

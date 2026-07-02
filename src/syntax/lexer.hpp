@@ -81,6 +81,7 @@ enum class TokenKind {
     LeftAngle, RightAngle,    // "⟨" / "⟩" — anonymous tuples
     Comma, Colon, Semicolon, Pipe,
     Dot,
+    Ellipsis,        // "..." — fold/series notation (1 + 2 + ... + n)
     DotLeftBrace,    // ".{"  introduces universe-argument list
     Assign,          // ":="
     FatArrow,        // "=>"

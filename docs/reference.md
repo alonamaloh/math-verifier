@@ -19,6 +19,7 @@ A catalogue of surface constructs. For depth see `docs/conventions/`.
 | `congruence_under_binder F := L` | rewrite-under-binder lemma for head F |
 | `fold_operation (sym) on T := W` | register `sym` on `T` as fold-capable; `W : IsMonoid(T, op, id)` must certify the same `op` the operator registry dispatches to (canonical per (sym, T); feeds the fold binder form and ellipsis notation) |
 | `sum k from LO to HI of BODY` | Σ over the inclusive range as an ordinary term: `Algebra.Fold(carrier, +, 0, λk. BODY, LO, (1 + HI) ∸ LO)` via the fold_operation registry (monus-free count for literal LO ∈ {0,1}); `product … of …` is (*), `fold (op) k from … to … of …` any registered op; an upper bound written `E - 1` is half-open `[LO, E)` |
+| `t₁ op … op ... op g` | ellipsis notation, sugar for the binder form: the general term `g` is the LAST term; index/term-function read by anti-unification against the last prefix term (fallback: 0/1 evaluation probe), prefix verified, mismatch/ambiguity are loud errors; `-` in the display is blackboard monus |
 
 Pattern-match definition: `definition f : A → B \| pat1 => e1 \| pat2 => e2`.
 

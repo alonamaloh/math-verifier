@@ -1577,6 +1577,13 @@ ExpressionPointer Elaborator::elaborateExpression(
                                         expectedType,
                                         expression.line, expression.column);
         }
+        if (auto* ellipsisFold =
+                std::get_if<SurfaceEllipsisFold>(&expression.node)) {
+            return elaborateEllipsisFold(*ellipsisFold, localBinders,
+                                          expectedType,
+                                          expression.line,
+                                          expression.column);
+        }
         if (auto* binary =
                 std::get_if<SurfaceBinaryOperation>(&expression.node)) {
             if (binary->opSymbol == "=") {
@@ -2175,4 +2182,662 @@ ExpressionPointer Elaborator::elaborateFoldBinder(
             }
         }
         return term;
+    }
+
+// ----------------------------------------------------------------------
+// Ellipsis fold recognition (A8 step 4). File-local surface helpers.
+
+namespace {
+
+// Ground evaluation of a CLOSED elaborated Natural term over the known
+// arithmetic heads. Recognition-side only: it establishes truth for the
+// prefix verification and the 0/1 probe; no proof term is built (the
+// notation is a compile-time shape check, not a proof obligation).
+std::optional<unsigned long long> evaluateGroundNatural(
+        const ExpressionPointer& expression) {
+    if (auto* constant = std::get_if<Constant>(&expression->node)) {
+        // Natural's constructors are the BARE `zero` / `successor`.
+        if (constant->name == "zero") return 0ull;
+        return std::nullopt;
+    }
+    if (auto* application = std::get_if<Application>(&expression->node)) {
+        // Peel the spine.
+        std::vector<ExpressionPointer> args;
+        ExpressionPointer head = expression;
+        while (auto* app = std::get_if<Application>(&head->node)) {
+            args.push_back(app->argument);
+            head = app->function;
+        }
+        std::reverse(args.begin(), args.end());
+        auto* constant = std::get_if<Constant>(&head->node);
+        if (!constant) return std::nullopt;
+        auto unary = [&](auto f) -> std::optional<unsigned long long> {
+            if (args.size() != 1) return std::nullopt;
+            auto a = evaluateGroundNatural(args[0]);
+            if (!a) return std::nullopt;
+            return f(*a);
+        };
+        auto binary = [&](auto f) -> std::optional<unsigned long long> {
+            if (args.size() != 2) return std::nullopt;
+            auto a = evaluateGroundNatural(args[0]);
+            auto b = evaluateGroundNatural(args[1]);
+            if (!a || !b) return std::nullopt;
+            return f(*a, *b);
+        };
+        if (constant->name == "successor") {
+            return unary([](unsigned long long a) { return a + 1; });
+        }
+        if (constant->name == "Natural.add") {
+            return binary([](unsigned long long a, unsigned long long b) {
+                return a + b; });
+        }
+        if (constant->name == "Natural.multiply") {
+            return binary([](unsigned long long a, unsigned long long b) {
+                return a * b; });
+        }
+        if (constant->name == "Natural.monus") {
+            return binary([](unsigned long long a, unsigned long long b) {
+                return a >= b ? a - b : 0; });
+        }
+        (void)application;
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+bool surfaceStructurallyEqual(const SurfaceExpressionPointer& a,
+                              const SurfaceExpressionPointer& b);
+
+bool surfaceArgumentsEqual(const std::vector<SurfaceArgument>& a,
+                           const std::vector<SurfaceArgument>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (a[i].name != b[i].name) return false;
+        if (!surfaceStructurallyEqual(a[i].value, b[i].value)) return false;
+    }
+    return true;
+}
+
+// Structural surface equality over the expression subset the ellipsis
+// notation can contain. Unknown node kinds compare unequal (conservative:
+// recognition then falls through to the probe or errors out).
+bool surfaceStructurallyEqual(const SurfaceExpressionPointer& a,
+                              const SurfaceExpressionPointer& b) {
+    if (auto* ia = std::get_if<SurfaceIdentifier>(&a->node)) {
+        auto* ib = std::get_if<SurfaceIdentifier>(&b->node);
+        return ib && ia->qualifiedName == ib->qualifiedName;
+    }
+    if (auto* na = std::get_if<SurfaceNumericLiteral>(&a->node)) {
+        auto* nb = std::get_if<SurfaceNumericLiteral>(&b->node);
+        return nb && na->digits == nb->digits;
+    }
+    if (auto* pa = std::get_if<SurfaceApplication>(&a->node)) {
+        auto* pb = std::get_if<SurfaceApplication>(&b->node);
+        return pb
+            && surfaceStructurallyEqual(pa->function, pb->function)
+            && surfaceArgumentsEqual(pa->arguments, pb->arguments);
+    }
+    if (auto* oa = std::get_if<SurfaceBinaryOperation>(&a->node)) {
+        auto* ob = std::get_if<SurfaceBinaryOperation>(&b->node);
+        return ob && oa->opSymbol == ob->opSymbol
+            && surfaceStructurallyEqual(oa->left, ob->left)
+            && surfaceStructurallyEqual(oa->right, ob->right);
+    }
+    if (auto* ua = std::get_if<SurfaceUnaryOperation>(&a->node)) {
+        auto* ub = std::get_if<SurfaceUnaryOperation>(&b->node);
+        return ub && ua->opSymbol == ub->opSymbol
+            && surfaceStructurallyEqual(ua->operand, ub->operand);
+    }
+    if (auto* ca = std::get_if<SurfaceAscription>(&a->node)) {
+        auto* cb = std::get_if<SurfaceAscription>(&b->node);
+        return cb
+            && surfaceStructurallyEqual(ca->expression, cb->expression)
+            && surfaceStructurallyEqual(ca->type, cb->type);
+    }
+    return false;
+}
+
+// Anti-unify `written` (the last prefix term) against `general`: walk the
+// two trees in parallel; where they agree structurally, keep the node;
+// where they diverge, emit the index identifier and record the
+// (written-side, general-side) pair. The caller checks all pairs agree.
+SurfaceExpressionPointer surfaceAntiUnify(
+        const SurfaceExpressionPointer& written,
+        const SurfaceExpressionPointer& general,
+        const std::string& indexName,
+        std::vector<std::pair<SurfaceExpressionPointer,
+                              SurfaceExpressionPointer>>& pairs) {
+    auto diverge = [&]() {
+        pairs.push_back({written, general});
+        return makeSurfaceIdentifier(indexName, {}, general->line,
+                                     general->column);
+    };
+    if (auto* pa = std::get_if<SurfaceApplication>(&written->node)) {
+        auto* pb = std::get_if<SurfaceApplication>(&general->node);
+        if (pb && pa->arguments.size() == pb->arguments.size()
+            && surfaceStructurallyEqual(pa->function, pb->function)) {
+            bool namesMatch = true;
+            for (size_t i = 0; i < pa->arguments.size(); ++i) {
+                if (pa->arguments[i].name != pb->arguments[i].name) {
+                    namesMatch = false;
+                }
+            }
+            if (namesMatch) {
+                std::vector<SurfaceArgument> newArguments;
+                for (size_t i = 0; i < pa->arguments.size(); ++i) {
+                    newArguments.push_back(SurfaceArgument{
+                        pa->arguments[i].name,
+                        surfaceAntiUnify(pa->arguments[i].value,
+                                          pb->arguments[i].value,
+                                          indexName, pairs)});
+                }
+                return makeSurfaceApplication(
+                    pb->function, std::move(newArguments),
+                    general->line, general->column);
+            }
+        }
+        return diverge();
+    }
+    if (auto* oa = std::get_if<SurfaceBinaryOperation>(&written->node)) {
+        auto* ob = std::get_if<SurfaceBinaryOperation>(&general->node);
+        if (ob && oa->opSymbol == ob->opSymbol) {
+            auto left = surfaceAntiUnify(oa->left, ob->left,
+                                          indexName, pairs);
+            auto right = surfaceAntiUnify(oa->right, ob->right,
+                                           indexName, pairs);
+            return makeSurfaceBinaryOperation(
+                ob->opSymbol, std::move(left), std::move(right),
+                general->line, general->column);
+        }
+        return diverge();
+    }
+    if (auto* ua = std::get_if<SurfaceUnaryOperation>(&written->node)) {
+        auto* ub = std::get_if<SurfaceUnaryOperation>(&general->node);
+        if (ub && ua->opSymbol == ub->opSymbol) {
+            return makeSurfaceUnaryOperation(
+                ub->opSymbol,
+                surfaceAntiUnify(ua->operand, ub->operand,
+                                  indexName, pairs),
+                general->line, general->column);
+        }
+        return diverge();
+    }
+    if (surfaceStructurallyEqual(written, general)) return general;
+    return diverge();
+}
+
+// Every identifier occurring in a surface tree (for fresh-name choice and
+// probe-candidate collection).
+void collectSurfaceIdentifiers(const SurfaceExpressionPointer& node,
+                               std::vector<std::string>& out) {
+    if (auto* identifier = std::get_if<SurfaceIdentifier>(&node->node)) {
+        out.push_back(identifier->qualifiedName);
+        return;
+    }
+    if (auto* application = std::get_if<SurfaceApplication>(&node->node)) {
+        collectSurfaceIdentifiers(application->function, out);
+        for (const auto& argument : application->arguments) {
+            collectSurfaceIdentifiers(argument.value, out);
+        }
+        return;
+    }
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node->node)) {
+        collectSurfaceIdentifiers(binary->left, out);
+        collectSurfaceIdentifiers(binary->right, out);
+        return;
+    }
+    if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node->node)) {
+        collectSurfaceIdentifiers(unary->operand, out);
+        return;
+    }
+    if (auto* ascription = std::get_if<SurfaceAscription>(&node->node)) {
+        collectSurfaceIdentifiers(ascription->expression, out);
+        collectSurfaceIdentifiers(ascription->type, out);
+        return;
+    }
+}
+
+// Minimal surface renderer for recognizer diagnostics (the node subset
+// the ellipsis notation can contain).
+std::string surfaceToDisplayString(const SurfaceExpressionPointer& node) {
+    if (auto* identifier = std::get_if<SurfaceIdentifier>(&node->node)) {
+        return identifier->qualifiedName;
+    }
+    if (auto* numeral = std::get_if<SurfaceNumericLiteral>(&node->node)) {
+        return numeral->digits;
+    }
+    if (auto* application = std::get_if<SurfaceApplication>(&node->node)) {
+        std::string rendered =
+            surfaceToDisplayString(application->function) + "(";
+        for (size_t i = 0; i < application->arguments.size(); ++i) {
+            if (i) rendered += ", ";
+            rendered += surfaceToDisplayString(
+                application->arguments[i].value);
+        }
+        return rendered + ")";
+    }
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node->node)) {
+        return "(" + surfaceToDisplayString(binary->left) + " "
+            + binary->opSymbol + " "
+            + surfaceToDisplayString(binary->right) + ")";
+    }
+    if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node->node)) {
+        return unary->opSymbol + surfaceToDisplayString(unary->operand);
+    }
+    if (auto* ascription = std::get_if<SurfaceAscription>(&node->node)) {
+        return "(" + surfaceToDisplayString(ascription->expression) + " : "
+            + surfaceToDisplayString(ascription->type) + ")";
+    }
+    return "<expression>";
+}
+
+// Ground evaluation directly on the SURFACE tree (numerals and the
+// arithmetic operators, `-` read as monus). This is what lets a probe
+// instance like `2*1 - 1` verify even though `-` has no Natural
+// elaboration — the ellipsis display is notation, evaluated as
+// blackboard arithmetic.
+std::optional<unsigned long long> surfaceGroundEval(
+        const SurfaceExpressionPointer& node) {
+    if (auto* numeral = std::get_if<SurfaceNumericLiteral>(&node->node)) {
+        try { return std::stoull(numeral->digits); }
+        catch (...) { return std::nullopt; }
+    }
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node->node)) {
+        auto a = surfaceGroundEval(binary->left);
+        auto b = surfaceGroundEval(binary->right);
+        if (!a || !b) return std::nullopt;
+        if (binary->opSymbol == "+") return *a + *b;
+        if (binary->opSymbol == "*") return *a * *b;
+        if (binary->opSymbol == "-") return *a >= *b ? *a - *b : 0;
+        if (binary->opSymbol == "^") {
+            unsigned long long result = 1;
+            for (unsigned long long i = 0; i < *b; ++i) result *= *a;
+            return result;
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+// The probe verifies instances under blackboard-monus semantics for
+// `-`; the desugared body must spell that same semantics in a form the
+// carrier elaborates — Natural.monus.
+SurfaceExpressionPointer monusizeSurface(
+        const SurfaceExpressionPointer& node) {
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node->node)) {
+        auto left = monusizeSurface(binary->left);
+        auto right = monusizeSurface(binary->right);
+        if (binary->opSymbol == "-") {
+            return makeSurfaceApplication(
+                makeSurfaceIdentifier("Natural.monus", {},
+                                      node->line, node->column),
+                std::vector<SurfaceExpressionPointer>{left, right},
+                node->line, node->column);
+        }
+        return makeSurfaceBinaryOperation(
+            binary->opSymbol, std::move(left), std::move(right),
+            node->line, node->column);
+    }
+    if (auto* application = std::get_if<SurfaceApplication>(&node->node)) {
+        std::vector<SurfaceArgument> newArguments;
+        for (const auto& argument : application->arguments) {
+            newArguments.push_back(SurfaceArgument{
+                argument.name, monusizeSurface(argument.value)});
+        }
+        return makeSurfaceApplication(
+            application->function, std::move(newArguments),
+            node->line, node->column);
+    }
+    if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node->node)) {
+        return makeSurfaceUnaryOperation(
+            unary->opSymbol, monusizeSurface(unary->operand),
+            node->line, node->column);
+    }
+    return node;
+}
+
+// Numeral-literal probe helpers.
+std::optional<unsigned long long> surfaceNumeralValue(
+        const SurfaceExpressionPointer& node) {
+    auto* numeral = std::get_if<SurfaceNumericLiteral>(&node->node);
+    if (!numeral) return std::nullopt;
+    try {
+        return std::stoull(numeral->digits);
+    } catch (...) { return std::nullopt; }
+}
+
+} // namespace
+
+bool Elaborator::ellipsisTermsMatch(
+        const SurfaceExpressionPointer& written,
+        const SurfaceExpressionPointer& expected,
+        ExpressionPointer carrierType,
+        const std::vector<LocalBinder>& localBinders) {
+    // Blackboard arithmetic first: if both sides ground-evaluate at the
+    // surface level, compare numbers (this also covers spellings with no
+    // Natural elaboration, like a probe instance `2*1 - 1`).
+    {
+        auto writtenValue = surfaceGroundEval(written);
+        auto expectedValue = surfaceGroundEval(expected);
+        if (writtenValue && expectedValue) {
+            return *writtenValue == *expectedValue;
+        }
+    }
+    ExpressionPointer writtenKernel, expectedKernel;
+    try {
+        writtenKernel = elaborateExpression(
+            *written, localBinders, carrierType);
+        expectedKernel = elaborateExpression(
+            *expected, localBinders, carrierType);
+    } catch (const ElaborateError&) {
+        return false;
+    } catch (const TypeError&) {
+        return false;
+    } catch (const AutoProverBudgetError&) {
+        return false;
+    }
+    size_t N = localBinders.size();
+    try {
+        Context context = buildContextFromLocalBinders(localBinders);
+        if (isDefinitionallyEqual(
+                environment_, context,
+                openOverLocalBinders(writtenKernel, localBinders, N),
+                openOverLocalBinders(expectedKernel, localBinders, N))) {
+            return true;
+        }
+    } catch (...) { /* fall through to ground evaluation */ }
+    auto writtenValue = evaluateGroundNatural(writtenKernel);
+    auto expectedValue = evaluateGroundNatural(expectedKernel);
+    return writtenValue && expectedValue && *writtenValue == *expectedValue;
+}
+
+ExpressionPointer Elaborator::elaborateEllipsisFold(
+        const SurfaceEllipsisFold& fold,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this, "ellipsis fold (… " + fold.operatorSymbol
+                    + " ... " + fold.operatorSymbol + " …) at line "
+                    + std::to_string(line));
+        size_t k = fold.prefixTerms.size();
+        const SurfaceExpressionPointer& general = fold.generalTerm;
+        const SurfaceExpressionPointer& last = fold.prefixTerms[k - 1];
+
+        // NOTE: the general term is never elaborated verbatim — a
+        // half-open display like `a(n - 1)` contains the bound-only
+        // `E - 1` syntax, which has no Natural elaboration. The carrier
+        // comes from the ABSTRACTED term function (mechanism 1) or a
+        // numeral-substituted instance (mechanism 2).
+        auto carrierOfBody = [&](const SurfaceExpressionPointer& body)
+                -> ExpressionPointer {
+            ExpressionPointer bodyKernel = elaborateExpression(
+                *body, localBinders);
+            return closeOverLocalBinders(
+                inferTypeInLocalContext(localBinders, bodyKernel),
+                localBinders, localBinders.size());
+        };
+
+        // A fresh index name: prefer `k`, avoid capture against anything
+        // spelled in the general term or bound in scope.
+        std::vector<std::string> usedNames;
+        collectSurfaceIdentifiers(general, usedNames);
+        for (const auto& binder : localBinders) {
+            usedNames.push_back(binder.name);
+        }
+        auto isUsed = [&](const std::string& candidate) {
+            for (const auto& name : usedNames) {
+                if (name == candidate) return true;
+            }
+            return false;
+        };
+        std::string indexName = "k";
+        for (int suffix = 0; isUsed(indexName); ++suffix) {
+            indexName = "k" + std::to_string(suffix);
+        }
+
+        // Index spelling at offset i above lo, canonical: ground numerals
+        // fold; symbolic lo keeps `lo` (i = 0) or `lo + i`.
+        auto indexAt = [&](const SurfaceExpressionPointer& lo, size_t i)
+                -> SurfaceExpressionPointer {
+            if (auto loValue = surfaceNumeralValue(lo)) {
+                return makeSurfaceNumericLiteral(
+                    std::to_string(*loValue + i), line, column);
+            }
+            if (i == 0) return lo;
+            return makeSurfaceBinaryOperation(
+                "+", lo, makeSurfaceNumericLiteral(
+                    std::to_string(i), line, column), line, column);
+        };
+
+        // Shared: verify the earlier prefix terms against f at lo…; a
+        // mismatch records the nearest-miss detail and declines (the 0/1
+        // probe may still read the shape — e.g. `2 + 4 + ... + 2*n`,
+        // where anti-unification's whole-term candidate f = ⟨index⟩
+        // verifies false and the probe finds f(1) = 2).
+        std::string mismatchDetail;
+        auto verifyAndFinish = [&](const SurfaceExpressionPointer& fBody,
+                          const SurfaceExpressionPointer& lo,
+                          const SurfaceExpressionPointer& hi,
+                          ExpressionPointer carrierType)
+                -> ExpressionPointer {
+            for (size_t i = 0; i + 1 < k; ++i) {
+                SurfaceExpressionPointer expected = substituteSurfaceIdentifier(
+                    fBody, indexName, indexAt(lo, i));
+                if (!ellipsisTermsMatch(fold.prefixTerms[i], expected,
+                                         carrierType, localBinders)) {
+                    mismatchDetail = "candidate term function `"
+                        + surfaceToDisplayString(fBody) + "` (index `"
+                        + indexName + "`, start `"
+                        + surfaceToDisplayString(lo) + "`) generates `"
+                        + surfaceToDisplayString(expected) + "` at term "
+                        + std::to_string(i + 1) + ", but the prefix has `"
+                        + surfaceToDisplayString(fold.prefixTerms[i]) + "`";
+                    return nullptr;
+                }
+            }
+            SurfaceFoldBinder binder{fold.operatorSymbol, indexName,
+                                      lo, hi, fBody};
+            return elaborateFoldBinder(binder, localBinders, expectedType,
+                                        line, column);
+        };
+
+        // Mechanism 1 — anti-unification against the last prefix term.
+        // A reading verified against at least one earlier prefix term is
+        // decisive. The degenerate case — a SINGLE prefix term diverging
+        // at the ROOT (candidate f = the bare index, which any display
+        // matches) — is only a candidate: it competes with the probe's
+        // readings and an overlap is the §9 ambiguity error
+        // (`0 + ... + k*(k−1)`).
+        SurfaceExpressionPointer identityReadingLo, identityReadingHi;
+        {
+            std::vector<std::pair<SurfaceExpressionPointer,
+                                  SurfaceExpressionPointer>> pairs;
+            SurfaceExpressionPointer fBody = surfaceAntiUnify(
+                last, general, indexName, pairs);
+            bool consistent = !pairs.empty();
+            for (size_t i = 1; i < pairs.size() && consistent; ++i) {
+                consistent = surfaceStructurallyEqual(pairs[i].first,
+                                                      pairs[0].first)
+                    && surfaceStructurallyEqual(pairs[i].second,
+                                                pairs[0].second);
+            }
+            bool rootDiffSingleTerm = consistent && k == 1
+                && pairs.size() == 1
+                && std::get_if<SurfaceIdentifier>(&fBody->node) != nullptr;
+            if (consistent && !rootDiffSingleTerm) {
+                const SurfaceExpressionPointer& lastIndex = pairs[0].first;
+                const SurfaceExpressionPointer& hi = pairs[0].second;
+                // Carrier from the LAST WRITTEN TERM (fully concrete —
+                // the abstracted body would need the binder in scope).
+                ExpressionPointer carrierType = carrierOfBody(last);
+                // lo := lastIndex − (k − 1), by numeral arithmetic on the
+                // literal or on a trailing `+ numeral`.
+                SurfaceExpressionPointer lo;
+                if (k == 1) {
+                    lo = lastIndex;
+                } else if (auto lastValue = surfaceNumeralValue(lastIndex)) {
+                    if (*lastValue >= k - 1) {
+                        lo = makeSurfaceNumericLiteral(
+                            std::to_string(*lastValue - (k - 1)),
+                            line, column);
+                    }
+                } else if (auto* sum = std::get_if<SurfaceBinaryOperation>(
+                               &lastIndex->node)) {
+                    if (sum->opSymbol == "+") {
+                        if (auto offset = surfaceNumeralValue(sum->right)) {
+                            if (*offset >= k - 1) {
+                                lo = *offset == k - 1
+                                    ? sum->left
+                                    : makeSurfaceBinaryOperation(
+                                          "+", sum->left,
+                                          makeSurfaceNumericLiteral(
+                                              std::to_string(
+                                                  *offset - (k - 1)),
+                                              line, column),
+                                          line, column);
+                            }
+                        }
+                    }
+                }
+                if (lo) {
+                    if (ExpressionPointer result =
+                            verifyAndFinish(fBody, lo, hi, carrierType)) {
+                        return result;
+                    }
+                }
+            }
+            if (rootDiffSingleTerm) {
+                identityReadingLo = pairs[0].first;
+                identityReadingHi = pairs[0].second;
+            }
+        }
+
+        // Mechanism 2 — the 0/1 evaluation probe. Candidates: identifiers
+        // of the general term bound in scope at type Natural.
+        struct ProbeCandidate {
+            std::string variable;
+            unsigned long long start;
+        };
+        std::vector<ProbeCandidate> survivors;
+        {
+            std::vector<std::string> identifiers;
+            collectSurfaceIdentifiers(general, identifiers);
+            std::sort(identifiers.begin(), identifiers.end());
+            identifiers.erase(
+                std::unique(identifiers.begin(), identifiers.end()),
+                identifiers.end());
+            for (const auto& name : identifiers) {
+                bool isNaturalBinder = false;
+                for (const auto& binder : localBinders) {
+                    if (binder.name == name
+                        && headConstantName(binder.type) == "Natural") {
+                        isNaturalBinder = true;
+                        break;
+                    }
+                }
+                if (!isNaturalBinder) continue;
+                for (unsigned long long start : {0ull, 1ull}) {
+                    // The probe is arithmetic-anchored: instances are
+                    // compared by GROUND EVALUATION, so the carrier is
+                    // Natural by construction (an all-numeral instance
+                    // like `2 * 1` has no bottom-up carrier otherwise).
+                    ExpressionPointer carrierType = makeConstant("Natural");
+                    bool allMatch = true;
+                    for (size_t i = 0; i < k && allMatch; ++i) {
+                        SurfaceExpressionPointer expected =
+                            substituteSurfaceIdentifier(
+                                general, name,
+                                makeSurfaceNumericLiteral(
+                                    std::to_string(start + i),
+                                    line, column));
+                        allMatch = ellipsisTermsMatch(
+                            fold.prefixTerms[i], expected, carrierType,
+                            localBinders);
+                    }
+                    if (allMatch) survivors.push_back({name, start});
+                }
+            }
+        }
+        // The identity reading (whole-term diff, single prefix) joins the
+        // candidate pool unless a probe survivor IS the same reading
+        // (bare-variable general term, same start).
+        bool identityDistinct = false;
+        if (identityReadingLo) {
+            identityDistinct = true;
+            auto* hiIdentifier = identityReadingHi
+                ? std::get_if<SurfaceIdentifier>(&identityReadingHi->node)
+                : nullptr;
+            for (const auto& candidate : survivors) {
+                if (hiIdentifier
+                    && hiIdentifier->qualifiedName == candidate.variable
+                    && surfaceNumeralValue(identityReadingLo)
+                    && *surfaceNumeralValue(identityReadingLo)
+                           == candidate.start) {
+                    identityDistinct = false;
+                }
+            }
+        }
+        if (identityReadingLo && identityDistinct && !survivors.empty()) {
+            std::string listing = "whole-term index (lo `"
+                + surfaceToDisplayString(identityReadingLo) + "`, hi `"
+                + surfaceToDisplayString(identityReadingHi) + "`)";
+            for (const auto& candidate : survivors) {
+                listing += "; index `" + candidate.variable + "` (start "
+                    + std::to_string(candidate.start) + ")";
+            }
+            throwElaborate(
+                "ambiguous ellipsis: " + listing + " all generate the "
+                "written prefix — write the explicit form "
+                "(sum k from LO to HI of BODY)");
+        }
+        if (identityReadingLo && survivors.empty()) {
+            // Unambiguous after all: only the identity reading exists.
+            ExpressionPointer carrierType = carrierOfBody(last);
+            SurfaceExpressionPointer fBody = makeSurfaceIdentifier(
+                indexName, {}, line, column);
+            if (ExpressionPointer result = verifyAndFinish(
+                    fBody, identityReadingLo, identityReadingHi,
+                    carrierType)) {
+                return result;
+            }
+        }
+        if (survivors.size() == 1) {
+            const auto& winner = survivors[0];
+            SurfaceExpressionPointer lo = makeSurfaceNumericLiteral(
+                std::to_string(winner.start), line, column);
+            SurfaceExpressionPointer hi = makeSurfaceIdentifier(
+                winner.variable, {}, line, column);
+            // The prefix was already verified by the probe; the binder
+            // name is the variable itself (bounds elaborate outside the
+            // binder, so the outer occurrence is not captured). `-` in
+            // the general term was verified as blackboard monus — spell
+            // it as Natural.monus so the body elaborates.
+            SurfaceFoldBinder binder{fold.operatorSymbol, winner.variable,
+                                      lo, hi, monusizeSurface(general)};
+            return elaborateFoldBinder(binder, localBinders, expectedType,
+                                        line, column);
+        }
+        if (survivors.size() > 1) {
+            std::string listing;
+            for (const auto& candidate : survivors) {
+                if (!listing.empty()) listing += "; ";
+                listing += "index `" + candidate.variable + "` (start "
+                    + std::to_string(candidate.start) + ")";
+            }
+            throwElaborate(
+                "ambiguous ellipsis: " + listing + " all generate the "
+                "written prefix — write the explicit form "
+                "(sum k from LO to HI of BODY)");
+        }
+        throwElaborate(
+            "could not read the ellipsis: the general term `"
+            + surfaceToDisplayString(general)
+            + "` neither anti-unifies with the last prefix term `"
+            + surfaceToDisplayString(last)
+            + "` at one consistent position, nor generates the prefix "
+            "from a Natural index at start 0 or 1."
+            + (mismatchDetail.empty() ? std::string()
+                                       : "\n    " + mismatchDetail)
+            + "\n    Write the explicit form "
+            "(sum k from LO to HI of BODY)");
     }
