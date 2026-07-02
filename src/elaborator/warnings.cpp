@@ -497,3 +497,155 @@ bool Elaborator::binderReferencesAllBound(
         return true;
     }
 
+// ---- B5 hint classifier (`MATH_CLASSIFY_HINTS`) ------------------------
+// See the declaration comment in internal.hpp. The features are SHAPE
+// classifications — the tiers they size do not exist yet, so this reads
+// the goal's form (sign judgment, cast content, groundness) rather than
+// running any prospective procedure. `closes` is the one live probe: the
+// same budget-capped speculative re-proof the redundancy checker runs.
+
+namespace {
+
+// Pre-order visit of every subterm.
+template <typename Visitor>
+void visitEverySubterm(const ExpressionPointer& term,
+                       const Visitor& visit) {
+    if (!term) return;
+    visit(term);
+    if (auto* application = std::get_if<Application>(&term->node)) {
+        visitEverySubterm(application->function, visit);
+        visitEverySubterm(application->argument, visit);
+    } else if (auto* pi = std::get_if<Pi>(&term->node)) {
+        visitEverySubterm(pi->domain, visit);
+        visitEverySubterm(pi->codomain, visit);
+    } else if (auto* lambda = std::get_if<Lambda>(&term->node)) {
+        visitEverySubterm(lambda->domain, visit);
+        visitEverySubterm(lambda->body, visit);
+    } else if (auto* let = std::get_if<Let>(&term->node)) {
+        visitEverySubterm(let->type, visit);
+        visitEverySubterm(let->value, visit);
+        visitEverySubterm(let->body, visit);
+    }
+}
+
+// Application-spine head constant name + spine arguments (outermost last).
+std::string spineHeadAndArguments(
+        ExpressionPointer term,
+        std::vector<ExpressionPointer>& arguments) {
+    arguments.clear();
+    ExpressionPointer cursor = term;
+    while (auto* application = std::get_if<Application>(&cursor->node)) {
+        arguments.push_back(application->argument);
+        cursor = application->function;
+    }
+    std::reverse(arguments.begin(), arguments.end());
+    if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+        return constant->name;
+    }
+    return std::string();
+}
+
+} // namespace
+
+bool Elaborator::classifyHintsEnabled() const {
+    static const bool enabled = [] {
+        const char* flag = std::getenv("MATH_CLASSIFY_HINTS");
+        return flag && flag[0] != '\0' && flag[0] != '0';
+    }();
+    return enabled;
+}
+
+void Elaborator::emitHintClassification(
+        const char* kind,
+        const char* relationLabel,
+        ExpressionPointer goalClosed,
+        const SurfaceExpression* hint,
+        bool hintIsExplanation,
+        bool bareCloses,
+        int line) {
+    if (!goalClosed) return;
+
+    // Peel `Not(...)` so `x ≠ 0` classifies by its inner equality.
+    ExpressionPointer subject = goalClosed;
+    int negations = 0;
+    std::vector<ExpressionPointer> arguments;
+    std::string headName;
+    for (;;) {
+        headName = spineHeadAndArguments(subject, arguments);
+        if (headName == "Not" && arguments.size() == 1) {
+            subject = arguments[0];
+            ++negations;
+            continue;
+        }
+        break;
+    }
+
+    // Sign-judgment shape (tier-4 candidate): a relation whose subject is
+    // anchored on the numeral 0 (`0 ≤ x`, `0 < x`, `x = 0` under Not), or
+    // a unary nonnegativity predicate.
+    bool signShape = false;
+    if (arguments.size() >= 2) {
+        for (size_t i = arguments.size() - 2; i < arguments.size(); ++i) {
+            auto numeral = asNumeralLiteral(arguments[i]);
+            if (numeral && numeral->second == 0) signShape = true;
+        }
+    }
+    if (!signShape && headName.find("IsNonneg") != std::string::npos) {
+        signShape = true;
+    }
+
+    bool containsCast = false;
+    bool containsFree = false;
+    visitEverySubterm(goalClosed, [&](const ExpressionPointer& sub) {
+        if (auto* constant = std::get_if<Constant>(&sub->node)) {
+            if (!containsCast && isCoercionFunctionName(constant->name)) {
+                containsCast = true;
+            }
+        } else if (std::get_if<FreeVariable>(&sub->node)) {
+            containsFree = true;
+        }
+    });
+    // Ground (tier-2 candidate): no reference to any local binder — the
+    // closed form's free-BV watermark is the whole check (-1 = closed).
+    bool ground = !containsFree && goalClosed->maxFreeBoundVariable < 0;
+
+    std::string hintName = "<term>";
+    if (hint) {
+        if (auto* identifier = std::get_if<SurfaceIdentifier>(&hint->node)) {
+            hintName = identifier->qualifiedName;
+        } else if (auto* application =
+                       std::get_if<SurfaceApplication>(&hint->node)) {
+            if (auto* head = std::get_if<SurfaceIdentifier>(
+                    &application->function->node)) {
+                hintName = head->qualifiedName + "(...)";
+            } else {
+                hintName = "<application>";
+            }
+        } else if (std::get_if<SurfaceUnfold>(&hint->node)) {
+            hintName = "<unfolding>";
+        }
+    }
+
+    std::string goalText = prettyPrint(goalClosed);
+    for (char& character : goalText) {
+        if (character == '\n' || character == '\t') character = ' ';
+    }
+    if (goalText.size() > 140) {
+        goalText.resize(137);
+        goalText += "...";
+    }
+
+    std::cerr << "[classify-hint]\t" << moduleName_ << ":" << line
+        << "\tkind=" << kind
+        << "\trel=" << relationLabel
+        << "\t" << (hintIsExplanation ? "since" : "by")
+        << "\tcloses=" << (bareCloses ? 1 : 0)
+        << "\tneg=" << negations
+        << "\thead=" << (headName.empty() ? "<none>" : headName)
+        << "\tsign=" << (signShape ? 1 : 0)
+        << "\tcast=" << (containsCast ? 1 : 0)
+        << "\tground=" << (ground ? 1 : 0)
+        << "\thint=" << hintName
+        << "\tgoal=" << goalText << "\n";
+}
+

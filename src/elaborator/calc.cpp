@@ -532,6 +532,56 @@ ExpressionPointer Elaborator::elaborateCalc(
                             localBinders, step.line);
                         fromFactCitation = true;
                     }
+                    // B5 classifier (`MATH_CLASSIFY_HINTS`): record this
+                    // hinted step's shape for the tier-sizing report. The
+                    // `closes` bit re-proves by-less under the redundancy
+                    // budget, faithfully per relation (the same split the
+                    // redundancy check below uses); `unfolding` hints skip
+                    // the probe (their transparency flip makes a
+                    // speculative success spurious).
+                    if (classifyHintsEnabled()) {
+                        ExpressionPointer classifyAttempt;
+                        if (std::get_if<SurfaceUnfold>(
+                                &step.stepProof->node) == nullptr) {
+                            uint64_t stepsBefore = kernelStepsSoFar();
+                            RedundancyBudgetGuard budgetGuard(*this);
+                            try {
+                                if (step.relation == CalcRelation::Equality) {
+                                    classifyAttempt = autoProveCalcStep(
+                                        localBinders, previousKernel,
+                                        nextKernel, carrierType, carrierLevel,
+                                        stepRelationType,
+                                        step.line, step.column);
+                                } else {
+                                    classifyAttempt = autoProveClaim(
+                                        stepRelationType, localBinders,
+                                        step.line);
+                                }
+                            } catch (const ElaborateError&) {
+                                classifyAttempt = nullptr;
+                            } catch (const TypeError&) {
+                                classifyAttempt = nullptr;
+                            } catch (const AutoProverBudgetError&) {
+                                classifyAttempt = nullptr;
+                            }
+                            if (classifyAttempt
+                                && redundancyReproofWasExpensive(
+                                       stepsBefore)) {
+                                classifyAttempt = nullptr;
+                            }
+                        }
+                        const char* relationLabel =
+                            step.relation == CalcRelation::Equality
+                                ? "="
+                                : (strictnessOf(step.relation)
+                                       == Strictness::Strict
+                                       ? "<" : "<=");
+                        emitHintClassification(
+                            "calc", relationLabel, stepRelationType,
+                            step.stepProof.get(),
+                            step.stepProofIsExplanation,
+                            classifyAttempt != nullptr, step.line);
+                    }
                     bool checkThisStep = !fromFactCitation
                         && reportRedundantBy_
                         && !step.stepProofIsExplanation

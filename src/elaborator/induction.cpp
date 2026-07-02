@@ -978,6 +978,37 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             }
         }
 
+        // B5 classifier (`MATH_CLASSIFY_HINTS`): record this hinted claim's
+        // shape for the tier-sizing report. The `closes` bit is the same
+        // budget-capped speculative re-proof the redundancy check runs —
+        // here for `since` hints too (classification, not a warning), and
+        // skipped for `unfolding` hints, whose transparency flip makes the
+        // speculative success spurious (see the exemption note below).
+        if (classifyHintsEnabled()) {
+            ExpressionPointer classifyAttempt;
+            if (std::get_if<SurfaceUnfold>(&claim.byHint->node) == nullptr) {
+                uint64_t stepsBefore = kernelStepsSoFar();
+                RedundancyBudgetGuard budgetGuard(*this);
+                try {
+                    classifyAttempt = autoProveClaim(
+                        goalClosed, localBinders, line);
+                } catch (const ElaborateError&) {
+                    classifyAttempt = nullptr;
+                } catch (const TypeError&) {
+                    classifyAttempt = nullptr;
+                } catch (const AutoProverBudgetError&) {
+                    classifyAttempt = nullptr;
+                }
+                if (classifyAttempt
+                    && redundancyReproofWasExpensive(stepsBefore)) {
+                    classifyAttempt = nullptr;
+                }
+            }
+            emitHintClassification(
+                "claim", "-", goalClosed, claim.byHint.get(),
+                claim.byIsExplanation, classifyAttempt != nullptr, line);
+        }
+
         // `--check-redundant-by`: speculatively run the bare-`claim`
         // auto-prover on the same goal. If it would also discharge
         // the goal, warn that the hint is redundant. A `since` hint is an

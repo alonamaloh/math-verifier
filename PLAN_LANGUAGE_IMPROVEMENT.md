@@ -37,7 +37,7 @@ the suggested order at the end of the plan.
 
 | Step | Workstream | Status | Record |
 |------|------------|--------|--------|
-| 1 | B5 classifier (instrument hinted claims/calc steps) | **in progress** | started 2026-07-02 |
+| 1 | B5 classifier (instrument hinted claims/calc steps) | **done** | 2026-07-02; `MATH_CLASSIFY_HINTS` + `scripts/hint_classification_report.py`; findings in B5 (64.6% absorbable of 5807 sites) |
 | 2 | B1–B3 tier skeleton, context index, cast tier | not started | |
 | 3 | A1 keyword-free claims/calc | not started | |
 | 4 | B4 order automation in calc | not started | |
@@ -828,6 +828,52 @@ Cheapest first, strict budgets, first success wins:
   from review: tiers 2–4 absorb well over half, dominated by
   partialSum/power/abs sign lemmas and to_real transport. Build this
   classifier first; it prioritizes everything else in Part B.
+
+**Findings (2026-07-02 — the classifier ran over the full library).**
+Instrument: `MATH_CLASSIFY_HINTS=1` (hooks at the hinted-claim and
+hinted-calc-step elaboration sites; shape features + a budget-capped
+speculative by-less re-proof), aggregated by
+`scripts/hint_classification_report.py`. **5807 hinted sites**
+(2811 `since` / 2996 `by`; 3387 claims / 2420 calc steps), bucketed
+first-match-wins:
+
+| bucket | sites | share | dominated by |
+|---|---|---|---|
+| closes-today (budget-capped bare re-proof succeeds) | 2101 | 36.2% | inline terms, `LessThan.weaken`, `IsNonneg` bridges, bare `IH` |
+| B4 order calc step | 305 | 5.3% | `add_preserves_LessOrEqual/LessThan` family, `multiply_by_nonneg`, `triangle_inequality` |
+| tier 2 ground | 345 | 5.9% | `two_positive`, `zero_less_one`, `to_real.positive_preserves`, `False` |
+| tiers 3+4 sign-through-casts | 217 | 3.7% | `divide_positive`, `absolute_value_nonneg`, `factorial_cast_positive` |
+| tier 4 sign | 312 | 5.4% | `IsNonneg` bridges/`IsNonneg.multiply`, `modulus_nonneg`, `square_IsNonneg` |
+| tier 3 cast | 473 | 8.1% | cast-bearing equalities/existentials, `sign_split` |
+| **absorbable total** | **3753** | **64.6%** | |
+| unabsorbed | 2054 | 35.4% | inline sub-proof terms (586), `IH` citations, abstract-ring plumbing, `le_through_max_*` |
+
+Reading, against the expectations above:
+- **The tier-2–4 + B4 prediction is confirmed in composition**: the
+  sign/cast buckets are dominated by exactly the predicted families
+  (divide/abs/factorial-cast positivity, `to_real` transport), and
+  the B4 bucket is almost entirely `add_preserves_*` monotonicity —
+  but their combined share is ~23%, not "over half". The bulk
+  absorber is **closes-today at 36%**: hints today's prover already
+  discharges near-instantly. Under C1's role split those become
+  lint-removable citations wholesale — so C1 + the lint, not new
+  tiers, deletes the single biggest slice.
+- **The unabsorbed third decomposes on sight**: inline `<term>`
+  sub-proofs (the hint IS the proof — correctly on the page), `IH`
+  citations (A2 statement-addressability's target), abstract-carrier
+  associativity/commutativity plumbing (`ring`'s domain, invisible to
+  head-symbol indexes), and `Natural.le_through_max_*` threshold
+  juggling (A6 `eventually`'s target, 28 sites in this bucket alone).
+- **Caveats**: buckets are shape-classified upper bounds (tier 4's
+  yield depends on B2 rule coverage); generic-relation calc steps
+  (`∣`/`⊆`) are labeled `=` by the instrument; `closes-today` uses
+  the 1000-step redundancy budget, so slower-but-provable sites land
+  in other buckets.
+- **Priority confirmed with one amendment**: B3+B2 first (1002
+  sign/cast sites), then B4 (305 steps, a dozen lemma families to
+  index), then the tier-2 evaluator (345). The amendment: schedule
+  the C1 `since`-role decision early, because the closes-today slice
+  (2101) is gated on it, not on any tier.
 
 ---
 

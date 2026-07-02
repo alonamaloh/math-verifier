@@ -2269,6 +2269,25 @@ private:
     // occurrence search when it could actually widen a match.
     bool containsNumeralLiteral(ExpressionPointer term) const;
 
+    // ---- B5 hint classifier (`MATH_CLASSIFY_HINTS`) --------------------
+    // Sizing instrument for PLAN_LANGUAGE_IMPROVEMENT.md Part B: one
+    // machine-readable stderr line per hinted claim / calc step,
+    // classifying the goal's shape by the prospective auto-prover tier
+    // that could absorb the hint (sign judgment → tier 4, cast-bearing →
+    // tier 3, ground numeral → tier 2, order calc step → B4), plus a
+    // `closes` bit from a budget-capped speculative by-less re-proof
+    // (= would today's redundancy check flag it). Aggregated by
+    // scripts/hint_classification_report.py.
+    bool classifyHintsEnabled() const;
+    void emitHintClassification(
+        const char* kind,             // "claim" | "calc"
+        const char* relationLabel,    // "=", "<=", "<" for calc; "-" for claim
+        ExpressionPointer goalClosed, // the hinted goal / step proposition
+        const SurfaceExpression* hint,
+        bool hintIsExplanation,       // `since` (true) vs `by` (false)
+        bool bareCloses,
+        int line);
+
     // The target carrier type of a single-hop coercion function (e.g.
     // `Rational.to_real` → "Real"), read off the registry's direct edge.
     // Empty string if `functionName` is not a registered direct coercion.
