@@ -1409,10 +1409,21 @@ private:
                     }
                 }
                 SurfaceExpressionPointer expression = parseExpression();
-                SurfaceExpressionPointer byHint;
-                if (peek().kind == TokenKind::KeywordBy) {
-                    consumeAny();  // 'by'
-                    byHint = parseExpression();
+                // Full claim-form parity: a bare statement takes every
+                // hint shape the `claim` keyword does — `by <proof>`,
+                // `by cases { … }`, `by substituting <eq>`,
+                // `by induction on …` — via the same shared tail
+                // parser, so the two forms can never drift.
+                SurfaceExpressionPointer claimValue;
+                bool hasByForm = (peek().kind == TokenKind::KeywordBy);
+                if (hasByForm) {
+                    claimValue = parseStructuredClaimTail(
+                        statementStart, expression);
+                } else {
+                    claimValue = makeSurfaceStructuredClaim(
+                        expression, /*label=*/"", /*byHint=*/nullptr,
+                        /*byCases=*/false, {}, statementStart.line,
+                        statementStart.column);
                 }
                 std::string bindingName;
                 if (peek().kind == TokenKind::KeywordAs) {
@@ -1427,7 +1438,7 @@ private:
                     && peekAt(1).kind != TokenKind::RightBrace) {
                     isStatement = true;
                     consumeAny();  // ';'
-                } else if (!bindingName.empty() || byHint) {
+                } else if (!bindingName.empty() || hasByForm) {
                     // `E as NAME` / `E by V` only mean anything as a
                     // statement (the old grammar rejected both here).
                     isStatement = true;
@@ -1447,10 +1458,7 @@ private:
                           + std::to_string(statementStart.column)
                     : bindingName;
                 wrapper.type = expression;
-                wrapper.value = makeSurfaceStructuredClaim(
-                    expression, /*label=*/"", std::move(byHint),
-                    /*byCases=*/false, {}, statementStart.line,
-                    statementStart.column);
+                wrapper.value = std::move(claimValue);
                 wrapper.line = statementStart.line;
                 wrapper.column = statementStart.column;
                 wrappers.push_back(std::move(wrapper));
