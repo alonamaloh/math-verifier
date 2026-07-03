@@ -253,6 +253,28 @@ theorem Natural.lt_trichotomy (a : Natural)
     }
   }
 
+-- The trichotomy bridge the reductio idiom leans on: a failed ≤ flips
+-- to a strict < the other way.
+theorem Natural.lt_of_not_le (a b : Natural)
+        (notLessOrEqual : ¬(a ≤ b)) : b < a := {
+  claim a < b ∨ a = b ∨ b < a by Natural.lt_trichotomy;
+  claim by cases {
+    in (a < b) as aBelowB: {
+        claim a ≤ b by Natural.LessThan.weaken;
+        done
+      }
+    in (a = b ∨ b < a) as equalOrAbove: {
+        claim by cases {
+          in (a = b) as equal: {
+              claim a ≤ b by substituting equal;
+              done
+            }
+          in (b < a) as bBelowA: { done }
+        }
+      }
+  }
+}
+
 -- Successor preserves ≤.
 automatic theorem Natural.successor_less_or_equal_successor (a b : Natural)
         (proof : a ≤ b) : successor(a) ≤ successor(b) :=
