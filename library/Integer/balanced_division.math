@@ -49,49 +49,63 @@ theorem Integer.four_square_le_from_natural (t m : Natural) (bound : t + t ≤ m
      = (m : Integer)²
 }
 
--- Balanced division.
-theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m)
+-- Balanced division: dividing by a positive integer leaves a remainder
+-- of absolute value at most half the divisor (stated multiplication-
+-- only: 4·remainder² ≤ m²).
+theorem Integer.divide_balanced (a m : Integer) (mPositive : m > (0 : Integer))
         : ∃ (quotient : Integer). ∃ (remainder : Integer).
-            a = (m : Integer) * quotient + remainder
-            ∧ (4 : Integer) * remainder² ≤ (m : Integer)² := {
+            a = m * quotient + remainder
+            ∧ 4 * remainder² ≤ m² := {
+  -- Positivity exhibits m as the image of a positive Natural, which the
+  -- Natural division machinery consumes.
+  choose k such that m = ((0 : Integer) + Integer.one) + (k : Integer)
+      as mDecomposition from mPositive;
+  m = ((0 : Integer) + Integer.one) + (k : Integer)   by mDecomposition
+    = ((1 + k : Natural) : Integer)                   by substituting Natural.to_integer.add_preserves
+    as mCast;
   obtain ⟨quotient0, naturalRemainder, aEquation, remainderBelow⟩
-      from Integer.divide_by_positive(a, m, mPositive);
-  cases Natural.totality_of_less_or_equal(naturalRemainder + naturalRemainder, m) {
+      from Integer.divide_by_positive(a, 1 + k, (1 ≤ 1 + k));
+  a = m * quotient0 + (naturalRemainder : Integer)
+      by substituting mCast as aEquationM;
+  cases Natural.totality_of_less_or_equal(naturalRemainder + naturalRemainder, 1 + k) {
     | Or.introduceLeft(smallRemainder) => {
-        -- r + r ≤ m: keep r. remainder = (r : ℤ), quotient = quotient0.
+        -- r + r ≤ 1 + k: keep r. remainder = (r : ℤ), quotient = quotient0.
         witness quotient0 with
         witness (naturalRemainder : Integer) with
-            { (4 : Integer) * (naturalRemainder : Integer)² ≤ (m : Integer)²
-                  by Integer.four_square_le_from_natural as keepBound;
-              And.introduction(aEquation, keepBound) }
+            { 4 * (naturalRemainder : Integer)² ≤ ((1 + k : Natural) : Integer)²
+                  by Integer.four_square_le_from_natural;
+              4 * (naturalRemainder : Integer)² ≤ m²
+                  by substituting mCast as keepBound;
+              And.introduction(aEquationM, keepBound) }
       }
     | Or.introduceRight(largeRemainder) => {
-        -- m ≤ r + r: bump. With m = r + d, remainder = −(d : ℤ), quotient = quotient0 + (1 : Integer).
-        naturalRemainder ≤ m by Natural.LessThan.weaken;
-        ∃ (d : Natural). m = naturalRemainder + d by Natural.subtraction_witness as dExists;
+        -- 1 + k ≤ r + r: bump. With 1 + k = r + d, remainder = −(d : ℤ),
+        -- quotient = quotient0 + 1.
+        naturalRemainder ≤ 1 + k by Natural.LessThan.weaken;
+        ∃ (d : Natural). 1 + k = naturalRemainder + d by Natural.subtraction_witness as dExists;
         obtain ⟨d, mEquation⟩ from dExists;
-        -- d ≤ r: from m ≤ r + r and m = r + d, so r + d ≤ r + r, cancel r.
-        naturalRemainder + d = m ≤ naturalRemainder + naturalRemainder   by largeRemainder;
+        -- d ≤ r: from 1 + k ≤ r + r and 1 + k = r + d, cancel r.
+        naturalRemainder + d = 1 + k ≤ naturalRemainder + naturalRemainder   by largeRemainder;
         d ≤ naturalRemainder;
-        -- d + d ≤ r + d = m.
+        -- d + d ≤ r + d = 1 + k.
         d + d ≤ naturalRemainder + d   by Natural.le_add_preserves_left
-              = m;
-        (4 : Integer) * (d : Integer)² ≤ (m : Integer)²
+              = 1 + k;
+        4 * (d : Integer)² ≤ ((1 + k : Natural) : Integer)²
             by Integer.four_square_le_from_natural;
-        (m : Integer)
-            = ((naturalRemainder + d : Natural) : Integer)
-            = (naturalRemainder : Integer) + (d : Integer)
-            as mCast;
-        (naturalRemainder : Integer) = (m : Integer) - (d : Integer)
-            by substituting mCast as remainderCast;
-        a = (m : Integer) * quotient0 + (naturalRemainder : Integer)
-          = (m : Integer) * quotient0 + ((m : Integer) - (d : Integer))
-                by substituting remainderCast
-          = (m : Integer) * (quotient0 + (1 : Integer)) + (-(d : Integer))
+        4 * (d : Integer)² ≤ m² by substituting mCast;
+        m = ((1 + k : Natural) : Integer)                  by mCast
+          = ((naturalRemainder + d : Natural) : Integer)   by substituting mEquation
+          = (naturalRemainder : Integer) + (d : Integer)
+          as remainderSplit;
+        (naturalRemainder : Integer) = m - (d : Integer)
+            by substituting remainderSplit as remainderCast;
+        a = m * quotient0 + (naturalRemainder : Integer)   by aEquationM
+          = m * quotient0 + (m - (d : Integer))            by substituting remainderCast
+          = m * (quotient0 + (1 : Integer)) + (-(d : Integer))
                 by ring
           as aBalanced;
         (-(d : Integer))² = (d : Integer)² by ring as squareNegate;
-        (4 : Integer) * (-(d : Integer))² ≤ (m : Integer)²
+        4 * (-(d : Integer))² ≤ m²
             by substituting squareNegate as remainderBound;
         witness quotient0 + (1 : Integer) with
         witness -(d : Integer) with
