@@ -33,7 +33,7 @@ theorem Natural.add_equals_zero_right (a b : Natural) (equation : a + b = 0) : b
   cases a refining equation {
     | zero => equation
     | successor(predA) => {
-        claim isZero : successor(predA + b) = 0 by substituting Natural.successor_add;
+        successor(predA + b) = 0 by substituting Natural.successor_add as isZero;
         absurd(isZero)
       }
   }
@@ -46,8 +46,8 @@ theorem Natural.divides_after_remove_one_witness_zero
         (divisor secondSummand : Natural)
         (equation : divisor + secondSummand = divisor * 0)
         : divisor ∣ secondSummand := {
-    claim divisor + secondSummand = 0;
-    claim secondEqualsZero : secondSummand = 0;
+    divisor + secondSummand = 0;
+    secondSummand = 0 as secondEqualsZero;
     claim divisor ∣ secondSummand by substituting secondEqualsZero
 }
 
@@ -56,9 +56,8 @@ theorem Natural.divides_after_remove_one_witness_successor
         (equation : divisor + secondSummand = divisor * successor(predQ))
         : divisor ∣ secondSummand := {
     -- divisor + secondSummand = divisor + divisor * predQ
-    claim divisor + secondSummand = divisor + divisor * predQ;
-    claim secondEqualsMultiple
-            : secondSummand = divisor * predQ;
+    divisor + secondSummand = divisor + divisor * predQ;
+    secondSummand = divisor * predQ as secondEqualsMultiple;
     witness predQ with secondEqualsMultiple
 }
 
@@ -90,7 +89,7 @@ theorem Natural.divides_after_remove_multiple
     case zero: {
         take secondSummand : Natural;
         suppose divisor ∣ (divisor * 0 + secondSummand) as dividesEnlargedSum;
-        calc divisor * 0 + secondSummand
+        divisor * 0 + secondSummand
            = secondSummand;
         claim divisor ∣ secondSummand by substitution
       }
@@ -100,11 +99,11 @@ theorem Natural.divides_after_remove_multiple
             as dividesEnlargedSum;
         -- Reshape divisor·(predQ+1) + s into divisor + (divisor·predQ + s),
         -- peel one divisor, then recurse on predQ via the IH.
-        calc divisor * successor(predQ) + secondSummand
+        divisor * successor(predQ) + secondSummand
            = divisor + (divisor * predQ + secondSummand);
-        claim divisor ∣ (divisor + (divisor * predQ + secondSummand))
+        divisor ∣ (divisor + (divisor * predQ + secondSummand))
             by substitution;
-        claim peeled : divisor ∣ (divisor * predQ + secondSummand);
+        divisor ∣ (divisor * predQ + secondSummand) as peeled;
         IH(secondSummand, peeled)
       }
   }
@@ -121,7 +120,7 @@ theorem Natural.divides_subtract_from_sum
         (dividesFirst : divisor ∣ firstSummand)
         : divisor ∣ secondSummand := {
   choose q such that firstSummand = divisor * q as firstEquation from dividesFirst;
-  claim divisor ∣ (divisor * q + secondSummand)
+  divisor ∣ (divisor * q + secondSummand)
       by substituting firstEquation;
   done by Natural.divides_after_remove_multiple
 }
@@ -139,21 +138,21 @@ theorem Natural.is_gcd_remainder_lift
         (decomposition : first = quotient * second + remainder)
         (gcdOfSecondRemainder : Natural.is_gcd(gcdValue, second, remainder))
         : Natural.is_gcd(gcdValue, first, second) := {
-    claim gcdValue ∣ second;
-    claim gcdValue ∣ remainder;
-    claim gcdValue ∣ (quotient * second) by Natural.divides_multiple_left;
-    claim gcdValue ∣ (quotient * second + remainder) by Natural.divides_add;
-    claim gcdValue ∣ first by substituting decomposition;
+    gcdValue ∣ second;
+    gcdValue ∣ remainder;
+    gcdValue ∣ (quotient * second) by Natural.divides_multiple_left;
+    gcdValue ∣ (quotient * second + remainder) by Natural.divides_add;
+    gcdValue ∣ first by substituting decomposition;
     -- a common divisor of (first, second) divides remainder = first − quotient·second.
-    claim universalForward : ∀ (d : Natural). d ∣ second → d ∣ remainder → d ∣ gcdValue;
-    claim ∀ (commonDivisor : Natural).
+    ∀ (d : Natural). d ∣ second → d ∣ remainder → d ∣ gcdValue as universalForward;
+    ∀ (commonDivisor : Natural).
             commonDivisor ∣ first → commonDivisor ∣ second → commonDivisor ∣ gcdValue by {
       take commonDivisor : Natural;
       suppose commonDivisor ∣ first as dDividesFirst;
       suppose commonDivisor ∣ second as dDividesSecond;
-      claim commonDivisor ∣ (quotient * second) by Natural.divides_multiple_left;
-      claim commonDivisor ∣ (quotient * second + remainder) by substituting decomposition;
-      claim dDividesRemainder : commonDivisor ∣ remainder by Natural.divides_subtract_from_sum;
+      commonDivisor ∣ (quotient * second) by Natural.divides_multiple_left;
+      commonDivisor ∣ (quotient * second + remainder) by substituting decomposition;
+      commonDivisor ∣ remainder by Natural.divides_subtract_from_sum as dDividesRemainder;
       universalForward(commonDivisor, dDividesSecond, dDividesRemainder)
     };
     done

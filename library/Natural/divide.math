@@ -153,15 +153,14 @@ theorem Natural.monus_zero_implies_decompose (divisor : Natural)
         cases dividend refining monusEqZero {
           | zero => {
               -- monus(succ _, 0) = succ _, so succ(predDivisor) = 0, absurd.
-              claim succEqZero : successor(predDivisor) = 0;
+              successor(predDivisor) = 0 as succEqZero;
               absurd(succEqZero)
             }
           | successor(predDividend) => {
               -- Peel via monus_succ_succ so the IH applies to the inner
               -- monus(predDivisor, predDividend).
-              claim innerMonusZero
-                    : Natural.monus(predDivisor, predDividend) = 0;
-              calc successor(predDividend)
+              Natural.monus(predDivisor, predDividend) = 0 as innerMonusZero;
+              successor(predDividend)
                  = successor(predDivisor
                              + Natural.monus(predDividend, predDivisor))
                         by IH(predDividend, innerMonusZero)
@@ -185,7 +184,7 @@ theorem Natural.divide_modulo_step_decompose (fuel : Natural)
         take divisor : Natural;
         take dividend : Natural;
         -- Zero fuel: divide_step returns 0, modulo_step carries the dividend.
-        calc divisor * Natural.divide_step(0, divisor, dividend)
+        divisor * Natural.divide_step(0, divisor, dividend)
                  + Natural.modulo_step(0, divisor, dividend)
            = divisor * 0 + dividend
            = dividend
@@ -254,7 +253,7 @@ automatic theorem Natural.monus_le_self (n : Natural)
   by_induction on n with IH {
     case zero: {
         take d : Natural;
-        calc Natural.monus(0, d)
+        Natural.monus(0, d)
            = 0
            ≤ 0
       }
@@ -297,12 +296,12 @@ theorem Natural.monus_succ_implies_gt (d : Natural)
         suppose Natural.monus(successor(d'), n) = successor(predM) as monusEq;
         cases n refining monusEq {
           | zero => {
-              claim 0 ≤ d';
+              0 ≤ d';
               claim successor(0) ≤ successor(d')
             }
           | successor(k) => {
-              claim innerMonusEq : Natural.monus(d', k) = successor(predM);
-              claim successor(k) ≤ d'
+              Natural.monus(d', k) = successor(predM) as innerMonusEq;
+              successor(k) ≤ d'
                   by IH(k, predM, innerMonusEq);
               claim successor(successor(k)) ≤ successor(d')
             }
@@ -325,9 +324,9 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
         suppose successor(n) ≤ successor(0) as nLeFuel;
         -- fuel = 0 forces n = 0; modulo_step(0, d, 0) = 0, so the goal is
         -- successor(0) ≤ d, which is dPositive.
-        claim n ≤ 0;
-        claim n = 0;
-        calc successor(Natural.modulo_step(0, d, n))
+        n ≤ 0;
+        n = 0;
+        successor(Natural.modulo_step(0, d, n))
            = successor(0)
            ≤ d   by dPositive
       }
@@ -341,8 +340,7 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
               -- d ≤ n: modulo_step(succ(f), d, n) = modulo_step(f, d, n - d).
               -- The fuel bound succ(n - d) ≤ succ(f) holds since n - d ≤ n - 1
               -- ≤ f; case-split on d (positive) and n to peel the monus.
-              claim monusBoundedByFuel
-                    : successor(Natural.monus(n, d)) ≤ successor(f)
+              successor(Natural.monus(n, d)) ≤ successor(f)
                   by cases on d refining dPositive {
                     case zero: absurd(dPositive)
                     case successor(predD):
@@ -361,8 +359,8 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
                                          by Natural.successor_less_or_equal_successor
                                    ≤ successor(f)
                         }
-                };
-              calc successor(Natural.modulo_step(successor(f), d, n))
+                } as monusBoundedByFuel;
+              successor(Natural.modulo_step(successor(f), d, n))
                  = successor(Natural.modulo_step(f, d, Natural.monus(n, d)))
                  ≤ d   by IH(d, Natural.monus(n, d), dPositive, monusBoundedByFuel)
           }
@@ -414,7 +412,7 @@ theorem Natural.monus_self_plus (d : Natural)
       }
     case successor(k): {
         take m : Natural;
-        calc Natural.monus(successor(k), successor(k) + m)
+        Natural.monus(successor(k), successor(k) + m)
            = Natural.monus(k, k + m)
            = 0 by IH(m)
       }
@@ -434,19 +432,19 @@ theorem Natural.modulo_step_at_multiple (q : Natural)
         -- d * 0 = 0, so the goal reduces to modulo_step(fuel, d, 0) = 0.
         -- Either fuel is exhausted (zero-fuel lemma) or d = succ(predD) makes
         -- monus(d, 0) positive, sending modulo_step to its "too big" branch.
-        claim Natural.modulo_step(fuel, d, 0) = 0
+        Natural.modulo_step(fuel, d, 0) = 0
             by cases on fuel {
               case zero: done
               case successor(f):
                   cases d refining dPositive {
                     | zero => absurd(dPositive)
                     | successor(predD) => {
-                        claim Natural.monus(successor(predD), 0) = successor(predD);
+                        Natural.monus(successor(predD), 0) = successor(predD);
                         done
                       }
                   }
             };
-        calc Natural.modulo_step(fuel, d, d * 0)
+        Natural.modulo_step(fuel, d, d * 0)
            = Natural.modulo_step(fuel, d, 0)
            = 0
       }
@@ -460,13 +458,13 @@ theorem Natural.modulo_step_at_multiple (q : Natural)
         -- modulo_step(f, d, d*q'), which the induction hypothesis sends to 0.
         cases fuel refining succQLeSuccFuel {
           | zero => {
-              claim succQLeZero : successor(q') ≤ 0;
+              successor(q') ≤ 0 as succQLeZero;
               absurd(succQLeZero)
             }
           | successor(f) => {
-              claim succQLeFuel : successor(q') ≤ successor(f);
-              claim Natural.monus(d, d + d * q') = 0;
-              calc Natural.modulo_step(successor(f), d, d * successor(q'))
+              successor(q') ≤ successor(f) as succQLeFuel;
+              Natural.monus(d, d + d * q') = 0;
+              Natural.modulo_step(successor(f), d, d * successor(q'))
                  = Natural.modulo_step(successor(f), d, d + d * q')
                  = Natural.modulo_step(f, d, Natural.monus(d + d * q', d))
                  = Natural.modulo_step(f, d, d * q')
@@ -487,14 +485,14 @@ theorem Natural.divides_implies_modulo_zero
   -- With dividend = divisor * q, modulo(divisor, divisor*q) is a multiple,
   -- which modulo_step_at_multiple sends to 0. Its fuel premise
   -- succ(q) ≤ succ(divisor*q) follows from q ≤ divisor*q (divisor ≥ 1).
-  claim Natural.monus(successor(0), divisor) = 0;
-  calc q
+  Natural.monus(successor(0), divisor) = 0;
+  q
      = successor(0) * q
      ≤ successor(0) * q + Natural.monus(divisor, successor(0)) * q
      = (successor(0) + Natural.monus(divisor, successor(0))) * q
      = divisor * q;
-  claim successor(q) ≤ successor(divisor * q);
-  calc Natural.modulo(divisor, dividend)
+  successor(q) ≤ successor(divisor * q);
+  Natural.modulo(divisor, dividend)
      = Natural.modulo(divisor, divisor * q)
      = 0   by Natural.modulo_step_at_multiple
 }

@@ -36,19 +36,19 @@ theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
       | yes someSmaller => {
           choose smaller such that smaller < subject ∧ predicate(smaller)
               from someSmaller;
-          claim smallerBelowSubject : smaller < subject;
-          claim predicateAtSmaller : predicate(smaller);
+          smaller < subject as smallerBelowSubject;
+          predicate(smaller) as predicateAtSmaller;
           inductionHypothesis(smaller, smallerBelowSubject, predicateAtSmaller)
         }
       | no noneSmaller => {
-          claim subjectIsMinimal : ∀ (k : Natural). k < subject → ¬predicate(k)
+          ∀ (k : Natural). k < subject → ¬predicate(k)
               by (k : Natural) (kLessSubject : k < subject)
                      (predicateAtK : predicate(k)) ↦ {
-                   claim existsSmaller
-                       : ∃ (smaller : Natural). smaller < subject ∧ predicate(smaller)
-                       by { witness k with And.introduction(kLessSubject, predicateAtK) };
+                   ∃ (smaller : Natural). smaller < subject ∧ predicate(smaller)
+                       by { witness k with And.introduction(kLessSubject, predicateAtK) }
+                       as existsSmaller;
                    noneSmaller(existsSmaller)
-                 };
+                 } as subjectIsMinimal;
           witness subject with And.introduction(predicateAtSubject, subjectIsMinimal)
         }
     }
@@ -62,19 +62,18 @@ theorem Natural.least_witness (predicate : Natural → Proposition)
         (n : Natural) (witnessAtN : predicate(n))
         : ∃ (minimum : Natural).
             predicate(minimum) ∧ (∀ (k : Natural). predicate(k) → minimum ≤ k) := {
-  claim minimalWitness
-        : ∃ (minimum : Natural).
-            predicate(minimum) ∧ (∀ (k : Natural). k < minimum → ¬predicate(k))
-      by Natural.least_witness_minimal;
+  ∃ (minimum : Natural).
+      predicate(minimum) ∧ (∀ (k : Natural). k < minimum → ¬predicate(k))
+      by Natural.least_witness_minimal as minimalWitness;
   choose minimum such that
       predicate(minimum) ∧ (∀ (k : Natural). k < minimum → ¬predicate(k))
       from minimalWitness;
-  claim predicateAtMinimum : predicate(minimum);
-  claim nothingBelow : ∀ (k : Natural). k < minimum → ¬predicate(k);
-  claim minimumIsLeast : ∀ (k : Natural). predicate(k) → minimum ≤ k
+  predicate(minimum) as predicateAtMinimum;
+  ∀ (k : Natural). k < minimum → ¬predicate(k) as nothingBelow;
+  ∀ (k : Natural). predicate(k) → minimum ≤ k
       by (k : Natural) (predicateAtK : predicate(k)) ↦ {
-           claim trichotomy : k < minimum ∨ k = minimum ∨ minimum < k
-               by Natural.lt_trichotomy;
+           k < minimum ∨ k = minimum ∨ minimum < k
+               by Natural.lt_trichotomy as trichotomy;
            cases trichotomy {
              | Or.introduceLeft(kLessMinimum) =>
                  absurd(nothingBelow(k, kLessMinimum)(predicateAtK))
@@ -86,6 +85,6 @@ theorem Natural.least_witness (predicate : Natural → Proposition)
                        claim minimum ≤ k by Natural.LessThan.weaken
                  }
            }
-         };
+         } as minimumIsLeast;
   witness minimum with And.introduction(predicateAtMinimum, minimumIsLeast)
 }

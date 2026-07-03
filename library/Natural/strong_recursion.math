@@ -39,11 +39,11 @@ automatic theorem LessOrEqual.invert (s b : Natural)
     claim by cases {
       in (s < b): {
           choose c such that s + (1 + c) = b from Natural.lt_elim;
-          claim s ≤ s + c;
-          calc b
+          s ≤ s + c;
+          b
              = s + (1 + c)
              = successor(s + c);
-          claim ∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ s ≤ bPredecessor
+          ∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ s ≤ bPredecessor
               by witness (s + c) with (b = successor(s + c) ∧ s ≤ s + c);
           done
         }
@@ -73,7 +73,7 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
   (successorKLessOrEqualSuccessorMProof : successor(k) ≤ successor(m)) ↦
     claim by cases {
       in (successor(k) = successor(m)): {
-          claim k = m;
+          k = m;
           done
         }
       in (∃ (bPredecessor : Natural). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) as existsProof:
@@ -83,8 +83,8 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
                 from existsProof;
             -- m = bPredecessor by injectivity; substitute it back so
             -- successor(k) ≤ bPredecessor becomes successor(k) ≤ m.
-            claim mEqualsBPredecessor : m = bPredecessor;
-            claim successor(k) ≤ m by substituting mEqualsBPredecessor;
+            m = bPredecessor as mEqualsBPredecessor;
+            successor(k) ≤ m by substituting mEqualsBPredecessor;
             done
           }
     }
@@ -110,7 +110,7 @@ theorem Natural.for_all_below
           -- The step bound `1 + predecessor` is not defeq to
           -- `successor(predecessor)`, but the successor-form inversion lemma
           -- still applies — its premise is discharged up to `one_add`.
-          claim k = predecessor ∨ successor(k) ≤ predecessor
+          k = predecessor ∨ successor(k) ≤ predecessor
               by Natural.less_or_equal_successor_successor_inversion;
           claim by cases {
             in (k = predecessor):
@@ -154,7 +154,7 @@ automatic theorem Natural.less_or_equal_successor_successor_descend
 -- step(k)` produces) without naming the constructor.
 theorem Natural.le_cancel_one_plus (p q : Natural) (bound : 1 + p ≤ 1 + q)
         : p ≤ q := {
-  calc successor(p)
+  successor(p)
      = 1 + p
      ≤ 1 + q
      = successor(q);
@@ -177,16 +177,16 @@ theorem Natural.strong_induction
   -- `for_all_below` is stated with the `successor(k) ≤ m` step form; bridge
   -- the caller's `<`-step to it (and the `<`-result back) — `<` is no
   -- longer defeq to `successor ≤`.
-  claim ∀ (m : Natural). (∀ (k : Natural). successor(k) ≤ m → P(k)) → P(m)
+  ∀ (m : Natural). (∀ (k : Natural). successor(k) ≤ m → P(k)) → P(m)
       by (m : Natural) (belowM : ∀ (k : Natural). successor(k) ≤ m → P(k)) ↦
           step(m, (k : Natural) (kLessThanM : k < m) ↦ {
-            claim successor(k) ≤ m;
+            successor(k) ≤ m;
             belowM(k, (successor(k) ≤ m))
           });
-  claim below : ∀ (k : Natural). k < n → P(k)
+  ∀ (k : Natural). k < n → P(k)
       by (k : Natural) (kLessThanN : k < n) ↦ {
-        claim successor(k) ≤ n;
+        successor(k) ≤ n;
         done
-      };
+      } as below;
   step(n, below)
 }
