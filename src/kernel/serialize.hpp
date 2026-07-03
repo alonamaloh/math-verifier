@@ -127,6 +127,11 @@ struct CacheContents {
     std::string sourcePath;
     uint64_t sourceHash;
     std::string moduleName;
+    // D Phase-1: for an `implementation module Y implements X`, the
+    // interface module name X; empty for every other module kind. The
+    // interface's build cross-validates this against its
+    // `implemented by` clause.
+    std::string implementsName;
     std::vector<CachedDependency> dependencies;
     // Declarations added by this file, in insertion order.
     std::vector<std::pair<std::string, Declaration>> declarations;

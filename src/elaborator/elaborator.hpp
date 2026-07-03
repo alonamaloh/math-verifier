@@ -73,4 +73,7 @@ void elaborateModule(const SurfaceModule& module,
                      std::function<const LibrarySearchIndex*()>
                          librarySearchProvider = nullptr,
                      int goalAtLine = -1,
-                     std::string* goalAtReport = nullptr);
+                     std::string* goalAtReport = nullptr,
+                     std::vector<std::pair<std::string,
+                         SurfaceAxiomDeclaration::InterfaceRole>>*
+                         interfaceObligations = nullptr);

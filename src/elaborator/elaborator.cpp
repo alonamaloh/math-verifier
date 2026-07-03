@@ -18,7 +18,10 @@ void elaborateModule(const SurfaceModule& module,
                      std::function<const LibrarySearchIndex*()>
                          librarySearchProvider,
                      int goalAtLine,
-                     std::string* goalAtReport) {
+                     std::string* goalAtReport,
+                     std::vector<std::pair<std::string,
+                         SurfaceAxiomDeclaration::InterfaceRole>>*
+                         interfaceObligations) {
     Elaborator elaborator(environment, importedModules);
     elaborator.setReportRedundantBy(reportRedundantBy);
     elaborator.setReportRedundantCalcSteps(reportRedundantCalcSteps);
@@ -33,6 +36,10 @@ void elaborateModule(const SurfaceModule& module,
     elaborator.setGoalAtLine(goalAtLine);
     if (!goalAtReport) {
         elaborator.runModule(module);
+        if (interfaceObligations) {
+            *interfaceObligations =
+                elaborator.checkedInterfaceObligations();
+        }
         return;
     }
     // The queried goal is wanted even when elaboration fails past the
@@ -44,4 +51,7 @@ void elaborateModule(const SurfaceModule& module,
         throw;
     }
     *goalAtReport = elaborator.formatGoalAtReport();
+    if (interfaceObligations) {
+        *interfaceObligations = elaborator.checkedInterfaceObligations();
+    }
 }

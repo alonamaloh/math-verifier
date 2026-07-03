@@ -5755,6 +5755,19 @@ private:
     };
     bool parseOrderJudgment(ExpressionPointer proposition,
                             OrderJudgment& out) const;
+    // D Phase-1: obligation names checked while elaborating an
+    // `interface module` (name, role); the cache writer reads these to
+    // seal the corresponding implementation declarations.
+    std::vector<std::pair<std::string,
+                          SurfaceAxiomDeclaration::InterfaceRole>>
+        checkedInterfaceObligations_;
+public:
+    const std::vector<std::pair<std::string,
+                                SurfaceAxiomDeclaration::InterfaceRole>>&
+    checkedInterfaceObligations() const {
+        return checkedInterfaceObligations_;
+    }
+private:
     std::unordered_map<std::string, std::vector<SignRule>>
         monotonicityRuleIndex_;
     int monotonicityRuleConflicts_ = 0;

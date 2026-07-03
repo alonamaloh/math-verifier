@@ -5321,22 +5321,26 @@ int verifyWithCache(const std::string& sourcePath,
                   << error.what() << "\n";
         return 1;
     }
-    // D Phase-1 staging: the module kinds PARSE (stage 1, landed);
-    // interface-module PROCESSING (obligation check + sealed-cache
-    // derivation over the implementation, plan section D3a) is stage 2.
-    // Implementation modules build as ordinary modules — `implements`
-    // is inert until the interface side consumes it.
-    if (parsedModule.kind == ModuleKind::Interface) {
-        std::cerr << sourcePath << ":1:1: elaborate error: interface "
-                  << "modules parse but do not yet build — the "
-                  << "obligation check and sealed-view derivation are "
-                  << "D Phase-1 stage 2 (see PLAN_LANGUAGE_IMPROVEMENT"
-                  << ".md section D3a)\n";
-        return 1;
-    }
     const std::string moduleName = parsedModule.moduleName;
     const std::vector<std::string> importedModuleNames =
         importedModulesOf(parsedModule);
+    if (parsedModule.kind == ModuleKind::Interface) {
+        bool implementationImported = false;
+        for (const auto& name : importedModuleNames) {
+            if (name == parsedModule.implementedByName) {
+                implementationImported = true;
+            }
+        }
+        if (parsedModule.implementedByName.empty()
+            || !implementationImported) {
+            std::cerr << sourcePath << ":1:1: elaborate error: an "
+                      << "interface module must name its implementation "
+                      << "(`implemented by Y`) and import it (the "
+                      << "import gives the build edge; consumers of the "
+                      << "interface never load it)\n";
+            return 1;
+        }
+    }
 
     // Resolve dependency cache paths. The explicit `--deps` list (if
     // any) is honored; when `--cache-root` is given, each import is
@@ -5475,12 +5479,15 @@ int verifyWithCache(const std::string& sourcePath,
         }
         std::cout << goalAtReport;
     };
+    std::vector<std::pair<std::string,
+        SurfaceAxiomDeclaration::InterfaceRole>> interfaceObligations;
     try {
         elaborateModule(parsedModule, environment, importedModules,
                          reportRedundantBy, reportRedundantCalcSteps,
                          reportRedundantByNonEq, reportUnusedNames,
                          librarySearchProvider, goalAtLine,
-                         goalAtLine >= 0 ? &goalAtReport : nullptr);
+                         goalAtLine >= 0 ? &goalAtReport : nullptr,
+                         &interfaceObligations);
     } catch (const ElaborateError& error) {
         printGoalAtReport();
         std::cerr << sourcePath << ":"
@@ -5653,6 +5660,90 @@ int verifyWithCache(const std::string& sourcePath,
             entry.witnessName = operation.witnessName;
             cache.foldOperationRegistrations.push_back(std::move(entry));
         }
+    }
+
+    // D Phase-1: an implementation module records the interface it
+    // implements; an interface module's cache is TRANSFORMED into the
+    // sealed public view before writing.
+    cache.implementsName = parsedModule.implementsName;
+    if (parsedModule.kind == ModuleKind::Interface) {
+        // Cross-validate the implementation's `implements` clause.
+        auto implementationInfo =
+            moduleToDepInfo.find(parsedModule.implementedByName);
+        if (implementationInfo != moduleToDepInfo.end()) {
+            std::string implementationCachePath =
+                implementationInfo->second.first;
+            try {
+                CacheContents implementationCache = readCacheFile(
+                    std::filesystem::exists(implementationCachePath)
+                        ? implementationCachePath
+                        : implementationCachePath + ".iface",
+                    /*skipDefinitionBodies=*/true);
+                if (implementationCache.implementsName != moduleName) {
+                    std::cerr << sourcePath << ":1:1: elaborate error: "
+                        << parsedModule.implementedByName
+                        << " does not declare `implements " << moduleName
+                        << "` (it declares `"
+                        << implementationCache.implementsName
+                        << "`)\n";
+                    return 1;
+                }
+            } catch (const SerializationError&) {
+                // Unreadable implementation cache: the dependency load
+                // above would already have failed loudly.
+            }
+        }
+        // Seal: obligation-checked names are copied out of the loaded
+        // environment — abstract types/constants become bodyless
+        // axioms (nothing to unfold), obligations keep the theorem
+        // Definition kind with the fixed placeholder body (the .iface
+        // precedent — prover seeding reads types only).
+        const ExpressionPointer sealedBody = makeSort(0);
+        for (const auto& [obligationName, role] : interfaceObligations) {
+            auto declarationIterator =
+                environment.declarations.find(obligationName);
+            if (declarationIterator == environment.declarations.end()) {
+                continue;
+            }
+            const Declaration& implementationDeclaration =
+                declarationIterator->second;
+            std::vector<std::string> universeParameters;
+            ExpressionPointer declaredType;
+            if (auto* definition =
+                    std::get_if<Definition>(&implementationDeclaration)) {
+                universeParameters = definition->universeParameters;
+                declaredType = definition->type;
+            } else if (auto* axiom =
+                    std::get_if<Axiom>(&implementationDeclaration)) {
+                universeParameters = axiom->universeParameters;
+                declaredType = axiom->type;
+            } else {
+                continue;  // inductives etc. cannot be sealed this way
+            }
+            if (role == SurfaceAxiomDeclaration::InterfaceRole::Obligation) {
+                cache.declarations.emplace_back(
+                    obligationName,
+                    Definition{universeParameters, declaredType,
+                               sealedBody, Opacity::Opaque,
+                               /*automatic=*/false});
+            } else {
+                cache.declarations.emplace_back(
+                    obligationName,
+                    Axiom{universeParameters, declaredType,
+                          /*automatic=*/false});
+            }
+        }
+        // Consumers must never load the construction: drop the
+        // implementation from the recorded dependency list. (Its other
+        // imports stay — the sealed declarations' types reference
+        // them.)
+        std::vector<CachedDependency> keptDependencies;
+        for (auto& dependency : cache.dependencies) {
+            if (dependency.moduleName != parsedModule.implementedByName) {
+                keptDependencies.push_back(std::move(dependency));
+            }
+        }
+        cache.dependencies = std::move(keptDependencies);
     }
 
     // Stage-1 (statements-only) produces ONLY the interface cache: there are

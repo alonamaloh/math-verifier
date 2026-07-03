@@ -24,7 +24,7 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // which gzip kept 17 (every shared subterm of the ring certificate
 // written out in full at every occurrence).
 // Version 10 adds the fold-operation registry section at the tail.
-constexpr uint32_t cacheVersion = 10;
+constexpr uint32_t cacheVersion = 11;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -548,6 +548,7 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
     writer.writeString(contents.sourcePath);
     writer.writeU64(contents.sourceHash);
     writer.writeString(contents.moduleName);
+    writer.writeString(contents.implementsName);
     writer.writeU32(static_cast<uint32_t>(contents.dependencies.size()));
     for (const auto& dependency : contents.dependencies) {
         writer.writeString(dependency.moduleName);
@@ -655,6 +656,7 @@ CacheContents readCacheFile(const std::string& path,
     contents.sourcePath = reader.readString();
     contents.sourceHash = reader.readU64();
     contents.moduleName = reader.readString();
+    contents.implementsName = reader.readString();
     uint32_t dependencyCount = reader.readU32();
     contents.dependencies.reserve(dependencyCount);
     for (uint32_t i = 0; i < dependencyCount; ++i) {

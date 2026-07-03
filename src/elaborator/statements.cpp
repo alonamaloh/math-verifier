@@ -734,6 +734,46 @@ bool Elaborator::typeHasHeadName(ExpressionPointer expressionType,
 
 void Elaborator::elaborateAxiom(const SurfaceAxiomDeclaration& declaration) {
         Frame frame(*this, "axiom '" + declaration.name + "'");
+        // Interface-module forms (`type N` / `constant N : T` / theorem
+        // signatures) are OBLIGATION CHECKS against the implementation
+        // loaded via imports, not fresh declarations: the name must
+        // already exist with a definitionally-equal type. The checked
+        // names are recorded; the cache writer seals them.
+        if (declaration.interfaceRole
+                != SurfaceAxiomDeclaration::InterfaceRole::None) {
+            const Declaration* implementationDeclaration =
+                environment_.lookup(declaration.name);
+            if (!implementationDeclaration) {
+                throwElaborate(
+                    "interface obligation '" + declaration.name
+                    + "' has no matching declaration in the "
+                    "implementation (is the implementation module "
+                    "imported?)");
+            }
+            ExpressionPointer statedType =
+                elaborateExpression(*declaration.type, {});
+            ExpressionPointer declaredType =
+                declarationType(*implementationDeclaration);
+            Context emptyContext;
+            bool typesAgree;
+            try {
+                typesAgree = isDefinitionallyEqual(
+                    environment_, emptyContext, statedType, declaredType);
+            } catch (const TypeError&) {
+                typesAgree = false;
+            }
+            if (!typesAgree) {
+                throwElaborate(
+                    "interface obligation '" + declaration.name
+                    + "' does not match the implementation:\n"
+                    "  interface states: " + prettyPrint(statedType)
+                    + "\n  implementation has: "
+                    + prettyPrint(declaredType));
+            }
+            checkedInterfaceObligations_.emplace_back(
+                declaration.name, declaration.interfaceRole);
+            return;
+        }
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
