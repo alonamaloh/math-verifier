@@ -71,6 +71,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
 | `claim P by cases { in A as h: … in B as h: … }` | prove `P` by ∨-elimination |
 | `claim P by substituting eq;` | prove `P` by rewriting with `eq` |
+| `from h: P [as NAME];` | restate hypothesis `h` with in-scope equations substituted: `P` is `h`'s statement after rewriting, checked and bound like a claim (source first, transformed statement on the page) |
 | `claim goal [by V]` | close the current goal (type from context) |
 | `done` / `okay` | ≡ `claim goal`; bare or with `by` |
 | `note P [by V];` | a *checked comment*: verify `P` holds, then **discard** it — unlike `claim`, it does NOT bind `P`, so later steps don't see it |
