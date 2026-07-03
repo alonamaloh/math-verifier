@@ -40,8 +40,8 @@ import GaussianInteger.integral_domain
 -- gives (a − 0, 0).
 theorem GaussianInteger.coordinates_embedInteger (a : Integer)
         : coords(GaussianInteger.embedInteger(a)) = Product.make(a, Integer.zero) := {
-  claim a - Integer.zero = a;
-  calc coords(GaussianInteger.embedInteger(a))
+  a - Integer.zero = a;
+  coords(GaussianInteger.embedInteger(a))
      = Product.make(a - Integer.zero, Integer.zero)
      = Product.make(a, Integer.zero)
 }
@@ -76,9 +76,9 @@ theorem GaussianInteger.gaussianProduct_conjugate (p : Pair(Integer, Integer))
           = Product.make(GaussianInteger.normPair(p), Integer.zero) :=
   cases p { | Product.make(a, b) =>
     {
-      claim firstEqual : a * a - b * (-b) = a * a + b * b by ring;
-      claim secondEqual : a * (-b) + b * a = Integer.zero by ring;
-      calc GaussianInteger.gaussianProduct(Product.make(a, b), Product.make(a, -b))
+      a * a - b * (-b) = a * a + b * b by ring as firstEqual;
+      a * (-b) + b * a = Integer.zero by ring as secondEqual;
+      GaussianInteger.gaussianProduct(Product.make(a, b), Product.make(a, -b))
          = Product.make(a * a - b * (-b), a * (-b) + b * a)
          = Product.make(a * a + b * b, a * (-b) + b * a)   by substituting firstEqual
          = Product.make(a * a + b * b, Integer.zero)        by substituting secondEqual
@@ -89,11 +89,10 @@ theorem GaussianInteger.gaussianProduct_conjugate (p : Pair(Integer, Integer))
 theorem GaussianInteger.multiply_conjugate (z : GaussianInteger)
         : z * GaussianInteger.conjugate(z)
           = GaussianInteger.embedInteger(GaussianInteger.normInteger(z)) := {
-  claim coordinatesConjugate
-      : coords(GaussianInteger.conjugate(z))
-        = Product.make(Product.first(coords(z)), -(Product.second(coords(z))));
-  claim coordinatesProduct
-      : coords(z * GaussianInteger.conjugate(z))
+  coords(GaussianInteger.conjugate(z))
+        = Product.make(Product.first(coords(z)), -(Product.second(coords(z))))
+      as coordinatesConjugate;
+  coords(z * GaussianInteger.conjugate(z))
         = Product.make(GaussianInteger.normInteger(z), Integer.zero)
       by calc coords(z * GaussianInteger.conjugate(z))
             = GaussianInteger.gaussianProduct(coords(z), coords(GaussianInteger.conjugate(z)))
@@ -101,8 +100,9 @@ theorem GaussianInteger.multiply_conjugate (z : GaussianInteger)
                   Product.make(Product.first(coords(z)), -(Product.second(coords(z)))))
                   by substituting coordinatesConjugate
             = Product.make(GaussianInteger.normPair(coords(z)), Integer.zero)
-                  by GaussianInteger.gaussianProduct_conjugate;
-  claim coords(z * GaussianInteger.conjugate(z))
+                  by GaussianInteger.gaussianProduct_conjugate
+      as coordinatesProduct;
+  coords(z * GaussianInteger.conjugate(z))
         = coords(GaussianInteger.embedInteger(GaussianInteger.normInteger(z)))
       by calc coords(z * GaussianInteger.conjugate(z))
             = Product.make(GaussianInteger.normInteger(z), Integer.zero)   by coordinatesProduct
@@ -113,9 +113,9 @@ theorem GaussianInteger.multiply_conjugate (z : GaussianInteger)
 -- N(embedInteger a) = a².
 theorem GaussianInteger.normInteger_embedInteger (a : Integer)
         : GaussianInteger.normInteger(GaussianInteger.embedInteger(a)) = a * a := {
-  claim coordinatesEmbed
-      : coords(GaussianInteger.embedInteger(a)) = Product.make(a, Integer.zero);
-  calc GaussianInteger.normInteger(GaussianInteger.embedInteger(a))
+  coords(GaussianInteger.embedInteger(a)) = Product.make(a, Integer.zero)
+      as coordinatesEmbed;
+  GaussianInteger.normInteger(GaussianInteger.embedInteger(a))
      = GaussianInteger.normPair(Product.make(a, Integer.zero))   by substituting coordinatesEmbed
      = a * a + Integer.zero * Integer.zero
      = a * a   by ring
@@ -133,14 +133,14 @@ theorem GaussianInteger.embedInteger_one
 theorem GaussianInteger.unit_of_normInteger_one (z : GaussianInteger)
         (normOne : GaussianInteger.normInteger(z) = Integer.one)
         : Ring.IsUnit(GaussianInteger.ring_bundle, z) := {
-  claim oneEqual
-      : Ring.one(GaussianInteger.ring_bundle) = z * GaussianInteger.conjugate(z)
+  Ring.one(GaussianInteger.ring_bundle) = z * GaussianInteger.conjugate(z)
       by calc Ring.one(GaussianInteger.ring_bundle)
             = GaussianInteger.embedInteger(Integer.one)
             = GaussianInteger.embedInteger(GaussianInteger.normInteger(z))
                   by substituting normOne
             = z * GaussianInteger.conjugate(z)
-                  by GaussianInteger.multiply_conjugate;
+                  by GaussianInteger.multiply_conjugate
+      as oneEqual;
   ⟨GaussianInteger.conjugate(z), oneEqual⟩
 }
 
@@ -149,14 +149,12 @@ theorem GaussianInteger.unit_of_normInteger_one (z : GaussianInteger)
 theorem GaussianInteger.coordinates_embedInteger_multiply (p : Integer) (w : GaussianInteger)
         : coords(GaussianInteger.embedInteger(p) * w)
           = Product.make(p * Product.first(coords(w)), p * Product.second(coords(w))) := {
-  claim firstSimplify
-      : p * Product.first(coords(w)) - Integer.zero * Product.second(coords(w))
-        = p * Product.first(coords(w)) by ring;
-  claim secondSimplify
-      : p * Product.second(coords(w)) + Integer.zero * Product.first(coords(w))
-        = p * Product.second(coords(w)) by ring;
-  claim embedCoordinates : coords(GaussianInteger.embedInteger(p)) = Product.make(p, Integer.zero);
-  calc coords(GaussianInteger.embedInteger(p) * w)
+  p * Product.first(coords(w)) - Integer.zero * Product.second(coords(w))
+        = p * Product.first(coords(w)) by ring as firstSimplify;
+  p * Product.second(coords(w)) + Integer.zero * Product.first(coords(w))
+        = p * Product.second(coords(w)) by ring as secondSimplify;
+  coords(GaussianInteger.embedInteger(p)) = Product.make(p, Integer.zero) as embedCoordinates;
+  coords(GaussianInteger.embedInteger(p) * w)
      = GaussianInteger.gaussianProduct(coords(GaussianInteger.embedInteger(p)), coords(w))
      = GaussianInteger.gaussianProduct(Product.make(p, Integer.zero), coords(w))
            by substituting embedCoordinates
@@ -174,19 +172,19 @@ theorem GaussianInteger.coordinates_embedInteger_multiply (p : Integer) (w : Gau
 theorem GaussianInteger.embedInteger_multiply (a b : Integer)
         : GaussianInteger.embedInteger(a * b)
           = GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b) := {
-  claim a * Integer.zero = Integer.zero;
-  claim bCoordinates : coords(GaussianInteger.embedInteger(b)) = Product.make(b, Integer.zero);
-  claim coords(GaussianInteger.embedInteger(a * b)) = Product.make(a * b, Integer.zero);
-  claim rightCoordinates
-      : coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
+  a * Integer.zero = Integer.zero;
+  coords(GaussianInteger.embedInteger(b)) = Product.make(b, Integer.zero) as bCoordinates;
+  coords(GaussianInteger.embedInteger(a * b)) = Product.make(a * b, Integer.zero);
+  coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
         = Product.make(a * b, Integer.zero)
       by calc coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
             = Product.make(a * Product.first(coords(GaussianInteger.embedInteger(b))),
                   a * Product.second(coords(GaussianInteger.embedInteger(b))))
                   by GaussianInteger.coordinates_embedInteger_multiply
             = Product.make(a * b, a * Integer.zero)   by substituting bCoordinates
-            = Product.make(a * b, Integer.zero);
-  claim coords(GaussianInteger.embedInteger(a * b))
+            = Product.make(a * b, Integer.zero)
+      as rightCoordinates;
+  coords(GaussianInteger.embedInteger(a * b))
         = coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
       by calc coords(GaussianInteger.embedInteger(a * b))
             = Product.make(a * b, Integer.zero)
@@ -201,15 +199,16 @@ theorem GaussianInteger.embedInteger_divides_imaginary (p : Integer) (z : Gaussi
         : Integer.divides(p, Product.second(coords(z))) := {
   obtain ⟨w, zEqual⟩ from dividesZ;
   let factor : GaussianInteger := w;
-  claim zProduct : z = GaussianInteger.embedInteger(p) * factor by zEqual;
-  claim coords(GaussianInteger.embedInteger(p) * factor)
+  z = GaussianInteger.embedInteger(p) * factor by zEqual as zProduct;
+  coords(GaussianInteger.embedInteger(p) * factor)
         = Product.make(p * Product.first(coords(factor)), p * Product.second(coords(factor)))
       by GaussianInteger.coordinates_embedInteger_multiply;
-  claim secondEqual : Product.second(coords(z)) = p * Product.second(coords(factor))
+  Product.second(coords(z)) = p * Product.second(coords(factor))
       by calc Product.second(coords(z))
             = Product.second(coords(GaussianInteger.embedInteger(p) * factor))   by substituting zProduct
             = Product.second(Product.make(p * Product.first(coords(factor)), p * Product.second(coords(factor))))
-            = p * Product.second(coords(factor));
+            = p * Product.second(coords(factor))
+      as secondEqual;
   ⟨Product.second(coords(factor)), secondEqual⟩
 }
 
@@ -217,9 +216,9 @@ theorem GaussianInteger.embedInteger_divides_imaginary (p : Integer) (z : Gaussi
 theorem GaussianInteger.normNatural_multiply (z w : GaussianInteger)
         : GaussianInteger.normNatural(z * w)
           = GaussianInteger.normNatural(z) * GaussianInteger.normNatural(w) := {
-  claim zCast : (GaussianInteger.normNatural(z) : Integer) = GaussianInteger.normInteger(z);
-  claim wCast : (GaussianInteger.normNatural(w) : Integer) = GaussianInteger.normInteger(w);
-  claim (GaussianInteger.normNatural(z * w) : Integer)
+  (GaussianInteger.normNatural(z) : Integer) = GaussianInteger.normInteger(z) as zCast;
+  (GaussianInteger.normNatural(w) : Integer) = GaussianInteger.normInteger(w) as wCast;
+  (GaussianInteger.normNatural(z * w) : Integer)
         = ((GaussianInteger.normNatural(z) * GaussianInteger.normNatural(w)) : Integer)
       by calc (GaussianInteger.normNatural(z * w) : Integer)
             = GaussianInteger.normInteger(z * w)
@@ -237,7 +236,7 @@ theorem GaussianInteger.normNatural_multiply (z w : GaussianInteger)
 -- normNatural of the ring zero and one.
 theorem GaussianInteger.normNatural_zero
         : GaussianInteger.normNatural(Ring.zero(GaussianInteger.ring_bundle)) = 0 := {
-  claim (GaussianInteger.normNatural(Ring.zero(GaussianInteger.ring_bundle)) : Integer)
+  (GaussianInteger.normNatural(Ring.zero(GaussianInteger.ring_bundle)) : Integer)
         = (0 : Integer)
       by calc (GaussianInteger.normNatural(Ring.zero(GaussianInteger.ring_bundle)) : Integer)
             = GaussianInteger.normInteger(Ring.zero(GaussianInteger.ring_bundle))
@@ -247,7 +246,7 @@ theorem GaussianInteger.normNatural_zero
 
 theorem GaussianInteger.normNatural_one
         : GaussianInteger.normNatural(Ring.one(GaussianInteger.ring_bundle)) = 1 := {
-  claim (GaussianInteger.normNatural(Ring.one(GaussianInteger.ring_bundle)) : Integer)
+  (GaussianInteger.normNatural(Ring.one(GaussianInteger.ring_bundle)) : Integer)
         = (1 : Integer)
       by calc (GaussianInteger.normNatural(Ring.one(GaussianInteger.ring_bundle)) : Integer)
             = GaussianInteger.normInteger(Ring.one(GaussianInteger.ring_bundle))
@@ -260,7 +259,7 @@ theorem GaussianInteger.normNatural_one
 -- N(embed p) = p² as a natural number (p the prime, embedded via ℤ).
 theorem GaussianInteger.normNatural_embedInteger_natural (p : Natural)
         : GaussianInteger.normNatural(GaussianInteger.embedInteger((p : Integer))) = p * p := {
-  claim (GaussianInteger.normNatural(GaussianInteger.embedInteger((p : Integer))) : Integer)
+  (GaussianInteger.normNatural(GaussianInteger.embedInteger((p : Integer))) : Integer)
         = ((p * p : Natural) : Integer)
       by calc (GaussianInteger.normNatural(GaussianInteger.embedInteger((p : Integer))) : Integer)
             = GaussianInteger.normInteger(GaussianInteger.embedInteger((p : Integer)))

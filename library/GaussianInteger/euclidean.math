@@ -112,11 +112,11 @@ theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : Integer)
         (r2Def : r2 = a2 - (b2 * q1 + b1 * q2))
         : (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
           = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2) := {
-  claim linRel1 : b1 * s1 - b2 * s2 = (b1 * b1 + b2 * b2) * r1
-      by Integer.gaussian_linear_relation_one;
-  claim linRel2 : b2 * s1 + b1 * s2 = (b1 * b1 + b2 * b2) * r2
-      by Integer.gaussian_linear_relation_two;
-  calc (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
+  b1 * s1 - b2 * s2 = (b1 * b1 + b2 * b2) * r1
+      by Integer.gaussian_linear_relation_one as linRel1;
+  b2 * s1 + b1 * s2 = (b1 * b1 + b2 * b2) * r2
+      by Integer.gaussian_linear_relation_two as linRel2;
+  (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
      = (b1 * s1 - b2 * s2) * (b1 * s1 - b2 * s2)
          + (b2 * s1 + b1 * s2) * (b2 * s1 + b1 * s2)
            by ring
@@ -136,16 +136,16 @@ theorem Natural.less_of_four_times_le_double (a b : Natural)
   cases Natural.compare_strict(a, b) {
     | Natural.StrictComparison.below(belowProof) => { done }
     | Natural.StrictComparison.atLeast(bLessOrEqualA) => {
-        claim 1 ≤ a;
-        claim 1 ≤ 2 * a by Natural.multiply_at_least_one;
-        claim 2 * b ≤ 2 * a;
-        claim fourALeTwoA : 4 * a ≤ 2 * a;
-        claim fourAExpand : 4 * a = 2 * a + 2 * a;
-        calc 2 * a
+        1 ≤ a;
+        1 ≤ 2 * a by Natural.multiply_at_least_one;
+        2 * b ≤ 2 * a;
+        4 * a ≤ 2 * a as fourALeTwoA;
+        4 * a = 2 * a + 2 * a as fourAExpand;
+        2 * a
               < 2 * a + 2 * a                  by Natural.lt_add_of_one_le
               = 4 * a                          by fourAExpand
               ≤ 2 * a                          by fourALeTwoA;
-        claim False by Natural.lt_irreflexive;
+        False by Natural.lt_irreflexive;
         done
       }
   }
@@ -157,12 +157,11 @@ theorem Integer.cancel_norm_bound (dNat : Natural) (dPositive : 1 ≤ dNat)
         (crux : (dNat : Integer) * sSquares = ((dNat : Integer) * (dNat : Integer)) * norm)
         (bound : (4 : Integer) * sSquares ≤ (2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
         : (4 : Integer) * norm ≤ (2 : Integer) * (dNat : Integer) := {
-  claim scaled
-      : (dNat : Integer) * ((4 : Integer) * sSquares)
+  (dNat : Integer) * ((4 : Integer) * sSquares)
         ≤ (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
-      by Integer.multiply_le_by_natural;
-  claim dSquareCast : ((dNat * dNat : Natural) : Integer) = (dNat : Integer) * (dNat : Integer);
-  calc (dNat : Integer) * ((4 : Integer) * sSquares)
+      by Integer.multiply_le_by_natural as scaled;
+  ((dNat * dNat : Natural) : Integer) = (dNat : Integer) * (dNat : Integer) as dSquareCast;
+  (dNat : Integer) * ((4 : Integer) * sSquares)
             = (4 : Integer) * ((dNat : Integer) * sSquares)
                   by ring
             = (4 : Integer) * (((dNat : Integer) * (dNat : Integer)) * norm)
@@ -172,20 +171,20 @@ theorem Integer.cancel_norm_bound (dNat : Natural) (dPositive : 1 ≤ dNat)
             = ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
                   by substituting dSquareCast
       as lhsForm;
-  calc (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+  (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
             = ((dNat : Integer) * (dNat : Integer)) * ((2 : Integer) * (dNat : Integer))
                   by ring
             = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
                   by substituting dSquareCast
       as rhsForm;
-      calc ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
+      ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
             = (dNat : Integer) * ((4 : Integer) * sSquares)
                   by lhsForm
             ≤ (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
                   by scaled
             = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
                   by rhsForm;
-  claim 1 ≤ dNat * dNat;
+  1 ≤ dNat * dNat;
   done by Integer.cancel_le_by_natural_positive
 }
 
@@ -200,8 +199,8 @@ theorem GaussianInteger.has_euclidean_division
     let b1 : Integer := Product.first(coords(b));
     let b2 : Integer := Product.second(coords(b));
     let dNat : Natural := GaussianInteger.normNatural(b);
-    claim dPositive : 1 ≤ dNat by GaussianInteger.normNatural_positive;
-    calc (dNat : Integer)
+    1 ≤ dNat by GaussianInteger.normNatural_positive as dPositive;
+    (dNat : Integer)
               = GaussianInteger.normInteger(b)
               = b1 * b1 + b2 * b2
         as dCast;
@@ -212,11 +211,11 @@ theorem GaussianInteger.has_euclidean_division
     obtain ⟨q2, s2, s2Equation, bound2⟩
         from Integer.divide_balanced(a2 * b1 - a1 * b2, (dNat : Integer), dIntPositive);
     -- s_i = n_i − D·q_i, with D = b₁²+b₂².
-    calc s1
+    s1
               = ((dNat : Integer) * q1 + s1) - (dNat : Integer) * q1   by ring
               = (a1 * b1 + a2 * b2) - (dNat : Integer) * q1            by substituting s1Equation
               = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1         by substituting dCast;
-    calc s2
+    s2
               = ((dNat : Integer) * q2 + s2) - (dNat : Integer) * q2   by ring
               = (a2 * b1 - a1 * b2) - (dNat : Integer) * q2            by substituting s2Equation
               = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2         by substituting dCast;
@@ -227,23 +226,23 @@ theorem GaussianInteger.has_euclidean_division
     let r1 : Integer := Product.first(coords(r));
     let r2 : Integer := Product.second(coords(r));
     -- a = b·q + r, an additive-group rearrangement.
-    calc a
+    a
               = RingModulo.add(RingModulo.multiply(b, q),
                     RingModulo.add(a, RingModulo.negate(RingModulo.multiply(b, q))))
                     by ring
         as aEquation;
     -- The coordinates of b·q.
-    calc Product.first(coords(RingModulo.multiply(b, q)))
+    Product.first(coords(RingModulo.multiply(b, q)))
               = Product.first(GaussianInteger.gaussianProduct(coords(b), Product.make(q1, q2)))
                     by GaussianInteger.coordinates_multiply
               = b1 * q1 - b2 * q2
         as bqFirst;
-        calc Product.second(coords(RingModulo.multiply(b, q)))
+        Product.second(coords(RingModulo.multiply(b, q)))
               = Product.second(GaussianInteger.gaussianProduct(coords(b), Product.make(q1, q2)))
                     by GaussianInteger.coordinates_multiply
               = b2 * q1 + b1 * q2;
     -- coords(a) = coords(b·q) + coords(r) componentwise.
-    calc coords(a)
+    coords(a)
               = coords(RingModulo.add(RingModulo.multiply(b, q), r))
                     by substituting aEquation
               = Product.make(
@@ -253,20 +252,20 @@ theorem GaussianInteger.has_euclidean_division
               = Product.make((b1 * q1 - b2 * q2) + r1, (b2 * q1 + b1 * q2) + r2)
                     by substituting bqFirst
         as coordsAEquation;
-    calc r1
+    r1
               = ((b1 * q1 - b2 * q2) + r1) - (b1 * q1 - b2 * q2)
                     by ring
               = Product.first(coords(a)) - (b1 * q1 - b2 * q2)
                     by substituting coordsAEquation
               = a1 - (b1 * q1 - b2 * q2);
-    calc r2
+    r2
               = ((b2 * q1 + b1 * q2) + r2) - (b2 * q1 + b1 * q2)
                     by ring
               = Product.second(coords(a)) - (b2 * q1 + b1 * q2)
                     by substituting coordsAEquation
               = a2 - (b2 * q1 + b1 * q2);
     -- The crux, in terms of D = (dNat : ℤ).
-    calc (dNat : Integer) * (s1 * s1 + s2 * s2)
+    (dNat : Integer) * (s1 * s1 + s2 * s2)
               = (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
                     by substituting dCast
               = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2)
@@ -274,7 +273,7 @@ theorem GaussianInteger.has_euclidean_division
               = ((dNat : Integer) * (dNat : Integer)) * (r1 * r1 + r2 * r2)
                     by substituting dCast;
     -- Combine the two coordinate bounds: 4·(s₁²+s₂²) ≤ 2·D².
-    calc (4 : Integer) * (s1 * s1 + s2 * s2)
+    (4 : Integer) * (s1 * s1 + s2 * s2)
               = (4 : Integer) * (s1 * s1) + (4 : Integer) * (s2 * s2)
               ≤ (dNat : Integer) * (dNat : Integer) + (4 : Integer) * (s2 * s2)
                     by Integer.add_preserves_less_or_equal
@@ -283,9 +282,9 @@ theorem GaussianInteger.has_euclidean_division
                     by Integer.add_preserves_less_or_equal
               = (2 : Integer) * ((dNat : Integer) * (dNat : Integer));
     -- 4·N(r) ≤ 2·D, then transfer to ℕ.
-    claim normBound : (4 : Integer) * (r1 * r1 + r2 * r2) ≤ (2 : Integer) * (dNat : Integer)
-        by Integer.cancel_norm_bound;
-    calc ((4 * GaussianInteger.normNatural(r) : Natural) : Integer)
+    (4 : Integer) * (r1 * r1 + r2 * r2) ≤ (2 : Integer) * (dNat : Integer)
+        by Integer.cancel_norm_bound as normBound;
+    ((4 * GaussianInteger.normNatural(r) : Natural) : Integer)
               = (4 : Integer) * (GaussianInteger.normNatural(r) : Integer)
               = (4 : Integer) * GaussianInteger.normInteger(r)
                     by substituting GaussianInteger.normNatural_is_normInteger(r)
@@ -293,10 +292,10 @@ theorem GaussianInteger.has_euclidean_division
               ≤ (2 : Integer) * (dNat : Integer)               by normBound
               = (2 : Integer) * (GaussianInteger.normNatural(b) : Integer)
               = ((2 * GaussianInteger.normNatural(b) : Natural) : Integer);
-    claim 4 * GaussianInteger.normNatural(r) ≤ 2 * GaussianInteger.normNatural(b)
+    4 * GaussianInteger.normNatural(r) ≤ 2 * GaussianInteger.normNatural(b)
         by Natural.to_integer.LessOrEqual_reflects;
-    claim remainderNormLess : GaussianInteger.normNatural(r) < GaussianInteger.normNatural(b)
-        by Natural.less_of_four_times_le_double;
+    GaussianInteger.normNatural(r) < GaussianInteger.normNatural(b)
+        by Natural.less_of_four_times_le_double as remainderNormLess;
     witness q with
     witness r with
         And.introduction(aEquation, Or.introduceRight(remainderNormLess))

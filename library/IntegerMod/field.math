@@ -51,7 +51,7 @@ theorem IntegerMod.congruent_of_make_equal (modulus : Natural) (x y : Integer)
         : Integer.CongruentModulo(modulus, x, y) := {
   -- Equal classes (makeEquality) ⇒ congruent representatives — the
   -- exact-bridge resolves the parameterised IntegerMod.equivalence(modulus).
-  claim congruent : Integer.CongruentModulo(modulus, x, y);
+  Integer.CongruentModulo(modulus, x, y) as congruent;
   congruent
 }
 
@@ -73,16 +73,16 @@ theorem IntegerMod.zero_not_one (p : Natural)
         (primality : Natural.is_prime(p))
         : ¬(IntegerMod.zero(p) = IntegerMod.one(p)) :=
   (zeroEqualsOne : IntegerMod.zero(p) = IntegerMod.one(p)) ↦ {
-    claim congruent : Integer.CongruentModulo(p, Integer.zero, Integer.one);
+    Integer.CongruentModulo(p, Integer.zero, Integer.one) as congruent;
     -- p | (0 − 1); negate to get p | 1.
-    claim Integer.divides((p : Integer), -(Integer.zero - Integer.one))
+    Integer.divides((p : Integer), -(Integer.zero - Integer.one))
         by Integer.divides_negate((p : Integer), Integer.zero - Integer.one, congruent);
-    claim negationEquation : -(Integer.zero - Integer.one) = Integer.one by ring;
-    claim dividesOne : Integer.divides((p : Integer), Integer.one)
-        by substituting negationEquation;
-    claim Natural.divides(p, 1)
+    -(Integer.zero - Integer.one) = Integer.one by ring as negationEquation;
+    Integer.divides((p : Integer), Integer.one)
+        by substituting negationEquation as dividesOne;
+    Natural.divides(p, 1)
         by Integer.natural_divides_of_integer_divides(p, 1, dividesOne);
-    claim pEqualsOne : p = 1;
+    p = 1 as pEqualsOne;
     Natural.not_two_less_or_equal_one(
         rewrite(pEqualsOne, Natural.is_prime.at_least_two(p, primality)))
   }
@@ -103,11 +103,12 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
     in (Integer.IsNonneg(a)) as nonnegative: {
         obtain ⟨k, aEqualsK⟩ from nonnegative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | (k : Integer) = a.
-        claim notDividesK : ¬ Natural.divides(p, k)
+        ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦
                  notDivides(
                      rewrite(Equality.symmetry(aEqualsK),
-                         Integer.divides_of_natural_divides(p, k, pDividesK)));
+                         Integer.divides_of_natural_divides(p, k, pDividesK)))
+            as notDividesK;
         obtain ⟨bezoutX, bezoutY, bezoutEquation⟩
             from Natural.bezout_one_when_prime_coprime(p, k, primality,
                      notDividesK);
@@ -123,12 +124,13 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
     in (∃ (k : Natural). a = -(k : Integer)) as negative: {
         obtain ⟨k, aEqualsNegativeK⟩ from negative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : Integer) = a.
-        claim notDividesK : ¬ Natural.divides(p, k)
+        ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦
                  notDivides(
                      rewrite(Equality.symmetry(aEqualsNegativeK),
                          Integer.divides_negate((p : Integer), (k : Integer),
-                             Integer.divides_of_natural_divides(p, k, pDividesK))));
+                             Integer.divides_of_natural_divides(p, k, pDividesK))))
+            as notDividesK;
         obtain ⟨bezoutX, bezoutY, bezoutEquation⟩
             from Natural.bezout_one_when_prime_coprime(p, k, primality,
                      notDividesK);
@@ -155,14 +157,14 @@ theorem IntegerMod.nonzero_invertible (p : Natural)
           → ∃ (y : IntegerMod(p)). x * y = IntegerMod.one(p) :=
   cases x { | a =>
       (notZero : ¬(IntegerMod.make(p, a) = IntegerMod.zero(p))) ↦ {
-        claim notDivides : ¬ Integer.divides((p : Integer), a)
+        ¬ Integer.divides((p : Integer), a)
             by (pDividesA : Integer.divides((p : Integer), a)) ↦ {
-                 claim congruentToZero : Integer.CongruentModulo(p, a, Integer.zero)
-                     by substituting (ring : a - Integer.zero = a);
+                 Integer.CongruentModulo(p, a, Integer.zero)
+                     by substituting (ring : a - Integer.zero = a) as congruentToZero;
                  notZero(Quotient.equivalent_implies_equal(
                              Integer, Integer.CongruentModulo(p),
                              a, Integer.zero, congruentToZero))
-               };
+               } as notDivides;
         IntegerMod.invertible_at_representative(p, a, primality, notDivides)
       } }
 

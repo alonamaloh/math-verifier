@@ -106,26 +106,28 @@ theorem IntegralDomain.prime_divides_listProduct_member (d : IntegralDomain)
           let s : Ring := IntegralDomain.ring(d);
           -- listProduct(prepend(head,tail)) = head · listProduct(tail), so p
           -- divides the product — and being prime, divides head or the tail.
-          claim p ∣ head
+          p ∣ head
               ∨ p ∣ IntegralDomain.listProduct(d, tail);
           claim by cases {
             in (p ∣ head) as pDividesHead: {
-                claim List.member(Ring.carrier(s), head,
+                List.member(Ring.carrier(s), head,
                     List.prepend(Ring.carrier(s), head, tail));
-                claim headWitness : List.member(Ring.carrier(s), head,
+                List.member(Ring.carrier(s), head,
                         List.prepend(Ring.carrier(s), head, tail))
-                      ∧ p ∣ head;
+                      ∧ p ∣ head
+                    as headWitness;
                 witness head with headWitness
               }
             in (p ∣ IntegralDomain.listProduct(d, tail)) as pDividesTail: {
                 choose q such that
                     List.member(Ring.carrier(s), q, tail) ∧ p ∣ q
                     from memberFromTail(pDividesTail);
-                claim List.member(Ring.carrier(s), q,
+                List.member(Ring.carrier(s), q,
                     List.prepend(Ring.carrier(s), head, tail));
-                claim tailWitness : List.member(Ring.carrier(s), q,
+                List.member(Ring.carrier(s), q,
                         List.prepend(Ring.carrier(s), head, tail))
-                      ∧ p ∣ q;
+                      ∧ p ∣ q
+                    as tailWitness;
                 witness q with tailWitness
               }
           }
@@ -152,9 +154,10 @@ theorem IntegralDomain.prime_list_unit_product_empty (d : IntegralDomain)
     | List.prepend(head, tail) => {
         -- head is prime (it is a member), and head divides the unit
         -- product, so head divides 1 — a unit — contradiction.
-        claim headIsPrime : IntegralDomain.IsPrimeElement(d, head)
+        IntegralDomain.IsPrimeElement(d, head)
             by allPrime(head,
-                   List.member.here(Ring.carrier(s), head, tail));
+                   List.member.here(Ring.carrier(s), head, tail))
+            as headIsPrime;
         let ⟨_, headNotUnit, _⟩ := headIsPrime;
         choose unitInverse such that
             Ring.one(s) = IntegralDomain.listProduct(d,
@@ -162,11 +165,12 @@ theorem IntegralDomain.prime_list_unit_product_empty (d : IntegralDomain)
             from productIsUnit;
         -- 1 = head · (listProduct(tail) · unitInverse), so head is a unit —
         -- contradicting that a prime is not a unit.
-        claim headIsUnit : Ring.IsUnit(s, head)
+        Ring.IsUnit(s, head)
             by witness IntegralDomain.listProduct(d, tail) * unitInverse with
                 (calc Ring.one(s)
                    = (head * IntegralDomain.listProduct(d, tail)) * unitInverse
-                   = head * (IntegralDomain.listProduct(d, tail) * unitInverse));
+                   = head * (IntegralDomain.listProduct(d, tail) * unitInverse))
+            as headIsUnit;
         absurd(headNotUnit(headIsUnit))
       }
   }

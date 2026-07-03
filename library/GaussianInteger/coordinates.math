@@ -61,17 +61,17 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
     case Polynomial.Coefficients.nil:
         done
     case Polynomial.Coefficients.cons(c, rest): {
-        claim cIsZero : c = Integer.zero by allZero(0);
-        claim restCoordinates : coords(rest) = Product.make(Integer.zero, Integer.zero)
-            by IH((i : Natural) ↦ allZero(successor(i)));
+        c = Integer.zero by allZero(0) as cIsZero;
+        coords(rest) = Product.make(Integer.zero, Integer.zero)
+            by IH((i : Natural) ↦ allZero(successor(i))) as restCoordinates;
         -- coords(c :: rest) = (c − Product.second(coords(rest)), Product.first(coords(rest))) = (0, 0).
-        calc c - Product.second(coords(rest))
+        c - Product.second(coords(rest))
            = c - Product.second(Product.make(Integer.zero, Integer.zero))
                  by restCoordinates
            = c - Integer.zero
            = Integer.zero - Integer.zero   by substituting cIsZero
            = Integer.zero;
-        claim Product.first(coords(rest)) = Integer.zero by restCoordinates;
+        Product.first(coords(rest)) = Integer.zero by restCoordinates;
         done
     }
   }
@@ -93,11 +93,11 @@ theorem GaussianInteger.coords_extensional
         suppose Polynomial.ExtensionallyEqual(Integer, Integer.zero,
             Polynomial.Coefficients.nil(Integer), b) as extensionallyEqual;
         -- b agrees with the empty list at every index, so b is all-zero too.
-        claim ∀ (i : Natural). Polynomial.nth(Integer, Integer.zero, b, i) = Integer.zero by {
+        ∀ (i : Natural). Polynomial.nth(Integer, Integer.zero, b, i) = Integer.zero by {
             take i : Natural;
             done by extensionallyEqual(i)
           };
-        calc coords(Polynomial.Coefficients.nil(Integer))
+        coords(Polynomial.Coefficients.nil(Integer))
            = Product.make(Integer.zero, Integer.zero)
            = coords(b)
     }
@@ -107,23 +107,24 @@ theorem GaussianInteger.coords_extensional
             Polynomial.Coefficients.cons(Integer, c, rest), b) as extensionallyEqual;
         cases b {
           | Polynomial.Coefficients.nil => {
-              claim ∀ (i : Natural).
+              ∀ (i : Natural).
                   Polynomial.nth(Integer, Integer.zero,
                       Polynomial.Coefficients.cons(Integer, c, rest), i) = Integer.zero;
               done
             }
           | Polynomial.Coefficients.cons(d, restB) => {
-              claim headsEqual : c = d by extensionallyEqual(0);
-              claim tailCoordinates : coords(rest) = coords(restB)
-                  by IH(restB, (i : Natural) ↦ extensionallyEqual(successor(i)));
+              c = d by extensionallyEqual(0) as headsEqual;
+              coords(rest) = coords(restB)
+                  by IH(restB, (i : Natural) ↦ extensionallyEqual(successor(i)))
+                  as tailCoordinates;
               -- coords(c :: rest) = (c − Product.second(coords(rest)), Product.first(coords(rest))), likewise for d :: restB.
-              calc c - Product.second(coords(rest))
+              c - Product.second(coords(rest))
                  = d - Product.second(coords(rest))   by headsEqual
                  = d - Product.second(coords(restB))  by tailCoordinates;
-              claim Product.first(coords(rest)) = Product.first(coords(restB));
+              Product.first(coords(rest)) = Product.first(coords(restB));
               -- Assemble through the explicit make(…) forms so the prover never
               -- unfolds the recursive coords.
-              calc coords(Polynomial.Coefficients.cons(Integer, c, rest))
+              coords(Polynomial.Coefficients.cons(Integer, c, rest))
                  = Product.make(
                        c - Product.second(coords(rest)), Product.first(coords(rest)))
                  = Product.make(

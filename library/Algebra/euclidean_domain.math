@@ -88,7 +88,7 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
   let norm : Ring.carrier(s) → Natural := EuclideanDomain.norm(euclidean);
   -- Re-type the ideal at `s` so its projections are spelled with `s`
   -- (matching the ring operations below; avoids ζ-mismatches in rewrite).
-  claim isIdealAtRing : Ring.IsIdeal(s, member);
+  Ring.IsIdeal(s, member) as isIdealAtRing;
   let ⟨containsZero, closedUnderAddition, absorbsMultiplication⟩ := isIdealAtRing;
   decide ∃ (candidate : Ring.carrier(s)).
              member(candidate) ∧ ¬(candidate = Ring.zero(s)) {
@@ -103,14 +103,13 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
                      norm(nonzero),
                      ⟨nonzero, ⟨memberNonzero,
                          ⟨nonzeroDistinct, reflexivity(Natural, norm(nonzero))⟩⟩⟩);
-        claim leastIsNormExplicit
-            : ∃ (x : Ring.carrier(s)).
-                member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = leastNorm;
+        ∃ (x : Ring.carrier(s)).
+                member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = leastNorm
+            as leastIsNormExplicit;
         obtain ⟨generator, memberGenerator, generatorDistinct, generatorNorm⟩
             from leastIsNormExplicit;
         -- generator: member, nonzero, norm(generator) = leastNorm.
-        claim forwardGenerates
-            : ∀ (x : Ring.carrier(s)).
+        ∀ (x : Ring.carrier(s)).
               member(x) → Ring.divides(s, generator, x) by {
           take x : Ring.carrier(s);
           suppose member(x) as memberX;
@@ -121,16 +120,17 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
           -- ring as `s` (matching the ideal's `s`-spelled facts in `rewrite`).
           let quotient : Ring.carrier(s) := rawQuotient;
           -- remainder = x − generator·quotient lies in the ideal.
-          claim quotient * generator = generator * quotient;
-          claim memberProduct : member(generator * quotient);
-          calc remainder
+          quotient * generator = generator * quotient;
+          member(generator * quotient) as memberProduct;
+          remainder
                     = (generator * quotient + remainder) - generator * quotient
                     = x - generator * quotient as remainderIsDifference;
-          claim memberRemainder : member(remainder)
+          member(remainder)
               by rewrite(Equality.symmetry(remainderIsDifference),
                      Ring.ideal_member_subtract(s, member, isIdeal, x,
                          generator * quotient,
-                         memberX, memberProduct));
+                         memberX, memberProduct))
+              as memberRemainder;
           -- The remainder must vanish: otherwise it is a nonzero member of
           -- norm below the least, contradicting minimality.
           decide remainder = Ring.zero(s) {
@@ -141,53 +141,52 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
                     = generator * quotient + Ring.zero(s)
                     = generator * quotient⟩
             | no remainderNonzero => {
-                claim remainderNormBelow : norm(remainder) < norm(generator) by {
+                norm(remainder) < norm(generator) by {
                   cases remainderCase {
                     | Or.introduceLeft(remainderZero) =>
                         absurd(remainderNonzero(remainderZero))
                     | Or.introduceRight(normLess) => normLess
                   }
-                };
-                claim remainderNormBelowLeast : norm(remainder) < leastNorm
-                    by rewrite(generatorNorm, remainderNormBelow);
-                claim remainderIsNonzeroNorm
-                    : ∃ (x : Ring.carrier(s)).
+                } as remainderNormBelow;
+                norm(remainder) < leastNorm
+                    by rewrite(generatorNorm, remainderNormBelow)
+                    as remainderNormBelowLeast;
+                ∃ (x : Ring.carrier(s)).
                         member(x) ∧ ¬(x = Ring.zero(s))
                         ∧ norm(x) = norm(remainder)
                     by ⟨remainder, ⟨memberRemainder,
                         ⟨remainderNonzero,
-                         reflexivity(Natural, norm(remainder))⟩⟩⟩;
+                         reflexivity(Natural, norm(remainder))⟩⟩⟩
+                    as remainderIsNonzeroNorm;
                 absurd(
                     nothingSmaller(norm(remainder), remainderNormBelowLeast,
                         remainderIsNonzeroNorm))
               }
           }
-        };
-        claim backwardGenerates
-            : ∀ (x : Ring.carrier(s)).
+        } as forwardGenerates;
+        ∀ (x : Ring.carrier(s)).
               Ring.divides(s, generator, x) → member(x) by {
           take x : Ring.carrier(s);
           suppose Ring.divides(s, generator, x) as generatorDividesX;
           obtain ⟨quotient, xEquation⟩ from generatorDividesX;
           -- x = generator·quotient = quotient·generator ∈ ideal.
-          claim memberX : member(quotient * generator);
+          member(quotient * generator) as memberX;
           rewrite(
               calc quotient * generator
                  = generator * quotient
                  = x,
               memberX)
-        };
+        } as backwardGenerates;
         ⟨generator, ⟨forwardGenerates, backwardGenerates⟩⟩
       }
     | no noNonzeroMember => {
         -- The ideal is {0}; zero generates it.
-        claim forwardGenerates
-            : ∀ (x : Ring.carrier(s)).
+        ∀ (x : Ring.carrier(s)).
               member(x) → Ring.divides(s, Ring.zero(s), x) by {
           take x : Ring.carrier(s);
           suppose member(x) as memberX;
           -- x must be zero (no nonzero member exists), and 0 ∣ 0.
-          claim x = Ring.zero(s) by {
+          x = Ring.zero(s) by {
             decide x = Ring.zero(s) {
               | yes xZero => xZero
               | no xNonzero =>
@@ -198,19 +197,18 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
            calc x
               = Ring.zero(s)
               = Ring.zero(s) * Ring.zero(s)⟩
-        };
-        claim backwardGenerates
-            : ∀ (x : Ring.carrier(s)).
+        } as forwardGenerates;
+        ∀ (x : Ring.carrier(s)).
               Ring.divides(s, Ring.zero(s), x) → member(x) by {
           take x : Ring.carrier(s);
           suppose Ring.divides(s, Ring.zero(s), x) as zeroDividesX;
           obtain ⟨quotient, xEquation⟩ from zeroDividesX;
           -- x = 0·quotient = 0 ∈ ideal.
-          calc x
+          x
                     = Ring.zero(s) * quotient
                     = Ring.zero(s) as xIsZero;
           rewrite(Equality.symmetry(xIsZero), containsZero)
-        };
+        } as backwardGenerates;
         ⟨Ring.zero(s), ⟨forwardGenerates, backwardGenerates⟩⟩
       }
   }

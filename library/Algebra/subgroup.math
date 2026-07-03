@@ -111,11 +111,11 @@ theorem GroupHomomorphism.image_is_subgroup
         (f : Group.carrier(G) → Group.carrier(H))
         (homomorphism : IsHomomorphism(G, H, f))
         : IsSubgroup(H, GroupHomomorphism.image(G, H, f)) := {
-  claim identityInImage : ∃ (x : Group.carrier(G)). f(x) = Group.identity(H)
+  ∃ (x : Group.carrier(G)). f(x) = Group.identity(H)
       by ⟨Group.identity(G),
-          GroupHomomorphism.preserves_identity(G, H, f, homomorphism)⟩;
-  claim closedUnderOperation
-      : ∀ (y1 y2 : Group.carrier(H)).
+          GroupHomomorphism.preserves_identity(G, H, f, homomorphism)⟩
+      as identityInImage;
+  ∀ (y1 y2 : Group.carrier(H)).
         (∃ (x : Group.carrier(G)). f(x) = y1)
         → (∃ (x : Group.carrier(G)). f(x) = y2)
         → ∃ (x : Group.carrier(G)). f(x) = y1 · y2
@@ -129,9 +129,8 @@ theorem GroupHomomorphism.image_is_subgroup
                = f(x1) · f(x2)
                      by homomorphism(x1, x2)
                = y1 · y2⟩
-         };
-  claim closedUnderInverse
-      : ∀ (y : Group.carrier(H)).
+         } as closedUnderOperation;
+  ∀ (y : Group.carrier(H)).
         (∃ (x : Group.carrier(G)). f(x) = y)
         → ∃ (x : Group.carrier(G)). f(x) = y⁻¹
       by (y : Group.carrier(H))
@@ -141,7 +140,7 @@ theorem GroupHomomorphism.image_is_subgroup
             calc f(x⁻¹)
                = f(x)⁻¹
                = y⁻¹⟩
-         };
+         } as closedUnderInverse;
   ⟨identityInImage, closedUnderOperation, closedUnderInverse⟩
 }
 
@@ -186,14 +185,13 @@ theorem GroupHomomorphism.trivial_kernel_implies_injective
         : GroupHomomorphism.IsInjective(G, H, f) :=
   (x y : Group.carrier(G)) (fxEqualsfy : f(x) = f(y)) ↦ {
     -- x·y⁻¹ is in the kernel: f(x·y⁻¹) = f(x)·f(y)⁻¹ = f(y)·f(y)⁻¹ = e_H.
-    calc f(x · y⁻¹)
+    f(x · y⁻¹)
               = f(x) · f(y⁻¹)
                     by homomorphism(x, y⁻¹)
               = f(y) · f(y)⁻¹
               = Group.identity(H) as productInKernel;
     -- so x·y⁻¹ = e_G; then x·y⁻¹ = y·y⁻¹ and right-cancel y⁻¹.
-    claim
-        x · y⁻¹ = Group.identity(G)
+    x · y⁻¹ = Group.identity(G)
         by trivialKernel(x · y⁻¹, productInKernel);
     Group.cancel_right_bundled(G, y⁻¹, x, y,
         calc x · y⁻¹

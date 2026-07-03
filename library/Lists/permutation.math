@@ -64,14 +64,14 @@ theorem List.Permutation.symmetric (A : Type(0)) (l1 l2 : List(A))
         : List.Permutation(A, l1, l2) → List.Permutation(A, l2, l1)
   | List.Permutation.empty => List.Permutation.empty(A)
   | List.Permutation.skip(x, a, b, perm) => {
-      claim invertedTail : List.Permutation(A, b, a);
+      List.Permutation(A, b, a) as invertedTail;
       List.Permutation.skip(A, x, b, a, invertedTail)
     }
   | List.Permutation.swap(x, y, l) => List.Permutation.swap(A, y, x, l)
   | List.Permutation.transitive(a, b, c, firstLeg, secondLeg) => {
       -- invert each leg and compose them in the opposite order.
-      claim invertedFirst : List.Permutation(A, b, a);
-      claim invertedSecond : List.Permutation(A, c, b);
+      List.Permutation(A, b, a) as invertedFirst;
+      List.Permutation(A, c, b) as invertedSecond;
       List.Permutation.transitive(A, c, b, a, invertedSecond, invertedFirst)
     }
 
@@ -130,7 +130,7 @@ theorem List.Permutation.member_forward (A : Type(0)) (element : A)
       (mem : List.member(A, element, List.empty(A))) ↦ mem
   | List.Permutation.skip(x, a, b, perm) =>
       (mem : List.member(A, element, List.prepend(A, x, a))) ↦ {
-        claim element = x ∨ List.member(A, element, a)
+        element = x ∨ List.member(A, element, a)
             by List.member_invert_general;
         claim by cases {
           in (element = x):
@@ -145,17 +145,17 @@ theorem List.Permutation.member_forward (A : Type(0)) (element : A)
   | List.Permutation.swap(x, y, l) =>
       (mem : List.member(A, element,
                  List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
-        claim element = x ∨ List.member(A, element, List.prepend(A, y, l))
+        element = x ∨ List.member(A, element, List.prepend(A, y, l))
             by List.member_prepend_invert;
         claim by cases {
           in (element = x): {
               -- element = x: in prepend(y, prepend(x, l)) it sits one level deep.
-              claim List.member(A, x, List.prepend(A, y, List.prepend(A, x, l)))
+              List.member(A, x, List.prepend(A, y, List.prepend(A, x, l)))
                   by List.member.there;
               done by substitution
             }
           in (List.member(A, element, List.prepend(A, y, l))): {
-              claim element = y ∨ List.member(A, element, l)
+              element = y ∨ List.member(A, element, l)
                   by List.member_prepend_invert;
               claim by cases {
                 in (element = y):
@@ -183,8 +183,8 @@ theorem List.Permutation.not_member_forward (A : Type(0)) (element : A)
         : ¬(List.member(A, element, l2)) :=
   (memberTarget : List.member(A, element, l2)) ↦ {
     -- pull the target membership back across the reversed permutation.
-    claim List.Permutation(A, l2, l1);
-    claim memberSource : List.member(A, element, l1);
+    List.Permutation(A, l2, l1);
+    List.member(A, element, l1) as memberSource;
     notMember(memberSource)
   }
 
@@ -199,8 +199,8 @@ theorem List.Permutation.extract (A : Type(0)) (element : A) (l : List(A))
               List.Permutation(A, l, List.prepend(A, element, rest))
   | List.member.here(rest) => {
       -- element is already the head; the list permutes to itself.
-      claim selfPermutation : List.Permutation(A,
-          List.prepend(A, element, rest), List.prepend(A, element, rest));
+      List.Permutation(A,
+          List.prepend(A, element, rest), List.prepend(A, element, rest)) as selfPermutation;
       witness rest with selfPermutation
     }
   | List.member.there(head, tail, sub) => {

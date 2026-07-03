@@ -110,7 +110,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
     case zero:
       (dividend : Polynomial(Ring.carrier(r), Ring.zero(r)))
                (dividendBound : Polynomial.DegreeLessThan(r, dividend, degreeF + 0)) ↦ {
-        claim (Polynomial.zero(r) * f) = Polynomial.zero(r)
+        (Polynomial.zero(r) * f) = Polynomial.zero(r)
             by Ring.zero_multiply_left(Polynomial.ring(r), f);
         ⟨Polynomial.zero(r), dividend,
          Equality.symmetry(
@@ -123,9 +123,9 @@ theorem Polynomial.divide_by_excess (r : Ring)
       (dividend : Polynomial(Ring.carrier(r), Ring.zero(r)))
                (dividendBound
                    : Polynomial.DegreeLessThan(r, dividend, degreeF + successor(ePredecessor))) ↦ {
-        claim dividendBoundSuccessor
-            : Polynomial.DegreeLessThan(r, dividend, successor(degreeF + ePredecessor))
-            by rewrite(Natural.add_successor(degreeF, ePredecessor), dividendBound);
+        Polynomial.DegreeLessThan(r, dividend, successor(degreeF + ePredecessor))
+            by rewrite(Natural.add_successor(degreeF, ePredecessor), dividendBound)
+            as dividendBoundSuccessor;
         let leadingCoefficient : Ring.carrier(r) :=
             Polynomial.coefficientOf(dividend, degreeF + ePredecessor);
         let quotientStep : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
@@ -137,7 +137,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
             (dividend + (- stepProduct));
 
         -- The inverse from the other side (the ring is commutative).
-        calc (leadingInverseValue * Polynomial.coefficientOf(f, degreeF))
+        (leadingInverseValue * Polynomial.coefficientOf(f, degreeF))
                   = (Polynomial.coefficientOf(f, degreeF) * leadingInverseValue)
                         by commutativity(leadingInverseValue, Polynomial.coefficientOf(f, degreeF))
                   = Ring.one(r);
@@ -145,8 +145,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
         -- The step product agrees with the dividend at every index ≥ the
         -- top index (degreeF + ePredecessor): at the top index both equal
         -- the leading coefficient; strictly above, both vanish.
-        claim productAgreesWithDividend
-            : ∀ (i : Natural). degreeF + ePredecessor ≤ i
+        ∀ (i : Natural). degreeF + ePredecessor ≤ i
               → Polynomial.coefficientOf(stepProduct, i)
                 = Polynomial.coefficientOf(dividend, i)
             by (i : Natural) (topLessOrEqual : degreeF + ePredecessor ≤ i) ↦
@@ -163,14 +162,15 @@ theorem Polynomial.divide_by_excess (r : Ring)
                          = Polynomial.coefficientOf(dividend, degreeF + ePredecessor)
                          = Polynomial.coefficientOf(dividend, i)
                   | no indexNotTop => {
-                      claim successorLessOrEqual : successor(degreeF + ePredecessor) ≤ i
+                      successor(degreeF + ePredecessor) ≤ i
                           by Natural.less_or_equal_not_equal_successor(
-                                 degreeF + ePredecessor, i, topLessOrEqual, indexNotTop);
-                      claim ePredecessor ≤ i
+                                 degreeF + ePredecessor, i, topLessOrEqual, indexNotTop)
+                          as successorLessOrEqual;
+                      ePredecessor ≤ i
                           by calc ePredecessor
                                 ≤ degreeF + ePredecessor   by Natural.less_or_equal_add_left
                                 ≤ i                          by Natural.less_or_equal_predecessor_less_or_equal;
-                      calc Polynomial.coefficientOf(stepProduct, i)
+                      Polynomial.coefficientOf(stepProduct, i)
                                 = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, Natural.monus(i, ePredecessor)))
                                       by Polynomial.coefficientOf_monomial_multiply
                                 = ((leadingCoefficient * leadingInverseValue) * Ring.zero(r))
@@ -178,16 +178,15 @@ theorem Polynomial.divide_by_excess (r : Ring)
                                              Natural.degree_bound_helper(degreeF, ePredecessor, i,
                                                  successorLessOrEqual))
                                 = Ring.zero(r);
-                      calc Polynomial.coefficientOf(stepProduct, i)
+                      Polynomial.coefficientOf(stepProduct, i)
                          = Ring.zero(r)
                          = Polynomial.coefficientOf(dividend, i)
                                by dividendBoundSuccessor(i, successorLessOrEqual)
                     }
-                };
+                } as productAgreesWithDividend;
 
         -- Hence the residual drops below the top index.
-        claim residualBound
-            : Polynomial.DegreeLessThan(r, residual, degreeF + ePredecessor)
+        Polynomial.DegreeLessThan(r, residual, degreeF + ePredecessor)
             by (i : Natural) (topLessOrEqual : degreeF + ePredecessor ≤ i) ↦
                 calc Polynomial.coefficientOf(residual, i)
                    = (Polynomial.coefficientOf(dividend, i) + Polynomial.coefficientOf((- stepProduct), i))
@@ -195,12 +194,13 @@ theorem Polynomial.divide_by_excess (r : Ring)
                    = (Polynomial.coefficientOf(dividend, i) + (- Polynomial.coefficientOf(stepProduct, i)))
                    = (Polynomial.coefficientOf(dividend, i) + (- Polynomial.coefficientOf(dividend, i)))
                          by productAgreesWithDividend(i, topLessOrEqual)
-                   = Ring.zero(r);
+                   = Ring.zero(r)
+            as residualBound;
 
         obtain ⟨quotientRest, remainderRest, restEquation, remainderRestBound⟩
             from IH(residual, residualBound);
 
-        calc (stepProduct + (dividend + (- stepProduct)))
+        (stepProduct + (dividend + (- stepProduct)))
                   = ((stepProduct + dividend) + (- stepProduct))
                   = ((dividend + stepProduct) + (- stepProduct))
                   = (dividend + (stepProduct + (- stepProduct)))

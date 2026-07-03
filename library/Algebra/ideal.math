@@ -62,8 +62,7 @@ theorem Ring.ideal_member_negate (s : Ring)
         (y : Ring.carrier(s)) (memberY : member(y))
         : member(-y) := {
   let ⟨_, _, absorbsMultiplication⟩ := isIdeal;
-  claim negationIsScaling
-      : (-Ring.one(s)) * y = -y;
+  (-Ring.one(s)) * y = -y as negationIsScaling;
   rewrite(negationIsScaling,
       absorbsMultiplication(-Ring.one(s), y, memberY))
 }
@@ -89,13 +88,13 @@ definition Ring.pairIdealMember (s : Ring) (a b z : Ring.carrier(s))
 theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
         : Ring.IsIdeal(s, Ring.pairIdealMember(s, a, b)) := {
   -- Zero is the trivial combination 0·a + 0·b.
-  claim containsZero : Ring.pairIdealMember(s, a, b, Ring.zero(s))
+  Ring.pairIdealMember(s, a, b, Ring.zero(s))
       by witness Ring.zero(s) with witness Ring.zero(s) with
            calc Ring.zero(s)
-              = Ring.zero(s) * a + Ring.zero(s) * b;
+              = Ring.zero(s) * a + Ring.zero(s) * b
+      as containsZero;
   -- A sum of two combinations adds coefficientwise.
-  claim closedUnderAddition
-      : ∀ (x y : Ring.carrier(s)).
+  ∀ (x y : Ring.carrier(s)).
         Ring.pairIdealMember(s, a, b, x)
         → Ring.pairIdealMember(s, a, b, y)
         → Ring.pairIdealMember(s, a, b, x + y)
@@ -110,10 +109,9 @@ theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
           calc x + y
              = (x1 * a + y1 * b) + (x2 * a + y2 * b)
              = (x1 + x2) * a + (y1 + y2) * b
-      };
+      } as closedUnderAddition;
   -- Multiplying a combination by r scales both coefficients.
-  claim absorbsMultiplication
-      : ∀ (r z : Ring.carrier(s)).
+  ∀ (r z : Ring.carrier(s)).
         Ring.pairIdealMember(s, a, b, z)
         → Ring.pairIdealMember(s, a, b, r * z)
       by {
@@ -125,6 +123,6 @@ theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
           calc r * z
              = r * (x * a + y * b)
              = (r * x) * a + (r * y) * b
-      };
+      } as absorbsMultiplication;
   Ring.IsIdeal.make(containsZero, closedUnderAddition, absorbsMultiplication)
 }

@@ -45,13 +45,13 @@ automatic theorem Logic.not_implies_implies_and_not
   {
     -- Any proof of `consequent` would make the implication hold constantly,
     -- contradicting `notImplication`.
-    claim Not(consequent)
+    Not(consequent)
         by (consequentHolds : consequent) ↦
             notImplication((givenAntecedent : antecedent) ↦ consequentHolds);
     -- And `antecedent` must hold: with no antecedent the implication is
     -- vacuous, again contradicting `notImplication`.
-    claim antecedent by {
-        claim Not(Not(antecedent))
+    antecedent by {
+        Not(Not(antecedent))
             by (notAntecedent : Not(antecedent)) ↦
                 notImplication((givenAntecedent : antecedent) ↦
                     absurd(notAntecedent(givenAntecedent)));
@@ -71,18 +71,18 @@ theorem Logic.not_forall_implies_exists_not
         (predicate : Domain → Proposition)
         (notForall : Not(∀ (x : Domain). predicate(x)))
         : ∃ (x : Domain). Not(predicate(x)) := {
-  claim Not(Not(∃ (x : Domain). Not(predicate(x))))
+  Not(Not(∃ (x : Domain). Not(predicate(x))))
       by (notExists : Not(∃ (x : Domain). Not(predicate(x)))) ↦ {
-          claim forallPredicate : ∀ (x : Domain). predicate(x)
+          ∀ (x : Domain). predicate(x)
               by (x : Domain) ↦ {
-                  claim Not(Not(predicate(x)))
+                  Not(Not(predicate(x)))
                       by (notPredicateAtX : Not(predicate(x))) ↦ {
-                          claim witnessExists : ∃ (y : Domain). Not(predicate(y))
-                              by { witness x with notPredicateAtX };
+                          ∃ (y : Domain). Not(predicate(y))
+                              by { witness x with notPredicateAtX } as witnessExists;
                           notExists(witnessExists)
                       };
                   done
-              };
+              } as forallPredicate;
           notForall(forallPredicate)
       };
   done by Logic.double_negation_eliminate

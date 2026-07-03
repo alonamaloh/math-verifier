@@ -69,8 +69,8 @@ theorem Equinumerous.product_congruence (A A' B B' : Type(0))
 theorem NaturalsBelow.product_index_bound (m n i j : Natural)
         (belowM : i < m) (belowN : j < n)
         : n * i + j < m * n := {
-  claim successor(i) ≤ m;
-  claim successor(j) ≤ n;
+  successor(i) ≤ m;
+  successor(j) ≤ n;
   done by Natural.lt_of_successor_le(n * i + j, m * n,
     calc successor(n * i + j)
        = n * i + successor(j)
@@ -88,25 +88,25 @@ theorem NaturalsBelow.product_index_bound (m n i j : Natural)
 theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
         (oneLeN : 1 ≤ n) (belowProduct : k < m * n)
         : Natural.divide(n, k) < m := {
-  claim successor(k) ≤ m * n;
-  claim n * Natural.divide(n, k) + Natural.modulo(n, k) = k;
+  successor(k) ≤ m * n;
+  n * Natural.divide(n, k) + Natural.modulo(n, k) = k;
   -- n·q ≤ n·q + r = k.
-  calc n * Natural.divide(n, k)
-            ≤ n * Natural.divide(n, k) + Natural.modulo(n, k)
-            = k;
+  n * Natural.divide(n, k)
+      ≤ n * Natural.divide(n, k) + Natural.modulo(n, k)
+      = k;
   -- Hence n·q < n·m.
-  calc successor(n * Natural.divide(n, k))
-            ≤ successor(k)
-            ≤ m * n
-            = n * m;
+  successor(n * Natural.divide(n, k))
+      ≤ successor(k)
+      ≤ m * n
+      = n * m;
   cases Natural.compare_strict(Natural.divide(n, k), m) {
     | Natural.StrictComparison.below(strictlyBelow) =>
         Natural.lt_of_successor_le(Natural.divide(n, k), m, strictlyBelow)
     | Natural.StrictComparison.atLeast(atLeast) => {
         -- m ≤ q forces n·m ≤ n·q, so successor(n·q) ≤ n·m ≤ n·q: impossible.
-        calc successor(n * Natural.divide(n, k))
-                  ≤ n * m
-                  ≤ n * Natural.divide(n, k)   as selfBelow;
+        successor(n * Natural.divide(n, k))
+            ≤ n * m
+            ≤ n * Natural.divide(n, k)   as selfBelow;
         absurd(Natural.not_successor_less_or_equal_self(n * Natural.divide(n, k), selfBelow))
       }
   }
@@ -154,19 +154,21 @@ theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : 1 ≤ n)
                 NaturalsBelow.value(first), NaturalsBelow.value(second),
                 NaturalsBelow.below(first), NaturalsBelow.below(second));
         -- Dividing the index by n recovers quotient i and remainder j.
-        claim decompose : n * Natural.divide(n, index) + Natural.modulo(n, index) = index;
-        claim quotientIsFirst : Natural.divide(n, index) = NaturalsBelow.value(first)
+        n * Natural.divide(n, index) + Natural.modulo(n, index) = index as decompose;
+        Natural.divide(n, index) = NaturalsBelow.value(first)
             by Natural.quotient_remainder_unique(n,
                    Natural.divide(n, index), Natural.modulo(n, index),
                    NaturalsBelow.value(first), NaturalsBelow.value(second),
                    Natural.modulo_bound(n, index, oneLeN),
-                   Natural.successor_le_of_lt(NaturalsBelow.value(second), n, NaturalsBelow.below(second)), decompose);
-        claim remainderIsSecond : Natural.modulo(n, index) = NaturalsBelow.value(second)
+                   Natural.successor_le_of_lt(NaturalsBelow.value(second), n, NaturalsBelow.below(second)), decompose)
+            as quotientIsFirst;
+        Natural.modulo(n, index) = NaturalsBelow.value(second)
             by Natural.remainder_unique(n,
                    Natural.divide(n, index), Natural.modulo(n, index),
                    NaturalsBelow.value(first), NaturalsBelow.value(second),
                    Natural.modulo_bound(n, index, oneLeN),
-                   Natural.successor_le_of_lt(NaturalsBelow.value(second), n, NaturalsBelow.below(second)), decompose);
+                   Natural.successor_le_of_lt(NaturalsBelow.value(second), n, NaturalsBelow.below(second)), decompose)
+            as remainderIsSecond;
         -- So the recovered cell ⟨divide(n,index), modulo(n,index)⟩ is ⟨first, second⟩.
         let recoveredFirst : NaturalsBelow(m) :=
             NaturalsBelow.make(Natural.divide(n, index),
@@ -204,25 +206,25 @@ theorem NaturalsBelow.product_equinumerous (m n : Natural)
     | zero => {
         -- Both sides are empty: the product has no second component, and
         -- NaturalsBelow(m·0) is NaturalsBelow(0) since m·0 = 0.
-        claim Pair(NaturalsBelow(m), NaturalsBelow(0)) → False
+        Pair(NaturalsBelow(m), NaturalsBelow(0)) → False
             by (p : Pair(NaturalsBelow(m), NaturalsBelow(0))) ↦
                 NaturalsBelow.zero_is_empty(Product.second(p));
-        claim targetEmpty : NaturalsBelow(m * 0) → False
+        NaturalsBelow(m * 0) → False
             by (e : NaturalsBelow(m * 0)) ↦ {
-                claim NaturalsBelow.value(e) < m * 0;
-                claim valueBelowZero : NaturalsBelow.value(e) < 0
-                    by substituting Natural.multiply_zero(m);
+                NaturalsBelow.value(e) < m * 0;
+                NaturalsBelow.value(e) < 0
+                    by substituting Natural.multiply_zero(m) as valueBelowZero;
                 absurd(Natural.not_less_than_zero(NaturalsBelow.value(e), valueBelowZero))
-            };
-        claim Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(0)), NaturalsBelow(0))
+            } as targetEmpty;
+        Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(0)), NaturalsBelow(0))
             by HasSize.empty_has_size_zero;
-        claim Equinumerous(NaturalsBelow(0), NaturalsBelow(m * 0))
+        Equinumerous(NaturalsBelow(0), NaturalsBelow(m * 0))
             by Equinumerous.symmetric(NaturalsBelow(m * 0), NaturalsBelow(0),
                    HasSize.empty_has_size_zero(NaturalsBelow(m * 0), targetEmpty));
         claim Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(0)), NaturalsBelow(m * 0));
       }
     | successor(predecessorN) => {
-        claim oneLeN : 1 ≤ successor(predecessorN);
+        1 ≤ successor(predecessorN) as oneLeN;
         ⟨NaturalsBelow.product_into(m, successor(predecessorN), oneLeN),
          ⟨NaturalsBelow.product_out_of(m, successor(predecessorN), oneLeN),
           And.introduction(
@@ -236,7 +238,7 @@ theorem NaturalsBelow.product_equinumerous (m n : Natural)
 theorem HasSize.product (X Y : Type(0)) (m n : Natural)
         (sizeX : HasSize(X, m)) (sizeY : HasSize(Y, n))
         : HasSize(Pair(X, Y), m * n) := {
-  claim Equinumerous(Pair(X, Y), Pair(NaturalsBelow(m), NaturalsBelow(n)));
-  claim Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n));
+  Equinumerous(Pair(X, Y), Pair(NaturalsBelow(m), NaturalsBelow(n)));
+  Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n));
   claim HasSize(Pair(X, Y), m * n);
 }
