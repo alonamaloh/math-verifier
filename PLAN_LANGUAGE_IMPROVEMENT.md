@@ -240,6 +240,24 @@ by induction on n {
   the other branch; a refuted supposition never used afterward is a
   vestigial detour.
 
+**A4 progress (2026-07-03, 9b1b593b): `otherwise:` LANDED.** Last-arm
+only (parser-enforced); hypothesis = ¬(∨ of stated cases), optional
+`as h`; exhaustiveness = excluded middle BY CONSTRUCTION (elaborator
+builds the EM split + injection map — no prover obligation, cannot
+fail to cover). `case P:` clause spelling was already parse-accepted
+(A2-era); reference.md now documents it as primary with `in (P):`
+legacy. Landed alongside: a LATENT Let-lift bug the tests flushed out
+(liftBoundVariables skipped Let nodes → stale indices under ζ-lets
+lifted by one binder; bit any ≥3-arm by-cases whose later arms
+carried claim wrappers referencing outer binders). REMAINING A4:
+structural cases with witness binders (`case n = successor(k) for
+some k:` — recognizer + coverage-lemma auto-generation at
+inductive-declaration time), the SUBSTITUTION rule for constructor
+equations (must be reliable, kills `refining`/`cases…with eq`),
+induction as a by-cases variant, `decide` deletion (needs the
+substitution rule + otherwise), the `in (P):`→`case P:` library
+migration (mechanical, Sonnet), and the both-directions lint.
+
 **Settled: clause keyword is `case P:`, with `otherwise:` for the
 complement.** (Decided July 2026; do not relitigate.) Rationale:
 (1) "Case 1: m ≤ n" is the literal textbook idiom — `case` is read
