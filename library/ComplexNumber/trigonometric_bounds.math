@@ -85,15 +85,15 @@ theorem Real.partialSum_pair (s : Natural → Real) (N : Natural)
                 (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), N) :=
   by_induction on N with IH {
     case zero: {
-        claim twoTimesZero : 2 * 0 = 0;
-        calc Real.partialSum(s, 2 * 0)
+        2 * 0 = 0 as twoTimesZero;
+        Real.partialSum(s, 2 * 0)
            = Real.partialSum(s, 0)    by twoTimesZero
            = Real.partialSum(
                  (m : Natural) ↦ s(2 * m) + s(successor(2 * m)), 0)
       }
     case successor(p): {
-        claim indexStep : 2 * successor(p) = successor(successor(2 * p));
-        calc Real.partialSum(s, 2 * successor(p))
+        2 * successor(p) = successor(successor(2 * p)) as indexStep;
+        Real.partialSum(s, 2 * successor(p))
            = Real.partialSum(s, successor(successor(2 * p)))
                  by indexStep
            = Real.partialSum(s, 1 + (1 + 2 * p))
@@ -132,17 +132,17 @@ theorem Real.power_negate_parity (y : Real)
         : ∀ (m : Natural).
           Real.power(-y, 2 * m) = Real.power(y, 2 * m) ∧ Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)))
   | zero => {
-      claim twoTimesZero : 2 * 0 = 0;
-      claim Real.power(-y, 2 * 0) = Real.power(y, 2 * 0)
+      2 * 0 = 0 as twoTimesZero;
+      Real.power(-y, 2 * 0) = Real.power(y, 2 * 0)
           by calc Real.power(-y, 2 * 0)
                 = Real.power(-y, 0)        by twoTimesZero
                 = Real.one
                 = Real.power(y, 0)
                 = Real.power(y, 2 * 0)     by twoTimesZero;
-      claim Real.power(-y, successor(2 * 0)) = -(Real.power(y, successor(2 * 0)))
+      Real.power(-y, successor(2 * 0)) = -(Real.power(y, successor(2 * 0)))
           by {
-            claim succTwoTimesZero : successor(2 * 0) = 1;
-            calc Real.power(-y, successor(2 * 0))
+            successor(2 * 0) = 1 as succTwoTimesZero;
+            Real.power(-y, successor(2 * 0))
                = Real.power(-y, 1)               by succTwoTimesZero
                = (-y) * Real.power(-y, 0)
                = (-y) * Real.one
@@ -156,9 +156,9 @@ theorem Real.power_negate_parity (y : Real)
     }
   | successor(m) => {
       obtain ⟨evenAt, oddAt⟩ from Real.power_negate_parity(y, m);
-      claim indexEven : 2 * successor(m) = successor(successor(2 * m));
-      claim indexOdd : successor(2 * successor(m)) = successor(successor(successor(2 * m)));
-      claim Real.power(-y, 2 * successor(m)) = Real.power(y, 2 * successor(m))
+      2 * successor(m) = successor(successor(2 * m)) as indexEven;
+      successor(2 * successor(m)) = successor(successor(successor(2 * m))) as indexOdd;
+      Real.power(-y, 2 * successor(m)) = Real.power(y, 2 * successor(m))
           by calc Real.power(-y, 2 * successor(m))
                 = Real.power(-y, successor(successor(2 * m)))
                       by indexEven
@@ -170,7 +170,7 @@ theorem Real.power_negate_parity (y : Real)
                 = Real.power(y, successor(successor(2 * m)))
                 = Real.power(y, 2 * successor(m))
                       by indexEven;
-      claim Real.power(-y, successor(2 * successor(m))) = -(Real.power(y, successor(2 * successor(m))))
+      Real.power(-y, successor(2 * successor(m))) = -(Real.power(y, successor(2 * successor(m))))
           by calc Real.power(-y, successor(2 * successor(m)))
                 = Real.power(-y, successor(successor(successor(2 * m))))
                       by indexOdd
@@ -209,13 +209,13 @@ theorem Real.SequenceConverges.subsequence_double
     obtain ⟨threshold, close⟩ from converges(ε, εPositive);
     witness threshold with
         (N : Natural) (aboveThreshold : threshold ≤ N) ↦ {
-          claim doubleAbove : threshold ≤ 2 * N
+          threshold ≤ 2 * N
               by {
-                claim N ≤ N + N;
-                claim twoN : 2 * N = N + N;
-                claim N ≤ 2 * N by substituting twoN;
+                N ≤ N + N;
+                2 * N = N + N as twoN;
+                N ≤ 2 * N by substituting twoN;
                 done
-              };
+              } as doubleAbove;
           done by close(2 * N, doubleAbove)
         }
   }
@@ -233,17 +233,15 @@ theorem Real.cosine_paired_series_converges (x : Real)
                               2 * m))),
               cos(x)) := {
   -- The full series converges to cos x; so does its even subsequence.
-  claim fullConverges
-      : Real.SequenceConverges(
+  Real.SequenceConverges(
             Real.partialSum(
                 (k : Natural) ↦
                     ComplexNumber.realPart(
                         ComplexNumber.exponentialTerm(
                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
             cos(x))
-      by Real.cosine_series_converges(x);
-  claim evenSubsequence
-      : Real.SequenceConverges(
+      by Real.cosine_series_converges(x) as fullConverges;
+  Real.SequenceConverges(
             (N : Natural) ↦
                 Real.partialSum(
                     (k : Natural) ↦
@@ -258,10 +256,9 @@ theorem Real.cosine_paired_series_converges (x : Real)
                      ComplexNumber.realPart(
                          ComplexNumber.exponentialTerm(
                              ComplexNumber.i * ComplexNumber.from_real(x), k))),
-             cos(x), fullConverges);
+             cos(x), fullConverges) as evenSubsequence;
   -- Each 2N-cut sums in pairs, and each pair drops to its even term.
-  claim pairsCollapse
-      : ∀ (N : Natural).
+  ∀ (N : Natural).
         Real.partialSum(
               (k : Natural) ↦
                   ComplexNumber.realPart(
@@ -314,14 +311,13 @@ theorem Real.cosine_paired_series_converges (x : Real)
                                        ComplexNumber.i * ComplexNumber.from_real(x),
                                        2 * m)),
                            (m : Natural) ↦ {
-                             claim oddVanishes
-                                 : ComplexNumber.realPart(
+                             ComplexNumber.realPart(
                                        ComplexNumber.exponentialTerm(
                                            ComplexNumber.i * ComplexNumber.from_real(x),
                                            successor(2 * m)))
                                    = Real.zero
-                                 by Real.cosine_term_odd(x, m);
-                             calc ComplexNumber.realPart(
+                                 by Real.cosine_term_odd(x, m) as oddVanishes;
+                             ComplexNumber.realPart(
                                       ComplexNumber.exponentialTerm(
                                           ComplexNumber.i * ComplexNumber.from_real(x),
                                           2 * m))
@@ -340,7 +336,7 @@ theorem Real.cosine_paired_series_converges (x : Real)
                                           ComplexNumber.i * ComplexNumber.from_real(x),
                                           2 * m))
                            },
-                           N);
+                           N) as pairsCollapse;
   done by Real.SequenceConverges.of_pointwise(
               (N : Natural) ↦
                   Real.partialSum(
@@ -370,17 +366,15 @@ theorem Real.sine_paired_series_converges (x : Real)
                               ComplexNumber.i * ComplexNumber.from_real(x),
                               successor(2 * m)))),
               sin(x)) := {
-  claim fullConverges
-      : Real.SequenceConverges(
+  Real.SequenceConverges(
             Real.partialSum(
                 (k : Natural) ↦
                     ComplexNumber.imaginaryPart(
                         ComplexNumber.exponentialTerm(
                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
             sin(x))
-      by Real.sine_series_converges(x);
-  claim evenSubsequence
-      : Real.SequenceConverges(
+      by Real.sine_series_converges(x) as fullConverges;
+  Real.SequenceConverges(
             (N : Natural) ↦
                 Real.partialSum(
                     (k : Natural) ↦
@@ -395,9 +389,8 @@ theorem Real.sine_paired_series_converges (x : Real)
                      ComplexNumber.imaginaryPart(
                          ComplexNumber.exponentialTerm(
                              ComplexNumber.i * ComplexNumber.from_real(x), k))),
-             sin(x), fullConverges);
-  claim pairsCollapse
-      : ∀ (N : Natural).
+             sin(x), fullConverges) as evenSubsequence;
+  ∀ (N : Natural).
         Real.partialSum(
               (k : Natural) ↦
                   ComplexNumber.imaginaryPart(
@@ -452,14 +445,13 @@ theorem Real.sine_paired_series_converges (x : Real)
                                        ComplexNumber.i * ComplexNumber.from_real(x),
                                        successor(2 * m))),
                            (m : Natural) ↦ {
-                             claim evenVanishes
-                                 : ComplexNumber.imaginaryPart(
+                             ComplexNumber.imaginaryPart(
                                        ComplexNumber.exponentialTerm(
                                            ComplexNumber.i * ComplexNumber.from_real(x),
                                            2 * m))
                                    = Real.zero
-                                 by Real.sine_term_even(x, m);
-                             calc ComplexNumber.imaginaryPart(
+                                 by Real.sine_term_even(x, m) as evenVanishes;
+                             ComplexNumber.imaginaryPart(
                                       ComplexNumber.exponentialTerm(
                                           ComplexNumber.i * ComplexNumber.from_real(x),
                                           2 * m))
@@ -478,7 +470,7 @@ theorem Real.sine_paired_series_converges (x : Real)
                                           ComplexNumber.i * ComplexNumber.from_real(x),
                                           successor(2 * m)))
                            },
-                           N);
+                           N) as pairsCollapse;
   done by Real.SequenceConverges.of_pointwise(
               (N : Natural) ↦
                   Real.partialSum(
@@ -502,9 +494,9 @@ theorem Real.sine_paired_series_converges (x : Real)
 -- factor ≥ 1, so a! ≤ (a+1)!; the general case chains those.
 theorem Natural.factorial_le_succ (n : Natural)
         : Natural.factorial(n) ≤ Natural.factorial(successor(n)) := {
-  claim 1 ≤ successor(n);
-  claim scaled : Natural.factorial(n) * 1 ≤ Natural.factorial(n) * successor(n);
-  calc Natural.factorial(n)
+  1 ≤ successor(n);
+  Natural.factorial(n) * 1 ≤ Natural.factorial(n) * successor(n) as scaled;
+  Natural.factorial(n)
      = Natural.factorial(n) * 1
      ≤ Natural.factorial(n) * successor(n)
            by scaled
@@ -516,13 +508,13 @@ theorem Natural.factorial_le_succ (n : Natural)
 theorem Natural.factorial_le_add (a : Natural)
         : ∀ (k : Natural). Natural.factorial(a) ≤ Natural.factorial(k + a)
   | zero => {
-      claim Natural.factorial(a) ≤ Natural.factorial(a);
+      Natural.factorial(a) ≤ Natural.factorial(a);
       done by substituting Natural.zero_add(a)
     }
   | successor(p) => {
-      claim Natural.factorial(a) ≤ Natural.factorial(p + a)
+      Natural.factorial(a) ≤ Natural.factorial(p + a)
           by Natural.factorial_le_add(a, p);
-      claim Natural.factorial(p + a)
+      Natural.factorial(p + a)
             ≤ Natural.factorial(successor(p + a))
           by Natural.factorial_le_succ(p + a);
       done by Natural.LessOrEqual.transitive
@@ -531,7 +523,7 @@ theorem Natural.factorial_le_add (a : Natural)
 theorem Natural.factorial_monotone (a b : Natural) (aLeB : a ≤ b)
         : Natural.factorial(a) ≤ Natural.factorial(b) := {
   obtain ⟨k, bEqual⟩ from Natural.le_to_add(a, b, aLeB);
-  claim Natural.factorial(a) ≤ Natural.factorial(k + a)
+  Natural.factorial(a) ≤ Natural.factorial(k + a)
       by Natural.factorial_le_add(a, k);
   done by substituting bEqual
 }
@@ -542,21 +534,19 @@ theorem Natural.factorial_monotone (a b : Natural) (aLeB : a ≤ b)
 -- ℚ → ℝ casts).
 theorem Real.exponentialCoefficient_antitone (i j : Natural) (iLeqJ : i ≤ j)
         : Real.exponentialCoefficient(j) ≤ Real.exponentialCoefficient(i) := {
-  claim factorialLe : Natural.factorial(i) ≤ Natural.factorial(j)
-      by Natural.factorial_monotone(i, j, iLeqJ);
-  claim castLe
-      : (Natural.factorial(i) : Rational) ≤ (Natural.factorial(j) : Rational)
+  Natural.factorial(i) ≤ Natural.factorial(j)
+      by Natural.factorial_monotone(i, j, iLeqJ) as factorialLe;
+  (Natural.factorial(i) : Rational) ≤ (Natural.factorial(j) : Rational)
       by Rational.from_natural_le_preserves(
-             Natural.factorial(i), Natural.factorial(j), factorialLe);
-  claim iPositive : Rational.zero < (Natural.factorial(i) : Rational)
-      by Rational.factorial_cast_positive;
-  claim recipLe
-      : Rational.reciprocal_function((Natural.factorial(j) : Rational))
+             Natural.factorial(i), Natural.factorial(j), factorialLe) as castLe;
+  Rational.zero < (Natural.factorial(i) : Rational)
+      by Rational.factorial_cast_positive as iPositive;
+  Rational.reciprocal_function((Natural.factorial(j) : Rational))
         ≤ Rational.reciprocal_function((Natural.factorial(i) : Rational))
       by Rational.reciprocal_function_antitone(
              (Natural.factorial(i) : Rational),
              (Natural.factorial(j) : Rational),
-             iPositive, castLe);
+             iPositive, castLe) as recipLe;
   done by Rational.to_real.LessOrEqual_preserves(
               Rational.reciprocal_function((Natural.factorial(j) : Rational)),
               Rational.reciprocal_function((Natural.factorial(i) : Rational)),
@@ -568,21 +558,21 @@ theorem Real.exponentialCoefficient_antitone (i j : Natural) (iLeqJ : i ≤ j)
 theorem Natural.even_or_odd
         : ∀ (n : Natural). ∃ (j : Natural). n = 2 * j ∨ n = successor(2 * j)
   | zero => {
-      claim base : (0 : Natural) = 2 * 0;
+      (0 : Natural) = 2 * 0 as base;
       witness 0 with Or.introduceLeft(base)
     }
   | successor(p) => {
       obtain ⟨j, disjunction⟩ from Natural.even_or_odd(p);
       cases disjunction {
         | Or.introduceLeft(pEven) => {
-            claim oddEq : successor(p) = successor(2 * j) by substituting pEven;
+            successor(p) = successor(2 * j) by substituting pEven as oddEq;
             witness j with Or.introduceRight(oddEq)
           }
         | Or.introduceRight(pOdd) => {
-            claim evenEq : successor(p) = 2 * successor(j)
+            successor(p) = 2 * successor(j)
                 by calc successor(p)
                       = successor(successor(2 * j))
-                      = 2 * successor(j);
+                      = 2 * successor(j) as evenEq;
             witness successor(j) with Or.introduceLeft(evenEq)
           }
       }
@@ -600,8 +590,8 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
         : ∀ (j : Natural).
           Real.partialSum(g, 2 * j) ≤ Real.zero ∧ Real.partialSum(g, successor(2 * j)) ≤ Real.zero
   | zero => {
-      claim Real.partialSum(g, 2 * 0) ≤ Real.zero;
-      claim Real.partialSum(g, successor(2 * 0)) ≤ Real.zero
+      Real.partialSum(g, 2 * 0) ≤ Real.zero;
+      Real.partialSum(g, successor(2 * 0)) ≤ Real.zero
           by calc Real.partialSum(g, successor(2 * 0))
                 = Real.partialSum(g, 2 * 0) + g(2 * 0)
                 = Real.zero + g(2 * 0)
@@ -614,9 +604,9 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
       obtain ⟨evenAt, oddAt⟩
           from Real.partialSum_nonpositive_paired(
                    g, leadNonpositive, pairNonpositive, j);
-      claim indexEven : 2 * successor(j) = successor(successor(2 * j));
-      claim g(2 * j) + g(successor(2 * j)) ≤ Real.zero;
-      claim Real.partialSum(g, 2 * successor(j)) ≤ Real.zero
+      2 * successor(j) = successor(successor(2 * j)) as indexEven;
+      g(2 * j) + g(successor(2 * j)) ≤ Real.zero;
+      Real.partialSum(g, 2 * successor(j)) ≤ Real.zero
           by calc Real.partialSum(g, 2 * successor(j))
                 = Real.partialSum(g, successor(successor(2 * j)))
                       by indexEven
@@ -628,8 +618,8 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
                 ≤ Real.zero + Real.zero
                       by Real.add_preserves_LessOrEqual_left
                 = Real.zero;
-      claim g(2 * successor(j)) ≤ Real.zero;
-      claim Real.partialSum(g, successor(2 * successor(j))) ≤ Real.zero
+      g(2 * successor(j)) ≤ Real.zero;
+      Real.partialSum(g, successor(2 * successor(j))) ≤ Real.zero
           by calc Real.partialSum(g, successor(2 * successor(j)))
                 = Real.partialSum(g, 2 * successor(j)) + g(2 * successor(j))
                 ≤ Real.zero + g(2 * successor(j))
@@ -673,13 +663,13 @@ theorem Real.partialSum_nonnegative (g : Natural → Real)
             : ∀ (j : Natural). Real.zero ≤ g(2 * j) + g(successor(2 * j)))
         (n : Natural)
         : Real.zero ≤ Real.partialSum(g, n) := {
-  claim ∀ (j : Natural). -g(2 * j) ≤ Real.zero
+  ∀ (j : Natural). -g(2 * j) ≤ Real.zero
       by (j : Natural) ↦
            calc -g(2 * j)
               ≤ -Real.zero
                     by Real.LessOrEqual.negate(Real.zero, g(2 * j), leadNonnegative(j))
               = Real.zero;
-  claim ∀ (j : Natural). -g(2 * j) + -g(successor(2 * j)) ≤ Real.zero
+  ∀ (j : Natural). -g(2 * j) + -g(successor(2 * j)) ≤ Real.zero
       by (j : Natural) ↦
            calc -g(2 * j) + -g(successor(2 * j))
               = -(g(2 * j) + g(successor(2 * j)))
@@ -688,14 +678,14 @@ theorem Real.partialSum_nonnegative (g : Natural → Real)
                            Real.zero, g(2 * j) + g(successor(2 * j)),
                            pairNonnegative(j))
               = Real.zero;
-  claim Real.partialSum((k : Natural) ↦ -g(k), n) ≤ Real.zero;
-  claim negated : -Real.partialSum(g, n) ≤ Real.zero
+  Real.partialSum((k : Natural) ↦ -g(k), n) ≤ Real.zero;
+  -Real.partialSum(g, n) ≤ Real.zero
       by {
-        claim Real.partialSum((k : Natural) ↦ -g(k), n) = -Real.partialSum(g, n);
+        Real.partialSum((k : Natural) ↦ -g(k), n) = -Real.partialSum(g, n);
         done by substituting (Real.partialSum((k : Natural) ↦ -g(k), n)
                                   = -Real.partialSum(g, n))
-      };
-  calc Real.zero
+      } as negated;
+  Real.zero
      = -Real.zero
      ≤ -(-Real.partialSum(g, n))
            by Real.LessOrEqual.negate(-Real.partialSum(g, n), Real.zero, negated)
@@ -735,9 +725,9 @@ theorem Real.cosineCoefficient_one_value (m : Natural)
 -- 1/k! is non-negative.
 theorem Real.exponentialCoefficient_nonneg (k : Natural)
         : Real.zero ≤ Real.exponentialCoefficient(k) := {
-  claim Rational.zero < (Natural.factorial(k) : Rational);
-  claim Rational.zero < Rational.reciprocal_function((Natural.factorial(k) : Rational));
-  claim Real.zero < (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real);
+  Rational.zero < (Natural.factorial(k) : Rational);
+  Rational.zero < Rational.reciprocal_function((Natural.factorial(k) : Rational));
+  Real.zero < (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real);
   done
 }
 
@@ -745,12 +735,12 @@ theorem Real.exponentialCoefficient_nonneg (k : Natural)
 theorem Real.cosineCoefficient_one_even (j : Natural)
         : Real.cosineCoefficient(Real.one, 2 * j)
           = Real.exponentialCoefficient(2 * (2 * j)) := {
-  claim signOne : Real.power(-Real.one, 2 * j) = Real.one
+  Real.power(-Real.one, 2 * j) = Real.one
       by calc Real.power(-Real.one, 2 * j)
             = Real.power(Real.one, 2 * j)
                   by Real.power_negate_even
-            = Real.one;
-  calc Real.cosineCoefficient(Real.one, 2 * j)
+            = Real.one as signOne;
+  Real.cosineCoefficient(Real.one, 2 * j)
      = Real.exponentialCoefficient(2 * (2 * j)) * Real.power(-Real.one, 2 * j)
      = Real.exponentialCoefficient(2 * (2 * j)) * Real.one
            by signOne
@@ -761,12 +751,12 @@ theorem Real.cosineCoefficient_one_even (j : Natural)
 theorem Real.cosineCoefficient_one_odd (j : Natural)
         : Real.cosineCoefficient(Real.one, successor(2 * j))
           = -Real.exponentialCoefficient(2 * successor(2 * j)) := {
-  claim signNegOne : Real.power(-Real.one, successor(2 * j)) = -Real.one
+  Real.power(-Real.one, successor(2 * j)) = -Real.one
       by calc Real.power(-Real.one, successor(2 * j))
             = -(Real.power(Real.one, successor(2 * j)))
             = -Real.one
-                  by Real.power_one(successor(2 * j));
-  calc Real.cosineCoefficient(Real.one, successor(2 * j))
+                  by Real.power_one(successor(2 * j)) as signNegOne;
+  Real.cosineCoefficient(Real.one, successor(2 * j))
      = Real.exponentialCoefficient(2 * successor(2 * j))
            * Real.power(-Real.one, successor(2 * j))
      = Real.exponentialCoefficient(2 * successor(2 * j)) * (-Real.one)
@@ -782,21 +772,19 @@ theorem Real.cosine_one_upper_bound
         : cos(Real.one)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3) := {
   -- Lead terms (odd index 3 + 2k) are −1/(…)! ≤ 0.
-  claim ∀ (k : Natural). Real.cosineCoefficient(Real.one, 3 + 2 * k) ≤ Real.zero
+  ∀ (k : Natural). Real.cosineCoefficient(Real.one, 3 + 2 * k) ≤ Real.zero
       by (k : Natural) ↦ {
-           claim oddIndex : (3 : Natural) + 2 * k = successor(2 * successor(k));
-           claim ccValue
-               : Real.cosineCoefficient(Real.one, 3 + 2 * k)
+           (3 : Natural) + 2 * k = successor(2 * successor(k)) as oddIndex;
+           Real.cosineCoefficient(Real.one, 3 + 2 * k)
                  = -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                by calc Real.cosineCoefficient(Real.one, 3 + 2 * k)
                      = Real.cosineCoefficient(Real.one, successor(2 * successor(k)))
                            by oddIndex
                      = -Real.exponentialCoefficient(
-                            2 * successor(2 * successor(k)));
-           claim ecNonneg
-               : Real.zero
-                 ≤ Real.exponentialCoefficient(2 * successor(2 * successor(k)));
-           calc Real.cosineCoefficient(Real.one, 3 + 2 * k)
+                            2 * successor(2 * successor(k))) as ccValue;
+           Real.zero
+                 ≤ Real.exponentialCoefficient(2 * successor(2 * successor(k))) as ecNonneg;
+           Real.cosineCoefficient(Real.one, 3 + 2 * k)
               = -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                     by ccValue
               ≤ -Real.zero
@@ -808,41 +796,39 @@ theorem Real.cosine_one_upper_bound
               = Real.zero
          };
   -- Each consecutive pair (odd then even) sums to ≤ 0 (magnitudes shrink).
-  claim ∀ (k : Natural).
+  ∀ (k : Natural).
         Real.cosineCoefficient(Real.one, 3 + 2 * k)
               + Real.cosineCoefficient(Real.one, 3 + successor(2 * k))
           ≤ Real.zero
       by (k : Natural) ↦ {
-           claim oddIndex : (3 : Natural) + 2 * k = successor(2 * successor(k));
-           claim evenIndex
-               : (3 : Natural) + successor(2 * k) = 2 * successor(successor(k));
-           claim oddValue
-               : Real.cosineCoefficient(Real.one, 3 + 2 * k)
+           (3 : Natural) + 2 * k = successor(2 * successor(k)) as oddIndex;
+           (3 : Natural) + successor(2 * k) = 2 * successor(successor(k)) as evenIndex;
+           Real.cosineCoefficient(Real.one, 3 + 2 * k)
                  = -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                by calc Real.cosineCoefficient(Real.one, 3 + 2 * k)
                      = Real.cosineCoefficient(Real.one, successor(2 * successor(k)))
                            by oddIndex
                      = -Real.exponentialCoefficient(
-                            2 * successor(2 * successor(k)));
-           claim Real.cosineCoefficient(Real.one, 3 + successor(2 * k))
+                            2 * successor(2 * successor(k))) as oddValue;
+           Real.cosineCoefficient(Real.one, 3 + successor(2 * k))
                  = Real.exponentialCoefficient(2 * (2 * successor(successor(k))))
                by calc Real.cosineCoefficient(Real.one, 3 + successor(2 * k))
                      = Real.cosineCoefficient(Real.one, 2 * successor(successor(k)))
                            by evenIndex
                      = Real.exponentialCoefficient(2 * (2 * successor(successor(k))));
-           claim 2 * successor(2 * successor(k))
+           2 * successor(2 * successor(k))
                  ≤ 2 * (2 * successor(successor(k)))
                by {
-                 claim gap : 2 * (2 * successor(successor(k)))
+                 2 * (2 * successor(successor(k)))
                              = 2 * successor(2 * successor(k)) + 2
-                     by ring;
-                 claim 2 * successor(2 * successor(k))
+                     by ring as gap;
+                 2 * successor(2 * successor(k))
                        ≤ 2 * successor(2 * successor(k)) + 2;
                  done by substituting gap
                };
-           claim Real.exponentialCoefficient(2 * (2 * successor(successor(k))))
+           Real.exponentialCoefficient(2 * (2 * successor(successor(k))))
                  ≤ Real.exponentialCoefficient(2 * successor(2 * successor(k)));
-           calc Real.cosineCoefficient(Real.one, 3 + 2 * k)
+           Real.cosineCoefficient(Real.one, 3 + 2 * k)
                     + Real.cosineCoefficient(Real.one, 3 + successor(2 * k))
               = -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                 + Real.exponentialCoefficient(2 * (2 * successor(successor(k))))
@@ -856,17 +842,15 @@ theorem Real.cosine_one_upper_bound
          };
   -- Hence the tail from index 3 is non-positive, and every partial sum
   -- past 3 stays ≤ S₃.
-  claim eventuallyBelow
-      : ∀ (M : Natural). 3 ≤ M
+  ∀ (M : Natural). 3 ≤ M
         → Real.partialSum(Real.cosineCoefficient(Real.one), M)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3)
       by (M : Natural) (threeLeqM : 3 ≤ M) ↦ {
            obtain ⟨r, mEqual⟩ from Natural.le_to_add(3, M, threeLeqM);
-           claim Real.partialSum(
+           Real.partialSum(
                      (j : Natural) ↦ Real.cosineCoefficient(Real.one, 3 + j), r)
                  ≤ Real.zero;
-           claim splitForm
-               : Real.partialSum(Real.cosineCoefficient(Real.one), M)
+           Real.partialSum(Real.cosineCoefficient(Real.one), M)
                  = Real.partialSum(Real.cosineCoefficient(Real.one), 3)
                    + Real.partialSum(
                          (j : Natural) ↦ Real.cosineCoefficient(Real.one, 3 + j), r)
@@ -878,8 +862,8 @@ theorem Real.cosine_one_upper_bound
                              (j : Natural) ↦ Real.cosineCoefficient(Real.one, 3 + j),
                              r)
                            by Real.partialSum_split(
-                                  Real.cosineCoefficient(Real.one), 3, r);
-           calc Real.partialSum(Real.cosineCoefficient(Real.one), M)
+                                  Real.cosineCoefficient(Real.one), 3, r) as splitForm;
+           Real.partialSum(Real.cosineCoefficient(Real.one), M)
               = Real.partialSum(Real.cosineCoefficient(Real.one), 3)
                 + Real.partialSum(
                       (j : Natural) ↦ Real.cosineCoefficient(Real.one, 3 + j), r)
@@ -887,7 +871,7 @@ theorem Real.cosine_one_upper_bound
               ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3) + Real.zero
                     by Real.add_preserves_LessOrEqual_left
               = Real.partialSum(Real.cosineCoefficient(Real.one), 3)
-         };
+         } as eventuallyBelow;
   done by Real.SequenceConverges.le_of_eventually_le(
               Real.partialSum(Real.cosineCoefficient(Real.one)),
               cos(Real.one),
@@ -902,56 +886,52 @@ theorem Real.cosine_one_upper_bound
 theorem Real.cosine_one_lower_bound
         : Real.partialSum(Real.cosineCoefficient(Real.one), 2)
           ≤ cos(Real.one) := {
-  claim ∀ (k : Natural). Real.zero ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
+  ∀ (k : Natural). Real.zero ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
       by (k : Natural) ↦ {
-           claim evenIndex : (2 : Natural) + 2 * k = 2 * successor(k);
-           claim ccValue
-               : Real.cosineCoefficient(Real.one, 2 + 2 * k)
+           (2 : Natural) + 2 * k = 2 * successor(k) as evenIndex;
+           Real.cosineCoefficient(Real.one, 2 + 2 * k)
                  = Real.exponentialCoefficient(2 * (2 * successor(k)))
                by calc Real.cosineCoefficient(Real.one, 2 + 2 * k)
                      = Real.cosineCoefficient(Real.one, 2 * successor(k))
                            by evenIndex
-                     = Real.exponentialCoefficient(2 * (2 * successor(k)));
-           claim Real.zero ≤ Real.exponentialCoefficient(2 * (2 * successor(k)));
+                     = Real.exponentialCoefficient(2 * (2 * successor(k))) as ccValue;
+           Real.zero ≤ Real.exponentialCoefficient(2 * (2 * successor(k)));
            done by substituting ccValue
          };
-  claim ∀ (k : Natural).
+  ∀ (k : Natural).
         Real.zero
           ≤ Real.cosineCoefficient(Real.one, 2 + 2 * k)
                 + Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
       by (k : Natural) ↦ {
-           claim evenIndex : (2 : Natural) + 2 * k = 2 * successor(k);
-           claim oddIndex
-               : (2 : Natural) + successor(2 * k) = successor(2 * successor(k));
-           claim evenValue
-               : Real.cosineCoefficient(Real.one, 2 + 2 * k)
+           (2 : Natural) + 2 * k = 2 * successor(k) as evenIndex;
+           (2 : Natural) + successor(2 * k) = successor(2 * successor(k)) as oddIndex;
+           Real.cosineCoefficient(Real.one, 2 + 2 * k)
                  = Real.exponentialCoefficient(2 * (2 * successor(k)))
                by calc Real.cosineCoefficient(Real.one, 2 + 2 * k)
                      = Real.cosineCoefficient(Real.one, 2 * successor(k))
                            by evenIndex
-                     = Real.exponentialCoefficient(2 * (2 * successor(k)));
-           claim oddValue
-               : Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
+                     = Real.exponentialCoefficient(2 * (2 * successor(k))) as evenValue;
+           Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
                  = -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                by calc Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
                      = Real.cosineCoefficient(Real.one, successor(2 * successor(k)))
                            by oddIndex
                      = -Real.exponentialCoefficient(
-                            2 * successor(2 * successor(k)));
-           claim 2 * (2 * successor(k)) ≤ 2 * successor(2 * successor(k))
+                            2 * successor(2 * successor(k))) as oddValue;
+           2 * (2 * successor(k)) ≤ 2 * successor(2 * successor(k))
                by {
-                 claim gap : 2 * successor(2 * successor(k))
+                 2 * successor(2 * successor(k))
                              = 2 * (2 * successor(k)) + 2
-                     by ring;
-                 claim 2 * (2 * successor(k)) ≤ 2 * (2 * successor(k)) + 2;
+                     by ring as gap;
+                 2 * (2 * successor(k)) ≤ 2 * (2 * successor(k)) + 2;
                  done by substituting gap
                };
-           claim Real.exponentialCoefficient(2 * successor(2 * successor(k)))
+           Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                  ≤ Real.exponentialCoefficient(2 * (2 * successor(k)));
-           claim -Real.exponentialCoefficient(2 * (2 * successor(k)))
+           -Real.exponentialCoefficient(2 * (2 * successor(k)))
                  ≤ -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                by Real.LessOrEqual.negate;
-           calc Real.zero
+           Real.zero
               = Real.exponentialCoefficient(2 * (2 * successor(k)))
                 + -Real.exponentialCoefficient(2 * (2 * successor(k)))
               ≤ Real.exponentialCoefficient(2 * (2 * successor(k)))
@@ -964,18 +944,16 @@ theorem Real.cosine_one_lower_bound
                 + Real.cosineCoefficient(Real.one, 2 + successor(2 * k))
                     by oddValue
          };
-  claim eventuallyAbove
-      : ∀ (M : Natural). 2 ≤ M
+  ∀ (M : Natural). 2 ≤ M
         → Real.partialSum(Real.cosineCoefficient(Real.one), 2)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), M)
       by (M : Natural) (twoLeqM : 2 ≤ M) ↦ {
            obtain ⟨r, mEqual⟩ from Natural.le_to_add(2, M, twoLeqM);
-           claim Real.zero
+           Real.zero
                  ≤ Real.partialSum(
                        (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j), r)
                by Real.partialSum_nonnegative;
-           claim splitForm
-               : Real.partialSum(Real.cosineCoefficient(Real.one), M)
+           Real.partialSum(Real.cosineCoefficient(Real.one), M)
                  = Real.partialSum(Real.cosineCoefficient(Real.one), 2)
                    + Real.partialSum(
                          (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j), r)
@@ -987,8 +965,8 @@ theorem Real.cosine_one_lower_bound
                              (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j),
                              r)
                            by Real.partialSum_split(
-                                  Real.cosineCoefficient(Real.one), 2, r);
-           calc Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+                                  Real.cosineCoefficient(Real.one), 2, r) as splitForm;
+           Real.partialSum(Real.cosineCoefficient(Real.one), 2)
               = Real.partialSum(Real.cosineCoefficient(Real.one), 2) + Real.zero
                     by ring
               ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 2)
@@ -997,7 +975,7 @@ theorem Real.cosine_one_lower_bound
                     by Real.add_preserves_LessOrEqual_left
               = Real.partialSum(Real.cosineCoefficient(Real.one), M)
                     by splitForm
-         };
+         } as eventuallyAbove;
   done by Real.SequenceConverges.ge_of_eventually_ge(
               Real.partialSum(Real.cosineCoefficient(Real.one)),
               cos(Real.one),
@@ -1012,13 +990,11 @@ theorem Real.cosine_one_lower_bound
 theorem Real.cosine_double
         : cos(Real.one + Real.one)
           = (Real.one + Real.one) * (cos(Real.one) * cos(Real.one)) - Real.one := {
-  claim pythagorean
-      : cos(Real.one) * cos(Real.one) + sin(Real.one) * sin(Real.one) = Real.one
-      by Real.pythagorean_identity(Real.one);
-  claim sinSquare
-      : sin(Real.one) * sin(Real.one) = Real.one - cos(Real.one) * cos(Real.one)
-      by linear_combination(pythagorean);
-  calc cos(Real.one + Real.one)
+  cos(Real.one) * cos(Real.one) + sin(Real.one) * sin(Real.one) = Real.one
+      by Real.pythagorean_identity(Real.one) as pythagorean;
+  sin(Real.one) * sin(Real.one) = Real.one - cos(Real.one) * cos(Real.one)
+      by linear_combination(pythagorean) as sinSquare;
+  cos(Real.one + Real.one)
      = cos(Real.one) * cos(Real.one) - sin(Real.one) * sin(Real.one)
      = cos(Real.one) * cos(Real.one)
        - (Real.one - cos(Real.one) * cos(Real.one))
@@ -1034,20 +1010,20 @@ theorem Real.cosine_double
 -- a real one.
 theorem Real.from_natural_LessThan (a b : Natural) (succLeqB : successor(a) ≤ b)
         : (a : Real) < (b : Real) := {
-  claim (successor(a) : Real) ≤ (b : Real)
+  (successor(a) : Real) ≤ (b : Real)
       by Rational.to_real.LessOrEqual_preserves(
              (successor(a) : Rational), (b : Rational),
              Rational.from_natural_le_preserves(successor(a), b, succLeqB));
-  claim successorAsAdd : successor(a) = a + 1;
-  claim successorReal : (successor(a) : Real) = (a : Real) + Real.one
+  successor(a) = a + 1 as successorAsAdd;
+  (successor(a) : Real) = (a : Real) + Real.one
       by calc (successor(a) : Real)
             = (a + 1 : Real)
                   by successorAsAdd
             = (a : Real) + (1 : Real)
                   by Real.from_natural_add_preserves
-            = (a : Real) + Real.one;
-  claim zeroLessOne : Real.zero < Real.one;
-  claim (a : Real) < (successor(a) : Real)
+            = (a : Real) + Real.one as successorReal;
+  Real.zero < Real.one as zeroLessOne;
+  (a : Real) < (successor(a) : Real)
       by calc (a : Real)
             = (a : Real) + Real.zero
             < (a : Real) + Real.one
@@ -1072,71 +1048,69 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
   let a : Real := (4 * Natural.factorial(2) : Real);
 
   -- EC 0 = 1.
-  claim (Natural.factorial(0) : Rational) = Rational.one;
-  claim ec0 : Real.exponentialCoefficient(0) = Real.one
+  (Natural.factorial(0) : Rational) = Rational.one;
+  Real.exponentialCoefficient(0) = Real.one
       by calc Real.exponentialCoefficient(0)
             = (Rational.reciprocal_function((Natural.factorial(0) : Rational)) : Real)
             = (Rational.reciprocal_function(Rational.one) : Real)
             = (Rational.one : Real)
                   by Rational.reciprocal_function_one
-            = Real.one;
+            = Real.one as ec0;
 
   -- The reciprocal relations dₖ · EC k = 1 (factorial cancels its
   -- reciprocal across the ℚ → ℝ cast).
-  claim ¬((Natural.factorial(2) : Rational) = Rational.zero);
-  claim recip2
-      : (Natural.factorial(2) : Rational)
+  ¬((Natural.factorial(2) : Rational) = Rational.zero);
+  (Natural.factorial(2) : Rational)
             * Rational.reciprocal_function((Natural.factorial(2) : Rational))
-        = Rational.one;
-  claim relation2 : d2 * Real.exponentialCoefficient(2) = Real.one
+        = Rational.one as recip2;
+  d2 * Real.exponentialCoefficient(2) = Real.one
       by calc d2 * Real.exponentialCoefficient(2)
             = d2 * (Rational.reciprocal_function((Natural.factorial(2) : Rational)) : Real)
             = (((Natural.factorial(2) : Rational)
                   * Rational.reciprocal_function((Natural.factorial(2) : Rational))) : Real)
             = (Rational.one : Real)
                   by recip2
-            = Real.one;
-  claim ¬((Natural.factorial(4) : Rational) = Rational.zero);
-  claim recip4
-      : (Natural.factorial(4) : Rational)
+            = Real.one as relation2;
+  ¬((Natural.factorial(4) : Rational) = Rational.zero);
+  (Natural.factorial(4) : Rational)
             * Rational.reciprocal_function((Natural.factorial(4) : Rational))
-        = Rational.one;
-  claim relation4 : d4 * Real.exponentialCoefficient(4) = Real.one
+        = Rational.one as recip4;
+  d4 * Real.exponentialCoefficient(4) = Real.one
       by calc d4 * Real.exponentialCoefficient(4)
             = d4 * (Rational.reciprocal_function((Natural.factorial(4) : Rational)) : Real)
             = (((Natural.factorial(4) : Rational)
                   * Rational.reciprocal_function((Natural.factorial(4) : Rational))) : Real)
             = (Rational.one : Real)
                   by recip4
-            = Real.one;
+            = Real.one as relation4;
 
   -- Real values of the natural casts: d2 = 2, four = 4.
-  claim (1 : Real) = Real.one;
-  claim twoNatReal : (2 : Real) = Real.one + Real.one
+  (1 : Real) = Real.one;
+  (2 : Real) = Real.one + Real.one
       by calc (2 : Real)
             = (1 + 1 : Real)
             = (1 : Real) + (1 : Real)
                   by Real.from_natural_add_preserves
             = Real.one + (1 : Real)
-            = Real.one + Real.one;
-  claim factorialOne : Natural.factorial(1) = 1
+            = Real.one + Real.one as twoNatReal;
+  Natural.factorial(1) = 1
       by calc Natural.factorial(1)
             = (1 + 0) * Natural.factorial(0)
-            = 1;
-  claim factorialTwo : Natural.factorial(2) = 2
+            = 1 as factorialOne;
+  Natural.factorial(2) = 2
       by calc Natural.factorial(2)
             = (1 + 1) * Natural.factorial(1)
             = (1 + 1) * 1
                   by substituting factorialOne
-            = 2;
-  claim d2Value : d2 = Real.one + Real.one
+            = 2 as factorialTwo;
+  d2 = Real.one + Real.one
       by calc d2
             = (Natural.factorial(2) : Real)
             = (2 : Real)
                   by substituting factorialTwo
             = Real.one + Real.one
-                  by twoNatReal;
-  claim fourValue : four = Real.one + Real.one + Real.one + Real.one
+                  by twoNatReal as d2Value;
+  four = Real.one + Real.one + Real.one + Real.one
       by calc four
             = (4 : Real)
             = (2 + 2 : Real)
@@ -1146,48 +1120,46 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by twoNatReal
             = (Real.one + Real.one) + (Real.one + Real.one)
                   by twoNatReal
-            = Real.one + Real.one + Real.one + Real.one;
+            = Real.one + Real.one + Real.one + Real.one as fourValue;
   -- The crux relation 2·EC 2 = 1.
-  claim twoEC2 : (Real.one + Real.one) * Real.exponentialCoefficient(2) = Real.one
+  (Real.one + Real.one) * Real.exponentialCoefficient(2) = Real.one
       by calc (Real.one + Real.one) * Real.exponentialCoefficient(2)
             = d2 * Real.exponentialCoefficient(2)
                   by d2Value
             = Real.one
-                  by relation2;
+                  by relation2 as twoEC2;
   -- 1 − EC 2 = EC 2, the other face of 2·EC 2 = 1.
-  claim oneMinusEC2
-      : Real.one - Real.exponentialCoefficient(2) = Real.exponentialCoefficient(2)
-      by linear_combination(Real.zero - twoEC2);
+  Real.one - Real.exponentialCoefficient(2) = Real.exponentialCoefficient(2)
+      by linear_combination(Real.zero - twoEC2) as oneMinusEC2;
 
   -- The three leading cosine coefficients at x = 1. Each is an instance
   -- of cosineCoefficient_one_even/odd; we bridge the index into the
   -- lemma's 2·j / 2·(2·j) shape with `ring` (the citation matcher does
   -- not reduce the multiplications on its own).
-  claim cc0 : Real.cosineCoefficient(Real.one, 0) = Real.exponentialCoefficient(0)
+  Real.cosineCoefficient(Real.one, 0) = Real.exponentialCoefficient(0)
       by calc Real.cosineCoefficient(Real.one, 0)
             = Real.cosineCoefficient(Real.one, 2 * 0)
                   by (ring : (0 : Natural) = 2 * 0)
             = Real.exponentialCoefficient(2 * (2 * 0))
             = Real.exponentialCoefficient(0)
-                  by (ring : (2 : Natural) * (2 * 0) = 0);
-  claim cc1 : Real.cosineCoefficient(Real.one, 1) = -Real.exponentialCoefficient(2)
+                  by (ring : (2 : Natural) * (2 * 0) = 0) as cc0;
+  Real.cosineCoefficient(Real.one, 1) = -Real.exponentialCoefficient(2)
       by calc Real.cosineCoefficient(Real.one, 1)
             = Real.cosineCoefficient(Real.one, successor(2 * 0))
                   by (ring : (1 : Natural) = successor(2 * 0))
             = -Real.exponentialCoefficient(2 * successor(2 * 0))
             = -Real.exponentialCoefficient(2)
-                  by (ring : (2 : Natural) * successor(2 * 0) = 2);
-  claim cc2 : Real.cosineCoefficient(Real.one, 2) = Real.exponentialCoefficient(4)
+                  by (ring : (2 : Natural) * successor(2 * 0) = 2) as cc1;
+  Real.cosineCoefficient(Real.one, 2) = Real.exponentialCoefficient(4)
       by calc Real.cosineCoefficient(Real.one, 2)
             = Real.cosineCoefficient(Real.one, 2 * 1)
                   by (ring : (2 : Natural) = 2 * 1)
             = Real.exponentialCoefficient(2 * (2 * 1))
             = Real.exponentialCoefficient(4)
-                  by (ring : (2 : Natural) * (2 * 1) = 4);
+                  by (ring : (2 : Natural) * (2 * 1) = 4) as cc2;
 
   -- S₂ = EC 2 ≥ 0, so cos 1 ≥ 0.
-  claim s2Value
-      : Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+  Real.partialSum(Real.cosineCoefficient(Real.one), 2)
         = Real.exponentialCoefficient(2)
       by calc Real.partialSum(Real.cosineCoefficient(Real.one), 2)
             = (Real.zero + Real.cosineCoefficient(Real.one, 0 + 0))
@@ -1209,13 +1181,13 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
             = Real.one - Real.exponentialCoefficient(2)
                   by ring
             = Real.exponentialCoefficient(2)
-                  by oneMinusEC2;
-  claim s2Nonneg : Real.zero ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 2)
+                  by oneMinusEC2 as s2Value;
+  Real.zero ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 2)
       by calc Real.zero
             ≤ Real.exponentialCoefficient(2)
                   by Real.exponentialCoefficient_nonneg(2)
-            = Real.partialSum(Real.cosineCoefficient(Real.one), 2);
-  claim Real.zero ≤ cos(Real.one)
+            = Real.partialSum(Real.cosineCoefficient(Real.one), 2) as s2Nonneg;
+  Real.zero ≤ cos(Real.one)
       by calc Real.zero
             ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 2)
                   by s2Nonneg
@@ -1227,12 +1199,10 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
   -- calc diff-step: cosineCoefficient(1,2) unfolds to a degree-4 complex
   -- power whose fully-reduced normal form is enormous, and any defeq that
   -- materialises it (e.g. comparing it against EC 4) costs gigabytes.
-  claim thirdTermValue
-      : Real.exponentialCoefficient(2) + Real.cosineCoefficient(Real.one, 2)
+  Real.exponentialCoefficient(2) + Real.cosineCoefficient(Real.one, 2)
         = Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4)
-      by substituting cc2;
-  claim s3Value
-      : Real.partialSum(Real.cosineCoefficient(Real.one), 3)
+      by substituting cc2 as thirdTermValue;
+  Real.partialSum(Real.cosineCoefficient(Real.one), 3)
         = Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4)
       by calc Real.partialSum(Real.cosineCoefficient(Real.one), 3)
             = Real.partialSum(Real.cosineCoefficient(Real.one), 2)
@@ -1243,11 +1213,11 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
             = Real.exponentialCoefficient(2) + Real.cosineCoefficient(Real.one, 2)
                   by s2Value
             = Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4)
-                  by thirdTermValue;
+                  by thirdTermValue as s3Value;
   -- cos 1 ≤ S₃, with S₃ collapsed to EC 2 + EC 4 once (single rewrite —
   -- partialSum never enters a product, where a failed rewrite would send
   -- the prover normalising cosineCoefficient).
-  claim cos(Real.one)
+  cos(Real.one)
         ≤ Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4)
       by calc cos(Real.one)
             ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3)
@@ -1256,26 +1226,26 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by s3Value;
 
   -- Positivity facts about EC 2, EC 4.
-  claim Real.zero < Real.exponentialCoefficient(2)
-      by { claim Rational.zero < (Natural.factorial(2) : Rational);
-           claim Rational.zero
+  Real.zero < Real.exponentialCoefficient(2)
+      by { Rational.zero < (Natural.factorial(2) : Rational);
+           Rational.zero
                  < Rational.reciprocal_function((Natural.factorial(2) : Rational));
            done by Rational.to_real.positive_preserves };
-  claim Real.zero < Real.exponentialCoefficient(4)
-      by { claim Rational.zero < (Natural.factorial(4) : Rational);
-           claim Rational.zero
+  Real.zero < Real.exponentialCoefficient(4)
+      by { Rational.zero < (Natural.factorial(4) : Rational);
+           Rational.zero
                  < Rational.reciprocal_function((Natural.factorial(4) : Rational));
            done by Rational.to_real.positive_preserves };
-  claim Real.zero < Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4);
-  claim ec4Nonneg : Real.zero ≤ Real.exponentialCoefficient(4);
-  claim ec4LeOne : Real.exponentialCoefficient(4) ≤ Real.one
+  Real.zero < Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4);
+  Real.zero ≤ Real.exponentialCoefficient(4) as ec4Nonneg;
+  Real.exponentialCoefficient(4) ≤ Real.one
       by calc Real.exponentialCoefficient(4)
             ≤ Real.exponentialCoefficient(0)
                   by Real.exponentialCoefficient_antitone(0, 4, Natural.zero_least(4))
             = Real.one
-                  by ec0;
+                  by ec0 as ec4LeOne;
   -- EC 4² ≤ EC 4 (EC 4 ≤ 1).
-  claim Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
+  Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
         ≤ Real.exponentialCoefficient(4)
       by calc Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4)
             ≤ Real.one * Real.exponentialCoefficient(4)
@@ -1288,21 +1258,21 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
             = Real.exponentialCoefficient(4);
 
   -- 4·EC 4 < EC 2, via multiplying 4·d2 < d4 by the positive EC 2·EC 4.
-  claim factorialThree : Natural.factorial(3) = 6
+  Natural.factorial(3) = 6
       by calc Natural.factorial(3)
             = 3 * Natural.factorial(2)
             = 3 * 2
                   by substituting factorialTwo
             = 6
-                  by ring;
-  claim Natural.factorial(4) = 24
+                  by ring as factorialThree;
+  Natural.factorial(4) = 24
       by calc Natural.factorial(4)
             = 4 * Natural.factorial(3)
             = 4 * 6
                   by substituting factorialThree
             = 24
                   by ring;
-  claim successor(4 * Natural.factorial(2)) ≤ Natural.factorial(4)
+  successor(4 * Natural.factorial(2)) ≤ Natural.factorial(4)
       by calc successor(4 * Natural.factorial(2))
             = successor(4 * 2)
                   by substituting factorialTwo
@@ -1313,24 +1283,21 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
             = (24 : Natural)
                   by ring
             = Natural.factorial(4);
-  claim a < d4
+  a < d4
       by Real.from_natural_LessThan;
-  claim aMultForm : a = four * d2;
-  claim productStrict
-      : a * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
+  a = four * d2 as aMultForm;
+  a * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
         < d4 * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
-      by Real.LessThan.multiply_by_positive_right;
-  claim lhsForm
-      : a * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
+      by Real.LessThan.multiply_by_positive_right as productStrict;
+  a * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
         = four * Real.exponentialCoefficient(4)
       by linear_combination(
              (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4)) * aMultForm
-             + four * Real.exponentialCoefficient(4) * relation2);
-  claim rhsForm
-      : d4 * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
+             + four * Real.exponentialCoefficient(4) * relation2) as lhsForm;
+  d4 * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
         = Real.exponentialCoefficient(2)
-      by linear_combination(Real.exponentialCoefficient(2) * relation4);
-  claim four * Real.exponentialCoefficient(4) < Real.exponentialCoefficient(2)
+      by linear_combination(Real.exponentialCoefficient(2) * relation4) as rhsForm;
+  four * Real.exponentialCoefficient(4) < Real.exponentialCoefficient(2)
       by calc four * Real.exponentialCoefficient(4)
             = a * (Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4))
                   by lhsForm
@@ -1340,18 +1307,17 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by rhsForm;
 
   -- 2·EC 4 + 2·EC 4² ≤ 4·EC 4 < EC 2.
-  claim Real.IsNonneg(Real.one + Real.one)
-      by { claim Real.zero < Real.one;
-           claim Real.zero < Real.one + Real.one
+  Real.IsNonneg(Real.one + Real.one)
+      by { Real.zero < Real.one;
+           Real.zero < Real.one + Real.one
                by calc Real.zero
                      = Real.zero + Real.zero
                            by ring
                      < Real.one + Real.one
                            by Real.LessThan.add_strict_strict;
-           claim Real.zero ≤ Real.one + Real.one by Real.LessThan.weaken;
+           Real.zero ≤ Real.one + Real.one by Real.LessThan.weaken;
            done by Real.IsNonneg_of_LessOrEqual_zero };
-  claim twoEC4SquareLe
-      : (Real.one + Real.one) * (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
+  (Real.one + Real.one) * (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
         ≤ (Real.one + Real.one) * Real.exponentialCoefficient(4)
       by calc (Real.one + Real.one)
                   * (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
@@ -1359,8 +1325,8 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   * (Real.one + Real.one)
             ≤ Real.exponentialCoefficient(4) * (Real.one + Real.one)
                   by Real.LessOrEqual.multiply_by_nonneg_right
-            = (Real.one + Real.one) * Real.exponentialCoefficient(4);
-  claim (Real.one + Real.one) * Real.exponentialCoefficient(4)
+            = (Real.one + Real.one) * Real.exponentialCoefficient(4) as twoEC4SquareLe;
+  (Real.one + Real.one) * Real.exponentialCoefficient(4)
           + (Real.one + Real.one)
               * (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
         ≤ four * Real.exponentialCoefficient(4)
@@ -1380,17 +1346,15 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                   by ring
             = four * Real.exponentialCoefficient(4)
                   by fourValue;
-  claim keyBound
-      : (Real.one + Real.one) * Real.exponentialCoefficient(4)
+  (Real.one + Real.one) * Real.exponentialCoefficient(4)
           + (Real.one + Real.one)
               * (Real.exponentialCoefficient(4) * Real.exponentialCoefficient(4))
         < Real.exponentialCoefficient(2)
-      by Real.LessThan.transitive_left;
+      by Real.LessThan.transitive_left as keyBound;
 
   -- Abbreviate the bound B := EC 2 + EC 4 (= S₃). 2·B² = EC 2 + (2·EC 4 +
   -- 2·EC 4²) < EC 2 + EC 2 = 1, using 2·EC 2 = 1 for both equalities.
-  claim boundSquare
-      : (Real.one + Real.one)
+  (Real.one + Real.one)
             * ((Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4))
                * (Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4)))
         = Real.exponentialCoefficient(2)
@@ -1400,9 +1364,8 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
       by linear_combination(
              (Real.exponentialCoefficient(2)
               + (Real.one + Real.one) * Real.exponentialCoefficient(4))
-             * twoEC2);
-  claim twoBoundSquareLessOne
-      : (Real.one + Real.one)
+             * twoEC2) as boundSquare;
+  (Real.one + Real.one)
             * ((Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4))
                * (Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4)))
         < Real.one
@@ -1426,16 +1389,14 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
             = (Real.one + Real.one) * Real.exponentialCoefficient(2)
                   by ring
             = Real.one
-                  by twoEC2;
+                  by twoEC2 as twoBoundSquareLessOne;
 
   -- cos²1 ≤ B², hence 2·cos²1 ≤ 2·B² < 1.
-  claim cosSquareLe
-      : cos(Real.one) * cos(Real.one)
+  cos(Real.one) * cos(Real.one)
         ≤ (Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4))
           * (Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4))
-      by Real.LessOrEqual.multiply_monotone_nonneg;
-  claim twoCosSquareLessOne
-      : (Real.one + Real.one) * (cos(Real.one) * cos(Real.one)) < Real.one
+      by Real.LessOrEqual.multiply_monotone_nonneg as cosSquareLe;
+  (Real.one + Real.one) * (cos(Real.one) * cos(Real.one)) < Real.one
       by calc (Real.one + Real.one) * (cos(Real.one) * cos(Real.one))
             = (cos(Real.one) * cos(Real.one)) + (cos(Real.one) * cos(Real.one))
                   by ring
@@ -1464,10 +1425,10 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
                      * (Real.exponentialCoefficient(2) + Real.exponentialCoefficient(4)))
                   by ring
             < Real.one
-                  by twoBoundSquareLessOne;
+                  by twoBoundSquareLessOne as twoCosSquareLessOne;
 
   -- cos 2 = 2·cos²1 − 1 < 1 − 1 = 0.
-  calc cos(Real.one + Real.one)
+  cos(Real.one + Real.one)
      = (Real.one + Real.one) * (cos(Real.one) * cos(Real.one)) - Real.one
            by Real.cosine_double
      < Real.one - Real.one

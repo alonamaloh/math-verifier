@@ -45,26 +45,25 @@ theorem ComplexNumber.coordinatesOfCoefficients_scale (a : Real)
                   a * Product.second(coords(k)))
   | Polynomial.Coefficients.nil => {
       -- coords(scale(a, [])) = (0, 0) = (a·0, a·0).
-      claim Real.zero = a * Real.zero;
+      Real.zero = a * Real.zero;
       done
     }
   | Polynomial.Coefficients.cons(c, rest) => {
       -- scale(a, c :: rest) = (a·c) :: scale(a, rest); the induction
       -- hypothesis gives the coordinates of the scaled tail.
-      claim tail
-          : coords(
+      coords(
                 Polynomial.Coefficients.scale(Real.ring, a, rest))
             = Product.make(
                   a * Product.first(coords(rest)),
-                  a * Product.second(coords(rest)));
+                  a * Product.second(coords(rest))) as tail;
       -- real part
-      calc a * c - Product.second(coords(
+      a * c - Product.second(coords(
                Polynomial.Coefficients.scale(Real.ring, a, rest)))
          = a * c - a * Product.second(coords(rest))
                by tail
          = a * (c - Product.second(coords(rest)));
       -- imaginary part
-      claim Product.first(coords(
+      Product.first(coords(
                 Polynomial.Coefficients.scale(Real.ring, a, rest)))
             = a * Product.first(coords(rest))
           by tail;
@@ -85,10 +84,10 @@ theorem ComplexNumber.coordinatesOfCoefficients_multiply
                   coords(q))
   | Polynomial.Coefficients.nil, q => {
       -- coords(nil·q) = coords(nil) = (0,0) = (0,0) ⊗ coords(q).
-      claim Real.zero
+      Real.zero
           = Real.zero * Product.first(coords(q))
                 - Real.zero * Product.second(coords(q));
-      claim Real.zero
+      Real.zero
           = Real.zero * Product.second(coords(q))
                 + Real.zero * Product.first(coords(q));
       done
@@ -100,30 +99,27 @@ theorem ComplexNumber.coordinatesOfCoefficients_multiply
       -- summands. Additivity splits coords of the sum; then each coordinate
       -- is a `ring` rearrangement into the complex product of the cons.
       -- induction hypothesis on the tail
-      claim ihMultiply
-          : coords(
+      coords(
                 Polynomial.Coefficients.multiply(Real.ring, restA, q))
             = ComplexNumber.coordinateProduct(
                   coords(restA),
                   coords(q))
-          by ComplexNumber.coordinatesOfCoefficients_multiply(restA, q);
-      claim scaleCoordinates
-          : coords(
+          by ComplexNumber.coordinatesOfCoefficients_multiply(restA, q) as ihMultiply;
+      coords(
                 Polynomial.Coefficients.scale(Real.ring, a, q))
             = Product.make(
                   a * Product.first(coords(q)),
-                  a * Product.second(coords(q)));
-      claim shiftCoordinates
-          : coords(
+                  a * Product.second(coords(q))) as scaleCoordinates;
+      coords(
                 Polynomial.Coefficients.shift(Real.ring,
                     Polynomial.Coefficients.multiply(Real.ring, restA, q)))
             = Product.make(
                   -Product.second(coords(
                       Polynomial.Coefficients.multiply(Real.ring, restA, q))),
                   Product.first(coords(
-                      Polynomial.Coefficients.multiply(Real.ring, restA, q))));
+                      Polynomial.Coefficients.multiply(Real.ring, restA, q)))) as shiftCoordinates;
       -- The real part: a·re(q) − [re(restA)·im(q) + im(restA)·re(q)].
-      calc Product.first(coords(
+      Product.first(coords(
                Polynomial.Coefficients.scale(Real.ring, a, q)))
                + Product.first(coords(
                      Polynomial.Coefficients.shift(Real.ring,
@@ -148,7 +144,7 @@ theorem ComplexNumber.coordinatesOfCoefficients_multiply
                        - Product.first(coords(restA))
                          * Product.second(coords(q));
       -- The imaginary part: a·im(q) + [re(restA)·re(q) − im(restA)·im(q)].
-      calc Product.second(coords(
+      Product.second(coords(
                Polynomial.Coefficients.scale(Real.ring, a, q)))
                + Product.second(coords(
                      Polynomial.Coefficients.shift(Real.ring,
@@ -174,7 +170,7 @@ theorem ComplexNumber.coordinatesOfCoefficients_multiply
                          * Product.first(coords(q));
       -- coords(scale(a,q) + shift(restA·q)) splits componentwise (additivity);
       -- the two claims are exactly its real and imaginary parts.
-      calc coords(
+      coords(
                Polynomial.Coefficients.add(Real.ring,
                    Polynomial.Coefficients.scale(Real.ring, a, q),
                    Polynomial.Coefficients.shift(Real.ring,

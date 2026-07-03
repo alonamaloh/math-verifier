@@ -62,14 +62,13 @@ theorem ComplexNumber.coordinatesOfCoefficients_all_zero
       (allZero
           : ∀ (i : Natural). Polynomial.nth(Real, Real.zero,
                 Polynomial.Coefficients.cons(Real, c, rest), i) = Real.zero) ↦ {
-        claim c = Real.zero by allZero(0);
-        claim restCoordinates
-            : coords(rest) = Product.make(Real.zero, Real.zero)
+        c = Real.zero by allZero(0);
+        coords(rest) = Product.make(Real.zero, Real.zero)
             by ComplexNumber.coordinatesOfCoefficients_all_zero(rest,
-                   (i : Natural) ↦ allZero(successor(i)));
+                   (i : Natural) ↦ allZero(successor(i))) as restCoordinates;
         -- coords(c :: rest) = (c − im(rest), re(rest)) = (0, 0).
         -- real coordinate
-        calc c - Product.second(coords(rest))
+        c - Product.second(coords(rest))
            = c - Product.second(Product.make(Real.zero, Real.zero))
                  by restCoordinates
            = c - Real.zero
@@ -77,14 +76,13 @@ theorem ComplexNumber.coordinatesOfCoefficients_all_zero
            = Real.zero
            as realCoordinate;
         -- imaginary coordinate
-        claim imaginaryCoordinate
-            : Product.first(coords(rest)) = Real.zero by restCoordinates;
+        Product.first(coords(rest)) = Real.zero by restCoordinates as imaginaryCoordinate;
         -- assemble the pair: unfold the recursion on cons, then rewrite
         -- one coordinate at a time
         change Product.make(c - Product.second(coords(rest)),
                    Product.first(coords(rest)))
                = Product.make(Real.zero, Real.zero);
-        calc Product.make(c - Product.second(coords(rest)),
+        Product.make(c - Product.second(coords(rest)),
                  Product.first(coords(rest)))
            = Product.make(Real.zero, Product.first(coords(rest)))
                  by realCoordinate
@@ -107,11 +105,11 @@ theorem ComplexNumber.coordinatesOfCoefficients_respects
       (extensionallyEqual : Polynomial.ExtensionallyEqual(Real, Real.zero,
           Polynomial.Coefficients.nil(Real), b)) ↦ {
         -- b agrees with the empty list at every index, so b is all-zero too.
-        claim ∀ (i : Natural). Polynomial.nth(Real, Real.zero, b, i) = Real.zero
+        ∀ (i : Natural). Polynomial.nth(Real, Real.zero, b, i) = Real.zero
             by (i : Natural) ↦
                  calc Polynomial.nth(Real, Real.zero, b, i)
                     = Real.zero   by extensionallyEqual(i);
-        calc coords(Polynomial.Coefficients.nil(Real))
+        coords(Polynomial.Coefficients.nil(Real))
            = Product.make(Real.zero, Real.zero)
            = coords(b)
       }
@@ -125,22 +123,21 @@ theorem ComplexNumber.coordinatesOfCoefficients_respects
                   Polynomial.Coefficients.cons(Real, c, rest),
                   (i : Natural) ↦ extensionallyEqual(i))
           | Polynomial.Coefficients.cons(d, restB) => {
-              claim headsEqual : c = d by extensionallyEqual(0);
-              claim tailCoordinates
-                  : coords(rest) = coords(restB)
+              c = d by extensionallyEqual(0) as headsEqual;
+              coords(rest) = coords(restB)
                   by ComplexNumber.coordinatesOfCoefficients_respects(rest, restB,
-                         (i : Natural) ↦ extensionallyEqual(successor(i)));
+                         (i : Natural) ↦ extensionallyEqual(successor(i))) as tailCoordinates;
               -- coords(c :: rest) = (c − im(rest), re(rest)), likewise for d :: restB.
               -- real coordinate: c − im(rest) = d − im(restB)
-              calc c - Product.second(coords(rest))
+              c - Product.second(coords(rest))
                  = d - Product.second(coords(rest))   by headsEqual
                  = d - Product.second(coords(restB))  by tailCoordinates;
               -- imaginary coordinate: re(rest) = re(restB)
-              claim Product.first(coords(rest)) = Product.first(coords(restB))
+              Product.first(coords(rest)) = Product.first(coords(restB))
                   by tailCoordinates;
               -- assemble through the explicit pair forms (keeps both endpoints
               -- cheap make(…) so the prover never unfolds the recursive coords)
-              calc coords(Polynomial.Coefficients.cons(Real, c, rest))
+              coords(Polynomial.Coefficients.cons(Real, c, rest))
                  = Product.make(
                        c - Product.second(coords(rest)), Product.first(coords(rest)))
                  = Product.make(

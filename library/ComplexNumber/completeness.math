@@ -95,10 +95,9 @@ theorem ComplexNumber.SequenceIsCauchy.realPart
     choose threshold as close from cauchy(ε, εPositive);
     witness threshold with
         (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
-          claim differencePart
-              : ComplexNumber.realPart(s(m) - s(n))
-                = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n));
-          calc abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n)))
+          ComplexNumber.realPart(s(m) - s(n))
+              = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n)) as differencePart;
+          abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n)))
              = abs(ComplexNumber.realPart(s(m) - s(n)))
                    by differencePart
              ≤ ComplexNumber.modulus(s(m) - s(n))
@@ -116,10 +115,9 @@ theorem ComplexNumber.SequenceIsCauchy.imaginaryPart
     choose threshold as close from cauchy(ε, εPositive);
     witness threshold with
         (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
-          claim differencePart
-              : ComplexNumber.imaginaryPart(s(m) - s(n))
-                = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n));
-          calc abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n)))
+          ComplexNumber.imaginaryPart(s(m) - s(n))
+              = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n)) as differencePart;
+          abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n)))
              = abs(ComplexNumber.imaginaryPart(s(m) - s(n)))
                    by differencePart
              ≤ ComplexNumber.modulus(s(m) - s(n))
@@ -138,12 +136,10 @@ theorem ComplexNumber.cauchy_sequence_converges
         (cauchy : ComplexNumber.SequenceIsCauchy(s))
         : ComplexNumber.SequenceConvergent(s) := {
   -- Each coordinate sequence is real-Cauchy, hence converges.
-  claim realCauchy
-      : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.realPart(s(n)))
-      by ComplexNumber.SequenceIsCauchy.realPart;
-  claim imaginaryCauchy
-      : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)))
-      by ComplexNumber.SequenceIsCauchy.imaginaryPart;
+  Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.realPart(s(n)))
+      by ComplexNumber.SequenceIsCauchy.realPart as realCauchy;
+  Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)))
+      by ComplexNumber.SequenceIsCauchy.imaginaryPart as imaginaryCauchy;
   choose realLimit as realConverges
       from Real.cauchy_sequence_converges(
                (n : Natural) ↦ ComplexNumber.realPart(s(n)), realCauchy);
@@ -153,7 +149,7 @@ theorem ComplexNumber.cauchy_sequence_converges
   -- The candidate limit reassembles the coordinate limits.
   witness ComplexNumber.ofCoordinates(realLimit, imaginaryLimit) with
       (ε : Real) (εPositive : ε > 0) ↦ {
-        claim halfPositive : ε / 2 > 0;
+        ε / 2 > 0 as halfPositive;
         choose realThreshold as realClose
             from realConverges(ε / 2, halfPositive);
         choose imaginaryThreshold as imaginaryClose
@@ -161,39 +157,35 @@ theorem ComplexNumber.cauchy_sequence_converges
         witness Natural.maximum(realThreshold, imaginaryThreshold) with
             (m : Natural)
             (aboveMaximum : Natural.maximum(realThreshold, imaginaryThreshold) ≤ m) ↦ {
-              claim realAbove : realThreshold ≤ m
-                  by Natural.le_through_max_left;
-              claim imaginaryAbove : imaginaryThreshold ≤ m
-                  by Natural.le_through_max_right;
-              claim abs(ComplexNumber.realPart(s(m)) - realLimit)
+              realThreshold ≤ m by Natural.le_through_max_left as realAbove;
+              imaginaryThreshold ≤ m by Natural.le_through_max_right as imaginaryAbove;
+              abs(ComplexNumber.realPart(s(m)) - realLimit)
                     < ε / 2
                   by realClose(m, realAbove);
-              claim abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
+              abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
                     < ε / 2
                   by imaginaryClose(m, imaginaryAbove);
               -- The coordinates of the difference s(m) − limit.
-              claim realDifference
-                  : ComplexNumber.realPart(
-                        s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                    = ComplexNumber.realPart(s(m))
-                      - ComplexNumber.realPart(
-                            ComplexNumber.ofCoordinates(realLimit, imaginaryLimit));
-              claim imaginaryDifference
-                  : ComplexNumber.imaginaryPart(
-                        s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                    = ComplexNumber.imaginaryPart(s(m))
-                      - ComplexNumber.imaginaryPart(
-                            ComplexNumber.ofCoordinates(realLimit, imaginaryLimit));
-              claim realOfLimit
-                  : ComplexNumber.realPart(
-                        ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                    = realLimit;
-              claim imaginaryOfLimit
-                  : ComplexNumber.imaginaryPart(
-                        ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
-                    = imaginaryLimit;
+              ComplexNumber.realPart(
+                    s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  = ComplexNumber.realPart(s(m))
+                    - ComplexNumber.realPart(
+                          ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  as realDifference;
+              ComplexNumber.imaginaryPart(
+                    s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  = ComplexNumber.imaginaryPart(s(m))
+                    - ComplexNumber.imaginaryPart(
+                          ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  as imaginaryDifference;
+              ComplexNumber.realPart(
+                    ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  = realLimit as realOfLimit;
+              ComplexNumber.imaginaryPart(
+                    ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  = imaginaryLimit as imaginaryOfLimit;
               -- Squeeze the modulus through the coordinate sum.
-              calc ComplexNumber.modulus(
+              ComplexNumber.modulus(
                        s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
                  ≤ abs(ComplexNumber.realPart(
                            s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
