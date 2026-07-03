@@ -1554,18 +1554,23 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                 };
             // Per-premise hypothesis scan: try each in-scope hypothesis
             // (with the folded-head unfold retry) and report how many
-            // matched, plus the FIRST match's bindings.
+            // matched, plus the FIRST match's bindings and proof term.
+            // In the unique-match-first retry pass, conjunction LEGS of
+            // hypotheses participate too (a premise packaged inside an
+            // `∧` fact discharges via the projections), mirroring
+            // collectLocalBinderFacts. Additive: the greedy pass never
+            // sees the legs, so existing citations are untouched.
             auto scanHypotheses = [&](const ExpressionPointer& domain,
                                       std::vector<ExpressionPointer>&
                                           firstTrial,
-                                      int& firstBinder) -> int {
+                                      ExpressionPointer& firstProof,
+                                      bool includeConjunctionLegs) -> int {
                 int matches = 0;
-                for (int b = N - 1; b >= 0; --b) {
-                    ExpressionPointer hypType = liftBoundVariables(
-                        localBinders[b].type, N - b, 0);
+                auto tryCandidate = [&](ExpressionPointer candidateType,
+                                        const ExpressionPointer& proof) {
                     std::vector<ExpressionPointer> trial = bindings;
                     bool matched = matchAgainstPattern(
-                        domain, hypType, matchedDepth, trial);
+                        domain, candidateType, matchedDepth, trial);
                     if (!matched) {
                         // The hypothesis may be stated through a
                         // definition that folds the premise's rigid
@@ -1573,7 +1578,7 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                         // `filter(P, list)`). Unfold the head one
                         // step at a time — full WHNF would reduce
                         // PAST the head the pattern wants.
-                        ExpressionPointer unfolded = hypType;
+                        ExpressionPointer unfolded = candidateType;
                         for (int step = 0; step < 4 && !matched;
                              ++step) {
                             ExpressionPointer next =
@@ -1591,8 +1596,59 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                         ++matches;
                         if (matches == 1) {
                             firstTrial = std::move(trial);
-                            firstBinder = b;
+                            firstProof = proof;
                         }
+                    }
+                };
+                for (int b = N - 1; b >= 0; --b) {
+                    ExpressionPointer hypType = liftBoundVariables(
+                        localBinders[b].type, N - b, 0);
+                    ExpressionPointer hypProof =
+                        makeBoundVariable(N - 1 - b);
+                    tryCandidate(hypType, hypProof);
+                    if (!includeConjunctionLegs) continue;
+                    // Worklist so nested conjunctions fully decompose.
+                    std::vector<std::pair<ExpressionPointer,
+                                          ExpressionPointer>> queue;
+                    queue.push_back({hypType, hypProof});
+                    for (size_t cursor = 0;
+                         cursor < queue.size() && cursor < 32; ++cursor) {
+                        ExpressionPointer conjunction =
+                            weakHeadNormalForm(environment_,
+                                               queue[cursor].first);
+                        auto* outerApp = std::get_if<Application>(
+                            &conjunction->node);
+                        auto* innerApp = outerApp
+                            ? std::get_if<Application>(
+                                  &outerApp->function->node)
+                            : nullptr;
+                        auto* head = innerApp
+                            ? std::get_if<Constant>(
+                                  &innerApp->function->node)
+                            : nullptr;
+                        if (!head || head->name != "And") continue;
+                        ExpressionPointer leftType = innerApp->argument;
+                        ExpressionPointer rightType = outerApp->argument;
+                        const ExpressionPointer& proof =
+                            queue[cursor].second;
+                        ExpressionPointer leftProof = makeApplication(
+                            makeApplication(
+                                makeApplication(
+                                    makeConstant("And.left", {}),
+                                    leftType),
+                                rightType),
+                            proof);
+                        ExpressionPointer rightProof = makeApplication(
+                            makeApplication(
+                                makeApplication(
+                                    makeConstant("And.right", {}),
+                                    leftType),
+                                rightType),
+                            proof);
+                        tryCandidate(leftType, leftProof);
+                        tryCandidate(rightType, rightProof);
+                        queue.push_back({leftType, leftProof});
+                        queue.push_back({rightType, rightProof});
                     }
                 }
                 return matches;
@@ -1609,7 +1665,7 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                 // only when a whole round produced nothing else.
                 int stalledPremise = -1;
                 std::vector<ExpressionPointer> stalledTrial;
-                int stalledBinder = -1;
+                ExpressionPointer stalledProof;
                 for (int innerIndex = 0; innerIndex < matchedDepth;
                      ++innerIndex) {
                     if (bindings[innerIndex]) continue;
@@ -1618,19 +1674,19 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                     // filling any data binders the premise mentions.
                     {
                         std::vector<ExpressionPointer> firstTrial;
-                        int firstBinder = -1;
+                        ExpressionPointer firstProof;
                         int matches = scanHypotheses(
-                            domain, firstTrial, firstBinder);
+                            domain, firstTrial, firstProof,
+                            /*includeConjunctionLegs=*/uniqueMatchFirst);
                         if (matches == 1
                             || (matches > 1 && !uniqueMatchFirst)) {
                             bindings = std::move(firstTrial);
-                            bindings[innerIndex] =
-                                makeBoundVariable(N - 1 - firstBinder);
+                            bindings[innerIndex] = firstProof;
                             progress = true;
                         } else if (matches > 1 && stalledPremise == -1) {
                             stalledPremise = innerIndex;
                             stalledTrial = std::move(firstTrial);
-                            stalledBinder = firstBinder;
+                            stalledProof = firstProof;
                         }
                     }
                     if (bindings[innerIndex]) continue;
@@ -1712,8 +1768,7 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                     // historical greedy behavior) and re-enter the
                     // fixpoint — later premises may now disambiguate.
                     bindings = std::move(stalledTrial);
-                    bindings[stalledPremise] =
-                        makeBoundVariable(N - 1 - stalledBinder);
+                    bindings[stalledPremise] = stalledProof;
                     progress = true;
                 }
             }
