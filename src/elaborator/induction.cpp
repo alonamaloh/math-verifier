@@ -938,6 +938,31 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // missing args. Forcing expected type on a partial app would
         // make the kernel reject the Pi-typed result mid-elaboration,
         // before autoFillHintForClaim gets to bridge the gap.
+        //
+        // Rewrite-under-binder first: an equality claim whose hint is a
+        // lambda (`Sum(r,f,n) = Sum(r,g,n) by (j) ↦ …`) is the same
+        // pointwise form a calc `=` step accepts — route it through the
+        // same recognizer, so the two spellings can never drift. Nullptr
+        // unless the endpoints have a registered extensionality bridge
+        // and the hint elaborates pointwise, so it never shadows an
+        // ordinary lambda proof of the equality itself.
+        if (std::get_if<SurfaceLambda>(&claim.byHint->node)) {
+            EqualityComponents goalComponents;
+            bool goalIsEquality = true;
+            try {
+                goalComponents = extractEqualityComponents(
+                    goalClosed, "claim-by-lambda goal", line);
+            } catch (const ElaborateError&) {
+                goalIsEquality = false;
+            }
+            if (goalIsEquality) {
+                ExpressionPointer underBinder = tryUnderBinderStep(
+                    localBinders, goalComponents.leftEndpoint,
+                    goalComponents.rightEndpoint, *claim.byHint,
+                    line, /*column=*/0);
+                if (underBinder) return underBinder;
+            }
+        }
         bool propagateExpectedTypeToHint =
             hintShapeIsProofTerm(*claim.byHint);
         const char* claimSizeFlag = std::getenv("MATH_CLAIM_SIZES");
