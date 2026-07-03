@@ -427,7 +427,28 @@ std::vector<Elaborator::ContextFact> Elaborator::collectContextFacts(
                     break;
                 }
                 auto* pi = std::get_if<Pi>(&depthCursor->node);
-                if (!pi) break;
+                if (!pi) {
+                    // A `Not(P)` conclusion hides one more premise:
+                    // `Not(P)` = `P → False`, so the lemma also proves
+                    // `False` — but structurally it is an Application,
+                    // not a Pi, so the peel above stops short and a
+                    // `False` goal never sees negation lemmas (e.g.
+                    // the automatic irreflexivity family) in the
+                    // unprompted pool. Peel it without WHNF (this loop
+                    // runs per declaration per goal): the conclusion
+                    // past `Not` is exactly `False`.
+                    auto* app =
+                        std::get_if<Application>(&depthCursor->node);
+                    if (app) {
+                        auto* head = std::get_if<Constant>(
+                            &app->function->node);
+                        if (head && head->name == "Not") {
+                            depthCursor = makeConstant("False", {});
+                            continue;
+                        }
+                    }
+                    break;
+                }
                 depthCursor = pi->codomain;
             }
             if (!anyDepthMatches) continue;
