@@ -62,14 +62,14 @@ theorem IntegerMod.unit_residues_member_unit (n : Natural)
         (z : IntegerMod(n))
         (zMember : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n)))
         : IntegerMod.is_unit(z) := {
-  claim residueExists : ∃ (j : Natural).
+  ∃ (j : Natural).
         List.member(Natural, j, Natural.coprime_residues(n)) ∧ IntegerMod.residue(n, j) = z
-      by List.map_member_invert;
+      by List.map_member_invert as residueExists;
   choose j such that List.member(Natural, j, Natural.coprime_residues(n)) ∧ IntegerMod.residue(n, j) = z
       from residueExists;
-  claim List.member(Natural, j, Natural.coprime_residues(n));
-  claim Natural.coprime(j, n) by List.filter_member_property;
-  claim IntegerMod.is_unit(IntegerMod.make(n, (j : Integer)))
+  List.member(Natural, j, Natural.coprime_residues(n));
+  Natural.coprime(j, n) by List.filter_member_property;
+  IntegerMod.is_unit(IntegerMod.make(n, (j : Integer)))
       by IntegerMod.unit_of_coprime;
   done by substituting (IntegerMod.residue(n, j) = z)
 }
@@ -82,29 +82,29 @@ theorem IntegerMod.unit_residues_complete (n : Natural)
         (nAtLeastTwo : 2 ≤ n)
         (c : IntegerMod(n)) (cUnit : IntegerMod.is_unit(c))
         : List.member(IntegerMod(n), c, IntegerMod.unit_residues(n)) := {
-  calc (1 : Natural) ≤ 2 ≤ n;
+  (1 : Natural) ≤ 2 ≤ n;
   choose r such that r < n ∧ c = IntegerMod.make(n, (r : Integer))
       from IntegerMod.exists_natural_representative;
-  claim r < n;
-  claim cEquation : c = IntegerMod.make(n, (r : Integer));
-  claim IntegerMod.is_unit(IntegerMod.make(n, (r : Integer)))
+  r < n;
+  c = IntegerMod.make(n, (r : Integer)) as cEquation;
+  IntegerMod.is_unit(IntegerMod.make(n, (r : Integer)))
       by substituting cEquation;
-  claim Natural.coprime(r, n)
+  Natural.coprime(r, n)
       by IntegerMod.coprime_of_unit_representative;
-  claim r ≠ 0 by {
+  r ≠ 0 by {
       suppose r = 0 as rZero;
-      claim Natural.coprime(0, n) by substituting rZero;
-      claim n = 1;
-      claim 2 ≤ 1 by substituting (n = 1);
+      Natural.coprime(0, n) by substituting rZero;
+      n = 1;
+      2 ≤ 1 by substituting (n = 1);
       done
     };
-  claim 1 ≤ r;
-  claim r ≤ n;
-  claim List.member(Natural, r, List.range_down(n))
+  1 ≤ r;
+  r ≤ n;
+  List.member(Natural, r, List.range_down(n))
       by List.range_down_complete;
-  claim List.member(Natural, r, Natural.coprime_residues(n))
+  List.member(Natural, r, Natural.coprime_residues(n))
       by List.filter_member_complete;
-  claim List.member(IntegerMod(n), IntegerMod.residue(n, r),
+  List.member(IntegerMod(n), IntegerMod.residue(n, r),
             IntegerMod.unit_residues(n))
       by List.map_member;
   done by substituting cEquation
@@ -118,25 +118,25 @@ theorem IntegerMod.unit_residues_distinct (n : Natural)
         (nAtLeastTwo : 2 ≤ n)
         : List.Distinct(IntegerMod(n), IntegerMod.unit_residues(n)) := {
   -- A coprime residue is strictly below the modulus.
-  claim ∀ (j : Natural). List.member(Natural, j, Natural.coprime_residues(n))
+  ∀ (j : Natural). List.member(Natural, j, Natural.coprime_residues(n))
           → j < n
       by {
         take j : Natural;
         suppose List.member(Natural, j, Natural.coprime_residues(n)) as jMember;
-        claim List.member(Natural, j, List.range_down(n))
+        List.member(Natural, j, List.range_down(n))
             by List.filter_member_subset;
-        claim j ≤ n by List.range_down_member_le;
-        claim Natural.coprime(j, n) by List.filter_member_property;
-        claim j ≠ n by {
+        j ≤ n by List.range_down_member_le;
+        Natural.coprime(j, n) by List.filter_member_property;
+        j ≠ n by {
             suppose j = n as jIsN;
-            claim Natural.coprime(n, n) by substituting jIsN;
-            claim n = 1;
-            claim 2 ≤ 1 by substituting (n = 1);
+            Natural.coprime(n, n) by substituting jIsN;
+            n = 1;
+            2 ≤ 1 by substituting (n = 1);
             done
           };
         done by Natural.lt_of_le_of_ne
       };
-  claim (x y : Natural) → List.member(Natural, x, Natural.coprime_residues(n))
+  (x y : Natural) → List.member(Natural, x, Natural.coprime_residues(n))
           → List.member(Natural, y, Natural.coprime_residues(n))
           → IntegerMod.residue(n, x) = IntegerMod.residue(n, y) → x = y
       by {
@@ -145,13 +145,13 @@ theorem IntegerMod.unit_residues_distinct (n : Natural)
         suppose List.member(Natural, x, Natural.coprime_residues(n)) as xMember;
         suppose List.member(Natural, y, Natural.coprime_residues(n)) as yMember;
         suppose IntegerMod.residue(n, x) = IntegerMod.residue(n, y) as imagesEqual;
-        claim x < n;
-        claim y < n;
+        x < n;
+        y < n;
         done by IntegerMod.make_injective_below_modulus
       };
-  claim List.Distinct(Natural, List.range_down(n))
+  List.Distinct(Natural, List.range_down(n))
       by List.range_down_distinct;
-  claim List.Distinct(Natural, Natural.coprime_residues(n))
+  List.Distinct(Natural, Natural.coprime_residues(n))
       by List.filter_distinct;
   done by List.map_distinct_on
 }
@@ -166,16 +166,16 @@ theorem IntegerMod.scaled_unit_residue_member (n : Natural)
             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
                 IntegerMod.unit_residues(n))))
         : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n)) := {
-  claim scaledExists : ∃ (u : IntegerMod(n)).
+  ∃ (u : IntegerMod(n)).
         List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
         ∧ IntegerMod.multiply_by(n, x, u) = z
-      by List.map_member_invert;
+      by List.map_member_invert as scaledExists;
   choose u such that List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
           ∧ IntegerMod.multiply_by(n, x, u) = z
       from scaledExists;
-  claim IntegerMod.is_unit(u) by IntegerMod.unit_residues_member_unit;
-  claim IntegerMod.is_unit(x * u) by IntegerMod.multiply_unit;
-  claim IntegerMod.is_unit(z) by substituting (IntegerMod.multiply_by(n, x, u) = z);
+  IntegerMod.is_unit(u) by IntegerMod.unit_residues_member_unit;
+  IntegerMod.is_unit(x * u) by IntegerMod.multiply_unit;
+  IntegerMod.is_unit(z) by substituting (IntegerMod.multiply_by(n, x, u) = z);
   done by IntegerMod.unit_residues_complete
 }
 
@@ -187,42 +187,42 @@ theorem IntegerMod.euler_fermat (n : Natural)
         : IntegerMod.power(n, x, Natural.totient(n)) = IntegerMod.one(n) := {
   -- The scaled list map(x·_, U) is a permutation of U: it is contained
   -- in U, distinct (the unit x cancels), and of equal length.
-  claim (z : IntegerMod(n))
+  (z : IntegerMod(n))
         → List.member(IntegerMod(n), z,
               List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
                   IntegerMod.unit_residues(n)))
         → List.member(IntegerMod(n), z, IntegerMod.unit_residues(n));
-  claim (u v : IntegerMod(n))
+  (u v : IntegerMod(n))
         → List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
         → List.member(IntegerMod(n), v, IntegerMod.unit_residues(n))
         → IntegerMod.multiply_by(n, x, u) = IntegerMod.multiply_by(n, x, v)
         → u = v
       by IntegerMod.multiply_cancel_left_of_unit;
-  claim List.Distinct(IntegerMod(n), IntegerMod.unit_residues(n));
-  claim List.Distinct(IntegerMod(n),
+  List.Distinct(IntegerMod(n), IntegerMod.unit_residues(n));
+  List.Distinct(IntegerMod(n),
             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
                 IntegerMod.unit_residues(n)))
       by List.map_distinct_on;
-  claim List.length(IntegerMod(n),
+  List.length(IntegerMod(n),
             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
                 IntegerMod.unit_residues(n)))
         = List.length(IntegerMod(n), IntegerMod.unit_residues(n));
-  claim List.Permutation(IntegerMod(n),
+  List.Permutation(IntegerMod(n),
             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
                 IntegerMod.unit_residues(n)),
             IntegerMod.unit_residues(n))
       by List.permutation_of_distinct_inclusion;
-  claim ∀ (u v w : IntegerMod(n)). (u * v) * w = u * (v * w)
+  ∀ (u v w : IntegerMod(n)). (u * v) * w = u * (v * w)
       by IntegerMod.multiply_associative;
-  claim ∀ (u v : IntegerMod(n)). u * v = v * u
+  ∀ (u v : IntegerMod(n)). u * v = v * u
       by IntegerMod.multiply_commutative;
-  claim List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+  List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
                 IntegerMod.unit_residues(n)))
         = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
               IntegerMod.unit_residues(n))
       by List.Permutation.product_invariant;
-  calc IntegerMod.power(n, x,
+  IntegerMod.power(n, x,
             List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
             * List.product(IntegerMod(n), IntegerMod.multiply,
                   IntegerMod.one(n), IntegerMod.unit_residues(n))
@@ -232,15 +232,15 @@ theorem IntegerMod.euler_fermat (n : Natural)
         = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
               IntegerMod.unit_residues(n))
       as scaledProduct;
-  claim ∀ (z : IntegerMod(n)).
+  ∀ (z : IntegerMod(n)).
         List.member(IntegerMod(n), z, IntegerMod.unit_residues(n))
         → IntegerMod.is_unit(z)
       by IntegerMod.unit_residues_member_unit;
-  claim IntegerMod.is_unit(
+  IntegerMod.is_unit(
             List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
                 IntegerMod.unit_residues(n)))
       by IntegerMod.product_unit;
-  calc IntegerMod.power(n, x,
+  IntegerMod.power(n, x,
             List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
             * List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
                   IntegerMod.unit_residues(n))
@@ -251,11 +251,11 @@ theorem IntegerMod.euler_fermat (n : Natural)
               * List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
                     IntegerMod.unit_residues(n))
               by IntegerMod.multiply_identity_left;
-  claim IntegerMod.power(n, x,
+  IntegerMod.power(n, x,
             List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
         = IntegerMod.one(n)
       by IntegerMod.multiply_cancel_right_of_unit;
-  claim lengthValue : List.length(IntegerMod(n), IntegerMod.unit_residues(n)) = Natural.totient(n);
+  List.length(IntegerMod(n), IntegerMod.unit_residues(n)) = Natural.totient(n) as lengthValue;
   done by substituting lengthValue
 }
 
@@ -268,31 +268,31 @@ theorem Natural.euler_fermat (n a : Natural)
         (coprime : Natural.coprime(a, n))
         : Integer.CongruentModulo(n,
               (Natural.power(Natural.totient(n), a) : Integer), Integer.one) := {
-  claim n = 0 ∨ ∃ (m : Natural). n = m + 1 by Natural.zero_or_add_one;
+  n = 0 ∨ ∃ (m : Natural). n = m + 1 by Natural.zero_or_add_one;
   claim by cases {
     in (n = 0) as nIsZero: {
-        calc Natural.totient(n)
+        Natural.totient(n)
             = Natural.totient(0)
             = List.length(Natural, Natural.coprime_residues(0))
             = 0;
-        calc Natural.power(Natural.totient(n), a)
+        Natural.power(Natural.totient(n), a)
             = Natural.power(0, a)
             = 1
           as powerIsOne;
-        calc (Natural.power(Natural.totient(n), a) : Integer)
+        (Natural.power(Natural.totient(n), a) : Integer)
            = 1                     by substituting powerIsOne
            = Integer.one
           as residueIsOne;
-        claim Integer.CongruentModulo(n, Integer.one, Integer.one)
+        Integer.CongruentModulo(n, Integer.one, Integer.one)
             by Integer.CongruentModulo.reflexive;
         done by substituting residueIsOne
       }
     in (∃ (m : Natural). n = m + 1) as nPositive: {
         choose m such that n = m + 1 from nPositive;
-        claim m = 0 ∨ ∃ (k : Natural). m = k + 1 by Natural.zero_or_add_one;
+        m = 0 ∨ ∃ (k : Natural). m = k + 1 by Natural.zero_or_add_one;
         claim by cases {
           in (m = 0) as mIsZero: {
-              calc n = m + 1
+              n = m + 1
                    = 1   by substituting mIsZero
                 as nIsOne;
               witness (Natural.power(Natural.totient(n), a) : Integer) - Integer.one with
@@ -305,16 +305,16 @@ theorem Natural.euler_fermat (n a : Natural)
             }
           in (∃ (k : Natural). m = k + 1) as mPositive: {
               choose k such that m = k + 1 as mEquation from mPositive;
-              claim 1 ≤ m by substituting mEquation;
-              calc (2 : Natural)
+              1 ≤ m by substituting mEquation;
+              (2 : Natural)
                  = 1 + 1
                  ≤ m + 1   by Natural.add_one_le_add_one_of_le
                  = n;
-              claim IntegerMod.is_unit(IntegerMod.make(n, (a : Integer)))
+              IntegerMod.is_unit(IntegerMod.make(n, (a : Integer)))
                   by IntegerMod.unit_of_coprime;
-              claim IntegerMod.power(n, IntegerMod.make(n, (a : Integer)), Natural.totient(n)) = IntegerMod.one(n)
+              IntegerMod.power(n, IntegerMod.make(n, (a : Integer)), Natural.totient(n)) = IntegerMod.one(n)
                   by IntegerMod.euler_fermat;
-              calc IntegerMod.make(n, (Natural.power(Natural.totient(n), a) : Integer))
+              IntegerMod.make(n, (Natural.power(Natural.totient(n), a) : Integer))
                   = IntegerMod.power(n, IntegerMod.make(n, (a : Integer)), Natural.totient(n))
                   = IntegerMod.one(n);
               done by IntegerMod.congruent_of_make_equal

@@ -52,15 +52,15 @@ theorem IntegerMod.unit_of_coprime (n a : Natural)
         (coprime : Natural.coprime(a, n))
         : IntegerMod.is_unit(IntegerMod.make(n, (a : Integer))) := {
   obtain ⟨x, y, bezoutEquation⟩ from Natural.coprime_bezout(a, n, coprime);
-  claim Integer.divides((n : Integer), (a : Integer) * x - Integer.one)
+  Integer.divides((n : Integer), (a : Integer) * x - Integer.one)
       by ⟨-y, calc (a : Integer) * x - Integer.one
                  = (a : Integer) * x - ((a : Integer) * x + (n : Integer) * y)
                        by substituting bezoutEquation
                  = (n : Integer) * -y
                        by ring⟩;
-  claim inverse : IntegerMod.make(n, (a : Integer)) * IntegerMod.make(n, x)
+  IntegerMod.make(n, (a : Integer)) * IntegerMod.make(n, x)
         = IntegerMod.one(n)
-      by IntegerMod.inverse_from_witness;
+      by IntegerMod.inverse_from_witness as inverse;
   witness IntegerMod.make(n, x) with inverse
 }
 
@@ -74,19 +74,19 @@ theorem Natural.divides_one_of_divides_congruent_one (d n : Natural)
             : Integer.divides((n : Integer), product - Integer.one))
         (dDividesProduct : Integer.divides((d : Integer), product))
         : d ∣ 1 := {
-  claim Integer.divides((d : Integer), (n : Integer))
+  Integer.divides((d : Integer), (n : Integer))
       by Integer.divides_of_natural_divides;
-  claim Integer.divides((d : Integer), product - Integer.one)
+  Integer.divides((d : Integer), product - Integer.one)
       by Integer.divides_transitive;
   -- d divides the product and the product minus one, hence their
   -- difference: product − (product − 1) = 1.
-  claim Integer.divides((d : Integer), -(product - Integer.one))
+  Integer.divides((d : Integer), -(product - Integer.one))
       by Integer.divides_negate;
-  claim Integer.divides((d : Integer), product + -(product - Integer.one))
+  Integer.divides((d : Integer), product + -(product - Integer.one))
       by Integer.divides_add;
-  claim oneEquation : product + -(product - Integer.one) = Integer.one
-      by ring;
-  claim Integer.divides((d : Integer), ((1 : Natural) : Integer))
+  product + -(product - Integer.one) = Integer.one
+      by ring as oneEquation;
+  Integer.divides((d : Integer), ((1 : Natural) : Integer))
       by substituting oneEquation;
   done by Integer.natural_divides_of_integer_divides
 }
@@ -98,18 +98,19 @@ theorem IntegerMod.coprime_of_unit_representative (n r : Natural)
   -- Read the inverse at a representative: r·b ≡ 1 (mod n) for some
   -- integer b.
   cases w refining inverseEquation { | b => {
-      claim Integer.CongruentModulo(n, (r : Integer) * b, Integer.one);
+      Integer.CongruentModulo(n, (r : Integer) * b, Integer.one);
       -- Any common divisor of r and n divides r·b ≡ 1, hence is 1.
-      claim greatest : ∀ (d : Natural). d ∣ r → d ∣ n → d ∣ 1
+      ∀ (d : Natural). d ∣ r → d ∣ n → d ∣ 1
           by (d : Natural) (dDividesR : d ∣ r) (dDividesN : d ∣ n) ↦ {
-              claim Integer.divides((d : Integer), (r : Integer))
+              Integer.divides((d : Integer), (r : Integer))
                   by Integer.divides_of_natural_divides;
-              claim Integer.divides((d : Integer), (r : Integer) * b)
+              Integer.divides((d : Integer), (r : Integer) * b)
                   by Integer.divides_multiply_right;
               done by Natural.divides_one_of_divides_congruent_one
-            };
-      claim 1 ∣ r by Natural.one_divides;
-      claim 1 ∣ n by Natural.one_divides;
+            }
+          as greatest;
+      1 ∣ r by Natural.one_divides;
+      1 ∣ n by Natural.one_divides;
       And.introduction(Natural.one_divides(r),
           And.introduction(Natural.one_divides(n), greatest))
     } }
@@ -159,23 +160,23 @@ theorem IntegerMod.product_unit (modulus : Natural)
               List.member(IntegerMod(modulus), z,
                     List.prepend(IntegerMod(modulus), head, tail))
               → IntegerMod.is_unit(z)) ↦ {
-        claim IntegerMod.is_unit(head)
+        IntegerMod.is_unit(head)
             by membersUnits(head,
                    List.member.here(IntegerMod(modulus), head, tail));
-        claim tailMembersUnits
-            : ∀ (z : IntegerMod(modulus)).
+        ∀ (z : IntegerMod(modulus)).
               List.member(IntegerMod(modulus), z, tail)
               → IntegerMod.is_unit(z)
             by (z : IntegerMod(modulus))
                (zMember : List.member(IntegerMod(modulus), z, tail)) ↦
                  membersUnits(z,
                      List.member.there(IntegerMod(modulus), z, head, tail,
-                         zMember));
-        claim IntegerMod.is_unit(
+                         zMember))
+            as tailMembersUnits;
+        IntegerMod.is_unit(
                   List.product(IntegerMod(modulus), IntegerMod.multiply,
                       IntegerMod.one(modulus), tail))
             by IntegerMod.product_unit(modulus, tail, tailMembersUnits);
-        claim IntegerMod.is_unit(head
+        IntegerMod.is_unit(head
                   * List.product(IntegerMod(modulus), IntegerMod.multiply,
                         IntegerMod.one(modulus), tail));
         done
@@ -188,11 +189,12 @@ theorem IntegerMod.multiply_cancel_left_of_unit (modulus : Natural)
         (equation : c * u = c * v)
         : u = v := {
   obtain ⟨inverse, inverseEquation⟩ from cUnit;
-  claim inverseLeft : inverse * c = IntegerMod.one(modulus)
+  inverse * c = IntegerMod.one(modulus)
       by calc inverse * c
             = c * inverse
-            = IntegerMod.one(modulus);
-  calc u
+            = IntegerMod.one(modulus)
+      as inverseLeft;
+  u
      = IntegerMod.one(modulus) * u
      = (inverse * c) * u            by substituting inverseLeft
      = inverse * (c * u)
@@ -209,7 +211,7 @@ theorem IntegerMod.multiply_cancel_right_of_unit (modulus : Natural)
         (cUnit : IntegerMod.is_unit(c))
         (equation : u * c = v * c)
         : u = v := {
-  calc c * u
+  c * u
      = u * c
      = v * c
      = c * v;

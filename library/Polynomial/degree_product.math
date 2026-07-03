@@ -41,7 +41,7 @@ theorem Natural.le_or_successor_le (i m : Natural)
     | Or.introduceRight(mLessOrEqualI) =>
         decide i = m {
           | yes indexIsM => {
-              claim indexLessOrEqualM : i ≤ m by substituting indexIsM;
+              i ≤ m by substituting indexIsM as indexLessOrEqualM;
               Or.introduceLeft(indexLessOrEqualM)
             }
           | no indexNotM =>
@@ -68,10 +68,10 @@ theorem Ring.field_no_zero_divisors (r : Ring)
         (productZero : (x * y) = Ring.zero(r))
         : y = Ring.zero(r) := {
   obtain ⟨xInverse, inverseEquation⟩ from inverseExistence(x, xNonzero);
-  calc (xInverse * x)
+  (xInverse * x)
             = (x * xInverse)   by commutativity(xInverse, x)
             = Ring.one(r);
-  calc y
+  y
      = (Ring.one(r) * y)
      = ((xInverse * x) * y)
      = (xInverse * (x * y))
@@ -101,25 +101,25 @@ theorem Polynomial.coefficientOf_product_at_sum (r : Ring)
                       cases Natural.totality_of_less_or_equal(i, m) {
                         | Or.introduceLeft(iLessOrEqualM) => {
                             -- i < m: the b-index m+n−i ≥ n+1, so coeff(b,·) = 0.
-                            claim m ≠ i by indexNotM;
-                            claim successorILessOrEqualM : successor(i) ≤ m
-                                by Natural.less_or_equal_not_equal_successor;
-                            claim degreeBound : successor(n) ≤ Natural.monus(m + n, i)
+                            m ≠ i by indexNotM;
+                            successor(i) ≤ m
+                                by Natural.less_or_equal_not_equal_successor as successorILessOrEqualM;
+                            successor(n) ≤ Natural.monus(m + n, i)
                                 by Natural.degree_bound_helper(n, i, m + n,
                                        rewrite(Natural.add_commutative(n, m),
                                            rewrite(Natural.add_successor(n, i),
                                                Natural.add_left_monotone(n, successor(i), m,
-                                                   successorILessOrEqualM))));
-                            calc (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
+                                                   successorILessOrEqualM)))) as degreeBound;
+                            (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
                                = (Polynomial.coefficientOf(a, i) * Ring.zero(r))
                                      by bBound(Natural.monus(m + n, i), degreeBound)
                                = Ring.zero(r)
                           }
                         | Or.introduceRight(mLessOrEqualI) => {
                             -- m < i: coeff(a,i) = 0.
-                            claim successorMLessOrEqualI : successor(m) ≤ i
-                                by Natural.less_or_equal_not_equal_successor;
-                            calc (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
+                            successor(m) ≤ i
+                                by Natural.less_or_equal_not_equal_successor as successorMLessOrEqualI;
+                            (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
                                = (Ring.zero(r) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
                                      by aBound(i, successorMLessOrEqualI)
                                = Ring.zero(r)
@@ -148,7 +148,7 @@ theorem Polynomial.product_DegreeLessThan (r : Ring)
                     (i : Natural) (iLessOrEqualK : i ≤ k) ↦
                         cases Natural.le_or_successor_le(i, m) {
                           | Or.introduceLeft(iLessOrEqualM) => {
-                              claim degreeBound : successor(n) ≤ Natural.monus(k, i)
+                              successor(n) ≤ Natural.monus(k, i)
                                   by Natural.degree_bound_helper(n, i, k,
                                          (calc successor(n + i)
                                              ≤ successor(m + n)
@@ -157,8 +157,8 @@ theorem Polynomial.product_DegreeLessThan (r : Ring)
                                                               Natural.add_left_monotone(n, i, m,
                                                                   iLessOrEqualM)))
                                              ≤ k
-                                                   by successorMNLessOrEqualK));
-                              calc (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(k, i)))
+                                                   by successorMNLessOrEqualK)) as degreeBound;
+                              (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(k, i)))
                                  = (Polynomial.coefficientOf(a, i) * Ring.zero(r))
                                        by bBound(Natural.monus(k, i), degreeBound)
                                  = Ring.zero(r)
@@ -190,7 +190,7 @@ theorem Polynomial.HasDegree_product (r : Ring)
                     = Ring.zero(r)) ↦ {
           -- coeff(a,m)·coeff(b,n) is the top coefficient of a·b, which is 0;
           -- a is nonzero there, so (no zero divisors) b is zero at n.
-          calc (Polynomial.coefficientOf(a, m) * Polynomial.coefficientOf(b, n))
+          (Polynomial.coefficientOf(a, m) * Polynomial.coefficientOf(b, n))
                     = Polynomial.coefficientOf((a * b), m + n)
                           by Polynomial.coefficientOf_product_at_sum(r, a, b, m, n, aBound, bBound)
                     = Ring.zero(r) as topProductZero;

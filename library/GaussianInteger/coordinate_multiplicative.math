@@ -48,26 +48,25 @@ theorem GaussianInteger.coordinatesOfCoefficients_scale (a : Integer)
                   a * Product.second(coords(k)))
   | Polynomial.Coefficients.nil => {
       -- coords(scale(a, [])) = (0, 0) = (a·0, a·0).
-      claim Integer.zero = a * Integer.zero;
+      Integer.zero = a * Integer.zero;
       done
     }
   | Polynomial.Coefficients.cons(c, rest) => {
       -- scale(a, c :: rest) = (a·c) :: scale(a, rest); the induction
       -- hypothesis gives the coordinates of the scaled tail.
-      claim tail
-          : coords(
+      coords(
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest))
             = Product.make(
                   a * Product.first(coords(rest)),
-                  a * Product.second(coords(rest)));
+                  a * Product.second(coords(rest))) as tail;
       -- real part
-      calc a * c - Product.second(coords(
+      a * c - Product.second(coords(
                Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest)))
          = a * c - a * Product.second(coords(rest))
                by tail
          = a * (c - Product.second(coords(rest)));
       -- imaginary part
-      claim Product.first(coords(
+      Product.first(coords(
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest)))
             = a * Product.first(coords(rest))
           by tail;
@@ -88,10 +87,10 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
                   coords(q))
   | Polynomial.Coefficients.nil, q => {
       -- coords(nil·q) = coords(nil) = (0,0) = (0,0) ⊗ coords(q).
-      claim Integer.zero
+      Integer.zero
           = Integer.zero * Product.first(coords(q))
                 - Integer.zero * Product.second(coords(q));
-      claim Integer.zero
+      Integer.zero
           = Integer.zero * Product.second(coords(q))
                 + Integer.zero * Product.first(coords(q));
       done
@@ -103,30 +102,27 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
       -- summands. Additivity splits coords of the sum; then each coordinate
       -- is a `ring` rearrangement into the Gaussian product of the cons.
       -- induction hypothesis on the tail
-      claim ihMultiply
-          : coords(
+      coords(
                 Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))
             = GaussianInteger.gaussianProduct(
                   coords(restA),
                   coords(q))
-          by GaussianInteger.coordinatesOfCoefficients_multiply(restA, q);
-      claim scaleCoordinates
-          : coords(
+          by GaussianInteger.coordinatesOfCoefficients_multiply(restA, q) as ihMultiply;
+      coords(
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, q))
             = Product.make(
                   a * Product.first(coords(q)),
-                  a * Product.second(coords(q)));
-      claim shiftCoordinates
-          : coords(
+                  a * Product.second(coords(q))) as scaleCoordinates;
+      coords(
                 Polynomial.Coefficients.shift(Integer.ring_bundle,
                     Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))
             = Product.make(
                   Integer.negate(Product.second(coords(
                       Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))),
                   Product.first(coords(
-                      Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))));
+                      Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))) as shiftCoordinates;
       -- The real part: a·re(q) − [re(restA)·im(q) + im(restA)·re(q)].
-      calc Product.first(coords(
+      Product.first(coords(
                Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
                + Product.first(coords(
                      Polynomial.Coefficients.shift(Integer.ring_bundle,
@@ -152,7 +148,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
                        - Product.first(coords(restA))
                          * Product.second(coords(q));
       -- The imaginary part: a·im(q) + [re(restA)·re(q) − im(restA)·im(q)].
-      calc Product.second(coords(
+      Product.second(coords(
                Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
                + Product.second(coords(
                      Polynomial.Coefficients.shift(Integer.ring_bundle,
@@ -178,7 +174,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
                          * Product.first(coords(q));
       -- coords(scale(a,q) + shift(restA·q)) splits componentwise (additivity);
       -- the two claims are exactly its real and imaginary parts.
-      calc coords(
+      coords(
                Polynomial.Coefficients.add(Integer.ring_bundle,
                    Polynomial.Coefficients.scale(Integer.ring_bundle, a, q),
                    Polynomial.Coefficients.shift(Integer.ring_bundle,

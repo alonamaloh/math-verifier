@@ -45,12 +45,12 @@ theorem List.filter_member_subset (A : Type(0)) (P : A → Proposition) (x : A)
             -- The head was kept: the membership is in the prepend form.
             suppose List.member(A, x,
                 List.prepend(A, head, List.filter(A, P, tail))) as mem;
-            claim x = head ∨ List.member(A, x, List.filter(A, P, tail))
+            x = head ∨ List.member(A, x, List.filter(A, P, tail))
                 by List.member_prepend_invert;
             claim by cases {
               in (x = head): {
-                  claim List.member(A, head, List.prepend(A, head, tail));
-                  claim List.member(A, x, List.prepend(A, head, tail))
+                  List.member(A, head, List.prepend(A, head, tail));
+                  List.member(A, x, List.prepend(A, head, tail))
                       by substituting (x = head);
                   done
                 }
@@ -80,12 +80,12 @@ theorem List.filter_member_property (A : Type(0)) (P : A → Proposition) (x : A
         | yes propertyWitness => {
             suppose List.member(A, x,
                 List.prepend(A, head, List.filter(A, P, tail))) as mem;
-            claim x = head ∨ List.member(A, x, List.filter(A, P, tail))
+            x = head ∨ List.member(A, x, List.filter(A, P, tail))
                 by List.member_prepend_invert;
             claim by cases {
               in (x = head): {
                   -- x is the kept head, and the decision carries P(head).
-                  claim P(x) by substituting (x = head);
+                  P(x) by substituting (x = head);
                   done
                 }
               in (List.member(A, x, List.filter(A, P, tail))) as memberFilteredTail:
@@ -115,12 +115,12 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
             suppose List.member(A, x, List.prepend(A, head, tail)) as mem;
             suppose P(x) as property;
             -- The head is kept: place x in the prepend form.
-            claim x = head ∨ List.member(A, x, tail)
+            x = head ∨ List.member(A, x, tail)
                 by List.member_prepend_invert;
             claim by cases {
               in (x = head): {
-                  claim List.member(A, head, List.prepend(A, head, List.filter(A, P, tail)));
-                  claim List.member(A, x,
+                  List.member(A, head, List.prepend(A, head, List.filter(A, P, tail)));
+                  List.member(A, x,
                             List.prepend(A, head, List.filter(A, P, tail)))
                       by substituting (x = head);
                   done
@@ -134,12 +134,12 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
             suppose List.member(A, x, List.prepend(A, head, tail)) as mem;
             suppose P(x) as property;
             -- The head is dropped: x must sit in the filtered tail.
-            claim x = head ∨ List.member(A, x, tail)
+            x = head ∨ List.member(A, x, tail)
                 by List.member_prepend_invert;
             claim by cases {
               in (x = head): {
                   -- x is the dropped head, yet P(x) holds — absurd.
-                  claim propertyAtHead : P(head) by substituting (x = head);
+                  P(head) by substituting (x = head) as propertyAtHead;
                   absurd(propertyFails(propertyAtHead))
                 }
               in (List.member(A, x, tail)) as memberTail:
@@ -160,24 +160,23 @@ theorem List.filter_distinct (A : Type(0)) (P : A → Proposition)
       decide P(head) {
         | yes _ => {
             suppose List.Distinct(A, List.prepend(A, head, tail)) as distinct;
-            claim headNotInTail : ¬(List.member(A, head, tail))
-                by List.Distinct.head_not_member;
-            claim tailDistinct : List.Distinct(A, tail)
-                by List.Distinct.tail_distinct;
-            claim headNotInFilteredTail
-                : ¬(List.member(A, head, List.filter(A, P, tail)))
+            ¬(List.member(A, head, tail))
+                by List.Distinct.head_not_member as headNotInTail;
+            List.Distinct(A, tail)
+                by List.Distinct.tail_distinct as tailDistinct;
+            ¬(List.member(A, head, List.filter(A, P, tail)))
                 by (innerMember : List.member(A, head, List.filter(A, P, tail))) ↦ {
-                    claim headInTail : List.member(A, head, tail);
+                    List.member(A, head, tail) as headInTail;
                     headNotInTail(headInTail)
-                  };
+                  } as headNotInFilteredTail;
             List.Distinct.prepend(A, head, List.filter(A, P, tail),
                 headNotInFilteredTail,
                 List.filter_distinct(A, P, tail, tailDistinct))
           }
         | no _ => {
             suppose List.Distinct(A, List.prepend(A, head, tail)) as distinct;
-            claim tailDistinct : List.Distinct(A, tail)
-                by List.Distinct.tail_distinct;
+            List.Distinct(A, tail)
+                by List.Distinct.tail_distinct as tailDistinct;
             List.filter_distinct(A, P, tail, tailDistinct)
           }
       }

@@ -63,13 +63,13 @@ theorem Integer.prime_natural_not_divides_one (p : Natural)
         (primality : Natural.is_prime(p))
         (dividesOne : Integer.divides((p : Integer), Integer.one))
         : False := {
-  claim oneCast : Integer.one = (Natural.to_integer(1));
-  claim Integer.divides((p : Integer), (Natural.to_integer(1)))
+  Integer.one = (Natural.to_integer(1)) as oneCast;
+  Integer.divides((p : Integer), (Natural.to_integer(1)))
       by substituting oneCast;
-  claim Natural.divides(p, 1) by Integer.natural_divides_of_integer_divides;
-  claim pEqualOne : p = 1;
-  claim 2 ≤ p;
-  claim 2 ≤ 1 by substituting pEqualOne;
+  Natural.divides(p, 1) by Integer.natural_divides_of_integer_divides;
+  p = 1 as pEqualOne;
+  2 ≤ p;
+  2 ≤ 1 by substituting pEqualOne;
   done
 }
 
@@ -93,15 +93,15 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
   let α : GaussianInteger := GaussianInteger.ofCoordinates(m, Integer.one);
   let β : GaussianInteger := GaussianInteger.ofCoordinates(m, -(Integer.one));
 
-  claim 2 ≤ p;
-  claim 1 ≤ p by Natural.is_prime.positive;
+  2 ≤ p;
+  1 ≤ p by Natural.is_prime.positive;
 
   -- α·β = embed(m² + 1).
-  claim αCoordinates : coords(α) = Product.make(m, Integer.one);
-  claim βCoordinates : coords(β) = Product.make(m, -(Integer.one));
-  claim firstSimplify : m * m - Integer.one * (-(Integer.one)) = m * m + Integer.one by ring;
-  claim secondSimplify : m * (-(Integer.one)) + Integer.one * m = Integer.zero by ring;
-  calc coords(α * β)
+  coords(α) = Product.make(m, Integer.one) as αCoordinates;
+  coords(β) = Product.make(m, -(Integer.one)) as βCoordinates;
+  m * m - Integer.one * (-(Integer.one)) = m * m + Integer.one by ring as firstSimplify;
+  m * (-(Integer.one)) + Integer.one * m = Integer.zero by ring as secondSimplify;
+  coords(α * β)
             = GaussianInteger.gaussianProduct(coords(α), coords(β))
                   by GaussianInteger.coordinates_multiply
             = GaussianInteger.gaussianProduct(Product.make(m, Integer.one), coords(β))
@@ -116,12 +116,12 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
             = Product.make(m * m + Integer.one, Integer.zero)
                   by substituting secondSimplify
             = coords(GaussianInteger.embedInteger(m * m + Integer.one));
-  claim αβEqual : α * β = GaussianInteger.embedInteger(m * m + Integer.one)
-      by GaussianInteger.coordinates_injective;
+  α * β = GaussianInteger.embedInteger(m * m + Integer.one)
+      by GaussianInteger.coordinates_injective as αβEqual;
 
   -- bigP divides α·β.
   choose q such that m * m + Integer.one = (p : Integer) * q as qEqual from dividesSquarePlusOne;
-  claim Ring.divides(s, bigP, α * β)
+  Ring.divides(s, bigP, α * β)
       by witness GaussianInteger.embedInteger(q) with
           calc α * β
              = GaussianInteger.embedInteger(m * m + Integer.one)   by αβEqual
@@ -129,32 +129,32 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
              = bigP * GaussianInteger.embedInteger(q);
 
   -- bigP divides neither α nor β.
-  claim ¬(Ring.divides(s, bigP, α))
+  ¬(Ring.divides(s, bigP, α))
       by {
         suppose Ring.divides(s, bigP, α) as dividesα;
-        claim Integer.divides((p : Integer), im(α))
+        Integer.divides((p : Integer), im(α))
             by GaussianInteger.embedInteger_divides_imaginary;
-        calc im(α)
+        im(α)
                   = Product.second(coords(α))
                   = Product.second(Product.make(m, Integer.one))   by substituting αCoordinates
                   = Integer.one
             as imaginaryOne;
-        claim Integer.divides((p : Integer), Integer.one) by substituting imaginaryOne;
+        Integer.divides((p : Integer), Integer.one) by substituting imaginaryOne;
         done by Integer.prime_natural_not_divides_one
       };
-  claim ¬(Ring.divides(s, bigP, β))
+  ¬(Ring.divides(s, bigP, β))
       by {
         suppose Ring.divides(s, bigP, β) as dividesβ;
-        claim Integer.divides((p : Integer), im(β))
+        Integer.divides((p : Integer), im(β))
             by GaussianInteger.embedInteger_divides_imaginary;
-        calc im(β)
+        im(β)
                   = Product.second(coords(β))
                   = Product.second(Product.make(m, -(Integer.one)))   by substituting βCoordinates
                   = -(Integer.one)
             as imaginaryNegOne;
-        claim Integer.divides((p : Integer), -(Integer.one)) by substituting imaginaryNegOne;
+        Integer.divides((p : Integer), -(Integer.one)) by substituting imaginaryNegOne;
         choose quotientNeg such that -(Integer.one) = (p : Integer) * quotientNeg as negEqual;
-        claim Integer.divides((p : Integer), Integer.one)
+        Integer.divides((p : Integer), Integer.one)
             by witness -(quotientNeg) with
                 calc Integer.one
                    = -(-(Integer.one))
@@ -164,49 +164,49 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
       };
 
   -- bigP ≠ 0.
-  claim ¬(bigP = Ring.zero(s))
+  ¬(bigP = Ring.zero(s))
       by {
         suppose bigP = Ring.zero(s) as bigPZero;
-        claim GaussianInteger.normNatural(GaussianInteger.embedInteger((p : Integer))) = p * p;
-        calc p * p
+        GaussianInteger.normNatural(GaussianInteger.embedInteger((p : Integer))) = p * p;
+        p * p
                   = GaussianInteger.normNatural(bigP)
                   = GaussianInteger.normNatural(Ring.zero(s))   by substituting bigPZero
                   = 0   by GaussianInteger.normNatural_zero
             as normEqual;
-        claim p ≤ p * p
+        p ≤ p * p
             by Natural.le_multiply_when_factor_at_least_one;
-        claim p ≤ 0 by substituting normEqual;
-        calc (2 : Natural) ≤ p ≤ 0;
+        p ≤ 0 by substituting normEqual;
+        (2 : Natural) ≤ p ≤ 0;
         done
       };
 
   -- bigP is not a unit.
-  claim ¬(Ring.IsUnit(s, bigP))
+  ¬(Ring.IsUnit(s, bigP))
       by {
         suppose Ring.IsUnit(s, bigP) as bigPUnit;
         choose w such that Ring.one(s) = bigP * w as oneEqual from bigPUnit;
         let factor : GaussianInteger := w;
-        calc (1 : Natural)
+        (1 : Natural)
                   = GaussianInteger.normNatural(Ring.one(s))   by GaussianInteger.normNatural_one
                   = GaussianInteger.normNatural(bigP * factor)   by substituting oneEqual
                   = GaussianInteger.normNatural(bigP) * GaussianInteger.normNatural(factor)
                   = (p * p) * GaussianInteger.normNatural(factor)
                         by substituting (GaussianInteger.normNatural(bigP) = p * p)
             as normProduct;
-        claim (p * p) ∣ 1 by witness GaussianInteger.normNatural(factor) with normProduct;
-        claim squareEqualOne : p * p = 1;
-        claim p ≤ p * p
+        (p * p) ∣ 1 by witness GaussianInteger.normNatural(factor) with normProduct;
+        p * p = 1 as squareEqualOne;
+        p ≤ p * p
             by Natural.le_multiply_when_factor_at_least_one;
-        claim p ≤ 1 by substituting squareEqualOne;
-        calc (2 : Natural) ≤ p ≤ 1;
+        p ≤ 1 by substituting squareEqualOne;
+        (2 : Natural) ≤ p ≤ 1;
         done
       };
 
   -- bigP is not irreducible: were it, irreducibility in the PID would force
   -- it to divide α or β, which it does not.
-  claim ¬(IntegralDomain.IsIrreducible(GaussianInteger.integral_domain, bigP)) by {
+  ¬(IntegralDomain.IsIrreducible(GaussianInteger.integral_domain, bigP)) by {
     suppose IntegralDomain.IsIrreducible(GaussianInteger.integral_domain, bigP) as irreducible;
-    claim Ring.divides(s, bigP, α) ∨ Ring.divides(s, bigP, β)
+    Ring.divides(s, bigP, α) ∨ Ring.divides(s, bigP, β)
         by PrincipalIdealDomain.irreducible_divides_factor(
                pid := GaussianInteger.principal_ideal_domain);
     claim by cases {
@@ -221,25 +221,25 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
       from IntegralDomain.reducible_factorization(d := GaussianInteger.integral_domain);
   choose bG such that
       bigP = aG * bG ∧ ¬(Ring.IsUnit(s, aG)) ∧ ¬(Ring.IsUnit(s, bG));
-  claim bigPFactored : bigP = aG * bG;
-  claim ¬(Ring.IsUnit(s, aG));
-  claim ¬(Ring.IsUnit(s, bG));
+  bigP = aG * bG as bigPFactored;
+  ¬(Ring.IsUnit(s, aG));
+  ¬(Ring.IsUnit(s, bG));
   let aGauss : GaussianInteger := aG;
 
   -- aG ≠ 0 and bG ≠ 0 (else bigP = aG·bG = 0).
-  claim ¬(aG = Ring.zero(s))
+  ¬(aG = Ring.zero(s))
       by {
         suppose aG = Ring.zero(s) as aGZero;
-        calc bigP
+        bigP
                   = aG * bG                  by bigPFactored
                   = Ring.zero(s) * bG        by substituting aGZero
                   = Ring.zero(s);
         done
       };
-  claim ¬(bG = Ring.zero(s))
+  ¬(bG = Ring.zero(s))
       by {
         suppose bG = Ring.zero(s) as bGZero;
-        calc bigP
+        bigP
                   = aG * bG                  by bigPFactored
                   = aG * Ring.zero(s)        by substituting bGZero
                   = Ring.zero(s);
@@ -247,43 +247,43 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
       };
 
   -- norms of aG and bG are ≥ 2.
-  claim 1 ≤ GaussianInteger.normNatural(aG)
+  1 ≤ GaussianInteger.normNatural(aG)
       by GaussianInteger.normNatural_positive;
-  claim 1 ≤ GaussianInteger.normNatural(bG)
+  1 ≤ GaussianInteger.normNatural(bG)
       by GaussianInteger.normNatural_positive;
-  claim ¬(GaussianInteger.normNatural(aG) = 1)
+  ¬(GaussianInteger.normNatural(aG) = 1)
       by {
         suppose GaussianInteger.normNatural(aG) = 1 as aGNormOne;
-        calc GaussianInteger.normInteger(aG)
+        GaussianInteger.normInteger(aG)
                   = (GaussianInteger.normNatural(aG) : Integer)
                   = (Natural.to_integer(1))   by substituting aGNormOne
                   = Integer.one;
-        claim Ring.IsUnit(s, aG) by GaussianInteger.unit_of_normInteger_one;
+        Ring.IsUnit(s, aG) by GaussianInteger.unit_of_normInteger_one;
         done
       };
-  claim ¬(GaussianInteger.normNatural(bG) = 1)
+  ¬(GaussianInteger.normNatural(bG) = 1)
       by {
         suppose GaussianInteger.normNatural(bG) = 1 as bGNormOne;
-        calc GaussianInteger.normInteger(bG)
+        GaussianInteger.normInteger(bG)
                   = (GaussianInteger.normNatural(bG) : Integer)
                   = (Natural.to_integer(1))   by substituting bGNormOne
                   = Integer.one;
-        claim Ring.IsUnit(s, bG) by GaussianInteger.unit_of_normInteger_one;
+        Ring.IsUnit(s, bG) by GaussianInteger.unit_of_normInteger_one;
         done
       };
-  claim 2 ≤ GaussianInteger.normNatural(aG);
-  claim 2 ≤ GaussianInteger.normNatural(bG);
+  2 ≤ GaussianInteger.normNatural(aG);
+  2 ≤ GaussianInteger.normNatural(bG);
 
   -- norm(aG)·norm(bG) = p², so norm(aG) = p.
-  calc GaussianInteger.normNatural(aG) * GaussianInteger.normNatural(bG)
+  GaussianInteger.normNatural(aG) * GaussianInteger.normNatural(bG)
             = GaussianInteger.normNatural(aG * bG)
             = GaussianInteger.normNatural(bigP)   by substituting bigPFactored
             = p * p;
-  claim aGNormEqualP : GaussianInteger.normNatural(aG) = p
-      by Natural.prime_square_factor;
+  GaussianInteger.normNatural(aG) = p
+      by Natural.prime_square_factor as aGNormEqualP;
 
   -- p = re(aG)² + im(aG)².
-  calc (p : Integer)
+  (p : Integer)
             = (GaussianInteger.normNatural(aG) : Integer)   by substituting aGNormEqualP
             = GaussianInteger.normInteger(aGauss)
             = re(aGauss) * re(aGauss)

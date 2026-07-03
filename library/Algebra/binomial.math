@@ -47,9 +47,9 @@ definition Ring.binomialTerm (r : Ring) (a b : Ring.carrier(r)) (n k : Natural)
 -- is bⁿ.
 theorem Ring.binomialTerm_zero_index (r : Ring) (a b : Ring.carrier(r)) (n : Natural)
         : Ring.binomialTerm(r, a, b, n, 0) = Ring.power(r, b, n) := {
-  claim coefficient : Natural.binomial(n, 0) = 1;
-  claim deficit : Natural.monus(n, 0) = n;
-  calc Ring.binomialTerm(r, a, b, n, 0)
+  Natural.binomial(n, 0) = 1 as coefficient;
+  Natural.monus(n, 0) = n as deficit;
+  Ring.binomialTerm(r, a, b, n, 0)
      = Ring.from_natural(r, Natural.binomial(n, 0))
        * (Ring.one(r) * Ring.power(r, b, Natural.monus(n, 0)))
      = Ring.from_natural(r, 1)
@@ -62,8 +62,8 @@ theorem Ring.binomialTerm_zero_index (r : Ring) (a b : Ring.carrier(r)) (n : Nat
 -- Above the diagonal the coefficient vanishes, so the term is zero.
 theorem Ring.binomialTerm_overflow (r : Ring) (a b : Ring.carrier(r)) (p : Natural)
         : Ring.binomialTerm(r, a, b, p, 1 + p) = Ring.zero(r) := {
-  claim coefficientZero : Natural.binomial(p, 1 + p) = 0 by Natural.binomial_overflow;
-  calc Ring.binomialTerm(r, a, b, p, 1 + p)
+  Natural.binomial(p, 1 + p) = 0 by Natural.binomial_overflow as coefficientZero;
+  Ring.binomialTerm(r, a, b, p, 1 + p)
      = Ring.from_natural(r, Natural.binomial(p, 1 + p))
        * (Ring.power(r, a, 1 + p) * Ring.power(r, b, Natural.monus(p, 1 + p)))
      = Ring.from_natural(r, 0)
@@ -92,16 +92,15 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
           = a * Ring.binomialTerm(CommutativeRing.ring(c), a, b, p, j)
             + b * Ring.binomialTerm(CommutativeRing.ring(c), a, b, p, 1 + j) := {
   let R : Ring := CommutativeRing.ring(c);
-  claim pascalCoefficient
-      : Natural.binomial(1 + p, 1 + j)
+  Natural.binomial(1 + p, 1 + j)
         = Natural.binomial(p, j) + Natural.binomial(p, 1 + j)
-      by substituting Natural.one_add;
-  claim deficitDiagonal : Natural.monus(1 + p, 1 + j) = Natural.monus(p, j);
-  claim comparison : j < p ∨ p ≤ j by Natural.lt_or_le;
+      by substituting Natural.one_add as pascalCoefficient;
+  Natural.monus(1 + p, 1 + j) = Natural.monus(p, j) as deficitDiagonal;
+  j < p ∨ p ≤ j by Natural.lt_or_le as comparison;
   cases comparison {
     | Or.introduceLeft(jBelow) => {
-        claim deficitShift : Natural.monus(p, j) = 1 + Natural.monus(p, 1 + j);
-        calc a * Ring.binomialTerm(R, a, b, p, j)
+        Natural.monus(p, j) = 1 + Natural.monus(p, 1 + j) as deficitShift;
+        a * Ring.binomialTerm(R, a, b, p, j)
              + b * Ring.binomialTerm(R, a, b, p, 1 + j)
            = a * (Ring.from_natural(R, Natural.binomial(p, j))
                   * (Ring.power(R, a, j) * Ring.power(R, b, Natural.monus(p, j))))
@@ -125,7 +124,7 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
                 * (b * Ring.power(R, b, Natural.monus(p, 1 + j))))
                  by ring
            as rightExpanded;
-        calc Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
+        Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
            = Ring.from_natural(R, Natural.binomial(1 + p, 1 + j))
              * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(1 + p, 1 + j)))
            = Ring.from_natural(R, Natural.binomial(p, j) + Natural.binomial(p, 1 + j))
@@ -152,13 +151,13 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
                by rightExpanded
       }
     | Or.introduceRight(pBelow) => {
-        claim coefficientZero : Natural.binomial(p, 1 + j) = 0 by Natural.binomial_overflow;
-        calc Natural.binomial(1 + p, 1 + j)
+        Natural.binomial(p, 1 + j) = 0 by Natural.binomial_overflow as coefficientZero;
+        Natural.binomial(1 + p, 1 + j)
            = Natural.binomial(p, j) + Natural.binomial(p, 1 + j)
            = Natural.binomial(p, j) + 0
            = Natural.binomial(p, j)       by (Natural.binomial(p, j) + 0 = Natural.binomial(p, j))
            as boundaryCoefficient;
-        calc b * Ring.binomialTerm(R, a, b, p, 1 + j)
+        b * Ring.binomialTerm(R, a, b, p, 1 + j)
            = b * (Ring.from_natural(R, Natural.binomial(p, 1 + j))
                   * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, 1 + j))))
            = b * (Ring.from_natural(R, 0)
@@ -168,7 +167,7 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
                   * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, 1 + j))))
            = Ring.zero(R)   by ring
            as secondVanishes;
-        calc Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
+        Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
            = Ring.from_natural(R, Natural.binomial(1 + p, 1 + j))
              * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(1 + p, 1 + j)))
            = Ring.from_natural(R, Natural.binomial(p, j))
@@ -184,7 +183,7 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
                   * (Ring.power(R, a, j) * Ring.power(R, b, Natural.monus(p, j))))
                by ring
            as firstAligns;
-        calc Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
+        Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
            = a * Ring.binomialTerm(R, a, b, p, j)                          by firstAligns
            = a * Ring.binomialTerm(R, a, b, p, j) + Ring.zero(R)
            = a * Ring.binomialTerm(R, a, b, p, j)
@@ -209,7 +208,7 @@ theorem CommutativeRing.binomial_theorem (c : CommutativeRing)
            = Ring.binomialTerm(R, a, b, 0, 0)
            = Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, 0, k), 0)
     case step(p): {
-        calc b * Ring.binomialTerm(R, a, b, p, 1 + p)
+        b * Ring.binomialTerm(R, a, b, p, 1 + p)
            = b * Ring.zero(R)   by Ring.binomialTerm_overflow
            = Ring.zero(R)
            as secondVanishes;
@@ -224,7 +223,7 @@ theorem CommutativeRing.binomial_theorem (c : CommutativeRing)
                       = Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
                           by Ring.binomialTerm_pascal
            as pascalRows;
-        calc Ring.power(R, a + b, 1 + p)
+        Ring.power(R, a + b, 1 + p)
            = (a + b) * Ring.power(R, a + b, p)
            = (a + b) * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)   by IH
            = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
