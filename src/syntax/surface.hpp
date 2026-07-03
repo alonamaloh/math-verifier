@@ -428,9 +428,13 @@ struct SurfaceCalc {
 // under a user-chosen identifier; otherwise it's anonymous and
 // reachable only via `given (T)` or the Step 5 lookup.
 struct SurfaceStructuredClaimArm {
-    SurfaceExpressionPointer disjunctType;
+    SurfaceExpressionPointer disjunctType;  // null for `otherwise:`
     std::string binderName;            // empty if anonymous
     SurfaceExpressionPointer body;
+    // `otherwise:` — the complement of the other cases. The hypothesis
+    // is ¬(P₁ ∨ … ∨ Pₖ), synthesized at elaboration time; exhaustiveness
+    // is excluded middle, discharged by construction (no prover).
+    bool isOtherwise = false;
     int line = 0;
     int column = 0;
 };

@@ -725,19 +725,38 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                 "proposition or an expected type from context");
         }
 
-        // Elaborate each arm's disjunct proposition.
+        // Elaborate each arm's disjunct proposition. An `otherwise:` arm
+        // (always last; the parser enforces it) has no stated proposition:
+        // its hypothesis is the complement ¬(P₀ ∨ … ∨ Pₖ₋₁) of the stated
+        // cases, built below.
+        bool hasOtherwise = claim.arms.back().isOtherwise;
+        size_t statedCount = hasOtherwise ? armCount - 1 : armCount;
         std::vector<ExpressionPointer> disjuncts;
-        for (const auto& arm : claim.arms) {
-            disjuncts.push_back(
-                elaborateExpression(*arm.disjunctType, localBinders));
+        for (size_t i = 0; i < statedCount; ++i) {
+            disjuncts.push_back(elaborateExpression(
+                *claim.arms[i].disjunctType, localBinders));
         }
-        // Right-nested disjunction `Or` (a non-polymorphic Proposition):
-        // restDisjunction[i] = Pᵢ ∨ Pᵢ₊₁ ∨ … ∨ Pₙ₋₁, so restDisjunction[0]
-        // is the whole `P₀ ∨ … ∨ Pₙ₋₁` the cases must cover.
         auto makeOr = [&](ExpressionPointer a, ExpressionPointer b) {
             return makeApplication(
                 makeApplication(makeConstant("Or", {}), a), b);
         };
+        // statedDisjunction[i] = Pᵢ ∨ … ∨ Pₖ₋₁ over the STATED cases only —
+        // the proposition whose excluded middle covers an `otherwise`.
+        std::vector<ExpressionPointer> statedDisjunction(statedCount);
+        statedDisjunction[statedCount - 1] = disjuncts[statedCount - 1];
+        for (int i = static_cast<int>(statedCount) - 2; i >= 0; --i) {
+            statedDisjunction[i] =
+                makeOr(disjuncts[i], statedDisjunction[i + 1]);
+        }
+        ExpressionPointer complement;
+        if (hasOtherwise) {
+            complement = makeApplication(
+                makeConstant("Not", {}), statedDisjunction[0]);
+            disjuncts.push_back(complement);
+        }
+        // Right-nested disjunction `Or` (a non-polymorphic Proposition):
+        // restDisjunction[i] = Pᵢ ∨ Pᵢ₊₁ ∨ … ∨ Pₙ₋₁, so restDisjunction[0]
+        // is the whole `P₀ ∨ … ∨ Pₙ₋₁` the cases must cover.
         std::vector<ExpressionPointer> restDisjunction(armCount);
         restDisjunction[armCount - 1] = disjuncts[armCount - 1];
         for (int i = static_cast<int>(armCount) - 2; i >= 0; --i) {
@@ -745,24 +764,125 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
         }
         ExpressionPointer expectedDisjunction = restDisjunction[0];
 
-        // Find OR synthesize the disjunction via the unified hammer
-        // dispatch. This is the same "find or synthesize" function
-        // bare `claim P;` uses — local hypothesis match, library
-        // scan, transitivity, the lot. If nothing in scope proves
-        // the disjunction, the dispatch error message (wrapped by
-        // the Frame above) tells the user exactly what failed.
         ExpressionPointer disjProof;
-        try {
-            disjProof = autoProveClaim(
-                expectedDisjunction, localBinders, line);
-        } catch (const ElaborateError&) {
-            throwElaborate(
-                "couldn't automatically prove `"
-                + prettyPrintInLocalScope(
-                      expectedDisjunction, localBinders)
-                + "` to finish off `by cases` — either bring that "
-                "disjunction into scope explicitly (`claim <P₀> ∨ … ∨ <Pₙ₋₁> "
-                "by …;`), or check that the cases really do cover the goal");
+        if (hasOtherwise) {
+            // Exhaustiveness by construction: excluded middle on the
+            // stated disjunction Q gives Q ∨ ¬Q; map the left leg into
+            // the (right-nested) target by injecting each stated case at
+            // its position, and the ¬Q leg to the final `otherwise` slot.
+            // No prover involvement, so `otherwise` never fails to cover.
+            if (!environment_.lookup("Logic.excluded_middle")) {
+                throwElaborate(
+                    "`otherwise:` needs `Logic.excluded_middle` in scope "
+                    "(import axioms) to split on the stated cases");
+            }
+            const size_t k = statedCount;
+            ExpressionPointer statedQ = statedDisjunction[0];
+            auto inject = [&](const char* constructor,
+                              ExpressionPointer left,
+                              ExpressionPointer right,
+                              ExpressionPointer value) {
+                return makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant(constructor, {}), std::move(left)),
+                        std::move(right)),
+                    std::move(value));
+            };
+            // mapStated(i, lift): (Pᵢ ∨ … ∨ Pₖ₋₁) → (Pᵢ ∨ … ∨ Pₖ₋₁ ∨ ¬Q),
+            // built `lift` binders deep inside the surrounding term.
+            std::function<ExpressionPointer(size_t, int)> mapStated =
+                [&](size_t i, int lift) -> ExpressionPointer {
+                    ExpressionPointer domain =
+                        liftBoundVariables(statedDisjunction[i], lift, 0);
+                    int inner = lift + 1;
+                    ExpressionPointer body;
+                    if (i + 1 == k) {
+                        // The last stated case: Pₖ₋₁ ↦ Pₖ₋₁ ∨ ¬Q, left leg.
+                        body = inject(
+                            "Or.introduceLeft",
+                            liftBoundVariables(disjuncts[i], inner, 0),
+                            liftBoundVariables(complement, inner, 0),
+                            makeBoundVariable(0));
+                    } else {
+                        ExpressionPointer handleLeft = makeLambda(
+                            "_stated_case",
+                            liftBoundVariables(disjuncts[i], inner, 0),
+                            inject(
+                                "Or.introduceLeft",
+                                liftBoundVariables(disjuncts[i], inner + 1, 0),
+                                liftBoundVariables(
+                                    restDisjunction[i + 1], inner + 1, 0),
+                                makeBoundVariable(0)));
+                        ExpressionPointer handleRight = makeLambda(
+                            "_stated_rest",
+                            liftBoundVariables(
+                                statedDisjunction[i + 1], inner, 0),
+                            inject(
+                                "Or.introduceRight",
+                                liftBoundVariables(disjuncts[i], inner + 1, 0),
+                                liftBoundVariables(
+                                    restDisjunction[i + 1], inner + 1, 0),
+                                makeApplication(
+                                    mapStated(i + 1, inner + 1),
+                                    makeBoundVariable(0))));
+                        ExpressionPointer call =
+                            makeConstant("Or.eliminate", {});
+                        call = makeApplication(call,
+                            liftBoundVariables(disjuncts[i], inner, 0));
+                        call = makeApplication(call,
+                            liftBoundVariables(
+                                statedDisjunction[i + 1], inner, 0));
+                        call = makeApplication(call,
+                            liftBoundVariables(restDisjunction[i], inner, 0));
+                        call = makeApplication(call, std::move(handleLeft));
+                        call = makeApplication(call, std::move(handleRight));
+                        call = makeApplication(call, makeBoundVariable(0));
+                        body = std::move(call);
+                    }
+                    return makeLambda("_stated", domain, body);
+                };
+            // ¬Q ↦ the last slot of the target disjunction.
+            ExpressionPointer complementBody = makeBoundVariable(0);
+            for (int i = static_cast<int>(k) - 1; i >= 0; --i) {
+                complementBody = inject(
+                    "Or.introduceRight",
+                    liftBoundVariables(disjuncts[i], 1, 0),
+                    liftBoundVariables(restDisjunction[i + 1], 1, 0),
+                    std::move(complementBody));
+            }
+            ExpressionPointer mapComplement = makeLambda(
+                "_complement", complement, std::move(complementBody));
+            ExpressionPointer excludedMiddle = makeApplication(
+                makeConstant("Logic.excluded_middle", {}), statedQ);
+            ExpressionPointer split = makeConstant("Or.eliminate", {});
+            split = makeApplication(split, statedQ);
+            split = makeApplication(split, complement);
+            split = makeApplication(split, expectedDisjunction);
+            split = makeApplication(split, mapStated(0, 0));
+            split = makeApplication(split, std::move(mapComplement));
+            split = makeApplication(split, std::move(excludedMiddle));
+            disjProof = std::move(split);
+        } else {
+            // Find OR synthesize the disjunction via the unified hammer
+            // dispatch. This is the same "find or synthesize" function
+            // bare `claim P;` uses — local hypothesis match, library
+            // scan, transitivity, the lot. If nothing in scope proves
+            // the disjunction, the dispatch error message (wrapped by
+            // the Frame above) tells the user exactly what failed.
+            try {
+                disjProof = autoProveClaim(
+                    expectedDisjunction, localBinders, line);
+            } catch (const ElaborateError&) {
+                throwElaborate(
+                    "couldn't automatically prove `"
+                    + prettyPrintInLocalScope(
+                          expectedDisjunction, localBinders)
+                    + "` to finish off `by cases` — either bring that "
+                    "disjunction into scope explicitly (`claim <P₀> ∨ … ∨ "
+                    "<Pₙ₋₁> by …;`), or check that the cases really do "
+                    "cover the goal");
+            }
         }
 
         // Build each arm's lambda. Body is elaborated under

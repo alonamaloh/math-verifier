@@ -455,6 +455,16 @@ ExpressionPointer liftBoundVariables(
             liftBoundVariables(app->function, increment, threshold),
             liftBoundVariables(app->argument, increment, threshold));
     }
+    if (auto* let = std::get_if<Let>(&expression->node)) {
+        // A ζ-let binds one variable for its body — the body's threshold
+        // shifts by one, like a lambda. (Missing this case silently left
+        // free variables under `let` unlifted — the 3-arm `by cases`
+        // fold's misapplied-type kernel error.)
+        return makeLet(let->displayHint,
+            liftBoundVariables(let->type, increment, threshold),
+            liftBoundVariables(let->value, increment, threshold),
+            liftBoundVariables(let->body, increment, threshold + 1));
+    }
     return expression;
 }
 

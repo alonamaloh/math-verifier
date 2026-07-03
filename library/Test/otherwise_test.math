@@ -1,0 +1,55 @@
+module Test.otherwise_test
+
+import Logic.basics
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- `otherwise:` covers the complement of the stated cases;
+-- exhaustiveness is excluded middle by construction, never a prover
+-- obligation. Here: either n = 0 (then n ≤ n + m trivially since both
+-- reduce), or n ≠ 0 — either way the goal holds, and no disjunction
+-- needs to be found in scope.
+theorem Test.otherwise_basic (n m : Natural) : n ≤ n + m := {
+  n ≤ n + m by cases {
+    case n = 0: done by substitution
+    otherwise: done by Natural.less_or_equal_add_right
+  };
+  done
+}
+
+-- The complement hypothesis is available in the otherwise arm — named
+-- with `as`, it is ¬(the disjunction of the stated cases).
+theorem Test.otherwise_hypothesis (n : Natural) : n = 0 ∨ 1 ≤ n := {
+  n = 0 ∨ 1 ≤ n by cases {
+    case n = 0: done
+    otherwise as nonzero: {
+      1 ≤ n by Natural.one_le_of_nonzero;
+      done
+    }
+  };
+  done
+}
+
+-- Several stated cases: the complement is the negation of their
+-- disjunction, and the injection map covers each stated position.
+theorem Test.otherwise_multiway (a b : Natural) : a ≤ b ∨ b ≤ a := {
+  a ≤ b ∨ b ≤ a by cases {
+    case a < b: {
+      a ≤ b by Natural.LessThan.weaken;
+      done
+    }
+    case a = b: {
+      a ≤ b by substitution;
+      done
+    }
+    otherwise: {
+      b < a by Natural.lt_of_not_le;
+      b ≤ a by Natural.LessThan.weaken;
+      done
+    }
+  };
+  done
+}

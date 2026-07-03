@@ -71,7 +71,8 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | `claim <proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — claim its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
 | `claim P by V;` | assert `P`, discharged by `V` |
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
-| `claim P by cases { in A as h: … in B as h: … }` | prove `P` by ∨-elimination |
+| `claim P by cases { case A as h: … case B as h: … }` | prove `P` by ∨-elimination (`in (A) as h:` is the legacy spelling) |
+| `P by cases { case A: … otherwise [as h]: … }` | last-arm `otherwise:` covers the complement `¬(A ∨ …)`; exhaustiveness is excluded middle by construction, never a prover obligation |
 | `claim P by substituting eq;` | prove `P` by rewriting with `eq` |
 | `claim goal [by V]` | close the current goal (type from context) |
 | `done` / `okay` | ≡ `claim goal`; bare or with `by` |

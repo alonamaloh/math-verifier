@@ -3719,10 +3719,29 @@ private:
             std::vector<SurfaceStructuredClaimArm> arms;
             expect(TokenKind::LeftBrace, "after 'by cases'");
             while (peek().kind == TokenKind::KeywordIn
-                   || peek().kind == TokenKind::KeywordCase) {
+                   || peek().kind == TokenKind::KeywordCase
+                   || (isIdentifierLike(peek().kind)
+                       && peek().lexeme == "otherwise")) {
                 arms.push_back(parseStructuredClaimArm());
             }
             expect(TokenKind::RightBrace, "ending 'by cases' arms block");
+            for (size_t i = 0; i < arms.size(); ++i) {
+                if (!arms[i].isOtherwise) continue;
+                if (i == 0) {
+                    throw ParseError(
+                        "`otherwise:` needs at least one `case P:` before "
+                        "it — with no stated cases there is nothing to "
+                        "take the complement of (line "
+                        + std::to_string(arms[i].line) + ")");
+                }
+                if (i + 1 != arms.size()) {
+                    throw ParseError(
+                        "`otherwise:` must be the LAST arm of a `by cases` "
+                        "block — it covers the complement of the cases "
+                        "before it (line "
+                        + std::to_string(arms[i].line) + ")");
+                }
+            }
             return makeSurfaceStructuredClaim(
                 proposition, /*label=*/"",
                 /*byHint=*/nullptr, /*byCases=*/true, std::move(arms),
@@ -4219,9 +4238,15 @@ private:
         //                            (parseExpression stops cleanly
         //                            at either since neither is an
         //                            expression-position operator).
-        Token armToken = consumeAny();  // 'in' or 'case'
+        Token armToken = consumeAny();  // 'in' or 'case' or 'otherwise'
+        bool isOtherwise = armToken.kind != TokenKind::KeywordIn
+            && armToken.kind != TokenKind::KeywordCase
+            && armToken.lexeme == "otherwise";
         SurfaceExpressionPointer disjunctType;
-        if (armToken.kind == TokenKind::KeywordIn) {
+        if (isOtherwise) {
+            // `otherwise [as h]: body` — no proposition; the hypothesis
+            // is the complement of the other cases, synthesized later.
+        } else if (armToken.kind == TokenKind::KeywordIn) {
             expect(TokenKind::LeftParen, "after 'in'");
             disjunctType = parseExpression();
             expect(TokenKind::RightParen,
@@ -4270,6 +4295,7 @@ private:
         arm.disjunctType = std::move(disjunctType);
         arm.binderName = std::move(binderName);
         arm.body = std::move(body);
+        arm.isOtherwise = isOtherwise;
         arm.line = armToken.line;
         arm.column = armToken.column;
         return arm;
