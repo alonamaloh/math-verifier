@@ -1352,6 +1352,57 @@ ExpressionPointer Elaborator::autoFillHintForClaimCore(
                 }
             }
         }
+        // Or.self collapse (A7 whole-body-`by` plumbing): a conclusion
+        // `X ∨ Y` where BOTH disjuncts unify with the goal under one
+        // assignment proves the goal through `Or.self` — the canonical
+        // shape being `prime_divides_product : … → p ∣ a ∨ p ∣ b`
+        // cited at goal `2 ∣ m` (a = b = m after unification). Pure
+        // logic-shuffling that should never be on the page. Matched by
+        // building the synthetic goal `Or(goal, goal)` so the ordinary
+        // matcher enforces the disjuncts' consistency.
+        if (matchedDepth == -1 && environment_.lookup("Or.self")) {
+            auto makeOrOf = [&](ExpressionPointer proposition) {
+                return makeApplication(
+                    makeApplication(makeConstant("Or", {}), proposition),
+                    proposition);
+            };
+            ExpressionPointer orGoalReduced = makeOrOf(goalReduced);
+            ExpressionPointer orGoalUnreduced = makeOrOf(goalClosed);
+            for (int trialDepth = totalBinders;
+                 trialDepth >= 0 && matchedDepth == -1;
+                 --trialDepth) {
+                for (ExpressionPointer orGoal :
+                         {orGoalReduced, orGoalUnreduced}) {
+                    std::vector<ExpressionPointer> trial(trialDepth);
+                    if (matchAgainstPatternWithDeferredProjections(
+                            cursorsAtDepth[trialDepth], orGoal,
+                            trialDepth, trial)) {
+                        ExpressionPointer orGoalOpened =
+                            openOverLocalBinders(
+                                makeOrOf(goalClosed), localBinders,
+                                localBinders.size());
+                        try {
+                            ExpressionPointer disjunctionProof =
+                                completeCitationFromBindings(
+                                    hintTerm, makeOrOf(goalClosed),
+                                    orGoalOpened, openedContext,
+                                    localBinders, domainsOutermostFirst,
+                                    cursorsAtDepth, totalBinders,
+                                    trialDepth, std::move(trial),
+                                    /*conclusionWasFlexApplication=*/false);
+                            return makeApplication(
+                                makeApplication(
+                                    makeConstant("Or.self", {}),
+                                    goalClosed),
+                                std::move(disjunctionProof));
+                        } catch (const ElaborateError&) {
+                            // fall through to the other variants
+                        }
+                        break;
+                    }
+                }
+            }
+        }
         // The conclusion may be an APPLICATION OF A PEELED BINDER —
         // `P(x)` for a lemma quantified over the predicate P. First-order
         // matching can then "succeed" with the wrong split (binding P to
