@@ -1463,6 +1463,40 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
         int matchedDepth,
         std::vector<ExpressionPointer> bindings,
         bool conclusionWasFlexApplication) {
+        // Historical greedy pass first — additive compatibility: every
+        // citation that resolved before resolves identically. The
+        // unique-match-first retry only sees citations that FAILED.
+        try {
+            return completeCitationWithStrategy(
+                hintTerm, goalClosed, goalOpened, openedContext,
+                localBinders, domainsOutermostFirst, cursorsAtDepth,
+                totalBinders, matchedDepth, bindings,
+                conclusionWasFlexApplication,
+                /*uniqueMatchFirst=*/false);
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        return completeCitationWithStrategy(
+            hintTerm, goalClosed, goalOpened, openedContext,
+            localBinders, domainsOutermostFirst, cursorsAtDepth,
+            totalBinders, matchedDepth, std::move(bindings),
+            conclusionWasFlexApplication,
+            /*uniqueMatchFirst=*/true);
+    }
+
+ExpressionPointer Elaborator::completeCitationWithStrategy(
+        ExpressionPointer hintTerm,
+        const ExpressionPointer& goalClosed,
+        const ExpressionPointer& goalOpened,
+        const Context& openedContext,
+        const std::vector<LocalBinder>& localBinders,
+        const std::vector<ExpressionPointer>& domainsOutermostFirst,
+        const std::vector<ExpressionPointer>& cursorsAtDepth,
+        int totalBinders,
+        int matchedDepth,
+        std::vector<ExpressionPointer> bindings,
+        bool conclusionWasFlexApplication,
+        bool uniqueMatchFirst) {
         // Back-inference pass. The conclusion match above pins only the
         // binders that appear in the conclusion; many lemmas keep their key
         // arguments in their HYPOTHESES (e.g. all_prime_under_prepend_equality
@@ -1502,47 +1536,85 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                             || referencesUnfilled(lam->body, depth + 1);
                     return false;
                 };
+            // Per-premise hypothesis scan: try each in-scope hypothesis
+            // (with the folded-head unfold retry) and report how many
+            // matched, plus the FIRST match's bindings.
+            auto scanHypotheses = [&](const ExpressionPointer& domain,
+                                      std::vector<ExpressionPointer>&
+                                          firstTrial,
+                                      int& firstBinder) -> int {
+                int matches = 0;
+                for (int b = N - 1; b >= 0; --b) {
+                    ExpressionPointer hypType = liftBoundVariables(
+                        localBinders[b].type, N - b, 0);
+                    std::vector<ExpressionPointer> trial = bindings;
+                    bool matched = matchAgainstPattern(
+                        domain, hypType, matchedDepth, trial);
+                    if (!matched) {
+                        // The hypothesis may be stated through a
+                        // definition that folds the premise's rigid
+                        // head (`coprime_residues(n)` for
+                        // `filter(P, list)`). Unfold the head one
+                        // step at a time — full WHNF would reduce
+                        // PAST the head the pattern wants.
+                        ExpressionPointer unfolded = hypType;
+                        for (int step = 0; step < 4 && !matched;
+                             ++step) {
+                            ExpressionPointer next =
+                                unfoldHeadConstantOneStep(unfolded);
+                            if (!next || next.get() == unfolded.get()) {
+                                break;
+                            }
+                            unfolded = next;
+                            trial = bindings;
+                            matched = matchAgainstPattern(
+                                domain, unfolded, matchedDepth, trial);
+                        }
+                    }
+                    if (matched) {
+                        ++matches;
+                        if (matches == 1) {
+                            firstTrial = std::move(trial);
+                            firstBinder = b;
+                        }
+                    }
+                }
+                return matches;
+            };
             bool progress = true;
             while (progress) {
                 progress = false;
+                // Premises whose hypothesis match was AMBIGUOUS this
+                // round (several hypotheses fit an underdetermined
+                // pattern like `1 ≤ ?c`). Committing the first match
+                // greedily poisons the assignment — `?c` pinned to the
+                // wrong bound with no backtracking — so unique matches
+                // commit first, and an ambiguous first-match is taken
+                // only when a whole round produced nothing else.
+                int stalledPremise = -1;
+                std::vector<ExpressionPointer> stalledTrial;
+                int stalledBinder = -1;
                 for (int innerIndex = 0; innerIndex < matchedDepth;
                      ++innerIndex) {
                     if (bindings[innerIndex]) continue;
                     ExpressionPointer domain = domainInPatternScope(innerIndex);
                     // (a) discharge against an in-scope hypothesis, back-
                     // filling any data binders the premise mentions.
-                    for (int b = N - 1; b >= 0; --b) {
-                        ExpressionPointer hypType = liftBoundVariables(
-                            localBinders[b].type, N - b, 0);
-                        std::vector<ExpressionPointer> trial = bindings;
-                        bool matched = matchAgainstPattern(
-                            domain, hypType, matchedDepth, trial);
-                        if (!matched) {
-                            // The hypothesis may be stated through a
-                            // definition that folds the premise's rigid
-                            // head (`coprime_residues(n)` for
-                            // `filter(P, list)`). Unfold the head one
-                            // step at a time — full WHNF would reduce
-                            // PAST the head the pattern wants.
-                            ExpressionPointer unfolded = hypType;
-                            for (int step = 0; step < 4 && !matched;
-                                 ++step) {
-                                ExpressionPointer next =
-                                    unfoldHeadConstantOneStep(unfolded);
-                                if (!next || next.get() == unfolded.get()) {
-                                    break;
-                                }
-                                unfolded = next;
-                                trial = bindings;
-                                matched = matchAgainstPattern(
-                                    domain, unfolded, matchedDepth, trial);
-                            }
-                        }
-                        if (matched) {
-                            bindings = std::move(trial);
-                            bindings[innerIndex] = makeBoundVariable(N - 1 - b);
+                    {
+                        std::vector<ExpressionPointer> firstTrial;
+                        int firstBinder = -1;
+                        int matches = scanHypotheses(
+                            domain, firstTrial, firstBinder);
+                        if (matches == 1
+                            || (matches > 1 && !uniqueMatchFirst)) {
+                            bindings = std::move(firstTrial);
+                            bindings[innerIndex] =
+                                makeBoundVariable(N - 1 - firstBinder);
                             progress = true;
-                            break;
+                        } else if (matches > 1 && stalledPremise == -1) {
+                            stalledPremise = innerIndex;
+                            stalledTrial = std::move(firstTrial);
+                            stalledBinder = firstBinder;
                         }
                     }
                     if (bindings[innerIndex]) continue;
@@ -1617,18 +1689,34 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                     bindings[innerIndex] = refl;
                     progress = true;
                 }
+                if (!progress && stalledPremise != -1
+                    && !bindings[stalledPremise]) {
+                    // A whole round produced no unique pin: take the
+                    // first ambiguous premise's first match (the
+                    // historical greedy behavior) and re-enter the
+                    // fixpoint — later premises may now disambiguate.
+                    bindings = std::move(stalledTrial);
+                    bindings[stalledPremise] =
+                        makeBoundVariable(N - 1 - stalledBinder);
+                    progress = true;
+                }
             }
             // (c) Bare-prover fallback for fully-determined Proposition
             // premises still unbound after the fixpoint: not a stated
             // hypothesis, but the premise may close near-instantly from
             // `automatic` lemmas / the tier stack (`start ≤ start + c`
             // via less_or_equal_add_right — the A7 known-gap fix).
-            // Budget-capped like the redundancy re-proof; skipped under
-            // the speculative context scan, where it would multiply
-            // per-candidate cost (and whose flag also breaks the
-            // prover → scan → citation-fill recursion). Single pass —
-            // a proof slot cannot pin data slots, so no fixpoint needed.
-            if (!inSpeculativeContextScan_) {
+            // Budget-capped like the redundancy re-proof. Under the
+            // speculative context scan — where a general fallback would
+            // multiply per-candidate cost and re-enter the
+            // prover → scan → citation-fill loop — only GROUND premises
+            // (closed numeral facts like the cancellation lemmas'
+            // `1 ≤ 2`) get the fallback: they are tiny, budget-capped,
+            // and exactly the facts nothing else can supply, so bare
+            // steps can use automatic lemmas without a stated
+            // breadcrumb. Single pass — a proof slot cannot pin data
+            // slots, so no fixpoint needed.
+            {
                 for (int innerIndex = 0; innerIndex < matchedDepth;
                      ++innerIndex) {
                     if (bindings[innerIndex]) continue;
@@ -1637,6 +1725,10 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                     if (referencesUnfilled(domain, 0)) continue;
                     ExpressionPointer concretePremise =
                         instantiateLemmaBinders(domain, bindings);
+                    if (inSpeculativeContextScan_
+                        && concretePremise->maxFreeBoundVariable >= 0) {
+                        continue;
+                    }
                     ExpressionPointer concreteOpened;
                     try {
                         concreteOpened = weakHeadNormalForm(
@@ -1650,17 +1742,78 @@ ExpressionPointer Elaborator::completeCitationFromBindings(
                                            concreteOpened)) {
                         continue;
                     }
-                    RedundancyBudgetGuard budgetGuard(*this);
                     ExpressionPointer proved;
-                    try {
-                        proved = autoProveClaim(
-                            concretePremise, localBinders, 0);
-                    } catch (const ElaborateError&) {
-                        proved = nullptr;
-                    } catch (const TypeError&) {
-                        proved = nullptr;
-                    } catch (const AutoProverBudgetError&) {
-                        proved = nullptr;
+                    if (inSpeculativeContextScan_) {
+                        // Under the scan, a GROUND premise gets a
+                        // SEARCH-FREE lookup only: a premise-free
+                        // `automatic` fact whose statement is
+                        // definitionally the premise (the cancellation
+                        // lemmas' `1 ≤ 2` against `one_le_two`).
+                        // Running the full bare prover here multiplies
+                        // per-candidate cost catastrophically on
+                        // disjunction-shaped goals. The hash prefilter
+                        // admits BOTH spellings: the premise as stated
+                        // and its WHNF (a transparent `≤` premise
+                        // unfolds to its Exists body while the fact is
+                        // stored in `≤` form).
+                        uint64_t premiseHash = spineHash(concreteOpened);
+                        uint64_t premiseHashUnreduced = spineHash(
+                            openOverLocalBinders(
+                                concretePremise, localBinders, N));
+                        Context emptyContext;
+                        for (const auto& [factName, factDeclaration]
+                                 : environment_.declarations) {
+                            ExpressionPointer factType;
+                            bool automaticFlag = false;
+                            size_t universeParameterCount = 0;
+                            if (auto* definition = std::get_if<Definition>(
+                                    &factDeclaration)) {
+                                factType = definition->type;
+                                automaticFlag = definition->automatic;
+                                universeParameterCount =
+                                    definition->universeParameters.size();
+                            } else if (auto* axiom = std::get_if<Axiom>(
+                                           &factDeclaration)) {
+                                factType = axiom->type;
+                                automaticFlag = axiom->automatic;
+                                universeParameterCount =
+                                    axiom->universeParameters.size();
+                            } else {
+                                continue;
+                            }
+                            if (!automaticFlag
+                                || universeParameterCount != 0) {
+                                continue;
+                            }
+                            if (std::get_if<Pi>(&factType->node)) continue;
+                            uint64_t factHash = spineHash(factType);
+                            if (factHash != premiseHash
+                                && factHash != premiseHashUnreduced) {
+                                continue;
+                            }
+                            bool equal = false;
+                            try {
+                                equal = isDefinitionallyEqual(
+                                    environment_, emptyContext,
+                                    factType, concreteOpened);
+                            } catch (...) { equal = false; }
+                            if (equal) {
+                                proved = makeConstant(factName, {});
+                                break;
+                            }
+                        }
+                    } else {
+                        RedundancyBudgetGuard budgetGuard(*this);
+                        try {
+                            proved = autoProveClaim(
+                                concretePremise, localBinders, 0);
+                        } catch (const ElaborateError&) {
+                            proved = nullptr;
+                        } catch (const TypeError&) {
+                            proved = nullptr;
+                        } catch (const AutoProverBudgetError&) {
+                            proved = nullptr;
+                        }
                     }
                     if (proved) bindings[innerIndex] = proved;
                 }

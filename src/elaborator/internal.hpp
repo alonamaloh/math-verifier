@@ -4366,7 +4366,12 @@ private:
     // depth and (possibly partial) bindings from the conclusion match,
     // run premise back-inference + slot filling, assemble the call, and
     // (for a flexible-headed conclusion) validate the instantiated
-    // conclusion against the goal.
+    // conclusion against the goal. Two-pass: the historical greedy
+    // premise matcher first (every existing closure keeps its exact
+    // behavior), then a unique-match-first retry on failure — an
+    // underdetermined premise like `1 ≤ ?c` defers to premises whose
+    // hypothesis match is unambiguous (the equation pins ?c) instead
+    // of greedily pinning ?c to the first `1 ≤ _` fact in scope.
     ExpressionPointer completeCitationFromBindings(
         ExpressionPointer hintTerm,
         const ExpressionPointer& goalClosed,
@@ -4379,6 +4384,19 @@ private:
         int matchedDepth,
         std::vector<ExpressionPointer> bindings,
         bool conclusionWasFlexApplication);
+    ExpressionPointer completeCitationWithStrategy(
+        ExpressionPointer hintTerm,
+        const ExpressionPointer& goalClosed,
+        const ExpressionPointer& goalOpened,
+        const Context& openedContext,
+        const std::vector<LocalBinder>& localBinders,
+        const std::vector<ExpressionPointer>& domainsOutermostFirst,
+        const std::vector<ExpressionPointer>& cursorsAtDepth,
+        int totalBinders,
+        int matchedDepth,
+        std::vector<ExpressionPointer> bindings,
+        bool conclusionWasFlexApplication,
+        bool uniqueMatchFirst);
 
     ExpressionPointer recoverClaimHint(
         const ExpressionPointer& hintTerm,

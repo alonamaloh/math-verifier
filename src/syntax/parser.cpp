@@ -1340,9 +1340,9 @@ private:
                || peek().kind == TokenKind::KeywordTake
                || peek().kind == TokenKind::KeywordNote
                || peek().kind == TokenKind::KeywordChange
-               || peek().kind == TokenKind::KeywordFrom
                || peek().kind == TokenKind::KeywordCalc
                || (peek().kind != TokenKind::RightBrace
+                   && peek().kind != TokenKind::KeywordFrom
                    && peek().kind != TokenKind::KeywordContradiction
                    && peek().kind != TokenKind::KeywordDone
                    && peek().kind != TokenKind::KeywordOkay
@@ -1366,7 +1366,6 @@ private:
                 && peek().kind != TokenKind::KeywordTake
                 && peek().kind != TokenKind::KeywordNote
                 && peek().kind != TokenKind::KeywordChange
-                && peek().kind != TokenKind::KeywordFrom
                 && peek().kind != TokenKind::KeywordCalc
                 && peek().kind != TokenKind::KeywordDone
                 && peek().kind != TokenKind::KeywordOkay) {
@@ -1470,50 +1469,6 @@ private:
                     statementStart.column);
                 wrapper.line = statementStart.line;
                 wrapper.column = statementStart.column;
-                wrappers.push_back(std::move(wrapper));
-                continue;
-            }
-            // `from <fact>: <instance> [as NAME];` (A7) — restate a
-            // hypothesis with in-scope equations substituted into it:
-            // the fact is named first, the transformed statement is on
-            // the page. Desugars onto the claim wrapper with the fact
-            // as the by-hint (the citation machinery's transport across
-            // context equalities does the checking), so downstream
-            // statements find the instance by structural match exactly
-            // like a claim's.
-            if (peek().kind == TokenKind::KeywordFrom) {
-                Token fromToken = consumeAny();
-                SurfaceExpressionPointer fact = parseExpression();
-                expect(TokenKind::Colon,
-                       "after the source fact (from <fact>: <instance>;)");
-                SurfaceExpressionPointer instance = parseExpression();
-                std::string bindingName;
-                if (peek().kind == TokenKind::KeywordAs) {
-                    consumeAny();  // 'as'
-                    if (!isIdentifierLike(peek().kind)) {
-                        throwHere("expected name after 'as'");
-                    }
-                    bindingName = consumeAny().lexeme;
-                }
-                if (peek().kind == TokenKind::Semicolon) {
-                    consumeAny();  // ';'
-                } else if (peek().kind != TokenKind::RightBrace) {
-                    throwHere("expected ';' after from-statement "
-                              "(from <fact>: <instance>;)");
-                }
-                BlockWrapper wrapper;
-                wrapper.kind = BlockWrapper::TypedLet;
-                wrapper.name = bindingName.empty()
-                    ? "_claim_anon_" + std::to_string(fromToken.line)
-                          + "_" + std::to_string(fromToken.column)
-                    : bindingName;
-                wrapper.type = instance;
-                wrapper.value = makeSurfaceStructuredClaim(
-                    instance, /*label=*/"", /*byHint=*/fact,
-                    /*byCases=*/false, {}, fromToken.line,
-                    fromToken.column);
-                wrapper.line = fromToken.line;
-                wrapper.column = fromToken.column;
                 wrappers.push_back(std::move(wrapper));
                 continue;
             }

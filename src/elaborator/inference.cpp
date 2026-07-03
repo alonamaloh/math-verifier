@@ -1192,6 +1192,117 @@ ExpressionPointer Elaborator::recoverClaimHint(
                     "spelling)");
             }
         }
+        // A7 "hypothesis discharge at call sites": `by Lemma(n, k)` with
+        // POSITIONAL arguments maps them onto the lemma's DATA
+        // parameters (non-Proposition domains) in order; the premise
+        // slots become inference holes, discharged from the goal and
+        // context like any citation's. A mathematician's "apply the
+        // induction hypothesis to n and k". Only reached when the
+        // direct application failed, so fully-spelled calls keep their
+        // ordinary positional meaning.
+        if (auto* application =
+                std::get_if<SurfaceApplication>(&byHint.node)) {
+            auto* head = std::get_if<SurfaceIdentifier>(
+                &application->function->node);
+            bool allPositional =
+                head != nullptr && !application->arguments.empty();
+            if (allPositional) {
+                for (const auto& argument : application->arguments) {
+                    if (!argument.name.empty()) allPositional = false;
+                }
+            }
+            ExpressionPointer lemmaTypeClosed;
+            if (allPositional) {
+                int N = static_cast<int>(localBinders.size());
+                for (int b = N - 1; b >= 0; --b) {
+                    if (localBinders[b].name == head->qualifiedName) {
+                        lemmaTypeClosed = liftBoundVariables(
+                            localBinders[b].type, N - b, 0);
+                        break;
+                    }
+                }
+                if (!lemmaTypeClosed) {
+                    if (const Declaration* declaration =
+                            environment_.lookup(head->qualifiedName)) {
+                        lemmaTypeClosed = declarationType(*declaration);
+                    }
+                }
+            }
+            if (lemmaTypeClosed) {
+                // Walk the Pi chain in OPENED form, classifying each
+                // parameter: data (its domain is a Type) or premise
+                // (its domain is a Proposition).
+                ExpressionPointer cursor = openOverLocalBinders(
+                    lemmaTypeClosed, localBinders, localBinders.size());
+                Context chainContext =
+                    buildContextFromLocalBinders(localBinders);
+                std::vector<bool> premiseSlot;
+                while (premiseSlot.size() < 64) {
+                    ExpressionPointer normalized =
+                        weakHeadNormalForm(environment_, cursor);
+                    auto* pi = std::get_if<Pi>(&normalized->node);
+                    if (!pi) break;
+                    bool isPremise = false;
+                    try {
+                        ExpressionPointer sort = weakHeadNormalForm(
+                            environment_,
+                            inferType(environment_, chainContext,
+                                      pi->domain));
+                        if (auto* asSort = std::get_if<Sort>(&sort->node)) {
+                            auto level = levelAsConstant(asSort->level);
+                            isPremise = level && *level == 0;
+                        }
+                    } catch (const TypeError&) {}
+                    premiseSlot.push_back(isPremise);
+                    std::string opened = "_positional_"
+                        + std::to_string(premiseSlot.size());
+                    chainContext.push_back(
+                        {opened, pi->domain,
+                         FreeVariableOrigin::Internal, nullptr});
+                    cursor = openBinder(pi->codomain, opened,
+                                        FreeVariableOrigin::Internal);
+                }
+                size_t dataCount = 0;
+                for (bool premise : premiseSlot) {
+                    if (!premise) ++dataCount;
+                }
+                if (application->arguments.size() <= dataCount
+                    && application->arguments.size()
+                           < premiseSlot.size()) {
+                    std::vector<SurfaceExpressionPointer> full;
+                    size_t argCursor = 0;
+                    for (size_t i = 0; i < premiseSlot.size(); ++i) {
+                        if (!premiseSlot[i]
+                            && argCursor
+                                   < application->arguments.size()) {
+                            full.push_back(
+                                application->arguments[argCursor++]
+                                    .value);
+                        } else {
+                            full.push_back(makeSurfaceHole(line, 0));
+                        }
+                    }
+                    if (argCursor == application->arguments.size()) {
+                        SurfaceExpressionPointer rebuilt =
+                            makeSurfaceApplication(
+                                application->function, std::move(full),
+                                line, 0);
+                        try {
+                            ExpressionPointer filled =
+                                elaborateExpression(
+                                    *rebuilt, localBinders, goalClosed);
+                            if (filled
+                                && bridgedResultProvesGoal(
+                                       filled, goalClosed,
+                                       localBinders)) {
+                                return filled;
+                            }
+                        } catch (const ElaborateError&) {
+                        } catch (const TypeError&) {}
+                    }
+                }
+            }
+        }
         // Pi-typed goal (structurally, or after one WHNF step — `¬P` is
         // `P → False` behind `Not`): introduce its binders and retry the
         // citation against the inner goal (`claim (x : T) → P by Lemma`
