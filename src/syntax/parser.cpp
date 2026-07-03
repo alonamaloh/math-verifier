@@ -4255,6 +4255,42 @@ private:
             // 'case T [as h]: body'.
             disjunctType = parseExpression();
         }
+        // `case <equation> for some k:` / `for some (k : T):` — the
+        // structural-case witness binder (A4). The arm's hypothesis
+        // becomes `∃ k. <equation>`, with the witness and the equation
+        // both in scope in the arm body. One binder for now.
+        std::string witnessName;
+        SurfaceExpressionPointer witnessType;
+        if (!isOtherwise && disjunctType
+            && isIdentifierLike(peek().kind) && peek().lexeme == "for") {
+            consumeAny();  // 'for'
+            if (!(isIdentifierLike(peek().kind)
+                  && peek().lexeme == "some")) {
+                throwHere("expected 'some' after 'for' in a case arm "
+                          "(`case P for some k:`)");
+            }
+            consumeAny();  // 'some'
+            if (peek().kind == TokenKind::LeftParen) {
+                consumeAny();  // '('
+                if (!isIdentifierLike(peek().kind)) {
+                    throwHere("expected the witness name in "
+                              "'for some (k : T)'");
+                }
+                witnessName = consumeAny().lexeme;
+                expect(TokenKind::Colon, "after the witness name");
+                witnessType = parseExpression();
+                expect(TokenKind::RightParen,
+                       "ending 'for some (k : T)'");
+            } else if (isIdentifierLike(peek().kind)) {
+                witnessName = consumeAny().lexeme;
+            } else {
+                throwHere("expected a witness name after 'for some'");
+            }
+            if (peek().kind == TokenKind::Comma) {
+                throwHere("one witness binder per case for now "
+                          "(`for some k`)");
+            }
+        }
         std::string binderName;
         SurfacePatternPointer destructurePattern;
         if (peek().kind == TokenKind::KeywordAs) {
@@ -4296,6 +4332,8 @@ private:
         arm.binderName = std::move(binderName);
         arm.body = std::move(body);
         arm.isOtherwise = isOtherwise;
+        arm.witnessName = std::move(witnessName);
+        arm.witnessType = std::move(witnessType);
         arm.line = armToken.line;
         arm.column = armToken.column;
         return arm;

@@ -73,6 +73,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
 | `claim P by cases { case A as h: … case B as h: … }` | prove `P` by ∨-elimination (`in (A) as h:` is the legacy spelling) |
 | `P by cases { case A: … otherwise [as h]: … }` | last-arm `otherwise:` covers the complement `¬(A ∨ …)`; exhaustiveness is excluded middle by construction, never a prover obligation |
+| `case n = k + 1 for some k [as eq]:` | structural case: the arm's hypothesis is `∃ k. n = k + 1`, with the witness `k` and the equation both in scope in the body (`as` names the equation). Witness type inferred from the equation's left side; annotate with `for some (k : T)` otherwise. Exhaustiveness discharges through the coverage lemma (`Natural.zero_or_add_one` is automatic) |
 | `claim P by substituting eq;` | prove `P` by rewriting with `eq` |
 | `claim goal [by V]` | close the current goal (type from context) |
 | `done` / `okay` | ≡ `claim goal`; bare or with `by` |

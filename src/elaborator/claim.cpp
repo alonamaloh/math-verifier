@@ -732,9 +732,68 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
         bool hasOtherwise = claim.arms.back().isOtherwise;
         size_t statedCount = hasOtherwise ? armCount - 1 : armCount;
         std::vector<ExpressionPointer> disjuncts;
+        // Witness arms (`case P for some k:`): the disjunct is ∃ k. P.
+        // The witness type is the annotation when given, else inferred
+        // as the type of the equation's left endpoint.
+        std::vector<ExpressionPointer> witnessTypes(armCount);
+        std::vector<ExpressionPointer> witnessEquations(armCount);
+        std::vector<LevelPointer> witnessLevels(armCount);
         for (size_t i = 0; i < statedCount; ++i) {
-            disjuncts.push_back(elaborateExpression(
-                *claim.arms[i].disjunctType, localBinders));
+            const SurfaceStructuredClaimArm& arm = claim.arms[i];
+            if (arm.witnessName.empty()) {
+                disjuncts.push_back(elaborateExpression(
+                    *arm.disjunctType, localBinders));
+                continue;
+            }
+            ExpressionPointer witnessT;
+            if (arm.witnessType) {
+                witnessT = elaborateExpression(
+                    *arm.witnessType, localBinders);
+            } else {
+                auto* binary = std::get_if<SurfaceBinaryOperation>(
+                    &arm.disjunctType->node);
+                if (!binary || binary->opSymbol != "=") {
+                    throwElaborate(
+                        "`for some " + arm.witnessName + "` without a "
+                        "type annotation needs the case proposition to "
+                        "be an equation `lhs = rhs` (the witness type "
+                        "is inferred from the left side) — annotate "
+                        "it: `for some (" + arm.witnessName + " : T)`");
+                }
+                ExpressionPointer lhsKernel = elaborateExpression(
+                    *binary->left, localBinders);
+                ExpressionPointer lhsTypeOpened =
+                    inferTypeInLocalContext(localBinders, lhsKernel);
+                witnessT = closeOverLocalBinders(
+                    lhsTypeOpened, localBinders, localBinders.size());
+            }
+            LevelPointer witnessLevel;
+            {
+                ExpressionPointer tSort = weakHeadNormalForm(
+                    environment_,
+                    inferTypeInLocalContext(localBinders, witnessT));
+                auto* sort = std::get_if<Sort>(&tSort->node);
+                if (!sort) {
+                    throwElaborate(
+                        "`for some " + arm.witnessName + "`: cannot "
+                        "determine the witness type's universe");
+                }
+                witnessLevel = predecessorOfSortLevel(sort->level);
+            }
+            std::vector<LocalBinder> withWitness = localBinders;
+            withWitness.push_back({arm.witnessName, witnessT});
+            ExpressionPointer equationClosed = elaborateExpression(
+                *arm.disjunctType, withWitness);
+            ExpressionPointer predicate = makeLambda(
+                arm.witnessName, witnessT, equationClosed);
+            ExpressionPointer existsDisjunct = makeApplication(
+                makeApplication(
+                    makeConstant("Exists", {witnessLevel}), witnessT),
+                predicate);
+            disjuncts.push_back(std::move(existsDisjunct));
+            witnessTypes[i] = std::move(witnessT);
+            witnessEquations[i] = std::move(equationClosed);
+            witnessLevels[i] = std::move(witnessLevel);
         }
         auto makeOr = [&](ExpressionPointer a, ExpressionPointer b) {
             return makeApplication(
@@ -897,6 +956,56 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
             [&](size_t index, ExpressionPointer domain)
                 -> ExpressionPointer {
             const SurfaceStructuredClaimArm& arm = claim.arms[index];
+            if (!arm.witnessName.empty()) {
+                // `case P for some k:` — the hypothesis is ∃ k. P; open
+                // it so the body sees BOTH the witness `k` and the
+                // equation. Body elaborates under localBinders + [k]
+                // + [equation]; the assembled arm is
+                //   λ (h : ∃ k. P).
+                //     Exists.eliminate(T, λk. P, Goal, λ k eq. body, h).
+                // `as h` names the EQUATION hypothesis (the witness has
+                // its own name; the ∃ itself is consumed on the spot).
+                ExpressionPointer witnessT = witnessTypes[index];
+                ExpressionPointer equation = witnessEquations[index];
+                std::string equationName = arm.binderName.empty()
+                    ? "_case_equation" : arm.binderName;
+                std::vector<LocalBinder> innerBinders = localBinders;
+                innerBinders.push_back({arm.witnessName, witnessT});
+                innerBinders.push_back({equationName, equation});
+                ExpressionPointer goalLiftedTwo =
+                    liftBoundVariables(goalClosed, 2, 0);
+                Frame armFrame(*this,
+                    "`by cases` arm at line " + std::to_string(arm.line),
+                    innerBinders, goalLiftedTwo, arm.line, arm.column);
+                ExpressionPointer body = elaborateExpression(
+                    *arm.body, innerBinders, goalLiftedTwo);
+                body = coerceToExpectedTypeViaDiff(
+                    innerBinders, body, goalLiftedTwo);
+                // Reposition under the ∃-hypothesis binder `h`, which
+                // sits between the locals and (k, equation): the locals'
+                // indices shift by one, k and the equation keep theirs.
+                ExpressionPointer bodyShifted =
+                    liftBoundVariables(body, 1, 2);
+                ExpressionPointer equationShifted =
+                    liftBoundVariables(equation, 1, 1);
+                ExpressionPointer typeShifted =
+                    liftBoundVariables(witnessT, 1, 0);
+                ExpressionPointer handler = makeLambda(
+                    arm.witnessName, typeShifted,
+                    makeLambda(equationName, equationShifted,
+                               std::move(bodyShifted)));
+                ExpressionPointer predicateShifted = makeLambda(
+                    arm.witnessName, typeShifted, equationShifted);
+                ExpressionPointer call = makeConstant(
+                    "Exists.eliminate", {witnessLevels[index]});
+                call = makeApplication(call, typeShifted);
+                call = makeApplication(call, predicateShifted);
+                call = makeApplication(call, goalLifted);
+                call = makeApplication(call, std::move(handler));
+                call = makeApplication(call, makeBoundVariable(0));
+                return makeLambda(
+                    "_disjunct_hypothesis", domain, std::move(call));
+            }
             std::string binderName = arm.binderName.empty()
                 ? "_disjunct_hypothesis" : arm.binderName;
             std::vector<LocalBinder> extendedBinders = localBinders;

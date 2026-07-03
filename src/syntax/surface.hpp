@@ -435,6 +435,11 @@ struct SurfaceStructuredClaimArm {
     // is ¬(P₁ ∨ … ∨ Pₖ), synthesized at elaboration time; exhaustiveness
     // is excluded middle, discharged by construction (no prover).
     bool isOtherwise = false;
+    // `case P for some k:` — the arm's hypothesis is `∃ k. P`; the
+    // witness and the equation are both in scope in the body. The
+    // witness type is inferred from P's left endpoint when omitted.
+    std::string witnessName;                // empty if no witness
+    SurfaceExpressionPointer witnessType;   // null if inferred
     int line = 0;
     int column = 0;
 };

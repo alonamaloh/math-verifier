@@ -1,0 +1,38 @@
+module Test.witness_case_test
+
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- `case P for some k:` — the structural-case clause. The arm's
+-- hypothesis is ∃ k. P; inside the body both the witness k and the
+-- equation are in scope. Exhaustiveness is the ordinary coverage
+-- lemma (Natural.zero_or_add_one).
+theorem Test.witness_case_basic (n : Natural) : n = 0 ∨ 1 ≤ n := {
+  n = 0 ∨ 1 ≤ n by cases {
+    case n = 0: done
+    case n = k + 1 for some k: {
+      1 ≤ k + 1;
+      1 ≤ n by substitution;
+      done
+    }
+  };
+  done
+}
+
+-- The annotated form `for some (k : T)` skips the inference.
+theorem Test.witness_case_annotated (n : Natural) : n = 0 ∨ 1 ≤ n := {
+  n = 0 ∨ 1 ≤ n by cases {
+    case n = 0: done
+    case n = k + 1 for some (k : Natural) as successorForm: {
+      1 ≤ k + 1;
+      1 ≤ n by substituting successorForm;
+      done
+    }
+  };
+  done
+}
