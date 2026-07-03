@@ -500,6 +500,29 @@ public:
         }
         interfaceModuleMode_ = module.kind == ModuleKind::Interface;
         while (peek().kind != TokenKind::EndOfFile) {
+            // `export theorems of M1, M2, …` — an interface-module
+            // clause, recorded on the module (not a statement).
+            if (interfaceModuleMode_
+                && peek().kind == TokenKind::Identifier
+                && peek().lexeme == "export"
+                && peekAt(1).kind == TokenKind::Identifier
+                && peekAt(1).lexeme == "theorems") {
+                consumeAny();
+                consumeAny();
+                if (!(peek().kind == TokenKind::Identifier
+                      && peek().lexeme == "of")) {
+                    throwHere("expected 'of' after 'export theorems'");
+                }
+                consumeAny();
+                module.exportTheoremsOfModules.push_back(
+                    consumeQualifiedNameString());
+                while (peek().kind == TokenKind::Comma) {
+                    consumeAny();
+                    module.exportTheoremsOfModules.push_back(
+                        consumeQualifiedNameString());
+                }
+                continue;
+            }
             module.statements.push_back(parseTopStatement());
         }
         return module;

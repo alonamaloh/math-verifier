@@ -5733,13 +5733,87 @@ int verifyWithCache(const std::string& sourcePath,
                           /*automatic=*/false});
             }
         }
+        // `export theorems of M, …`: every Prop-typed declaration of
+        // each listed module re-emits sealed, exactly like a checked
+        // obligation — the scalable route for construction subtrees
+        // with hundreds of lemmas (the prover reaches them invisibly,
+        // so curated lists under-export). `automatic` is preserved.
+        std::set<std::string> alreadySealed;
+        for (const auto& [sealedName, sealedDeclaration]
+                 : cache.declarations) {
+            (void)sealedDeclaration;
+            alreadySealed.insert(sealedName);
+        }
+        for (const auto& exportedModule
+                 : parsedModule.exportTheoremsOfModules) {
+            auto exportedInfo = moduleToDepInfo.find(exportedModule);
+            if (exportedInfo == moduleToDepInfo.end()) {
+                std::cerr << sourcePath << ":1:1: elaborate error: "
+                    << "export theorems of " << exportedModule
+                    << ": the module is not imported by this "
+                    << "interface\n";
+                return 1;
+            }
+            CacheContents exportedCache;
+            try {
+                std::string exportedPath = exportedInfo->second.first;
+                if (!std::filesystem::exists(exportedPath)) {
+                    exportedPath += ".iface";
+                }
+                exportedCache = readCacheFile(
+                    exportedPath, /*skipDefinitionBodies=*/true);
+            } catch (const SerializationError& error) {
+                std::cerr << sourcePath << ":1:1: elaborate error: "
+                    << "export theorems of " << exportedModule
+                    << ": cannot read its cache (" << error.what()
+                    << ")\n";
+                return 1;
+            }
+            for (const auto& [exportedName, exportedDeclaration]
+                     : exportedCache.declarations) {
+                if (alreadySealed.count(exportedName)) continue;
+                std::vector<std::string> universeParameters;
+                ExpressionPointer declaredType;
+                bool automaticFlag = false;
+                if (auto* definition =
+                        std::get_if<Definition>(&exportedDeclaration)) {
+                    universeParameters = definition->universeParameters;
+                    declaredType = definition->type;
+                    automaticFlag = definition->automatic;
+                } else if (auto* axiom =
+                        std::get_if<Axiom>(&exportedDeclaration)) {
+                    universeParameters = axiom->universeParameters;
+                    declaredType = axiom->type;
+                    automaticFlag = axiom->automatic;
+                } else {
+                    continue;
+                }
+                if (!typeIsProposition(environment, declaredType)) {
+                    continue;
+                }
+                cache.declarations.emplace_back(
+                    exportedName,
+                    Definition{universeParameters, declaredType,
+                               sealedBody, Opacity::Opaque,
+                               automaticFlag});
+                alreadySealed.insert(exportedName);
+            }
+        }
         // Consumers must never load the construction: drop the
-        // implementation from the recorded dependency list. (Its other
-        // imports stay — the sealed declarations' types reference
-        // them.)
+        // implementation AND every theorem-exported module from the
+        // recorded dependency list (their content was COPIED above;
+        // keeping the edges would leak the construction transitively).
+        // Other imports stay — the sealed declarations' types
+        // reference them.
+        std::set<std::string> droppedDependencies;
+        droppedDependencies.insert(parsedModule.implementedByName);
+        for (const auto& exportedModule
+                 : parsedModule.exportTheoremsOfModules) {
+            droppedDependencies.insert(exportedModule);
+        }
         std::vector<CachedDependency> keptDependencies;
         for (auto& dependency : cache.dependencies) {
-            if (dependency.moduleName != parsedModule.implementedByName) {
+            if (!droppedDependencies.count(dependency.moduleName)) {
                 keptDependencies.push_back(std::move(dependency));
             }
         }

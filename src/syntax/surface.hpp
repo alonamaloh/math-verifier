@@ -1172,6 +1172,11 @@ struct SurfaceModule {
     // Interface modules: the implementation backing them (the build
     // edge; cross-validated against the implementation's `implements`).
     std::string implementedByName;
+    // Interface modules: `export theorems of M1, M2, …` — every
+    // Prop-typed declaration of each listed (imported) module re-emits
+    // in the sealed cache like a checked obligation. The scalable
+    // alternative to hand-listing hundreds of theorem signatures.
+    std::vector<std::string> exportTheoremsOfModules;
     std::vector<SurfaceTopStatement> statements;
 };
 
