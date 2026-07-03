@@ -75,6 +75,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | `from h: P [as NAME];` | restate hypothesis `h` with in-scope equations substituted: `P` is `h`'s statement after rewriting, checked and bound like a claim (source first, transformed statement on the page) |
 | `claim goal [by V]` | close the current goal (type from context) |
 | `done` / `okay` | ≡ `claim goal`; bare or with `by` |
+| `theorem X : T := by L` | the whole proof is a citation of `L`; the prover does the logical plumbing (premise discharge, `Or.self` collapse) |
 | `note P [by V];` | a *checked comment*: verify `P` holds, then **discard** it — unlike `claim`, it does NOT bind `P`, so later steps don't see it |
 | `note goal : T;` | a checked assertion that the goal is (defeq) `T`; non-binding, goal unchanged |
 | `change T;` | replace the goal by a defeq `T` (this *does* change the proof state) |
