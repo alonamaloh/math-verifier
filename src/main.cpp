@@ -5321,6 +5321,19 @@ int verifyWithCache(const std::string& sourcePath,
                   << error.what() << "\n";
         return 1;
     }
+    // D Phase-1 staging: the module kinds PARSE (stage 1, landed);
+    // interface-module PROCESSING (obligation check + sealed-cache
+    // derivation over the implementation, plan section D3a) is stage 2.
+    // Implementation modules build as ordinary modules — `implements`
+    // is inert until the interface side consumes it.
+    if (parsedModule.kind == ModuleKind::Interface) {
+        std::cerr << sourcePath << ":1:1: elaborate error: interface "
+                  << "modules parse but do not yet build — the "
+                  << "obligation check and sealed-view derivation are "
+                  << "D Phase-1 stage 2 (see PLAN_LANGUAGE_IMPROVEMENT"
+                  << ".md section D3a)\n";
+        return 1;
+    }
     const std::string moduleName = parsedModule.moduleName;
     const std::vector<std::string> importedModuleNames =
         importedModulesOf(parsedModule);

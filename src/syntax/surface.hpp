@@ -1000,6 +1000,13 @@ struct SurfaceAxiomDeclaration {
     SurfaceExpressionPointer type;
     // `automatic axiom …` — see SurfaceDefinitionDeclaration::automatic.
     bool automatic = false;
+    // Provenance inside an `interface module` (D Phase-1): abstract
+    // `type N` / `constant N : T` primitives, or a theorem signature
+    // (an OBLIGATION the implementation must discharge). Regular
+    // axioms keep None.
+    enum class InterfaceRole { None, AbstractType, AbstractConstant,
+                               Obligation };
+    InterfaceRole interfaceRole = InterfaceRole::None;
 };
 
 // `definition Name.{u} (arguments) : Type := body`  OR
@@ -1151,8 +1158,20 @@ using SurfaceTopStatement = std::variant<
     SurfaceFoldOperationDeclaration
 >;
 
+// D Phase-1 (sealed structures): a module is REGULAR, an INTERFACE
+// (declares the public view: abstract types/constants, transparent
+// definitions, theorem signatures = obligations), or an IMPLEMENTATION
+// (an ordinary module that additionally `implements` an interface).
+enum class ModuleKind { Regular, Interface, Implementation };
+
 struct SurfaceModule {
     std::string moduleName;
+    ModuleKind kind = ModuleKind::Regular;
+    // Implementation modules: the interface they implement.
+    std::string implementsName;
+    // Interface modules: the implementation backing them (the build
+    // edge; cross-validated against the implementation's `implements`).
+    std::string implementedByName;
     std::vector<SurfaceTopStatement> statements;
 };
 

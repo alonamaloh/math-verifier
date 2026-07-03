@@ -465,8 +465,40 @@ public:
 
     SurfaceModule parseModule() {
         SurfaceModule module;
+        // D Phase-1 module kinds — `interface` / `implementation` are
+        // CONTEXTUAL words (ordinary identifiers elsewhere).
+        if (peek().kind == TokenKind::Identifier
+            && peek().lexeme == "interface"
+            && peekAt(1).kind == TokenKind::KeywordModule) {
+            consumeAny();
+            module.kind = ModuleKind::Interface;
+        } else if (peek().kind == TokenKind::Identifier
+                   && peek().lexeme == "implementation"
+                   && peekAt(1).kind == TokenKind::KeywordModule) {
+            consumeAny();
+            module.kind = ModuleKind::Implementation;
+        }
         expect(TokenKind::KeywordModule, "at start of file");
         module.moduleName = consumeQualifiedNameString();
+        if (module.kind == ModuleKind::Implementation) {
+            if (!(peek().kind == TokenKind::Identifier
+                  && peek().lexeme == "implements")) {
+                throwHere("an implementation module must declare the "
+                          "interface it implements: `implementation "
+                          "module Name implements InterfaceName`");
+            }
+            consumeAny();
+            module.implementsName = consumeQualifiedNameString();
+        }
+        if (module.kind == ModuleKind::Interface
+            && peek().kind == TokenKind::Identifier
+            && peek().lexeme == "implemented"
+            && peekAt(1).kind == TokenKind::KeywordBy) {
+            consumeAny();
+            consumeAny();
+            module.implementedByName = consumeQualifiedNameString();
+        }
+        interfaceModuleMode_ = module.kind == ModuleKind::Interface;
         while (peek().kind != TokenKind::EndOfFile) {
             module.statements.push_back(parseTopStatement());
         }
@@ -475,6 +507,64 @@ public:
 
 private:
     SurfaceTopStatement parseTopStatement() {
+        // Interface-module body forms: `type N` and `constant N : T`
+        // (contextual words), both representing abstract primitives.
+        if (interfaceModuleMode_ && peek().kind == TokenKind::Identifier
+            && peek().lexeme == "type"
+            && peekAt(1).kind == TokenKind::Identifier) {
+            consumeAny();
+            SurfaceAxiomDeclaration declaration;
+            declaration.name = consumeQualifiedNameString();
+            declaration.type = makeSurfaceType(
+                makeSurfaceLevelNumeric(0, peek().line, peek().column),
+                peek().line, peek().column);
+            declaration.interfaceRole =
+                SurfaceAxiomDeclaration::InterfaceRole::AbstractType;
+            return declaration;
+        }
+        if (interfaceModuleMode_
+            && peek().kind == TokenKind::KeywordTheorem) {
+            // A theorem SIGNATURE (no `:=`): an obligation the
+            // implementation must discharge; consumers see it as a
+            // bodyless fact. Binders fold into a Pi type.
+            int line = peek().line, column = peek().column;
+            consumeAny();
+            SurfaceAxiomDeclaration declaration;
+            declaration.name = consumeQualifiedNameString();
+            std::vector<SurfaceBinder> binders;
+            while (peek().kind == TokenKind::LeftParen
+                   || peek().kind == TokenKind::LeftBrace) {
+                binders.push_back(parseExplicitBinder());
+            }
+            expect(TokenKind::Colon, "before the theorem signature's "
+                                      "statement");
+            SurfaceExpressionPointer statement = parseExpression();
+            if (peek().kind == TokenKind::Assign) {
+                throwHere("an interface theorem is a SIGNATURE — the "
+                          "proof belongs in the implementation module");
+            }
+            for (auto binderIterator = binders.rbegin();
+                 binderIterator != binders.rend(); ++binderIterator) {
+                statement = makeSurfacePiType(*binderIterator, statement,
+                                              line, column);
+            }
+            declaration.type = statement;
+            declaration.interfaceRole =
+                SurfaceAxiomDeclaration::InterfaceRole::Obligation;
+            return declaration;
+        }
+        if (interfaceModuleMode_ && peek().kind == TokenKind::Identifier
+            && peek().lexeme == "constant"
+            && peekAt(1).kind == TokenKind::Identifier) {
+            consumeAny();
+            SurfaceAxiomDeclaration declaration;
+            declaration.name = consumeQualifiedNameString();
+            expect(TokenKind::Colon, "after the constant's name");
+            declaration.type = parseExpression();
+            declaration.interfaceRole =
+                SurfaceAxiomDeclaration::InterfaceRole::AbstractConstant;
+            return declaration;
+        }
         switch (peek().kind) {
             case TokenKind::KeywordImport:     return parseImportDeclaration();
             case TokenKind::KeywordUsing:      return parseUsingDeclaration();
@@ -4281,6 +4371,9 @@ private:
     const std::vector<Token>& tokens_;
     size_t position_ = 0;
     int anonymousClaimCounter_ = 0;
+    // True while parsing an `interface module` body: enables the
+    // `type`/`constant` forms and proofless theorem signatures.
+    bool interfaceModuleMode_ = false;
 };
 
 }  // namespace
