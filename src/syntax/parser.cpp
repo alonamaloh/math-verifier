@@ -4322,11 +4322,14 @@ private:
             ihName);
     }
 
-    // `by_strong_induction on E with subject, ih { body }` —
-    // single-step strong induction. Same surface shape as the
-    // explicit `by_induction on E using L with subject, ih { body }`
-    // but with the induction lemma resolved at elaboration time as
-    // `<CarrierTypeName>.strong_induction`.
+    // `by_strong_induction on m with hypothesis ih { body }` —
+    // single-step strong induction. The generalized subject keeps the
+    // inducted variable's name (shadowing it), so the body speaks the
+    // statement's vocabulary; `hypothesis` (contextual word) marks the
+    // one name in the clause as the induction hypothesis. The verbose
+    // `with <subject>, <ih>` form names the subject explicitly — for
+    // an `on` expression that isn't a plain variable, or when a
+    // distinct subject name genuinely helps.
     SurfaceExpressionPointer parseByStrongInduction() {
         Token byToken = consumeAny();  // 'by_strong_induction'
         expect(TokenKind::KeywordOn,
@@ -4336,20 +4339,47 @@ private:
                "after 'by_strong_induction on <expr>'");
         if (!isIdentifierLike(peek().kind)) {
             throwHere(
-                "expected the subject name after 'with'");
+                "expected 'hypothesis <name>' or '<subject>, <ih>' "
+                "after 'with'");
         }
-        std::string subjectName = consumeAny().lexeme;
-        expect(TokenKind::Comma,
-               "between subject name and ih name in "
-               "by_strong_induction");
-        if (!isIdentifierLike(peek().kind)) {
-            throwHere(
-                "expected the induction hypothesis name "
-                "after ','");
+        std::string subjectName;
+        std::string ihName;
+        if (peek().kind == TokenKind::Identifier
+            && peek().lexeme == "hypothesis") {
+            consumeAny();  // 'hypothesis'
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere(
+                    "expected the induction hypothesis name after "
+                    "'with hypothesis'");
+            }
+            ihName = consumeAny().lexeme;
+            auto* onIdentifier = std::get_if<SurfaceIdentifier>(
+                &scrutinee->node);
+            if (!onIdentifier
+                || onIdentifier->qualifiedName.find('.')
+                       != std::string::npos) {
+                throwHere(
+                    "'with hypothesis <ih>' names the generalized "
+                    "subject after the inducted variable, so "
+                    "'by_strong_induction on <expr>' needs a plain "
+                    "variable — use 'with <subject>, <ih>' to name "
+                    "the subject explicitly");
+            }
+            subjectName = onIdentifier->qualifiedName;
+        } else {
+            subjectName = consumeAny().lexeme;
+            expect(TokenKind::Comma,
+                   "between subject name and ih name in "
+                   "by_strong_induction");
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere(
+                    "expected the induction hypothesis name "
+                    "after ','");
+            }
+            ihName = consumeAny().lexeme;
         }
-        std::string ihName = consumeAny().lexeme;
         expect(TokenKind::LeftBrace,
-               "after 'by_strong_induction on … with <subject>, <ih>'");
+               "after the by_strong_induction with-clause");
         SurfaceExpressionPointer body = parseBlockContents();
         expect(TokenKind::RightBrace,
                "ending by_strong_induction block");
