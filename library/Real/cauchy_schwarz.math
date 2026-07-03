@@ -57,10 +57,10 @@ theorem Real.quadratic_form_nonneg
                 (k : Natural) ↦
                     (X * a(k) - Y * b(k)) * (X * a(k) - Y * b(k)),
                 n) := {
-  claim ∀ (j : Natural).
+  ∀ (j : Natural).
             Real.zero ≤ (X * a(j) - Y * b(j)) * (X * a(j) - Y * b(j))
       by (j : Natural) ↦ {
-           claim Real.IsNonneg((X * a(j) - Y * b(j)) * (X * a(j) - Y * b(j)));
+           Real.IsNonneg((X * a(j) - Y * b(j)) * (X * a(j) - Y * b(j)));
            done by Real.LessOrEqual_zero_of_IsNonneg
          };
   done
@@ -86,7 +86,7 @@ theorem Real.quadratic_form_expansion
                + ((-(X * Y)) * (a(k) * b(k)) + (Y * Y) * (b(k) * b(k))),
            n)
            by {
-             claim ∀ (k : Natural).
+             ∀ (k : Natural).
                  (X * a(k) - Y * b(k)) * (X * a(k) - Y * b(k))
                  = ((X * X) * (a(k) * a(k)) + (-(X * Y)) * (a(k) * b(k)))
                    + ((-(X * Y)) * (a(k) * b(k)) + (Y * Y) * (b(k) * b(k)))
@@ -144,15 +144,14 @@ theorem Real.cauchy_schwarz (a b : Natural → Real) (n : Natural)
           ≤ Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
             * Real.partialSum((k : Natural) ↦ b(k) * b(k), n) := {
   -- Abbreviate in prose: A = Σa², B = Σab, C = Σb².
-  claim ∀ (j : Natural). Real.zero ≤ b(j) * b(j)
+  ∀ (j : Natural). Real.zero ≤ b(j) * b(j)
       by (j : Natural) ↦ {
-           claim Real.IsNonneg(b(j) * b(j));
+           Real.IsNonneg(b(j) * b(j));
            done by Real.LessOrEqual_zero_of_IsNonneg
          };
-  claim Real.zero ≤ Real.partialSum((k : Natural) ↦ b(k) * b(k), n);
+  Real.zero ≤ Real.partialSum((k : Natural) ↦ b(k) * b(k), n);
   -- The form at X := C, Y := B is nonnegative and expands.
-  claim formNonnegRaw
-        : Real.zero
+  Real.zero
           ≤ Real.partialSum(
                 (k : Natural) ↦
                     (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
@@ -164,8 +163,8 @@ theorem Real.cauchy_schwarz (a b : Natural → Real) (n : Natural)
                        - Real.partialSum((k2 : Natural) ↦ a(k2) * b(k2), n)
                            * b(k)),
                 n)
-      by Real.quadratic_form_nonneg;
-  calc Real.zero
+      by Real.quadratic_form_nonneg as formNonnegRaw;
+  Real.zero
             ≤ Real.partialSum(
                   (k : Natural) ↦
                       (Real.partialSum((k2 : Natural) ↦ b(k2) * b(k2), n)
@@ -198,36 +197,35 @@ theorem Real.cauchy_schwarz (a b : Natural → Real) (n : Natural)
   decide Real.partialSum((k : Natural) ↦ b(k) * b(k), n) = Real.zero {
     -- C = 0: every bₖ below the cut vanishes, so B does too.
     | yes CZero => {
-        claim bPrefixZero
-              : ∀ (j : Natural). j < n → b(j) = Real.zero
+        ∀ (j : Natural). j < n → b(j) = Real.zero
             by (j : Natural) (jBelow : j < n) ↦ {
-                 claim b(j) * b(j) = Real.zero
+                 b(j) * b(j) = Real.zero
                      by Real.partialSum_zero_term;
                  decide b(j) = Real.zero {
                    | yes termZero => termZero
                    | no termNonzero => { done by Real.right_factor_zero_of_product_zero }
                  }
-               };
+               } as bPrefixZero;
         -- B sums products that all vanish below the cut, so B = 0.
-        claim ∀ (j : Natural). j < n → a(j) * b(j) = Real.zero
+        ∀ (j : Natural). j < n → a(j) * b(j) = Real.zero
             by (j : Natural) (jBelow : j < n) ↦
                  calc a(j) * b(j)
                     = a(j) * Real.zero    by bPrefixZero(j, jBelow)
                     = Real.zero;
-        calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+        Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
            = Real.partialSum((k : Natural) ↦ Real.zero, n)
            = Real.zero
            as BZero;
-        calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+        Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
                  * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
            = Real.zero * Real.zero    by BZero
            = Real.zero
            as leftZero;
-        calc Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
+        Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
                  * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
            = Real.partialSum((k : Natural) ↦ a(k) * a(k), n) * Real.zero    by CZero
            = Real.zero;
-        calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+        Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
                  * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
            = Real.zero
                  by leftZero
@@ -237,19 +235,19 @@ theorem Real.cauchy_schwarz (a b : Natural → Real) (n : Natural)
       }
     -- C > 0: cancel it out of C·(CA − B²) ≥ 0.
     | no CNonzero => {
-        claim Real.zero ≠ Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
+        Real.zero ≠ Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
             by (zeroEqualsC : Real.zero = Real.partialSum((k : Natural) ↦ b(k) * b(k), n)) ↦
                  CNonzero(
                      calc Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
                         = Real.zero);
-        claim Real.zero < Real.partialSum((k : Natural) ↦ b(k) * b(k), n);
-        claim Real.zero
+        Real.zero < Real.partialSum((k : Natural) ↦ b(k) * b(k), n);
+        Real.zero
                 ≤ Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
                       * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
                   - Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
                       * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
             by Real.nonneg_of_multiply_nonneg;
-        calc Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
+        Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
                  * Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
            = Real.zero
              + Real.partialSum((k : Natural) ↦ a(k) * b(k), n)

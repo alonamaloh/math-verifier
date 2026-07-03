@@ -129,33 +129,33 @@ theorem Real.geometric_series_converges
   -- The decay tolerance is scaled at the rational layer, so build the
   -- partial-sum convergence at a rational ε and lift it by density.
   {
-    claim ∀ (ε : Rational). ε > Rational.zero →
+    ∀ (ε : Rational). ε > Rational.zero →
             ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
               abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
               < (ε : Real)
         by (ε : Rational) (εPositive : ε > Rational.zero) ↦ {
-          claim Real.zero ≤ abs(r);
-          claim absLNonneg : Real.zero ≤ abs(L);
+          Real.zero ≤ abs(r);
+          Real.zero ≤ abs(L) as absLNonneg;
           -- The positive rational roof B + 1 over |L|.
           choose B such that abs(L) ≤ (B : Real) as LRoof
               from Real.exists_rational_above;
-          claim ((B + Rational.one) : Real) = (B : Real) + (Rational.one : Real);
-          claim Rational.one > Rational.zero;
-          claim (Rational.one : Real) > Real.zero;
-          calc abs(L)
+          ((B + Rational.one) : Real) = (B : Real) + (Rational.one : Real);
+          Rational.one > Rational.zero;
+          (Rational.one : Real) > Real.zero;
+          abs(L)
              ≤ (B : Real)                           by LRoof
              = (B : Real) + Real.zero
              < (B : Real) + (Rational.one : Real)   by Real.add_left_preserves_LessThan
              = ((B + Rational.one) : Real)
              as absStrictRoof;
-          claim abs(L) ≤ ((B + Rational.one) : Real);
-          calc (Rational.zero : Real)
+          abs(L) ≤ ((B + Rational.one) : Real);
+          (Rational.zero : Real)
              ≤ abs(L)                       by absLNonneg
              < ((B + Rational.one) : Real)  by absStrictRoof;
-          claim B + Rational.one > Rational.zero by Rational.to_real.LessThan_reflects;
-          claim B + Rational.one ≠ Rational.zero;
+          B + Rational.one > Rational.zero by Rational.to_real.LessThan_reflects;
+          B + Rational.one ≠ Rational.zero;
           -- The scaled tolerance ε/(B + 1), and the decay tail below it.
-          claim ε / (B + Rational.one) > Rational.zero;
+          ε / (B + Rational.one) > Rational.zero;
           choose N such that
               ∀ (m : Natural). N ≤ m →
                 Real.power(abs(r), m)
@@ -163,19 +163,19 @@ theorem Real.geometric_series_converges
               as tailBelow
               from Real.power_eventually_below;
           -- Scaling back: (ε/(B + 1))·(B + 1) = ε.
-          claim (B + Rational.one) * (ε / (B + Rational.one)) = ε;
-          calc (ε / (B + Rational.one)) * (B + Rational.one)
+          (B + Rational.one) * (ε / (B + Rational.one)) = ε;
+          (ε / (B + Rational.one)) * (B + Rational.one)
              = (B + Rational.one) * (ε / (B + Rational.one))
              = ε
              as toleranceProduct;
           witness N with {
             take m : Natural;
             take NLeqM : N ≤ m;
-            claim Real.power(abs(r), m)
+            Real.power(abs(r), m)
                   < ((ε / (B + Rational.one)) : Real)
                 by tailBelow(m, NLeqM);
             -- Sₘ = (1 − rᵐ)·L, so the error is exactly |r|ᵐ·|L|.
-            calc Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
+            Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
                = Real.partialSum((k : Natural) ↦ Real.power(r, k), m) * Real.one
                = Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
                      * ((Real.one - r) * L)
@@ -186,7 +186,7 @@ theorem Real.geometric_series_converges
                = (Real.one - Real.power(r, m)) * L
                      by Real.geometric_partialSum
                as sumFormula;
-            calc abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
+            abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
                = abs((Real.one - Real.power(r, m)) * L - L)
                      by sumFormula
                = abs(-(Real.power(r, m) * L))
@@ -198,9 +198,9 @@ theorem Real.geometric_series_converges
                = Real.power(abs(r), m) * abs(L)         by Real.absolute_value_power
                as absDifference;
             -- |r|ᵐ·|L| ≤ |r|ᵐ·(B + 1) < (ε/(B + 1))·(B + 1) = ε.
-            claim Real.zero ≤ Real.power(abs(r), m);
-            claim Real.IsNonneg(Real.power(abs(r), m));
-            calc Real.power(abs(r), m) * abs(L)
+            Real.zero ≤ Real.power(abs(r), m);
+            Real.IsNonneg(Real.power(abs(r), m));
+            Real.power(abs(r), m) * abs(L)
                = abs(L) * Real.power(abs(r), m)
                ≤ ((B + Rational.one) : Real) * Real.power(abs(r), m)
                      by Real.LessOrEqual.multiply_by_nonneg_right
@@ -212,7 +212,7 @@ theorem Real.geometric_series_converges
                    * (B + Rational.one) : Rational) : Real)
                = (ε : Real)                                          by toleranceProduct
                as finalBound;
-            calc abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
+            abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
                = Real.power(abs(r), m) * abs(L)    by absDifference
                < (ε : Real)                        by finalBound
           }
@@ -226,14 +226,14 @@ theorem Real.geometric_series_converges
 theorem Real.geometric_series (r : Real) (rSmall : abs(r) < Real.one)
         : ∃ (L : Real).
             (Real.one - r) * L = Real.one ∧ Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L) := {
-  claim r ≤ abs(r) by Real.LessOrEqual_absolute_value;
-  claim r < Real.one by Real.LessThan.transitive_left;
-  calc Real.zero
+  r ≤ abs(r) by Real.LessOrEqual_absolute_value;
+  r < Real.one by Real.LessThan.transitive_left;
+  Real.zero
      = r - r
      < Real.one - r      by Real.add_preserves_LessThan;
-  claim Real.one - r ≠ Real.zero;
+  Real.one - r ≠ Real.zero;
   choose L such that (Real.one - r) * L = Real.one from Real.reciprocal_exists_for_nonzero;
-  claim Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L);
+  Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L);
   witness L with done
 }
 
@@ -293,19 +293,18 @@ theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
         (termsBounded : ∀ (j : Natural). j < n → s(j) ≤ t(j))
         : Real.partialSum(s, n) ≤ Real.partialSum(t, n) :=
   by_induction on n with IH refining termsBounded {
-    case base: { claim Real.zero ≤ Real.zero; done }
+    case base: { Real.zero ≤ Real.zero; done }
     case step(predecessor): {
-        claim predecessor < 1 + predecessor;
-        claim prefixBounded
-              : ∀ (j : Natural). j < predecessor → s(j) ≤ t(j)
+        predecessor < 1 + predecessor;
+        ∀ (j : Natural). j < predecessor → s(j) ≤ t(j)
             by (j : Natural) (jBelow : j < predecessor) ↦ {
-                 claim j < 1 + predecessor by Natural.lt_transitive;
+                 j < 1 + predecessor by Natural.lt_transitive;
                  done
-               };
-        claim Real.partialSum(s, predecessor) ≤ Real.partialSum(t, predecessor)
+               } as prefixBounded;
+        Real.partialSum(s, predecessor) ≤ Real.partialSum(t, predecessor)
             by IH(prefixBounded);
-        claim s(predecessor) ≤ t(predecessor);
-        calc Real.partialSum(s, 1 + predecessor)
+        s(predecessor) ≤ t(predecessor);
+        Real.partialSum(s, 1 + predecessor)
            = Real.partialSum(s, predecessor) + s(predecessor)
            ≤ Real.partialSum(t, predecessor) + s(predecessor)
            ≤ Real.partialSum(t, predecessor) + t(predecessor)
@@ -319,10 +318,10 @@ theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
         (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
         : Real.zero ≤ Real.partialSum(s, n) :=
   by_induction on n with IH {
-    case base: { claim Real.zero ≤ Real.zero; done }
+    case base: { Real.zero ≤ Real.zero; done }
     case step(predecessor): {
-        claim Real.zero ≤ s(predecessor);
-        calc Real.zero
+        Real.zero ≤ s(predecessor);
+        Real.zero
            = Real.zero + Real.zero
            ≤ Real.partialSum(s, predecessor) + Real.zero
            ≤ Real.partialSum(s, predecessor) + s(predecessor)
@@ -337,9 +336,9 @@ theorem Real.partialSum_monotone_of_nonneg (s : Natural → Real)
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.partialSum(s, N) ≤ Real.partialSum(s, m) := {
   choose k such that m = k + N from Natural.le_to_add;
-  claim ∀ (j : Natural). Real.zero ≤ s(N + j) by (j : Natural) ↦ termsNonneg(N + j);
-  claim Real.zero ≤ Real.partialSum((j : Natural) ↦ s(N + j), k);
-  calc Real.partialSum(s, N)
+  ∀ (j : Natural). Real.zero ≤ s(N + j) by (j : Natural) ↦ termsNonneg(N + j);
+  Real.zero ≤ Real.partialSum((j : Natural) ↦ s(N + j), k);
+  Real.partialSum(s, N)
      = Real.partialSum(s, N) + Real.zero
      ≤ Real.partialSum(s, N) + Real.partialSum((j : Natural) ↦ s(N + j), k)
            by Real.add_preserves_LessOrEqual_left
@@ -354,15 +353,15 @@ theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
           = ((Rational.linearGrowth(c, n) - Rational.one : Rational) : Real) :=
   by_induction on n with IH {
     case base: {
-        claim Rational.linearGrowth(c, 0) = Rational.one;
-        calc Real.partialSum((j : Natural) ↦ (c : Real), 0)
+        Rational.linearGrowth(c, 0) = Rational.one;
+        Real.partialSum((j : Natural) ↦ (c : Real), 0)
            = (Rational.zero : Real)
            = ((Rational.one - Rational.one : Rational) : Real)
                  by (Rational.zero = Rational.one - Rational.one)
            = ((Rational.linearGrowth(c, 0) - Rational.one : Rational) : Real)
       }
     case step(predecessor): {
-        calc Real.partialSum((j : Natural) ↦ (c : Real), 1 + predecessor)
+        Real.partialSum((j : Natural) ↦ (c : Real), 1 + predecessor)
            = Real.partialSum((j : Natural) ↦ (c : Real), predecessor)
              + (c : Real)
                  by Real.partialSum_add_one
@@ -388,8 +387,8 @@ theorem Real.partialSum_constant (c : Real) (n : Natural)
         : Real.partialSum((j : Natural) ↦ c, n) = (n : Real) * c :=
   by_induction on n with IH {
     case base: {
-        claim ((0 : Natural) : Real) = Real.zero;
-        calc Real.partialSum((j : Natural) ↦ c, 0)
+        ((0 : Natural) : Real) = Real.zero;
+        Real.partialSum((j : Natural) ↦ c, 0)
            = Real.zero
            = 0 * c                          by ring
            = ((0 : Natural) : Real) * c
@@ -397,11 +396,9 @@ theorem Real.partialSum_constant (c : Real) (n : Natural)
     case step(predecessor): {
         -- The cast of 1 is Real.one definitionally, so the split is the
         -- additive leg alone.
-        claim castStep
-              : (1 + predecessor : Real)
-                = Real.one + (predecessor : Real)
-            by Real.from_natural_add_preserves;
-        calc Real.partialSum((j : Natural) ↦ c, 1 + predecessor)
+        (1 + predecessor : Real) = Real.one + (predecessor : Real)
+            by Real.from_natural_add_preserves as castStep;
+        Real.partialSum((j : Natural) ↦ c, 1 + predecessor)
            = Real.partialSum((j : Natural) ↦ c, predecessor) + c
                  by Real.partialSum_add_one
            = (predecessor : Real) * c + c
@@ -502,21 +499,21 @@ theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
         (j : Natural) (jBelow : j < n)
         : s(j) = Real.zero := {
   -- s(j) ≤ Σ_{i < j+1} s(i) ≤ Σ_{i < n} s(i) = 0.
-  claim Real.zero ≤ Real.partialSum(s, j);
-  calc s(j)
+  Real.zero ≤ Real.partialSum(s, j);
+  s(j)
      = Real.zero + s(j)
      ≤ Real.partialSum(s, j) + s(j)
      = Real.partialSum(s, 1 + j)
      as headBound;
-  claim 1 + j ≤ n
-      by { claim j + 1 ≤ n by Natural.add_one_le_of_lt;
+  1 + j ≤ n
+      by { j + 1 ≤ n by Natural.add_one_le_of_lt;
            done by substituting (ring : 1 + j = j + 1) };
-  claim Real.partialSum(s, 1 + j) ≤ Real.partialSum(s, n);
-  calc s(j)
+  Real.partialSum(s, 1 + j) ≤ Real.partialSum(s, n);
+  s(j)
      ≤ Real.partialSum(s, 1 + j)           by headBound
      ≤ Real.partialSum(s, n)
      = Real.zero;
-  claim Real.zero ≤ s(j);
+  Real.zero ≤ s(j);
   done by Real.LessOrEqual.antisymmetric
 }
 
@@ -548,9 +545,9 @@ theorem Real.abs_partialSum_le (s : Natural → Real) (n : Natural)
           ≤ Real.partialSum((k : Natural) ↦ abs(s(k)), n) :=
   by_induction on n with IH {
     case base: {
-        claim Real.IsNonneg(Real.zero);
-        claim abs(Real.zero) = Real.zero;
-        calc abs(Real.partialSum(s, 0))
+        Real.IsNonneg(Real.zero);
+        abs(Real.zero) = Real.zero;
+        abs(Real.partialSum(s, 0))
            = abs(Real.zero)
            = Real.zero
            ≤ Real.zero
@@ -573,17 +570,15 @@ theorem Real.partialSum_window_bound (b : Natural → Real) (m w : Natural)
         : abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
           ≤ Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
             - Real.partialSum((k : Natural) ↦ abs(b(k)), m) := {
-  claim signedSplit
-      : Real.partialSum(b, w + m)
+  Real.partialSum(b, w + m)
         = Real.partialSum(b, m)
           + Real.partialSum((j : Natural) ↦ b(m + j), w)
-      by Real.partialSum_split;
-  claim absSplit
-      : Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
+      by Real.partialSum_split as signedSplit;
+  Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
         = Real.partialSum((k : Natural) ↦ abs(b(k)), m)
           + Real.partialSum((j : Natural) ↦ abs(b(m + j)), w)
-      by Real.partialSum_split;
-  calc abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
+      by Real.partialSum_split as absSplit;
+  abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
      = abs((Real.partialSum(b, m)
                 + Real.partialSum((j : Natural) ↦ b(m + j), w))
            - Real.partialSum(b, m))

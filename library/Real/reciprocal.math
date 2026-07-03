@@ -86,9 +86,9 @@ theorem Rational.LessThan.multiply_cancel_right
   claim by cases {
     case x ≤ y as xLeqY: {
         -- x ≤ y; and x ≠ y, since x = y would give x·c = y·c, contradicting x·c < y·c.
-        claim productDistinct : x * c ≠ y * c;
-        claim x ≠ y by (xEqY : x = y) ↦ {
-            claim productEqual : x * c = y * c by substituting xEqY;
+        x * c ≠ y * c as productDistinct;
+        x ≠ y by (xEqY : x = y) ↦ {
+            x * c = y * c by substituting xEqY as productEqual;
             productDistinct(productEqual)
           };
         done
@@ -96,11 +96,11 @@ theorem Rational.LessThan.multiply_cancel_right
     case y ≤ x as yLeqX: {
         -- y·c ≤ x·c (multiply by c ≥ 0); antisymmetric with x·c ≤ y·c forces
         -- x·c = y·c, contradicting x·c < y·c.
-        claim Rational.zero ≤ c;
-        claim y * c ≤ x * c;
-        claim x * c ≤ y * c;
-        claim productEqual : x * c = y * c by Rational.LessOrEqual.antisymmetric;
-        claim productDistinct : x * c ≠ y * c;
+        Rational.zero ≤ c;
+        y * c ≤ x * c;
+        x * c ≤ y * c;
+        x * c = y * c by Rational.LessOrEqual.antisymmetric as productEqual;
+        x * c ≠ y * c as productDistinct;
         absurd(productDistinct(productEqual))
       }
   }
@@ -125,7 +125,7 @@ theorem Real.reciprocal_sequence_is_cauchy
   (ε : Rational)
            (εPositive : Rational.zero < ε) ↦ {
     -- The scaled threshold ε · (K · K) is positive.
-    claim Rational.zero < lowerBound * lowerBound;
+    Rational.zero < lowerBound * lowerBound;
     -- Apply Cauchy at ε · (K · K).
     choose cauchyIndex as cauchyAtScaledε
         from underlyingIsCauchy(
@@ -141,50 +141,47 @@ theorem Real.reciprocal_sequence_is_cauchy
           {
             -- Index bookkeeping: apartnessIndex ≤ m, apartnessIndex ≤ n,
             -- cauchyIndex ≤ m, cauchyIndex ≤ n.
-            claim apartnessIndex ≤ m;
-            claim apartnessIndex ≤ n;
-            claim cauchyIndexLeqM : cauchyIndex ≤ m;
-            claim cauchyIndexLeqN : cauchyIndex ≤ n;
+            apartnessIndex ≤ m;
+            apartnessIndex ≤ n;
+            cauchyIndex ≤ m as cauchyIndexLeqM;
+            cauchyIndex ≤ n as cauchyIndexLeqN;
             -- Apartness applied at m, n.
-            claim
-                  lowerBound
-                      ≤ abs(underlyingSequence(m));
-            claim
-                  lowerBound
-                      ≤ abs(underlyingSequence(n));
+            lowerBound
+                ≤ abs(underlyingSequence(m));
+            lowerBound
+                ≤ abs(underlyingSequence(n));
             -- s(m), s(n) are nonzero (0 < lowerBound ≤ |s(·)|).
-            claim Rational.zero < abs(underlyingSequence(m))
+            Rational.zero < abs(underlyingSequence(m))
                 by Rational.LessThan.transitive_right;
-            claim Rational.zero < abs(underlyingSequence(n))
+            Rational.zero < abs(underlyingSequence(n))
                 by Rational.LessThan.transitive_right;
-            claim smNonzero : underlyingSequence(m) ≠ Rational.zero
-                by Rational.nonzero_of_absolute_value_positive;
-            claim snNonzero : underlyingSequence(n) ≠ Rational.zero
-                by Rational.nonzero_of_absolute_value_positive;
+            underlyingSequence(m) ≠ Rational.zero
+                by Rational.nonzero_of_absolute_value_positive as smNonzero;
+            underlyingSequence(n) ≠ Rational.zero
+                by Rational.nonzero_of_absolute_value_positive as snNonzero;
             -- The Cauchy bound: |s(n) - s(m)| < ε · (K · K).
-            claim
-                  abs(
-                        underlyingSequence(n) - underlyingSequence(m))
-                    < ε * (lowerBound * lowerBound)
+            abs(
+                  underlyingSequence(n) - underlyingSequence(m))
+                < ε * (lowerBound * lowerBound)
               by cauchyAtScaledε(
                      n, cauchyIndexLeqN, m, cauchyIndexLeqM);
             -- (ra - rb) * (s(m) * s(n)) = s(n) - s(m) — a pure field identity
             -- in s(m), s(n) given nonzero. Anonymous: next calc consumes it
             -- by type-match.
-            claim (Rational.reciprocal_function(underlyingSequence(m))
-                       - Rational.reciprocal_function(underlyingSequence(n)))
+            (Rational.reciprocal_function(underlyingSequence(m))
+                 - Rational.reciprocal_function(underlyingSequence(n)))
                     * (underlyingSequence(m) * underlyingSequence(n))
                   = underlyingSequence(n) - underlyingSequence(m)
               by field(smNonzero, snNonzero);
             -- Take absolute value to get
             --   |ra - rb| * (|s(m)| * |s(n)|) = |s(n) - s(m)|.
-            calc abs(
-                     Rational.reciprocal_function(underlyingSequence(m))
-                       - Rational.reciprocal_function(
-                             underlyingSequence(n)))
-                     * (abs(underlyingSequence(m))
-                            * abs(
-                                  underlyingSequence(n)))
+            abs(
+                  Rational.reciprocal_function(underlyingSequence(m))
+                    - Rational.reciprocal_function(
+                          underlyingSequence(n)))
+                  * (abs(underlyingSequence(m))
+                         * abs(
+                               underlyingSequence(n)))
                = abs(
                      Rational.reciprocal_function(underlyingSequence(m))
                        - Rational.reciprocal_function(
@@ -201,32 +198,31 @@ theorem Real.reciprocal_sequence_is_cauchy
                = abs(
                      underlyingSequence(n) - underlyingSequence(m));
             -- |ra - rb| ≥ 0 (absolute value).
-            claim
-                  Rational.zero
-                      ≤ abs(
-                            Rational.reciprocal_function(
-                                underlyingSequence(m))
-                              - Rational.reciprocal_function(
-                                    underlyingSequence(n)));
+            Rational.zero
+                ≤ abs(
+                      Rational.reciprocal_function(
+                          underlyingSequence(m))
+                        - Rational.reciprocal_function(
+                              underlyingSequence(n)));
             -- K * K ≤ |s(m)| * |s(n)|. We have K ≤ |s(m)| and K ≤ |s(n)|.
             -- K * K ≤ |s(m)| * K  [multiply_by_nonneg_right with cNonneg = K ≥ 0]
             -- |s(m)| * K ≤ |s(m)| * |s(n)|  [multiply_by_nonneg_left with cNonneg = |s(m)| ≥ 0]
-            claim Rational.LessOrEqual(Rational.zero, lowerBound);
-            claim Rational.LessOrEqual(
-                        Rational.zero,
-                        abs(underlyingSequence(m)));
-            calc lowerBound * lowerBound
+            Rational.LessOrEqual(Rational.zero, lowerBound);
+            Rational.LessOrEqual(
+                Rational.zero,
+                abs(underlyingSequence(m)));
+            lowerBound * lowerBound
                     ≤ abs(underlyingSequence(m)) * lowerBound
                     ≤ abs(underlyingSequence(m)) * abs(underlyingSequence(n));
             -- Combine the three steps in one chain:
             --   |ra - rb| · K² ≤ |ra - rb| · (|s(m)| · |s(n)|)   (mul by nonneg)
             --                  = |s(n) - s(m)|                    (absRecipScaledEquation)
             --                  < ε · K²                           (cauchyBound).
-            calc abs(
-                          Rational.reciprocal_function(underlyingSequence(m))
-                            - Rational.reciprocal_function(
-                                  underlyingSequence(n)))
-                          * (lowerBound * lowerBound)
+            abs(
+                  Rational.reciprocal_function(underlyingSequence(m))
+                    - Rational.reciprocal_function(
+                          underlyingSequence(n)))
+                  * (lowerBound * lowerBound)
                     ≤ abs(
                           Rational.reciprocal_function(underlyingSequence(m))
                             - Rational.reciprocal_function(
