@@ -133,7 +133,10 @@ End each with `;`; the block returns its final non-`;` expression.
   `(∀ (k : Natural). P(k))(m)` — or as a `choose` source addresses
   the in-scope fact with that statement (defeq match, anonymous facts
   included); two matching facts is a loud error naming both. `given (P)`
-  is the same lookup as a bare term.
+  is the same lookup as a bare term. Inside a `cases x with eq` arm,
+  addressing the REFINED statement (`P(successor(k))` when the context
+  holds `P(x)`) transports silently along the case equation — no
+  `refining` needed for single-position shapes.
 - `?` — a hole in a function-call argument position, solved by unification
   from the goal/other arguments (does not invoke the auto-prover).
 - `recalling f, g` after a `by` hint — bring extra named facts into

@@ -1,0 +1,24 @@
+-- Feature test: A2 by-cases transport — statement addressing inside a
+-- cases arm finds outer facts MODULO the case equation.
+module Test.case_transport_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- Address an outer fact by its REFINED statement inside a cases arm:
+-- h is stated about n; the arm knows n = successor(k) via the case
+-- equation; given(P(successor(k))) must transport h silently.
+theorem Test.transported_address (P : Natural → Proposition) (n : Natural)
+        (h : P(n))
+        : n = n := {
+  cases n with caseEquation {
+    | zero => reflexivity(n)
+    | successor(k) => {
+        claim P(successor(k)) by given(P(successor(k)));
+        reflexivity(n)
+      }
+  }
+}

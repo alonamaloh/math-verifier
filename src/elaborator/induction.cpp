@@ -1818,12 +1818,61 @@ ExpressionPointer Elaborator::elaborateGiven(
             }
         }
         if (matchIndex == -1) {
+            // A2 by-cases transport: no fact carries the statement as
+            // written, but one may differ from it at a single position
+            // bridged by an in-scope equation — the canonical shape
+            // being a `cases … with eq` arm addressing `P(pattern)`
+            // while the context holds `h : P(scrutinee)` and
+            // `eq : scrutinee = pattern`. Transport silently; two
+            // transported matches are the same ambiguity error.
+            ExpressionPointer transported;
+            int transportedIndex = -1;
+            int transportedDuplicate = -1;
+            for (int b = N - 1; b >= 0; --b) {
+                int lift = N - b;
+                ExpressionPointer binderTypeInScope =
+                    liftBoundVariables(localBinders[b].type, lift, 0);
+                ExpressionPointer candidate;
+                try {
+                    candidate = tryDiffBridgeViaContextEquality(
+                        localBinders, makeBoundVariable(N - 1 - b),
+                        binderTypeInScope, requestedTypeClosed);
+                } catch (const ElaborateError&) {
+                    candidate = nullptr;
+                } catch (const TypeError&) {
+                    candidate = nullptr;
+                }
+                if (candidate) {
+                    if (transportedIndex == -1) {
+                        transported = candidate;
+                        transportedIndex = b;
+                    } else {
+                        transportedDuplicate = b;
+                        break;
+                    }
+                }
+            }
+            if (transportedIndex != -1 && transportedDuplicate == -1) {
+                return transported;
+            }
+            if (transportedDuplicate != -1) {
+                throwElaborate(
+                    "given(`"
+                    + prettyPrintInLocalScope(
+                          requestedTypeClosed, localBinders)
+                    + "`): proposition is ambiguous — at least two "
+                    "in-scope hypotheses transport to this statement "
+                    "('" + localBinders[transportedIndex].name + "' and '"
+                    + localBinders[transportedDuplicate].name
+                    + "'); name one of them explicitly");
+            }
             throwElaborate(
                 "given(`"
                 + prettyPrintInLocalScope(
                       requestedTypeClosed, localBinders)
                 + "`): no in-scope hypothesis matches this "
-                "proposition structurally");
+                "proposition structurally (nor transports to it along "
+                "an in-scope equation)");
         }
         if (duplicateIndex != -1) {
             throwElaborate(
