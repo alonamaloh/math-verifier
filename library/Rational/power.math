@@ -67,14 +67,14 @@ theorem Rational.power_nonneg
         : Rational.zero ≤ Rational.power(base, n) :=
   by_induction on n with IH {
     case zero: {
-        claim Rational.zero < Rational.one;
+        Rational.zero < Rational.one;
         done
       }
     case successor(predecessor): {
-        claim Rational.IsNonneg(base);
-        claim Rational.IsNonneg(Rational.power(base, predecessor));
-        claim Rational.IsNonneg(base * Rational.power(base, predecessor));
-        claim Rational.zero ≤ base * Rational.power(base, predecessor);
+        Rational.IsNonneg(base);
+        Rational.IsNonneg(Rational.power(base, predecessor));
+        Rational.IsNonneg(base * Rational.power(base, predecessor));
+        Rational.zero ≤ base * Rational.power(base, predecessor);
         done
       }
   }
@@ -96,7 +96,7 @@ theorem Rational.linearGrowth_at_least_one
         : Rational.one ≤ Rational.linearGrowth(step, n) :=
   by_induction on n with IH {
     case zero: {
-        claim Rational.one ≤ Rational.one;
+        Rational.one ≤ Rational.one;
         done
       }
     case successor(predecessor):
@@ -118,8 +118,8 @@ theorem Rational.linearGrowth_closed_form
            = Rational.one
            = Rational.one + (0 : Rational) * step
     case step(predecessor): {
-        claim oneCast : (1 + predecessor : Rational) = (1 : Rational) + (predecessor : Rational);
-        calc Rational.linearGrowth(step, 1 + predecessor)
+        (1 + predecessor : Rational) = (1 : Rational) + (predecessor : Rational) as oneCast;
+        Rational.linearGrowth(step, 1 + predecessor)
            = Rational.linearGrowth(step, predecessor) + step
            = (Rational.one + (predecessor : Rational) * step) + step
                  by IH
@@ -146,32 +146,32 @@ theorem Rational.power_bernoulli
            ≤ Rational.one
     case successor(predecessor): {
         -- c ≤ 1 ≤ L, so L − c ≥ 0.
-        calc c
+        c
            = c + Rational.zero
            ≤ c + h            by Rational.add_general_LessOrEqual_left
            = Rational.one;
-        claim Rational.one ≤ Rational.linearGrowth(h, predecessor);
-        calc c
+        Rational.one ≤ Rational.linearGrowth(h, predecessor);
+        c
            ≤ Rational.one
            ≤ Rational.linearGrowth(h, predecessor);
-        claim Rational.IsNonneg(Rational.linearGrowth(h, predecessor) - c);
-        claim Rational.IsNonneg(h);
-        claim Rational.IsNonneg(
+        Rational.IsNonneg(Rational.linearGrowth(h, predecessor) - c);
+        Rational.IsNonneg(h);
+        Rational.IsNonneg(
                   h * (Rational.linearGrowth(h, predecessor) - c));
         -- The per-step inequality, via its difference form.
-        claim keyEquation
-              : Rational.linearGrowth(h, predecessor)
+        Rational.linearGrowth(h, predecessor)
                 - c * (Rational.linearGrowth(h, predecessor) + h)
                 = h * (Rational.linearGrowth(h, predecessor) - c)
             by linear_combination(
                    Rational.linearGrowth(h, predecessor)
-                   - Rational.linearGrowth(h, predecessor) * partition);
-        claim c * (Rational.linearGrowth(h, predecessor) + h)
+                   - Rational.linearGrowth(h, predecessor) * partition)
+            as keyEquation;
+        c * (Rational.linearGrowth(h, predecessor) + h)
                 ≤ Rational.linearGrowth(h, predecessor)
             by substituting keyEquation;
-        claim Rational.zero ≤ Rational.power(c, predecessor)
+        Rational.zero ≤ Rational.power(c, predecessor)
             by Rational.power_nonneg;
-        calc Rational.power(c, successor(predecessor))
+        Rational.power(c, successor(predecessor))
                  * Rational.linearGrowth(h, successor(predecessor))
            = (c * Rational.power(c, predecessor))
                  * (Rational.linearGrowth(h, predecessor) + h)
@@ -195,23 +195,23 @@ theorem Rational.power_decay_witness
         (εPositive : Rational.zero < ε)
         : ∃ (N : Natural). Rational.power(c, N) < ε := {
   -- The gap h := 1 − c is positive.
-  calc Rational.zero
+  Rational.zero
      = c - c
      < Rational.one - c   by Rational.add_preserves_LessThan;
-  claim Rational.zero ≤ Rational.one - c;
-  claim c + (Rational.one - c) = Rational.one;
-  claim Rational.zero < ε * (Rational.one - c);
+  Rational.zero ≤ Rational.one - c;
+  c + (Rational.one - c) = Rational.one;
+  Rational.zero < ε * (Rational.one - c);
   -- Archimedes: some multiple of ε·h reaches 1 …
-  claim Rational.zero < Rational.one;
-  claim Rational.zero ≤ Rational.one;
-  claim Rational.IsNonneg(Rational.one);
+  Rational.zero < Rational.one;
+  Rational.zero ≤ Rational.one;
+  Rational.IsNonneg(Rational.one);
   choose K such that Rational.one ≤ (successor(K) : Rational) * (ε * (Rational.one - c))
       from Rational.archimedean_for_positives;
   -- … so at N = K+1 the scaled linear factor exceeds 1 strictly.
-  claim lgClosed
-        : Rational.linearGrowth(Rational.one - c, successor(K))
-          = Rational.one + successor(K) * (Rational.one - c);
-  calc Rational.one
+  Rational.linearGrowth(Rational.one - c, successor(K))
+          = Rational.one + successor(K) * (Rational.one - c)
+      as lgClosed;
+  Rational.one
      = Rational.one + Rational.zero
      < Rational.one + ε
            by Rational.add_left_preserves_LessThan
@@ -220,20 +220,21 @@ theorem Rational.power_decay_witness
      = ε * Rational.linearGrowth(Rational.one - c, successor(K))
            by linear_combination(ε - ε * lgClosed);
   -- Bernoulli at N, then cancel the (positive) linear factor.
-  claim Rational.power(c, successor(K))
+  Rational.power(c, successor(K))
               * Rational.linearGrowth(Rational.one - c, successor(K))
           ≤ Rational.one
       by Rational.power_bernoulli;
-  claim Rational.one ≤ Rational.linearGrowth(Rational.one - c, successor(K))
+  Rational.one ≤ Rational.linearGrowth(Rational.one - c, successor(K))
       by Rational.linearGrowth_at_least_one;
-  claim Rational.zero < Rational.linearGrowth(Rational.one - c, successor(K))
+  Rational.zero < Rational.linearGrowth(Rational.one - c, successor(K))
       by Rational.LessThan.transitive_right;
-  claim Rational.power(c, successor(K))
+  Rational.power(c, successor(K))
               * Rational.linearGrowth(Rational.one - c, successor(K))
           < ε * Rational.linearGrowth(Rational.one - c, successor(K))
       by Rational.LessThan.transitive_left;
-  claim powerBelow : Rational.power(c, successor(K)) < ε
-      by Rational.LessThan.multiply_cancel_right_positive;
+  Rational.power(c, successor(K)) < ε
+      by Rational.LessThan.multiply_cancel_right_positive
+      as powerBelow;
   witness successor(K) with powerBelow
 }
 
@@ -246,13 +247,13 @@ theorem Rational.power_le_subsequent
         : Rational.power(c, k + N) ≤ Rational.power(c, N) :=
   by_induction on k with IH {
     case zero: {
-        claim Rational.power(c, N) ≤ Rational.power(c, N)
+        Rational.power(c, N) ≤ Rational.power(c, N)
             by Rational.LessOrEqual.reflexive;
         done
       }
     case successor(predecessor): {
-        claim Rational.zero ≤ Rational.power(c, predecessor + N);
-        calc Rational.power(c, successor(predecessor) + N)
+        Rational.zero ≤ Rational.power(c, predecessor + N);
+        Rational.power(c, successor(predecessor) + N)
            = c * Rational.power(c, predecessor + N)
            ≤ Rational.one * Rational.power(c, predecessor + N)
                  by Rational.LessOrEqual.multiply_by_nonneg_right
@@ -267,6 +268,6 @@ theorem Rational.power_le_at_le
         (N m : Natural) (NLeqM : N ≤ m)
         : Rational.power(c, m) ≤ Rational.power(c, N) := {
   choose k such that m = k + N from Natural.le_to_add;
-  claim Rational.power(c, k + N) ≤ Rational.power(c, N);
+  Rational.power(c, k + N) ≤ Rational.power(c, N);
   claim by substitution
 }
