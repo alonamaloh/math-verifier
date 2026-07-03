@@ -30,10 +30,16 @@ theorem Test.flatten_nested (g : Natural → Natural → Natural)
         : ¬ ∃ (m n : Natural). g(m, n) = 0 :=
   by L
 
--- KNOWN GAP (banked in PLAN_LANGUAGE_IMPROVEMENT.md): nested
--- existentials WITH a conjunction under the inner one (the
--- sqrt_two_irrational shape) still fail — the premise back-inference
--- meets the whole conjunction as ONE eliminated fact and cannot pin
--- both witnesses. When that lands, add:
---   theorem Test.flatten_nested_conjunction ... : ¬ ∃ (m n : Natural).
---       1 ≤ m ∧ 1 ≤ n ∧ g(m, n) = 0 := by L
+-- Nested existentials with a nested conjunction — the
+-- sqrt_two_irrational shape (conjunctions decompose into their legs
+-- the same way the existentials eliminate).
+theorem Test.flatten_nested_conjunction (g : Natural → Natural → Natural)
+        (L : (m n : Natural) → 1 ≤ m → 1 ≤ n → g(m, n) = 0 → False)
+        : ¬ ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ g(m, n) = 0 :=
+  by L
+
+-- The existential may also sit INSIDE a conjunction.
+theorem Test.flatten_exists_in_conjunction (g : Natural → Natural → Natural)
+        (L : (m n : Natural) → 1 ≤ m → g(m, n) = 0 → False)
+        : ¬ ∃ (m : Natural). 1 ≤ m ∧ (∃ (n : Natural). g(m, n) = 0) :=
+  by L

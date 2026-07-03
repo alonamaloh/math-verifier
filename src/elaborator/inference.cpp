@@ -1035,7 +1035,52 @@ ExpressionPointer Elaborator::citeCoreGoalWithExistsFlattening(
             auto* head = innerApp
                 ? std::get_if<Constant>(&innerApp->function->node)
                 : nullptr;
-            if (!head || head->name != "Exists") continue;
+            if (!head) continue;
+            // A conjunction-typed binder decomposes into its legs the
+            // same way (a nested `∃ … ∧ …` alternates the two): two
+            // lambda binders applied to the projections — no motive
+            // needed.
+            if (head->name == "And") {
+                ExpressionPointer leftAtEnd = liftBoundVariables(
+                    innerApp->argument, N - i, 0);
+                ExpressionPointer rightAtEnd = liftBoundVariables(
+                    outerApp->argument, N - i, 0);
+                ExpressionPointer rightPastLeft = liftBoundVariables(
+                    outerApp->argument, N + 1 - i, 0);
+                std::vector<LocalBinder> extended = binders;
+                std::string leftName =
+                    "_flattened_l_" + std::to_string(i);
+                std::string rightName =
+                    "_flattened_r_" + std::to_string(i);
+                extended.push_back({leftName, leftAtEnd});
+                extended.push_back({rightName, rightPastLeft});
+                std::set<size_t> eliminated = alreadyEliminated;
+                eliminated.insert(i);
+                ExpressionPointer inner =
+                    citeCoreGoalWithExistsFlattening(
+                        byHint, liftBoundVariables(coreGoal, 2, 0),
+                        extended, firstIntroducedIndex,
+                        std::move(eliminated), depth - 1, line);
+                if (!inner) continue;
+                ExpressionPointer binderReference =
+                    makeBoundVariable(N - 1 - i);
+                auto projection = [&](const char* name) {
+                    ExpressionPointer p = makeConstant(name, {});
+                    p = makeApplication(std::move(p), leftAtEnd);
+                    p = makeApplication(std::move(p), rightAtEnd);
+                    return makeApplication(std::move(p),
+                                            binderReference);
+                };
+                ExpressionPointer redex = makeLambda(
+                    leftName, leftAtEnd,
+                    makeLambda(rightName, rightPastLeft, inner));
+                redex = makeApplication(std::move(redex),
+                                         projection("And.left"));
+                redex = makeApplication(std::move(redex),
+                                         projection("And.right"));
+                return redex;
+            }
+            if (head->name != "Exists") continue;
             // Lift the components from the binder's position to the
             // current scope's end.
             ExpressionPointer carrierAtEnd = liftBoundVariables(
