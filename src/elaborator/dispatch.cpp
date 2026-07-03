@@ -769,6 +769,35 @@ ExpressionPointer Elaborator::elaborateExpression(
                 }
                 return call;
             }
+            // Holes with a LOCAL-BINDER head — an induction hypothesis
+            // or assumed lemma cited with `?` slots
+            // (`no_smaller_solution(n, ?, k, ?, ?, ?)`). Same hole
+            // solver; the head's type comes from the binder (lifted to
+            // the closed scope), monomorphic, and the assembled call
+            // applies the binder reference.
+            if (anyHole && headIdentifier) {
+                int N = static_cast<int>(localBinders.size());
+                for (int b = N - 1; b >= 0; --b) {
+                    if (localBinders[b].name
+                            != headIdentifier->qualifiedName) {
+                        continue;
+                    }
+                    ExpressionPointer binderType = liftBoundVariables(
+                        localBinders[b].type, N - b, 0);
+                    std::vector<ExpressionPointer> resolvedArgs =
+                        inferCallWithHoles(
+                            headIdentifier->qualifiedName, binderType,
+                            positionalArguments, localBinders,
+                            expectedType, expression.line);
+                    ExpressionPointer call =
+                        makeBoundVariable(N - 1 - b);
+                    for (auto& v : resolvedArgs) {
+                        call = makeApplication(std::move(call),
+                                                std::move(v));
+                    }
+                    return call;
+                }
+            }
             if (headIdentifier && headIdentifier->universeArgs.empty()) {
                 const std::string& name = headIdentifier->qualifiedName;
                 size_t argumentCount = positionalArguments.size();
