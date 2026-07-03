@@ -770,8 +770,8 @@ void Elaborator::elaborateAxiom(const SurfaceAxiomDeclaration& declaration) {
                     + "\n  implementation has: "
                     + prettyPrint(declaredType));
             }
-            checkedInterfaceObligations_.emplace_back(
-                declaration.name, declaration.interfaceRole);
+            checkedInterfaceObligations_.push_back(
+                {declaration.name, declaration.interfaceRole, statedType});
             return;
         }
         currentUniverseParametersOrdered_ = declaration.universeParameters;

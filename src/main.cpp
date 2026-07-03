@@ -5479,8 +5479,7 @@ int verifyWithCache(const std::string& sourcePath,
         }
         std::cout << goalAtReport;
     };
-    std::vector<std::pair<std::string,
-        SurfaceAxiomDeclaration::InterfaceRole>> interfaceObligations;
+    std::vector<CheckedInterfaceObligation> interfaceObligations;
     try {
         elaborateModule(parsedModule, environment, importedModules,
                          reportRedundantBy, reportRedundantCalcSteps,
@@ -5693,44 +5692,49 @@ int verifyWithCache(const std::string& sourcePath,
                 // above would already have failed loudly.
             }
         }
-        // Seal: obligation-checked names are copied out of the loaded
-        // environment — abstract types/constants become bodyless
-        // axioms (nothing to unfold), obligations keep the theorem
-        // Definition kind with the fixed placeholder body (the .iface
-        // precedent — prover seeding reads types only).
+        // Seal: obligation-checked names re-emit under the type AS
+        // STATED in the interface source (the public contract's
+        // spelling — the implementation's defeq-equal spelling could
+        // carry construction-side reduced forms). Abstract
+        // types/constants become bodyless axioms (nothing to unfold);
+        // obligations keep the theorem Definition kind with the fixed
+        // placeholder body (the .iface precedent — prover seeding
+        // reads types only). The `automatic` flag is copied from the
+        // implementation declaration, matching the bulk-export path.
         const ExpressionPointer sealedBody = makeSort(0);
-        for (const auto& [obligationName, role] : interfaceObligations) {
+        for (const auto& obligation : interfaceObligations) {
             auto declarationIterator =
-                environment.declarations.find(obligationName);
+                environment.declarations.find(obligation.name);
             if (declarationIterator == environment.declarations.end()) {
                 continue;
             }
             const Declaration& implementationDeclaration =
                 declarationIterator->second;
             std::vector<std::string> universeParameters;
-            ExpressionPointer declaredType;
+            bool automaticFlag = false;
             if (auto* definition =
                     std::get_if<Definition>(&implementationDeclaration)) {
                 universeParameters = definition->universeParameters;
-                declaredType = definition->type;
+                automaticFlag = definition->automatic;
             } else if (auto* axiom =
                     std::get_if<Axiom>(&implementationDeclaration)) {
                 universeParameters = axiom->universeParameters;
-                declaredType = axiom->type;
+                automaticFlag = axiom->automatic;
             } else {
                 continue;  // inductives etc. cannot be sealed this way
             }
-            if (role == SurfaceAxiomDeclaration::InterfaceRole::Obligation) {
+            if (obligation.role
+                    == SurfaceAxiomDeclaration::InterfaceRole::Obligation) {
                 cache.declarations.emplace_back(
-                    obligationName,
-                    Definition{universeParameters, declaredType,
+                    obligation.name,
+                    Definition{universeParameters, obligation.statedType,
                                sealedBody, Opacity::Opaque,
-                               /*automatic=*/false});
+                               automaticFlag});
             } else {
                 cache.declarations.emplace_back(
-                    obligationName,
-                    Axiom{universeParameters, declaredType,
-                          /*automatic=*/false});
+                    obligation.name,
+                    Axiom{universeParameters, obligation.statedType,
+                          automaticFlag});
             }
         }
         // `export theorems of M, …`: every Prop-typed declaration of
@@ -5744,6 +5748,58 @@ int verifyWithCache(const std::string& sourcePath,
             (void)sealedDeclaration;
             alreadySealed.insert(sealedName);
         }
+        // Exportability is judged against what a CONSUMER of the sealed
+        // cache can reach, so the dropped-module set and the names
+        // reachable through the kept dependency edges come first.
+        std::set<std::string> droppedDependencies;
+        droppedDependencies.insert(parsedModule.implementedByName);
+        for (const auto& exportedModule
+                 : parsedModule.exportTheoremsOfModules) {
+            droppedDependencies.insert(exportedModule);
+        }
+        std::set<std::string> reachableViaKeptImports;
+        {
+            std::set<std::string> visitedPaths;
+            std::function<void(const std::string&)> collectReachable =
+                [&](const std::string& cachePath) {
+                    if (visitedPaths.count(cachePath)) return;
+                    visitedPaths.insert(cachePath);
+                    CacheContents contents;
+                    try {
+                        contents = readCacheFile(
+                            std::filesystem::exists(cachePath)
+                                ? cachePath
+                                : cachePath + ".iface",
+                            /*skipDefinitionBodies=*/true);
+                    } catch (const SerializationError&) {
+                        return;  // the consumer's own load will complain
+                    }
+                    for (const auto& [depName, depDeclaration]
+                             : contents.declarations) {
+                        (void)depDeclaration;
+                        reachableViaKeptImports.insert(depName);
+                    }
+                    for (const auto& dependency : contents.dependencies) {
+                        collectReachable(dependency.cachePath);
+                    }
+                };
+            for (const auto& dependency : cache.dependencies) {
+                if (!droppedDependencies.count(dependency.moduleName)) {
+                    collectReachable(dependency.cachePath);
+                }
+            }
+        }
+        // Pass 1: gather the Prop-typed export candidates of every
+        // listed module.
+        struct ExportCandidate {
+            std::string name;
+            std::vector<std::string> universeParameters;
+            ExpressionPointer type;
+            bool automatic;
+            std::string fromModule;
+        };
+        std::vector<ExportCandidate> exportCandidates;
+        std::set<std::string> exportCandidateNames;
         for (const auto& exportedModule
                  : parsedModule.exportTheoremsOfModules) {
             auto exportedInfo = moduleToDepInfo.find(exportedModule);
@@ -5772,6 +5828,7 @@ int verifyWithCache(const std::string& sourcePath,
             for (const auto& [exportedName, exportedDeclaration]
                      : exportedCache.declarations) {
                 if (alreadySealed.count(exportedName)) continue;
+                if (exportCandidateNames.count(exportedName)) continue;
                 std::vector<std::string> universeParameters;
                 ExpressionPointer declaredType;
                 bool automaticFlag = false;
@@ -5791,13 +5848,65 @@ int verifyWithCache(const std::string& sourcePath,
                 if (!typeIsProposition(environment, declaredType)) {
                     continue;
                 }
-                cache.declarations.emplace_back(
-                    exportedName,
-                    Definition{universeParameters, declaredType,
-                               sealedBody, Opacity::Opaque,
-                               automaticFlag});
-                alreadySealed.insert(exportedName);
+                exportCandidates.push_back(
+                    {exportedName, std::move(universeParameters),
+                     declaredType, automaticFlag, exportedModule});
+                exportCandidateNames.insert(exportedName);
             }
+        }
+        // Pass 2: emit the candidates whose statements a consumer can
+        // spell — every mentioned constant is sealed, a fellow export,
+        // or reachable through the kept imports. The rest (typically
+        // representative-level lemmas quantifying over construction
+        // internals) are SKIPPED and reported: silently exporting them
+        // writes dangling references into the sealed cache, silently
+        // dropping them without a report would misstate the coverage.
+        // Fixpoint, since a statement embedding a skipped fellow export
+        // (a proof term in a statement position) must cascade.
+        std::set<std::string> skippedExportNames;
+        bool skipsChanged = true;
+        while (skipsChanged) {
+            skipsChanged = false;
+            for (const auto& candidate : exportCandidates) {
+                if (skippedExportNames.count(candidate.name)) continue;
+                std::set<std::string> mentioned;
+                collectConstantNames(candidate.type, mentioned);
+                for (const auto& name : mentioned) {
+                    bool available = alreadySealed.count(name)
+                        || reachableViaKeptImports.count(name)
+                        || (exportCandidateNames.count(name)
+                            && !skippedExportNames.count(name));
+                    if (!available) {
+                        skippedExportNames.insert(candidate.name);
+                        skipsChanged = true;
+                        break;
+                    }
+                }
+            }
+        }
+        std::map<std::string, std::vector<std::string>> skippedByModule;
+        for (const auto& candidate : exportCandidates) {
+            if (skippedExportNames.count(candidate.name)) {
+                skippedByModule[candidate.fromModule]
+                    .push_back(candidate.name);
+                continue;
+            }
+            cache.declarations.emplace_back(
+                candidate.name,
+                Definition{candidate.universeParameters, candidate.type,
+                           sealedBody, Opacity::Opaque,
+                           candidate.automatic});
+            alreadySealed.insert(candidate.name);
+        }
+        for (const auto& [skippedModule, skippedNames] : skippedByModule) {
+            std::cerr << "sealing note: " << skippedNames.size()
+                << " statement(s) of " << skippedModule
+                << " mention construction internals and are not "
+                << "exported:";
+            for (const auto& skippedName : skippedNames) {
+                std::cerr << " " << skippedName;
+            }
+            std::cerr << "\n";
         }
         // The WIRING (operators, coercions, fold operations, instances,
         // bundles, congruences, overloads, implicit-argument counts) of
@@ -5828,8 +5937,15 @@ int verifyWithCache(const std::string& sourcePath,
                     }
                     droppedCache = readCacheFile(
                         droppedPath, /*skipDefinitionBodies=*/true);
-                } catch (const SerializationError&) {
-                    continue;
+                } catch (const SerializationError& error) {
+                    // Silently skipping would drop the module's whole
+                    // wiring from the sealed cache — consumers would
+                    // see baffling downstream failures instead of this.
+                    std::cerr << sourcePath << ":1:1: elaborate error: "
+                        << "sealing: cannot read the cache of dropped "
+                        << "module " << droppedModule << " to copy its "
+                        << "wiring (" << error.what() << ")\n";
+                    return 1;
                 }
                 for (const auto& entry
                          : droppedCache.operatorRegistrations) {
@@ -5899,12 +6015,6 @@ int verifyWithCache(const std::string& sourcePath,
         // keeping the edges would leak the construction transitively).
         // Other imports stay — the sealed declarations' types
         // reference them.
-        std::set<std::string> droppedDependencies;
-        droppedDependencies.insert(parsedModule.implementedByName);
-        for (const auto& exportedModule
-                 : parsedModule.exportTheoremsOfModules) {
-            droppedDependencies.insert(exportedModule);
-        }
         std::vector<CachedDependency> keptDependencies;
         for (auto& dependency : cache.dependencies) {
             if (!droppedDependencies.count(dependency.moduleName)) {
@@ -5912,6 +6022,54 @@ int verifyWithCache(const std::string& sourcePath,
             }
         }
         cache.dependencies = std::move(keptDependencies);
+        // Closure validation: every constant a sealed declaration's
+        // type mentions must be visible to a CONSUMER of this cache —
+        // sealed here, or reachable through the kept dependencies.
+        // The export pass above prunes unspellable BULK entries; this
+        // is the backstop that also covers the obligation-stated types
+        // and turns any remaining dangling reference into a loud error
+        // instead of a consumer-side "unknown identifier" / latent
+        // kernel unknown-constant failure.
+        std::map<std::string, std::string> danglingExamples;
+        for (const auto& [sealedName, sealedDeclaration]
+                 : cache.declarations) {
+            ExpressionPointer sealedType;
+            if (auto* definition =
+                    std::get_if<Definition>(&sealedDeclaration)) {
+                sealedType = definition->type;
+            } else if (auto* axiom =
+                           std::get_if<Axiom>(&sealedDeclaration)) {
+                sealedType = axiom->type;
+            } else {
+                continue;
+            }
+            std::set<std::string> mentioned;
+            collectConstantNames(sealedType, mentioned);
+            for (const auto& name : mentioned) {
+                if (!alreadySealed.count(name)
+                    && !reachableViaKeptImports.count(name)) {
+                    danglingExamples.emplace(name, sealedName);
+                }
+            }
+        }
+        if (!danglingExamples.empty()) {
+            std::cerr << sourcePath << ":1:1: elaborate error: the "
+                << "sealed interface is not closed — "
+                << danglingExamples.size() << " name(s) mentioned by "
+                << "sealed statements do not survive sealing and are "
+                << "not reachable through the kept imports. Declare "
+                << "each as an interface `constant` (with boundary "
+                << "lemmas if consumers need its defining equations), "
+                << "or drop the module that states it from the export "
+                << "list:\n";
+            for (const auto& [danglingName, inDeclaration]
+                     : danglingExamples) {
+                std::cerr << "  " << danglingName
+                          << "   (mentioned by " << inDeclaration
+                          << ")\n";
+            }
+            return 1;
+        }
     }
 
     // Stage-1 (statements-only) produces ONLY the interface cache: there are

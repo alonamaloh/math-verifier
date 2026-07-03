@@ -63,6 +63,18 @@ ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
 // writes the prettied report into `*goalAtReport` — including when
 // elaboration throws downstream of the queried line, so a file whose
 // proof fails after the query point still reports its goal.
+
+// D Phase-1: one obligation checked while elaborating an `interface
+// module` — the name, its role, and the type AS STATED in the interface
+// source. The cache writer seals the STATED spelling (the public
+// contract), not the implementation's defeq-equal spelling, so a
+// construction-side reduced form can never re-enter through the seal.
+struct CheckedInterfaceObligation {
+    std::string name;
+    SurfaceAxiomDeclaration::InterfaceRole role;
+    ExpressionPointer statedType;
+};
+
 void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
                      std::vector<std::string>& importedModules,
@@ -74,6 +86,5 @@ void elaborateModule(const SurfaceModule& module,
                          librarySearchProvider = nullptr,
                      int goalAtLine = -1,
                      std::string* goalAtReport = nullptr,
-                     std::vector<std::pair<std::string,
-                         SurfaceAxiomDeclaration::InterfaceRole>>*
+                     std::vector<CheckedInterfaceObligation>*
                          interfaceObligations = nullptr);

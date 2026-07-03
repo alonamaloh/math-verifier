@@ -19,8 +19,7 @@ void elaborateModule(const SurfaceModule& module,
                          librarySearchProvider,
                      int goalAtLine,
                      std::string* goalAtReport,
-                     std::vector<std::pair<std::string,
-                         SurfaceAxiomDeclaration::InterfaceRole>>*
+                     std::vector<CheckedInterfaceObligation>*
                          interfaceObligations) {
     Elaborator elaborator(environment, importedModules);
     elaborator.setReportRedundantBy(reportRedundantBy);
