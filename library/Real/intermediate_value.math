@@ -59,214 +59,198 @@ theorem Real.intermediate_value
         : ∃ (c : Real). a ≤ c ∧ c ≤ b ∧ f(c) = 0 := {
   set candidates := Real.intermediate_value_candidates(f, a, b);
   -- a is a candidate, and b bounds all of them, so the supremum exists.
-  claim a ≤ a;
-  claim aInCandidates : a ∈ candidates;
-  claim bIsUpper : Real.IsUpperBound(candidates, b)
+  a ≤ a;
+  a ∈ candidates as aInCandidates;
+  Real.IsUpperBound(candidates, b)
       by (y : Real) (yInCandidates : y ∈ candidates) ↦ {
-           claim a ≤ y ∧ y ≤ b ∧ f(y) ≤ 0;
+           a ≤ y ∧ y ≤ b ∧ f(y) ≤ 0;
            done
-         };
-  claim Set.IsNonempty(Real, candidates)
+         } as bIsUpper;
+  Set.IsNonempty(Real, candidates)
       by witness a with aInCandidates;
-  claim Real.IsBoundedAbove(candidates)
+  Real.IsBoundedAbove(candidates)
       by witness b with bIsUpper;
-  claim supremumExists : ∃ (s : Real). Real.IsSupremum(candidates, s)
-      by Real.supremum_exists;
+  ∃ (s : Real). Real.IsSupremum(candidates, s)
+      by Real.supremum_exists as supremumExists;
   choose c from supremumExists;
-  claim Real.IsUpperBound(candidates, c);
-  claim ∀ (otherBound : Real). Real.IsUpperBound(candidates, otherBound) → c ≤ otherBound;
-  claim a ≤ c;
-  claim c ≤ b;
-  claim fContinuousAtC : Real.ContinuousAt(f, c);
+  Real.IsUpperBound(candidates, c);
+  ∀ (otherBound : Real). Real.IsUpperBound(candidates, otherBound) → c ≤ otherBound;
+  a ≤ c;
+  c ≤ b;
+  Real.ContinuousAt(f, c) as fContinuousAtC;
 
   -- ------------------------------------------------------------------
   -- f(c) ≤ 0: otherwise f stays positive on a δ-band around c, so
   -- c − δ already bounds the candidate set — beating the least bound c.
   suppose f(c) > 0 for contradiction {
       -- A tolerance inside the gap (0, f(c)): half of f(c).
-      claim 0 < (2 : Real);
-      claim (2 : Real) ≠ 0;
+      0 < (2 : Real);
+      (2 : Real) ≠ 0;
       let ε : Real := f(c) / 2;
-      claim εPositive : 0 < ε by Real.divide_positive;
-      claim ε < f(c) by Real.divide_two_less_than_self;
+      0 < ε by Real.divide_positive as εPositive;
+      ε < f(c) by Real.divide_two_less_than_self;
       choose δ such that
           0 < δ ∧ ∀ (y : Real). abs(y - c) < δ
             → abs(f(y) - f(c)) < ε
           from fContinuousAtC(ε, εPositive);
-      claim fClose : ∀ (y : Real). abs(y - c) < δ → abs(f(y) - f(c)) < ε;
-      claim 0 < δ;
+      ∀ (y : Real). abs(y - c) < δ → abs(f(y) - f(c)) < ε as fClose;
+      0 < δ;
       -- Any candidate above c − δ would sit δ-close to c
       -- (candidates never exceed c), forcing f > 0 there —
       -- impossible for a candidate. So c − δ is an upper bound.
-      claim Real.IsUpperBound(candidates, c - δ)
+      Real.IsUpperBound(candidates, c - δ)
           by (y : Real) (yInCandidates : y ∈ candidates) ↦ {
                suppose c - δ < y for contradiction {
-                 claim f(y) ≤ 0;
-                 claim y ≤ c;
+                 f(y) ≤ 0;
+                 y ≤ c;
                  -- |y − c| < δ from the two sides.
-                 calc -δ
-                           = (c - δ) - c
-                           < y - c
-                                 by Real.add_preserves_LessThan;
-                 calc y - c
-                           ≤ c - c             by Real.add_preserves_LessOrEqual
-                           = 0
-                           < δ;
-                 claim yClose : abs(y - c) < δ
-                     by Real.absolute_value_LessThan_of_bounds;
-                 claim abs(f(y) - f(c)) < ε
+                 -δ = (c - δ) - c
+                    < y - c
+                          by Real.add_preserves_LessThan;
+                 y - c ≤ c - c             by Real.add_preserves_LessOrEqual
+                       = 0
+                       < δ;
+                 abs(y - c) < δ
+                     by Real.absolute_value_LessThan_of_bounds as yClose;
+                 abs(f(y) - f(c)) < ε
                      by fClose(y, yClose);
-                 claim -ε < f(y) - f(c) ∧ (f(y) - f(c)) < ε
+                 -ε < f(y) - f(c) ∧ (f(y) - f(c)) < ε
                      by Real.absolute_value_LessThan_bounds;
                  -- 0 < f(c) − ε < f(y), yet f(y) ≤ 0.
-                 calc 0
-                           = ε - ε
-                           < f(c) - ε
-                                 by Real.add_preserves_LessThan;
-                 claim 0 ≤ f(c) - ε;
-                 calc f(c) - ε
-                           = -ε + f(c)
-                           < (f(y) - f(c)) + f(c)
-                                 by Real.add_preserves_LessThan
-                           = f(y);
-                 claim 0 < f(y)
+                 0 = ε - ε
+                   < f(c) - ε
+                         by Real.add_preserves_LessThan;
+                 0 ≤ f(c) - ε;
+                 f(c) - ε = -ε + f(c)
+                          < (f(y) - f(c)) + f(c)
+                                by Real.add_preserves_LessThan
+                          = f(y);
+                 0 < f(y)
                      by Real.LessThan.transitive_left;
-                 claim (0 : Real) < 0
+                 (0 : Real) < 0
                      by Real.LessThan.transitive_right;
                  done
                };
                done by Real.LessOrEqual_of_not_LessThan
              };
-      claim c ≤ c - δ;
-      claim c - δ < c
+      c ≤ c - δ;
+      c - δ < c
           by Real.subtract_positive_LessThan;
-      claim c < c by Real.LessThan.transitive_left;
+      c < c by Real.LessThan.transitive_left;
       done
   };
-  claim f(c) ≤ 0 by Real.LessOrEqual_of_not_LessThan;
+  f(c) ≤ 0 by Real.LessOrEqual_of_not_LessThan;
 
   -- ------------------------------------------------------------------
   -- 0 ≤ f(c): otherwise f stays negative on a δ-band around c. Either
   -- a point just above c is then a candidate beyond the upper bound c,
   -- or b itself lies in the band and f(b) < 0 — both absurd.
   suppose f(c) < 0 for contradiction {
-      calc 0
-                = f(c) + -f(c)
-                < 0 + -f(c)
-                      by Real.add_preserves_LessThan
-                = -f(c);
+      0 = f(c) + -f(c)
+        < 0 + -f(c)
+              by Real.add_preserves_LessThan
+        = -f(c);
       -- A tolerance inside the gap (0, −f(c)): half of −f(c).
-      claim 0 < (2 : Real);
-      claim (2 : Real) ≠ 0;
+      0 < (2 : Real);
+      (2 : Real) ≠ 0;
       let ε : Real := -f(c) / 2;
-      claim εPositive : 0 < ε by Real.divide_positive;
-      claim ε < -f(c) by Real.divide_two_less_than_self;
+      0 < ε by Real.divide_positive as εPositive;
+      ε < -f(c) by Real.divide_two_less_than_self;
       choose δ such that
           0 < δ ∧ ∀ (y : Real). abs(y - c) < δ
             → abs(f(y) - f(c)) < ε
           from fContinuousAtC(ε, εPositive);
-      claim 0 < δ;
-      claim fClose : ∀ (y : Real). abs(y - c) < δ → abs(f(y) - f(c)) < ε;
+      0 < δ;
+      ∀ (y : Real). abs(y - c) < δ → abs(f(y) - f(c)) < ε as fClose;
       -- Everything δ-close to c keeps f negative.
-      claim bandNegative
-            : ∀ (y : Real). abs(y - c) < δ
-              → f(y) < 0
+      ∀ (y : Real). abs(y - c) < δ
+        → f(y) < 0
           by (y : Real)
              (yClose : abs(y - c) < δ) ↦ {
-               claim abs(f(y) - f(c)) < ε
+               abs(f(y) - f(c)) < ε
                    by fClose(y, yClose);
-               claim -ε < f(y) - f(c) ∧ (f(y) - f(c)) < ε
+               -ε < f(y) - f(c) ∧ (f(y) - f(c)) < ε
                    by Real.absolute_value_LessThan_bounds;
                -- f(y) < f(c) + ε < f(c) + (−f(c)) = 0.
-               calc f(c) + ε
-                         = ε + f(c)
-                         < -f(c) + f(c)
-                               by Real.add_preserves_LessThan
-                         = 0;
-               calc f(y)
-                         = (f(y) - f(c)) + f(c)
-                         < ε + f(c)
-                               by Real.add_preserves_LessThan
-                         = f(c) + ε;
-               claim f(y) ≤ f(c) + ε;
+               f(c) + ε = ε + f(c)
+                        < -f(c) + f(c)
+                              by Real.add_preserves_LessThan
+                        = 0;
+               f(y) = (f(y) - f(c)) + f(c)
+                    < ε + f(c)
+                          by Real.add_preserves_LessThan
+                    = f(c) + ε;
+               f(y) ≤ f(c) + ε;
                done by Real.LessThan.transitive_left
-             };
+             } as bandNegative;
       -- The half-δ step we probe with.
-      claim 0 < δ / 2;
-      claim 0 ≤ δ / 2;
-      claim δ / 2 < δ by Real.divide_two_less_than_self;
+      0 < δ / 2;
+      0 ≤ δ / 2;
+      δ / 2 < δ by Real.divide_two_less_than_self;
       decide c + δ / 2 ≤ b {
         -- c + δ/2 stays inside [a, b]: it is a candidate
         -- strictly above the upper bound c.
         | yes insideInterval => {
-            calc -δ
-                      = 0 - δ
-                      < δ - δ
-                            by Real.add_preserves_LessThan
-                      = 0
-                      ≤ δ / 2
-                      = (c + δ / 2) - c;
-            calc (c + δ / 2) - c
-                      = δ / 2
-                      < δ;
-            claim candidateClose
-                  : abs((c + δ / 2) - c)
-                      < δ
-                by Real.absolute_value_LessThan_of_bounds;
-            claim f(c + δ / 2) < 0
+            -δ = 0 - δ
+               < δ - δ
+                     by Real.add_preserves_LessThan
+               = 0
+               ≤ δ / 2
+               = (c + δ / 2) - c;
+            (c + δ / 2) - c = δ / 2
+                            < δ;
+            abs((c + δ / 2) - c) < δ
+                by Real.absolute_value_LessThan_of_bounds as candidateClose;
+            f(c + δ / 2) < 0
                 by bandNegative(
                        c + δ / 2,
                        candidateClose);
-            claim f(c + δ / 2) ≤ 0;
-            calc a
-                      ≤ c
-                      = 0 + c
-                      ≤ δ / 2 + c
-                            by Real.add_preserves_LessOrEqual
-                      = c + δ / 2;
-            claim (c + δ / 2) ∈ candidates;
-            claim c + δ / 2 ≤ c;
-            calc c
-                      = 0 + c
-                      < δ / 2 + c
-                            by Real.add_preserves_LessThan
-                      = c + δ / 2;
-            claim c < c by Real.LessThan.transitive_right;
+            f(c + δ / 2) ≤ 0;
+            a ≤ c
+              = 0 + c
+              ≤ δ / 2 + c
+                    by Real.add_preserves_LessOrEqual
+              = c + δ / 2;
+            (c + δ / 2) ∈ candidates;
+            c + δ / 2 ≤ c;
+            c = 0 + c
+              < δ / 2 + c
+                    by Real.add_preserves_LessThan
+              = c + δ / 2;
+            c < c by Real.LessThan.transitive_right;
             done
           }
         -- Otherwise b itself sits inside the δ-band, so
         -- f(b) < 0 — against f(b) ≥ 0.
         | no notInside => {
-            claim b < c + δ / 2
+            b < c + δ / 2
                 by Real.LessThan_of_not_LessOrEqual;
-            calc -δ
-                      = 0 - δ
-                      < δ - δ
-                            by Real.add_preserves_LessThan
-                      = c - c
-                      ≤ b - c
-                            by Real.add_preserves_LessOrEqual;
-            calc b - c
-                      < (c + δ / 2) - c
-                            by Real.add_preserves_LessThan
-                      = δ / 2
-                      < δ;
-            claim bClose : abs(b - c) < δ
-                by Real.absolute_value_LessThan_of_bounds;
-            claim f(b) < 0 by bandNegative(b, bClose);
-            claim (0 : Real) < 0
+            -δ = 0 - δ
+               < δ - δ
+                     by Real.add_preserves_LessThan
+               = c - c
+               ≤ b - c
+                     by Real.add_preserves_LessOrEqual;
+            b - c < (c + δ / 2) - c
+                        by Real.add_preserves_LessThan
+                  = δ / 2
+                  < δ;
+            abs(b - c) < δ
+                by Real.absolute_value_LessThan_of_bounds as bClose;
+            f(b) < 0 by bandNegative(b, bClose);
+            (0 : Real) < 0
                 by Real.LessThan.transitive_left;
             done
           }
       }
   };
-  claim 0 ≤ f(c) by Real.LessOrEqual_of_not_LessThan;
+  0 ≤ f(c) by Real.LessOrEqual_of_not_LessThan;
 
-  claim f(c) = 0
+  f(c) = 0
       by Real.LessOrEqual.antisymmetric;
   witness c with {
-    claim a ≤ c;
-    claim c ≤ b ∧ f(c) = 0;
+    a ≤ c;
+    c ≤ b ∧ f(c) = 0;
     done
   }
 }

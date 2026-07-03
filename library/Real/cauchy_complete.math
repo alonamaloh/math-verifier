@@ -67,7 +67,7 @@ theorem Real.SequenceIsCauchy.at_rational (s : Natural → Real)
               ∀ (m n : Natural). N ≤ m → N ≤ n →
                 abs(s(m) - s(n)) < (ε : Real) :=
   (ε : Rational) (εPositive : Rational.zero < ε) ↦ {
-    claim (ε : Real) > 0;
+    (ε : Real) > 0;
     done by cauchy((ε : Real))
   }
 
@@ -88,13 +88,13 @@ theorem Real.cauchy_tail_gives_lower_bound
         : (s(N) - q) ∈ Real.eventual_lower_bounds(s) :=
   witness N with
       (m : Natural) (mInTail : N ≤ m) ↦ {
-        claim N ≤ N;
-        claim close : abs(s(m) - s(N)) < q
-            by tailClose(m, N, mInTail, (N ≤ N));
+        N ≤ N;
+        abs(s(m) - s(N)) < q
+            by tailClose(m, N, mInTail, (N ≤ N)) as close;
         obtain ⟨closeLower, _⟩
             from Real.absolute_value_LessThan_bounds(
                      s(m) - s(N), (q : Real), close);
-        claim s(N) - q < s(m)
+        s(N) - q < s(m)
             by calc s(N) - q
                   = -q + s(N)
                   < (s(m) - s(N)) + s(N)       by Real.add_preserves_LessThan
@@ -111,22 +111,24 @@ theorem Real.cauchy_tail_gives_upper_bound
   (t : Real) (tEventual : t ∈ Real.eventual_lower_bounds(s)) ↦ {
     obtain ⟨tailStart, tailLow⟩ from tEventual;
     -- Probe past both tails at once.
-    claim tailStart ≤ Natural.maximum(tailStart, N);
-    claim N ≤ Natural.maximum(tailStart, N);
-    claim N ≤ N;
-    claim tBelowTerm : t ≤ s(Natural.maximum(tailStart, N));
-    claim close : abs(s(Natural.maximum(tailStart, N)) - s(N)) < q
+    tailStart ≤ Natural.maximum(tailStart, N);
+    N ≤ Natural.maximum(tailStart, N);
+    N ≤ N;
+    t ≤ s(Natural.maximum(tailStart, N)) as tBelowTerm;
+    abs(s(Natural.maximum(tailStart, N)) - s(N)) < q
         by tailClose(Natural.maximum(tailStart, N), N,
-                     (N ≤ Natural.maximum(tailStart, N)), (N ≤ N));
+                     (N ≤ Natural.maximum(tailStart, N)), (N ≤ N))
+        as close;
     obtain ⟨_, closeUpper⟩
         from Real.absolute_value_LessThan_bounds(
                  s(Natural.maximum(tailStart, N)) - s(N), (q : Real), close);
-    claim termBelow : s(Natural.maximum(tailStart, N)) < s(N) + q
+    s(Natural.maximum(tailStart, N)) < s(N) + q
         by calc s(Natural.maximum(tailStart, N))
               = (s(Natural.maximum(tailStart, N)) - s(N)) + s(N)   by ring
               < q + s(N)        by Real.add_preserves_LessThan
-              = s(N) + q;
-    calc t
+              = s(N) + q
+        as termBelow;
+    t
        ≤ s(Natural.maximum(tailStart, N))    by tBelowTerm
        < s(N) + q                   by termBelow;
     done
@@ -143,14 +145,16 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
   choose unitIndex as unitClose
       from Real.SequenceIsCauchy.at_rational(s, cauchy)(
                Rational.one, Rational.zero_less_one);
-  claim nonempty : Set.IsNonempty(Real, Real.eventual_lower_bounds(s))
+  Set.IsNonempty(Real, Real.eventual_lower_bounds(s))
       by ⟨s(unitIndex) - (Rational.one : Real),
           Real.cauchy_tail_gives_lower_bound(
-              s, unitIndex, Rational.one, unitClose)⟩;
-  claim boundedAbove : Real.IsBoundedAbove(Real.eventual_lower_bounds(s))
+              s, unitIndex, Rational.one, unitClose)⟩
+      as nonempty;
+  Real.IsBoundedAbove(Real.eventual_lower_bounds(s))
       by ⟨s(unitIndex) + (Rational.one : Real),
           Real.cauchy_tail_gives_upper_bound(
-              s, unitIndex, Rational.one, unitClose)⟩;
+              s, unitIndex, Rational.one, unitClose)⟩
+      as boundedAbove;
   obtain ⟨limit, isSupremum⟩
       from Real.supremum_exists(Real.eventual_lower_bounds(s),
                                 nonempty, boundedAbove);
@@ -161,50 +165,48 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
       Real.SequenceConverges.of_rational(s, limit,
       (ε : Rational)
       (εPositive : Rational.zero < ε) ↦ {
-        claim Rational.zero < Rational.halve(ε);
-        claim quarterPositive : Rational.zero < Rational.halve(Rational.halve(ε));
+        Rational.zero < Rational.halve(ε);
+        Rational.zero < Rational.halve(Rational.halve(ε)) as quarterPositive;
         choose N as tailClose
             from Real.SequenceIsCauchy.at_rational(s, cauchy)(
                      Rational.halve(Rational.halve(ε)),
                      quarterPositive);
         -- The supremum is trapped within a quarter-ε of s(N).
-        claim s(N) - (Rational.halve(Rational.halve(ε)) : Real)
+        s(N) - (Rational.halve(Rational.halve(ε)) : Real)
                 ≤ limit
             by isUpper(
                    s(N) - (Rational.halve(Rational.halve(ε)) : Real),
                    Real.cauchy_tail_gives_lower_bound(
                        s, N, Rational.halve(Rational.halve(ε)),
                        tailClose));
-        claim limit
+        limit
                 ≤ s(N) + (Rational.halve(Rational.halve(ε)) : Real)
             by isLeast(
                    s(N) + (Rational.halve(Rational.halve(ε)) : Real),
                    Real.cauchy_tail_gives_upper_bound(
                        s, N, Rational.halve(Rational.halve(ε)),
                        tailClose));
-        claim Rational.halve(ε) < ε
+        Rational.halve(ε) < ε
             by Rational.halve_less_than_self;
-        claim halveBelowε
-              : (Rational.halve(ε) : Real) < (ε : Real)
-            by Rational.to_real.LessThan_preserves;
+        (Rational.halve(ε) : Real) < (ε : Real)
+            by Rational.to_real.LessThan_preserves as halveBelowε;
         witness N with
             (m : Natural) (mInTail : N ≤ m) ↦ {
-              claim N ≤ N;
-              claim close
-                    : abs(s(m) - s(N))
+              N ≤ N;
+              abs(s(m) - s(N))
                       < (Rational.halve(Rational.halve(ε)) : Real)
-                  by tailClose(m, N, mInTail, (N ≤ N));
+                  by tailClose(m, N, mInTail, (N ≤ N)) as close;
               obtain ⟨closeLower, closeUpper⟩
                   from Real.absolute_value_LessThan_bounds(
                            s(m) - s(N),
                            (Rational.halve(Rational.halve(ε)) : Real),
                            close);
               -- Both gaps to the limit stay below 2·(ε/4) < ε.
-              claim -limit
+              -limit
                       ≤ -(s(N) - (Rational.halve(Rational.halve(ε))
                                   : Real))
                   by Real.LessOrEqual.negate;
-              claim s(m) - limit < (ε : Real)
+              s(m) - limit < (ε : Real)
                   by calc s(m) - limit
                         ≤ s(m) - (s(N)
                                   - (Rational.halve(Rational.halve(ε))
@@ -222,7 +224,7 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
                         = (Rational.halve(ε) : Real)
                         < (ε : Real)
                               by halveBelowε;
-              claim s(N) - (Rational.halve(Rational.halve(ε)) : Real)
+              s(N) - (Rational.halve(Rational.halve(ε)) : Real)
                       < s(m)
                   by calc s(N) - (Rational.halve(Rational.halve(ε))
                                   : Real)
@@ -232,11 +234,11 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
                         < (s(m) - s(N)) + s(N)
                               by Real.add_preserves_LessThan
                         = s(m);
-              claim -s(m)
+              -s(m)
                       < -(s(N) - (Rational.halve(Rational.halve(ε))
                                   : Real))
                   by Real.LessThan.negate;
-              claim limit - s(m) < (ε : Real)
+              limit - s(m) < (ε : Real)
                   by calc limit - s(m)
                         ≤ (s(N) + (Rational.halve(Rational.halve(ε))
                                    : Real)) - s(m)
@@ -255,9 +257,9 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
                         = (Rational.halve(ε) : Real)
                         < (ε : Real)
                               by halveBelowε;
-              claim -(ε : Real) < -(limit - s(m))
+              -(ε : Real) < -(limit - s(m))
                   by Real.LessThan.negate;
-              claim -(ε : Real) < s(m) - limit
+              -(ε : Real) < s(m) - limit
                   by calc -(ε : Real)
                         < -(limit - s(m))    by (-(ε : Real)
                                                  < -(limit - s(m)))
@@ -277,15 +279,15 @@ theorem Real.converges_implies_cauchy (s : Natural → Real)
       from convergent;
   take ε : Real;
   take εPositive : ε > 0;
-  claim (2 : Real) > 0;
-  claim (2 : Real) ≠ 0;
-  claim halfPositive : ε / 2 > 0;
+  (2 : Real) > 0;
+  (2 : Real) ≠ 0;
+  ε / 2 > 0 as halfPositive;
   choose N as tailClose from converges(ε / 2, halfPositive);
   witness N with
       (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
-        claim abs(s(m) - limit) < ε / 2 by tailClose(m, mInTail);
-        claim abs(s(n) - limit) < ε / 2 by tailClose(n, nInTail);
-        calc abs(s(m) - s(n))
+        abs(s(m) - limit) < ε / 2 by tailClose(m, mInTail);
+        abs(s(n) - limit) < ε / 2 by tailClose(n, nInTail);
+        abs(s(m) - s(n))
            = abs((s(m) - limit) + (limit - s(n)))
                  by ((s(m) - limit) + (limit - s(n)) = s(m) - s(n))
            ≤ abs(s(m) - limit) + abs(limit - s(n))
@@ -310,40 +312,39 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
   (εPositive : ε > 0) ↦ {
     choose N as tailClose from boundCauchy(ε, εPositive);
     -- The ordered case: the gap from index i up to index j ≥ i.
-    claim oneSided
-          : ∀ (i j : Natural). N ≤ i → N ≤ j → i ≤ j
-            → abs(Real.partialSum(t, j) - Real.partialSum(t, i))
-              < ε
+    ∀ (i j : Natural). N ≤ i → N ≤ j → i ≤ j
+        → abs(Real.partialSum(t, j) - Real.partialSum(t, i))
+          < ε
         by {
           take i : Natural; take j : Natural;
           take iInTail : N ≤ i; take jInTail : N ≤ j;
           take iLeqJ : i ≤ j;
           obtain ⟨c, splitEquation⟩
               from Natural.subtraction_witness(i, j, iLeqJ);
-          claim jAsSum : j = c + i
+          j = c + i
               by calc j
                     = i + c    by splitEquation
-                    = c + i;
-          claim splitT
-                : Real.partialSum(t, j)
+                    = c + i
+              as jAsSum;
+          Real.partialSum(t, j)
                   = Real.partialSum(t, i)
                     + Real.partialSum((k : Natural) ↦ t(i + k), c)
               by calc Real.partialSum(t, j)
                     = Real.partialSum(t, c + i)    by jAsSum
                     = Real.partialSum(t, i)
                       + Real.partialSum((k : Natural) ↦ t(i + k), c)
-                          by Real.partialSum_split(t, i, c);
-          claim splitB
-                : Real.partialSum(b, j)
+                          by Real.partialSum_split(t, i, c)
+              as splitT;
+          Real.partialSum(b, j)
                   = Real.partialSum(b, i)
                     + Real.partialSum((k : Natural) ↦ b(i + k), c)
               by calc Real.partialSum(b, j)
                     = Real.partialSum(b, c + i)    by jAsSum
                     = Real.partialSum(b, i)
                       + Real.partialSum((k : Natural) ↦ b(i + k), c)
-                          by Real.partialSum_split(b, i, c);
-          claim tWindowValue
-                : Real.partialSum(t, j) - Real.partialSum(t, i)
+                          by Real.partialSum_split(b, i, c)
+              as splitB;
+          Real.partialSum(t, j) - Real.partialSum(t, i)
                   = Real.partialSum((k : Natural) ↦ t(i + k), c)
               by calc Real.partialSum(t, j) - Real.partialSum(t, i)
                     = (Real.partialSum(t, i)
@@ -351,9 +352,9 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                       - Real.partialSum(t, i)
                           by splitT
                     = Real.partialSum((k : Natural) ↦ t(i + k), c)
-                          by ring;
-          claim bWindowValue
-                : Real.partialSum((k : Natural) ↦ b(i + k), c)
+                          by ring
+              as tWindowValue;
+          Real.partialSum((k : Natural) ↦ b(i + k), c)
                   = Real.partialSum(b, j) - Real.partialSum(b, i)
               by calc Real.partialSum((k : Natural) ↦ b(i + k), c)
                     = (Real.partialSum(b, i)
@@ -361,9 +362,9 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                       - Real.partialSum(b, i)
                           by ring
                     = Real.partialSum(b, j) - Real.partialSum(b, i)
-                          by splitB;
-          claim tWindowBound
-                : abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
+                          by splitB
+              as bWindowValue;
+          abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
                   ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
               by calc abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
                     ≤ Real.partialSum((k : Natural) ↦ abs(t(i + k)), c)
@@ -373,16 +374,17 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                                  (k : Natural) ↦ abs(t(i + k)),
                                  (k : Natural) ↦ b(i + k), c,
                                  (k : Natural) (_ : k < c) ↦
-                                   domination(i + k));
-          claim bWindowBelow
-                : Real.partialSum(b, j) - Real.partialSum(b, i)
+                                   domination(i + k))
+              as tWindowBound;
+          Real.partialSum(b, j) - Real.partialSum(b, i)
                   < ε
               by calc Real.partialSum(b, j) - Real.partialSum(b, i)
                     ≤ abs(Real.partialSum(b, j) - Real.partialSum(b, i))
                           by Real.LessOrEqual_absolute_value
                     < ε
-                          by tailClose(j, i, jInTail, iInTail);
-          calc abs(Real.partialSum(t, j) - Real.partialSum(t, i))
+                          by tailClose(j, i, jInTail, iInTail)
+              as bWindowBelow;
+          abs(Real.partialSum(t, j) - Real.partialSum(t, i))
              = abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
                    by tWindowValue
              ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
@@ -391,18 +393,18 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                    by bWindowValue
              < ε
                    by bWindowBelow
-        };
+        } as oneSided;
     witness N with
         (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦
           cases Natural.compare_strict(m, n) {
             | Natural.StrictComparison.below(mStrictlyBelowN) => {
-                claim m ≤ n;
-                claim abs(Real.partialSum(t, n) - Real.partialSum(t, m))
+                m ≤ n;
+                abs(Real.partialSum(t, n) - Real.partialSum(t, m))
                         < ε
                     by oneSided(m, n, mInTail, nInTail, (m ≤ n));
-                claim abs(Real.partialSum(t, m) - Real.partialSum(t, n))
+                abs(Real.partialSum(t, m) - Real.partialSum(t, n))
                         = abs(Real.partialSum(t, n) - Real.partialSum(t, m));
-                calc abs(Real.partialSum(t, m) - Real.partialSum(t, n))
+                abs(Real.partialSum(t, m) - Real.partialSum(t, n))
                    = abs(Real.partialSum(t, n) - Real.partialSum(t, m))
                    < ε
               }
@@ -417,9 +419,9 @@ theorem Real.series_dominated_converges (t b : Natural → Real)
         (domination : ∀ (k : Natural). abs(t(k)) ≤ b(k))
         (boundConvergent : Real.SequenceConvergent(Real.partialSum(b)))
         : Real.SequenceConvergent(Real.partialSum(t)) := {
-  claim Real.SequenceIsCauchy(Real.partialSum(b))
+  Real.SequenceIsCauchy(Real.partialSum(b))
       by Real.converges_implies_cauchy;
-  claim Real.SequenceIsCauchy(Real.partialSum(t))
+  Real.SequenceIsCauchy(Real.partialSum(t))
       by Real.series_dominated_cauchy;
   done by Real.cauchy_sequence_converges
 }

@@ -74,7 +74,7 @@ theorem Real.SequenceConverges.add (s t : Natural → Real)
         : Real.SequenceConverges((n : Natural) ↦ s(n) + t(n), sLimit + tLimit) :=
   (ε : Real)
   (εPositive : ε > 0) ↦ {
-    claim halfPositive : ε / 2 > 0;
+    ε / 2 > 0 as halfPositive;
     choose sThreshold as sClose
         from sConverges(ε / 2, halfPositive);
     choose tThreshold as tClose
@@ -82,11 +82,11 @@ theorem Real.SequenceConverges.add (s t : Natural → Real)
     witness Natural.maximum(sThreshold, tThreshold) with
         (m : Natural)
         (aboveMaximum : Natural.maximum(sThreshold, tThreshold) ≤ m) ↦ {
-          claim sAbove : sThreshold ≤ m;
-          claim tAbove : tThreshold ≤ m;
-          claim abs(s(m) - sLimit) < ε / 2 by sClose(m, sAbove);
-          claim abs(t(m) - tLimit) < ε / 2 by tClose(m, tAbove);
-          calc abs((s(m) + t(m)) - (sLimit + tLimit))
+          sThreshold ≤ m as sAbove;
+          tThreshold ≤ m as tAbove;
+          abs(s(m) - sLimit) < ε / 2 by sClose(m, sAbove);
+          abs(t(m) - tLimit) < ε / 2 by tClose(m, tAbove);
+          abs((s(m) + t(m)) - (sLimit + tLimit))
              = abs((s(m) - sLimit) + (t(m) - tLimit))
                    by substituting
                        (ring : (s(m) + t(m)) - (sLimit + tLimit)
@@ -144,8 +144,8 @@ theorem Real.SequenceConverges.squeeze_zero (v u : Natural → Real)
     choose threshold from uVanishes(ε, εPositive);
     witness threshold with
         (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
-          claim u(m) ≤ abs(u(m)) by Real.LessOrEqual_absolute_value;
-          calc abs(v(m) - 0)
+          u(m) ≤ abs(u(m)) by Real.LessOrEqual_absolute_value;
+          abs(v(m) - 0)
              = abs(v(m))
                    by substituting (ring : v(m) - 0 = v(m))
              ≤ u(m)
@@ -174,27 +174,27 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
     -- A positive roof over each limit, one unit above its absolute value.
     let sBound : Real := 1 + abs(sLimit);
     let tBound : Real := 1 + abs(tLimit);
-    claim abs(sLimit) ≥ 0;
-    claim abs(tLimit) ≥ 0;
-    claim onePositive : (0 : Real) < 1;
-    claim (0 : Real) ≤ 1;
-    calc (0 : Real)
+    abs(sLimit) ≥ 0;
+    abs(tLimit) ≥ 0;
+    (0 : Real) < 1 as onePositive;
+    (0 : Real) ≤ 1;
+    (0 : Real)
        < 1                by Real.zero_less_one
        = 1 + 0
        ≤ 1 + abs(sLimit)  by Real.add_preserves_LessOrEqual_left;
-    calc (0 : Real)
+    (0 : Real)
        < 1                by Real.zero_less_one
        = 1 + 0
        ≤ 1 + abs(tLimit)  by Real.add_preserves_LessOrEqual_left;
-    claim sBound ≠ 0;
-    claim tBound ≠ 0;
-    calc abs(tLimit)
+    sBound ≠ 0;
+    tBound ≠ 0;
+    abs(tLimit)
        = 0 + abs(tLimit)
        ≤ 1 + abs(tLimit)   by Real.add_preserves_LessOrEqual;
     -- Each piece gets a quarter of ε, divided by the opposite roof.
-    claim ε / 4 > 0;
-    claim tTolerancePositive : (ε / 4) / sBound > 0;
-    claim sTolerancePositive : (ε / 4) / tBound > 0;
+    ε / 4 > 0;
+    (ε / 4) / sBound > 0 as tTolerancePositive;
+    (ε / 4) / tBound > 0 as sTolerancePositive;
     -- Tails: s within one unit of its limit (to roof |s(m)|), and each
     -- sequence within its tolerance.
     choose unitThreshold as sUnitClose from sConverges((1 : Real), onePositive);
@@ -204,38 +204,38 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
         (m : Natural)
         (aboveAll : Natural.maximum(unitThreshold,
                         Natural.maximum(tThreshold, sThreshold)) ≤ m) ↦ {
-          claim unitThreshold ≤ m by Natural.le_through_max_left;
-          claim Natural.maximum(tThreshold, sThreshold) ≤ m
+          unitThreshold ≤ m by Natural.le_through_max_left;
+          Natural.maximum(tThreshold, sThreshold) ≤ m
               by Natural.le_through_max_right;
-          claim tThreshold ≤ m by Natural.le_through_max_left;
-          claim sThreshold ≤ m by Natural.le_through_max_right;
-          claim abs(s(m)) ≥ 0 by Real.absolute_value_nonneg;
-          claim abs(t(m) - tLimit) ≥ 0 by Real.absolute_value_nonneg;
-          claim abs(s(m) - sLimit) ≥ 0 by Real.absolute_value_nonneg;
+          tThreshold ≤ m by Natural.le_through_max_left;
+          sThreshold ≤ m by Natural.le_through_max_right;
+          abs(s(m)) ≥ 0 by Real.absolute_value_nonneg;
+          abs(t(m) - tLimit) ≥ 0 by Real.absolute_value_nonneg;
+          abs(s(m) - sLimit) ≥ 0 by Real.absolute_value_nonneg;
           -- |s(m)| ≤ sBound, since s is within one unit of its limit.
-          claim abs(s(m) - sLimit) < 1 by sUnitClose(m, (unitThreshold ≤ m));
-          claim abs(s(m) - sLimit) ≤ 1;
-          calc abs(s(m))
+          abs(s(m) - sLimit) < 1 by sUnitClose(m, (unitThreshold ≤ m));
+          abs(s(m) - sLimit) ≤ 1;
+          abs(s(m))
              = abs((s(m) - sLimit) + sLimit)
                    by substituting (ring : s(m) = (s(m) - sLimit) + sLimit)
              ≤ abs(s(m) - sLimit) + abs(sLimit)   by Real.triangle_inequality
              ≤ 1 + abs(sLimit)                    by Real.add_preserves_LessOrEqual;
           -- Each tolerance is realised at m, then weakened to ≤.
-          claim abs(t(m) - tLimit) < (ε / 4) / sBound by tClose(m, (tThreshold ≤ m));
-          claim abs(t(m) - tLimit) ≤ (ε / 4) / sBound;
-          claim abs(s(m) - sLimit) < (ε / 4) / tBound by sClose(m, (sThreshold ≤ m));
-          claim abs(s(m) - sLimit) ≤ (ε / 4) / tBound;
+          abs(t(m) - tLimit) < (ε / 4) / sBound by tClose(m, (tThreshold ≤ m));
+          abs(t(m) - tLimit) ≤ (ε / 4) / sBound;
+          abs(s(m) - sLimit) < (ε / 4) / tBound by sClose(m, (sThreshold ≤ m));
+          abs(s(m) - sLimit) ≤ (ε / 4) / tBound;
           -- Each piece collapses to a quarter of ε.
-          calc abs(s(m) * (t(m) - tLimit))
+          abs(s(m) * (t(m) - tLimit))
              = abs(s(m)) * abs(t(m) - tLimit)
              ≤ sBound * ((ε / 4) / sBound)   by Real.LessOrEqual.multiply_monotone_nonneg
              = ε / 4;
-          calc abs(tLimit * (s(m) - sLimit))
+          abs(tLimit * (s(m) - sLimit))
              = abs(tLimit) * abs(s(m) - sLimit)
              ≤ tBound * ((ε / 4) / tBound)   by Real.LessOrEqual.multiply_monotone_nonneg
              = ε / 4;
           -- Assemble: split, triangle, two quarters, half < whole.
-          calc abs(s(m) * t(m) - sLimit * tLimit)
+          abs(s(m) * t(m) - sLimit * tLimit)
              = abs(s(m) * (t(m) - tLimit) + tLimit * (s(m) - sLimit))
                    by substituting
                        (ring : s(m) * t(m) - sLimit * tLimit
@@ -262,12 +262,12 @@ theorem Real.upper_bound_of_no_term_above (s : Natural → Real) (c : Real)
         : Real.IsUpperBound(Real.sequence_range(s), c) :=
   (y : Real) (yInRange : y ∈ Real.sequence_range(s)) ↦ {
     choose n such that s(n) = y from yInRange;
-    claim ¬(c < s(n))
+    ¬(c < s(n))
         by (above : c < s(n)) ↦ {
-             claim termExists : ∃ (N : Natural). c < s(N) by witness n with above;
+             ∃ (N : Natural). c < s(N) by witness n with above as termExists;
              noTermAbove(termExists)
            };
-    claim s(n) ≤ c by Real.LessOrEqual_of_not_LessThan;
+    s(n) ≤ c by Real.LessOrEqual_of_not_LessThan;
     done by substituting (s(n) = y)
   }
 
@@ -275,11 +275,11 @@ theorem Real.upper_bound_of_no_term_above (s : Natural → Real) (c : Real)
 theorem Real.subtract_positive_LessThan (x ε : Real)
         (εPositive : ε > 0)
         : x - ε < x := {
-  calc -ε
+  -ε
      = 0 + -ε
      < ε + -ε     by Real.add_preserves_LessThan
      = 0;
-  calc x - ε
+  x - ε
      = -ε + x
      < 0 + x      by Real.add_preserves_LessThan
      = x
@@ -295,21 +295,21 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
         (bounded : ∀ (n : Natural). s(n) ≤ bound)
         : Real.SequenceConvergent(s) := {
   -- The range is nonempty and bounded above, so it has a supremum.
-  claim Set.IsNonempty(Real, Real.sequence_range(s))
+  Set.IsNonempty(Real, Real.sequence_range(s))
       by witness s(0) with witness 0 with reflexivity(Real, s(0));
-  claim Real.IsBoundedAbove(Real.sequence_range(s))
+  Real.IsBoundedAbove(Real.sequence_range(s))
       by witness bound with
           (y : Real) (yInRange : y ∈ Real.sequence_range(s)) ↦ {
             choose n such that s(n) = y from yInRange;
-            claim s(n) ≤ bound;
+            s(n) ≤ bound;
             done by substituting (s(n) = y)
           };
   choose limit such that Real.IsSupremum(Real.sequence_range(s), limit)
       from Real.supremum_exists;
-  claim Real.IsUpperBound(Real.sequence_range(s), limit);
-  claim ∀ (otherBound : Real).
-            Real.IsUpperBound(Real.sequence_range(s), otherBound)
-          → limit ≤ otherBound;
+  Real.IsUpperBound(Real.sequence_range(s), limit);
+  ∀ (otherBound : Real).
+      Real.IsUpperBound(Real.sequence_range(s), otherBound)
+    → limit ≤ otherBound;
   witness limit with
       (ε : Real)
       (εPositive : ε > 0) ↦ {
@@ -321,30 +321,30 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
               witness N with
                   (m : Natural) (aboveThreshold : N ≤ m) ↦ {
                     -- limit − ε < s(N) ≤ s(m) ≤ limit < limit + ε.
-                    calc limit - ε
+                    limit - ε
                        < s(N)
                        ≤ s(m);
-                    claim s(m) ∈ Real.sequence_range(s)
+                    s(m) ∈ Real.sequence_range(s)
                         by witness m with reflexivity(Real, s(m));
-                    claim s(m) ≤ limit;
-                    calc s(m) - limit
+                    s(m) ≤ limit;
+                    s(m) - limit
                        ≤ limit - limit     by Real.add_preserves_LessOrEqual
                        = 0
                        < ε;
-                    calc -ε
+                    -ε
                        = (limit - ε) - limit
                        < s(m) - limit      by Real.add_preserves_LessThan;
                     done by Real.absolute_value_LessThan_of_bounds
                   }
             }
           | no noTermAbove => {
-              claim Real.IsUpperBound(Real.sequence_range(s),
-                        limit - ε);
-              claim limit ≤ limit - ε;
-              claim limit - ε < limit
+              Real.IsUpperBound(Real.sequence_range(s),
+                  limit - ε);
+              limit ≤ limit - ε;
+              limit - ε < limit
                   by Real.subtract_positive_LessThan;
-              claim limit < limit by Real.LessThan.transitive_left;
-              claim False;
+              limit < limit by Real.LessThan.transitive_left;
+              False;
               done
             }
         }
@@ -389,38 +389,38 @@ theorem Real.SequenceConverges.le_of_eventually_le
         (tailBelow : ∀ (m : Natural). N ≤ m → s(m) ≤ bound)
         : limit ≤ bound := {
   suppose bound < limit as above for contradiction {
-    calc 0
+    0
        = bound - bound
        < limit - bound       by Real.add_preserves_LessThan;
     let ε : Real := (limit - bound) / 2;
-    claim (2 : Real) > 0;
-    claim εPositive : (limit - bound) / 2 > 0;
-    claim ε < limit - bound by Real.divide_two_less_than_self;
+    (2 : Real) > 0;
+    (limit - bound) / 2 > 0 as εPositive;
+    ε < limit - bound by Real.divide_two_less_than_self;
     choose M as tailClose from converges(ε, εPositive);
-    claim N ≤ Natural.maximum(N, M);
-    claim M ≤ Natural.maximum(N, M);
-    claim s(Natural.maximum(N, M)) ≤ bound;
-    claim abs(s(Natural.maximum(N, M)) - limit) < ε
+    N ≤ Natural.maximum(N, M);
+    M ≤ Natural.maximum(N, M);
+    s(Natural.maximum(N, M)) ≤ bound;
+    abs(s(Natural.maximum(N, M)) - limit) < ε
         by tailClose(Natural.maximum(N, M), (M ≤ Natural.maximum(N, M)));
-    claim -ε < (s(Natural.maximum(N, M)) - limit)
+    -ε < (s(Natural.maximum(N, M)) - limit)
           ∧ (s(Natural.maximum(N, M)) - limit) < ε
         by Real.absolute_value_LessThan_bounds;
-    claim -ε < s(Natural.maximum(N, M)) - limit by And.left;
-    calc limit - ε
+    -ε < s(Natural.maximum(N, M)) - limit by And.left;
+    limit - ε
        = -ε + limit
        < (s(Natural.maximum(N, M)) - limit) + limit
              by Real.add_preserves_LessThan
        = s(Natural.maximum(N, M));
-    calc bound + ε
+    bound + ε
        < bound + (limit - bound)
              by Real.add_left_preserves_LessThan
        = limit;
-    calc bound
+    bound
        = (bound + ε) - ε
        < limit - ε
              by Real.add_preserves_LessThan
        < s(Natural.maximum(N, M));
-    claim bound < bound by Real.LessThan.transitive_right;
+    bound < bound by Real.LessThan.transitive_right;
     done
   };
   done by Real.LessOrEqual_of_not_LessThan
@@ -433,34 +433,34 @@ theorem Real.SequenceConverges.ge_of_eventually_ge
         (tailAbove : ∀ (m : Natural). N ≤ m → bound ≤ s(m))
         : bound ≤ limit := {
   suppose limit < bound as below for contradiction {
-    calc 0
+    0
        = limit - limit
        < bound - limit       by Real.add_preserves_LessThan;
     let ε : Real := (bound - limit) / 2;
-    claim (2 : Real) > 0;
-    claim εPositive : (bound - limit) / 2 > 0;
-    claim ε < bound - limit by Real.divide_two_less_than_self;
+    (2 : Real) > 0;
+    (bound - limit) / 2 > 0 as εPositive;
+    ε < bound - limit by Real.divide_two_less_than_self;
     choose M as tailClose from converges(ε, εPositive);
-    claim N ≤ Natural.maximum(N, M);
-    claim M ≤ Natural.maximum(N, M);
-    claim bound ≤ s(Natural.maximum(N, M));
-    claim abs(s(Natural.maximum(N, M)) - limit) < ε
+    N ≤ Natural.maximum(N, M);
+    M ≤ Natural.maximum(N, M);
+    bound ≤ s(Natural.maximum(N, M));
+    abs(s(Natural.maximum(N, M)) - limit) < ε
         by tailClose(Natural.maximum(N, M), (M ≤ Natural.maximum(N, M)));
-    claim -ε < (s(Natural.maximum(N, M)) - limit)
+    -ε < (s(Natural.maximum(N, M)) - limit)
           ∧ (s(Natural.maximum(N, M)) - limit) < ε
         by Real.absolute_value_LessThan_bounds;
-    claim s(Natural.maximum(N, M)) - limit < ε by And.right;
-    calc s(Natural.maximum(N, M))
+    s(Natural.maximum(N, M)) - limit < ε by And.right;
+    s(Natural.maximum(N, M))
        = (s(Natural.maximum(N, M)) - limit) + limit
        < ε + limit
              by Real.add_preserves_LessThan
        = limit + ε;
-    calc s(Natural.maximum(N, M))
+    s(Natural.maximum(N, M))
        < limit + ε
        < limit + (bound - limit)
              by Real.add_left_preserves_LessThan
        = bound;
-    claim bound < bound by Real.LessThan.transitive_left;
+    bound < bound by Real.LessThan.transitive_left;
     done
   };
   done by Real.LessOrEqual_of_not_LessThan

@@ -52,10 +52,9 @@ theorem Real.LessOrEqual_absolute_value_at_make
                (εPositive : Rational.zero < ε) ↦
         witness 0 with
             (m : Natural) (_ : 0 ≤ m) ↦ {
-              claim s(m) ≤ abs(s(m)) by Rational.le_absolute_value;
-              claim Rational.IsNonneg(abs(s(m)) + -(s(m)));
-              calc -ε
-                 < Rational.zero   by Rational.negate_LessThan_zero_of_positive
+              s(m) ≤ abs(s(m)) by Rational.le_absolute_value;
+              Rational.IsNonneg(abs(s(m)) + -(s(m)));
+              -ε < Rational.zero   by Rational.negate_LessThan_zero_of_positive
                  ≤ abs(s(m)) + -(s(m))   by Rational.LessOrEqual_zero_of_IsNonneg
             })
 
@@ -84,16 +83,15 @@ theorem Real.absolute_value_LessOrEqual_of_nonneg_at_make
                 CauchyRationalSequence.make(s, sCauchy)))
       (ε : Rational)
       (εPositive : Rational.zero < ε) ↦ {
-        claim halfPositive : Rational.zero < Rational.halve(ε);
+        Rational.zero < Rational.halve(ε) as halfPositive;
         choose N as eventuallyAboveHalf
             from eventuallyNonneg(Rational.halve(ε), halfPositive);
         witness N with
             (m : Natural) (NLeqM : N ≤ m) ↦ {
-              claim -Rational.halve(ε) < s(m)
+              -Rational.halve(ε) < s(m)
                   by eventuallyAboveHalf(m, NLeqM);
               -- Goal: -ε < s(m) + -|s(m)|; ε is twice the slack δ.
-              calc -ε
-                 = -(Rational.halve(ε) + Rational.halve(ε))
+              -ε = -(Rational.halve(ε) + Rational.halve(ε))
                  < s(m) + -abs(s(m))   by Rational.subtract_absolute_value_lower_bound
             }
       })
@@ -102,7 +100,7 @@ theorem Real.absolute_value_LessOrEqual_of_nonneg (x : Real)
         (xNonneg : Real.IsNonneg(x))
         : abs(x) ≤ x :=
   cases x refining xNonneg { | rep => {
-      claim CauchyRationalSequence.IsEventuallyNonneg(rep) by Real.IsNonneg.eventually_nonneg;
+      CauchyRationalSequence.IsEventuallyNonneg(rep) by Real.IsNonneg.eventually_nonneg;
       done by Real.absolute_value_LessOrEqual_of_nonneg_at_make
   } }
 
@@ -112,15 +110,15 @@ theorem Real.absolute_value_LessOrEqual_of_nonneg (x : Real)
 theorem Real.absolute_value_when_nonneg (x : Real)
         (xNonneg : Real.IsNonneg(x))
         : abs(x) = x := {
-  claim abs(x) ≤ x;
-  claim x ≤ abs(x);
+  abs(x) ≤ x;
+  x ≤ abs(x);
   done by Real.LessOrEqual.antisymmetric
 }
 
 -- The absolute value of zero is zero. A routine fact the auto-prover finds
 -- on its own, so a trivial `abs(Real.zero) = 0` step needs no hint.
 automatic theorem Real.absolute_value_zero : abs(Real.zero) = Real.zero := {
-  claim Real.IsNonneg(Real.zero);
+  Real.IsNonneg(Real.zero);
   done
 }
 
@@ -137,10 +135,9 @@ theorem Real.absolute_value_when_negate_nonneg (x : Real)
 theorem Real.negate_flip_LessThan (a b : Real)
         (lowerBound : -a < b)
         : -b < a := {
-  claim -a + (a + -b) < b + (a + -b)
+  -a + (a + -b) < b + (a + -b)
       by Real.add_preserves_LessThan;
-  calc -b
-     = -a + (a + -b)
+  -b = -a + (a + -b)
      < b + (a + -b)
      = a
 }
@@ -157,8 +154,8 @@ theorem Real.absolute_value_LessThan_of_bounds (x c : Real)
            = x
            < c
     in (Real.IsNonneg(-x)) as negateNonneg: {
-        claim -x < c by Real.negate_flip_LessThan;
-        calc abs(x)
+        -x < c by Real.negate_flip_LessThan;
+        abs(x)
            = -x
            < c
       }
@@ -167,13 +164,11 @@ theorem Real.absolute_value_LessThan_of_bounds (x c : Real)
 theorem Real.absolute_value_LessThan_bounds (x c : Real)
         (absoluteBound : abs(x) < c)
         : -c < x ∧ x < c := {
-  calc x
-     ≤ abs(x)   by Real.LessOrEqual_absolute_value
-     < c   as upperBound;
-  calc -x
-     ≤ abs(x)   by Real.negate_LessOrEqual_absolute_value
+  x ≤ abs(x)   by Real.LessOrEqual_absolute_value
+    < c   as upperBound;
+  -x ≤ abs(x)   by Real.negate_LessOrEqual_absolute_value
      < c;
-  claim lowerBound : -c < x by Real.negate_flip_LessThan;
+  -c < x by Real.negate_flip_LessThan as lowerBound;
   And.introduction(lowerBound, upperBound)
 }
 
@@ -181,13 +176,13 @@ theorem Real.absolute_value_LessThan_bounds (x c : Real)
 theorem Real.absolute_value_nonneg (x : Real) : Real.zero ≤ abs(x) :=
   claim by cases {
     in (Real.IsNonneg(x)) as xNonneg: {
-        claim Real.zero ≤ x;
-        claim absEquation : abs(x) = x;
+        Real.zero ≤ x;
+        abs(x) = x as absEquation;
         done by substituting absEquation
       }
     in (Real.IsNonneg(-x)) as negateNonneg: {
-        claim Real.zero ≤ -x;
-        claim absEquation : abs(x) = -x;
+        Real.zero ≤ -x;
+        abs(x) = -x as absEquation;
         done by substituting absEquation
       }
   }
