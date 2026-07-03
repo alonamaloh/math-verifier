@@ -32,26 +32,14 @@ struct TypeError : std::runtime_error {
 // defeq/inferType bridge, elaborator deep-WHNF / cases-on-expression / tuple-
 // lambda-Pi intro) refuse to expand an opaque head, so the only way to see
 // through one is an explicit `unfold X in …`. True for every opaque VALUE
-// definition; false for an opaque QUOTIENT-TYPE ALIAS (body literally
-// `Quotient(T, R)`), whose leaf-defeq bridge home-file constructions rely
-// on (see the implementation comment). Kept as the single decision point
-// for a possible future `reducible` opt-in. (Formerly gated by the
-// MATH_HARD_OPAQUE env var.)
+// definition — unconditionally true by owner decision (2026-07-02):
+// opacity is hard for all opaque definitions, quotient-type aliases
+// included; sealing for consumers happens at the interface-module cache
+// boundary instead. Kept as the single decision point for a possible
+// future `reducible` opt-in.
 struct Environment;
 bool isHardOpaqueConstant(const Environment& environment,
                           const std::string& name);
-
-// While alive, the quotient-type-alias defeq bridge is enabled on this
-// thread (see isHardOpaqueConstant). The kernel arms it around
-// inferType's application argument-vs-domain check; elaborator code may
-// arm it around a final kernel re-check of an assembled term. It is
-// NEVER armed during the auto-prover's speculative equality search.
-struct AliasBridgeScope {
-    AliasBridgeScope();
-    ~AliasBridgeScope();
-private:
-    bool saved;
-};
 
 // A reduction ran out of its resource budget — the recursion-depth bound
 // or the WHNF fuel limit — before reaching a normal form. Distinct from a
