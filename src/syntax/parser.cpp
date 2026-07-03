@@ -1313,6 +1313,11 @@ private:
         // expression (no `;`, or `;` immediately before `}`) is stashed
         // here so the post-loop code doesn't re-parse it.
         SurfaceExpressionPointer parsedFinalExpression;
+        // A1 keyword-free chains: the bare-statement fallthrough's
+        // speculation detected a relation chain at the cursor; the next
+        // iteration routes it through the `calc` statement branch with
+        // no anchor keyword.
+        bool pendingBareChain = false;
         while (peek().kind == TokenKind::KeywordLet
                || peek().kind == TokenKind::KeywordClaim
                || peek().kind == TokenKind::KeywordObtain
@@ -1338,7 +1343,8 @@ private:
             // meaning as the block's final expression (so blocks whose
             // value is data are untouched); only `E; <more>` is a
             // statement.
-            if (peek().kind != TokenKind::KeywordLet
+            if (!pendingBareChain
+                && peek().kind != TokenKind::KeywordLet
                 && peek().kind != TokenKind::KeywordClaim
                 && peek().kind != TokenKind::KeywordObtain
                 && peek().kind != TokenKind::KeywordSuppose
@@ -1367,6 +1373,44 @@ private:
                         || peekAt(1).kind == TokenKind::LeftParen)) {
                     consumeAny();
                     statementStart = peek();
+                }
+                // A1 keyword-free chains: a relation chain at statement
+                // position is a calc with no anchor keyword. Detect it
+                // by a rewound speculative parse — the initial term at
+                // additive level followed by a calc relation token —
+                // and route the NEXT iteration through the `calc`
+                // statement branch. (parseExpression cannot be used to
+                // detect this: relations are non-associative there and
+                // a second relation token is a parse error.)
+                {
+                    size_t probePosition = position_;
+                    int probeCounter = anonymousClaimCounter_;
+                    bool chainAhead = false;
+                    try {
+                        (void)parseAdditive();
+                        switch (peek().kind) {
+                            case TokenKind::Equal:
+                            case TokenKind::LessOrEqual:
+                            case TokenKind::Less:
+                            case TokenKind::GreaterOrEqual:
+                            case TokenKind::Greater:
+                            case TokenKind::Divides:
+                            case TokenKind::SubsetOf:
+                            case TokenKind::Approx:
+                                chainAhead = true;
+                                break;
+                            default:
+                                break;
+                        }
+                    } catch (const ParseError&) {
+                        chainAhead = false;
+                    }
+                    position_ = probePosition;
+                    anonymousClaimCounter_ = probeCounter;
+                    if (chainAhead) {
+                        pendingBareChain = true;
+                        continue;
+                    }
                 }
                 SurfaceExpressionPointer expression = parseExpression();
                 SurfaceExpressionPointer byHint;
@@ -1470,9 +1514,12 @@ private:
             // `claim NAME : TYPE by calc …` form). If the calc is
             // followed by neither `as` nor `;`, treat it as the block's
             // final expression instead.
-            if (peek().kind == TokenKind::KeywordCalc) {
+            if (peek().kind == TokenKind::KeywordCalc || pendingBareChain) {
+                bool keyworded = (peek().kind == TokenKind::KeywordCalc);
+                pendingBareChain = false;
                 Token calcToken = peek();
-                SurfaceExpressionPointer calcExpression = parseCalc();
+                SurfaceExpressionPointer calcExpression =
+                    parseCalc(/*consumeCalcKeyword=*/keyworded);
                 // A calc at statement position is always a binding (named via
                 // `as`, else anonymous); the block's `}` then closes the goal
                 // through the auto-prover, finding the calc's fact by
@@ -3776,8 +3823,12 @@ private:
     // the calc separator, not an in-expression operator. Step
     // expressions containing `≤`/`<` etc. must be parenthesised, just
     // as they must already be for `=`.
-    SurfaceExpressionPointer parseCalc() {
-        Token calcToken = consumeAny();  // 'calc'
+    SurfaceExpressionPointer parseCalc(bool consumeCalcKeyword = true) {
+        // A1 keyword-free chains parse the same grammar with no
+        // anchor keyword — `consumeCalcKeyword=false` starts directly
+        // at the initial expression.
+        Token calcToken = peek();
+        if (consumeCalcKeyword) consumeAny();  // 'calc'
         auto initialExpression = parseAdditive();
         std::vector<SurfaceCalcStep> steps;
         while (peek().kind == TokenKind::Equal
