@@ -1352,6 +1352,22 @@ private:
                 && peek().kind != TokenKind::KeywordDone
                 && peek().kind != TokenKind::KeywordOkay) {
                 Token statementStart = peek();
+                // Rhetorical connectives (A1): `then` / `hence` /
+                // `therefore` before a bare statement are noise words —
+                // prose rhythm at zero semantic cost. (The prover
+                // already tries most-recent facts first, which is the
+                // consequence reading.) Contextual: consumed only at
+                // statement position when a statement follows.
+                if ((statementStart.kind == TokenKind::KeywordThen
+                     || (statementStart.kind == TokenKind::Identifier
+                         && (statementStart.lexeme == "hence"
+                             || statementStart.lexeme == "therefore")))
+                    && (peekAt(1).kind == TokenKind::Identifier
+                        || peekAt(1).kind == TokenKind::NumericLiteral
+                        || peekAt(1).kind == TokenKind::LeftParen)) {
+                    consumeAny();
+                    statementStart = peek();
+                }
                 SurfaceExpressionPointer expression = parseExpression();
                 SurfaceExpressionPointer byHint;
                 if (peek().kind == TokenKind::KeywordBy) {
