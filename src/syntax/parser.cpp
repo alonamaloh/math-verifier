@@ -1372,32 +1372,31 @@ private:
                 Token statementStart = peek();
                 // A1 keyword-free chains: a relation chain at statement
                 // position is a calc with no anchor keyword. Detect it
-                // by a rewound speculative parse — the initial term at
-                // additive level followed by a calc relation token —
-                // and route the NEXT iteration through the `calc`
-                // statement branch. (parseExpression cannot be used to
-                // detect this: relations are non-associative there and
-                // a second relation token is a parse error.)
+                // by a rewound speculative parse of the WHOLE chain: it
+                // must have at least two steps (a single relation stays
+                // on the claim route) and must end at a statement
+                // boundary — otherwise the relation is a subterm of a
+                // larger proposition (`k = 0 ∨ …` continues past the
+                // first equation) and the plain expression parser owns
+                // it. (parseExpression cannot detect chains itself:
+                // relations are non-associative there and a second
+                // relation token is a parse error.)
                 {
                     size_t probePosition = position_;
                     int probeCounter = anonymousClaimCounter_;
                     bool chainAhead = false;
                     try {
-                        (void)parseAdditive();
-                        switch (peek().kind) {
-                            case TokenKind::Equal:
-                            case TokenKind::LessOrEqual:
-                            case TokenKind::Less:
-                            case TokenKind::GreaterOrEqual:
-                            case TokenKind::Greater:
-                            case TokenKind::Divides:
-                            case TokenKind::SubsetOf:
-                            case TokenKind::Approx:
-                                chainAhead = true;
-                                break;
-                            default:
-                                break;
-                        }
+                        SurfaceExpressionPointer probeChain =
+                            parseCalc(/*consumeCalcKeyword=*/false);
+                        auto* calcNode =
+                            std::get_if<SurfaceCalc>(&probeChain->node);
+                        bool atStatementBoundary =
+                            peek().kind == TokenKind::Semicolon
+                            || peek().kind == TokenKind::KeywordAs
+                            || peek().kind == TokenKind::RightBrace;
+                        chainAhead = calcNode
+                            && calcNode->steps.size() >= 2
+                            && atStatementBoundary;
                     } catch (const ParseError&) {
                         chainAhead = false;
                     }

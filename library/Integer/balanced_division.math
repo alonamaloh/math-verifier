@@ -45,9 +45,9 @@ theorem Integer.four_square_le_from_natural (t m : Natural) (bound : t + t ≤ m
             = m * (t + t)
             ≤ m * m
                   by Natural.multiply_monotone_left;
-  claim castSquared : ((t + t) * (t + t) : Integer) ≤ (m * m : Integer)
-      by Natural.to_integer.LessOrEqual_preserves;
-  claim naturalSquare : (t + t) * (t + t) = 4 * (t * t);
+  ((t + t) * (t + t) : Integer) ≤ (m * m : Integer)
+      by Natural.to_integer.LessOrEqual_preserves as castSquared;
+  (t + t) * (t + t) = 4 * (t * t) as naturalSquare;
   calc (((t + t) * (t + t) : Natural) : Integer)
             = ((4 * (t * t) : Natural) : Integer)
                   by substituting naturalSquare
@@ -55,7 +55,7 @@ theorem Integer.four_square_le_from_natural (t m : Natural) (bound : t + t ≤ m
             = (4 : Integer) * ((t : Integer) * (t : Integer))
                   by substituting Natural.to_integer.multiply_preserves
       as leftImage;
-  claim ((m * m : Natural) : Integer) = (m : Integer) * (m : Integer);
+  ((m * m : Natural) : Integer) = (m : Integer) * (m : Integer);
   calc (4 : Integer) * ((t : Integer) * (t : Integer))
      = ((t + t) * (t + t) : Integer)   by leftImage
      ≤ (m * m : Integer)               by castSquared
@@ -74,34 +74,34 @@ theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m
         -- r + r ≤ m: keep r. remainder = (r : ℤ), quotient = quotient0.
         witness quotient0 with
         witness (naturalRemainder : Integer) with
-            { claim keepBound : (4 : Integer) * ((naturalRemainder : Integer) * (naturalRemainder : Integer)) ≤ (m : Integer) * (m : Integer)
-                  by Integer.four_square_le_from_natural;
+            { (4 : Integer) * ((naturalRemainder : Integer) * (naturalRemainder : Integer)) ≤ (m : Integer) * (m : Integer)
+                  by Integer.four_square_le_from_natural as keepBound;
               And.introduction(aEquation, keepBound) }
       }
     | Or.introduceRight(largeRemainder) => {
         -- m ≤ r + r: bump. With m = r + d, remainder = −(d : ℤ), quotient = quotient0 + (1 : Integer).
-        claim naturalRemainder ≤ m by Natural.LessThan.weaken;
-        claim dExists : ∃ (d : Natural). m = naturalRemainder + d by Natural.subtraction_witness;
+        naturalRemainder ≤ m by Natural.LessThan.weaken;
+        ∃ (d : Natural). m = naturalRemainder + d by Natural.subtraction_witness as dExists;
         obtain ⟨d, mEquation⟩ from dExists;
         -- d ≤ r: from m ≤ r + r and m = r + d, so r + d ≤ r + r, cancel r.
         let _ : naturalRemainder + d ≤ naturalRemainder + naturalRemainder :=
             calc naturalRemainder + d
                   = m
                   ≤ naturalRemainder + naturalRemainder        by largeRemainder;
-        claim d ≤ naturalRemainder;
+        d ≤ naturalRemainder;
         -- d + d ≤ r + d = m.
         let _ : d + d ≤ m :=
             calc d + d
                   ≤ naturalRemainder + d                       by Natural.le_add_preserves_left
                   = m;
-        claim (4 : Integer) * ((d : Integer) * (d : Integer)) ≤ (m : Integer) * (m : Integer)
+        (4 : Integer) * ((d : Integer) * (d : Integer)) ≤ (m : Integer) * (m : Integer)
             by Integer.four_square_le_from_natural;
         calc (m : Integer)
                   = ((naturalRemainder + d : Natural) : Integer)
                   = (naturalRemainder : Integer) + (d : Integer)
             as mCast;
-        claim remainderCast : (naturalRemainder : Integer) = (m : Integer) - (d : Integer)
-            by substituting mCast;
+        (naturalRemainder : Integer) = (m : Integer) - (d : Integer)
+            by substituting mCast as remainderCast;
         calc a
                   = (m : Integer) * quotient0 + (naturalRemainder : Integer)
                   = (m : Integer) * quotient0 + ((m : Integer) - (d : Integer))
@@ -109,10 +109,9 @@ theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m
                   = (m : Integer) * (quotient0 + (1 : Integer)) + (-(d : Integer))
                         by ring
             as aBalanced;
-        claim squareNegate : (-(d : Integer)) * (-(d : Integer)) = (d : Integer) * (d : Integer) by ring;
-        claim remainderBound
-            : (4 : Integer) * ((-(d : Integer)) * (-(d : Integer))) ≤ (m : Integer) * (m : Integer)
-            by substituting squareNegate;
+        (-(d : Integer)) * (-(d : Integer)) = (d : Integer) * (d : Integer) by ring as squareNegate;
+        (4 : Integer) * ((-(d : Integer)) * (-(d : Integer))) ≤ (m : Integer) * (m : Integer)
+            by substituting squareNegate as remainderBound;
         witness quotient0 + (1 : Integer) with
         witness -(d : Integer) with
             And.introduction(aBalanced, remainderBound)
