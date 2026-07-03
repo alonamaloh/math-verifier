@@ -67,6 +67,22 @@ ExpressionPointer Elaborator::elaborateChoose(
             + std::to_string(line));
         int N = static_cast<int>(localBinders.size());
 
+        // Surface-text unused-name check on the condition name — same
+        // rule as `calc … as X`: the chosen condition joins the context
+        // either way and the auto-prover finds it by type-match, so a
+        // never-typed `as <name>` is dead weight.
+        if (reportUnusedNames_ && !choose.conditionName.empty()
+            && choose.conditionName[0] != '_' && choose.body
+            && !surfaceMentionsName(*choose.body, choose.conditionName)) {
+            std::cerr << "warning: " << moduleName_
+                << ":" << line << ":" << column
+                << ": `choose ... as " << choose.conditionName
+                << "` is never textually referenced — drop the `as "
+                << choose.conditionName
+                << "` (the chosen condition still joins the context,"
+                   " and the auto-prover finds it by type-match)\n";
+        }
+
         // Decide the existential's SOURCE — what the cases below
         // destructures. Three forms:
         //   (a) `from <hypothesis>` — destructure that hypothesis directly
