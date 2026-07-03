@@ -936,7 +936,19 @@ ExpressionPointer Elaborator::citePiGoalByIntroduction(
         // already expressed relative to the binders peeled before it.
         std::vector<LocalBinder> extended = localBinders;
         ExpressionPointer coreGoal = goalClosed;
-        while (auto* pi = std::get_if<Pi>(&coreGoal->node)) {
+        while (true) {
+            auto* pi = std::get_if<Pi>(&coreGoal->node);
+            if (!pi) {
+                // A `Not(P)` (or other definition-headed) goal hides
+                // its Pi behind one WHNF step — `¬∃ …` goals intro
+                // their supposition here.
+                ExpressionPointer unfolded =
+                    weakHeadNormalForm(environment_, coreGoal);
+                if (unfolded.get() == coreGoal.get()) break;
+                pi = std::get_if<Pi>(&unfolded->node);
+                if (!pi) break;
+                coreGoal = unfolded;
+            }
             std::string name = pi->displayHint;
             bool collides = name.empty();
             for (const auto& binder : extended) {
@@ -952,23 +964,20 @@ ExpressionPointer Elaborator::citePiGoalByIntroduction(
         if (extended.size() == localBinders.size()) return nullptr;
         // Run the citation machinery against the core goal with the
         // introduced binders in scope — automating the
-        // `(x)(h) ↦ { done by <lemma> }` wrapper idiom.
-        ExpressionPointer result;
-        ExpressionPointer hintTerm;
-        try {
-            hintTerm = elaborateExpression(byHint, extended, nullptr);
-            ExpressionPointer hintType = closeOverLocalBinders(
-                inferTypeInLocalContext(extended, hintTerm),
-                extended, extended.size());
-            result = autoFillHintForClaim(
-                hintTerm, hintType, coreGoal, extended, line);
-        } catch (...) {
+        // `(x)(h) ↦ { done by <lemma> }` wrapper idiom. The flattening
+        // helper tries the direct citation first, then eliminates
+        // Exists-typed introduced binders into their witnesses (the
+        // `¬∃ m n. …  by <lemma over m, n>` shape).
+        ExpressionPointer result = citeCoreGoalWithExistsFlattening(
+            byHint, coreGoal, extended, localBinders.size(),
+            /*alreadyEliminated=*/{}, /*depth=*/6, line);
+        if (!result) {
             // Mirror the claim flow's recovery against the core goal.
             // No recursion risk: the core goal is Pi-free, so the
             // Pi-introduction branch cannot re-fire.
             try {
                 result = recoverClaimHint(
-                    hintTerm, byHint, coreGoal, extended, line);
+                    nullptr, byHint, coreGoal, extended, line);
             } catch (...) {
                 return nullptr;
             }
@@ -983,6 +992,105 @@ ExpressionPointer Elaborator::citePiGoalByIntroduction(
                                 extended[i].type, result);
         }
         return result;
+    }
+
+ExpressionPointer Elaborator::citeCoreGoalWithExistsFlattening(
+        const SurfaceExpression& byHint,
+        ExpressionPointer coreGoal,
+        const std::vector<LocalBinder>& binders,
+        size_t firstIntroducedIndex,
+        std::set<size_t> alreadyEliminated,
+        int depth,
+        int line) {
+        // The direct citation attempt at this scope.
+        try {
+            ExpressionPointer hintTerm =
+                elaborateExpression(byHint, binders, nullptr);
+            ExpressionPointer hintType = closeOverLocalBinders(
+                inferTypeInLocalContext(binders, hintTerm),
+                binders, binders.size());
+            ExpressionPointer direct = autoFillHintForClaim(
+                hintTerm, hintType, coreGoal, binders, line);
+            if (direct
+                && bridgedResultProvesGoal(direct, coreGoal, binders)) {
+                return direct;
+            }
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        if (depth <= 0) return nullptr;
+        int N = static_cast<int>(binders.size());
+        for (int i = N - 1; i >= static_cast<int>(firstIntroducedIndex);
+             --i) {
+            if (alreadyEliminated.count(i)) continue;
+            // Binder types are CLOSED relative to the binders before
+            // them; WHNF is safe on that form (bound variables are
+            // opaque to reduction).
+            ExpressionPointer binderType = weakHeadNormalForm(
+                environment_, binders[i].type);
+            auto* outerApp = std::get_if<Application>(&binderType->node);
+            auto* innerApp = outerApp
+                ? std::get_if<Application>(&outerApp->function->node)
+                : nullptr;
+            auto* head = innerApp
+                ? std::get_if<Constant>(&innerApp->function->node)
+                : nullptr;
+            if (!head || head->name != "Exists") continue;
+            // Lift the components from the binder's position to the
+            // current scope's end.
+            ExpressionPointer carrierAtEnd = liftBoundVariables(
+                innerApp->argument, N - i, 0);
+            ExpressionPointer predicateAtEnd = liftBoundVariables(
+                outerApp->argument, N - i, 0);
+            ExpressionPointer predicatePastWitness = liftBoundVariables(
+                outerApp->argument, N + 1 - i, 0);
+            std::vector<LocalBinder> extended = binders;
+            std::string witnessName =
+                "_flattened_w_" + std::to_string(i);
+            std::string factName =
+                "_flattened_h_" + std::to_string(i);
+            extended.push_back({witnessName, carrierAtEnd});
+            extended.push_back({factName,
+                makeApplication(predicatePastWitness,
+                                makeBoundVariable(0))});
+            std::set<size_t> eliminated = alreadyEliminated;
+            eliminated.insert(i);
+            ExpressionPointer inner = citeCoreGoalWithExistsFlattening(
+                byHint, liftBoundVariables(coreGoal, 2, 0), extended,
+                firstIntroducedIndex, std::move(eliminated), depth - 1,
+                line);
+            if (!inner) continue;
+            // Carrier universe for the eliminator's level argument.
+            LevelPointer carrierLevel;
+            try {
+                ExpressionPointer carrierSort = weakHeadNormalForm(
+                    environment_,
+                    inferTypeInLocalContext(binders, carrierAtEnd));
+                auto* sort = std::get_if<Sort>(&carrierSort->node);
+                if (!sort) continue;
+                carrierLevel = predecessorOfSortLevel(sort->level);
+            } catch (const TypeError&) {
+                continue;
+            } catch (const ElaborateError&) {
+                continue;
+            }
+            ExpressionPointer handler = makeLambda(
+                witnessName, carrierAtEnd,
+                makeLambda(factName,
+                           makeApplication(predicatePastWitness,
+                                           makeBoundVariable(0)),
+                           inner));
+            ExpressionPointer call = makeConstant(
+                "Exists.eliminate", {carrierLevel});
+            call = makeApplication(std::move(call), carrierAtEnd);
+            call = makeApplication(std::move(call), predicateAtEnd);
+            call = makeApplication(std::move(call), coreGoal);
+            call = makeApplication(std::move(call), std::move(handler));
+            call = makeApplication(std::move(call),
+                                    makeBoundVariable(N - 1 - i));
+            return call;
+        }
+        return nullptr;
     }
 
 ExpressionPointer Elaborator::recoverClaimHint(
@@ -1039,14 +1147,23 @@ ExpressionPointer Elaborator::recoverClaimHint(
                     "spelling)");
             }
         }
-        // Pi-typed goal: introduce its binders and retry the citation
-        // against the inner goal (`claim (x : T) → P by Lemma` cites Lemma
-        // at P with x in scope, wrapping the result back into a lambda).
-        if (std::get_if<Pi>(&goalClosed->node)
-            && !hintShapeIsProofTerm(byHint)) {
-            ExpressionPointer introduced = citePiGoalByIntroduction(
-                byHint, goalClosed, localBinders, line);
-            if (introduced) return introduced;
+        // Pi-typed goal (structurally, or after one WHNF step — `¬P` is
+        // `P → False` behind `Not`): introduce its binders and retry the
+        // citation against the inner goal (`claim (x : T) → P by Lemma`
+        // cites Lemma at P with x in scope, wrapping the result back
+        // into a lambda).
+        if (!hintShapeIsProofTerm(byHint)) {
+            bool piShaped = std::get_if<Pi>(&goalClosed->node) != nullptr;
+            if (!piShaped) {
+                ExpressionPointer unfolded =
+                    weakHeadNormalForm(environment_, goalClosed);
+                piShaped = std::get_if<Pi>(&unfolded->node) != nullptr;
+            }
+            if (piShaped) {
+                ExpressionPointer introduced = citePiGoalByIntroduction(
+                    byHint, goalClosed, localBinders, line);
+                if (introduced) return introduced;
+            }
         }
         // Last-ditch recovery: re-elaborate the hint AT the goal type and
         // diff-bridge it (handles `claim f(a) = f(b) by eq` with `eq : a = b`).

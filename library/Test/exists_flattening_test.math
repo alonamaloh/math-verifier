@@ -1,0 +1,39 @@
+module Test.exists_flattening_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- A7 whole-body-by: exists-flattening. A ¬∃ goal cited against a
+-- lemma over the witnesses intros the negation, eliminates the
+-- existentials, and discharges the legs — the logical plumbing stays
+-- off the page.
+
+-- One existential, no conjunction.
+theorem Test.flatten_one (f : Natural → Natural)
+        (L : (x : Natural) → f(x) = 0 → False)
+        : ¬ ∃ (x : Natural). f(x) = 0 :=
+  by L
+
+-- One existential, conjunction under it.
+theorem Test.flatten_conjunction (f : Natural → Natural)
+        (L : (x : Natural) → 1 ≤ x → f(x) = 0 → False)
+        : ¬ ∃ (x : Natural). 1 ≤ x ∧ f(x) = 0 :=
+  by L
+
+-- Nested existentials.
+theorem Test.flatten_nested (g : Natural → Natural → Natural)
+        (L : (m n : Natural) → g(m, n) = 0 → False)
+        : ¬ ∃ (m n : Natural). g(m, n) = 0 :=
+  by L
+
+-- KNOWN GAP (banked in PLAN_LANGUAGE_IMPROVEMENT.md): nested
+-- existentials WITH a conjunction under the inner one (the
+-- sqrt_two_irrational shape) still fail — the premise back-inference
+-- meets the whole conjunction as ONE eliminated fact and cannot pin
+-- both witnesses. When that lands, add:
+--   theorem Test.flatten_nested_conjunction ... : ¬ ∃ (m n : Natural).
+--       1 ≤ m ∧ 1 ≤ n ∧ g(m, n) = 0 := by L

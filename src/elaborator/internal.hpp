@@ -4345,6 +4345,23 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // The ∃-flattening leg of whole-body `by` (A7): try the citation
+    // at `coreGoal` directly; failing that, eliminate an Exists-typed
+    // binder among those citePiGoalByIntroduction introduced (indices
+    // ≥ firstIntroducedIndex, skipping alreadyEliminated) into its
+    // witness pair via a verbose `Exists.eliminate`, and recurse with
+    // the witnesses in scope. Depth-bounded; CLOSED-form throughout
+    // (coreGoal and every binder type are closed relative to the
+    // binders before them).
+    ExpressionPointer citeCoreGoalWithExistsFlattening(
+        const SurfaceExpression& byHint,
+        ExpressionPointer coreGoal,
+        const std::vector<LocalBinder>& binders,
+        size_t firstIntroducedIndex,
+        std::set<size_t> alreadyEliminated,
+        int depth,
+        int line);
+
     // The completion phase of a `by <lemma>` citation: given the peel
     // depth and (possibly partial) bindings from the conclusion match,
     // run premise back-inference + slot filling, assemble the call, and
