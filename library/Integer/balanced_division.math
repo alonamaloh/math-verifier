@@ -37,23 +37,23 @@ import Algebra.integer_euclidean
 -- The Natural embedding is monotone: a ≤ b ⟹ (a : ℤ) ≤ (b : ℤ).
 -- t + t ≤ m forces 4t² ≤ m² (square the bound in ℕ, then transport to ℤ).
 theorem Integer.four_square_le_from_natural (t m : Natural) (bound : t + t ≤ m)
-        : (4 : Integer) * ((t : Integer) * (t : Integer)) ≤ (m : Integer) * (m : Integer) := {
+        : (4 : Integer) * (t : Integer)² ≤ (m : Integer)² := {
   (t + t)² ≤ (t + t) * m = m * (t + t) ≤ m²;
   ((t + t)² : Integer) ≤ (m² : Integer)
       by Natural.to_integer.LessOrEqual_preserves as castSquared;
   (t + t)² = 4 * t² as naturalSquare;
-  calc (4 : Integer) * ((t : Integer) * (t : Integer))
+  calc (4 : Integer) * (t : Integer)²
      = ((4 * t² : Natural) : Integer)   by substituting Natural.to_integer.multiply_preserves
      = ((t + t)² : Integer)             by substituting naturalSquare
      ≤ (m² : Integer)                   by castSquared
-     = (m : Integer) * (m : Integer)
+     = (m : Integer)²
 }
 
 -- Balanced division.
 theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m)
         : ∃ (quotient : Integer). ∃ (remainder : Integer).
             a = (m : Integer) * quotient + remainder
-            ∧ (4 : Integer) * (remainder * remainder) ≤ (m : Integer) * (m : Integer) := {
+            ∧ (4 : Integer) * remainder² ≤ (m : Integer)² := {
   obtain ⟨quotient0, naturalRemainder, aEquation, remainderBelow⟩
       from Integer.divide_by_positive(a, m, mPositive);
   cases Natural.totality_of_less_or_equal(naturalRemainder + naturalRemainder, m) {
@@ -61,7 +61,7 @@ theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m
         -- r + r ≤ m: keep r. remainder = (r : ℤ), quotient = quotient0.
         witness quotient0 with
         witness (naturalRemainder : Integer) with
-            { (4 : Integer) * ((naturalRemainder : Integer) * (naturalRemainder : Integer)) ≤ (m : Integer) * (m : Integer)
+            { (4 : Integer) * (naturalRemainder : Integer)² ≤ (m : Integer)²
                   by Integer.four_square_le_from_natural as keepBound;
               And.introduction(aEquation, keepBound) }
       }
@@ -81,7 +81,7 @@ theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m
             calc d + d
                   ≤ naturalRemainder + d                       by Natural.le_add_preserves_left
                   = m;
-        (4 : Integer) * ((d : Integer) * (d : Integer)) ≤ (m : Integer) * (m : Integer)
+        (4 : Integer) * (d : Integer)² ≤ (m : Integer)²
             by Integer.four_square_le_from_natural;
         calc (m : Integer)
                   = ((naturalRemainder + d : Natural) : Integer)
@@ -96,8 +96,8 @@ theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m
                   = (m : Integer) * (quotient0 + (1 : Integer)) + (-(d : Integer))
                         by ring
             as aBalanced;
-        (-(d : Integer)) * (-(d : Integer)) = (d : Integer) * (d : Integer) by ring as squareNegate;
-        (4 : Integer) * ((-(d : Integer)) * (-(d : Integer))) ≤ (m : Integer) * (m : Integer)
+        (-(d : Integer))² = (d : Integer)² by ring as squareNegate;
+        (4 : Integer) * (-(d : Integer))² ≤ (m : Integer)²
             by substituting squareNegate as remainderBound;
         witness quotient0 + (1 : Integer) with
         witness -(d : Integer) with
