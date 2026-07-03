@@ -2222,6 +2222,12 @@ private:
                                 head->qualifiedName == "Not"
                                 && application->arguments.size() == 1;
                         }
+                    } else if (auto* binary =
+                                   std::get_if<SurfaceBinaryOperation>(
+                                       &iterator->type->node)) {
+                        // `a ≠ b` IS a negation — `suppose a ≠ b for
+                        // contradiction { … }` establishes `a = b`.
+                        assumptionIsNegation = binary->opSymbol == "≠";
                     }
                     // The braced block derives `False` under `h : P` in
                     // EVERY case, so ascribe it — a bare `done` inside the

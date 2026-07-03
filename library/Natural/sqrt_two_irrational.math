@@ -13,6 +13,7 @@ module Natural.sqrt_two_irrational
 
 import Logic.basics
 import Logic.exists
+import Logic.excluded_middle
 import Equality.basics
 import Natural.basics
 import Natural.peano
@@ -73,14 +74,35 @@ theorem Natural.no_double_square_descent (m : Natural)
     done by no_smaller_solution
   }
 
+-- The complete characterization: the only natural solution of
+-- m² = 2·n² is the trivial one.
 theorem Natural.no_double_square (m n : Natural)
-        (bothPositive : 1 ≤ m ∧ 1 ≤ n)
-        : m * m ≠ 2 * (n * n) :=
-  by Natural.no_double_square_descent
+        (equation : m * m = 2 * (n * n))
+        : m = 0 ∧ n = 0 := {
+  claim m = 0 by {
+    suppose m ≠ 0 for contradiction {
+      1 ≤ m by Natural.one_le_of_nonzero;
+      suppose n = 0 for contradiction {
+        1 ≤ m * m = 2 * (n * n) = 0;
+        done
+      };
+      1 ≤ n by Natural.one_le_of_nonzero;
+      done by Natural.no_double_square_descent
+    }
+  };
+  suppose n ≠ 0 for contradiction {
+    1 ≤ n by Natural.one_le_of_nonzero;
+    1 ≤ n * n ≤ 2 * (n * n)   by Natural.le_multiply_when_factor_at_least_one
+              = m * m
+              = 0;
+    done
+  };
+  done
+}
 
 -- ----------------------------------------------------------------------
 -- Freek #1.
 
 theorem Natural.sqrt_two_irrational
         : ¬ ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n) :=
-  by Natural.no_double_square
+  by Natural.no_double_square_descent
