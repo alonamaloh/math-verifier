@@ -397,33 +397,49 @@ ExpressionPointer Elaborator::tryDoubleNegationElimination(
 std::pair<ExpressionPointer, ExpressionPointer>
     Elaborator::findUniqueDiffPair(
         ExpressionPointer left, ExpressionPointer right) {
-        ExpressionPointer pairA;
-        ExpressionPointer pairB;
-        bool failed = false;
-        std::function<void(ExpressionPointer, ExpressionPointer)> walk =
-            [&](ExpressionPointer l, ExpressionPointer r) {
-                if (failed) return;
-                if (structurallyEqual(l, r)) return;
-                auto* leftApp =
-                    std::get_if<Application>(&l->node);
-                auto* rightApp =
-                    std::get_if<Application>(&r->node);
-                if (!leftApp || !rightApp) {
-                    if (!pairA) {
-                        pairA = l;
-                        pairB = r;
-                    } else if (!structurallyEqual(l, pairA)
-                               || !structurallyEqual(r, pairB)) {
-                        failed = true;
+        // Bottom-up coarsening walk: a node whose children carry
+        // MULTIPLE distinct diffs is itself the diff. An in-scope
+        // equation may rewrite a whole subtree in one step — fact
+        // `s*s ≤ n*n` against target `2*(n*n) ≤ n*n` with
+        // `equation : s*s = 2*(n*n)`: both sides share the multiply
+        // head, so a purely fine-grained walk splits the diff into an
+        // irreconcilable two-position pair and declines, even though
+        // the equation rewrites `s*s` as a unit. A unique fine-grained
+        // diff coarsens to itself, so every previously-found pair is
+        // returned unchanged.
+        using DiffPairs = std::vector<
+            std::pair<ExpressionPointer, ExpressionPointer>>;
+        std::function<DiffPairs(ExpressionPointer, ExpressionPointer)>
+            walk = [&](ExpressionPointer l,
+                       ExpressionPointer r) -> DiffPairs {
+                if (structurallyEqual(l, r)) return {};
+                auto* leftApp = std::get_if<Application>(&l->node);
+                auto* rightApp = std::get_if<Application>(&r->node);
+                if (!leftApp || !rightApp) return {{l, r}};
+                DiffPairs pairs =
+                    walk(leftApp->function, rightApp->function);
+                DiffPairs argumentPairs =
+                    walk(leftApp->argument, rightApp->argument);
+                for (auto& candidate : argumentPairs) {
+                    bool duplicate = false;
+                    for (const auto& seen : pairs) {
+                        if (structurallyEqual(candidate.first,
+                                              seen.first)
+                            && structurallyEqual(candidate.second,
+                                                 seen.second)) {
+                            duplicate = true;
+                            break;
+                        }
                     }
-                    return;
+                    if (!duplicate) pairs.push_back(std::move(candidate));
                 }
-                walk(leftApp->function, rightApp->function);
-                walk(leftApp->argument, rightApp->argument);
+                if (pairs.size() <= 1) return pairs;
+                // Multiple distinct diffs below: this node IS the diff.
+                return {{l, r}};
             };
-        walk(left, right);
-        if (failed || !pairA) return {nullptr, nullptr};
-        return {pairA, pairB};
+        DiffPairs pairs = walk(left, right);
+        if (pairs.size() != 1) return {nullptr, nullptr};
+        return pairs[0];
     }
 
 ExpressionPointer Elaborator::tryDiffBridgeViaContextEquality(
