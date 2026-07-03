@@ -500,8 +500,10 @@ public:
         }
         interfaceModuleMode_ = module.kind == ModuleKind::Interface;
         while (peek().kind != TokenKind::EndOfFile) {
-            // `export theorems of M1, M2, …` — an interface-module
-            // clause, recorded on the module (not a statement).
+            // `export theorems of M1, M2, …` (module-granular) and
+            // `export definitions D1, D2, …` (name-granular,
+            // transparent re-export) — interface-module clauses,
+            // recorded on the module (not statements).
             if (interfaceModuleMode_
                 && peek().kind == TokenKind::Identifier
                 && peek().lexeme == "export"
@@ -519,6 +521,22 @@ public:
                 while (peek().kind == TokenKind::Comma) {
                     consumeAny();
                     module.exportTheoremsOfModules.push_back(
+                        consumeQualifiedNameString());
+                }
+                continue;
+            }
+            if (interfaceModuleMode_
+                && peek().kind == TokenKind::Identifier
+                && peek().lexeme == "export"
+                && peekAt(1).kind == TokenKind::Identifier
+                && peekAt(1).lexeme == "definitions") {
+                consumeAny();
+                consumeAny();
+                module.exportDefinitionsNames.push_back(
+                    consumeQualifiedNameString());
+                while (peek().kind == TokenKind::Comma) {
+                    consumeAny();
+                    module.exportDefinitionsNames.push_back(
                         consumeQualifiedNameString());
                 }
                 continue;

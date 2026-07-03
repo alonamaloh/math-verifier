@@ -5789,6 +5789,49 @@ int verifyWithCache(const std::string& sourcePath,
                 }
             }
         }
+        // `export definitions D1, D2, …`: each named construction
+        // definition re-emits WITH ITS BODY (transparent) — the honest
+        // public predicates/data (ε-δ definitions, the supremum
+        // family, embedded zero/one) whose bodies consumer proofs
+        // intro/eliminate and whose defeq consumers lean on. The name
+        // must be a loaded Definition; its type and body are
+        // closure-validated below (a construction-internal mention is
+        // a loud error — the author explicitly asked for this name).
+        struct ExportedDefinition {
+            std::string name;
+            const Definition* definition;
+        };
+        std::vector<ExportedDefinition> exportedDefinitions;
+        std::set<std::string> exportedDefinitionNames;
+        for (const auto& definitionName
+                 : parsedModule.exportDefinitionsNames) {
+            auto declarationIterator =
+                environment.declarations.find(definitionName);
+            if (declarationIterator == environment.declarations.end()) {
+                std::cerr << sourcePath << ":1:1: elaborate error: "
+                    << "export definitions: '" << definitionName
+                    << "' is not declared by the loaded construction\n";
+                return 1;
+            }
+            auto* definition =
+                std::get_if<Definition>(&declarationIterator->second);
+            if (!definition) {
+                std::cerr << sourcePath << ":1:1: elaborate error: "
+                    << "export definitions: '" << definitionName
+                    << "' is not a definition (only definitions can "
+                    << "re-export transparently)\n";
+                return 1;
+            }
+            if (alreadySealed.count(definitionName)) {
+                std::cerr << sourcePath << ":1:1: elaborate error: "
+                    << "export definitions: '" << definitionName
+                    << "' is already declared abstract in this "
+                    << "interface — pick one treatment\n";
+                return 1;
+            }
+            exportedDefinitions.push_back({definitionName, definition});
+            exportedDefinitionNames.insert(definitionName);
+        }
         // Pass 1: gather the Prop-typed export candidates of every
         // listed module.
         struct ExportCandidate {
@@ -5828,6 +5871,7 @@ int verifyWithCache(const std::string& sourcePath,
             for (const auto& [exportedName, exportedDeclaration]
                      : exportedCache.declarations) {
                 if (alreadySealed.count(exportedName)) continue;
+                if (exportedDefinitionNames.count(exportedName)) continue;
                 if (exportCandidateNames.count(exportedName)) continue;
                 std::vector<std::string> universeParameters;
                 ExpressionPointer declaredType;
@@ -5874,6 +5918,7 @@ int verifyWithCache(const std::string& sourcePath,
                 for (const auto& name : mentioned) {
                     bool available = alreadySealed.count(name)
                         || reachableViaKeptImports.count(name)
+                        || exportedDefinitionNames.count(name)
                         || (exportCandidateNames.count(name)
                             && !skippedExportNames.count(name));
                     if (!available) {
@@ -5908,6 +5953,37 @@ int verifyWithCache(const std::string& sourcePath,
             }
             std::cerr << "\n";
         }
+        // Emit the transparent definitions — types AND bodies must be
+        // closed over what a consumer sees (the author named these
+        // explicitly, so an unspellable one is an error, not a skip).
+        for (const auto& exported : exportedDefinitions) {
+            std::set<std::string> mentioned;
+            collectConstantNames(exported.definition->type, mentioned);
+            collectConstantNames(exported.definition->body, mentioned);
+            std::vector<std::string> unspellable;
+            for (const auto& name : mentioned) {
+                if (!alreadySealed.count(name)
+                    && !exportedDefinitionNames.count(name)
+                    && !reachableViaKeptImports.count(name)) {
+                    unspellable.push_back(name);
+                }
+            }
+            if (!unspellable.empty()) {
+                std::cerr << sourcePath << ":1:1: elaborate error: "
+                    << "export definitions: '" << exported.name
+                    << "' cannot re-export transparently — its type or "
+                    << "body mentions construction internals:";
+                for (const auto& name : unspellable) {
+                    std::cerr << " " << name;
+                }
+                std::cerr << "\n  (declare it as a `constant` with "
+                    << "boundary lemmas instead)\n";
+                return 1;
+            }
+            cache.declarations.emplace_back(
+                exported.name, *exported.definition);
+            alreadySealed.insert(exported.name);
+        }
         // The WIRING (operators, coercions, fold operations, instances,
         // bundles, congruences, overloads, implicit-argument counts) of
         // the dropped modules must survive in the sealed cache — it
@@ -5923,8 +5999,13 @@ int verifyWithCache(const std::string& sourcePath,
                      : parsedModule.exportTheoremsOfModules) {
                 droppedModules.push_back(exportedModule);
             }
+            // Consumer-visibility, not sealed-ness: a registration may
+            // reference kept-layer names too (a coercion chain's
+            // Integer/Rational links, a mixed-carrier operator) — those
+            // are reachable through the kept imports, not sealed here.
             auto sealedHas = [&](const std::string& name) {
-                return alreadySealed.count(name) != 0;
+                return alreadySealed.count(name) != 0
+                    || reachableViaKeptImports.count(name) != 0;
             };
             for (const auto& droppedModule : droppedModules) {
                 auto droppedInfo = moduleToDepInfo.find(droppedModule);

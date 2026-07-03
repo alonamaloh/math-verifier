@@ -1177,6 +1177,14 @@ struct SurfaceModule {
     // in the sealed cache like a checked obligation. The scalable
     // alternative to hand-listing hundreds of theorem signatures.
     std::vector<std::string> exportTheoremsOfModules;
+    // Interface modules: `export definitions D1, D2, …` — each named
+    // construction definition re-emits in the sealed cache WITH ITS
+    // BODY (transparent): the honest public predicates/data whose
+    // bodies are stated in public vocabulary (ε-δ definitions, the
+    // supremum family, …), which consumer proofs intro/eliminate.
+    // Bodies are closure-validated at seal time; a body mentioning a
+    // construction internal is a loud error, not a silent leak.
+    std::vector<std::string> exportDefinitionsNames;
     std::vector<SurfaceTopStatement> statements;
 };
 
