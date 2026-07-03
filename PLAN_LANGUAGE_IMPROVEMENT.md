@@ -255,8 +255,10 @@ some k:` — recognizer + coverage-lemma auto-generation at
 inductive-declaration time), the SUBSTITUTION rule for constructor
 equations (must be reliable, kills `refining`/`cases…with eq`),
 induction as a by-cases variant, `decide` deletion (needs the
-substitution rule + otherwise), the `in (P):`→`case P:` library
-migration (mechanical, Sonnet), and the both-directions lint.
+substitution rule + otherwise), and the both-directions lint.
+The `in (P):`→`case P:` migration is DONE (d3b3655e: 204 arm headers,
+39 files, 3 Sonnet agents); a follow-up parser session can retire the
+`in (P):` spelling outright.
 
 **Settled: clause keyword is `case P:`, with `otherwise:` for the
 complement.** (Decided July 2026; do not relitigate.) Rationale:
