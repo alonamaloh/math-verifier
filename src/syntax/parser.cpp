@@ -1308,6 +1308,11 @@ private:
         // (it's the final expression). In that case we stash the parsed
         // calc here and skip the trailing parseExpression() call.
         SurfaceExpressionPointer parsedFinalCalc;
+        // A1: a bare expression at statement position parsed by the
+        // fallthrough below and discovered to be the block's FINAL
+        // expression (no `;`, or `;` immediately before `}`) is stashed
+        // here so the post-loop code doesn't re-parse it.
+        SurfaceExpressionPointer parsedFinalExpression;
         while (peek().kind == TokenKind::KeywordLet
                || peek().kind == TokenKind::KeywordClaim
                || peek().kind == TokenKind::KeywordObtain
@@ -1318,7 +1323,83 @@ private:
                || peek().kind == TokenKind::KeywordNote
                || peek().kind == TokenKind::KeywordChange
                || peek().kind == TokenKind::KeywordFrom
-               || peek().kind == TokenKind::KeywordCalc) {
+               || peek().kind == TokenKind::KeywordCalc
+               || (peek().kind != TokenKind::RightBrace
+                   && peek().kind != TokenKind::KeywordContradiction
+                   && peek().kind != TokenKind::KeywordDone
+                   && peek().kind != TokenKind::KeywordOkay
+                   && peek().kind != TokenKind::EndOfFile)) {
+            // A1 keyword-free claims: a statement that starts with none
+            // of the keywords above is a bare stated proposition (or a
+            // proof term — the claim machinery's type-directed dispatch
+            // covers both): `P;` reads exactly as `claim P;`, and
+            // `P as NAME;` as the named form. Backward compatibility:
+            // an expression followed by `;}` or `}` keeps its old
+            // meaning as the block's final expression (so blocks whose
+            // value is data are untouched); only `E; <more>` is a
+            // statement.
+            if (peek().kind != TokenKind::KeywordLet
+                && peek().kind != TokenKind::KeywordClaim
+                && peek().kind != TokenKind::KeywordObtain
+                && peek().kind != TokenKind::KeywordSuppose
+                && peek().kind != TokenKind::KeywordChoose
+                && peek().kind != TokenKind::KeywordSet
+                && peek().kind != TokenKind::KeywordTake
+                && peek().kind != TokenKind::KeywordNote
+                && peek().kind != TokenKind::KeywordChange
+                && peek().kind != TokenKind::KeywordFrom
+                && peek().kind != TokenKind::KeywordCalc
+                && peek().kind != TokenKind::KeywordDone
+                && peek().kind != TokenKind::KeywordOkay) {
+                Token statementStart = peek();
+                SurfaceExpressionPointer expression = parseExpression();
+                SurfaceExpressionPointer byHint;
+                if (peek().kind == TokenKind::KeywordBy) {
+                    consumeAny();  // 'by'
+                    byHint = parseExpression();
+                }
+                std::string bindingName;
+                if (peek().kind == TokenKind::KeywordAs) {
+                    consumeAny();  // 'as'
+                    if (!isIdentifierLike(peek().kind)) {
+                        throwHere("expected name after 'as'");
+                    }
+                    bindingName = consumeAny().lexeme;
+                }
+                bool isStatement = false;
+                if (peek().kind == TokenKind::Semicolon
+                    && peekAt(1).kind != TokenKind::RightBrace) {
+                    isStatement = true;
+                    consumeAny();  // ';'
+                } else if (!bindingName.empty() || byHint) {
+                    // `E as NAME` / `E by V` only mean anything as a
+                    // statement (the old grammar rejected both here).
+                    isStatement = true;
+                    if (peek().kind == TokenKind::Semicolon) {
+                        consumeAny();
+                    }
+                }
+                if (!isStatement) {
+                    parsedFinalExpression = std::move(expression);
+                    break;
+                }
+                BlockWrapper wrapper;
+                wrapper.kind = BlockWrapper::TypedLet;
+                wrapper.name = bindingName.empty()
+                    ? "_claim_anon_"
+                          + std::to_string(statementStart.line) + "_"
+                          + std::to_string(statementStart.column)
+                    : bindingName;
+                wrapper.type = expression;
+                wrapper.value = makeSurfaceStructuredClaim(
+                    expression, /*label=*/"", std::move(byHint),
+                    /*byCases=*/false, {}, statementStart.line,
+                    statementStart.column);
+                wrapper.line = statementStart.line;
+                wrapper.column = statementStart.column;
+                wrappers.push_back(std::move(wrapper));
+                continue;
+            }
             // `from <fact>: <instance> [as NAME];` (A7) — restate a
             // hypothesis with in-scope equations substituted into it:
             // the fact is named first, the transformed statement is on
@@ -1970,6 +2051,15 @@ private:
             // wasn't followed by `as` or `;`, so it's the block's final
             // expression. Use the pre-parsed value directly.
             finalExpression = std::move(parsedFinalCalc);
+            if (peek().kind == TokenKind::Semicolon) {
+                consumeAny();
+            }
+        } else if (parsedFinalExpression) {
+            // The A1 bare-statement fallthrough parsed an expression and
+            // discovered it is the block's final expression (no `;`, or
+            // a trailing `;` right before `}` — the old grammar's
+            // optional final semicolon).
+            finalExpression = std::move(parsedFinalExpression);
             if (peek().kind == TokenKind::Semicolon) {
                 consumeAny();
             }

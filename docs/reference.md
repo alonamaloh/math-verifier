@@ -66,6 +66,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | Form | Meaning |
 |---|---|
 | `claim P;` | assert `P`, auto-proved |
+| `P;` / `P by V;` / `P as NAME;` | **keyword-free claim** (A1): a bare stated proposition (or proof term) at statement position is a claim — verified, then in scope. A block may end by restating the goal. The final expression (`E}` or `E;}`) keeps its ordinary meaning |
 | `claim <proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — claim its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
 | `claim P by V;` | assert `P`, discharged by `V` |
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
