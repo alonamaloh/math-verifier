@@ -18,7 +18,6 @@ import Natural.basics
 import Natural.peano
 import Natural.order
 import Natural.add_order
-import Natural.compare
 import Natural.cancellation
 import Natural.multiply_order
 import Natural.multiply_bounds
@@ -41,61 +40,41 @@ theorem Natural.two_divides_root (m : Natural) (squareEven : 2 ∣ (m * m)) : 2 
 
 theorem Natural.no_double_square (m : Natural)
         : ∀ (n : Natural). 1 ≤ m → 1 ≤ n → m * m = 2 * (n * n) → False :=
-  by_strong_induction on m with subject, inductionHypothesis {
+  by_strong_induction on m with subject, no_smaller_solution {
     take n : Natural;
     suppose 1 ≤ subject as subjectPositive;
     suppose 1 ≤ n as nPositive;
     suppose subject * subject = 2 * (n * n) as equation;
 
-    -- 2 divides subject², hence — 2 being prime — divides subject itself.
-    claim 2 ∣ (subject * subject);
-    claim twoDividesSubject : 2 ∣ subject;
+    2 ∣ (subject * subject);
+    2 ∣ subject by Natural.two_divides_root as twoDividesSubject;
     choose k such that subject = 2 * k as subjectEquation from twoDividesSubject;
 
-    -- k ≥ 1, since otherwise subject = 2·0 = 0 would contradict subject ≥ 1.
-    let kPositive : 1 ≤ k := {
-        claim k ≠ 0 by {
-            suppose k = 0 as kIsZero;
-            absurd(calc (1 : Natural)
-                      ≤ subject   by subjectPositive
-                      = 2 * k
-                      = 2 * 0
-                      = 0)
-          };
-        done by Natural.one_le_of_nonzero
-      };
+    suppose k = 0 for contradiction {
+      then 1 ≤ subject = 2 * 0 = 0;
+      done
+    };
+    hence 1 ≤ k by Natural.one_le_of_nonzero;
 
-    -- Substituting subject = 2·k and cancelling the leading 2 leaves
-    -- n² = 2·k² — a strictly smaller instance of the same equation.
-    claim 1 ≤ 2;
-    calc 2 * (2 * (k * k))
-       = (2 * k) * (2 * k)
-       = subject * subject
-       = 2 * (n * n);
-    claim 2 * (k * k) = n * n;
-    claim descendedEquation : n * n = 2 * (k * k);
+    from equation: (2 * k) * (2 * k) = 2 * (n * n);
+    1 ≤ 2;
+    then 2 * (2 * (k * k)) = (2 * k) * (2 * k) = 2 * (n * n);
+    hence 2 * (k * k) = n * n;
+    hence n * n = 2 * (k * k);
 
-    -- The new instance is smaller: n < subject. (Otherwise subject ≤ n
-    -- gives subject² ≤ n² < 2·n² = subject², which is absurd.)
-    cases Natural.compare_strict(n, subject) {
-      | Natural.StrictComparison.below(nBelowSubject) => {
-          claim n < subject;
-          inductionHypothesis(n, (n < subject), k, nPositive, kPositive, descendedEquation)
-        }
-      | Natural.StrictComparison.atLeast(subjectAtMostN) => {
-          claim subject * subject ≤ subject * n;
-          claim n * subject ≤ n * n;
-          calc subject * subject
-             ≤ subject * n
-             = n * subject
-             ≤ n * n;
-          claim 1 ≤ n * n;
-          claim successor(n * n) ≤ 2 * (n * n) by Natural.successor_less_or_equal_multiply;
-          claim 2 * (n * n) ≤ n * n by substituting equation;
-          claim successor(n * n) ≤ n * n;
-          done
-      }
-    }
+    suppose subject ≤ n for contradiction {
+      subject * subject ≤ subject * n;
+      n * subject ≤ n * n;
+      then subject * subject ≤ subject * n = n * subject ≤ n * n;
+      1 ≤ n * n;
+      successor(n * n) ≤ 2 * (n * n) by Natural.successor_less_or_equal_multiply;
+      claim 2 * (n * n) ≤ n * n by substituting equation;
+      successor(n * n) ≤ n * n;
+      done
+    };
+
+    hence n < subject by Natural.lt_of_not_le;
+    done by no_smaller_solution
   }
 
 -- ----------------------------------------------------------------------
