@@ -5799,6 +5799,100 @@ int verifyWithCache(const std::string& sourcePath,
                 alreadySealed.insert(exportedName);
             }
         }
+        // The WIRING (operators, coercions, fold operations, instances,
+        // bundles, congruences, overloads, implicit-argument counts) of
+        // the dropped modules must survive in the sealed cache — it
+        // cannot be re-declared in the interface source (duplicate
+        // registration against the loaded construction) — so it is
+        // COPIED mechanically, filtered to entries whose referenced
+        // names survive sealing (a registration pointing at an
+        // unlisted construction internal would not replay downstream).
+        {
+            std::vector<std::string> droppedModules;
+            droppedModules.push_back(parsedModule.implementedByName);
+            for (const auto& exportedModule
+                     : parsedModule.exportTheoremsOfModules) {
+                droppedModules.push_back(exportedModule);
+            }
+            auto sealedHas = [&](const std::string& name) {
+                return alreadySealed.count(name) != 0;
+            };
+            for (const auto& droppedModule : droppedModules) {
+                auto droppedInfo = moduleToDepInfo.find(droppedModule);
+                if (droppedInfo == moduleToDepInfo.end()) continue;
+                CacheContents droppedCache;
+                try {
+                    std::string droppedPath = droppedInfo->second.first;
+                    if (!std::filesystem::exists(droppedPath)) {
+                        droppedPath += ".iface";
+                    }
+                    droppedCache = readCacheFile(
+                        droppedPath, /*skipDefinitionBodies=*/true);
+                } catch (const SerializationError&) {
+                    continue;
+                }
+                for (const auto& entry
+                         : droppedCache.operatorRegistrations) {
+                    if (sealedHas(entry.functionName)) {
+                        cache.operatorRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& entry
+                         : droppedCache.overloadRegistrations) {
+                    if (sealedHas(entry.functionName)) {
+                        cache.overloadRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& entry
+                         : droppedCache.congruenceRegistrations) {
+                    if (sealedHas(entry.lemmaName)) {
+                        cache.congruenceRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& entry
+                         : droppedCache.coercionRegistrations) {
+                    bool allSealed = !entry.chain.empty();
+                    for (const auto& link : entry.chain) {
+                        if (!sealedHas(link)) allSealed = false;
+                    }
+                    if (allSealed) {
+                        cache.coercionRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& entry
+                         : droppedCache.instanceRegistrations) {
+                    if (sealedHas(entry.termName)) {
+                        cache.instanceRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& entry
+                         : droppedCache.bundleRegistrations) {
+                    if (sealedHas(entry.termName)) {
+                        cache.bundleRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& entry
+                         : droppedCache.forgetfulRegistrations) {
+                    if (sealedHas(entry.termName)) {
+                        cache.forgetfulRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& entry
+                         : droppedCache.foldOperationRegistrations) {
+                    if (sealedHas(entry.witnessName)
+                        && sealedHas(entry.operationName)) {
+                        cache.foldOperationRegistrations.push_back(entry);
+                    }
+                }
+                for (const auto& [countedName, count]
+                         : droppedCache.implicitArgumentCounts) {
+                    if (sealedHas(countedName)) {
+                        cache.implicitArgumentCounts.emplace_back(
+                            countedName, count);
+                    }
+                }
+            }
+        }
         // Consumers must never load the construction: drop the
         // implementation AND every theorem-exported module from the
         // recorded dependency list (their content was COPIED above;
