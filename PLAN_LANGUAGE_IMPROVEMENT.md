@@ -249,11 +249,14 @@ fail to cover). `case P:` clause spelling was already parse-accepted
 legacy. Landed alongside: a LATENT Let-lift bug the tests flushed out
 (liftBoundVariables skipped Let nodes → stale indices under ζ-lets
 lifted by one binder; bit any ≥3-arm by-cases whose later arms
-carried claim wrappers referencing outer binders). REMAINING A4:
-structural cases with witness binders (`case n = successor(k) for
-some k:` — recognizer + coverage-lemma auto-generation at
-inductive-declaration time; IMPLEMENTATION SKETCH from the 2026-07-03
-session: parser — after the arm proposition, accept `for some
+carried claim wrappers referencing outer binders). REMAINING A4 (structural witness clause LANDED 33f3d949: `case n = k + 1
+for some k [as eq]:` — ∃-hypothesis opened on the spot via one
+Exists.eliminate, witness type inferred from the equation's left
+endpoint or annotated `for some (k : T)`, single binder v1;
+Natural.zero_or_add_one marked automatic as Natural's coverage lemma;
+feature test + reference row): coverage-lemma AUTO-GENERATION at
+inductive-declaration time is still open (sketch below now partially
+superseded — parser — after the arm proposition, accept `for some
 <name>[, <name>…]` (names optionally `(k : T)`-annotated), store
 witnessBinders on the arm; elaborator — the arm's disjunct becomes
 the ∃-nest `∃k. equation` with unannotated binder types INFERRED as
