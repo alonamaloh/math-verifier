@@ -91,6 +91,7 @@ enum class TokenKind {
     Plus, Minus, Star, Slash, Caret,
     CenterDot,       // "·" (binary operation symbol, multiplicative precedence)
     InverseSuperscript,  // "⁻¹" (postfix operator symbol, e.g. group inverse)
+    SquareSuperscript,   // "²" (postfix squaring; parse-time sugar for E * E)
     Bang,            // "!" (postfix operator symbol, e.g. factorial). There is
                      // no "!=" spelling of ≠, so `k!=1` reads as `k! = 1`.
     Less, Greater, LessOrEqual, GreaterOrEqual,

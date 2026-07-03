@@ -14,6 +14,7 @@ A catalogue of surface constructs. For depth see `docs/conventions/`.
 | `inductive N (params) : Sort where \| C : … ` | an inductive type and its constructors |
 | `axiom N : T` | assumed without proof |
 | `operator (sym) on (T1, T2) := F` | infix/postfix operator dispatch |
+| `E²` | parse-time sugar for `E * E` at any carrier (binds tighter than every binary operator: `2 * n²` is `2 * (n * n)`) |
 | `instance N` | register the canonical structure instance/bundle for N's carrier |
 | `coercion (S, T) := F` | canonical embedding S ↪ T |
 | `congruence_under_binder F := L` | rewrite-under-binder lemma for head F |

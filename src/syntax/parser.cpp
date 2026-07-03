@@ -2990,12 +2990,22 @@ private:
         // Postfix operators bind tighter than any binary operator and
         // attach to the application/atom just parsed. `g⁻¹` wraps `g`;
         // `a · b⁻¹` parses as `a · (b⁻¹)`; `g⁻¹⁻¹` chains; `k!` likewise.
+        // `k²` is parse-time sugar for `k * k` (the shared immutable
+        // surface node appears twice), so every downstream system —
+        // operator resolution at any carrier, `ring`, the indexes —
+        // sees ordinary multiplication.
         auto base = parseApplication();
         while (peek().kind == TokenKind::InverseSuperscript
-               || peek().kind == TokenKind::Bang) {
+               || peek().kind == TokenKind::Bang
+               || peek().kind == TokenKind::SquareSuperscript) {
             Token op = consumeAny();
-            base = makeSurfaceUnaryOperation(op.lexeme, std::move(base),
-                                              op.line, op.column);
+            if (op.kind == TokenKind::SquareSuperscript) {
+                base = makeSurfaceBinaryOperation(
+                    "*", base, base, op.line, op.column);
+            } else {
+                base = makeSurfaceUnaryOperation(
+                    op.lexeme, std::move(base), op.line, op.column);
+            }
         }
         return base;
     }
