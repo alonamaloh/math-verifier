@@ -1014,7 +1014,20 @@ private:
         declaration.type = parseExpression();
         if (peek().kind == TokenKind::Assign) {
             consumeAny();  // ':='
-            declaration.body = parseExpression();
+            // `:= by <lemma>` — the whole proof is a citation; the
+            // prover does the logical plumbing between the goal and
+            // the lemma's form (A7). Reads as the reference target's
+            // `sqrt_two_irrational := by no_double_square`; sugar for
+            // `:= done by <lemma>`.
+            if (peek().kind == TokenKind::KeywordBy) {
+                Token byToken = consumeAny();
+                declaration.body = makeSurfaceStructuredClaim(
+                    makeSurfaceGoal(byToken.line, byToken.column),
+                    /*label=*/"", /*byHint=*/parseExpression(),
+                    /*byCases=*/false, {}, byToken.line, byToken.column);
+            } else {
+                declaration.body = parseExpression();
+            }
         } else if (peek().kind == TokenKind::Pipe) {
             while (peek().kind == TokenKind::Pipe) {
                 declaration.cases.push_back(parsePatternCase());
