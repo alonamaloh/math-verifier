@@ -252,7 +252,18 @@ lifted by one binder; bit any ≥3-arm by-cases whose later arms
 carried claim wrappers referencing outer binders). REMAINING A4:
 structural cases with witness binders (`case n = successor(k) for
 some k:` — recognizer + coverage-lemma auto-generation at
-inductive-declaration time), the SUBSTITUTION rule for constructor
+inductive-declaration time; IMPLEMENTATION SKETCH from the 2026-07-03
+session: parser — after the arm proposition, accept `for some
+<name>[, <name>…]` (names optionally `(k : T)`-annotated), store
+witnessBinders on the arm; elaborator — the arm's disjunct becomes
+the ∃-nest `∃k. equation` with unannotated binder types INFERRED as
+the type of the equation's LHS (elaborate the surface `=`'s left side
+without k; error asks for an annotation if the proposition isn't a
+surface equality); arm body elaborates under extendedBinders + [k:T,
+eq-hypothesis] and buildArmLambda wraps it in Exists.eliminate(T,
+predicate, goal, λ k eqHyp. body, disjunctHypothesis); exhaustiveness
+stays the normal prover path against existing coverage lemmas
+(zero_or_add_one etc.) until per-inductive auto-generation lands), the SUBSTITUTION rule for constructor
 equations (must be reliable, kills `refining`/`cases…with eq`),
 induction as a by-cases variant, `decide` deletion (needs the
 substitution rule + otherwise), and the both-directions lint.
