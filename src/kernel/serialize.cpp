@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <unordered_map>
 #include <variant>
@@ -538,9 +539,15 @@ Declaration readDeclaration(Reader& reader,
 // Public API.
 
 void writeCacheFile(const std::string& path, const CacheContents& contents) {
-    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    // Write-to-temp + rename, so an interrupted job (a parallel build
+    // killed mid-write) can never leave a TRUNCATED cache behind — a
+    // short .mathv with a fresh mtime poisons every later incremental
+    // build ("short read" at some innocent consumer). The rename is
+    // atomic within the directory; no two build jobs write one target.
+    const std::string temporaryPath = path + ".tmp";
+    std::ofstream output(temporaryPath, std::ios::binary | std::ios::trunc);
     if (!output) {
-        throw SerializationError("cannot open for write: " + path);
+        throw SerializationError("cannot open for write: " + temporaryPath);
     }
     Writer writer{output, {}, 0};
     writer.writeU32(cacheMagic);
@@ -629,8 +636,17 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
         writer.writeString(entry.identityName);
         writer.writeString(entry.witnessName);
     }
+    output.close();
     if (!output) {
-        throw SerializationError("write failed (final flush): " + path);
+        throw SerializationError(
+            "write failed (final flush): " + temporaryPath);
+    }
+    std::error_code renameError;
+    std::filesystem::rename(temporaryPath, path, renameError);
+    if (renameError) {
+        throw SerializationError(
+            "cannot move cache into place: " + path + " ("
+            + renameError.message() + ")");
     }
 }
 
