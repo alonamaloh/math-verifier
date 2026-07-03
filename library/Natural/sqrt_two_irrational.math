@@ -38,66 +38,46 @@ theorem Natural.two_divides_of_two_divides_square (m : Natural) (squareEven : 2 
 -- ----------------------------------------------------------------------
 -- The descent: no m ≥ 1 admits a partner n ≥ 1 with m² = 2·n².
 
--- The induction needs the stronger, n-generalized statement: the
--- descent replaces (m, n) by (n, k), so the induction hypothesis must
--- apply at a different second argument.
-theorem Natural.no_double_square_descent (m : Natural)
-        : ∀ (n : Natural). 1 ≤ m → 1 ≤ n → m * m ≠ 2 * (n * n) :=
-  by_strong_induction on m with hypothesis no_smaller_solution {
-    take n : Natural;
-    suppose 1 ≤ m as mPositive;
-    suppose 1 ≤ n as nPositive;
-    suppose m * m = 2 * (n * n) as equation;
-
-    2 ∣ (m * m);
-    2 ∣ m by Natural.two_divides_of_two_divides_square as twoDividesM;
-    choose k such that m = 2 * k from twoDividesM;
-
-    suppose k = 0 for contradiction {
-      1 ≤ m = 2 * 0 = 0;
-      done
-    };
-    1 ≤ k by Natural.one_le_of_nonzero;
-
-    2 * (n * n) = (2 * k) * (2 * k)   by equation
-                = 2 * (2 * (k * k));
-    n * n = 2 * (k * k);
-
-    suppose m ≤ n for contradiction {
-      m * m ≤ m * n = n * m ≤ n * n
-            < 2 * (n * n)              by Natural.lt_multiply_of_two_le
-            = m * m;
-      done
-    };
-
-    n < m by Natural.lt_of_not_le;
-    done by no_smaller_solution
-  }
-
--- The complete characterization: the only natural solution of
--- m² = 2·n² is the trivial one.
 theorem Natural.no_double_square (m n : Natural)
-        (equation : m * m = 2 * (n * n))
-        : m = 0 ∧ n = 0 := {
-  claim m = 0 by {
-    suppose m ≠ 0 for contradiction {
-      1 ≤ m by Natural.one_le_of_nonzero;
-      suppose n = 0 for contradiction {
-        1 ≤ m * m = 2 * (n * n) = 0;
+        (bothPositive : 1 ≤ m ∧ 1 ≤ n)
+        : m * m ≠ 2 * (n * n) := {
+  -- The induction needs the n-generalized statement: the descent
+  -- replaces (m, n) by (n, k), so the induction hypothesis must apply
+  -- at a different second argument.
+  claim general : ∀ (m n : Natural). 1 ≤ m → 1 ≤ n → m * m ≠ 2 * (n * n) by {
+    take m : Natural;
+    by_strong_induction on m with hypothesis no_smaller_solution {
+      take n : Natural;
+      suppose 1 ≤ m as mPositive;
+      suppose 1 ≤ n as nPositive;
+      suppose m * m = 2 * (n * n) as equation;
+
+      2 ∣ (m * m);
+      2 ∣ m by Natural.two_divides_of_two_divides_square as twoDividesM;
+      choose k such that m = 2 * k from twoDividesM;
+
+      suppose k = 0 for contradiction {
+        1 ≤ m = 2 * 0 = 0;
         done
       };
-      1 ≤ n by Natural.one_le_of_nonzero;
-      done by Natural.no_double_square_descent
+      1 ≤ k by Natural.one_le_of_nonzero;
+
+      2 * (n * n) = (2 * k) * (2 * k)   by equation
+                  = 2 * (2 * (k * k));
+      n * n = 2 * (k * k);
+
+      suppose m ≤ n for contradiction {
+        m * m ≤ m * n = n * m ≤ n * n
+              < 2 * (n * n)              by Natural.lt_multiply_of_two_le
+              = m * m;
+        done
+      };
+
+      n < m by Natural.lt_of_not_le;
+      done by no_smaller_solution
     }
   };
-  suppose n ≠ 0 for contradiction {
-    1 ≤ n by Natural.one_le_of_nonzero;
-    1 ≤ n * n ≤ 2 * (n * n)   by Natural.le_multiply_when_factor_at_least_one
-              = m * m
-              = 0;
-    done
-  };
-  done
+  done by general
 }
 
 -- ----------------------------------------------------------------------
@@ -105,4 +85,4 @@ theorem Natural.no_double_square (m n : Natural)
 
 theorem Natural.sqrt_two_irrational
         : ¬ ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n) :=
-  by Natural.no_double_square_descent
+  by Natural.no_double_square
