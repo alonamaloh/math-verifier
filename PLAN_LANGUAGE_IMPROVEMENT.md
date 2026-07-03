@@ -1307,6 +1307,38 @@ signature has a matching proof; the set is complete. Downstream,
 δ-reduction), carrier never unfolding to the quotient. The
 implementation module is not on the ordinary import path.
 
+#### D3a. Phase-1 implementation design (2026-07-02 night survey)
+
+The `.mathv.iface` machinery is already ~90% of the sealing semantics:
+it strips proof bodies and opaque-definition bodies to bodyless axioms,
+zeroes source-dependent fields, and consumers load interfaces
+transitively (never proof-carrying caches). Phase 1 therefore builds as
+a REFINEMENT of the iface derivation, not a new subsystem:
+
+- An `implementation module Y implements X` is an ordinary module plus
+  the recorded relation.
+- Processing `interface module X` = load Y's cache, run the OBLIGATION
+  CHECK (every interface `type`/`constant`/theorem signature has a
+  matching Y-declaration with definitionally-equal type; the set is
+  complete), then derive X's cache from Y's by FILTERING to the listed
+  names and FORCING opacity on listed value definitions (listed
+  transparent `definition`s keep bodies; unlisted names remain present
+  but unadvertised — a visibility lint can tighten this later).
+- `import X` then resolves to the interface cache exactly like any
+  module import; no new load path.
+- BUILD EDGE: the interface file must name its implementation for the
+  Makefile to know the dependency without scanning — proposed spelling
+  `interface module X ... implemented by Y` (cross-validated against
+  Y's `implements X`). OWNER MAY VETO the dual declaration; the
+  alternative is a build-system mapping file.
+- Staging: (1) parser + surface for both module kinds and the
+  interface-body statement forms (`type N`, `constant N : T`, theorem
+  signatures without `:=`); (2) the obligation check + sealed-cache
+  derivation in main.cpp; (3) the Makefile rule; (4) a TOY interface
+  feature test (counter over Natural) where the consumer must FAIL to
+  see the construction defeq — the sealing acceptance; (5) migrate the
+  ℝ prototype (the measured 1-site bill).
+
 ### D4. Eliminator export — the Natural interface
 
 ℝ has no eliminator problem (nothing eliminates a real). `Natural` is
