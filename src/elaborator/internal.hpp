@@ -795,6 +795,41 @@ private:
     // coercion chain)?
     bool isCoercionFunctionName(const std::string& name) const;
 
+    // Does `term` mention any registered coercion function? Cheap
+    // syntactic pre-filter shared by the cast tactics.
+    bool containsCoercionConstant(ExpressionPointer term) const;
+
+    // B3.3a — the factoring dual of `castPushToLeaves`: `term` at the
+    // hop's target carrier re-expressed as the image `ι(source)` of a
+    // single source-carrier term. `proof` proves `term = ι(source)`,
+    // null when `term` is literally `ι(source)`. Fails (nullopt) when
+    // any leaf is a bare target-carrier atom — such a term has no
+    // preimage spelling.
+    struct PulledCast {
+        ExpressionPointer source;
+        ExpressionPointer proof;  // term = ι(source), or null
+    };
+    std::optional<PulledCast> castPullToRoot(
+        ExpressionPointer term,
+        const std::string& hopName,
+        const std::string& sourceCarrierName,
+        const std::string& targetCarrierName,
+        ExpressionPointer targetCarrier,
+        LevelPointer targetLevel,
+        const std::vector<LocalBinder>& localBinders);
+
+    // B3.3b — context-fact cast normalization: match the diff walk's
+    // sub-goal `subLeft = subRight` against the local equality
+    // hypotheses at the shared leaf-cast normal form (placement
+    // differences dissolve), and against hypotheses `ι x = ι y`
+    // lowered through the hop's `injective` lemma. Runs after
+    // `tryClassifyDiff`'s direct defeq scan declines; all terms in the
+    // closed representation.
+    ExpressionPointer tryCastNormalizedHypothesisMatch(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer subLeft,
+        ExpressionPointer subRight);
+
     // Does `expressionType` have the given Constant name at its head?
     // Checks the *raw* head first (so a parameter declared as
     // `Rational` matches `Rational`, even though `Rational` δ-reduces
@@ -1394,6 +1429,17 @@ private:
     // `Or.introduceRight`. Left-biased — if both branches would
     // succeed, the left one wins.
     ExpressionPointer tryDisjunctionIntro(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
+    // Disjunctive syllogism: an in-scope `A ∨ B` whose one side is the
+    // goal and whose other side is refuted by an in-scope negation
+    // concludes the goal by-less — the one Or-elimination performed
+    // without announcing a case split (trichotomy/totality splits with
+    // a refuted arm). Conjunction legs participate on both the
+    // disjunction and the refutation side; no recursive proof search.
+    ExpressionPointer tryDisjunctiveSyllogism(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
         int line);

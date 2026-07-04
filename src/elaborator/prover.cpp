@@ -218,6 +218,128 @@ ExpressionPointer Elaborator::tryContradiction(
         return nullptr;
     }
 
+ExpressionPointer Elaborator::tryDisjunctiveSyllogism(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/) {
+        // A ∨ B with ¬A in scope yields B (and symmetrically A from
+        // ¬B) — the one Or-elimination a mathematician performs
+        // without announcing a case split. Scans the in-scope facts
+        // (conjunction legs included) for a disjunction whose one
+        // side is the goal and whose other side is refuted by a
+        // second fact.
+        if (!environment_.lookup("Or.eliminate")
+            || !environment_.lookup("False.eliminate_proposition")) {
+            return nullptr;
+        }
+        int N = static_cast<int>(localBinders.size());
+        if (N == 0) return nullptr;
+        std::vector<ContextFact> facts =
+            collectLocalBinderFacts(localBinders);
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, N);
+        auto matchesGoal = [&](ExpressionPointer sideClosed) {
+            if (structurallyEqual(sideClosed, goalClosed)) return true;
+            try {
+                return isDefinitionallyEqual(
+                    environment_, openedContext,
+                    openOverLocalBinders(sideClosed, localBinders, N),
+                    goalOpened);
+            } catch (const TypeError&) {
+                return false;
+            }
+        };
+        // A fact refuting `sideClosed` — a Pi `side → False` (Not is
+        // transparent sugar for exactly that shape).
+        auto findRefutation =
+            [&](ExpressionPointer sideClosed) -> ExpressionPointer {
+            ExpressionPointer sideOpened = openOverLocalBinders(
+                sideClosed, localBinders, N);
+            for (const ContextFact& fact : facts) {
+                ExpressionPointer factWhnf;
+                try {
+                    factWhnf = weakHeadNormalForm(
+                        environment_, fact.type);
+                } catch (const TypeError&) {
+                    continue;
+                }
+                auto* pi = std::get_if<Pi>(&factWhnf->node);
+                if (!pi) continue;
+                auto* codomainConst =
+                    std::get_if<Constant>(&pi->codomain->node);
+                if (!codomainConst
+                    || codomainConst->name != "False") continue;
+                try {
+                    if (isDefinitionallyEqual(
+                            environment_, openedContext,
+                            openOverLocalBinders(
+                                pi->domain, localBinders, N),
+                            sideOpened)) {
+                        return fact.proofTerm;
+                    }
+                } catch (const TypeError&) {
+                }
+            }
+            return nullptr;
+        };
+        for (const ContextFact& fact : facts) {
+            autoProveSpend(1);
+            ExpressionPointer factWhnf;
+            try {
+                factWhnf = weakHeadNormalForm(environment_, fact.type);
+            } catch (const TypeError&) {
+                continue;
+            }
+            auto* outerApp = std::get_if<Application>(&factWhnf->node);
+            if (!outerApp) continue;
+            auto* innerApp =
+                std::get_if<Application>(&outerApp->function->node);
+            if (!innerApp) continue;
+            auto* head =
+                std::get_if<Constant>(&innerApp->function->node);
+            if (!head || head->name != "Or") continue;
+            ExpressionPointer leftSide = innerApp->argument;
+            ExpressionPointer rightSide = outerApp->argument;
+            bool goalIsRight = matchesGoal(rightSide);
+            bool goalIsLeft = !goalIsRight && matchesGoal(leftSide);
+            if (!goalIsRight && !goalIsLeft) continue;
+            ExpressionPointer refuted =
+                goalIsRight ? leftSide : rightSide;
+            ExpressionPointer refutation = findRefutation(refuted);
+            if (!refutation) continue;
+            // Or.eliminate(A, B, G, handleLeft, handleRight, or).
+            // The refuted side's handler derives False and eliminates
+            // into the goal; the goal side's handler is the identity.
+            // Inside each lambda every outer reference lifts by one.
+            auto refutedHandler = [&]() {
+                ExpressionPointer body = makeApplication(
+                    makeApplication(
+                        makeConstant("False.eliminate_proposition", {}),
+                        liftBoundVariables(goalClosed, 1, 0)),
+                    makeApplication(
+                        liftBoundVariables(refutation, 1, 0),
+                        makeBoundVariable(0)));
+                return makeLambda("_refuted", refuted, body);
+            };
+            ExpressionPointer goalSide =
+                goalIsRight ? rightSide : leftSide;
+            ExpressionPointer identityHandler = makeLambda(
+                "_goal", goalSide, makeBoundVariable(0));
+            ExpressionPointer call = makeConstant("Or.eliminate", {});
+            call = makeApplication(call, leftSide);
+            call = makeApplication(call, rightSide);
+            call = makeApplication(call, goalClosed);
+            call = makeApplication(
+                call, goalIsRight ? refutedHandler() : identityHandler);
+            call = makeApplication(
+                call, goalIsRight ? identityHandler : refutedHandler());
+            call = makeApplication(call, fact.proofTerm);
+            return call;
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::tryDisjunctionIntro(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -1866,6 +1988,17 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // Disjunctive syllogism — `A ∨ B` + `¬A` in scope concludes B
+        // without a case split on the page. Pure context scan (no
+        // recursive search), so it sits with the cheap shape-gated
+        // tactics, before the expensive library scans.
+        {
+            ExpressionPointer attempt = runTactic("disjunctiveSyllogism",
+                [&] { return tryDisjunctiveSyllogism(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
         // From here on the tactics are per-call expensive (full library
         // scans, recursive sub-proofs). Each charges the effort budget in
         // its hot loop via autoProveSpend(), which throws
@@ -2068,6 +2201,10 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("contradiction", [&] {
             return tryContradiction(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("disjunctiveSyllogism", [&] {
+            return tryDisjunctiveSyllogism(
                 goalClosed, localBinders, line);
         });
         runProfiled("contextFactMatch", [&] {

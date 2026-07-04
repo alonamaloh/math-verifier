@@ -337,6 +337,15 @@ ExpressionPointer Elaborator::tryClassifyDiff(
                 }
             }
         }
+        // B3.3b — the direct scan declined; retry the equality
+        // hypotheses at leaf-cast placement (and lowered through
+        // `injective`), so a fact stated as `a = ι(1+k)·q` still
+        // closes a goal spelled `a = (ι1 + ιk)·q`. Gated inside on
+        // hypotheses that actually mention a coercion.
+        if (ExpressionPointer proof = tryCastNormalizedHypothesisMatch(
+                localBinders, subLeft, subRight)) {
+            return proof;
+        }
         return nullptr;
     }
 

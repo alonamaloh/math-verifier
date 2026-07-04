@@ -1,0 +1,56 @@
+module Test.cast_context_test
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.sign
+
+-- B3.3 — cast normalization at the context boundary
+-- (PLAN_LANGUAGE_IMPROVEMENT.md, B3.3). Three mechanisms, each probed
+-- by-less: compound lowering (the goal is the ι-image of a
+-- source-carrier fact), placement matching (hypothesis and goal differ
+-- only in where the casts sit), and injectivity lowering (a cast-level
+-- equality serves the source-carrier goal).
+
+-- Compound lowering: `ι j = ι q · ι m + ι r` factors to the image of
+-- `j = q·m + r`, which is the hypothesis — at Natural, where no amount
+-- of Integer-side normalization could reach it.
+theorem cast_compound_lowering (q m r j : Natural) (fact : j = q * m + r)
+    : (j : Integer) = (q : Integer) * (m : Integer) + (r : Integer) := {
+  (j : Integer) = (q : Integer) * (m : Integer) + (r : Integer);
+  done
+}
+
+-- Placement match: the hypothesis lifts `1 + k` as a unit, the goal
+-- spells the leaves. Both push to the same leaf-cast normal form.
+theorem cast_placement_match (a q : Integer) (k r : Natural)
+        (fact : a = ((1 + k : Natural) : Integer) * q + (r : Integer))
+    : a = ((1 : Integer) + (k : Integer)) * q + (r : Integer) := {
+  a = ((1 : Integer) + (k : Integer)) * q + (r : Integer);
+  done
+}
+
+-- Injectivity lowering: `ι n = ι m` in scope closes `n = m` through
+-- `Natural.to_integer.injective`.
+theorem cast_injectivity_lowering (n m : Natural)
+        (fact : (n : Integer) = (m : Integer))
+    : n = m := {
+  n = m;
+  done
+}
+
+-- The zero/one constants participate in the pull: `Integer.one + ι k`
+-- is the image of `1 + k`, so a Natural-level successor fact closes it.
+theorem cast_pull_through_one (k j : Natural) (fact : j = 1 + k)
+    : (j : Integer) = Integer.one + (k : Integer) := {
+  (j : Integer) = Integer.one + (k : Integer);
+  done
+}

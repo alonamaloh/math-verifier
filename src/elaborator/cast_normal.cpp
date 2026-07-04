@@ -16,6 +16,18 @@
 
 namespace {
 
+// Diagnostic telemetry (`MATH_CAST_TIER_DEBUG=1`): one stderr line per
+// tryCastEqualityTier invocation recording the outcome, so the yield of
+// prospective B3.x extensions can be sized from a classifier run instead
+// of guessed. Not a user-facing feature; costs nothing when unset.
+bool castTierDebugEnabled() {
+    static const bool enabled = [] {
+        const char* flag = std::getenv("MATH_CAST_TIER_DEBUG");
+        return flag && flag[0] != '\0' && flag[0] != '0';
+    }();
+    return enabled;
+}
+
 // A binary ring operation `<carrier>.<suffix>(a, b)` on a CONCRETE carrier
 // (exactly two explicit arguments, constant head). Bundled/abstract
 // carriers carry a leading structure argument and so do not match — which
@@ -35,8 +47,13 @@ std::optional<BinaryOp> asBinaryOp(ExpressionPointer term) {
     if (!inner) return std::nullopt;
     auto* head = std::get_if<Constant>(&inner->function->node);
     if (!head) return std::nullopt;
-    static const std::array<const char*, 3> suffixes{
-        "add", "multiply", "subtract"};
+    // `divide` earns its slot for the generic-descent side only: no
+    // carrier pair has a `divide_preserves` move lemma (ℕ and ℤ have no
+    // division), so a cast never distributes over it — but descending
+    // INTO a quotient's operands is what lets the analysis files'
+    // `ι(a)/ι(b!)` spellings normalize underneath.
+    static const std::array<const char*, 4> suffixes{
+        "add", "multiply", "subtract", "divide"};
     for (const char* suffix : suffixes) {
         std::string dotted = std::string(".") + suffix;
         const std::string& name = head->name;
@@ -199,6 +216,131 @@ Elaborator::CastNormalForm Elaborator::pushCoercion(
     return {coercedInner, innerCongruence};
 }
 
+// B3.3a — the factoring dual of `castPushToLeaves`: try to express
+// `term` (at the target carrier) as the image `ι(source)` of a single
+// term at the hop's source carrier, collapsing leaf casts back through
+// the registered `<hop>.<op>_preserves` lemmas run right-to-left.
+// Succeeds only when EVERY leaf is reachable — a cast `ι(x)`, a
+// carrier constant with a `zero`/`one` preservation lemma, or an
+// add/multiply/subtract node whose operands both pull. A bare
+// target-carrier atom anywhere fails the pull, which is correct: such
+// a term has no preimage spelling. The payoff is compound LOWERING:
+// `ι q · ι m + ι r  =  ι j` becomes `q · m + r = j` at the source
+// carrier, where the context facts that close it actually live.
+std::optional<Elaborator::PulledCast> Elaborator::castPullToRoot(
+        ExpressionPointer term,
+        const std::string& hopName,
+        const std::string& sourceCarrierName,
+        const std::string& targetCarrierName,
+        ExpressionPointer targetCarrier,
+        LevelPointer targetLevel,
+        const std::vector<LocalBinder>& localBinders) {
+    // Direct image `ι(source)`.
+    if (auto* app = std::get_if<Application>(&term->node)) {
+        if (auto* head = std::get_if<Constant>(&app->function->node)) {
+            if (head->name == hopName) {
+                return PulledCast{app->argument, nullptr};
+            }
+        }
+    }
+    auto coercionOf = [&](ExpressionPointer argument) {
+        return makeApplication(makeConstant(hopName), std::move(argument));
+    };
+    // Carrier constant with a preservation lemma: `<T>.zero` / `<T>.one`
+    // pulls to the literal the lemma `ι(lit) = <T>.zero/one` names.
+    if (auto* constant = std::get_if<Constant>(&term->node)) {
+        std::string suffix;
+        if (constant->name == targetCarrierName + ".zero") suffix = "zero";
+        if (constant->name == targetCarrierName + ".one") suffix = "one";
+        if (!suffix.empty()) {
+            std::string lemmaName = hopName + "." + suffix + "_preserves";
+            const Declaration* declaration = environment_.lookup(lemmaName);
+            if (auto* definition =
+                    declaration ? std::get_if<Definition>(declaration)
+                                : nullptr) {
+                // Statement shape: Equality(T, ι(lit), <T>.zero/one).
+                auto* eqApp =
+                    std::get_if<Application>(&definition->type->node);
+                auto* eqApp2 = eqApp
+                    ? std::get_if<Application>(&eqApp->function->node)
+                    : nullptr;
+                if (eqApp && eqApp2) {
+                    ExpressionPointer stated = eqApp->argument;
+                    ExpressionPointer image = eqApp2->argument;
+                    auto* imageApp =
+                        std::get_if<Application>(&image->node);
+                    auto* imageHead = imageApp
+                        ? std::get_if<Constant>(&imageApp->function->node)
+                        : nullptr;
+                    if (imageHead && imageHead->name == hopName
+                        && structurallyEqual(stated, term)) {
+                        // lemma : ι(lit) = term; we need term = ι(lit).
+                        ExpressionPointer proof = buildEqualitySymmetry(
+                            targetLevel, targetCarrier, image, term,
+                            makeConstant(lemmaName));
+                        return PulledCast{imageApp->argument, proof};
+                    }
+                }
+            }
+            return std::nullopt;
+        }
+    }
+    // Binary carrier operation whose move lemma exists: pull both
+    // operands, rebuild at the source carrier, and stitch
+    //   op'(A, B) = op'(ι a, ι b) = ι(op(a, b))
+    // from the operand proofs and the preserves lemma reversed.
+    if (auto op = asBinaryOp(term)) {
+        if (op->opName != targetCarrierName + "." + op->suffix) {
+            return std::nullopt;
+        }
+        std::string lemmaName = hopName + "." + op->suffix + "_preserves";
+        if (environment_.lookup(lemmaName) == nullptr) return std::nullopt;
+        auto leftPull = castPullToRoot(
+            op->left, hopName, sourceCarrierName, targetCarrierName,
+            targetCarrier, targetLevel, localBinders);
+        if (!leftPull) return std::nullopt;
+        auto rightPull = castPullToRoot(
+            op->right, hopName, sourceCarrierName, targetCarrierName,
+            targetCarrier, targetLevel, localBinders);
+        if (!rightPull) return std::nullopt;
+        ExpressionPointer coercedLeft = coercionOf(leftPull->source);
+        ExpressionPointer coercedRight = coercionOf(rightPull->source);
+        ExpressionPointer source = makeApplication(
+            makeApplication(
+                makeConstant(sourceCarrierName + "." + op->suffix),
+                leftPull->source),
+            rightPull->source);
+        // preserves(a, b) : ι(op(a, b)) = op'(ι a, ι b), reversed.
+        ExpressionPointer distributed = makeApplication(
+            makeApplication(
+                makeConstant(op->opName), coercedLeft), coercedRight);
+        ExpressionPointer collapse = buildEqualitySymmetry(
+            targetLevel, targetCarrier, coercionOf(source), distributed,
+            makeApplication(
+                makeApplication(makeConstant(lemmaName), leftPull->source),
+                rightPull->source));
+        if (!leftPull->proof && !rightPull->proof) {
+            // term IS op'(ι a, ι b) already.
+            return PulledCast{source, collapse};
+        }
+        ExpressionPointer leftProof = leftPull->proof
+            ? leftPull->proof
+            : buildReflexivity(targetLevel, targetCarrier, op->left);
+        ExpressionPointer rightProof = rightPull->proof
+            ? rightPull->proof
+            : buildReflexivity(targetLevel, targetCarrier, op->right);
+        ExpressionPointer congruence = buildBinaryOpCongruence(
+            op->opName, op->left, coercedLeft, leftProof,
+            op->right, coercedRight, rightProof,
+            targetCarrier, targetLevel);
+        ExpressionPointer proof = buildEqualityTransitivity(
+            targetLevel, targetCarrier, term, distributed,
+            coercionOf(source), congruence, collapse);
+        return PulledCast{source, proof};
+    }
+    return std::nullopt;
+}
+
 // B3.1 — the cast-equality tier. Runs when the equality battery has
 // declined a step `previous = next`. Normalize both endpoints to
 // leaf-cast form (proof-carrying); then:
@@ -224,6 +366,111 @@ ExpressionPointer Elaborator::tryCastEqualityTier(
         ExpressionPointer stepEqualityType,
         int line, int column) {
     autoProveSpend(2);
+
+    // B3.3a — compound lowering. Before spreading casts out, try the
+    // opposite move: FACTOR each endpoint as the image `ι(s)` of a
+    // single source-carrier term and lower the whole equality to
+    // `sL = sR` there. This is where the context facts live — a goal
+    // `ι q · ι m + ι r = ι j` is the image of `q·m + r = j`, whose
+    // proof is a hypothesis at the source carrier that no amount of
+    // target-carrier normalization can reach. The battery re-runs at
+    // the source (its own cast tier handles multi-hop towers, which
+    // terminate because the coercion graph is acyclic).
+    {
+        std::string carrierName = headConstantName(carrierType);
+        for (const auto& [registryKey, chain]
+                 : environment_.coercionRegistry) {
+            if (chain.size() != 1) continue;
+            if (std::get<1>(registryKey) != carrierName) continue;
+            const std::string& hopName = chain[0];
+            const std::string& sourceName = std::get<0>(registryKey);
+            std::optional<PulledCast> leftPull;
+            std::optional<PulledCast> rightPull;
+            try {
+                leftPull = castPullToRoot(
+                    previousKernel, hopName, sourceName, carrierName,
+                    carrierType, carrierLevel, localBinders);
+                if (leftPull) {
+                    rightPull = castPullToRoot(
+                        nextKernel, hopName, sourceName, carrierName,
+                        carrierType, carrierLevel, localBinders);
+                }
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
+            if (!leftPull || !rightPull) continue;
+            // Both endpoints are ι-images: lower, re-prove, lift.
+            autoProveSpend(2);
+            ExpressionPointer sourceCarrier;
+            LevelPointer sourceLevel;
+            ExpressionPointer loweredProof;
+            try {
+                sourceCarrier = inferTypeInLocalContext(
+                    localBinders, leftPull->source);
+                sourceLevel = typeUniverseOf(localBinders,
+                                             leftPull->source);
+                ExpressionPointer loweredGoal = makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Equality", {sourceLevel}),
+                            sourceCarrier),
+                        leftPull->source),
+                    rightPull->source);
+                loweredProof = autoProveCalcStep(
+                    localBinders, leftPull->source, rightPull->source,
+                    sourceCarrier, sourceLevel, loweredGoal,
+                    line, column);
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
+            if (!loweredProof) {
+                if (castTierDebugEnabled()) {
+                    std::cerr << "[cast-tier]\t" << moduleName_ << ":"
+                              << line << "\tpull-lowered-fail\thop="
+                              << hopName << "\n";
+                }
+                continue;
+            }
+            if (castTierDebugEnabled()) {
+                std::cerr << "[cast-tier]\t" << moduleName_ << ":"
+                          << line << "\tpull-lowered-ok\thop="
+                          << hopName << "\n";
+            }
+            ExpressionPointer hopLambda = makeLambda(
+                "_cast_z", sourceCarrier,
+                makeApplication(makeConstant(hopName),
+                                makeBoundVariable(0)));
+            ExpressionPointer lifted = buildEqualityCongruence(
+                sourceLevel, sourceCarrier, carrierLevel, carrierType,
+                hopLambda, leftPull->source, rightPull->source,
+                loweredProof);
+            // previous = ι(sL) = ι(sR) = next.
+            ExpressionPointer coercedLeft = makeApplication(
+                makeConstant(hopName), leftPull->source);
+            ExpressionPointer total = lifted;
+            if (leftPull->proof) {
+                total = buildEqualityTransitivity(
+                    carrierLevel, carrierType, previousKernel,
+                    coercedLeft, makeApplication(
+                        makeConstant(hopName), rightPull->source),
+                    leftPull->proof, total);
+            }
+            if (rightPull->proof) {
+                ExpressionPointer reversed = buildEqualitySymmetry(
+                    carrierLevel, carrierType, nextKernel,
+                    makeApplication(makeConstant(hopName),
+                                    rightPull->source),
+                    rightPull->proof);
+                total = buildEqualityTransitivity(
+                    carrierLevel, carrierType, previousKernel,
+                    makeApplication(makeConstant(hopName),
+                                    rightPull->source),
+                    nextKernel, total, reversed);
+            }
+            return total;
+        }
+    }
+
     CastNormalForm leftNorm =
         castPushToLeaves(previousKernel, localBinders);
     CastNormalForm rightNorm = castPushToLeaves(nextKernel, localBinders);
@@ -260,6 +507,24 @@ ExpressionPointer Elaborator::tryCastEqualityTier(
         return total;
     };
 
+    auto debugLine = [&](const char* outcome) {
+        if (!castTierDebugEnabled()) return;
+        auto brief = [&](ExpressionPointer term) {
+            std::string text;
+            try {
+                text = prettyPrintInLocalScope(term, localBinders);
+            } catch (...) { text = "<print-failed>"; }
+            if (text.size() > 110) text.resize(110);
+            return text;
+        };
+        std::cerr << "[cast-tier]\t" << moduleName_ << ":" << line
+                  << "\t" << outcome
+                  << "\tmovedL=" << (leftNorm.proof ? 1 : 0)
+                  << " movedR=" << (rightNorm.proof ? 1 : 0)
+                  << "\tL=" << brief(leftNorm.term)
+                  << "\tR=" << brief(rightNorm.term) << "\n";
+    };
+
     auto leftHop = singleHop(leftNorm.term);
     auto rightHop = singleHop(rightNorm.term);
     if (leftHop && rightHop && leftHop->first == rightHop->first) {
@@ -284,7 +549,9 @@ ExpressionPointer Elaborator::tryCastEqualityTier(
         } catch (const ElaborateError&) {
         } catch (const TypeError&) {
         }
+        if (!loweredProof) debugLine("lowered-fail");
         if (loweredProof) {
+            debugLine("lowered-ok");
             ExpressionPointer hopLambda = makeLambda(
                 "_cast_z", sourceCarrier,
                 makeApplication(makeConstant(leftHop->first),
@@ -307,7 +574,227 @@ ExpressionPointer Elaborator::tryCastEqualityTier(
         } catch (const ElaborateError&) {
         } catch (const TypeError&) {
         }
-        if (retryProof) return stitch(retryProof);
+        if (retryProof) {
+            debugLine("retry-ok");
+            return stitch(retryProof);
+        }
+        debugLine("retry-fail");
+        return nullptr;
+    }
+    debugLine("no-move");
+    return nullptr;
+}
+
+// B3.3b — cast-normalized hypothesis matching, the context-fact half
+// of cast normalization: an equality HYPOTHESIS whose statement places
+// its casts differently from the goal (`a = ι(1+k)·q + ι r` in scope,
+// `a = (ι 1 + ι k)·q + ι r` wanted) matches once both are pushed to
+// leaf-cast form; and a hypothesis `ι x = ι y` serves a source-carrier
+// sub-goal `x = y` through the hop's `injective` lemma. Called from
+// `tryClassifyDiff` after the direct defeq scan declines, at every
+// level of the equality battery's diff walk. All terms are in the
+// CLOSED (bound-variable) representation throughout — see the
+// autoProveClaim convention note at internal.hpp.
+ExpressionPointer Elaborator::tryCastNormalizedHypothesisMatch(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer subLeft,
+        ExpressionPointer subRight) {
+    auto mentionsCoercion = [&](ExpressionPointer term) {
+        return containsCoercionConstant(term);
+    };
+    int binderCount = static_cast<int>(localBinders.size());
+    // Sub-diff normal forms, computed on the first cast-bearing
+    // hypothesis (most tryClassifyDiff calls never get that far).
+    bool subNormalized = false;
+    CastNormalForm subLeftNorm{subLeft, nullptr};
+    CastNormalForm subRightNorm{subRight, nullptr};
+    ExpressionPointer subCarrier;
+    LevelPointer subLevel;
+    auto ensureSubNormalized = [&]() {
+        if (subNormalized) return true;
+        try {
+            subLeftNorm = castPushToLeaves(subLeft, localBinders);
+            subRightNorm = castPushToLeaves(subRight, localBinders);
+            subCarrier = inferTypeInLocalContext(localBinders, subLeft);
+            subLevel = typeUniverseOf(localBinders, subLeft);
+        } catch (const ElaborateError&) {
+            return false;
+        } catch (const TypeError&) {
+            return false;
+        }
+        subNormalized = true;
+        return true;
+    };
+    // Splice the sub-diff's own normalization proofs around a proof of
+    // `subLeftNorm.term = subRightNorm.term`.
+    auto wrapSubNormalization = [&](ExpressionPointer core) {
+        ExpressionPointer total = core;
+        if (subLeftNorm.proof) {
+            total = buildEqualityTransitivity(
+                subLevel, subCarrier, subLeft, subLeftNorm.term,
+                subRightNorm.term, subLeftNorm.proof, total);
+        }
+        if (subRightNorm.proof) {
+            ExpressionPointer reversed = buildEqualitySymmetry(
+                subLevel, subCarrier, subRight, subRightNorm.term,
+                subRightNorm.proof);
+            total = buildEqualityTransitivity(
+                subLevel, subCarrier, subLeft, subRightNorm.term,
+                subRight, total, reversed);
+        }
+        return total;
+    };
+    for (int b = binderCount - 1; b >= 0; --b) {
+        if (!mentionsCoercion(localBinders[b].type)) continue;
+        autoProveSpend(1);
+        ExpressionPointer factType = liftBoundVariables(
+            localBinders[b].type, binderCount - b, 0);
+        ExpressionPointer factWhnf;
+        try {
+            factWhnf = weakHeadNormalForm(environment_, factType);
+        } catch (const TypeError&) {
+            continue;
+        }
+        // Expect App(App(App(Equality.{lv}, carrier), eqL), eqR).
+        auto* app3 = std::get_if<Application>(&factWhnf->node);
+        if (!app3) continue;
+        auto* app2 = std::get_if<Application>(&app3->function->node);
+        if (!app2) continue;
+        auto* app1 = std::get_if<Application>(&app2->function->node);
+        if (!app1) continue;
+        auto* head = std::get_if<Constant>(&app1->function->node);
+        if (!head || head->name != "Equality"
+            || head->universeArguments.empty()) {
+            continue;
+        }
+        ExpressionPointer factCarrier = app1->argument;
+        LevelPointer factLevel = head->universeArguments[0];
+        ExpressionPointer eqLeft = app2->argument;
+        ExpressionPointer eqRight = app3->argument;
+        CastNormalForm eqLeftNorm{eqLeft, nullptr};
+        CastNormalForm eqRightNorm{eqRight, nullptr};
+        try {
+            eqLeftNorm = castPushToLeaves(eqLeft, localBinders);
+            eqRightNorm = castPushToLeaves(eqRight, localBinders);
+        } catch (const ElaborateError&) {
+            continue;
+        } catch (const TypeError&) {
+            continue;
+        }
+        if (!ensureSubNormalized()) return nullptr;
+        // hypothesisAtNorm : eqLeftNorm.term = eqRightNorm.term.
+        auto hypothesisAtNorm = [&]() {
+            ExpressionPointer proof =
+                makeBoundVariable(binderCount - 1 - b);
+            if (eqRightNorm.proof) {
+                proof = buildEqualityTransitivity(
+                    factLevel, factCarrier, eqLeft, eqRight,
+                    eqRightNorm.term, proof, eqRightNorm.proof);
+            }
+            if (eqLeftNorm.proof) {
+                ExpressionPointer reversed = buildEqualitySymmetry(
+                    factLevel, factCarrier, eqLeft, eqLeftNorm.term,
+                    eqLeftNorm.proof);
+                proof = buildEqualityTransitivity(
+                    factLevel, factCarrier, eqLeftNorm.term, eqLeft,
+                    eqRightNorm.term, reversed, proof);
+            }
+            return proof;
+        };
+        // Placement match at the shared leaf-cast normal form.
+        if (structurallyEqual(eqLeftNorm.term, subLeftNorm.term)
+            && structurallyEqual(eqRightNorm.term, subRightNorm.term)) {
+            return wrapSubNormalization(hypothesisAtNorm());
+        }
+        if (structurallyEqual(eqRightNorm.term, subLeftNorm.term)
+            && structurallyEqual(eqLeftNorm.term, subRightNorm.term)) {
+            return wrapSubNormalization(buildEqualitySymmetry(
+                factLevel, factCarrier, eqLeftNorm.term,
+                eqRightNorm.term, hypothesisAtNorm()));
+        }
+        // Injectivity lowering: a fact `ι x = ι y` serves `x = y` at
+        // the hop's source carrier (iterating down a tower, at most
+        // the coercion graph's depth).
+        ExpressionPointer currentLeft = eqLeftNorm.term;
+        ExpressionPointer currentRight = eqRightNorm.term;
+        ExpressionPointer currentProof;  // built lazily below
+        for (int hopCount = 0; hopCount < 3; ++hopCount) {
+            auto* leftApp = std::get_if<Application>(&currentLeft->node);
+            auto* rightApp =
+                std::get_if<Application>(&currentRight->node);
+            if (!leftApp || !rightApp) break;
+            auto* leftHead =
+                std::get_if<Constant>(&leftApp->function->node);
+            auto* rightHead =
+                std::get_if<Constant>(&rightApp->function->node);
+            if (!leftHead || !rightHead
+                || leftHead->name != rightHead->name
+                || !isCoercionFunctionName(leftHead->name)) {
+                break;
+            }
+            std::string injectiveName = leftHead->name + ".injective";
+            if (environment_.lookup(injectiveName) == nullptr) break;
+            ExpressionPointer loweredLeft = leftApp->argument;
+            ExpressionPointer loweredRight = rightApp->argument;
+            if (!currentProof) currentProof = hypothesisAtNorm();
+            currentProof = makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant(injectiveName),
+                                    loweredLeft),
+                    loweredRight),
+                currentProof);
+            currentLeft = loweredLeft;
+            currentRight = loweredRight;
+            ExpressionPointer loweredCarrier;
+            LevelPointer loweredLevel;
+            try {
+                loweredCarrier = inferTypeInLocalContext(
+                    localBinders, currentLeft);
+                loweredLevel = typeUniverseOf(localBinders, currentLeft);
+            } catch (const ElaborateError&) {
+                break;
+            } catch (const TypeError&) {
+                break;
+            }
+            if (structurallyEqual(currentLeft, subLeftNorm.term)
+                && structurallyEqual(currentRight,
+                                     subRightNorm.term)) {
+                return wrapSubNormalization(currentProof);
+            }
+            if (structurallyEqual(currentRight, subLeftNorm.term)
+                && structurallyEqual(currentLeft, subRightNorm.term)) {
+                return wrapSubNormalization(buildEqualitySymmetry(
+                    loweredLevel, loweredCarrier, currentLeft,
+                    currentRight, currentProof));
+            }
+        }
     }
     return nullptr;
+}
+
+// Does `term` mention any registered coercion function? Cheap
+// syntactic pre-filter shared by the cast tactics.
+bool Elaborator::containsCoercionConstant(ExpressionPointer term) const {
+    if (!term) return false;
+    if (auto* constant = std::get_if<Constant>(&term->node)) {
+        return isCoercionFunctionName(constant->name);
+    }
+    if (auto* application = std::get_if<Application>(&term->node)) {
+        return containsCoercionConstant(application->function)
+            || containsCoercionConstant(application->argument);
+    }
+    if (auto* pi = std::get_if<Pi>(&term->node)) {
+        return containsCoercionConstant(pi->domain)
+            || containsCoercionConstant(pi->codomain);
+    }
+    if (auto* lambda = std::get_if<Lambda>(&term->node)) {
+        return containsCoercionConstant(lambda->domain)
+            || containsCoercionConstant(lambda->body);
+    }
+    if (auto* let = std::get_if<Let>(&term->node)) {
+        return containsCoercionConstant(let->type)
+            || containsCoercionConstant(let->value)
+            || containsCoercionConstant(let->body);
+    }
+    return false;
 }
