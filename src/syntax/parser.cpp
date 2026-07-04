@@ -486,6 +486,15 @@ SurfaceExpressionPointer substituteSurfaceName(
                                   decide->noBinderName, std::move(newNoBody),
                                   line, column);
     }
+    if (auto* blockTail = std::get_if<SurfaceBlockTail>(&node.node)) {
+        // The dual-reading final expression of a block — recurse into the
+        // wrapped expression so a `set`-bound name inside a block's last
+        // piece is substituted like any other subterm.
+        return makeSurfaceBlockTail(
+            substituteSurfaceName(blockTail->expression,
+                                   targetName, replacement),
+            line, column);
+    }
     // Unhandled node kind: be conservative and return unchanged. If we
     // ever add a new SurfaceExpression variant, the `set` substitution
     // will silently skip it — surfaced by the test suite if it bites.
@@ -1077,7 +1086,8 @@ private:
                     /*label=*/"", /*byHint=*/parseExpression(),
                     /*byCases=*/false, {}, byToken.line, byToken.column);
             } else {
-                declaration.body = parseExpression();
+                declaration.body = parseBodyExpressionOrStatement(
+                    /*allowClaimTail=*/true);
             }
         } else if (peek().kind == TokenKind::Pipe) {
             while (peek().kind == TokenKind::Pipe) {
@@ -1320,6 +1330,120 @@ private:
         return result;
     }
 
+    // D2: parse the body of a definition/theorem (`:=`), or of a lambda /
+    // cases arm (`↦`, `=>`). A body that is a single statement-shaped item
+    // means the same as `{ <that statement>; }` — the statement establishes
+    // a fact and the block's implicit auto-close proves the goal from it.
+    // Two shapes are statement-shaped and are NOT ordinary expressions:
+    //   * a ≥2-step relation chain (`a = b = c`, mixed relations, per-step
+    //     `by`) — a bare `calc` chain, which the plain expression parser
+    //     rejects (equality/relations are non-associative there);
+    //   * an expression carrying a `by <hint>` / `as <name>` tail
+    //     (`P by V`, `P by V as N`, `P as N`) — a claim.
+    // Every OTHER body (bare expressions, `:= calc …`, propositions,
+    // lambdas, tuples, `:= by <lemma>`) parses as an ordinary expression and
+    // keeps today's meaning byte for byte. Multi-statement bodies still use
+    // braces; only ONE statement is accepted here.
+    //
+    // `allowClaimTail` gates the `by <hint>` / `as <name>` claim shape. It
+    // is ON only for a `:=` definition/theorem body, whose terminator is
+    // always a new top-level declaration — so a trailing `by`/`as` can only
+    // be the body's own claim tail. It is OFF for lambda (`↦`) and cases-arm
+    // (`=>`) bodies, where a `by`/`as` after the body binds to the ENCLOSING
+    // statement instead (e.g. `P by (x) ↦ {…} as N` — the `as N` names the
+    // claim, not the lambda body); greedily consuming it there misparses.
+    // The chain shape is unambiguous either way (it fails the ordinary parse
+    // and consumes no trailing `by`/`as`), so it is always detected.
+    SurfaceExpressionPointer parseBodyExpressionOrStatement(
+        bool allowClaimTail = false) {
+        Token statementStart = peek();
+        size_t savedPosition = position_;
+        int savedAnonymousClaimCounter = anonymousClaimCounter_;
+        // (a) Relation-chain probe FIRST. A ≥2-step chain is statement-
+        // shaped and the expression parser can't represent it (relations
+        // are non-associative there); it must be detected before the claim
+        // tail, so a per-step `by` (`a = b by h = c by h`) is read as a
+        // chain, not a `P by …` claim on its first step. Speculatively
+        // parse a chain, commit only on ≥2 steps, then rewind.
+        {
+            bool isChain = false;
+            try {
+                SurfaceExpressionPointer probeCalc =
+                    parseCalc(/*consumeCalcKeyword=*/false);
+                auto* calcNode =
+                    std::get_if<SurfaceCalc>(&probeCalc->node);
+                isChain = calcNode && calcNode->steps.size() >= 2;
+            } catch (const ParseError&) {
+                isChain = false;
+            }
+            position_ = savedPosition;
+            anonymousClaimCounter_ = savedAnonymousClaimCounter;
+            if (isChain) {
+                SurfaceExpressionPointer calcExpression =
+                    parseCalc(/*consumeCalcKeyword=*/false);
+                // `{ <chain>; }` — bind the chain's fact under an anonymous
+                // (type-inferred) let, then auto-close the goal from it.
+                SurfaceExpressionPointer autoClose =
+                    makeSurfaceStructuredClaim(
+                        makeSurfaceGoal(statementStart.line,
+                                        statementStart.column),
+                        /*label=*/"", /*byHint=*/nullptr,
+                        /*byCases=*/false, {}, statementStart.line,
+                        statementStart.column);
+                std::string calcName = "_calc_"
+                    + std::to_string(statementStart.line) + "_"
+                    + std::to_string(statementStart.column);
+                return makeSurfaceLet(
+                    std::move(calcName), /*type=*/nullptr,
+                    std::move(calcExpression), std::move(autoClose),
+                    statementStart.line, statementStart.column);
+            }
+        }
+        // (b) Ordinary expression body — today's meaning, byte for byte.
+        // A malformed body's parse error surfaces here directly.
+        SurfaceExpressionPointer expression = parseExpression();
+        bool hasByForm =
+            allowClaimTail && peek().kind == TokenKind::KeywordBy;
+        bool hasAsForm =
+            allowClaimTail && peek().kind == TokenKind::KeywordAs;
+        if (!hasByForm && !hasAsForm) {
+            return expression;
+        }
+        // `P by <hint>` / `P by <hint> as N` / `P as N` — desugar to
+        // `{ <statement>; }`: a let binding the stated fact, then the
+        // implicit auto-close proving the goal from it. Mirrors the block
+        // statement loop's bare-statement branch exactly.
+        SurfaceExpressionPointer claimValue;
+        if (hasByForm) {
+            claimValue = parseStructuredClaimTail(statementStart, expression);
+        } else {
+            claimValue = makeSurfaceStructuredClaim(
+                expression, /*label=*/"", /*byHint=*/nullptr,
+                /*byCases=*/false, {}, statementStart.line,
+                statementStart.column);
+        }
+        std::string bindingName;
+        if (peek().kind == TokenKind::KeywordAs) {
+            consumeAny();  // 'as'
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected name after 'as'");
+            }
+            bindingName = consumeAny().lexeme;
+        }
+        std::string letName = bindingName.empty()
+            ? "_claim_anon_" + std::to_string(statementStart.line) + "_"
+                  + std::to_string(statementStart.column)
+            : bindingName;
+        SurfaceExpressionPointer autoClose = makeSurfaceStructuredClaim(
+            makeSurfaceGoal(statementStart.line, statementStart.column),
+            /*label=*/"", /*byHint=*/nullptr, /*byCases=*/false, {},
+            statementStart.line, statementStart.column);
+        return makeSurfaceLet(
+            std::move(letName), /*type=*/expression,
+            std::move(claimValue), std::move(autoClose),
+            statementStart.line, statementStart.column);
+    }
+
     // Parses the inside of a block (without the surrounding `{ … }`).
     // Used both by parseBlockBody and recursively by the `suffices`
     // continuation.
@@ -1528,7 +1652,17 @@ private:
                     }
                 }
                 if (!isStatement) {
-                    parsedFinalExpression = std::move(expression);
+                    // A1/D1 dual-reading tail: this bare expression (no
+                    // by/as tail, not a chain — those already became
+                    // statements above) is the block's last piece (`E}` or
+                    // `E;}`). Wrap it so the elaborator can resolve its
+                    // reading once the expected type is known: a Proposition
+                    // goal reads it as the statement `E;` + implicit
+                    // auto-close (final fact bridged keyword-free), data
+                    // leaves it a plain value.
+                    parsedFinalExpression = makeSurfaceBlockTail(
+                        std::move(expression),
+                        statementStart.line, statementStart.column);
                     break;
                 }
                 BlockWrapper wrapper;
@@ -1698,10 +1832,16 @@ private:
             //              Restore position and let the existing break
             //              + parseExpression flow handle it (so
             //              parseStructuredClaimSequence keeps working).
-            if ((peek().kind == TokenKind::KeywordClaim
-                 && !looksLikeLegacyClaim())
-                || peek().kind == TokenKind::KeywordDone
-                || peek().kind == TokenKind::KeywordOkay) {
+            // Only `claim` reaches here: `done` / `okay` are excluded from
+            // the statement loop's entry guard above, so they can never
+            // enter this branch. (The old code also listed `KeywordDone` /
+            // `KeywordOkay` here — a dead path: a `done by X` before `}`
+            // would have passed the `claimNode->proposition` non-null check
+            // below with the goal-sentinel proposition and been mis-wrapped
+            // into a de-Bruijn-broken binding. Deleted, not fixed — it is
+            // unreachable.)
+            if (peek().kind == TokenKind::KeywordClaim
+                && !looksLikeLegacyClaim()) {
                 Token claimToken = peek();
                 size_t savedPosition = position_;
                 int savedAnonymousClaimCounter = anonymousClaimCounter_;
@@ -2648,7 +2788,7 @@ private:
             patternCase.patterns.push_back(parsePattern());
         }
         expect(TokenKind::FatArrow, "between pattern and body");
-        patternCase.body = parseExpression();
+        patternCase.body = parseBodyExpressionOrStatement();
         return patternCase;
     }
 
@@ -2838,7 +2978,7 @@ private:
             throwHere("expected at least one binder before '↦'");
         }
         expect(TokenKind::MapsTo, "after binders in lambda");
-        auto body = parseExpression();
+        auto body = parseBodyExpressionOrStatement();
         for (auto iterator = binders.rbegin(); iterator != binders.rend();
              ++iterator) {
             body = makeSurfaceLambda(std::move(*iterator), std::move(body),
@@ -3975,7 +4115,7 @@ private:
                 clause.pattern = parsePattern();
                 expect(TokenKind::FatArrow,
                        "between cases pattern and body");
-                clause.body = parseExpression();
+                clause.body = parseBodyExpressionOrStatement();
             } else {
                 if (sawPipeForm) {
                     throwHere("can't mix 'case' clauses and '|' clauses "
@@ -4074,7 +4214,7 @@ private:
                        caseFollowedBy == TokenKind::Colon
                            ? "between case pattern and body"
                            : "between case pattern and body");
-                clause.body = parseExpression();
+                clause.body = parseBodyExpressionOrStatement();
                 if (peek().kind == TokenKind::Semicolon) {
                     consumeAny();
                 }

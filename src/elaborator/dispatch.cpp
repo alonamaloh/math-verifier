@@ -2146,7 +2146,66 @@ ExpressionPointer Elaborator::elaborateExpression(
                 *eventuallyScope, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (auto* blockTail =
+                std::get_if<SurfaceBlockTail>(&expression.node)) {
+            return elaborateBlockTail(
+                *blockTail, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
+    }
+
+ExpressionPointer Elaborator::elaborateBlockTail(
+        const SurfaceBlockTail& blockTail,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        // Data (or no expected type): the tail is a plain value — the
+        // pre-A1 final-expression meaning, byte for byte.
+        if (!expectedType || !termIsProposition(localBinders, expectedType)) {
+            return elaborateExpression(
+                *blockTail.expression, localBinders, expectedType);
+        }
+        // Proposition goal. Try the direct-proof reading first: `E`
+        // elaborated AT the goal type is exactly the pre-A1 meaning and
+        // keeps every proof that works today (proof terms, anonymous
+        // tuples, coercion towers, implicit-argument resolution) working
+        // unchanged. Speculative elaboration is state-safe (Frame /
+        // GoalScope are RAII, cf. coerceToExpectedTypeViaDiff). Accept it
+        // only when it actually PROVES the goal: a bare fact that is not the
+        // goal (`a ≤ c` under goal `a ≤ c + 0`) elaborates to the
+        // Proposition itself without throwing, so a plain success check
+        // would wrongly bind the proposition as the block's value.
+        try {
+            ExpressionPointer direct = elaborateExpression(
+                *blockTail.expression, localBinders, expectedType);
+            if (bridgedResultProvesGoal(direct, expectedType, localBinders)) {
+                return direct;
+            }
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        // The direct reading failed: read `E` as the block's final
+        // statement `E;` and let the implicit auto-close bridge its fact to
+        // the goal — the keyword-free spelling of `claim E; done`. Mirrors
+        // the parser's statement wrapper (a TypedLet whose type and value
+        // are the stated fact) plus the auto-close `claim goal` it appends
+        // for a statement-only block. The `_claim_anon_` prefix suppresses
+        // the unused-name warning (the auto-close consumes the fact by
+        // type-match, never by name).
+        SurfaceExpressionPointer statedFact = makeSurfaceStructuredClaim(
+            blockTail.expression, /*label=*/"", /*byHint=*/nullptr,
+            /*byCases=*/false, /*arms=*/{}, line, column);
+        SurfaceExpressionPointer autoClose = makeSurfaceStructuredClaim(
+            makeSurfaceGoal(line, column), /*label=*/"", /*byHint=*/nullptr,
+            /*byCases=*/false, /*arms=*/{}, line, column);
+        std::string anonymousName = "_claim_anon_" + std::to_string(line)
+            + "_" + std::to_string(column);
+        SurfaceExpressionPointer desugared = makeSurfaceLet(
+            std::move(anonymousName), /*type=*/blockTail.expression,
+            /*value=*/std::move(statedFact), /*body=*/std::move(autoClose),
+            line, column);
+        return elaborateExpression(*desugared, localBinders, expectedType);
     }
 
 

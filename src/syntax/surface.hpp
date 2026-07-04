@@ -471,6 +471,20 @@ struct SurfaceGiven {
 // (used in a position with no propagating expected type).
 struct SurfaceGoal {};
 
+// The final bare expression of a `{ … }` block (`E}` or `E;}`) when it is
+// a plain expression with no by/as tail and is not a relation chain — the
+// dual-reading tail. Its meaning is resolved at ELABORATION time, once the
+// expected type is known: if the block's goal is a Proposition, the tail is
+// read as the statement `E;` followed by the block's implicit auto-close
+// (so a final fact that is not literally the goal — a representative-level
+// equation bridged by auto-close — proves the goal keyword-free), with the
+// direct-proof reading tried first so today's proof-term / tuple / coercion
+// tails keep their exact meaning; if the goal is data (or there is no
+// expected type), the tail is a plain data value, byte-for-byte unchanged.
+struct SurfaceBlockTail {
+    SurfaceExpressionPointer expression;
+};
+
 // `?` — placeholder for an argument the elaborator should infer.
 // At a function call `f(?, b, c)`, asks the elaborator to fill in
 // the first argument by unification against the goal type, against
@@ -608,7 +622,8 @@ struct SurfaceExpression {
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceEventuallyScope,
         SurfaceGoal, SurfaceUnfold,
-        SurfaceDecide, SurfaceNote, SurfaceHole, SurfaceCiteInferred
+        SurfaceDecide, SurfaceNote, SurfaceHole, SurfaceCiteInferred,
+        SurfaceBlockTail
     > node;
     int line = 0;
     int column = 0;
@@ -851,6 +866,11 @@ inline SurfaceExpressionPointer makeSurfaceUnfold(
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceUnfold{std::move(names), std::move(body)},
         line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceBlockTail(
+    SurfaceExpressionPointer expression, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceBlockTail{std::move(expression)}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     SurfaceExpressionPointer proposition,

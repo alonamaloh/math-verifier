@@ -1813,6 +1813,16 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                        outerBinderCount),
                 node.line, node.column);
         }
+        if (auto* blockTail = std::get_if<SurfaceBlockTail>(&node.node)) {
+            // A recursive self-call sitting in the block's final
+            // expression must be rewritten too, or it survives to the
+            // kernel as "undefined constant: <thisDeclName>".
+            return makeSurfaceBlockTail(
+                rewriteRecursiveCalls(blockTail->expression, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
         // Atomic forms (identifier, numeric literal, Type, Proposition,
         // sorry, ring, goal, hole, cite-inferred) carry no rewritable
         // sub-expressions and are unchanged. NOTE if you add a surface

@@ -1383,6 +1383,18 @@ private:
         ExpressionPointer expectedType,
         int line, int /*column*/);
 
+    // The dual-reading final expression of a block (`E}` / `E;}`). Under a
+    // Proposition goal it reads `E` first as a direct proof of the goal
+    // (today's meaning for proof-term / tuple / coercion tails); if that
+    // fails, as the statement `E;` whose fact the block's implicit
+    // auto-close bridges to the goal. Under a data (or absent) expected
+    // type it is `E` as a plain value, byte-for-byte unchanged.
+    ExpressionPointer elaborateBlockTail(
+        const SurfaceBlockTail& blockTail,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
     // Walks the Pi chain of `hintType`, unifies the conclusion with
     // `goalClosed`, fills remaining binders from local hypotheses,
     // and returns the resulting application of `hintTerm`. All

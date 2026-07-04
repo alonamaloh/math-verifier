@@ -1,0 +1,93 @@
+-- A1 endgame: statement-shaped claims/calc in EXPRESSION positions —
+-- the block's final piece (D1), the body after `:=` / `↦` / `=>` (D2),
+-- and a brace block as an argument (D3) — all keyword-free.
+module Test.expression_position_statement_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- D1. Dual-reading block tail.
+
+-- A final bare FACT that is NOT the goal: the block's implicit auto-close
+-- bridges it (`a ≤ c` establishes the goal `a ≤ c + 0` since `c + 0 = c`).
+theorem Test.final_fact_bridges (a b c : Natural)
+        (h1 : a ≤ b) (h2 : b ≤ c) : a ≤ c + 0 := {
+  a ≤ c by Natural.LessOrEqual.transitive;
+  a ≤ c
+}
+
+-- A final bare fact that IS the goal, keyword-free.
+theorem Test.final_fact_is_goal (a b : Natural)
+        (h1 : a ≤ b) (h2 : b ≤ a) : a ≤ a := {
+  b ≤ a by h2;
+  a ≤ a
+}
+
+-- A final PROOF TERM states its type (the direct reading).
+theorem Test.final_proof_term (a b : Natural)
+        (h : a + b = b + a) : a + b = b + a := {
+  a + b = a + b;
+  h
+}
+
+-- A data block's final expression is a plain value, untouched.
+definition Test.data_block_tail (n : Natural) : Natural := {
+  let doubled : Natural := n + n;
+  doubled + 1
+}
+
+-- D2. Statement-shaped bodies after `:=`, `↦`, `=>`.
+
+-- `:= <chain>` — a bare relation chain, per-step `by`.
+theorem Test.body_chain (a b c : Natural)
+        (h1 : a = b) (h2 : b = c) : a = c :=
+  a = b by h1
+    = c by h2
+
+-- `:= <chain>`, multi-line and mixed relations.
+theorem Test.body_chain_mixed (a b c : Natural)
+        (h1 : a ≤ b) (h2 : b < c) : a < c + 0 :=
+  a ≤ b by h1
+    < c by h2
+    = c + 0
+
+-- `:= P by V` — a bare claim with a hint.
+theorem Test.body_claim_by (a b : Natural) (h : a = b) : a = b :=
+  a = b by h
+
+-- A bare-proposition body keeps today's coercion meaning (regression).
+theorem Test.body_bare_prop (a b : Natural) (h : a = b) : a = b :=
+  a = b
+
+-- `↦ <chain>` — a lambda whose body is a chain.
+theorem Test.lambda_chain (a b c : Natural)
+        (h1 : a = b) (h2 : b = c) : ∀ (x : Natural). a = c :=
+  (x : Natural) ↦
+    a = b by h1
+      = c by h2
+
+-- `=> <chain>` — a cases arm whose body is a chain.
+theorem Test.arm_chain (a b c : Natural)
+        (h1 : a = b) (h2 : b = c) (pick : Natural) : a = c :=
+  cases pick {
+    | 0 =>
+        a = b by h1
+          = c by h2
+    | 1 + k =>
+        a = b by h1
+          = c by h2
+  }
+
+-- D3. Brace blocks in argument position.
+
+-- A block as a lemma argument.
+theorem Test.block_as_argument (a b : Natural) (h : a = b)
+        (f : a = b → b = a) : b = a :=
+  f({ a = b by h })
+
+-- A block as the `witness … with` proof.
+theorem Test.block_as_witness (a : Natural) : ∃ (x : Natural). x = a :=
+  witness a with { a = a }

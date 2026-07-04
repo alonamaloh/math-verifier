@@ -185,6 +185,14 @@ bool Elaborator::surfaceContainsAutoProverInvocation(
             return decide->noBody
                 && surfaceContainsAutoProverInvocation(*decide->noBody);
         }
+        if (auto* blockTail =
+                std::get_if<SurfaceBlockTail>(&expression.node)) {
+            // Under a Proposition goal a block tail reads as a statement +
+            // implicit auto-close, so it can host an auto-prover call;
+            // conservatively also walk the wrapped expression.
+            return blockTail->expression
+                && surfaceContainsAutoProverInvocation(*blockTail->expression);
+        }
         // Leaves (identifier, numeric literal, sort, type, etc.) and
         // any variants not enumerated above can't host an auto-prover
         // call — return false.
@@ -432,6 +440,14 @@ bool Elaborator::surfaceMentionsName(
                 std::get_if<SurfaceUnfold>(&expression.node)) {
             return unfold->body
                 && surfaceMentionsName(*unfold->body, name);
+        }
+        if (auto* blockTail =
+                std::get_if<SurfaceBlockTail>(&expression.node)) {
+            // Recurse into the wrapped final expression so a name used
+            // only there still counts as referenced (preserving the
+            // pre-wrap unused-name accounting for every block).
+            return blockTail->expression
+                && surfaceMentionsName(*blockTail->expression, name);
         }
         // Leaf / specialised nodes (numeric literal, Type,
         // Proposition, hammer, sorry, ring, etc.) don't have
