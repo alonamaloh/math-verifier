@@ -1,5 +1,6 @@
 #include "syntax/parser.hpp"
 
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <utility>
@@ -3768,25 +3769,39 @@ private:
             ifToken.line, ifToken.column);
     }
 
-    // Parses an optional `refining <name>[, <name>]*` clause used by
-    // `cases` and `by induction` to mark in-scope binders whose types
-    // should be refined per arm. Empty vector if the keyword isn't
-    // present.
+    // Parses an optional `generalizing <name>[, <name>]*` clause used
+    // by `cases` and `by induction` — induction loading: the listed
+    // binders are reverted into the motive so the IH quantifies over
+    // them ("induct on a, keeping b, c arbitrary"). Hypotheses that
+    // merely DEPEND on the split variable need no list — auto-
+    // generalize reverts them on every route. The old `refining`
+    // spelling (which conflated the two) is retired; the lexer still
+    // tokenizes it so `kernel rewrite --strip-refining` keeps working.
+    // Empty vector if the word isn't present.
     std::vector<std::string> parseOptionalRefiningList() {
         std::vector<std::string> names;
-        if (peek().kind != TokenKind::KeywordRefining) {
+        if (peek().kind == TokenKind::KeywordRefining) {
+            throw ParseError(
+                "the `refining` clause was retired: hypotheses depending "
+                "on the split variable are generalized automatically; "
+                "for induction loading (an IH quantifying over extra "
+                "binders) write `generalizing b, c, …` (line "
+                + std::to_string(peek().line) + ")");
+        }
+        if (!(peek().kind == TokenKind::Identifier
+              && peek().lexeme == "generalizing")) {
             return names;
         }
-        consumeAny();  // 'refining'
+        consumeAny();  // contextual 'generalizing'
         if (!isIdentifierLike(peek().kind)) {
-            throwHere("expected a binder name after 'refining'");
+            throwHere("expected a binder name after 'generalizing'");
         }
         names.push_back(consumeAny().lexeme);
         while (peek().kind == TokenKind::Comma) {
             consumeAny();
             if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected a binder name after ',' in "
-                          "'refining' list");
+                          "'generalizing' list");
             }
             names.push_back(consumeAny().lexeme);
         }

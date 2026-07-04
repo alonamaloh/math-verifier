@@ -306,20 +306,19 @@ cases x { | IntegerRepresentative.make(a, b) =>
     …use a, b, c, d… } }
 ```
 
-### `cases x refining h1, h2 { … }` — destructure with hypothesis refinement
+### Hypotheses about `x` refine through the destructure automatically
 
-When you've named hypotheses about `x` (e.g. `xPos : 0 < x`), use
-`refining` to thread them through the destructure so the inner body
-sees their refined types. Works on inductive scrutinees AND quotient
-scrutinees, with any number of refining names.
+Hypotheses about `x` (e.g. `xPos : 0 < x`) are threaded through the
+destructure automatically, so the inner body sees their refined types.
+Works on inductive scrutinees AND quotient scrutinees.
 
 ```math
 theorem Rational.multiply_positive_positive
         (x y : Rational) (xPos : 0 < x) (yPos : 0 < y)
         : 0 < x * y :=
-  cases x refining xPos { | RationalRepresentative.make(n_x, d_x, dxNonzero) =>
-    cases y refining yPos { | RationalRepresentative.make(n_y, d_y, dyNonzero) =>
-      …use xPos (now refined to 0 < [n_x/d_x]) … } }
+  cases x { | RationalRepresentative.make(n_x, d_x, dxNonzero) =>
+    cases y { | RationalRepresentative.make(n_y, d_y, dyNonzero) =>
+      …use xPos (seen here as 0 < [n_x/d_x]) … } }
 ```
 
 ### `take x as <pattern> : T;` — statement-level intro with destructure

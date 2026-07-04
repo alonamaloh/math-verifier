@@ -157,7 +157,7 @@ To prove an `A ∨ B` goal you don't have to name `Or.introduceLeft` /
   to definitional equality), so it's the right tool when the side needs real
   work the prover wouldn't find:
   ```math
-  cases quotient refining nEqualsDtimesQuotient {
+  cases quotient {
     -- n = d·0 = 0 — the left disjunct.
     | zero => calc n = d * 0 = 0
     -- n = d·(q′+1) = d + d·q′ ≥ d — the right disjunct.
@@ -265,7 +265,8 @@ reach for the math-like form instead:
   calc Sum.left(A, B, recovered)
      = Sum.left(A, B, original)   by valueEquality        -- congruence inferred
   ```
-  Caveat: after a `cases`/`refining` has already reduced the goal, the
+  Caveat: after a `cases` (with its automatic hypothesis refinement) has
+  already reduced the goal, the
   function application in the goal is *already* the reduced constructor
   form, while a freshly-written `f(g(x))` is *stuck* (neutral scrutinee).
   So **start the calc from the reduced form**, not from the original
@@ -325,33 +326,30 @@ reach for the math-like form instead:
   - **Recursion reads as induction.** A pattern-matched proof whose body
     recurses by a positional self-call (`Foo.bar(predecessor, …)`) hides the
     induction in a comment AND counts as a direct call. Write it
-    `by induction on a with IH refining b, c, h { case zero: … case
+    `by induction on a with IH { case zero: … case
     successor(predecessor): … }` instead: the hypothesis is the named local
     `IH`, cited argument-free like any fact (`done by IH`),
     so the recursion both reads as induction and is no longer a lemma call.
-    Example — `Natural.add_cancel_left` (`library/Natural/arithmetic.math`):
+    Hypotheses whose types mention the inducted variable are generalised
+    automatically (the IH then quantifies over them); write
+    `generalizing b, c` only for induction loading — an IH the proof must
+    apply at *different* values of extra binders. Example —
+    `Natural.add_cancel_left` (`library/Natural/arithmetic.math`):
     ```
-    by induction on a with IH refining b, c, equalityHypothesis {
+    by induction on a with IH {
       case zero: equalityHypothesis
       case successor(predecessor): {
-        claim predecessor + b = predecessor + c;   -- strip the successor
+        predecessor + b = predecessor + c;   -- strip the successor
         done by IH
       }
     }
     ```
     This also works for induction on a **derivation** (an indexed inductive
-    `Prop`, e.g. a `≤` proof). Use the constructor names as cases, and
-    `refining <h>` for a hypothesis whose type mentions an index that the
-    induction varies. Example — `LessOrEqual.transitive`:
-    ```
-    by induction on bc with IH refining ab {
-      case LessOrEqual.reflexivity(_): ab                       -- b = c
-      case LessOrEqual.step(_, cPredecessor, _):
-          LessOrEqual.step(a, cPredecessor, IH(ab))             -- one more step
-    }
-    ```
-    The case bodies use the constructor's *destructured* index names, not the
-    outer binders; `IH` (or `IH(<refined-hyp>)`) is the named hypothesis.
+    `Prop`, e.g. a `≤` proof) — use the constructor names as cases; a
+    hypothesis mentioning an index the induction varies is generalised
+    automatically. The case bodies use the constructor's *destructured*
+    index names, not the outer binders; `IH` (or `IH(<generalised-hyp>)`)
+    is the named hypothesis.
   - **Closers.** `done` and `okay` are precisely `claim goal` — a claim
     whose proposition is the `goal` (the expected type). A bare `done`/`okay`
     discharges the goal by lookup; each also takes an optional `by <hint>`.
@@ -648,9 +646,9 @@ Outermost-arm shorthands for case-splits:
 
 - `by induction on n with IH { case zero: … case successor(k): … }` —
   preferred over a pattern-match definition.
-- `by induction on n with IH refining h1, h2 { … }` — also refine
-  the listed in-scope binders' types per case (so hypotheses about
-  `n` get the right shape in each arm).
+- Hypotheses about `n` refine automatically per arm (and the IH
+  quantifies over them); `by induction on n with IH generalizing b { … }`
+  loads the IH over extra binders.
 - `by induction on n using <strongRecursionLemma> { … }` — route
   the recursion through a user-supplied recursion principle.
 - `by strong induction on n with IH { … }` — strong induction on a

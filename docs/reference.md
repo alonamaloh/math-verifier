@@ -91,7 +91,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 by induction on x with IH { case x = 0: … case x = k + 1 for some k: … }
 by induction on x { case x = 0: … case x = k + 1, with IH: … }  -- header-less: arms name their own IH
 by induction on x with IH { case zero: … case successor(k): … } -- constructor-pattern arms
-by induction on x with IH refining h, … { … }      -- generalise h per case
+by induction on x with IH generalizing b, … { … }  -- induction loading: IH quantifies over b (scrutinee-dependent hypotheses generalise automatically)
 by induction on x using R with subject, IH { … }   -- with an explicit recursor
 by strong induction on n with hypothesis IH { … }  -- subject shadows n; IH : (k) → k < n → P(k)
 by strong induction on n with hypothesis IH;       -- statement form: the REST of the block is the body (no braces)
@@ -99,7 +99,6 @@ by strong induction on n with subject, IH { … }    -- explicit subject name (n
 
 cases e { | pat => … }                 -- split an inductive value
 cases e with eq { | pat => … }         -- also bind eq : e = pat
-cases e refining h { | pat => … }      -- generalise scrutinee-dependent h
 cases by L { | C(args) => … }          -- split a lemma's disjunction (args inferred)
 if P then a else b                     -- value-level classical conditional (cases on `Logic.classical_decidable(P)`)
 ```
@@ -156,8 +155,8 @@ End each with `;`; the block returns its final non-`;` expression.
   included); two matching facts is a loud error naming both. `given (P)`
   is the same lookup as a bare term. Inside a `cases x with eq` arm,
   addressing the REFINED statement (`P(successor(k))` when the context
-  holds `P(x)`) transports silently along the case equation — no
-  `refining` needed for single-position shapes.
+  holds `P(x)`) transports silently along the case equation
+  (single-position shapes).
 - `?` — a hole in a function-call argument position, solved by unification
   from the goal/other arguments (does not invoke the auto-prover).
 - `recalling f, g` after a `by` hint — bring extra named facts into

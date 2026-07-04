@@ -6404,6 +6404,99 @@ int rewriteInductionSpelling(const std::vector<std::string>& filenames) {
     return 0;
 }
 
+// `kernel rewrite --strip-refining FILE ...` — the A4 mechanical
+// rewriter deleting `refining name[, name]*` clauses (auto-generalize
+// now covers scrutinee-dependent hypotheses on every induction route;
+// only genuine induction-loading sites keep an explicit list — those
+// files are simply not passed to this tool). Lexer-driven like the
+// other rewrite modes; the byte span runs from the `refining` keyword
+// through the last list token, plus one preceding space when present.
+int rewriteStripRefining(const std::vector<std::string>& filenames) {
+    int totalRewritten = 0;
+    for (const auto& filename : filenames) {
+        std::ifstream input(filename, std::ios::binary);
+        if (!input.is_open()) {
+            std::cerr << "cannot open file: " << filename << "\n";
+            return 1;
+        }
+        std::stringstream buffer;
+        buffer << input.rdbuf();
+        std::string source = buffer.str();
+        input.close();
+
+        std::vector<Token> tokens;
+        try {
+            tokens = lex(source);
+        } catch (const LexError& error) {
+            std::cerr << filename << ": lex error: " << error.what() << "\n";
+            return 1;
+        }
+
+        std::vector<size_t> lineStart = {0, 0};
+        for (size_t i = 0; i < source.size(); ++i) {
+            if (source[i] == '\n') lineStart.push_back(i + 1);
+        }
+        auto tokenOffset = [&](const Token& token) -> size_t {
+            return lineStart[token.line] + (size_t)token.column - 1;
+        };
+
+        struct Span { size_t begin; size_t end; };
+        std::vector<Span> spans;
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            if (tokens[i].kind != TokenKind::KeywordRefining) continue;
+            size_t begin = tokenOffset(tokens[i]);
+            if (source.compare(begin, 8, "refining") != 0) {
+                std::cerr << filename << ":" << tokens[i].line << ":"
+                          << tokens[i].column
+                          << ": internal error: expected 'refining' at "
+                          << "this byte span; file left untouched\n";
+                return 1;
+            }
+            // The list: identifier (, identifier)*.
+            size_t j = i + 1;
+            if (j >= tokens.size()
+                || tokens[j].kind != TokenKind::Identifier) {
+                std::cerr << filename << ":" << tokens[i].line
+                          << ": refining not followed by a name; "
+                          << "file left untouched\n";
+                return 1;
+            }
+            size_t last = j;
+            while (last + 2 < tokens.size()
+                   && tokens[last + 1].kind == TokenKind::Comma
+                   && tokens[last + 2].kind == TokenKind::Identifier) {
+                last += 2;
+            }
+            size_t end = tokenOffset(tokens[last])
+                + tokens[last].lexeme.size();
+            // Swallow one preceding space so `on n with IH refining h {`
+            // becomes `on n with IH {`.
+            if (begin > 0 && source[begin - 1] == ' ') --begin;
+            spans.push_back({begin, end});
+            i = last;
+        }
+        if (spans.empty()) continue;
+
+        for (auto it = spans.rbegin(); it != spans.rend(); ++it) {
+            source.erase(it->begin, it->end - it->begin);
+        }
+
+        std::ofstream output(filename, std::ios::binary | std::ios::trunc);
+        if (!output.is_open()) {
+            std::cerr << "cannot write file: " << filename << "\n";
+            return 1;
+        }
+        output << source;
+        output.close();
+        std::cout << filename << ": " << spans.size()
+                  << " refining clauses stripped\n";
+        totalRewritten += (int)spans.size();
+    }
+    std::cout << "total: " << totalRewritten
+              << " refining clauses stripped\n";
+    return 0;
+}
+
 int verifyFiles(const std::vector<std::string>& filenames) {
     Environment environment;
     std::vector<std::string> importedModules;
@@ -7176,8 +7269,16 @@ static int kernelMain(int argc, char* argv[]) {
             }
             return rewriteInductionSpelling(filenames);
         }
+        if (mode == "--strip-refining") {
+            if (filenames.empty()) {
+                std::cerr << "rewrite: no input files\n";
+                return 1;
+            }
+            return rewriteStripRefining(filenames);
+        }
         std::cerr << "rewrite: unknown mode " << mode
-                  << " (expected --induction-spelling)\n";
+                  << " (expected --induction-spelling or "
+                  << "--strip-refining)\n";
         return 1;
     }
     if (argc >= 3 && std::string(argv[1]) == "deps") {

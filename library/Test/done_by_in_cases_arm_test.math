@@ -1,10 +1,11 @@
 -- Regression: `done` / `goal` / `okay` (propositionless closers) must
--- discharge a refining-cases arm exactly like a term arm or `claim P
--- by …` does — even when the arm's goal is headed by a `definition`
--- that the surrounding eliminator motive has already unfolded.
+-- discharge a cases arm (with generalized hypotheses) exactly like a
+-- term arm or `claim P by …` does — even when the arm's goal is headed
+-- by a `definition` that the surrounding eliminator motive has already
+-- unfolded.
 --
 -- The bug: after a `choose` (an `Exists` elimination), the goal
--- `Test.splits(d, n)` reaches each refining arm in its UNFOLDED form
+-- `Test.splits(d, n)` reaches each cases arm in its UNFOLDED form
 -- `∃ q. n = d * q`. A propositionless `done by L` took that unfolded
 -- goal verbatim, while the cited lemma `L`'s conclusion stayed FOLDED
 -- (`Test.splits …`), so the conclusion-matcher could not unify the two
@@ -15,7 +16,7 @@
 -- through the resulting predicate lambda. No user-visible quirk: all of
 -- `done` / `goal` / `okay` / `claim` now behave the same here.
 
-module Test.done_by_in_refining_test
+module Test.done_by_in_cases_arm_test
 
 import Logic.basics
 import Logic.exists
@@ -39,11 +40,11 @@ theorem Test.splits_from_equation
 
 -- The regression proper: each arm closes with a propositionless
 -- closer, citing the folded-conclusion lemma against the unfolded goal.
-theorem Test.done_goal_okay_in_refining
+theorem Test.done_goal_okay_in_cases_arm
         (divisor dividend : Natural) (hypothesis : Test.splits(divisor, dividend))
         : Test.splits(divisor, dividend) := {
   choose quotient such that dividend = divisor * quotient as equation from hypothesis;
-  cases quotient refining equation {
+  cases quotient {
     | zero                    => done by Test.splits_from_equation
     | successor(predecessor)  => done by Test.splits_from_equation
   }

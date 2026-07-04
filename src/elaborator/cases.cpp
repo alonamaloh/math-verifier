@@ -1008,6 +1008,21 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                         cases, cases.refiningNames, localBinders,
                         expectedType, line, column);
                 }
+                // Auto-generalize, mirroring the recursor path below: a
+                // hypothesis depending on the scrutinee is reverted into
+                // the motive automatically (the IH then quantifies over
+                // it), so plain `by induction` covers what previously
+                // needed an explicit `refining` list.
+                if (expectedType) {
+                    std::vector<std::string> autoRefine =
+                        scrutineeDependentBinders(cases.scrutinee,
+                                                  localBinders);
+                    if (!autoRefine.empty()) {
+                        return elaborateByInductionOnePlusReverted(
+                            cases, autoRefine, localBinders,
+                            expectedType, line, column);
+                    }
+                }
                 return elaborateByInductionOnePlus(
                     cases, localBinders, expectedType, line, column);
             }

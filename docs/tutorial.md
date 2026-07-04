@@ -258,9 +258,12 @@ from it.
 Here `IH` has type `k + 0 = k`, and `by IH` tells the reader the last
 step rests on it. Two common extensions:
 
-- **`refining h`** — when a hypothesis `h`'s type mentions the variable you
-  are inducting on, list it (`by induction on n with IH refining h { … }`)
-  so it is generalised correctly in each case.
+- **Hypotheses about the inducted variable just work** — a hypothesis
+  whose type mentions the variable is generalised automatically, so each
+  case sees it in the right shape and the IH quantifies over it.
+- **`generalizing b, c`** — induction loading: list extra binders the IH
+  should quantify over (`by induction on a with IH generalizing b { … }`
+  reads "induct on a, keeping b arbitrary").
 - **`by strong induction on n with hypothesis IH;`** — well-founded
   induction, where `IH` covers *every* `k < n`; the rest of the block is
   the induction body.
@@ -280,8 +283,9 @@ Useful variants:
 
 - **`cases e with eq { … }`** also gives you `eq : e = <pattern>` in each
   arm.
-- **`cases e refining h { … }`** generalises a hypothesis `h` whose type
-  mentions the scrutinee `e` (the analogue of `refining` for induction).
+- **Hypotheses about the scrutinee just work** — a hypothesis whose type
+  mentions `e` is generalised automatically, so each arm sees it refined
+  to that arm's constructor form.
 - **`cases by <lemma> { | C(args) => … }`** splits on a disjunction a lemma
   produces, inferring its arguments.
 - **`by cases { case P: … otherwise: … }`** is the classical case-split

@@ -126,7 +126,7 @@ theorem Rational.IsNonneg.numerator_denominator
 pair over `CauchyRationalSequence.IsEventuallyNonneg`. The consumer rule:
 
 - **destruct** — route through `.numerator_denominator` / `.eventually_nonneg`.
-  After `cases x refining h { | rep => … }`, `h : IsNonneg(mk rep)`; feed it to
+  After `cases x { | rep => … }` (h refines automatically), `h : IsNonneg(mk rep)`; feed it to
   the destructor to recover the rep-level fact (`Integer.IsNonneg(n · d)`). Sites
   that *apply* an IsNonneg value as the `∀ε∃N` form use
   `(unfold Real.IsNonneg in h)(…)`.
@@ -140,7 +140,7 @@ pair over `CauchyRationalSequence.IsEventuallyNonneg`. The consumer rule:
   `unfold X in <rep-level proof>`. This is the at-representatives pattern; the
   `unfold` is local to that one helper.
 
-Pure **uses** (transitivity/antisymmetry citations, `cases B refining hyp`
+Pure **uses** (transitivity/antisymmetry citations, `cases B` hypothesis
 pass-throughs, the `claim by cases` linearity splits) operate on the
 `IsNonneg` *arguments* and lemmas, not the unfolded body — they need nothing
 special, since `LessOrEqual`/`LessThan` are transparent and reduce to

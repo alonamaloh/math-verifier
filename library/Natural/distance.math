@@ -235,23 +235,23 @@ theorem Natural.distance_add_triangle (a b c d : Natural)
 -- distance(c, d)`. Load-bearing for Integer.absolute_value's lift.
 --
 -- Induction on `a`, then case-split on `b` in the successor case.
--- `refining b, c, d, hypothesis` lifts those binders into the
--- recursor's motive: the IH at the successor step then takes them
--- as arguments (so the inner case-on-b can pass `bPredecessor` for
--- `b`), and the inner cases-refining gets the hypothesis with `b`
--- already specialised per arm.
+-- `generalizing b, c, d, hypothesis` lifts those binders into the
+-- recursor's motive — induction loading: the IH at the successor step
+-- then takes them as arguments (so the inner case-on-b can pass
+-- `bPredecessor` for `b`), and the inner case-split re-specialises
+-- the hypothesis per arm automatically.
 theorem Natural.distance_respects_integer_equivalent
         (a b c d : Natural) (hypothesis : a + d = b + c)
         : Natural.distance(a, b) = Natural.distance(c, d) :=
   unfold Natural.add in
-  by induction on a with IH refining b, c, d, hypothesis {
+  by induction on a with IH generalizing b, c, d, hypothesis {
     case zero:
         -- hypothesis : 0 + d = b + c  (i.e. d = b + c by 0 + d → d).
         calc Natural.distance(0, b)
            = Natural.distance(c, b + c)
            = Natural.distance(c, d)
     case successor(k):
-        cases b refining hypothesis {
+        cases b {
           case zero:
               -- hypothesis : (1+k) + d = c  (0 + c reduces to c).
               -- Walk d off the right of distance((1+k) + d, d), then

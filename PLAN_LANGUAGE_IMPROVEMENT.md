@@ -282,9 +282,8 @@ transports back automatically — ι-reduction works, computed facts
 state bare; deterministic, applies whenever the equation's left side
 is a plain local variable and the goal mentions it; plain `case x = c:` arms FLIPPED too
 (348e6dec) — library fallout was exactly two arms, both of which got
-SIMPLER; referenced-hypothesis substitution remains open (context
-facts still bridge via `by substitution`); zero_or_one_plus added as the automatic
-1+k coverage lemma). coverage-lemma AUTO-GENERATION at
+SIMPLER; zero_or_one_plus added as the automatic
+1+k coverage lemma). **REFERENCED-HYPOTHESIS SUBSTITUTION RESOLVED (2026-07-04): probes show name-citation (`by h`) and bare restatement both already transport inside equation arms (the A2 bridge + prover equality bridge) — nothing was missing there. The real residue was `refining`, and it is RETIRED:** a measured experiment (MATH_IGNORE_REFINING build) showed dropping ALL 84 refining clauses breaks only 7 files — 6 were a machinery gap (the one-plus induction route lacked the recursor route's auto-generalize; FIXED, one dispatch block in cases.cpp mirrors scrutineeDependentBinders→Reverted), and 1 (Natural/distance) is genuine induction LOADING (data binders b, c, d the IH must quantify over — real mathematical content, "keeping b, c, d arbitrary", not case-propagation). So: scrutinee-dependent hypotheses now generalize automatically on EVERY route; the loading speech act is spelled **`generalizing b, c, …`** (contextual word); `refining` throws a migration error (lexer keeps the token for `kernel rewrite --strip-refining`, the sweep tool — 83 clauses / 49 files stripped, distance converted to `generalizing`); unused-name cascade settled (5 choose-`as` names whose only reference was the stripped clause). Docs reteach auto-generalize-as-default + generalizing-as-loading (LANGUAGE/reference/tutorial/proof-style/quotients/opaque); feature pins in auto_generalize_test (one-plus route + generalizing), ErrorTest refining_retired; done_by_in_refining_test renamed done_by_in_cases_arm_test.** coverage-lemma AUTO-GENERATION at
 inductive-declaration time is still open (sketch below now partially
 superseded — parser — after the arm proposition, accept `for some
 <name>[, <name>…]` (names optionally `(k : T)`-annotated), store

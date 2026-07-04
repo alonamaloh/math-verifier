@@ -139,21 +139,23 @@ Adds an equation `refinedEq : <scrutinee> = <constructor pattern>` to
 each arm. Used when the goal mentions the scrutinee in a way the
 constructor reduction alone won't expose.
 
-### `cases x refining h1, h2 { … }` — refine in-scope hypotheses
+### Hypotheses about the scrutinee refine automatically
 
-Lifts the named binders into the recursor's motive so each arm sees
-their types refined by the constructor match. Use when you have
-hypotheses about `x` that need to update their shape per arm.
+A hypothesis whose type mentions the scrutinee is lifted into the
+recursor's motive automatically, so each arm sees it refined by the
+constructor match — no clause needed.
 
 ```math
-cases x refining xPos { | RationalRepresentative.make(n, d) =>
-  -- xPos : 0 < x has been refined to 0 < [(n, d)]
+cases x { | RationalRepresentative.make(n, d) =>
+  -- an in-scope xPos : 0 < x is seen here as 0 < [(n, d)]
   …
 }
 ```
 
-Works on inductive and quotient scrutinees, with any number of
-refining names.
+Works on inductive and quotient scrutinees. For induction *loading* —
+an IH that must quantify over extra binders ("induct on a, keeping b
+arbitrary") — list them explicitly:
+`by induction on a with IH generalizing b, c { … }`.
 
 ### `by induction on n with IH { … }`
 
@@ -162,7 +164,8 @@ The `IH` is in scope in the recursive arm as a hypothesis about `k`.
 Arms may state the constructor form as an equation (`case n = 0:` /
 `case n = k + 1 for some k:`), and the header `with IH` may be dropped
 when each recursive arm names its own hypothesis (`case n = k + 1,
-with IH:`). Refines too: `by induction on n with IH refining h1, h2 { … }`.
+with IH:`). Scrutinee-dependent hypotheses generalise automatically;
+`generalizing b, c` loads the IH over extra binders.
 
 ```math
 theorem Natural.add_zero_right (n : Natural) : n + 0 = n :=
@@ -376,8 +379,8 @@ The motive is recovered by abstracting the scrutinee(s) in the
 expected type. If the goal doesn't mention the scrutinee, the
 constant-motive fallback kicks in. If the motive should have a
 specific shape (e.g. threading hypotheses through `→`), supply it
-explicitly OR use `cases ... refining` and let the elaborator
-construct the chain.
+explicitly, or rely on auto-generalize (`generalizing` for extra
+binders) and let the elaborator construct the chain.
 
 ### Explicit `_` placeholder
 
