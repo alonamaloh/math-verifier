@@ -203,7 +203,22 @@ prove <fact> by cases {
   `by cases`.
 - **`otherwise:`** clause for the complement of the other cases —
   makes exhaustiveness trivially `P ∨ ¬P` and **deletes `decide`
-  entirely**.
+  entirely**. *(Finding, 2026-07-03 night: the deletion needs a
+  re-classification. The 47 library sites split into: 1 value-level
+  (`List.filter`'s definition — stays, it produces data);
+  proof-side WITHOUT scrutinee refinement (the goal doesn't mention
+  the decision term — convert mechanically to `case P: … otherwise:`);
+  and proof-side WITH scrutinee refinement — the goal mentions a
+  `decide`-defined value (`min(a,b) ≤ a`), and the construct's case
+  split ι-reduces the embedded `classical_decidable(P)` term, which a
+  propositional `by cases` split CANNOT do: from `h : P` one cannot
+  rewrite the Type-valued `classical_decidable(P)` to `yes(h)` without
+  proof irrelevance. Those sites need per-function CHARACTERIZING
+  LEMMAS first (`minimum_eq_left_of_le : a ≤ b → min(a,b) = a`, filter
+  unfold lemmas, …) — the same boundary discipline opaque definitions
+  use. Full site-by-site classification table is in the 2026-07-03
+  session transcript; the refinement-free subset is the mechanical
+  batch, the refinement subset is proof-engineering per definition.)*
 - **Structural cases with witness binders:**
   `case n = successor(k) for some k: …`. The elaborator recognizes
   constructor-coverage shapes and emits the recursor. Per-inductive
