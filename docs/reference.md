@@ -92,6 +92,7 @@ by_induction on x with IH { case zero: … case successor(k): … }
 by_induction on x with IH refining h, … { … }      -- generalise h per case
 by_induction on x using R with subject, IH { … }   -- with an explicit recursor
 by_strong_induction on n with hypothesis IH { … }  -- subject shadows n; IH : (k) → k < n → P(k)
+by_strong_induction on n with hypothesis IH;       -- statement form: the REST of the block is the body (no braces)
 by_strong_induction on n with subject, IH { … }    -- explicit subject name (needed when `on` isn't a plain variable)
 
 cases e { | pat => … }                 -- split an inductive value

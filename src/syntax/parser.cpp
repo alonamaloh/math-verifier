@@ -1297,7 +1297,8 @@ private:
             enum Kind { TypedLet, PatternLet, Suppose, Choose, Set,
                         NoteGoal, NoteAssertion, ChangeGoal,
                         SupposeForContradiction,
-                        SupposeForContradictionForward, SupposeToProve };
+                        SupposeForContradictionForward, SupposeToProve,
+                        StrongInduction };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet, Suppose
                                                // (when set on Suppose,
@@ -1382,6 +1383,29 @@ private:
                 && peek().kind != TokenKind::KeywordDone
                 && peek().kind != TokenKind::KeywordOkay) {
                 Token statementStart = peek();
+                // A4 statement-form strong induction:
+                // `by_strong_induction on m with hypothesis ih;` (no
+                // braces) — the rest of the block is the induction
+                // body, exactly like a suppose/take wrapper. The braced
+                // form still parses as an ordinary expression below.
+                if (peek().kind == TokenKind::KeywordByStrongInduction) {
+                    size_t probePosition = position_;
+                    StrongInductionHeader header =
+                        parseByStrongInductionHeader();
+                    if (peek().kind == TokenKind::Semicolon) {
+                        consumeAny();  // ';'
+                        BlockWrapper wrapper;
+                        wrapper.kind = BlockWrapper::StrongInduction;
+                        wrapper.value = std::move(header.scrutinee);
+                        wrapper.name = std::move(header.subjectName);
+                        wrapper.conditionName = std::move(header.ihName);
+                        wrapper.line = header.line;
+                        wrapper.column = header.column;
+                        wrappers.push_back(std::move(wrapper));
+                        continue;
+                    }
+                    position_ = probePosition;  // braced form: reparse
+                }
                 // A1 keyword-free chains: a relation chain at statement
                 // position is a calc with no anchor keyword. Detect it
                 // by a rewound speculative parse of the WHOLE chain: it
@@ -2393,6 +2417,17 @@ private:
                         std::move(iterator->conditionName),
                         std::move(iterator->source),
                         std::move(iterator->additionalNames));
+                    break;
+                }
+                case BlockWrapper::StrongInduction: {
+                    // Statement-form strong induction: the rest of the
+                    // block (already assembled in `result`) is the body.
+                    result = makeSurfaceByStrongInduction(
+                        std::move(iterator->value),
+                        std::move(iterator->name),
+                        std::move(iterator->conditionName),
+                        std::move(result),
+                        iterator->line, iterator->column);
                     break;
                 }
                 case BlockWrapper::Set:
@@ -4409,11 +4444,26 @@ private:
     // `with <subject>, <ih>` form names the subject explicitly — for
     // an `on` expression that isn't a plain variable, or when a
     // distinct subject name genuinely helps.
-    SurfaceExpressionPointer parseByStrongInduction() {
+    struct StrongInductionHeader {
+        SurfaceExpressionPointer scrutinee;
+        std::string subjectName;
+        std::string ihName;
+        int line = 0;
+        int column = 0;
+    };
+
+    // Parses `by_strong_induction on <expr> with hypothesis <ih>` (or the
+    // verbose `with <subject>, <ih>`) up to — but not including — the body.
+    // Shared between the braced expression form and the A4 statement form
+    // (`…;` scoping over the rest of the block).
+    StrongInductionHeader parseByStrongInductionHeader() {
+        StrongInductionHeader header;
         Token byToken = consumeAny();  // 'by_strong_induction'
+        header.line = byToken.line;
+        header.column = byToken.column;
         expect(TokenKind::KeywordOn,
                "after 'by_strong_induction'");
-        SurfaceExpressionPointer scrutinee = parseExpression();
+        header.scrutinee = parseExpression();
         expect(TokenKind::KeywordWith,
                "after 'by_strong_induction on <expr>'");
         if (!isIdentifierLike(peek().kind)) {
@@ -4421,8 +4471,6 @@ private:
                 "expected 'hypothesis <name>' or '<subject>, <ih>' "
                 "after 'with'");
         }
-        std::string subjectName;
-        std::string ihName;
         if (peek().kind == TokenKind::Identifier
             && peek().lexeme == "hypothesis") {
             consumeAny();  // 'hypothesis'
@@ -4431,9 +4479,9 @@ private:
                     "expected the induction hypothesis name after "
                     "'with hypothesis'");
             }
-            ihName = consumeAny().lexeme;
+            header.ihName = consumeAny().lexeme;
             auto* onIdentifier = std::get_if<SurfaceIdentifier>(
-                &scrutinee->node);
+                &header.scrutinee->node);
             if (!onIdentifier
                 || onIdentifier->qualifiedName.find('.')
                        != std::string::npos) {
@@ -4444,9 +4492,9 @@ private:
                     "variable — use 'with <subject>, <ih>' to name "
                     "the subject explicitly");
             }
-            subjectName = onIdentifier->qualifiedName;
+            header.subjectName = onIdentifier->qualifiedName;
         } else {
-            subjectName = consumeAny().lexeme;
+            header.subjectName = consumeAny().lexeme;
             expect(TokenKind::Comma,
                    "between subject name and ih name in "
                    "by_strong_induction");
@@ -4455,19 +4503,24 @@ private:
                     "expected the induction hypothesis name "
                     "after ','");
             }
-            ihName = consumeAny().lexeme;
+            header.ihName = consumeAny().lexeme;
         }
+        return header;
+    }
+
+    SurfaceExpressionPointer parseByStrongInduction() {
+        StrongInductionHeader header = parseByStrongInductionHeader();
         expect(TokenKind::LeftBrace,
                "after the by_strong_induction with-clause");
         SurfaceExpressionPointer body = parseBlockContents();
         expect(TokenKind::RightBrace,
                "ending by_strong_induction block");
         return makeSurfaceByStrongInduction(
-            std::move(scrutinee),
-            std::move(subjectName),
-            std::move(ihName),
+            std::move(header.scrutinee),
+            std::move(header.subjectName),
+            std::move(header.ihName),
             std::move(body),
-            byToken.line, byToken.column);
+            header.line, header.column);
     }
 
     // `witness E with P` — a shorthand for the anonymous tuple
