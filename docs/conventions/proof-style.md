@@ -541,6 +541,7 @@ returns its final non-`;`-terminated expression.
   established fact, wrap the terminal form in a claim:
   `claim hx : X by { suppose Not(X) for contradiction; … };`.
 - `suppose P [as h] for proving Q { … };` — forward implication intro.
+- `take x : T for proving Q { … };` — forward ∀-introduction (same grammar).
   Prove `Q` under the hypothesis `h : P` inside the block, which adds
   `P → Q` to the context (anonymously, for the auto-prover to pick up by
   type) for the rest of the proof. Reads as "suppose `P`; to prove `Q`: …".
