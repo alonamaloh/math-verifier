@@ -50,12 +50,12 @@ linter counts them, and there is always a math-like form:
 
 | Instead of | Write |
 |---|---|
-| `congruenceOf(f, eq)` | a one-step `calc f(a) = f(b)` (diff-inference) |
-| `rewrite(eq, term)` | `claim … by substituting eq` |
-| `Equality.symmetry(eq)` | a reversed by-less `calc` step |
+| `congruenceOf(f, eq)` | a one-step chain `f(a) = f(b)` (diff-inference) |
+| `rewrite(eq, term)` | state the transported proposition bare (`P;` / `P by <fact>;`) |
+| `Equality.symmetry(eq)` | a reversed by-less chain step |
 | `transport_proposition(…)` | `substituting`, or an element-interface lemma |
-| a positional lemma call | `claim … by <lemma>` / `done by <lemma>` |
-| **`claim T by calc …`** | **a bare `calc …;`** (or `calc … as NAME;`) |
+| a positional lemma call | `P by <lemma>` / `done by <lemma>` |
+| **`P by { <chain> }` restating the chain's endpoints** | **the bare chain statement** (add `as NAME` only if referenced) |
 | raw `Subtype.make(…)` | the structure's `construction`/intro form |
 | `⟨pA, pB⟩ : A ∧ B`, `⟨v, p⟩ : ∃…` | see "Connectives aren't tuples" |
 | `Not(a = b)`, `¬(a = b)` | `a ≠ b` (the operator desugars to it) |
@@ -63,15 +63,17 @@ linter counts them, and there is always a math-like form:
 `a ≠ b` is the surface spelling of `Not(a = b)`; prefer it everywhere — in
 hypotheses, claims, and goals — over the raw `¬(…)` / `Not(…)` forms.
 
-**Never write `claim … by calc …` (or `claim NAME : T by calc …`).** This is
-an anti-pattern, with no exceptions. A `calc` at statement position *is*
-already a claim: it binds its `first <relation> last` endpoints into context
-(anonymously, found by type-match), so wrapping it in a `claim` only restates
-what the chain concludes — pure repetition, and the linter counts it as a CIC
-leak (`claim-by-calc`). Write the bare `calc …;`, and add `as NAME` only when a
-later step references the result *by name*. The same goes for the whole-proof
-case: when a `calc` is the entire proof, return it directly (`:= calc …`),
-never `:= { claim goal by calc … }`. Full mechanics: `conventions/calc-and-rewrite.md`.
+**Never restate a chain's endpoints around the chain** (`P by { <chain> }`
+where `P` is just the chain's `first <relation> last`). This is an
+anti-pattern, with no exceptions. A relation chain at statement position *is*
+already a stated fact: it binds its `first <relation> last` endpoints into
+context (anonymously, found by type-match), so wrapping it in a stated
+proposition only restates what the chain concludes — pure repetition, and the
+linter counts it as a CIC leak (`claim-by-calc`). Write the bare chain
+statement, and add `as NAME` only when a later step references the result
+*by name*. The same goes for the whole-proof case: when a chain is the entire
+proof, return it directly (`:= <chain>`), never wrap it in a block that
+restates it. Full mechanics: `conventions/calc-and-rewrite.md`.
 
 ## Connectives aren't tuples
 
@@ -117,10 +119,10 @@ concept. Lead comments with the math; pull kernel/elaborator mechanics into a
 
 ## Closers & names
 
-- Close the goal with `done` / `okay` (≡ `claim goal`); `goal` alone is not
-  a closer.
-- **Name a `claim`/`calc … as` only if you reference the name.** A dead
-  name is noise — drop it (anonymous `claim T;` / `calc …;`); the
+- Close the goal with `done` / `okay` (a bare goal restate); `goal` alone is
+  not a closer.
+- **Name a stated fact (`… as NAME`) only if you reference the name.** A
+  dead name is noise — drop it (anonymous `P;` / bare chain); the
   auto-prover still finds the fact by type. Verify with
   `make … --check-redundant-by` (unused-name + redundant-`by` warnings).
 

@@ -24,18 +24,20 @@ theorem Real.zero_less_one : Real.zero < Real.one :=
   Real.LessThan.from_rational(Rational.zero_less_one)
 ```
 
-**2. A `calc` chain.** For equational/inequalitiy reasoning where each
-intermediate form is named. Reads as a textbook equation chain.
+**2. A relation chain (informally "calc").** For equational/inequalitiy
+reasoning where each intermediate form is named. Reads as a textbook
+equation chain.
 
 ```math
 theorem Integer.subtract_swap (x y : Integer) : x - y = -(y - x) :=
-  calc x - y
+  x - y
      = -(y - x)
 ```
 
-**3. A `{ … }` block.** A sequence of statements (`claim`, `take`,
-`choose`, `let`, `cases`, `by induction`, `calc`, `note`, etc.)
-followed by a final expression. Reads as math prose with paragraphs.
+**3. A `{ … }` block.** A sequence of statements (a bare stated
+proposition, `take`, `choose`, `let`, `cases`, `by induction`, a
+relation chain, `note`, etc.) followed by a final expression. Reads as
+math prose with paragraphs.
 
 ```math
 theorem Integer.triangle_inequality
@@ -48,7 +50,7 @@ theorem Integer.triangle_inequality
 ```
 
 Pick the shape that matches what the math looks like. A two-step
-calculation is a calc. A multi-paragraph argument is a block. A
+calculation is a chain. A multi-paragraph argument is a block. A
 straight cite is a direct term.
 
 ## Names
@@ -62,7 +64,7 @@ straight cite is a direct term.
   declarations that mention `p` get `{p : Natural} {_ : is_prime(p)}`
   prepended implicitly. Useful for whole files about primes.
 
-## Numbers, equality, and the calc kit
+## Numbers, equality, and the relation-chain kit
 
 ### Numeric literals over Peano constructors
 
@@ -84,9 +86,9 @@ cases n {
 And occasionally inside structural-reduction-sensitive proofs (see
 `CLAUDE.md`'s "When `successor(n)` wins anyway").
 
-### `=`, `≤`, `<`, `≥`, `>` in calc chains
+### `=`, `≤`, `<`, `≥`, `>` in relation chains
 
-`calc` accepts all five as step separators. The chain's overall
+A chain accepts all five as step separators. The chain's overall
 relation is the strongest one across steps: any `<` or `>` makes it
 strict, otherwise `≤`/`≥` if present, otherwise `=`. Mixing forward
 (`<`/`≤`) with backward (`>`/`≥`) is rejected; `=` is allowed in
@@ -94,7 +96,7 @@ either direction.
 
 ### `by lemma` in a `=` step infers congruence
 
-If the `by` proof has type `Equality(T, a, b)` and the calc step's two
+If the `by` proof has type `Equality(T, a, b)` and the chain step's two
 endpoints differ in a unique single position at `(a, b)`, the
 elaborator auto-wraps with `Equality.congruence` and you don't have
 to write the motive lambda. The user supplies the equation, the
@@ -102,8 +104,8 @@ elaborator finds the slot. (Same direction or symmetric.)
 
 ### `rewrite(eq)` and `rewrite(eq, term)`
 
-Two forms. **1-arg in calc context**: `by rewrite(L)` for `L : a = b`
-finds the unique structural occurrence of `a` on the calc step's LHS
+Two forms. **1-arg in a chain step**: `by rewrite(L)` for `L : a = b`
+finds the unique structural occurrence of `a` on the chain step's LHS
 and replaces it with `b`. **2-arg term-level**: `rewrite(eq, term)`
 for `eq : a = b` and `term : P(a)` returns a term of type `P(b)`.
 Replaces explicit `Equality.transport_proposition` everywhere outside
@@ -351,25 +353,27 @@ choose m, n such that 1 ≤ m ∧ m = n from solutionExists;
 diff-bridge walker). Use freely for value abbreviations when one
 expression appears 3+ times in a proof.
 
-## Claims — sequence-of-claims style
+## Stating facts — sequence-of-stated-facts style
 
 When a proof has several distinct subgoals, write them as a sequence
-of `claim` lines and assemble the result from the named claims:
+of stated-fact lines and assemble the result from the named facts:
 
 ```math
 {
-  claim epsilonHalvedPositive : 0 < halve(epsilon)
-    by Rational.halve_positive(epsilon, epsilonPositive);
-  claim sumWithinHalf : abs(s(m) - s(n)) < halve(epsilon)
-    by sCauchy(halve(epsilon), epsilonHalvedPositive, m, n, mLarge, nLarge);
+  0 < halve(epsilon)
+    by Rational.halve_positive(epsilon, epsilonPositive)
+    as epsilonHalvedPositive;
+  abs(s(m) - s(n)) < halve(epsilon)
+    by sCauchy(halve(epsilon), epsilonHalvedPositive, m, n, mLarge, nLarge)
+    as sumWithinHalf;
   -- assemble: …
 }
 ```
 
-The structure makes the argument legible. A reader can skim the claims
+The structure makes the argument legible. A reader can skim the facts
 to see the shape before reading the inner proofs.
 
-### `claim P by V, by definition of X[, Y];` — by-definition modifier
+### `P by V, by definition of X[, Y];` — by-definition modifier
 
 Sometimes the cited hint proves a fact whose type only matches the
 stated proposition after a definition is unfolded (typically an opaque
@@ -378,30 +382,29 @@ the hint — under the SAME unfold wrapper `suffices … by definition of X`
 uses (the machinery is reused verbatim, not a second unfolding path):
 
 ```math
--- pointwiseLower(N) proves `B ≤ s(N)`; the claim reads it as `-ε < …`
--- with Real.LessOrEqual unfolded.
+-- pointwiseLower(N) proves `B ≤ s(N)`; the stated fact reads it as
+-- `-ε < …` with Real.LessOrEqual unfolded.
 -ε < s(m) - b(m) by pointwiseLower(N), by definition of Real.LessOrEqual;
 ```
 
 One or more comma-separated definition names may follow `of`. This is
 distinct from the postfix `by V unfolding X`, which makes `X`
 transparent only inside the hint proof, not for the proposition-vs-goal
-match. The modifier attaches to the keyword-free claim form too
-(`P by V, by definition of X;`).
+match.
 
-### Calc as a statement
+### A relation chain as a statement
 
-`calc … as NAME;` and bare `calc …;` at statement position bind the
+`<chain> as NAME;` and bare `<chain>;` at statement position bind the
 chain's result into local scope:
 
 ```math
-calc (aInt * yPrime - qInt * bInt * yPrime)
+(aInt * yPrime - qInt * bInt * yPrime)
    = (aInt - qInt * bInt) * yPrime
    = rInt * yPrime                            as factoredEqualsRYPrime;
 -- factoredEqualsRYPrime is now in scope
 ```
 
-Bare `calc …;` (no `as`) synthesizes an anonymous name and the
+Bare `<chain>;` (no `as`) synthesizes an anonymous name and the
 auto-prover finds the equation by type-match. Use `as NAME` only when
 a later step textually references the name; the lint warns if you
 use `as NAME` and never type NAME afterward.
@@ -459,13 +462,15 @@ lemma's argument types against the supplied (non-`?`) args' types.
 
 ```math
 -- Without `?` — every argument explicit:
-claim oneEqualsTwoPlus : 1 = successor(successor(n))
+1 = successor(successor(n))
   by Natural.successor_injective(1, successor(successor(n)),
-                                  twoEqualsThreePlus);
+                                  twoEqualsThreePlus)
+  as oneEqualsTwoPlus;
 
 -- With `?` — the two Natural args are recoverable from the goal:
-claim oneEqualsTwoPlus : 1 = successor(successor(n))
-  by Natural.successor_injective(?, ?, twoEqualsThreePlus);
+1 = successor(successor(n))
+  by Natural.successor_injective(?, ?, twoEqualsThreePlus)
+  as oneEqualsTwoPlus;
 ```
 
 `?` works wherever:
@@ -508,7 +513,7 @@ search):
 - `instance N` — canonical structure instance (`N : IsGroup(T, …)`),
   bundle (`N : Ring`), or forgetful derivation, keyed by carrier.
 - `congruence_under_binder F := L` — rewrite-under-binder lemma for
-  calc steps whose endpoints differ inside a lambda under head `F`.
+  chain steps whose endpoints differ inside a lambda under head `F`.
 - `fold_operation (sym) on T := W` — register the operation behind
   `sym` on `T` as **fold-capable**, certified by
   `W : IsMonoid(T, operation, identity)`. The elaborator checks the
@@ -598,18 +603,18 @@ and series inequalities are errors.
 
 ## Common mistakes and how to avoid them
 
-### Don't write nested `Equality.transitivity` — write `calc`
+### Don't write nested `Equality.transitivity` — write a relation chain
 
 Nested `transitivity(A, transitivity(B, C))` encodes a chain in a
 right-associated binary tree. A reader has to mentally flatten it.
-Rewrite as a calc:
+Rewrite as a chain:
 
 ```math
 -- Bad:
 Equality.transitivity(eq1, Equality.transitivity(eq2, eq3))
 
 -- Good:
-calc lhs
+lhs
    = mid1   by eq1
    = mid2   by eq2
    = rhs    by eq3
@@ -650,9 +655,9 @@ For "either P or not P" reasoning, prefer `by cases { case P: …
 otherwise: … }` over `cases Logic.excluded_middle(P) {
 | Or.introduceLeft => … | Or.introduceRight => … }`.
 
-### Don't keep a "claim by V" whose name is unused
+### Don't keep a named "stated fact by V" whose name is unused
 
-The elaborator warns: switch to anonymous `claim <type> by V;` (the
+The elaborator warns: switch to anonymous `<type> by V;` (the
 auto-prover finds the equation by type), or to `note <type>;` if it's
 purely for the reader.
 
@@ -690,7 +695,7 @@ harder". The current language has good idioms for most math moves:
   cases-with-equality.
 - "Suppose …" — `suppose <hypothesis> as <name>;`
 - "Note that …" — `note <proposition>;`
-- "Therefore …" — calc chains, claim sequences.
+- "Therefore …" — relation chains, sequences of stated facts.
 
 When the math has a "single move" that translates to bureaucratic
 CIC, look for a sugar that exists. If none exists, **ask whether one

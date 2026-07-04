@@ -10,7 +10,7 @@ The `ring`/`field` tactics, foundational-vs-derived ring lemmas, and `linear_com
 associativity, like-term collection at arbitrary signed integer
 coefficients, total cancellation, unit-multiplication strip, subtract
 sugar, and Integer numeric literals) handles essentially every
-commutative-ring identity you'd write by hand in a calc block. The
+commutative-ring identity you'd write by hand in a relation chain. The
 default for any equality between ring expressions on Natural, Integer,
 Rational, Real, or PAdic is `:= ring` (top-level) or `(ring : LHS =
 RHS)` (as a `rewrite` equation). Reach for explicit `add_commutative`
@@ -33,7 +33,7 @@ real limitation:
 - **`let`-bound values are atoms to `ring`/`field`/`linear_combination`.**
   These normalisers do NOT ζ-unfold a local `let`, so an identity that is
   only true *after* unfolding — `mean * mean - x*y = halfDiff * halfDiff`
-  with `let mean := (x+y)/2` — won't close; write that one claim in the
+  with `let mean := (x+y)/2` — won't close; state that one fact in the
   explicit `((x+y)/2) * …` form. The *matcher* does unfold `let`s, so
   `by <lemma>` and relation steps over a `let` are fine; only the
   algebra normalisers are blind. See `numerals-and-naming.md`.
@@ -104,7 +104,7 @@ specific carrier, either:
   `Ring.zero_multiply(Rational, Rational.add, Rational.zero,
   Rational.negate, Rational.multiply, Rational.one, Rational.is_ring,
   x)` — verbose but mechanical.
-- Just `:= ring` (or in a calc step, a step that needs the lemma).
+- Just `:= ring` (or in a chain step, a step that needs the lemma).
   The `ring` normaliser finds `Ring.<lemma>` plus `<carrier>.is_ring` in scope and
   emits the abstract application internally.
 

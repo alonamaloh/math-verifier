@@ -185,8 +185,8 @@ A parenthesised **proposition** written where a proof is expected — e.g.
 handled identically to a user-supplied proof of that proposition. One
 primitive, three positions:
 
-- **proof position** — `… ≤ b by (x ≤ y)` on a calc step, or `claim P by
-  (<fact>)`. The proof of the cited fact bridges to the goal by the same
+- **proof position** — `… ≤ b by (x ≤ y)` on a chain step, or `P by
+  (<fact>);`. The proof of the cited fact bridges to the goal by the same
   paths as `by <proof>`: definitional match, conclusion-unify, and the
   diff/congruence bridge (so `succ(a) = succ(b)` closes from `by (a =
   b)`). It does **not** chain through a combining lemma or flip by

@@ -46,12 +46,12 @@ expressions (kernel-defeq; pattern positions keep `successor`).
 | `absurd(p)` | from a proof of an impossible/`False` fact, prove anything; `p` may be a **proposition** (proved from context, then contradicted) |
 | `witness w with proof` | prove `∃ x. P(x)` |
 
-## calc
+## Relation chains
 
 ```
-calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
-       ≤ c                  -- '≤'/'∣' step: argument-free `by L`, or by-less
-       < d   by R      as NAME
+a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
+  ≤ c                  -- '≤'/'∣' step: argument-free `by L`, or by-less
+  < d   by R      as NAME
 ```
 - Mixed relations compose (`=`,`≤`,`<`,`≥`,`>`,`∣`).
 - A by-less step is closed by the auto-prover.
@@ -61,31 +61,35 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
   proof, a proposition (`substituting (x = head)` — proved in place), or
   a quantified lemma cited by name (`substituting Natural.add_zero` —
   arguments inferred by matching its conclusion against the goal).
+- The `calc` keyword that used to anchor a chain is **retired** (A1
+  Phase 3): a chain is written bare — at statement position, as a
+  `:=`/arm body, or inside `{ … }` in argument positions. "calc" survives
+  only as the informal name of this construct.
 
 ## Claims & closers
 
 | Form | Meaning |
 |---|---|
-| `claim P;` | assert `P`, auto-proved |
-| `P;` / `P by V;` / `P as NAME;` | **keyword-free claim** (A1): a bare stated proposition (or proof term) at statement position is a claim — verified, then in scope. A block may end by restating the goal. The final expression (`E}` or `E;}`) keeps its ordinary meaning |
-| `claim <proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — claim its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
-| `claim P by V;` | assert `P`, discharged by `V` |
-| `claim P by V, by definition of X[, Y];` | comma-joined **by-definition modifier**: check `P` — and discharge `V` — under the same unfold wrapper `suffices … by definition of X` uses, so a hint whose type only matches after unfolding `X` (`Y`, …) bridges to `P`. (Distinct from postfix `by V unfolding X`, which unfolds only inside the hint proof, not the proposition-vs-goal check.) Also works on the keyword-free form `P by V, by definition of X;` |
-| `claim NAME : P [by V];` | named (reference `NAME` later) |
-| `claim P by cases { case A as h: … case B as h: … }` | prove `P` by ∨-elimination |
+| `P;` / `P by V;` / `P as NAME;` | a bare stated proposition (or proof term) at statement position — verified, then in scope. A block may end by restating the goal. The final expression (`E}` or `E;}`) keeps its ordinary meaning |
+| `<proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — states its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
+| `P by V, by definition of X[, Y];` | comma-joined **by-definition modifier**: check `P` — and discharge `V` — under the same unfold wrapper `suffices … by definition of X` uses, so a hint whose type only matches after unfolding `X` (`Y`, …) bridges to `P`. (Distinct from postfix `by V unfolding X`, which unfolds only inside the hint proof, not the proposition-vs-goal check.) |
+| `P by V as NAME;` | named (reference `NAME` later) |
+| `P by cases { case A as h: … case B as h: … }` | prove `P` by ∨-elimination |
 | `P by cases { case A: … otherwise [as h]: … }` | last-arm `otherwise:` covers the complement `¬(A ∨ …)`; exhaustiveness is excluded middle by construction, never a prover obligation |
 | `case n = k + 1 for some k [as eq]:` | structural case: the arm's hypothesis is `∃ k. n = k + 1`, with the witness `k` and the equation both in scope in the body (`as` names the equation). Witness type inferred from the equation's left side; annotate with `for some (k : T)` otherwise. Exhaustiveness discharges through the coverage lemma (`Natural.zero_or_add_one` / `zero_or_one_plus` are automatic). **Substitution rule**: the arm's goal has `n` substituted by `k + 1` (transported back automatically), so the kernel ι-reduces on the constructor form — state computed facts bare, no `by substitution` plumbing |
 | `case x = f(a, b) for some a, b [as eq]:` | **multiple witnesses**: a comma-separated binder list gives the nested hypothesis `∃ a. ∃ b. x = f(a, b)`; every witness and the equation are in scope in the body. Each un-annotated binder's type is inferred by priority — annotation `(a : T)`, else the constructor telescope of the right side (`f`'s Pi-domain at that argument position), else the equation's left-side type (the carrier). A later binder may be annotated with a type that mentions an earlier witness. Duplicate binder names are a parse error |
-| `claim P by substituting eq;` | prove `P` by rewriting with `eq` |
-| `claim goal [by V]` | close the current goal (type from context) |
-| `done` / `okay` | ≡ `claim goal`; bare or with `by` |
+| `P by substituting eq;` | prove `P` by rewriting with `eq` |
+| `done [by V]` / `okay [by V]` | close the current goal (type from context); bare or with `by` |
 | `theorem X : T := by L` | the whole proof is a citation of `L`; the prover does the logical plumbing (premise discharge, `Or.self` collapse) |
-| `note P [by V];` | a *checked comment*: verify `P` holds, then **discard** it — unlike `claim`, it does NOT bind `P`, so later steps don't see it |
+| `note P [by V];` | a *checked comment*: verify `P` holds, then **discard** it — unlike a stated proposition, it does NOT bind `P`, so later steps don't see it |
 | `note goal : T;` | a checked assertion that the goal is (defeq) `T`; non-binding, goal unchanged |
 | `change T;` | replace the goal by a defeq `T` (this *does* change the proof state) |
 
-`goal` is the *name* of the current goal type (used in `claim goal`,
-`note goal : T`); it is not a standalone proof.
+`goal` is the *name* of the current goal type (used in `done by V`,
+`note goal : T`); it is not a standalone proof. The `claim` keyword that
+used to spell out all of the above (`claim P [by V] [as NAME]`,
+`claim goal [by V]`, `claim NAME : P [by V]`) is **retired** (A1 Phase 3);
+every row above is its bare/`done` replacement.
 
 ## Induction & cases
 

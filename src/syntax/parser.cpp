@@ -1671,22 +1671,32 @@ private:
                 wrappers.push_back(std::move(wrapper));
                 continue;
             }
-            // `calc` at statement position has two shapes:
-            //   - `calc … as NAME;`  (named binding for downstream use)
-            //   - `calc …;`          (anonymous binding; the auto-prover
+            // The `calc` keyword is RETIRED (A1 Phase 3): a relation chain
+            // at statement position is written bare (detected above by the
+            // `pendingBareChain` probe) and reaches this branch with no
+            // anchor keyword at all.
+            if (peek().kind == TokenKind::KeywordCalc) {
+                throw ParseError(
+                    "the `calc` keyword was retired: write the relation "
+                    "chain bare — at statement position, as a `:=`/arm "
+                    "body, or inside `{ … }` in argument positions (line "
+                    + std::to_string(peek().line) + ")");
+            }
+            // A bare chain has two shapes:
+            //   - `<chain> as NAME;`  (named binding for downstream use)
+            //   - `<chain>;`          (anonymous binding; the auto-prover
             //                         still finds it via type-match)
             // Both desugar to a TypedLet wrapper with type recovered
-            // from the calc's endpoints (LHS = final RHS, all-= chain
-            // only — mixed `=`/`≤` calcs must use the explicit
-            // `claim NAME : TYPE by calc …` form). If the calc is
+            // from the chain's endpoints (LHS = final RHS, all-= chain
+            // only — mixed `=`/`≤` chains must use the explicit
+            // `NAME : TYPE by <chain>` form). If the chain is
             // followed by neither `as` nor `;`, treat it as the block's
             // final expression instead.
-            if (peek().kind == TokenKind::KeywordCalc || pendingBareChain) {
-                bool keyworded = (peek().kind == TokenKind::KeywordCalc);
+            if (pendingBareChain) {
                 pendingBareChain = false;
                 Token calcToken = peek();
                 SurfaceExpressionPointer calcExpression =
-                    parseCalc(/*consumeCalcKeyword=*/keyworded);
+                    parseCalc(/*consumeCalcKeyword=*/false);
                 // A calc at statement position is always a binding (named via
                 // `as`, else anonymous); the block's `}` then closes the goal
                 // through the auto-prover, finding the calc's fact by
@@ -1809,87 +1819,20 @@ private:
                 wrappers.push_back(std::move(wrapper));
                 continue;
             }
-            // `claim` has two block-statement shapes:
-            //   - Legacy:    `claim NAME : TYPE [by V];` (typed let-synonym)
-            //   - Structured: `claim …` (any of the new structured-proof
-            //     forms; chained by parseStructuredClaimSequence).
-            // Disambiguate by lookahead — legacy needs `claim NAME :`.
-            // If we're at the structured form, speculatively parse one
-            // structured claim and peek at the next token:
-            //   - `;`  →  mid-block statement. Wrap as an anonymous
-            //              TypedLet so subsequent statements' auto-
-            //              prover finds the proof by hypothesis match.
-            //   - else →  not a statement (no proposition, no `;`,
-            //              or followed by another `claim` for a chain).
-            //              Restore position and let the existing break
-            //              + parseExpression flow handle it (so
-            //              parseStructuredClaimSequence keeps working).
-            // Only `claim` reaches here: `done` / `okay` are excluded from
-            // the statement loop's entry guard above, so they can never
-            // enter this branch. (The old code also listed `KeywordDone` /
-            // `KeywordOkay` here — a dead path: a `done by X` before `}`
-            // would have passed the `claimNode->proposition` non-null check
-            // below with the goal-sentinel proposition and been mis-wrapped
-            // into a de-Bruijn-broken binding. Deleted, not fixed — it is
-            // unreachable.)
-            if (peek().kind == TokenKind::KeywordClaim
-                && !looksLikeLegacyClaim()) {
-                Token claimToken = peek();
-                size_t savedPosition = position_;
-                int savedAnonymousClaimCounter = anonymousClaimCounter_;
-                SurfaceExpressionPointer claimExpression =
-                    parseStructuredClaim();
-                auto* claimNode = std::get_if<SurfaceStructuredClaim>(
-                    &claimExpression->node);
-                // A `, by definition of X` modifier wraps the claim in a
-                // SurfaceUnfold; peek through it so the anonymous-let
-                // still reads the inner claim's proposition (the whole
-                // unfold-wrapped expression stays the bound value).
-                if (!claimNode) {
-                    if (auto* unfold = std::get_if<SurfaceUnfold>(
-                            &claimExpression->node)) {
-                        claimNode = std::get_if<SurfaceStructuredClaim>(
-                            &unfold->body->node);
-                    }
-                }
-                if (claimNode && claimNode->proposition
-                    && (peek().kind == TokenKind::Semicolon
-                        || peek().kind == TokenKind::RightBrace)) {
-                    // `claim P [by …];` mid-block, OR a final `claim P [by …]`
-                    // immediately before `}` (the trailing `;` is optional —
-                    // pure punctuation). Stash the proof under an anonymous
-                    // name so the auto-prover — whether the next statement's or
-                    // the implicit `done` that closes the block — finds it via
-                    // structural hypothesis match.
-                    SurfaceExpressionPointer propositionCopy =
-                        claimNode->proposition;
-                    if (peek().kind == TokenKind::Semicolon) {
-                        consumeAny();  // ';'
-                    }
-                    BlockWrapper wrapper;
-                    wrapper.kind = BlockWrapper::TypedLet;
-                    wrapper.name = "_claim_anon_"
-                        + std::to_string(claimToken.line) + "_"
-                        + std::to_string(claimToken.column);
-                    wrapper.type = std::move(propositionCopy);
-                    wrapper.value = std::move(claimExpression);
-                    wrapper.line = claimToken.line;
-                    wrapper.column = claimToken.column;
-                    wrappers.push_back(std::move(wrapper));
-                    continue;
-                }
-                // Not the statement shape. Rewind and let the normal
-                // break-and-parseExpression path handle it — that path
-                // calls parseStructuredClaimSequence, which is the one
-                // that knows how to chain `claim P` followed by another
-                // `claim` via the implicit anonymous-let.
-                position_ = savedPosition;
-                anonymousClaimCounter_ = savedAnonymousClaimCounter;
-                break;
+            // The `claim` keyword is RETIRED (A1 Phase 3), both of its old
+            // block-statement shapes: the legacy `claim NAME : TYPE [by V];`
+            // typed-let synonym, and the structured `claim P [by V];` form.
+            // The bare-statement fallthrough above already covers both
+            // keyword-free: `P;` / `P by V;` / `P by V as NAME;`, with a
+            // goal restate spelled `done`.
+            if (peek().kind == TokenKind::KeywordClaim) {
+                throw ParseError(
+                    "the `claim` keyword was retired: state the "
+                    "proposition bare — `P;`, `P by V;`, `P as NAME;` "
+                    "(a goal restate is `done`) (line "
+                    + std::to_string(peek().line) + ")");
             }
             Token statementToken = consumeAny();
-            bool isClaim =
-                statementToken.kind == TokenKind::KeywordClaim;
             bool isObtain =
                 statementToken.kind == TokenKind::KeywordObtain;
             bool isSuppose =
@@ -2251,13 +2194,13 @@ private:
                     "(witness lists flatten nested ∃), or destructure "
                     "genuine data with `let ⟨…⟩ := E;` (line "
                     + std::to_string(statementToken.line) + ")");
-            } else if (!isClaim && peek().kind == TokenKind::LeftAngle) {
+            } else if (peek().kind == TokenKind::LeftAngle) {
                 wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();
                 expect(TokenKind::Assign,
                        "after let-pattern in block body");
                 wrapper.value = parseExpression();
-            } else if (!isClaim && isIdentifierLike(peek().kind)
+            } else if (isIdentifierLike(peek().kind)
                        && position_ + 1 < tokens_.size()
                        && tokens_[position_ + 1].kind
                            == TokenKind::ElementOf) {
@@ -2302,49 +2245,19 @@ private:
                 wrapper.kind = BlockWrapper::TypedLet;
                 wrapper.name = nameToken.lexeme;
                 if (peek().kind != TokenKind::Colon) {
-                    throwHere(isClaim
-                        ? "claim requires ': type [by proof]'"
-                        : "typed let in block body requires ': type "
-                          "after the name (use let ⟨…⟩ := … ; for "
-                          "destructuring without a type)");
+                    throwHere("typed let in block body requires ': type "
+                              "after the name (use let ⟨…⟩ := … ; for "
+                              "destructuring without a type)");
                 }
                 consumeAny();  // ':'
                 wrapper.type = parseExpression();
-                if (isClaim) {
-                    if (peek().kind == TokenKind::LeftBrace) {
-                        // Footnote form: `claim P : T { proof_block };` is
-                        // sugar for `claim P : T by { proof_block };`. Build
-                        // the same structured-claim node, with the block as
-                        // the by-hint, so it elaborates identically to the
-                        // anonymous form.
-                        wrapper.value = makeSurfaceStructuredClaim(
-                            wrapper.type, /*label=*/"",
-                            parseExpression(), /*byCases=*/false,
-                            /*arms=*/{}, statementToken.line,
-                            statementToken.column);
-                    } else {
-                        // A named claim is exactly an anonymous claim plus a
-                        // let-binding: parse the `[by …]` tail with the SAME
-                        // routine the anonymous `claim P by …` form uses, so
-                        // the two elaborate identically (autoFillHintForClaim,
-                        // `recalling`, the redundant-`by` check, diff-coerce
-                        // fallback). Handles by cases / substitution /
-                        // induction / EXPR and the no-`by` auto-prover case.
-                        wrapper.value = parseStructuredClaimTail(
-                            statementToken, wrapper.type, wrapper.name);
-                    }
-                } else {
-                    expect(TokenKind::Assign, "after let type");
-                    wrapper.value = parseExpression();
-                }
+                expect(TokenKind::Assign, "after let type");
+                wrapper.value = parseExpression();
             } else {
-                throwHere(isClaim
-                    ? "expected identifier after 'claim'"
-                    : "expected identifier or '⟨' after 'let'");
+                throwHere("expected identifier or '⟨' after 'let'");
             }
             const char* terminator =
-                isClaim  ? "ending claim statement"
-              : isObtain ? "ending obtain statement"
+                isObtain ? "ending obtain statement"
               : isSuppose ? "ending suppose statement"
               : isChoose ? "ending choose statement"
               : isSet    ? "ending set statement"
@@ -3691,23 +3604,26 @@ private:
             return makeSurfaceLinearCombination(std::move(combination),
                                                  tok.line, tok.column);
         }
-        // `claim` at expression position starts a structured proof.
-        // Checked BEFORE isIdentifierLike, because `claim` is a
-        // contextual keyword (and so would otherwise be treated as a
-        // bare identifier). Block-statement `claim NAME : T [by V];`
-        // is parsed earlier via parseBlockContents and never reaches
-        // here, so the two forms don't collide. A claim immediately
-        // followed by another `claim` chains via SurfaceLet so the
-        // proposition of the first is in scope for the rest.
-        if (current.kind == TokenKind::KeywordClaim
-            || current.kind == TokenKind::KeywordDone
+        // The `claim` keyword is RETIRED (A1 Phase 3): a stated
+        // proposition at expression position is written bare (`P`, `P by
+        // V`, `P as NAME`), and a goal restate is `done`. Checked BEFORE
+        // isIdentifierLike, because `claim` is a contextual keyword (and
+        // so would otherwise be treated as a bare identifier).
+        if (current.kind == TokenKind::KeywordClaim) {
+            throw ParseError(
+                "the `claim` keyword was retired: state the "
+                "proposition bare — `P;`, `P by V;`, `P as NAME;` "
+                "(a goal restate is `done`) (line "
+                + std::to_string(current.line) + ")");
+        }
+        if (current.kind == TokenKind::KeywordDone
             || current.kind == TokenKind::KeywordOkay) {
             // `done` and `okay` are bare-`claim` synonyms — math-
             // style closers ("the proof is done here" / Aroca-style
-            // "okay, that proves it"). Both lex distinctly but
-            // dispatch to the same parser path; parseStructuredClaim
-            // detects the alternate spellings and treats them as a
-            // bare claim with no proposition and no `by` hint.
+            // "okay, that proves it"). Both dispatch to the same
+            // parser path; parseStructuredClaim detects the alternate
+            // spellings and treats them as a bare claim with no
+            // proposition and no `by` hint.
             return parseStructuredClaimSequence();
         }
         if (current.kind == TokenKind::KeywordGiven) {
@@ -3746,7 +3662,11 @@ private:
             return parseCasesExpression();
         }
         if (current.kind == TokenKind::KeywordCalc) {
-            return parseCalc();
+            throw ParseError(
+                "the `calc` keyword was retired: write the relation "
+                "chain bare — at statement position, as a `:=`/arm "
+                "body, or inside `{ … }` in argument positions (line "
+                + std::to_string(current.line) + ")");
         }
         if (current.kind == TokenKind::ForAll
             || current.kind == TokenKind::Exists) {
@@ -4429,54 +4349,25 @@ private:
                                 calcToken.line, calcToken.column);
     }
 
-    // One `claim` step. Forms:
-    //   `claim P`                       — prove / introduce P (lookup)
-    //   `claim P by Hint`               — prove P from Hint, args filled
-    //   `claim P by cases { in (A): … in (B): … }`
-    //                                   — prove P by case-split on a
-    //                                     disjunction found in scope
-    //   `claim by Hint`                 — discharge current goal via Hint
-    //   `claim by cases { … }`          — discharge by case-split
-    //   `claim`                         — discharge current goal by lookup
-    //   `done` / `okay`                 — bare-`claim` synonyms (no
-    //                                     proposition, no `by`); read as
-    //                                     "QED" / Aroca-style "okay".
-    // Coexists with block-statement `claim NAME : TYPE [by V];` — that
-    // form is handled by parseBlockContents and never reaches here.
+    // `done` / `okay` — math-style closers, synonyms of `goal`: a claim
+    // whose proposition is the `goal` type-reference (resolved from the
+    // expected type). They take no proposition but DO accept an optional
+    // `by <hint>` tail, so `done by IH` / `okay by add_zero` read as
+    // "…and we're done, by <reason>"; bare they discharge the goal by
+    // lookup. (The `claim` keyword these once abbreviated is RETIRED —
+    // A1 Phase 3 — its statement-shaped forms are all written bare.)
     SurfaceExpressionPointer parseStructuredClaim() {
-        Token claimToken = consumeAny();  // 'claim' / 'done' / 'okay'
-        // `done` and `okay` are math-style closers, synonyms of `goal`:
-        // they take no proposition (it comes from the expected type) but DO
-        // accept an optional `by <hint>` — so `done by IH`
-        // and `okay by add_zero` read as "…and we're done, by <reason>".
-        // A bare `done` / `okay` still means "discharge the goal by lookup".
-        bool isBareCloser =
-            claimToken.kind == TokenKind::KeywordDone
-            || claimToken.kind == TokenKind::KeywordOkay;
-        if (isBareCloser) {
-            // `done` / `okay` are precisely `claim goal`: a claim whose
-            // proposition is the `goal` type-reference (resolved from the
-            // expected type). They accept the same optional `by <hint>` /
-            // `by <hint>` tail, so `done by IH` ≡ `claim goal by IH`.
-            SurfaceExpressionPointer goalProposition =
-                makeSurfaceGoal(claimToken.line, claimToken.column);
-            if (peek().kind == TokenKind::KeywordBy) {
-                return parseStructuredClaimTail(
-                    claimToken, std::move(goalProposition));
-            }
-            return makeSurfaceStructuredClaim(
-                std::move(goalProposition), /*label=*/"",
-                /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
-                claimToken.line, claimToken.column);
+        Token claimToken = consumeAny();  // 'done' / 'okay'
+        SurfaceExpressionPointer goalProposition =
+            makeSurfaceGoal(claimToken.line, claimToken.column);
+        if (peek().kind == TokenKind::KeywordBy) {
+            return parseStructuredClaimTail(
+                claimToken, std::move(goalProposition));
         }
-        SurfaceExpressionPointer proposition;
-        // Bare `claim` / `claim by …` — terminal-shaped, no proposition.
-        if (peek().kind != TokenKind::KeywordBy
-            && !isStructuredClaimTerminator()) {
-            proposition = parseExpression();
-        }
-        return parseStructuredClaimTail(
-            claimToken, std::move(proposition));
+        return makeSurfaceStructuredClaim(
+            std::move(goalProposition), /*label=*/"",
+            /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
+            claimToken.line, claimToken.column);
     }
 
     // Shared "after the keyword + optional proposition" parser. Called
@@ -4747,21 +4638,20 @@ private:
             casesToken.line, casesToken.column);
     }
 
-    // A run of one or more `claim`s. Each non-terminal claim (one that
-    // is followed by another `claim`) is wrapped in a SurfaceLet that
-    // introduces its proof under an auto-generated anonymous binder
-    // name (`_anonymousClaim_<n>`). The final claim becomes the
-    // sequence's value. Anonymous binders are searchable via Step 5's
-    // hypothesis lookup and `given (P)`.
+    // A run of one or more `done`/`okay` closers. Each non-terminal one
+    // (followed by another) is wrapped in a SurfaceLet that introduces
+    // its proof under an auto-generated anonymous binder name
+    // (`_anonymousClaim_<n>`). The final one becomes the sequence's
+    // value. Anonymous binders are searchable via Step 5's hypothesis
+    // lookup and `given (P)`. (The retired `claim` keyword used to be
+    // able to start this chain too; a literal `claim` token reaching
+    // here — e.g. immediately after a `done`/`okay` with no separator —
+    // is left unconsumed so it surfaces the retirement error at its own
+    // parse site instead of being silently absorbed.)
     SurfaceExpressionPointer parseStructuredClaimSequence() {
         SurfaceExpressionPointer first = parseStructuredClaim();
-        // Chain to a following `claim` / `done` / `okay`. The
-        // latter two are bare-`claim` synonyms; they always end the
-        // chain (parseStructuredClaim returns them with no
-        // proposition).
         TokenKind next = peek().kind;
-        if (next != TokenKind::KeywordClaim
-            && next != TokenKind::KeywordDone
+        if (next != TokenKind::KeywordDone
             && next != TokenKind::KeywordOkay) {
             return first;
         }
@@ -4771,8 +4661,8 @@ private:
         const SurfaceStructuredClaim* claim =
             std::get_if<SurfaceStructuredClaim>(&first->node);
         if (!claim || !claim->proposition) {
-            throwHere("a `claim` followed by another `claim` must "
-                      "have an explicit proposition (so it can be "
+            throwHere("a `done`/`okay` followed by another `done`/`okay` "
+                      "must have an explicit proposition (so it can be "
                       "introduced as an anonymous local fact)");
         }
         int firstLine = first->line;
@@ -4787,45 +4677,6 @@ private:
             std::move(first),
             std::move(rest),
             firstLine, firstColumn);
-    }
-
-    // Lookahead for the legacy block-statement `claim NAME : TYPE`
-    // shape. The current token is `claim`; if the next-next sequence
-    // is identifier followed by `:`, this is the legacy form (handled
-    // by parseBlockContents' wrapper loop). Otherwise it's one of the
-    // new structured-proof forms, which the structured-claim parser
-    // handles via parseExpression. Restoring lookahead by saving and
-    // resetting position_ — non-destructive.
-    bool looksLikeLegacyClaim() {
-        if (position_ + 2 >= tokens_.size()) return false;
-        return isIdentifierLike(tokens_[position_ + 1].kind)
-            && tokens_[position_ + 2].kind == TokenKind::Colon;
-    }
-
-    // True if the next token can only end a bare `claim` (no
-    // proposition). Used to decide whether `claim` is bare or
-    // followed by a proposition expression. Covers block / file
-    // boundaries and `in` (which always introduces a sibling arm,
-    // never an expression).
-    bool isStructuredClaimTerminator() {
-        TokenKind k = peek().kind;
-        return k == TokenKind::Semicolon
-            || k == TokenKind::RightBrace
-            || k == TokenKind::EndOfFile
-            || k == TokenKind::KeywordIn
-            || k == TokenKind::KeywordTheorem
-            || k == TokenKind::KeywordDefinition
-            || k == TokenKind::KeywordAxiom
-            || k == TokenKind::KeywordInductive
-            || k == TokenKind::KeywordImport
-            || k == TokenKind::KeywordModule
-            // `|` ends the body of a pattern-match arm — without
-            // this, a bare `claim` as an arm body greedily tries
-            // to parse the next pattern's `|` as a proposition.
-            || k == TokenKind::Pipe
-            // `case` similarly ends the body of a `cases E
-            // { case … : body  case … : body }` arm.
-            || k == TokenKind::KeywordCase;
     }
 
     // `given (P)` — refer to the unique in-scope hypothesis of type P.

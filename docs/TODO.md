@@ -6,9 +6,9 @@ Durable backlog of ideas worth trying. Promote to a real task when picked up.
 
 - **[DONE]** The unused-name check is now **default-ON** (`src/main.cpp`
   `reportUnusedNames = true`; opt out with `--no-check-unused-names`). The
-  whole library was cleaned by hand (anonymize `claim X : T by V` →
-  `claim T by V`, drop `calc … as X`, or `note`/delete truly-dead
-  bindings). `Test/` opts out via a target-specific Makefile flag because
+  whole library was cleaned by hand (anonymize named claims, drop dead
+  `… as X` names, or `note`/delete truly-dead bindings; spellings predate
+  the A1 keyword retirement). `Test/` opts out via a target-specific Makefile flag because
   its fixtures deliberately exercise named/unused claims. Also fixed a
   real check bug along the way: `surfaceMentionsName` didn't descend into
   `linear_combination(...)` arguments, so names used only there were

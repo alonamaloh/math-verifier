@@ -29,10 +29,11 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 - **A comment is an admission of defeat.** The proof should carry the
   reasoning itself: a comment explaining *what* a step does is a signal the
   step wasn't saying enough — push it into the code (`by <named-lemma>`, a
-  named `claim`, a `calc` form) and delete the comment. A one-line *why*
-  comment (a non-obvious strategy) may still earn its place, for now; kernel
-  mechanics stay quarantined as `-- Implementation note:` in the foundational
-  files only. Full rule + the what/why split: `docs/conventions/proof-style.md`.
+  named stated proposition, a relation-chain form) and delete the comment.
+  A one-line *why* comment (a non-obvious strategy) may still earn its
+  place, for now; kernel mechanics stay quarantined as
+  `-- Implementation note:` in the foundational files only. Full rule +
+  the what/why split: `docs/conventions/proof-style.md`.
 - **`ring` / `field` first.** For any commutative-ring identity, the
   default is `:= ring` (or `field(h1, ...)` when reciprocals are
   involved). Reach for hand-written `congruenceOf`/associativity only
@@ -63,10 +64,11 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 - **quotients.md** — `Quotient.mk`/`.sound`/`.lift`/`.induct[_two/_three]`
   short forms, `construction` intro forms, and pattern-binders
   (`by_representatives`, `cases`, `take`, `suppose`) on quotients.
-- **calc-and-rewrite.md** — `calc` with mixed `=`/`≤`/`<`/`≥`/`>`, `calc`
-  over preorders (`∣`/`⊆`), by-less `=` steps via the full prover, `let`
-  abbreviations, `calc ... as NAME`, `claim … by substituting` /
-  `rewrite(eq, term)`, diff-inferred `by`, and rewrite-under-binder.
+- **calc-and-rewrite.md** — the bare relation-chain form with mixed
+  `=`/`≤`/`<`/`≥`/`>`, chains over preorders (`∣`/`⊆`), by-less `=` steps
+  via the full prover, `let` abbreviations, `<chain> as NAME`,
+  `… by substituting` / `rewrite(eq, term)`, diff-inferred `by`, and
+  rewrite-under-binder.
 - **algebra-tactics.md** — `ring`, `field`, `linear_combination`, and the
   foundational-vs-derived ring-lemma split.
 - **proof-style.md** — math-like phrasing; **what an ideal proof looks
@@ -74,9 +76,9 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   `transport_proposition`/raw `Subtype.make`/positional lemma calls —
   read this BEFORE writing proofs); `cases`/`by_induction` over
   pattern-match; `cases ... with`; `decide`; statement-level sugar
-  (`claim`/`goal`/`obtain`/`choose`/`take`/`suppose`/`let`/`note`/
-  `change`/`unfold`); `note … by` (the verified comment; `since` is
-  retired); CIC-noise-reduction idioms; and the **redundancy-check
+  (a bare stated proposition/`goal`/`choose`/`take`/`suppose`/`let`/
+  `note`/`change`/`unfold`); `note … by` (the verified comment; `since`
+  is retired); CIC-noise-reduction idioms; and the **redundancy-check
   polishing workflow** (`--check-redundant-by`… + the unused-name cascade
   and how to settle it).
 - **structures-and-inference.md** — name-bound `convention`s, implicit

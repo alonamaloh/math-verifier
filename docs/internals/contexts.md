@@ -21,7 +21,7 @@ relate.
 2. **Local hypotheses — `localBinders` (`std::vector<LocalBinder>`)**.
    The local proof context: theorem parameters/hypotheses, and every
    binder introduced inside the proof (`λ`, `take`, `suppose`, `let`,
-   `claim`, `calc … as`). Each `LocalBinder` is `{name, type, value,
+   stated propositions, `<chain> as`). Each `LocalBinder` is `{name, type, value,
    valueIsProof}` (`src/elaborator/term_utilities.hpp`).
 
    **It is a flat vector threaded as a parameter, not stored state.**

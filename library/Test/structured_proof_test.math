@@ -1,8 +1,11 @@
--- Structured-proof Step 2: `claim P by Hint` and `claim by Hint`
--- elaborate by auto-filling the hint's arguments. Step 1's parser
--- scaffolding covers all forms, but only the `by`-equipped ones
--- elaborate end-to-end at this point. Bare `claim` / `claim P`
--- (Step 5 lookup) and disjunctive arms (Step 4) are deferred.
+-- Structured-proof Step 2: `P by Hint` and `done by Hint` elaborate by
+-- auto-filling the hint's arguments. Step 1's parser scaffolding covers
+-- all forms, but only the `by`-equipped ones elaborate end-to-end at
+-- this point. Bare `done` / bare `P` (Step 5 lookup) and disjunctive
+-- arms (Step 4) are deferred. (The `claim` keyword these forms once
+-- spelled out is retired — A1 Phase 3 — so every case below is written
+-- keyword-free: a stated proposition is bare, and a goal restate is
+-- `done`.)
 
 module Test.structured_proof_test
 
@@ -33,56 +36,58 @@ theorem ClaimByHintWithHypothesis (p m : Natural)
         : p ≤ m :=
   done by Natural.less_or_equal_predecessor_less_or_equal
 
--- (4) Non-terminal claim with an explicit proposition.
+-- (4) A stated proposition with an explicit `by` hint.
 theorem ClaimWithProposition (n : Natural) : zero ≤ n :=
-  claim zero ≤ n by Natural.zero_least
+  zero ≤ n by Natural.zero_least
 
--- (4b) Step 6: bare terminal `claim by L` — the goal is the theorem's
+-- (4b) Step 6: bare terminal `done by L` — the goal is the theorem's
 -- stated type and the hint discharges it. Same machinery as case (2),
 -- but the proposition is taken from expectedType.
 theorem ClaimTerminalBare (n : Natural) : zero ≤ n :=
   done by Natural.zero_least
 
--- (4c) Step 5: terminal `claim` with neither hint nor proposition.
+-- (4c) Step 5: terminal `done` with neither hint nor proposition.
 -- The elaborator looks up Natural.zero_least in the library by
 -- conclusion spine-hash and applies it.
 theorem ClaimTerminalLookup (n : Natural) : zero ≤ n :=
-  claim
+  done
 
--- (4d) Step 5: terminal `claim P` discharging a direct local
+-- (4d) Step 5: a terminal stated proposition discharging a direct local
 -- hypothesis. No library scan needed — the matching binder is
 -- already in scope.
 theorem ClaimTerminalFromHypothesis (n : Natural)
         (alreadyHave : zero ≤ n) : zero ≤ n :=
-  claim zero ≤ n
+  zero ≤ n
 
--- (4e) Structured claim inside a `{ }` block. The block parser
--- previously eat `claim` as a legacy named statement; with the
--- legacy-shape lookahead, the new form now passes through.
+-- (4e) A terminal `done` inside a `{ }` block, after an intermediate
+-- `let`.
 theorem ClaimInsideBlock (n : Natural) (h : zero ≤ n) : zero ≤ n := {
   let m : Natural := n;
-  claim
+  done
 }
 
--- (4f) `claim by cases` inside a `{ }` block — the harder mix that
--- the Or.eliminate sweep hit. let-bindings introduce intermediate
--- values, then a structured-claim chain handles the case-split.
+-- (4f) `done by cases` inside a `{ }` block — the harder mix that
+-- the Or.eliminate sweep hit. A let-binding introduces an intermediate
+-- value, a bare statement states the disjunction, then `done by cases`
+-- handles the case-split, each arm closing by bare `done` (Step 5
+-- lookup).
 theorem ClaimByCasesInsideBlock (p m : Natural)
         (succP_le_succM : successor(p) ≤ successor(m))
         : p ≤ m := {
   let dummy : Natural := zero;
-  claim (p = m) ∨ (successor(p) ≤ m)
+  (p = m) ∨ (successor(p) ≤ m);
   done by cases {
-    case p = m:              claim
-    case successor(p) ≤ m:   claim
+    case p = m:              done
+    case successor(p) ≤ m:   done
   }
 }
 
--- (5) The motivating example from the design conversation, written
--- in the most stripped-down form: every step is just `claim`. No
--- `function` wrapper, no scrutinee name, no `Or.eliminate` positional
--- call, no explicit lemma citations, no `transport_proposition`
--- plumbing in the left arm. The prover handles everything:
+-- (5) The motivating example from the design conversation, written in
+-- the most stripped-down form: the disjunction is stated as a single
+-- bare fact, and every arm just closes with `done`. No `function`
+-- wrapper, no scrutinee name, no `Or.eliminate` positional call, no
+-- explicit lemma citations, no `transport_proposition` plumbing in the
+-- left arm. The prover handles everything:
 --   - Outer disjunction: Step 5 library scan finds
 --     `Natural.less_or_equal_successor_successor_inversion` by
 --     the Or-headed conclusion shape; Step 2 auto-fills the args
@@ -90,19 +95,20 @@ theorem ClaimByCasesInsideBlock (p m : Natural)
 --   - Step 4 synthesizes `Or.eliminate` from the two `case P: …`
 --     arms, putting each disjunct as an anonymous hypothesis in
 --     scope for its body.
---   - Right arm's `claim`: Step 5 library scan finds
+--   - Right arm's `done`: Step 5 library scan finds
 --     `Natural.less_or_equal_predecessor_less_or_equal`; auto-fill
 --     pulls `succ(p) ≤ m` from the right-arm disjunct hypothesis.
---   - Left arm's `claim`: Step 5's transport bridge fires. With
+--   - Left arm's `done`: Step 5's transport bridge fires. With
 --     `p = m` in scope and goal `p ≤ m`, the prover abstracts `m`
 --     at its single occurrence to get `p ≤ p`, recursively finds
 --     `Natural.LessOrEqual.reflexive(p)`, and wraps the result in
 --     `Equality.transport_proposition`.
 theorem ClaimDisjunctiveArms (p m : Natural)
         (succP_le_succM : successor(p) ≤ successor(m))
-        : p ≤ m :=
-  claim (p = m) ∨ (successor(p) ≤ m)
+        : p ≤ m := {
+  (p = m) ∨ (successor(p) ≤ m);
   done by cases {
-    case p = m:              claim
-    case successor(p) ≤ m:   claim
+    case p = m:              done
+    case successor(p) ≤ m:   done
   }
+}

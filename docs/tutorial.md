@@ -38,7 +38,7 @@ name — `by <lemma>`, with no arguments, letting the system fill them in —
 or if you skip the citation entirely and let the automatic prover find it:
 
 ```
-claim a = b by Natural.successor_injective;
+a = b by Natural.successor_injective;
 ```
 
 Now the line says exactly what is now true (`a = b`) and, parenthetically,
@@ -74,15 +74,15 @@ polynomial and algebra towers, …) the one-liner is the `ring` tactic, with
 `field(h, …)` when you divide. (`Natural` is only a semiring, so there you
 lean on the automatic prover and named lemmas, which we meet next.)
 
-## The automatic prover, and `calc`
+## The automatic prover, and relation chains
 
-Most equational reasoning is a `calc` chain: a sequence of steps, each a
-relation, that compose end to end. Relations may mix — `=` with `≤`, `<`,
-`∣` — as long as they chain:
+Most equational reasoning is a relation chain (informally, a "calc"
+chain): a sequence of steps, each a relation, that compose end to end.
+Relations may mix — `=` with `≤`, `<`, `∣` — as long as they chain:
 
 ```
 theorem Tutorial.chain (a b : Natural) : a + b ≤ b + a + 1 :=
-  calc a + b
+  a + b
      = b + a          -- the automatic prover closes this (commutativity)
      ≤ b + a + 1      -- and this
 ```
@@ -100,7 +100,7 @@ second step is left to the prover:
 ```
 theorem Tutorial.add_successor_commute (a b : Natural)
         : a + successor(b) = successor(b + a) :=
-  calc a + successor(b)
+  a + successor(b)
      = successor(a + b)   by Natural.add_successor
      = successor(b + a)   -- the automatic prover closes this (commutativity)
 ```
@@ -118,16 +118,17 @@ it, and keeping it anyway is a deliberate author's call. (An older
 keyword `since` marked exactly those kept explanations; it has been
 removed from the language.)
 
-## Stating intermediate facts: `claim`
+## Stating intermediate facts
 
-`claim P` asserts `P` and adds it to the context, where the automatic
-prover and later steps can use it. By default the prover discharges it; a
-`by` hint helps when needed:
+A stated proposition `P` at statement position asserts `P` and adds it to
+the context, where the automatic prover and later steps can use it. By
+default the prover discharges it; a `by` hint helps when needed, and
+`as NAME` gives the fact a name for later citation:
 
 ```
 theorem Tutorial.two_divides_six : 2 ∣ 6 := {
   note goal : ∃ (quotient : Natural). 6 = 2 * quotient;   -- this is what `2 ∣ 6` means
-  claim sixIsTwoTimesThree : 6 = 2 * 3;                   -- the prover checks this
+  6 = 2 * 3 as sixIsTwoTimesThree;                        -- the prover checks this
   witness 3 with sixIsTwoTimesThree
 }
 ```
@@ -142,10 +143,11 @@ A few things to read off this example:
   the same, then discards the line: it changes nothing and binds nothing,
   so you could delete it and the proof would still work. Its only job is to
   remind the reader (and you) what must actually be produced.
-- **Name a claim only if you use the name.** Here we reference
-  `sixIsTwoTimesThree` in the `witness`, so it earns a name. If you never
-  refer to it, drop the name — write `claim 6 = 2 * 3;` — and the prover
-  will still find the fact by its type. An unused name is just noise.
+- **Name a stated fact only if you use the name.** Here we reference
+  `sixIsTwoTimesThree` in the `witness`, so it earns a name (`as
+  sixIsTwoTimesThree`). If you never refer to it, drop the name — write
+  `6 = 2 * 3;` — and the prover will still find the fact by its type. An
+  unused name is just noise.
 - `witness w with proof` proves an existential `∃ x. P(x)` by exhibiting
   the witness `w` and a proof of `P(w)`. Here the witness is the quotient
   `3` and the proof is `sixIsTwoTimesThree`. (`d ∣ n` is *defined* as
@@ -155,9 +157,10 @@ A few things to read off this example:
 
 That example is more ceremony than it needs. **Anywhere the system expects
 a *proof*, you may instead write the *proposition* it should prove, and the
-automatic prover is dispatched to establish it.** It is the inline form of
-a bare `claim`: you say *what* must hold, the machine works out *how*. So
-the whole block above collapses to one line:
+automatic prover is dispatched to establish it.** It is the same idea as a
+bare stated proposition at statement position: you say *what* must hold,
+the machine works out *how*. So the whole block above collapses to one
+line:
 
 ```
 theorem Tutorial.two_divides_six : 2 ∣ 6 :=
@@ -177,29 +180,30 @@ Two things to keep in mind:
   different claim. An unrelated proposition fails loudly rather than being
   quietly "corrected".
 - The prover still has to *succeed*. If the fact needs a real argument,
-  you must supply one (a proof term, or a `claim … by <lemma>`). And when a
-  fact is reused or genuinely illuminating, a *named* `claim` reads better
-  than inlining it — the terse form is for the steps that are obvious once
-  stated.
+  you must supply one (a proof term, or `… by <lemma>`). And when a fact
+  is reused or genuinely illuminating, stating it as a *named* fact reads
+  better than inlining it — the terse form is for the steps that are
+  obvious once stated.
 
 ## Closing the goal
 
-To close the current goal, write `done` or `okay`. They are precisely
-`claim goal` — a claim whose statement is "the goal" (the type the context
-expects). Like any claim they take an optional `by`:
+To close the current goal, write `done` or `okay`. They are precisely a
+bare restatement of the goal itself — read as "and this proves the goal"
+(the type the context expects). Like any stated proposition they take an
+optional `by`:
 
 ```
-  claim divisorPositive : 1 ≤ d by Natural.some_lemma;
+  1 ≤ d by Natural.some_lemma as divisorPositive;
   done
 ```
 
 The word `goal` on its own just names the goal's type (handy in
-`claim goal` or in a comment like `note goal : T`); it is not a standalone
+`done by …` or in a comment like `note goal : T`); it is not a standalone
 closer.
 
 ## Using a hypothesis you already have
 
-When a fact is sitting in your context — a parameter, a `claim`, an
+When a fact is sitting in your context — a parameter, a stated fact, an
 induction hypothesis — you do *not* cite it with `by`; you simply let the
 prover use it, or apply it by name if it is a function. Applying a *local*
 hypothesis like `IH(k)` or `notEqual(proof)` is fine and reads well — it is
@@ -310,7 +314,7 @@ To prove `A ∨ B`, get one of the disjuncts into your context and then
 `done` — the prover does the "or-introduction" for you:
 
 ```
-  claim 0 ≤ b by Natural.zero_least;
+  0 ≤ b by Natural.zero_least;
   done                                -- closes the goal `0 ≤ b ∨ …`
 ```
 
@@ -320,14 +324,14 @@ No need to mention `Or.introduceLeft` / `Or.introduceRight`.
 
 Sometimes you want to point something out to the reader without using it.
 `note P;` asks the kernel to *verify* that `P` holds at this point — so the
-comment cannot lie — but, unlike `claim`, it does **not** add `P` to the
-context. It is pure documentation:
+comment cannot lie — but, unlike a stated proposition, it does **not**
+add `P` to the context. It is pure documentation:
 
 ```
   note 1 ≤ successor(k);   -- observed, checked, but not bound
 ```
 
-If a later step needs the fact, use `claim` (which binds), not `note`.
+If a later step needs the fact, state it bare (which binds), not `note`.
 
 ## A worked example
 
@@ -341,7 +345,7 @@ theorem Tutorial.divides_add (d a b : Natural)
   choose q1 such that a = d * q1 from dDividesA;
   choose q2 such that b = d * q2 from dDividesB;
   witness q1 + q2 with
-    calc a + b
+    a + b
        = d * q1 + d * q2       -- using the two equations in context
        = d * (q1 + q2)         -- distributivity
 }

@@ -77,3 +77,41 @@ theorem Test.bare_mixed_chain (a b c : Natural)
   a ≤ b < c = c + 0;
   done
 }
+
+-- A mid-block bare statement followed by a bare FINAL restate (no
+-- explicit `done`): the auto-prover closes the goal by structural
+-- hypothesis match against the earlier statement.
+theorem Test.bare_statement_then_bare_restate
+        (a b : Natural) (aEqB : a = b)
+        : b = a := {
+  a = b;
+  b = a
+}
+
+-- Same shape with an explicit `by` hint on the mid-block statement.
+theorem Test.bare_statement_by_then_bare_restate
+        (a b c : Natural) (aEqB : a = b)
+        : a = b := {
+  a = b by aEqB;
+  a = b
+}
+
+-- A chain of mid-block statements followed by a bare final restate.
+theorem Test.bare_statement_chain_then_bare_restate
+        (a b c : Natural) (aEqB : a = b) (bEqC : b = c)
+        : a = c := {
+  a = b;
+  b = c;
+  a = c
+}
+
+-- Mixed with `suppose`: the suppose binder lands first, then a
+-- mid-block bare statement consumes it, then a bare final restate
+-- closes the goal.
+theorem Test.bare_statement_with_suppose
+        (P Q : Proposition) (impliesPQ : P → Q)
+        : P → Q := {
+  suppose P as hP;
+  Q by impliesPQ(hP);
+  Q
+}

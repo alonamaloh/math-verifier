@@ -1,6 +1,6 @@
 # Proof style and statement-level sugar
 
-Write proofs that read like math: `cases`/`by induction` over pattern-match, `cases … with`, `by cases { case P: … otherwise: … }`, the statement-level sugar (`claim`/`obtain`/`take`/…), and CIC-noise-reduction idioms.
+Write proofs that read like math: `cases`/`by induction` over pattern-match, `cases … with`, `by cases { case P: … otherwise: … }`, the statement-level sugar (a bare stated proposition/`take`/`suppose`/…), and CIC-noise-reduction idioms.
 
 *(Part of the project conventions; see `CLAUDE.md` for the index.)*
 
@@ -148,25 +148,25 @@ Error diagnostic: if the assembled `Decidable_recursor` application doesn't type
 To prove an `A ∨ B` goal you don't have to name `Or.introduceLeft` /
 `Or.introduceRight`. Two by-less options, in preference order:
 
-- **`claim`** — let the auto-prover prove the whole disjunction: it tries
-  `A`, then `B`, from context and wraps the matching constructor. Best when
-  the winning side is *cheap* for the prover (a hypothesis, reflexivity, a
-  short transitivity chain). It will also close sides that need a library
-  search, but that can be slow — don't lean on it for a disjunct that needs
-  a specific cited lemma plus algebra.
+- **Bare `done`** — let the auto-prover prove the whole disjunction: it
+  tries `A`, then `B`, from context and wraps the matching constructor.
+  Best when the winning side is *cheap* for the prover (a hypothesis,
+  reflexivity, a short transitivity chain). It will also close sides that
+  need a library search, but that can be slow — don't lean on it for a
+  disjunct that needs a specific cited lemma plus algebra.
 - **State the side directly** — give a proof whose type *is* one disjunct
-  (a hypothesis, a `calc`, a lemma application) and the **disjunction-
-  injection coercion** wraps the right constructor. This is a targeted,
-  search-free coercion (it matches the proof's type against each disjunct up
-  to definitional equality), so it's the right tool when the side needs real
-  work the prover wouldn't find:
+  (a hypothesis, a relation chain, a lemma application) and the
+  **disjunction-injection coercion** wraps the right constructor. This is
+  a targeted, search-free coercion (it matches the proof's type against
+  each disjunct up to definitional equality), so it's the right tool when
+  the side needs real work the prover wouldn't find:
   ```math
   cases quotient {
     -- n = d·0 = 0 — the left disjunct.
-    | zero => calc n = d * 0 = 0
+    | zero => n = d * 0 = 0
     -- n = d·(q′+1) = d + d·q′ ≥ d — the right disjunct.
     | successor(quotientPredecessor) =>
-        calc d ≤ d + d * quotientPredecessor
+        d ≤ d + d * quotientPredecessor
                   by Natural.less_or_equal_add_right(d, d * quotientPredecessor)
               = d * successor(quotientPredecessor)
               = n
@@ -201,14 +201,14 @@ Concretely:
   proof that explains each step in *named mathematical steps* is better
   than a 10-line proof that requires unwinding three nested
   `Quotient.lift` calls in your head to follow. But the explanation
-  belongs in the proof code — a `calc` chain, named `claim`s, `by`
+  belongs in the proof code — a relation chain, named stated facts, `by`
   citations — not in a comment narrating what the code should already say
   (see the comment maxim below).
 
-- **`calc` is encouraged.** It mirrors how a mathematician writes
-  an equation chain. Use it whenever you can name each intermediate
-  form. Even a two-step calc is usually clearer than the equivalent
-  `Equality.transitivity(...)`.
+- **A relation chain is encouraged.** It mirrors how a mathematician
+  writes an equation chain. Use it whenever you can name each
+  intermediate form. Even a two-step chain is usually clearer than the
+  equivalent `Equality.transitivity(...)`.
 
 - **Bind a repeated long subexpression with `let`.** When the same verbose
   term (`Real.partialSum((j : Natural) ↦ s(m + j), m)`, `(x + y) / 2`) recurs,
@@ -224,12 +224,13 @@ Concretely:
   proof reads like the mathematics on its own; a comment is a signal that a
   step wasn't saying enough. Triage every comment:
   - **A "what" comment is defeat.** `-- b divides 0 (every n divides 0)` over a
-    bare `claim b ∣ 0;` puts the *reason* in prose, not code. Push it into the
-    proof — `claim b ∣ 0 by Natural.divides_zero;` — and delete the comment.
-    The lever is almost always a `by <named-lemma>`, a named `claim`, a
-    `calc` form, or `take`/`suppose`. (A claim stays bare only when a
-    *tactic/computation* closes it — `ring`, defeq, the equality battery —
-    where there is no lemma to name; see "don't justify routine computation".)
+    bare `b ∣ 0;` puts the *reason* in prose, not code. Push it into the
+    proof — `b ∣ 0 by Natural.divides_zero;` — and delete the comment.
+    The lever is almost always a `by <named-lemma>`, a named stated fact, a
+    relation-chain form, or `take`/`suppose`. (A stated fact stays bare
+    only when a *tactic/computation* closes it — `ring`, defeq, the
+    equality battery — where there is no lemma to name; see "don't
+    justify routine computation".)
   - **A "why" comment may earn its place — for now, be lenient.** A genuinely
     non-derivable strategic choice ("recurse on the derivation, not the list";
     "scale both differences by `c` so the equality becomes one of classes") is
@@ -245,12 +246,11 @@ Concretely:
   `ring`" or "`inverse_right`" when the proof now does neither is worse than no
   comment.
 
-- **Sequence-of-claims style is encouraged.** When a proof has
-  several distinct subgoals, write them as a sequence of `claim
-  <name> : <type> by <proof>` lines and then assemble the result
-  from the named claims. This makes the structure of the argument
-  legible and lets a reader skim the claims to see the shape before
-  reading the inner proofs.
+- **Sequence-of-stated-facts style is encouraged.** When a proof has
+  several distinct subgoals, write them as a sequence of `<type> by
+  <proof> as <name>;` lines and then assemble the result from the named
+  facts. This makes the structure of the argument legible and lets a
+  reader skim the facts to see the shape before reading the inner proofs.
 
 ### What an ideal proof looks like — and the CIC tells that betray it
 
@@ -261,45 +261,46 @@ mathematics. If you find yourself writing any of the following, stop and
 reach for the math-like form instead:
 
 - **`congruenceOf(…)` / `Equality.congruence(…)` — a raw-CIC stink.**
-  "Apply `f` to both sides of `a = b`" is a one-step `calc` whose
-  justification is the inner equality: the elaborator's *diff-inferred
-  congruence* wraps `f` automatically (see calc-and-rewrite.md).
+  "Apply `f` to both sides of `a = b`" is a one-step relation-chain
+  whose justification is the inner equality: the elaborator's
+  *diff-inferred congruence* wraps `f` automatically (see
+  calc-and-rewrite.md).
   ```
   -- NOT: congruenceOf((x) ↦ Sum.left(A, B, x), valueEquality)
-  calc Sum.left(A, B, recovered)
+  Sum.left(A, B, recovered)
      = Sum.left(A, B, original)   by valueEquality        -- congruence inferred
   ```
   Caveat: after a `cases` (with its automatic hypothesis refinement) has
   already reduced the goal, the
   function application in the goal is *already* the reduced constructor
   form, while a freshly-written `f(g(x))` is *stuck* (neutral scrutinee).
-  So **start the calc from the reduced form**, not from the original
+  So **start the chain from the reduced form**, not from the original
   application.
 
 - **`Equality.symmetry(…)` to flip an equation is usually unnecessary.**
-  A `calc` `=` step's diff-inference already tries both orientations, so a
+  A chain `=` step's diff-inference already tries both orientations, so a
   *reversed* step needs only `by <lemma/hypothesis>` — `by bEquation`, not
   `by Equality.symmetry(bEquation)` — and the binder stays referenced. When
-  the reversed equation is needed in *argument* position (no calc step to
+  the reversed equation is needed in *argument* position (no chain step to
   flip — e.g. feeding `equal_of_value` or another lemma), wrap it in a
-  one-step `calc B = A by <proofOfAeqB>` rather than calling
+  one-step `B = A by <proofOfAeqB>` rather than calling
   `Equality.symmetry`.
 
-- **`claim NAME : a = c by calc a = … = c` is ceremony** — the calc's
-  endpoints already *are* `a = c`, so the `claim NAME : <type> by` wrapper
-  just restates it. Bind the calc's result directly:
+- **`NAME : a = c by <chain a = … = c>` is ceremony** — the chain's
+  endpoints already *are* `a = c`, so the `NAME : <type> by` wrapper
+  just restates it. Bind the chain's result directly:
   ```
-  -- NOT: claim quotientLeK : n * q ≤ k by calc n * q ≤ n * q + r = k;
-  calc n * q ≤ n * q + r = k   as quotientLeK;
+  -- NOT: quotientLeK : n * q ≤ k by (n * q ≤ n * q + r = k);
+  n * q ≤ n * q + r = k   as quotientLeK;
   ```
-  Use `calc … as NAME;` when the result is referenced later by name, and a
-  bare `calc …;` when it's only consumed by type-match (see calc-and-
-  rewrite.md, "`calc … as NAME;` and bare `calc …;` at statement position").
-  And when the calc *is* the whole proof, it is the proof — write `:= calc
-  …` / return the `calc`, never `claim <goal> by calc …`.
+  Use `<chain> as NAME;` when the result is referenced later by name, and
+  a bare `<chain>;` when it's only consumed by type-match (see calc-and-
+  rewrite.md, "the bare chain statement forms"). And when the chain *is*
+  the whole proof, it is the proof — write `:= <chain>` / return the
+  chain, never `<goal> by <chain>`.
 
 - **`Equality.transport_proposition(…)` to move a fact along an
-  equation** — use a `calc` step or `by substituting <eq>` instead.
+  equation** — use a chain step or `by substituting <eq>` instead.
 
 - **Raw `Subtype.make(Carrier, (k) ↦ …predicate…, value, proof)` at call
   sites** — when you carve a type out with a predicate (`Subtype`,
@@ -317,8 +318,8 @@ reach for the math-like form instead:
   `LessOrEqual.transitive(a, b, c, p, q)` but also the one-argument
   `successor_less_or_equal_successor(proof)`: both invoke the lemma as a
   function instead of reading as mathematics. **State the fact and
-  discharge it by name, argument-free**: `claim T by <Lemma>` (which binds
-  `T` into context), or chain it via `calc`,
+  discharge it by name, argument-free**: `T by <Lemma>` (which binds
+  `T` into context), or chain it via a relation chain,
   letting goal-driven inference + context-discharge fill the arguments (see
   structures-and-inference.md, "Citing a lemma by name"). Name the
   *operative result* (the insight), not the plumbing. (This is a proof
@@ -354,25 +355,25 @@ reach for the math-like form instead:
     automatically. The case bodies use the constructor's *destructured*
     index names, not the outer binders; `IH` (or `IH(<generalised-hyp>)`)
     is the named hypothesis.
-  - **Closers.** `done` and `okay` are precisely `claim goal` — a claim
-    whose proposition is the `goal` (the expected type). A bare `done`/`okay`
-    discharges the goal by lookup; each also takes an optional `by <hint>`.
-    `goal` itself is only the NAME of the type being proved — a type
-    reference (`claim goal`, `note goal : T`), NOT a standalone closer
-    (`goal by …` is rejected; write `done by …` / `okay by …` /
-    `claim goal by …`). Keep an illuminating `by <reason>` — the induction
-    hypothesis, the operative lemma — **even when a bare closer would
-    succeed** (accepting the redundancy warning): we keep the explanation
-    for the reader regardless of how strong the auto-prover gets.
+  - **Closers.** `done` and `okay` are a bare restatement of the `goal`
+    (the expected type). A bare `done`/`okay` discharges the goal by
+    lookup; each also takes an optional `by <hint>`. `goal` itself is
+    only the NAME of the type being proved — a type reference (`done by
+    …`, `note goal : T`), NOT a standalone closer (`goal by …` is
+    rejected; write `done by …` / `okay by …`). Keep an illuminating
+    `by <reason>` — the induction hypothesis, the operative lemma —
+    **even when a bare closer would succeed** (accepting the redundancy
+    warning): we keep the explanation for the reader regardless of how
+    strong the auto-prover gets.
   - Transitivity / a "`x` is strictly below itself" contradiction reads as
-    an inequality **`≤`-calc**, never a positional `transitive` call:
+    an inequality **`≤`-chain**, never a positional `transitive` call:
     ```
-    claim valueBelowItself : successor(v) ≤ v
-        by calc successor(v) ≤ m by below ≤ v by atLeast;
+    successor(v) ≤ m by below
+                 ≤ v by atLeast   as valueBelowItself;
     absurd(Natural.not_successor_less_or_equal_self(v, valueBelowItself))
     ```
-  - Argument-free `by <Lemma>` works for a `≤`/`∣` calc step and any goal
-    that pins the lemma's conclusion. It does **not** work for an `=` calc
+  - Argument-free `by <Lemma>` works for a `≤`/`∣` chain step and any goal
+    that pins the lemma's conclusion. It does **not** work for an `=` chain
     step (diff-inference needs the lemma *applied*: `by add_successor(m,
     x)`), nor when a lemma premise is a *derived term* rather than a
     context hypothesis (the prover can't conjure it) — there, keep that one
@@ -386,15 +387,15 @@ reach for the math-like form instead:
   positions, and write the constructors **bare** — `Sum.left(value)`,
   `Sum.right(value)`, `Product.make(a, b)` — they infer their levels and
   component types from the expected type. The one spot that needs help is a
-  `calc` *head* (no expected type): give it a one-line ascription
-  `calc (Sum.left(…) : DisjointUnion(A, B)) = …`. `cases`/patterns over the
-  aliases work unchanged (they unfold to `Sum`/`Product`).
+  relation chain's *head* (no expected type): give it a one-line
+  ascription `(Sum.left(…) : DisjointUnion(A, B)) = …`. `cases`/patterns
+  over the aliases work unchanged (they unfold to `Sum`/`Product`).
 
 - **The hole marker is `?`, never `_`** (`_` parses as an identifier).
   `?` is solved from the expected type in direct-goal position — e.g.
   `Foo.equal_of_value(n, ?, b, valueProof)` against a goal `a = b` solves
-  `? = a`. It mis-resolves inside a `congruenceOf`/calc-`by` position, so
-  spell those.
+  `? = a`. It mis-resolves inside a `congruenceOf`/chain-step `by`
+  position, so spell those.
 
 The litmus test: a reader should follow the proof as *mathematics* —
 "apply `g` to both sides", "by antisymmetry", "`successor(v) ≤ m ≤ v`,
@@ -407,12 +408,11 @@ Inside a `{ … }` proof block, the following statement forms compose
 naturally and read as math prose. All end with `;` and the block
 returns its final non-`;`-terminated expression.
 
-- `claim <name> : <type> by <proof>;` — assert and discharge.
-  To close the current goal (type from the surrounding expected type):
-  `claim goal [by <proof>]`, or its synonyms `done` / `okay`
-  (`done by <proof>` ≡ `claim goal by <proof>`; bare `done`/`okay` let the
-  auto-prover close it).
-- `claim <type> by <hint>;` — anonymous claim. Hints include `by
+- `<type> by <proof> as <name>;` — assert and discharge, named for later
+  citation. To close the current goal (type from the surrounding expected
+  type): bare `done` / `okay`, or with a hint `done by <proof>` /
+  `okay by <proof>` (the auto-prover closes a bare `done`/`okay`).
+- `<type> by <hint>;` — anonymous stated fact. Hints include `by
   (<fact>)` (cite a proposition: auto-proved, then used as a proof of
   itself — below), `by substitution` (auto-find equality + body), `by
   substituting <eq>` (narrowed to a supplied equation — `<eq>` may be a
@@ -423,17 +423,17 @@ returns its final non-`;`-terminated expression.
   | Or.introduceRight(y) => … }`. The arms list the disjuncts as propositions
   (no `Or.introduce*` constructor names), and the auto-prover supplies the
   covering `LEFT ∨ RIGHT` from whatever's in scope — a hypothesis, a local
-  `claim`, or a re-derived lemma — so the scrutinee never has to be named. (The
-  covering disjunction must be exhaustive, of course; that is the only
-  requirement.)
-- `claim <proofTerm>;` — when the argument is already a **proof** (a
-  hypothesis, a cited lemma), `claim` introduces its *type* as the fact,
-  with that proof — the mirror of the proposition-as-proof coercion (a
-  proof position may take a proposition; here the proposition position
-  takes a proof). Lets a named fact enter context without restating its
-  (often long) type: `claim Rational.is_commutative_ring;` adds the
-  `IsCommutativeRing(…)` fact. Assembling a bundle from its named
-  components reads as `claim a; claim b; claim c; done` — and because each
+  stated fact, or a re-derived lemma — so the scrutinee never has to be
+  named. (The covering disjunction must be exhaustive, of course; that is
+  the only requirement.)
+- `<proofTerm>;` — when the argument is already a **proof** (a
+  hypothesis, a cited lemma), stating it bare introduces its *type* as
+  the fact, with that proof — the mirror of the proposition-as-proof
+  coercion (a proof position may take a proposition; here the
+  proposition position takes a proof). Lets a named fact enter context
+  without restating its (often long) type: `Rational.is_commutative_ring;`
+  adds the `IsCommutativeRing(…)` fact. Assembling a bundle from its named
+  components reads as `a; b; c; done` — and because each
   fact is exact-typed, the `done` conjoins them directly (no expensive
   decomposition), so this is the form for `⟨a, b, c⟩`-style structure
   proofs (`IsField`, `IsEquivalenceRelation`, …), not a tuple.
@@ -472,10 +472,10 @@ returns its final non-`;`-terminated expression.
   the connective is encoded as a tuple. (`obtain` is retired.)
 - **Building a connective — symmetric to destructuring it.** Don't write the
   constructor tuple either. To prove `A ∧ B`, state the parts and let the prover
-  conjoin: a bare `done`, or `claim A by …; claim B by …; done`. To prove
+  conjoin: a bare `done`, or `A by …; B by …; done`. To prove
   `∃ x. P`, `witness v with <proof of P(v)>`. To project a single axiom out of a
   bundled proof — associativity from an in-scope `IsGroup`, a leg of `IsRing`
-  brought in by `claim IsRing(…) by <r>.is_ring;` — a bare `done` suffices;
+  brought in by `IsRing(…) by <r>.is_ring;` — a bare `done` suffices;
   the prover decomposes the conjunction and finds the leg. (`⟨proofA, proofB⟩` /
   `⟨v, proof⟩` are the construction-side tells.) Genuine data records (`Ring`, a
   representative, `Subtype`) really are tuples, so `⟨…⟩` and `by_representatives x
@@ -495,14 +495,14 @@ returns its final non-`;`-terminated expression.
 - **Multi-argument helper with derived premises.** To discharge a helper that
   takes several data arguments and several proof premises (some of them derived
   — e.g. `quotient_strict_absurd`), state any derived premise as a bare
-  `calc`/`claim` so ALL its premises are in context, then `claim <conclusion>
-  by <helper>`: backward chaining discharges every premise from context and
-  pins all the data arguments as a side effect. Caveat: this search can be
-  expensive — if the helper's premises themselves invite a wide search (e.g.
-  `multiply_at_least_one` among many in-scope facts) it may not terminate in
-  budget; keep those explicit.
+  fact/relation chain so ALL its premises are in context, then state the
+  `<conclusion> by <helper>`: backward chaining discharges every premise
+  from context and pins all the data arguments as a side effect. Caveat:
+  this search can be expensive — if the helper's premises themselves
+  invite a wide search (e.g. `multiply_at_least_one` among many in-scope
+  facts) it may not terminate in budget; keep those explicit.
 - **Proving a disjunction `A ∨ B`.** State the true disjunct and let the
-  auto-prover introduce the `∨`: `claim A by <reason>; done`,
+  auto-prover introduce the `∨`: `A by <reason>; done`,
   NOT the raw constructor `Or.introduceLeft(<proof of A>)`. `done`'s
   disjunction-introduction picks whichever disjunct is in context. (Same for
   proving a universal: prefer `take x; …` — introduce the variable — over a
@@ -540,8 +540,8 @@ returns its final non-`;`-terminated expression.
   proof then **continues at the original goal**. Use this to prove an
   intermediate fact `X` by contradiction mid-proof; the terminal form is
   the special case where `X` is the goal and nothing follows. To name the
-  established fact, wrap the terminal form in a claim:
-  `claim hx : X by { suppose Not(X) for contradiction; … };`.
+  established fact, state the terminal form's type and name it:
+  `X by { suppose Not(X) for contradiction; … } as hx;`.
 - `suppose P [as h] for proving Q { … };` — forward implication intro.
 - `take x : T for proving Q { … };` — forward ∀-introduction (same grammar).
   Prove `Q` under the hypothesis `h : P` inside the block, which adds
@@ -564,8 +564,9 @@ returns its final non-`;`-terminated expression.
   `cases` split, before a long calc). The elaborator runs
   `isDefinitionallyEqual` and reports a mismatch with both forms in
   the error.
-- `note <proposition> [by <proof>];` — a *verified comment*: like `claim`,
-  except it does **not** add the fact to the context. Reads as "note
+- `note <proposition> [by <proof>];` — a *verified comment*: like a
+  bare stated proposition, except it does **not** add the fact to the
+  context. Reads as "note
   that …" / "observe that …" — a parenthetical aside in math prose. With
   no `by`, the auto-prover must close `<proposition>`; with `by <proof>`
   the reason is shown (and the note holds even when the auto-prover
@@ -585,7 +586,7 @@ returns its final non-`;`-terminated expression.
   goal by `<type>` for the rest of the block (the body is elaborated at
   `<type>`). The one-line escape hatch for a residual defeq-spelling
   mismatch — write the spelling your next step needs, instead of the
-  ad-hoc `claim X : <type> by <oldGoalProof>` bridge. (`note goal : T`
+  ad-hoc `<type> by <oldGoalProof> as X;` bridge. (`note goal : T`
   only *checks*; `change T` checks and *switches*.)
 - `unfold <Foo> in <body>` — temporarily mark `Foo` transparent
   inside `<body>` (for opaque definitions; see the opaque section).
@@ -594,7 +595,7 @@ returns its final non-`;`-terminated expression.
 
 The guiding light is what a mathematician would write. Most of the
 time that means **leaning on the auto-prover and citing nothing** —
-a by-less `calc` step or a bare `claim P;` reads like "clearly" /
+a by-less chain step or a bare `P;` reads like "clearly" /
 "and so", which is exactly how a proof flows when the step is routine.
 Spell a justification out only when a *human or LLM reader* genuinely
 benefits from it.
@@ -608,11 +609,11 @@ hint for when the *named result itself* is the insight.
 
 So, in order of preference for a step the auto-prover can close:
 
-1. **Nothing** — by-less `calc` step / `claim P;`. The default.
+1. **Nothing** — by-less chain step / bare `P;`. The default.
 2. **`note P [by …];`** — surface an intermediate fact for the reader
    without binding it into context (the proof closes without it). The
    "observe that …" aside.
-3. **`claim P by <Lemma>;`** / `… = b by <Lemma>` *kept despite the
+3. **`P by <Lemma>;`** / `… = b by <Lemma>` *kept despite the
    redundancy warning* — for the rare step where the named result
    itself is the insight (the induction hypothesis, a closed form, a
    big-name theorem). The redundant-`by` check will flag it; keeping
@@ -642,7 +643,7 @@ isn't an explanation — it's load-bearing. Prefer, in order:
 (equalities via congruence, conclusion-matching facts); it does **not**
 chain through a combining lemma or flip by symmetry — for those, name the
 lemma (optionally `recalling (<fact>)`). Example where the `by` is
-genuinely load-bearing: `claim (0 : Rational) ≤ (n : Rational) by
+genuinely load-bearing: `(0 : Rational) ≤ (n : Rational) by
 Rational.LessOrEqual_zero_of_IsNonneg((n : Rational), Rational.from_-
 natural_is_nonneg(n))` — the prover can't reach `IsNonneg(n)` on its own.
 
@@ -658,10 +659,10 @@ Outermost-arm shorthands for case-splits:
 - `by strong induction on n with IH { … }` — strong induction on a
   Natural; IH has type `(k : Natural) → k < n → P(k)`.
 
-`done` and `okay` are aliases for `claim goal` — pick whichever spells
-the proof's intent: "the proof is done here" (`done`), "okay, that proves
-it" (`okay`), or the explicit `claim goal by …`. (`goal` on its own is
-just the name of the goal type, not a closer.)
+`done` and `okay` are both a bare restatement of the `goal` — pick
+whichever spells the proof's intent: "the proof is done here" (`done`),
+"okay, that proves it" (`okay`). (`goal` on its own is just the name of
+the goal type, not a closer.)
 
 The remaining subsections are about *CIC noise* — bureaucracy that
 the kernel demands but a mathematician would never write. Those
@@ -811,10 +812,10 @@ deliberate polishing pass, somewhat expensive, run on *your* files only):
 ```
 
 `--check-redundant-by` reports both a *redundant-`by`* finding (the
-auto-prover closes the step/claim without the hint) and an *unused-name*
-finding (a binding the prover consumes by type-match, so the name is dead
-weight). `.mark_redundant.py <files>` annotates the calc-step `by` sites
-with marker
+auto-prover closes the step/stated fact without the hint) and an
+*unused-name* finding (a binding the prover consumes by type-match, so
+the name is dead weight). `.mark_redundant.py <files>` annotates the
+chain-step `by` sites with marker
 comments; you then **edit by hand and rebuild**, reverting anything that
 turns out to be load-bearing (the checker tests each site in isolation, so
 adjacent steps in a chain can interact). Do NOT write a fully-automated
@@ -822,15 +823,15 @@ rewriter.
 
 **How to resolve each finding — by readability, not by chasing zero:**
 
-- **Redundant `by` on a *calc step* citing a library lemma / tactic**
+- **Redundant `by` on a *chain step* citing a library lemma / tactic**
   (`by ring`, `by add_successor`, `by multiply_commutative`) → make it
-  **by-less**. The calc already shows the intermediate form; the citation
-  was noise.
-- **Redundant `by` on a *claim* that names the operative lemma** (often
-  with a long positional argument list) → go **argument-free** (`by
-  <Lemma>`) and then decide: if the named result is genuinely the
+  **by-less**. The chain already shows the intermediate form; the
+  citation was noise.
+- **Redundant `by` on a *stated fact* that names the operative lemma**
+  (often with a long positional argument list) → go **argument-free**
+  (`by <Lemma>`) and then decide: if the named result is genuinely the
   insight (IH, a closed form, a big-name theorem), **keep it** and
-  accept the persistent warning; otherwise **bare the claim** — the
+  accept the persistent warning; otherwise **bare the fact** — the
   stated proposition is its own explanation. (The old `since <Lemma>`
   resolution is retired; there is no exempt keyword anymore.)
 
@@ -838,27 +839,27 @@ rewriter.
 argument-free) makes the auto-prover pick the needed fact out of context by
 *type-match* instead of by name. Two follow-on findings appear:
 
-1. A named intermediate `claim NAME : T by …` whose `NAME` is now only
+1. A named intermediate `T by … as NAME` whose `NAME` is now only
    consumed by type-match → flagged **`unused name`**. Fix: **anonymize**
-   it — `claim T by V;` (or bare `claim T;` if its own `by` was also
+   it — `T by V;` (or bare `T;` if its own `by` was also
    redundant). The fact is still stated and still in context for the
    type-match; only the dead label goes. Keep a name **only** when it is
    referenced by name later (a genuine milestone).
-2. A calc step that fed such a claim may itself become redundant → by-less
-   it too.
+2. A chain step that fed such a stated fact may itself become redundant
+   → by-less it too.
 
 Re-run the check after editing; the cascade is finite and converges to
 by-less routine steps + anonymous intermediate facts + a few kept
 `by`-cited operative lemmas (flagged, deliberately). Stop short of churning when removal would *worsen*
 things: by-less'ing a step that cites a `choose`/`suppose` binder just
 moves the warning to an "unused binder" (use `as _`, or leave it); and a
-genuinely informative reduction *chain* in a `calc` is worth keeping even
-when the prover could skip it.
+genuinely informative reduction *chain* is worth keeping even when the
+prover could skip it.
 
 **`by` vs `note` — the mnemonic.** `by` = the prover needs it (or the
 author insists the reader does — a kept, flagged hint). `note P [by …];`
 = a verified comment that is **not added to the context** — so never use
 `note` for a fact a later step must consume by type-match (it won't be
-there); use an anonymous `claim` for that. (`since` — the old
+there); state it bare (anonymously) for that. (`since` — the old
 exempt-explanation keyword — was removed (2026-07-02) and no longer
 parses.)
