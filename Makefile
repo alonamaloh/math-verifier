@@ -186,6 +186,14 @@ checker-tests: library $(TEST_MATHV_FILES)
 	@./kernel verify 	    --source library/Test/redundant_check_cache_isolation_test.math 	    --output build/checker-tests.mathv --cache-root build 	    --check-redundant-by --no-check-unused-names > /dev/null 2>&1 	  && echo "checker-tests: PASS" 	  || { echo "checker-tests: FAIL — a clean file broke under --check-redundant-by"; exit 1; }
 	@bash scripts/redundancy_probe_test.sh
 
+# B3.4 — morphism-packet audit: re-verify the audit surface module
+# (which imports every packet-lemma home) with the audit flag on and
+# print one report line per registered coercion hop, naming the packet
+# slots the cast tiers would fail to discover. A report, not a gate —
+# some absences are structural (ℕ has no subtraction).
+audit-coercions: library
+	@MATH_AUDIT_COERCION_PACKETS=1 ./kernel verify 	    --source library/Test/coercion_packet_audit.math 	    --output build/coercion-audit.mathv --cache-root build 	    2>&1 | grep "coercion-packet" 	  || { echo "audit-coercions: the audit module failed to verify"; exit 1; }
+
 # Error-message regression suite: each library/ErrorTest/<name>.math is an
 # intentionally-broken proof paired with a <name>.expected sidecar listing
 # substrings its error MUST contain. `make error-tests` asserts each file

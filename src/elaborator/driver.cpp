@@ -264,6 +264,45 @@ void Elaborator::runModule(const SurfaceModule& module) {
         if (enableKernelCache) kernelCacheEnabled = previousKernelCache;
         if (enableKernelProfile) kernelProfileEnabled = previousKernelProfile;
         if (enableHashCons) g_hashConsEnabled = previousHashCons;
+        // B3.4 — morphism-packet audit (`MATH_AUDIT_COERCION_PACKETS=1`):
+        // after the module elaborates, report each registered coercion
+        // hop's missing packet slots. Run against a module at the top of
+        // the tower (`make audit-coercions`) this lists every slot the
+        // cast tiers would silently fail to find. A report, not a
+        // warning: some absences are structural (ℕ has no subtraction,
+        // so `Natural.to_integer.subtract_preserves` cannot exist).
+        {
+            const char* auditFlag =
+                std::getenv("MATH_AUDIT_COERCION_PACKETS");
+            if (auditFlag && auditFlag[0] != '\0' && auditFlag[0] != '0') {
+                static const std::array<const char*, 11> slots{
+                    "zero_preserves", "one_preserves", "add_preserves",
+                    "multiply_preserves", "subtract_preserves",
+                    "negate_preserves", "LessOrEqual_preserves",
+                    "LessThan_preserves", "LessOrEqual_reflects",
+                    "LessThan_reflects", "injective"};
+                for (const auto& [key, chain]
+                         : environment_.coercionRegistry) {
+                    if (chain.size() != 1) continue;
+                    const std::string& hop = chain[0];
+                    std::string missing;
+                    for (const char* slot : slots) {
+                        if (environment_.lookup(hop + "." + slot)
+                            == nullptr) {
+                            if (!missing.empty()) missing += ", ";
+                            missing += slot;
+                        }
+                    }
+                    std::cerr << "[coercion-packet] " << hop
+                              << " (" << std::get<0>(key) << " -> "
+                              << std::get<1>(key) << "): "
+                              << (missing.empty()
+                                      ? std::string("complete")
+                                      : "missing " + missing)
+                              << "\n";
+                }
+            }
+        }
         if (timeDeclarations || tacticTimingEnabled_) {
             struct rusage ru;
             if (getrusage(RUSAGE_SELF, &ru) == 0) {
