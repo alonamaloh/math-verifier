@@ -218,7 +218,11 @@ prove <fact> by cases {
   unfold lemmas, …) — the same boundary discipline opaque definitions
   use. Full site-by-site classification table is in the 2026-07-03
   session transcript; the refinement-free subset is the mechanical
-  batch, the refinement subset is proof-engineering per definition.)*
+  batch, the refinement subset is proof-engineering per definition.
+  PILOT VALIDATED (37ffdc14): Rational/minimum — minimum_eq_left/
+  minimum_eq_right as the quarantine boundary, the three order
+  theorems converted to case/otherwise splits through the
+  equations. Follow the same shape per refinement-class file.)*
 - **Structural cases with witness binders:**
   `case n = successor(k) for some k: …`. The elaborator recognizes
   constructor-coverage shapes and emits the recursor. Per-inductive
