@@ -1469,6 +1469,124 @@ ExpressionPointer Elaborator::recoverClaimHint(
             // fall through to the descriptive citation-failure error
         }
 
+        // Last attempts before erroring — claims and calc steps are one
+        // language, so a hint that closes a calc step must close the same
+        // statement as a claim. These mirror the calc `=`-step mismatch
+        // pipeline (rewrite → bare-lemma-at-diff → equality diff-wrap);
+        // all three are cold paths, running only when the alternative is
+        // the citation error.
+        //
+        // (1) Bare-lemma congruence (tryApplyBareLemmaToDiff): the cited
+        // lemma is un-applied and its conclusion matches the goal
+        // equality's differing SUBTERM (not the whole equality) — solve
+        // its arguments against that subterm, discharge premises, wrap in
+        // congruence. Closes `Sum.left(make(v, p)) = Sum.left(element)
+        // by equal_of_value` exactly as the calc step spelling does.
+        if (hintTerm) {
+            try {
+                ExpressionPointer goalOpenedEq = weakHeadNormalForm(
+                    environment_,
+                    openOverLocalBinders(goalClosed, localBinders,
+                                         localBinders.size()));
+                EqualityComponents goalComps = extractEqualityComponents(
+                    goalOpenedEq, "claim bare-lemma diff", line);
+                ExpressionPointer previousKernel = closeOverLocalBinders(
+                    goalComps.leftEndpoint, localBinders,
+                    localBinders.size());
+                ExpressionPointer nextKernel = closeOverLocalBinders(
+                    goalComps.rightEndpoint, localBinders,
+                    localBinders.size());
+                ExpressionPointer hintTypeClosedForBare =
+                    closeOverLocalBinders(
+                        inferTypeInLocalContext(localBinders, hintTerm),
+                        localBinders, localBinders.size());
+                if (std::holds_alternative<Pi>(
+                        hintTypeClosedForBare->node)) {
+                    ExpressionPointer bareAttempt = tryApplyBareLemmaToDiff(
+                        localBinders, previousKernel, nextKernel,
+                        hintTerm, hintTypeClosedForBare, line, 0);
+                    if (bareAttempt) {
+                        ExpressionPointer bareTypeOpened =
+                            inferTypeInLocalContext(localBinders,
+                                                    bareAttempt);
+                        Context openedContext =
+                            buildContextFromLocalBinders(localBinders);
+                        ExpressionPointer goalOpenedForCheck =
+                            openOverLocalBinders(goalClosed, localBinders,
+                                                 localBinders.size());
+                        if (isDefinitionallyEqual(environment_,
+                                                  openedContext,
+                                                  bareTypeOpened,
+                                                  goalOpenedForCheck)) {
+                            return bareAttempt;
+                        }
+                    }
+                }
+            } catch (const ElaborateError&) {
+                // fall through
+            } catch (const TypeError&) {
+                // fall through
+            }
+        }
+        // (2) The calc `=`-step auto-rewrite fallback (calc.cpp): rewrite
+        // the goal equality with the cited lemma — instantiating it at the
+        // matching subterm under congruence, premises discharged — exactly
+        // as a calc step would. This is the mechanism that closes
+        // `f(g(x)) = f(y) by lemma : g(x) = y`-shaped citations.
+        {
+            ExpressionPointer rewriteAttempt;
+            try {
+                rewriteAttempt = desugarRewrite(
+                    std::make_shared<const SurfaceExpression>(byHint),
+                    localBinders, goalClosed, line, 0);
+            } catch (const ElaborateError&) {
+                rewriteAttempt = nullptr;
+            } catch (const TypeError&) {
+                rewriteAttempt = nullptr;
+            }
+            if (rewriteAttempt) {
+                // Speculative: verify the candidate really proves the goal
+                // (same guard as the calc step's rewrite fallback).
+                try {
+                    ExpressionPointer rewriteTypeOpened =
+                        inferTypeInLocalContext(localBinders,
+                                                rewriteAttempt);
+                    ExpressionPointer goalOpenedForCheck =
+                        openOverLocalBinders(goalClosed, localBinders,
+                                             localBinders.size());
+                    Context openedContext =
+                        buildContextFromLocalBinders(localBinders);
+                    if (isDefinitionallyEqual(environment_, openedContext,
+                                              rewriteTypeOpened,
+                                              goalOpenedForCheck)) {
+                        return rewriteAttempt;
+                    }
+                } catch (const TypeError&) {
+                } catch (const ElaborateError&) {
+                }
+            }
+        }
+        // (3) The calc `=`-step diff-inference: a cited equality lemma
+        // whose conclusion proves the goal at a single differing position
+        // (under congruence) closes here exactly as it closes a calc step.
+        if (hintTerm) {
+            ExpressionPointer hintTypeForDiff;
+            try {
+                hintTypeForDiff = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, hintTerm),
+                    localBinders, localBinders.size());
+            } catch (const TypeError&) {
+                hintTypeForDiff = nullptr;
+            } catch (const ElaborateError&) {
+                hintTypeForDiff = nullptr;
+            }
+            if (hintTypeForDiff) {
+                ExpressionPointer wrapped = tryDiffWrapForEqualityGoal(
+                    localBinders, hintTerm, hintTypeForDiff, goalClosed);
+                if (wrapped) return wrapped;
+            }
+        }
+
         // Build a citation-failure message at the claim site.
         std::string hintName;
         if (auto* identifier =

@@ -4037,9 +4037,14 @@ private:
         Token ifToken = consumeAny();  // 'if'
         SurfaceExpressionPointer proposition = parseExpression();
         expect(TokenKind::KeywordThen, "after `if P`");
-        SurfaceExpressionPointer yesBody = parseExpression();
+        // Proof-level `if` branches may be bare relation chains (the
+        // keyword-free calc); the ≥2-step probe never fires on data
+        // branches (relations are non-associative in expressions), so
+        // value-level conditionals are untouched. `then`/`else` stop the
+        // chain cleanly.
+        SurfaceExpressionPointer yesBody = parseBodyExpressionOrStatement();
         expect(TokenKind::KeywordElse, "after `if P then a`");
-        SurfaceExpressionPointer noBody = parseExpression();
+        SurfaceExpressionPointer noBody = parseBodyExpressionOrStatement();
         return makeSurfaceDecide(
             std::move(proposition),
             std::string("_"), std::move(yesBody),
@@ -4938,7 +4943,10 @@ private:
             }
         }
         expect(TokenKind::Colon, "after arm header");
-        auto body = parseExpression();
+        // A `case …:` arm body may be a bare ≥2-step relation chain (the
+        // keyword-free calc), like `=>` arm bodies — chain-only for the
+        // same reason (a trailing `by`/`as` belongs elsewhere).
+        auto body = parseBodyExpressionOrStatement();
         if (destructurePattern) {
             // Wrap the body in a destructure of the disjunct hypothesis.
             SurfaceExpressionPointer scrutinee = makeSurfaceIdentifier(
@@ -5062,7 +5070,11 @@ private:
         auto witnessExpression = parseRelational();
         expect(TokenKind::KeywordWith,
                "after witness expression");
-        auto witnessProof = parseExpression();
+        // The proof position accepts a bare ≥2-step relation chain (the
+        // keyword-free calc), like `:=` and arm bodies — chain-only, since
+        // a trailing `by`/`as` after a `with` proof belongs to the
+        // enclosing statement.
+        auto witnessProof = parseBodyExpressionOrStatement();
         std::vector<SurfaceExpressionPointer> components;
         components.push_back(std::move(witnessExpression));
         components.push_back(std::move(witnessProof));
