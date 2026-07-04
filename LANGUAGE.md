@@ -151,6 +151,15 @@ Exhaustiveness discharges through the type's coverage lemma
 ordinary stated hypothesis — addressable, citable, transported by the
 prover.
 
+`for some` takes a comma-separated binder list, so a multi-argument
+constructor opens all its witnesses at once: `case x = pack(a, b) for
+some a, b:` gives the arm the nested hypothesis `∃ a. ∃ b. x = pack(a,
+b)`, with `a`, `b`, and the equation all in scope. Each un-annotated
+binder's type is inferred by priority — an annotation `(a : T)`, else
+the constructor's Pi-domain at that argument position, else the
+equation's left-side type. A later binder may be annotated with a type
+that mentions an earlier witness; repeating a name is a parse error.
+
 ### Hypotheses about the scrutinee refine automatically
 
 A hypothesis whose type mentions the scrutinee is lifted into the

@@ -800,12 +800,20 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
         bool hasOtherwise = claim.arms.back().isOtherwise;
         size_t statedCount = hasOtherwise ? armCount - 1 : armCount;
         std::vector<ExpressionPointer> disjuncts;
-        // Witness arms (`case P for some k:`): the disjunct is ∃ k. P.
-        // The witness type is the annotation when given, else inferred
-        // as the type of the equation's left endpoint.
-        std::vector<ExpressionPointer> witnessTypes(armCount);
-        std::vector<ExpressionPointer> witnessEquations(armCount);
-        std::vector<LevelPointer> witnessLevels(armCount);
+        // Witness arms (`case P for some k₁, …, kₙ:`): the disjunct is the
+        // nested existential `∃ k₁. ∃ k₂. … P`. Per binder, the type is the
+        // annotation when given, else inferred from the constructor
+        // telescope of the equation's right side, else the type of the
+        // equation's left endpoint (the carrier). Per-arm we keep the
+        // ordered binder types Tᵢ (each elaborated under
+        // localBinders + [k₁ … k_{i-1}]), their universe levels, and the
+        // equation P (elaborated under localBinders + all n witnesses).
+        struct WitnessArmData {
+            std::vector<ExpressionPointer> types;
+            std::vector<LevelPointer> levels;
+            ExpressionPointer equation;
+        };
+        std::vector<WitnessArmData> witnessData(armCount);
         for (size_t i = 0; i < statedCount; ++i) {
             const SurfaceStructuredClaimArm& arm = claim.arms[i];
             if (!arm.disjunctType) {
@@ -816,60 +824,259 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                       "proposition (a surface transform dropped it) — "
                       "please report this");
             }
-            if (arm.witnessName.empty()) {
+            if (arm.witnessBinders.empty()) {
                 disjuncts.push_back(elaborateExpression(
                     *arm.disjunctType, localBinders));
                 continue;
             }
-            ExpressionPointer witnessT;
-            if (arm.witnessType) {
-                witnessT = elaborateExpression(
-                    *arm.witnessType, localBinders);
-            } else {
-                auto* binary = std::get_if<SurfaceBinaryOperation>(
-                    &arm.disjunctType->node);
-                if (!binary || binary->opSymbol != "=") {
-                    throwElaborate(
-                        "`for some " + arm.witnessName + "` without a "
-                        "type annotation needs the case proposition to "
-                        "be an equation `lhs = rhs` (the witness type "
-                        "is inferred from the left side) — annotate "
-                        "it: `for some (" + arm.witnessName + " : T)`");
-                }
-                ExpressionPointer lhsKernel = elaborateExpression(
-                    *binary->left, localBinders);
-                ExpressionPointer lhsTypeOpened =
-                    inferTypeInLocalContext(localBinders, lhsKernel);
-                witnessT = closeOverLocalBinders(
-                    lhsTypeOpened, localBinders, localBinders.size());
+            const size_t witnessCount = arm.witnessBinders.size();
+            auto* surfaceEquation = std::get_if<SurfaceBinaryOperation>(
+                &arm.disjunctType->node);
+            if (surfaceEquation && surfaceEquation->opSymbol != "=") {
+                surfaceEquation = nullptr;
             }
-            LevelPointer witnessLevel;
-            {
-                ExpressionPointer tSort = weakHeadNormalForm(
-                    environment_,
-                    inferTypeInLocalContext(localBinders, witnessT));
-                auto* sort = std::get_if<Sort>(&tSort->node);
-                if (!sort) {
-                    throwElaborate(
-                        "`for some " + arm.witnessName + "`: cannot "
-                        "determine the witness type's universe");
+            // True when `expr` textually mentions any of the arm's witness
+            // names — used to reject leading constructor arguments that
+            // would make a telescope domain depend on a witness.
+            auto mentionsAnyWitness =
+                [&](const SurfaceExpression& expr) -> bool {
+                    for (const auto& b : arm.witnessBinders) {
+                        if (surfaceMentionsName(expr, b.name)) return true;
+                    }
+                    return false;
+                };
+            WitnessArmData armData;
+            std::vector<LocalBinder> paddedBinders = localBinders;
+            for (size_t b = 0; b < witnessCount; ++b) {
+                const SurfaceWitnessBinder& binder = arm.witnessBinders[b];
+                ExpressionPointer witnessT;
+                // Priority 1: annotation.
+                if (binder.type) {
+                    witnessT = elaborateExpression(
+                        *binder.type, paddedBinders);
                 }
-                witnessLevel = predecessorOfSortLevel(sort->level);
+                // Priority 2: constructor/head telescope — when the case
+                // proposition is `lhs = rhs`, `rhs` is `Head(a₀, …)` whose
+                // head resolves to a Constant, and this binder occurs among
+                // the arguments as a bare identifier exactly once, take the
+                // constant's Pi-domain at that argument position (with the
+                // earlier ACTUAL arguments substituted). Earlier arguments
+                // must not mention a witness.
+                if (!witnessT && surfaceEquation) {
+                    if (auto* application =
+                            std::get_if<SurfaceApplication>(
+                                &surfaceEquation->right->node)) {
+                        auto* headIdentifier = application->function
+                            ? std::get_if<SurfaceIdentifier>(
+                                  &application->function->node)
+                            : nullptr;
+                        if (headIdentifier) {
+                            int position = -1;
+                            int occurrences = 0;
+                            for (size_t a = 0;
+                                 a < application->arguments.size(); ++a) {
+                                const SurfaceArgument& argument =
+                                    application->arguments[a];
+                                auto* argumentName =
+                                    std::get_if<SurfaceIdentifier>(
+                                        &argument.value->node);
+                                if (argument.name.empty() && argumentName
+                                    && argumentName->universeArgs.empty()
+                                    && argumentName->qualifiedName
+                                           == binder.name) {
+                                    ++occurrences;
+                                    position = static_cast<int>(a);
+                                }
+                            }
+                            // Set inside the try when the domain depends on an
+                            // earlier binder AND an earlier actual argument
+                            // mentions a witness — a hard error thrown after
+                            // the telescope attempt (so it isn't swallowed by
+                            // the fall-through catch).
+                            bool requireAnnotation = false;
+                            if (occurrences == 1) {
+                                try {
+                                    ExpressionPointer headKernel =
+                                        elaborateExpression(
+                                            *application->function,
+                                            localBinders);
+                                    if (std::get_if<Constant>(
+                                            &headKernel->node)) {
+                                        ExpressionPointer piType =
+                                            weakHeadNormalForm(
+                                                environment_,
+                                                closeOverLocalBinders(
+                                                    inferTypeInLocalContext(
+                                                        localBinders,
+                                                        headKernel),
+                                                    localBinders,
+                                                    localBinders.size()));
+                                        // Descend `position` codomains WITHOUT
+                                        // substituting, to see whether the
+                                        // domain at this argument position
+                                        // depends on an earlier telescope
+                                        // binder.
+                                        ExpressionPointer raw = piType;
+                                        bool ok = true;
+                                        for (int a = 0; a < position; ++a) {
+                                            auto* pi = std::get_if<Pi>(
+                                                &raw->node);
+                                            if (!pi) { ok = false; break; }
+                                            raw = weakHeadNormalForm(
+                                                environment_, pi->codomain);
+                                        }
+                                        auto* rawPi = ok
+                                            ? std::get_if<Pi>(&raw->node)
+                                            : nullptr;
+                                        bool dependsOnEarlier = false;
+                                        if (rawPi) {
+                                            for (int i = 0; i < position;
+                                                 ++i) {
+                                                if (referencesBoundVariable(
+                                                        rawPi->domain, i)) {
+                                                    dependsOnEarlier = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        // Earlier actual arguments only reach
+                                        // the domain when it references an
+                                        // earlier binder; only then must they
+                                        // be witness-free (else the inferred
+                                        // type would capture a witness — the
+                                        // spec asks for an annotation there).
+                                        if (rawPi && dependsOnEarlier) {
+                                            for (int a = 0; a < position;
+                                                 ++a) {
+                                                if (mentionsAnyWitness(
+                                                        *application
+                                                             ->arguments[a]
+                                                             .value)) {
+                                                    requireAnnotation = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        // Instantiate: substitute the earlier
+                                        // ACTUAL arguments (dependent case) or
+                                        // a closed dummy (independent — its
+                                        // value cannot reach the domain), then
+                                        // read the domain at depth L.
+                                        ExpressionPointer cursor = piType;
+                                        ExpressionPointer dummy = makeSort(
+                                            makeLevelConst(0));
+                                        for (int a = 0;
+                                             ok && !requireAnnotation
+                                                 && a < position;
+                                             ++a) {
+                                            auto* pi = std::get_if<Pi>(
+                                                &cursor->node);
+                                            if (!pi) { ok = false; break; }
+                                            ExpressionPointer argKernel =
+                                                dependsOnEarlier
+                                                    ? elaborateExpression(
+                                                          *application
+                                                               ->arguments[a]
+                                                               .value,
+                                                          localBinders)
+                                                    : dummy;
+                                            cursor = weakHeadNormalForm(
+                                                environment_,
+                                                substituteBoundVariable(
+                                                    pi->codomain, argKernel,
+                                                    0));
+                                        }
+                                        auto* pi = std::get_if<Pi>(
+                                            &cursor->node);
+                                        if (ok && !requireAnnotation && pi) {
+                                            // Domain lives at depth L; lift
+                                            // it into the padded context.
+                                            witnessT = liftBoundVariables(
+                                                pi->domain,
+                                                static_cast<int>(b), 0);
+                                        }
+                                    }
+                                } catch (const ElaborateError&) {
+                                    // Telescope not usable — fall through.
+                                } catch (const TypeError&) {
+                                }
+                            }
+                            if (requireAnnotation) {
+                                throwElaborate(
+                                    "`for some " + binder.name + "`: cannot "
+                                    "infer the witness type — an earlier "
+                                    "argument of `"
+                                    + headIdentifier->qualifiedName
+                                    + "` mentions a witness, so its type would "
+                                      "capture one; annotate it: `for some ("
+                                    + binder.name + " : T)`");
+                            }
+                        }
+                    }
+                }
+                // Priority 3: carrier — the type of the equation's left
+                // endpoint, elaborated at depth L (lifted into the padded
+                // context). Errors if the left side mentions a witness.
+                if (!witnessT) {
+                    if (!surfaceEquation) {
+                        throwElaborate(
+                            "`for some " + binder.name + "` without a "
+                            "type annotation needs the case proposition "
+                            "to be an equation `lhs = rhs` (the witness "
+                            "type is inferred from the right side's "
+                            "constructor or the left side) — annotate "
+                            "it: `for some (" + binder.name + " : T)`");
+                    }
+                    if (mentionsAnyWitness(*surfaceEquation->left)) {
+                        throwElaborate(
+                            "`for some " + binder.name + "`: the case "
+                            "equation's left side mentions a witness, so "
+                            "its type can't be used as the witness type — "
+                            "annotate it: `for some (" + binder.name
+                            + " : T)`");
+                    }
+                    ExpressionPointer lhsKernel = elaborateExpression(
+                        *surfaceEquation->left, localBinders);
+                    ExpressionPointer lhsTypeOpened =
+                        inferTypeInLocalContext(localBinders, lhsKernel);
+                    ExpressionPointer lhsTypeClosed = closeOverLocalBinders(
+                        lhsTypeOpened, localBinders, localBinders.size());
+                    witnessT = liftBoundVariables(
+                        lhsTypeClosed, static_cast<int>(b), 0);
+                }
+                LevelPointer witnessLevel;
+                {
+                    ExpressionPointer tSort = weakHeadNormalForm(
+                        environment_,
+                        inferTypeInLocalContext(paddedBinders, witnessT));
+                    auto* sort = std::get_if<Sort>(&tSort->node);
+                    if (!sort) {
+                        throwElaborate(
+                            "`for some " + binder.name + "`: cannot "
+                            "determine the witness type's universe");
+                    }
+                    witnessLevel = predecessorOfSortLevel(sort->level);
+                }
+                armData.types.push_back(witnessT);
+                armData.levels.push_back(witnessLevel);
+                paddedBinders.push_back({binder.name, witnessT});
             }
-            std::vector<LocalBinder> withWitness = localBinders;
-            withWitness.push_back({arm.witnessName, witnessT});
-            ExpressionPointer equationClosed = elaborateExpression(
-                *arm.disjunctType, withWitness);
-            ExpressionPointer predicate = makeLambda(
-                arm.witnessName, witnessT, equationClosed);
-            ExpressionPointer existsDisjunct = makeApplication(
-                makeApplication(
-                    makeConstant("Exists", {witnessLevel}), witnessT),
-                predicate);
-            disjuncts.push_back(std::move(existsDisjunct));
-            witnessTypes[i] = std::move(witnessT);
-            witnessEquations[i] = std::move(equationClosed);
-            witnessLevels[i] = std::move(witnessLevel);
+            // Equation P at depth L + n.
+            armData.equation = elaborateExpression(
+                *arm.disjunctType, paddedBinders);
+            // Nested existential, assembled innermost-first.
+            ExpressionPointer nest = armData.equation;
+            for (int b = static_cast<int>(witnessCount) - 1; b >= 0; --b) {
+                ExpressionPointer predicate = makeLambda(
+                    arm.witnessBinders[b].name, armData.types[b], nest);
+                nest = makeApplication(
+                    makeApplication(
+                        makeConstant("Exists", {armData.levels[b]}),
+                        armData.types[b]),
+                    predicate);
+            }
+            disjuncts.push_back(std::move(nest));
+            witnessData[i] = std::move(armData);
         }
         auto makeOr = [&](ExpressionPointer a, ExpressionPointer b) {
             return makeApplication(
@@ -1032,33 +1239,41 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
             [&](size_t index, ExpressionPointer domain)
                 -> ExpressionPointer {
             const SurfaceStructuredClaimArm& arm = claim.arms[index];
-            if (!arm.witnessName.empty()) {
-                // `case P for some k:` — the hypothesis is ∃ k. P; open
-                // it so the body sees BOTH the witness `k` and the
-                // equation. Body elaborates under localBinders + [k]
-                // + [equation]; the assembled arm is
-                //   λ (h : ∃ k. P).
-                //     Exists.eliminate(T, λk. P, Goal, λ k eq. body, h).
-                // `as h` names the EQUATION hypothesis (the witness has
-                // its own name; the ∃ itself is consumed on the spot).
-                ExpressionPointer witnessT = witnessTypes[index];
-                ExpressionPointer equation = witnessEquations[index];
+            if (!arm.witnessBinders.empty()) {
+                // `case P for some k₁, …, kₙ:` — the hypothesis is the
+                // nested existential ∃ k₁. … ∃ kₙ. P; open it so the body
+                // sees ALL n witnesses and the equation. Body elaborates
+                // under localBinders + [k₁ … kₙ] + [equation]; the arm is
+                // a stack of n `Exists.eliminate`s, each peeling one
+                // witness and the residual existential below it. For n = 1
+                // this reduces to the single eliminate
+                //   λ h. Exists.eliminate(T, λk. P, Goal, λ k eq. body, h).
+                // `as h` names the EQUATION hypothesis only.
+                const WitnessArmData& armData = witnessData[index];
+                const size_t n = arm.witnessBinders.size();
+                ExpressionPointer equation = armData.equation;
                 std::string equationName = arm.binderName.empty()
                     ? "_case_equation" : arm.binderName;
+                // innerBinders = localBinders + [k₁ … kₙ] + [equation]
+                // (depth L + n + 1). Each witness type sits at its own
+                // depth in armData.types (Tᵢ over localBinders+[k₁…k_{i-1}]).
                 std::vector<LocalBinder> innerBinders = localBinders;
-                innerBinders.push_back({arm.witnessName, witnessT});
+                for (size_t b = 0; b < n; ++b) {
+                    innerBinders.push_back(
+                        {arm.witnessBinders[b].name, armData.types[b]});
+                }
                 innerBinders.push_back({equationName, equation});
-                ExpressionPointer goalLiftedTwo =
-                    liftBoundVariables(goalClosed, 2, 0);
+                ExpressionPointer goalLiftedNPlus1 =
+                    liftBoundVariables(goalClosed,
+                                       static_cast<int>(n) + 1, 0);
                 // A4 substitution rule: when the case proposition is an
-                // equation whose left side is a plain local variable
-                // (`case n = k + 1 for some k:`), the arm's goal has
-                // that variable SUBSTITUTED by the right side — the
-                // kernel can then ι-reduce on the constructor form —
-                // and the proof is transported back along the equation
-                // automatically. Deterministic: it always applies when
-                // the shape matches and the goal mentions the variable.
-                ExpressionPointer armGoal = goalLiftedTwo;
+                // equation whose left side is a plain LOCAL variable
+                // (index ≥ n at the equation's scope — beyond every
+                // witness), the arm's goal has that variable SUBSTITUTED
+                // by the right side — the kernel can then ι-reduce on the
+                // constructor form — and the proof is transported back
+                // along the equation automatically.
+                ExpressionPointer armGoal = goalLiftedNPlus1;
                 int substitutedIndexInner = -1;
                 ExpressionPointer rhsInner, carrierInner;
                 LevelPointer equationLevel;
@@ -1074,10 +1289,11 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                     if (isEquation) {
                         auto* leftVariable = std::get_if<BoundVariable>(
                             &components.leftEndpoint->node);
-                        // Index ≥ 1 at the equation's scope: a LOCAL,
-                        // not the witness itself (BV0 = the witness).
+                        // Index ≥ n at the equation's scope: a LOCAL, not
+                        // one of the n witnesses (indices 0 … n-1).
                         if (leftVariable
-                            && leftVariable->deBruijnIndex >= 1) {
+                            && leftVariable->deBruijnIndex
+                                   >= static_cast<int>(n)) {
                             int targetInner =
                                 leftVariable->deBruijnIndex + 1;
                             ExpressionPointer candidateRhs =
@@ -1085,10 +1301,10 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                                     components.rightEndpoint, 1, 0);
                             ExpressionPointer substituted =
                                 replaceBoundVariableInPlace(
-                                    goalLiftedTwo, targetInner,
+                                    goalLiftedNPlus1, targetInner,
                                     candidateRhs);
                             if (!structurallyEqual(
-                                    substituted, goalLiftedTwo)) {
+                                    substituted, goalLiftedNPlus1)) {
                                 armGoal = substituted;
                                 substitutedIndexInner = targetInner;
                                 rhsInner = candidateRhs;
@@ -1109,20 +1325,17 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                     innerBinders, body, armGoal);
                 warnIfArmIsContradictionOnly(body, armCount, hasOtherwise, arm);
                 if (substitutedIndexInner >= 0) {
-                    // body : goal[n := rhs]. Transport back to goal(n)
-                    // along rhs = n (the equation reversed):
-                    //   transport(T, λx. goal[n := x], rhs, n,
-                    //             symmetry(eq), body).
+                    // body : goal[v := rhs]. Transport back to goal(v)
+                    // along rhs = v (the equation reversed).
                     ExpressionPointer variableInner =
                         makeBoundVariable(substitutedIndexInner);
                     ExpressionPointer motiveBody =
                         replaceBoundVariableInPlace(
-                            liftBoundVariables(goalLiftedTwo, 1, 0),
+                            liftBoundVariables(goalLiftedNPlus1, 1, 0),
                             substitutedIndexInner + 1,
                             makeBoundVariable(0));
                     ExpressionPointer motive = makeLambda(
-                        "_substituted",
-                        liftBoundVariables(carrierInner, 0, 0),
+                        "_substituted", carrierInner,
                         std::move(motiveBody));
                     ExpressionPointer symmetric = makeConstant(
                         "Equality.symmetry", {equationLevel});
@@ -1143,30 +1356,84 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                     transport = makeApplication(transport, std::move(body));
                     body = std::move(transport);
                 }
-                // Reposition under the ∃-hypothesis binder `h`, which
-                // sits between the locals and (k, equation): the locals'
-                // indices shift by one, k and the equation keep theirs.
-                ExpressionPointer bodyShifted =
-                    liftBoundVariables(body, 1, 2);
-                ExpressionPointer equationShifted =
-                    liftBoundVariables(equation, 1, 1);
-                ExpressionPointer typeShifted =
-                    liftBoundVariables(witnessT, 1, 0);
-                ExpressionPointer handler = makeLambda(
-                    arm.witnessName, typeShifted,
-                    makeLambda(equationName, equationShifted,
-                               std::move(bodyShifted)));
-                ExpressionPointer predicateShifted = makeLambda(
-                    arm.witnessName, typeShifted, equationShifted);
-                ExpressionPointer call = makeConstant(
-                    "Exists.eliminate", {witnessLevels[index]});
-                call = makeApplication(call, typeShifted);
-                call = makeApplication(call, predicateShifted);
-                call = makeApplication(call, goalLifted);
-                call = makeApplication(call, std::move(handler));
-                call = makeApplication(call, makeBoundVariable(0));
+                // ---- assemble the nested Exists.eliminate stack ----
+                // Lift `term` by 1 at each cutoff (ascending).
+                auto liftAtCutoffs =
+                    [&](ExpressionPointer term,
+                        const std::vector<int>& cutoffs) {
+                        for (int cutoff : cutoffs) {
+                            term = liftBoundVariables(term, 1, cutoff);
+                        }
+                        return term;
+                    };
+                // body' = body lifted at cutoffs 2, 4, …, 2n. For n = 1
+                // this is the old `lift(body, 1, 2)`.
+                {
+                    std::vector<int> cutoffs;
+                    for (size_t b = 0; b < n; ++b) {
+                        cutoffs.push_back(2 * static_cast<int>(b + 1));
+                    }
+                    body = liftAtCutoffs(body, cutoffs);
+                }
+                // nestBelow[b] = the ∃-nest under kᵦ (0-based), at depth
+                // L + b + 1: P itself for b = n-1, else ∃k_{b+1}. … P.
+                std::vector<ExpressionPointer> nestBelow(n);
+                nestBelow[n - 1] = equation;
+                for (int b = static_cast<int>(n) - 2; b >= 0; --b) {
+                    ExpressionPointer predicate = makeLambda(
+                        arm.witnessBinders[b + 1].name,
+                        armData.types[b + 1], nestBelow[b + 1]);
+                    nestBelow[b] = makeApplication(
+                        makeApplication(
+                            makeConstant("Exists",
+                                         {armData.levels[b + 1]}),
+                            armData.types[b + 1]),
+                        predicate);
+                }
+                // Fold from the innermost eliminate (b = n-1) outward.
+                ExpressionPointer inner = body;
+                for (int b = static_cast<int>(n) - 1; b >= 0; --b) {
+                    // Tᵦ' : lift Tᵦ (depth L+b) at cutoffs 0,2,…,2b.
+                    std::vector<int> typeCutoffs;
+                    for (int c = 0; c <= b; ++c) {
+                        typeCutoffs.push_back(2 * c);
+                    }
+                    ExpressionPointer typeLifted =
+                        liftAtCutoffs(armData.types[b], typeCutoffs);
+                    // Nᵦ' : lift nestBelow[b] (depth L+b+1) at cutoffs
+                    // 1,3,…,2b+1. It is both predᵦ's body and the type of
+                    // the handler's second binder (hᵦ, or eq for b=n-1).
+                    std::vector<int> nestCutoffs;
+                    for (int c = 0; c <= b; ++c) {
+                        nestCutoffs.push_back(2 * c + 1);
+                    }
+                    ExpressionPointer nestLifted =
+                        liftAtCutoffs(nestBelow[b], nestCutoffs);
+                    // Goalᵦ = lift(goalClosed, 2b+1, 0). b=0 → goalLifted.
+                    ExpressionPointer goalForLevel = liftBoundVariables(
+                        goalClosed, 2 * b + 1, 0);
+                    std::string secondBinderName =
+                        (b == static_cast<int>(n) - 1)
+                            ? equationName
+                            : ("_witness_rest_" + std::to_string(b));
+                    ExpressionPointer handler = makeLambda(
+                        arm.witnessBinders[b].name, typeLifted,
+                        makeLambda(secondBinderName, nestLifted, inner));
+                    ExpressionPointer predicate = makeLambda(
+                        arm.witnessBinders[b].name, typeLifted, nestLifted);
+                    ExpressionPointer call = makeConstant(
+                        "Exists.eliminate", {armData.levels[b]});
+                    call = makeApplication(call, typeLifted);
+                    call = makeApplication(call, predicate);
+                    call = makeApplication(call, goalForLevel);
+                    call = makeApplication(call, std::move(handler));
+                    // Scrutinee is BV(0) at each level: h for b=0, h_{b-1}
+                    // otherwise (the immediate body of λk_{b-1} λh_{b-1}).
+                    call = makeApplication(call, makeBoundVariable(0));
+                    inner = std::move(call);
+                }
                 return makeLambda(
-                    "_disjunct_hypothesis", domain, std::move(call));
+                    "_disjunct_hypothesis", domain, std::move(inner));
             }
             std::string binderName = arm.binderName.empty()
                 ? "_disjunct_hypothesis" : arm.binderName;

@@ -422,6 +422,15 @@ struct SurfaceCalc {
     std::vector<SurfaceCalcStep> steps;
 };
 
+// One witness binder in a `case P for some k₁, k₂, …:` arm. `type`
+// is null when the type is inferred (from an annotation-free binder;
+// see the inference priority in claim.cpp). A later binder's `type`
+// may reference an EARLIER witness in the same list.
+struct SurfaceWitnessBinder {
+    std::string name;
+    SurfaceExpressionPointer type;   // null if inferred
+};
+
 // One arm of a `claim by cases` block. `in (T) [as name]: body`
 // opens an arm where a hypothesis of type `T` is in scope while the
 // body proves the surrounding goal. `as name` binds the hypothesis
@@ -435,11 +444,12 @@ struct SurfaceStructuredClaimArm {
     // is ¬(P₁ ∨ … ∨ Pₖ), synthesized at elaboration time; exhaustiveness
     // is excluded middle, discharged by construction (no prover).
     bool isOtherwise = false;
-    // `case P for some k:` — the arm's hypothesis is `∃ k. P`; the
-    // witness and the equation are both in scope in the body. The
-    // witness type is inferred from P's left endpoint when omitted.
-    std::string witnessName;                // empty if no witness
-    SurfaceExpressionPointer witnessType;   // null if inferred
+    // `case P for some k₁, k₂, …:` — the arm's hypothesis is the nested
+    // existential `∃ k₁. ∃ k₂. … P`; every witness and the equation are
+    // in scope in the body. Each binder's type is inferred (from an
+    // annotation, the constructor telescope, or P's left endpoint) when
+    // omitted. Empty when the arm has no witnesses.
+    std::vector<SurfaceWitnessBinder> witnessBinders;
     int line = 0;
     int column = 0;
 };

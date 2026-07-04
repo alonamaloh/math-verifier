@@ -397,15 +397,27 @@ SurfaceExpressionPointer substituteSurfaceName(
                 ? substituteSurfaceName(arm.disjunctType,
                                          targetName, replacement)
                 : nullptr;
+            // Substitute in each binder's type only while `targetName`
+            // is not yet shadowed by an EARLIER witness binder (a later
+            // type may reference an earlier witness); once a binder named
+            // `targetName` appears, later types and the body see the
+            // shadowed name.
+            bool witnessShadowsTarget = false;
+            newArm.witnessBinders.clear();
+            for (const auto& binder : arm.witnessBinders) {
+                SurfaceWitnessBinder newBinder = binder;
+                newBinder.type = (binder.type && !witnessShadowsTarget)
+                    ? substituteSurfaceName(binder.type,
+                                             targetName, replacement)
+                    : binder.type;
+                if (binder.name == targetName) witnessShadowsTarget = true;
+                newArm.witnessBinders.push_back(std::move(newBinder));
+            }
             bool bodyShadowed = arm.binderName == targetName
-                || arm.witnessName == targetName;
+                || witnessShadowsTarget;
             newArm.body = (bodyShadowed || !arm.body)
                 ? arm.body
                 : substituteSurfaceName(arm.body, targetName, replacement);
-            newArm.witnessType = arm.witnessType
-                ? substituteSurfaceName(arm.witnessType,
-                                         targetName, replacement)
-                : nullptr;
             newArms.push_back(std::move(newArm));
         }
         return makeSurfaceStructuredClaim(
@@ -4719,40 +4731,50 @@ private:
             // 'case T [as h]: body'.
             disjunctType = parseExpression();
         }
-        // `case <equation> for some k:` / `for some (k : T):` — the
-        // structural-case witness binder (A4). The arm's hypothesis
-        // becomes `∃ k. <equation>`, with the witness and the equation
-        // both in scope in the arm body. One binder for now.
-        std::string witnessName;
-        SurfaceExpressionPointer witnessType;
+        // `case <equation> for some k₁, k₂, …:` — the structural-case
+        // witness binders (A4). The arm's hypothesis becomes the nested
+        // existential `∃ k₁. ∃ k₂. … <equation>`, with every witness and
+        // the equation in scope in the arm body. Each binder is a bare
+        // identifier or `(ident : T)`; a later binder's type may mention
+        // an earlier witness.
+        std::vector<SurfaceWitnessBinder> witnessBinders;
         if (!isOtherwise && disjunctType
             && isIdentifierLike(peek().kind) && peek().lexeme == "for") {
             consumeAny();  // 'for'
             if (!(isIdentifierLike(peek().kind)
                   && peek().lexeme == "some")) {
                 throwHere("expected 'some' after 'for' in a case arm "
-                          "(`case P for some k:`)");
+                          "(`case P for some k`)");
             }
             consumeAny();  // 'some'
-            if (peek().kind == TokenKind::LeftParen) {
-                consumeAny();  // '('
-                if (!isIdentifierLike(peek().kind)) {
-                    throwHere("expected the witness name in "
-                              "'for some (k : T)'");
+            while (true) {
+                SurfaceWitnessBinder binder;
+                if (peek().kind == TokenKind::LeftParen) {
+                    consumeAny();  // '('
+                    if (!isIdentifierLike(peek().kind)) {
+                        throwHere("expected the witness name in "
+                                  "'for some (k : T)'");
+                    }
+                    binder.name = consumeAny().lexeme;
+                    expect(TokenKind::Colon, "after the witness name");
+                    binder.type = parseExpression();
+                    expect(TokenKind::RightParen,
+                           "ending 'for some (k : T)'");
+                } else if (isIdentifierLike(peek().kind)) {
+                    binder.name = consumeAny().lexeme;
+                } else {
+                    throwHere("expected a witness name after 'for some'");
                 }
-                witnessName = consumeAny().lexeme;
-                expect(TokenKind::Colon, "after the witness name");
-                witnessType = parseExpression();
-                expect(TokenKind::RightParen,
-                       "ending 'for some (k : T)'");
-            } else if (isIdentifierLike(peek().kind)) {
-                witnessName = consumeAny().lexeme;
-            } else {
-                throwHere("expected a witness name after 'for some'");
-            }
-            if (peek().kind == TokenKind::Comma) {
-                throwHere("one witness binder per case for now "
-                          "(`for some k`)");
+                for (const auto& existing : witnessBinders) {
+                    if (existing.name == binder.name) {
+                        throwHere("duplicate witness name '" + binder.name
+                                  + "' in `for some` — each witness in a "
+                                    "case arm needs a distinct name");
+                    }
+                }
+                witnessBinders.push_back(std::move(binder));
+                if (peek().kind != TokenKind::Comma) break;
+                consumeAny();  // ','
             }
         }
         std::string binderName;
@@ -4796,8 +4818,7 @@ private:
         arm.binderName = std::move(binderName);
         arm.body = std::move(body);
         arm.isOtherwise = isOtherwise;
-        arm.witnessName = std::move(witnessName);
-        arm.witnessType = std::move(witnessType);
+        arm.witnessBinders = std::move(witnessBinders);
         arm.line = armToken.line;
         arm.column = armToken.column;
         return arm;

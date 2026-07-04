@@ -36,3 +36,60 @@ theorem Test.witness_case_annotated (n : Natural) : n = 0 ∨ 1 ≤ n := {
   };
   done
 }
+
+-- Two witnesses of the SAME carrier, both inferred (no annotation): the
+-- arm's hypothesis is ∃ k. ∃ j. n = k + j. Inside the arm all of k, j
+-- and the equation are available; the A4 rule substitutes n by k + j in
+-- the goal. The `otherwise:` arm discharges exhaustiveness by excluded
+-- middle, so no coverage lemma is needed for the ∃∃ shape.
+theorem Test.witness_case_two_carrier (n : Natural) : 0 ≤ n := {
+  0 ≤ n by cases {
+    case n = k + j for some k, j: {
+      claim usesBothWitnesses : k + j = k + j by done;
+      done
+    }
+    otherwise: done
+  };
+  done
+}
+
+-- Annotated two-binder arm; `as` names the EQUATION hypothesis (not any
+-- witness), which the body then cites by name.
+theorem Test.witness_case_two_annotated (n : Natural) : 0 ≤ n := {
+  0 ≤ n by cases {
+    case n = k + j for some (k : Natural), (j : Natural) as splitEquation: {
+      claim recovered : n = k + j by splitEquation;
+      done
+    }
+    otherwise: done
+  };
+  done
+}
+
+-- Telescope inference: the equation's right side is a constructor
+-- application, so each un-annotated witness takes its type from the
+-- constructor's Pi domain at that argument position (here both Natural).
+inductive Test.Boxed : Type(0) where
+  | Test.Boxed.empty : Test.Boxed
+  | Test.Boxed.pack : Natural → Natural → Test.Boxed
+
+theorem Test.witness_case_telescope (b : Test.Boxed) : b = b :=
+  done by cases {
+    case b = Test.Boxed.empty: done
+    case b = Test.Boxed.pack(x, y) for some x, y: done
+  }
+
+-- A later binder's TYPE is an EARLIER witness: the first witness
+-- `carrier` is a type and the second witness `element` has type
+-- `carrier`. Both annotated. (`Exists` requires a Type-valued witness,
+-- so a proof-valued dependent binder such as `k ≤ n` is not expressible
+-- here — see the report.) The disjunct's later binder type is
+-- elaborated under the context extended by the earlier witness.
+theorem Test.witness_case_dependent_binder (n : Natural) : 0 ≤ n := {
+  0 ≤ n by cases {
+    case element = element
+        for some (carrier : Type(0)), (element : carrier): done
+    otherwise: done
+  };
+  done
+}

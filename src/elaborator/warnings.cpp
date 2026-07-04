@@ -316,12 +316,22 @@ bool Elaborator::surfaceMentionsName(
                 && surfaceMentionsName(*claim->byHint, name))
                 return true;
             for (const auto& arm : claim->arms) {
-                if (arm.body
-                    && surfaceMentionsName(*arm.body, name))
-                    return true;
                 if (arm.disjunctType
                     && surfaceMentionsName(
                         *arm.disjunctType, name)) return true;
+                // A witness binder's type can mention the name; scan
+                // each until a binder shadows it, after which later
+                // types and the body see the shadowed name.
+                bool shadowed = false;
+                for (const auto& binder : arm.witnessBinders) {
+                    if (!shadowed && binder.type
+                        && surfaceMentionsName(*binder.type, name))
+                        return true;
+                    if (binder.name == name) shadowed = true;
+                }
+                if (!shadowed && arm.body
+                    && surfaceMentionsName(*arm.body, name))
+                    return true;
             }
             return false;
         }

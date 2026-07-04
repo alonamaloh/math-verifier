@@ -1629,12 +1629,17 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                              recursiveArgToHypothesis,
                                              outerBinderCount)
                     : nullptr;
-                rewrittenArm.witnessType = arm.witnessType
-                    ? rewriteRecursiveCalls(arm.witnessType,
-                                             thisDeclName,
-                                             recursiveArgToHypothesis,
-                                             outerBinderCount)
-                    : nullptr;
+                rewrittenArm.witnessBinders.clear();
+                for (const auto& binder : arm.witnessBinders) {
+                    SurfaceWitnessBinder rewrittenBinder = binder;
+                    rewrittenBinder.type = binder.type
+                        ? rewriteRecursiveCalls(binder.type, thisDeclName,
+                                                 recursiveArgToHypothesis,
+                                                 outerBinderCount)
+                        : nullptr;
+                    rewrittenArm.witnessBinders.push_back(
+                        std::move(rewrittenBinder));
+                }
                 rewrittenArms.push_back(std::move(rewrittenArm));
             }
             auto rewrittenNode = makeSurfaceStructuredClaim(
