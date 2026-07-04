@@ -2023,6 +2023,15 @@ ExpressionPointer Elaborator::autoProveCalcStepRaw(
                 localBinders, previousKernel, nextKernel,
                 carrierType, carrierLevel, line);
             if (ringProof) return ringProof;
+            // B3.1: cast-equality tier — leaf-normalize both endpoints,
+            // lower a same-hop `ι(a) = ι(b)` to the source carrier and
+            // re-run the battery there (lifting by congruence), or retry
+            // once at the normalized endpoints.
+            ExpressionPointer castProof = tryCastEqualityTier(
+                localBinders, previousKernel, nextKernel,
+                carrierType, carrierLevel, stepEqualityType,
+                line, column);
+            if (castProof) return castProof;
             return nullptr;
         }
         // Wrap from innermost out. At each step we need the type of

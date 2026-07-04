@@ -767,6 +767,21 @@ private:
         ExpressionPointer term,
         const std::vector<LocalBinder>& localBinders);
 
+    // B3.1 — the cast-equality tier, run at the equality battery's
+    // decline point: normalize both endpoints to leaf-cast form; when
+    // both become the same single-hop cast `ι(a)` / `ι(b)`, LOWER to
+    // `a = b` at the source carrier, re-run the battery there, and
+    // lift by ι-congruence; otherwise retry once at the normalized
+    // endpoints (guarded on the normalization having moved something).
+    ExpressionPointer tryCastEqualityTier(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        ExpressionPointer stepEqualityType,
+        int line, int column);
+
     // Helper for `castPushToLeaves`: normalize `coercionName(inner)`,
     // distributing the coercion over `inner`'s top operation when the move
     // lemma exists. `term` is the original `coercionName(inner)` node.

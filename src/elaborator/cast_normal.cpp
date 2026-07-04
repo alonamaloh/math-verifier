@@ -198,3 +198,116 @@ Elaborator::CastNormalForm Elaborator::pushCoercion(
     // No distribution at this layer; the only change (if any) is inside.
     return {coercedInner, innerCongruence};
 }
+
+// B3.1 — the cast-equality tier. Runs when the equality battery has
+// declined a step `previous = next`. Normalize both endpoints to
+// leaf-cast form (proof-carrying); then:
+//   1. If both normal forms are the SAME single-hop cast — `ι(a)` and
+//      `ι(b)` — LOWER the goal to `a = b` at the source carrier,
+//      re-run the battery there, and lift the found proof back through
+//      ι by congruence. This is the reflection direction the
+//      push-to-leaves transform alone cannot provide: the battery's
+//      indexes speak the source carrier's lemmas (`a = b` over
+//      Integer), which the cast-bearing spelling hides.
+//   2. Otherwise, if normalization moved either endpoint, retry the
+//      battery once at the normalized endpoints and stitch the
+//      normalization proofs around the found core.
+// Terminates: lowering strictly shortens the coercion chain, and the
+// retry is guarded on "normalization moved something" (normal forms
+// are fixpoints of castPushToLeaves).
+ExpressionPointer Elaborator::tryCastEqualityTier(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        ExpressionPointer stepEqualityType,
+        int line, int column) {
+    autoProveSpend(2);
+    CastNormalForm leftNorm =
+        castPushToLeaves(previousKernel, localBinders);
+    CastNormalForm rightNorm = castPushToLeaves(nextKernel, localBinders);
+
+    auto singleHop = [&](ExpressionPointer term)
+            -> std::optional<std::pair<std::string, ExpressionPointer>> {
+        auto* app = std::get_if<Application>(&term->node);
+        if (!app) return std::nullopt;
+        auto* head = std::get_if<Constant>(&app->function->node);
+        if (!head || !isCoercionFunctionName(head->name)) {
+            return std::nullopt;
+        }
+        return std::make_pair(head->name, app->argument);
+    };
+    // Assemble previous = next from the three pieces
+    //   previous = leftNorm.term   (normalization, or refl)
+    //   leftNorm.term = rightNorm.term   (the found core)
+    //   rightNorm.term = next   (normalization reversed, or refl)
+    auto stitch = [&](ExpressionPointer coreProof) {
+        ExpressionPointer total = coreProof;
+        if (leftNorm.proof) {
+            total = buildEqualityTransitivity(
+                carrierLevel, carrierType, previousKernel,
+                leftNorm.term, rightNorm.term, leftNorm.proof, total);
+        }
+        if (rightNorm.proof) {
+            ExpressionPointer reversed = buildEqualitySymmetry(
+                carrierLevel, carrierType, nextKernel, rightNorm.term,
+                rightNorm.proof);
+            total = buildEqualityTransitivity(
+                carrierLevel, carrierType, previousKernel,
+                rightNorm.term, nextKernel, total, reversed);
+        }
+        return total;
+    };
+
+    auto leftHop = singleHop(leftNorm.term);
+    auto rightHop = singleHop(rightNorm.term);
+    if (leftHop && rightHop && leftHop->first == rightHop->first) {
+        ExpressionPointer loweredLeft = leftHop->second;
+        ExpressionPointer loweredRight = rightHop->second;
+        ExpressionPointer sourceCarrier =
+            inferTypeInLocalContext(localBinders, loweredLeft);
+        LevelPointer sourceLevel =
+            typeUniverseOf(localBinders, loweredLeft);
+        ExpressionPointer loweredGoal = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("Equality", {sourceLevel}),
+                    sourceCarrier),
+                loweredLeft),
+            loweredRight);
+        ExpressionPointer loweredProof = nullptr;
+        try {
+            loweredProof = autoProveCalcStep(
+                localBinders, loweredLeft, loweredRight, sourceCarrier,
+                sourceLevel, loweredGoal, line, column);
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        if (loweredProof) {
+            ExpressionPointer hopLambda = makeLambda(
+                "_cast_z", sourceCarrier,
+                makeApplication(makeConstant(leftHop->first),
+                                 makeBoundVariable(0)));
+            ExpressionPointer lifted = buildEqualityCongruence(
+                sourceLevel, sourceCarrier, carrierLevel, carrierType,
+                hopLambda, loweredLeft, loweredRight, loweredProof);
+            return stitch(lifted);
+        }
+        return nullptr;
+    }
+
+    if (leftNorm.proof || rightNorm.proof) {
+        ExpressionPointer retryProof = nullptr;
+        try {
+            retryProof = autoProveCalcStepRaw(
+                localBinders, leftNorm.term, rightNorm.term,
+                carrierType, carrierLevel, stepEqualityType,
+                line, column);
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        if (retryProof) return stitch(retryProof);
+    }
+    return nullptr;
+}
