@@ -1081,6 +1081,16 @@ private:
 
     void elaborateInductive(const SurfaceInductiveDeclaration& declaration);
 
+    // A4: after an inductive lands, synthesize its automatic coverage
+    // lemma `<T>.cases_covered : ∀ params (subject : T). subject = C1(…)
+    // ∨ ∃ args. subject = C2(args) ∨ …` so equation-shaped `by cases` /
+    // `by induction` arms discharge exhaustiveness without hand-written
+    // per-type lemmas. Skips silently when the logic vocabulary (Or /
+    // Exists / Equality) isn't in scope at the declaration site, and for
+    // Prop-valued or indexed inductives.
+    void synthesizeCoverageLemma(
+        const SurfaceInductiveDeclaration& declaration);
+
     // -------- expression elaboration --------
 
     // Convert a list of SurfaceArguments (possibly with names) into a

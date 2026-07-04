@@ -1,0 +1,62 @@
+-- Feature test (A4): auto-generated coverage lemmas at inductive-
+-- declaration time. Every Type-valued, non-indexed inductive declared
+-- where the logic vocabulary is in scope gets an automatic
+-- `<T>.cases_covered : ∀ params (subject : T). subject = C1(…) ∨
+-- ∃ args. subject = C2(args) ∨ …`, so equation-shaped case splits
+-- discharge exhaustiveness with no hand-written coverage lemma.
+module Test.coverage_lemma_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Lists.basics
+import Lists.list
+
+-- Parameterless, mixed nullary/unary/binary constructors.
+inductive Test.Shape : Type(0) where
+  | Test.Shape.point : Test.Shape
+  | Test.Shape.circle : Natural → Test.Shape
+  | Test.Shape.rectangle : Natural → Natural → Test.Shape
+
+-- The generated lemma is citable by name.
+theorem Test.shape_covered (s : Test.Shape)
+        : s = Test.Shape.point
+          ∨ (∃ (radius : Natural). s = Test.Shape.circle(radius))
+          ∨ (∃ (width : Natural). ∃ (height : Natural).
+               s = Test.Shape.rectangle(width, height)) :=
+  done by Test.Shape.cases_covered
+
+-- The pre-existing library inductive got one too (NaturalList is
+-- declared in Lists.basics, after the logic vocabulary).
+theorem Test.natural_list_covered (l : NaturalList)
+        : l = NaturalList.empty
+          ∨ (∃ (head : Natural). ∃ (tail : NaturalList).
+               l = NaturalList.prepend(head, tail)) :=
+  done by NaturalList.cases_covered
+
+-- The payoff: an equation-shaped by-cases split on a custom inductive
+-- discharges exhaustiveness against the generated automatic lemma —
+-- no hand-written coverage lemma anywhere.
+inductive Test.Signal : Type(0) where
+  | Test.Signal.off : Test.Signal
+  | Test.Signal.on : Natural → Test.Signal
+
+definition Test.Signal.strength : Test.Signal → Natural
+  | Test.Signal.off      => 0
+  | Test.Signal.on(level) => level
+
+theorem Test.signal_strength_self_bound (s : Test.Signal)
+        : Test.Signal.strength(s) ≤ Test.Signal.strength(s) :=
+  done by cases {
+    case s = Test.Signal.off: done
+    case s = Test.Signal.on(level) for some (level : Natural): done
+  }
+
+-- Parametrized inductives get one too (constructors applied to the
+-- parameters explicitly in the generated statement).
+theorem Test.list_covered (A : Type(0)) (l : List(A))
+        : l = List.empty(A)
+          ∨ (∃ (head : A). ∃ (tail : List(A)).
+               l = List.prepend(A, head, tail)) :=
+  done by List.cases_covered

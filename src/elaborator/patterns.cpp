@@ -1891,5 +1891,208 @@ void Elaborator::elaborateInductive(const SurfaceInductiveDeclaration& declarati
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
         resetAutoBoundState();
+
+        synthesizeCoverageLemma(declaration);
+    }
+
+void Elaborator::synthesizeCoverageLemma(
+        const SurfaceInductiveDeclaration& declaration) {
+        // Type-valued, non-indexed inductives with at least one
+        // constructor only. (An indexed inductive's surface kind is a
+        // Pi; Prop-valued ones don't get equation-shaped case splits.)
+        if (!std::get_if<SurfaceType>(&declaration.kind->node)) return;
+        if (declaration.constructors.empty()) return;
+        // The logic vocabulary must be in scope at the declaration site
+        // (the foundational files declare their inductives before Or /
+        // Exists / Equality exist — those keep hand-written lemmas).
+        for (const char* needed :
+             {"Or", "Or.introduceLeft", "Or.introduceRight", "Exists",
+              "Exists.introduce", "Equality", "reflexivity"}) {
+            if (environment_.declarations.find(needed)
+                    == environment_.declarations.end()) {
+                return;
+            }
+        }
+
+        int line = declaration.kind->line;
+        int column = declaration.kind->column;
+        auto identifier = [&](const std::string& name) {
+            return makeSurfaceIdentifier(name, {}, line, column);
+        };
+
+        std::vector<std::string> parameterNames;
+        for (const auto& binder : declaration.parameters) {
+            if (binder.isImplicit) return;
+            for (const auto& name : binder.names) {
+                parameterNames.push_back(name);
+            }
+        }
+        auto isTaken = [&](const std::string& name) {
+            return std::find(parameterNames.begin(), parameterNames.end(),
+                             name) != parameterNames.end();
+        };
+        std::string subjectName = "subject";
+        while (isTaken(subjectName)) subjectName += "_";
+
+        auto applyToParameters = [&](const std::string& head)
+                -> SurfaceExpressionPointer {
+            if (parameterNames.empty()) return identifier(head);
+            std::vector<SurfaceExpressionPointer> arguments;
+            for (const auto& name : parameterNames) {
+                arguments.push_back(identifier(name));
+            }
+            return makeSurfaceApplication(identifier(head),
+                                          std::move(arguments),
+                                          line, column);
+        };
+
+        // Per constructor: the argument telescope (from the SURFACE
+        // constructor type — value args only; parameter Pis are added
+        // at elaboration), the ∃-wrapped equation disjunct, and the
+        // cases-arm proof.
+        struct ConstructorArgument {
+            std::string name;
+            SurfaceExpressionPointer type;
+        };
+        std::vector<SurfaceExpressionPointer> disjuncts;
+        std::vector<SurfaceCasesClause> clauses;
+        std::vector<SurfaceExpressionPointer> armProofs;
+        for (const auto& constructorSpec : declaration.constructors) {
+            std::vector<ConstructorArgument> constructorArguments;
+            const SurfaceExpression* cursor = constructorSpec.type.get();
+            int freshCounter = 0;
+            while (auto* pi = std::get_if<SurfacePiType>(&cursor->node)) {
+                if (pi->binder.isImplicit) return;
+                if (!pi->binder.type) return;
+                size_t nameCount = pi->binder.names.empty()
+                    ? 1 : pi->binder.names.size();
+                for (size_t i = 0; i < nameCount; ++i) {
+                    std::string name = pi->binder.names.empty()
+                        ? std::string() : pi->binder.names[i];
+                    if (name.empty() || name == "_") {
+                        name = "value" + std::to_string(++freshCounter);
+                    }
+                    while (isTaken(name) || name == subjectName) {
+                        name += "_";
+                    }
+                    bool duplicate = false;
+                    for (const auto& earlier : constructorArguments) {
+                        if (earlier.name == name) { duplicate = true; break; }
+                    }
+                    if (duplicate) {
+                        name += std::to_string(++freshCounter);
+                    }
+                    constructorArguments.push_back({name, pi->binder.type});
+                }
+                cursor = pi->codomain.get();
+            }
+
+            // subject = C(params…, args…), ∃-wrapped over the args.
+            SurfaceExpressionPointer constructorApplication;
+            {
+                std::vector<SurfaceExpressionPointer> arguments;
+                for (const auto& name : parameterNames) {
+                    arguments.push_back(identifier(name));
+                }
+                for (const auto& argument : constructorArguments) {
+                    arguments.push_back(identifier(argument.name));
+                }
+                constructorApplication = arguments.empty()
+                    ? identifier(constructorSpec.name)
+                    : makeSurfaceApplication(identifier(constructorSpec.name),
+                                             std::move(arguments),
+                                             line, column);
+            }
+            SurfaceExpressionPointer disjunct = makeSurfaceBinaryOperation(
+                "=", identifier(subjectName), constructorApplication,
+                line, column);
+            for (auto it = constructorArguments.rbegin();
+                 it != constructorArguments.rend(); ++it) {
+                SurfaceBinder existsBinder{{it->name}, it->type};
+                disjunct = makeSurfaceApplication(
+                    identifier("Exists"),
+                    std::vector<SurfaceExpressionPointer>{
+                        it->type,
+                        makeSurfaceLambda(std::move(existsBinder), disjunct,
+                                          line, column)},
+                    line, column);
+            }
+            disjuncts.push_back(std::move(disjunct));
+
+            // Arm: | C(args…) => witness-chain(reflexivity(C(params…, args…)))
+            SurfaceExpressionPointer proof = makeSurfaceApplication(
+                identifier("reflexivity"),
+                std::vector<SurfaceExpressionPointer>{constructorApplication},
+                line, column);
+            for (auto it = constructorArguments.rbegin();
+                 it != constructorArguments.rend(); ++it) {
+                proof = makeSurfaceAnonymousTuple(
+                    std::vector<SurfaceExpressionPointer>{
+                        identifier(it->name), std::move(proof)},
+                    line, column, /*userWritten=*/false);
+            }
+            armProofs.push_back(std::move(proof));
+
+            std::vector<SurfacePatternPointer> patternArguments;
+            for (const auto& argument : constructorArguments) {
+                patternArguments.push_back(makeSurfacePatternBareName(
+                    argument.name, line, column));
+            }
+            SurfaceCasesClause clause;
+            clause.pattern = makeSurfacePatternConstructor(
+                constructorSpec.name, std::move(patternArguments),
+                line, column);
+            clause.line = line;
+            clause.column = column;
+            clauses.push_back(std::move(clause));
+        }
+
+        // Right-associated disjunction, with each arm's proof wrapped in
+        // the matching Or-injection chain (constructor i of n: i Rights
+        // then a Left, the last constructor all Rights).
+        size_t constructorCount = disjuncts.size();
+        SurfaceExpressionPointer statement = disjuncts.back();
+        for (size_t i = constructorCount - 1; i-- > 0;) {
+            statement = makeSurfaceBinaryOperation(
+                "∨", disjuncts[i], std::move(statement), line, column);
+        }
+        for (size_t i = 0; i < constructorCount; ++i) {
+            SurfaceExpressionPointer wrapped = std::move(armProofs[i]);
+            if (i + 1 < constructorCount) {
+                wrapped = makeSurfaceApplication(
+                    identifier("Or.introduceLeft"),
+                    std::vector<SurfaceExpressionPointer>{std::move(wrapped)},
+                    line, column);
+            }
+            for (size_t j = 0; j < i; ++j) {
+                wrapped = makeSurfaceApplication(
+                    identifier("Or.introduceRight"),
+                    std::vector<SurfaceExpressionPointer>{std::move(wrapped)},
+                    line, column);
+            }
+            clauses[i].body = std::move(wrapped);
+        }
+
+        SurfaceDefinitionDeclaration lemma;
+        lemma.name = declaration.name + ".cases_covered";
+        lemma.universeParameters = declaration.universeParameters;
+        lemma.arguments = declaration.parameters;
+        SurfaceBinder subjectBinder{{subjectName},
+                                    applyToParameters(declaration.name)};
+        lemma.arguments.push_back(std::move(subjectBinder));
+        lemma.type = std::move(statement);
+        lemma.body = makeSurfaceCases(identifier(subjectName),
+                                      std::move(clauses), line, column);
+        lemma.isTheorem = true;
+        lemma.automatic = true;
+        try {
+            elaborateDefinition(lemma);
+        } catch (const ElaborateError&) {
+            // The vocabulary was present but the lemma didn't elaborate
+            // (dependent corner, exotic constructor shape, name clash) —
+            // the inductive itself is unaffected; hand-written coverage
+            // lemmas remain the fallback.
+        } catch (const TypeError&) {
+        }
     }
 

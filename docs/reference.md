@@ -102,6 +102,12 @@ cases e with eq { | pat => … }         -- also bind eq : e = pat
 cases by L { | C(args) => … }          -- split a lemma's disjunction (args inferred)
 if P then a else b                     -- value-level classical conditional (cases on `Logic.classical_decidable(P)`)
 ```
+Every Type-valued, non-indexed `inductive` declared where the logic
+vocabulary is in scope auto-generates an automatic coverage lemma
+`<T>.cases_covered : ∀ params (subject : T). subject = C1(…) ∨ ∃ args.
+subject = C2(args) ∨ …` — equation-shaped case splits discharge their
+exhaustiveness against it, so no hand-written per-type coverage lemma
+is needed.
 `if P then a else b` branches a definition on any proposition `P` — a
 mathematical condition, not a constructor pattern. Reason about the result
 through the generic characterizing equations `Logic.if_positive` /
