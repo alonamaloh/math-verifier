@@ -58,7 +58,7 @@ theorem Natural.lt_one_plus (a : Natural) : a < 1 + a :=
 
 -- a < successor(a) — the same fact in successor form.
 automatic theorem Natural.lt_successor (a : Natural) : a < successor(a) :=
-  unfold Natural.LessThan in witness 0 with (calc a + (1 + 0) = successor(a))
+  unfold Natural.LessThan in witness 0 with { a + (1 + 0) = successor(a) }
 
 -- Nothing lies strictly below zero. A gap `c` with `k + (1 + c) = 0` makes
 -- the left side a successor of `k + c`, which is never zero.
@@ -68,9 +68,10 @@ automatic theorem Natural.lt_successor (a : Natural) : a < successor(a) :=
 theorem Natural.not_less_than_zero (k : Natural) : ¬(k < 0) := {
   suppose k < 0 as _;
   choose gap such that k + (1 + gap) = 0 from Natural.lt_elim;
-  absurd((calc successor(k + gap)
-            = k + (1 + gap)
-            = 0            by (k + (1 + gap) = 0)))
+  successor(k + gap)
+     = k + (1 + gap)
+     = 0            by (k + (1 + gap) = 0);
+  done
 }
 
 -- Irreflexivity: a value never lies strictly below itself. A gap `c` with
@@ -84,9 +85,10 @@ automatic theorem Natural.lt_irreflexive (a : Natural) : ¬ (a < a) := {
      = a
      = a + 0;
   1 + gap = 0;
-  absurd((calc successor(gap)
-            = 1 + gap
-            = 0         by (1 + gap = 0)))
+  successor(gap)
+     = 1 + gap
+     = 0         by (1 + gap = 0);
+  done
 }
 
 -- Transitivity of `<`: stacking the two gaps gives a gap for a < c. This is
@@ -116,7 +118,7 @@ theorem Natural.lt_of_le_of_ne (a b : Natural) (lessOrEqual : a ≤ b) (notEqual
   done by cases {
     case a < b: done
     case a = b: {
-        claim False;
+        False;
         done
       }
   }
@@ -166,7 +168,7 @@ automatic theorem Natural.le_successor (n : Natural) : n ≤ successor(n) := {
 -- played): smaller ≤ larger ≤ successor(larger).
 automatic theorem Natural.le_step (smaller larger : Natural) (proof : smaller ≤ larger)
         : smaller ≤ successor(larger) :=
-  calc smaller
+  smaller
      ≤ larger              by proof
      ≤ successor(larger)   by Natural.le_successor
 
@@ -187,7 +189,7 @@ automatic theorem Natural.less_or_equal_add_right (a b : Natural) : a ≤ a + b 
 
 -- Zero is at most every natural number: 0 ≤ 0 + upperBound = upperBound.
 automatic theorem Natural.zero_least (upperBound : Natural) : 0 ≤ upperBound :=
-  calc 0
+  0
      ≤ 0 + upperBound   by Natural.less_or_equal_add_right
      = upperBound
 
@@ -195,7 +197,7 @@ automatic theorem Natural.zero_least (upperBound : Natural) : 0 ≤ upperBound :
 -- a numeral cancellation never breadcrumbs it. (The general ground-
 -- arithmetic tactic is future work; this is its stop-gap.)
 automatic theorem Natural.one_le_two : (1 : Natural) ≤ 2 :=
-  calc (1 : Natural)
+  (1 : Natural)
      ≤ 1 + 1
      = 2
 
@@ -253,7 +255,7 @@ theorem Natural.lt_trichotomy (a : Natural)
             done
           }
         | successor(predecessor) =>
-            calc 0
+            0
                ≤ predecessor              by Natural.zero_least
                < successor(predecessor)   by Natural.lt_successor
       }
@@ -308,7 +310,7 @@ automatic theorem Natural.successor_positive (k : Natural) : 1 ≤ successor(k) 
 
 -- 1 ≤ k + 1: the `n + 1` form of successor_positive.
 theorem Natural.one_le_add_one (k : Natural) : 1 ≤ k + 1 :=
-  calc (1 : Natural)
+  (1 : Natural)
      ≤ successor(k)   by Natural.successor_positive
      = k + 1
 
@@ -353,7 +355,7 @@ automatic theorem Natural.successor_le_of_lt (k n : Natural) (h : k < n) : succe
 
 -- successor(k) ≤ n  ⟹  k < n: k < successor(k) ≤ n.
 automatic theorem Natural.lt_of_successor_le (k n : Natural) (h : successor(k) ≤ n) : k < n :=
-  calc k
+  k
      < successor(k)   by Natural.lt_successor
      ≤ n              by h
 
@@ -382,7 +384,7 @@ theorem Natural.add_one_le_of_lt (k n : Natural) (h : k < n) : k + 1 ≤ n := {
 
 -- k + 1 ≤ n  ⟹  k < n: k < k + 1 ≤ n.
 theorem Natural.lt_of_add_one_le (k n : Natural) (h : k + 1 ≤ n) : k < n :=
-  calc k
+  k
      < k + 1   by Natural.lt_add_one
      ≤ n        by h
 
@@ -404,12 +406,12 @@ theorem Natural.zero_lt_of_one_le (m : Natural) (h : 1 ≤ m) : 0 < m := {
 
 -- a < n  ⟹  a < n + 1 (the strict-order step, `+ 1` form).
 theorem Natural.lt_add_one_of_lt (a n : Natural) (h : a < n) : a < n + 1 :=
-  calc a
+  a
      < n        by h
      < n + 1    by Natural.lt_add_one
 
 -- a ≤ n  ⟹  a ≤ n + 1 (the weak-order step, `+ 1` form).
 theorem Natural.le_add_one_of_le (a n : Natural) (h : a ≤ n) : a ≤ n + 1 :=
-  calc a
+  a
      ≤ n        by h
      ≤ n + 1    by Natural.less_or_equal_add_right

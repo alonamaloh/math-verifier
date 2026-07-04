@@ -31,32 +31,33 @@ theorem Natural.to_integer.eq_zero_implies (m : Natural)
         (imageZero : Natural.to_integer(m) = Integer.zero) : m = 0 :=
   -- `(m : Integer) = 0` is `from_difference(m, 0) = from_difference(0, 0)`;
   -- the boundary reads it back as the cross-equation `m + 0 = 0 + 0`.
-  calc m
+  m
      = m + 0
      = 0 + 0
      = 0
 
 -- A square is non-negative: ∃ n. a·a = (n : Integer).
-theorem Integer.square_is_nonneg (a : Integer) : Integer.IsNonneg(a * a) :=
-  claim Integer.IsNonneg(a) ∨ (∃ (k : Natural). a = -(k : Integer))
-      by Integer.sign_split
+theorem Integer.square_is_nonneg (a : Integer) : Integer.IsNonneg(a * a) := {
+  Integer.IsNonneg(a) ∨ (∃ (k : Natural). a = -(k : Integer))
+      by Integer.sign_split;
   done by cases {
     case Integer.IsNonneg(a) as nonnegative: {
         choose n such that a = (n : Integer) as aEqualsN from nonnegative;
         witness n * n with
-            calc a * a
+            a * a
                = (n : Integer) * (n : Integer)        by aEqualsN
                = ((n * n : Natural) : Integer)
       }
     case ∃ (k : Natural). a = -(k : Integer) as negative: {
         choose k such that a = -(k : Integer) as aEqualsNegativeK from negative;
         witness k * k with
-            calc a * a
+            a * a
                = (-(k : Integer)) * (-(k : Integer))   by aEqualsNegativeK
                = (k : Integer) * (k : Integer)
                = ((k * k : Natural) : Integer)
       }
   }
+}
 
 -- a² + b² = 0 ⟹ a = 0 ∧ b = 0.
 theorem Integer.sum_of_squares_zero (a b : Integer)
@@ -65,12 +66,11 @@ theorem Integer.sum_of_squares_zero (a b : Integer)
   choose m such that a * a = (m : Integer) as aaEqualsM from Integer.square_is_nonneg;
   choose n such that b * b = (n : Integer) as bbEqualsN from Integer.square_is_nonneg;
   -- (m + n : Integer) = a² + b² = 0, so m + n = 0 as Naturals.
-  let _ : Natural.to_integer(m + n) = Integer.zero :=
-      calc Natural.to_integer(m + n)
-         = (m : Integer) + (n : Integer)
-         = a * a + (n : Integer)         by aaEqualsM
-         = a * a + b * b                 by bbEqualsN
-         = Integer.zero                  by squaresSumZero;
+  Natural.to_integer(m + n)
+     = (m : Integer) + (n : Integer)
+     = a * a + (n : Integer)         by aaEqualsM
+     = a * a + b * b                 by bbEqualsN
+     = Integer.zero                  by squaresSumZero;
   m + n = 0;
   m = 0 as mZero;
   n = 0 as nZero;

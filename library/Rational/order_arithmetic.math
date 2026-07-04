@@ -48,7 +48,7 @@ theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) := {
 -- 0 ≤ q ↔ IsNonneg(q) was already in `Rational.positive`. We mirror
 -- as Rational.LessOrEqual.reflexive: x ≤ x.
 automatic theorem Rational.LessOrEqual.reflexive (x : Rational) : x ≤ x :=
-  claim Rational.IsNonneg(x - x)
+  Rational.IsNonneg(x - x)
     by substituting (ring : x - x = Rational.zero)
 
 -- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p + q). At Integer level the
@@ -61,9 +61,9 @@ theorem Integer.IsNonneg.add
     choose a from xIsNonneg;
     choose b from yIsNonneg;
     witness a + b with
-        (calc x + y
+        { x + y
             = (a : Integer) + (b : Integer)
-            = (a + b : Integer))
+            = (a + b : Integer) }
 }
 
 -- Rational IsNonneg.add: take representatives, the Integer-level
@@ -138,7 +138,7 @@ theorem Rational.LessOrEqual.transitive
         (xLeqY : x ≤ y) (yLeqZ : y ≤ z)
         : x ≤ z :=
   -- (z - y) + (y - x) = z - x; IsNonneg.add closes the rewritten goal.
-  claim Rational.IsNonneg(z - x)
+  Rational.IsNonneg(z - x)
     by substituting (ring : (z - y) + (y - x) = z - x)
 
 -- ----------------------------------------------------------------------
@@ -200,9 +200,9 @@ theorem Rational.LessThan.transitive_left
     suppose x = z as xEqualsZ;
     y ≤ x;
     yNotZ(
-        calc y
-           = x   by Rational.LessOrEqual.antisymmetric
-           = z)
+        { y
+             = x   by Rational.LessOrEqual.antisymmetric
+             = z })
   };
   done
 }
@@ -231,14 +231,14 @@ theorem Rational.LessThan.transitive_right
 automatic theorem Rational.add_preserves_LessOrEqual
         (x y z : Rational) (xLeqY : x ≤ y)
         : x + z ≤ y + z :=
-  claim x + z ≤ y + z
+  x + z ≤ y + z
     by substituting ((y + z) - (x + z) = y - x)
 
 -- Add cancel right: x + z = y + z → x = y. Add -z to both sides.
 theorem Rational.add_cancel_right (x y z : Rational)
         (sumEquality : x + z = y + z)
         : x = y :=
-  calc x
+  x
      = (x + z) + -z
      = (y + z) + -z
      = y
@@ -253,7 +253,7 @@ automatic theorem Rational.add_preserves_LessThan
 theorem Rational.add_left_preserves_LessThan
         (x y z : Rational) (xLessY : x < y)
         : z + x < z + y :=
-  calc z + x
+  z + x
      = x + z
      < y + z
      = z + y
@@ -263,7 +263,7 @@ theorem Rational.add_left_preserves_LessThan
 theorem Rational.add_preserves_LessOrEqual_left
         (b h : Rational) (bLeqH : b ≤ h)
         : h + b ≤ h + h :=
-  calc h + b
+  h + b
      = b + h
      ≤ h + h
 
@@ -284,7 +284,7 @@ automatic theorem Rational.negate_LessThan_zero_of_positive
         (x : Rational) (xPositive : Rational.zero < x)
         : -x < Rational.zero :=
   -- Add -x to both sides of 0 < x: 0 + -x < x + -x, i.e., -x < 0.
-  calc (-x : Rational)
+  (-x : Rational)
      = Rational.zero + -x
      < x + -x   by Rational.add_preserves_LessThan
      = Rational.zero
@@ -294,7 +294,7 @@ automatic theorem Rational.negate_LessThan_zero_of_positive
 -- modulo `y - x = -x - -y`, which is pure ring.
 automatic theorem Rational.LessOrEqual.negate
         (x y : Rational) (xLeqY : x ≤ y) : -y ≤ -x :=
-  claim -y ≤ -x by substituting (ring : y - x = -x - -y)
+  -y ≤ -x by substituting (ring : y - x = -x - -y)
 
 -- Strict order reverses under negation: x < y → -y < -x.
 automatic theorem Rational.LessThan.negate
@@ -302,7 +302,7 @@ automatic theorem Rational.LessThan.negate
   x ≤ y;
   -y ≤ -x;
   x ≠ y as xDistinct;
-  -y ≠ -x by (negEqual : -y = -x) ↦ xDistinct(claim x = y by substituting (ring : x = -(-x)));
+  -y ≠ -x by (negEqual : -y = -x) ↦ xDistinct({ x = y by substituting (ring : x = -(-x)) });
   done
 }
 
@@ -311,7 +311,7 @@ automatic theorem Rational.LessOrEqual_zero_of_negate_IsNonneg
         (x : Rational) (negXIsNonneg : Rational.IsNonneg(-x))
         : x ≤ Rational.zero :=
   -- x ≤ 0 = IsNonneg(0 - x) = IsNonneg(-x).
-  claim x ≤ Rational.zero by substituting (ring : -x = Rational.zero - x)
+  x ≤ Rational.zero by substituting (ring : -x = Rational.zero - x)
 
 -- A rational with positive absolute value is nonzero: if q = 0 then
 -- |q| = 0, contradicting 0 < |q|.
@@ -322,5 +322,5 @@ theorem Rational.nonzero_of_absolute_value_positive
   (qIsZero : q = Rational.zero) ↦ {
     Rational.zero ≠ abs(q) as zeroDistinctFromAbsolute;
     abs(q) = abs(Rational.zero) = Rational.zero;
-    absurd(zeroDistinctFromAbsolute(claim Rational.zero = abs(q)))
+    absurd(zeroDistinctFromAbsolute({ Rational.zero = abs(q) }))
   }

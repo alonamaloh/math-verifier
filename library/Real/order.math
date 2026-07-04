@@ -197,14 +197,15 @@ automatic theorem Real.IsNonneg_zero : Real.IsNonneg(Real.zero) :=
   ((ε : Rational)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦
+        (m : Natural) (_ : 0 ≤ m) ↦ {
           -- Goal: -ε < sf(to_cauchy_constant(0), m) ≡β Rational.zero.
-          claim -ε < Rational.zero by Rational.negate_LessThan_zero_of_positive)
+          -ε < Rational.zero by Rational.negate_LessThan_zero_of_positive
+        })
 
 -- Real.LessOrEqual.reflexive : x ≤ x.
 automatic theorem Real.LessOrEqual.reflexive (x : Real) : x ≤ x :=
   -- x ≤ x is Real.IsNonneg(x - x); rewrite x - x to 0 and use IsNonneg_zero.
-  claim Real.IsNonneg(x - x)
+  Real.IsNonneg(x - x)
     by substituting (ring : x - x = Real.zero)
 
 -- ----------------------------------------------------------------------
@@ -269,7 +270,7 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.add
         (m : Natural) (_ : N ≤ m) ↦
           -- -ε < sf(a, m) + sf(b, m) (the pointwise bound), and
           -- sf(a, m) + sf(b, m) = sf(add(a, b), m) (bridge lemma).
-          calc -ε
+          -ε
              < CauchyRationalSequence.sequenceFunction(a, m)
                + CauchyRationalSequence.sequenceFunction(b, m)
              = CauchyRationalSequence.sequenceFunction(
@@ -300,7 +301,7 @@ theorem Real.LessOrEqual.transitive
         (x y z : Real)
         (xLeqY : x ≤ y) (yLeqZ : y ≤ z)
         : x ≤ z :=
-  claim Real.IsNonneg(z - x)
+  Real.IsNonneg(z - x)
     by substituting (ring : (y - x) + (z - y) = z - x)
 
 -- ----------------------------------------------------------------------
@@ -344,7 +345,7 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
           -- Final step: |s(m) - 0| = |s(m)| < ε. s(m) - 0 = s(m) by
           -- add_zero applied to (s(m) + -0) (definition of subtract).
           abs(s(m) - Rational.zero)
-             = abs(s(m))   by (calc s(m) - Rational.zero = s(m))
+             = abs(s(m))   by { s(m) - Rational.zero = s(m) }
              < ε
         }
   }
@@ -440,7 +441,7 @@ theorem Real.LessThan.transitive_left
         -- Then y = x = z contradicts y ≠ z.
         y ≤ z = x;
         x = y;
-        yNotZ(calc y = x = z)
+        yNotZ({ y = x = z })
       })
 }
 
@@ -469,13 +470,13 @@ theorem Real.LessThan.transitive_right
 automatic theorem Real.add_preserves_LessOrEqual
         (x y z : Real) (xLeqY : x ≤ y)
         : x + z ≤ y + z :=
-  claim x + z ≤ y + z by substituting (ring : y - x = (y + z) - (x + z))
+  x + z ≤ y + z by substituting (ring : y - x = (y + z) - (x + z))
 
 -- x + z = y + z → x = y. By ring + Equality.symmetry.
 theorem Real.add_cancel_right
         (x y z : Real) (sumEquality : x + z = y + z)
         : x = y :=
-  calc x
+  x
      = (x + z) - z
      = (y + z) - z
      = y
@@ -499,7 +500,7 @@ theorem Real.add_preserves_LessThan
 theorem Real.add_left_preserves_LessThan
         (x y z : Real) (xLessY : x < y)
         : z + x < z + y :=
-  calc z + x
+  z + x
      = x + z
      < y + z
      = z + y
@@ -508,7 +509,7 @@ theorem Real.add_left_preserves_LessThan
 theorem Real.add_preserves_LessOrEqual_left
         (x y z : Real) (xLeqY : x ≤ y)
         : z + x ≤ z + y :=
-  calc z + x
+  z + x
      = x + z
      ≤ y + z
      = z + y
@@ -517,20 +518,20 @@ theorem Real.add_preserves_LessOrEqual_left
 -- weakly increases. The everyday `x < x + 1` / `x ≤ x + c` facts.
 theorem Real.less_than_add_of_positive (x c : Real) (cPositive : c > 0)
         : x < x + c :=
-  calc x
+  x
      = x + 0
      < x + c   by Real.add_left_preserves_LessThan
 
 theorem Real.less_or_equal_add_of_nonneg (x c : Real) (cNonneg : c ≥ 0)
         : x ≤ x + c :=
-  calc x
+  x
      = x + 0
      ≤ x + c
 
 -- Negation reverses ≤: (−x) − (−y) is the same difference as y − x.
 theorem Real.LessOrEqual.negate (x y : Real) (xLeqY : x ≤ y)
         : -y ≤ -x :=
-  claim -y ≤ -x by substituting (ring : y - x = -x - -y)
+  -y ≤ -x by substituting (ring : y - x = -x - -y)
 
 -- Strict counterpart: x < y → -y < -x. Negation reverses strict order.
 automatic theorem Real.LessThan.negate
@@ -538,7 +539,7 @@ automatic theorem Real.LessThan.negate
   x ≤ y;
   -y ≤ -x;
   x ≠ y as xDistinct;
-  -y ≠ -x by (negEqual : -y = -x) ↦ xDistinct(claim x = y by substituting (ring : x = -(-x)));
+  -y ≠ -x by (negEqual : -y = -x) ↦ xDistinct({ x = y by substituting (ring : x = -(-x)) });
   done
 }
 
@@ -548,7 +549,7 @@ theorem Real.LessThan.add_strict_strict
         (a b c d : Real)
         (aLessC : a < c) (bLessD : b < d)
         : a + b < c + d :=
-  calc a + b
+  a + b
      < c + b   by Real.add_preserves_LessThan
      < c + d   by Real.add_left_preserves_LessThan
 
@@ -558,10 +559,10 @@ theorem Real.LessThan.add_strict_strict
 theorem Real.LessOrEqual_zero_of_IsNonneg (x : Real)
         (xNonneg : Real.IsNonneg(x))
         : Real.zero ≤ x :=
-  claim Real.IsNonneg(x - Real.zero)
+  Real.IsNonneg(x - Real.zero)
       by substituting (ring : x - Real.zero = x)
 
 automatic theorem Real.IsNonneg_of_LessOrEqual_zero (x : Real)
         (zeroLeqX : Real.zero ≤ x)
         : Real.IsNonneg(x) :=
-  claim Real.IsNonneg(x) by substituting (ring : x = x - Real.zero)
+  Real.IsNonneg(x) by substituting (ring : x = x - Real.zero)
