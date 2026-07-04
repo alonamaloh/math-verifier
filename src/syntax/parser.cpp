@@ -1723,6 +1723,31 @@ private:
                 wrapper.name = nameToken.lexeme;
                 wrapper.pattern = std::move(destructurePattern);
                 wrapper.type = parseExpression();
+                // `take x : T for proving Q { block };` — the
+                // ∀-introduction analog of `suppose … for proving`: the
+                // block proves Q under `x : T`, and `∀ (x : T). Q` enters
+                // the context (anonymously) for the rest of the block.
+                // Unrolls through the same wrapper as the suppose form —
+                // a lambda over a data binder gives the Pi statement.
+                if (peek().kind == TokenKind::Identifier
+                    && peek().lexeme == "for"
+                    && peekAt(1).kind == TokenKind::Identifier
+                    && peekAt(1).lexeme == "proving") {
+                    if (wrapper.pattern) {
+                        throwHere("take … for proving takes a plain name, "
+                                  "not an `as <pattern>` destructure");
+                    }
+                    consumeAny();  // 'for'
+                    consumeAny();  // 'proving'
+                    wrapper.kind = BlockWrapper::SupposeToProve;
+                    wrapper.value = parseExpression();  // the goal Q
+                    if (peek().kind != TokenKind::LeftBrace) {
+                        throwHere("take … for proving Q needs a `{ … }` "
+                                  "proof block "
+                                  "(take x : T for proving Q { … });");
+                    }
+                    wrapper.source = parseExpression();  // the `{ block }`
+                }
             } else if (isNote) {
                 // `note goal : <type>;` — assert the current expected
                 // type is definitionally equal to <type>. Reads as
