@@ -26,6 +26,7 @@ import Integer.negation
 import Integer.ring
 import Integer.algebra
 import Integer.order
+import Integer.order_multiply
 import Integer.sign
 import Rational.basics
 import Rational.embedding
@@ -48,7 +49,7 @@ import Rational.reciprocal_function
 -- ----------------------------------------------------------------------
 -- Natural → Rational monotonicity for `succ`.
 
-theorem Rational.from_natural_le_preserves
+theorem Rational.from_natural.LessOrEqual_preserves
         (a b : Natural) (aLeqB : a ≤ b)
         : (a : Rational) ≤ (b : Rational) := {
     ∃ (c : Natural). b = a + c
@@ -58,7 +59,7 @@ theorem Rational.from_natural_le_preserves
     -- multiply, and both numerators reduce to (c : Integer).
     ((a + c) : Rational) - (a : Rational)
        = ((a : Rational) + (c : Rational)) - (a : Rational)
-             by Rational.from_natural_add_preserves
+             by Rational.from_natural.add_preserves
        = (c : Rational);
     -- With b = a + c, (b : R) - (a : R) = (c : R), and the rational image of
     -- a natural is nonnegative. The goal (a : R) ≤ (b : R) is by definition
@@ -141,6 +142,51 @@ automatic theorem Integer.to_rational.positive_preserves (i : Integer) (iPositiv
       by Integer.to_rational.LessThan_preserves;
   ((0 : Integer) : Rational) = Rational.zero as zeroCast;
   done by substituting zeroCast
+}
+
+-- ℤ→ℚ reflects ≤: the weak inequality between the casts is IsNonneg of their
+-- difference, which is the cast of b − a; the fraction boundary reads that
+-- back as Integer.IsNonneg(b − a).
+theorem Integer.to_rational.LessOrEqual_reflects (a b : Integer)
+        (imageLessOrEqual : (a : Rational) ≤ (b : Rational)) : a ≤ b := {
+  Rational.IsNonneg((b : Rational) - (a : Rational));
+  ((b - a : Integer) : Rational) = (b : Rational) - (a : Rational)
+      by Integer.to_rational.subtract_preserves as castDifference;
+  Rational.IsNonneg(((b - a : Integer) : Rational)) by substituting castDifference;
+  Integer.IsNonneg((b - a) * Integer.one) by Rational.IsNonneg.numerator_denominator;
+  Integer.IsNonneg(b - a) by substituting (ring : (b - a) * Integer.one = b - a);
+  done by Integer.le_of_nonneg_difference
+}
+
+-- ℤ→ℚ reflects <: the weak part reflects, distinctness reflects (the cast is a
+-- function), and a distinct weak inequality of integers steps by at least one.
+theorem Integer.to_rational.LessThan_reflects (a b : Integer)
+        (imageLessThan : (a : Rational) < (b : Rational)) : a < b := {
+  (a : Rational) ≤ (b : Rational) by Rational.LessThan.weaken;
+  a ≤ b by Integer.to_rational.LessOrEqual_reflects as weakPart;
+  (a : Rational) ≠ (b : Rational) by Rational.LessThan.distinct;
+  a ≠ b by {
+    suppose a = b for contradiction {
+      (a : Rational) = (b : Rational);
+      done
+    }
+  };
+  choose gap such that b = a + (gap : Integer) as gapEquation from weakPart;
+  cases gap {
+    | zero => {
+        b = a;
+        a = b;
+        claim False;
+        done
+      }
+    | successor(gapPredecessor) =>
+        witness gapPredecessor with
+            calc b
+               = a + (successor(gapPredecessor) : Integer)          by gapEquation
+               = a + ((gapPredecessor + 1 : Natural) : Integer)     by Natural.add_one
+               = a + ((gapPredecessor : Integer) + Integer.one)     by Natural.to_integer.add_one_preserves
+               = (a + Integer.one) + (gapPredecessor : Integer)
+  }
 }
 
 -- (successor(n) : Rational) = (1 : Rational) + (n : Rational). The cast

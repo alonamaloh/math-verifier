@@ -120,21 +120,54 @@ theorem Rational.to_real.LessThan_reflects (a b : Rational)
     done
   }
 
+-- … and the weak order (classically — were the rationals not so ordered, the
+-- strict reverse inequality would preserve to the reals, against the hypothesis).
+theorem Rational.to_real.LessOrEqual_reflects (a b : Rational)
+        (weakAtReal : (a : Real) ≤ (b : Real))
+        : a ≤ b :=
+  {
+    suppose ¬(a ≤ b) for contradiction;
+    a ≤ b ∨ b ≤ a;
+    b ≤ a;
+    b ≠ a by {
+      suppose b = a for contradiction {
+        a ≤ b by substituting (b = a);
+        done
+      }
+    };
+    b < a;
+    (b : Real) < (a : Real) by Rational.to_real.LessThan_preserves;
+    (b : Real) < (b : Real) by Real.LessThan.transitive_right;
+    done
+  }
+
+-- ℚ→ℝ is injective, by antisymmetry: the cast equality weakens to ≤ both
+-- ways, and each weak inequality reflects to the rationals.
+theorem Rational.to_real.injective (a b : Rational)
+        (castEqual : (a : Real) = (b : Real))
+        : a = b := {
+  (a : Real) ≤ (b : Real) by substituting castEqual;
+  (b : Real) ≤ (a : Real) by substituting castEqual;
+  a ≤ b by Rational.to_real.LessOrEqual_reflects;
+  b ≤ a by Rational.to_real.LessOrEqual_reflects;
+  done by Rational.LessOrEqual.antisymmetric
+}
+
 -- ----------------------------------------------------------------------
 -- The composite ℕ → ℝ cast is additive, leg by leg.
-theorem Real.from_natural_add_preserves (m1 m2 : Natural)
+theorem Real.from_natural.add_preserves (m1 m2 : Natural)
         : (m1 + m2 : Real) = (m1 : Real) + (m2 : Real) :=
   calc (m1 + m2 : Real)
      = (((m1 : Rational) + (m2 : Rational)) : Real)
      = (m1 : Real) + (m2 : Real)
 
 -- The cast of the natural 0 is the real 0 (definitionally, hop by hop).
-theorem Real.from_natural_zero_preserves
+theorem Real.from_natural.zero_preserves
         : ((0 : Natural) : Real) = Real.zero :=
   reflexivity(Real, Real.zero)
 
 -- The cast of the natural 1 is the real 1.
-theorem Real.from_natural_one_preserves
+theorem Real.from_natural.one_preserves
         : ((1 : Rational) : Real) = Real.one := {
   ((1 : Rational) : Real)
      = ((Rational.one) : Real)
@@ -143,7 +176,7 @@ theorem Real.from_natural_one_preserves
 
 
 -- … and multiplicative.
-theorem Real.from_natural_multiply_preserves (m1 m2 : Natural)
+theorem Real.from_natural.multiply_preserves (m1 m2 : Natural)
         : (m1 * m2 : Real) = (m1 : Real) * (m2 : Real) :=
   calc (m1 * m2 : Real)
      = (((m1 : Rational) * (m2 : Rational)) : Real)
@@ -152,10 +185,10 @@ theorem Real.from_natural_multiply_preserves (m1 m2 : Natural)
 -- ----------------------------------------------------------------------
 -- The composite ℕ → ℝ cast preserves the order: the weak form, positivity,
 -- and the hypothesis-free `1 + n` special case.
-theorem Real.from_natural_le_preserves (m1 m2 : Natural) (le : m1 ≤ m2)
+theorem Real.from_natural.LessOrEqual_preserves (m1 m2 : Natural) (le : m1 ≤ m2)
         : (m1 : Real) ≤ (m2 : Real) := {
   (m1 : Rational) ≤ (m2 : Rational)
-      by Rational.from_natural_le_preserves;
+      by Rational.from_natural.LessOrEqual_preserves;
   done
 }
 
