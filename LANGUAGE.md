@@ -270,6 +270,24 @@ Statement-level form. Wraps the rest of the block in
 arbitrary x : T". Use it whenever the theorem signature is a `Pi`
 type that needs intros.
 
+### `take x REL E;` — combined take header (the analytic opener)
+
+The analytic goal `∀ ε. ε > 0 → …` is a `Pi` whose codomain is an
+implication, so opening it takes two intros: the binder and its
+hypothesis. `take ε > 0;` does both in one line. It desugars EXACTLY
+to the two-statement opener
+
+```math
+take ε;              -- binder type inferred from the goal's Π
+suppose ε > 0;       -- anonymous hypothesis, picked up by type later
+```
+
+`REL` is one of `>`, `≥`, `<`, `≤`, `≠` (the `>`/`≥` forms reverse onto
+`<`/`≤`, as any relation does). The hypothesis is left anonymous —
+statement-addressable, so a later by-less / `by` / `substituting` step
+consumes it by type. Exactly one binder: `take a, b > 0;` is a parse
+error steering to separate `take` statements.
+
 ### `take x as <pattern> : T;` — intro with immediate destructure
 
 Type-directed dispatch: inductive T → `cases x`; quotient T →
@@ -341,6 +359,26 @@ of `claim` lines and assemble the result from the named claims:
 
 The structure makes the argument legible. A reader can skim the claims
 to see the shape before reading the inner proofs.
+
+### `claim P by V, by definition of X[, Y];` — by-definition modifier
+
+Sometimes the cited hint proves a fact whose type only matches the
+stated proposition after a definition is unfolded (typically an opaque
+one). The comma-joined modifier checks the proposition — and discharges
+the hint — under the SAME unfold wrapper `suffices … by definition of X`
+uses (the machinery is reused verbatim, not a second unfolding path):
+
+```math
+-- pointwiseLower(N) proves `B ≤ s(N)`; the claim reads it as `-ε < …`
+-- with Real.LessOrEqual unfolded.
+-ε < s(m) - b(m) by pointwiseLower(N), by definition of Real.LessOrEqual;
+```
+
+One or more comma-separated definition names may follow `of`. This is
+distinct from the postfix `by V unfolding X`, which makes `X`
+transparent only inside the hint proof, not for the proposition-vs-goal
+match. The modifier attaches to the keyword-free claim form too
+(`P by V, by definition of X;`).
 
 ### Calc as a statement
 

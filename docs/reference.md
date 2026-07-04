@@ -70,6 +70,7 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | `P;` / `P by V;` / `P as NAME;` | **keyword-free claim** (A1): a bare stated proposition (or proof term) at statement position is a claim — verified, then in scope. A block may end by restating the goal. The final expression (`E}` or `E;}`) keeps its ordinary meaning |
 | `claim <proofTerm>;` | the argument is a **proof** (a hypothesis / cited lemma) — claim its *type* as the fact, no type restated (mirror of the proposition-as-proof coercion) |
 | `claim P by V;` | assert `P`, discharged by `V` |
+| `claim P by V, by definition of X[, Y];` | comma-joined **by-definition modifier**: check `P` — and discharge `V` — under the same unfold wrapper `suffices … by definition of X` uses, so a hint whose type only matches after unfolding `X` (`Y`, …) bridges to `P`. (Distinct from postfix `by V unfolding X`, which unfolds only inside the hint proof, not the proposition-vs-goal check.) Also works on the keyword-free form `P by V, by definition of X;` |
 | `claim NAME : P [by V];` | named (reference `NAME` later) |
 | `claim P by cases { case A as h: … case B as h: … }` | prove `P` by ∨-elimination |
 | `P by cases { case A: … otherwise [as h]: … }` | last-arm `otherwise:` covers the complement `¬(A ∨ …)`; exhaustiveness is excluded middle by construction, never a prover obligation |
@@ -130,6 +131,7 @@ End each with `;`; the block returns its final non-`;` expression.
 | Form | Meaning |
 |---|---|
 | `take x : T;` | introduce a ∀-bound variable |
+| `take x REL E;` | **combined take header** (the analytic opener): desugars to `take x;` (binder type inferred from the goal's Π) + anonymous `suppose x REL E;`. `REL` ∈ `>` `≥` `<` `≤` `≠`; the hypothesis is statement-addressable (no `as` in v1). One binder only — `take a, b > 0;` is a parse error |
 | `suppose P as h;` | introduce a hypothesis |
 | `suppose Not(G) [as h] for contradiction;` | reductio (terminal): assume `Not(G)`, derive `False` in the continuation, prove the goal `G` by double-negation elimination |
 | `suppose Not(X) [as h] for contradiction { … };` | reductio (forward): the braced block derives `False`, establishing `X` into the context, then the proof continues at the original goal |
