@@ -59,3 +59,36 @@ theorem Test.eventually_choose (s : Natural → Natural)
   N ≤ N;
   witness N with done
 }
+
+-- The goal-position scope (rule ii): every in-scope eventual
+-- hypothesis is usable at the bound variable; the thresholds and
+-- their maximum never appear on the page.
+theorem Test.eventually_scope (s t : Natural → Natural)
+        (sLarge : eventually (m). 5 ≤ s(m))
+        (tLarge : eventually (m). 7 ≤ t(m))
+        : eventually (m). 5 ≤ s(m) ∧ 7 ≤ t(m) :=
+  eventually (m): {
+    5 ≤ s(m);
+    7 ≤ t(m);
+    done
+  }
+
+-- The scope with a derivation in the body: combine two eventual bounds
+-- into a derived pointwise fact.
+theorem Test.eventually_scope_derives (s t : Natural → Natural)
+        (sLarge : eventually (m). 5 ≤ s(m))
+        (tBig : eventually (m). s(m) ≤ t(m))
+        : eventually (m). 5 ≤ t(m) :=
+  eventually (m): {
+    5 ≤ s(m)
+      ≤ t(m);
+    done
+  }
+
+-- With no eventual hypotheses the scope is plain ∀-introduction at
+-- threshold zero.
+theorem Test.eventually_scope_always (s : Natural → Natural)
+        : eventually (m). s(m) ≤ s(m) :=
+  eventually (m): {
+    done
+  }

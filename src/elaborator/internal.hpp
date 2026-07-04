@@ -1192,6 +1192,17 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
+    // `eventually (m): <body>` (A6 rule ii): proves a goal
+    // `Natural.Eventually(Q)` by combining every in-scope
+    // `Natural.Eventually(Pᵢ)` fact via `Eventually.and` (max of
+    // thresholds) and handing the body the bound index `m` with each
+    // `Pᵢ(m)` in scope; the body proves `Q(m)`.
+    ExpressionPointer elaborateEventuallyScope(
+        const SurfaceEventuallyScope& scope,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+
     // `choose <name> such that <predicate>;` — Exists-elim via scope
     // lookup. Scans local binders last-first for a hypothesis whose
     // type WHNFs to `Exists(T, motive)`; the most-recent match wins.

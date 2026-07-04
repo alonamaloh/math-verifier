@@ -346,6 +346,30 @@ SurfaceExpressionPointer substituteSurfaceName(
             induction->subjectName, induction->ihName,
             std::move(newBody), line, column);
     }
+    if (auto* byStrong =
+            std::get_if<SurfaceByStrongInduction>(&node.node)) {
+        auto newScrutinee = substituteSurfaceName(
+            byStrong->scrutinee, targetName, replacement);
+        bool shadows = byStrong->subjectName == targetName
+                    || byStrong->ihName == targetName;
+        auto newBody = shadows
+            ? byStrong->body
+            : substituteSurfaceName(byStrong->body,
+                                     targetName, replacement);
+        return makeSurfaceByStrongInduction(
+            std::move(newScrutinee),
+            byStrong->subjectName, byStrong->ihName,
+            std::move(newBody), line, column);
+    }
+    if (auto* eventuallyScope =
+            std::get_if<SurfaceEventuallyScope>(&node.node)) {
+        auto newBody = eventuallyScope->binderName == targetName
+            ? eventuallyScope->body
+            : substituteSurfaceName(eventuallyScope->body,
+                                     targetName, replacement);
+        return makeSurfaceEventuallyScope(
+            eventuallyScope->binderName, std::move(newBody), line, column);
+    }
     if (auto* structured =
             std::get_if<SurfaceStructuredClaim>(&node.node)) {
         // `claim [P] [by HINT] [{ arms }]` — recurse into the stated
@@ -3232,6 +3256,25 @@ private:
         // "holds from some index on" quantifier of limit arguments.
         // `eventually` stays an ordinary identifier everywhere else;
         // the form is claimed by the `(name).` lookahead shape only.
+        // Goal-position scope (A6 rule ii): `eventually (m): <body>` —
+        // proves a `Natural.Eventually(Q)` goal with every in-scope
+        // eventual hypothesis usable at `m`; thresholds stay invisible.
+        if (current.kind == TokenKind::Identifier
+            && current.lexeme == "eventually"
+            && peekAt(1).kind == TokenKind::LeftParen
+            && peekAt(2).kind == TokenKind::Identifier
+            && peekAt(3).kind == TokenKind::RightParen
+            && peekAt(4).kind == TokenKind::Colon) {
+            Token head = consumeAny();  // 'eventually'
+            consumeAny();               // '('
+            std::string binderName = consumeAny().lexeme;
+            consumeAny();               // ')'
+            consumeAny();               // ':'
+            SurfaceExpressionPointer body = parseExpression();
+            return makeSurfaceEventuallyScope(
+                std::move(binderName), std::move(body),
+                head.line, head.column);
+        }
         if (current.kind == TokenKind::Identifier
             && current.lexeme == "eventually"
             && peekAt(1).kind == TokenKind::LeftParen

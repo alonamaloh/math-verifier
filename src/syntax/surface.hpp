@@ -509,6 +509,16 @@ struct SurfaceByStrongInduction {
     SurfaceExpressionPointer body;
 };
 
+// `eventually (m): <body>` (A6) — proves a goal `Natural.Eventually(Q)`
+// from the eventual hypotheses in scope: every in-scope fact
+// `Natural.Eventually(Pᵢ)` is combined (max of thresholds, via
+// `Eventually.and`) and the body proves `Q(m)` under `m` with each
+// `Pᵢ(m)` available; the threshold plumbing never appears on the page.
+struct SurfaceEventuallyScope {
+    std::string binderName;
+    SurfaceExpressionPointer body;
+};
+
 // `choose <name> such that <predicate>;` — Exists-elimination via
 // scope lookup. At elaboration:
 //   1. Scan local binders last-first for a hypothesis whose type
@@ -586,7 +596,8 @@ struct SurfaceExpression {
         SurfaceRing, SurfaceGroup, SurfaceField, SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
-        SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold,
+        SurfaceByStrongInduction, SurfaceEventuallyScope,
+        SurfaceGoal, SurfaceUnfold,
         SurfaceDecide, SurfaceNote, SurfaceHole, SurfaceCiteInferred
     > node;
     int line = 0;
@@ -949,6 +960,15 @@ inline SurfaceExpressionPointer makeSurfaceByStrongInduction(
                                   std::move(subjectName),
                                   std::move(ihName),
                                   std::move(body)},
+        line, column});
+}
+
+inline SurfaceExpressionPointer makeSurfaceEventuallyScope(
+    std::string binderName,
+    SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceEventuallyScope{std::move(binderName), std::move(body)},
         line, column});
 }
 

@@ -1747,6 +1747,15 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                        outerBinderCount),
                 node.line, node.column);
         }
+        if (auto* eventuallyScope =
+                std::get_if<SurfaceEventuallyScope>(&node.node)) {
+            return makeSurfaceEventuallyScope(
+                eventuallyScope->binderName,
+                rewriteRecursiveCalls(eventuallyScope->body, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
         if (auto* inductionUsing =
                 std::get_if<SurfaceByInductionUsing>(&node.node)) {
             return makeSurfaceByInductionUsing(

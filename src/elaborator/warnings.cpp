@@ -412,6 +412,12 @@ bool Elaborator::surfaceMentionsName(
             return byStrong->body
                 && surfaceMentionsName(*byStrong->body, name);
         }
+        if (auto* eventuallyScope =
+                std::get_if<SurfaceEventuallyScope>(&expression.node)) {
+            return eventuallyScope->binderName != name
+                && eventuallyScope->body
+                && surfaceMentionsName(*eventuallyScope->body, name);
+        }
         if (auto* unfold =
                 std::get_if<SurfaceUnfold>(&expression.node)) {
             return unfold->body

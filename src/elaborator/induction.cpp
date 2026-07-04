@@ -57,6 +57,140 @@ ExpressionPointer Elaborator::elaborateByStrongInduction(
             wrapped, localBinders, expectedType, line, column);
     }
 
+ExpressionPointer Elaborator::elaborateEventuallyScope(
+        const SurfaceEventuallyScope& scope,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "eventually (" + scope.binderName + "): at line "
+            + std::to_string(line));
+        int N = static_cast<int>(localBinders.size());
+        if (!expectedType) {
+            throwElaborate(
+                "`eventually (" + scope.binderName + "): …` needs an "
+                "expected type from context — the goal must be an "
+                "`eventually (m). …` proposition");
+        }
+        // The goal must be `Natural.Eventually(Q)` — matched on the
+        // STATED spelling (WHNF would δ-unfold the transparent
+        // definition past recognition; the binder sugar always
+        // produces the literal head).
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            expectedType, localBinders, N);
+        auto* goalApp = std::get_if<Application>(&goalOpened->node);
+        auto* goalHead = goalApp
+            ? std::get_if<Constant>(&goalApp->function->node) : nullptr;
+        if (!goalHead || goalHead->name != "Natural.Eventually") {
+            throwElaborate(
+                "`eventually (" + scope.binderName + "): …` proves an "
+                "`eventually (m). …` goal, but the expected type here "
+                "is spelled differently: "
+                + prettyPrintInLocalScope(expectedType, localBinders)
+                + "\n  state the goal with the `eventually (m). …` "
+                  "binder (or as `Natural.Eventually(…)`)");
+        }
+        ExpressionPointer goalPredicate = closeOverLocalBinders(
+            goalApp->argument, localBinders, N);
+
+        // Collect every in-scope eventual fact `Natural.Eventually(Pᵢ)`,
+        // outermost first (deterministic; unused ones are harmless).
+        std::vector<ExpressionPointer> factPredicates;
+        std::vector<ExpressionPointer> factProofs;
+        for (int b = 0; b < N; ++b) {
+            int lift = N - b;
+            ExpressionPointer typeInScope = liftBoundVariables(
+                localBinders[b].type, lift, 0);
+            // Match the STATED spelling (like the goal above): the
+            // binder sugar produces the literal `Natural.Eventually`
+            // head, and WHNF would unfold it past recognition.
+            auto* app = std::get_if<Application>(&typeInScope->node);
+            auto* head = app
+                ? std::get_if<Constant>(&app->function->node) : nullptr;
+            if (!head || head->name != "Natural.Eventually") continue;
+            factPredicates.push_back(app->argument);
+            factProofs.push_back(makeBoundVariable(N - 1 - b));
+        }
+
+        ExpressionPointer naturalType = makeConstant("Natural", {});
+        if (factPredicates.empty()) {
+            // No eventual hypotheses: the body proves Q(m) outright and
+            // `Eventually.of_always` supplies threshold 0.
+            std::vector<LocalBinder> stepBinders = localBinders;
+            stepBinders.push_back({scope.binderName, naturalType});
+            ExpressionPointer expectedBody = makeApplication(
+                liftBoundVariables(goalPredicate, 1, 0),
+                makeBoundVariable(0));
+            ExpressionPointer bodyKernel = elaborateExpression(
+                *scope.body, stepBinders, expectedBody);
+            ExpressionPointer alwaysLambda = makeLambda(
+                scope.binderName, naturalType, bodyKernel);
+            return makeApplication(
+                makeApplication(
+                    makeConstant("Natural.Eventually.of_always", {}),
+                    goalPredicate),
+                std::move(alwaysLambda));
+        }
+
+        // Fold the eventual facts with `Eventually.and` — the combined
+        // predicate mirrors the lemma's conclusion shape exactly
+        // (λm. P(m) ∧ Q(m), applications unreduced), so the chain
+        // typechecks structurally.
+        ExpressionPointer combinedPredicate = factPredicates[0];
+        ExpressionPointer combinedProof = factProofs[0];
+        for (size_t i = 1; i < factPredicates.size(); ++i) {
+            ExpressionPointer nextProof = makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Natural.Eventually.and", {}),
+                            combinedPredicate),
+                        factPredicates[i]),
+                    combinedProof),
+                factProofs[i]);
+            ExpressionPointer pairedBody = makeApplication(
+                makeApplication(
+                    makeConstant("And", {}),
+                    makeApplication(
+                        liftBoundVariables(combinedPredicate, 1, 0),
+                        makeBoundVariable(0))),
+                makeApplication(
+                    liftBoundVariables(factPredicates[i], 1, 0),
+                    makeBoundVariable(0)));
+            combinedPredicate = makeLambda(
+                scope.binderName, naturalType, std::move(pairedBody));
+            combinedProof = std::move(nextProof);
+        }
+
+        // `Eventually.monotone`: the body proves Q(m) under m and the
+        // combined hypothesis (whose ∧-legs the prover decomposes).
+        std::vector<LocalBinder> stepBinders = localBinders;
+        stepBinders.push_back({scope.binderName, naturalType});
+        ExpressionPointer hypothesisType = makeApplication(
+            liftBoundVariables(combinedPredicate, 1, 0),
+            makeBoundVariable(0));
+        std::string hypothesisName = "_eventually_hyp_"
+            + std::to_string(line) + "_" + std::to_string(column);
+        stepBinders.push_back({hypothesisName, hypothesisType});
+        ExpressionPointer expectedBody = makeApplication(
+            liftBoundVariables(goalPredicate, 2, 0),
+            makeBoundVariable(1));
+        ExpressionPointer bodyKernel = elaborateExpression(
+            *scope.body, stepBinders, expectedBody);
+        ExpressionPointer pointwiseLambda = makeLambda(
+            scope.binderName, naturalType,
+            makeLambda(hypothesisName, hypothesisType, bodyKernel));
+        return makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeConstant("Natural.Eventually.monotone", {}),
+                        combinedPredicate),
+                    goalPredicate),
+                combinedProof),
+            std::move(pointwiseLambda));
+    }
+
 ExpressionPointer Elaborator::elaborateChoose(
         const SurfaceChoose& choose,
         const std::vector<LocalBinder>& localBinders,

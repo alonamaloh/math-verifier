@@ -2122,6 +2122,12 @@ ExpressionPointer Elaborator::elaborateExpression(
                 *strongInduction, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (auto* eventuallyScope =
+                std::get_if<SurfaceEventuallyScope>(&expression.node)) {
+            return elaborateEventuallyScope(
+                *eventuallyScope, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
     }
 
