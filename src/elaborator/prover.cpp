@@ -2326,6 +2326,33 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // Quotient sound bridge — the forward twin of the exact bridge:
+        // a class-equality goal `mk x = mk y` closes from an in-scope
+        // equivalence-shaped fact `R(x, y)` (e.g. the representative
+        // cross-equation) via Quotient.equivalent_implies_equal. The
+        // coercion path applies the same wrap to DIRECT proofs (the old
+        // final-calc route); this covers the statement route, where the
+        // fact is bound in context and the goal is re-proved by the
+        // block's auto-close. Cheap when the goal isn't a class equality
+        // (the peel declines before any fact is examined).
+        {
+            ExpressionPointer attempt = runTactic("quotientSoundBridge",
+                [&] () -> ExpressionPointer {
+                    std::vector<ContextFact> soundFacts =
+                        collectLocalBinderFacts(localBinders);
+                    for (const ContextFact& fact : soundFacts) {
+                        autoProveSpend(1);
+                        ExpressionPointer wrapped =
+                            tryQuotientSoundForClassEquality(
+                                localBinders, fact.proofTerm, fact.type,
+                                goalClosed);
+                        if (wrapped) return wrapped;
+                    }
+                    return nullptr;
+                });
+            if (attempt) return attempt;
+        }
+
         // Symmetry flip — true last resort: `x = y` (or symmetric
         // `R(x, y)`) from a fact stated the other way. Placed last so the
         // bridge (which already rewrites equalities) closes the common

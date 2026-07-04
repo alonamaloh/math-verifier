@@ -2185,6 +2185,36 @@ ExpressionPointer Elaborator::elaborateBlockTail(
         } catch (const ElaborateError&) {
         } catch (const TypeError&) {
         }
+        // Direct-coercion reading: prove the stated fact ONCE and coerce
+        // its proof to the goal (quotient-sound wrap, diff bridges — the
+        // route a final `calc`'s direct proof always took). Cheaper than
+        // the statement fallback below, whose auto-close re-proves the
+        // goal by context search — at a representative-level final fact
+        // under a class-equality goal that search is an expensive-by-less
+        // step, while this wrap is one defeq check.
+        {
+            ExpressionPointer factProof;
+            try {
+                SurfaceExpressionPointer statedFactOnly =
+                    makeSurfaceStructuredClaim(
+                        blockTail.expression, /*label=*/"",
+                        /*byHint=*/nullptr, /*byCases=*/false,
+                        /*arms=*/{}, line, column);
+                factProof = elaborateExpression(
+                    *statedFactOnly, localBinders, nullptr);
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
+            if (factProof) {
+                ExpressionPointer coerced = coerceToExpectedTypeViaDiff(
+                    localBinders, factProof, expectedType);
+                if (coerced
+                    && bridgedResultProvesGoal(coerced, expectedType,
+                                               localBinders)) {
+                    return coerced;
+                }
+            }
+        }
         // The direct reading failed: read `E` as the block's final
         // statement `E;` and let the implicit auto-close bridge its fact to
         // the goal — the keyword-free spelling of `claim E; done`. Mirrors
