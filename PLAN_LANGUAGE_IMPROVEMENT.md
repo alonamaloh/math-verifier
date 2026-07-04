@@ -258,10 +258,10 @@ feature test + reference row): SUBSTITUTION RULE LANDED for witness arms (4c36aa
 gets the variable substituted by the constructor form and the proof
 transports back automatically — ι-reduction works, computed facts
 state bare; deterministic, applies whenever the equation's left side
-is a plain local variable and the goal mentions it; plain `case x =
-c:` arms keep availability-semantics for library compat — flipping
-them is the remaining substitution work, alongside referenced-
-hypothesis substitution; zero_or_one_plus added as the automatic
+is a plain local variable and the goal mentions it; plain `case x = c:` arms FLIPPED too
+(348e6dec) — library fallout was exactly two arms, both of which got
+SIMPLER; referenced-hypothesis substitution remains open (context
+facts still bridge via `by substitution`); zero_or_one_plus added as the automatic
 1+k coverage lemma). coverage-lemma AUTO-GENERATION at
 inductive-declaration time is still open (sketch below now partially
 superseded — parser — after the arm proposition, accept `for some
