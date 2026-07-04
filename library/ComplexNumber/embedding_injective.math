@@ -58,7 +58,7 @@ theorem Complex.divides_definingPolynomial_low_degree_zero
         Polynomial.DegreeLessThan(Real.ring, p, successor(degreeP)) as pBound;
         ¬(Polynomial.coefficientOf(Real.ring, p, degreeP) = Ring.zero(Real.ring)) as pLeadingNonzero;
         choose quotient such that p = Complex.definingPolynomial * quotient
-            as pEqualsDefiningPolynomialQuotient from definingPolynomialDivides;
+            from definingPolynomialDivides;
         ¬(quotient = Polynomial.zero(Real.ring))
             by (quotientZero : quotient = Polynomial.zero(Real.ring)) ↦
                  pNonzero(
@@ -76,16 +76,15 @@ theorem Complex.divides_definingPolynomial_low_degree_zero
         degreeP = 2 + degreeQuotient
             by Polynomial.HasDegree_unique(Real.ring, p, degreeP, 2 + degreeQuotient,
                    And.introduction(pBound, pLeadingNonzero),
-                   rewrite(Equality.symmetry(pEqualsDefiningPolynomialQuotient),
-                       Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
-                           Real.reciprocal_exists_for_nonzero, Complex.definingPolynomial, quotient,
-                           2, degreeQuotient, Complex.definingPolynomial_HasDegree_two,
-                           And.introduction(quotientBound, quotientLeadingNonzero))))
-            as degreePEquation;
-        absurd(pLeadingNonzero(
-            pLow(degreeP,
-                rewrite(Equality.symmetry(degreePEquation),
-                    Natural.less_or_equal_add_right(2, degreeQuotient)))))
+                   { Polynomial.HasDegree(Real.ring, Complex.definingPolynomial * quotient, 2 + degreeQuotient)
+                         by Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
+                                Real.reciprocal_exists_for_nonzero, Complex.definingPolynomial, quotient,
+                                2, degreeQuotient, Complex.definingPolynomial_HasDegree_two,
+                                And.introduction(quotientBound, quotientLeadingNonzero));
+                     Polynomial.HasDegree(Real.ring, p, 2 + degreeQuotient) });
+        2 ≤ 2 + degreeQuotient by Natural.less_or_equal_add_right(2, degreeQuotient);
+        2 ≤ degreeP as twoLessOrEqualDegreeP;
+        absurd(pLeadingNonzero(pLow(degreeP, twoLessOrEqualDegreeP)))
       }
   }
 
@@ -114,14 +113,18 @@ theorem ComplexNumber.from_real_injective (a b : Real)
              Polynomial.negate(monomialB), 2,
              (i : Natural) (twoLessOrEqualI : 2 ≤ i) ↦
                  Polynomial.coefficientOf_monomial_off(Real.ring, a, 0, i,
-                     (iZero : i = 0) ↦
-                         absurd(rewrite(iZero, twoLessOrEqualI))),
+                     (iZero : i = 0) ↦ {
+                         2 ≤ 0 by substituting iZero as twoLessOrEqualZero;
+                         absurd(twoLessOrEqualZero)
+                       }),
              Polynomial.DegreeLessThan.negate(Real.ring,
                  monomialB, 2,
                  (i : Natural) (twoLessOrEqualI : 2 ≤ i) ↦
                      Polynomial.coefficientOf_monomial_off(Real.ring, b, 0, i,
-                         (iZero : i = 0) ↦
-                             absurd(rewrite(iZero, twoLessOrEqualI))))) as differenceLow;
+                         (iZero : i = 0) ↦ {
+                             2 ≤ 0 by substituting iZero as twoLessOrEqualZero;
+                             absurd(twoLessOrEqualZero)
+                           }))) as differenceLow;
   -- Hence the difference is zero.
   note difference = Polynomial.zero(Real.ring)
       by Complex.divides_definingPolynomial_low_degree_zero(

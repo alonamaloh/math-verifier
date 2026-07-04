@@ -45,17 +45,21 @@ definition IntegerMod (modulus : Natural) : Type(0) :=
 
 -- Reflexive: x − x = 0 and every integer divides 0.
 theorem Integer.CongruentModulo.reflexive (modulus : Natural) (x : Integer)
-        : Integer.CongruentModulo(modulus, x, x) :=
-  rewrite((ring : Integer.zero = x - x),
-          Integer.divides_zero((modulus : Integer)))
+        : Integer.CongruentModulo(modulus, x, x) := {
+  Integer.divides((modulus : Integer), Integer.zero) by Integer.divides_zero((modulus : Integer));
+  Integer.zero = x - x;
+  Integer.divides((modulus : Integer), x - x)
+}
 
 -- Symmetric: y − x = −(x − y), and divisibility is closed under
 -- negation.
 theorem Integer.CongruentModulo.symmetric (modulus : Natural) (x y : Integer)
         (congruent : Integer.CongruentModulo(modulus, x, y))
-        : Integer.CongruentModulo(modulus, y, x) :=
-  rewrite((ring : -(x - y) = y - x),
-          Integer.divides_negate((modulus : Integer), x - y, congruent))
+        : Integer.CongruentModulo(modulus, y, x) := {
+  Integer.divides((modulus : Integer), -(x - y)) by Integer.divides_negate((modulus : Integer), x - y, congruent);
+  -(x - y) = y - x;
+  Integer.divides((modulus : Integer), y - x)
+}
 
 -- Transitive: x − z = (x − y) + (y − z), and divisibility is closed
 -- under addition.
@@ -63,10 +67,12 @@ theorem Integer.CongruentModulo.transitive (modulus : Natural)
         (x y z : Integer)
         (congruentXY : Integer.CongruentModulo(modulus, x, y))
         (congruentYZ : Integer.CongruentModulo(modulus, y, z))
-        : Integer.CongruentModulo(modulus, x, z) :=
-  rewrite((ring : (x - y) + (y - z) = x - z),
-          Integer.divides_add((modulus : Integer), x - y, y - z,
-              congruentXY, congruentYZ))
+        : Integer.CongruentModulo(modulus, x, z) := {
+  Integer.divides((modulus : Integer), (x - y) + (y - z))
+      by Integer.divides_add((modulus : Integer), x - y, y - z, congruentXY, congruentYZ);
+  (x - y) + (y - z) = x - z;
+  Integer.divides((modulus : Integer), x - z)
+}
 
 -- The congruence bundled as an `IsEquivalenceRelation`, registered as
 -- the canonical instance for IntegerMod's quotient. Parameterized by the

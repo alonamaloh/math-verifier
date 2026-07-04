@@ -56,7 +56,7 @@ theorem Natural.multiply_successor_unreduced (a b : Natural)
               by reflexivity(successor(b) + predecessor * successor(b))
          -- Apply IH under successor(b) + _.
          = successor(b) + (predecessor + predecessor * b)
-              by rewrite(IH)
+              by IH
          -- Algebra of +: re-associate and swap.
          = successor((b + predecessor) + predecessor * b)
               by congruenceOf(
@@ -89,7 +89,7 @@ theorem Natural.multiply_successor_bare_reflexivity (a b : Natural)
     case successor(predecessor):
       successor(predecessor) * successor(b)
          = successor(b) + predecessor * successor(b)             by reflexivity
-         = successor(b) + (predecessor + predecessor * b)        by rewrite(IH)
+         = successor(b) + (predecessor + predecessor * b)        by IH
          = successor((b + predecessor) + predecessor * b)
               by congruenceOf(
                      successor,
@@ -115,11 +115,12 @@ theorem Natural.multiply_successor_bare_reflexivity (a b : Natural)
 theorem Natural.multiply_successor_by_ring (a b : Natural)
         : a * successor(b) = a + a * b := ring
 
--- `rewrite` doesn't see through goal-side β-reductions, so the
--- inner-of-successor algebra needs explicit `congruenceOf`. With a
--- WHNF-aware structural matcher (or definitional-equality fallback in
--- abstractStructuralOccurrence), the three congruenceOf lines below
--- would collapse to three `by rewrite(...)` lines.
+-- The diff-inferred congruence bridge doesn't see through goal-side
+-- β-reductions, so the inner-of-successor algebra needs explicit
+-- `congruenceOf`. With a WHNF-aware structural matcher (or
+-- definitional-equality fallback in abstractStructuralOccurrence), the
+-- three congruenceOf lines below would collapse to three plain
+-- `by <equation>` lines.
 
 -- Smallest test: `=` step with no `by` clause. The auto-prover
 -- closes when the two sides are definitionally equal.

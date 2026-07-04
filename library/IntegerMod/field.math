@@ -83,8 +83,9 @@ theorem IntegerMod.zero_not_one (p : Natural)
     Natural.divides(p, 1)
         by Integer.natural_divides_of_integer_divides(p, 1, dividesOne);
     p = 1 as pEqualsOne;
-    Natural.not_two_less_or_equal_one(
-        rewrite(pEqualsOne, Natural.is_prime.at_least_two(p, primality)))
+    2 ≤ p by Natural.is_prime.at_least_two(p, primality);
+    2 ≤ 1 by substituting pEqualsOne;
+    False by Natural.not_two_less_or_equal_one
   }
 
 -- ----------------------------------------------------------------------
@@ -101,13 +102,15 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
       by Integer.sign_split;
   done by cases {
     case Integer.IsNonneg(a) as nonnegative: {
-        choose k such that a = (k : Integer) as aEqualsK from nonnegative;
+        choose k such that a = (k : Integer) from nonnegative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | (k : Integer) = a.
         ¬ Natural.divides(p, k)
-            by (pDividesK : Natural.divides(p, k)) ↦
-                 notDivides(
-                     rewrite(Equality.symmetry(aEqualsK),
-                         Integer.divides_of_natural_divides(p, k, pDividesK)))
+            by (pDividesK : Natural.divides(p, k)) ↦ {
+                 Integer.divides((p : Integer), (k : Integer))
+                     by Integer.divides_of_natural_divides(p, k, pDividesK);
+                 Integer.divides((p : Integer), a);
+                 False by notDivides
+               }
             as notDividesK;
         -- Bezout: p·bezoutX + k·bezoutY = 1, used below to rewrite Integer.one.
         choose bezoutX, bezoutY such that
@@ -122,14 +125,16 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
                     = (p : Integer) * -bezoutX }⟩)
     }
     case ∃ (k : Natural). a = -(k : Integer) as negative: {
-        choose k such that a = -(k : Integer) as aEqualsNegativeK from negative;
+        choose k such that a = -(k : Integer) from negative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : Integer) = a.
         ¬ Natural.divides(p, k)
-            by (pDividesK : Natural.divides(p, k)) ↦
-                 notDivides(
-                     rewrite(Equality.symmetry(aEqualsNegativeK),
-                         Integer.divides_negate((p : Integer), (k : Integer),
-                             Integer.divides_of_natural_divides(p, k, pDividesK))))
+            by (pDividesK : Natural.divides(p, k)) ↦ {
+                 Integer.divides((p : Integer), -(k : Integer))
+                     by Integer.divides_negate((p : Integer), (k : Integer),
+                            Integer.divides_of_natural_divides(p, k, pDividesK));
+                 Integer.divides((p : Integer), a);
+                 False by notDivides
+               }
             as notDividesK;
         -- Bezout: p·bezoutX + k·bezoutY = 1, used below to rewrite Integer.one.
         choose bezoutX, bezoutY such that
