@@ -81,10 +81,10 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
             ∧ remainder < m := {
   cases Integer.sign_split(a) {
     | Or.introduceLeft(aNonneg) => {
-        obtain ⟨j, aIsImage⟩ from aNonneg;
-        obtain ⟨naturalQuotient, naturalRemainder, jEquation, remainderBelow⟩
+        choose j such that a = (j : Integer) from aNonneg;
+        choose naturalQuotient, naturalRemainder such that
+            j = naturalQuotient * m + naturalRemainder ∧ successor(naturalRemainder) ≤ m
             from Natural.divide_with_remainder(m, mPositive, j);
-        -- jEquation : j = naturalQuotient * m + naturalRemainder.
         (j : Integer)
                   = ((naturalQuotient * m + naturalRemainder : Natural) : Integer)
                   = ((naturalQuotient * m : Natural) : Integer) + (naturalRemainder : Integer)
@@ -98,8 +98,9 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
           remainderLessThanM⟩⟩
       }
     | Or.introduceRight(aNegative) => {
-        obtain ⟨j, aIsNegativeImage⟩ from aNegative;
-        obtain ⟨naturalQuotient, naturalRemainder, jEquation, remainderBelow⟩
+        choose j such that a = -(j : Integer) from aNegative;
+        choose naturalQuotient, naturalRemainder such that
+            j = naturalQuotient * m + naturalRemainder ∧ successor(naturalRemainder) ≤ m
             from Natural.divide_with_remainder(m, mPositive, j);
         (j : Integer)
                   = ((naturalQuotient * m + naturalRemainder : Natural) : Integer)
@@ -122,10 +123,9 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
             }
           otherwise as remainderNonzero: {
               naturalRemainder ≤ m as remainderAtMostM;
-              obtain ⟨gap, mEquation⟩
+              choose gap such that m = naturalRemainder + gap
                   from Natural.subtraction_witness(naturalRemainder, m,
                            remainderAtMostM);
-              -- mEquation : m = naturalRemainder + gap.
               1 ≤ naturalRemainder;
               (m : Integer) = (naturalRemainder : Integer) + (gap : Integer);
               (gap : Integer)
@@ -164,14 +164,17 @@ theorem Integer.has_euclidean_division (a b : Integer)
                  < Integer.absolute_value_natural(b)) := {
   cases Integer.sign_split(b) {
     | Or.introduceLeft(bNonneg) => {
-        obtain ⟨m, bIsImage⟩ from bNonneg;
+        choose m such that b = (m : Integer) as bIsImage from bNonneg;
         ¬((m : Integer) = Integer.zero)
             by (mImageZero : (m : Integer) = Integer.zero) ↦
                  bNonzero(calc b = (m : Integer)
                                  = Integer.zero);
         1 ≤ m as mPositive;
-        obtain ⟨quotient, remainder, aEquation, remainderBelow⟩
+        choose quotient, remainder such that
+            a = (m : Integer) * quotient + (remainder : Integer) ∧ remainder < m
             from Integer.divide_by_positive(a, m, mPositive);
+        a = (m : Integer) * quotient + (remainder : Integer) as aEquation;
+        remainder < m as remainderBelow;
         ⟨quotient, (remainder : Integer),
          ⟨calc a
              = (m : Integer) * quotient + (remainder : Integer)
@@ -189,15 +192,18 @@ theorem Integer.has_euclidean_division (a b : Integer)
                       remainderBelow)))⟩⟩
       }
     | Or.introduceRight(bNegative) => {
-        obtain ⟨m, bIsNegativeImage⟩ from bNegative;
+        choose m such that b = -(m : Integer) as bIsNegativeImage from bNegative;
         ¬((m : Integer) = Integer.zero)
             by (mImageZero : (m : Integer) = Integer.zero) ↦
                  bNonzero(calc b = -(m : Integer)
                                  = -(Integer.zero) by mImageZero
                                  = Integer.zero);
         1 ≤ m as mPositive;
-        obtain ⟨quotient, remainder, aEquation, remainderBelow⟩
+        choose quotient, remainder such that
+            a = (m : Integer) * quotient + (remainder : Integer) ∧ remainder < m
             from Integer.divide_by_positive(a, m, mPositive);
+        a = (m : Integer) * quotient + (remainder : Integer) as aEquation;
+        remainder < m as remainderBelow;
         ⟨-quotient, (remainder : Integer),
          ⟨calc a
              = (m : Integer) * quotient + (remainder : Integer)

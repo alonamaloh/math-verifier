@@ -330,15 +330,24 @@ Pi-binder of type T and immediately destructures it. Equivalent to
 type-directed: inductive T uses cases; quotient T uses the
 quotient-cases path above.
 
+For a quotient, the preferred pattern is the mathematical
+`representative(…)` spelling (A5) — the carrier's constructor is
+resolved from the type and never appears on the page:
+
 ```math
 theorem Integer.triangle_inequality
         : (x y : Integer)
           → abs(x + y) ≤ abs(x) + abs(y) := {
-  take x as IntegerRepresentative.make(a, b) : Integer;
-  take y as IntegerRepresentative.make(c, d) : Integer;
+  take x as representative(a, b) : Integer;
+  take y as representative(c, d) : Integer;
   Integer.triangle_inequality_at_representatives(a, b, c, d)
 }
 ```
+
+The same pattern works in a quotient `cases`:
+`cases x { | representative(a, b) => … }`. The constructor-spelled
+form (`IntegerRepresentative.make(a, b)`) remains legal but is the
+representation-leaking spelling; prefer `representative`.
 
 ### `suppose <P> as <pattern>;` — destructure on intro for hypotheses
 
@@ -350,5 +359,5 @@ into named pieces).
 suppose ∃ (n : Natural). P(n) as ⟨witness, proof⟩;
 -- equivalent to:
 -- suppose ∃ (n : Natural). P(n) as h;
--- obtain ⟨witness, proof⟩ from h;
+-- choose witness such that P(witness) as proof from h;
 ```

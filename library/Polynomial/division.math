@@ -197,8 +197,11 @@ theorem Polynomial.divide_by_excess (r : Ring)
                    = Ring.zero(r)
             as residualBound;
 
-        obtain ⟨quotientRest, remainderRest, restEquation, remainderRestBound⟩
+        choose quotientRest, remainderRest such that
+            residual = ((quotientRest * f) + remainderRest)
+            ∧ Polynomial.DegreeLessThan(r, remainderRest, degreeF)
             from IH(residual, residualBound);
+        Polynomial.DegreeLessThan(r, remainderRest, degreeF) as remainderRestBound;
 
         (stepProduct + (dividend + (- stepProduct)))
                   = ((stepProduct + dividend) + (- stepProduct))
@@ -236,8 +239,12 @@ theorem Polynomial.division_with_remainder (r : Ring)
         : ∃ (quotient remainder : Polynomial(Ring.carrier(r), Ring.zero(r))).
             g = ((quotient * f) + remainder)
             ∧ Polynomial.DegreeLessThan(r, remainder, degreeF) := {
-  obtain ⟨leadingInverseValue, leadingInverseEquation⟩ from leadingInverse;
-  obtain ⟨bound, gBound⟩ from Polynomial.exists_degree_bound(r, g);
+  choose leadingInverseValue such that
+      (Polynomial.coefficientOf(f, degreeF) * leadingInverseValue) = Ring.one(r)
+      as leadingInverseEquation
+      from leadingInverse;
+  choose bound such that Polynomial.DegreeLessThan(r, g, bound) as gBound
+      from Polynomial.exists_degree_bound(r, g);
   Polynomial.divide_by_excess(r, commutativity, f, degreeF, fDegreeBound,
       leadingInverseValue, leadingInverseEquation, bound, g,
       Polynomial.DegreeLessThan.weaken(r, g, bound, degreeF + bound,

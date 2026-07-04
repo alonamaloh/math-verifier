@@ -1947,23 +1947,15 @@ private:
                         "or choose n from h;)");
                 }
             } else if (isObtain) {
-                wrapper.kind = BlockWrapper::PatternLet;
-                wrapper.pattern = parsePattern();
-                // `obtain ⟨…⟩ from E;` destructures the value E.
-                // `obtain ⟨…⟩ by Lemma;` cites Lemma with all explicit
-                // arguments inferred (its premises recovered from context),
-                // then destructures the result — the math-like "for some c,
-                // … by <lemma>".
-                if (peek().kind == TokenKind::KeywordBy) {
-                    Token byToken = consumeAny();  // 'by'
-                    wrapper.value = makeSurfaceCiteInferred(
-                        parseExpression(), byToken.line, byToken.column);
-                } else {
-                    expect(TokenKind::KeywordFrom,
-                           "after obtain-pattern (obtain ⟨…⟩ from E; "
-                           "or obtain ⟨…⟩ by Lemma;)");
-                    wrapper.value = parseExpression();
-                }
+                // RETIRED (A5): `obtain` split into `choose` (∃/∧
+                // elimination, the property stated on the page) and
+                // `let ⟨…⟩ :=` (genuine data destructure).
+                throw ParseError(
+                    "`obtain` was retired; eliminate an ∃/∧ with "
+                    "`choose w[, …] such that P [as h] [from E];` "
+                    "(witness lists flatten nested ∃), or destructure "
+                    "genuine data with `let ⟨…⟩ := E;` (line "
+                    + std::to_string(statementToken.line) + ")");
             } else if (!isClaim && peek().kind == TokenKind::LeftAngle) {
                 wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();

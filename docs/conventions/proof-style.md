@@ -444,7 +444,7 @@ returns its final non-`;`-terminated expression.
   - **`from <source>`** — where the existential comes from. A **hypothesis**
     name destructures that specific one (so you say *which* when several `∃`
     are in scope — what plain `choose` can't). A **lemma** name is cited
-    argument-free (premises discharged from context, like `obtain … by`), then
+    argument-free (premises discharged from context), then
     destructured. `from` also takes any applied term of existential type
     (`gSurjective(z)`, `Permutation.extract(a, b, sub)`, an explicit recursive
     self-call). With **no `from`**, `choose` takes the most-recent in-scope `∃`.
@@ -463,11 +463,11 @@ returns its final non-`;`-terminated expression.
   `A ∧ B` lets you prove/cite `A` or `B` directly — no manual `And.left`/
   `And.right`. So after `choose x such that A ∧ B from h;`, both `A` and `B` are
   usable in by-less / `by` / `substituting` steps.
-- `obtain ⟨a, b⟩ from <expr>;` / `let ⟨a, b⟩ := <expr>;` — the tuple
-  destructure, now reserved for genuine **data records** (a quotient
-  representative, `Subtype`, a bundle) where naming several components flatly is
-  what's wanted. For an `∃`/`∧`, use `choose` / the leg-facts above — the `⟨…⟩`
-  is an implementation tell that the connective is encoded as a tuple.
+- `let ⟨a, b⟩ := <expr>;` — the tuple destructure, reserved for genuine
+  **data records** (a quotient representative, `Subtype`, a bundle) where
+  naming several components flatly is what's wanted. For an `∃`/`∧`, use
+  `choose` / the leg-facts above — the `⟨…⟩` is an implementation tell that
+  the connective is encoded as a tuple. (`obtain` is retired.)
 - **Building a connective — symmetric to destructuring it.** Don't write the
   constructor tuple either. To prove `A ∧ B`, state the parts and let the prover
   conjoin: a bare `done`, or `claim A by …; claim B by …; done`. To prove
@@ -848,7 +848,7 @@ argument-free) makes the auto-prover pick the needed fact out of context by
 Re-run the check after editing; the cascade is finite and converges to
 by-less routine steps + anonymous intermediate facts + a few kept
 `by`-cited operative lemmas (flagged, deliberately). Stop short of churning when removal would *worsen*
-things: by-less'ing a step that cites an `obtain`/`suppose` binder just
+things: by-less'ing a step that cites a `choose`/`suppose` binder just
 moves the warning to an "unused binder" (use `as _`, or leave it); and a
 genuinely informative reduction *chain* in a `calc` is worth keeping even
 when the prover could skip it.

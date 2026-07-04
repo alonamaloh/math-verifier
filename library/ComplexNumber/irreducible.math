@@ -159,7 +159,8 @@ theorem Complex.no_degree_one_factorization
 theorem Complex.definingPolynomial_not_unit
         : ¬(Polynomial.IsUnit(Real.ring, Complex.definingPolynomial)) :=
   (isUnit : Polynomial.IsUnit(Real.ring, Complex.definingPolynomial)) ↦ {
-    obtain ⟨g, oneEquation⟩ from isUnit;
+    choose g such that Polynomial.one(Real.ring) = Complex.definingPolynomial * g
+        as oneEquation from isUnit;
     claim by cases {
       case g = Polynomial.zero(Real.ring): {
           Polynomial.one(Real.ring)
@@ -174,8 +175,11 @@ theorem Complex.definingPolynomial_not_unit
                      = Real.zero)
         }
       otherwise as gNonzero: {
-          obtain ⟨degreeG, gBound, gLeadingNonzero⟩
+          choose degreeG such that Polynomial.DegreeLessThan(Real.ring, g, successor(degreeG))
+                  ∧ ¬(Polynomial.coefficientOf(Real.ring, g, degreeG) = Ring.zero(Real.ring))
               from Polynomial.exists_degree_of_nonzero(Real.ring, g, gNonzero);
+          Polynomial.DegreeLessThan(Real.ring, g, successor(degreeG)) as gBound;
+          ¬(Polynomial.coefficientOf(Real.ring, g, degreeG) = Ring.zero(Real.ring)) as gLeadingNonzero;
           let ⟨_, productLeadingNonzero⟩
               := Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
                      Real.reciprocal_exists_for_nonzero, Complex.definingPolynomial, g, 2, degreeG,
@@ -237,9 +241,11 @@ theorem Complex.definingPolynomial_irreducible
                                                 by Ring.multiply_zero_right(Real.polynomial_ring, a)
                                           = Real.zero)
                           as bNonzero;
-                      obtain ⟨degreeA, aBound, aLeadingNonzero⟩
+                      choose degreeA such that Polynomial.DegreeLessThan(Real.ring, a, successor(degreeA))
+                              ∧ ¬(Polynomial.coefficientOf(Real.ring, a, degreeA) = Ring.zero(Real.ring))
                           from Polynomial.exists_degree_of_nonzero(Real.ring, a, aNonzero);
-                      obtain ⟨degreeB, bBound, bLeadingNonzero⟩
+                      choose degreeB such that Polynomial.DegreeLessThan(Real.ring, b, successor(degreeB))
+                              ∧ ¬(Polynomial.coefficientOf(Real.ring, b, degreeB) = Ring.zero(Real.ring))
                           from Polynomial.exists_degree_of_nonzero(Real.ring, b, bNonzero);
                       Polynomial.HasDegree(Real.ring, a, degreeA);
                       Polynomial.HasDegree(Real.ring, b, degreeB);

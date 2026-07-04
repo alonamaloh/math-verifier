@@ -52,9 +52,13 @@ theorem Complex.divides_definingPolynomial_low_degree_zero
   claim by cases {
     case p = Polynomial.zero(Real.ring) as pZero: pZero
     otherwise as pNonzero: {
-        obtain ⟨degreeP, pBound, pLeadingNonzero⟩
+        choose degreeP such that Polynomial.DegreeLessThan(Real.ring, p, successor(degreeP))
+                ∧ ¬(Polynomial.coefficientOf(Real.ring, p, degreeP) = Ring.zero(Real.ring))
             from Polynomial.exists_degree_of_nonzero(Real.ring, p, pNonzero);
-        obtain ⟨quotient, pEqualsDefiningPolynomialQuotient⟩ from definingPolynomialDivides;
+        Polynomial.DegreeLessThan(Real.ring, p, successor(degreeP)) as pBound;
+        ¬(Polynomial.coefficientOf(Real.ring, p, degreeP) = Ring.zero(Real.ring)) as pLeadingNonzero;
+        choose quotient such that p = Complex.definingPolynomial * quotient
+            as pEqualsDefiningPolynomialQuotient from definingPolynomialDivides;
         ¬(quotient = Polynomial.zero(Real.ring))
             by (quotientZero : quotient = Polynomial.zero(Real.ring)) ↦
                  pNonzero(
@@ -64,8 +68,11 @@ theorem Complex.divides_definingPolynomial_low_degree_zero
                         = Polynomial.zero(Real.ring)
                               by Ring.multiply_zero_right(Real.polynomial_ring, Complex.definingPolynomial))
             as quotientNonzero;
-        obtain ⟨degreeQuotient, quotientBound, quotientLeadingNonzero⟩
+        choose degreeQuotient such that Polynomial.DegreeLessThan(Real.ring, quotient, successor(degreeQuotient))
+                ∧ ¬(Polynomial.coefficientOf(Real.ring, quotient, degreeQuotient) = Ring.zero(Real.ring))
             from Polynomial.exists_degree_of_nonzero(Real.ring, quotient, quotientNonzero);
+        Polynomial.DegreeLessThan(Real.ring, quotient, successor(degreeQuotient)) as quotientBound;
+        ¬(Polynomial.coefficientOf(Real.ring, quotient, degreeQuotient) = Ring.zero(Real.ring)) as quotientLeadingNonzero;
         degreeP = 2 + degreeQuotient
             by Polynomial.HasDegree_unique(Real.ring, p, degreeP, 2 + degreeQuotient,
                    And.introduction(pBound, pLeadingNonzero),

@@ -50,7 +50,7 @@ enum class TokenKind {
     KeywordSubstituting,    // `by substituting <eq>` — narrow to specified equality
     KeywordRecalling,       // `by <lemma> recalling <fact>, …` — facts in discharge scope
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
-    KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
+    KeywordObtain,          // RETIRED construct (A5) — kept only for the migration error
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step
     KeywordChoose,          // `choose N such that P(N);` — Exists-elim via scope lookup
     KeywordFrom,            // separator for `obtain ⟨…⟩ from E;`

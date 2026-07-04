@@ -90,10 +90,9 @@ theorem Real.cauchy_tail_gives_lower_bound
       (m : Natural) (mInTail : N ≤ m) ↦ {
         N ≤ N;
         abs(s(m) - s(N)) < q
-            by tailClose(m, N, mInTail, (N ≤ N)) as close;
-        obtain ⟨closeLower, _⟩
-            from Real.absolute_value_LessThan_bounds(
-                     s(m) - s(N), (q : Real), close);
+            by tailClose(m, N, mInTail, (N ≤ N));
+        -(q : Real) < s(m) - s(N) ∧ s(m) - s(N) < (q : Real)
+            by Real.absolute_value_LessThan_bounds;
         s(N) - q < s(m)
             by calc s(N) - q
                   = -q + s(N)
@@ -109,7 +108,8 @@ theorem Real.cauchy_tail_gives_upper_bound
         : Real.IsUpperBound(Real.eventual_lower_bounds(s),
                             s(N) + q) :=
   (t : Real) (tEventual : t ∈ Real.eventual_lower_bounds(s)) ↦ {
-    obtain ⟨tailStart, tailLow⟩ from tEventual;
+    choose tailStart such that ∀ (m : Natural). tailStart ≤ m → t ≤ s(m)
+        from tEventual;
     -- Probe past both tails at once.
     tailStart ≤ Natural.maximum(tailStart, N);
     N ≤ Natural.maximum(tailStart, N);
@@ -117,11 +117,10 @@ theorem Real.cauchy_tail_gives_upper_bound
     t ≤ s(Natural.maximum(tailStart, N)) as tBelowTerm;
     abs(s(Natural.maximum(tailStart, N)) - s(N)) < q
         by tailClose(Natural.maximum(tailStart, N), N,
-                     (N ≤ Natural.maximum(tailStart, N)), (N ≤ N))
-        as close;
-    obtain ⟨_, closeUpper⟩
-        from Real.absolute_value_LessThan_bounds(
-                 s(Natural.maximum(tailStart, N)) - s(N), (q : Real), close);
+                     (N ≤ Natural.maximum(tailStart, N)), (N ≤ N));
+    -(q : Real) < s(Natural.maximum(tailStart, N)) - s(N)
+        ∧ s(Natural.maximum(tailStart, N)) - s(N) < (q : Real)
+        by Real.absolute_value_LessThan_bounds;
     s(Natural.maximum(tailStart, N)) < s(N) + q
         by calc s(Natural.maximum(tailStart, N))
               = (s(Natural.maximum(tailStart, N)) - s(N)) + s(N)   by ring
@@ -155,7 +154,8 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
           Real.cauchy_tail_gives_upper_bound(
               s, unitIndex, Rational.one, unitClose)⟩
       as boundedAbove;
-  obtain ⟨limit, isSupremum⟩
+  choose limit such that Real.IsSupremum(Real.eventual_lower_bounds(s), limit)
+          as isSupremum
       from Real.supremum_exists(Real.eventual_lower_bounds(s),
                                 nonempty, boundedAbove);
   let ⟨isUpper, isLeast⟩ := isSupremum;
@@ -195,12 +195,10 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
               N ≤ N;
               abs(s(m) - s(N))
                       < (Rational.halve(Rational.halve(ε)) : Real)
-                  by tailClose(m, N, mInTail, (N ≤ N)) as close;
-              obtain ⟨closeLower, closeUpper⟩
-                  from Real.absolute_value_LessThan_bounds(
-                           s(m) - s(N),
-                           (Rational.halve(Rational.halve(ε)) : Real),
-                           close);
+                  by tailClose(m, N, mInTail, (N ≤ N));
+              -(Rational.halve(Rational.halve(ε)) : Real) < s(m) - s(N)
+                  ∧ s(m) - s(N) < (Rational.halve(Rational.halve(ε)) : Real)
+                  by Real.absolute_value_LessThan_bounds;
               -- Both gaps to the limit stay below 2·(ε/4) < ε.
               -limit
                       ≤ -(s(N) - (Rational.halve(Rational.halve(ε))
@@ -319,7 +317,7 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
           take i : Natural; take j : Natural;
           take iInTail : N ≤ i; take jInTail : N ≤ j;
           take iLeqJ : i ≤ j;
-          obtain ⟨c, splitEquation⟩
+          choose c such that j = i + c as splitEquation
               from Natural.subtraction_witness(i, j, iLeqJ);
           j = c + i
               by calc j

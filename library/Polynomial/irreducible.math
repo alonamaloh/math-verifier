@@ -73,16 +73,19 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
             ((a * f) + (b * g))
             = Polynomial.one(r) := {
   let ⟨fNotUnit, factorClause⟩ := fIrreducible;
-  obtain ⟨bound, gBound⟩ from Polynomial.exists_degree_bound(r, g);
-  obtain ⟨m, coefficientF, coefficientG, combinationEquation, mDividesF, mDividesG⟩
+  choose bound such that Polynomial.DegreeLessThan(r, g, bound) as gBound
+      from Polynomial.exists_degree_bound(r, g);
+  choose m, coefficientF, coefficientG such that
+      m = ((coefficientF * f) + (coefficientG * g))
+      ∧ Ring.divides(Polynomial.ring(r), m, f)
+      ∧ Ring.divides(Polynomial.ring(r), m, g)
       from Polynomial.gcd_bezout(r, commutativity, inverseExistence, bound, g, gBound, f);
-  -- combinationEquation : m = coefficientF·f + coefficientG·g; mDividesF/G.
-  obtain ⟨quotientFM, fEqualsMquotient⟩ from mDividesF;
-  -- fEqualsMquotient : f = m·quotientFM.
+  Ring.divides(Polynomial.ring(r), m, f) as mDividesF;
+  Ring.divides(Polynomial.ring(r), m, g) as mDividesG;
+  choose quotientFM such that f = (m * quotientFM) as fEqualsMquotient from mDividesF;
   cases factorClause(m, quotientFM, fEqualsMquotient) {
     | Or.introduceLeft(mIsUnit) => {
-        obtain ⟨mInverse, oneEqualsMmInverse⟩ from mIsUnit;
-        -- oneEqualsMmInverse : 1 = m·mInverse.
+        choose mInverse such that Polynomial.one(r) = (m * mInverse) from mIsUnit;
         ⟨(coefficientF * mInverse),
          (coefficientG * mInverse),
          Equality.symmetry(
@@ -94,15 +97,15 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
                 = (((coefficientF * mInverse) * f) + ((coefficientG * mInverse) * g)))⟩
       }
     | Or.introduceRight(quotientIsUnit) => {
-        obtain ⟨quotientInverse, oneEqualsQuotientInverse⟩ from quotientIsUnit;
-        -- oneEqualsQuotientInverse : 1 = quotientFM·quotientInverse.
+        choose quotientInverse such that
+            Polynomial.one(r) = (quotientFM * quotientInverse)
+            from quotientIsUnit;
         m
                   = (m * Polynomial.one(r))
                   = (m * (quotientFM * quotientInverse))
                   = ((m * quotientFM) * quotientInverse)
                   = (f * quotientInverse);
-        obtain ⟨cofactorG, gEqualsMcofactor⟩ from mDividesG;
-        -- gEqualsMcofactor : g = m·cofactorG.
+        choose cofactorG such that g = (m * cofactorG) from mDividesG;
         absurd(notDivides(
             ⟨(quotientInverse * cofactorG),
              calc g

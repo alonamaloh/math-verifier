@@ -75,9 +75,10 @@ theorem IntegerMod.residues_complete (p n : Natural) (pEquation : p = 1 + n)
   -- Reduce c to its canonical representative r < p.
   1 ≤ 1 + n;
   1 ≤ p by substituting pEquation as pPositive;
-  obtain ⟨r, rProperties⟩
+  choose r such that r < p ∧ c = IntegerMod.make(p, (r : Integer))
       from IntegerMod.exists_natural_representative(p, pPositive, c);
-  let ⟨rBound, cEquation⟩ := rProperties;
+  r < p as rBound;
+  c = IntegerMod.make(p, (r : Integer)) as cEquation;
   -- r is not 0 (the class is nonzero), so 1 ≤ r.
   r ≠ 0
       by (rZero : r = 0) ↦ {
@@ -139,10 +140,11 @@ theorem IntegerMod.residues_member_nonzero (p n : Natural) (pEquation : p = 1 + 
         (cMember : List.member(IntegerMod(p), c, IntegerMod.residues_up_to(p, n)))
         : ¬(c = IntegerMod.zero(p)) :=
   (cZero : c = IntegerMod.zero(p)) ↦ {
-    obtain ⟨j, jProperties⟩
+    choose j such that
+        List.member(Natural, j, List.range_down(n)) ∧ IntegerMod.residue(p, j) = c
         from List.map_member_invert(Natural, IntegerMod(p), IntegerMod.residue(p),
                  c, List.range_down(n), cMember);
-    let ⟨jMember, jClassEquation⟩ := jProperties;
+    IntegerMod.residue(p, j) = c as jClassEquation;
     1 ≤ j by List.range_down_member_positive;
     -- [j] = 0 = [0], so j = 0 by injectivity — contradicting 1 ≤ j.
     IntegerMod.residue(p, j) = IntegerMod.residue(p, 0)

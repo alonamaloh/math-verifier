@@ -34,7 +34,7 @@ theorem Integer.subtract_swap (x y : Integer) : x - y = -(y - x) :=
 ```
 
 **3. A `{ … }` block.** A sequence of statements (`claim`, `take`,
-`obtain`, `let`, `cases`, `by_induction`, `calc`, `note`, etc.)
+`choose`, `let`, `cases`, `by_induction`, `calc`, `note`, etc.)
 followed by a final expression. Reads as math prose with paragraphs.
 
 ```math
@@ -274,23 +274,25 @@ suppose 0 < epsilon as epsilonPositive;
 suppose ∃ (n : Natural). Q(n) as ⟨witnessValue, witnessProof⟩;
 ```
 
-### `obtain ⟨a, b⟩ from h;` — destructure an existing value
+### `let ⟨a, b⟩ := E;` — destructure a data record
 
-For an `h : ∃ x. P(x)` or `h : And(A, B)`, destructure into named
-pieces. Also works with constructor patterns for any single-
-constructor inductive, and with quotient patterns for a quotient
-value (where it routes through `Quotient.induct`).
+For genuine DATA (a record, a bundle, a single-constructor inductive
+over values), the tuple pattern names the components flatly. Logic is
+never destructured this way — `∃`/`∧` go through `choose` and the
+conjunction-leg facts. (The old `obtain` construct is retired: it was
+`choose` for logic and this let-pattern for data.)
+
+### `choose w [such that P] [as h] [from E];` — ∃-elimination
+
+The textbook "choose ε > 0 such that …". The property is stated on
+the page and joins the context (conjunct-by-conjunct for ∧-chains);
+`from` names the source (a hypothesis, an applied term, or a lemma
+cited argument-free); without `from`, the most recent in-scope ∃ is
+used. Witness lists flatten a nested ∃ in one step:
 
 ```math
-obtain ⟨k, witnessEquation⟩ from Natural.subtraction_witness(a, b, h);
-obtain IntegerRepresentative.make(a, b) from x;  -- x : Integer
-```
-
-### `choose N such that P(N);` — math-prose existential
-
-```math
-choose N such that converges_within_epsilon_of(s, N);
--- Sugar for: obtain ⟨N, _⟩ from someExists; claim P(N) by …
+choose k such that m = 2 * k;                        -- source: the in-scope `2 ∣ m`
+choose m, n such that 1 ≤ m ∧ m = n from solutionExists;
 ```
 
 ### `let x : T := V;` — local abbreviation

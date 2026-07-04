@@ -51,7 +51,8 @@ definition IntegerMod.is_unit {modulus : Natural} (x : IntegerMod(modulus))
 theorem IntegerMod.unit_of_coprime (n a : Natural)
         (coprime : Natural.coprime(a, n))
         : IntegerMod.is_unit(IntegerMod.make(n, (a : Integer))) := {
-  obtain ⟨x, y, bezoutEquation⟩ from Natural.coprime_bezout(a, n, coprime);
+  choose x, y such that (a : Integer) * x + (n : Integer) * y = Integer.one as bezoutEquation
+      from Natural.coprime_bezout(a, n, coprime);
   Integer.divides((n : Integer), (a : Integer) * x - Integer.one)
       by ⟨-y, calc (a : Integer) * x - Integer.one
                  = (a : Integer) * x - ((a : Integer) * x + (n : Integer) * y)
@@ -94,7 +95,8 @@ theorem Natural.divides_one_of_divides_congruent_one (d n : Natural)
 theorem IntegerMod.coprime_of_unit_representative (n r : Natural)
         (rUnit : IntegerMod.is_unit(IntegerMod.make(n, (r : Integer))))
         : Natural.coprime(r, n) := {
-  obtain ⟨w, inverseEquation⟩ from rUnit;
+  choose w such that IntegerMod.make(n, (r : Integer)) * w = IntegerMod.one(n) as inverseEquation
+      from rUnit;
   -- Read the inverse at a representative: r·b ≡ 1 (mod n) for some
   -- integer b.
   cases w refining inverseEquation { | b => {
@@ -128,8 +130,8 @@ theorem IntegerMod.multiply_unit (modulus : Natural)
         (x y : IntegerMod(modulus))
         (xUnit : IntegerMod.is_unit(x)) (yUnit : IntegerMod.is_unit(y))
         : IntegerMod.is_unit(x * y) := {
-  obtain ⟨xInverse, xEquation⟩ from xUnit;
-  obtain ⟨yInverse, yEquation⟩ from yUnit;
+  choose xInverse such that x * xInverse = IntegerMod.one(modulus) as xEquation from xUnit;
+  choose yInverse such that y * yInverse = IntegerMod.one(modulus) as yEquation from yUnit;
   witness xInverse * yInverse with
       calc (x * y) * (xInverse * yInverse)
          = (x * xInverse) * (y * yInverse)
@@ -188,7 +190,7 @@ theorem IntegerMod.multiply_cancel_left_of_unit (modulus : Natural)
         (cUnit : IntegerMod.is_unit(c))
         (equation : c * u = c * v)
         : u = v := {
-  obtain ⟨inverse, inverseEquation⟩ from cUnit;
+  choose inverse such that c * inverse = IntegerMod.one(modulus) from cUnit;
   inverse * c = IntegerMod.one(modulus)
       by calc inverse * c
             = c * inverse

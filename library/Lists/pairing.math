@@ -97,9 +97,10 @@ theorem List.paired_inverses_drop_pair (A : Type(0))
         by List.Permutation.symmetric;
     List.member(A, z, list)
         by List.Permutation.member_forward as zMemberList;
-    obtain ⟨w, wProperties⟩ from paired(z, zMemberList);
-    let ⟨wMemberList, wInverseProperties⟩ := wProperties;
-    let ⟨zPairsToOne, wNotZ⟩ := wInverseProperties;
+    choose w such that List.member(A, w, list) ∧ multiply(z, w) = one ∧ ¬(w = z)
+        from paired(z, zMemberList);
+    multiply(z, w) = one as zPairsToOne;
+    ¬(w = z) as wNotZ;
     List.member(A, w,
         List.prepend(A, head, List.prepend(A, partner, rest)))
         by List.Permutation.member_forward;
@@ -203,15 +204,15 @@ theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
 
               -- The head has a partner elsewhere in the list — in the tail.
               List.member(A, head, List.prepend(A, head, tail)) as headMember;
-              obtain ⟨partner, partnerProperties⟩ from paired(head, headMember);
-              let ⟨partnerMember, partnerInverseProperties⟩ := partnerProperties;
-              let ⟨headPairsToOne, partnerNotHead⟩ := partnerInverseProperties;
+              choose partner such that
+                  List.member(A, partner, tail) ∧ multiply(head, partner) = one ∧ ¬(partner = head)
+                  from paired(head, headMember);
               List.member(A, partner, tail)
                   by List.member_of_prepend_not_head as partnerInTail;
 
               -- Rotate the partner to the front of the tail, so the whole
               -- list permutes to head :: partner :: rest.
-              obtain ⟨rest, tailPermutation⟩
+              choose rest such that List.Permutation(A, tail, List.prepend(A, partner, rest))
                   from List.Permutation.extract(A, partner, tail, partnerInTail);
               List.Permutation(A, List.prepend(A, head, tail),
                   List.prepend(A, head, List.prepend(A, partner, rest)));

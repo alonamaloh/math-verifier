@@ -224,10 +224,10 @@ also takes a lemma, cited argument-free:
 ```
 
 Add `as <name>` to name the property for later citation, or leave it off and a
-later by-less step picks it up. (Prefer `choose` over the raw tuple destructure
-`obtain ⟨w, p⟩` / `let ⟨w, p⟩ := …` for `∃`/`∧` — the `⟨…⟩` exposes that they
-happen to be encoded as tuples, which isn't how you think about them. Keep the
-tuple form for genuine records.)
+later by-less step picks it up. (`choose` is the ONLY spelling for `∃`/`∧`
+elimination — the retired `obtain`'s tuple `⟨w, p⟩` exposed that connectives
+happen to be encoded as tuples, which isn't how you think about them. The
+tuple form `let ⟨a, b⟩ := …` survives for genuine data records.)
 
 A context `A ∧ B` gives you both `A` and `B` as facts directly — no projecting
 a pair — and `absurd(0 = successor(k))` lets you state a contradictory fact and

@@ -181,7 +181,7 @@ theorem ComplexNumber.exponentialTerm_binomial_split
            let recipK : Real :=
                (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real);
            i ≤ k by Natural.successor_le_cancel;
-           obtain ⟨d, kSplit⟩ from Natural.subtraction_witness(i, k, (i ≤ k));
+           choose d such that k = i + d from Natural.subtraction_witness(i, k, (i ≤ k));
            i + d = k as kJoin;
            Natural.monus(k, i) = d
                by {
@@ -459,7 +459,7 @@ theorem ComplexNumber.cauchy_product_difference_bound
             - aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i))
       by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
            i ≤ n;
-           obtain ⟨e, nSplit⟩ from Natural.subtraction_witness(i, n, (i ≤ n));
+           choose e such that n = i + e from Natural.subtraction_witness(i, n, (i ≤ n));
            i + e = n as nJoin;
            Natural.monus(n, i) = e
                by {
@@ -707,7 +707,7 @@ theorem ComplexNumber.cauchy_product_converges
                by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
                     i ≤ n
                         by Natural.less_or_equal_predecessor_less_or_equal;
-                    obtain ⟨e, nSplit⟩
+                    choose e such that n = i + e
                         from Natural.subtraction_witness(i, n, (i ≤ n));
                     Natural.monus(n, i) ≤ n;
                     Real.partialSum(bModulus, Natural.monus(n, i))
@@ -753,7 +753,8 @@ theorem ComplexNumber.cauchy_product_converges
                  ≤ aAbsoluteLimit * bAbsoluteLimit;
            done
          } as absoluteTriangleBounded;
-  obtain ⟨triangleAbsoluteLimit, absoluteTriangleConverges⟩
+  choose triangleAbsoluteLimit such that Real.SequenceConverges(Real.partialSum(absoluteDiagonal), triangleAbsoluteLimit)
+      as absoluteTriangleConverges
       from Real.monotone_bounded_converges(
                Real.partialSum(absoluteDiagonal),
                absoluteTriangleMonotone,
@@ -783,7 +784,7 @@ theorem ComplexNumber.cauchy_product_converges
                by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
                     i ≤ n
                         by Natural.less_or_equal_predecessor_less_or_equal;
-                    obtain ⟨e, nSplit⟩
+                    choose e such that n = i + e as nSplit
                         from Natural.subtraction_witness(i, n, (i ≤ n));
                     n + n = i + (e + n)
                         by calc n + n
@@ -1011,10 +1012,10 @@ theorem ComplexNumber.exponential_add (z w : ComplexNumber)
           = ComplexNumber.exponential(z) * ComplexNumber.exponential(w) := {
   -- The absolute series converge: the modulus of the k-th term IS the
   -- real exponential term at the modulus.
-  obtain ⟨zAbsoluteLimit, zRealConverges⟩
-      from Real.exponential_series_convergent(abs(z));
-  obtain ⟨wAbsoluteLimit, wRealConverges⟩
-      from Real.exponential_series_convergent(abs(w));
+  choose zAbsoluteLimit such that Real.SequenceConverges(Real.partialSum(Real.exponentialTerm(abs(z))), zAbsoluteLimit)
+      as zRealConverges from Real.exponential_series_convergent(abs(z));
+  choose wAbsoluteLimit such that Real.SequenceConverges(Real.partialSum(Real.exponentialTerm(abs(w))), wAbsoluteLimit)
+      as wRealConverges from Real.exponential_series_convergent(abs(w));
   ∀ (n : Natural).
         Real.partialSum(Real.exponentialTerm(abs(z)), n)
           = Real.partialSum(

@@ -148,7 +148,7 @@ theorem Real.exponentialTerm_binomial_split (x y : Real) (k : Natural)
       by (i : Natural) (iLessThan : i < 1 + k) ↦ {
            successor(i) ≤ 1 + k;
            i ≤ k by Natural.successor_le_cancel;
-           obtain ⟨d, kSplit⟩ from Natural.subtraction_witness(i, k, (i ≤ k));
+           choose d such that k = i + d from Natural.subtraction_witness(i, k, (i ≤ k));
            i + d = k as kJoin;
            Natural.monus(k, i) = d
                by {
@@ -401,7 +401,7 @@ theorem Real.cauchy_product_difference_bound (a b : Natural → Real) (n : Natur
       by (i : Natural) (iLessThan : i < n) ↦ {
            successor(i) ≤ n;
            i ≤ n;
-           obtain ⟨e, nSplit⟩ from Natural.subtraction_witness(i, n, (i ≤ n));
+           choose e such that n = i + e from Natural.subtraction_witness(i, n, (i ≤ n));
            i + e = n as nJoin;
            Natural.monus(n, i) = e
                by {
@@ -665,7 +665,7 @@ theorem Real.cauchy_product_converges
                     successor(i) ≤ n;
                     i ≤ n
                         by Natural.less_or_equal_predecessor_less_or_equal;
-                    obtain ⟨e, nSplit⟩
+                    choose e such that n = i + e
                         from Natural.subtraction_witness(i, n, (i ≤ n));
                     Natural.monus(n, i) ≤ n;
                     Real.partialSum((k : Natural) ↦ abs(b(k)),
@@ -750,7 +750,7 @@ theorem Real.cauchy_product_converges
                  ≤ aAbsoluteLimit * bAbsoluteLimit;
            done
          } as absoluteTriangleBounded;
-  obtain ⟨triangleAbsoluteLimit, absoluteTriangleConverges⟩
+  choose triangleAbsoluteLimit as absoluteTriangleConverges
       from Real.monotone_bounded_converges(
                Real.partialSum(
                    (k : Natural) ↦
@@ -807,7 +807,7 @@ theorem Real.cauchy_product_converges
                     successor(i) ≤ n;
                     i ≤ n
                         by Natural.less_or_equal_predecessor_less_or_equal;
-                    obtain ⟨e, nSplit⟩
+                    choose e such that n = i + e as nSplit
                         from Natural.subtraction_witness(i, n, (i ≤ n));
                     n + n = i + (e + n)
                         by calc n + n
@@ -1186,9 +1186,17 @@ theorem Real.cauchy_product_converges
 -- of the limits by Mertens; limits are unique.
 theorem Real.exponential_add (x y : Real)
         : Real.exponential(x + y) = Real.exponential(x) * Real.exponential(y) := {
-  obtain ⟨xAbsoluteLimit, xAbsolutelyConverges⟩
+  choose xAbsoluteLimit such that
+      Real.SequenceConverges(
+          Real.partialSum((k : Natural) ↦ abs(Real.exponentialTerm(x, k))),
+          xAbsoluteLimit)
+      as xAbsolutelyConverges
       from Real.exponential_series_absolutely_convergent(x);
-  obtain ⟨yAbsoluteLimit, yAbsolutelyConverges⟩
+  choose yAbsoluteLimit such that
+      Real.SequenceConverges(
+          Real.partialSum((k : Natural) ↦ abs(Real.exponentialTerm(y, k))),
+          yAbsoluteLimit)
+      as yAbsolutelyConverges
       from Real.exponential_series_absolutely_convergent(y);
   Real.SequenceConverges(
             Real.partialSum(Real.exponentialTerm(x)), Real.exponential(x))

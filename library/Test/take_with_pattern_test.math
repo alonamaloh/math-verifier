@@ -13,10 +13,11 @@ import Natural.basics
 import Integer.basics
 import Integer.addition
 
--- (1) `take` with quotient pattern: destructure x as a representative
--- right at the intro.
+-- (1) `take` with the quotient-representative pattern (A5 spelling):
+-- destructure x as a representative right at the intro, no constructor
+-- name on the page.
 theorem take_quotient_destructure : ∀ (x : Integer). x = x := {
-  take x as IntegerRepresentative.make(a, b) : Integer;
+  take x as representative(a, b) : Integer;
   reflexivity(Integer,
       (Quotient.class_of(IntegerRepresentative.make(a, b)) : Integer))
 }
@@ -61,24 +62,25 @@ theorem suppose_bare_name
   h
 }
 
--- (7) `obtain Constructor.make(a, b) from h;` — destructure an inductive
--- value (non-Quotient) via obtain. Tests the existing PatternLet → cases
--- dispatch on a single-constructor inductive.
-theorem obtain_inductive_destructure
+-- (7) `let ⟨a, b⟩ := h;` — destructure an inductive DATA value
+-- (non-Quotient) via the pattern-let; the tuple resolves the sole
+-- constructor from the type.
+theorem let_inductive_destructure
         (h : IntegerRepresentative)
         : IntegerRepresentative := {
-  obtain IntegerRepresentative.make(a, b) from h;
+  let ⟨a, b⟩ := h;
   IntegerRepresentative.make(a, b)
 }
 
--- (8) `obtain Constructor.make(a, b) from h;` where h is a Quotient
--- value. Goes through the cases-on-Quotient path (Stage A). Equivalent
--- to `take h as Constructor.make(a, b)` for a given h.
-theorem obtain_quotient_destructure (x : Integer) : x = x := {
-  obtain IntegerRepresentative.make(a, b) from x;
-  reflexivity(Integer,
-      (Quotient.class_of(IntegerRepresentative.make(a, b)) : Integer))
-}
+-- (8) `cases x { | representative(a, b) => … }` — the A5 quotient
+-- destructure of a given value. Goes through the cases-on-Quotient
+-- path with the carrier's constructor resolved from the type.
+theorem cases_quotient_representative (x : Integer) : x = x :=
+  cases x {
+    | representative(a, b) =>
+        reflexivity(Integer,
+            (Quotient.class_of(IntegerRepresentative.make(a, b)) : Integer))
+  }
 
 -- (9) `cases x refining h1, h2 { | rep => body }` — multi-name refining
 -- on a Quotient scrutinee. Confirms the fix to elaborateCasesWithRefining

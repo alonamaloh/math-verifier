@@ -101,7 +101,7 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
       by Integer.sign_split
   claim by cases {
     case Integer.IsNonneg(a) as nonnegative: {
-        obtain ⟨k, aEqualsK⟩ from nonnegative;
+        choose k such that a = (k : Integer) as aEqualsK from nonnegative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | (k : Integer) = a.
         ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦
@@ -109,10 +109,10 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
                      rewrite(Equality.symmetry(aEqualsK),
                          Integer.divides_of_natural_divides(p, k, pDividesK)))
             as notDividesK;
-        obtain ⟨bezoutX, bezoutY, bezoutEquation⟩
-            from Natural.bezout_one_when_prime_coprime(p, k, primality,
-                     notDividesK);
-        -- bezoutEquation : (p : Integer)·bezoutX + (k : Integer)·bezoutY = 1
+        -- Bezout: p·bezoutX + k·bezoutY = 1, used below to rewrite Integer.one.
+        choose bezoutX, bezoutY such that
+            (p : Integer) * bezoutX + (k : Integer) * bezoutY = Integer.one
+            from Natural.bezout_one_when_prime_coprime(p, k, primality, notDividesK);
         witness IntegerMod.make(p, bezoutY) with
             IntegerMod.inverse_from_witness(p, a, bezoutY,
                 ⟨-bezoutX,
@@ -122,7 +122,7 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
                     = (p : Integer) * -bezoutX⟩)
     }
     case ∃ (k : Natural). a = -(k : Integer) as negative: {
-        obtain ⟨k, aEqualsNegativeK⟩ from negative;
+        choose k such that a = -(k : Integer) as aEqualsNegativeK from negative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : Integer) = a.
         ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦
@@ -131,9 +131,10 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
                          Integer.divides_negate((p : Integer), (k : Integer),
                              Integer.divides_of_natural_divides(p, k, pDividesK))))
             as notDividesK;
-        obtain ⟨bezoutX, bezoutY, bezoutEquation⟩
-            from Natural.bezout_one_when_prime_coprime(p, k, primality,
-                     notDividesK);
+        -- Bezout: p·bezoutX + k·bezoutY = 1, used below to rewrite Integer.one.
+        choose bezoutX, bezoutY such that
+            (p : Integer) * bezoutX + (k : Integer) * bezoutY = Integer.one
+            from Natural.bezout_one_when_prime_coprime(p, k, primality, notDividesK);
         witness IntegerMod.make(p, -bezoutY) with
             IntegerMod.inverse_from_witness(p, a, -bezoutY,
                 ⟨-bezoutX,

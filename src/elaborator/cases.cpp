@@ -312,6 +312,20 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
                     innerDestructurePattern =
                         constructorPattern->arguments[0];
                 }
+            } else if (constructorPattern
+                && constructorPattern->constructorName == "representative") {
+                // `take x as representative (a, b)` (A5) — the
+                // mathematical name for the carrier's sole constructor.
+                // Route through the tuple path: the inner cases resolves
+                // the constructor from the carrier type, so the
+                // representation's constructor name never appears.
+                representativeName = "_quotientRep_"
+                    + std::to_string(clause.line) + "_"
+                    + std::to_string(clause.column);
+                innerDestructurePattern = makeSurfacePatternTuple(
+                    constructorPattern->arguments,
+                    clause.line, clause.column,
+                    /*userWritten=*/false);
             } else if (constructorPattern) {
                 // `cases x { | <Constructor>(args) => body }` —
                 // destructure directly. Synthesise the rep binder.

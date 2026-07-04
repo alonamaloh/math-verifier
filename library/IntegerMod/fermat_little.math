@@ -194,11 +194,13 @@ theorem IntegerMod.scaled_residue_member (p n : Natural)
                 IntegerMod.residues_up_to(p, n))))
         : List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n)) := {
   -- z = x·u for a nonzero class u, so z is itself nonzero, hence listed.
-  obtain ⟨u, uProperties⟩
+  choose u such that
+      List.member(IntegerMod(p), u, IntegerMod.residues_up_to(p, n))
+      ∧ IntegerMod.multiply_by(p, x, u) = z
       from List.map_member_invert(IntegerMod(p), IntegerMod(p),
                IntegerMod.multiply_by(p, x), z, IntegerMod.residues_up_to(p, n),
                zMember);
-  let ⟨uMember, scaledEqualsZ⟩ := uProperties;
+  IntegerMod.multiply_by(p, x, u) = z as scaledEqualsZ;
   ¬(u = IntegerMod.zero(p)) by IntegerMod.residues_member_nonzero;
   ¬(x * u = IntegerMod.zero(p)) by IntegerMod.multiply_nonzero;
   ¬(z = IntegerMod.zero(p)) by substituting scaledEqualsZ;
@@ -322,7 +324,8 @@ theorem IntegerMod.class_nonzero_of_not_divides (p a : Natural)
         : ¬(IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p)) :=
   (classZero : IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p)) ↦ {
     -- p ∣ a − 0 = a, over the integers and then over the naturals.
-    obtain ⟨quotient, differenceEquation⟩ by IntegerMod.congruent_of_make_equal;
+    choose quotient such that (a : Integer) - Integer.zero = (p : Integer) * quotient
+        as differenceEquation from IntegerMod.congruent_of_make_equal;
     Integer.divides((p : Integer), (a : Integer))
         by ⟨quotient,
             calc (a : Integer)

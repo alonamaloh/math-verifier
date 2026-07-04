@@ -40,7 +40,7 @@ theorem Proto.lt_one_plus (a : Natural) : Proto.lt(a, 1 + a) :=
 -- Irreflexivity.
 theorem Proto.lt_irreflexive (a : Natural) : ¬ Proto.lt(a, a) :=
   (h : Proto.lt(a, a)) ↦ {
-    obtain ⟨c, hc⟩ from Proto.lt_elim(a, a, h);
+    choose c such that a + (1 + c) = a as hc from Proto.lt_elim(a, a, h);
     claim sumEq : a + (1 + c) = a + 0
         by calc a + (1 + c)
               = a       by hc
@@ -56,8 +56,8 @@ theorem Proto.lt_irreflexive (a : Natural) : ¬ Proto.lt(a, a) :=
 -- Transitivity.
 theorem Proto.lt_transitive (a b c : Natural)
         (hab : Proto.lt(a, b)) (hbc : Proto.lt(b, c)) : Proto.lt(a, c) := {
-  obtain ⟨c1, h1⟩ from Proto.lt_elim(a, b, hab);
-  obtain ⟨c2, h2⟩ from Proto.lt_elim(b, c, hbc);
+  choose c1 such that a + (1 + c1) = b as h1 from Proto.lt_elim(a, b, hab);
+  choose c2 such that b + (1 + c2) = c as h2 from Proto.lt_elim(b, c, hbc);
   Proto.lt_intro(a, c, c1 + (1 + c2),
       calc a + (1 + (c1 + (1 + c2)))
          = (a + (1 + c1)) + (1 + c2)   by ring
@@ -97,7 +97,7 @@ theorem Proto.trichotomy (a : Natural)
         | Or.introduceLeft(bZero) =>
             Or.introduceRight(Or.introduceLeft(Equality.symmetry(bZero)))
         | Or.introduceRight(bSucc) => {
-            obtain ⟨k, bEqSucc⟩ from bSucc;
+            choose k such that b = successor(k) as bEqSucc from bSucc;
             Or.introduceLeft(Proto.lt_intro(0, b, k,
                 calc 0 + (1 + k)
                    = 1 + k         by Natural.zero_add(1 + k)
@@ -108,7 +108,7 @@ theorem Proto.trichotomy (a : Natural)
     case step(a'): (b : Natural) ↦
       cases IH(b) {
         | Or.introduceLeft(a'LtB) => {
-            obtain ⟨c, hc⟩ from Proto.lt_elim(a', b, a'LtB);
+            choose c such that a' + (1 + c) = b as hc from Proto.lt_elim(a', b, a'LtB);
             cases Natural.zero_or_successor(c) {
               | Or.introduceLeft(cZero) =>
                   Or.introduceRight(Or.introduceLeft(
@@ -117,7 +117,7 @@ theorem Proto.trichotomy (a : Natural)
                          = a' + (1 + c)  by substituting Equality.symmetry(cZero)
                          = b             by hc))
               | Or.introduceRight(cSucc) => {
-                  obtain ⟨c', cEqSucc⟩ from cSucc;
+                  choose c' such that c = successor(c') as cEqSucc from cSucc;
                   claim cBridge : 1 + c' = c
                       by calc 1 + c'
                             = successor(c')  by Natural.one_add(c')

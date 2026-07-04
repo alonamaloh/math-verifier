@@ -155,7 +155,11 @@ theorem Real.power_negate_parity (y : Real)
       done by And.introduction
     }
   | successor(m) => {
-      obtain ⟨evenAt, oddAt⟩ from Real.power_negate_parity(y, m);
+      Real.power(-y, 2 * m) = Real.power(y, 2 * m)
+          ∧ Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)))
+          by Real.power_negate_parity(y, m);
+      Real.power(-y, 2 * m) = Real.power(y, 2 * m) as evenAt;
+      Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)));
       2 * successor(m) = successor(successor(2 * m)) as indexEven;
       successor(2 * successor(m)) = successor(successor(successor(2 * m))) as indexOdd;
       Real.power(-y, 2 * successor(m)) = Real.power(y, 2 * successor(m))
@@ -188,13 +192,17 @@ theorem Real.power_negate_parity (y : Real)
 -- The two projections, as standalone facts.
 theorem Real.power_negate_even (y : Real) (m : Natural)
         : Real.power(-y, 2 * m) = Real.power(y, 2 * m) := {
-  obtain ⟨evenPart, _⟩ from Real.power_negate_parity(y, m);
+  Real.power(-y, 2 * m) = Real.power(y, 2 * m)
+      ∧ Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)))
+      by Real.power_negate_parity(y, m);
   done
 }
 
 theorem Real.power_negate_odd (y : Real) (m : Natural)
         : Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m))) := {
-  obtain ⟨_, oddPart⟩ from Real.power_negate_parity(y, m);
+  Real.power(-y, 2 * m) = Real.power(y, 2 * m)
+      ∧ Real.power(-y, successor(2 * m)) = -(Real.power(y, successor(2 * m)))
+      by Real.power_negate_parity(y, m);
   done
 }
 
@@ -206,7 +214,8 @@ theorem Real.SequenceConverges.subsequence_double
         (converges : Real.SequenceConverges(s, limit))
         : Real.SequenceConverges((N : Natural) ↦ s(2 * N), limit) :=
   (ε : Real) (εPositive : ε > 0) ↦ {
-    obtain ⟨threshold, close⟩ from converges(ε, εPositive);
+    choose threshold such that ∀ (m : Natural). threshold ≤ m → abs(s(m) - limit) < ε
+        as close from converges(ε, εPositive);
     witness threshold with
         (N : Natural) (aboveThreshold : threshold ≤ N) ↦ {
           threshold ≤ 2 * N
@@ -522,7 +531,7 @@ theorem Natural.factorial_le_add (a : Natural)
 
 theorem Natural.factorial_monotone (a b : Natural) (aLeB : a ≤ b)
         : Natural.factorial(a) ≤ Natural.factorial(b) := {
-  obtain ⟨k, bEqual⟩ from Natural.le_to_add(a, b, aLeB);
+  choose k such that b = k + a as bEqual from Natural.le_to_add(a, b, aLeB);
   Natural.factorial(a) ≤ Natural.factorial(k + a)
       by Natural.factorial_le_add(a, k);
   done by substituting bEqual
@@ -562,7 +571,7 @@ theorem Natural.even_or_odd
       witness 0 with Or.introduceLeft(base)
     }
   | successor(p) => {
-      obtain ⟨j, disjunction⟩ from Natural.even_or_odd(p);
+      choose j such that p = 2 * j ∨ p = successor(2 * j) as disjunction from Natural.even_or_odd(p);
       cases disjunction {
         | Or.introduceLeft(pEven) => {
             successor(p) = successor(2 * j) by substituting pEven as oddEq;
@@ -601,9 +610,9 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
       done
     }
   | successor(j) => {
-      obtain ⟨evenAt, oddAt⟩
-          from Real.partialSum_nonpositive_paired(
-                   g, leadNonpositive, pairNonpositive, j);
+      Real.partialSum(g, 2 * j) ≤ Real.zero
+          ∧ Real.partialSum(g, successor(2 * j)) ≤ Real.zero
+          by Real.partialSum_nonpositive_paired(g, leadNonpositive, pairNonpositive, j);
       2 * successor(j) = successor(successor(2 * j)) as indexEven;
       g(2 * j) + g(successor(2 * j)) ≤ Real.zero;
       Real.partialSum(g, 2 * successor(j)) ≤ Real.zero
@@ -637,10 +646,12 @@ theorem Real.partialSum_nonpositive (g : Natural → Real)
             : ∀ (j : Natural). g(2 * j) + g(successor(2 * j)) ≤ Real.zero)
         (n : Natural)
         : Real.partialSum(g, n) ≤ Real.zero := {
-  obtain ⟨j, disjunction⟩ from Natural.even_or_odd(n);
-  obtain ⟨evenPaired, oddPaired⟩
-      from Real.partialSum_nonpositive_paired(
-               g, leadNonpositive, pairNonpositive, j);
+  choose j such that n = 2 * j ∨ n = successor(2 * j) as disjunction from Natural.even_or_odd(n);
+  Real.partialSum(g, 2 * j) ≤ Real.zero
+      ∧ Real.partialSum(g, successor(2 * j)) ≤ Real.zero
+      by Real.partialSum_nonpositive_paired(g, leadNonpositive, pairNonpositive, j);
+  Real.partialSum(g, 2 * j) ≤ Real.zero as evenPaired;
+  Real.partialSum(g, successor(2 * j)) ≤ Real.zero as oddPaired;
   cases disjunction {
     | Or.introduceLeft(nEven) =>
         calc Real.partialSum(g, n)
@@ -846,7 +857,7 @@ theorem Real.cosine_one_upper_bound
         → Real.partialSum(Real.cosineCoefficient(Real.one), M)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3)
       by (M : Natural) (threeLeqM : 3 ≤ M) ↦ {
-           obtain ⟨r, mEqual⟩ from Natural.le_to_add(3, M, threeLeqM);
+           choose r such that M = r + 3 as mEqual from Natural.le_to_add(3, M, threeLeqM);
            Real.partialSum(
                      (j : Natural) ↦ Real.cosineCoefficient(Real.one, 3 + j), r)
                  ≤ Real.zero;
@@ -948,7 +959,7 @@ theorem Real.cosine_one_lower_bound
         → Real.partialSum(Real.cosineCoefficient(Real.one), 2)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), M)
       by (M : Natural) (twoLeqM : 2 ≤ M) ↦ {
-           obtain ⟨r, mEqual⟩ from Natural.le_to_add(2, M, twoLeqM);
+           choose r such that M = r + 2 as mEqual from Natural.le_to_add(2, M, twoLeqM);
            Real.zero
                  ≤ Real.partialSum(
                        (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j), r)
