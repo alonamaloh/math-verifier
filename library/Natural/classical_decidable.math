@@ -120,3 +120,24 @@ theorem Logic.classical_decidable (P : Proposition) : Logic.Decidable(P) := {
           existence, uniqueness) as indicatorEvidence;
   Logic.decidable_from_indicator(P, indicator, indicatorEvidence)
 }
+
+-- The characterizing equations of the value-level conditional: when the
+-- condition holds the conditional is its `then` branch, otherwise its
+-- `else` branch. These two lemmas are the QUARANTINE BOUNDARY for
+-- scrutinee refinement — the one place a proof case-analyzes the
+-- `classical_decidable(P)` term inside a conditional so the kernel can
+-- ι-reduce it. Every conditional definition in the library gets its
+-- characterizing equations by citing these; consumers never re-decide.
+theorem Logic.if_positive.{u}
+        (P : Proposition) (T : Type(u)) (a b : T) (holds : P)
+        : (if P then a else b : T) = a :=
+  if P
+  then { note goal : a = a; done }
+  else { False; done }
+
+theorem Logic.if_negative.{u}
+        (P : Proposition) (T : Type(u)) (a b : T) (fails : ¬P)
+        : (if P then a else b : T) = b :=
+  if P
+  then { False; done }
+  else { note goal : b = b; done }

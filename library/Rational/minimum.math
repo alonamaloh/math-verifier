@@ -48,29 +48,16 @@ definition Rational.minimum (a b : Rational) : Rational :=
 overload min := Rational.minimum
 
 -- The characterizing equations: min(a, b) picks whichever endpoint the
--- order selects. These two lemmas are the QUARANTINE BOUNDARY for the
--- decision inside the definition — the one place `decide` refines the
--- `classical_decidable(a ≤ b)` term; every consumer below reasons
--- propositionally through the equations.
+-- order selects. They are instances of the generic conditional
+-- equations (Logic.if_positive / if_negative); every consumer below
+-- reasons propositionally through them, never re-deciding the order.
 theorem Rational.minimum_eq_left (a b : Rational) (aLeqB : a ≤ b)
         : min(a, b) = a :=
-  decide a ≤ b {
-    | yes _ => {
-        note goal : a = a;
-        done
-      }
-    | no notALeqB => absurd(notALeqB(aLeqB))
-  }
+  by Logic.if_positive
 
 theorem Rational.minimum_eq_right (a b : Rational) (notALeqB : ¬(a ≤ b))
         : min(a, b) = b :=
-  decide a ≤ b {
-    | yes aLeqB => absurd(notALeqB(aLeqB))
-    | no _ => {
-        note goal : b = b;
-        done
-      }
-  }
+  by Logic.if_negative
 
 -- min(a, b) ≤ a. When a ≤ b the minimum is a itself; otherwise it is
 -- b, and ¬(a ≤ b) forces b ≤ a by linearity of the order.
