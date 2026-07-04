@@ -2134,6 +2134,43 @@ ExpressionPointer Elaborator::structuralDiffProve(
         }
     }
 
+ExpressionPointer Elaborator::tryQuotientSoundBridge(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders) {
+        std::vector<ContextFact> soundFacts =
+            collectLocalBinderFacts(localBinders);
+        for (const ContextFact& fact : soundFacts) {
+            autoProveSpend(1);
+            ExpressionPointer wrapped =
+                tryQuotientSoundForClassEquality(
+                    localBinders, fact.proofTerm, fact.type, goalClosed);
+            if (!wrapped) continue;
+            // The wrap's inferred type is spelled at the peeled
+            // `class_of x = class_of y` form. The goal may be spelled
+            // through an opaque quotient alias (`Natural.to_integer(a * b)
+            // = to_integer(a) * to_integer(b)` at Integer), where the two
+            // spellings are NOT definitionally equal for the final
+            // declared-type check even though the peel's WHNF crossed the
+            // boundary. Accept the wrap only when it proves the goal as
+            // stated; otherwise decline and let the later tactics close
+            // the site at its own spelling.
+            try {
+                ExpressionPointer wrappedTypeOpened =
+                    inferTypeInLocalContext(localBinders, wrapped);
+                ExpressionPointer goalOpened = openOverLocalBinders(
+                    goalClosed, localBinders, localBinders.size());
+                Context openedContext =
+                    buildContextFromLocalBinders(localBinders);
+                if (isDefinitionallyEqual(environment_, openedContext,
+                                          wrappedTypeOpened, goalOpened)) {
+                    return wrapped;
+                }
+            } catch (const TypeError&) {
+            } catch (const ElaborateError&) {}
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::autoProveClaimTactics(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -2262,6 +2299,27 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // Quotient sound bridge — the forward twin of the exact bridge:
+        // a class-equality goal `mk x = mk y` closes from an in-scope
+        // equivalence-shaped fact `R(x, y)` (e.g. the representative
+        // cross-equation) via Quotient.equivalent_implies_equal. The
+        // coercion path applies the same wrap to DIRECT proofs (the old
+        // final-calc route); this covers the statement route, where the
+        // fact is bound in context and the goal is re-proved by the
+        // block's auto-close. Shape-gated (the class-equality peel
+        // declines before any fact is examined), so it belongs with the
+        // cheap tactics: when it applies, the wrap IS the intended proof,
+        // and running it after the scans below made a quotient arm burn
+        // their full failed search first (Rational.algebra:44 spent 615k
+        // kernel steps — nearly all in contextEqualityBridge — before
+        // this closed it in microseconds).
+        {
+            ExpressionPointer attempt = runTactic("quotientSoundBridge",
+                [&] { return tryQuotientSoundBridge(
+                    goalClosed, localBinders); });
+            if (attempt) return attempt;
+        }
+
         // From here on the tactics are per-call expensive (full library
         // scans, recursive sub-proofs). Each charges the effort budget in
         // its hot loop via autoProveSpend(), which throws
@@ -2323,33 +2381,6 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             ExpressionPointer attempt = runTactic("quotientExactBridge",
                 [&] { return tryQuotientExactBridge(
                     goalClosed, localBinders); });
-            if (attempt) return attempt;
-        }
-
-        // Quotient sound bridge — the forward twin of the exact bridge:
-        // a class-equality goal `mk x = mk y` closes from an in-scope
-        // equivalence-shaped fact `R(x, y)` (e.g. the representative
-        // cross-equation) via Quotient.equivalent_implies_equal. The
-        // coercion path applies the same wrap to DIRECT proofs (the old
-        // final-calc route); this covers the statement route, where the
-        // fact is bound in context and the goal is re-proved by the
-        // block's auto-close. Cheap when the goal isn't a class equality
-        // (the peel declines before any fact is examined).
-        {
-            ExpressionPointer attempt = runTactic("quotientSoundBridge",
-                [&] () -> ExpressionPointer {
-                    std::vector<ContextFact> soundFacts =
-                        collectLocalBinderFacts(localBinders);
-                    for (const ContextFact& fact : soundFacts) {
-                        autoProveSpend(1);
-                        ExpressionPointer wrapped =
-                            tryQuotientSoundForClassEquality(
-                                localBinders, fact.proofTerm, fact.type,
-                                goalClosed);
-                        if (wrapped) return wrapped;
-                    }
-                    return nullptr;
-                });
             if (attempt) return attempt;
         }
 
@@ -2505,6 +2536,9 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             return tryConstructorDisjointness(
                 goalClosed, localBinders, line);
         });
+        runProfiled("quotientSoundBridge", [&] {
+            return tryQuotientSoundBridge(goalClosed, localBinders);
+        });
         runProfiled("contextFactMatch", [&] {
             return tryContextFactMatch(
                 goalClosed, localBinders, line);
@@ -2516,6 +2550,12 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         runProfiled("contextEqualityBridge", [&] {
             return tryContextEqualityBridge(
                 goalClosed, localBinders, line, transportBudget);
+        });
+        runProfiled("quotientExactBridge", [&] {
+            return tryQuotientExactBridge(goalClosed, localBinders);
+        });
+        runProfiled("symmetryFlip", [&] {
+            return trySymmetryFlip(goalClosed, localBinders, line);
         });
 
         autoProveRows_.push_back(std::move(row));

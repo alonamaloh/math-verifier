@@ -2218,6 +2218,14 @@ private:
             ExpressionPointer termTypeClosed,
             ExpressionPointer expectedTypeClosed);
 
+    // The sound bridge as a claim tactic: scan the in-scope facts for one
+    // whose type is definitionally the goal's underlying equivalence
+    // `R(x, y)` and wrap it with tryQuotientSoundForClassEquality. Declines
+    // before examining any fact when the goal isn't a class equality.
+    ExpressionPointer tryQuotientSoundBridge(
+            ExpressionPointer goalClosed,
+            const std::vector<LocalBinder>& localBinders);
+
     // The `exact` bridge — the mirror of tryQuotientSoundForClassEquality.
     // When the goal is a quotient relation application `R(a, b)` and some
     // in-scope hypothesis proves `Quotient.class_of(a) = Quotient.class_of(b)` (the two
