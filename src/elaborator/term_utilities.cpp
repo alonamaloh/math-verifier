@@ -644,6 +644,47 @@ Context buildContextFromLocalBinders(
     return result;
 }
 
+ExpressionPointer replaceBoundVariableInPlace(
+    ExpressionPointer body, int target, ExpressionPointer replacement) {
+    if (auto* bv = std::get_if<BoundVariable>(&body->node)) {
+        if (bv->deBruijnIndex == target) {
+            return replacement;
+        }
+        return body;  // indices unchanged — the binder stays.
+    }
+    if (auto* app = std::get_if<Application>(&body->node)) {
+        return makeApplication(
+            replaceBoundVariableInPlace(app->function, target, replacement),
+            replaceBoundVariableInPlace(app->argument, target, replacement));
+    }
+    if (auto* lam = std::get_if<Lambda>(&body->node)) {
+        ExpressionPointer replacementLifted =
+            liftBoundVariables(replacement, 1, 0);
+        return makeLambda(lam->displayHint,
+            replaceBoundVariableInPlace(lam->domain, target, replacement),
+            replaceBoundVariableInPlace(
+                lam->body, target + 1, replacementLifted));
+    }
+    if (auto* pi = std::get_if<Pi>(&body->node)) {
+        ExpressionPointer replacementLifted =
+            liftBoundVariables(replacement, 1, 0);
+        return makePi(pi->displayHint,
+            replaceBoundVariableInPlace(pi->domain, target, replacement),
+            replaceBoundVariableInPlace(
+                pi->codomain, target + 1, replacementLifted));
+    }
+    if (auto* let = std::get_if<Let>(&body->node)) {
+        ExpressionPointer replacementLifted =
+            liftBoundVariables(replacement, 1, 0);
+        return makeLet(let->displayHint,
+            replaceBoundVariableInPlace(let->type, target, replacement),
+            replaceBoundVariableInPlace(let->value, target, replacement),
+            replaceBoundVariableInPlace(
+                let->body, target + 1, replacementLifted));
+    }
+    return body;
+}
+
 ExpressionPointer substituteBoundVariable(
     ExpressionPointer body, ExpressionPointer argument, int target) {
     if (auto* bv = std::get_if<BoundVariable>(&body->node)) {

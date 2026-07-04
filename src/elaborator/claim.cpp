@@ -974,13 +974,98 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                 innerBinders.push_back({equationName, equation});
                 ExpressionPointer goalLiftedTwo =
                     liftBoundVariables(goalClosed, 2, 0);
+                // A4 substitution rule: when the case proposition is an
+                // equation whose left side is a plain local variable
+                // (`case n = k + 1 for some k:`), the arm's goal has
+                // that variable SUBSTITUTED by the right side — the
+                // kernel can then ι-reduce on the constructor form —
+                // and the proof is transported back along the equation
+                // automatically. Deterministic: it always applies when
+                // the shape matches and the goal mentions the variable.
+                ExpressionPointer armGoal = goalLiftedTwo;
+                int substitutedIndexInner = -1;
+                ExpressionPointer rhsInner, carrierInner;
+                LevelPointer equationLevel;
+                {
+                    EqualityComponents components;
+                    bool isEquation = true;
+                    try {
+                        components = extractEqualityComponents(
+                            equation, "case equation", arm.line);
+                    } catch (const ElaborateError&) {
+                        isEquation = false;
+                    }
+                    if (isEquation) {
+                        auto* leftVariable = std::get_if<BoundVariable>(
+                            &components.leftEndpoint->node);
+                        // Index ≥ 1 at the equation's scope: a LOCAL,
+                        // not the witness itself (BV0 = the witness).
+                        if (leftVariable
+                            && leftVariable->deBruijnIndex >= 1) {
+                            int targetInner =
+                                leftVariable->deBruijnIndex + 1;
+                            ExpressionPointer candidateRhs =
+                                liftBoundVariables(
+                                    components.rightEndpoint, 1, 0);
+                            ExpressionPointer substituted =
+                                replaceBoundVariableInPlace(
+                                    goalLiftedTwo, targetInner,
+                                    candidateRhs);
+                            if (!structurallyEqual(
+                                    substituted, goalLiftedTwo)) {
+                                armGoal = substituted;
+                                substitutedIndexInner = targetInner;
+                                rhsInner = candidateRhs;
+                                carrierInner = liftBoundVariables(
+                                    components.carrierType, 1, 0);
+                                equationLevel =
+                                    components.carrierUniverseLevel;
+                            }
+                        }
+                    }
+                }
                 Frame armFrame(*this,
                     "`by cases` arm at line " + std::to_string(arm.line),
-                    innerBinders, goalLiftedTwo, arm.line, arm.column);
+                    innerBinders, armGoal, arm.line, arm.column);
                 ExpressionPointer body = elaborateExpression(
-                    *arm.body, innerBinders, goalLiftedTwo);
+                    *arm.body, innerBinders, armGoal);
                 body = coerceToExpectedTypeViaDiff(
-                    innerBinders, body, goalLiftedTwo);
+                    innerBinders, body, armGoal);
+                if (substitutedIndexInner >= 0) {
+                    // body : goal[n := rhs]. Transport back to goal(n)
+                    // along rhs = n (the equation reversed):
+                    //   transport(T, λx. goal[n := x], rhs, n,
+                    //             symmetry(eq), body).
+                    ExpressionPointer variableInner =
+                        makeBoundVariable(substitutedIndexInner);
+                    ExpressionPointer motiveBody =
+                        replaceBoundVariableInPlace(
+                            liftBoundVariables(goalLiftedTwo, 1, 0),
+                            substitutedIndexInner + 1,
+                            makeBoundVariable(0));
+                    ExpressionPointer motive = makeLambda(
+                        "_substituted",
+                        liftBoundVariables(carrierInner, 0, 0),
+                        std::move(motiveBody));
+                    ExpressionPointer symmetric = makeConstant(
+                        "Equality.symmetry", {equationLevel});
+                    symmetric = makeApplication(symmetric, carrierInner);
+                    symmetric = makeApplication(symmetric, variableInner);
+                    symmetric = makeApplication(symmetric, rhsInner);
+                    symmetric = makeApplication(
+                        symmetric, makeBoundVariable(0));
+                    ExpressionPointer transport = makeConstant(
+                        "Equality.transport_proposition",
+                        {equationLevel});
+                    transport = makeApplication(transport, carrierInner);
+                    transport = makeApplication(transport, std::move(motive));
+                    transport = makeApplication(transport, rhsInner);
+                    transport = makeApplication(transport, variableInner);
+                    transport = makeApplication(
+                        transport, std::move(symmetric));
+                    transport = makeApplication(transport, std::move(body));
+                    body = std::move(transport);
+                }
                 // Reposition under the ∃-hypothesis binder `h`, which
                 // sits between the locals and (k, equation): the locals'
                 // indices shift by one, k and the equation keep theirs.

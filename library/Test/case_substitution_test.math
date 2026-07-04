@@ -1,0 +1,45 @@
+module Test.case_substitution_test
+
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- A function that only reduces once its argument has constructor shape.
+definition Test.indicatorOfZero : Natural → Natural
+  | zero         => 1
+  | successor(k) => 0
+
+-- The A4 substitution rule: in `case n = 1 + k for some k:` the arm's
+-- goal is goal[n := 1 + k] (transported back automatically), so the
+-- kernel ι-reduces the constructor form: indicatorOfZero(1 + k) IS 0
+-- by computation, and the arm states it bare — no `by substitution`
+-- plumbing anywhere.
+theorem Test.case_substitution_reduces (n : Natural)
+        : Test.indicatorOfZero(n) = 0 ∨ n = 0 := {
+  Test.indicatorOfZero(n) = 0 ∨ n = 0 by cases {
+    case n = 0: done
+    case n = 1 + k for some k: {
+      Test.indicatorOfZero(1 + k) = 0;
+      done
+    }
+  };
+  done
+}
+
+-- The substituted goal also makes disjunction splits immediate: the
+-- arm's goal is `1 + k = 0 ∨ 1 ≤ 1 + k`, whose right disjunct is a
+-- ground fact about the constructor form.
+theorem Test.case_substitution_disjunction (n : Natural) : n = 0 ∨ 1 ≤ n := {
+  n = 0 ∨ 1 ≤ n by cases {
+    case n = 0: done
+    case n = 1 + k for some k: {
+      1 ≤ 1 + k;
+      done
+    }
+  };
+  done
+}

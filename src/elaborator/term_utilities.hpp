@@ -178,6 +178,12 @@ Context buildContextFromLocalBinders(
 ExpressionPointer substituteBoundVariable(
     ExpressionPointer body, ExpressionPointer argument, int target);
 
+// Replace every occurrence of BoundVariable(target) with `replacement`,
+// WITHOUT removing a binder: all other indices stay as they are (unlike
+// substituteBoundVariable, which β-reduces a binder away and shifts).
+ExpressionPointer replaceBoundVariableInPlace(
+    ExpressionPointer body, int target, ExpressionPointer replacement);
+
 
 // ---- let-binder zeta-unfolding + free-variable substitution ----
 
