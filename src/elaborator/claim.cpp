@@ -622,17 +622,68 @@ void Elaborator::collectQuantifiedSubstitutionCandidates(
                                            binderCount, bindings)) {
                     continue;
                 }
-                bool allBound = true;
-                for (const auto& binding : bindings) {
-                    if (!binding) { allBound = false; break; }
-                }
-                if (!allBound) continue;
                 // Assemble `cited(binding_for_BV(n-1), …, BV(0))` —
-                // outermost binder first, matching the Pi chain.
+                // outermost binder first, matching the Pi chain. A slot
+                // the endpoint match left unbound is a PREMISE when its
+                // (now fully-determined) domain is a Proposition:
+                // discharge it with the budget-capped bare prover, the
+                // same fallback citation premise-discharge uses. Any
+                // other unbound slot means the match carried no
+                // inference signal — skip the candidate.
                 ExpressionPointer instance = citedProof;
+                bool assembled = true;
                 for (int i = binderCount - 1; i >= 0; --i) {
-                    instance = makeApplication(instance, bindings[i]);
+                    if (bindings[i]) {
+                        instance = makeApplication(instance, bindings[i]);
+                        continue;
+                    }
+                    ExpressionPointer partialType;
+                    try {
+                        partialType = inferTypeInLocalContext(
+                            localBinders, instance);
+                    } catch (const TypeError&) {
+                        assembled = false; break;
+                    } catch (const ElaborateError&) {
+                        assembled = false; break;
+                    }
+                    ExpressionPointer partialWhnf = weakHeadNormalForm(
+                        environment_,
+                        openOverLocalBinders(partialType, localBinders, N));
+                    auto* premisePi = std::get_if<Pi>(&partialWhnf->node);
+                    if (!premisePi) { assembled = false; break; }
+                    ExpressionPointer domainOpened = weakHeadNormalForm(
+                        environment_, premisePi->domain);
+                    Context openedContext =
+                        buildContextFromLocalBinders(localBinders);
+                    if (!typeIsProposition(openedContext, domainOpened)) {
+                        assembled = false; break;
+                    }
+                    if (backwardChainingDepth_ >= kBackwardChainDepthCap) {
+                        assembled = false; break;
+                    }
+                    ExpressionPointer domainClosed = closeOverLocalBinders(
+                        premisePi->domain, localBinders, N);
+                    ExpressionPointer premiseProof = nullptr;
+                    ++backwardChainingDepth_;
+                    struct DepthDecrement {
+                        int& d;
+                        ~DepthDecrement() { --d; }
+                    } depthDecrement{backwardChainingDepth_};
+                    try {
+                        premiseProof = autoProveClaim(
+                            domainClosed, localBinders, line);
+                    } catch (const ElaborateError&) {
+                        premiseProof = nullptr;
+                    } catch (const TypeError&) {
+                        premiseProof = nullptr;
+                    } catch (const AutoProverBudgetError&) {
+                        premiseProof = nullptr;
+                    }
+                    if (!premiseProof) { assembled = false; break; }
+                    instance = makeApplication(
+                        instance, std::move(premiseProof));
                 }
+                if (!assembled) continue;
                 ExpressionPointer instanceTypeOpened;
                 try {
                     instanceTypeOpened = inferTypeInLocalContext(
@@ -677,16 +728,33 @@ void Elaborator::collectQuantifiedSubstitutionCandidates(
             scan(goalDeepWhnf);
         }
         if (inferred.empty()) {
+            // A hypothesis-transport claim (`P' by substituting eq`
+            // where P' is the REWRITTEN spelling) carries the equation's
+            // un-rewritten endpoint only in the SOURCE FACT — scan the
+            // context facts' statements for endpoint instances too.
+            for (int b = N - 1; b >= 0; --b) {
+                int lift = N - b;
+                ExpressionPointer factType = liftBoundVariables(
+                    localBinders[b].type, lift, 0);
+                scan(factType);
+                ExpressionPointer factDeepWhnf =
+                    deepWhnfThroughApplications(factType);
+                if (factDeepWhnf.get() != factType.get()) {
+                    scan(factDeepWhnf);
+                }
+            }
+        }
+        if (inferred.empty()) {
             throwElaborate(
                 "`by substituting`: '" + citedPrinted
                 + "' is a quantified equation — it still expects "
                 + std::to_string(binderCount)
                 + " argument(s), and no instance of its left- or "
-                  "right-hand side occurs in the goal, so they could "
-                  "not be inferred. Apply it explicitly (`by "
-                  "substituting " + citedPrinted + "(…)`), or use the "
-                  "unnamed `by substitution` to search every equality "
-                  "in scope.");
+                  "right-hand side occurs in the goal or in any "
+                  "in-scope fact, so they could not be inferred. Apply "
+                  "it explicitly (`by substituting " + citedPrinted
+                + "(…)`), or use the unnamed `by substitution` to "
+                  "search every equality in scope.");
         }
         for (ContextEquality& eq : inferred) {
             out.push_back(std::move(eq));
@@ -740,6 +808,14 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
         std::vector<LevelPointer> witnessLevels(armCount);
         for (size_t i = 0; i < statedCount; ++i) {
             const SurfaceStructuredClaimArm& arm = claim.arms[i];
+            if (!arm.disjunctType) {
+                throwElaborate(
+                    "internal error: `case` arm "
+                    + std::to_string(i + 1)
+                    + " of the `by cases` block has no stated "
+                      "proposition (a surface transform dropped it) — "
+                      "please report this");
+            }
             if (arm.witnessName.empty()) {
                 disjuncts.push_back(elaborateExpression(
                     *arm.disjunctType, localBinders));

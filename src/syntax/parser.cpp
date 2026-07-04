@@ -364,17 +364,24 @@ SurfaceExpressionPointer substituteSurfaceName(
             : nullptr;
         std::vector<SurfaceStructuredClaimArm> newArms;
         for (const auto& arm : structured->arms) {
-            SurfaceStructuredClaimArm newArm;
+            // Start from a full copy so structural flags (`isOtherwise`,
+            // witness binders) survive the substitution — an `otherwise`
+            // arm that loses its flag becomes a stated arm with a null
+            // proposition and crashes the elaborator downstream.
+            SurfaceStructuredClaimArm newArm = arm;
             newArm.disjunctType = arm.disjunctType
                 ? substituteSurfaceName(arm.disjunctType,
                                          targetName, replacement)
                 : nullptr;
-            newArm.binderName = arm.binderName;
-            newArm.body = (arm.binderName == targetName || !arm.body)
+            bool bodyShadowed = arm.binderName == targetName
+                || arm.witnessName == targetName;
+            newArm.body = (bodyShadowed || !arm.body)
                 ? arm.body
                 : substituteSurfaceName(arm.body, targetName, replacement);
-            newArm.line = arm.line;
-            newArm.column = arm.column;
+            newArm.witnessType = arm.witnessType
+                ? substituteSurfaceName(arm.witnessType,
+                                         targetName, replacement)
+                : nullptr;
             newArms.push_back(std::move(newArm));
         }
         return makeSurfaceStructuredClaim(

@@ -1614,21 +1614,27 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                     : nullptr;
             std::vector<SurfaceStructuredClaimArm> rewrittenArms;
             for (const auto& arm : claim->arms) {
-                SurfaceStructuredClaimArm rewrittenArm;
+                // Full copy first: structural flags (`isOtherwise`,
+                // witness binders) must survive the rewrite — see the
+                // matching clone in substituteSurfaceName.
+                SurfaceStructuredClaimArm rewrittenArm = arm;
                 rewrittenArm.disjunctType = arm.disjunctType
                     ? rewriteRecursiveCalls(arm.disjunctType,
                                              thisDeclName,
                                              recursiveArgToHypothesis,
                                              outerBinderCount)
                     : nullptr;
-                rewrittenArm.binderName = arm.binderName;
                 rewrittenArm.body = arm.body
                     ? rewriteRecursiveCalls(arm.body, thisDeclName,
                                              recursiveArgToHypothesis,
                                              outerBinderCount)
                     : nullptr;
-                rewrittenArm.line = arm.line;
-                rewrittenArm.column = arm.column;
+                rewrittenArm.witnessType = arm.witnessType
+                    ? rewriteRecursiveCalls(arm.witnessType,
+                                             thisDeclName,
+                                             recursiveArgToHypothesis,
+                                             outerBinderCount)
+                    : nullptr;
                 rewrittenArms.push_back(std::move(rewrittenArm));
             }
             auto rewrittenNode = makeSurfaceStructuredClaim(
