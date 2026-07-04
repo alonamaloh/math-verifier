@@ -1383,6 +1383,11 @@ private:
                    && peek().kind != TokenKind::KeywordContradiction
                    && peek().kind != TokenKind::KeywordDone
                    && peek().kind != TokenKind::KeywordOkay
+                   // `suffices` / `apply` are handled by the post-loop
+                   // branches (they own the REST of the block); the A1
+                   // bare-statement catch-all must not swallow them.
+                   && peek().kind != TokenKind::KeywordSuffices
+                   && peek().kind != TokenKind::KeywordApply
                    && peek().kind != TokenKind::EndOfFile)) {
             // A1 keyword-free claims: a statement that starts with none
             // of the keywords above is a bare stated proposition (or a
@@ -2123,7 +2128,31 @@ private:
             auto reducedGoal = parseExpression();
             expect(TokenKind::KeywordBy,
                    "after suffices goal");
-            auto reductionLemma = parseExpression();
+            // `suffices Q by definition of X[, Y];` — Q is the goal
+            // with the named definition(s) unfolded; no reduction
+            // lemma, the continuation proves Q and the unfold wrapper
+            // carries the definitional step (needed when X is opaque;
+            // harmless when transparent). Replaces the
+            // `unfold X in (λ …)` proof-header idiom.
+            bool byDefinition =
+                peek().kind == TokenKind::KeywordDefinition
+                && peekAt(1).kind == TokenKind::Identifier
+                && peekAt(1).lexeme == "of";
+            std::vector<std::string> definitionNames;
+            SurfaceExpressionPointer reductionLemma;
+            if (byDefinition) {
+                consumeAny();  // 'definition'
+                consumeAny();  // 'of'
+                definitionNames.push_back(
+                    consumeQualifiedNameString());
+                while (peek().kind == TokenKind::Comma) {
+                    consumeAny();
+                    definitionNames.push_back(
+                        consumeQualifiedNameString());
+                }
+            } else {
+                reductionLemma = parseExpression();
+            }
             expect(TokenKind::Semicolon,
                    "ending suffices statement");
             // The continuation must prove `reducedGoal`; we ascribe so
@@ -2132,12 +2161,19 @@ private:
             auto ascribedContinuation = makeSurfaceAscription(
                 std::move(continuation), reducedGoal,
                 sufficesToken.line, sufficesToken.column);
-            std::vector<SurfaceExpressionPointer> arguments;
-            arguments.push_back(std::move(ascribedContinuation));
-            finalExpression = makeSurfaceApplication(
-                std::move(reductionLemma),
-                std::move(arguments),
-                sufficesToken.line, sufficesToken.column);
+            if (byDefinition) {
+                finalExpression = makeSurfaceUnfold(
+                    std::move(definitionNames),
+                    std::move(ascribedContinuation),
+                    sufficesToken.line, sufficesToken.column);
+            } else {
+                std::vector<SurfaceExpressionPointer> arguments;
+                arguments.push_back(std::move(ascribedContinuation));
+                finalExpression = makeSurfaceApplication(
+                    std::move(reductionLemma),
+                    std::move(arguments),
+                    sufficesToken.line, sufficesToken.column);
+            }
         } else if (peek().kind == TokenKind::KeywordApply) {
             // `apply Expr;` — terminal block statement. Reads as "we
             // apply Lemma, producing this conclusion". The expression

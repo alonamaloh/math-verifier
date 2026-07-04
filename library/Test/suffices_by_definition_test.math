@@ -1,0 +1,33 @@
+-- `suffices Q by definition of X;` (A3/A7): Q is the current goal with
+-- the named definition unfolded — no reduction lemma; the rest of the
+-- block proves Q and the unfold wrapper carries the definitional step
+-- (needed when X is opaque; harmless when transparent). Replaces the
+-- `unfold X in (λ …)` proof-header idiom.
+
+module Test.suffices_by_definition_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+
+-- An opaque definition whose body consumers cannot see directly.
+opaque definition Test.IsDoubled (n : Natural) : Proposition :=
+  ∃ (k : Natural). n = 2 * k
+
+theorem Test.four_is_doubled : Test.IsDoubled(4) := {
+  suffices ∃ (k : Natural). 4 = 2 * k by definition of Test.IsDoubled;
+  witness 2 with done
+}
+
+-- Transparent definitions work the same way (the unfold is a no-op
+-- definitionally, the announcement is for the reader).
+definition Test.AtLeastOne (n : Natural) : Proposition := 1 ≤ n
+
+theorem Test.two_at_least_one : Test.AtLeastOne(2) := {
+  suffices 1 ≤ 2 by definition of Test.AtLeastOne;
+  done
+}
