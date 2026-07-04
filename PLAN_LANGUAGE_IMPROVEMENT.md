@@ -278,9 +278,9 @@ stays the normal prover path against existing coverage lemmas
 equations (must be reliable, kills `refining`/`cases…with eq`),
 induction as a by-cases variant, `decide` deletion (needs the
 substitution rule + otherwise), and the both-directions lint.
-The `in (P):`→`case P:` migration is DONE (d3b3655e: 204 arm headers,
-39 files, 3 Sonnet agents); a follow-up parser session can retire the
-`in (P):` spelling outright.
+The `in (P):`→`case P:` migration is DONE (d3b3655e) and the spelling
+is RETIRED from the parser (post-348e6dec) with a migration-grade
+error; the retirement caught 3 multi-line stragglers + 5 Test files.
 
 **Settled: clause keyword is `case P:`, with `otherwise:` for the
 complement.** (Decided July 2026; do not relitigate.) Rationale:
