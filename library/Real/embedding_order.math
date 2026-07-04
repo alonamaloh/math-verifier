@@ -14,6 +14,7 @@ import Logic.quotient
 import Equality.basics
 import Natural.basics
 import Natural.order
+import Natural.eventually
 import Rational.basics
 import Rational.addition
 import Rational.negation
@@ -170,3 +171,18 @@ theorem Real.one_plus_cast_positive (n : Natural)
   (1 + n : Rational) > 0;
   done
 }
+
+-- Consume a `mk(b) ≤ (q : Real)` bound at the sequence level: beyond
+-- some index, every term of b sits within any ε below q. This is the
+-- boundary lemma pointwise-bound arguments consume — the ≤ unfolds
+-- (through the opaque `Real.IsNonneg`) to eventual nonnegativity of
+-- the pointwise difference, restated here in the eventually
+-- vocabulary with the quotient plumbing kept off the page.
+theorem Real.eventually_below_cast_of_LessOrEqual
+        (b : Rational.sequence.Sequence)
+        (bIsCauchy : Rational.sequence.IsCauchy(b))
+        (q : Rational)
+        (belowCast : Real.from_cauchy_sequence(b, bIsCauchy) ≤ (q : Real))
+        (ε : Rational) (εPositive : ε > (0 : Rational))
+        : eventually (m). -ε < q - b(m) :=
+  (unfold Real.IsNonneg in belowCast)(ε, εPositive)

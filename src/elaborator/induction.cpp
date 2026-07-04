@@ -57,6 +57,80 @@ ExpressionPointer Elaborator::elaborateByStrongInduction(
             wrapped, localBinders, expectedType, line, column);
     }
 
+// Structural β-only reduction at the root: an elimination motive can
+// leave a fact's type as `(λx. P(x))(w)`; peel such redexes without
+// any δ-unfolding so stated spellings survive. Used by the eventually
+// scope's goal / fact recognition below.
+static ExpressionPointer peelRootBetaRedexes(ExpressionPointer expression) {
+        while (true) {
+            auto* application = std::get_if<Application>(&expression->node);
+            if (!application) return expression;
+            auto* lambda = std::get_if<Lambda>(&application->function->node);
+            if (!lambda) return expression;
+            expression = substituteBoundVariable(
+                lambda->body, application->argument, 0);
+        }
+    }
+
+// Fold an UNFOLDED eventually back to its predicate: a proposition of
+// the shape `Exists(Natural, λN. Π(m : Natural). N ≤ m → P(m))` (with
+// P independent of N and of the ≤-proof) is definitionally
+// `Natural.Eventually(λm. P(m))`. Returns the recovered predicate
+// `λm. P(m)`, or null when the shape doesn't match. Upstream machinery
+// (quotient-cases motives, suffices ascriptions, goal normalization)
+// can hand the scope a δ-reduced goal; recognizing the shape keeps the
+// scope robust without WHNF-unfolding stated goals past recognition.
+ExpressionPointer Elaborator::recognizeUnfoldedEventually(
+        ExpressionPointer proposition) {
+        // Exists(Natural, predicateLambda)
+        auto* outerApp = std::get_if<Application>(&proposition->node);
+        if (!outerApp) return nullptr;
+        auto* innerApp = std::get_if<Application>(&outerApp->function->node);
+        if (!innerApp) return nullptr;
+        auto* head = std::get_if<Constant>(&innerApp->function->node);
+        if (!head || head->name != "Exists") return nullptr;
+        auto* indexType = std::get_if<Constant>(&innerApp->argument->node);
+        if (!indexType || indexType->name != "Natural") return nullptr;
+        auto* predicate = std::get_if<Lambda>(&outerApp->argument->node);
+        if (!predicate) return nullptr;
+        // λN. Π(m : Natural). (N ≤ m) → body
+        auto* tailPi = std::get_if<Pi>(&predicate->body->node);
+        if (!tailPi) return nullptr;
+        auto* tailDomain = std::get_if<Constant>(&tailPi->domain->node);
+        if (!tailDomain || tailDomain->name != "Natural") return nullptr;
+        auto* boundPi = std::get_if<Pi>(&tailPi->codomain->node);
+        if (!boundPi) return nullptr;
+        // The bound: Natural.LessOrEqual(N, m) — N at BV(1), m at BV(0).
+        auto* boundApp = std::get_if<Application>(&boundPi->domain->node);
+        if (!boundApp) return nullptr;
+        auto* boundInner =
+            std::get_if<Application>(&boundApp->function->node);
+        if (!boundInner) return nullptr;
+        auto* boundHead = std::get_if<Constant>(&boundInner->function->node);
+        if (!boundHead || boundHead->name != "Natural.LessOrEqual") {
+            return nullptr;
+        }
+        auto* boundLeft =
+            std::get_if<BoundVariable>(&boundInner->argument->node);
+        auto* boundRight =
+            std::get_if<BoundVariable>(&boundApp->argument->node);
+        if (!boundLeft || boundLeft->deBruijnIndex != 1) return nullptr;
+        if (!boundRight || boundRight->deBruijnIndex != 0) return nullptr;
+        // The body sits under [N, m, proof-of-≤]; it must not mention
+        // the ≤-proof (BV 0) or N (BV 2) — then dropping those two
+        // binders leaves it under [m] alone.
+        ExpressionPointer body = boundPi->codomain;
+        if (referencesBoundVariable(body, 0)
+            || referencesBoundVariable(body, 2)) {
+            return nullptr;
+        }
+        ExpressionPointer lowered =
+            liftBoundVariables(body, -1, 1);        // drop the ≤-proof
+        lowered = liftBoundVariables(lowered, -1, 1);   // drop N
+        return makeLambda("m", makeConstant("Natural", {}),
+                          std::move(lowered));
+    }
+
 ExpressionPointer Elaborator::elaborateEventuallyScope(
         const SurfaceEventuallyScope& scope,
         const std::vector<LocalBinder>& localBinders,
@@ -76,12 +150,21 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
         // STATED spelling (WHNF would δ-unfold the transparent
         // definition past recognition; the binder sugar always
         // produces the literal head).
-        ExpressionPointer goalOpened = openOverLocalBinders(
-            expectedType, localBinders, N);
+        ExpressionPointer goalOpened = peelRootBetaRedexes(
+            openOverLocalBinders(expectedType, localBinders, N));
         auto* goalApp = std::get_if<Application>(&goalOpened->node);
         auto* goalHead = goalApp
             ? std::get_if<Constant>(&goalApp->function->node) : nullptr;
-        if (!goalHead || goalHead->name != "Natural.Eventually") {
+        ExpressionPointer goalPredicateOpened;
+        if (goalHead && goalHead->name == "Natural.Eventually") {
+            goalPredicateOpened = goalApp->argument;
+        } else {
+            // Upstream machinery (a quotient-cases motive, a suffices
+            // ascription) may hand the scope the goal δ-REDUCED; fold
+            // the raw ∃N.∀m≥N shape back to its predicate.
+            goalPredicateOpened = recognizeUnfoldedEventually(goalOpened);
+        }
+        if (!goalPredicateOpened) {
             throwElaborate(
                 "`eventually (" + scope.binderName + "): …` proves an "
                 "`eventually (m). …` goal, but the expected type here "
@@ -91,7 +174,7 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
                   "binder (or as `Natural.Eventually(…)`)");
         }
         ExpressionPointer goalPredicate = closeOverLocalBinders(
-            goalApp->argument, localBinders, N);
+            goalPredicateOpened, localBinders, N);
 
         // Collect every in-scope eventual fact `Natural.Eventually(Pᵢ)`,
         // outermost first (deterministic; unused ones are harmless).
@@ -103,13 +186,25 @@ ExpressionPointer Elaborator::elaborateEventuallyScope(
                 localBinders[b].type, lift, 0);
             // Match the STATED spelling (like the goal above): the
             // binder sugar produces the literal `Natural.Eventually`
-            // head, and WHNF would unfold it past recognition.
+            // head, and WHNF would unfold it past recognition. A fact
+            // that arrived δ-reduced folds back via the recognizer;
+            // a fact wrapped in an elimination motive's β-redex
+            // (`(λN. eventually …)(w)` from choose) peels first.
+            typeInScope = peelRootBetaRedexes(typeInScope);
             auto* app = std::get_if<Application>(&typeInScope->node);
             auto* head = app
                 ? std::get_if<Constant>(&app->function->node) : nullptr;
-            if (!head || head->name != "Natural.Eventually") continue;
-            factPredicates.push_back(app->argument);
-            factProofs.push_back(makeBoundVariable(N - 1 - b));
+            if (head && head->name == "Natural.Eventually") {
+                factPredicates.push_back(app->argument);
+                factProofs.push_back(makeBoundVariable(N - 1 - b));
+                continue;
+            }
+            ExpressionPointer folded =
+                recognizeUnfoldedEventually(typeInScope);
+            if (folded) {
+                factPredicates.push_back(folded);
+                factProofs.push_back(makeBoundVariable(N - 1 - b));
+            }
         }
 
         ExpressionPointer naturalType = makeConstant("Natural", {});

@@ -2493,6 +2493,13 @@ private:
     bool referencesBoundVariable(
         ExpressionPointer expression, int targetIndex);
 
+    // A6: fold an unfolded eventually (`∃N. ∀m ≥ N. P(m)`) back to its
+    // predicate `λm. P(m)`; null when the shape doesn't match. Keeps
+    // the eventually scope robust when upstream machinery hands it a
+    // δ-reduced goal or hypothesis.
+    ExpressionPointer recognizeUnfoldedEventually(
+        ExpressionPointer proposition);
+
     // A4 lint helper: whether an elaborated proof term concludes by
     // ex falso — peeling `Let`s, lambdas, and the application spine,
     // its head constant is `False.eliminate` /

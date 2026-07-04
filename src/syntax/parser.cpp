@@ -1327,7 +1327,7 @@ private:
                         NoteGoal, NoteAssertion, ChangeGoal,
                         SupposeForContradiction,
                         SupposeForContradictionForward, SupposeToProve,
-                        StrongInduction };
+                        StrongInduction, TakeDestructure };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet, Suppose
                                                // (when set on Suppose,
@@ -1781,36 +1781,51 @@ private:
                     consumeAny();  // 'as'
                     destructurePattern = parsePattern();
                 }
-                expect(TokenKind::Colon,
-                       "after take name (take n : T; or take n as <pat> : T;)");
-                wrapper.kind = BlockWrapper::Suppose;
-                wrapper.name = nameToken.lexeme;
-                wrapper.pattern = std::move(destructurePattern);
-                wrapper.type = parseExpression();
-                // `take x : T for proving Q { block };` — the
-                // ∀-introduction analog of `suppose … for proving`: the
-                // block proves Q under `x : T`, and `∀ (x : T). Q` enters
-                // the context (anonymously) for the rest of the block.
-                // Unrolls through the same wrapper as the suppose form —
-                // a lambda over a data binder gives the Pi statement.
-                if (peek().kind == TokenKind::Identifier
-                    && peek().lexeme == "for"
-                    && peekAt(1).kind == TokenKind::Identifier
-                    && peekAt(1).lexeme == "proving") {
-                    if (wrapper.pattern) {
-                        throwHere("take … for proving takes a plain name, "
-                                  "not an `as <pattern>` destructure");
+                // Type-less `take x as <pattern>;` — destructure an
+                // IN-SCOPE binder in place: the rest of the block runs
+                // under `cases x { | <pattern> => … }` (hypotheses
+                // depending on x refine automatically). Reads as
+                // "take B as a representative (b, bIsCauchy)".
+                if (destructurePattern
+                    && peek().kind != TokenKind::Colon) {
+                    wrapper.kind = BlockWrapper::TakeDestructure;
+                    wrapper.name = nameToken.lexeme;
+                    wrapper.pattern = std::move(destructurePattern);
+                } else {
+                    expect(TokenKind::Colon,
+                           "after take name (take n : T; or "
+                           "take n as <pat> : T;)");
+                    wrapper.kind = BlockWrapper::Suppose;
+                    wrapper.name = nameToken.lexeme;
+                    wrapper.pattern = std::move(destructurePattern);
+                    wrapper.type = parseExpression();
+                    // `take x : T for proving Q { block };` — the
+                    // ∀-introduction analog of `suppose … for proving`:
+                    // the block proves Q under `x : T`, and `∀ (x : T).
+                    // Q` enters the context (anonymously) for the rest
+                    // of the block. Unrolls through the same wrapper as
+                    // the suppose form — a lambda over a data binder
+                    // gives the Pi statement.
+                    if (peek().kind == TokenKind::Identifier
+                        && peek().lexeme == "for"
+                        && peekAt(1).kind == TokenKind::Identifier
+                        && peekAt(1).lexeme == "proving") {
+                        if (wrapper.pattern) {
+                            throwHere("take … for proving takes a plain "
+                                      "name, not an `as <pattern>` "
+                                      "destructure");
+                        }
+                        consumeAny();  // 'for'
+                        consumeAny();  // 'proving'
+                        wrapper.kind = BlockWrapper::SupposeToProve;
+                        wrapper.value = parseExpression();  // the goal Q
+                        if (peek().kind != TokenKind::LeftBrace) {
+                            throwHere("take … for proving Q needs a "
+                                      "`{ … }` proof block "
+                                      "(take x : T for proving Q { … });");
+                        }
+                        wrapper.source = parseExpression();  // `{ block }`
                     }
-                    consumeAny();  // 'for'
-                    consumeAny();  // 'proving'
-                    wrapper.kind = BlockWrapper::SupposeToProve;
-                    wrapper.value = parseExpression();  // the goal Q
-                    if (peek().kind != TokenKind::LeftBrace) {
-                        throwHere("take … for proving Q needs a `{ … }` "
-                                  "proof block "
-                                  "(take x : T for proving Q { … });");
-                    }
-                    wrapper.source = parseExpression();  // the `{ block }`
                 }
             } else if (isNote) {
                 // `note goal : <type>;` — assert the current expected
@@ -2307,6 +2322,26 @@ private:
                         std::move(result),
                         iterator->line, iterator->column,
                         /*fromStatementIntro=*/true);
+                    break;
+                }
+                case BlockWrapper::TakeDestructure: {
+                    // `take x as <pattern>;` on an in-scope binder:
+                    // just the cases wrap — no new Pi-binder.
+                    SurfaceExpressionPointer scrutinee =
+                        makeSurfaceIdentifier(iterator->name, {},
+                                               iterator->line,
+                                               iterator->column);
+                    SurfaceCasesClause innerClause;
+                    innerClause.pattern = iterator->pattern;
+                    innerClause.body = std::move(result);
+                    innerClause.line = iterator->line;
+                    innerClause.column = iterator->column;
+                    std::vector<SurfaceCasesClause> innerClauses;
+                    innerClauses.push_back(std::move(innerClause));
+                    result = makeSurfaceCases(
+                        std::move(scrutinee),
+                        std::move(innerClauses),
+                        iterator->line, iterator->column);
                     break;
                 }
                 case BlockWrapper::SupposeForContradiction: {

@@ -143,6 +143,7 @@ End each with `;`; the block returns its final non-`;` expression.
 | `suffices Q by definition of X[, Y];` | `Q` is the goal with the named definition(s) unfolded — no reduction lemma; carries the definitional step even when `X` is opaque |
 | `let ⟨a, b⟩ := E;` | tuple destructure — genuine data records only (`∃`/`∧` → use `choose`; `obtain` is retired) |
 | `take x as representative(a, b) : T;` / `cases x { \| representative(a, b) => … }` | quotient destructure — the carrier's constructor is resolved from the type, never written |
+| `take x as <pattern>;` | destructure an IN-SCOPE binder in place (no type annotation): the rest of the block runs under `cases x`; hypotheses about `x` refine automatically — `take B as representative(b, bIsCauchy);` |
 | `let x := V;` / `set x := V;` | local (transparent) binding |
 
 ## Tactics

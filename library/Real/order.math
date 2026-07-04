@@ -18,6 +18,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.eventually
 import Natural.maximum
 import Rational.basics
 import Rational.addition
@@ -46,9 +47,8 @@ import Real.algebra
 
 definition Rational.sequence.IsEventuallyNonneg
         (s : Rational.sequence.Sequence) : Proposition :=
-  ∀ (ε : Rational). Rational.zero < ε →
-    ∃ (N : Natural).
-      ∀ (m : Natural). N ≤ m → -ε < s(m)
+  ∀ (ε : Rational). ε > 0 →
+    eventually (m). -ε < s(m)
 
 -- IsEventuallyNonneg on a packaged CauchyRationalSequence: lifted
 -- through sequenceFunction.
@@ -222,14 +222,12 @@ theorem Rational.sequence.IsEventuallyNonneg.add
   (ε : Rational)
            (εPositive : Rational.zero < ε) ↦ {
     Rational.zero < Rational.halve(ε);
-    -- `obtain` cannot infer these existentials through the opaque Rational,
-    -- so state them top-down first.
-    ∃ (N : Natural). ∀ (m : Natural). N ≤ m → -Rational.halve(ε) < s(m)
-        as sBounded;
-    choose N_s as sBound from sBounded;
-    ∃ (N : Natural). ∀ (m : Natural). N ≤ m → -Rational.halve(ε) < t(m)
-        as tBounded;
-    choose N_t as tBound from tBounded;
+    eventually (m). -Rational.halve(ε) < s(m) as sBounded;
+    choose N_s such that ∀ (m : Natural). N_s ≤ m → -Rational.halve(ε) < s(m)
+        as sBound from sBounded;
+    eventually (m). -Rational.halve(ε) < t(m) as tBounded;
+    choose N_t such that ∀ (m : Natural). N_t ≤ m → -Rational.halve(ε) < t(m)
+        as tBound from tBounded;
     witness Natural.maximum(N_s, N_t) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_t) ≤ m) ↦ {

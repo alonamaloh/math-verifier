@@ -33,6 +33,7 @@ import Natural.classical_decidable
 import Natural.peano
 import Natural.arithmetic
 import Natural.add_order
+import Natural.eventually
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -867,84 +868,43 @@ theorem Real.LessOrEqual_of_pointwise
       }
   }
 
--- Dual: at-make form, lower bound by the limit. If every term of a
--- Cauchy rational sequence is (as Real) ≥ some lower bound mk(make(b, _)),
--- then mk(make(b, _)) ≤ mk(make(s, _)). Same proof structure as the
--- upper-bound version with s and b swapped: pick N_s from s's Cauchy
--- modulus at ε/2 (giving `s(N_s) - s(j) < ε/2`), apply the pointwise
--- bound at N_s to extract `s(N_s) - b(j) > -ε/2`, sum to
--- `s(j) - b(j) > -ε`.
-theorem Real.LessOrEqual_of_pointwise_lower_at_make
-        (s : Natural → Rational)
-        (sIsCauchy : Rational.sequence.IsCauchy(s))
-        (b : Natural → Rational)
-        (bIsCauchy : Rational.sequence.IsCauchy(b))
-        (pointwiseGeq
-            : ∀ (n : Natural).
-                Real.from_cauchy_sequence(b, bIsCauchy)
-                  ≤ (s(n) : Real))
-        : Real.from_cauchy_sequence(b, bIsCauchy)
-            ≤ Real.from_cauchy_sequence(s, sIsCauchy) :=
-  unfold Real.IsNonneg in
-  ((ε : Rational)
-           (εPositive : (0 : Rational) < ε) ↦ {
-    (0 : Rational) < Rational.halve(ε) as halvedPositive;
-    choose N_s as sCauchyAt
-        from sIsCauchy(Rational.halve(ε), halvedPositive);
-    -- pointwiseGeq(N_s) : mk(make(b, _)) ≤ (s(N_s) : Real)
-    --   = Real.IsNonneg((s(N_s) : Real) - mk(make(b, _)))
-    --   = IsEventuallyNonneg(λj. s(N_s) - b(j))
-    choose N_b as sNsMinusBAt
-        from pointwiseGeq(N_s)(Rational.halve(ε), halvedPositive);
-    witness Natural.maximum(N_s, N_b) with
-        (m : Natural)
-                 (mGeMax : Natural.maximum(N_s, N_b) ≤ m) ↦ {
-          N_s ≤ m as m_geq_N_s;
-          N_b ≤ m as m_geq_N_b;
-          N_s ≤ N_s;
-          -- |s(m) - s(N_s)| < halve(ε)
-          abs(s(m) - s(N_s)) < Rational.halve(ε)
-            by sCauchyAt(m, m_geq_N_s, N_s, given(N_s ≤ N_s));
-          -- Lower bound: -halve(ε) < s(m) - s(N_s)  (lower half of |·| bounds).
-          (-Rational.halve(ε) < s(m) - s(N_s))
-                  ∧ (s(m) - s(N_s) < Rational.halve(ε))
-            by Rational.absolute_value_LessThan_bounds;
-          -Rational.halve(ε) < s(m) - s(N_s);
-          -- pointwiseGeq at m: -halve(ε) < s(N_s) - b(m).
-          -Rational.halve(ε) < s(N_s) - b(m)
-            by sNsMinusBAt(m, m_geq_N_b);
-          -- Chain the two ε/2 bounds end-to-end and simplify:
-          --   -ε = -halve(ε) + -halve(ε)
-          --      < (s(m) - s(N_s)) + -halve(ε)            (sLowerBound)
-          --      ≤ (s(m) - s(N_s)) + (s(N_s) - b(m))      (sBBound, weakened)
-          --      = s(m) - b(m).
-          -Rational.halve(ε) ≤ s(N_s) - b(m);
-          -ε
-             = -(Rational.halve(ε) + Rational.halve(ε))
-                  by Rational.halve_doubled
-             = -Rational.halve(ε) + -Rational.halve(ε)
-             < (s(m) - s(N_s)) + -Rational.halve(ε)
-                  by Rational.add_preserves_LessThan
-             ≤ (s(m) - s(N_s)) + (s(N_s) - b(m))
-                  by Rational.add_general_LessOrEqual_left
-             = s(m) - b(m)
-        }
-  })
-
--- Take a representative B = [(b, bIsCauchy)]; the at-make form proves it.
+-- Dual: lower bound by the limit. If every term of s dominates B
+-- (as Real), then B ≤ mk(s). The plan's analytic acceptance target
+-- (PLAN_LANGUAGE_IMPROVEMENT.md §Reference target): take a
+-- representative of B, reduce the ≤ to eventual nonnegativity of the
+-- pointwise difference by definition, anchor the Cauchy modulus at
+-- some N, read the pointwise bound at that anchor, and chain the two
+-- ε/2 bounds inside one eventually scope — thresholds never on the
+-- page.
 theorem Real.LessOrEqual_of_pointwise_lower
         (s : Natural → Rational)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         (B : Real)
-        (pointwiseGeq : ∀ (n : Natural). B ≤ (s(n) : Real))
-        : B ≤ Real.from_cauchy_sequence(s, sIsCauchy) :=
-  cases B {
-    | CauchyRationalSequence.make(b, bIsCauchy) => {
-        Real.from_cauchy_sequence(b, bIsCauchy)
-                ≤ Real.from_cauchy_sequence(s, sIsCauchy);
-        done
-      }
+        (pointwiseLower : ∀ (n : Natural). B ≤ (s(n) : Real))
+        : B ≤ Real.from_cauchy_sequence(s, sIsCauchy) := {
+  take B as representative(b, bIsCauchy);
+  suffices ∀ (ε : Rational). ε > 0 → eventually (m). -ε < s(m) - b(m)
+      by definition of Real.LessOrEqual, Real.IsNonneg;
+  take ε : Rational;
+  suppose ε > 0 as εPositive;
+
+  choose N such that eventually (m). abs(s(m) - s(N)) < Rational.halve(ε)
+      from Rational.sequence.IsCauchy.eventually_near_anchor;
+  eventually (m). -Rational.halve(ε) < s(N) - b(m)
+      by Real.eventually_below_cast_of_LessOrEqual;
+
+  eventually (m): {
+    (-Rational.halve(ε) < s(m) - s(N)) ∧ (s(m) - s(N) < Rational.halve(ε))
+        by Rational.absolute_value_LessThan_bounds;
+    calc -ε
+       = -Rational.halve(ε) + -Rational.halve(ε)
+       < (s(m) - s(N)) + -Rational.halve(ε)
+             by Rational.add_preserves_LessThan
+       ≤ (s(m) - s(N)) + (s(N) - b(m))
+       = s(m) - b(m);
+    done
   }
+}
 
 -- ----------------------------------------------------------------------
 -- Within-interval invariant: left(n) ≤ right(n) at every step. Each

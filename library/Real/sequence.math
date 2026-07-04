@@ -14,6 +14,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.eventually
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
@@ -118,3 +119,22 @@ theorem Rational.sequence.constant_converges_to_itself (q : Rational)
           calc abs(q - q)
              = Rational.zero
              < ε
+
+-- A Cauchy sequence eventually stays within ε of any one of its own
+-- sufficiently late terms: some anchor index N has every later term
+-- within ε of s(N). This is the shape limit arguments consume —
+-- "pick N from the Cauchy modulus" hands back an anchored eventually
+-- fact instead of the raw two-index tail.
+theorem Rational.sequence.IsCauchy.eventually_near_anchor
+        (s : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (ε : Rational) (εPositive : ε > (0 : Rational))
+        : ∃ (N : Natural). eventually (m). abs(s(m) - s(N)) < ε := {
+  choose N as cauchyAt from sIsCauchy(ε, εPositive);
+  witness N with
+      witness N with
+          (m : Natural) (mPastAnchor : N ≤ m) ↦ {
+            N ≤ N;
+            done by cauchyAt
+          }
+}
