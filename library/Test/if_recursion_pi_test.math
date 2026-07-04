@@ -1,7 +1,8 @@
--- Two `decide` capabilities that let classically-filtered recursions be
--- written naturally (see Lists/filter.math for the real use):
+-- Two conditional (`if P then … else …`) capabilities that let
+-- classically-filtered recursions be written naturally (see
+-- Lists/filter.math for the real use):
 --
--- 1. A recursive SELF-CALL inside a decision arm resolves to the
+-- 1. A recursive SELF-CALL inside a conditional branch resolves to the
 --    pattern-match induction hypothesis (rewriteRecursiveCalls walks
 --    SurfaceDecide bodies). Previously: "undefined constant: <name>".
 -- 2. The motive abstraction sees `classical_decidable(P)` occurrences
@@ -10,39 +11,37 @@
 --    gets. Previously only codomain occurrences were abstracted, so
 --    implication goals over an unreduced classical definition failed.
 
-module Test.decide_recursion_pi_test
+module Test.if_recursion_pi_test
 
 import axioms
 import Natural.classical_decidable
 import Logic.basics
 import Lists.list
 
--- (1) Self-call inside both decision arms.
+-- (1) Self-call inside both conditional branches.
 definition Test.keep_satisfying (A : Type(0)) (P : A → Proposition) : List(A) → List(A)
   | List.empty => List.empty(A)
   | List.prepend(head, tail) =>
-      decide P(head) {
-        | yes _ => List.prepend(A, head, Test.keep_satisfying(A, P, tail))
-        | no _ => Test.keep_satisfying(A, P, tail)
-      }
+      if P(head)
+      then List.prepend(A, head, Test.keep_satisfying(A, P, tail))
+      else Test.keep_satisfying(A, P, tail)
 
 -- (2) The goal is an implication whose DOMAIN (and codomain) mention
 -- `keep_satisfying(P, prepend(head, tail))`, which only exposes
--- `classical_decidable(P(head))` after unfolding. `decide` must rewrite
--- both sides in each arm; the arm bodies are then the identity at the
--- reduced types.
-theorem Test.decide_rewrites_under_pi (A : Type(0)) (P : A → Proposition)
+-- `classical_decidable(P(head))` after unfolding. The conditional must
+-- rewrite both sides in each branch; the branch bodies are then the
+-- identity at the reduced types.
+theorem Test.conditional_rewrites_under_pi (A : Type(0)) (P : A → Proposition)
         (x head : A) (tail : List(A))
         : List.member(A, x, Test.keep_satisfying(A, P, List.prepend(A, head, tail)))
           → List.member(A, x, Test.keep_satisfying(A, P, List.prepend(A, head, tail))) :=
-  decide P(head) {
-    | yes _ => {
-        suppose List.member(A, x,
-            List.prepend(A, head, Test.keep_satisfying(A, P, tail))) as mem;
-        mem
-      }
-    | no _ => {
-        suppose List.member(A, x, Test.keep_satisfying(A, P, tail)) as mem;
-        mem
-      }
-  }
+  if P(head)
+  then {
+      suppose List.member(A, x,
+          List.prepend(A, head, Test.keep_satisfying(A, P, tail))) as mem;
+      mem
+    }
+  else {
+      suppose List.member(A, x, Test.keep_satisfying(A, P, tail)) as mem;
+      mem
+    }

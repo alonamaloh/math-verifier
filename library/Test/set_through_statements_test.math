@@ -1,10 +1,13 @@
 -- A `set`-bound alias must stay substituted through statement-intro forms
--- that introduce their own scope — `choose`, `decide`, and the like.
--- Regression: `substituteSurfaceName` (the engine behind `set`) had no case
--- for `SurfaceChoose`/`SurfaceDecide`, so it stopped at the first such node
--- and left the alias unsubstituted past it (an "unknown identifier" error);
--- worse, descending into those bodies could reach an untyped binding's null
--- type and segfault. Both are fixed; these pin the behaviour.
+-- that introduce their own scope — `choose`, `by cases`, and the like.
+-- Regression 1: `substituteSurfaceName` (the engine behind `set`) had no
+-- case for `SurfaceChoose`/`SurfaceDecide`, so it stopped at the first such
+-- node and left the alias unsubstituted past it (an "unknown identifier"
+-- error); worse, descending into those bodies could reach an untyped
+-- binding's null type and segfault. Regression 2: its structured-claim arm
+-- clone rebuilt arms field-by-field and dropped `isOtherwise`, so an
+-- `otherwise:` arm under a `set` became a stated arm with a null
+-- proposition (a crash downstream). All fixed; these pin the behaviour.
 
 module Test.set_through_statements_test
 
@@ -25,12 +28,12 @@ theorem Test.set_survives_choose
   done
 }
 
--- The alias is used inside both arms of a `decide`.
-theorem Test.set_survives_decide
+-- The alias is used inside both arms of a propositional case split.
+theorem Test.set_survives_by_cases
         (P Q : Proposition) (hQ : Q) : Q := {
   set goalAlias := Q;
-  decide P {
-    | yes inhabited => { claim goalAlias; done }
-    | no empty      => { claim goalAlias; done }
+  claim by cases {
+    case P: { claim goalAlias; done }
+    otherwise: { claim goalAlias; done }
   }
 }

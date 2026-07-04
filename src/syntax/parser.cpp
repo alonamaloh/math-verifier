@@ -39,12 +39,11 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordOperator:
         case TokenKind::KeywordOverload:
         case TokenKind::KeywordCoercion:
-        // `decide` is dispatched from parseAtom for the `decide P { … }`
-        // form, but the bare name is also a long-standing module/file
-        // name component (Natural.decide, Natural.decide_divides). Mark
-        // it contextual so the qualified-name parser accepts it after
-        // `.`; the parseAtom dispatch still claims it in expression
-        // position.
+        // The `decide P { … }` construct is retired, but the bare name
+        // is a long-standing module/file name component (Natural.decide,
+        // Natural.decide_divides). Mark it contextual so the
+        // qualified-name parser accepts it after `.`; parseAtom claims a
+        // construct-position `decide` for the migration error.
         case TokenKind::KeywordDecide:
             return true;
         default:
@@ -3231,13 +3230,20 @@ private:
         if (current.kind == TokenKind::KeywordGiven) {
             return parseGiven();
         }
-        // `decide P { … }` must short-circuit BEFORE the isIdentifierLike
-        // fallthrough: `decide` is a contextual keyword (so that
-        // `Natural.decide` and similar qualified-name uses still parse),
-        // so the isIdentifierLike check below would otherwise claim it
-        // as a bare identifier.
-        if (current.kind == TokenKind::KeywordDecide) {
-            return parseDecideExpression();
+        // The `decide P { yes/no }` construct is RETIRED (A4). The check
+        // must short-circuit BEFORE the isIdentifierLike fallthrough
+        // (`decide` stays a contextual keyword so `Natural.decide` and
+        // similar qualified names still parse) and steer to the settled
+        // spellings.
+        if (current.kind == TokenKind::KeywordDecide
+            && peekAt(1).kind != TokenKind::Dot) {
+            throw ParseError(
+                "the `decide P { yes/no }` construct was retired; split "
+                "propositionally with `by cases { case P: … otherwise: … }` "
+                "(reasoning through a definition's characterizing equations "
+                "where the goal must reduce), or use the value-level "
+                "conditional `if P then a else b` (line "
+                + std::to_string(current.line) + ")");
         }
         if (current.kind == TokenKind::KeywordIf) {
             return parseIfExpression();
@@ -3507,71 +3513,6 @@ private:
                                        it->line, it->column);
         }
         return result;
-    }
-
-    // `decide P { | yes m => arm_yes  | no n => arm_no }` —
-    // classical case-split on whether P holds. Either branch may be
-    // first; binder names default to the unused-marker `_` if absent.
-    // The trailing `=>` style is required (the `case … :` math-style
-    // form is not accepted here for the moment — `decide` arms are
-    // tight by design).
-    SurfaceExpressionPointer parseDecideExpression() {
-        Token decideToken = consumeAny();  // 'decide'
-        SurfaceExpressionPointer proposition = parseExpression();
-        expect(TokenKind::LeftBrace, "after `decide P`");
-        std::string yesBinderName;
-        SurfaceExpressionPointer yesBody;
-        std::string noBinderName;
-        SurfaceExpressionPointer noBody;
-        bool sawYes = false;
-        bool sawNo = false;
-        while (peek().kind != TokenKind::RightBrace) {
-            expect(TokenKind::Pipe, "before a `decide` arm");
-            if (!isIdentifierLike(peek().kind)) {
-                throwHere("expected `yes` or `no` after `|` in `decide`");
-            }
-            Token armKind = consumeAny();
-            std::string binderName;
-            if (peek().kind == TokenKind::FatArrow) {
-                binderName = "_";
-            } else {
-                if (!isIdentifierLike(peek().kind)) {
-                    throwHere("expected a binder name (or `=>`) after "
-                              "`" + armKind.lexeme + "` in `decide`");
-                }
-                binderName = consumeAny().lexeme;
-            }
-            expect(TokenKind::FatArrow,
-                   "between `decide` arm header and body");
-            SurfaceExpressionPointer body = parseExpression();
-            if (armKind.lexeme == "yes") {
-                if (sawYes) {
-                    throwHere("two `yes` arms in the same `decide`");
-                }
-                sawYes = true;
-                yesBinderName = std::move(binderName);
-                yesBody = std::move(body);
-            } else if (armKind.lexeme == "no") {
-                if (sawNo) {
-                    throwHere("two `no` arms in the same `decide`");
-                }
-                sawNo = true;
-                noBinderName = std::move(binderName);
-                noBody = std::move(body);
-            } else {
-                throwHere("expected `yes` or `no`, got `"
-                          + armKind.lexeme + "`");
-            }
-        }
-        expect(TokenKind::RightBrace, "ending `decide` expression");
-        if (!sawYes || !sawNo) {
-            throwHere("`decide` needs both a `yes` and a `no` arm");
-        }
-        return makeSurfaceDecide(
-            std::move(proposition),
-            std::move(yesBinderName), std::move(yesBody),
-            std::move(noBinderName), std::move(noBody),
-            decideToken.line, decideToken.column);
     }
 
     // `if P then a else b` — surface sugar for

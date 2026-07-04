@@ -27,16 +27,15 @@
 --   auto positions (O4 applies):
 --     P2 by-less calc step           P4 bare `claim`
 --
--- P8 `decide` arm body: now UNIFORM with `cases`. `decide`'s arm bodies
--- run the same coerceToExpectedTypeViaDiff that `cases` arms do
--- (elaborator.cpp elaborateArms), so a `decide` arm closes exactly what a
--- `cases` arm closes — `decide` being constructor-`cases` on
--- `Logic.Decidable(P)`. (Until 2026-06 this was the one gap: the bespoke
--- decide path skipped arm coercion. Cells P8_* below pin the fix.)
+-- P8 conditional (`if`) branch body: now UNIFORM with `cases`. The
+-- branches run the same coerceToExpectedTypeViaDiff that `cases` arms do
+-- (elaborator.cpp elaborateArms), the conditional being constructor-
+-- `cases` on `Logic.Decidable(P)`. (Until 2026-06 this was the one gap:
+-- the bespoke path skipped arm coercion. Cells P8_* below pin the fix.)
 --
 -- STAGE 2 AUDIT RESULT: every position with a CONCRETE expected type
 -- routes through the single coercion entry coerceToExpectedTypeViaDiff —
--- theorem body, function arg, cases arm, decide arm, lambda body, let
+-- theorem body, function arg, cases arm, `if` branch, lambda body, let
 -- value, suppose body, obtain body (all pinned below / above). The only
 -- residual non-uniformity is an anonymous tuple / constructor component
 -- whose type is an INFERRED PARAMETER: the coerce call fires but against
@@ -121,15 +120,16 @@ theorem Test.matrix_O4step_P4_claim (a b c : Natural) (h : a = b) (ctx : b = c)
   True.trivial
 }
 
--- ── P8 `decide` arm — now coerces like a `cases` arm (gap closed).
+-- ── P8 conditional (`if`) branch — coerces like a `cases` arm (gap
+-- closed; the branches share the `cases` arm-elaboration path).
 -- O1 single-position congruence on a bare cited fact:
-theorem Test.matrix_O1_P8_decide (a b : Natural) (h : a = b)
+theorem Test.matrix_O1_P8_conditional (a b : Natural) (h : a = b)
         : successor(a) = successor(b) :=
-  decide a = b { | yes _ => h | no _ => h }
+  if a = b then h else h
 -- O3 bounded combine (cited h : a = b, context ctx : c = d):
-theorem Test.matrix_O3_P8_decide (a b c d : Natural) (h : a = b) (ctx : c = d)
+theorem Test.matrix_O3_P8_conditional (a b c d : Natural) (h : a = b) (ctx : c = d)
         : a + c = b + d :=
-  decide a = b { | yes _ => h | no _ => h }
+  if a = b then h else h
 
 -- ── O1 at the remaining structured-proof body positions (Stage 2 audit) ──
 -- P11 suppose body, P12 obtain body — both coerce uniformly.

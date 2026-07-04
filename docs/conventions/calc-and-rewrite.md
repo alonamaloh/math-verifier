@@ -350,7 +350,7 @@ Gotchas / limits:
 
 The 2026-era kernel does ζ-unfold let-binders in
 `isDefinitionallyEqual` (the auto-prover, the rewrite matcher, and
-the `decide` walker all see through them, per the section above on
+the conditional's motive walker all see through them, per the section above on
 let-for-local-abbreviations). The old advice "don't use `let` for
 value abbreviations" — driven by a kernel that didn't ζ-track
 let-binders through `congruenceOf`'s motive checks — no longer
@@ -385,7 +385,7 @@ Two caveats remain:
   from `midIsUpper`'s declared type (the let-bound `midReal`). Two
   kernel-equal-but-not-structurally-equal terms result — fine for the
   kernel, but it matters if the surface tactic does literal subterm
-  matching. The decide elaborator ζ-unfolds the target up front; other
+  matching. The conditional's elaborator ζ-unfolds the target up front; other
   paths may need explicit ζ-unfold or `claim`-binding to align shapes.
 
 - **Function-valued `let`s are not β-reduced after ζ.** `let f := (k) ↦

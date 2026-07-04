@@ -173,14 +173,24 @@ theorem Natural.add_zero_right : (n : Natural) → n + 0 = n :=
 For strong recursion (you need IH for all `k < n`), use
 `by_strong_induction on n with IH { … }`.
 
-### `decide P { yes m => … | no n => … }` — classical case split
+### `by cases { case P: … otherwise: … }` — classical case split
 
-The canonical form for "P or not P" reasoning. Replaces both
-`cases Logic.excluded_middle(P)` and the bisection-style
-`cases Logic.classical_decidable(P) with eq { … }`. The elaborator's
-motive search finds buried `classical_decidable(P)` occurrences (e.g.
-inside `bisectionStepWithDec`) and abstracts them, so each arm proves
-the ι-reduced shape automatically.
+The canonical form for "P or not P" reasoning (the old `decide P {
+yes/no }` construct is retired). `otherwise` is always last; its
+hypothesis is the negation of the stated cases, and exhaustiveness is
+excluded middle by construction. When a goal must REDUCE a value
+defined by the same decision (`min(a, b)`, `List.filter`, a bisection
+step), don't re-decide: cite the definition's characterizing
+equations, which are one-liners over the generic conditional lemmas
+`Logic.if_positive` / `Logic.if_negative`
+(`min(a, b) = a  by Rational.minimum_eq_left; done by substitution`).
+
+### `if P then a else b` — the value-level classical conditional
+
+Branches a DEFINITION on any proposition (desugars to
+`cases Logic.classical_decidable(P)`); this is the one surviving
+value-level spelling. Reason about the result through
+`Logic.if_positive` / `Logic.if_negative`, never by re-deciding.
 
 ### Collapsing Quotient-lifted ring laws (the "triple-helper" antipattern)
 
@@ -560,11 +570,11 @@ function (caseScrutinee : T) (eq : E = caseScrutinee) =>
 cases E with eq { | Pat => … }
 ```
 
-### Don't write `Or.introduceLeft/Right` when `decide` would work
+### Don't write `Or.introduceLeft/Right` when `by cases` would work
 
-For "if P then … else …" reasoning, prefer `decide P { yes h => … |
-no nh => … }` over `cases Logic.excluded_middle(P) { | Or.introduceLeft
-=> … | Or.introduceRight => … }`.
+For "either P or not P" reasoning, prefer `by cases { case P: …
+otherwise: … }` over `cases Logic.excluded_middle(P) {
+| Or.introduceLeft => … | Or.introduceRight => … }`.
 
 ### Don't keep a "claim by V" whose name is unused
 
@@ -602,7 +612,7 @@ harder". The current language has good idioms for most math moves:
 - "Pick a representative" — `take x as <Constructor>(args) : T;`
 - "By cases on …" — `cases E { … }`
 - "By induction on n" — `by_induction on n with IH { … }`
-- "WLOG assume …" — `decide P { yes h => … | no nh => … }` or
+- "WLOG assume …" — `by cases { case P: … otherwise: … }` or
   cases-with-equality.
 - "Suppose …" — `suppose <hypothesis> as <name>;`
 - "Note that …" — `note <proposition>;`

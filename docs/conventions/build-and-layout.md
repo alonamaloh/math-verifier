@@ -46,7 +46,7 @@ dispatch        the core elaborateExpression dispatch
 statements      top-level declarations (definitions, axioms, instances, ...)
 patterns        pattern-matching definitions + inductive types
 induction       by-induction / strong-induction / choose / structured-claim
-cases           cases-on-expression family + sorry / note / decide / tuple
+cases           cases-on-expression family + sorry / note / if-conditional / tuple
 inference       identifier + leading-argument/hole inference, lambda/Pi
 prover          the auto-prover (context facts/equalities, bridges)
 claim           claim-by-substitution / claim-by-cases

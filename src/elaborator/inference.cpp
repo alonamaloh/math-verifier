@@ -47,15 +47,16 @@ ExpressionPointer Elaborator::elaborateIdentifier(
             // Hint for a name that moved out of the universally-imported
             // foundation. `Logic.classical_decidable` is now a theorem in
             // `Natural.classical_decidable` (no longer an axiom in
-            // `axioms.math`); the `decide` tactic desugars to it, so a
-            // `decide` in a module that doesn't reach that file lands here
-            // with the desugared name and an otherwise baffling "unknown
-            // identifier" at the `decide`.
+            // `axioms.math`); the `if P then a else b` conditional
+            // desugars to it, so an `if` in a module that doesn't reach
+            // that file lands here with the desugared name and an
+            // otherwise baffling "unknown identifier" at the `if`.
             if (identifier.qualifiedName == "Logic.classical_decidable") {
                 message +=
                     "\n  `Logic.classical_decidable` is a theorem in "
-                    "`Natural.classical_decidable` (the `decide` tactic "
-                    "desugars to it) — add `import Natural.classical_decidable`";
+                    "`Natural.classical_decidable` (the `if P then a else "
+                    "b` conditional desugars to it) — add `import "
+                    "Natural.classical_decidable`";
             }
             // Carry the position structurally too — without it the driver
             // prints the error header at 1:1 and only the message text

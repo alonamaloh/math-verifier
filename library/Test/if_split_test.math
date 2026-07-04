@@ -1,0 +1,92 @@
+-- `if P then a else b` — the value-level classical conditional (the
+-- one surviving spelling of the retired `decide` construct). The
+-- expected type must contain `Logic.classical_decidable(P)`
+-- structurally (after WHNF); the elaborator abstracts that occurrence
+-- to form the motive, builds the Logic.Decidable_recursor application,
+-- and feeds each branch a body whose expected type is the goal with
+-- the constructor substituted in — so wrappers like
+-- `bisectionStepWithDec(…, decision)` ι-reduce in each branch. The
+-- branch hypotheses (P / ¬P) are anonymous facts, reachable via
+-- `given(…)` and the bare-statement prover.
+
+module Test.if_split_test
+
+import Logic.basics
+import Natural.classical_decidable
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+-- A tiny helper that depends on a decidable: returns 0 for yes, 1
+-- for no. Defined via pattern match, so the user-side test below
+-- exercises the canonical use of the conditional: after substituting
+-- the constructor for `classical_decidable(P)`, the branch body's
+-- expected type ι-reduces to `zero = zero` (in the then branch) or
+-- `1 = 1` (in the else branch).
+definition Test.conditional_pick (P : Proposition)
+        : Logic.Decidable(P) → Natural
+  | Logic.Decidable.yes(_) => zero
+  | Logic.Decidable.no(_)  => 1
+
+-- Goal mentions `Logic.classical_decidable(P)` directly (no wrapping
+-- function buried behind δ-reduction). The then branch sees expected
+-- type ι-reducing to `zero = zero`; the else branch `1 = 1`.
+theorem Test.conditional_pick_eq_constructor
+        (P : Proposition)
+        : Test.conditional_pick(P, Logic.classical_decidable(P))
+          = Test.conditional_pick(P, Logic.classical_decidable(P)) :=
+  if P
+  then reflexivity(Natural, zero)
+  else reflexivity(Natural, 1)
+
+-- A goal where the branch's witness is the (anonymous) hypothesis
+-- itself, addressed by statement via `given`. The expected branch type
+-- ι-reduces to P in the then branch and Not(P) in the else branch.
+definition Test.conditional_branch (P : Proposition)
+        : Logic.Decidable(P) → Proposition
+  | Logic.Decidable.yes(_) => P
+  | Logic.Decidable.no(_)  => Not(P)
+
+theorem Test.conditional_branch_holds
+        (P : Proposition)
+        : Test.conditional_branch(P, Logic.classical_decidable(P)) :=
+  if P
+  then given(P)
+  else given(Not(P))
+
+-- A wrapping definition that buries the classical_decidable behind a
+-- δ-reducible step. Mimics `Real.bisectionStep`'s shape so we can
+-- verify the elaborator's WHNF-walker finds the hidden decidable.
+definition Test.wrappedPick (P : Proposition) : Natural :=
+  Test.conditional_pick(P, Logic.classical_decidable(P))
+
+theorem Test.conditional_through_wrapper
+        (P : Proposition)
+        : Test.wrappedPick(P) = Test.wrappedPick(P) :=
+  if P
+  then reflexivity(Natural, zero)
+  else reflexivity(Natural, 1)
+
+-- Same but with a let-binding so the proposition syntactically uses
+-- the let-binder while the goal predates the let. Exercises the
+-- ζ-unfolding step.
+theorem Test.conditional_with_let
+        (Q : Proposition)
+        : Test.wrappedPick(Q) = Test.wrappedPick(Q) := {
+    let R : Proposition := Q;
+    if R
+    then reflexivity(Natural, zero)
+    else reflexivity(Natural, 1)
+  }
+
+-- Constant-motive case: the goal doesn't mention
+-- `classical_decidable(P)` anywhere. The conditional falls back to a
+-- constant motive (`λ_. Goal`) and each branch just proves the goal
+-- directly, with P / Not(P) available as anonymous hypotheses.
+theorem Test.conditional_constant_motive
+        (Q : Proposition) (someQ : Q ∨ Not(Q) → Natural)
+        : Natural :=
+  if Q
+  then someQ(Or.introduceLeft(Q, Not(Q), given(Q)))
+  else someQ(Or.introduceRight(Q, Not(Q), given(Not(Q))))

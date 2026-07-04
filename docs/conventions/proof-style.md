@@ -1,6 +1,6 @@
 # Proof style and statement-level sugar
 
-Write proofs that read like math: `cases`/`by_induction` over pattern-match, `cases … with`, `decide`, the statement-level sugar (`claim`/`obtain`/`take`/…), and CIC-noise-reduction idioms.
+Write proofs that read like math: `cases`/`by_induction` over pattern-match, `cases … with`, `by cases { case P: … otherwise: … }`, the statement-level sugar (`claim`/`obtain`/`take`/…), and CIC-noise-reduction idioms.
 
 *(Part of the project conventions; see `CLAUDE.md` for the index.)*
 
@@ -87,61 +87,55 @@ The elaborator desugars this to the convoy pattern (`(caseScrutinee : T) (equali
 
 Constructor patterns with arguments (e.g. `successor(predecessor)`) are reconstructed as expressions for the equation type; tuple patterns aren't yet supported.
 
-## `decide P { yes m => … | no n => … }` — classical case-split
+## Classical case-splits: `by cases { case P: … otherwise: … }`
 
-> **Import:** `decide` desugars to `cases Logic.classical_decidable(P)`,
-> which is now a **theorem** in `Natural.classical_decidable` (no longer an
-> axiom in `axioms.math` — it's derived from excluded middle + `Logic.the`).
-> A module using `decide` must reach that file; an `unknown identifier
-> 'Logic.classical_decidable'` means you need `import
-> Natural.classical_decidable`.
-
-The canonical form for classical case-splits. Replaces both:
-
-- `cases Logic.excluded_middle(P) { | Or.introduceLeft(m) => … | Or.introduceRight(n) => … }` (for plain "P or not P" reasoning at the proposition level), AND
-- `cases Logic.classical_decidable(P) with decisionEq { | Decidable.yes(m) => transport(…, m) | Decidable.no(n) => transport(…, n) }` (for the bisection-style pattern where the goal contains `bisectionStepWithDec(…, classical_decidable(P))` and we want each arm checked at the ι-reduced shape).
+The canonical form for "P or not P" reasoning in proofs (the old
+`decide P { yes/no }` construct is retired). `otherwise` is always
+last; its hypothesis is ¬(the stated cases), and exhaustiveness is
+excluded middle by construction — it cannot fail to cover.
 
 ```math
--- Simple proposition-level case split (no goal abstraction needed):
-decide x = Real.zero {
-  | yes xEqZero  => Or.introduceLeft(IsNonneg(x), IsNonneg(-x), rewrite(…))
-  | no  xNotZero => /* recurse with the inequality */
-}
-
--- Bisection-style: the goal `Real.IsUpperBound(subset, right(bisectionStep(…)))`
--- has `classical_decidable(IsUpperBound(subset, midpoint))` buried five δ
--- unfoldings deep. The elaborator finds it (head-directed WHNF walker)
--- and abstracts the motive automatically — each arm proves its
--- ι-reduced shape.
-decide Real.IsUpperBound(subset, (midpoint : Real)) {
-  | yes midIsUpper => midIsUpper      -- new_right = midpoint
-  | no  _          => IH              -- new_right = right(predecessor)
+claim by cases {
+  case x = Real.zero: …           -- x = 0 in scope (anonymous; `as h` names it)
+  otherwise as xNotZero: …        -- ¬(x = 0) in scope
 }
 ```
 
-Semantics: builds `Logic.Decidable_recursor(P, motive, λp. arm_yes, λn. arm_no, Logic.classical_decidable(P))`. The motive abstracts every structural occurrence of `Logic.classical_decidable(P)` in the goal (after δ unfolds chained definitions like `bisectionStep`); if none appears, motive defaults to `λ_. Goal` and each arm proves the goal directly with `p` / `notP` in scope.
+**When the goal must REDUCE a conditional definition** (`min(a, b)`,
+`List.filter`, a bisection step — anything defined by `if P then a
+else b` or a `Decidable`-parametrized helper), do NOT re-decide: a
+propositional split cannot ι-reduce the `classical_decidable(P)` term
+buried in the definition. Reason through the definition's
+**characterizing equations** instead, which are one-liners over the
+generic conditional lemmas `Logic.if_positive` / `Logic.if_negative`:
 
-What it eliminates:
-- The motive-as-lambda boilerplate (`(decision : Logic.Decidable(…)) ↦ …`).
-- The explicit `Equality.transport_proposition(…)` call wrapping each arm.
-- The `with decisionEq` equation plumbing.
-- The `Or.introduceLeft` / `Or.introduceRight` constructor names.
+```math
+theorem Rational.minimum_eq_left (a b : Rational) (aLeqB : a ≤ b)
+        : min(a, b) = a :=
+  by Logic.if_positive
 
-When `decide` doesn't apply: the goal mentions some OTHER decidable expression (not the user's `P`), so the head-directed search finds no `classical_decidable(P)` and the motive falls back to constant. That's fine — it's the same as the old `cases Logic.excluded_middle(P)` pattern, just spelled more clearly. Either binder name may be `_`.
+-- and in a consumer:
+claim by cases {
+  case a ≤ b: {
+      min(a, b) = a by Rational.minimum_eq_left;
+      done by substitution
+    }
+  otherwise: …
+}
+```
 
-Two things that work and used to require `_step` helper splits (see
-Lists/filter.math for the natural style):
+Every conditional definition publishes its characterizing equations
+right below itself (`minimum_eq_left/right`,
+`filter_prepend_positive/negative`, `bisectionStep_eq_of_[not_]upper_bound`
+plus the endpoint recurrences in Real/supremum.math); consumers never
+case-analyze the classical decision.
 
-- **Recursion in arms.** In a pattern-match definition or theorem, a
-  self-call inside a `decide` arm resolves to the induction hypothesis
-  like anywhere else in the case body.
-- **Occurrences under a Pi.** The motive abstraction sees
-  `classical_decidable(P)` on the hypothesis side of an implication
-  goal too (it unfolds Pi domains with the same gated WHNF walk as the
-  conclusion). So a lemma `member(filter(P, prepend(h, t))) → …` can
-  open directly with `decide P(h)`, and each arm `suppose`s the
-  membership at its ι-reduced form (`prepend`-form in `yes`, tail-form
-  in `no`).
+> **Import:** `if P then a else b` desugars to
+> `cases Logic.classical_decidable(P)`, a **theorem** in
+> `Natural.classical_decidable` (derived from excluded middle +
+> `Logic.the`). A module using `if` must reach that file; an `unknown
+> identifier 'Logic.classical_decidable'` means you need
+> `import Natural.classical_decidable`.
 
 Error diagnostic: if the assembled `Decidable_recursor` application doesn't typecheck, the elaborator pre-checks it and dumps each of the 5 arg slots (proposition / motive / yes case / no case / scrutinee) with its inferred type, so the error points at which slot is the culprit. Generic kernel "Application: argument type does not match Pi domain" errors anywhere in the file now also print `expected type:` and `actual type:` lines.
 

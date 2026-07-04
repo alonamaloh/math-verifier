@@ -67,7 +67,7 @@ enum class TokenKind {
     KeywordGiven,           // `given (P)` — look up the in-scope hypothesis of type P
     KeywordAs,              // `in (P) as h:` — name the arm's disjunct hypothesis
     KeywordRefining,        // `cases X refining h, …` — refine listed binders' types per case
-    KeywordDecide,          // `decide P { yes m => …; no n => … }` — classical case-split with auto-transport
+    KeywordDecide,          // RETIRED construct (A4); contextual keyword kept for qualified names (Natural.decide) + the migration error
     KeywordTake,            // `take h : T;` — introduce a Pi-binder (math-style "take an arbitrary h : T")
     KeywordNote,            // `note goal : T;` / `note P;` — elaboration-time assertion / goal restatement
     KeywordChange,          // `change T;` — replace the goal by a definitionally-equal T

@@ -634,24 +634,11 @@ theorem Real.bisectionLeft_below_witness
   }
 
 -- I2: the upper bound of the bisection interval is an upper bound
--- for S. Induction on n: the base case is the initial hypothesis;
--- the step case threads the bisectionStep's `cases` on the classical
--- decision. The "yes" branch sets right = midpoint, which is exactly
--- the upper-bound proof we picked that branch by; the "no" branch
--- preserves right = right(predecessor), which the IH covers.
---
--- The `cases X with decisionEq` form retains the equation
--- `classical_decidable(...) = Decidable.yes(midIsUpper)` (or `no`)
--- in each branch. We then rewrite each branch's witness back into the
--- goal — the type ascription on the witness pins down a structural
--- occurrence of the decision constructor for the rewrite matcher,
--- and the kernel ι-reduces `bisectionStepWithDec` on it.
--- Step lemma: takes the classical decision as an explicit argument
--- so `cases` (not `decide`) does the case split. This sidesteps the
--- expensive decide-elaborator motive walker that would have to
--- δ-unfold `bisectionRight(... successor(n))` to find the buried
--- `classical_decidable(...)`; here the decision is a top-level
--- binder and `cases` matches it directly.
+-- for S. Induction on n: the base case is the initial hypothesis; the
+-- step case splits on whether the midpoint is an upper bound. Yes:
+-- right = midpoint, which is exactly the upper-bound fact we split on;
+-- no: right = right(predecessor), which the IH covers. Both arms
+-- reason through the endpoint recurrences.
 theorem Real.bisectionRight_is_upper_bound
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialRightAbove

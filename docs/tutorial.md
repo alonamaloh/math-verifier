@@ -278,9 +278,10 @@ Useful variants:
   mentions the scrutinee `e` (the analogue of `refining` for induction).
 - **`cases by <lemma> { | C(args) => … }`** splits on a disjunction a lemma
   produces, inferring its arguments.
-- **`decide P { | yes p => … | no notP => … }`** is a classical
-  case-split on whether `P` holds, usable where you need to *build data*
-  (not just prove a proposition).
+- **`by cases { case P: … otherwise: … }`** is the classical case-split
+  on whether `P` holds; `if P then a else b` is its value-level sibling
+  for *building data* (reason about the result via `Logic.if_positive` /
+  `Logic.if_negative`).
 
 ## Introducing things, step by step
 
