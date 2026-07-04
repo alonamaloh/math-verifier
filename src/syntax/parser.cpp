@@ -3275,6 +3275,26 @@ private:
                 std::move(binderName), std::move(body),
                 head.line, head.column);
         }
+        // Prose spelling of the same scope:
+        // `for sufficiently large m: <body>`.
+        if (current.kind == TokenKind::Identifier
+            && current.lexeme == "for"
+            && peekAt(1).kind == TokenKind::Identifier
+            && peekAt(1).lexeme == "sufficiently"
+            && peekAt(2).kind == TokenKind::Identifier
+            && peekAt(2).lexeme == "large"
+            && peekAt(3).kind == TokenKind::Identifier
+            && peekAt(4).kind == TokenKind::Colon) {
+            Token head = consumeAny();  // 'for'
+            consumeAny();               // 'sufficiently'
+            consumeAny();               // 'large'
+            std::string binderName = consumeAny().lexeme;
+            consumeAny();               // ':'
+            SurfaceExpressionPointer body = parseExpression();
+            return makeSurfaceEventuallyScope(
+                std::move(binderName), std::move(body),
+                head.line, head.column);
+        }
         if (current.kind == TokenKind::Identifier
             && current.lexeme == "eventually"
             && peekAt(1).kind == TokenKind::LeftParen
