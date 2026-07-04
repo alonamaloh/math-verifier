@@ -976,7 +976,7 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
-        // Keystone (PLAN_LUX_TRANSITION.md): a `by_induction` cases-block
+        // Keystone (PLAN_LUX_TRANSITION.md): a `by induction` cases-block
         // (inductionHypothesisName set) that uses the `case base:` /
         // `case step(k):` vocabulary routes to the `1 + n` principle
         // `<Carrier>.induction_on_one_plus`. `base` / `step` are never real

@@ -88,12 +88,14 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 ## Induction & cases
 
 ```
-by_induction on x with IH { case zero: … case successor(k): … }
-by_induction on x with IH refining h, … { … }      -- generalise h per case
-by_induction on x using R with subject, IH { … }   -- with an explicit recursor
-by_strong_induction on n with hypothesis IH { … }  -- subject shadows n; IH : (k) → k < n → P(k)
-by_strong_induction on n with hypothesis IH;       -- statement form: the REST of the block is the body (no braces)
-by_strong_induction on n with subject, IH { … }    -- explicit subject name (needed when `on` isn't a plain variable)
+by induction on x with IH { case x = 0: … case x = k + 1 for some k: … }
+by induction on x { case x = 0: … case x = k + 1, with IH: … }  -- header-less: arms name their own IH
+by induction on x with IH { case zero: … case successor(k): … } -- constructor-pattern arms
+by induction on x with IH refining h, … { … }      -- generalise h per case
+by induction on x using R with subject, IH { … }   -- with an explicit recursor
+by strong induction on n with hypothesis IH { … }  -- subject shadows n; IH : (k) → k < n → P(k)
+by strong induction on n with hypothesis IH;       -- statement form: the REST of the block is the body (no braces)
+by strong induction on n with subject, IH { … }    -- explicit subject name (needed when `on` isn't a plain variable)
 
 cases e { | pat => … }                 -- split an inductive value
 cases e with eq { | pat => … }         -- also bind eq : e = pat
@@ -110,8 +112,10 @@ non-computational (goes through `classical_decidable`), so it defines and
 proves but does not reduce on closed inputs. The old proof-side
 `decide P { yes/no }` construct is retired — classical splits in proofs are
 `by cases { case P: … otherwise: … }`.
-Inside `by_induction`, the recursion is the local hypothesis `IH`; apply it
-(`IH(args)`) — not a lemma call.
+Inside `by induction`, the recursion is the local hypothesis `IH`; apply it
+(`IH(args)`) — not a lemma call. The header `with IH` is optional when the
+recursive arms name their own hypothesis (`case x = k + 1, with IH:`); the
+old `by_induction`/`by_strong_induction` spellings are retired.
 
 ## Hypothesis introduction (block statements)
 

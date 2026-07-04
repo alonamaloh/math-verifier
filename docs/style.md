@@ -40,7 +40,7 @@ readability, not terseness. (Depth: `docs/conventions/`.)
   Foo.bar;` (arguments inferred, premises discharged from context), or
   chain it through `calc`. This is the single biggest readability lever;
   `scripts/cic_leak_report` counts every such call.
-- **Recursion is `by_induction`**, so the recursive call is the local `IH`,
+- **Recursion is `by induction`**, so the recursive call is the local `IH`,
   not a self-call to the theorem.
 
 ## Avoid raw CIC
@@ -137,5 +137,5 @@ If a proof looks like term-soup — nested positional calls, `congruenceOf`,
 raw `rewrite`, `⟨…⟩` over an `And`/`Exists`, `cases <proof> { | Or.introduceLeft
 … }` over a disjunction, anonymous `Or.introduceLeft(…)` chains — rewrite it as
 the mathematician's sentence: state each fact, justify it by its reason, and let
-`claim`/`calc`/`done`/`by_induction`/`choose`/`witness`/`claim by cases { in … }`
+`claim`/`calc`/`done`/`by induction`/`choose`/`witness`/`claim by cases { in … }`
 carry the structure.

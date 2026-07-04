@@ -235,29 +235,35 @@ have it proved-then-contradicted.
 
 ## Induction
 
-Recursion is written as `by_induction`. The crucial payoff: the recursive
+Recursion is written as `by induction`. The crucial payoff: the recursive
 call becomes a *named hypothesis* `IH` in the successor case, so it reads as
 "by the induction hypothesis" rather than as a function calling itself.
 
 ```
 theorem Tutorial.add_zero (n : Natural) : n + 0 = n :=
-  by_induction on n with IH {
-    case zero: reflexivity(0)
-    case successor(k):
-        calc successor(k) + 0
-           = successor(k + 0)
-           = successor(k)        by IH
+  by induction on n with IH {
+    case n = 0: done
+    case n = k + 1 for some k: {
+        k + 0 = k by IH;
+        done
+      }
   }
 ```
+
+The arm states the constructor form as an equation on the inducted
+variable (`for some k` is documentation — the pattern binds `k`); the
+recursive arm restates the induction hypothesis and the goal closes
+from it.
 
 Here `IH` has type `k + 0 = k`, and `by IH` tells the reader the last
 step rests on it. Two common extensions:
 
 - **`refining h`** — when a hypothesis `h`'s type mentions the variable you
-  are inducting on, list it (`by_induction on n with IH refining h { … }`)
+  are inducting on, list it (`by induction on n with IH refining h { … }`)
   so it is generalised correctly in each case.
-- **`by_strong_induction on n with subject, IH { … }`** — well-founded
-  induction, where `IH` covers *every* `k < n`.
+- **`by strong induction on n with hypothesis IH;`** — well-founded
+  induction, where `IH` covers *every* `k < n`; the rest of the block is
+  the induction body.
 
 ## Case analysis
 

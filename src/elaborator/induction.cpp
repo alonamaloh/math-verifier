@@ -12,7 +12,7 @@ ExpressionPointer Elaborator::elaborateByStrongInduction(
         ExpressionPointer expectedType,
         int line, int column) {
         Frame frame(*this,
-            "by_strong_induction at line " + std::to_string(line));
+            "by strong induction at line " + std::to_string(line));
         // First-pass scrutinee elaboration just to learn the type.
         // elaborateByInductionUsing will re-elaborate.
         ExpressionPointer scrutineeKernel = elaborateExpression(
@@ -29,7 +29,7 @@ ExpressionPointer Elaborator::elaborateByStrongInduction(
         auto* headConstant = std::get_if<Constant>(&spineHead->node);
         if (!headConstant) {
             throwElaborate(
-                "by_strong_induction: scrutinee's type has no "
+                "by strong induction: scrutinee's type has no "
                 "named carrier (head must be a constant like "
                 "`Natural` or `Integer`)");
         }
@@ -37,7 +37,7 @@ ExpressionPointer Elaborator::elaborateByStrongInduction(
             headConstant->name + ".strong_induction";
         if (!environment_.lookup(lemmaName)) {
             throwElaborate(
-                "by_strong_induction: no `" + lemmaName
+                "by strong induction: no `" + lemmaName
                 + "` in scope (expected the strong-induction "
                   "principle for carrier `" + headConstant->name
                 + "` to be defined under that name; import the "
@@ -494,7 +494,7 @@ ExpressionPointer Elaborator::elaborateByInductionUsingReverted(
                 if (localBinders[i].name == name) { positionInArray = i; break; }
             }
             if (positionInArray < 0) {
-                throwElaborate("by_induction auto-generalize: no binder '"
+                throwElaborate("by induction auto-generalize: no binder '"
                     + name + "' in scope");
             }
             depBoundVariableIndices.push_back(total - 1 - positionInArray);
@@ -541,10 +541,10 @@ ExpressionPointer Elaborator::elaborateByInductionUsingInner(
         ExpressionPointer expectedType,
         int line, int column) {
         Frame frame(*this,
-            "by_induction-using at line " + std::to_string(line));
+            "by induction-using at line " + std::to_string(line));
         if (!expectedType) {
             throwElaborate(
-                "by_induction needs an expected type from context");
+                "by induction needs an expected type from context");
         }
         ExpressionPointer scrutineeKernel = elaborateExpression(
             *form.scrutinee, localBinders);
@@ -555,7 +555,7 @@ ExpressionPointer Elaborator::elaborateByInductionUsingInner(
             || boundVariable->deBruijnIndex
                    >= static_cast<int>(localBinders.size())) {
             throwElaborate(
-                "by_induction's scrutinee must be a local-binder "
+                "by induction's scrutinee must be a local-binder "
                 "variable (a parameter or let-binding name)");
         }
         int scrutineeDeBruijn = boundVariable->deBruijnIndex;
@@ -653,10 +653,10 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlusReverted(
         ExpressionPointer expectedType,
         int line, int column) {
         Frame frame(*this,
-            "by_induction (1+n) refining at line " + std::to_string(line));
+            "by induction (1+n) refining at line " + std::to_string(line));
         if (!expectedType) {
             throwElaborate(
-                "by_induction needs an expected type from context");
+                "by induction needs an expected type from context");
         }
         int total = static_cast<int>(localBinders.size());
         int count = static_cast<int>(refiningNames.size());
@@ -675,7 +675,7 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlusReverted(
             }
             if (positionInArray < 0) {
                 throwElaborate(
-                    "by_induction ... refining " + name
+                    "by induction ... refining " + name
                     + ": no binder named '" + name + "' in scope");
             }
             boundVariableIndices.push_back(total - 1 - positionInArray);
@@ -729,15 +729,15 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
         ExpressionPointer expectedType,
         int line, int column) {
         Frame frame(*this,
-            "by_induction (1+n) at line " + std::to_string(line));
+            "by induction (1+n) at line " + std::to_string(line));
         if (!expectedType) {
             throwElaborate(
-                "by_induction needs an expected type from context");
+                "by induction needs an expected type from context");
         }
 
-        // Support `by_induction on j` where `j` is a ∀-bound variable of the
+        // Support `by induction on j` where `j` is a ∀-bound variable of the
         // GOAL rather than a local binder — e.g. `claim ∀ (j : T). P(j) by
-        // by_induction on j`. Introduce it: peel the leading Pi, run the
+        // by induction on j`. Introduce it: peel the leading Pi, run the
         // induction against the body with `j` in scope (now the innermost
         // local binder, so `pi->codomain`'s de Bruijn references line up), and
         // re-wrap the result in a lambda. Without this the scrutinee lookup
@@ -790,7 +790,7 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                 if (constructorPattern->constructorName == "step") {
                     if (constructorPattern->arguments.empty()) {
                         throwElaborate(
-                            "by_induction: `case step` must bind the "
+                            "by induction: `case step` must bind the "
                             "predecessor, as `case step(k):`");
                     }
                     auto* predecessorName =
@@ -798,7 +798,7 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                             &constructorPattern->arguments[0]->node);
                     if (!predecessorName) {
                         throwElaborate(
-                            "by_induction: `case step`'s first binder "
+                            "by induction: `case step`'s first binder "
                             "must be a plain name (the predecessor `k`)");
                     }
                     stepSubjectName = predecessorName->name;
@@ -821,7 +821,7 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
             }
             if (offending == "zero" || offending == "successor") {
                 throwElaborate(
-                    "by_induction: a `case " + offending + "` clause is mixed "
+                    "by induction: a `case " + offending + "` clause is mixed "
                     "with `case base`/`case step` — these are different "
                     "induction vocabularies. The `1 + n` form uses `case base:` "
                     "and `case step(k):`; rename `zero`→`base` and "
@@ -829,12 +829,12 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                     "instead, use `case zero`/`case successor` for every clause.)");
             }
             throwElaborate(
-                "by_induction (1+n form) expects exactly `case base:` and "
+                "by induction (1+n form) expects exactly `case base:` and "
                 "`case step(k):` clauses (got a `" + offending + "` clause)");
         }
         if (!baseBody || !stepBody) {
             throwElaborate(
-                "by_induction (1+n form) needs both a `case base:` and a "
+                "by induction (1+n form) needs both a `case base:` and a "
                 "`case step(k):` clause");
         }
 
@@ -849,7 +849,7 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
             || boundVariable->deBruijnIndex
                    >= static_cast<int>(localBinders.size())) {
             throwElaborate(
-                "by_induction's scrutinee must be a local-binder "
+                "by induction's scrutinee must be a local-binder "
                 "variable (a parameter or let-binding name)");
         }
         int scrutineeDeBruijn = boundVariable->deBruijnIndex;
@@ -870,14 +870,14 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
         auto* headConstant = std::get_if<Constant>(&spineHead->node);
         if (!headConstant) {
             throwElaborate(
-                "by_induction: scrutinee's type has no named carrier "
+                "by induction: scrutinee's type has no named carrier "
                 "(head must be a constant like `Natural`)");
         }
         std::string lemmaName =
             headConstant->name + ".induction_on_one_plus";
         if (!environment_.lookup(lemmaName)) {
             throwElaborate(
-                "by_induction: no `" + lemmaName + "` in scope (the "
+                "by induction: no `" + lemmaName + "` in scope (the "
                 "`1 + n` induction principle for carrier `"
                 + headConstant->name + "`); import the module that "
                 "provides it, or use `case zero` / `case successor` for "

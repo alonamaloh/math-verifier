@@ -1,0 +1,58 @@
+-- Feature test (A4): the `by induction` / `by strong induction` space spellings,
+-- header-less `with IH` (arms name their own), the `using` variant,
+-- and the statement-form strong induction in the new spelling.
+
+module Test.induction_spelling_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.strong_recursion
+
+-- Space spelling, header IH.
+theorem Test.probe_add_zero (n : Natural) : n + 0 = n :=
+  by induction on n with IH {
+    case n = 0: done
+    case n = k + 1 for some k: {
+        k + 0 = k by IH;
+        done
+      }
+  }
+
+-- Space spelling, HEADER-LESS: each recursive arm names its own IH.
+theorem Test.probe_add_zero_headerless (n : Natural) : n + 0 = n :=
+  by induction on n {
+    case n = 0: done
+    case n = k + 1 for some k, with additionAtK: {
+        k + 0 = k by additionAtK;
+        done
+      }
+  }
+
+-- Space spelling as a `:=` body with constructor-pattern arms.
+theorem Test.probe_zero_le (n : Natural) : 0 ≤ n :=
+  by induction on n with IH {
+    case n = 0: done
+    case n = 1 + k: done by Natural.zero_least
+  }
+
+-- Statement-form strong induction, space spelling.
+theorem Test.probe_strong (n : Natural) : 0 ≤ n := {
+  by strong induction on n with hypothesis smaller;
+  done by Natural.zero_least
+}
+
+-- Braced strong induction, space spelling.
+theorem Test.probe_strong_braced (n : Natural) : 0 ≤ n :=
+  by strong induction on n with hypothesis smaller {
+    done by Natural.zero_least
+  }
+
+-- The `using` variant in the space spelling.
+theorem Test.probe_using (n : Natural) : 0 ≤ n :=
+  by induction on n using Natural.strong_induction with subject, smaller {
+    done by Natural.zero_least
+  }

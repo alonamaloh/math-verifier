@@ -921,7 +921,7 @@ private:
             return;
         }
         // SurfaceNumericLiteral, SurfaceType, SurfaceProposition,
-        // SurfaceSorry, SurfaceRing, calc, by_induction, and a handful
+        // SurfaceSorry, SurfaceRing, calc, by induction, and a handful
         // of other leaf/specialised nodes have no children we care
         // about for convention detection. We default to ignoring them
         // — at worst the convention doesn't fire for those forms.
@@ -1024,7 +1024,7 @@ private:
         ExpressionPointer motive,
         const std::vector<ExpressionPointer>& parameterValues,
         const std::vector<LocalBinder>& outerBinderStack,
-        // The `by_induction … with IH` hypothesis name, if any. The parser
+        // The `by induction … with IH` hypothesis name, if any. The parser
         // appends it as a trailing pattern arg to EVERY case; for a
         // non-recursive constructor (no IH slot) that trailing name is
         // spurious and is dropped here. Empty for ordinary pattern matches.
@@ -1177,7 +1177,7 @@ private:
         ExpressionPointer carrierType,
         const std::vector<LocalBinder>& localBinders);
 
-    // `by_strong_induction on E with subject, ih { body }` —
+    // `by strong induction on E with subject, ih { body }` —
     // single-step strong induction. Extract the scrutinee's carrier
     // type, build `<CarrierTypeName>.strong_induction` as the
     // induction lemma, and dispatch to elaborateByInductionUsing.
@@ -1220,7 +1220,7 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
-    // `by_induction on E using L with subject, ih { body }`:
+    // `by induction on E using L with subject, ih { body }`:
     //   E    = local-variable scrutinee
     //   L    = induction lemma whose type is
     //              (motive : T → Sort u)
@@ -1234,8 +1234,8 @@ private:
     // already-substituted type to extract the subject and ih binder
     // types. Then build the step lambda and finish the application.
     // Try-then-revert auto-generalize for the lemma-based induction path
-    // (`by_strong_induction`, `by_induction … using`), mirroring the
-    // `cases`/`by_induction` wrapper: on failure with scrutinee-dependent
+    // (`by strong induction`, `by induction … using`), mirroring the
+    // `cases`/`by induction` wrapper: on failure with scrutinee-dependent
     // in-scope hypotheses, retry with them reverted into the goal (and
     // re-introduced in the step body). Zero-regression — proofs that
     // elaborate without reverting take the first path.
@@ -1265,7 +1265,7 @@ private:
 
     // The `1 + n` ordinary induction (the successor-sealing keystone,
     // PLAN_LUX_TRANSITION.md). Triggered additively from
-    // `elaborateCasesExpression` when a `by_induction` cases-block uses the
+    // `elaborateCasesExpression` when a `by induction` cases-block uses the
     // `case base:` / `case step(k):` vocabulary (legacy `case zero` /
     // `case successor` keeps the raw-recursor path). Resolves
     // `<Carrier>.induction_on_one_plus`, builds the motive from the goal —
@@ -2413,7 +2413,7 @@ private:
     // bindings[0]'s outer-binder references. A single combined walk
     // sidesteps that by treating each binding as opaque once placed.
     // Emit an "unused name" warning when a binder a user explicitly
-    // named (let, claim, suppose, choose, case … as, by_induction
+    // named (let, claim, suppose, choose, case … as, by induction
     // with ih, etc.) is closed and the body it scopes over never
     // references it. The body is elaborated under the binder, so a
     // BV(0) inside `body` refers to the just-introduced name. Names
@@ -4165,7 +4165,7 @@ private:
         const SurfaceExpressionPointer& scrutinee,
         const std::vector<LocalBinder>& localBinders);
 
-    // `cases`/`by_induction` entry. The plain form (no explicit
+    // `cases`/`by induction` entry. The plain form (no explicit
     // `refining`/`with`) gets an automatic generalize-fallback: if it
     // fails to elaborate AND the scrutinee has in-scope dependent
     // hypotheses, retry reverting them into the motive (via the same

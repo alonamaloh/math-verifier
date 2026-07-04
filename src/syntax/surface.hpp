@@ -258,7 +258,7 @@ struct SurfaceCases {
     // resulting cases to (h1, h2, …) from the outer context. Compatible
     // with `with equalityHypothesisName` (both can be used together).
     std::vector<std::string> refiningNames;
-    // `by_induction on X with IH { … }` — the user-chosen induction-
+    // `by induction on X with IH { … }` — the user-chosen induction-
     // hypothesis name. The parser also appends it as a trailing pattern
     // arg to each recursive constructor case (where it names that case's
     // hypothesis); recorded here too so the elaborator can recognise — and
@@ -358,7 +358,7 @@ struct SurfaceLinearCombination {
     SurfaceExpressionPointer combination;
 };
 
-// `by_induction on scrutinee using inductionLemma with subjectName,
+// `by induction on scrutinee using inductionLemma with subjectName,
 // ihName { body }`. The elaborator constructs the motive by
 // abstracting the surrounding expected type over the scrutinee
 // variable, extracts the induction-hypothesis type from the lemma's
@@ -493,14 +493,14 @@ struct SurfaceUnfold {
     SurfaceExpressionPointer body;
 };
 
-// `by_strong_induction on <scrutinee> with <subject>, <ih> { body }`
+// `by strong induction on <scrutinee> with <subject>, <ih> { body }`
 // — single-step strong induction. The elaborator looks up
 // `<CarrierType>.strong_induction` (where CarrierType is the head
 // of the scrutinee's type) and uses it as the induction lemma.
 // IH binder type is `(k : T) → succ(k) ≤ subject → P(k)` (or
 // whatever the strong-induction lemma's step signature dictates).
 // Body is a single expression proving the conclusion, NOT case-
-// clauses (use the existing `by_induction on E with IH { case … }`
+// clauses (use the existing `by induction on E with IH { case … }`
 // for Peano-style case-split).
 struct SurfaceByStrongInduction {
     SurfaceExpressionPointer scrutinee;

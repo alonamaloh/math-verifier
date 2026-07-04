@@ -34,7 +34,7 @@ theorem Integer.subtract_swap (x y : Integer) : x - y = -(y - x) :=
 ```
 
 **3. A `{ … }` block.** A sequence of statements (`claim`, `take`,
-`choose`, `let`, `cases`, `by_induction`, `calc`, `note`, etc.)
+`choose`, `let`, `cases`, `by induction`, `calc`, `note`, etc.)
 followed by a final expression. Reads as math prose with paragraphs.
 
 ```math
@@ -155,23 +155,30 @@ cases x refining xPos { | RationalRepresentative.make(n, d) =>
 Works on inductive and quotient scrutinees, with any number of
 refining names.
 
-### `by_induction on n with IH { … }`
+### `by induction on n with IH { … }`
 
 Replaces pattern-match definitions for typical induction-on-Natural.
-The `IH` is in scope in the `successor(k)` arm as a hypothesis about
-`k`. Refines too: `by_induction on n with IH refining h1, h2 { … }`.
+The `IH` is in scope in the recursive arm as a hypothesis about `k`.
+Arms may state the constructor form as an equation (`case n = 0:` /
+`case n = k + 1 for some k:`), and the header `with IH` may be dropped
+when each recursive arm names its own hypothesis (`case n = k + 1,
+with IH:`). Refines too: `by induction on n with IH refining h1, h2 { … }`.
 
 ```math
-theorem Natural.add_zero_right : (n : Natural) → n + 0 = n :=
-  function (n : Natural) =>
-    by_induction on n with IH {
-      case zero:           reflexivity(Natural, 0)
-      case successor(k):   congruenceOf(successor, IH)
-    }
+theorem Natural.add_zero_right (n : Natural) : n + 0 = n :=
+  by induction on n with IH {
+    case n = 0: done
+    case n = k + 1 for some k: {
+        k + 0 = k by IH;
+        done
+      }
+  }
 ```
 
 For strong recursion (you need IH for all `k < n`), use
-`by_strong_induction on n with IH { … }`.
+`by strong induction on n with hypothesis IH;` (statement form — the
+rest of the block is the body) or the braced
+`by strong induction on n with hypothesis IH { … }`.
 
 ### `by cases { case P: … otherwise: … }` — classical case split
 
@@ -613,7 +620,7 @@ If a proof is hard to write, the right reaction is almost always
 harder". The current language has good idioms for most math moves:
 - "Pick a representative" — `take x as <Constructor>(args) : T;`
 - "By cases on …" — `cases E { … }`
-- "By induction on n" — `by_induction on n with IH { … }`
+- "By induction on n" — `by induction on n with IH { … }`
 - "WLOG assume …" — `by cases { case P: … otherwise: … }` or
   cases-with-equality.
 - "Suppose …" — `suppose <hypothesis> as <name>;`

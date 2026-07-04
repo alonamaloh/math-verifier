@@ -625,7 +625,7 @@ ExpressionPointer Elaborator::buildCaseLambda(
         for (const auto& constructorArgument : constructorArguments) {
             if (constructorArgument.isRecursive) ++recursiveCount;
         }
-        // `by_induction … with IH` makes the parser append the IH name to
+        // `by induction … with IH` makes the parser append the IH name to
         // every case pattern. A non-recursive constructor has no IH slot to
         // absorb it, so that trailing name is spurious — drop it. (A
         // recursive constructor keeps it; it names that case's hypothesis.)

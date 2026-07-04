@@ -6314,6 +6314,96 @@ int emitDeps(const std::vector<std::string>& sourcePaths,
     return 0;
 }
 
+// `kernel rewrite --induction-spelling FILE ...` — the C6 mechanical
+// rewriter for the induction-spelling migration: `by_induction` →
+// `by induction`, `by_strong_induction` → `by strong induction`. The
+// lexer (not a text script) decides what is a keyword: occurrences
+// inside comments or identifiers are never touched. Token line/column
+// are 1-based BYTE positions, so the byte span of each keyword token is
+// exact; every span is checked to spell the expected keyword before any
+// edit, and the file is rewritten only when all spans check out. The
+// kernel re-verifies the result on the next build — that, not this
+// tool, is the safety net for semantics.
+int rewriteInductionSpelling(const std::vector<std::string>& filenames) {
+    int totalRewritten = 0;
+    for (const auto& filename : filenames) {
+        std::ifstream input(filename, std::ios::binary);
+        if (!input.is_open()) {
+            std::cerr << "cannot open file: " << filename << "\n";
+            return 1;
+        }
+        std::stringstream buffer;
+        buffer << input.rdbuf();
+        std::string source = buffer.str();
+        input.close();
+
+        std::vector<Token> tokens;
+        try {
+            tokens = lex(source);
+        } catch (const LexError& error) {
+            std::cerr << filename << ": lex error: " << error.what() << "\n";
+            return 1;
+        }
+
+        // Line-start byte offsets (1-based line numbers).
+        std::vector<size_t> lineStart = {0, 0};
+        for (size_t i = 0; i < source.size(); ++i) {
+            if (source[i] == '\n') lineStart.push_back(i + 1);
+        }
+
+        struct Span { size_t offset; size_t length; const char* text; };
+        std::vector<Span> spans;
+        for (const auto& token : tokens) {
+            const char* oldSpelling = nullptr;
+            const char* newSpelling = nullptr;
+            if (token.kind == TokenKind::KeywordByInduction) {
+                oldSpelling = "by_induction";
+                newSpelling = "by induction";
+            } else if (token.kind == TokenKind::KeywordByStrongInduction) {
+                oldSpelling = "by_strong_induction";
+                newSpelling = "by strong induction";
+            } else {
+                continue;
+            }
+            if (token.line <= 0 || (size_t)token.line >= lineStart.size()) {
+                std::cerr << filename << ": internal error: token line "
+                          << token.line << " out of range\n";
+                return 1;
+            }
+            size_t offset = lineStart[token.line] + (size_t)token.column - 1;
+            size_t length = std::string(oldSpelling).size();
+            if (offset + length > source.size()
+                || source.compare(offset, length, oldSpelling) != 0) {
+                std::cerr << filename << ":" << token.line << ":"
+                          << token.column
+                          << ": internal error: expected '" << oldSpelling
+                          << "' at this byte span; file left untouched\n";
+                return 1;
+            }
+            spans.push_back({offset, length, newSpelling});
+        }
+        if (spans.empty()) continue;
+
+        // Replace back-to-front so earlier offsets stay valid.
+        for (auto it = spans.rbegin(); it != spans.rend(); ++it) {
+            source.replace(it->offset, it->length, it->text);
+        }
+
+        std::ofstream output(filename, std::ios::binary | std::ios::trunc);
+        if (!output.is_open()) {
+            std::cerr << "cannot write file: " << filename << "\n";
+            return 1;
+        }
+        output << source;
+        output.close();
+        std::cout << filename << ": " << spans.size()
+                  << " induction spellings\n";
+        totalRewritten += (int)spans.size();
+    }
+    std::cout << "total: " << totalRewritten << " induction spellings\n";
+    return 0;
+}
+
 int verifyFiles(const std::vector<std::string>& filenames) {
     Environment environment;
     std::vector<std::string> importedModules;
@@ -7071,6 +7161,24 @@ static int kernelMain(int argc, char* argv[]) {
                                reportUnusedNames,
                                writeInterface,
                                goalAtLine);
+    }
+    if (argc >= 3 && std::string(argv[1]) == "rewrite") {
+        // kernel rewrite --induction-spelling FILE.math [FILE.math ...]
+        // Mechanical migration rewrites, driven by the lexer (C6: the
+        // rewriter is the elaborator, never a text script).
+        std::string mode = argv[2];
+        std::vector<std::string> filenames;
+        for (int i = 3; i < argc; ++i) filenames.push_back(argv[i]);
+        if (mode == "--induction-spelling") {
+            if (filenames.empty()) {
+                std::cerr << "rewrite: no input files\n";
+                return 1;
+            }
+            return rewriteInductionSpelling(filenames);
+        }
+        std::cerr << "rewrite: unknown mode " << mode
+                  << " (expected --induction-spelling)\n";
+        return 1;
     }
     if (argc >= 3 && std::string(argv[1]) == "deps") {
         // kernel deps [--cache-root DIR] SOURCE.math [SOURCE.math ...]

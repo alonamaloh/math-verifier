@@ -15,7 +15,7 @@ Durable backlog of ideas worth trying. Promote to a real task when picked up.
   false-positives (mirrors the pre-existing `SurfaceField` case).
 
 - **[FIXED]** `since` was not exempt from the redundant-`by` check inside
-  `by_induction`/`cases` bodies: the `byIsExplanation` flag was dropped by
+  `by induction`/`cases` bodies: the `byIsExplanation` flag was dropped by
   the two claim-rebuild sites (parser `substituteSurfaceName` and
   elaborator `rewriteRecursiveCalls`), both of which omitted it from
   `makeSurfaceStructuredClaim`. Now plumbed through.

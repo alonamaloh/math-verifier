@@ -7,12 +7,12 @@
 namespace {
 
 // Tactic-block keywords that are contextual: they have meaning only at
-// specific positions inside `{ ... }` block bodies, `by_induction`
+// specific positions inside `{ ... }` block bodies, `by induction`
 // constructs, or `obtain ... from ...` statements. Outside those
 // contexts they have no syntactic role at all, so the parser accepts
 // them as ordinary identifiers — letting mathematicians use `claim`,
 // `case`, `with`, etc. as binder or variable names. (The "wide" tactic
-// keywords `cases`, `calc`, `witness`, and `by_induction` still
+// keywords `cases`, `calc`, `witness`, and `by induction` still
 // dispatch to special parsers from `parseAtom`, so they remain
 // reserved everywhere; freeing them would require expression-position
 // backtracking.)
@@ -130,7 +130,7 @@ bool patternBindsName(const SurfacePattern& pattern,
 // n := E;` in block bodies — every later reference to `n` becomes
 // the surface expression `E`, then elaborates afresh at each site.
 // Respects shadowing by lambda / Pi / let / cases-pattern /
-// by_induction binders.
+// by-induction binders.
 SurfaceExpressionPointer substituteSurfaceName(
     SurfaceExpressionPointer expression,
     const std::string& targetName,
@@ -1052,8 +1052,12 @@ private:
             // prover does the logical plumbing between the goal and
             // the lemma's form (A7). Reads as the reference target's
             // `sqrt_two_irrational := by no_double_square`; sugar for
-            // `:= done by <lemma>`.
-            if (peek().kind == TokenKind::KeywordBy) {
+            // `:= done by <lemma>`. The induction spellings
+            // (`by induction …` / `by strong induction …`) are whole
+            // expressions, not citations — they take the else branch.
+            if (peek().kind == TokenKind::KeywordBy
+                && peekAt(1).kind != TokenKind::KeywordInduction
+                && !isSpaceSpelledStrongInduction()) {
                 Token byToken = consumeAny();
                 declaration.body = makeSurfaceStructuredClaim(
                     makeSurfaceGoal(byToken.line, byToken.column),
@@ -1413,11 +1417,11 @@ private:
                 && peek().kind != TokenKind::KeywordOkay) {
                 Token statementStart = peek();
                 // A4 statement-form strong induction:
-                // `by_strong_induction on m with hypothesis ih;` (no
+                // `by strong induction on m with hypothesis ih;` (no
                 // braces) — the rest of the block is the induction
                 // body, exactly like a suppose/take wrapper. The braced
                 // form still parses as an ordinary expression below.
-                if (peek().kind == TokenKind::KeywordByStrongInduction) {
+                if (isSpaceSpelledStrongInduction()) {
                     size_t probePosition = position_;
                     StrongInductionHeader header =
                         parseByStrongInductionHeader();
@@ -2551,7 +2555,7 @@ private:
         // `successor(n)`; in general `N` and `N + p` desugar to N `successor`
         // wrappers around `zero` / the inner pattern `p`. This lets structural
         // recursion over a Natural read `| 0 => … | 1 + n => …` without naming
-        // the constructors (the same `1 + n` form `by_induction` presents).
+        // the constructors (the same `1 + n` form `by induction` presents).
         if (peek().kind == TokenKind::NumericLiteral) {
             Token numeralToken = consumeAny();
             int successorCount = std::stoi(numeralToken.lexeme);
@@ -3480,10 +3484,31 @@ private:
         if (current.kind == TokenKind::KeywordWitness) {
             return parseWitnessExpression();
         }
+        // The underscore spellings are RETIRED (A4); the lexer still
+        // tokenizes them so `kernel rewrite --induction-spelling` can
+        // migrate files mechanically.
         if (current.kind == TokenKind::KeywordByInduction) {
-            return parseByInduction();
+            throw ParseError(
+                "the `by_induction` spelling was retired; write "
+                "`by induction on …` (line "
+                + std::to_string(current.line) + ")");
         }
         if (current.kind == TokenKind::KeywordByStrongInduction) {
+            throw ParseError(
+                "the `by_strong_induction` spelling was retired; write "
+                "`by strong induction on …` (line "
+                + std::to_string(current.line) + ")");
+        }
+        // The space spellings: `by induction on E …` and
+        // `by strong induction on E with hypothesis ih { … }` as
+        // whole-proof expressions (`strong` is contextual).
+        if (current.kind == TokenKind::KeywordBy
+            && peekAt(1).kind == TokenKind::KeywordInduction) {
+            Token byToken = consumeAny();  // 'by'
+            consumeAny();                  // 'induction'
+            return parseInductionTail(byToken);
+        }
+        if (isSpaceSpelledStrongInduction()) {
             return parseByStrongInduction();
         }
         if (current.kind == TokenKind::KeywordByRepresentatives) {
@@ -3744,7 +3769,7 @@ private:
     }
 
     // Parses an optional `refining <name>[, <name>]*` clause used by
-    // `cases` and `by_induction` to mark in-scope binders whose types
+    // `cases` and `by induction` to mark in-scope binders whose types
     // should be refined per arm. Empty vector if the keyword isn't
     // present.
     std::vector<std::string> parseOptionalRefiningList() {
@@ -3771,13 +3796,14 @@ private:
     // Parses the inside of a `{ … }` of a cases-style block: either a
     // sequence of `| pattern => body` clauses (legacy form) or a
     // sequence of `case pattern <separator> body;` clauses (math-style
-    // form). When `injectedIhName` is non-empty (set by `by_induction`),
+    // form). When `injectedIhName` is non-empty (set by `by induction`),
     // an extra bare-name pattern with that name is appended to each
     // constructor pattern that has any recursive arguments — the
     // existing IH-naming convention in cases patterns picks it up.
     std::vector<SurfaceCasesClause> parseCasesClauseBlock(
         const std::string& injectedIhName,
-        TokenKind caseFollowedBy) {
+        TokenKind caseFollowedBy,
+        bool inductionContext = false) {
         std::vector<SurfaceCasesClause> clauses;
         bool sawCaseForm = false;
         bool sawPipeForm = false;
@@ -3816,7 +3842,8 @@ private:
                 //   restated for the reader; the right side is the
                 //   constructor form.
                 std::string armIhName;
-                bool equationArm = !injectedIhName.empty()
+                bool equationArm = (inductionContext
+                                    || !injectedIhName.empty())
                     && isIdentifierLike(peek().kind)
                     && peekAt(1).kind == TokenKind::Equal;
                 if (equationArm) {
@@ -4281,15 +4308,55 @@ private:
     // [refining …] { case …: body … }`. The opening `claim P by`
     // and the `induction` keyword have already been consumed by the
     // caller (parseStructuredClaim). Builds the same SurfaceCases /
-    // SurfaceCasesWithRefining the standalone `by_induction on E …
+    // SurfaceCasesWithRefining the standalone `by induction on E …
     // { … }` form produces — only the surrounding wrapper differs.
     SurfaceExpressionPointer parseClaimByInduction() {
         Token inductionToken = consumeAny();  // 'induction'
-        expect(TokenKind::KeywordOn, "after 'by induction'");
+        return parseInductionTail(inductionToken);
+    }
+
+    // The one induction grammar, shared by every entry point — the
+    // standalone `by induction on E …` and the claim hint `P by
+    // induction on E …`. Assumes everything up to and including the
+    // `induction` word has been consumed. Grammar:
+    //   on E using L with <subject>, <ih> { body }
+    //   on E [with <ih>] [refining …] { case …: body … }
+    // The header `with <ih>` is optional: recursive arms may name their
+    // own hypothesis (`case n = k + 1 for some k, with IH:`); an arm
+    // that names none gets no user-visible IH binding.
+    SurfaceExpressionPointer parseInductionTail(Token inductionToken) {
+        expect(TokenKind::KeywordOn, "after 'induction'");
         auto scrutinee = parseExpression();
-        // `with ih` is optional; when absent we leave ihName empty
-        // (recursive arms get no user-visible IH binding, matching
-        // the bare `cases` form).
+        if (peek().kind == TokenKind::KeywordUsing) {
+            consumeAny();  // 'using'
+            auto inductionLemma = parseExpression();
+            expect(TokenKind::KeywordWith,
+                   "after 'by induction on <expr> using <lemma>'");
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected an identifier (the subject "
+                          "name) after 'with'");
+            }
+            std::string subjectName = consumeAny().lexeme;
+            expect(TokenKind::Comma,
+                   "between subject name and ih name");
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected an identifier (the ih name) "
+                          "after ','");
+            }
+            std::string ihNameUsing = consumeAny().lexeme;
+            expect(TokenKind::LeftBrace,
+                   "after 'by induction … using … with <subject>, <ih>'");
+            auto inductionBody = parseBlockContents();
+            expect(TokenKind::RightBrace,
+                   "ending by-induction-using block");
+            return makeSurfaceByInductionUsing(
+                std::move(scrutinee),
+                std::move(inductionLemma),
+                std::move(subjectName),
+                std::move(ihNameUsing),
+                std::move(inductionBody),
+                inductionToken.line, inductionToken.column);
+        }
         std::string ihName;
         if (peek().kind == TokenKind::KeywordWith) {
             consumeAny();  // 'with'
@@ -4304,7 +4371,7 @@ private:
         expect(TokenKind::LeftBrace,
                "after 'by induction on <expr>'");
         auto clauses = parseCasesClauseBlock(
-            ihName, TokenKind::Colon);
+            ihName, TokenKind::Colon, /*inductionContext=*/true);
         expect(TokenKind::RightBrace,
                "ending 'by induction' block");
         if (refiningNames.empty()) {
@@ -4561,77 +4628,7 @@ private:
         return arm;
     }
 
-    // `by_induction on E with ih { case P: body; … }`, or
-    // `by_induction on E using L with subject, ih { body }`. Both parse
-    // as regular expressions so they can sit anywhere a value belongs
-    // (and be applied to further arguments via parseApplication).
-    // (Structural case-split without an IH uses `cases E { … }` — see
-    // parseCasesExpression.)
-    SurfaceExpressionPointer parseByInduction() {
-        Token byToken = consumeAny();  // 'by_induction'
-        expect(TokenKind::KeywordOn, "after 'by_induction'");
-        auto scrutinee = parseExpression();
-        if (peek().kind == TokenKind::KeywordUsing) {
-            consumeAny();  // 'using'
-            auto inductionLemma = parseExpression();
-            expect(TokenKind::KeywordWith,
-                   "after 'by_induction on <expr> using <lemma>'");
-            if (!isIdentifierLike(peek().kind)) {
-                throwHere("expected an identifier (the subject "
-                          "name) after 'with'");
-            }
-            std::string subjectName = consumeAny().lexeme;
-            expect(TokenKind::Comma,
-                   "between subject name and ih name");
-            if (!isIdentifierLike(peek().kind)) {
-                throwHere("expected an identifier (the ih name) "
-                          "after ','");
-            }
-            std::string ihNameUsing = consumeAny().lexeme;
-            expect(TokenKind::LeftBrace,
-                   "after 'by_induction … using … with <subject>, <ih>'");
-            auto inductionBody = parseBlockContents();
-            expect(TokenKind::RightBrace,
-                   "ending by_induction-using block");
-            return makeSurfaceByInductionUsing(
-                std::move(scrutinee),
-                std::move(inductionLemma),
-                std::move(subjectName),
-                std::move(ihNameUsing),
-                std::move(inductionBody),
-                byToken.line, byToken.column);
-        }
-        expect(TokenKind::KeywordWith,
-               "after 'by_induction on <expr>'");
-        if (!isIdentifierLike(peek().kind)) {
-            throwHere("expected an identifier (the "
-                      "induction hypothesis name) after 'with'");
-        }
-        std::string ihName = consumeAny().lexeme;
-        // Optional `refining <name>[, <name>]*`: each listed in-scope
-        // binder has its type refined per arm. See parseOptionalRefiningList.
-        std::vector<std::string> refiningNames =
-            parseOptionalRefiningList();
-        expect(TokenKind::LeftBrace,
-               "after 'by_induction on <expr> with <ih>'");
-        auto clauses = parseCasesClauseBlock(
-            ihName, TokenKind::Colon);
-        expect(TokenKind::RightBrace, "ending by_induction block");
-        if (refiningNames.empty()) {
-            return makeSurfaceCases(
-                std::move(scrutinee), std::move(clauses),
-                byToken.line, byToken.column,
-                ihName);
-        }
-        return makeSurfaceCasesWithRefining(
-            std::move(scrutinee), std::move(clauses),
-            /*equalityHypothesisName=*/std::string(),
-            std::move(refiningNames),
-            byToken.line, byToken.column,
-            ihName);
-    }
-
-    // `by_strong_induction on m with hypothesis ih { body }` —
+    // `by strong induction on m with hypothesis ih { body }` —
     // single-step strong induction. The generalized subject keeps the
     // inducted variable's name (shadowing it), so the body speaks the
     // statement's vocabulary; `hypothesis` (contextual word) marks the
@@ -4647,20 +4644,22 @@ private:
         int column = 0;
     };
 
-    // Parses `by_strong_induction on <expr> with hypothesis <ih>` (or the
-    // verbose `with <subject>, <ih>`) up to — but not including — the body.
-    // Shared between the braced expression form and the A4 statement form
-    // (`…;` scoping over the rest of the block).
+    // Parses `by strong induction on <expr> with hypothesis <ih>` (or
+    // the verbose `with <subject>, <ih>`) up to — but not including —
+    // the body. Shared between the braced expression form and the A4
+    // statement form (`…;` scoping over the rest of the block).
     StrongInductionHeader parseByStrongInductionHeader() {
         StrongInductionHeader header;
-        Token byToken = consumeAny();  // 'by_strong_induction'
+        Token byToken = consumeAny();  // 'by'
+        consumeAny();                  // contextual 'strong'
+        expect(TokenKind::KeywordInduction, "after 'by strong'");
         header.line = byToken.line;
         header.column = byToken.column;
         expect(TokenKind::KeywordOn,
-               "after 'by_strong_induction'");
+               "after 'by strong induction'");
         header.scrutinee = parseExpression();
         expect(TokenKind::KeywordWith,
-               "after 'by_strong_induction on <expr>'");
+               "after 'by strong induction on <expr>'");
         if (!isIdentifierLike(peek().kind)) {
             throwHere(
                 "expected 'hypothesis <name>' or '<subject>, <ih>' "
@@ -4683,7 +4682,7 @@ private:
                 throwHere(
                     "'with hypothesis <ih>' names the generalized "
                     "subject after the inducted variable, so "
-                    "'by_strong_induction on <expr>' needs a plain "
+                    "'by strong induction on <expr>' needs a plain "
                     "variable — use 'with <subject>, <ih>' to name "
                     "the subject explicitly");
             }
@@ -4692,7 +4691,7 @@ private:
             header.subjectName = consumeAny().lexeme;
             expect(TokenKind::Comma,
                    "between subject name and ih name in "
-                   "by_strong_induction");
+                   "by strong induction");
             if (!isIdentifierLike(peek().kind)) {
                 throwHere(
                     "expected the induction hypothesis name "
@@ -4706,10 +4705,10 @@ private:
     SurfaceExpressionPointer parseByStrongInduction() {
         StrongInductionHeader header = parseByStrongInductionHeader();
         expect(TokenKind::LeftBrace,
-               "after the by_strong_induction with-clause");
+               "after the strong-induction with-clause");
         SurfaceExpressionPointer body = parseBlockContents();
         expect(TokenKind::RightBrace,
-               "ending by_strong_induction block");
+               "ending strong-induction block");
         return makeSurfaceByStrongInduction(
             std::move(header.scrutinee),
             std::move(header.subjectName),
@@ -4911,6 +4910,17 @@ private:
                        + " " + context);
         }
         consumeAny();
+    }
+
+    // `by strong induction …` — the space spelling's three-token
+    // lookahead (`strong` is contextual, so it must be checked by
+    // lexeme). Shared by the expression-atom dispatch and the A4
+    // statement-form dispatch.
+    bool isSpaceSpelledStrongInduction() const {
+        return peek().kind == TokenKind::KeywordBy
+            && peekAt(1).kind == TokenKind::Identifier
+            && peekAt(1).lexeme == "strong"
+            && peekAt(2).kind == TokenKind::KeywordInduction;
     }
 
     [[noreturn]] void throwHere(const std::string& message) {

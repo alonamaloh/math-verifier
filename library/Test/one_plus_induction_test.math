@@ -1,4 +1,4 @@
--- Exercises the `1 + n` form of `by_induction` (the successor-sealing
+-- Exercises the `1 + n` form of `by induction` (the successor-sealing
 -- keystone, PLAN_LUX_TRANSITION.md): `case base:` / `case step(k):`
 -- routes to `Natural.induction_on_one_plus`, the step goal is `P(1 + k)`
 -- with `IH : P(k)`, and no `successor` token appears.
@@ -16,7 +16,7 @@ import Logic.basics
 -- (If the step goal weren't P(1+k) or IH weren't P(k), the assembled
 -- induction_on_one_plus application would fail to typecheck.)
 theorem Test.reflexive_one_plus (n : Natural) : n = n :=
-  by_induction on n with IH {
+  by induction on n with IH {
     case base:    done
     case step(k): done
   }
@@ -25,14 +25,14 @@ theorem Test.reflexive_one_plus (n : Natural) : n = n :=
 -- hypothesis is `IH : k + 0 = k`.
 theorem Test.add_zero_one_plus (a : Natural) : a + 0 = a :=
   unfold Natural.add in
-  by_induction on a with IH {
+  by induction on a with IH {
     case base:    done
     case step(k): done
   }
 
 -- Pi-returning goal + lambda step body: the function-typed motive case.
 theorem Test.pi_goal_one_plus (n : Natural) : ∀ (k : Natural). k = k :=
-  by_induction on n with IH {
+  by induction on n with IH {
     case base:    (k : Natural) ↦ done
     case step(p): (k : Natural) ↦ done
   }
@@ -48,19 +48,19 @@ theorem Test.refining_one_plus
         (n : Natural)
         (hypothesis : ∀ (j : Natural). j < n → P(j))
         : ∀ (j : Natural). j < n → P(j) :=
-  by_induction on n with IH refining hypothesis {
+  by induction on n with IH refining hypothesis {
     case base:    hypothesis
     case step(k): hypothesis
   }
 
 -- ∀-target scrutinee: the induction variable is bound by the GOAL's
--- leading `∀`, not a local parameter — `by_induction on j` peels the Pi,
+-- leading `∀`, not a local parameter — `by induction on j` peels the Pi,
 -- runs the induction with `j` in scope, and re-wraps in a lambda. The raw
 -- recursor (`case zero`/`case successor`) always handled this; the `1 + n`
 -- form needed the Pi-introduction added to `elaborateByInductionOnePlus`.
 theorem Test.forall_target_one_plus : ∀ (j : Natural). j + 0 = j :=
   unfold Natural.add in
-  by_induction on j with IH {
+  by induction on j with IH {
     case base:    done
     case step(k): done
   }
@@ -74,7 +74,7 @@ theorem Test.forall_target_one_plus : ∀ (j : Natural). j + 0 = j :=
 theorem Test.parametric_goal_with_cases
         (P : Natural → Proposition) (give : ∀ (q : Natural). P(q))
         (n : Natural) : ∀ (k : Natural). P(k) :=
-  by_induction on n with IH {
+  by induction on n with IH {
     case base: (k : Natural) ↦ give(k)
     case step(p): (k : Natural) ↦ {
       claim orFact : (k = k) ∨ (k = k) by Or.introduceLeft(done);

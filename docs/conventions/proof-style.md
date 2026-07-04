@@ -1,10 +1,10 @@
 # Proof style and statement-level sugar
 
-Write proofs that read like math: `cases`/`by_induction` over pattern-match, `cases … with`, `by cases { case P: … otherwise: … }`, the statement-level sugar (`claim`/`obtain`/`take`/…), and CIC-noise-reduction idioms.
+Write proofs that read like math: `cases`/`by induction` over pattern-match, `cases … with`, `by cases { case P: … otherwise: … }`, the statement-level sugar (`claim`/`obtain`/`take`/…), and CIC-noise-reduction idioms.
 
 *(Part of the project conventions; see `CLAUDE.md` for the index.)*
 
-## Prefer `cases` / `by_induction` over pattern-match definitions
+## Prefer `cases` / `by induction` over pattern-match definitions
 
 The pattern-match definition form (`theorem foo | zero => … |
 successor(k) => …`) is supported but NOT the preferred style.
@@ -29,14 +29,14 @@ theorem Natural.foo (n : Natural) : P(n) :=
 
 -- Preferred — recursive (k's IH needed in stepProof):
 theorem Natural.foo (n : Natural) : P(n) :=
-  by_induction on n with IH {
+  by induction on n with IH {
     case zero:           baseProof
     case successor(k):   stepProof(k, IH)  -- IH : P(k)
   }
 ```
 
 Pattern-match definitions remain unavoidable for direct recursion
-that doesn't fit `by_induction`'s motive shape — for example when
+that doesn't fit `by induction`'s motive shape — for example when
 the conclusion is universally quantified over a parameter that the
 IH must be polymorphic over (`Natural.decides_equality` recursing on
 `a` while the IH must work for all `b`). Use the `cases` body style
@@ -325,13 +325,13 @@ reach for the math-like form instead:
   - **Recursion reads as induction.** A pattern-matched proof whose body
     recurses by a positional self-call (`Foo.bar(predecessor, …)`) hides the
     induction in a comment AND counts as a direct call. Write it
-    `by_induction on a with IH refining b, c, h { case zero: … case
+    `by induction on a with IH refining b, c, h { case zero: … case
     successor(predecessor): … }` instead: the hypothesis is the named local
     `IH`, cited argument-free like any fact (`done by IH`),
     so the recursion both reads as induction and is no longer a lemma call.
     Example — `Natural.add_cancel_left` (`library/Natural/arithmetic.math`):
     ```
-    by_induction on a with IH refining b, c, equalityHypothesis {
+    by induction on a with IH refining b, c, equalityHypothesis {
       case zero: equalityHypothesis
       case successor(predecessor): {
         claim predecessor + b = predecessor + c;   -- strip the successor
@@ -344,7 +344,7 @@ reach for the math-like form instead:
     `refining <h>` for a hypothesis whose type mentions an index that the
     induction varies. Example — `LessOrEqual.transitive`:
     ```
-    by_induction on bc with IH refining ab {
+    by induction on bc with IH refining ab {
       case LessOrEqual.reflexivity(_): ab                       -- b = c
       case LessOrEqual.step(_, cPredecessor, _):
           LessOrEqual.step(a, cPredecessor, IH(ab))             -- one more step
@@ -646,14 +646,14 @@ natural_is_nonneg(n))` — the prover can't reach `IsNonneg(n)` on its own.
 
 Outermost-arm shorthands for case-splits:
 
-- `by_induction on n with IH { case zero: … case successor(k): … }` —
+- `by induction on n with IH { case zero: … case successor(k): … }` —
   preferred over a pattern-match definition.
-- `by_induction on n with IH refining h1, h2 { … }` — also refine
+- `by induction on n with IH refining h1, h2 { … }` — also refine
   the listed in-scope binders' types per case (so hypotheses about
   `n` get the right shape in each arm).
-- `by_induction on n using <strongRecursionLemma> { … }` — route
+- `by induction on n using <strongRecursionLemma> { … }` — route
   the recursion through a user-supplied recursion principle.
-- `by_strong_induction on n with IH { … }` — strong induction on a
+- `by strong induction on n with IH { … }` — strong induction on a
   Natural; IH has type `(k : Natural) → k < n → P(k)`.
 
 `done` and `okay` are aliases for `claim goal` — pick whichever spells
