@@ -1,0 +1,41 @@
+-- `choose m, n such that P [from source];` — witness lists flatten a
+-- nested ∃ (with an optional ∧-chain under the innermost binder) in
+-- ONE step (A5). The destructure is the n-ary tuple ⟨m, n, …, P⟩; the
+-- property joins the context (conjunct-by-conjunct for ∧-chains) and
+-- is statement-addressable afterwards.
+
+module Test.choose_multi_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+
+-- Two witnesses through a nested ∃, property an equation.
+theorem Test.choose_two_witnesses
+        (source : ∃ (a : Natural). ∃ (b : Natural). a = 2 * b)
+        : ∃ (c : Natural). ∃ (d : Natural). c = 2 * d := {
+  choose a, b such that a = 2 * b from source;
+  witness a with { witness b with done }
+}
+
+-- Three witnesses, ∧-chain under the innermost binder; the legs join
+-- the context individually and close bare statements.
+theorem Test.choose_three_witnesses_with_conjunction
+        (source : ∃ (m : Natural). ∃ (n : Natural). ∃ (k : Natural).
+                      1 ≤ m ∧ m = n + k)
+        : ∃ (m : Natural). 1 ≤ m := {
+  choose m, n, k such that 1 ≤ m ∧ m = n + k from source;
+  witness m with done
+}
+
+-- Without `from`: the scan finds the most recent in-scope ∃.
+theorem Test.choose_two_witnesses_scanned
+        (source : ∃ (a : Natural). ∃ (b : Natural). a = 2 * b)
+        : ∃ (c : Natural). ∃ (d : Natural). c = 2 * d := {
+  choose a, b such that a = 2 * b;
+  witness a with { witness b with done }
+}

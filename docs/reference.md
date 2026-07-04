@@ -126,6 +126,7 @@ End each with `;`; the block returns its final non-`;` expression.
 | `take x : T for proving Q { … };` | forward ∀-introduction: prove `Q` under `x : T`, adding `∀ (x : T). Q` to the context for the rest of the block |
 | `choose w [such that P] [as h] from S;` | `∃`-elimination (preferred): `S` a hypothesis, a lemma cited argument-free, or an applied term |
 | `choose n such that P(n);` | `∃`-elimination from the most-recent in-scope `∃` |
+| `choose m, n such that P;` | witness list — flattens a nested `∃` (with an `∧`-chain under the innermost binder) in one step |
 | `obtain ⟨a, b⟩ from E;` / `let ⟨a, b⟩ := E;` | tuple destructure — non-existential structures only (`∃`/`∧` → use `choose`) |
 | `let x := V;` / `set x := V;` | local (transparent) binding |
 

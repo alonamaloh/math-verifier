@@ -1730,7 +1730,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 choose->conditionName,
                 rewriteRecursiveCalls(choose->source, thisDeclName,
                                        recursiveArgToHypothesis,
-                                       outerBinderCount));
+                                       outerBinderCount),
+                choose->additionalNames);
         }
         if (auto* strongInduction =
                 std::get_if<SurfaceByStrongInduction>(&node.node)) {

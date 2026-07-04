@@ -408,6 +408,9 @@ SurfaceExpressionPointer substituteSurfaceName(
         // `conditionName` scopes over the body; `source` is in the outer
         // scope. Guard each binder against shadowing the target.
         bool nameShadows = choose->name == targetName;
+        for (const std::string& extra : choose->additionalNames) {
+            nameShadows = nameShadows || extra == targetName;
+        }
         bool bodyShadows = nameShadows || choose->conditionName == targetName;
         SurfaceExpressionPointer newPredicate =
             (nameShadows || !choose->predicate)
@@ -423,7 +426,8 @@ SurfaceExpressionPointer substituteSurfaceName(
             : nullptr;
         return makeSurfaceChoose(choose->name, std::move(newPredicate),
                                   std::move(newBody), line, column,
-                                  choose->conditionName, std::move(newSource));
+                                  choose->conditionName, std::move(newSource),
+                                  choose->additionalNames);
     }
     if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
         // `decide proposition { yes h => … | no n => … }`. The proposition
@@ -1312,6 +1316,8 @@ private:
             SurfaceExpressionPointer source;   // Choose: optional `from <source>`;
                                                // the `{ block }` for SupposeToProve
                                                // and SupposeForContradictionForward
+            std::vector<std::string> additionalNames;  // Choose: witnesses past
+                                               // the first (`choose m, n …`)
             // Only set for TypedLet wrappers that came from `calc … as NAME;`
             // with an explicit user-supplied NAME. Propagated onto the
             // resulting SurfaceLet so the elaborator can emit the
@@ -1893,6 +1899,17 @@ private:
                 }
                 Token nameToken = consumeAny();
                 wrapper.name = nameToken.lexeme;
+                // `choose m, n, … such that P;` — witness names past the
+                // first flatten a nested ∃/∧ in one step.
+                while (peek().kind == TokenKind::Comma) {
+                    consumeAny();  // ','
+                    if (!isIdentifierLike(peek().kind)) {
+                        throwHere("expected a witness name after ',' "
+                                  "in choose");
+                    }
+                    wrapper.additionalNames.push_back(
+                        consumeAny().lexeme);
+                }
                 // Optional `such that <predicate>`. `such`/`that` are
                 // ordinary identifiers everywhere except this slot —
                 // text-match so they stay usable as variable names.
@@ -2382,7 +2399,8 @@ private:
                         std::move(result),
                         iterator->line, iterator->column,
                         std::move(iterator->conditionName),
-                        std::move(iterator->source));
+                        std::move(iterator->source),
+                        std::move(iterator->additionalNames));
                     break;
                 }
                 case BlockWrapper::Set:

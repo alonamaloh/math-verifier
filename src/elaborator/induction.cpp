@@ -162,6 +162,14 @@ ExpressionPointer Elaborator::elaborateChoose(
                 // `∃ (name : T). prop`, so the body disambiguates which
                 // hypothesis the lemma's premise discharges against; the
                 // witness type T is read off the lemma's own conclusion.
+                if (!choose.additionalNames.empty()) {
+                    throwElaborate(
+                        "choose with several witnesses takes its source "
+                        "from a hypothesis or an argument-free lemma "
+                        "citation; for a lemma that needs `such that` "
+                        "disambiguation, claim the existential first "
+                        "(`claim ∃ …; by <lemma>`) and choose from it");
+                }
                 ExpressionPointer lemmaTerm = elaborateExpression(
                     *choose.source, localBinders);
                 ExpressionPointer lemmaType = inferTypeInLocalContext(
@@ -262,10 +270,16 @@ ExpressionPointer Elaborator::elaborateChoose(
             warnIfSurfaceNameUnused(
                 choose.name, *choose.body, line, column,
                 "`choose ...`");
+            for (const std::string& extra : choose.additionalNames) {
+                warnIfSurfaceNameUnused(
+                    extra, *choose.body, line, column, "`choose ...`");
+            }
         }
         // Build a SurfaceCases destructuring the chosen existential. The
         // condition hypothesis takes the user's `as <name>` when given, else
         // an internal name (the auto-prover finds it by type-match anyway).
+        // Witness names past the first extend the tuple pattern — the
+        // n-ary ⟨m, n, …, predicate⟩ flattens a nested ∃/∧ in one step.
         std::string predHypName = choose.conditionName.empty()
             ? ("_choice_pred_" + std::to_string(line) + "_"
                + std::to_string(column))
@@ -274,6 +288,10 @@ ExpressionPointer Elaborator::elaborateChoose(
         patternComponents.push_back(
             makeSurfacePatternBareName(
                 choose.name, line, column));
+        for (const std::string& extra : choose.additionalNames) {
+            patternComponents.push_back(
+                makeSurfacePatternBareName(extra, line, column));
+        }
         patternComponents.push_back(
             makeSurfacePatternBareName(
                 std::move(predHypName), line, column));

@@ -533,6 +533,10 @@ struct SurfaceChoose {
     // that hypothesis directly; a bare lemma name is cited argument-free
     // (shaped by `such that`) and the result destructured.
     SurfaceExpressionPointer source;
+    // `choose m, n such that P;` — witness names past the first. The
+    // whole list flattens a nested ∃/∧ in one step (the destructure
+    // pattern is the n-ary tuple ⟨m, n, …, predicate⟩).
+    std::vector<std::string> additionalNames;
 };
 
 // `claim` — a structured-proof step in mathematician style. Forms:
@@ -925,11 +929,12 @@ inline SurfaceExpressionPointer makeSurfaceChoose(
     SurfaceExpressionPointer body,
     int line, int column,
     std::string conditionName = "",
-    SurfaceExpressionPointer source = nullptr) {
+    SurfaceExpressionPointer source = nullptr,
+    std::vector<std::string> additionalNames = {}) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceChoose{std::move(name), std::move(predicate),
                        std::move(body), std::move(conditionName),
-                       std::move(source)},
+                       std::move(source), std::move(additionalNames)},
         line, column});
 }
 
