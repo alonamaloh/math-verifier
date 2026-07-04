@@ -254,7 +254,15 @@ for some k [as eq]:` — ∃-hypothesis opened on the spot via one
 Exists.eliminate, witness type inferred from the equation's left
 endpoint or annotated `for some (k : T)`, single binder v1;
 Natural.zero_or_add_one marked automatic as Natural's coverage lemma;
-feature test + reference row): coverage-lemma AUTO-GENERATION at
+feature test + reference row): SUBSTITUTION RULE LANDED for witness arms (4c36aacb: the arm's goal
+gets the variable substituted by the constructor form and the proof
+transports back automatically — ι-reduction works, computed facts
+state bare; deterministic, applies whenever the equation's left side
+is a plain local variable and the goal mentions it; plain `case x =
+c:` arms keep availability-semantics for library compat — flipping
+them is the remaining substitution work, alongside referenced-
+hypothesis substitution; zero_or_one_plus added as the automatic
+1+k coverage lemma). coverage-lemma AUTO-GENERATION at
 inductive-declaration time is still open (sketch below now partially
 superseded — parser — after the arm proposition, accept `for some
 <name>[, <name>…]` (names optionally `(k : T)`-annotated), store
