@@ -4927,18 +4927,6 @@ private:
     // unique structural occurrence of `x` in `term`'s inferred type and
     // abstracting it.
     //
-    // Distinguished from the 1-arg `rewrite(equalityProof)` (calc-step
-    // form) by argument count. The two have different return types and
-    // operate in different positions: term-level transport produces a
-    // proof witness; calc-step rewrite produces an equality between two
-    // calc endpoints.
-    ExpressionPointer desugarRewriteTerm(
-        SurfaceExpressionPointer equalityProofSurface,
-        SurfaceExpressionPointer termSurface,
-        const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer expectedType,
-        int line, int /*column*/);
-
     ExpressionPointer desugarRewrite(
         SurfaceExpressionPointer lemmaSurface,
         const std::vector<LocalBinder>& localBinders,

@@ -93,7 +93,8 @@ through `LessOrEqual → IsNonneg → Quotient.lift`, landing in
 `IsNonneg.multiply`, `from_natural_is_nonneg`, …) are all stated in
 `IsNonneg(…)` form, so the auto-prover's `contextFactMatch` couldn't
 line a `Quotient.lift`-shaped goal up against them, and the resistant
-order transports needed a hand-written `rewrite(eq, IsNonneg.add(…))`.
+order transports needed hand-written transport plumbing (the since-retired
+`rewrite(eq, IsNonneg.add(…))`).
 
 Marking `IsNonneg` opaque makes WHNF stop at `IsNonneg(z - x)` — exactly
 the form the characterising lemmas use. The transports then convert to
@@ -218,10 +219,10 @@ synthetic motive because two `b`s collided," revert.
   unfolded view and the declared type in the opaque view. Wrap the
   proof body in `unfold Foo in <body>` if it really should compute,
   or add a characterising-lemma citation to bridge.
-- **`rewrite(eq, term): left endpoint does not appear`** — the
-  goal type was the un-reduced opaque shape but you handed
-  `rewrite` an equation whose LHS is from the unfolded view. Apply
-  the characterising lemma first to align shapes.
+- **`left endpoint does not appear (structurally)`** on an equation
+  transport — the goal type was the un-reduced opaque shape but the
+  cited equation's LHS is from the unfolded view. Apply the
+  characterising lemma first to align shapes.
 - **`Application: argument type does not match Pi domain`** when
   recursing — the recursive call expects the un-reduced shape but
   you fed it the reduced one. Bridge with the appropriate

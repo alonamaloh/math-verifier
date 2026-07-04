@@ -74,10 +74,10 @@ real limitation:
   NOT match structurally, so don't mix them across a `≤`-step or a lemma
   citation (the `2`-vs-`1+1` rule in `numerals-and-naming.md`).
 
-When the goal is `(ring : Foo = Bar)` and you intend to `rewrite` with
-it, double-check the direction: `rewrite(eq, term)` looks for the LHS
-of `eq` in `term`'s type. Putting it the wrong way round gives the
-"left endpoint does not appear (structurally) in term's type" error.
+When you state a `(ring : Foo = Bar)` fact for the transport bridge,
+double-check the direction: the bridge looks for one side of the
+equation in the fact being transported. Stating it the wrong way round
+gives the "left endpoint does not appear (structurally)" error.
 
 ## Ring lemmas: foundational vs. derived
 

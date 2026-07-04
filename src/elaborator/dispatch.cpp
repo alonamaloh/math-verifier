@@ -828,19 +828,20 @@ ExpressionPointer Elaborator::elaborateExpression(
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
-                if (name == "rewrite" && argumentCount == 1) {
-                    return desugarRewrite(
-                        positionalArguments[0],
-                        localBinders, expectedType,
-                        expression.line, expression.column);
-                }
-                if (name == "rewrite" && argumentCount == 2) {
-                    return desugarRewriteTerm(
-                        positionalArguments[0],
-                        positionalArguments[1],
-                        localBinders,
-                        expectedType,
-                        expression.line, expression.column);
+                if (name == "rewrite") {
+                    // RETIRED (A1 de-rewrite, owner call: `rewrite(…)` is
+                    // CIC noise). The transport it performed is what the
+                    // context-equality bridge does for a bare stated
+                    // proposition; the internal desugarRewrite machinery
+                    // survives as the citation-parity fallback (calc.cpp,
+                    // inference.cpp) but has no surface spelling.
+                    throwElaborate(
+                        "the `rewrite(…)` form was retired: state the "
+                        "equation (bare or `as NAME`), then state the "
+                        "transported proposition itself — `P;` or "
+                        "`P by <fact>;` — and the context-equality bridge "
+                        "carries it across; on a chain step, cite the "
+                        "equation directly (`by <equation>`)");
                 }
                 if (name == "simplify" && argumentCount >= 1) {
                     return desugarSimplify(

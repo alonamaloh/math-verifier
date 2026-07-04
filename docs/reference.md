@@ -56,9 +56,9 @@ a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 - Mixed relations compose (`=`,`≤`,`<`,`≥`,`>`,`∣`).
 - A by-less step is closed by the auto-prover.
 - `by L` justifies a step. `as NAME` binds the step's fact.
-- `substituting eq` / `rewrite(eq)` rewrite by an equality (prefer
-  `substituting`; raw `rewrite` is a counted CIC leak). `eq` may be a
-  proof, a proposition (`substituting (x = head)` — proved in place), or
+- `substituting eq` rewrites by an equality (the raw `rewrite(…)` form
+  is retired; a plain `by eq` also works via diff-inference). `eq` may be
+  a proof, a proposition (`substituting (x = head)` — proved in place), or
   a quantified lemma cited by name (`substituting Natural.add_zero` —
   arguments inferred by matching its conclusion against the goal).
 - The `calc` keyword that used to anchor a chain is **retired** (A1

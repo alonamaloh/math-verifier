@@ -199,40 +199,30 @@ referenced in the rest of the block, the elaborator warns "drop the
 the equation by type-match either way, so the name is dead weight).
 Pick `as NAME` only when a later step or stated fact spells the name out.
 
-## `rewrite(lemma)` / `rewrite(lemma, term)`
+## Transport across an equation (`rewrite` is retired)
 
-**Prefer a relation chain or `by substituting eq`.** Raw `rewrite(…)` is
-transport plumbing in a function-call costume and is now counted as a
-CIC leak by `scripts/cic_leak_report`. A chain step absorbs `=` rewrites
-and reads as the chain it is; `T by substituting eq` reads as "by
-substituting the equation" (and is *not* a leak). Reach for raw
-`rewrite(eq, term)` only when neither fits — typically a transport in
-a non-chain term position
-where `substituting` cannot be threaded. The mechanics below are for those
-residual cases.
+The `rewrite(…)` form is **retired** (owner call: transport plumbing in
+a function-call costume — a CIC leak with a keyword). Every use has a
+bare spelling:
 
-Two forms, disambiguated by argument count.
+- **On a chain step**: cite the equation directly — `by L` for
+  `L : a = b`. The diff-inferred congruence finds the unique differing
+  slot (symmetric uses included: no `Equality.symmetry` wrapper).
+  Multi-occurrence motives fall back to `congruenceOf((z) ↦ …, L)`.
+- **In statement position** (the old `rewrite(eq, term)`): state the
+  equation (bare, or `as NAME` if referenced), state what the
+  transported-from fact proves (`P(a) by <reason>;` or bare), then
+  state the transported proposition itself — `P(b);` — and the
+  context-equality bridge carries it across the in-scope equation.
+  Where the fact must feed an argument position (e.g. inside
+  `absurd(…)`, whose argument is type-inferring — brace blocks don't
+  elaborate there), name the transported statement (`P(b) by
+  substituting eq as h;`) and pass the name.
+- **Order relations**: the bare bridge covers single-position equality
+  diffs; an order-relation transport spells the intent with
+  `P by substituting eq;`.
 
-**1-arg, in a chain step**: `by rewrite(L)` for `L : a = b` finds
-the unique structural occurrence of `a` on the chain step's LHS and
-replaces with `b`. Only works in a chain step (needs the step's
-target as expected type). If `a` occurs multiple times or zero
-times, fall back to explicit `congruenceOf((z) ↦ …, L)`.
-
-**2-arg, term-level**: `rewrite(eq, term)` for `eq : a = b` and
-`term : P(a)` returns a term of type `P(b)`. Desugars to
-`Equality.transport_proposition(T, λz. P[a↦z], a, b, eq, term)` —
-the motive is recovered by locating the unique structural
-occurrence of `a` in `term`'s inferred type. Use this wherever the
-6-arg `Equality.transport_proposition(...)` was the only option
-(outside a chain step — `≤`/`∣` witness contexts, `Or.introduceRight(...)`
-arguments, etc.).
-
-The matcher tries six combos: (term type × LHS) × (unreduced,
-head-WHNF, deep-β). If you get "left endpoint does not appear
-(structurally) in term's type" and you're confident the equality is
-true, check the equation direction first; then check whether the LHS
-appears modulo a definitional unfold not covered by WHNF.
+The old spelling fails with a migration error pointing at these forms.
 
 ## `by lemma` in a chain step — diff-inferred congruence
 
@@ -276,10 +266,9 @@ Limits:
   underspecified lemma calls that needed the expected type to
   disambiguate won't reach the fallback.
 - The match uses kernel `isDefinitionallyEqual`, so it sees through
-  β/ζ/ι reductions. Plain `rewrite(eq)` does a stricter structural
-  match — diff inference catches cases like `v_p((1+dx)*(1+dy))` (the
-  lemma's LHS) vs `v_p(1+dy+dx*(1+dy))` (the step's slot) where
-  multiplication reduces structurally.
+  β/ζ/ι reductions — diff inference catches cases like
+  `v_p((1+dx)*(1+dy))` (the lemma's LHS) vs `v_p(1+dy+dx*(1+dy))`
+  (the step's slot) where multiplication reduces structurally.
 - **Subtraction must surface the same way on both sides.** `a - b`
   (`subtract(a, b)`) and `a + -b` (`add(a, -b)`) print alike and are
   ring-equal, but the structural diff treats them as DISTINCT heads — so a

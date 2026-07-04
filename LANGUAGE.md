@@ -102,21 +102,23 @@ elaborator auto-wraps with `Equality.congruence` and you don't have
 to write the motive lambda. The user supplies the equation, the
 elaborator finds the slot. (Same direction or symmetric.)
 
-### `rewrite(eq)` and `rewrite(eq, term)`
+### Transport across an equation (`rewrite` is retired)
 
-Two forms. **1-arg in a chain step**: `by rewrite(L)` for `L : a = b`
-finds the unique structural occurrence of `a` on the chain step's LHS
-and replaces it with `b`. **2-arg term-level**: `rewrite(eq, term)`
-for `eq : a = b` and `term : P(a)` returns a term of type `P(b)`.
-Replaces explicit `Equality.transport_proposition` everywhere outside
-the few cases that need a manual motive.
+The `rewrite(…)` form is **retired** (it was transport plumbing in a
+function-call costume). Its two jobs have bare spellings: on a chain
+step, cite the equation directly (`by L` for `L : a = b` — the
+diff-inferred congruence finds the slot); in term/statement position,
+state the equation (bare or `as NAME`), then state the transported
+proposition itself — `P;` or `P by <fact>;` — and the context-equality
+bridge carries it across. The old spelling fails with a migration
+error pointing here.
 
 ### `ring` first, then explicit
 
 `ring` (v2: polynomial normalization, ±1 coefficients) handles
 essentially every commutative-ring identity you'd write by hand on
 Natural, Integer, Rational, Real, or PAdic. Default for ring
-equalities: `:= ring` or `(ring : LHS = RHS)` inside a `rewrite`.
+equalities: `:= ring`, or a stated `(ring : LHS = RHS)` fact.
 Reach for explicit `add_commutative`/`add_associative`/`congruenceOf`
 only after ring fails (coefficient outside ±1, missing axioms in
 scope, etc.).

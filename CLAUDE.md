@@ -67,8 +67,8 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 - **calc-and-rewrite.md** — the bare relation-chain form with mixed
   `=`/`≤`/`<`/`≥`/`>`, chains over preorders (`∣`/`⊆`), by-less `=` steps
   via the full prover, `let` abbreviations, `<chain> as NAME`,
-  `… by substituting` / `rewrite(eq, term)`, diff-inferred `by`, and
-  rewrite-under-binder.
+  `… by substituting`, equation transport (`rewrite(…)` is retired),
+  diff-inferred `by`, and rewrite-under-binder.
 - **algebra-tactics.md** — `ring`, `field`, `linear_combination`, and the
   foundational-vs-derived ring-lemma split.
 - **proof-style.md** — math-like phrasing; **what an ideal proof looks
