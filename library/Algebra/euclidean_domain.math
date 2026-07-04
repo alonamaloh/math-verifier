@@ -90,9 +90,9 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
   -- (matching the ring operations below; avoids ζ-mismatches in rewrite).
   Ring.IsIdeal(s, member) as isIdealAtRing;
   let ⟨containsZero, closedUnderAddition, absorbsMultiplication⟩ := isIdealAtRing;
-  decide ∃ (candidate : Ring.carrier(s)).
-             member(candidate) ∧ ¬(candidate = Ring.zero(s)) {
-    | yes someNonzeroMember => {
+  claim by cases {
+    case ∃ (candidate : Ring.carrier(s)).
+             member(candidate) ∧ ¬(candidate = Ring.zero(s)) as someNonzeroMember: {
         obtain ⟨nonzero, memberNonzero, nonzeroDistinct⟩ from someNonzeroMember;
         -- A least-norm nonzero member generates the ideal.
         obtain ⟨leastNorm, leastIsNorm, nothingSmaller⟩
@@ -133,14 +133,14 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
               as memberRemainder;
           -- The remainder must vanish: otherwise it is a nonzero member of
           -- norm below the least, contradicting minimality.
-          decide remainder = Ring.zero(s) {
-            | yes remainderZero =>
+          claim by cases {
+            case remainder = Ring.zero(s) as remainderZero:
                 ⟨quotient,
                  calc x
                     = generator * quotient + remainder
                     = generator * quotient + Ring.zero(s)
                     = generator * quotient⟩
-            | no remainderNonzero => {
+            otherwise as remainderNonzero: {
                 norm(remainder) < norm(generator) by {
                   cases remainderCase {
                     | Or.introduceLeft(remainderZero) =>
@@ -179,19 +179,17 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
         } as backwardGenerates;
         ⟨generator, ⟨forwardGenerates, backwardGenerates⟩⟩
       }
-    | no noNonzeroMember => {
+    otherwise as noNonzeroMember: {
         -- The ideal is {0}; zero generates it.
         ∀ (x : Ring.carrier(s)).
               member(x) → Ring.divides(s, Ring.zero(s), x) by {
           take x : Ring.carrier(s);
           suppose member(x) as memberX;
           -- x must be zero (no nonzero member exists), and 0 ∣ 0.
-          x = Ring.zero(s) by {
-            decide x = Ring.zero(s) {
-              | yes xZero => xZero
-              | no xNonzero =>
-                  absurd(noNonzeroMember(⟨x, ⟨memberX, xNonzero⟩⟩))
-            }
+          x = Ring.zero(s) by cases {
+            case x = Ring.zero(s) as xZero: xZero
+            otherwise as xNonzero:
+                absurd(noNonzeroMember(⟨x, ⟨memberX, xNonzero⟩⟩))
           };
           ⟨Ring.zero(s),
            calc x

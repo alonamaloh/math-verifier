@@ -115,20 +115,19 @@ theorem Polynomial.gcd_bezout (r : Ring)
         (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
                  (yBound : Polynomial.DegreeLessThan(r, y, subject))
                  (x : Polynomial(Ring.carrier(r), Ring.zero(r))) ↦
-        decide y = Polynomial.zero(r) {
-          | yes yIsZero => {
-              Ring.zero(Polynomial.ring(r)) = y as yIsRingZero;
-              -- gcd = x: x = 1·x + 0·y, x | x, x | 0 = y.
+        claim by cases {
+          case y = Polynomial.zero(r): {
+              -- gcd = x: x = 1·x + 0·0, x | x, x | 0.
               ⟨x, Polynomial.one(r), Polynomial.zero(r),
                calc x
                   = (Polynomial.one(r) * x)
                   = ((Polynomial.one(r) * x) + Polynomial.zero(r))
-                  = ((Polynomial.one(r) * x) + (Polynomial.zero(r) * y))
-                        by Ring.zero_multiply_left(Polynomial.ring(r), y),
+                  = ((Polynomial.one(r) * x) + (Polynomial.zero(r) * Polynomial.zero(r)))
+                        by Ring.zero_multiply_left(Polynomial.ring(r), Polynomial.zero(r)),
                Ring.divides_reflexive(Polynomial.ring(r), x),
-               rewrite(yIsRingZero, Ring.divides_zero(Polynomial.ring(r), x))⟩
+               Ring.divides_zero(Polynomial.ring(r), x)⟩
             }
-          | no yNotZero => {
+          otherwise as yNotZero: {
               obtain ⟨degreeY, yDegreeBound, leadingNonzero⟩
                   from Polynomial.exists_degree_of_nonzero(r, y, yNotZero);
               -- y has degree degreeY < subject: were subject ≤ degreeY, yBound

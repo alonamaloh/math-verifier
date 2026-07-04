@@ -160,8 +160,8 @@ theorem Complex.definingPolynomial_not_unit
         : ¬(Polynomial.IsUnit(Real.ring, Complex.definingPolynomial)) :=
   (isUnit : Polynomial.IsUnit(Real.ring, Complex.definingPolynomial)) ↦ {
     obtain ⟨g, oneEquation⟩ from isUnit;
-    decide g = Polynomial.zero(Real.ring) {
-      | yes gZero => {
+    claim by cases {
+      case g = Polynomial.zero(Real.ring): {
           Polynomial.one(Real.ring)
                     = (Complex.definingPolynomial * g)
                     = (Complex.definingPolynomial * Polynomial.zero(Real.ring))
@@ -173,7 +173,7 @@ theorem Complex.definingPolynomial_not_unit
                      = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 0)
                      = Real.zero)
         }
-      | no gNonzero => {
+      otherwise as gNonzero: {
           obtain ⟨degreeG, gBound, gLeadingNonzero⟩
               from Polynomial.exists_degree_of_nonzero(Real.ring, g, gNonzero);
           let ⟨_, productLeadingNonzero⟩
@@ -202,12 +202,12 @@ theorem Complex.definingPolynomial_irreducible
       Complex.definingPolynomial_not_unit,
       (a b : Polynomial(Real, Real.zero))
                (factorEquation : Complex.definingPolynomial = (a * b)) ↦
-          decide Polynomial.IsUnit(Real.ring, a) {
-            | yes aUnit => Or.introduceLeft(aUnit)
-            | no aNotUnit =>
-                decide Polynomial.IsUnit(Real.ring, b) {
-                  | yes bUnit => Or.introduceRight(bUnit)
-                  | no bNotUnit => {
+          claim by cases {
+            case Polynomial.IsUnit(Real.ring, a) as aUnit: Or.introduceLeft(aUnit)
+            otherwise as aNotUnit:
+                claim by cases {
+                  case Polynomial.IsUnit(Real.ring, b) as bUnit: Or.introduceRight(bUnit)
+                  otherwise as bNotUnit: {
                       -- Neither factor is a unit; derive a contradiction.
                       ¬(a = Polynomial.zero(Real.ring))
                           by (aZero : a = Polynomial.zero(Real.ring)) ↦

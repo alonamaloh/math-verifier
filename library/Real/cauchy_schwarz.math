@@ -194,16 +194,16 @@ theorem Real.cauchy_schwarz (a b : Natural → Real) (n : Natural)
                      * Real.partialSum((k : Natural) ↦ a(k) * a(k), n)
                  - Real.partialSum((k : Natural) ↦ a(k) * b(k), n)
                      * Real.partialSum((k : Natural) ↦ a(k) * b(k), n));
-  decide Real.partialSum((k : Natural) ↦ b(k) * b(k), n) = Real.zero {
+  claim by cases {
     -- C = 0: every bₖ below the cut vanishes, so B does too.
-    | yes CZero => {
+    case Real.partialSum((k : Natural) ↦ b(k) * b(k), n) = Real.zero as CZero: {
         ∀ (j : Natural). j < n → b(j) = Real.zero
             by (j : Natural) (jBelow : j < n) ↦ {
                  b(j) * b(j) = Real.zero
                      by Real.partialSum_zero_term;
-                 decide b(j) = Real.zero {
-                   | yes termZero => termZero
-                   | no termNonzero => { done by Real.right_factor_zero_of_product_zero }
+                 claim by cases {
+                   case b(j) = Real.zero as termZero: termZero
+                   otherwise as termNonzero: { done by Real.right_factor_zero_of_product_zero }
                  }
                } as bPrefixZero;
         -- B sums products that all vanish below the cut, so B = 0.
@@ -234,7 +234,7 @@ theorem Real.cauchy_schwarz (a b : Natural → Real) (n : Natural)
                  * Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
       }
     -- C > 0: cancel it out of C·(CA − B²) ≥ 0.
-    | no CNonzero => {
+    otherwise as CNonzero: {
         Real.zero ≠ Real.partialSum((k : Natural) ↦ b(k) * b(k), n)
             by (zeroEqualsC : Real.zero = Real.partialSum((k : Natural) ↦ b(k) * b(k), n)) ↦
                  CNonzero(
