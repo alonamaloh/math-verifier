@@ -128,6 +128,7 @@ End each with `;`; the block returns its final non-`;` expression.
 | `choose w [such that P] [as h] from S;` | `∃`-elimination (preferred): `S` a hypothesis, a lemma cited argument-free, or an applied term |
 | `choose n such that P(n);` | `∃`-elimination from the most-recent in-scope `∃` |
 | `choose m, n such that P;` | witness list — flattens a nested `∃` (with an `∧`-chain under the innermost binder) in one step |
+| `eventually (m). P(m)` | "P holds from some index on" — `Natural.Eventually((m : Natural) ↦ P(m))`; combine via `Eventually.and` (max of thresholds) / `Eventually.monotone`; `choose N such that … from h` opens the threshold |
 | `let ⟨a, b⟩ := E;` | tuple destructure — genuine data records only (`∃`/`∧` → use `choose`; `obtain` is retired) |
 | `take x as representative(a, b) : T;` / `cases x { \| representative(a, b) => … }` | quotient destructure — the carrier's constructor is resolved from the type, never written |
 | `let x := V;` / `set x := V;` | local (transparent) binding |

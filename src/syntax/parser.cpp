@@ -3227,6 +3227,37 @@ private:
             && peekAt(5).kind == TokenKind::KeywordFrom) {
             return parseFoldBinder();
         }
+        // The `eventually` binder form (A6): `eventually (m). P(m)` —
+        // sugar for `Natural.Eventually((m : Natural) ↦ P(m))`, the
+        // "holds from some index on" quantifier of limit arguments.
+        // `eventually` stays an ordinary identifier everywhere else;
+        // the form is claimed by the `(name).` lookahead shape only.
+        if (current.kind == TokenKind::Identifier
+            && current.lexeme == "eventually"
+            && peekAt(1).kind == TokenKind::LeftParen
+            && peekAt(2).kind == TokenKind::Identifier
+            && peekAt(3).kind == TokenKind::RightParen
+            && peekAt(4).kind == TokenKind::Dot) {
+            Token head = consumeAny();  // 'eventually'
+            consumeAny();               // '('
+            std::string binderName = consumeAny().lexeme;
+            consumeAny();               // ')'
+            consumeAny();               // '.'
+            SurfaceExpressionPointer body = parseExpression();
+            SurfaceBinder binder;
+            binder.names.push_back(binderName);
+            binder.type = makeSurfaceIdentifier(
+                "Natural", {}, head.line, head.column);
+            binder.isImplicit = false;
+            SurfaceExpressionPointer predicate = makeSurfaceLambda(
+                std::move(binder), std::move(body),
+                head.line, head.column);
+            return makeSurfaceApplication(
+                makeSurfaceIdentifier(
+                    "Natural.Eventually", {}, head.line, head.column),
+                std::vector<SurfaceExpressionPointer>{std::move(predicate)},
+                head.line, head.column);
+        }
         // `sorry` and `ring` must short-circuit before the
         // identifier-like path because they're also contextual
         // keywords (so they can appear as name segments inside

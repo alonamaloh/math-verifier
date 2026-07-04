@@ -1,0 +1,61 @@
+-- `eventually (m). P(m)` (A6) — the "holds from some index on"
+-- quantifier: sugar for `Natural.Eventually((m : Natural) ↦ P(m))`.
+-- The binder form is an ordinary proposition (statements, hypotheses,
+-- choose sources); combining facts goes through the Eventually lemma
+-- set (∧-closure via maximum, pointwise monotonicity).
+
+module Test.eventually_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.maximum
+import Natural.eventually
+
+-- The binder form states, and the desugared spelling is the SAME
+-- proposition (statement-addressable both ways).
+theorem Test.eventually_states (s : Natural → Natural)
+        (tailLarge : eventually (m). 5 ≤ s(m))
+        : Natural.Eventually((m : Natural) ↦ 5 ≤ s(m)) :=
+  tailLarge
+
+-- ∧-closure: two eventual facts combine; the thresholds never appear.
+theorem Test.eventually_combines (s t : Natural → Natural)
+        (sLarge : eventually (m). 5 ≤ s(m))
+        (tLarge : eventually (m). 7 ≤ t(m))
+        : eventually (m). 5 ≤ s(m) ∧ 7 ≤ t(m) :=
+  Natural.Eventually.and(
+      (m : Natural) ↦ 5 ≤ s(m),
+      (m : Natural) ↦ 7 ≤ t(m),
+      sLarge, tLarge)
+
+-- Monotone: weaken pointwise under the quantifier.
+theorem Test.eventually_weakens (s : Natural → Natural)
+        (sLarge : eventually (m). 5 ≤ s(m))
+        : eventually (m). 1 ≤ s(m) := {
+  ∀ (m : Natural). 5 ≤ m → 1 ≤ m
+      by (m : Natural) (mLarge : 5 ≤ m) ↦
+           calc 1 ≤ 5
+                  ≤ m;
+  Natural.Eventually.monotone(
+      (m : Natural) ↦ 5 ≤ s(m),
+      (m : Natural) ↦ 1 ≤ s(m),
+      sLarge,
+      (m : Natural) (sLargeAt : 5 ≤ s(m)) ↦
+        calc 1 ≤ 5
+               ≤ s(m))
+}
+
+-- `choose` opens the quantifier when the threshold itself is needed.
+theorem Test.eventually_choose (s : Natural → Natural)
+        (sLarge : eventually (m). 5 ≤ s(m))
+        : ∃ (N : Natural). 5 ≤ s(N) := {
+  choose N such that ∀ (m : Natural). N ≤ m → 5 ≤ s(m) from sLarge;
+  N ≤ N;
+  witness N with done
+}
