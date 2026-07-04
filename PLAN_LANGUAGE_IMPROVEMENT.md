@@ -271,7 +271,7 @@ fail to cover). `case P:` clause spelling was already parse-accepted
 legacy. Landed alongside: a LATENT Let-lift bug the tests flushed out
 (liftBoundVariables skipped Let nodes → stale indices under ζ-lets
 lifted by one binder; bit any ≥3-arm by-cases whose later arms
-carried claim wrappers referencing outer binders). REMAINING A4 (structural witness clause LANDED 33f3d949: `case n = k + 1
+carried claim wrappers referencing outer binders). **Equation-shaped INDUCTION arms LANDED (2026-07-04): induction blocks share the by-cases clause grammar** — `by_induction on n with IH { case n = 0: … case n = k + 1 for some k, with IH: … }`; the `k + 1` offset spelling parses (parsePattern only knew `1 + k`), `for some k` is accepted as documentation (the pattern binds), and `, with <ih>` names the arm's OWN induction hypothesis (overriding the header). Constructor-pattern arms remain legal. Feature test induction_equation_arms_test. Still open toward the full 'induction as a by-cases variant': dropping the header `with IH` when every recursive arm names its own, the `by induction` (space) spelling, and strong induction's IH-quantification variant. REMAINING A4 (structural witness clause LANDED 33f3d949: `case n = k + 1
 for some k [as eq]:` — ∃-hypothesis opened on the spot via one
 Exists.eliminate, witness type inferred from the equation's left
 endpoint or annotated `for some (k : T)`, single binder v1;

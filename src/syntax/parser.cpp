@@ -3770,8 +3770,73 @@ private:
                 Token caseToken = consumeAny();
                 clause.line = caseToken.line;
                 clause.column = caseToken.column;
-                clause.pattern = parsePattern();
-                if (!injectedIhName.empty()) {
+                // A4 equation-shaped arm (induction blocks only):
+                //   `case n = 0:` / `case n = k + 1:` / `case n = 1 + k:`
+                //   with optional `for some k` (documentation — the
+                //   pattern already binds the witness) and optional
+                //   `, with <ih>` (names THIS arm's induction
+                //   hypothesis, overriding the header's name). The
+                //   equation's left side is the inducted variable
+                //   restated for the reader; the right side is the
+                //   constructor form.
+                std::string armIhName;
+                bool equationArm = !injectedIhName.empty()
+                    && isIdentifierLike(peek().kind)
+                    && peekAt(1).kind == TokenKind::Equal;
+                if (equationArm) {
+                    consumeAny();  // the inducted variable
+                    consumeAny();  // '='
+                    if (isIdentifierLike(peek().kind)
+                        && peekAt(1).kind == TokenKind::Plus
+                        && peekAt(2).kind
+                               == TokenKind::NumericLiteral) {
+                        // `k + 1` — the offset spelled AFTER the
+                        // variable (parsePattern only knows `1 + k`).
+                        Token innerToken = consumeAny();
+                        consumeAny();  // '+'
+                        Token numeralToken = consumeAny();
+                        int wraps = std::stoi(numeralToken.lexeme);
+                        SurfacePatternPointer inner =
+                            makeSurfacePatternBareName(
+                                innerToken.lexeme,
+                                innerToken.line, innerToken.column);
+                        for (int i = 0; i < wraps; ++i) {
+                            std::vector<SurfacePatternPointer> wrapped;
+                            wrapped.push_back(std::move(inner));
+                            inner = makeSurfacePatternConstructor(
+                                "successor", std::move(wrapped),
+                                innerToken.line, innerToken.column);
+                        }
+                        clause.pattern = std::move(inner);
+                    } else {
+                        clause.pattern = parsePattern();
+                    }
+                    if (peek().kind == TokenKind::Identifier
+                        && peek().lexeme == "for"
+                        && peekAt(1).kind == TokenKind::Identifier
+                        && peekAt(1).lexeme == "some"
+                        && isIdentifierLike(peekAt(2).kind)) {
+                        consumeAny();  // 'for'
+                        consumeAny();  // 'some'
+                        consumeAny();  // the witness name (documentation)
+                    }
+                    if (peek().kind == TokenKind::Comma
+                        && peekAt(1).kind == TokenKind::KeywordWith) {
+                        consumeAny();  // ','
+                        consumeAny();  // 'with'
+                        if (!isIdentifierLike(peek().kind)) {
+                            throwHere("expected the induction-hypothesis "
+                                      "name after ', with' in the case "
+                                      "arm");
+                        }
+                        armIhName = consumeAny().lexeme;
+                    }
+                } else {
+                    clause.pattern = parsePattern();
+                }
+                std::string ihNameForArm =
+                    armIhName.empty() ? injectedIhName : armIhName;
+                if (!ihNameForArm.empty()) {
                     if (auto* constructorPattern =
                             std::get_if<SurfacePatternConstructor>(
                                 &clause.pattern->node)) {
@@ -3780,7 +3845,7 @@ private:
                                 constructorPattern->arguments);
                         extendedArguments.push_back(
                             makeSurfacePatternBareName(
-                                injectedIhName,
+                                ihNameForArm,
                                 clause.line, clause.column));
                         clause.pattern =
                             makeSurfacePatternConstructor(

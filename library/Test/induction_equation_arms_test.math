@@ -1,0 +1,34 @@
+-- Equation-shaped induction arms (A4): induction blocks share the
+-- by-cases clause grammar — the arm states the constructor form as an
+-- equation on the inducted variable:
+--   `case n = 0:` / `case n = k + 1 for some k, with IH:`
+-- `for some k` is documentation (the pattern binds k); `, with IH`
+-- names THIS arm's induction hypothesis (overriding the header name).
+-- The constructor-pattern arms (`case zero:` / `case successor(k):`)
+-- remain legal.
+
+module Test.induction_equation_arms_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+
+-- Both arms equation-shaped, `k + 1` offset spelling, per-arm IH name.
+theorem Test.add_zero_right_equation_arms (n : Natural) : n + 0 = n :=
+  by_induction on n with IH {
+    case n = 0: done
+    case n = k + 1 for some k, with additionAtK: {
+        k + 0 = k by additionAtK;
+        done
+      }
+  }
+
+-- The `1 + k` offset spelling and the header IH name.
+theorem Test.zero_le_equation_arms (n : Natural) : 0 ≤ n :=
+  by_induction on n with IH {
+    case n = 0: done
+    case n = 1 + k: done by Natural.zero_least
+  }
