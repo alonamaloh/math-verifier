@@ -95,7 +95,7 @@ last; its hypothesis is ¬(the stated cases), and exhaustiveness is
 excluded middle by construction — it cannot fail to cover.
 
 ```math
-claim by cases {
+done by cases {
   case x = Real.zero: …           -- x = 0 in scope (anonymous; `as h` names it)
   otherwise as xNotZero: …        -- ¬(x = 0) in scope
 }
@@ -115,7 +115,7 @@ theorem Rational.minimum_eq_left (a b : Rational) (aLeqB : a ≤ b)
   by Logic.if_positive
 
 -- and in a consumer:
-claim by cases {
+done by cases {
   case a ≤ b: {
       min(a, b) = a by Rational.minimum_eq_left;
       done by substitution
@@ -414,7 +414,7 @@ returns its final non-`;`-terminated expression.
   substituting <eq>` (narrowed to a supplied equation — `<eq>` may be a
   proof *or* a bare equation `(a = b)`, which is auto-proved), `by cases
   { … }`, `by cases on E { case A: … case B: … }`, `by induction { … }`.
-- **Split a disjunction with `claim by cases { in (LEFT) as x: … in (RIGHT)
+- **Split a disjunction with `done by cases { in (LEFT) as x: … in (RIGHT)
   as y: … }`** — NOT `cases <disjunctionProof> { | Or.introduceLeft(x) => …
   | Or.introduceRight(y) => … }`. The arms list the disjuncts as propositions
   (no `Or.introduce*` constructor names), and the auto-prover supplies the

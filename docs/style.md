@@ -137,5 +137,5 @@ If a proof looks like term-soup — nested positional calls, `congruenceOf`,
 raw `rewrite`, `⟨…⟩` over an `And`/`Exists`, `cases <proof> { | Or.introduceLeft
 … }` over a disjunction, anonymous `Or.introduceLeft(…)` chains — rewrite it as
 the mathematician's sentence: state each fact, justify it by its reason, and let
-`claim`/`calc`/`done`/`by induction`/`choose`/`witness`/`claim by cases { in … }`
+`claim`/`calc`/`done`/`by induction`/`choose`/`witness`/`done by cases { … }`
 carry the structure.

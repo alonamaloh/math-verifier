@@ -141,7 +141,7 @@ pair over `CauchyRationalSequence.IsEventuallyNonneg`. The consumer rule:
   `unfold` is local to that one helper.
 
 Pure **uses** (transitivity/antisymmetry citations, `cases B` hypothesis
-pass-throughs, the `claim by cases` linearity splits) operate on the
+pass-throughs, the `done by cases` linearity splits) operate on the
 `IsNonneg` *arguments* and lemmas, not the unfolded body — they need nothing
 special, since `LessOrEqual`/`LessThan` are transparent and reduce to
 `IsNonneg(diff)` without touching the opaque head.
