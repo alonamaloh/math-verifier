@@ -1771,7 +1771,7 @@ private:
                 //   `suppose P [as h] for contradiction;` — assume P,
                 //     derive False through the continuation, and prove
                 //     the goal by double-negation elimination.
-                //   `suppose P [as h] to prove Q { block };` — prove Q
+                //   `suppose P [as h] for proving Q { block };` — prove Q
                 //     under the assumption P, adding `P → Q` to the
                 //     context for the rest of the block.
                 wrapper.type = parseExpression();
@@ -1782,48 +1782,56 @@ private:
                     consumeAny();  // 'as'
                     asPattern = parsePattern();
                 }
-                // `for`/`to`/`prove` are ordinary identifiers everywhere
+                // `for`/`proving` are ordinary identifiers everywhere
                 // except this slot — text-match so they stay usable as
-                // variable names.
-                bool isForContradiction =
+                // variable names. One grammar, two exits:
+                // `for contradiction` and `for proving Q`.
+                bool isForModifier =
                     peek().kind == TokenKind::Identifier
                     && peek().lexeme == "for";
-                bool isToProve =
+                bool isRetiredToProve =
                     peek().kind == TokenKind::Identifier
-                    && peek().lexeme == "to";
-                if (isForContradiction) {
+                    && peek().lexeme == "to"
+                    && peekAt(1).kind == TokenKind::Identifier
+                    && peekAt(1).lexeme == "prove";
+                if (isRetiredToProve) {
+                    throwHere("`suppose P to prove Q { … }` was renamed; "
+                              "write `suppose P for proving Q { … }` "
+                              "(one grammar with `for contradiction`)");
+                }
+                if (isForModifier) {
                     consumeAny();  // 'for'
-                    expect(TokenKind::KeywordContradiction,
-                           "after 'for' in suppose "
-                           "(suppose P for contradiction;)");
-                    // A braced `{ … }` makes it a forward step: the block
-                    // derives False, the proven fact enters the context,
-                    // and the rest of the proof continues at the original
-                    // goal. Without braces the continuation IS the
-                    // False-derivation and the construct proves the goal.
-                    if (peek().kind == TokenKind::LeftBrace) {
-                        wrapper.kind =
-                            BlockWrapper::SupposeForContradictionForward;
+                    if (peek().kind == TokenKind::Identifier
+                        && peek().lexeme == "proving") {
+                        consumeAny();  // 'proving'
+                        wrapper.kind = BlockWrapper::SupposeToProve;
+                        wrapper.value = parseExpression();  // the goal Q
+                        if (peek().kind != TokenKind::LeftBrace) {
+                            throwHere("suppose … for proving Q needs a "
+                                      "`{ … }` proof block "
+                                      "(suppose P for proving Q { … });");
+                        }
                         wrapper.source = parseExpression();  // the `{ block }`
                     } else {
-                        wrapper.kind = BlockWrapper::SupposeForContradiction;
+                        expect(TokenKind::KeywordContradiction,
+                               "after 'for' in suppose "
+                               "(suppose P for contradiction; / "
+                               "suppose P for proving Q { … })");
+                        // A braced `{ … }` makes it a forward step: the
+                        // block derives False, the proven fact enters the
+                        // context, and the rest of the proof continues at
+                        // the original goal. Without braces the
+                        // continuation IS the False-derivation and the
+                        // construct proves the goal.
+                        if (peek().kind == TokenKind::LeftBrace) {
+                            wrapper.kind =
+                                BlockWrapper::SupposeForContradictionForward;
+                            wrapper.source = parseExpression();  // `{ block }`
+                        } else {
+                            wrapper.kind =
+                                BlockWrapper::SupposeForContradiction;
+                        }
                     }
-                } else if (isToProve) {
-                    consumeAny();  // 'to'
-                    if (peek().kind != TokenKind::Identifier
-                        || peek().lexeme != "prove") {
-                        throwHere("expected 'prove' after 'to' in suppose "
-                                  "(suppose P to prove Q { … });");
-                    }
-                    consumeAny();  // 'prove'
-                    wrapper.kind = BlockWrapper::SupposeToProve;
-                    wrapper.value = parseExpression();  // the goal Q
-                    if (peek().kind != TokenKind::LeftBrace) {
-                        throwHere("suppose … to prove Q needs a `{ … }` "
-                                  "proof block "
-                                  "(suppose P to prove Q { … });");
-                    }
-                    wrapper.source = parseExpression();  // the `{ block }`
                 } else {
                     wrapper.kind = BlockWrapper::Suppose;
                     if (!asPattern) {
@@ -1843,9 +1851,9 @@ private:
                             + std::to_string(statementToken.column);
                         wrapper.pattern = std::move(asPattern);
                     } else {
-                        throwHere("suppose … for contradiction / to prove "
-                                  "takes a plain `as <name>`, not a "
-                                  "destructuring pattern");
+                        throwHere("suppose … for contradiction / for "
+                                  "proving takes a plain `as <name>`, not "
+                                  "a destructuring pattern");
                     }
                 } else {
                     wrapper.name = "_supposed_"
@@ -2289,7 +2297,7 @@ private:
                     break;
                 }
                 case BlockWrapper::SupposeToProve: {
-                    // `suppose P as h to prove Q { block };` proves Q under
+                    // `suppose P as h for proving Q { block };` proves Q under
                     // `h : P`, then binds the resulting `P → Q` into the
                     // context (anonymously, for the auto-prover to pick up
                     // by type) for the rest of the block. The block is
@@ -3073,8 +3081,8 @@ private:
 
     // `sum k from LO to HI of BODY` / `product k from LO to HI of BODY` /
     // `fold (op) k from LO to HI of BODY` — the explicit fold binder form.
-    // `to` and `of` are text-matched identifiers (the `suppose … to prove`
-    // treatment), so they stay usable as variable names; the bounds parse
+    // `to` and `of` are text-matched identifiers (the `suppose … for
+    // proving` treatment), so they stay usable as variable names; the bounds parse
     // as full expressions and stop at them naturally (no juxtaposition
     // application exists). The body takes the longest expression to the
     // right — parenthesise the whole form to continue an enclosing

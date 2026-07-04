@@ -122,7 +122,7 @@ End each with `;`; the block returns its final non-`;` expression.
 | `suppose P as h;` | introduce a hypothesis |
 | `suppose Not(G) [as h] for contradiction;` | reductio (terminal): assume `Not(G)`, derive `False` in the continuation, prove the goal `G` by double-negation elimination |
 | `suppose Not(X) [as h] for contradiction { … };` | reductio (forward): the braced block derives `False`, establishing `X` into the context, then the proof continues at the original goal |
-| `suppose P [as h] to prove Q { … };` | forward implication: prove `Q` under `h : P`, adding `P → Q` to the context for the rest of the block |
+| `suppose P [as h] for proving Q { … };` | forward implication: prove `Q` under `h : P`, adding `P → Q` to the context for the rest of the block |
 | `choose w [such that P] [as h] from S;` | `∃`-elimination (preferred): `S` a hypothesis, a lemma cited argument-free, or an applied term |
 | `choose n such that P(n);` | `∃`-elimination from the most-recent in-scope `∃` |
 | `obtain ⟨a, b⟩ from E;` / `let ⟨a, b⟩ := E;` | tuple destructure — non-existential structures only (`∃`/`∧` → use `choose`) |

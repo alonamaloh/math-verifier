@@ -540,7 +540,7 @@ returns its final non-`;`-terminated expression.
   the special case where `X` is the goal and nothing follows. To name the
   established fact, wrap the terminal form in a claim:
   `claim hx : X by { suppose Not(X) for contradiction; … };`.
-- `suppose P [as h] to prove Q { … };` — forward implication intro.
+- `suppose P [as h] for proving Q { … };` — forward implication intro.
   Prove `Q` under the hypothesis `h : P` inside the block, which adds
   `P → Q` to the context (anonymously, for the auto-prover to pick up by
   type) for the rest of the proof. Reads as "suppose `P`; to prove `Q`: …".
