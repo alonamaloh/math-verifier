@@ -98,7 +98,8 @@ by strong induction on n with hypothesis IH;       -- statement form: the REST o
 by strong induction on n with subject, IH { … }    -- explicit subject name (needed when `on` isn't a plain variable)
 
 cases e { | pat => … }                 -- split an inductive value
-cases e with eq { | pat => … }         -- also bind eq : e = pat
+-- need the split equation on the page? state it in a by-cases arm:
+--   by cases { case e = pat [for some x] [as eq]: … }  (`cases e with eq` is retired)
 cases by L { | C(args) => … }          -- split a lemma's disjunction (args inferred)
 if P then a else b                     -- value-level classical conditional (cases on `Logic.classical_decidable(P)`)
 ```
@@ -160,10 +161,11 @@ End each with `;`; the block returns its final non-`;` expression.
   `(∀ (k : Natural). P(k))(m)` — or as a `choose` source addresses
   the in-scope fact with that statement (defeq match, anonymous facts
   included); two matching facts is a loud error naming both. `given (P)`
-  is the same lookup as a bare term. Inside a `cases x with eq` arm,
-  addressing the REFINED statement (`P(successor(k))` when the context
-  holds `P(x)`) transports silently along the case equation
-  (single-position shapes).
+  is the same lookup as a bare term. Inside an equation-shaped case
+  arm (`case x = successor(k) for some k:`), addressing the REFINED
+  statement (`P(successor(k))` when the context holds `P(x)`)
+  transports silently along the arm's equation (single-position
+  shapes).
 - `?` — a hole in a function-call argument position, solved by unification
   from the goal/other arguments (does not invoke the auto-prover).
 - `recalling f, g` after a `by` hint — bring extra named facts into

@@ -281,8 +281,9 @@ step rests on it. Two common extensions:
 
 Useful variants:
 
-- **`cases e with eq { … }`** also gives you `eq : e = <pattern>` in each
-  arm.
+- **Need the split equation on the page?** State it in a by-cases arm:
+  `by cases { case e = 0 as eq: … case e = successor(k) for some (k :
+  Natural) as eq: … }` — each arm's equation is an ordinary hypothesis.
 - **Hypotheses about the scrutinee just work** — a hypothesis whose type
   mentions `e` is generalised automatically, so each arm sees it refined
   to that arm's constructor form.

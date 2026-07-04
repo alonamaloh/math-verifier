@@ -71,21 +71,25 @@ inductives — covers `IntegerRepresentative.make`,
 constructor inner positions would need per-row coverage analysis
 that isn't yet wired up.
 
-## `cases ... with` — case-split with retained equation
+## Case-split with retained equation: state it in the arm
 
-To case-split on an expression and retain an equation between the
-expression and the matched form, add `with <equalityHypothesisName>`:
+To case-split on an expression and keep the equation between the
+expression and the matched form on the page, use the equation-shaped
+by-cases split (the old `cases E with <eq>` convoy form is retired):
 
 ```math
-cases Integer.absolute_value_natural(x) with refinedEquation {
-  | zero          => ...refinedEquation : Integer.absolute_value_natural(x) = zero...
-  | successor(k)  => ...refinedEquation : Integer.absolute_value_natural(x) = successor(k)...
+done by cases {
+  case Integer.absolute_value_natural(x) = 0 as refinedEquation: …
+  case Integer.absolute_value_natural(x) = successor(k)
+         for some (k : Natural) as refinedEquation: …
 }
 ```
 
-The elaborator desugars this to the convoy pattern (`(caseScrutinee : T) (equalityOuter : X = caseScrutinee) ↦ …`) — the user just picks a name. Each arm gets `refinedEquation` in scope with the type refined per branch.
-
-Constructor patterns with arguments (e.g. `successor(predecessor)`) are reconstructed as expressions for the equation type; tuple patterns aren't yet supported.
+Each arm's equation is an ordinary stated hypothesis — citable,
+statement-addressable, and transported by the prover — and
+exhaustiveness discharges through the type's coverage lemma
+(auto-generated `<T>.cases_covered`; `Natural.zero_or_successor` /
+`zero_or_one_plus` at the floor).
 
 ## Classical case-splits: `by cases { case P: … otherwise: … }`
 

@@ -1,14 +1,12 @@
--- `cases X with <equalityHypothesisName> { … }` — convoy form.
+-- Equation-shaped case splits — the replacement for the retired
+-- `cases X with <eq>` convoy form.
 --
--- Each arm gets an additional binder
---   `equalityHypothesisName : X = <constructor pattern>`
--- so the arm body can reason about what X must equal.
---
--- Replaces the manual function-then-apply idiom documented in
--- CLAUDE.md ("cases with hypothesis"), which is the single biggest
--- line-eater the library audit flagged.
+-- Value-level `cases X { | pattern => … }` keeps its plain spelling;
+-- when a PROOF needs the split equation, the by-cases arm states it
+-- (`case X = <constructor pattern> [for some x] [as <eq>]:`) and
+-- exhaustiveness discharges through the type's coverage lemma.
 
-module Test.cases_with_equality_hypothesis_test
+module Test.case_equation_split_test
 
 import Logic.basics
 import Logic.exists
@@ -17,32 +15,22 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 
--- (1) Simplest case: name is bound, but the body doesn't use the
--- equation. Confirms the desugar leaves a well-typed term even
--- when the equation is ignored.
+-- (1) Value-level split, no equation needed: plain cases.
 theorem identitySplit (a : Natural) : Natural :=
-  cases a with equationFromSplit {
+  cases a {
     | zero => zero
     | successor(predecessor) => predecessor
   }
 
--- (2) Use the equation inside one branch. The branch where `a` is
--- `zero` ignores the equation; the successor branch could use it
--- (here we just check the type checks).
-theorem successorOrSelf (a : Natural) : Natural :=
-  cases a with equationFromSplit {
-    | zero => zero
-    | successor(predecessor) => successor(predecessor)
-  }
-
--- (3) Use the equation to construct a more interesting term. The
--- body returns the equation itself in each branch — proving that
--- `equationFromSplit` is actually in scope with the refined type.
+-- (2) The equation carries the arm's knowledge into a witness: each
+-- arm exhibits what `a` must equal, citing its own stated equation.
 theorem returnTheEquation
         (a : Natural)
         : Exists(Natural, (witnessValue : Natural) ↦ a = witnessValue) :=
-  cases a with equationFromSplit {
-    | zero => Exists.introduce(zero, equationFromSplit)
-    | successor(predecessor) =>
-        Exists.introduce(successor(predecessor), equationFromSplit)
+  done by cases {
+    case a = 0 as equationFromSplit:
+        witness 0 with equationFromSplit
+    case a = successor(predecessor) for some (predecessor : Natural)
+           as equationFromSplit:
+        witness successor(predecessor) with equationFromSplit
   }

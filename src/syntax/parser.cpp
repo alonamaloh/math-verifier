@@ -3694,18 +3694,18 @@ private:
     SurfaceExpressionPointer parseCasesExpression() {
         Token casesToken = consumeAny();  // 'cases'
         auto scrutinee = parseCasesScrutinee();
-        // Optional `with <equalityHypothesisName>`: each arm gets an
-        // additional binder `<name> : <scrutinee> = <constructor pattern>`
-        // in scope, generated via the standard convoy desugaring.
+        // `cases E with <eq>` (pattern-match on an expression with the
+        // refinement equation named) is retired: the equation-shaped
+        // by-cases split carries the equation as a stated hypothesis.
         std::string equalityHypothesisName;
         if (peek().kind == TokenKind::KeywordWith) {
-            consumeAny();  // 'with'
-            if (!isIdentifierLike(peek().kind)) {
-                throwHere("expected an equality-hypothesis name after "
-                          "`cases X with`");
-            }
-            Token nameToken = consumeAny();
-            equalityHypothesisName = nameToken.lexeme;
+            throw ParseError(
+                "`cases E with <eq>` was retired: split with "
+                "`by cases { case E = <constructor pattern> "
+                "[for some x] [as <eq>]: … }` — the equation is the "
+                "arm's stated hypothesis and exhaustiveness discharges "
+                "through the type's coverage lemma (line "
+                + std::to_string(peek().line) + ")");
         }
         // Optional `refining <name1>, <name2>, …`: each listed
         // in-scope binder has its type refined per arm (the scrutinee

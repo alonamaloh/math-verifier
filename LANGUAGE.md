@@ -133,11 +133,23 @@ cases Integer.absolute_value_natural(x) {
 }
 ```
 
-### `cases x with refinedEq { … }` — split with retained equation
+### Splitting with a retained equation: equation-shaped by-cases
 
-Adds an equation `refinedEq : <scrutinee> = <constructor pattern>` to
-each arm. Used when the goal mentions the scrutinee in a way the
-constructor reduction alone won't expose.
+When a proof needs the split equation on the page, state it in the
+arm (the old `cases x with eq` form is retired):
+
+```math
+done by cases {
+  case Natural.monus(d, n) = 0 as monusEq: …
+  case Natural.monus(d, n) = successor(k) for some (k : Natural) as monusEq: …
+}
+```
+
+Exhaustiveness discharges through the type's coverage lemma
+(`<T>.cases_covered`, auto-generated; `Natural.zero_or_successor` /
+`zero_or_one_plus` at the floor), and each arm's equation is an
+ordinary stated hypothesis — addressable, citable, transported by the
+prover.
 
 ### Hypotheses about the scrutinee refine automatically
 
@@ -578,8 +590,11 @@ Quotient.induct_two(atMake, x, y)
 function (caseScrutinee : T) (eq : E = caseScrutinee) =>
   cases caseScrutinee { … : motive(caseScrutinee) }
 
--- Use `with`:
-cases E with eq { | Pat => … }
+-- Use the equation-shaped split:
+done by cases {
+  case E = 0 as eq: …
+  case E = successor(k) for some (k : Natural) as eq: …
+}
 ```
 
 ### Don't write `Or.introduceLeft/Right` when `by cases` would work
