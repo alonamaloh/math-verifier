@@ -1095,21 +1095,63 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                 ? "_disjunct_hypothesis" : arm.binderName;
             std::vector<LocalBinder> extendedBinders = localBinders;
             extendedBinders.push_back({binderName, domain});
+            // A4 substitution rule, plain-arm form: when the case
+            // proposition is an equation whose left side is a plain
+            // local variable (`case n = 0:`), the arm's goal has that
+            // variable substituted by the right side, and the proof is
+            // transported back along the hypothesis automatically.
+            // Same deterministic recipe as the witness arms.
+            ExpressionPointer armGoal = goalLifted;
+            int substitutedIndex = -1;
+            ExpressionPointer rhsExtended, carrierExtended;
+            LevelPointer equationLevel;
+            if (!arm.isOtherwise) {
+                EqualityComponents components;
+                bool isEquation = true;
+                try {
+                    components = extractEqualityComponents(
+                        domain, "case equation", arm.line);
+                } catch (const ElaborateError&) {
+                    isEquation = false;
+                }
+                if (isEquation) {
+                    auto* leftVariable = std::get_if<BoundVariable>(
+                        &components.leftEndpoint->node);
+                    if (leftVariable) {
+                        int target = leftVariable->deBruijnIndex + 1;
+                        ExpressionPointer candidateRhs =
+                            liftBoundVariables(
+                                components.rightEndpoint, 1, 0);
+                        ExpressionPointer substituted =
+                            replaceBoundVariableInPlace(
+                                goalLifted, target, candidateRhs);
+                        if (!structurallyEqual(substituted, goalLifted)) {
+                            armGoal = substituted;
+                            substitutedIndex = target;
+                            rhsExtended = candidateRhs;
+                            carrierExtended = liftBoundVariables(
+                                components.carrierType, 1, 0);
+                            equationLevel =
+                                components.carrierUniverseLevel;
+                        }
+                    }
+                }
+            }
             // Frame anchors any error in this arm at the arm's own position,
             // not at the enclosing eliminator (the misleading "case for
             // 'Exists.introduce'" / wrong-line report otherwise).
             Frame armFrame(*this,
                 "`by cases` arm at line " + std::to_string(arm.line),
-                extendedBinders, goalLifted, arm.line, arm.column);
+                extendedBinders, armGoal, arm.line, arm.column);
             ExpressionPointer body = elaborateExpression(
-                *arm.body, extendedBinders, goalLifted);
+                *arm.body, extendedBinders, armGoal);
             // Coerce the arm body to the goal, exactly as a lambda body or a
             // `cases` arm is coerced. This lets an arm state a proof of one
             // DISJUNCT (`calc n = … = 0`) and have the disjunction-injection
             // coercion wrap the matching `Or.introduce*` — consistent with
             // `cases` arms, instead of demanding an explicit `Or.introduceLeft`.
             body = coerceToExpectedTypeViaDiff(
-                extendedBinders, body, goalLifted);
+                extendedBinders, body, armGoal);
             // If the (coerced) body still doesn't prove the goal, report it
             // here, at the arm, with a math-shaped message — rather than
             // letting the mismatch surface later as a kernel Pi-domain error
@@ -1118,7 +1160,7 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                 ExpressionPointer bodyTypeOpened =
                     inferTypeInLocalContext(extendedBinders, body);
                 ExpressionPointer goalOpened = openOverLocalBinders(
-                    goalLifted, extendedBinders, extendedBinders.size());
+                    armGoal, extendedBinders, extendedBinders.size());
                 if (!isDefinitionallyEqual(
                         environment_,
                         buildContextFromLocalBinders(extendedBinders),
@@ -1127,7 +1169,7 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
                         bodyTypeOpened, extendedBinders, extendedBinders.size());
                     throwElaborate(
                         "this `by cases` arm must prove the goal\n      "
-                        + prettyPrintInLocalScope(goalLifted, extendedBinders)
+                        + prettyPrintInLocalScope(armGoal, extendedBinders)
                         + "\n  but its body proves\n      "
                         + prettyPrintInLocalScope(bodyTypeClosed, extendedBinders)
                         + "\n  — if that is meant to be one side of the "
@@ -1138,6 +1180,35 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
             } catch (const TypeError&) {
                 // Body isn't well-typed on its own — let the normal flow
                 // surface that error.
+            }
+            if (substitutedIndex >= 0) {
+                // body : goal[n := rhs]. Transport back along rhs = n.
+                ExpressionPointer variableExtended =
+                    makeBoundVariable(substitutedIndex);
+                ExpressionPointer motiveBody =
+                    replaceBoundVariableInPlace(
+                        liftBoundVariables(goalLifted, 1, 0),
+                        substitutedIndex + 1,
+                        makeBoundVariable(0));
+                ExpressionPointer motive = makeLambda(
+                    "_substituted", carrierExtended,
+                    std::move(motiveBody));
+                ExpressionPointer symmetric = makeConstant(
+                    "Equality.symmetry", {equationLevel});
+                symmetric = makeApplication(symmetric, carrierExtended);
+                symmetric = makeApplication(symmetric, variableExtended);
+                symmetric = makeApplication(symmetric, rhsExtended);
+                symmetric = makeApplication(
+                    symmetric, makeBoundVariable(0));
+                ExpressionPointer transport = makeConstant(
+                    "Equality.transport_proposition", {equationLevel});
+                transport = makeApplication(transport, carrierExtended);
+                transport = makeApplication(transport, std::move(motive));
+                transport = makeApplication(transport, rhsExtended);
+                transport = makeApplication(transport, variableExtended);
+                transport = makeApplication(transport, std::move(symmetric));
+                transport = makeApplication(transport, std::move(body));
+                body = std::move(transport);
             }
             warnIfBinderUnused(
                 arm.binderName, body, arm.line, arm.column,
