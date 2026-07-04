@@ -4238,19 +4238,20 @@ private:
         //                            (parseExpression stops cleanly
         //                            at either since neither is an
         //                            expression-position operator).
-        Token armToken = consumeAny();  // 'in' or 'case' or 'otherwise'
-        bool isOtherwise = armToken.kind != TokenKind::KeywordIn
-            && armToken.kind != TokenKind::KeywordCase
+        Token armToken = consumeAny();  // 'case' or 'otherwise'
+        if (armToken.kind == TokenKind::KeywordIn) {
+            // Retired spelling — steer to the settled clause syntax.
+            throw ParseError(
+                "the `in (P):` arm spelling was retired; write "
+                "`case P:` (line " + std::to_string(armToken.line)
+                + ")");
+        }
+        bool isOtherwise = armToken.kind != TokenKind::KeywordCase
             && armToken.lexeme == "otherwise";
         SurfaceExpressionPointer disjunctType;
         if (isOtherwise) {
             // `otherwise [as h]: body` — no proposition; the hypothesis
             // is the complement of the other cases, synthesized later.
-        } else if (armToken.kind == TokenKind::KeywordIn) {
-            expect(TokenKind::LeftParen, "after 'in'");
-            disjunctType = parseExpression();
-            expect(TokenKind::RightParen,
-                   "after disjunct type in 'in (T) …'");
         } else {
             // 'case T [as h]: body'.
             disjunctType = parseExpression();
