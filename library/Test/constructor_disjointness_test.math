@@ -1,0 +1,64 @@
+-- The auto-prover's constructor-disjointness refutation: a `False` goal
+-- closes from an in-scope hypothesis `C1(…) = C2(…)` where C1 ≠ C2 are two
+-- distinct constructors of the SAME Type-valued inductive. The tactic builds
+-- a discriminator `D : T → Prop` (True on C1's arm, False elsewhere) from the
+-- inductive's recursor and transports `True.trivial` across the equation, so
+-- `done` closes impossible constructor cases directly — no bespoke
+-- zero-vs-successor style lemma needed.
+
+module Test.constructor_disjointness_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Lists.list
+
+-- (a) A non-Natural inductive that no library lemma covers: the empty list
+-- cannot equal a prepend. Pins the mechanism itself (recursor discriminator
+-- over a parameterised Type inductive).
+theorem emptyIsNotPrepend (A : Type(0)) (x : A) (rest : List(A))
+        (impossible : List.empty(A) = List.prepend(A, x, rest))
+        : False := done
+
+-- The symmetric orientation closes just the same (the tactic reads the
+-- left endpoint's constructor as the True arm either way).
+theorem prependIsNotEmpty (A : Type(0)) (x : A) (rest : List(A))
+        (impossible : List.prepend(A, x, rest) = List.empty(A))
+        : False := done
+
+-- (b) The Natural case: `0`'s `zero` head is disjoint from a `successor`
+-- head. This is the generic form of the bespoke `Natural.zero_not_successor`
+-- / `Natural.successor_not_zero` lemmas (neither is imported here — the
+-- tactic alone closes it).
+theorem zeroIsNotSuccessor (n : Natural)
+        (impossible : 0 = successor(n))
+        : False := done
+
+-- The numeral literal `1` weak-head-reduces to `successor(0)`, exposing the
+-- successor head, so the numeral spelling closes too.
+theorem zeroIsNotOne (impossible : (0 : Natural) = 1)
+        : False := done
+
+-- Caveat (documented, not a bug): the `+`-numeral spelling `0 = 1 + n` does
+-- NOT close through this tactic, because `Natural.add` is an `opaque
+-- definition` — `1 + n` stays stuck at `Natural.add(1, n)` under WHNF rather
+-- than reducing to `successor(n)`. Respecting that opacity boundary is
+-- correct; rewriting `1 + n` to `successor(n)` first (e.g. `one_add`) is the
+-- caller's job. The literal-successor and numeral spellings above are the
+-- ones the tactic serves directly.
+
+-- (c) A by-cases arm whose hypothesis is an impossible constructor equation,
+-- closed by bare `done` (the real-world shape). Each disjunct is impossible,
+-- so both arms discharge the `False` goal through the tactic without a named
+-- refutation lemma.
+theorem impossibleCaseArmsCloseByDone (A : Type(0)) (x : A) (rest : List(A))
+        (split : ((0 : Natural) = 1)
+                 ∨ (List.empty(A) = List.prepend(A, x, rest)))
+        : False :=
+  done by cases {
+    case (0 : Natural) = 1 as zeroIsOne:
+      done
+    case List.empty(A) = List.prepend(A, x, rest) as emptyIsPrepend:
+      done
+  }

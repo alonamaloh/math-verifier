@@ -340,6 +340,246 @@ ExpressionPointer Elaborator::tryDisjunctiveSyllogism(
         return nullptr;
     }
 
+ExpressionPointer Elaborator::tryConstructorDisjointness(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/) {
+        // Fires only on a `False` goal, closing it from a hypothesis
+        // `C1(…) = C2(…)` with C1 ≠ C2 constructors of one Type-valued
+        // inductive. Mechanism: a discriminator `D : T → Prop` built from
+        // the inductive's recursor (True on C1's arm, False elsewhere) plus
+        // one `Equality.transport_proposition`, whose result `D(rhs)`
+        // ι-reduces to `False`.
+        if (!environment_.lookup("Equality.transport_proposition")
+            || !environment_.lookup("True")
+            || !environment_.lookup("True.trivial")
+            || !environment_.lookup("False")) {
+            return nullptr;
+        }
+        // Cheap goal gate: a `False` goal is almost always the literal
+        // constant; only WHNF when it wears a definition head, so a
+        // non-`False` goal pays at most one weak-head reduction and the
+        // fact scan below never runs.
+        {
+            auto* direct = std::get_if<Constant>(&goalClosed->node);
+            bool isFalse = direct && direct->name == "False";
+            if (!isFalse) {
+                ExpressionPointer goalWhnf;
+                try {
+                    goalWhnf = weakHeadNormalForm(environment_, goalClosed);
+                } catch (const TypeError&) { return nullptr; }
+                auto* gc = std::get_if<Constant>(&goalWhnf->node);
+                isFalse = gc && gc->name == "False";
+            }
+            if (!isFalse) return nullptr;
+        }
+        int N = static_cast<int>(localBinders.size());
+        if (N == 0) return nullptr;
+        std::vector<ContextFact> facts =
+            collectLocalBinderFacts(localBinders);
+
+        // λ-absorb a Pi-telescope's binders around a CLOSED body (True /
+        // False / Prop carry no bound variables, so no lifting is needed as
+        // we descend). Reuses the recursor type's own binder names/types, so
+        // each arm's arity — fields AND induction hypotheses — comes from
+        // the recursor's Pi telescope rather than being recomputed from the
+        // constructor.
+        auto absorbTelescope = [](ExpressionPointer teleType,
+                                  ExpressionPointer body) {
+            std::vector<std::pair<std::string, ExpressionPointer>> binders;
+            ExpressionPointer cursor = teleType;
+            while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+                binders.push_back({pi->displayHint, pi->domain});
+                cursor = pi->codomain;
+            }
+            ExpressionPointer result = body;
+            for (int i = static_cast<int>(binders.size()) - 1; i >= 0; --i) {
+                result = makeLambda(binders[i].first, binders[i].second,
+                                     std::move(result));
+            }
+            return result;
+        };
+        // Peel the constructor head off an endpoint (one WHNF, then the
+        // application spine). Returns the Constructor declaration or null.
+        auto constructorHead =
+            [&](ExpressionPointer endpoint) -> const Constructor* {
+            ExpressionPointer whnf;
+            try {
+                whnf = weakHeadNormalForm(environment_, endpoint);
+            } catch (const TypeError&) { return nullptr; }
+            ExpressionPointer cursor = whnf;
+            while (auto* app = std::get_if<Application>(&cursor->node)) {
+                cursor = app->function;
+            }
+            auto* constant = std::get_if<Constant>(&cursor->node);
+            if (!constant) return nullptr;
+            const Declaration* declaration =
+                environment_.lookup(constant->name);
+            return declaration
+                ? std::get_if<Constructor>(declaration) : nullptr;
+        };
+
+        for (const ContextFact& fact : facts) {
+            autoProveSpend(1);
+            // Cheap gate: only fully-applied `Equality.{u}(T, l, r)` facts.
+            ExpressionPointer factWhnf;
+            try {
+                factWhnf = weakHeadNormalForm(environment_, fact.type);
+            } catch (const TypeError&) { continue; }
+            auto* appR = std::get_if<Application>(&factWhnf->node);
+            if (!appR) continue;
+            auto* appL = std::get_if<Application>(&appR->function->node);
+            if (!appL) continue;
+            auto* appA = std::get_if<Application>(&appL->function->node);
+            if (!appA) continue;
+            auto* head = std::get_if<Constant>(&appA->function->node);
+            if (!head || head->name != "Equality"
+                || head->universeArguments.size() != 1) continue;
+            ExpressionPointer carrierType = appA->argument;
+            ExpressionPointer lhs = appL->argument;
+            ExpressionPointer rhs = appR->argument;
+            LevelPointer carrierLevel = head->universeArguments[0];
+
+            // Both endpoints must be constructors of the same inductive,
+            // and DIFFERENT ones (equal constructors are not absurd).
+            const Constructor* leftCtor = constructorHead(lhs);
+            if (!leftCtor) continue;
+            const Constructor* rightCtor = constructorHead(rhs);
+            if (!rightCtor) continue;
+            if (leftCtor->inductiveName != rightCtor->inductiveName) continue;
+            if (leftCtor->constructorIndex == rightCtor->constructorIndex) {
+                continue;
+            }
+            const std::string& inductiveName = leftCtor->inductiveName;
+
+            const Declaration* inductiveDeclaration =
+                environment_.lookup(inductiveName);
+            const Inductive* inductive = inductiveDeclaration
+                ? std::get_if<Inductive>(inductiveDeclaration) : nullptr;
+            if (!inductive) continue;
+            const Declaration* recursorDeclaration =
+                environment_.lookup(inductiveName + "_recursor");
+            const Recursor* recursor = recursorDeclaration
+                ? std::get_if<Recursor>(recursorDeclaration) : nullptr;
+            if (!recursor) continue;
+            // Skip Prop-valued inductives: their recursor lacks the extra
+            // motive-universe parameter (small elimination only), so a
+            // `T → Prop` discriminator cannot be built.
+            bool hasMotiveLevel =
+                recursor->universeParameters.size()
+                > inductive->universeParameters.size();
+            if (!hasMotiveLevel) continue;
+
+            // Parameter and index values come from the carrier type's spine:
+            // T = I(param_1 … param_p, index_1 … index_m). WHNF exposes I,
+            // and its universe arguments carry the inductive's levels.
+            ExpressionPointer carrierWhnf;
+            try {
+                carrierWhnf = weakHeadNormalForm(environment_, carrierType);
+            } catch (const TypeError&) { continue; }
+            std::vector<ExpressionPointer> carrierArguments;
+            std::vector<LevelPointer> inductiveUniverseArguments;
+            {
+                ExpressionPointer cursor = carrierWhnf;
+                while (auto* app =
+                           std::get_if<Application>(&cursor->node)) {
+                    carrierArguments.insert(carrierArguments.begin(),
+                                             app->argument);
+                    cursor = app->function;
+                }
+                auto* constant = std::get_if<Constant>(&cursor->node);
+                if (!constant || constant->name != inductiveName) continue;
+                inductiveUniverseArguments = constant->universeArguments;
+            }
+            int numParameters = inductive->numParameters;
+            int numIndices = recursor->numIndices;
+            if (static_cast<int>(carrierArguments.size())
+                != numParameters + numIndices) continue;
+
+            // Recursor universe arguments: the inductive's own levels
+            // followed by the motive level. The motive returns `Prop`
+            // (Sort 0), whose type is Sort 1, so the motive universe is 1.
+            std::vector<LevelPointer> recursorUniverseArguments =
+                inductiveUniverseArguments;
+            recursorUniverseArguments.push_back(makeLevelConst(1));
+            ExpressionPointer recursorType = substituteUniverseLevels(
+                recursor->type, recursor->universeParameters,
+                recursorUniverseArguments);
+
+            // Assemble D = λ x:T. I_recursor{…}(params, motive, arms…,
+            // indices, x) inside the discriminator's single binder, so the
+            // carrier's parameter/index values (closed in the fact scope)
+            // shift by one. The recursor's Pi telescope drives the motive
+            // and arm shapes: peel params (substituting their values), then
+            // the motive binder (whose domain is the motive's expected type
+            // `Π indices. Π s. Sort 1`), then one Pi per minor premise.
+            ExpressionPointer cursor = recursorType;
+            bool ok = true;
+            for (int i = 0; i < numParameters; ++i) {
+                auto* pi = std::get_if<Pi>(&cursor->node);
+                if (!pi) { ok = false; break; }
+                cursor = substitute(pi->codomain, 0,
+                                     shift(carrierArguments[i], 1));
+            }
+            if (!ok) continue;
+            ExpressionPointer motive;
+            {
+                auto* pi = std::get_if<Pi>(&cursor->node);
+                if (!pi) continue;
+                motive = absorbTelescope(pi->domain,
+                                          makeSort(makeLevelConst(0)));
+                cursor = substitute(pi->codomain, 0, motive);
+            }
+            std::vector<ExpressionPointer> arms;
+            for (int i = 0; i < recursor->numConstructors; ++i) {
+                auto* pi = std::get_if<Pi>(&cursor->node);
+                if (!pi) { ok = false; break; }
+                ExpressionPointer body =
+                    (i == leftCtor->constructorIndex)
+                        ? makeConstant("True", {})
+                        : makeConstant("False", {});
+                ExpressionPointer arm = absorbTelescope(pi->domain, body);
+                arms.push_back(arm);
+                cursor = substitute(pi->codomain, 0, arm);
+            }
+            if (!ok) continue;
+
+            ExpressionPointer application = makeConstant(
+                inductiveName + "_recursor", recursorUniverseArguments);
+            for (int i = 0; i < numParameters; ++i) {
+                application = makeApplication(
+                    application, shift(carrierArguments[i], 1));
+            }
+            application = makeApplication(application, motive);
+            for (const auto& arm : arms) {
+                application = makeApplication(application, arm);
+            }
+            for (int j = 0; j < numIndices; ++j) {
+                application = makeApplication(application,
+                    shift(carrierArguments[numParameters + j], 1));
+            }
+            application = makeApplication(application, makeBoundVariable(0));
+            ExpressionPointer discriminator = makeLambda(
+                "_discriminated", carrierType, std::move(application));
+
+            // transport_proposition{u}(T, D, lhs, rhs, eq, True.trivial)
+            // has type D(rhs), which ι-reduces to `False`; and its
+            // `proofAtX` obligation `D(lhs)` ι-reduces to `True`, discharged
+            // by `True.trivial`.
+            ExpressionPointer transport = makeConstant(
+                "Equality.transport_proposition", {carrierLevel});
+            transport = makeApplication(transport, carrierType);
+            transport = makeApplication(transport, discriminator);
+            transport = makeApplication(transport, lhs);
+            transport = makeApplication(transport, rhs);
+            transport = makeApplication(transport, fact.proofTerm);
+            transport = makeApplication(
+                transport, makeConstant("True.trivial", {}));
+            return transport;
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::tryDisjunctionIntro(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -2011,6 +2251,17 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // Constructor disjointness — a `False` goal from an impossible
+        // constructor equation `C1(…) = C2(…)` in scope. Pure context scan
+        // (one WHNF per endpoint), so it sits with the cheap shape-gated
+        // tactics, before the expensive library scans.
+        {
+            ExpressionPointer attempt = runTactic("constructorDisjointness",
+                [&] { return tryConstructorDisjointness(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
         // From here on the tactics are per-call expensive (full library
         // scans, recursive sub-proofs). Each charges the effort budget in
         // its hot loop via autoProveSpend(), which throws
@@ -2221,6 +2472,10 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("disjunctiveSyllogism", [&] {
             return tryDisjunctiveSyllogism(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("constructorDisjointness", [&] {
+            return tryConstructorDisjointness(
                 goalClosed, localBinders, line);
         });
         runProfiled("contextFactMatch", [&] {

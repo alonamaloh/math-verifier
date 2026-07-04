@@ -1456,6 +1456,22 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // Constructor disjointness: a `False` goal falls straight out of an
+    // in-scope hypothesis `C1(…) = C2(…)` where C1 ≠ C2 are two distinct
+    // constructors of the SAME Type-valued inductive — the generic form of
+    // the bespoke zero-vs-successor refutation lemmas. Builds a
+    // discriminator `D : T → Prop` (via the inductive's recursor) that is
+    // `True` on C1's arm and `False` on every other, then
+    // `Equality.transport_proposition(T, D, lhs, rhs, eq, True.trivial)`
+    // has type `D(rhs)`, which ι-reduces to `False`. Prop-valued inductives
+    // are skipped (small elimination cannot build a Prop-valued
+    // discriminator). Pure context scan (one WHNF per endpoint, no deep
+    // normalisation), so it sits with the cheap shape-gated tactics.
+    ExpressionPointer tryConstructorDisjointness(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
     // Unified named-fact representation. A fact carries a proof
     // term and that proof's type, plus a cost so the matcher tries
     // cheap facts first. Used by `tryContextFactMatch` to collapse
