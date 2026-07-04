@@ -30,7 +30,7 @@ theorem Natural.multiply_successor_inductive (a b : Natural)
       -- on its own. So expose the leading multiply step explicitly
       -- (`successor_multiply`), apply the induction hypothesis, and let
       -- `ring` re-associate to the right-hand side.
-      calc successor(predecessor) * successor(b)
+      successor(predecessor) * successor(b)
          = successor(b) + predecessor * successor(b)
               by Natural.successor_multiply
          = successor(b) + (predecessor + predecessor * b)
@@ -50,7 +50,7 @@ theorem Natural.multiply_successor_unreduced (a b : Natural)
       reflexivity(zero);
     case successor(predecessor):
       -- IH : predecessor * successor(b) = predecessor + predecessor * b
-      calc successor(predecessor) * successor(b)
+      successor(predecessor) * successor(b)
          -- β of * on the LHS exposes the IH-shaped subterm.
          = successor(b) + predecessor * successor(b)
               by reflexivity(successor(b) + predecessor * successor(b))
@@ -87,7 +87,7 @@ theorem Natural.multiply_successor_bare_reflexivity (a b : Natural)
   by induction on a with IH {
     case zero: reflexivity;
     case successor(predecessor):
-      calc successor(predecessor) * successor(b)
+      successor(predecessor) * successor(b)
          = successor(b) + predecessor * successor(b)             by reflexivity
          = successor(b) + (predecessor + predecessor * b)        by rewrite(IH)
          = successor((b + predecessor) + predecessor * b)
@@ -125,50 +125,43 @@ theorem Natural.multiply_successor_by_ring (a b : Natural)
 -- closes when the two sides are definitionally equal.
 theorem calc_no_by_reflexive (a b : Natural)
         : a + b = a + b :=
-  calc a + b
-     = a + b
+  a + b = a + b
 
 -- One-step calc with `by` omitted, relying on the kernel β of
 -- Natural.add for successor in the first argument.
 theorem calc_no_by_beta (b : Natural) (Y : Natural)
         : Natural.add(successor(b), Y) = successor(Natural.add(b, Y)) :=
-  calc Natural.add(successor(b), Y)
-     = successor(Natural.add(b, Y))
+  Natural.add(successor(b), Y) = successor(Natural.add(b, Y))
 
 -- Commutativity at a single position, no `by` clause.
 -- The auto-prover detects subL = op(a, b), subR = op(b, a) and looks
 -- up Natural.add as commutative.
 theorem calc_no_by_commutative (a b : Natural)
         : a + b = b + a :=
-  calc a + b
-     = b + a
+  a + b = b + a
 
 -- Associativity at a single position.
 theorem calc_no_by_associative (a b c : Natural)
         : (a + b) + c = a + (b + c) :=
-  calc (a + b) + c
-     = a + (b + c)
+  (a + b) + c = a + (b + c)
 
 -- Associativity reversed: uses Equality.symmetry under the hood.
 theorem calc_no_by_associative_reverse (a b c : Natural)
         : a + (b + c) = (a + b) + c :=
-  calc a + (b + c)
-     = (a + b) + c
+  a + (b + c) = (a + b) + c
 
 -- Commutativity at a nested position: inside successor(_).
 -- Exercises the path-aware congruence wrapping.
 theorem calc_no_by_commutative_nested (a b : Natural)
         : successor(a + b) = successor(b + a) :=
-  calc successor(a + b)
-     = successor(b + a)
+  successor(a + b) = successor(b + a)
 
 -- Multi-step chain mixing commutativity, associativity, and
 -- definitional equality, all without `by`. This is the form we
 -- want the multiply_successor proof to eventually shrink down to.
 theorem calc_no_by_chain (a b c : Natural)
         : (a + b) + c = c + (a + b) :=
-  calc (a + b) + c
-     = c + (a + b)
+  (a + b) + c = c + (a + b)
 
 -- Same algebraic chain as multiply_successor's nested rearrangement,
 -- with all `by ...` clauses dropped. The auto-prover should classify
@@ -177,7 +170,7 @@ theorem calc_no_by_chain (a b c : Natural)
 theorem calc_no_by_multiply_successor_inner (b predecessor : Natural)
         : successor(b + (predecessor + predecessor * b))
         = successor(predecessor + (b + predecessor * b)) :=
-  calc successor(b + (predecessor + predecessor * b))
+  successor(b + (predecessor + predecessor * b))
      = successor((b + predecessor) + predecessor * b)
      = successor((predecessor + b) + predecessor * b)
      = successor(predecessor + (b + predecessor * b))
@@ -191,7 +184,7 @@ theorem Natural.multiply_successor_no_by (a b : Natural)
   by induction on a with IH {
     case zero: reflexivity;
     case successor(predecessor):
-      calc successor(predecessor) * successor(b)
+      successor(predecessor) * successor(b)
          = successor(b) + predecessor * successor(b)
          = successor(b) + (predecessor + predecessor * b)
          = successor((b + predecessor) + predecessor * b)
@@ -208,18 +201,15 @@ theorem Natural.multiply_successor_no_by (a b : Natural)
 -- detected (1 binder, conclusion op(BV(0), unit) = BV(0)). The
 -- auto-prover should close `a + 0 = a` and the symmetric `a = a + 0`.
 theorem calc_no_by_add_zero (a : Natural) : a + zero = a :=
-  calc a + zero
-     = a
+  a + zero = a
 
 theorem calc_no_by_add_zero_reverse (a : Natural) : a = a + zero :=
-  calc a
-     = a + zero
+  a = a + zero
 
 -- Identity at a sub-position: `successor(a + zero)` to `successor(a)`.
 theorem calc_no_by_add_zero_nested (a : Natural)
         : successor(a + zero) = successor(a) :=
-  calc successor(a + zero)
-     = successor(a)
+  successor(a + zero) = successor(a)
 
 -- Multi-position AC rearrangement: `(a+b) + (c+d) = (b+a) + (d+c)`
 -- changes the order of args in two places simultaneously. The single-
@@ -228,23 +218,20 @@ theorem calc_no_by_add_zero_nested (a : Natural)
 -- flattening both sides and comparing multisets of leaves.
 theorem calc_no_by_ac_multi_position (a b c d : Natural)
         : (a + b) + (c + d) = (b + a) + (d + c) :=
-  calc (a + b) + (c + d)
-     = (b + a) + (d + c)
+  (a + b) + (c + d) = (b + a) + (d + c)
 
 -- Deeply nested AC rearrangement: `((a+b)+c)+d = a + (b + (c + d))`.
 -- All four leaves preserved; structure completely re-balanced.
 theorem calc_no_by_ac_reassociation (a b c d : Natural)
         : ((a + b) + c) + d = a + (b + (c + d)) :=
-  calc ((a + b) + c) + d
-     = a + (b + (c + d))
+  ((a + b) + c) + d = a + (b + (c + d))
 
 -- Definitional equality at calc step level: `succ(b) + X ≡
 -- succ(b + X)` reduces in the kernel, so the def-eq strategy of the
 -- auto-prover (its first pass) closes this without descent.
 theorem calc_no_by_beta_at_head (b X : Natural)
         : Natural.add(successor(b), X) = successor(Natural.add(b, X)) :=
-  calc Natural.add(successor(b), X)
-     = successor(Natural.add(b, X))
+  Natural.add(successor(b), X) = successor(Natural.add(b, X))
 
 -- Multi-level classification: the diff is at an INTERMEDIATE level
 -- (not the deepest single-position diff). With `sumEq : x + z = y + z`
@@ -254,8 +241,7 @@ theorem calc_no_by_beta_at_head (b X : Natural)
 theorem calc_intermediate_local_hyp_match
         (x y z : Natural) (sumEq : x + z = y + z)
         : (x + z) + z = (y + z) + z :=
-  calc (x + z) + z
-     = (y + z) + z
+  (x + z) + z = (y + z) + z
 
 -- Version with bare `by IH` (auto-rewrite fallback).
 theorem Natural.multiply_successor_by_IH (a b : Natural)
@@ -263,7 +249,7 @@ theorem Natural.multiply_successor_by_IH (a b : Natural)
   by induction on a with IH {
     case zero: reflexivity;
     case successor(predecessor):
-      calc successor(predecessor) * successor(b)
+      successor(predecessor) * successor(b)
          = successor(b) + predecessor * successor(b)             by reflexivity
          = successor(b) + (predecessor + predecessor * b)        by IH
          = successor((b + predecessor) + predecessor * b)

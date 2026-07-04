@@ -12,37 +12,37 @@ import Natural.arithmetic
 
 -- Argument position differs; the differing leaf `a` vs `b` is a context fact.
 theorem Test.sd_arg (a b c : Natural) (h : a = b) : c * a = c * b :=
-  calc c * a = c * b
+  c * a = c * b
 
 -- Function position differs; same leaf shape.
 theorem Test.sd_fn (a b c : Natural) (h : a = b) : a * c = b * c :=
-  calc a * c = b * c
+  a * c = b * c
 
 -- The differing leaf is a COMPOUND term whose head differs from its
 -- counterpart (successor vs +), matched against the context as a single
 -- unit — this mirrors the real `|nx| = 1+kx` case that motivated the tactic.
 theorem Test.sd_compound_leaf (a b c : Natural) (h : successor(a) = b + b)
     : successor(a) * c = (b + b) * c :=
-  calc successor(a) * c = (b + b) * c
+  successor(a) * c = (b + b) * c
 
 -- Both function and argument differ (same head): two congruences joined by
 -- transitivity, each leaf discharged from the context.
 theorem Test.sd_both (a b x y : Natural) (hf : a = b) (hx : x = y)
     : a * x = b * y :=
-  calc a * x = b * y
+  a * x = b * y
 
 -- The hypothesis's RHS is DEFEQ but not syntactically equal to the goal's
 -- (`successor(b)` vs `1 + b`). This is the real `|ny| = successor(ky)` vs
 -- `1 + ky` case — the leaf matcher must accept it via its defeq probe.
 theorem Test.sd_defeq_rhs (a b c : Natural) (h : a = successor(b))
     : c * a = c * (1 + b) :=
-  calc c * a = c * (1 + b)
+  c * a = c * (1 + b)
 
 -- Fallthrough: structuralDiff cannot close this (it needs commutativity, a
 -- library lemma, not a context fact). It must DECLINE cleanly and let the
 -- normal battery finish — guarding against the pre-tactic over-claiming.
 theorem Test.sd_fallthrough (a b : Natural) : a + b = b + a :=
-  calc a + b = b + a
+  a + b = b + a
 
 -- Pattern 1: the two sides differ at the ROOT (head `*` vs head `g`), so
 -- there is no congruence to peel; the bridge is a LEMMA whose conclusion
@@ -52,9 +52,9 @@ axiom Test.g_mult : ∀ (x y : Natural). Test.g(x * y) = Test.g(x) * Test.g(y)
 
 theorem Test.sd_lemma_shape (a b : Natural)
     : Test.g(a) * Test.g(b) = Test.g(a * b) :=
-  calc Test.g(a) * Test.g(b) = Test.g(a * b)
+  Test.g(a) * Test.g(b) = Test.g(a * b)
 
 -- Does `by substituting h` itself bridge the successor/1+ gap (opaque add)?
 theorem Test.sd_subst_defeq (a b c : Natural) (h : a = successor(b))
     : c * a = c * (1 + b) :=
-  calc c * a = c * (1 + b)   by substituting h
+  c * a = c * (1 + b)   by substituting h

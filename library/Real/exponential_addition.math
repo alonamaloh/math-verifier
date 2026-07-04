@@ -84,15 +84,12 @@ theorem Real.binomial_reciprocal_split (i d : Natural)
   -- The closed form, cast into ℝ.
   (Natural.binomial(i + d, i) : Real)
             * ((i! : Real) * (d! : Real))
+        = (Natural.binomial(i + d, i) : Real)
+              * (i! * d! : Real)
+              by Real.from_natural.multiply_preserves(i!, d!)
+        = (Natural.binomial(i + d, i) * (i! * d!) : Real)
         = ((i + d)! : Real)
-      by calc (Natural.binomial(i + d, i) : Real)
-                  * ((i! : Real) * (d! : Real))
-            = (Natural.binomial(i + d, i) : Real)
-                  * (i! * d! : Real)
-                  by Real.from_natural.multiply_preserves(i!, d!)
-            = (Natural.binomial(i + d, i) * (i! * d!) : Real)
-            = ((i + d)! : Real)
-                  by Natural.binomial_factorial(i, d) as castSplit;
+              by Natural.binomial_factorial(i, d) as castSplit;
   -- All three factorial casts are positive, hence nonzero.
   (i! : Real) > 0;
   (i! : Real) ≠ 0;
@@ -244,31 +241,23 @@ theorem Real.cauchy_product_exchange (a b : Natural → Real)
                   (i : Natural) ↦
                       a(i) * Real.partialSum(b, Natural.monus(p, i)),
                   p)
-          by calc Real.partialSum(
-                      (i : Natural) ↦
-                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
-                      successor(p))
-                = Real.partialSum(
-                      (i : Natural) ↦
-                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
-                      p)
-                  + a(p) * Real.partialSum(b, Natural.monus(p, p))
-                = Real.partialSum(
-                      (i : Natural) ↦
-                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
-                      p)
-                  + a(p) * Real.partialSum(b, 0)
-                      by monusDiagonal
-                = Real.partialSum(
-                      (i : Natural) ↦
-                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
-                      p)
-                  + a(p) * Real.zero
-                = Real.partialSum(
-                      (i : Natural) ↦
-                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
-                      p)
-                      by ring as headPadding;
+              + a(p) * Real.partialSum(b, Natural.monus(p, p))
+            = Real.partialSum(
+                  (i : Natural) ↦
+                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                  p)
+              + a(p) * Real.partialSum(b, 0)
+                  by monusDiagonal
+            = Real.partialSum(
+                  (i : Natural) ↦
+                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                  p)
+              + a(p) * Real.zero
+            = Real.partialSum(
+                  (i : Natural) ↦
+                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                  p)
+                  by ring as headPadding;
       -- Below the cut, peeling the successor off n − i absorbs one
       -- diagonal term into each weight.
       ∀ (i : Natural). i < successor(p)
@@ -809,10 +798,9 @@ theorem Real.cauchy_product_converges
                         by Natural.less_or_equal_predecessor_less_or_equal;
                     choose e such that n = i + e as nSplit
                         from Natural.subtraction_witness(i, n, (i ≤ n));
-                    n + n = i + (e + n)
-                        by calc n + n
-                              = (i + e) + n    by nSplit
-                              = i + (e + n);
+                    n + n
+                        = (i + e) + n    by nSplit
+                        = i + (e + n);
                     Natural.monus(n + n, i) = e + n
                         by {
                           Natural.monus(i + (e + n), i) = e + n;
@@ -1000,11 +988,10 @@ theorem Real.cauchy_product_converges
                       n),
              aAbsoluteLimit * bAbsoluteLimit, -triangleAbsoluteLimit,
              absoluteProductConverges, negatedTriangleConverges);
-  aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit = Real.zero
-      by calc aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit
-            = triangleAbsoluteLimit + -triangleAbsoluteLimit
-                  by limitsAgree
-            = Real.zero;
+  aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit
+      = triangleAbsoluteLimit + -triangleAbsoluteLimit
+            by limitsAgree
+      = Real.zero;
   Real.SequenceConverges(
             (n : Natural) ↦
                 Real.partialSum((k : Natural) ↦ abs(a(k)), n)

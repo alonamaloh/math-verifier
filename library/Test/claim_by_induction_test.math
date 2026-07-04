@@ -1,6 +1,6 @@
--- Tests for the new `claim P by induction on a [with ih]
+-- Tests for the new `P by induction on a [with ih]
 -- { case zero: …  case successor(k): … }` form — propositional
--- structural induction parallel to `claim P by cases { case A: …
+-- structural induction parallel to `P by cases { case A: …
 -- case B: … }`. The IH binder name is supplied via `with <ih>`
 -- after the scrutinee; when omitted, recursive arms see no
 -- user-visible IH (matching plain `cases`).
@@ -20,25 +20,25 @@ import Natural.arithmetic
 -- closes by applying `IH : predecessor + 0 = predecessor` under
 -- the `successor(_)` wrapper — no explicit `congruenceOf` needed.
 theorem Natural.add_zero_right_via_ih (a : Natural) : a + 0 = a :=
-  claim a + 0 = a by induction on a with IH {
+  a + 0 = a by induction on a with IH {
     case zero:                   reflexivity
     case successor(predecessor): IH
   }
 
 -- (2) Non-trivial calc inside the recursive arm. Same proof as
 -- `Natural.multiply_successor_inductive` in `induction_style_test`
--- but expressed via `claim … by induction …` so the goal P and
+-- but expressed via `… by induction …` so the goal P and
 -- the induction subject appear on the same line.
 theorem Natural.multiply_successor_claim (a b : Natural)
         : a * successor(b) = a + a * b :=
-  claim a * successor(b) = a + a * b by induction on a with IH {
+  a * successor(b) = a + a * b by induction on a with IH {
     case zero:
       done by ring
     case successor(predecessor):
       -- `successor(predecessor) * successor(b)` no longer β-reduces under
       -- opaque `Natural.add`; expose the multiply step, apply the IH, finish
       -- with `ring`.
-      calc successor(predecessor) * successor(b)
+      successor(predecessor) * successor(b)
          = successor(b) + predecessor * successor(b)
               by Natural.successor_multiply
          = successor(b) + (predecessor + predecessor * b)
@@ -47,8 +47,8 @@ theorem Natural.multiply_successor_claim (a b : Natural)
               by ring
   }
 
--- (3) Bare `claim by induction on a {…}` — proposition inferred
--- from the surrounding theorem return type, just like `claim by
+-- (3) Bare `done by induction on a {…}` — proposition inferred
+-- from the surrounding theorem return type, just like `done by
 -- cases {…}` does.
 theorem Natural.add_zero_right_inferred (a : Natural) : a + 0 = a :=
   done by induction on a with IH {
@@ -56,7 +56,7 @@ theorem Natural.add_zero_right_inferred (a : Natural) : a + 0 = a :=
     case successor(predecessor): IH
   }
 
--- (4) `claim by induction on a {…}` — uses the `goal` keyword
+-- (4) `done by induction on a {…}` — uses the `goal` keyword
 -- to refer to the surrounding theorem return type without
 -- repeating it.
 theorem Natural.add_zero_right_goal (a : Natural) : a + 0 = a :=
@@ -65,7 +65,7 @@ theorem Natural.add_zero_right_goal (a : Natural) : a + 0 = a :=
     case successor(predecessor): IH
   }
 
--- (5) `claim by cases { … }` — `goal` resolves to the
+-- (5) `done by cases { … }` — `goal` resolves to the
 -- surrounding proposition (here Q) without the user repeating it.
 theorem cases_goal_via_lem
         (P Q : Proposition)

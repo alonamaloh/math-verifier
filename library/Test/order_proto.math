@@ -41,15 +41,13 @@ theorem Proto.lt_one_plus (a : Natural) : Proto.lt(a, 1 + a) :=
 theorem Proto.lt_irreflexive (a : Natural) : ¬ Proto.lt(a, a) :=
   (h : Proto.lt(a, a)) ↦ {
     choose c such that a + (1 + c) = a as hc from Proto.lt_elim(a, a, h);
-    claim sumEq : a + (1 + c) = a + 0
-        by calc a + (1 + c)
-              = a       by hc
-              = a + 0   by Natural.add_zero(a);
-    claim oneC : 1 + c = 0 by Natural.add_cancel_left(a, 1 + c, 0, sumEq);
-    claim succEq : successor(c) = 0
-        by calc successor(c)
-              = 1 + c   by Natural.one_add(c)
-              = 0       by oneC;
+    a + (1 + c)
+        = a       by hc
+        = a + 0   by Natural.add_zero(a) as sumEq;
+    1 + c = 0 by Natural.add_cancel_left(a, 1 + c, 0, sumEq) as oneC;
+    successor(c)
+        = 1 + c   by Natural.one_add(c)
+        = 0       by oneC as succEq;
     Natural.successor_not_zero(c)(succEq)
   }
 
@@ -59,10 +57,10 @@ theorem Proto.lt_transitive (a b c : Natural)
   choose c1 such that a + (1 + c1) = b as h1 from Proto.lt_elim(a, b, hab);
   choose c2 such that b + (1 + c2) = c as h2 from Proto.lt_elim(b, c, hbc);
   Proto.lt_intro(a, c, c1 + (1 + c2),
-      calc a + (1 + (c1 + (1 + c2)))
-         = (a + (1 + c1)) + (1 + c2)   by ring
-         = b + (1 + c2)                 by substituting h1
-         = c                            by h2)
+      { a + (1 + (c1 + (1 + c2)))
+           = (a + (1 + c1)) + (1 + c2)   by ring
+           = b + (1 + c2)                 by substituting h1
+           = c                            by h2 })
 }
 
 -- ── ≤ on top, for free from transparency ──────────────────────────────
@@ -83,7 +81,7 @@ theorem Proto.le_transitive (a b c : Natural)
     | Or.introduceRight(aEqB) =>
         cases hbc {
           | Or.introduceLeft(bc) => Or.introduceLeft(rewrite(Equality.symmetry(aEqB), bc))
-          | Or.introduceRight(bEqC) => Or.introduceRight(calc a = b by aEqB = c by bEqC)
+          | Or.introduceRight(bEqC) => Or.introduceRight({ a = b by aEqB = c by bEqC })
         }
   }
 
@@ -99,10 +97,10 @@ theorem Proto.trichotomy (a : Natural)
         | Or.introduceRight(bSucc) => {
             choose k such that b = successor(k) as bEqSucc from bSucc;
             Or.introduceLeft(Proto.lt_intro(0, b, k,
-                calc 0 + (1 + k)
-                   = 1 + k         by Natural.zero_add(1 + k)
-                   = successor(k)  by Natural.one_add(k)
-                   = b             by Equality.symmetry(bEqSucc)))
+                { 0 + (1 + k)
+                     = 1 + k         by Natural.zero_add(1 + k)
+                     = successor(k)  by Natural.one_add(k)
+                     = b             by Equality.symmetry(bEqSucc) }))
           }
       }
     case step(a'): (b : Natural) ↦
@@ -112,21 +110,20 @@ theorem Proto.trichotomy (a : Natural)
             cases Natural.zero_or_successor(c) {
               | Or.introduceLeft(cZero) =>
                   Or.introduceRight(Or.introduceLeft(
-                      calc 1 + a'
-                         = a' + (1 + 0)  by ring
-                         = a' + (1 + c)  by substituting Equality.symmetry(cZero)
-                         = b             by hc))
+                      { 1 + a'
+                           = a' + (1 + 0)  by ring
+                           = a' + (1 + c)  by substituting Equality.symmetry(cZero)
+                           = b             by hc }))
               | Or.introduceRight(cSucc) => {
                   choose c' such that c = successor(c') as cEqSucc from cSucc;
-                  claim cBridge : 1 + c' = c
-                      by calc 1 + c'
-                            = successor(c')  by Natural.one_add(c')
-                            = c              by Equality.symmetry(cEqSucc);
+                  1 + c'
+                      = successor(c')  by Natural.one_add(c')
+                      = c              by Equality.symmetry(cEqSucc) as cBridge;
                   Or.introduceLeft(Proto.lt_intro(1 + a', b, c',
-                      calc (1 + a') + (1 + c')
-                         = a' + (1 + (1 + c'))  by ring
-                         = a' + (1 + c)         by substituting cBridge
-                         = b                    by hc))
+                      { (1 + a') + (1 + c')
+                           = a' + (1 + (1 + c'))  by ring
+                           = a' + (1 + c)         by substituting cBridge
+                           = b                    by hc }))
                 }
             }
           }

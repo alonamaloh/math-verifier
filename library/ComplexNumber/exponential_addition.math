@@ -93,14 +93,16 @@ theorem Rational.binomial_reciprocal_split (i d : Natural)
   (Natural.binomial(i + d, i) : Rational)
             * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
         = (Natural.factorial(i + d) : Rational)
-      by calc (Natural.binomial(i + d, i) : Rational)
+      by {
+        (Natural.binomial(i + d, i) : Rational)
                   * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
             = (Natural.binomial(i + d, i) : Rational)
                   * ((Natural.factorial(i) * Natural.factorial(d) : Natural) : Rational)
                   by Rational.from_natural.multiply_preserves(Natural.factorial(i), Natural.factorial(d))
             = ((Natural.binomial(i + d, i) * (Natural.factorial(i) * Natural.factorial(d)) : Natural) : Rational)
             = ((Natural.factorial(i + d) : Natural) : Rational)
-                  by Natural.binomial_factorial(i, d) as castSplit;
+                  by Natural.binomial_factorial(i, d)
+      } as castSplit;
   -- All three factorial casts are positive, hence nonzero.
   Rational.zero < (Natural.factorial(i) : Rational);
   ¬(Rational.zero = (Natural.factorial(i) : Rational));
@@ -196,24 +198,28 @@ theorem ComplexNumber.exponentialTerm_binomial_split
                      * Natural.binomial(k, i)
                  = Rational.reciprocal_function((Natural.factorial(i) : Rational))
                    * Rational.reciprocal_function((Natural.factorial(d) : Rational))
-               by calc Rational.reciprocal_function((Natural.factorial(k) : Rational))
+               by {
+                 Rational.reciprocal_function((Natural.factorial(k) : Rational))
                            * (Natural.binomial(k, i) : Rational)
                      = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
                            * (Natural.binomial(i + d, i) : Rational)
                            by kJoin
                      = Rational.reciprocal_function((Natural.factorial(i) : Rational))
                            * Rational.reciprocal_function((Natural.factorial(d) : Rational))
-                           by Rational.binomial_reciprocal_split as coefficientSplit;
+                           by Rational.binomial_reciprocal_split
+               } as coefficientSplit;
            recipK * (Natural.binomial(k, i) : Rational)
                  = recipI * recipD
-               by calc recipK * ((Natural.binomial(k, i) : Rational) : Real)
+               by {
+                 recipK * ((Natural.binomial(k, i) : Rational) : Real)
                      = ((Rational.reciprocal_function((Natural.factorial(k) : Rational))
                              * (Natural.binomial(k, i) : Rational) : Rational) : Real)
                      = ((Rational.reciprocal_function((Natural.factorial(i) : Rational))
                              * Rational.reciprocal_function(
                                    (Natural.factorial(d) : Rational)) : Rational) : Real)
                            by coefficientSplit
-                     = recipI * recipD as coefficientSplitCast;
+                     = recipI * recipD
+               } as coefficientSplitCast;
            ComplexNumber.from_real(recipK)
                     * (ComplexNumber.binomialCoefficient(k, i)
                            * (ComplexNumber.power(z, i)
@@ -317,14 +323,6 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ComplexNumber)
       -- a(p)·B(p − p) = a(p)·B(0) = 0.
       Natural.monus(p, p) = 0 as monusDiagonal;
       ComplexNumber.partialSum(
-                (i : Natural) ↦
-                    a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
-                successor(p))
-            = ComplexNumber.partialSum(
-                  (i : Natural) ↦
-                      a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
-                  p)
-          by calc ComplexNumber.partialSum(
                       (i : Natural) ↦
                           a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
                       successor(p))
@@ -786,10 +784,9 @@ theorem ComplexNumber.cauchy_product_converges
                         by Natural.less_or_equal_predecessor_less_or_equal;
                     choose e such that n = i + e as nSplit
                         from Natural.subtraction_witness(i, n, (i ≤ n));
-                    n + n = i + (e + n)
-                        by calc n + n
-                              = (i + e) + n    by nSplit
-                              = i + (e + n);
+                    n + n
+                        = (i + e) + n    by nSplit
+                        = i + (e + n);
                     Natural.monus(n + n, i) = e + n
                         by {
                           Natural.monus(i + (e + n), i) = e + n;
@@ -908,11 +905,10 @@ theorem ComplexNumber.cauchy_product_converges
              (n : Natural) ↦ -Real.partialSum(absoluteDiagonal, n),
              aAbsoluteLimit * bAbsoluteLimit, -triangleAbsoluteLimit,
              absoluteProductConverges, negatedTriangleConverges);
-  aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit = Real.zero
-      by calc aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit
-            = triangleAbsoluteLimit + -triangleAbsoluteLimit
-                  by limitsAgree
-            = Real.zero;
+  aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit
+        = triangleAbsoluteLimit + -triangleAbsoluteLimit
+              by limitsAgree
+        = Real.zero;
   Real.SequenceConverges(
             (n : Natural) ↦
                 Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
