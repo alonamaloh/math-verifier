@@ -772,6 +772,424 @@ ExpressionPointer Elaborator::tryCastNormalizedHypothesisMatch(
     return nullptr;
 }
 
+// B3.2 — the cast-order tier: order goals meet their facts across the
+// coercion tower the way B3.1/B3.3 arrange it for equalities. Three
+// mechanisms, tried in order:
+//   A. PULL-LOWERING — both endpoints factor as ι-images: prove the
+//      order at the source carrier (full recursive claim search — the
+//      hypotheses live there) and lift through
+//      `<hop>.<Rel>_preserves`, transporting the endpoints back along
+//      the pull equalities.
+//   B. PUSH-RETRY — normalization moved an endpoint: retry the
+//      monotonicity/sign machinery and the direct hypothesis scan at
+//      the leaf-cast spelling, transporting back.
+//   C. REFLECTS-LOWERED FACTS — an order fact at a HIGHER carrier
+//      whose sides both pull to the goal's carrier serves the goal
+//      through `<hop>.<Rel>_reflects`.
+// The recursion terminates: A descends the (acyclic) coercion graph,
+// B is guarded on "normalization moved something", C does no search.
+ExpressionPointer Elaborator::tryCastOrderTier(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+    OrderJudgment judgment;
+    if (!parseOrderJudgment(goalClosed, judgment)) return nullptr;
+    // Only the plain two-argument relation shape participates —
+    // structure-parameterised relations have no cast story.
+    ExpressionPointer rebuilt = makeApplication(
+        makeApplication(makeConstant(judgment.relationName),
+                        judgment.leftSide),
+        judgment.rightSide);
+    if (!structurallyEqual(rebuilt, goalClosed)) return nullptr;
+    const std::string relSlot =
+        judgment.kindTag == "le" ? "LessOrEqual" : "LessThan";
+    autoProveSpend(1);
+    ExpressionPointer carrier;
+    LevelPointer carrierLevel;
+    try {
+        carrier = inferTypeInLocalContext(localBinders,
+                                          judgment.leftSide);
+        carrierLevel = typeUniverseOf(localBinders, judgment.leftSide);
+    } catch (const ElaborateError&) {
+        return nullptr;
+    } catch (const TypeError&) {
+        return nullptr;
+    }
+    std::string carrierName = headConstantName(carrier);
+    if (carrierName.empty()) return nullptr;
+    // Transport a proof of `Rel(fromLeft, fromRight)` to
+    // `Rel(toLeft, toRight)` along `toLeft = fromLeft` /
+    // `toRight = fromRight` proofs (either may be null = no move),
+    // via two one-position `Equality.transport_proposition` steps at
+    // `relationCarrier`/`relationLevel`.
+    auto transportEndpoints = [&](ExpressionPointer proofAtFrom,
+                                  const std::string& relationName,
+                                  ExpressionPointer relationCarrier,
+                                  LevelPointer relationLevel,
+                                  ExpressionPointer fromLeft,
+                                  ExpressionPointer fromRight,
+                                  ExpressionPointer toLeft,
+                                  ExpressionPointer toRight,
+                                  ExpressionPointer toLeftEqualsFrom,
+                                  ExpressionPointer toRightEqualsFrom) {
+        ExpressionPointer proof = proofAtFrom;
+        if (toLeftEqualsFrom) {
+            // motive z ↦ Rel(z, fromRight), moved from fromLeft to
+            // toLeft along sym(toLeftEqualsFrom : toLeft = fromLeft).
+            ExpressionPointer motive = makeLambda(
+                "_ord_z", relationCarrier,
+                makeApplication(
+                    makeApplication(
+                        makeConstant(relationName),
+                        makeBoundVariable(0)),
+                    liftBoundVariables(fromRight, 1, 0)));
+            ExpressionPointer transported = makeConstant(
+                "Equality.transport_proposition", {relationLevel});
+            transported = makeApplication(transported, relationCarrier);
+            transported = makeApplication(transported, motive);
+            transported = makeApplication(transported, fromLeft);
+            transported = makeApplication(transported, toLeft);
+            transported = makeApplication(
+                transported, buildEqualitySymmetry(
+                    relationLevel, relationCarrier, toLeft, fromLeft,
+                    toLeftEqualsFrom));
+            proof = makeApplication(transported, proof);
+        }
+        if (toRightEqualsFrom) {
+            ExpressionPointer motive = makeLambda(
+                "_ord_z", relationCarrier,
+                makeApplication(
+                    makeApplication(
+                        makeConstant(relationName),
+                        liftBoundVariables(toLeft, 1, 0)),
+                    makeBoundVariable(0)));
+            ExpressionPointer transported = makeConstant(
+                "Equality.transport_proposition", {relationLevel});
+            transported = makeApplication(transported, relationCarrier);
+            transported = makeApplication(transported, motive);
+            transported = makeApplication(transported, fromRight);
+            transported = makeApplication(transported, toRight);
+            transported = makeApplication(
+                transported, buildEqualitySymmetry(
+                    relationLevel, relationCarrier, toRight, fromRight,
+                    toRightEqualsFrom));
+            proof = makeApplication(transported, proof);
+        }
+        return proof;
+    };
+
+    // ---- A: pull-lowering ------------------------------------------
+    for (const auto& [registryKey, chain] : environment_.coercionRegistry) {
+        if (chain.size() != 1) continue;
+        if (std::get<1>(registryKey) != carrierName) continue;
+        const std::string& hopName = chain[0];
+        const std::string& sourceName = std::get<0>(registryKey);
+        std::string preservesName = hopName + "." + relSlot + "_preserves";
+        if (environment_.lookup(preservesName) == nullptr) continue;
+        std::string sourceRelName = sourceName + "." + relSlot;
+        if (environment_.lookup(sourceRelName) == nullptr) continue;
+        std::optional<PulledCast> leftPull;
+        std::optional<PulledCast> rightPull;
+        try {
+            leftPull = castPullToRoot(
+                judgment.leftSide, hopName, sourceName, carrierName,
+                carrier, carrierLevel, localBinders);
+            if (leftPull) {
+                rightPull = castPullToRoot(
+                    judgment.rightSide, hopName, sourceName, carrierName,
+                    carrier, carrierLevel, localBinders);
+            }
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        if (!leftPull || !rightPull) {
+            if (castTierDebugEnabled()) {
+                std::cerr << "[cast-order]\t" << moduleName_ << ":" << line
+                          << "\tpull-fail\thop=" << hopName
+                          << " left=" << (leftPull ? 1 : 0) << "\n";
+            }
+            continue;
+        }
+        autoProveSpend(2);
+        ExpressionPointer loweredGoal = makeApplication(
+            makeApplication(makeConstant(sourceRelName),
+                            leftPull->source),
+            rightPull->source);
+        // BOUNDED prover for the lowered goal: hypothesis matches, the
+        // indexed order/sign recursions, and a further hop down the
+        // tower — deliberately NOT the full claim battery. The tier
+        // fires on speculative sub-goals too, and a library scan per
+        // speculative lowering blows the effort budget (measured:
+        // a sign-split probe `(2:Real) < 0` recursing three carriers
+        // deep took Real/division past the budget).
+        ExpressionPointer loweredProof;
+        try {
+            loweredProof = tryLocalFactExactMatch(
+                loweredGoal, localBinders);
+            if (!loweredProof) {
+                Context openedContext =
+                    buildContextFromLocalBinders(localBinders);
+                ExpressionPointer loweredOpened = openOverLocalBinders(
+                    loweredGoal, localBinders, localBinders.size());
+                for (int j = static_cast<int>(localBinders.size()) - 1;
+                     j >= 0; --j) {
+                    ExpressionPointer candidateType = openOverLocalBinders(
+                        localBinders[j].type, localBinders, j);
+                    bool equal;
+                    try {
+                        equal = isDefinitionallyEqual(
+                            environment_, openedContext, candidateType,
+                            loweredOpened);
+                    } catch (const TypeError&) {
+                        equal = false;
+                    }
+                    if (equal) {
+                        loweredProof = makeBoundVariable(
+                            static_cast<int>(localBinders.size()) - 1 - j);
+                        break;
+                    }
+                }
+            }
+            if (!loweredProof) {
+                loweredProof = tryMonotonicityRecursion(
+                    loweredGoal, localBinders, 12);
+            }
+            if (!loweredProof) {
+                loweredProof = trySignJudgmentRecursion(
+                    loweredGoal, localBinders, 12,
+                    /*allowFormBridge=*/true);
+            }
+            if (!loweredProof) {
+                loweredProof = tryCastOrderTier(
+                    loweredGoal, localBinders, line);
+            }
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        if (!loweredProof) {
+            if (castTierDebugEnabled()) {
+                std::cerr << "[cast-order]\t" << moduleName_ << ":" << line
+                          << "\tlowered-claim-fail\thop=" << hopName << "\n";
+            }
+            continue;
+        }
+        // preserves(sL, sR, proof) : Rel'(ι sL, ι sR). Verify the
+        // lemma's conclusion IS the goal's relation at the coerced
+        // endpoints before trusting the lift — a mis-shaped packet
+        // lemma must fail the tactic, not the kernel check.
+        ExpressionPointer lifted = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant(preservesName),
+                                leftPull->source),
+                rightPull->source),
+            loweredProof);
+        ExpressionPointer coercedLeft = makeApplication(
+            makeConstant(hopName), leftPull->source);
+        ExpressionPointer coercedRight = makeApplication(
+            makeConstant(hopName), rightPull->source);
+        ExpressionPointer expected = makeApplication(
+            makeApplication(makeConstant(judgment.relationName),
+                            coercedLeft),
+            coercedRight);
+        try {
+            ExpressionPointer liftedType = inferTypeInLocalContext(
+                localBinders, lifted);
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            if (!isDefinitionallyEqual(
+                    environment_, openedContext,
+                    openOverLocalBinders(liftedType, localBinders,
+                                         localBinders.size()),
+                    openOverLocalBinders(expected, localBinders,
+                                         localBinders.size()))) {
+                if (castTierDebugEnabled()) {
+                    std::cerr << "[cast-order]\t" << moduleName_ << ":"
+                              << line << "\tlift-shape-mismatch\thop="
+                              << hopName << "\n";
+                }
+                continue;
+            }
+        } catch (const ElaborateError&) {
+            continue;
+        } catch (const TypeError&) {
+            continue;
+        }
+        if (castTierDebugEnabled()) {
+            std::cerr << "[cast-order]\t" << moduleName_ << ":" << line
+                      << "\tpull-lowered-ok\thop=" << hopName << "\n";
+        }
+        return transportEndpoints(
+            lifted, judgment.relationName, carrier, carrierLevel,
+            coercedLeft, coercedRight,
+            judgment.leftSide, judgment.rightSide,
+            leftPull->proof, rightPull->proof);
+    }
+
+    // ---- B: push-retry at the leaf-cast spelling --------------------
+    if (containsCoercionConstant(goalClosed)) {
+        CastNormalForm leftNorm{judgment.leftSide, nullptr};
+        CastNormalForm rightNorm{judgment.rightSide, nullptr};
+        try {
+            leftNorm = castPushToLeaves(judgment.leftSide, localBinders);
+            rightNorm = castPushToLeaves(judgment.rightSide, localBinders);
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        if (leftNorm.proof || rightNorm.proof) {
+            autoProveSpend(1);
+            ExpressionPointer normalizedGoal = makeApplication(
+                makeApplication(makeConstant(judgment.relationName),
+                                leftNorm.term),
+                rightNorm.term);
+            ExpressionPointer proofAtNormalized;
+            // Direct hypothesis at the normalized spelling first (the
+            // pre-tactic scans saw only the original form).
+            {
+                Context openedContext =
+                    buildContextFromLocalBinders(localBinders);
+                ExpressionPointer normalizedOpened = openOverLocalBinders(
+                    normalizedGoal, localBinders, localBinders.size());
+                for (int j = static_cast<int>(localBinders.size()) - 1;
+                     j >= 0; --j) {
+                    ExpressionPointer candidateType = openOverLocalBinders(
+                        localBinders[j].type, localBinders, j);
+                    bool equal;
+                    try {
+                        equal = isDefinitionallyEqual(
+                            environment_, openedContext, candidateType,
+                            normalizedOpened);
+                    } catch (const TypeError&) {
+                        equal = false;
+                    }
+                    if (equal) {
+                        proofAtNormalized = makeBoundVariable(
+                            static_cast<int>(localBinders.size()) - 1 - j);
+                        break;
+                    }
+                }
+            }
+            if (!proofAtNormalized) {
+                proofAtNormalized = tryMonotonicityRecursion(
+                    normalizedGoal, localBinders, 12);
+            }
+            if (!proofAtNormalized) {
+                proofAtNormalized = trySignJudgmentRecursion(
+                    normalizedGoal, localBinders, 12,
+                    /*allowFormBridge=*/true);
+            }
+            if (proofAtNormalized) {
+                return transportEndpoints(
+                    proofAtNormalized, judgment.relationName, carrier,
+                    carrierLevel, leftNorm.term, rightNorm.term,
+                    judgment.leftSide, judgment.rightSide,
+                    leftNorm.proof, rightNorm.proof);
+            }
+        }
+    }
+
+    // ---- C: reflects-lowered facts ----------------------------------
+    // A fact `Rel_T(L, R)` at a higher carrier whose sides both pull
+    // to THIS carrier serves the goal through `<hop>.<Rel>_reflects`.
+    {
+        int binderCount = static_cast<int>(localBinders.size());
+        for (int b = binderCount - 1; b >= 0; --b) {
+            if (!containsCoercionConstant(localBinders[b].type)) continue;
+            autoProveSpend(1);
+            ExpressionPointer factType = liftBoundVariables(
+                localBinders[b].type, binderCount - b, 0);
+            // Parse the STATED spelling — WHNF would δ-unfold a
+            // transparent relation (Integer.LessOrEqual is IsNonneg
+            // under the hood) past recognition.
+            OrderJudgment fact;
+            ExpressionPointer factStated = factType;
+            if (!parseOrderJudgment(factStated, fact)) {
+                try {
+                    factStated = weakHeadNormalForm(
+                        environment_, factType);
+                } catch (const TypeError&) {
+                    continue;
+                }
+                if (!parseOrderJudgment(factStated, fact)) continue;
+            }
+            if (fact.kindTag != judgment.kindTag) continue;
+            ExpressionPointer factRebuilt = makeApplication(
+                makeApplication(makeConstant(fact.relationName),
+                                fact.leftSide),
+                fact.rightSide);
+            if (!structurallyEqual(factRebuilt, factStated)) continue;
+            ExpressionPointer factCarrier;
+            LevelPointer factLevel;
+            try {
+                factCarrier = inferTypeInLocalContext(
+                    localBinders, fact.leftSide);
+                factLevel = typeUniverseOf(localBinders, fact.leftSide);
+            } catch (const ElaborateError&) {
+                continue;
+            } catch (const TypeError&) {
+                continue;
+            }
+            std::string factCarrierName = headConstantName(factCarrier);
+            for (const auto& [registryKey, chain]
+                     : environment_.coercionRegistry) {
+                if (chain.size() != 1) continue;
+                if (std::get<0>(registryKey) != carrierName) continue;
+                if (std::get<1>(registryKey) != factCarrierName) continue;
+                const std::string& hopName = chain[0];
+                std::string reflectsName =
+                    hopName + "." + relSlot + "_reflects";
+                if (environment_.lookup(reflectsName) == nullptr) continue;
+                std::optional<PulledCast> leftPull;
+                std::optional<PulledCast> rightPull;
+                try {
+                    leftPull = castPullToRoot(
+                        fact.leftSide, hopName, carrierName,
+                        factCarrierName, factCarrier, factLevel,
+                        localBinders);
+                    if (leftPull) {
+                        rightPull = castPullToRoot(
+                            fact.rightSide, hopName, carrierName,
+                            factCarrierName, factCarrier, factLevel,
+                            localBinders);
+                    }
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {
+                }
+                if (!leftPull || !rightPull) continue;
+                if (!structurallyEqual(leftPull->source,
+                                       judgment.leftSide)
+                    || !structurallyEqual(rightPull->source,
+                                          judgment.rightSide)) {
+                    continue;
+                }
+                // Move the fact to its ι-image spelling (the pull
+                // proofs run fact-side = ι(goal-side)), then reflect.
+                ExpressionPointer coercedLeft = makeApplication(
+                    makeConstant(hopName), leftPull->source);
+                ExpressionPointer coercedRight = makeApplication(
+                    makeConstant(hopName), rightPull->source);
+                ExpressionPointer moved = transportEndpoints(
+                    makeBoundVariable(binderCount - 1 - b),
+                    fact.relationName, factCarrier, factLevel,
+                    fact.leftSide, fact.rightSide,
+                    coercedLeft, coercedRight,
+                    leftPull->proof ? buildEqualitySymmetry(
+                        factLevel, factCarrier, fact.leftSide,
+                        coercedLeft, leftPull->proof) : nullptr,
+                    rightPull->proof ? buildEqualitySymmetry(
+                        factLevel, factCarrier, fact.rightSide,
+                        coercedRight, rightPull->proof) : nullptr);
+                return makeApplication(
+                    makeApplication(
+                        makeApplication(makeConstant(reflectsName),
+                                        leftPull->source),
+                        rightPull->source),
+                    moved);
+            }
+        }
+    }
+    return nullptr;
+}
+
 // Does `term` mention any registered coercion function? Cheap
 // syntactic pre-filter shared by the cast tactics.
 bool Elaborator::containsCoercionConstant(ExpressionPointer term) const {

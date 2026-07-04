@@ -1974,6 +1974,18 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // B3.2 cast-order tier — an order goal the monotonicity/sign
+        // machinery declined crosses the coercion tower: lowered to
+        // the source carrier where its facts live, retried at the
+        // leaf-cast spelling, or served by a higher-carrier fact
+        // through the reflects lemmas.
+        {
+            ExpressionPointer attempt = runTactic("castOrderTier",
+                [&] { return tryCastOrderTier(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
         {
             ExpressionPointer attempt = runTactic("conjunctionIntro",
                 [&] { return tryConjunctionIntro(
@@ -2194,6 +2206,10 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         runProfiled("monotonicityRecursion", [&] {
             return tryMonotonicityRecursion(
                 goalClosed, localBinders, 12);
+        });
+        runProfiled("castOrderTier", [&] {
+            return tryCastOrderTier(
+                goalClosed, localBinders, line);
         });
         runProfiled("conjunctionIntro", [&] {
             return tryConjunctionIntro(

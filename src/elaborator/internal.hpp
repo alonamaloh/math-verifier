@@ -818,6 +818,18 @@ private:
         LevelPointer targetLevel,
         const std::vector<LocalBinder>& localBinders);
 
+    // B3.2 — the cast-order tier: order goals cross the coercion
+    // tower — pull-lowering through `<hop>.<Rel>_preserves` (prove at
+    // the source carrier, lift, transport endpoints), push-retry of
+    // the monotonicity/sign machinery at the leaf-cast spelling, and
+    // higher-carrier order facts lowered through
+    // `<hop>.<Rel>_reflects`. Runs as a claim tactic after the
+    // monotonicity recursion.
+    ExpressionPointer tryCastOrderTier(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
     // B3.3b — context-fact cast normalization: match the diff walk's
     // sub-goal `subLeft = subRight` against the local equality
     // hypotheses at the shared leaf-cast normal form (placement
