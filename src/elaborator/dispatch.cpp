@@ -2182,8 +2182,43 @@ ExpressionPointer Elaborator::elaborateBlockTail(
             if (bridgedResultProvesGoal(direct, expectedType, localBinders)) {
                 return direct;
             }
+            // A direct proof at a different spelling (a rep-level calc
+            // under a class-equality goal): coerce it like the old arm
+            // flow coerced its body — quotient-sound wrap, diff bridges.
+            ExpressionPointer coercedDirect = coerceToExpectedTypeViaDiff(
+                localBinders, direct, expectedType);
+            if (coercedDirect
+                && bridgedResultProvesGoal(coercedDirect, expectedType,
+                                           localBinders)) {
+                return coercedDirect;
+            }
         } catch (const ElaborateError&) {
         } catch (const TypeError&) {
+        } catch (const AutoProverBudgetError&) {
+            // Speculative reading only — a budget blow here must fall
+            // through to the statement route, never fail the build.
+        }
+        // A relation-chain tail (parseBodyExpressionOrStatement wraps body
+        // chains in a BlockTail): the direct reading above already tried
+        // the chain AT the goal — the final-calc direct path. The claim
+        // fallbacks below don't apply to a calc node (it is a proof, not a
+        // proposition); its statement reading is the anonymous
+        // `{ <chain>; }` let + auto-close.
+        if (std::holds_alternative<SurfaceCalc>(
+                blockTail.expression->node)) {
+            SurfaceExpressionPointer autoCloseCalc =
+                makeSurfaceStructuredClaim(
+                    makeSurfaceGoal(line, column), /*label=*/"",
+                    /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
+                    line, column);
+            std::string calcName = "_calc_" + std::to_string(line)
+                + "_" + std::to_string(column);
+            SurfaceExpressionPointer chainDesugared = makeSurfaceLet(
+                std::move(calcName), /*type=*/nullptr,
+                blockTail.expression, std::move(autoCloseCalc),
+                line, column);
+            return elaborateExpression(
+                *chainDesugared, localBinders, expectedType);
         }
         // Direct-coercion reading: prove the stated fact ONCE and coerce
         // its proof to the goal (quotient-sound wrap, diff bridges — the
@@ -2204,6 +2239,8 @@ ExpressionPointer Elaborator::elaborateBlockTail(
                     *statedFactOnly, localBinders, nullptr);
             } catch (const ElaborateError&) {
             } catch (const TypeError&) {
+            } catch (const AutoProverBudgetError&) {
+                // Speculative — fall through to the statement route.
             }
             if (factProof) {
                 ExpressionPointer coerced = coerceToExpectedTypeViaDiff(

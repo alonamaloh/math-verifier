@@ -1381,21 +1381,13 @@ private:
             if (isChain) {
                 SurfaceExpressionPointer calcExpression =
                     parseCalc(/*consumeCalcKeyword=*/false);
-                // `{ <chain>; }` — bind the chain's fact under an anonymous
-                // (type-inferred) let, then auto-close the goal from it.
-                SurfaceExpressionPointer autoClose =
-                    makeSurfaceStructuredClaim(
-                        makeSurfaceGoal(statementStart.line,
-                                        statementStart.column),
-                        /*label=*/"", /*byHint=*/nullptr,
-                        /*byCases=*/false, {}, statementStart.line,
-                        statementStart.column);
-                std::string calcName = "_calc_"
-                    + std::to_string(statementStart.line) + "_"
-                    + std::to_string(statementStart.column);
-                return makeSurfaceLet(
-                    std::move(calcName), /*type=*/nullptr,
-                    std::move(calcExpression), std::move(autoClose),
+                // Dual-reading tail: the elaborator first elaborates the
+                // chain AT the goal (the final-calc DIRECT path — cheap,
+                // handles quotient/coercion endpoints), and only falls
+                // back to `{ <chain>; }` (anonymous let + auto-close)
+                // when the direct proof doesn't land the goal.
+                return makeSurfaceBlockTail(
+                    std::move(calcExpression),
                     statementStart.line, statementStart.column);
             }
         }
@@ -4013,7 +4005,9 @@ private:
         }
         expect(TokenKind::FatArrow,
                "before the `by_representatives` body");
-        SurfaceExpressionPointer body = parseExpression();
+        // The body may be a bare ≥2-step relation chain (the keyword-free
+        // calc), like every other `=>` arm body — chain-only.
+        SurfaceExpressionPointer body = parseBodyExpressionOrStatement();
         // Fold right: the body is the innermost arm; each scrutinee wraps
         // it in `cases <scrutinee> { | <pattern> => <inner> }`.
         SurfaceExpressionPointer result = std::move(body);
