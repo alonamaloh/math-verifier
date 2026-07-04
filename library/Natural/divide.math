@@ -192,8 +192,8 @@ theorem Natural.divide_modulo_step_decompose (fuel : Natural)
     case successor(fuel): {
         take divisor : Natural;
         take dividend : Natural;
-        cases Natural.monus(divisor, dividend) with monusEq {
-          | zero =>
+        done by cases {
+          case Natural.monus(divisor, dividend) = 0 as monusEq:
               -- divisor ≤ dividend: divide_step / modulo_step reduce via
               -- *_succ_fits (monusEq supplies their precondition), then the
               -- induction hypothesis decomposes the recursive remainder.
@@ -216,7 +216,8 @@ theorem Natural.divide_modulo_step_decompose (fuel : Natural)
                  = divisor + Natural.monus(dividend, divisor)
                          by IH(divisor, Natural.monus(dividend, divisor))
                  = dividend
-          | successor(predM) =>
+          case Natural.monus(divisor, dividend) = successor(predM)
+                 for some (predM : Natural) as monusEq:
               -- divisor > dividend: divide_step returns 0 and modulo_step
               -- carries the dividend, via *_succ_too_big (monusEq, predM).
               calc divisor
@@ -335,8 +336,8 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
         take n : Natural;
         suppose successor(0) ≤ d as dPositive;
         suppose successor(n) ≤ successor(successor(f)) as nLeSuccFuel;
-        cases Natural.monus(d, n) with monusEq {
-          | zero => {
+        done by cases {
+          case Natural.monus(d, n) = 0 as monusEq: {
               -- d ≤ n: modulo_step(succ(f), d, n) = modulo_step(f, d, n - d).
               -- The fuel bound succ(n - d) ≤ succ(f) holds since n - d ≤ n - 1
               -- ≤ f; case-split on d (positive) and n to peel the monus.
@@ -364,7 +365,8 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
                  = successor(Natural.modulo_step(f, d, Natural.monus(n, d)))
                  ≤ d   by IH(d, Natural.monus(n, d), dPositive, monusBoundedByFuel)
           }
-          | successor(predM) =>
+          case Natural.monus(d, n) = successor(predM)
+                 for some (predM : Natural) as monusEq:
               -- d > n: modulo_step returns n and monus_succ_implies_gt gives
               -- succ(n) ≤ d directly.
               calc successor(Natural.modulo_step(successor(f), d, n))
