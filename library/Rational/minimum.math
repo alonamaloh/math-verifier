@@ -47,43 +47,79 @@ definition Rational.minimum (a b : Rational) : Rational :=
 
 overload min := Rational.minimum
 
+-- The characterizing equations: min(a, b) picks whichever endpoint the
+-- order selects. These two lemmas are the QUARANTINE BOUNDARY for the
+-- decision inside the definition — the one place `decide` refines the
+-- `classical_decidable(a ≤ b)` term; every consumer below reasons
+-- propositionally through the equations.
+theorem Rational.minimum_eq_left (a b : Rational) (aLeqB : a ≤ b)
+        : min(a, b) = a :=
+  decide a ≤ b {
+    | yes _ => {
+        note goal : a = a;
+        done
+      }
+    | no notALeqB => absurd(notALeqB(aLeqB))
+  }
+
+theorem Rational.minimum_eq_right (a b : Rational) (notALeqB : ¬(a ≤ b))
+        : min(a, b) = b :=
+  decide a ≤ b {
+    | yes aLeqB => absurd(notALeqB(aLeqB))
+    | no _ => {
+        note goal : b = b;
+        done
+      }
+  }
+
 -- min(a, b) ≤ a. When a ≤ b the minimum is a itself; otherwise it is
 -- b, and ¬(a ≤ b) forces b ≤ a by linearity of the order.
 theorem Rational.minimum_LessOrEqual_left
         (a b : Rational) : min(a, b) ≤ a :=
-  decide a ≤ b {
-    | yes _ => {
-        note goal : a ≤ a;
-        done
+  claim by cases {
+    case a ≤ b as aLeqB: {
+        min(a, b) = a by Rational.minimum_eq_left;
+        done by substitution
       }
-    | no notALeqB => {
-        note goal : b ≤ a;
-        a ≤ b ∨ b ≤ a;
-        claim by cases {
-          case (a ≤ b) as aLeqB:  absurd(notALeqB(aLeqB))
-          case (b ≤ a) as bLeqA:  bLeqA
-        }
+    otherwise as notALeqB: {
+        b ≤ a by cases {
+          case a ≤ b as aLeqB: absurd(notALeqB(aLeqB))
+          case b ≤ a as bLeqA: bLeqA
+        };
+        min(a, b) = b   by Rational.minimum_eq_right
+                  ≤ a;
+        done
       }
   }
 
 -- min(a, b) ≤ b. Symmetric: the yes arm is the hypothesis itself.
 theorem Rational.minimum_LessOrEqual_right
         (a b : Rational) : min(a, b) ≤ b :=
-  decide a ≤ b {
-    | yes aLeqB => aLeqB
-    | no _ => {
-        note goal : b ≤ b;
+  claim by cases {
+    case a ≤ b as aLeqB: {
+        min(a, b) = a   by Rational.minimum_eq_left
+                  ≤ b;
         done
+      }
+    otherwise: {
+        min(a, b) = b by Rational.minimum_eq_right;
+        done by substitution
       }
   }
 
 -- The minimum of two positives is positive: whichever endpoint the
--- decision picks, its positivity hypothesis is already in context.
+-- order picks, its positivity hypothesis is already in context.
 theorem Rational.minimum_positive
         (a b : Rational)
         (aPositive : Rational.zero < a) (bPositive : Rational.zero < b)
         : Rational.zero < min(a, b) :=
-  decide a ≤ b {
-    | yes _ => aPositive
-    | no  _ => bPositive
+  claim by cases {
+    case a ≤ b: {
+        min(a, b) = a by Rational.minimum_eq_left;
+        done by substitution
+      }
+    otherwise: {
+        min(a, b) = b by Rational.minimum_eq_right;
+        done by substitution
+      }
   }
