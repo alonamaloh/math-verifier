@@ -73,16 +73,17 @@ theorem Natural.least_witness (predicate : Natural → Proposition)
   ∀ (k : Natural). predicate(k) → minimum ≤ k
       by (k : Natural) (predicateAtK : predicate(k)) ↦ {
            k < minimum ∨ k = minimum ∨ minimum < k
-               by Natural.lt_trichotomy as trichotomy;
-           cases trichotomy {
-             | Or.introduceLeft(kLessMinimum) =>
-                 absurd(nothingBelow(k, kLessMinimum)(predicateAtK))
-             | Or.introduceRight(equalOrGreater) =>
-                 cases equalOrGreater {
-                   | Or.introduceLeft(kEqualsMinimum) =>
-                       claim minimum ≤ k by substituting kEqualsMinimum
-                   | Or.introduceRight(minimumLessK) =>
-                       claim minimum ≤ k by Natural.LessThan.weaken
+               by Natural.lt_trichotomy;
+           claim by cases {
+             case k < minimum as kLessMinimum: {
+                 ¬predicate(k) by nothingBelow(k, kLessMinimum);
+                 claim False;
+                 done
+               }
+             case k = minimum ∨ minimum < k:
+                 claim by cases {
+                   case k = minimum: done
+                   case minimum < k: done by Natural.LessThan.weaken
                  }
            }
          } as minimumIsLeast;

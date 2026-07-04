@@ -6497,6 +6497,75 @@ int rewriteStripRefining(const std::vector<std::string>& filenames) {
     return 0;
 }
 
+// `kernel rewrite --terminal-claim-to-done FILE ...` — the A1
+// mechanical rewriter for terminal claims: a `claim` keyword followed
+// IMMEDIATELY by `by` carries no proposition (it proves the enclosing
+// goal), which is exactly what `done by …` spells. Lexer-driven like
+// the other rewrite modes; only the `claim` token is replaced, and only
+// when the next token is `by`.
+int rewriteTerminalClaimToDone(const std::vector<std::string>& filenames) {
+    int totalRewritten = 0;
+    for (const auto& filename : filenames) {
+        std::ifstream input(filename, std::ios::binary);
+        if (!input.is_open()) {
+            std::cerr << "cannot open file: " << filename << "\n";
+            return 1;
+        }
+        std::stringstream buffer;
+        buffer << input.rdbuf();
+        std::string source = buffer.str();
+        input.close();
+
+        std::vector<Token> tokens;
+        try {
+            tokens = lex(source);
+        } catch (const LexError& error) {
+            std::cerr << filename << ": lex error: " << error.what() << "\n";
+            return 1;
+        }
+
+        std::vector<size_t> lineStart = {0, 0};
+        for (size_t i = 0; i < source.size(); ++i) {
+            if (source[i] == '\n') lineStart.push_back(i + 1);
+        }
+
+        std::vector<size_t> spans;
+        for (size_t i = 0; i + 1 < tokens.size(); ++i) {
+            if (tokens[i].kind != TokenKind::KeywordClaim) continue;
+            if (tokens[i + 1].kind != TokenKind::KeywordBy) continue;
+            size_t offset =
+                lineStart[tokens[i].line] + (size_t)tokens[i].column - 1;
+            if (offset + 5 > source.size()
+                || source.compare(offset, 5, "claim") != 0) {
+                std::cerr << filename << ":" << tokens[i].line << ":"
+                          << tokens[i].column
+                          << ": internal error: expected 'claim' at this "
+                          << "byte span; file left untouched\n";
+                return 1;
+            }
+            spans.push_back(offset);
+        }
+        if (spans.empty()) continue;
+
+        for (auto it = spans.rbegin(); it != spans.rend(); ++it) {
+            source.replace(*it, 5, "done");
+        }
+
+        std::ofstream output(filename, std::ios::binary | std::ios::trunc);
+        if (!output.is_open()) {
+            std::cerr << "cannot write file: " << filename << "\n";
+            return 1;
+        }
+        output << source;
+        output.close();
+        std::cout << filename << ": " << spans.size()
+                  << " terminal claims\n";
+        totalRewritten += (int)spans.size();
+    }
+    std::cout << "total: " << totalRewritten << " terminal claims\n";
+    return 0;
+}
+
 int verifyFiles(const std::vector<std::string>& filenames) {
     Environment environment;
     std::vector<std::string> importedModules;
@@ -7276,9 +7345,16 @@ static int kernelMain(int argc, char* argv[]) {
             }
             return rewriteStripRefining(filenames);
         }
+        if (mode == "--terminal-claim-to-done") {
+            if (filenames.empty()) {
+                std::cerr << "rewrite: no input files\n";
+                return 1;
+            }
+            return rewriteTerminalClaimToDone(filenames);
+        }
         std::cerr << "rewrite: unknown mode " << mode
-                  << " (expected --induction-spelling or "
-                  << "--strip-refining)\n";
+                  << " (expected --induction-spelling, --strip-refining, "
+                  << "or --terminal-claim-to-done)\n";
         return 1;
     }
     if (argc >= 3 && std::string(argv[1]) == "deps") {
