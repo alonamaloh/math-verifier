@@ -429,6 +429,45 @@ bool Elaborator::surfaceMentionsName(
         return false;
     }
 
+bool Elaborator::proofConcludesByExFalso(ExpressionPointer expression) {
+        ExpressionPointer cursor = expression;
+        while (cursor) {
+            if (auto* let = std::get_if<Let>(&cursor->node)) {
+                cursor = let->body;
+                continue;
+            }
+            if (auto* lambda = std::get_if<Lambda>(&cursor->node)) {
+                cursor = lambda->body;
+                continue;
+            }
+            if (auto* application = std::get_if<Application>(&cursor->node)) {
+                cursor = application->function;
+                continue;
+            }
+            break;
+        }
+        if (!cursor) return false;
+        auto* constant = std::get_if<Constant>(&cursor->node);
+        return constant
+            && (constant->name == "False.eliminate"
+                || constant->name == "False.eliminate_proposition");
+    }
+
+void Elaborator::warnIfArmIsContradictionOnly(
+        ExpressionPointer armBody, size_t armCount, bool hasOtherwise,
+        const SurfaceStructuredClaimArm& arm) {
+        if (!reportUnusedNames_) return;
+        if (armCount != 2 || !hasOtherwise) return;
+        if (!proofConcludesByExFalso(armBody)) return;
+        std::cerr << "warning: " << moduleName_ << ":" << arm.line
+                  << ":" << arm.column
+                  << ": this `by cases` arm concludes by contradiction — "
+                  "a `case P: … otherwise: …` split whose one arm is "
+                  "absurd reads better as `suppose … for contradiction "
+                  "{ … }` before the split, keeping only the other "
+                  "case's reasoning\n";
+    }
+
 bool Elaborator::referencesBoundVariable(
         ExpressionPointer expression, int targetIndex) {
         if (auto* bv =

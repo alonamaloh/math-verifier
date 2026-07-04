@@ -1455,6 +1455,24 @@ ExpressionPointer Elaborator::elaborateExpression(
             ExpressionPointer letBody =
                 elaborateExpression(*let->body, extended,
                                      bodyExpectedType);
+            // A4 lint: a forward `suppose … for contradiction { … }`
+            // binds its conclusion (¬P, or P with the double negation
+            // eliminated) anonymously for the rest of the block. If the
+            // elaborated continuation never references that binding —
+            // not even through an auto-prover step, which would leave a
+            // BV reference — the whole reductio was a vestigial detour.
+            if (reportUnusedNames_
+                && let->name.rfind("_contradiction_fact_", 0) == 0
+                && !referencesBoundVariable(letBody, 0)) {
+                std::cerr << "warning: " << moduleName_
+                          << ":" << expression.line
+                          << ":" << expression.column
+                          << ": the fact this `suppose … for "
+                          "contradiction { … }` establishes is never "
+                          "used afterward — a vestigial detour: delete "
+                          "the block, or make its conclusion carry "
+                          "weight in what follows\n";
+            }
             // Surface-text unused-name check on every named SurfaceLet
             // (covers `let X := V;`, `claim X : T by V;`, and
             // `calc … as X;` desugaring). The kernel-level BV(0) check

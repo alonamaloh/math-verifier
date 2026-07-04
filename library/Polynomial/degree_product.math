@@ -11,6 +11,7 @@
 module Polynomial.degree_product
 
 import Logic.basics
+import Logic.excluded_middle
 import Logic.exists
 import Logic.sum
 import Equality.basics
@@ -207,20 +208,20 @@ theorem Polynomial.HasDegree_unique (r : Ring)
   let ⟨dBound, dNonzero⟩ := dDegree;
   let ⟨eBound, eNonzero⟩ := eDegree;
   cases Natural.totality_of_less_or_equal(d, e) {
-    | Or.introduceLeft(dLessOrEqualE) =>
-        claim by cases {
-          case d = e as dEqualsE: dEqualsE
-          otherwise as dNotEqualsE:
-              absurd(eNonzero(dBound(e,
-                  Natural.less_or_equal_not_equal_successor(d, e, dLessOrEqualE,
-                      (eEqualsD : e = d) ↦ dNotEqualsE(Equality.symmetry(eEqualsD))))))
-        }
-    | Or.introduceRight(eLessOrEqualD) =>
-        claim by cases {
-          case d = e as dEqualsE: dEqualsE
-          otherwise as dNotEqualsE:
-              absurd(dNonzero(eBound(d,
-                  Natural.less_or_equal_not_equal_successor(e, d, eLessOrEqualD, dNotEqualsE))))
-        }
+    | Or.introduceLeft(dLessOrEqualE) => {
+        suppose d ≠ e as dNotEqualsE for contradiction {
+            absurd(eNonzero(dBound(e,
+                Natural.less_or_equal_not_equal_successor(d, e, dLessOrEqualE,
+                    (eEqualsD : e = d) ↦ dNotEqualsE(Equality.symmetry(eEqualsD))))))
+        };
+        done
+      }
+    | Or.introduceRight(eLessOrEqualD) => {
+        suppose d ≠ e as dNotEqualsE for contradiction {
+            absurd(dNonzero(eBound(d,
+                Natural.less_or_equal_not_equal_successor(e, d, eLessOrEqualD, dNotEqualsE))))
+        };
+        done
+      }
   }
 }

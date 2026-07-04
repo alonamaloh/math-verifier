@@ -1754,27 +1754,24 @@ theorem Real.IsSupremum.exists_above
         (subset : Set(Real)) (s u : Real)
         (isSupremum : Real.IsSupremum(subset, s))
         (uBelowSupremum : u < s)
-        : ∃ (x : Real). x ∈ subset ∧ u < x :=
-  claim by cases {
-    case ∃ (x : Real). x ∈ subset ∧ u < x as someAbove: someAbove
-    otherwise as noneAbove: {
-        -- Every element fails to exceed u, so u is an upper bound …
-        Real.IsUpperBound(subset, u)
-            by (y : Real) (yInSubset : y ∈ subset) ↦ {
-              ¬(u < y)
-                  by (uBelowY : u < y) ↦ {
-                       ∃ (x : Real). x ∈ subset ∧ u < x
-                           by { witness y with done };
-                       noneAbove(given(∃ (x : Real). x ∈ subset ∧ u < x))
-                     };
-              done by Real.LessOrEqual_of_not_LessThan
-            };
-        -- … so leastness pins s ≤ u, against u < s.
-        ∀ (otherBound : Real).
-                  Real.IsUpperBound(subset, otherBound) → s ≤ otherBound;
-        s ≤ u;
-        u < u by Real.LessThan.transitive_right;
-        False;
-        done
-      }
-  }
+        : ∃ (x : Real). x ∈ subset ∧ u < x := {
+  suppose ¬(∃ (x : Real). x ∈ subset ∧ u < x) as noneAbove for contradiction;
+  -- Every element fails to exceed u, so u is an upper bound …
+  Real.IsUpperBound(subset, u)
+      by (y : Real) (yInSubset : y ∈ subset) ↦ {
+        ¬(u < y)
+            by (uBelowY : u < y) ↦ {
+                 ∃ (x : Real). x ∈ subset ∧ u < x
+                     by { witness y with done };
+                 noneAbove(given(∃ (x : Real). x ∈ subset ∧ u < x))
+               };
+        done by Real.LessOrEqual_of_not_LessThan
+      };
+  -- … so leastness pins s ≤ u, against u < s.
+  ∀ (otherBound : Real).
+            Real.IsUpperBound(subset, otherBound) → s ≤ otherBound;
+  s ≤ u;
+  u < u by Real.LessThan.transitive_right;
+  False;
+  done
+}

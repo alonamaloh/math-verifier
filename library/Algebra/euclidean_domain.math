@@ -149,36 +149,33 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
               as memberRemainder;
           -- The remainder must vanish: otherwise it is a nonzero member of
           -- norm below the least, contradicting minimality.
-          claim by cases {
-            case remainder = Ring.zero(s) as remainderZero:
-                ⟨quotient,
-                 calc x
-                    = generator * quotient + remainder
-                    = generator * quotient + Ring.zero(s)
-                    = generator * quotient⟩
-            otherwise as remainderNonzero: {
-                norm(remainder) < norm(generator) by {
-                  cases remainderCase {
-                    | Or.introduceLeft(remainderZero) =>
-                        absurd(remainderNonzero(remainderZero))
-                    | Or.introduceRight(normLess) => normLess
-                  }
-                } as remainderNormBelow;
-                norm(remainder) < leastNorm
-                    by rewrite(generatorNorm, remainderNormBelow)
-                    as remainderNormBelowLeast;
-                ∃ (x : Ring.carrier(s)).
-                        member(x) ∧ ¬(x = Ring.zero(s))
-                        ∧ norm(x) = norm(remainder)
-                    by ⟨remainder, ⟨memberRemainder,
-                        ⟨remainderNonzero,
-                         reflexivity(Natural, norm(remainder))⟩⟩⟩
-                    as remainderIsNonzeroNorm;
-                absurd(
-                    nothingSmaller(norm(remainder), remainderNormBelowLeast,
-                        remainderIsNonzeroNorm))
-              }
-          }
+          suppose remainder ≠ Ring.zero(s) as remainderNonzero for contradiction {
+              norm(remainder) < norm(generator) by {
+                cases remainderCase {
+                  | Or.introduceLeft(remainderZero) =>
+                      absurd(remainderNonzero(remainderZero))
+                  | Or.introduceRight(normLess) => normLess
+                }
+              } as remainderNormBelow;
+              norm(remainder) < leastNorm
+                  by rewrite(generatorNorm, remainderNormBelow)
+                  as remainderNormBelowLeast;
+              ∃ (x : Ring.carrier(s)).
+                      member(x) ∧ ¬(x = Ring.zero(s))
+                      ∧ norm(x) = norm(remainder)
+                  by ⟨remainder, ⟨memberRemainder,
+                      ⟨remainderNonzero,
+                       reflexivity(Natural, norm(remainder))⟩⟩⟩
+                  as remainderIsNonzeroNorm;
+              absurd(
+                  nothingSmaller(norm(remainder), remainderNormBelowLeast,
+                      remainderIsNonzeroNorm))
+          };
+          ⟨quotient,
+           calc x
+              = generator * quotient + remainder
+              = generator * quotient + Ring.zero(s)
+              = generator * quotient⟩
         } as forwardGenerates;
         ∀ (x : Ring.carrier(s)).
               Ring.divides(s, generator, x) → member(x) by {
@@ -202,10 +199,8 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
           take x : Ring.carrier(s);
           suppose member(x) as memberX;
           -- x must be zero (no nonzero member exists), and 0 ∣ 0.
-          x = Ring.zero(s) by cases {
-            case x = Ring.zero(s) as xZero: xZero
-            otherwise as xNonzero:
-                absurd(noNonzeroMember(⟨x, ⟨memberX, xNonzero⟩⟩))
+          suppose x ≠ Ring.zero(s) as xNonzero for contradiction {
+              absurd(noNonzeroMember(⟨x, ⟨memberX, xNonzero⟩⟩))
           };
           ⟨Ring.zero(s),
            calc x

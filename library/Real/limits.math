@@ -316,39 +316,35 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
       (εPositive : ε > 0) ↦ {
         -- Some term rises above limit − ε; otherwise limit − ε would be a
         -- smaller upper bound than the least one.
-        claim by cases {
-          case ∃ (N : Natural). limit - ε < s(N) as termAboveExists: {
-              choose N from termAboveExists;
-              witness N with
-                  (m : Natural) (aboveThreshold : N ≤ m) ↦ {
-                    -- limit − ε < s(N) ≤ s(m) ≤ limit < limit + ε.
-                    limit - ε
-                       < s(N)
-                       ≤ s(m);
-                    s(m) ∈ Real.sequence_range(s)
-                        by witness m with reflexivity(Real, s(m));
-                    s(m) ≤ limit;
-                    s(m) - limit
-                       ≤ limit - limit     by Real.add_preserves_LessOrEqual
-                       = 0
-                       < ε;
-                    -ε
-                       = (limit - ε) - limit
-                       < s(m) - limit      by Real.add_preserves_LessThan;
-                    done by Real.absolute_value_LessThan_of_bounds
-                  }
+        suppose ¬(∃ (N : Natural). limit - ε < s(N)) for contradiction {
+            Real.IsUpperBound(Real.sequence_range(s),
+                limit - ε);
+            limit ≤ limit - ε;
+            limit - ε < limit
+                by Real.subtract_positive_LessThan;
+            limit < limit by Real.LessThan.transitive_left;
+            False;
+            done
+        };
+        choose N such that limit - ε < s(N);
+        witness N with
+            (m : Natural) (aboveThreshold : N ≤ m) ↦ {
+              -- limit − ε < s(N) ≤ s(m) ≤ limit < limit + ε.
+              limit - ε
+                 < s(N)
+                 ≤ s(m);
+              s(m) ∈ Real.sequence_range(s)
+                  by witness m with reflexivity(Real, s(m));
+              s(m) ≤ limit;
+              s(m) - limit
+                 ≤ limit - limit     by Real.add_preserves_LessOrEqual
+                 = 0
+                 < ε;
+              -ε
+                 = (limit - ε) - limit
+                 < s(m) - limit      by Real.add_preserves_LessThan;
+              done by Real.absolute_value_LessThan_of_bounds
             }
-          otherwise as noTermAbove: {
-              Real.IsUpperBound(Real.sequence_range(s),
-                  limit - ε);
-              limit ≤ limit - ε;
-              limit - ε < limit
-                  by Real.subtract_positive_LessThan;
-              limit < limit by Real.LessThan.transitive_left;
-              False;
-              done
-            }
-        }
       }
 }
 

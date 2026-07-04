@@ -2493,6 +2493,27 @@ private:
     bool referencesBoundVariable(
         ExpressionPointer expression, int targetIndex);
 
+    // A4 lint helper: whether an elaborated proof term concludes by
+    // ex falso — peeling `Let`s, lambdas, and the application spine,
+    // its head constant is `False.eliminate` /
+    // `False.eliminate_proposition`. Used by the contradiction-only-
+    // arm lint (a two-case split whose one arm is absurd reads better
+    // as `suppose … for contradiction` folded before the other case).
+    static bool proofConcludesByExFalso(ExpressionPointer expression);
+
+    // A4 lint: a two-case `case P: … otherwise: …` split whose arm
+    // concludes by contradiction reads better as `suppose … for
+    // contradiction { … }` before the split, keeping only the other
+    // case's reasoning (the fold is clean exactly when exhaustiveness
+    // is excluded middle — the surviving case's hypothesis IS what the
+    // suppose establishes). Cited-disjunction splits with a refuted
+    // arm are NOT linted: folding those needs a disjunctive-syllogism
+    // prover step (B-workstream gap), so the split is currently the
+    // honest spelling. Advisory; gated with the other style warnings.
+    void warnIfArmIsContradictionOnly(
+        ExpressionPointer armBody, size_t armCount, bool hasOtherwise,
+        const SurfaceStructuredClaimArm& arm);
+
     // Whether every BoundVariable reference in `expression` that maps
     // to a lemma binder (relative index < bindings.size()) has a
     // non-null entry in `bindings`. Used by the precondition-discharge
