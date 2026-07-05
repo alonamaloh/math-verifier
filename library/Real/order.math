@@ -73,16 +73,14 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
   (ε : Rational)
            (εPositive : Rational.zero < ε) ↦ {
     Rational.zero < Rational.halve(ε) as halvedPositive;
-    choose N_a as aBound from aEventuallyNonneg(Rational.halve(ε), halvedPositive);
+    choose N_a from aEventuallyNonneg(Rational.halve(ε), halvedPositive);
     choose N_eq as eqBound from aEquivB(Rational.halve(ε), halvedPositive);
     witness Natural.maximum(N_a, N_eq) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) ↦ {
           N_a ≤ m;
           N_eq ≤ m;
-          -Rational.halve(ε)
-                  < CauchyRationalSequence.sequenceFunction(a, m)
-            by aBound;
+          -Rational.halve(ε) < CauchyRationalSequence.sequenceFunction(a, m);
           abs(
                 CauchyRationalSequence.sequenceFunction(a, m)
                 - CauchyRationalSequence.sequenceFunction(b, m))
@@ -199,7 +197,7 @@ automatic theorem Real.IsNonneg_zero : Real.IsNonneg(Real.zero) :=
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦ {
           -- Goal: -ε < sf(to_cauchy_constant(0), m) ≡β Rational.zero.
-          -ε < Rational.zero by Rational.negate_LessThan_zero_of_positive
+          -ε < Rational.zero
         })
 
 -- Real.LessOrEqual.reflexive : x ≤ x.
@@ -225,17 +223,17 @@ theorem Rational.sequence.IsEventuallyNonneg.add
     Rational.zero < Rational.halve(ε);
     eventually (m). -Rational.halve(ε) < s(m) as sBounded;
     choose N_s such that ∀ (m : Natural). N_s ≤ m → -Rational.halve(ε) < s(m)
-        as sBound from sBounded;
+        from sBounded;
     eventually (m). -Rational.halve(ε) < t(m) as tBounded;
     choose N_t such that ∀ (m : Natural). N_t ≤ m → -Rational.halve(ε) < t(m)
-        as tBound from tBounded;
+        from tBounded;
     witness Natural.maximum(N_s, N_t) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_t) ≤ m) ↦ {
           N_s ≤ m;
           N_t ≤ m;
-          -Rational.halve(ε) < s(m) by sBound;
-          -Rational.halve(ε) < t(m) by tBound;
+          -Rational.halve(ε) < s(m);
+          -Rational.halve(ε) < t(m);
           -- Chain the two ε/2 bounds end-to-end:
           --   -ε = -halve(ε) + -halve(ε)
           --      < s(m) + -halve(ε)    (sAt, added on the right)
@@ -286,8 +284,7 @@ theorem Real.IsNonneg.add
   cases x { | rep_x =>
     cases y { | rep_y => {
       CauchyRationalSequence.IsEventuallyNonneg(rep_x);
-      CauchyRationalSequence.IsEventuallyNonneg(rep_y)
-        by Real.IsNonneg.eventually_nonneg;
+      CauchyRationalSequence.IsEventuallyNonneg(rep_y);
       CauchyRationalSequence.IsEventuallyNonneg(
           CauchyRationalSequence.add(rep_x, rep_y));
       done
@@ -324,7 +321,7 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
                 abs(s(m) - Rational.zero) < ε :=
   (ε : Rational)
            (εPositive : Rational.zero < ε) ↦ {
-    choose N_s as sLowerBound from sNonneg(ε, εPositive);
+    choose N_s from sNonneg(ε, εPositive);
     choose N_negS as negSLowerBound from negSNonneg(ε, εPositive);
     witness Natural.maximum(N_s, N_negS) with
         (m : Natural)
@@ -332,7 +329,7 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
           -- Lower bound on s(m): -ε < s(m), from sNonneg.
           N_s ≤ m;
           N_negS ≤ m as mGeNnegS;
-          -ε < s(m) by sLowerBound;
+          -ε < s(m);
           -- Lower bound on -s(m): -ε < -s(m), from negSNonneg. Negating
           -- both sides flips the inequality: s(m) < ε.
           -ε < -s(m) by negSLowerBound(m, mGeNnegS);
@@ -397,10 +394,9 @@ theorem Real.IsNonneg_and_negate_IsNonneg_implies_zero
         : x = Real.zero :=
   cases x { | rep => {
     CauchyRationalSequence.IsEventuallyNonneg(rep);
-    CauchyRationalSequence.IsEventuallyNonneg(CauchyRationalSequence.negate(rep))
-      by Real.IsNonneg.eventually_nonneg;
+    CauchyRationalSequence.IsEventuallyNonneg(CauchyRationalSequence.negate(rep));
     CauchyEquivalent(rep, Rational.to_cauchy_constant(Rational.zero));
-    done by Quotient.equivalent_implies_equal
+    done
   } }
 
 -- Real.LessOrEqual.antisymmetric : x ≤ y, y ≤ x → x = y. From
@@ -491,7 +487,7 @@ theorem Real.add_preserves_LessThan
       sumLeq,
       (sumEqual : x + z = y + z) ↦ {
         ¬(x = y) as distinctXY;
-        x = y by Real.add_cancel_right as xEqualsY;
+        x = y as xEqualsY;
         distinctXY(xEqualsY)
       })
 }
