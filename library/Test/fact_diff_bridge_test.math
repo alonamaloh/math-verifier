@@ -1,0 +1,43 @@
+-- contextFactDiffBridge: a same-head in-scope fact transports to the
+-- goal across the positional diff — bounded defeq leaves plus at most
+-- one in-scope/library equation, applied at exactly the differing
+-- positions. The order-relation extension of the equality diff walk:
+-- these goals close bare, with no `by substituting` hint.
+module Test.fact_diff_bridge_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- A local equation bridges the differing position. Positional diffing
+-- is load-bearing here: `1` also occurs inside `2` (successor form),
+-- so an all-occurrence rewrite would mangle the goal.
+theorem Test.fact_diff_local_equation (p : Natural)
+        (pEqualsOne : p = 1)
+        (pAtLeastTwo : 2 ≤ p)
+        : 2 ≤ 1 := {
+  2 ≤ 1;
+  done
+}
+
+-- A library equation (`Natural.add_zero`) bridges the differing
+-- position, found by matching at the diff node itself — the node pair
+-- `(1 + k) + 0` vs `1 + k` bridges as a whole instead of decomposing
+-- into unrelated leaf pairs.
+theorem Test.fact_diff_library_equation (a k : Natural)
+        (aBound : a ≤ 1 + k)
+        : a ≤ (1 + k) + 0 := {
+  a ≤ (1 + k) + 0;
+  done
+}
+
+-- A defeq leaf rides for free: `0 + 0` reduces to `0`, no equation
+-- needed, the fact itself proves the goal.
+theorem Test.fact_diff_defeq_leaf (a : Natural)
+        (aBound : a ≤ 0)
+        : a ≤ 0 + 0 := {
+  a ≤ 0 + 0;
+  done
+}

@@ -218,9 +218,13 @@ bare spelling:
   `absurd(…)`, whose argument is type-inferring — brace blocks don't
   elaborate there), name the transported statement (`P(b) by
   substituting eq as h;`) and pass the name.
-- **Order relations**: the bare bridge covers single-position equality
-  diffs; an order-relation transport spells the intent with
-  `P by substituting eq;`.
+- **Order relations** (and any same-head proposition — `divides`,
+  congruences, …): the bare statement closes too. The prover diffs the
+  goal against a same-head in-scope fact position by position and
+  carries the differing spots across an in-scope equation (or a plain
+  reduction), so `2 ≤ p` plus `p = 1` yields the bare statement
+  `2 ≤ 1;`. Reach for `P by substituting eq;` only when several
+  equations could bridge the diff and the choice needs recording.
 
 The old spelling fails with a migration error pointing at these forms.
 

@@ -1647,6 +1647,14 @@ private:
         const std::vector<LocalBinder>& localBinders,
         std::vector<ContextEquality>& out);
 
+    // The single-node body of `collectLibraryEqualitiesAt` (no descent
+    // into children) — for callers that walk the term themselves, like
+    // the context-fact diff bridge's per-diff-node equation lookup.
+    void collectLibraryEqualitiesAtNode(
+        ExpressionPointer subexpr,
+        const std::vector<LocalBinder>& localBinders,
+        std::vector<ContextEquality>& out);
+
     std::vector<ContextEquality> collectContextEqualities(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -1688,6 +1696,29 @@ private:
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
         int line, int budget);
+
+    // Context fact diff bridge — the diff walker extended past `=` goals
+    // (order relations, `divides`, any constant-headed proposition). A goal
+    // `H(a…)` closes from a same-head in-scope fact `H(b…)` when every
+    // POSITIONAL diff leaf between the two spellings is bridged by either
+    //   - a bounded defeq probe (the kernel's final check re-verifies at
+    //     full fuel), or
+    //   - at most ONE in-scope equation (local hypothesis / conjunction leg,
+    //     or a library rewrite lemma matched at the leaf itself), transported
+    //     with `Equality.transport_proposition` whose motive holds holes at
+    //     exactly the bridged leaves' paths (one shared diff pair may recur,
+    //     e.g. in both disjuncts of an unfolded `≤`).
+    // Diffing the goal AGAINST THE FACT pins the rewrite position, so an
+    // equation endpoint that also occurs inside an unrelated subterm — `1`
+    // inside `2` when bridging `2 ≤ 1` from `2 ≤ p` via `p = 1` — cannot
+    // derail it the way the all-occurrence context-equality rewrite does.
+    // Cheap and shape-gated (same-head local facts only, structural walks,
+    // no recursive search); the built term is accepted only when its
+    // inferred type is defeq to the goal AS STATED (the quotientSoundBridge
+    // wrap-verification lesson).
+    ExpressionPointer tryContextFactDiffBridge(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders);
 
     // Conjunction introduction: when the goal is `And(A, B)`,
     // recursively prove each conjunct via the same auto-prover

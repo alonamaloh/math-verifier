@@ -1143,13 +1143,11 @@ ExpressionPointer Elaborator::tryContextFactMatch(
         return nullptr;
     }
 
-void Elaborator::collectLibraryEqualitiesAt(
+void Elaborator::collectLibraryEqualitiesAtNode(
         ExpressionPointer subexpr,
         const std::vector<LocalBinder>& localBinders,
         std::vector<ContextEquality>& out) {
-        auto* app =
-            std::get_if<Application>(&subexpr->node);
-        if (!app) return;
+        if (!std::holds_alternative<Application>(subexpr->node)) return;
         uint64_t key = spineHash(subexpr);
         auto range = lemmaIndex_.equal_range(key);
         for (auto iterator = range.first;
@@ -1210,6 +1208,16 @@ void Elaborator::collectLibraryEqualitiesAt(
             eq.proofExpr = lemmaApp;
             out.push_back(std::move(eq));
         }
+    }
+
+void Elaborator::collectLibraryEqualitiesAt(
+        ExpressionPointer subexpr,
+        const std::vector<LocalBinder>& localBinders,
+        std::vector<ContextEquality>& out) {
+        auto* app =
+            std::get_if<Application>(&subexpr->node);
+        if (!app) return;
+        collectLibraryEqualitiesAtNode(subexpr, localBinders, out);
         // Recurse into Application children.
         collectLibraryEqualitiesAt(
             app->function, localBinders, out);
@@ -1389,6 +1397,280 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                 return call;
             }
           }
+        }
+        return nullptr;
+    }
+
+namespace {
+
+// Rebuild `expr` as a transport-motive body: the subterms at the given
+// paths become the motive's bound variable (one shared hole — all paths
+// carry the same diff pair), everything off the paths is lifted past
+// the new lambda binder. Paths run through Application nodes only
+// (guaranteed by the diff walk) and are pairwise non-nested (the walk
+// stops at a bridged node); nullptr on a structural mismatch. `paths`
+// holds (path, consumed-prefix-length) pairs relative to the root.
+ExpressionPointer buildFactDiffMotiveBody(
+        ExpressionPointer expr,
+        const std::vector<std::pair<const std::vector<bool>*, size_t>>&
+            paths) {
+    for (const auto& entry : paths) {
+        if (entry.second == entry.first->size()) {
+            return makeBoundVariable(0);
+        }
+    }
+    if (paths.empty()) return liftBoundVariables(expr, 1, 0);
+    auto* app = std::get_if<Application>(&expr->node);
+    if (!app) return nullptr;
+    std::vector<std::pair<const std::vector<bool>*, size_t>> functionPaths;
+    std::vector<std::pair<const std::vector<bool>*, size_t>> argumentPaths;
+    for (const auto& entry : paths) {
+        if ((*entry.first)[entry.second]) {
+            argumentPaths.push_back({entry.first, entry.second + 1});
+        } else {
+            functionPaths.push_back({entry.first, entry.second + 1});
+        }
+    }
+    ExpressionPointer fn = buildFactDiffMotiveBody(
+        app->function, functionPaths);
+    if (!fn) return nullptr;
+    ExpressionPointer arg = buildFactDiffMotiveBody(
+        app->argument, argumentPaths);
+    if (!arg) return nullptr;
+    return makeApplication(std::move(fn), std::move(arg));
+}
+
+}  // namespace
+
+ExpressionPointer Elaborator::tryContextFactDiffBridge(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders) {
+        if (!std::holds_alternative<Application>(goalClosed->node)) {
+            return nullptr;
+        }
+        std::string goalHead = goalHeadName(goalClosed);
+        if (goalHead.empty() || goalHead[0] == '<') return nullptr;
+
+        int N = static_cast<int>(localBinders.size());
+        Context context = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, N);
+
+        // Bounded defeq probe on a diff leaf. A bounded success is
+        // definitive (more fuel never fails a converted pair); a bounded
+        // failure just declines the leaf.
+        auto leafDefeq = [&](ExpressionPointer a, ExpressionPointer b) {
+            try {
+                return isDefinitionallyEqual(environment_, context,
+                    openOverLocalBinders(a, localBinders, N),
+                    openOverLocalBinders(b, localBinders, N),
+                    kDefeqProbeFuel);
+            } catch (...) { return false; }
+        };
+
+        // Equation candidates for the bridged leaf, collected on first
+        // need: the local-hypothesis half of the context-equality stream
+        // (conjunction legs included). Library lemmas are matched at the
+        // leaf itself, per leaf, below.
+        bool localEqualitiesCollected = false;
+        std::vector<ContextEquality> localEqualities;
+        auto ensureLocalEqualities = [&] {
+            if (localEqualitiesCollected) return;
+            localEqualitiesCollected = true;
+            for (const ContextFact& fact
+                     : collectLocalBinderFacts(localBinders)) {
+                EqualityComponents components;
+                try {
+                    components = extractEqualityComponents(
+                        weakHeadNormalForm(environment_, fact.type),
+                        "local equality", 0);
+                } catch (const ElaborateError&) { continue; }
+                ContextEquality eq;
+                eq.cost = fact.cost;
+                eq.source = fact.source;
+                eq.carrierType = components.carrierType;
+                eq.lhs = components.leftEndpoint;
+                eq.rhs = components.rightEndpoint;
+                eq.carrierLevel = components.carrierUniverseLevel;
+                eq.proofExpr = fact.proofTerm;
+                localEqualities.push_back(std::move(eq));
+            }
+        };
+
+        // The goal's WHNF spelling, for facts stated at a folded head the
+        // goal has unfolded past (or vice versa) — e.g. an induction-refined
+        // goal arriving as `a < b ∨ a = b` while the fact says `a ≤ b`.
+        // Computed once, on first head mismatch.
+        bool goalWhnfComputed = false;
+        ExpressionPointer goalWhnf;
+        auto goalWhnfSpelling = [&]() -> ExpressionPointer {
+            if (!goalWhnfComputed) {
+                goalWhnfComputed = true;
+                try {
+                    goalWhnf = weakHeadNormalForm(environment_, goalClosed);
+                } catch (...) { goalWhnf = nullptr; }
+            }
+            return goalWhnf;
+        };
+
+        constexpr int maxDiffLeaves = 4;
+        for (const ContextFact& fact
+                 : collectLocalBinderFacts(localBinders)) {
+            // Pick the spelling pair to diff: structural heads first;
+            // on a mismatch retry with both sides' WHNF (peels a folded
+            // definition like Natural's transparent `≤`, mirroring the
+            // `by substituting` hypothesis route).
+            ExpressionPointer goalForDiff = goalClosed;
+            ExpressionPointer factForDiff = fact.type;
+            if (goalHeadName(fact.type) != goalHead) {
+                ExpressionPointer goalW = goalWhnfSpelling();
+                if (!goalW) continue;
+                ExpressionPointer factW;
+                try {
+                    factW = weakHeadNormalForm(environment_, fact.type);
+                } catch (...) { continue; }
+                if (!std::holds_alternative<Application>(goalW->node)
+                    || goalHeadName(goalW).empty()
+                    || goalHeadName(goalW)[0] == '<'
+                    || goalHeadName(factW) != goalHeadName(goalW)) {
+                    continue;
+                }
+                goalForDiff = goalW;
+                factForDiff = factW;
+            } else if (!std::holds_alternative<Application>(
+                           fact.type->node)) {
+                continue;
+            }
+            // An exact structural match is the earlier tactics' job.
+            if (structurallyEqual(factForDiff, goalForDiff)) continue;
+            autoProveSpend(1);
+            // Walk the two spellings in lockstep, bridging each differing
+            // node COARSEST-FIRST — defeq probe, then an equation lookup
+            // (local hypotheses / conjunction legs, plus library rewrite
+            // lemmas matched at the node itself) — and descending into
+            // Application children only when the node as a whole doesn't
+            // bridge. Bridging before descending is what lets `(1+k)+0`
+            // vs `1+k` close via `add_zero` instead of decomposing into
+            // unrelated leaf pairs. All equation-bridged nodes must carry
+            // the SAME diff pair — one equation, one transport with a
+            // multi-hole motive (an unfolded `≤` shows the same rewrite
+            // in both disjuncts).
+            ExpressionPointer equationProof;   // : factSide = goalSide
+            ExpressionPointer equationFactSide;
+            ExpressionPointer equationGoalSide;
+            ExpressionPointer equationCarrierType;
+            LevelPointer equationCarrierLevel;
+            std::vector<std::vector<bool>> holePathStorage;
+            std::function<bool(ExpressionPointer, ExpressionPointer,
+                               std::vector<bool>&)> bridgeDiff =
+                [&](ExpressionPointer goalSub, ExpressionPointer factSub,
+                    std::vector<bool>& path) -> bool {
+                if (structurallyEqual(goalSub, factSub)) return true;
+                if (leafDefeq(goalSub, factSub)) return true;
+                if (equationProof) {
+                    if (structurallyEqual(equationGoalSide, goalSub)
+                        && structurallyEqual(equationFactSide, factSub)
+                        && static_cast<int>(holePathStorage.size())
+                               < maxDiffLeaves) {
+                        holePathStorage.push_back(path);
+                        return true;
+                    }
+                } else {
+                    autoProveSpend(1);
+                    ensureLocalEqualities();
+                    std::vector<ContextEquality> candidates =
+                        localEqualities;
+                    collectLibraryEqualitiesAtNode(
+                        goalSub, localBinders, candidates);
+                    collectLibraryEqualitiesAtNode(
+                        factSub, localBinders, candidates);
+                    for (const ContextEquality& eq : candidates) {
+                        // Need a proof of `factSide = goalSide`; the
+                        // equation may be stated either way round.
+                        ExpressionPointer proof;
+                        if (structurallyEqual(eq.lhs, factSub)
+                            && structurallyEqual(eq.rhs, goalSub)) {
+                            proof = eq.proofExpr;
+                        } else if (structurallyEqual(eq.lhs, goalSub)
+                                   && structurallyEqual(eq.rhs,
+                                                        factSub)) {
+                            ExpressionPointer symm = makeConstant(
+                                "Equality.symmetry", {eq.carrierLevel});
+                            for (ExpressionPointer a
+                                     : {eq.carrierType, eq.lhs, eq.rhs,
+                                        eq.proofExpr}) {
+                                symm = makeApplication(symm, a);
+                            }
+                            proof = symm;
+                        } else {
+                            continue;
+                        }
+                        equationProof = proof;
+                        equationFactSide = factSub;
+                        equationGoalSide = goalSub;
+                        equationCarrierType = eq.carrierType;
+                        equationCarrierLevel = eq.carrierLevel;
+                        holePathStorage.push_back(path);
+                        return true;
+                    }
+                }
+                auto* goalApp = std::get_if<Application>(&goalSub->node);
+                auto* factApp = std::get_if<Application>(&factSub->node);
+                if (goalApp && factApp) {
+                    path.push_back(false);
+                    bool ok = bridgeDiff(
+                        goalApp->function, factApp->function, path);
+                    path.back() = true;
+                    ok = ok && bridgeDiff(
+                        goalApp->argument, factApp->argument, path);
+                    path.pop_back();
+                    return ok;
+                }
+                return false;
+            };
+            std::vector<bool> rootPath;
+            if (!bridgeDiff(goalForDiff, factForDiff, rootPath)) continue;
+            ExpressionPointer candidate;
+            if (!equationProof) {
+                candidate = fact.proofTerm;
+            } else {
+                std::vector<std::pair<const std::vector<bool>*, size_t>>
+                    holePaths;
+                for (const std::vector<bool>& p : holePathStorage) {
+                    holePaths.push_back({&p, 0});
+                }
+                ExpressionPointer motiveBody = buildFactDiffMotiveBody(
+                    goalForDiff, holePaths);
+                if (!motiveBody) continue;
+                ExpressionPointer motive = makeLambda(
+                    "_diffHole", equationCarrierType, motiveBody);
+                ExpressionPointer transport = makeConstant(
+                    "Equality.transport_proposition",
+                    {equationCarrierLevel});
+                for (ExpressionPointer a
+                         : {equationCarrierType, motive,
+                            equationFactSide, equationGoalSide,
+                            equationProof, fact.proofTerm}) {
+                    transport = makeApplication(transport, a);
+                }
+                candidate = transport;
+            }
+            if (!candidate) continue;
+            // Accept the candidate only when it proves the goal AS STATED
+            // (the quotientSoundBridge wrap-verification lesson): the
+            // typing check also verifies the fact against the motive
+            // across the defeq leaves.
+            autoProveSpend(2);
+            try {
+                ExpressionPointer candidateTypeOpened =
+                    inferTypeInLocalContext(localBinders, candidate);
+                if (isDefinitionallyEqual(environment_, context,
+                                          candidateTypeOpened,
+                                          goalOpened)) {
+                    return candidate;
+                }
+            } catch (const TypeError&) {
+            } catch (const ElaborateError&) {}
         }
         return nullptr;
     }
@@ -2320,6 +2602,24 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // Context fact diff bridge — a same-head in-scope fact transported
+        // to the goal across the positional diff (bounded defeq leaves +
+        // at most one in-scope equation). The order-relation analogue of
+        // the equality diff walk; positional, so it cannot be derailed by
+        // an equation endpoint recurring inside an unrelated subterm (`1`
+        // inside `2` when bridging `2 ≤ 1` from `2 ≤ p` via `p = 1`).
+        // Cheap (local facts only, structural walks, no recursive search),
+        // so it sits at the end of the cheap tier — and it short-circuits
+        // the expensive scans below on sites they used to win slowly
+        // (defeq-diff `done` closers burned ~500k kernel steps reaching
+        // contextEqualityBridge).
+        {
+            ExpressionPointer attempt = runTactic("contextFactDiffBridge",
+                [&] { return tryContextFactDiffBridge(
+                    goalClosed, localBinders); });
+            if (attempt) return attempt;
+        }
+
         // From here on the tactics are per-call expensive (full library
         // scans, recursive sub-proofs). Each charges the effort budget in
         // its hot loop via autoProveSpend(), which throws
@@ -2538,6 +2838,9 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("quotientSoundBridge", [&] {
             return tryQuotientSoundBridge(goalClosed, localBinders);
+        });
+        runProfiled("contextFactDiffBridge", [&] {
+            return tryContextFactDiffBridge(goalClosed, localBinders);
         });
         runProfiled("contextFactMatch", [&] {
             return tryContextFactMatch(
