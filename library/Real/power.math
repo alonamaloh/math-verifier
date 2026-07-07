@@ -148,12 +148,12 @@ theorem Real.power_le_cast_power
 
 -- ----------------------------------------------------------------------
 -- The tail estimate: past some index, every power of q sits below any
--- given positive rational tolerance.
+-- given positive tolerance.
 theorem Real.power_eventually_below
-        (q : Real) (qNonneg : q ≥ Real.zero) (qBelowOne : q < Real.one)
-        (ε : Rational) (εPositive : ε > Rational.zero)
+        (q : Real) (qNonneg : q ≥ 0) (qBelowOne : q < 1)
+        (ε : Real) (εPositive : ε > 0)
         : ∃ (N : Natural). ∀ (m : Natural). N ≤ m
-            → Real.power(q, m) < (ε : Real) := {
+            → Real.power(q, m) < ε := {
   -- A rational gap inside (0, 1 − q), giving the bound c := 1 − gap
   -- with q ≤ (c : ℝ) and c < 1.
   Real.zero
@@ -200,8 +200,11 @@ theorem Real.power_eventually_below
      < Rational.zero + Rational.one    by Rational.add_preserves_LessThan
      = Rational.one;
   Rational.one - gap ≤ Rational.one;
-  -- Decay at the Rational layer, then transfer the whole tail.
-  choose N such that Rational.power(Rational.one - gap, N) < ε
+  -- A rational tolerance below ε lets the rational decay lemma apply; the
+  -- tail lands below it, hence below ε.
+  choose rationalε such that Rational.zero < rationalε ∧ (rationalε : Real) < ε
+      from Real.exists_positive_rational_below;
+  choose N such that Rational.power(Rational.one - gap, N) < rationalε
       from Rational.power_decay_witness;
   witness N with
       (m : Natural) (NLeqM : N ≤ m) ↦ {
@@ -213,36 +216,33 @@ theorem Real.power_eventually_below
                  by Real.power_le_cast_power
            ≤ (Rational.power(Rational.one - gap, N) : Real)
                  by Rational.to_real.LessOrEqual_preserves
-           < (ε : Real)
+           < (rationalε : Real)
                  by Rational.to_real.LessThan_preserves
+           < ε
       }
 }
 
 -- Powers of q with 0 ≤ q < 1 converge to zero.
 theorem Real.power_converges_zero
-        (q : Real) (qNonneg : q ≥ Real.zero) (qBelowOne : q < Real.one)
-        : Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), Real.zero) :=
-  -- The decay tolerance lives at the rational layer (`power_eventually_below`),
-  -- so build at a rational ε and lift by density.
-  Real.SequenceConverges.of_rational(
-      (n : Natural) ↦ Real.power(q, n), Real.zero,
-      rationalBound := (ε : Rational) (εPositive : ε > Rational.zero) ↦ {
-    choose N such that ∀ (m : Natural). N ≤ m → Real.power(q, m) < (ε : Real)
+        (q : Real) (qNonneg : q ≥ 0) (qBelowOne : q < 1)
+        : Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), 0) :=
+  (ε : Real) (εPositive : ε > 0) ↦ {
+    choose N such that ∀ (m : Natural). N ≤ m → Real.power(q, m) < ε
         from Real.power_eventually_below;
     witness N with
         (m : Natural) (NLeqM : N ≤ m) ↦ {
-          Real.power(q, m) < (ε : Real);
-          Real.power(q, m) ≥ Real.zero;
+          Real.power(q, m) < ε;
+          Real.power(q, m) ≥ 0;
           Real.IsNonneg(Real.power(q, m));
-          abs(Real.power(q, m) - Real.zero)
+          abs(Real.power(q, m) - 0)
              = abs(Real.power(q, m))
                    by substituting
-                       (ring : Real.power(q, m) - Real.zero = Real.power(q, m))
+                       (ring : Real.power(q, m) - 0 = Real.power(q, m))
              = Real.power(q, m)
              as absEqual;
           done by substituting absEqual
         }
-  })
+  }
 
 -- ----------------------------------------------------------------------
 -- The exponent laws and order facts the means inequality runs on.
