@@ -1,0 +1,53 @@
+-- Feature test: the `^` infix operator registered to power. The parser
+-- already builds a right-associative `^` node (tighter than `*`, looser
+-- than application/postfix); this checks the operator registry resolves
+-- it on Natural and Real, that the semantics are base^exponent, and that
+-- right-association is what the kernel sees.
+--
+-- Registering `^` at (Real, Natural) also exercises the heterogeneous-
+-- operator registry path (base and exponent at different carriers), fixed
+-- in desugar_equality.cpp: the coercion-join must not lift the exponent to
+-- the base's carrier before the exact registration is consulted.
+
+module Test.caret_power_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.power
+import Real.basics
+import Real.embedding
+import Real.multiplication
+import Real.power
+
+-- Resolves to Natural.power (now base-first): `b ^ n` is b to the n.
+theorem Test.caret_is_natural_power (b n : Natural)
+        : b ^ n = Natural.power(b, n) :=
+  done
+
+-- Ground semantics: 2 ^ 3 = 8 (base 2, exponent 3), NOT 9. Peeling with
+-- power_succ observes that the base is what gets multiplied.
+theorem Test.caret_ground : 2 ^ 3 = 8 :=
+  2 ^ 3
+     = Natural.power(2, 3)
+     = 2 * Natural.power(2, 2)          by Natural.power_succ
+     = 2 * (2 * Natural.power(2, 1))    by Natural.power_succ
+     = 2 * (2 * 2)                      by Natural.power_one
+     = 8
+
+-- Resolves to Real.power (base Real, exponent Natural).
+theorem Test.caret_is_real_power (x : Real) (n : Natural)
+        : x ^ n = Real.power(x, n) :=
+  done
+
+-- Right-associative: `a ^ b ^ c` is `a ^ (b ^ c)`, NOT `(a ^ b) ^ c`.
+theorem Test.caret_right_associates (a b c : Natural)
+        : a ^ b ^ c = Natural.power(a, Natural.power(b, c)) :=
+  done
+
+-- Binds tighter than `*`: `2 * x ^ n` is `2 * (x ^ n)`.
+theorem Test.caret_tighter_than_times (x : Real) (n : Natural)
+        : 2 * x ^ n = 2 * Real.power(x, n) :=
+  done

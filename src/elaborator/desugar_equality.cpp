@@ -178,13 +178,28 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         ExpressionPointer rightTypeRaw =
             inferTypeInLocalContext(localBinders, rightKernel);
         std::string rightTypeName = headConstantName(rightTypeRaw);
+        // Heterogeneous operators register at an exact (left, right) pair
+        // whose sides are DIFFERENT carriers — `^` : base^exponent is
+        // `(Real, Natural)`, base and exponent at unrelated types. Consult
+        // the registry on the RAW operand types before the coercion-join
+        // below rewrites them: that join assumes a homogeneous operator and
+        // would lift the exponent up to the base's carrier, hiding the exact
+        // heterogeneous registration (and looking up a homogeneous pair that
+        // does not exist). A homogeneous mismatch like `Rational + Real` has
+        // no raw `(Rational, Real)` registration, so this misses and the
+        // join still fires — no regression.
+        {
+            std::string rawHit = environment_.lookupOperator(
+                operatorSymbol, operandTypeName, rightTypeName);
+            if (!rawHit.empty()) targetFunction = rawHit;
+        }
         // Mixed operands: reconcile via the coercion order before the
         // registry lookup. When a join exists (e.g. `Rational + Real`),
         // lift the lower operand up to it so the rest of this function
         // sees a homogeneous pair at the join type — registry dispatch,
         // implicit-filler inference, and the Natural `<` special case all
         // then operate on the coerced operands. See PLAN_COERCIONS.md.
-        if (operandTypeName != rightTypeName) {
+        if (targetFunction.empty() && operandTypeName != rightTypeName) {
             ExpressionPointer rightTypeClosed = closeOverLocalBinders(
                 rightTypeRaw, localBinders, localBinders.size());
             if (auto combined = combineOperands(
