@@ -113,71 +113,67 @@ theorem Real.geometric_series_converges
         (r L : Real)
         (rSmall : abs(r) < 1)
         (inverseProperty : (1 - r) * L = 1)
-        : r^0 + r^1 + ... + r^k + ... = L :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
-    -- |L| + 1 is a positive roof over |L|.
-    abs(L) ≥ 0;
-    (1 : Real) > 0;
-    abs(L) + 1
-       > abs(L) + 0     by Real.add_left_preserves_LessThan
-       = abs(L)
-       ≥ 0;
-    abs(L) + 1 ≠ 0;
-    abs(L)
-       = abs(L) + 0
-       < abs(L) + 1     by Real.add_left_preserves_LessThan;
-    abs(L) ≤ abs(L) + 1;
-    abs(r) ≥ 0;
-    -- The scaled tolerance ε/(|L| + 1), and the decay tail below it.
-    ε / (abs(L) + 1) > 0;
-    choose N such that
-        ∀ (m : Natural). N ≤ m →
-          abs(r)^m < ε / (abs(L) + 1)
-        from Real.power_eventually_below;
-    eventually (m).
-        abs(Real.partialSum((k : Natural) ↦ r^k, m) - L) < ε
-      by witness N with
-          (m : Natural) (NLeqM : N ≤ m) ↦ {
-      abs(r)^m < ε / (abs(L) + 1);
-      -- Sₘ = (1 − rᵐ)·L, so the error is exactly |r|ᵐ·|L|.
-      Real.partialSum((k : Natural) ↦ r^k, m)
-         = Real.partialSum((k : Natural) ↦ r^k, m) * 1
-         = Real.partialSum((k : Natural) ↦ r^k, m)
-               * ((1 - r) * L)
-         = ((1 - r)
-            * Real.partialSum((k : Natural) ↦ r^k, m)) * L
-         = (1 - r^m) * L
-               by Real.geometric_partialSum
-         as sumFormula;
-      abs(Real.partialSum((k : Natural) ↦ r^k, m) - L)
-         = abs((1 - r^m) * L - L)
-               by sumFormula
-         = abs(-(r^m * L))
-               by substituting
-                   (ring : (1 - r^m) * L - L = -(r^m * L))
-         = abs(r^m * L)
-         = abs(r^m) * abs(L)
-         = abs(r)^m * abs(L);
-      -- |r|ᵐ·|L| ≤ |r|ᵐ·(|L| + 1) < (ε/(|L| + 1))·(|L| + 1) = ε.
-      abs(r)^m ≥ 0;
-      Real.IsNonneg(abs(r)^m);
-      abs(r)^m * abs(L)
-         = abs(L) * abs(r)^m
-         ≤ (abs(L) + 1) * abs(r)^m
-               by Real.LessOrEqual.multiply_by_nonneg_right
-         = abs(r)^m * (abs(L) + 1)
-         < (ε / (abs(L) + 1)) * (abs(L) + 1)
-               by Real.LessThan.multiply_by_positive_right
-         = (abs(L) + 1) * (ε / (abs(L) + 1))
-         = ε
-               by Real.divide_cancel
-         as finalBound;
-      abs(Real.partialSum((k : Natural) ↦ r^k, m) - L)
-         = abs(r)^m * abs(L)
-         < ε                        by finalBound
-      };
-    done
-  }
+        : r^0 + r^1 + ... + r^k + ... = L := {
+  -- rⁿ → 0, since |rⁿ| = |r|ⁿ and |r| < 1.
+  abs(r) ≥ 0;
+  Real.SequenceConverges((n : Natural) ↦ Real.power(abs(r), n), 0)
+      by Real.power_converges_zero;
+  Real.SequenceConverges((n : Natural) ↦ r^n, 0)
+      by Real.SequenceConverges.squeeze_zero(
+             v := (n : Natural) ↦ r^n,
+             u := (n : Natural) ↦ Real.power(abs(r), n),
+             dominated := (n : Natural) ↦ {
+               abs(r^n)
+                  = Real.power(abs(r), n)   by Real.absolute_value_power
+                  ≤ Real.power(abs(r), n)
+             })
+      as rConverges;
+  -- 1 − rⁿ → 1.
+  Real.SequenceConverges((n : Natural) ↦ -(r^n), -(0 : Real))
+      by Real.SequenceConverges.negate(
+             s := (n : Natural) ↦ r^n, sLimit := 0, sConverges := rConverges)
+      as negatedConverges;
+  Real.SequenceConverges((n : Natural) ↦ (1 : Real), 1)
+      by Real.constant_sequence_converges
+      as oneConverges;
+  Real.SequenceConverges((n : Natural) ↦ (1 : Real) + -(r^n), 1 + -(0 : Real))
+      by Real.SequenceConverges.add(
+             s := (n : Natural) ↦ (1 : Real), t := (n : Natural) ↦ -(r^n),
+             sLimit := 1, tLimit := -(0 : Real),
+             sConverges := oneConverges, tConverges := negatedConverges);
+  Real.SequenceConverges((n : Natural) ↦ 1 - r^n, 1 + -(0 : Real))
+      by Real.SequenceConverges.of_pointwise(
+             s := (n : Natural) ↦ (1 : Real) + -(r^n),
+             pointwiseEqual := (n : Natural) ↦ (ring : (1 : Real) + -(r^n) = 1 - r^n));
+  Real.SequenceConverges((n : Natural) ↦ 1 - r^n, 1)
+      by substituting (1 + -(0 : Real) = 1)
+      as oneMinusConverges;
+  -- Sₙ = (1 − rⁿ)·L, so Sₙ → 1·L = L.
+  Real.SequenceConverges((n : Natural) ↦ L, L)
+      by Real.constant_sequence_converges
+      as limitConverges;
+  Real.SequenceConverges((n : Natural) ↦ (1 - r^n) * L, 1 * L)
+      by Real.SequenceConverges.multiply(
+             s := (n : Natural) ↦ 1 - r^n, t := (n : Natural) ↦ L,
+             sLimit := 1, tLimit := L,
+             sConverges := oneMinusConverges, tConverges := limitConverges);
+  Real.SequenceConverges(
+        (n : Natural) ↦ Real.partialSum((k : Natural) ↦ r^k, n), 1 * L)
+      by Real.SequenceConverges.of_pointwise(
+             s := (n : Natural) ↦ (1 - r^n) * L,
+             pointwiseEqual := (n : Natural) ↦ {
+               Real.partialSum((k : Natural) ↦ r^k, n)
+                  = Real.partialSum((k : Natural) ↦ r^k, n) * 1
+                  = Real.partialSum((k : Natural) ↦ r^k, n) * ((1 - r) * L)
+                  = ((1 - r) * Real.partialSum((k : Natural) ↦ r^k, n)) * L
+                  = (1 - r^n) * L
+                        by Real.geometric_partialSum
+             });
+  Real.SequenceConverges(
+        (n : Natural) ↦ Real.partialSum((k : Natural) ↦ r^k, n), L)
+      by substituting (1 * L = L);
+  done
+}
 
 -- ----------------------------------------------------------------------
 -- Freek #66: the geometric series. For |r| < 1 there is an inverse L

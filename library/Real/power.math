@@ -59,6 +59,7 @@ import Real.field
 import Real.order_field
 import Real.density
 import Real.convergence
+import Real.limits
 
 -- ----------------------------------------------------------------------
 -- xⁿ, by recursion on the exponent.
@@ -147,106 +148,7 @@ theorem Real.power_le_cast_power
   }
 
 -- ----------------------------------------------------------------------
--- The tail estimate: past some index, every power of q sits below any
--- given positive tolerance.
-theorem Real.power_eventually_below
-        (q : Real) (qNonneg : q ≥ 0) (qBelowOne : q < 1)
-        (ε : Real) (εPositive : ε > 0)
-        : ∃ (N : Natural). ∀ (m : Natural). N ≤ m
-            → Real.power(q, m) < ε := {
-  -- A rational gap inside (0, 1 − q), giving the bound c := 1 − gap
-  -- with q ≤ (c : ℝ) and c < 1.
-  Real.zero
-     = q - q
-     < Real.one - q      by Real.add_preserves_LessThan;
-  choose gap such that Rational.zero < gap ∧ (gap : Real) < Real.one - q
-      from Real.exists_positive_rational_below;
-  -- The cast of 1 − gap is 1 − (gap : ℝ).
-  ((Rational.one - gap) : Real)
-     = (Rational.one : Real) + ((-gap : Rational) : Real)
-     = (Rational.one : Real) + -(gap : Real)
-     = Real.one - (gap : Real)
-     as castSubtract;
-  -- q ≤ 1 − (gap : ℝ) = (c : ℝ).
-  q + (gap : Real)
-     < q + (Real.one - q)    by Real.add_left_preserves_LessThan
-     = Real.one;
-  q
-     = (q + (gap : Real)) - (gap : Real)
-     < Real.one - (gap : Real)              by Real.add_preserves_LessThan;
-  q ≤ Real.one - (gap : Real);
-  q ≤ ((Rational.one - gap) : Real)
-      by substituting castSubtract;
-  -- c < 1 at the Rational level, reflected through the embedding.
-  Real.one - q
-     = Real.zero + (Real.one - q)
-     ≤ q + (Real.one - q)            by Real.add_preserves_LessOrEqual
-     = Real.one;
-  (gap : Real)
-     < Real.one - q
-     ≤ Real.one
-     = (Rational.one : Real);
-  gap < Rational.one;
-  gap ≤ Rational.one;
-  -Rational.one ≤ -gap;
-  Rational.zero
-     = -Rational.one + Rational.one
-     ≤ -gap + Rational.one              by Rational.add_preserves_LessOrEqual
-     = Rational.one - gap;
-  -gap < Rational.zero
-      by Rational.negate_LessThan_zero_of_positive;
-  Rational.one - gap
-     = -gap + Rational.one
-     < Rational.zero + Rational.one    by Rational.add_preserves_LessThan
-     = Rational.one;
-  Rational.one - gap ≤ Rational.one;
-  -- A rational tolerance below ε lets the rational decay lemma apply; the
-  -- tail lands below it, hence below ε.
-  choose rationalε such that Rational.zero < rationalε ∧ (rationalε : Real) < ε
-      from Real.exists_positive_rational_below;
-  choose N such that Rational.power(Rational.one - gap, N) < rationalε
-      from Rational.power_decay_witness;
-  witness N with
-      (m : Natural) (NLeqM : N ≤ m) ↦ {
-        Rational.power(Rational.one - gap, m)
-                ≤ Rational.power(Rational.one - gap, N)
-            by Rational.power_le_at_le;
-        Real.power(q, m)
-           ≤ (Rational.power(Rational.one - gap, m) : Real)
-                 by Real.power_le_cast_power
-           ≤ (Rational.power(Rational.one - gap, N) : Real)
-                 by Rational.to_real.LessOrEqual_preserves
-           < (rationalε : Real)
-                 by Rational.to_real.LessThan_preserves
-           < ε
-      }
-}
-
--- Powers of q with 0 ≤ q < 1 converge to zero.
-theorem Real.power_converges_zero
-        (q : Real) (qNonneg : q ≥ 0) (qBelowOne : q < 1)
-        : Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), 0) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
-    choose N such that ∀ (m : Natural). N ≤ m → Real.power(q, m) < ε
-        from Real.power_eventually_below;
-    witness N with
-        (m : Natural) (NLeqM : N ≤ m) ↦ {
-          Real.power(q, m) < ε;
-          Real.power(q, m) ≥ 0;
-          Real.IsNonneg(Real.power(q, m));
-          abs(Real.power(q, m) - 0)
-             = abs(Real.power(q, m))
-                   by substituting
-                       (ring : Real.power(q, m) - 0 = Real.power(q, m))
-             = Real.power(q, m)
-             as absEqual;
-          done by substituting absEqual
-        }
-  }
-
--- ----------------------------------------------------------------------
--- The exponent laws and order facts the means inequality runs on.
-
+-- xᵃ⁺ᵇ = xᵃ · xᵇ.
 theorem Real.power_add (x : Real) (exponent1 exponent2 : Natural)
         : Real.power(x, exponent1 + exponent2)
           = Real.power(x, exponent1) * Real.power(x, exponent2) :=
@@ -264,6 +166,121 @@ theorem Real.power_add (x : Real) (exponent1 exponent2 : Natural)
            = (x * Real.power(x, predecessor)) * Real.power(x, exponent2)
            = Real.power(x, 1 + predecessor) * Real.power(x, exponent2)
   }
+
+-- Powers of a base in [0, 1] stay at or below 1.
+theorem Real.power_le_one (q : Real) (qNonneg : q ≥ 0) (qLeqOne : q ≤ 1)
+        (n : Natural) : Real.power(q, n) ≤ 1 :=
+  by induction on n with IH {
+    case base:
+        Real.power(q, 0)
+           = 1
+           ≤ 1
+    case step(predecessor): {
+        Real.power(q, predecessor) ≥ 0;
+        Real.power(q, 1 + predecessor)
+           = q * Real.power(q, predecessor)   by Real.power_add_one
+           ≤ 1 * Real.power(q, predecessor)   by Real.LessOrEqual.multiply_by_nonneg_right
+           = Real.power(q, predecessor)
+           ≤ 1                                 by IH
+      }
+  }
+
+-- A base in [0, 1] makes the powers antitone in the exponent.
+theorem Real.power_antitone_exponent
+        (q : Real) (qNonneg : q ≥ 0) (qLeqOne : q ≤ 1)
+        (i j : Natural) (iLeqJ : i ≤ j)
+        : Real.power(q, j) ≤ Real.power(q, i) := {
+  choose difference such that j = difference + i from Natural.le_to_add;
+  Real.power(q, i) ≥ 0;
+  Real.power(q, difference) ≤ 1;
+  Real.power(q, j)
+     = Real.power(q, difference + i)
+     = Real.power(q, difference) * Real.power(q, i)   by Real.power_add
+     ≤ 1 * Real.power(q, i)
+           by Real.LessOrEqual.multiply_by_nonneg_right
+     = Real.power(q, i)
+}
+
+-- Powers of q with 0 ≤ q < 1 converge to zero. The sequence is decreasing
+-- and bounded below by 0, so it converges (monotone convergence); its
+-- limit L is pinned by the recursion q^(n+1) = q·q^n to satisfy L = q·L,
+-- and 1 − q ≠ 0 forces L = 0.
+theorem Real.power_converges_zero
+        (q : Real) (qNonneg : q ≥ 0) (qBelowOne : q < 1)
+        : Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), 0) := {
+  q ≤ 1;
+  0
+     = q - q
+     < 1 - q      by Real.add_preserves_LessThan;
+  1 - q ≠ 0 as denominatorNonzero;
+  -- −q^n is increasing and bounded above by 0, so it converges.
+  ∀ (i : Natural) (j : Natural). i ≤ j
+      → -Real.power(q, i) ≤ -Real.power(q, j)
+      by (i : Natural) (j : Natural) (iLeqJ : i ≤ j) ↦ {
+        Real.power(q, j) ≤ Real.power(q, i)   by Real.power_antitone_exponent;
+        done by Real.LessOrEqual.negate
+      } as increasing;
+  ∀ (n : Natural). -Real.power(q, n) ≤ 0
+      by (n : Natural) ↦ {
+        Real.power(q, n) ≥ 0;
+        -Real.power(q, n)
+           ≤ -(0 : Real)     by Real.LessOrEqual.negate
+           = 0
+      } as boundedAbove;
+  choose negativeLimit such that
+      Real.SequenceConverges((n : Natural) ↦ -Real.power(q, n), negativeLimit)
+      from Real.monotone_bounded_converges(
+               s := (n : Natural) ↦ -Real.power(q, n),
+               monotone := increasing, bound := 0, bounded := boundedAbove);
+  -- Undo the negation: q^n → −negativeLimit.
+  Real.SequenceConverges((n : Natural) ↦ -(-Real.power(q, n)), -negativeLimit)
+      by Real.SequenceConverges.negate(
+             s := (n : Natural) ↦ -Real.power(q, n), sLimit := negativeLimit);
+  Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), -negativeLimit)
+      by Real.SequenceConverges.of_pointwise(
+             s := (n : Natural) ↦ -(-Real.power(q, n)),
+             pointwiseEqual := (n : Natural) ↦
+                 (ring : -(-Real.power(q, n)) = Real.power(q, n)));
+  -- The shifted sequence has the same limit and equals q·q^n, so
+  -- −negativeLimit = q·(−negativeLimit).
+  Real.SequenceConverges((n : Natural) ↦ Real.power(q, 1 + n), -negativeLimit)
+      by Real.SequenceConverges.shift_one(
+             s := (n : Natural) ↦ Real.power(q, n), limit := -negativeLimit);
+  Real.SequenceConverges((n : Natural) ↦ q * Real.power(q, n), -negativeLimit)
+      by Real.SequenceConverges.of_pointwise(
+             s := (n : Natural) ↦ Real.power(q, 1 + n),
+             pointwiseEqual := (n : Natural) ↦ Real.power_add_one(q, n))
+      as shiftedConverges;
+  Real.SequenceConverges((n : Natural) ↦ q, q)
+      by Real.constant_sequence_converges;
+  Real.SequenceConverges((n : Natural) ↦ q * Real.power(q, n), q * -negativeLimit)
+      by Real.SequenceConverges.multiply(
+             s := (n : Natural) ↦ q, t := (n : Natural) ↦ Real.power(q, n),
+             sLimit := q, tLimit := -negativeLimit)
+      as productConverges;
+  -negativeLimit = q * -negativeLimit
+      by Real.SequenceConverges.unique(
+             s := (n : Natural) ↦ q * Real.power(q, n),
+             convergesToL1 := shiftedConverges, convergesToL2 := productConverges)
+      as fixedPoint;
+  -- (1 − q)·(−negativeLimit) = 0 with 1 − q ≠ 0 gives −negativeLimit = 0.
+  (1 - q) * -negativeLimit
+     = -negativeLimit - q * -negativeLimit
+     = -negativeLimit - -negativeLimit    by substituting fixedPoint
+     = 0
+     = (1 - q) * 0
+     as cancellable;
+  -negativeLimit = 0
+      by Real.equal_of_multiply_left(
+             a := -negativeLimit, b := 0, c := 1 - q,
+             cNonzero := denominatorNonzero, cancellable := cancellable);
+  Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), 0)
+      by substituting (-negativeLimit = 0);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The exponent laws and order facts the means inequality runs on.
 
 theorem Real.power_product (x y : Real) (n : Natural)
         : Real.power(x * y, n) = Real.power(x, n) * Real.power(y, n) :=
