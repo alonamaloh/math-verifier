@@ -15,6 +15,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Lists.basics
 
 -- Both arms equation-shaped, `k + 1` offset spelling, per-arm IH name.
 theorem Test.add_zero_right_equation_arms (n : Natural) : n + 0 = n :=
@@ -31,4 +32,18 @@ theorem Test.zero_le_equation_arms (n : Natural) : 0 ≤ n :=
   by induction on n with IH {
     case n = 0: done
     case n = 1 + k: done by Natural.zero_least
+  }
+
+-- Multi-binder witness arm: inducting over a 2-argument constructor. The
+-- `for some head, tail` list names both fields (documentation; the
+-- constructor equation binds them), reaching parity with `by cases`.
+-- `head`, `tail`, and the per-arm `ih` are all in scope in the body.
+theorem Test.product_self_multi_binder (xs : NaturalList) :
+    NaturalList.productOf(xs) = NaturalList.productOf(xs) :=
+  by induction on xs {
+    case xs = NaturalList.empty: done
+    case xs = NaturalList.prepend(head, tail) for some head, tail, with ih: {
+        NaturalList.productOf(tail) = NaturalList.productOf(tail) by ih;
+        done
+      }
   }

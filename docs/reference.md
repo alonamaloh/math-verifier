@@ -98,6 +98,7 @@ every row above is its bare/`done` replacement.
 by induction on x with IH { case x = 0: … case x = k + 1 for some k: … }
 by induction on x { case x = 0: … case x = k + 1, with IH: … }  -- header-less: arms name their own IH
 by induction on x with IH { case zero: … case successor(k): … } -- constructor-pattern arms
+by induction on xs { case xs = empty: … case xs = prepend(head, tail) for some head, tail, with IH: … }  -- multi-arg constructor: same witness lists as `by cases`
 by induction on x with IH generalizing b, … { … }  -- induction loading: IH quantifies over b (scrutinee-dependent hypotheses generalise automatically)
 by induction on x using R with subject, IH { … }   -- with an explicit recursor
 by strong induction on n with hypothesis IH { … }  -- subject shadows n; IH : (k) → k < n → P(k)

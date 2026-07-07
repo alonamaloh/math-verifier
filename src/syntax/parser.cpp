@@ -4093,14 +4093,12 @@ private:
                     } else {
                         clause.pattern = parsePattern();
                     }
-                    if (peek().kind == TokenKind::Identifier
-                        && peek().lexeme == "for"
-                        && peekAt(1).kind == TokenKind::Identifier
-                        && peekAt(1).lexeme == "some"
-                        && isIdentifierLike(peekAt(2).kind)) {
-                        consumeAny();  // 'for'
-                        consumeAny();  // 'some'
-                        consumeAny();  // the witness name (documentation)
+                    if (isIdentifierLike(peek().kind)
+                        && peek().lexeme == "for") {
+                        // `for some k₁, k₂, …` — documentation only; the
+                        // constructor pattern already binds every witness
+                        // (multi-arg constructors need the whole list).
+                        parseForSomeWitnessBinders();
                     }
                     if (peek().kind == TokenKind::Comma
                         && peekAt(1).kind == TokenKind::KeywordWith) {
@@ -4697,6 +4695,58 @@ private:
                                  givenToken.line, givenToken.column);
     }
 
+    // Parses `for some k₁, (k₂ : T), …` after a case-arm pattern or
+    // proposition. Shared by structural `by cases` arms — where the
+    // binders introduce the existential witnesses `∃ k₁. ∃ k₂. …` — and
+    // equation-shaped `by induction` arms, where the constructor pattern
+    // already binds the witnesses and the list is documentation. Stops
+    // before a trailing `, with <ih>` (induction's per-arm hypothesis
+    // clause). Assumes the caller has confirmed `peek()` is the `for` of
+    // `for some`. Each binder is a bare identifier or `(ident : T)`; a
+    // later binder's type may mention an earlier witness.
+    std::vector<SurfaceWitnessBinder> parseForSomeWitnessBinders() {
+        consumeAny();  // 'for'
+        if (!(isIdentifierLike(peek().kind) && peek().lexeme == "some")) {
+            throwHere("expected 'some' after 'for' in a case arm "
+                      "(`case P for some k`)");
+        }
+        consumeAny();  // 'some'
+        std::vector<SurfaceWitnessBinder> witnessBinders;
+        while (true) {
+            SurfaceWitnessBinder binder;
+            if (peek().kind == TokenKind::LeftParen) {
+                consumeAny();  // '('
+                if (!isIdentifierLike(peek().kind)) {
+                    throwHere("expected the witness name in "
+                              "'for some (k : T)'");
+                }
+                binder.name = consumeAny().lexeme;
+                expect(TokenKind::Colon, "after the witness name");
+                binder.type = parseExpression();
+                expect(TokenKind::RightParen,
+                       "ending 'for some (k : T)'");
+            } else if (isIdentifierLike(peek().kind)) {
+                binder.name = consumeAny().lexeme;
+            } else {
+                throwHere("expected a witness name after 'for some'");
+            }
+            for (const auto& existing : witnessBinders) {
+                if (existing.name == binder.name) {
+                    throwHere("duplicate witness name '" + binder.name
+                              + "' in `for some` — each witness in a "
+                                "case arm needs a distinct name");
+                }
+            }
+            witnessBinders.push_back(std::move(binder));
+            if (peek().kind != TokenKind::Comma
+                || peekAt(1).kind == TokenKind::KeywordWith) {
+                break;
+            }
+            consumeAny();  // ','
+        }
+        return witnessBinders;
+    }
+
     // `in (Proposition) [as name]: body` — one arm of a `claim by
     // cases` block. The optional `as name` lets the user bind the
     // disjunct hypothesis under an identifier (matching how legacy
@@ -4737,42 +4787,7 @@ private:
         std::vector<SurfaceWitnessBinder> witnessBinders;
         if (!isOtherwise && disjunctType
             && isIdentifierLike(peek().kind) && peek().lexeme == "for") {
-            consumeAny();  // 'for'
-            if (!(isIdentifierLike(peek().kind)
-                  && peek().lexeme == "some")) {
-                throwHere("expected 'some' after 'for' in a case arm "
-                          "(`case P for some k`)");
-            }
-            consumeAny();  // 'some'
-            while (true) {
-                SurfaceWitnessBinder binder;
-                if (peek().kind == TokenKind::LeftParen) {
-                    consumeAny();  // '('
-                    if (!isIdentifierLike(peek().kind)) {
-                        throwHere("expected the witness name in "
-                                  "'for some (k : T)'");
-                    }
-                    binder.name = consumeAny().lexeme;
-                    expect(TokenKind::Colon, "after the witness name");
-                    binder.type = parseExpression();
-                    expect(TokenKind::RightParen,
-                           "ending 'for some (k : T)'");
-                } else if (isIdentifierLike(peek().kind)) {
-                    binder.name = consumeAny().lexeme;
-                } else {
-                    throwHere("expected a witness name after 'for some'");
-                }
-                for (const auto& existing : witnessBinders) {
-                    if (existing.name == binder.name) {
-                        throwHere("duplicate witness name '" + binder.name
-                                  + "' in `for some` — each witness in a "
-                                    "case arm needs a distinct name");
-                    }
-                }
-                witnessBinders.push_back(std::move(binder));
-                if (peek().kind != TokenKind::Comma) break;
-                consumeAny();  // ','
-            }
+            witnessBinders = parseForSomeWitnessBinders();
         }
         std::string binderName;
         SurfacePatternPointer destructurePattern;
