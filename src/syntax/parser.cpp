@@ -3256,7 +3256,7 @@ private:
     }
 
     SurfaceExpressionPointer parseMultiplicative() {
-        auto left = parsePower();
+        auto left = parseUnary();
         while (peek().kind == TokenKind::Star
                || peek().kind == TokenKind::Slash
                || peek().kind == TokenKind::CenterDot) {
@@ -3277,7 +3277,7 @@ private:
                               + " g)");
                 }
                 consumeAny();  // the operator after '...'
-                auto general = parsePower();
+                auto general = parseUnary();
                 std::vector<SurfaceExpressionPointer> prefix;
                 flattenEllipsisPrefix(left, sym, prefix);
                 if (peek().kind == op.kind
@@ -3292,7 +3292,7 @@ private:
                     sym, std::move(prefix), std::move(general),
                     op.line, op.column);
             }
-            auto right = parsePower();
+            auto right = parseUnary();
             left = makeSurfaceBinaryOperation(sym, std::move(left),
                                                std::move(right),
                                                op.line, op.column);
@@ -3300,19 +3300,8 @@ private:
         return left;
     }
 
-    // Right-associative: a ^ b ^ c parses as a ^ (b ^ c).
-    SurfaceExpressionPointer parsePower() {
-        auto left = parseUnary();
-        if (peek().kind == TokenKind::Caret) {
-            Token op = consumeAny();
-            auto right = parsePower();
-            left = makeSurfaceBinaryOperation("^", std::move(left),
-                                               std::move(right),
-                                               op.line, op.column);
-        }
-        return left;
-    }
-
+    // Unary minus / logical-not bind looser than `^`, so `-x^2` is
+    // `-(x^2)` (the mathematician's reading) and `-x²` is `-(x·x)`.
     SurfaceExpressionPointer parseUnary() {
         if (peek().kind == TokenKind::Minus) {
             Token op = consumeAny();
@@ -3326,6 +3315,24 @@ private:
             return makeSurfaceUnaryOperation("¬", std::move(operand),
                                               op.line, op.column);
         }
+        return parsePower();
+    }
+
+    // Right-associative: a ^ b ^ c parses as a ^ (b ^ c). Binds tighter
+    // than unary minus, looser than postfix/application.
+    SurfaceExpressionPointer parsePower() {
+        auto left = parsePostfix();
+        if (peek().kind == TokenKind::Caret) {
+            Token op = consumeAny();
+            auto right = parsePower();
+            left = makeSurfaceBinaryOperation("^", std::move(left),
+                                               std::move(right),
+                                               op.line, op.column);
+        }
+        return left;
+    }
+
+    SurfaceExpressionPointer parsePostfix() {
         // Postfix operators bind tighter than any binary operator and
         // attach to the application/atom just parsed. `g⁻¹` wraps `g`;
         // `a · b⁻¹` parses as `a · (b⁻¹)`; `g⁻¹⁻¹` chains; `k!` likewise.

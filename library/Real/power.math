@@ -123,22 +123,22 @@ theorem Real.absolute_value_power (x : Real) (n : Natural)
 theorem Real.power_le_cast_power
         (q : Real) (c : Rational) (n : Natural)
         (qNonneg : q ≥ Real.zero) (qBound : q ≤ (c : Real))
-        : Real.power(q, n) ≤ (Rational.power(c, n) : Real) :=
+        : q^n ≤ (Rational.power(c, n) : Real) :=
   by induction on n with IH {
     case base: {
         Real.one ≤ Real.one;
         done
       }
     case step(predecessor): {
-        Real.power(q, predecessor) ≥ Real.zero;
-        Real.IsNonneg(Real.power(q, predecessor));
+        q^predecessor ≥ Real.zero;
+        Real.IsNonneg(q^predecessor);
         Real.zero ≤ q ≤ (c : Real);
         Real.IsNonneg((c : Real));
-        Real.power(q, 1 + predecessor)
-           = q * Real.power(q, predecessor)
-           ≤ (c : Real) * Real.power(q, predecessor)
+        q^(1 + predecessor)
+           = q * q^predecessor
+           ≤ (c : Real) * q^predecessor
                  by Real.LessOrEqual.multiply_by_nonneg_right
-           = Real.power(q, predecessor) * (c : Real)
+           = q^predecessor * (c : Real)
            ≤ (Rational.power(c, predecessor) : Real) * (c : Real)
                  by Real.LessOrEqual.multiply_by_nonneg_right
            = (c : Real) * (Rational.power(c, predecessor) : Real)
@@ -169,18 +169,18 @@ theorem Real.power_add (x : Real) (exponent1 exponent2 : Natural)
 
 -- Powers of a base in [0, 1] stay at or below 1.
 theorem Real.power_le_one (q : Real) (qNonneg : q ≥ 0) (qLeqOne : q ≤ 1)
-        (n : Natural) : Real.power(q, n) ≤ 1 :=
+        (n : Natural) : q^n ≤ 1 :=
   by induction on n with IH {
     case base:
         Real.power(q, 0)
            = 1
            ≤ 1
     case step(predecessor): {
-        Real.power(q, predecessor) ≥ 0;
-        Real.power(q, 1 + predecessor)
-           = q * Real.power(q, predecessor)   by Real.power_add_one
-           ≤ 1 * Real.power(q, predecessor)   by Real.LessOrEqual.multiply_by_nonneg_right
-           = Real.power(q, predecessor)
+        q^predecessor ≥ 0;
+        q^(1 + predecessor)
+           = q * q^predecessor   by Real.power_add_one
+           ≤ 1 * q^predecessor   by Real.LessOrEqual.multiply_by_nonneg_right
+           = q^predecessor
            ≤ 1                                 by IH
       }
   }
@@ -189,16 +189,16 @@ theorem Real.power_le_one (q : Real) (qNonneg : q ≥ 0) (qLeqOne : q ≤ 1)
 theorem Real.power_antitone_exponent
         (q : Real) (qNonneg : q ≥ 0) (qLeqOne : q ≤ 1)
         (i j : Natural) (iLeqJ : i ≤ j)
-        : Real.power(q, j) ≤ Real.power(q, i) := {
+        : q^j ≤ q^i := {
   choose difference such that j = difference + i from Natural.le_to_add;
-  Real.power(q, i) ≥ 0;
-  Real.power(q, difference) ≤ 1;
-  Real.power(q, j)
-     = Real.power(q, difference + i)
-     = Real.power(q, difference) * Real.power(q, i)   by Real.power_add
-     ≤ 1 * Real.power(q, i)
+  q^i ≥ 0;
+  q^difference ≤ 1;
+  q^j
+     = q^(difference + i)
+     = q^difference * q^i   by Real.power_add
+     ≤ 1 * q^i
            by Real.LessOrEqual.multiply_by_nonneg_right
-     = Real.power(q, i)
+     = q^i
 }
 
 -- Powers of q with 0 ≤ q < 1 converge to zero. The sequence is decreasing
@@ -207,7 +207,7 @@ theorem Real.power_antitone_exponent
 -- and 1 − q ≠ 0 forces L = 0.
 theorem Real.power_converges_zero
         (q : Real) (qNonneg : q ≥ 0) (qBelowOne : q < 1)
-        : Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), 0) := {
+        : Real.SequenceConverges((n : Natural) ↦ q^n, 0) := {
   q ≤ 1;
   0
      = q - q
@@ -215,52 +215,52 @@ theorem Real.power_converges_zero
   1 - q ≠ 0 as denominatorNonzero;
   -- −q^n is increasing and bounded above by 0, so it converges.
   ∀ (i : Natural) (j : Natural). i ≤ j
-      → -Real.power(q, i) ≤ -Real.power(q, j)
+      → -q^i ≤ -q^j
       by (i : Natural) (j : Natural) (iLeqJ : i ≤ j) ↦ {
-        Real.power(q, j) ≤ Real.power(q, i)   by Real.power_antitone_exponent;
+        q^j ≤ q^i   by Real.power_antitone_exponent;
         done by Real.LessOrEqual.negate
       } as increasing;
-  ∀ (n : Natural). -Real.power(q, n) ≤ 0
+  ∀ (n : Natural). -q^n ≤ 0
       by (n : Natural) ↦ {
-        Real.power(q, n) ≥ 0;
-        -Real.power(q, n)
+        q^n ≥ 0;
+        -q^n
            ≤ -(0 : Real)     by Real.LessOrEqual.negate
            = 0
       } as boundedAbove;
   choose negativeLimit such that
-      Real.SequenceConverges((n : Natural) ↦ -Real.power(q, n), negativeLimit)
+      Real.SequenceConverges((n : Natural) ↦ -q^n, negativeLimit)
       from Real.monotone_bounded_converges(
-               s := (n : Natural) ↦ -Real.power(q, n),
+               s := (n : Natural) ↦ -q^n,
                monotone := increasing, bound := 0, bounded := boundedAbove);
   -- Undo the negation: q^n → −negativeLimit.
-  Real.SequenceConverges((n : Natural) ↦ -(-Real.power(q, n)), -negativeLimit)
+  Real.SequenceConverges((n : Natural) ↦ -(-q^n), -negativeLimit)
       by Real.SequenceConverges.negate(
-             s := (n : Natural) ↦ -Real.power(q, n), sLimit := negativeLimit);
-  Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), -negativeLimit)
+             s := (n : Natural) ↦ -q^n, sLimit := negativeLimit);
+  Real.SequenceConverges((n : Natural) ↦ q^n, -negativeLimit)
       by Real.SequenceConverges.of_pointwise(
-             s := (n : Natural) ↦ -(-Real.power(q, n)),
+             s := (n : Natural) ↦ -(-q^n),
              pointwiseEqual := (n : Natural) ↦
-                 (ring : -(-Real.power(q, n)) = Real.power(q, n)));
+                 (ring : -(-q^n) = q^n));
   -- The shifted sequence has the same limit and equals q·q^n, so
   -- −negativeLimit = q·(−negativeLimit).
-  Real.SequenceConverges((n : Natural) ↦ Real.power(q, 1 + n), -negativeLimit)
+  Real.SequenceConverges((n : Natural) ↦ q^(1 + n), -negativeLimit)
       by Real.SequenceConverges.shift_one(
-             s := (n : Natural) ↦ Real.power(q, n), limit := -negativeLimit);
-  Real.SequenceConverges((n : Natural) ↦ q * Real.power(q, n), -negativeLimit)
+             s := (n : Natural) ↦ q^n, limit := -negativeLimit);
+  Real.SequenceConverges((n : Natural) ↦ q * q^n, -negativeLimit)
       by Real.SequenceConverges.of_pointwise(
-             s := (n : Natural) ↦ Real.power(q, 1 + n),
+             s := (n : Natural) ↦ q^(1 + n),
              pointwiseEqual := (n : Natural) ↦ Real.power_add_one(q, n))
       as shiftedConverges;
   Real.SequenceConverges((n : Natural) ↦ q, q)
       by Real.constant_sequence_converges;
-  Real.SequenceConverges((n : Natural) ↦ q * Real.power(q, n), q * -negativeLimit)
+  Real.SequenceConverges((n : Natural) ↦ q * q^n, q * -negativeLimit)
       by Real.SequenceConverges.multiply(
-             s := (n : Natural) ↦ q, t := (n : Natural) ↦ Real.power(q, n),
+             s := (n : Natural) ↦ q, t := (n : Natural) ↦ q^n,
              sLimit := q, tLimit := -negativeLimit)
       as productConverges;
   -negativeLimit = q * -negativeLimit
       by Real.SequenceConverges.unique(
-             s := (n : Natural) ↦ q * Real.power(q, n),
+             s := (n : Natural) ↦ q * q^n,
              convergesToL1 := shiftedConverges, convergesToL2 := productConverges)
       as fixedPoint;
   -- (1 − q)·(−negativeLimit) = 0 with 1 − q ≠ 0 gives −negativeLimit = 0.
@@ -274,7 +274,7 @@ theorem Real.power_converges_zero
       by Real.equal_of_multiply_left(
              a := -negativeLimit, b := 0, c := 1 - q,
              cNonzero := denominatorNonzero, cancellable := cancellable);
-  Real.SequenceConverges((n : Natural) ↦ Real.power(q, n), 0)
+  Real.SequenceConverges((n : Natural) ↦ q^n, 0)
       by substituting (-negativeLimit = 0);
   done
 }

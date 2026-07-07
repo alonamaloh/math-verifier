@@ -4,9 +4,9 @@
 -- (Freek #66): for |r| < 1 the powers of r sum to the inverse of 1 − r.
 --
 -- The partial sums satisfy the closed form (1 − r)·Sₙ = 1 − rⁿ (a ring
--- induction), so Sₙ − L = −rⁿ·L whenever (1 − r)·L = 1, and the error
--- is |r|ⁿ·|L| — geometric decay times a constant. A rational roof over
--- |L| turns the decay tolerance into the requested ε.
+-- induction), so Sₙ = (1 − rⁿ)·L whenever (1 − r)·L = 1. Since rⁿ → 0
+-- (Real.power_converges_zero), the partial sums converge to 1·L = L by
+-- limit algebra.
 
 module Real.series
 
@@ -20,28 +20,6 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 import Natural.add_order
-import Natural.eventually
-import Integer.basics
-import Integer.embedding
-import Rational.basics
-import Rational.embedding
-import Rational.addition
-import Rational.multiplication
-import Rational.negation
-import Rational.ring
-import Rational.order
-import Rational.order_arithmetic
-import Rational.order_multiplication
-import Rational.absolute_value
-import Rational.triangle
-import Rational.triangle_more
-import Rational.positive
-import Rational.linearity
-import Rational.reciprocal
-import Rational.division
-import Rational.archimedean
-import Rational.power
-import Algebra.ring_lemmas
 import Algebra.aggregation
 import Set.basics
 import Real.sequence
@@ -58,14 +36,11 @@ import Real.linearity
 import Real.embedding_order
 import Real.order_multiplication
 import Real.apartness
-import Real.reciprocal
 import Real.field
 import Real.order_field
-import Real.density
 import Real.absolute_value
 import Real.absolute_value_order
 import Real.convergence
-import Real.supremum
 import Real.limits
 import Real.power
 
@@ -129,22 +104,22 @@ theorem Real.geometric_series_converges
              })
       as rConverges;
   -- 1 − rⁿ → 1.
-  Real.SequenceConverges((n : Natural) ↦ -(r^n), -(0 : Real))
+  Real.SequenceConverges((n : Natural) ↦ -r^n, -(0 : Real))
       by Real.SequenceConverges.negate(
              s := (n : Natural) ↦ r^n, sLimit := 0, sConverges := rConverges)
       as negatedConverges;
   Real.SequenceConverges((n : Natural) ↦ (1 : Real), 1)
       by Real.constant_sequence_converges
       as oneConverges;
-  Real.SequenceConverges((n : Natural) ↦ (1 : Real) + -(r^n), 1 + -(0 : Real))
+  Real.SequenceConverges((n : Natural) ↦ (1 : Real) + -r^n, 1 + -(0 : Real))
       by Real.SequenceConverges.add(
-             s := (n : Natural) ↦ (1 : Real), t := (n : Natural) ↦ -(r^n),
+             s := (n : Natural) ↦ (1 : Real), t := (n : Natural) ↦ -r^n,
              sLimit := 1, tLimit := -(0 : Real),
              sConverges := oneConverges, tConverges := negatedConverges);
   Real.SequenceConverges((n : Natural) ↦ 1 - r^n, 1 + -(0 : Real))
       by Real.SequenceConverges.of_pointwise(
-             s := (n : Natural) ↦ (1 : Real) + -(r^n),
-             pointwiseEqual := (n : Natural) ↦ (ring : (1 : Real) + -(r^n) = 1 - r^n));
+             s := (n : Natural) ↦ (1 : Real) + -r^n,
+             pointwiseEqual := (n : Natural) ↦ (ring : (1 : Real) + -r^n = 1 - r^n));
   Real.SequenceConverges((n : Natural) ↦ 1 - r^n, 1)
       by substituting (1 + -(0 : Real) = 1)
       as oneMinusConverges;
@@ -299,41 +274,6 @@ theorem Real.partialSum_monotone_of_nonneg (s : Natural → Real)
      = Real.partialSum(s, k + N)
      = Real.partialSum(s, m)
 }
-
--- A constant block sums to (its length)·(the constant), with the
--- scalar carried by the linearGrowth closed form.
-theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
-        : Real.partialSum((j : Natural) ↦ (c : Real), n)
-          = ((Rational.linearGrowth(c, n) - Rational.one : Rational) : Real) :=
-  by induction on n with IH {
-    case base: {
-        Rational.linearGrowth(c, 0) = Rational.one;
-        Real.partialSum((j : Natural) ↦ (c : Real), 0)
-           = (Rational.zero : Real)
-           = ((Rational.one - Rational.one : Rational) : Real)
-                 by (Rational.zero = Rational.one - Rational.one)
-           = ((Rational.linearGrowth(c, 0) - Rational.one : Rational) : Real)
-      }
-    case step(predecessor): {
-        Real.partialSum((j : Natural) ↦ (c : Real), 1 + predecessor)
-           = Real.partialSum((j : Natural) ↦ (c : Real), predecessor)
-             + (c : Real)
-                 by Real.partialSum_add_one
-           = ((Rational.linearGrowth(c, predecessor) - Rational.one
-               : Rational) : Real)
-             + (c : Real)
-                 by IH
-           = ((Rational.linearGrowth(c, predecessor) - Rational.one + c
-               : Rational) : Real)
-           = ((Rational.linearGrowth(c, predecessor) + c - Rational.one
-               : Rational) : Real)
-                 by (Rational.linearGrowth(c, predecessor) - Rational.one + c
-                     = Rational.linearGrowth(c, predecessor) + c
-                       - Rational.one)
-           = ((Rational.linearGrowth(c, 1 + predecessor) - Rational.one
-               : Rational) : Real)
-      }
-  }
 
 -- A constant block sums to (its length)·(the constant), at the Real level.
 theorem Real.partialSum_constant (c : Real) (n : Natural)
