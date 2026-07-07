@@ -91,31 +91,31 @@ definition Real.SeriesConverges
 -- telescopes one factor at a time.
 theorem Real.geometric_partialSum (r : Real) (n : Natural)
         : (Real.one - r)
-              * Real.partialSum((k : Natural) ↦ Real.power(r, k), n)
-          = Real.one - Real.power(r, n) :=
+              * Real.partialSum((k : Natural) ↦ r^k, n)
+          = Real.one - r^n :=
   by induction on n with IH {
     case base:
         (Real.one - r)
-                 * Real.partialSum((k : Natural) ↦ Real.power(r, k), 0)
+                 * Real.partialSum((k : Natural) ↦ r^k, 0)
            = (Real.one - r) * Real.zero
            = Real.one - Real.one
-           = Real.one - Real.power(r, 0)
+           = Real.one - r^0
     case step(predecessor):
         (Real.one - r)
                  * Real.partialSum(
-                       (k : Natural) ↦ Real.power(r, k), 1 + predecessor)
+                       (k : Natural) ↦ r^k, 1 + predecessor)
            = (Real.one - r)
-                 * (Real.partialSum((k : Natural) ↦ Real.power(r, k), predecessor)
-                    + Real.power(r, predecessor))
+                 * (Real.partialSum((k : Natural) ↦ r^k, predecessor)
+                    + r^predecessor)
                  by substituting Real.partialSum_add_one
            = (Real.one - r)
-                 * Real.partialSum((k : Natural) ↦ Real.power(r, k), predecessor)
-             + (Real.one - r) * Real.power(r, predecessor)
-           = (Real.one - Real.power(r, predecessor))
-             + (Real.one - r) * Real.power(r, predecessor)
+                 * Real.partialSum((k : Natural) ↦ r^k, predecessor)
+             + (Real.one - r) * r^predecessor
+           = (Real.one - r^predecessor)
+             + (Real.one - r) * r^predecessor
                  by IH
-           = Real.one - r * Real.power(r, predecessor)
-           = Real.one - Real.power(r, 1 + predecessor)
+           = Real.one - r * r^predecessor
+           = Real.one - r^(1 + predecessor)
   }
 
 -- ----------------------------------------------------------------------
@@ -124,13 +124,13 @@ theorem Real.geometric_series_converges
         (r L : Real)
         (rSmall : abs(r) < Real.one)
         (inverseProperty : (Real.one - r) * L = Real.one)
-        : Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L) :=
+        : r^0 + r^1 + ... + r^k + ... = L :=
   -- The decay tolerance is scaled at the rational layer, so build the
   -- partial-sum convergence at a rational ε and lift it by density.
   {
     ∀ (ε : Rational). ε > Rational.zero →
             ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
-              abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
+              abs(Real.partialSum((k : Natural) ↦ r^k, m) - L)
               < (ε : Real)
         by (ε : Rational) (εPositive : ε > Rational.zero) ↦ {
           Real.zero ≤ abs(r);
@@ -157,7 +157,7 @@ theorem Real.geometric_series_converges
           ε / (B + Rational.one) > Rational.zero;
           choose N such that
               ∀ (m : Natural). N ≤ m →
-                Real.power(abs(r), m)
+                abs(r)^m
                 < ((ε / (B + Rational.one)) : Real)
               as tailBelow
               from Real.power_eventually_below;
@@ -169,37 +169,37 @@ theorem Real.geometric_series_converges
           witness N with {
             take m : Natural;
             take NLeqM : N ≤ m;
-            Real.power(abs(r), m)
+            abs(r)^m
                   < ((ε / (B + Rational.one)) : Real)
                 by tailBelow(m, NLeqM);
             -- Sₘ = (1 − rᵐ)·L, so the error is exactly |r|ᵐ·|L|.
-            Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
-               = Real.partialSum((k : Natural) ↦ Real.power(r, k), m) * Real.one
-               = Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
+            Real.partialSum((k : Natural) ↦ r^k, m)
+               = Real.partialSum((k : Natural) ↦ r^k, m) * Real.one
+               = Real.partialSum((k : Natural) ↦ r^k, m)
                      * ((Real.one - r) * L)
                = ((Real.one - r)
-                  * Real.partialSum((k : Natural) ↦ Real.power(r, k), m)) * L
-               = (Real.one - Real.power(r, m)) * L
+                  * Real.partialSum((k : Natural) ↦ r^k, m)) * L
+               = (Real.one - r^m) * L
                      by Real.geometric_partialSum
                as sumFormula;
-            abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
-               = abs((Real.one - Real.power(r, m)) * L - L)
+            abs(Real.partialSum((k : Natural) ↦ r^k, m) - L)
+               = abs((Real.one - r^m) * L - L)
                      by sumFormula
-               = abs(-(Real.power(r, m) * L))
+               = abs(-(r^m * L))
                      by substituting
-                         (ring : (Real.one - Real.power(r, m)) * L - L
-                             = -(Real.power(r, m) * L))
-               = abs(Real.power(r, m) * L)
-               = abs(Real.power(r, m)) * abs(L)
-               = Real.power(abs(r), m) * abs(L);
+                         (ring : (Real.one - r^m) * L - L
+                             = -(r^m * L))
+               = abs(r^m * L)
+               = abs(r^m) * abs(L)
+               = abs(r)^m * abs(L);
             -- |r|ᵐ·|L| ≤ |r|ᵐ·(B + 1) < (ε/(B + 1))·(B + 1) = ε.
-            Real.zero ≤ Real.power(abs(r), m);
-            Real.IsNonneg(Real.power(abs(r), m));
-            Real.power(abs(r), m) * abs(L)
-               = abs(L) * Real.power(abs(r), m)
-               ≤ ((B + Rational.one) : Real) * Real.power(abs(r), m)
+            Real.zero ≤ abs(r)^m;
+            Real.IsNonneg(abs(r)^m);
+            abs(r)^m * abs(L)
+               = abs(L) * abs(r)^m
+               ≤ ((B + Rational.one) : Real) * abs(r)^m
                      by Real.LessOrEqual.multiply_by_nonneg_right
-               = Real.power(abs(r), m) * ((B + Rational.one) : Real)
+               = abs(r)^m * ((B + Rational.one) : Real)
                < ((ε / (B + Rational.one)) : Real)
                      * ((B + Rational.one) : Real)
                      by Real.LessThan.multiply_by_positive_right
@@ -207,8 +207,8 @@ theorem Real.geometric_series_converges
                    * (B + Rational.one) : Rational) : Real)
                = (ε : Real)
                as finalBound;
-            abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
-               = Real.power(abs(r), m) * abs(L)
+            abs(Real.partialSum((k : Natural) ↦ r^k, m) - L)
+               = abs(r)^m * abs(L)
                < (ε : Real)                        by finalBound
           }
         };
@@ -220,7 +220,7 @@ theorem Real.geometric_series_converges
 -- of 1 − r — the sum of the series — and Σ rᵏ converges to it.
 theorem Real.geometric_series (r : Real) (rSmall : abs(r) < Real.one)
         : ∃ (L : Real).
-            (Real.one - r) * L = Real.one ∧ Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L) := {
+            (Real.one - r) * L = Real.one ∧ (r^0 + r^1 + ... + r^k + ... = L) := {
   r ≤ abs(r);
   r < Real.one by Real.LessThan.transitive_left;
   Real.zero
@@ -228,7 +228,7 @@ theorem Real.geometric_series (r : Real) (rSmall : abs(r) < Real.one)
      < Real.one - r      by Real.add_preserves_LessThan;
   Real.one - r ≠ Real.zero;
   choose L such that (Real.one - r) * L = Real.one from Real.reciprocal_exists_for_nonzero;
-  Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L);
+  r^0 + r^1 + ... + r^k + ... = L;
   witness L with done
 }
 
