@@ -1,0 +1,34 @@
+-- Blackboard-bold notation for the number types (ℕ ℤ ℚ ℝ ℂ) expands at lex
+-- time to the canonical name (Natural / Integer / Rational / Real /
+-- ComplexNumber), so it composes with operator, coercion, and instance
+-- dispatch exactly as the spelled-out name does. Also pins the Real ↪ ℂ
+-- coercion registered in ComplexNumber/embedding.math.
+
+module Test.blackboard_notation_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Real.interface
+import ComplexNumber.basics
+import ComplexNumber.embedding
+
+-- ℕ is Natural: induction and the `+` operator resolve through the notation.
+theorem Test.blackboard_natural (n : ℕ) : n + 0 = n :=
+  by induction on n with IH {
+    case n = 0: done
+    case n = k + 1 for some k, with ih: {
+        k + 0 = k by ih;
+        done
+      }
+  }
+
+-- ℝ is Real: `ring` and numerals work.
+theorem Test.blackboard_real (x : ℝ) : x + (2 : ℝ) = (2 : ℝ) + x :=
+  by ring
+
+-- ℂ is ComplexNumber, and (r : ℂ) is the registered Real ↪ ℂ coercion.
+theorem Test.blackboard_complex_coercion (r : Real) : (r : ℂ) = ComplexNumber.from_real(r) :=
+  reflexivity(ℂ, ComplexNumber.from_real(r))

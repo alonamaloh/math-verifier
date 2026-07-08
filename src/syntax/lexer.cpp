@@ -129,13 +129,46 @@ std::optional<Utf8Char> decodeUtf8(const std::string& source, size_t pos) {
 // Latin accents and Cyrillic — and deliberately exclude every block our
 // operators live in (math symbols at U+2200+, the middle dot U+00B7, the
 // superscripts of `⁻¹`), so a name can never swallow an adjacent operator.
+// The double-struck letters (ℕ ℤ ℚ ℝ ℂ …) are the blackboard-bold number-set
+// names; they sit in the Letterlike Symbols block alongside genuine symbols
+// (™ № ℮ …), so they are admitted one codepoint at a time, never as a range.
+bool isDoubleStruckLetter(uint32_t codepoint) {
+    switch (codepoint) {
+        case 0x2102:   // ℂ
+        case 0x210D:   // ℍ
+        case 0x2115:   // ℕ
+        case 0x2119:   // ℙ
+        case 0x211A:   // ℚ
+        case 0x211D:   // ℝ
+        case 0x2124:   // ℤ
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool isUnicodeIdentifierLetter(uint32_t codepoint) {
     return (codepoint >= 0x00C0 && codepoint <= 0x00D6)   // Latin-1 letters (À–Ö)
         || (codepoint >= 0x00D8 && codepoint <= 0x00F6)   //   (Ø–ö, skipping ×)
         || (codepoint >= 0x00F8 && codepoint <= 0x024F)   //   (ø–, Latin Extended-A/B, skipping ÷)
         || (codepoint >= 0x0370 && codepoint <= 0x03FF)   // Greek and Coptic
         || (codepoint >= 0x0400 && codepoint <= 0x04FF)   // Cyrillic
-        || (codepoint >= 0x1F00 && codepoint <= 0x1FFF);  // Greek Extended
+        || (codepoint >= 0x1F00 && codepoint <= 0x1FFF)   // Greek Extended
+        || isDoubleStruckLetter(codepoint);               // ℕ ℤ ℚ ℝ ℂ …
+}
+
+// Blackboard-bold notation for the standard number types. These expand to the
+// canonical type name at lex time, so `ℝ` IS `Real` everywhere downstream —
+// operator/coercion/instance dispatch and printing all key on the canonical
+// name, and the notation costs nothing beyond nicer source. Returns the
+// canonical name, or nullptr when the lexeme is an ordinary identifier.
+const char* numberTypeNotation(const std::string& lexeme) {
+    if (lexeme == "ℕ") return "Natural";
+    if (lexeme == "ℤ") return "Integer";
+    if (lexeme == "ℚ") return "Rational";
+    if (lexeme == "ℝ") return "Real";
+    if (lexeme == "ℂ") return "ComplexNumber";
+    return nullptr;
 }
 
 // A small state machine. Public entry is run(); everything else is
@@ -224,6 +257,9 @@ private:
                 } else {
                     break;
                 }
+            }
+            if (const char* canonical = numberTypeNotation(lexeme)) {
+                lexeme = canonical;
             }
             auto iterator = keywordTable().find(lexeme);
             TokenKind kind = (iterator != keywordTable().end())
