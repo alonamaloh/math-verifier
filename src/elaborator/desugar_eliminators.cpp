@@ -270,7 +270,11 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
         std::vector<ExpressionPointer> argumentKernels;
         std::vector<std::string> argumentTypeNames;
         std::vector<ExpressionPointer> argumentTypesClosed;
+        std::vector<bool> argumentIsNumeral;
         for (const auto& argumentSurface : argumentSurfaces) {
+            argumentIsNumeral.push_back(
+                std::get_if<SurfaceNumericLiteral>(&argumentSurface->node)
+                    != nullptr);
             ExpressionPointer argumentKernel =
                 elaborateExpression(*argumentSurface, localBinders);
             argumentKernels.push_back(argumentKernel);
@@ -310,6 +314,44 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
                 continue;
             }
             matches.push_back(candidateName);
+        }
+        // Numeral-literal fallback: a bare `1` infers as Natural, so a call
+        // like `conj(1)` finds no candidate above (conj expects ℂ). Only when
+        // nothing matched with the inferred types, retry treating numeral
+        // positions as wildcards — the final re-elaboration below passes the
+        // parameter type as the expected type, which coerces the literal
+        // (`1` -> `(1 : ℂ)`). Non-numeral positions must still match, so a
+        // numeral never silently widens a genuine mismatch; and this runs
+        // only on empty matches, so exact resolutions (`abs(1)` -> Natural)
+        // are unaffected.
+        bool anyNumeral = false;
+        for (bool isNumeral : argumentIsNumeral) anyNumeral |= isNumeral;
+        if (matches.empty() && anyNumeral) {
+            for (const auto& candidateName : candidateNames) {
+                const Declaration* declaration =
+                    environment_.lookup(candidateName);
+                if (!declaration) continue;
+                ExpressionPointer cursor = declarationType(*declaration);
+                bool accepts = true;
+                for (size_t i = 0; i < argumentTypeNames.size(); ++i) {
+                    cursor = weakHeadNormalForm(environment_, cursor);
+                    auto* pi = std::get_if<Pi>(&cursor->node);
+                    if (!pi) { accepts = false; break; }
+                    if (!argumentIsNumeral[i]) {
+                        std::string actualName = headConstantName(pi->domain);
+                        bool ok = actualName == argumentTypeNames[i];
+                        if (!ok && argumentTypesClosed[i]) {
+                            Context emptyContext;
+                            ok = isDefinitionallyEqual(environment_,
+                                     emptyContext, pi->domain,
+                                     argumentTypesClosed[i]);
+                        }
+                        if (!ok) { accepts = false; break; }
+                    }
+                    cursor = pi->codomain;
+                }
+                if (accepts) matches.push_back(candidateName);
+            }
         }
         if (matches.empty()) {
             std::string message =
