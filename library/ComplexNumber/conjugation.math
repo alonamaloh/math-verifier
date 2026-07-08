@@ -77,189 +77,166 @@ import ComplexNumber.series
 -- ----------------------------------------------------------------------
 -- The definition, and its coordinates.
 
-definition ComplexNumber.conjugate (z : ComplexNumber) : ComplexNumber :=
+definition ComplexNumber.conjugate (z : ℂ) : ℂ :=
   ComplexNumber.ofCoordinates(
-      ComplexNumber.realPart(z), -ComplexNumber.imaginaryPart(z))
+      Re(z), -Im(z))
 
-theorem ComplexNumber.realPart_conjugate (z : ComplexNumber)
-        : ComplexNumber.realPart(ComplexNumber.conjugate(z))
-          = ComplexNumber.realPart(z) :=
-  ComplexNumber.realPart_ofCoordinates(
-      ComplexNumber.realPart(z), -ComplexNumber.imaginaryPart(z))
+-- `conj` is the short name used in formulas; `ComplexNumber.conjugate` stays
+-- the canonical name that carries the lemmas below (they apply to `conj`
+-- unchanged, since `overload` makes the two the same function).
+overload conj := ComplexNumber.conjugate
 
-theorem ComplexNumber.imaginaryPart_conjugate (z : ComplexNumber)
-        : ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-          = -ComplexNumber.imaginaryPart(z) :=
-  ComplexNumber.imaginaryPart_ofCoordinates(
-      ComplexNumber.realPart(z), -ComplexNumber.imaginaryPart(z))
+theorem ComplexNumber.realPart_conjugate (z : ℂ)
+        : Re(conj(z))
+          = Re(z) :=
+  by ComplexNumber.realPart_ofCoordinates
+
+theorem ComplexNumber.imaginaryPart_conjugate (z : ℂ)
+        : Im(conj(z))
+          = -Im(z) :=
+  by ComplexNumber.imaginaryPart_ofCoordinates
 
 -- ----------------------------------------------------------------------
 -- Conjugation is a ring homomorphism: every law is a coordinate
 -- computation plus real ring algebra.
 
-theorem ComplexNumber.conjugate_add (z w : ComplexNumber)
-        : ComplexNumber.conjugate(z + w)
-          = ComplexNumber.conjugate(z) + ComplexNumber.conjugate(w) := {
-  ComplexNumber.realPart(ComplexNumber.conjugate(z + w))
-      = ComplexNumber.realPart(z + w)
-      = ComplexNumber.realPart(z) + ComplexNumber.realPart(w)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-        + ComplexNumber.realPart(w)
-            by ComplexNumber.realPart_conjugate(z)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-        + ComplexNumber.realPart(ComplexNumber.conjugate(w))
-            by ComplexNumber.realPart_conjugate(w)
-      = ComplexNumber.realPart(
-            ComplexNumber.conjugate(z) + ComplexNumber.conjugate(w))
-      as realSide;
-  ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z + w))
-      = -ComplexNumber.imaginaryPart(z + w)
-      = -(ComplexNumber.imaginaryPart(z) + ComplexNumber.imaginaryPart(w))
-            by ComplexNumber.imaginaryPart_add(z, w)
-      = -ComplexNumber.imaginaryPart(z) + -ComplexNumber.imaginaryPart(w)
-      = ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-        + -ComplexNumber.imaginaryPart(w)
-            by ComplexNumber.imaginaryPart_conjugate(z)
-      = ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-        + ComplexNumber.imaginaryPart(ComplexNumber.conjugate(w))
-            by ComplexNumber.imaginaryPart_conjugate(w)
-      = ComplexNumber.imaginaryPart(
-            ComplexNumber.conjugate(z) + ComplexNumber.conjugate(w))
-      as imaginarySide;
-  done by ComplexNumber.eq_of_coordinates(
-              ComplexNumber.conjugate(z + w),
-              ComplexNumber.conjugate(z) + ComplexNumber.conjugate(w),
-              realSide, imaginarySide)
+theorem ComplexNumber.conjugate_add (z w : ℂ)
+        : conj(z + w)
+          = conj(z) + conj(w) := {
+  Re(conj(z + w))
+      = Re(z + w)
+      = Re(z) + Re(w)
+      = Re(conj(z)) + Re(w)            by ComplexNumber.realPart_conjugate
+      = Re(conj(z)) + Re(conj(w))      by ComplexNumber.realPart_conjugate
+      = Re(conj(z) + conj(w));
+  Im(conj(z + w))
+      = -Im(z + w)
+      = -(Im(z) + Im(w))               by ComplexNumber.imaginaryPart_add
+      = -Im(z) + -Im(w)
+      = Im(conj(z)) + -Im(w)           by ComplexNumber.imaginaryPart_conjugate
+      = Im(conj(z)) + Im(conj(w))      by ComplexNumber.imaginaryPart_conjugate
+      = Im(conj(z) + conj(w));
+  done by ComplexNumber.eq_of_coordinates
 }
 
-theorem ComplexNumber.conjugate_multiply (z w : ComplexNumber)
-        : ComplexNumber.conjugate(z * w)
-          = ComplexNumber.conjugate(z) * ComplexNumber.conjugate(w) := {
-  ComplexNumber.realPart(ComplexNumber.conjugate(z) * ComplexNumber.conjugate(w))
-        = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-              * ComplexNumber.realPart(ComplexNumber.conjugate(w))
-          - ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-                * ComplexNumber.imaginaryPart(ComplexNumber.conjugate(w))
-      by ComplexNumber.realPart_multiply(
-             ComplexNumber.conjugate(z), ComplexNumber.conjugate(w));
-  ComplexNumber.imaginaryPart(
-            ComplexNumber.conjugate(z) * ComplexNumber.conjugate(w))
-        = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-              * ComplexNumber.imaginaryPart(ComplexNumber.conjugate(w))
-          + ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-                * ComplexNumber.realPart(ComplexNumber.conjugate(w));
-  ComplexNumber.realPart(ComplexNumber.conjugate(z * w))
-      = ComplexNumber.realPart(z * w)
-      = ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
-        - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w)
-      = ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
-        - (-ComplexNumber.imaginaryPart(z)) * (-ComplexNumber.imaginaryPart(w))
+theorem ComplexNumber.conjugate_multiply (z w : ℂ)
+        : conj(z * w)
+          = conj(z) * conj(w) := {
+  Re(conj(z) * conj(w))
+        = Re(conj(z))
+              * Re(conj(w))
+          - Im(conj(z))
+                * Im(conj(w))
+      by ComplexNumber.realPart_multiply;
+  Im(
+            conj(z) * conj(w))
+        = Re(conj(z))
+              * Im(conj(w))
+          + Im(conj(z))
+                * Re(conj(w));
+  Re(conj(z * w))
+      = Re(z * w)
+      = Re(z) * Re(w)
+        - Im(z) * Im(w)
+      = Re(z) * Re(w)
+        - (-Im(z)) * (-Im(w))
             by ring
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * ComplexNumber.realPart(w)
-        - (-ComplexNumber.imaginaryPart(z)) * (-ComplexNumber.imaginaryPart(w))
-            by ComplexNumber.realPart_conjugate(z)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * ComplexNumber.realPart(ComplexNumber.conjugate(w))
-        - (-ComplexNumber.imaginaryPart(z)) * (-ComplexNumber.imaginaryPart(w))
-            by ComplexNumber.realPart_conjugate(w)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * ComplexNumber.realPart(ComplexNumber.conjugate(w))
-        - ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-              * (-ComplexNumber.imaginaryPart(w))
-            by ComplexNumber.imaginaryPart_conjugate(z)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * ComplexNumber.realPart(ComplexNumber.conjugate(w))
-        - ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-              * ComplexNumber.imaginaryPart(ComplexNumber.conjugate(w))
-            by ComplexNumber.imaginaryPart_conjugate(w)
-      = ComplexNumber.realPart(
-            ComplexNumber.conjugate(z) * ComplexNumber.conjugate(w))
-      as realSide;
-  ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z * w))
-      = -ComplexNumber.imaginaryPart(z * w)
-      = -(ComplexNumber.realPart(z) * ComplexNumber.imaginaryPart(w)
-          + ComplexNumber.imaginaryPart(z) * ComplexNumber.realPart(w))
-            by ComplexNumber.imaginaryPart_multiply(z, w)
-      = ComplexNumber.realPart(z) * (-ComplexNumber.imaginaryPart(w))
-        + (-ComplexNumber.imaginaryPart(z)) * ComplexNumber.realPart(w)
+      = Re(conj(z))
+            * Re(w)
+        - (-Im(z)) * (-Im(w))
+            by ComplexNumber.realPart_conjugate
+      = Re(conj(z))
+            * Re(conj(w))
+        - (-Im(z)) * (-Im(w))
+            by ComplexNumber.realPart_conjugate
+      = Re(conj(z))
+            * Re(conj(w))
+        - Im(conj(z))
+              * (-Im(w))
+            by ComplexNumber.imaginaryPart_conjugate
+      = Re(conj(z))
+            * Re(conj(w))
+        - Im(conj(z))
+              * Im(conj(w))
+            by ComplexNumber.imaginaryPart_conjugate
+      = Re(
+            conj(z) * conj(w));
+  Im(conj(z * w))
+      = -Im(z * w)
+      = -(Re(z) * Im(w)
+          + Im(z) * Re(w))
+            by ComplexNumber.imaginaryPart_multiply
+      = Re(z) * (-Im(w))
+        + (-Im(z)) * Re(w)
             by ring
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * (-ComplexNumber.imaginaryPart(w))
-        + (-ComplexNumber.imaginaryPart(z)) * ComplexNumber.realPart(w)
-            by ComplexNumber.realPart_conjugate(z)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * ComplexNumber.imaginaryPart(ComplexNumber.conjugate(w))
-        + (-ComplexNumber.imaginaryPart(z)) * ComplexNumber.realPart(w)
-            by ComplexNumber.imaginaryPart_conjugate(w)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * ComplexNumber.imaginaryPart(ComplexNumber.conjugate(w))
-        + ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-              * ComplexNumber.realPart(w)
-            by ComplexNumber.imaginaryPart_conjugate(z)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(z))
-            * ComplexNumber.imaginaryPart(ComplexNumber.conjugate(w))
-        + ComplexNumber.imaginaryPart(ComplexNumber.conjugate(z))
-              * ComplexNumber.realPart(ComplexNumber.conjugate(w))
-            by ComplexNumber.realPart_conjugate(w)
-      = ComplexNumber.imaginaryPart(
-            ComplexNumber.conjugate(z) * ComplexNumber.conjugate(w))
-      as imaginarySide;
-  done by ComplexNumber.eq_of_coordinates(
-              ComplexNumber.conjugate(z * w),
-              ComplexNumber.conjugate(z) * ComplexNumber.conjugate(w),
-              realSide, imaginarySide)
+      = Re(conj(z))
+            * (-Im(w))
+        + (-Im(z)) * Re(w)
+            by ComplexNumber.realPart_conjugate
+      = Re(conj(z))
+            * Im(conj(w))
+        + (-Im(z)) * Re(w)
+            by ComplexNumber.imaginaryPart_conjugate
+      = Re(conj(z))
+            * Im(conj(w))
+        + Im(conj(z))
+              * Re(w)
+            by ComplexNumber.imaginaryPart_conjugate
+      = Re(conj(z))
+            * Im(conj(w))
+        + Im(conj(z))
+              * Re(conj(w))
+            by ComplexNumber.realPart_conjugate
+      = Im(
+            conj(z) * conj(w));
+  done by ComplexNumber.eq_of_coordinates
 }
 
 -- Conjugation fixes the embedded reals (their imaginary part is 0,
 -- and −0 = 0).
 theorem ComplexNumber.conjugate_from_real (r : Real)
-        : ComplexNumber.conjugate(ComplexNumber.from_real(r))
-          = ComplexNumber.from_real(r) := {
-  ComplexNumber.realPart(ComplexNumber.conjugate(ComplexNumber.from_real(r)))
-      = ComplexNumber.realPart(ComplexNumber.from_real(r)) as realSide;
-  ComplexNumber.imaginaryPart(
-          ComplexNumber.conjugate(ComplexNumber.from_real(r)))
-      = -ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
+        : conj((r : ℂ))
+          = (r : ℂ) := {
+  Re(conj((r : ℂ)))
+      = Re((r : ℂ));
+  Im(
+          conj((r : ℂ)))
+      = -Im((r : ℂ))
       = -Real.zero
       = Real.zero
-      = ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
-      as imaginarySide;
-  done by ComplexNumber.eq_of_coordinates(
-              ComplexNumber.conjugate(ComplexNumber.from_real(r)),
-              ComplexNumber.from_real(r),
-              realSide, imaginarySide)
+      = Im((r : ℂ));
+  done by ComplexNumber.eq_of_coordinates
 }
 
 theorem ComplexNumber.conjugate_zero
-        : ComplexNumber.conjugate(
+        : conj(
               RingModulo.zero(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial))
           = RingModulo.zero(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial) := {
-  let zero : ComplexNumber :=
+  let zero : ℂ :=
       RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial);
-  ComplexNumber.conjugate(zero)
-     = ComplexNumber.conjugate(ComplexNumber.from_real(Real.zero))
+  conj(zero)
+     = conj((Real.zero : ℂ))
            by ComplexNumber.from_real_zero
-     = ComplexNumber.from_real(Real.zero)
-           by ComplexNumber.conjugate_from_real(Real.zero)
+     = (Real.zero : ℂ)
+           by ComplexNumber.conjugate_from_real
      = zero
            by ComplexNumber.from_real_zero
 }
 
 theorem ComplexNumber.conjugate_one
-        : ComplexNumber.conjugate(
+        : conj(
               RingModulo.one(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial))
           = RingModulo.one(Real.polynomial_commutative_ring,
                 Complex.definingPolynomial) := {
-  let one : ComplexNumber :=
+  let one : ℂ :=
       RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial);
-  ComplexNumber.conjugate(one)
-     = ComplexNumber.conjugate(ComplexNumber.from_real(Real.one))
-     = ComplexNumber.from_real(Real.one)
-           by ComplexNumber.conjugate_from_real(Real.one)
+  conj(one)
+     = conj((Real.one : ℂ))
+     = (Real.one : ℂ)
+           by ComplexNumber.conjugate_from_real
      = one
 }
 
@@ -268,269 +245,239 @@ theorem ComplexNumber.conjugate_one
 -- negates it — and with it every purely imaginary number i·x.
 
 theorem ComplexNumber.realPart_i
-        : ComplexNumber.realPart(ComplexNumber.i) = Real.zero :=
-  ComplexNumber.realPart(ComplexNumber.i)
+        : Re(ComplexNumber.i) = Real.zero :=
+  Re(ComplexNumber.i)
      = Real.zero - Real.zero
      = Real.zero
 
 theorem ComplexNumber.imaginaryPart_i
-        : ComplexNumber.imaginaryPart(ComplexNumber.i) = Real.one :=
-  ComplexNumber.imaginaryPart(ComplexNumber.i)
+        : Im(ComplexNumber.i) = Real.one :=
+  Im(ComplexNumber.i)
      = Real.one - Real.zero
      = Real.one
 
 theorem ComplexNumber.conjugate_i
-        : ComplexNumber.conjugate(ComplexNumber.i) = -ComplexNumber.i := {
-  ComplexNumber.realPart(ComplexNumber.conjugate(ComplexNumber.i))
-      = ComplexNumber.realPart(ComplexNumber.i)
+        : conj(ComplexNumber.i) = -ComplexNumber.i := {
+  Re(conj(ComplexNumber.i))
+      = Re(ComplexNumber.i)
       = Real.zero
             by ComplexNumber.realPart_i
       = -Real.zero
-      = -ComplexNumber.realPart(ComplexNumber.i)
+      = -Re(ComplexNumber.i)
             by ComplexNumber.realPart_i
-      = ComplexNumber.realPart(-ComplexNumber.i)
-            by ComplexNumber.realPart_negate(ComplexNumber.i)
-      as realSide;
-  ComplexNumber.imaginaryPart(ComplexNumber.conjugate(ComplexNumber.i))
-      = -ComplexNumber.imaginaryPart(ComplexNumber.i)
-      = ComplexNumber.imaginaryPart(-ComplexNumber.i)
-      as imaginarySide;
-  done by ComplexNumber.eq_of_coordinates(
-              ComplexNumber.conjugate(ComplexNumber.i), -ComplexNumber.i,
-              realSide, imaginarySide)
+      = Re(-ComplexNumber.i)
+            by ComplexNumber.realPart_negate;
+  Im(conj(ComplexNumber.i))
+      = -Im(ComplexNumber.i)
+      = Im(-ComplexNumber.i);
+  done by ComplexNumber.eq_of_coordinates
 }
 
 theorem ComplexNumber.conjugate_i_times_from_real (x : Real)
-        : ComplexNumber.conjugate(ComplexNumber.i * ComplexNumber.from_real(x))
-          = -(ComplexNumber.i * ComplexNumber.from_real(x)) :=
-  ComplexNumber.conjugate(ComplexNumber.i * ComplexNumber.from_real(x))
-     = ComplexNumber.conjugate(ComplexNumber.i)
-       * ComplexNumber.conjugate(ComplexNumber.from_real(x))
-           by ComplexNumber.conjugate_multiply(
-                  ComplexNumber.i, ComplexNumber.from_real(x))
-     = (-ComplexNumber.i) * ComplexNumber.conjugate(ComplexNumber.from_real(x))
+        : conj(ComplexNumber.i * (x : ℂ))
+          = -(ComplexNumber.i * (x : ℂ)) :=
+  conj(ComplexNumber.i * (x : ℂ))
+     = conj(ComplexNumber.i)
+       * conj((x : ℂ))
+           by ComplexNumber.conjugate_multiply
+     = (-ComplexNumber.i) * conj((x : ℂ))
            by ComplexNumber.conjugate_i
-     = (-ComplexNumber.i) * ComplexNumber.from_real(x)
-           by ComplexNumber.conjugate_from_real(x)
-     = -(ComplexNumber.i * ComplexNumber.from_real(x))
+     = (-ComplexNumber.i) * (x : ℂ)
+           by ComplexNumber.conjugate_from_real
+     = -(ComplexNumber.i * (x : ℂ))
 
 -- Conjugation distributes over powers.
-theorem ComplexNumber.conjugate_power (z : ComplexNumber)
-        : ∀ (n : Natural).
-          ComplexNumber.conjugate(ComplexNumber.power(z, n))
-            = ComplexNumber.power(ComplexNumber.conjugate(z), n)
-  | zero => {
-      ComplexNumber.conjugate(
-                RingModulo.one(Real.polynomial_commutative_ring,
-                    Complex.definingPolynomial))
-            = RingModulo.one(Real.polynomial_commutative_ring,
-                  Complex.definingPolynomial)
-          by ComplexNumber.conjugate_one;
-      done
-    }
-  | successor(n) =>
-      ComplexNumber.conjugate(z * ComplexNumber.power(z, n))
-         = ComplexNumber.conjugate(z)
-           * ComplexNumber.conjugate(ComplexNumber.power(z, n))
-         = ComplexNumber.conjugate(z)
-           * ComplexNumber.power(ComplexNumber.conjugate(z), n)
-               by ComplexNumber.conjugate_power(z, n)
+theorem ComplexNumber.conjugate_power (z : ℂ) (n : Natural)
+        : conj(z ^ n)
+          = conj(z) ^ n :=
+  by induction on n with IH {
+    case zero: done by ComplexNumber.conjugate_one
+    case successor(n):
+        conj(z * z ^ n)
+           = conj(z) * conj(z ^ n)
+           = conj(z) * conj(z) ^ n
+               by IH
+  }
 
 -- Conjugation distributes over partial sums.
-theorem ComplexNumber.conjugate_partialSum (s : Natural → ComplexNumber)
-        : ∀ (n : Natural).
-          ComplexNumber.conjugate(ComplexNumber.partialSum(s, n))
-            = ComplexNumber.partialSum(
-                  (k : Natural) ↦ ComplexNumber.conjugate(s(k)), n)
-  | zero => {
-      ComplexNumber.conjugate(
-                RingModulo.zero(Real.polynomial_commutative_ring,
-                    Complex.definingPolynomial))
-            = RingModulo.zero(Real.polynomial_commutative_ring,
-                  Complex.definingPolynomial)
-          by ComplexNumber.conjugate_zero;
-      done
-    }
-  | successor(n) =>
-      ComplexNumber.conjugate(ComplexNumber.partialSum(s, n) + s(n))
-         = ComplexNumber.conjugate(ComplexNumber.partialSum(s, n))
-           + ComplexNumber.conjugate(s(n))
-         = ComplexNumber.partialSum(
-               (k : Natural) ↦ ComplexNumber.conjugate(s(k)), n)
-           + ComplexNumber.conjugate(s(n))
-               by ComplexNumber.conjugate_partialSum(s, n)
+theorem ComplexNumber.conjugate_partialSum (s : Natural → ℂ) (n : Natural)
+        : conj(ComplexNumber.partialSum(s, n))
+          = ComplexNumber.partialSum(
+                (k : Natural) ↦ conj(s(k)), n) :=
+  by induction on n with IH {
+    case zero: done by ComplexNumber.conjugate_zero
+    case successor(n):
+        conj(ComplexNumber.partialSum(s, n) + s(n))
+           = conj(ComplexNumber.partialSum(s, n))
+             + conj(s(n))
+           = ComplexNumber.partialSum(
+                 (k : Natural) ↦ conj(s(k)), n)
+             + conj(s(n))
+               by IH
+  }
 
 -- Conjugation carries the exponential series at z termwise to the
 -- series at conjugate(z): the coefficient is an embedded real, which
 -- conjugation fixes.
-theorem ComplexNumber.conjugate_exponentialTerm (z : ComplexNumber) (k : Natural)
-        : ComplexNumber.conjugate(ComplexNumber.exponentialTerm(z, k))
-          = ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z), k) := {
+theorem ComplexNumber.conjugate_exponentialTerm (z : ℂ) (k : Natural)
+        : conj(ComplexNumber.exponentialTerm(z, k))
+          = ComplexNumber.exponentialTerm(conj(z), k) := {
   let coefficient : Real :=
       (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real);
-  ComplexNumber.conjugate(ComplexNumber.exponentialTerm(z, k))
-     = ComplexNumber.conjugate(
-           ComplexNumber.from_real(coefficient) * ComplexNumber.power(z, k))
-     = ComplexNumber.conjugate(ComplexNumber.from_real(coefficient))
-       * ComplexNumber.conjugate(ComplexNumber.power(z, k))
-     = ComplexNumber.from_real(coefficient)
-       * ComplexNumber.conjugate(ComplexNumber.power(z, k))
-           by ComplexNumber.conjugate_from_real(coefficient)
-     = ComplexNumber.from_real(coefficient)
-       * ComplexNumber.power(ComplexNumber.conjugate(z), k)
-           by ComplexNumber.conjugate_power(z, k)
+  conj(ComplexNumber.exponentialTerm(z, k))
+     = conj(
+           (coefficient : ℂ) * z ^ k)
+     = conj((coefficient : ℂ))
+       * conj(z ^ k)
+     = (coefficient : ℂ)
+       * conj(z ^ k)
+           by ComplexNumber.conjugate_from_real
+     = (coefficient : ℂ)
+       * conj(z) ^ k
+           by ComplexNumber.conjugate_power
 }
 
 -- ----------------------------------------------------------------------
 -- Conjugation carries limits to limits (its coordinates are the
 -- coordinates and their negation, and both pass to the limit).
 theorem ComplexNumber.SequenceConverges.conjugate
-        (s : Natural → ComplexNumber) (limit : ComplexNumber)
+        (s : Natural → ℂ) (limit : ℂ)
         (converges : ComplexNumber.SequenceConverges(s, limit))
         : ComplexNumber.SequenceConverges(
-              (n : Natural) ↦ ComplexNumber.conjugate(s(n)),
-              ComplexNumber.conjugate(limit)) := {
+              (n : Natural) ↦ conj(s(n)),
+              conj(limit)) := {
   Real.SequenceConverges(
-          (n : Natural) ↦ ComplexNumber.realPart(s(n)),
-          ComplexNumber.realPart(limit))
-      by ComplexNumber.SequenceConverges.realPart(s, limit, converges) as realConverges;
+          (n : Natural) ↦ Re(s(n)),
+          Re(limit))
+      by ComplexNumber.SequenceConverges.realPart as realConverges;
   Real.SequenceConverges(
-          (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
-          ComplexNumber.imaginaryPart(limit))
-      by ComplexNumber.SequenceConverges.imaginaryPart(s, limit, converges) as imaginaryConverges;
+          (n : Natural) ↦ Im(s(n)),
+          Im(limit))
+      by ComplexNumber.SequenceConverges.imaginaryPart as imaginaryConverges;
   Real.SequenceConverges(
-          (n : Natural) ↦ -ComplexNumber.imaginaryPart(s(n)),
-          -ComplexNumber.imaginaryPart(limit))
+          (n : Natural) ↦ -Im(s(n)),
+          -Im(limit))
       by Real.SequenceConverges.negate(
-             (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
-             ComplexNumber.imaginaryPart(limit), imaginaryConverges)
+             (n : Natural) ↦ Im(s(n)),
+             Im(limit), imaginaryConverges)
       as negatedImaginaryConverges;
   ∀ (n : Natural).
-      ComplexNumber.realPart(s(n))
-        = ComplexNumber.realPart(ComplexNumber.conjugate(s(n)))
+      Re(s(n))
+        = Re(conj(s(n)))
       by (n : Natural) ↦ {
-           ComplexNumber.realPart(ComplexNumber.conjugate(s(n)))
-                 = ComplexNumber.realPart(s(n));
+           Re(conj(s(n)))
+                 = Re(s(n));
            done
          } as realPointwise;
   ∀ (n : Natural).
-      -ComplexNumber.imaginaryPart(s(n))
-        = ComplexNumber.imaginaryPart(ComplexNumber.conjugate(s(n)))
+      -Im(s(n))
+        = Im(conj(s(n)))
       by (n : Natural) ↦ {
-           ComplexNumber.imaginaryPart(ComplexNumber.conjugate(s(n)))
-                 = -ComplexNumber.imaginaryPart(s(n));
+           Im(conj(s(n)))
+                 = -Im(s(n));
            done
          } as imaginaryPointwise;
-  ComplexNumber.realPart(limit)
-      = ComplexNumber.realPart(ComplexNumber.conjugate(limit)) as limitRealPart;
-  -ComplexNumber.imaginaryPart(limit)
-      = ComplexNumber.imaginaryPart(ComplexNumber.conjugate(limit)) as limitImaginaryPart;
+  Re(limit)
+      = Re(conj(limit)) as limitRealPart;
+  -Im(limit)
+      = Im(conj(limit)) as limitImaginaryPart;
   Real.SequenceConverges(
-          (n : Natural) ↦ ComplexNumber.realPart(ComplexNumber.conjugate(s(n))),
-          ComplexNumber.realPart(ComplexNumber.conjugate(limit)))
+          (n : Natural) ↦ Re(conj(s(n))),
+          Re(conj(limit)))
       by {
         Real.SequenceConverges(
                   (n : Natural) ↦
-                      ComplexNumber.realPart(ComplexNumber.conjugate(s(n))),
-                  ComplexNumber.realPart(limit))
+                      Re(conj(s(n))),
+                  Re(limit))
             by Real.SequenceConverges.of_pointwise(
-                   (n : Natural) ↦ ComplexNumber.realPart(s(n)),
+                   (n : Natural) ↦ Re(s(n)),
                    (n : Natural) ↦
-                       ComplexNumber.realPart(ComplexNumber.conjugate(s(n))),
-                   ComplexNumber.realPart(limit),
+                       Re(conj(s(n))),
+                   Re(limit),
                    realPointwise, realConverges);
         done by substituting limitRealPart
-      } as realSide;
+      };
   Real.SequenceConverges(
           (n : Natural) ↦
-              ComplexNumber.imaginaryPart(ComplexNumber.conjugate(s(n))),
-          ComplexNumber.imaginaryPart(ComplexNumber.conjugate(limit)))
+              Im(conj(s(n))),
+          Im(conj(limit)))
       by {
         Real.SequenceConverges(
                   (n : Natural) ↦
-                      ComplexNumber.imaginaryPart(ComplexNumber.conjugate(s(n))),
-                  -ComplexNumber.imaginaryPart(limit))
+                      Im(conj(s(n))),
+                  -Im(limit))
             by Real.SequenceConverges.of_pointwise(
-                   (n : Natural) ↦ -ComplexNumber.imaginaryPart(s(n)),
+                   (n : Natural) ↦ -Im(s(n)),
                    (n : Natural) ↦
-                       ComplexNumber.imaginaryPart(ComplexNumber.conjugate(s(n))),
-                   -ComplexNumber.imaginaryPart(limit),
+                       Im(conj(s(n))),
+                   -Im(limit),
                    imaginaryPointwise, negatedImaginaryConverges);
         done by substituting limitImaginaryPart
-      } as imaginarySide;
-  done by ComplexNumber.SequenceConverges.of_coordinates(
-              (n : Natural) ↦ ComplexNumber.conjugate(s(n)),
-              ComplexNumber.conjugate(limit),
-              realSide, imaginarySide)
+      };
+  done by ComplexNumber.SequenceConverges.of_coordinates
 }
 
 -- ----------------------------------------------------------------------
 -- The exponential commutes with conjugation: conjugating the partial
 -- sums of the series at z gives the partial sums of the series at
 -- conjugate(z), and conjugation carries the limit exp(z) along.
-theorem ComplexNumber.exponential_conjugate (z : ComplexNumber)
-        : ComplexNumber.exponential(ComplexNumber.conjugate(z))
-          = ComplexNumber.conjugate(ComplexNumber.exponential(z)) := {
+theorem ComplexNumber.exponential_conjugate (z : ℂ)
+        : ComplexNumber.exponential(conj(z))
+          = conj(ComplexNumber.exponential(z)) := {
   ComplexNumber.SequenceConverges(
           (n : Natural) ↦
-              ComplexNumber.conjugate(
+              conj(
                   ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), n)),
-          ComplexNumber.conjugate(ComplexNumber.exponential(z)))
+          conj(ComplexNumber.exponential(z)))
       by ComplexNumber.SequenceConverges.conjugate(
              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)),
              ComplexNumber.exponential(z),
              ComplexNumber.exponential_converges(z))
       as conjugatedSumsConverge;
   ∀ (n : Natural).
-      ComplexNumber.conjugate(
+      conj(
             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), n))
         = ComplexNumber.partialSum(
-              ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z)), n)
+              ComplexNumber.exponentialTerm(conj(z)), n)
       by (n : Natural) ↦
-           ComplexNumber.conjugate(
+           conj(
                     ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), n))
               = ComplexNumber.partialSum(
                     (k : Natural) ↦
-                        ComplexNumber.conjugate(ComplexNumber.exponentialTerm(z, k)),
+                        conj(ComplexNumber.exponentialTerm(z, k)),
                     n)
               = ComplexNumber.partialSum(
-                    ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z)), n)
+                    ComplexNumber.exponentialTerm(conj(z)), n)
                     by ComplexNumber.partialSum_pointwise(
                            (k : Natural) ↦
-                               ComplexNumber.conjugate(
+                               conj(
                                    ComplexNumber.exponentialTerm(z, k)),
-                           ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z)),
+                           ComplexNumber.exponentialTerm(conj(z)),
                            (k : Natural) ↦ {
-                             ComplexNumber.conjugate(
+                             conj(
                                        ComplexNumber.exponentialTerm(z, k))
                                    = ComplexNumber.exponentialTerm(
-                                         ComplexNumber.conjugate(z), k);
+                                         conj(z), k);
                              done
                            },
                            n)
       as pointwiseConjugate;
   ComplexNumber.SequenceConverges(
           ComplexNumber.partialSum(
-              ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z))),
-          ComplexNumber.conjugate(ComplexNumber.exponential(z)))
+              ComplexNumber.exponentialTerm(conj(z))),
+          conj(ComplexNumber.exponential(z)))
       by ComplexNumber.SequenceConverges.of_pointwise(
              (n : Natural) ↦
-                 ComplexNumber.conjugate(
+                 conj(
                      ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), n)),
              ComplexNumber.partialSum(
-                 ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z))),
-             ComplexNumber.conjugate(ComplexNumber.exponential(z)),
-             pointwiseConjugate, conjugatedSumsConverge)
-      as conjugateSeriesConverges;
+                 ComplexNumber.exponentialTerm(conj(z))),
+             conj(ComplexNumber.exponential(z)),
+             pointwiseConjugate, conjugatedSumsConverge);
   ComplexNumber.SequenceConverges(
           ComplexNumber.partialSum(
-              ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z))),
-          ComplexNumber.exponential(ComplexNumber.conjugate(z)))
-      by ComplexNumber.exponential_converges(ComplexNumber.conjugate(z)) as ownLimit;
-  done by ComplexNumber.SequenceConverges.unique(
-              ComplexNumber.partialSum(
-                  ComplexNumber.exponentialTerm(ComplexNumber.conjugate(z))),
-              ComplexNumber.exponential(ComplexNumber.conjugate(z)),
-              ComplexNumber.conjugate(ComplexNumber.exponential(z)),
-              ownLimit, conjugateSeriesConverges)
+              ComplexNumber.exponentialTerm(conj(z))),
+          ComplexNumber.exponential(conj(z)))
+      by ComplexNumber.exponential_converges(conj(z));
+  done by ComplexNumber.SequenceConverges.unique
 }
