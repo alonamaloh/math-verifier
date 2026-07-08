@@ -795,6 +795,39 @@ private:
     // coercion chain)?
     bool isCoercionFunctionName(const std::string& name) const;
 
+    // A norm_cast-style ground normalization equality — a nullary library
+    // theorem `L = R` whose one side is a coercion image (`ι(<T>.zero)`)
+    // and the other a carrier constant (`RingModulo.zero(…)`). These bridge
+    // the two spellings of the same value: the numeral form `(0 : ℂ)`
+    // (defeq to `from_real(Real.zero)`) and the ring-quotient's own zero.
+    // Derived on demand from `environment_.declarations` (see
+    // `normalizationEqualities()`), so no new persisted registry is needed —
+    // the source lemmas and the coercion registry both already serialize.
+    struct NormalizationEquality {
+        ExpressionPointer lhs;
+        ExpressionPointer rhs;
+        ExpressionPointer carrierType;
+        LevelPointer carrierLevel;
+        std::string proofName;   // proof term is `makeConstant(proofName)`
+    };
+    // The registry, rebuilt when the declaration table grows (cheap membership
+    // scan gated on a count check, so the common no-change case is O(1)).
+    std::vector<NormalizationEquality> normalizationEqualitiesCache_;
+    size_t normalizationEqualitiesBuiltAtDeclCount_ = static_cast<size_t>(-1);
+    const std::vector<NormalizationEquality>& normalizationEqualities();
+
+    // Mechanism (4) of the citation-discharge fallback: rewrite the goal
+    // across a registered ground normalization equality (via the
+    // `Equality.transport_proposition` machinery `by substituting` uses),
+    // then close the rewritten goal with the cited hint. Returns the
+    // transported proof (validated defeq against `goalClosed` by the caller),
+    // or null if no registered equality bridges the gap.
+    ExpressionPointer tryNormalizationEqualityBridge(
+        const std::vector<LocalBinder>& localBinders,
+        const ExpressionPointer& hintTerm,
+        const ExpressionPointer& goalClosed,
+        int line);
+
     // Does `term` mention any registered coercion function? Cheap
     // syntactic pre-filter shared by the cast tactics.
     bool containsCoercionConstant(ExpressionPointer term) const;

@@ -1587,6 +1587,18 @@ ExpressionPointer Elaborator::recoverClaimHint(
             }
         }
 
+        // (4) The norm_cast normalization bridge: the hint proves the goal
+        // once a registered ground equality (`from_real(Real.zero) =
+        // RingModulo.zero`) is applied. Lets `conjugate_zero : conj(0) = 0`
+        // close a `conj(RingModulo.zero) = …` consumer without the verbose
+        // carrier-constant restatement. Validated defeq against the goal
+        // inside the helper.
+        if (hintTerm) {
+            ExpressionPointer bridged = tryNormalizationEqualityBridge(
+                localBinders, hintTerm, goalClosed, line);
+            if (bridged) return bridged;
+        }
+
         // Build a citation-failure message at the claim site.
         std::string hintName;
         if (auto* identifier =

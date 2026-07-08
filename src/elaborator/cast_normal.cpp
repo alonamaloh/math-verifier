@@ -80,6 +80,226 @@ bool Elaborator::isCoercionFunctionName(const std::string& name) const {
     return false;
 }
 
+// The norm_cast registry: every nullary library theorem `L = R` with a
+// coercion image on one side (`ι(<T>.zero) = <carrier>.zero`, the shape of
+// `from_real_zero`/`from_real_one`). Derived on demand from the declaration
+// table — no new persisted state — and cached until the table grows (an
+// O(1) `.size()` guard, so the steady state re-scan is free). The linter's
+// numeral spellings (`(0 : ℂ)` ≡ `from_real(Real.zero)`) meet the ring
+// quotient's own zero across these bridges.
+const std::vector<Elaborator::NormalizationEquality>&
+Elaborator::normalizationEqualities() {
+    if (normalizationEqualitiesBuiltAtDeclCount_
+            == environment_.declarations.size()) {
+        return normalizationEqualitiesCache_;
+    }
+    normalizationEqualitiesCache_.clear();
+    for (const auto& [name, declaration] : environment_.declarations) {
+        const auto* definition = std::get_if<Definition>(&declaration);
+        if (!definition || !definition->type) continue;
+        // Ground only: a quantified homomorphism law (`from_real_add`) is
+        // not a normalization equality between fixed spellings of a value.
+        if (countLeadingPis(definition->type) != 0) continue;
+        EqualityComponents components;
+        try {
+            components = extractEqualityComponents(
+                definition->type, "normalization-equality scan", 0);
+        } catch (const ElaborateError&) {
+            continue;
+        } catch (const TypeError&) {
+            continue;
+        }
+        // One side must be a coercion image — this is what makes it a
+        // norm_cast bridge, not an arbitrary ground equality.
+        if (!isCoercionFunctionName(
+                headConstantName(components.leftEndpoint))
+            && !isCoercionFunctionName(
+                headConstantName(components.rightEndpoint))) {
+            continue;
+        }
+        if (containsFreeVariable(components.leftEndpoint)
+            || containsFreeVariable(components.rightEndpoint)) {
+            continue;
+        }
+        normalizationEqualitiesCache_.push_back(
+            {components.leftEndpoint, components.rightEndpoint,
+             components.carrierType, components.carrierUniverseLevel, name});
+    }
+    normalizationEqualitiesBuiltAtDeclCount_ =
+        environment_.declarations.size();
+    return normalizationEqualitiesCache_;
+}
+
+// Mechanism (4) of the citation-discharge fallback. The cited hint proves an
+// equality that IS the goal once a registered normalization equality `L = R`
+// is applied (`conj((0:ℂ)) = (0:ℂ)` proves `conj(RingModulo.zero) =
+// RingModulo.zero` across `from_real(Real.zero) = RingModulo.zero`). Rewrite
+// the goal `R ↦ L` — defeq-aware, so an occurrence hidden behind a reducible
+// spelling (`partialSum(s, 0)` ≡ `RingModulo.zero`) is still found — close
+// the rewrite with the hint, and transport back via
+// `Equality.transport_proposition` (the same assembly `by substituting`
+// uses). The caller validates the result defeq against the goal.
+ExpressionPointer Elaborator::tryNormalizationEqualityBridge(
+        const std::vector<LocalBinder>& localBinders,
+        const ExpressionPointer& hintTerm,
+        const ExpressionPointer& goalClosed,
+        int line) {
+    if (!hintTerm) return nullptr;
+    const std::vector<NormalizationEquality>& registry =
+        normalizationEqualities();
+    if (registry.empty()) return nullptr;
+    if (environment_.lookup("Equality.transport_proposition") == nullptr) {
+        return nullptr;
+    }
+    // The hint's closed type — the fact we close each rewritten goal with.
+    ExpressionPointer hintTypeClosed;
+    try {
+        hintTypeClosed = closeOverLocalBinders(
+            inferTypeInLocalContext(localBinders, hintTerm),
+            localBinders, localBinders.size());
+    } catch (const ElaborateError&) {
+        return nullptr;
+    } catch (const TypeError&) {
+        return nullptr;
+    }
+    Context openedContext = buildContextFromLocalBinders(localBinders);
+    ExpressionPointer goalOpened =
+        openOverLocalBinders(goalClosed, localBinders, localBinders.size());
+    ExpressionPointer hintTypeOpened =
+        openOverLocalBinders(hintTypeClosed, localBinders, localBinders.size());
+
+    for (const NormalizationEquality& eq : registry) {
+        int fromArity = 0;
+        {
+            ExpressionPointer head = eq.rhs;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                ++fromArity;
+                head = app->function;
+            }
+        }
+        for (int direction = 0; direction < 2; ++direction) {
+            ExpressionPointer fromSide = (direction == 0) ? eq.rhs : eq.lhs;
+            ExpressionPointer toSide = (direction == 0) ? eq.lhs : eq.rhs;
+            int arity = fromArity;
+            if (direction == 1) {
+                arity = 0;
+                ExpressionPointer head = eq.lhs;
+                while (auto* app = std::get_if<Application>(&head->node)) {
+                    ++arity;
+                    head = app->function;
+                }
+            }
+            // Abstract occurrences of `fromSide`: structural first (free),
+            // then a bounded defeq pass so a reducible spelling is caught.
+            int occurrences = 0;
+            ExpressionPointer abstractedBody = abstractStructuralOccurrence(
+                goalClosed, fromSide, /*currentDepth=*/0, occurrences);
+            if (occurrences == 0) {
+                int defeqBudget = 64;
+                abstractedBody = abstractDefeqOccurrence(
+                    goalClosed, fromSide, arity, /*currentDepth=*/0,
+                    occurrences, defeqBudget);
+            }
+            if (occurrences == 0) continue;
+            autoProveSpend(1);
+            ExpressionPointer rewrittenGoal =
+                substitute(abstractedBody, 0, toSide);
+            // The rewrite must yield a well-typed goal.
+            try {
+                inferTypeInLocalContext(localBinders, rewrittenGoal);
+            } catch (const ElaborateError&) {
+                continue;
+            } catch (const TypeError&) {
+                continue;
+            }
+            // Close the rewritten goal with the hint: a direct defeq match
+            // (the ground case — the hint's conclusion IS the rewrite up to
+            // the numeral-tower defeq), else a bare-lemma-at-diff congruence
+            // when the hint is quantified.
+            ExpressionPointer rewrittenOpened = openOverLocalBinders(
+                rewrittenGoal, localBinders, localBinders.size());
+            ExpressionPointer proofRewritten;
+            bool direct = false;
+            try {
+                direct = isDefinitionallyEqual(
+                    environment_, openedContext, hintTypeOpened,
+                    rewrittenOpened);
+            } catch (const TypeError&) {
+                direct = false;
+            }
+            if (direct) {
+                proofRewritten = hintTerm;
+            } else if (std::holds_alternative<Pi>(hintTypeClosed->node)) {
+                try {
+                    EqualityComponents rc = extractEqualityComponents(
+                        weakHeadNormalForm(environment_, rewrittenOpened),
+                        "normalization-bridge rewritten", line);
+                    ExpressionPointer previous = closeOverLocalBinders(
+                        rc.leftEndpoint, localBinders, localBinders.size());
+                    ExpressionPointer next = closeOverLocalBinders(
+                        rc.rightEndpoint, localBinders, localBinders.size());
+                    proofRewritten = tryApplyBareLemmaToDiff(
+                        localBinders, previous, next, hintTerm,
+                        hintTypeClosed, line, 0);
+                } catch (const ElaborateError&) {
+                    proofRewritten = nullptr;
+                } catch (const TypeError&) {
+                    proofRewritten = nullptr;
+                }
+            }
+            if (!proofRewritten) continue;
+            // Transport back to the original goal. motive = λ hole. body;
+            // transport_proposition(T, motive, a, b, (a=b), motive[a]) :
+            // motive[b]. direction 0 rewrote R↦L, so motive[L] is the
+            // rewritten goal (proofRewritten) and motive[R] the original.
+            ExpressionPointer motive = makeLambda(
+                "_normHole", eq.carrierType, abstractedBody);
+            ExpressionPointer eqForTransport;
+            ExpressionPointer transportLhs;
+            ExpressionPointer transportRhs;
+            if (direction == 0) {
+                eqForTransport = makeConstant(eq.proofName);
+                transportLhs = eq.lhs;
+                transportRhs = eq.rhs;
+            } else {
+                eqForTransport = makeConstant(
+                    "Equality.symmetry", {eq.carrierLevel});
+                eqForTransport =
+                    makeApplication(eqForTransport, eq.carrierType);
+                eqForTransport = makeApplication(eqForTransport, eq.lhs);
+                eqForTransport = makeApplication(eqForTransport, eq.rhs);
+                eqForTransport = makeApplication(
+                    eqForTransport, makeConstant(eq.proofName));
+                transportLhs = eq.rhs;
+                transportRhs = eq.lhs;
+            }
+            ExpressionPointer call = makeConstant(
+                "Equality.transport_proposition", {eq.carrierLevel});
+            call = makeApplication(call, eq.carrierType);
+            call = makeApplication(call, motive);
+            call = makeApplication(call, transportLhs);
+            call = makeApplication(call, transportRhs);
+            call = makeApplication(call, eqForTransport);
+            call = makeApplication(call, proofRewritten);
+            // Soundness guard: the assembled term must prove the goal.
+            try {
+                ExpressionPointer callType =
+                    inferTypeInLocalContext(localBinders, call);
+                if (isDefinitionallyEqual(
+                        environment_, openedContext,
+                        openOverLocalBinders(callType, localBinders,
+                                             localBinders.size()),
+                        goalOpened)) {
+                    return call;
+                }
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
+        }
+    }
+    return nullptr;
+}
+
 Elaborator::CastNormalForm Elaborator::castPushToLeaves(
         ExpressionPointer term,
         const std::vector<LocalBinder>& localBinders) {

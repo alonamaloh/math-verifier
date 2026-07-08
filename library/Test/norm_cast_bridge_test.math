@@ -1,0 +1,40 @@
+-- Regression: the norm_cast normalization-equality bridge. A cited lemma
+-- stated in numeral form — `conj(0) = 0`, where `(0 : ℂ)` is defeq to
+-- `from_real(Real.zero)` — closes a consumer goal spelled with the ring
+-- quotient's own zero (`RingModulo.zero(…)`), by transporting the hint
+-- across the registered ground equality `from_real_zero`. The defeq-aware
+-- occurrence search also reaches a zero hidden behind a reducible spelling
+-- (`partialSum(s, 0)`), the empty-sum consumer this feature unblocks.
+module Test.norm_cast_bridge_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Real.basics
+import Real.instances
+import Polynomial.instances
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import ComplexNumber.basics
+import ComplexNumber.embedding
+import ComplexNumber.conjugation
+
+-- Direct: the numeral-form lemma bridges to the carrier constant's zero.
+theorem Test.conjugate_ring_zero
+        : conj(RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+          = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial) :=
+  done by ComplexNumber.conjugate_zero
+
+theorem Test.conjugate_ring_one
+        : conj(RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial))
+          = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial) :=
+  done by ComplexNumber.conjugate_one
+
+-- Defeq-hidden: the empty partial sum reduces to `RingModulo.zero`, so the
+-- bridge must find the occurrence up to definitional equality.
+theorem Test.conjugate_empty_partial_sum (s : Natural → ℂ)
+        : conj(ComplexNumber.partialSum(s, 0))
+          = ComplexNumber.partialSum((k : Natural) ↦ conj(s(k)), 0) :=
+  done by ComplexNumber.conjugate_zero
