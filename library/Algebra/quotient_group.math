@@ -66,9 +66,9 @@ theorem QuotientGroup.operation_representative_respects
         (y : QuotientGroup(G, subset))
         : QuotientGroup.operation_representative(G, subset, normal, a, y)
           = QuotientGroup.operation_representative(G, subset, normal, a', y) :=
-  cases y { | b =>
+  by_representatives y as b =>
       Quotient.equivalent_implies_equal(a · b, a' · b,
-          Group.SameCoset.right_translate(G, subset, normal, b, a, a', relatedA)) }
+          Group.SameCoset.right_translate(G, subset, normal, b, a, a', relatedA))
 
 definition QuotientGroup.operation
         (G : Group) (subset : Set(Group.carrier(G)))
@@ -114,7 +114,7 @@ theorem QuotientGroup.operation_associative
   by_representatives x as a, y as b, z as c => {
     QuotientGroup.make(G, subset, a · b · c)
         = QuotientGroup.make(G, subset, a · (b · c))
-      by substituting Group.associative(G, a, b, c)
+      by Group.associative
   }
 
 theorem QuotientGroup.operation_identity_left
@@ -126,7 +126,7 @@ theorem QuotientGroup.operation_identity_left
   by_representatives x as a => {
     QuotientGroup.make(G, subset, Group.identity(G) · a)
         = QuotientGroup.make(G, subset, a)
-      by substituting Group.identity_left(G, a)
+      by Group.identity_left
   }
 
 theorem QuotientGroup.operation_identity_right
@@ -138,7 +138,7 @@ theorem QuotientGroup.operation_identity_right
   by_representatives x as a => {
     QuotientGroup.make(G, subset, a · Group.identity(G))
         = QuotientGroup.make(G, subset, a)
-      by substituting Group.identity_right(G, a)
+      by Group.identity_right
   }
 
 theorem QuotientGroup.operation_inverse_left
@@ -151,7 +151,7 @@ theorem QuotientGroup.operation_inverse_left
   by_representatives x as a => {
     QuotientGroup.make(G, subset, a⁻¹ · a)
         = QuotientGroup.identity(G, subset)
-      by substituting Group.inverse_left(G, a)
+      by substituting Group.inverse_left
   }
 
 theorem QuotientGroup.operation_inverse_right
@@ -164,7 +164,7 @@ theorem QuotientGroup.operation_inverse_right
   by_representatives x as a => {
     QuotientGroup.make(G, subset, a · a⁻¹)
         = QuotientGroup.identity(G, subset)
-      by substituting Group.inverse_right(G, a)
+      by substituting Group.inverse_right
   }
 
 -- ----------------------------------------------------------------------
@@ -177,11 +177,14 @@ theorem QuotientGroup.is_group
                   QuotientGroup.operation(G, subset, normal),
                   QuotientGroup.identity(G, subset),
                   QuotientGroup.inverse(G, subset, normal)) :=
-  ⟨⟨QuotientGroup.operation_associative(G, subset, normal),
-    QuotientGroup.operation_identity_left(G, subset, normal),
-    QuotientGroup.operation_identity_right(G, subset, normal)⟩,
-   QuotientGroup.operation_inverse_left(G, subset, normal),
-   QuotientGroup.operation_inverse_right(G, subset, normal)⟩
+  {
+    QuotientGroup.operation_associative(G, subset, normal);
+    QuotientGroup.operation_identity_left(G, subset, normal);
+    QuotientGroup.operation_identity_right(G, subset, normal);
+    QuotientGroup.operation_inverse_left(G, subset, normal);
+    QuotientGroup.operation_inverse_right(G, subset, normal);
+    done
+  }
 
 -- The bundled quotient group G/N.
 definition QuotientGroup.group
@@ -211,4 +214,4 @@ theorem QuotientGroup.projection_is_homomorphism
                          QuotientGroup.projection(G, subset, normal)) :=
   (a b : Group.carrier(G)) ↦
     reflexivity(QuotientGroup(G, subset),
-        QuotientGroup.make(G, subset, Group.operation(G, a, b)))
+        QuotientGroup.make(G, subset, a · b))

@@ -71,31 +71,27 @@ theorem PrincipalIdealDomain.bezout (pid : PrincipalIdealDomain)
               ∧ Ring.divides(PrincipalIdealDomain.ring(pid), d, b)
               ∧ d = x * a + y * b := {
   let s : Ring := PrincipalIdealDomain.ring(pid);
+  Ring.IsIdeal(s, Ring.pairIdealMember(s, a, b)) by Ring.pairIdeal_is_ideal as pairIsIdeal;
   choose d such that
       Ring.GeneratesIdeal(s, Ring.pairIdealMember(s, a, b), d) as generates
       from PrincipalIdealDomain.every_ideal_principal(pid,
-               Ring.pairIdealMember(s, a, b),
-               Ring.pairIdeal_is_ideal(s, a, b));
+               Ring.pairIdealMember(s, a, b), pairIsIdeal);
   let ⟨forwardGenerates, backwardGenerates⟩ := generates;
   -- a and b lie in the ideal, so d divides both.
   Ring.pairIdealMember(s, a, b, a)
       by ⟨Ring.one(s), Ring.zero(s),
           { a
-             = Ring.one(s) * a + Ring.zero(s) * b }⟩
-      as aMember;
+             = Ring.one(s) * a + Ring.zero(s) * b }⟩;
   Ring.pairIdealMember(s, a, b, b)
       by ⟨Ring.zero(s), Ring.one(s),
           { b
-             = Ring.zero(s) * a + Ring.one(s) * b }⟩
-      as bMember;
+             = Ring.zero(s) * a + Ring.one(s) * b }⟩;
   -- d lies in the ideal (it divides itself), giving the combination.
-  Ring.pairIdealMember(s, a, b, d)
-      by backwardGenerates(d, Ring.divides_reflexive(s, d)) as dMember;
+  Ring.pairIdealMember(s, a, b, d) by backwardGenerates as dMember;
+  Ring.divides(s, d, a) by forwardGenerates as dDividesA;
+  Ring.divides(s, d, b) by forwardGenerates as dDividesB;
   choose x, y such that d = x * a + y * b as dEquation from dMember;
-  ⟨d, x, y,
-   forwardGenerates(a, aMember),
-   forwardGenerates(b, bMember),
-   dEquation⟩
+  ⟨d, x, y, dDividesA, dDividesB, dEquation⟩
 }
 
 -- ----------------------------------------------------------------------
@@ -114,21 +110,40 @@ theorem PrincipalIdealDomain.bezout_one_of_irreducible
         : ∃ (x : Ring.carrier(PrincipalIdealDomain.ring(pid))).
             ∃ (y : Ring.carrier(PrincipalIdealDomain.ring(pid))).
               x * p + y * a = Ring.one(PrincipalIdealDomain.ring(pid)) := {
-  let d : IntegralDomain := PrincipalIdealDomain.domain(pid);
   let s : Ring := PrincipalIdealDomain.ring(pid);
   let ⟨_, _, factorClause⟩ := pIrreducible;
-  choose g, x, y such that
+  ∃ (g : Ring.carrier(s)). ∃ (x : Ring.carrier(s)). ∃ (y : Ring.carrier(s)).
       Ring.divides(s, g, p) ∧ Ring.divides(s, g, a) ∧ g = x * p + y * a
-      from PrincipalIdealDomain.bezout(pid, p, a);
+      by PrincipalIdealDomain.bezout;
+  choose g, x, y such that
+      Ring.divides(s, g, p) ∧ Ring.divides(s, g, a) ∧ g = x * p + y * a;
   Ring.divides(s, g, p) as gDividesP;
   Ring.divides(s, g, a) as gDividesA;
-  choose e such that p = g * e as pEqualsGe from gDividesP;
-  cases factorClause(g, e, pEqualsGe) {
-    | Or.introduceRight(eIsUnit) => {
+  choose e such that p = g * e from gDividesP;
+  Ring.IsUnit(s, g) ∨ Ring.IsUnit(s, e) by factorClause;
+  done by cases {
+    case Ring.IsUnit(s, g) as gIsUnit: {
+        ∃ (gInverse : Ring.carrier(s)).
+            Ring.IsUnit(s, gInverse) ∧ g * gInverse = Ring.one(s)
+            by IntegralDomain.unit_inverse_is_unit;
+        choose gInverse such that Ring.IsUnit(s, gInverse) ∧ g * gInverse = Ring.one(s);
+        g * gInverse = Ring.one(s);
+        -- Left-multiply the gcd identity g = x·p + y·a by g⁻¹:
+        -- (g⁻¹·x)·p + (g⁻¹·y)·a = g⁻¹·(x·p + y·a) = g⁻¹·g = 1.
+        -- (Left-multiplying avoids commuting g⁻¹ past p and a.)
+        ⟨gInverse * x, gInverse * y,
+         { (gInverse * x) * p + (gInverse * y) * a
+            = gInverse * (x * p + y * a)
+            = gInverse * g
+            = g * gInverse
+            = Ring.one(s) }⟩
+      }
+    case Ring.IsUnit(s, e) as eIsUnit: {
         -- e a unit makes g an associate of p, so g ∣ a forces p ∣ a.
-        choose eInverse such that
+        ∃ (eInverse : Ring.carrier(s)).
             Ring.IsUnit(s, eInverse) ∧ e * eInverse = Ring.one(s)
-            from IntegralDomain.unit_inverse_is_unit(d, e, eIsUnit);
+            by IntegralDomain.unit_inverse_is_unit;
+        choose eInverse such that Ring.IsUnit(s, eInverse) ∧ e * eInverse = Ring.one(s);
         e * eInverse = Ring.one(s);
         choose k such that a = g * k from gDividesA;
         g
@@ -144,21 +159,6 @@ theorem PrincipalIdealDomain.bezout_one_of_irreducible
                    = p * (eInverse * k) }⟩
             as pDividesA;
         absurd(notDividesA(pDividesA))
-      }
-    | Or.introduceLeft(gIsUnit) => {
-        choose gInverse such that
-            Ring.IsUnit(s, gInverse) ∧ g * gInverse = Ring.one(s)
-            from IntegralDomain.unit_inverse_is_unit(d, g, gIsUnit);
-        g * gInverse = Ring.one(s);
-        -- Left-multiply the gcd identity g = x·p + y·a by g⁻¹:
-        -- (g⁻¹·x)·p + (g⁻¹·y)·a = g⁻¹·(x·p + y·a) = g⁻¹·g = 1.
-        -- (Left-multiplying avoids commuting g⁻¹ past p and a.)
-        ⟨gInverse * x, gInverse * y,
-         { (gInverse * x) * p + (gInverse * y) * a
-            = gInverse * (x * p + y * a)
-            = gInverse * g
-            = g * gInverse
-            = Ring.one(s) }⟩
       }
   }
 }
@@ -184,33 +184,23 @@ theorem PrincipalIdealDomain.irreducible_divides_factor
     case Ring.divides(s, p, a) as pDividesA:
         Or.introduceLeft(pDividesA)
     case ¬(Ring.divides(s, p, a)) as notDividesA: {
-        choose x, y such that x * p + y * a = Ring.one(s)
-            from PrincipalIdealDomain.bezout_one_of_irreducible(pid, p, a,
-                     pIrreducible, notDividesA);
-        Ring.divides(s, p, (x * p) * b)
-            by Ring.divides_multiply_right(s, p, x * p, b,
-                   Ring.divides_multiply_left(s, IntegralDomain.commutative(d),
-                       p, p, x, Ring.divides_reflexive(s, p)))
-            as pDividesXpb;
-        Ring.divides(s, p, (y * a) * b)
-            by Equality.transport_proposition(
-                   (t : Ring.carrier(s)) ↦ Ring.divides(s, p, t),
-                   y * (a * b), (y * a) * b,
-                   Equality.symmetry(Ring.multiply_associative(s, y, a, b)),
-                   Ring.divides_multiply_left(s, IntegralDomain.commutative(d),
-                       p, a * b, y, pDividesProduct))
-            as pDividesYab;
+        ∃ (x : Ring.carrier(s)). ∃ (y : Ring.carrier(s)). x * p + y * a = Ring.one(s)
+            by PrincipalIdealDomain.bezout_one_of_irreducible;
+        choose x, y such that x * p + y * a = Ring.one(s);
+        Ring.divides(s, p, x * p)
+            by Ring.divides_multiply_left(commutativity := IntegralDomain.commutative(d));
+        Ring.divides(s, p, (x * p) * b) by Ring.divides_multiply_right;
+        Ring.divides(s, p, y * (a * b))
+            by Ring.divides_multiply_left(commutativity := IntegralDomain.commutative(d));
+        (y * a) * b = y * (a * b);
+        Ring.divides(s, p, (y * a) * b);
+        Ring.divides(s, p, (x * p) * b + (y * a) * b) by Ring.divides_add;
         b
-                  = Ring.one(s) * b
-                  = (x * p + y * a) * b
-                  = (x * p) * b + (y * a) * b as bEqualsSum;
-        Or.introduceRight(
-            Equality.transport_proposition(
-                (t : Ring.carrier(s)) ↦ Ring.divides(s, p, t),
-                (x * p) * b + (y * a) * b, b,
-                Equality.symmetry(bEqualsSum),
-                Ring.divides_add(s, p, (x * p) * b, (y * a) * b,
-                    pDividesXpb, pDividesYab)))
+           = Ring.one(s) * b
+           = (x * p + y * a) * b
+           = (x * p) * b + (y * a) * b;
+        Ring.divides(s, p, b) as pDividesB;
+        Or.introduceRight(pDividesB)
       }
   }
 }
@@ -230,6 +220,5 @@ theorem PrincipalIdealDomain.irreducible_is_prime
    (a b : Ring.carrier(PrincipalIdealDomain.ring(pid)))
    (pDividesProduct :
        Ring.divides(PrincipalIdealDomain.ring(pid), p, a * b)) ↦
-     PrincipalIdealDomain.irreducible_divides_factor(pid, p, pIrreducible,
-         a, b, pDividesProduct)⟩
+     { done by PrincipalIdealDomain.irreducible_divides_factor }⟩
 }
