@@ -65,59 +65,49 @@ theorem Subgroup.associative (G : Group) (subset : Set(Group.carrier(G)))
         : Subgroup.operation(G, subset, subgroup,
               Subgroup.operation(G, subset, subgroup, x, y), z)
           = Subgroup.operation(G, subset, subgroup, x,
-              Subgroup.operation(G, subset, subgroup, y, z)) :=
-  Subtype.equal_of_value_equal(Group.carrier(G), subset,
-      Subgroup.operation(G, subset, subgroup,
-          Subgroup.operation(G, subset, subgroup, x, y), z),
-      Subgroup.operation(G, subset, subgroup, x,
-          Subgroup.operation(G, subset, subgroup, y, z)),
-      Group.associative(G, Subtype.value(x), Subtype.value(y), Subtype.value(z)))
+              Subgroup.operation(G, subset, subgroup, y, z)) := {
+  (Subtype.value(x) · Subtype.value(y)) · Subtype.value(z)
+      = Subtype.value(x) · (Subtype.value(y) · Subtype.value(z)) by Group.associative;
+  done by Subtype.equal_of_value_equal
+}
 
 theorem Subgroup.identity_left (G : Group) (subset : Set(Group.carrier(G)))
         (subgroup : IsSubgroup(G, subset))
         (x : Subgroup.carrier(G, subset))
         : Subgroup.operation(G, subset, subgroup,
-              Subgroup.identity(G, subset, subgroup), x) = x :=
-  Subtype.equal_of_value_equal(Group.carrier(G), subset,
-      Subgroup.operation(G, subset, subgroup,
-          Subgroup.identity(G, subset, subgroup), x),
-      x,
-      Group.identity_left(G, Subtype.value(x)))
+              Subgroup.identity(G, subset, subgroup), x) = x := {
+  Group.identity(G) · Subtype.value(x) = Subtype.value(x) by Group.identity_left;
+  done by Subtype.equal_of_value_equal
+}
 
 theorem Subgroup.identity_right (G : Group) (subset : Set(Group.carrier(G)))
         (subgroup : IsSubgroup(G, subset))
         (x : Subgroup.carrier(G, subset))
         : Subgroup.operation(G, subset, subgroup, x,
-              Subgroup.identity(G, subset, subgroup)) = x :=
-  Subtype.equal_of_value_equal(Group.carrier(G), subset,
-      Subgroup.operation(G, subset, subgroup, x,
-          Subgroup.identity(G, subset, subgroup)),
-      x,
-      Group.identity_right(G, Subtype.value(x)))
+              Subgroup.identity(G, subset, subgroup)) = x := {
+  Subtype.value(x) · Group.identity(G) = Subtype.value(x) by Group.identity_right;
+  done by Subtype.equal_of_value_equal
+}
 
 theorem Subgroup.inverse_left (G : Group) (subset : Set(Group.carrier(G)))
         (subgroup : IsSubgroup(G, subset))
         (x : Subgroup.carrier(G, subset))
         : Subgroup.operation(G, subset, subgroup,
               Subgroup.inverse(G, subset, subgroup, x), x)
-          = Subgroup.identity(G, subset, subgroup) :=
-  Subtype.equal_of_value_equal(Group.carrier(G), subset,
-      Subgroup.operation(G, subset, subgroup,
-          Subgroup.inverse(G, subset, subgroup, x), x),
-      Subgroup.identity(G, subset, subgroup),
-      Group.inverse_left(G, Subtype.value(x)))
+          = Subgroup.identity(G, subset, subgroup) := {
+  Subtype.value(x)⁻¹ · Subtype.value(x) = Group.identity(G) by Group.inverse_left;
+  done by Subtype.equal_of_value_equal
+}
 
 theorem Subgroup.inverse_right (G : Group) (subset : Set(Group.carrier(G)))
         (subgroup : IsSubgroup(G, subset))
         (x : Subgroup.carrier(G, subset))
         : Subgroup.operation(G, subset, subgroup, x,
               Subgroup.inverse(G, subset, subgroup, x))
-          = Subgroup.identity(G, subset, subgroup) :=
-  Subtype.equal_of_value_equal(Group.carrier(G), subset,
-      Subgroup.operation(G, subset, subgroup, x,
-          Subgroup.inverse(G, subset, subgroup, x)),
-      Subgroup.identity(G, subset, subgroup),
-      Group.inverse_right(G, Subtype.value(x)))
+          = Subgroup.identity(G, subset, subgroup) := {
+  Subtype.value(x) · Subtype.value(x)⁻¹ = Group.identity(G) by Group.inverse_right;
+  done by Subtype.equal_of_value_equal
+}
 
 -- ----------------------------------------------------------------------
 -- The subgroup is a group, bundled.
@@ -128,11 +118,14 @@ theorem Subgroup.is_group (G : Group) (subset : Set(Group.carrier(G)))
                   Subgroup.operation(G, subset, subgroup),
                   Subgroup.identity(G, subset, subgroup),
                   Subgroup.inverse(G, subset, subgroup)) :=
-  ⟨⟨Subgroup.associative(G, subset, subgroup),
-    Subgroup.identity_left(G, subset, subgroup),
-    Subgroup.identity_right(G, subset, subgroup)⟩,
-   Subgroup.inverse_left(G, subset, subgroup),
-   Subgroup.inverse_right(G, subset, subgroup)⟩
+  {
+    Subgroup.associative(G, subset, subgroup);
+    Subgroup.identity_left(G, subset, subgroup);
+    Subgroup.identity_right(G, subset, subgroup);
+    Subgroup.inverse_left(G, subset, subgroup);
+    Subgroup.inverse_right(G, subset, subgroup);
+    done
+  }
 
 -- The bundled group structure on the subgroup S ≤ G.
 definition Subgroup.group (G : Group) (subset : Set(Group.carrier(G)))
@@ -165,7 +158,9 @@ theorem Subgroup.inclusion_is_homomorphism (G : Group)
 theorem Subgroup.inclusion_is_injective (G : Group)
         (subset : Set(Group.carrier(G))) (subgroup : IsSubgroup(G, subset))
         : GroupHomomorphism.IsInjective(Subgroup.group(G, subset, subgroup), G,
-                                        Subgroup.inclusion(G, subset, subgroup)) :=
-  (x y : Subgroup.carrier(G, subset))
-           (valuesEqual : Subtype.value(x) = Subtype.value(y)) ↦
-    Subtype.equal_of_value_equal(Group.carrier(G), subset, x, y, valuesEqual)
+                                        Subgroup.inclusion(G, subset, subgroup)) := {
+  take x : Subgroup.carrier(G, subset);
+  take y : Subgroup.carrier(G, subset);
+  suppose Subtype.value(x) = Subtype.value(y) as valuesEqual;
+  done by Subtype.equal_of_value_equal
+}
