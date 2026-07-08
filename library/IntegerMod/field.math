@@ -62,9 +62,7 @@ theorem IntegerMod.inverse_from_witness (modulus : Natural) (a w : Integer)
             : Integer.divides((modulus : Integer), a * w - Integer.one))
         : IntegerMod.make(modulus, a) * IntegerMod.make(modulus, w)
           = IntegerMod.one(modulus) :=
-  Quotient.equivalent_implies_equal(
-      Integer, Integer.CongruentModulo(modulus),
-      a * w, Integer.one, witnessDivides)
+  Quotient.equivalent_implies_equal(a * w, Integer.one, witnessDivides)
 
 -- ----------------------------------------------------------------------
 -- 0 ≠ 1 in F_p. If [0] = [1] then p | 1, forcing p = 1, contradicting
@@ -73,17 +71,17 @@ theorem IntegerMod.zero_not_one (p : Natural)
         (primality : Natural.is_prime(p))
         : ¬(IntegerMod.zero(p) = IntegerMod.one(p)) :=
   (zeroEqualsOne : IntegerMod.zero(p) = IntegerMod.one(p)) ↦ {
-    Integer.CongruentModulo(p, Integer.zero, Integer.one) as congruent;
+    Integer.CongruentModulo(p, Integer.zero, Integer.one);
     -- p | (0 − 1); negate to get p | 1.
     Integer.divides((p : Integer), -(Integer.zero - Integer.one))
-        by Integer.divides_negate((p : Integer), Integer.zero - Integer.one, congruent);
+        by Integer.divides_negate;
     -(Integer.zero - Integer.one) = Integer.one by ring as negationEquation;
     Integer.divides((p : Integer), Integer.one)
-        by substituting negationEquation as dividesOne;
+        by substituting negationEquation;
     Natural.divides(p, 1)
-        by Integer.natural_divides_of_integer_divides(p, 1, dividesOne);
+        by Integer.natural_divides_of_integer_divides;
     p = 1;
-    2 ≤ p by Natural.is_prime.at_least_two(p, primality);
+    2 ≤ p by Natural.is_prime.at_least_two;
     2 ≤ 1;
     False by Natural.not_two_less_or_equal_one
   }
@@ -107,7 +105,7 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
         ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦ {
                  Integer.divides((p : Integer), (k : Integer))
-                     by Integer.divides_of_natural_divides(p, k, pDividesK);
+                     by Integer.divides_of_natural_divides;
                  Integer.divides((p : Integer), a);
                  False by notDivides
                }
@@ -117,7 +115,7 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
             (p : Integer) * bezoutX + (k : Integer) * bezoutY = Integer.one
             from Natural.bezout_one_when_prime_coprime(p, k, primality, notDividesK);
         witness IntegerMod.make(p, bezoutY) with
-            IntegerMod.inverse_from_witness(p, a, bezoutY,
+            IntegerMod.inverse_from_witness(witnessDivides :=
                 ⟨-bezoutX,
                  { a * bezoutY - Integer.one
                     = (k : Integer) * bezoutY
@@ -129,9 +127,10 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
         -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : Integer) = a.
         ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦ {
+                 Integer.divides((p : Integer), (k : Integer))
+                     by Integer.divides_of_natural_divides;
                  Integer.divides((p : Integer), -(k : Integer))
-                     by Integer.divides_negate((p : Integer), (k : Integer),
-                            Integer.divides_of_natural_divides(p, k, pDividesK));
+                     by Integer.divides_negate;
                  Integer.divides((p : Integer), a);
                  False by notDivides
                }
@@ -141,7 +140,7 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
             (p : Integer) * bezoutX + (k : Integer) * bezoutY = Integer.one
             from Natural.bezout_one_when_prime_coprime(p, k, primality, notDividesK);
         witness IntegerMod.make(p, -bezoutY) with
-            IntegerMod.inverse_from_witness(p, a, -bezoutY,
+            IntegerMod.inverse_from_witness(witnessDivides :=
                 ⟨-bezoutX,
                  { a * -bezoutY - Integer.one
                     = (-(k : Integer)) * -bezoutY - Integer.one
@@ -166,10 +165,9 @@ theorem IntegerMod.nonzero_invertible (p : Natural)
         ¬ Integer.divides((p : Integer), a)
             by (pDividesA : Integer.divides((p : Integer), a)) ↦ {
                  Integer.CongruentModulo(p, a, Integer.zero)
-                     by substituting (ring : a - Integer.zero = a) as congruentToZero;
-                 notZero(Quotient.equivalent_implies_equal(
-                             Integer, Integer.CongruentModulo(p),
-                             a, Integer.zero, congruentToZero))
+                     by substituting (ring : a - Integer.zero = a);
+                 IntegerMod.make(p, a) = IntegerMod.zero(p);
+                 False by notZero
                } as notDivides;
         IntegerMod.invertible_at_representative(p, a, primality, notDivides)
       } }
@@ -182,6 +180,9 @@ theorem IntegerMod.is_field (p : Natural) (primality : Natural.is_prime(p))
                   IntegerMod.zero(p), IntegerMod.negate,
                   IntegerMod.multiply,
                   IntegerMod.one(p)) :=
-    ⟨IntegerMod.is_commutative_ring(p),
-     IntegerMod.zero_not_one(p, primality),
-     IntegerMod.nonzero_invertible(p, primality)⟩
+    {
+      IntegerMod.is_commutative_ring;
+      IntegerMod.zero_not_one;
+      IntegerMod.nonzero_invertible;
+      done
+    }

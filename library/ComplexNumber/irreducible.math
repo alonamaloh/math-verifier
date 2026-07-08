@@ -66,9 +66,9 @@ theorem Natural.both_one_of_add_two (da db : Natural)
               -- da = 1 = 1 and likewise db.
               daPredecessor = 0 as daPredecessorZero;
               dbPredecessor = 0 as dbPredecessorZero;
-              successor(daPredecessor) = 1 by substituting daPredecessorZero as daIsOne;
-              successor(dbPredecessor) = 1 by substituting dbPredecessorZero as dbIsOne;
-              And.introduction(daIsOne, dbIsOne)
+              successor(daPredecessor) = 1 by substituting daPredecessorZero;
+              successor(dbPredecessor) = 1 by substituting dbPredecessorZero;
+              done by And.introduction
             }
         }
   }
@@ -94,8 +94,7 @@ theorem Complex.no_degree_one_factorization
   1 + 1 = 2 by ring as indexTwo;
   (aOne * bOne)
             = Polynomial.coefficientOf(Real.ring, (a * b), 1 + 1)
-                  by Polynomial.coefficientOf_product_at_sum(Real.ring, a, b, 1, 1,
-                             aBound, bBound)
+                  by Polynomial.coefficientOf_product_at_sum
             = Polynomial.coefficientOf(Real.ring, (a * b), 2)
                   by substituting indexTwo
             = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
@@ -109,7 +108,7 @@ theorem Complex.no_degree_one_factorization
                        * Polynomial.coefficientOf(Real.ring, b, Natural.monus(0, i))), 0)
                   by substituting Ring.Sum.base
             = Polynomial.coefficientOf(Real.ring, (a * b), 0)
-                  by Polynomial.coefficientOf_multiply(Real.ring, a, b, 0)
+                  by Polynomial.coefficientOf_multiply
             = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 0)
             = Real.one as coefficientEquationZero;
   -- de + cf = 0 (coefficient at 1).
@@ -148,10 +147,8 @@ theorem Complex.no_degree_one_factorization
   -- combination: cf·(de = −cf) minus (cdef = 1) is exactly (cf)² + 1 = 0.
   ((aOne * bZero) * (aOne * bZero))
       = Real.negate(Real.one)
-      by linear_combination((aOne * bZero) * deNegateCf - cdefOne) as cfSquareNegateOne;
-  Real.no_square_root_of_negate_one(
-      (aOne * bZero),
-      cfSquareNegateOne)
+      by linear_combination((aOne * bZero) * deNegateCf - cdefOne);
+  done by Real.no_square_root_of_negate_one
 }
 
 -- x²+1 is not a unit (it has degree 2).
@@ -167,33 +164,32 @@ theorem Complex.definingPolynomial_not_unit
                     = (Complex.definingPolynomial * Polynomial.zero(Real.ring))
                     = Polynomial.zero(Real.ring)
                           by Ring.multiply_zero_right(Real.polynomial_ring, Complex.definingPolynomial);
-          Real.zero_not_equal_one({
-              Real.one
-                     = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 0)
-                     = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 0)
-                     = Real.zero})
+          Real.one
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 0)
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 0)
+                 = Real.zero;
+          done by Real.zero_not_equal_one
         }
       otherwise as gNonzero: {
           choose degreeG such that Polynomial.DegreeLessThan(Real.ring, g, successor(degreeG))
                   ∧ ¬(Polynomial.coefficientOf(Real.ring, g, degreeG) = Ring.zero(Real.ring))
-              from Polynomial.exists_degree_of_nonzero(Real.ring, g, gNonzero);
-          Polynomial.DegreeLessThan(Real.ring, g, successor(degreeG)) as gBound;
-          ¬(Polynomial.coefficientOf(Real.ring, g, degreeG) = Ring.zero(Real.ring)) as gLeadingNonzero;
-          let ⟨_, productLeadingNonzero⟩
-              := Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
-                     Real.reciprocal_exists_for_nonzero, Complex.definingPolynomial, g, 2, degreeG,
-                     Complex.definingPolynomial_HasDegree_two,
-                     And.introduction(gBound, gLeadingNonzero));
+              from Polynomial.exists_degree_of_nonzero;
+          Polynomial.HasDegree(Real.ring, g, degreeG);
+          Polynomial.HasDegree(Real.ring, (Complex.definingPolynomial * g), 2 + degreeG)
+              by Polynomial.HasDegree_product
+                  recalling Real.multiply_commutative, Real.reciprocal_exists_for_nonzero,
+                      Complex.definingPolynomial_HasDegree_two
+              as productHasDegree;
+          let ⟨_, productLeadingNonzero⟩ := productHasDegree;
           2 + degreeG = successor(1 + degreeG) as leadingIndex;
-          productLeadingNonzero({
-              Polynomial.coefficientOf(Real.ring,
-                       (Complex.definingPolynomial * g), 2 + degreeG)
+          Polynomial.coefficientOf(Real.ring, (Complex.definingPolynomial * g), 2 + degreeG)
                  = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2 + degreeG)
                        by substituting oneEquation
                  = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), successor(1 + degreeG))
                        by substituting leadingIndex
                  = Real.zero
-                       by Polynomial.coefficientOf_one_successor(Real.ring, 1 + degreeG)})
+                       by Polynomial.coefficientOf_one_successor;
+          done by productLeadingNonzero
         }
     }
   }
@@ -213,65 +209,59 @@ theorem Complex.definingPolynomial_irreducible
                   otherwise as bNotUnit: {
                       -- Neither factor is a unit; derive a contradiction.
                       ¬(a = Polynomial.zero(Real.ring))
-                          by (aZero : a = Polynomial.zero(Real.ring)) ↦
-                               Real.zero_not_equal_one({
-                                   Real.one
-                                          = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
-                                                by Complex.definingPolynomial_coefficient_two
-                                          = Polynomial.coefficientOf(Real.ring,
-                                                (Polynomial.zero(Real.ring) * b), 2)
-                                                by aZero
-                                          = Polynomial.coefficientOf(Real.ring,
-                                                Polynomial.zero(Real.ring), 2)
-                                                by Ring.zero_multiply_left(Real.polynomial_ring, b)
-                                          = Real.zero})
-                          as aNonzero;
+                          by (aZero : a = Polynomial.zero(Real.ring)) ↦ {
+                               Real.one
+                                      = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
+                                            by Complex.definingPolynomial_coefficient_two
+                                      = Polynomial.coefficientOf(Real.ring, (Polynomial.zero(Real.ring) * b), 2)
+                                            by aZero
+                                      = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 2)
+                                            by Ring.zero_multiply_left(Real.polynomial_ring, b)
+                                      = Real.zero;
+                               done by Real.zero_not_equal_one
+                             };
                       ¬(b = Polynomial.zero(Real.ring))
-                          by (bZero : b = Polynomial.zero(Real.ring)) ↦
-                               Real.zero_not_equal_one({
-                                   Real.one
-                                          = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
-                                                by Complex.definingPolynomial_coefficient_two
-                                          = Polynomial.coefficientOf(Real.ring,
-                                                (a * Polynomial.zero(Real.ring)), 2)
-                                                by bZero
-                                          = Polynomial.coefficientOf(Real.ring,
-                                                Polynomial.zero(Real.ring), 2)
-                                                by Ring.multiply_zero_right(Real.polynomial_ring, a)
-                                          = Real.zero})
-                          as bNonzero;
+                          by (bZero : b = Polynomial.zero(Real.ring)) ↦ {
+                               Real.one
+                                      = Polynomial.coefficientOf(Real.ring, Complex.definingPolynomial, 2)
+                                            by Complex.definingPolynomial_coefficient_two
+                                      = Polynomial.coefficientOf(Real.ring, (a * Polynomial.zero(Real.ring)), 2)
+                                            by bZero
+                                      = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 2)
+                                            by Ring.multiply_zero_right(Real.polynomial_ring, a)
+                                      = Real.zero;
+                               done by Real.zero_not_equal_one
+                             };
                       choose degreeA such that Polynomial.DegreeLessThan(Real.ring, a, successor(degreeA))
                               ∧ ¬(Polynomial.coefficientOf(Real.ring, a, degreeA) = Ring.zero(Real.ring))
-                          from Polynomial.exists_degree_of_nonzero(Real.ring, a, aNonzero);
+                          from Polynomial.exists_degree_of_nonzero;
                       choose degreeB such that Polynomial.DegreeLessThan(Real.ring, b, successor(degreeB))
                               ∧ ¬(Polynomial.coefficientOf(Real.ring, b, degreeB) = Ring.zero(Real.ring))
-                          from Polynomial.exists_degree_of_nonzero(Real.ring, b, bNonzero);
+                          from Polynomial.exists_degree_of_nonzero;
                       Polynomial.HasDegree(Real.ring, a, degreeA);
                       Polynomial.HasDegree(Real.ring, b, degreeB);
                       -- Neither factor is degree 0: a degree-0 factor would be
                       -- a unit, contradicting the nontrivial factorization.
-                      1 ≤ degreeA
-                          by Natural.less_or_equal_not_equal_successor(0, degreeA,
-                                 Natural.zero_least(degreeA),
-                                 (degreeAZero : degreeA = 0) ↦ {
-                                     Polynomial.HasDegree(Real.ring, a, 0)
-                                         by substituting degreeAZero as aHasDegreeZero;
-                                     aNotUnit(
-                                         Polynomial.degree_zero_is_unit(Real.ring,
-                                             Real.reciprocal_exists_for_nonzero, a,
-                                             aHasDegreeZero))
-                                 }) as degreeAPositive;
-                      1 ≤ degreeB
-                          by Natural.less_or_equal_not_equal_successor(0, degreeB,
-                                 Natural.zero_least(degreeB),
-                                 (degreeBZero : degreeB = 0) ↦ {
-                                     Polynomial.HasDegree(Real.ring, b, 0)
-                                         by substituting degreeBZero as bHasDegreeZero;
-                                     bNotUnit(
-                                         Polynomial.degree_zero_is_unit(Real.ring,
-                                             Real.reciprocal_exists_for_nonzero, b,
-                                             bHasDegreeZero))
-                                 }) as degreeBPositive;
+                      degreeA ≠ 0
+                          by (degreeAZero : degreeA = 0) ↦ {
+                                 Polynomial.HasDegree(Real.ring, a, 0)
+                                     by substituting degreeAZero;
+                                 Polynomial.IsUnit(Real.ring, a)
+                                     by Polynomial.degree_zero_is_unit
+                                         recalling Real.reciprocal_exists_for_nonzero;
+                                 done by aNotUnit
+                             };
+                      1 ≤ degreeA by Natural.one_le_of_nonzero;
+                      degreeB ≠ 0
+                          by (degreeBZero : degreeB = 0) ↦ {
+                                 Polynomial.HasDegree(Real.ring, b, 0)
+                                     by substituting degreeBZero;
+                                 Polynomial.IsUnit(Real.ring, b)
+                                     by Polynomial.degree_zero_is_unit
+                                         recalling Real.reciprocal_exists_for_nonzero;
+                                 done by bNotUnit
+                             };
+                      1 ≤ degreeB by Natural.one_le_of_nonzero;
                       -- a·b has degree degreeA + degreeB; it equals the modulus,
                       -- which has degree 2 — so degreeA + degreeB = 2.
                       Polynomial.HasDegree(Real.ring,
@@ -282,18 +272,16 @@ theorem Complex.definingPolynomial_irreducible
                       Polynomial.HasDegree(Real.ring, Complex.definingPolynomial, degreeA + degreeB)
                           by substituting factorEquation;
                       degreeA + degreeB = 2
-                          by Polynomial.HasDegree_unique recalling Complex.definingPolynomial_HasDegree_two
-                          as sumIsTwo;
-                      let ⟨degreeAOne, degreeBOne⟩
-                          := Natural.both_one_of_add_two(degreeA, degreeB,
-                                 degreeAPositive, degreeBPositive, sumIsTwo);
+                          by Polynomial.HasDegree_unique recalling Complex.definingPolynomial_HasDegree_two;
+                      degreeA = 1 ∧ degreeB = 1 by Natural.both_one_of_add_two;
+                      degreeA = 1 as degreeAOne;
+                      degreeB = 1 as degreeBOne;
                       Polynomial.HasDegree(Real.ring, a, 1)
-                          by substituting degreeAOne as aHasDegreeOne;
+                          by substituting degreeAOne;
                       Polynomial.HasDegree(Real.ring, b, 1)
-                          by substituting degreeBOne as bHasDegreeOne;
-                      absurd(
-                          Complex.no_degree_one_factorization(
-                              a, b, aHasDegreeOne, bHasDegreeOne, factorEquation))
+                          by substituting degreeBOne;
+                      False by Complex.no_degree_one_factorization;
+                      done
                     }
                 }
           })
