@@ -708,173 +708,78 @@ theorem ComplexNumber.exponential_converges (z : ComplexNumber)
 -- computations from the definitions; the induction carries the tail.)
 theorem ComplexNumber.exponential_zero
         : exp((0 : ℂ)) = (1 : ℂ) := {
-  ∀ (k : Natural).
-          ComplexNumber.exponentialTerm(
-                RingModulo.zero(Real.polynomial_commutative_ring,
-                    Complex.definingPolynomial), successor(k))
-            = RingModulo.zero(Real.polynomial_commutative_ring,
-                  Complex.definingPolynomial)
+  let z : ℂ := (0 : ℂ);
+  z = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+      by ComplexNumber.from_real_zero as zIsRepZero;
+  -- From index 1 on every term vanishes: the (k+1)-th carries a factor z = 0.
+  ∀ (k : Natural). ComplexNumber.exponentialTerm(z, k + 1) = z
       by {
-        let complexZero : ComplexNumber :=
-            RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial);
         take k : Natural;
-        complexZero ^ successor(k)
-          = complexZero * complexZero ^ k
-          = complexZero as powerVanishes;
-        ComplexNumber.exponentialTerm(complexZero, successor(k))
-           = (1 / ((k + 1)! : Real) : ℂ) * complexZero ^ successor(k)
-           = (1 / ((k + 1)! : Real) : ℂ) * complexZero
-                 by powerVanishes
-           = complexZero
+        z ^ (k + 1)
+           = z * z ^ k
+           = z                by substituting zIsRepZero
+           as powerVanishes;
+        ComplexNumber.exponentialTerm(z, k + 1)
+           = (1 / ((k + 1)! : Real) : ℂ) * z ^ (k + 1)
+           = (1 / ((k + 1)! : Real) : ℂ) * z    by powerVanishes
+           = z                                   by substituting zIsRepZero
       } as termSuccessor;
-  ∀ (p : Natural).
-          ComplexNumber.partialSum(
-                ComplexNumber.exponentialTerm(
-                    RingModulo.zero(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)), successor(p))
-            = RingModulo.one(Real.polynomial_commutative_ring,
-                  Complex.definingPolynomial)
+  -- The head term is 1/0! · z⁰ = 1, so every partial sum from index 1 on is 1.
+  ∀ (p : Natural). ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), p + 1) = (1 : ℂ)
       by by induction on p with IH {
            case zero: {
-               -- exponentialTerm(z, 0) = (1/0! : ℂ) · z⁰ = (1 : ℂ) · 1 = one.
-               ComplexNumber.exponentialTerm(
-                         RingModulo.zero(Real.polynomial_commutative_ring,
-                             Complex.definingPolynomial), 0)
-                     = RingModulo.one(Real.polynomial_commutative_ring,
-                           Complex.definingPolynomial)
+               ComplexNumber.exponentialTerm(z, 0) = (1 : ℂ)
                    by {
                      (0! : Real) = 1 as factorialZero;
                      1 / (0! : Real)
                          = 1 / (1 : Real)   by substituting factorialZero
                          = 1                by field
                          as reciprocalOne;
-                     ComplexNumber.exponentialTerm(
-                              RingModulo.zero(Real.polynomial_commutative_ring,
-                                  Complex.definingPolynomial), 0)
-                        = (1 / (0! : Real) : ℂ)
-                          * RingModulo.zero(Real.polynomial_commutative_ring,
-                                Complex.definingPolynomial) ^ 0
+                     ComplexNumber.exponentialTerm(z, 0)
+                        = (1 / (0! : Real) : ℂ) * z ^ 0
+                        = (1 : ℂ) * (1 : ℂ)   by substituting reciprocalOne
                         = (1 : ℂ)
-                          * RingModulo.one(Real.polynomial_commutative_ring,
-                                Complex.definingPolynomial)
-                              by substituting reciprocalOne
-                        = RingModulo.one(Real.polynomial_commutative_ring,
-                              Complex.definingPolynomial)
-                          * RingModulo.one(Real.polynomial_commutative_ring,
-                                Complex.definingPolynomial)
-                        = RingModulo.one(Real.polynomial_commutative_ring,
-                              Complex.definingPolynomial)
                    } as firstTermIsOne;
-               ComplexNumber.partialSum(
-                        ComplexNumber.exponentialTerm(
-                            RingModulo.zero(Real.polynomial_commutative_ring,
-                                Complex.definingPolynomial)), 1)
-                  = RingModulo.zero(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)
-                    + ComplexNumber.exponentialTerm(
-                          RingModulo.zero(Real.polynomial_commutative_ring,
-                              Complex.definingPolynomial), 0)
-                  = RingModulo.zero(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)
-                    + RingModulo.one(Real.polynomial_commutative_ring,
-                          Complex.definingPolynomial)
-                        by substituting firstTermIsOne
-                  = RingModulo.one(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)
+               ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), 1)
+                  = z + ComplexNumber.exponentialTerm(z, 0)
+                  = z + (1 : ℂ)          by substituting firstTermIsOne
+                  = (1 : ℂ)              by substituting zIsRepZero
              }
            case successor(q):
-               ComplexNumber.partialSum(
-                        ComplexNumber.exponentialTerm(
-                            RingModulo.zero(Real.polynomial_commutative_ring,
-                                Complex.definingPolynomial)),
-                        successor(successor(q)))
-                  = ComplexNumber.partialSum(
-                        ComplexNumber.exponentialTerm(
-                            RingModulo.zero(Real.polynomial_commutative_ring,
-                                Complex.definingPolynomial)), successor(q))
-                    + ComplexNumber.exponentialTerm(
-                          RingModulo.zero(Real.polynomial_commutative_ring,
-                              Complex.definingPolynomial), successor(q))
-                  = RingModulo.one(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)
-                    + ComplexNumber.exponentialTerm(
-                          RingModulo.zero(Real.polynomial_commutative_ring,
-                              Complex.definingPolynomial), successor(q))
-                        by IH
-                  = RingModulo.one(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)
-                    + RingModulo.zero(Real.polynomial_commutative_ring,
-                          Complex.definingPolynomial)
-                        by termSuccessor(q)
-                  = RingModulo.one(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)
+               ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), (q + 1) + 1)
+                  = ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), q + 1)
+                    + ComplexNumber.exponentialTerm(z, q + 1)
+                  = (1 : ℂ) + ComplexNumber.exponentialTerm(z, q + 1)   by IH
+                  = (1 : ℂ) + z                                          by termSuccessor(q)
+                  = (1 : ℂ)                                              by substituting zIsRepZero
          } as tailConstant;
   ComplexNumber.SequenceConverges(
-              ComplexNumber.partialSum(
-                  ComplexNumber.exponentialTerm(
-                      RingModulo.zero(Real.polynomial_commutative_ring,
-                          Complex.definingPolynomial))),
-              RingModulo.one(Real.polynomial_commutative_ring,
-                  Complex.definingPolynomial))
+              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)), (1 : ℂ))
       by {
         take ε : Real;
         take εPositive : ε > 0;
         witness 1 with
             (m : Natural) (oneBelow : 1 ≤ m) ↦ {
               choose c from Natural.subtraction_witness(1, m, oneBelow);
-              ComplexNumber.partialSum(
-                          ComplexNumber.exponentialTerm(
-                              RingModulo.zero(Real.polynomial_commutative_ring,
-                                  Complex.definingPolynomial)), m)
-                = ComplexNumber.partialSum(
-                      ComplexNumber.exponentialTerm(
-                          RingModulo.zero(Real.polynomial_commutative_ring,
-                              Complex.definingPolynomial)),
-                      successor(c))
-                      by (m = successor(c))
-                = RingModulo.one(Real.polynomial_commutative_ring,
-                      Complex.definingPolynomial)
-                      by tailConstant(c);
-              ComplexNumber.partialSum(
-                          ComplexNumber.exponentialTerm(
-                              RingModulo.zero(Real.polynomial_commutative_ring,
-                                  Complex.definingPolynomial)), m)
-                - RingModulo.one(Real.polynomial_commutative_ring,
-                      Complex.definingPolynomial)
-                = RingModulo.one(Real.polynomial_commutative_ring,
-                      Complex.definingPolynomial)
-                  - RingModulo.one(Real.polynomial_commutative_ring,
-                        Complex.definingPolynomial)
-                = RingModulo.zero(Real.polynomial_commutative_ring,
-                      Complex.definingPolynomial);
+              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), m)
+                = ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), c + 1)
+                      by (m = c + 1)
+                = (1 : ℂ)                by tailConstant(c);
+              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), m) - (1 : ℂ)
+                = (1 : ℂ) - (1 : ℂ)
+                = z                      by substituting zIsRepZero;
               ComplexNumber.modulus(
-                       ComplexNumber.partialSum(
-                           ComplexNumber.exponentialTerm(
-                               RingModulo.zero(
-                                   Real.polynomial_commutative_ring,
-                                   Complex.definingPolynomial)), m)
-                       - RingModulo.one(Real.polynomial_commutative_ring,
-                             Complex.definingPolynomial))
-                 = ComplexNumber.modulus(
-                       RingModulo.zero(Real.polynomial_commutative_ring,
-                           Complex.definingPolynomial))
+                       ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), m) - (1 : ℂ))
+                 = ComplexNumber.modulus(z)
+                 = abs((0 : Real))       by ComplexNumber.modulus_from_real
                  = Real.zero
-                       by ComplexNumber.modulus_zero
                  < ε
             }
       } as sumsConvergeToOne;
   done by ComplexNumber.SequenceConverges.unique(
-              ComplexNumber.partialSum(
-                  ComplexNumber.exponentialTerm(
-                      RingModulo.zero(Real.polynomial_commutative_ring,
-                          Complex.definingPolynomial))),
-              ComplexNumber.exponential(
-                  RingModulo.zero(Real.polynomial_commutative_ring,
-                      Complex.definingPolynomial)),
-              RingModulo.one(Real.polynomial_commutative_ring,
-                  Complex.definingPolynomial),
-              ComplexNumber.exponential_converges(
-                  RingModulo.zero(Real.polynomial_commutative_ring,
-                      Complex.definingPolynomial)),
+              ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)),
+              ComplexNumber.exponential(z),
+              (1 : ℂ),
+              ComplexNumber.exponential_converges(z),
               sumsConvergeToOne)
 }
