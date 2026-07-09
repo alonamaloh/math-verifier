@@ -394,27 +394,27 @@ theorem IntegerMod.wilson_product (p n : Natural)
 -- The residue product is the class of the factorial: [n]·[n−1]⋯[1] = [n!].
 theorem IntegerMod.residues_product_is_factorial (p top : Natural)
         : IntegerMod.residues_product(p, top)
-          = IntegerMod.make(p, (Natural.factorial(top) : Integer)) :=
+          = IntegerMod.make(p, (top! : Integer)) :=
   by induction on top with IH {
     case zero:
         IntegerMod.residues_product(p, 0)
-           = IntegerMod.make(p, (Natural.factorial(0) : Integer))
+           = IntegerMod.make(p, (0! : Integer))
     case successor(predecessor): {
-        ((successor(predecessor) * Natural.factorial(predecessor) : Natural) : Integer)
-              = (successor(predecessor) : Integer) * (Natural.factorial(predecessor) : Integer) as castProduct;
+        ((successor(predecessor) * predecessor! : Natural) : Integer)
+              = (successor(predecessor) : Integer) * (predecessor! : Integer) as castProduct;
         IntegerMod.residues_product(p, successor(predecessor))
            = IntegerMod.residue(p, successor(predecessor))
                  * IntegerMod.residues_product(p, predecessor)
            = IntegerMod.residue(p, successor(predecessor))
-                 * IntegerMod.make(p, (Natural.factorial(predecessor) : Integer))
+                 * IntegerMod.make(p, (predecessor! : Integer))
                  by substituting IH
            = IntegerMod.make(p, (successor(predecessor) : Integer)
-                 * (Natural.factorial(predecessor) : Integer))
+                 * (predecessor! : Integer))
            = IntegerMod.make(p,
-                 ((successor(predecessor) * Natural.factorial(predecessor)
+                 ((successor(predecessor) * predecessor!
                      : Natural) : Integer))
                  by substituting castProduct
-           = IntegerMod.make(p, (Natural.factorial(successor(predecessor)) : Integer))
+           = IntegerMod.make(p, (successor(predecessor)! : Integer))
       }
   }
 
@@ -424,12 +424,12 @@ theorem IntegerMod.wilson (p n : Natural)
         (primality : Natural.is_prime(p))
         (pEquation : p = 1 + n)
         (nAtLeastTwo : 2 ≤ n)
-        : IntegerMod.make(p, (Natural.factorial(n) : Integer))
+        : IntegerMod.make(p, (n! : Integer))
           = IntegerMod.negate(IntegerMod.one(p)) := {
   IntegerMod.residues_product(p, n)
-        = IntegerMod.make(p, (Natural.factorial(n) : Integer));
+        = IntegerMod.make(p, (n! : Integer));
   IntegerMod.residues_product(p, n) = IntegerMod.negate(IntegerMod.one(p));
-  IntegerMod.make(p, (Natural.factorial(n) : Integer))
+  IntegerMod.make(p, (n! : Integer))
      = IntegerMod.residues_product(p, n)
      = IntegerMod.negate(IntegerMod.one(p))
 }
@@ -440,17 +440,17 @@ theorem Natural.wilson_divides (p n : Natural)
         (pEquation : p = 1 + n)
         (nAtLeastTwo : 2 ≤ n)
         : Integer.divides((p : Integer),
-              (Natural.factorial(n) : Integer) + Integer.one) := {
-  IntegerMod.make(p, (Natural.factorial(n) : Integer))
+              (n! : Integer) + Integer.one) := {
+  IntegerMod.make(p, (n! : Integer))
      = IntegerMod.negate(IntegerMod.one(p))
      = IntegerMod.make(p, -Integer.one);
-  Integer.CongruentModulo(p, (Natural.factorial(n) : Integer), -Integer.one) as congruent;
+  Integer.CongruentModulo(p, (n! : Integer), -Integer.one) as congruent;
   choose quotient such that
-      (Natural.factorial(n) : Integer) - (-Integer.one) = (p : Integer) * quotient
+      (n! : Integer) - (-Integer.one) = (p : Integer) * quotient
       as differenceEquation from congruent;
   witness quotient with
-      (Natural.factorial(n) : Integer) + Integer.one
-         = (Natural.factorial(n) : Integer) - (-Integer.one)
+      (n! : Integer) + Integer.one
+         = (n! : Integer) - (-Integer.one)
          = (p : Integer) * quotient                            by differenceEquation
 }
 
@@ -461,7 +461,7 @@ theorem Natural.wilson (p n : Natural)
         (primality : Natural.is_prime(p))
         (pEquation : p = 1 + n)
         : Integer.divides((p : Integer),
-              (Natural.factorial(n) : Integer) + Integer.one) :=
+              (n! : Integer) + Integer.one) :=
   cases n {
     | zero => {
         -- n = 0 would make p = 1, which is not prime.
@@ -483,7 +483,7 @@ theorem Natural.wilson (p n : Natural)
                  = Integer.one + Integer.one
                  as castP;
               witness Integer.one with
-                  (Natural.factorial(1) : Integer) + Integer.one
+                  (1! : Integer) + Integer.one
                      = ((1 : Natural) : Integer) + Integer.one
                      = (Integer.one + Integer.one) * Integer.one        by ring
                      = (p : Integer) * Integer.one                      by substituting castP
@@ -504,7 +504,7 @@ theorem Natural.divisor_one_or_self_of_divides_factorial_plus_one
         (p n : Natural)
         (pEquation : p = 1 + n)
         (pAtLeastTwo : 2 ≤ p)
-        (wilsonDivides : Natural.divides(p, Natural.factorial(n) + 1))
+        (wilsonDivides : Natural.divides(p, n! + 1))
         (divisor : Natural) (dividesP : divisor ∣ p)
         : divisor = 1 ∨ divisor = p := {
   divisor = p ∨ ¬(divisor = p);
@@ -547,7 +547,7 @@ theorem Natural.divisor_one_or_self_of_divides_factorial_plus_one
                       done
                     };
               1 ≤ divisor;
-              divisor ∣ Natural.factorial(n) + 1;
+              divisor ∣ n! + 1;
               divisor = 1
                   by Natural.small_divisor_of_factorial_plus_one_is_one;
               done
@@ -562,7 +562,7 @@ theorem Natural.divisor_one_or_self_of_divides_factorial_plus_one
 -- primes ≥ 2 by the Wilson congruence, completing Freek #51.
 theorem Natural.prime_of_divides_factorial_plus_one (p n : Natural)
         (pEquation : p = 1 + n) (nPositive : 1 ≤ n)
-        (wilsonDivides : Natural.divides(p, Natural.factorial(n) + 1))
+        (wilsonDivides : Natural.divides(p, n! + 1))
         : Natural.is_prime(p) := {
   1 + 1 ≤ 1 + n as oneAddOne;
   (2 : Natural)
