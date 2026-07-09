@@ -33,6 +33,14 @@ definition Natural.binomial : Natural → Natural → Natural
             + Natural.binomial(n, 1 + kPredecessor)
       }
 
+-- Pascal's rule, as an explicit lemma: with the 1+n numeral-pattern
+-- definition the recursion no longer unfolds cheaply for the auto-prover,
+-- so consumers cite this rather than relying on definitional reduction.
+theorem Natural.binomial_pascal (n k : Natural)
+        : Natural.binomial(1 + n, 1 + k)
+          = Natural.binomial(n, k) + Natural.binomial(n, 1 + k) :=
+  unfold Natural.add in done
+
 -- Above the diagonal the coefficients vanish.
 theorem Natural.binomial_overflow (n : Natural)
         : ∀ (k : Natural). 1 + n ≤ k → Natural.binomial(n, k) = 0 :=
@@ -74,8 +82,8 @@ theorem Natural.binomial_overflow (n : Natural)
 -- The left edge of Pascal's triangle is all ones.
 theorem Natural.binomial_zero_right
         : ∀ (n : Natural). Natural.binomial(n, 0) = 1
-  | zero => done
-  | successor(nPredecessor) => done
+  | 0 => done
+  | 1 + nPredecessor => done
 
 -- The closed form, stated additively to keep the subtraction honest:
 -- C(j + n, j) · j! · n! = (j + n)!. The outer recursion is on j (Pascal's
@@ -91,87 +99,87 @@ theorem Natural.binomial_factorial_row (i : Natural)
                     * (i! * n!)
                 = (i + n)!)
         : ∀ (n : Natural).
-          Natural.binomial(successor(i) + n, successor(i))
-                * (successor(i)! * n!)
-            = (successor(i) + n)!
-  | zero => unfold Natural.add in {
+          Natural.binomial((1 + i) + n, 1 + i)
+                * ((1 + i)! * n!)
+            = ((1 + i) + n)!
+  | 0 => unfold Natural.add in {
       i + 0 = i;
-      successor(i + 0) ≤ successor(i);
-      Natural.binomial(i + 0, successor(i)) = 0;
+      (1 + (i + 0)) ≤ 1 + i;
+      Natural.binomial(i + 0, 1 + i) = 0;
       Natural.binomial(i + 0, i)
                 * (i! * 0!)
             = (i + 0)!
           by previousRow(0);
-      successor(i)! = successor(i) * i!;
-      Natural.binomial(successor(i) + 0, successor(i))
-               * (successor(i)! * 0!)
-         = (Natural.binomial(i + 0, i) + Natural.binomial(i + 0, successor(i)))
-               * (successor(i)! * 0!)
+      (1 + i)! = (1 + i) * i!;
+      Natural.binomial((1 + i) + 0, 1 + i)
+               * ((1 + i)! * 0!)
+         = (Natural.binomial(i + 0, i) + Natural.binomial(i + 0, 1 + i))
+               * ((1 + i)! * 0!)
          = (Natural.binomial(i + 0, i) + 0)
-               * (successor(i)! * 0!)
+               * ((1 + i)! * 0!)
          = (Natural.binomial(i + 0, i) + 0)
-               * ((successor(i) * i!) * 0!)
-         = successor(i + 0)
+               * (((1 + i) * i!) * 0!)
+         = (1 + (i + 0))
                * (Natural.binomial(i + 0, i)
                       * (i! * 0!))
-         = successor(i + 0) * (i + 0)!
-         = (successor(i) + 0)!
+         = (1 + (i + 0)) * (i + 0)!
+         = ((1 + i) + 0)!
     }
-  | successor(m) => unfold Natural.add in {
-      Natural.binomial(i + successor(m), i)
-                * (i! * successor(m)!)
-            = (i + successor(m))!
-          by previousRow(successor(m));
-      Natural.binomial(successor(i) + m, successor(i))
-                * (successor(i)! * m!)
-            = (successor(i) + m)!;
-      i + successor(m) = successor(i) + m;
-      successor(i)! = successor(i) * i!;
-      successor(m)! = successor(m) * m!;
-      Natural.binomial(successor(i) + successor(m), successor(i))
-            = Natural.binomial(i + successor(m), i)
-              + Natural.binomial(i + successor(m), successor(i));
-      Natural.binomial(i + successor(m), successor(i))
-            = Natural.binomial(successor(i) + m, successor(i));
-      Natural.binomial(i + successor(m), i)
-               * (successor(i)! * successor(m)!)
-         = Natural.binomial(i + successor(m), i)
-               * ((successor(i) * i!)
-                      * successor(m)!)
-         = successor(i)
-               * (Natural.binomial(i + successor(m), i)
-                      * (i! * successor(m)!))
-         = successor(i) * (i + successor(m))!;
-      Natural.binomial(successor(i) + m, successor(i))
-               * (successor(i)! * successor(m)!)
-         = Natural.binomial(successor(i) + m, successor(i))
-               * (successor(i)!
-                      * (successor(m) * m!))
-         = successor(m)
-               * (Natural.binomial(successor(i) + m, successor(i))
-                      * (successor(i)! * m!))
-         = successor(m) * (successor(i) + m)!;
-      Natural.binomial(successor(i) + successor(m), successor(i))
-               * (successor(i)! * successor(m)!)
-         = (Natural.binomial(i + successor(m), i)
-                + Natural.binomial(i + successor(m), successor(i)))
-               * (successor(i)! * successor(m)!)
-         = (Natural.binomial(i + successor(m), i)
-                + Natural.binomial(successor(i) + m, successor(i)))
-               * (successor(i)! * successor(m)!)
-         = Natural.binomial(i + successor(m), i)
-               * (successor(i)! * successor(m)!)
-           + Natural.binomial(successor(i) + m, successor(i))
-               * (successor(i)! * successor(m)!)
-         = successor(i) * (i + successor(m))!
-           + Natural.binomial(successor(i) + m, successor(i))
-               * (successor(i)! * successor(m)!)
-         = successor(i) * (i + successor(m))!
-           + successor(m) * (successor(i) + m)!
-         = successor(i) * (i + successor(m))!
-           + successor(m) * (i + successor(m))!
-         = (successor(i) + successor(m)) * (i + successor(m))!
-         = (successor(i) + successor(m))!
+  | 1 + m => unfold Natural.add in {
+      Natural.binomial(i + (1 + m), i)
+                * (i! * (1 + m)!)
+            = (i + (1 + m))!
+          by previousRow(1 + m);
+      Natural.binomial((1 + i) + m, 1 + i)
+                * ((1 + i)! * m!)
+            = ((1 + i) + m)!;
+      i + (1 + m) = (1 + i) + m;
+      (1 + i)! = (1 + i) * i!;
+      (1 + m)! = (1 + m) * m!;
+      Natural.binomial((1 + i) + (1 + m), 1 + i)
+            = Natural.binomial(i + (1 + m), i)
+              + Natural.binomial(i + (1 + m), 1 + i);
+      Natural.binomial(i + (1 + m), 1 + i)
+            = Natural.binomial((1 + i) + m, 1 + i);
+      Natural.binomial(i + (1 + m), i)
+               * ((1 + i)! * (1 + m)!)
+         = Natural.binomial(i + (1 + m), i)
+               * (((1 + i) * i!)
+                      * (1 + m)!)
+         = (1 + i)
+               * (Natural.binomial(i + (1 + m), i)
+                      * (i! * (1 + m)!))
+         = (1 + i) * (i + (1 + m))!;
+      Natural.binomial((1 + i) + m, 1 + i)
+               * ((1 + i)! * (1 + m)!)
+         = Natural.binomial((1 + i) + m, 1 + i)
+               * ((1 + i)!
+                      * ((1 + m) * m!))
+         = (1 + m)
+               * (Natural.binomial((1 + i) + m, 1 + i)
+                      * ((1 + i)! * m!))
+         = (1 + m) * ((1 + i) + m)!;
+      Natural.binomial((1 + i) + (1 + m), 1 + i)
+               * ((1 + i)! * (1 + m)!)
+         = (Natural.binomial(i + (1 + m), i)
+                + Natural.binomial(i + (1 + m), 1 + i))
+               * ((1 + i)! * (1 + m)!)
+         = (Natural.binomial(i + (1 + m), i)
+                + Natural.binomial((1 + i) + m, 1 + i))
+               * ((1 + i)! * (1 + m)!)
+         = Natural.binomial(i + (1 + m), i)
+               * ((1 + i)! * (1 + m)!)
+           + Natural.binomial((1 + i) + m, 1 + i)
+               * ((1 + i)! * (1 + m)!)
+         = (1 + i) * (i + (1 + m))!
+           + Natural.binomial((1 + i) + m, 1 + i)
+               * ((1 + i)! * (1 + m)!)
+         = (1 + i) * (i + (1 + m))!
+           + (1 + m) * ((1 + i) + m)!
+         = (1 + i) * (i + (1 + m))!
+           + (1 + m) * (i + (1 + m))!
+         = ((1 + i) + (1 + m)) * (i + (1 + m))!
+         = ((1 + i) + (1 + m))!
     }
 
 -- The closed form itself, row by row.
@@ -181,12 +189,17 @@ theorem Natural.binomial_factorial (j : Natural)
                 * (j! * n!)
             = (j + n)! :=
   by induction on j with previousRow {
-    case zero: (n : Natural) ↦ {
+    case 0: (n : Natural) ↦ {
         Natural.binomial(0 + n, 0) = 1;
         Natural.binomial(0 + n, 0)
                  * (0! * n!)
            = 1 * (0! * n!)
            = (0 + n)!
       }
-    case successor(i): done by Natural.binomial_factorial_row
+    case 1 + i: (n : Natural) ↦ {
+        Natural.binomial((1 + i) + n, 1 + i)
+              * ((1 + i)! * n!)
+          = ((1 + i) + n)!
+          by Natural.binomial_factorial_row
+      }
   }
