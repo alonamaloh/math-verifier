@@ -16,49 +16,67 @@ import Natural.add_order
 import Natural.strong_recursion
 import Natural.multiply_order
 import Natural.decide
+import Natural.classical_decidable
 import Natural.divisibility
 import Natural.factorial
 
+-- Binomial coefficients (Pascal's triangle). Every row's k = 0 edge is 1;
+-- off that edge C(n, k) is the sum of the two entries one row up. The head
+-- recursion on the first argument keeps the definition structural, while the
+-- k = 0 test is an honest `if` — so consumers compute through the
+-- characterizing lemmas below (binomial_zero_right, binomial_zero_succ,
+-- binomial_pascal), not by unfolding.
 definition Natural.binomial : Natural → Natural → Natural
-  | 0, k =>
-      cases k {
-        | 0 => 1
-        | 1 + _ => 0
-      }
+  | 0, k => if k = 0 then 1 else 0
   | 1 + n, k =>
-      cases k {
-        | 0 => 1
-        | 1 + kPredecessor =>
-            Natural.binomial(n, kPredecessor)
-            + Natural.binomial(n, 1 + kPredecessor)
-      }
+      if k = 0 then 1
+      else Natural.binomial(n, Natural.monus(k, 1)) + Natural.binomial(n, k)
 
--- Pascal's rule, as an explicit lemma: with the 1+n numeral-pattern
--- definition the recursion no longer unfolds cheaply for the auto-prover,
--- so consumers cite this rather than relying on definitional reduction.
+-- The k = 0 edge of every row is 1.
+theorem Natural.binomial_zero_right : ∀ (n : Natural). Natural.binomial(n, 0) = 1
+  | 0 => { done by Logic.if_positive }
+  | 1 + n => { done by Logic.if_positive }
+
+-- The top row is empty off its first entry: C(0, k+1) = 0.
+theorem Natural.binomial_zero_succ (k : Natural)
+        : Natural.binomial(0, 1 + k) = 0 := {
+  ¬(1 + k = 0);
+  done by Logic.if_negative
+}
+
+-- Pascal's rule: C(n+1, k+1) = C(n, k) + C(n, k+1). The `k+1 = 0` test fails,
+-- so the coefficient is the else branch, with monus(k+1, 1) = k.
 theorem Natural.binomial_pascal (n k : Natural)
         : Natural.binomial(1 + n, 1 + k)
           = Natural.binomial(n, k) + Natural.binomial(n, 1 + k) :=
-  unfold Natural.add in done
+  unfold Natural.add in
+  if 1 + k = 0
+  then { 1 + k ≠ 0; done }
+  else {
+    Natural.monus(1 + k, 1) = k by Natural.monus_add_left;
+    done
+  }
 
 -- Above the diagonal the coefficients vanish.
 theorem Natural.binomial_overflow (n : Natural)
         : ∀ (k : Natural). 1 + n ≤ k → Natural.binomial(n, k) = 0 :=
-  unfold Natural.add in
   by induction on n with IH {
     case zero:
         (k : Natural) (overflow : 1 + 0 ≤ k) ↦
           cases k {
-            | 0 => {
+            | 0 => unfold Natural.add in {
                 False;
                 done
               }
-            | 1 + kPredecessor => done
+            | 1 + kPredecessor => {
+                Natural.binomial(0, 1 + kPredecessor) = 0 by Natural.binomial_zero_succ;
+                done
+              }
           }
     case 1 + nPredecessor:
         (k : Natural) (overflow : 1 + (1 + nPredecessor) ≤ k) ↦
           cases k {
-            | 0 => {
+            | 0 => unfold Natural.add in {
                 False;
                 done
               }
@@ -72,18 +90,13 @@ theorem Natural.binomial_overflow (n : Natural)
                 Natural.binomial(1 + nPredecessor, 1 + kPredecessor)
                    = Natural.binomial(nPredecessor, kPredecessor)
                      + Natural.binomial(nPredecessor, 1 + kPredecessor)
+                         by Natural.binomial_pascal
                    = 0 + Natural.binomial(nPredecessor, 1 + kPredecessor)
                    = 0 + 0
                    = 0
               }
           }
   }
-
--- The left edge of Pascal's triangle is all ones.
-theorem Natural.binomial_zero_right
-        : ∀ (n : Natural). Natural.binomial(n, 0) = 1
-  | 0 => done
-  | 1 + nPredecessor => done
 
 -- The closed form, stated additively to keep the subtraction honest:
 -- C(j + n, j) · j! · n! = (j + n)!. The outer recursion is on j (Pascal's
