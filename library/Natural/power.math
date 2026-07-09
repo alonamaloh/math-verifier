@@ -30,18 +30,18 @@ opaque definition Natural.power (base : Natural) : Natural → Natural
 operator (^) on (Natural, Natural) := Natural.power
 
 -- base^0 = 1.
-theorem Natural.power_zero (base : Natural) : Natural.power(base, 0) = successor(0) :=
+theorem Natural.power_zero (base : Natural) : base ^ 0 = successor(0) :=
   done by unfolding Natural.power
 
 -- base^(k+1) = base * base^k. The successor-equation lemma.
 theorem Natural.power_succ (base k : Natural)
-        : Natural.power(base, successor(k)) = base * Natural.power(base, k) :=
+        : base ^ successor(k) = base * base ^ k :=
   done by unfolding Natural.power
 
 -- base^1 = base. Stepping through power_succ + power_zero + multiply_one;
 -- the auto-prover finds each lemma by library scan.
-theorem Natural.power_one (base : Natural) : Natural.power(base, successor(0)) = base :=
-  Natural.power(base, successor(0))
+theorem Natural.power_one (base : Natural) : base ^ successor(0) = base :=
+  base ^ successor(0)
      = base * 1
      = base
 
@@ -49,43 +49,43 @@ theorem Natural.power_one (base : Natural) : Natural.power(base, successor(0)) =
 -- recursive step uses power_succ to peel a successor instead of
 -- riding the kernel's ι.
 theorem Natural.power_add (base a b : Natural)
-        : Natural.power(base, a + b) = Natural.power(base, a) * Natural.power(base, b) :=
+        : base ^ (a + b) = base ^ a * base ^ b :=
   unfold Natural.add in
   by induction on a with IH {
     case zero:
         -- 0 + b reduces to b; one_multiply restores the leading 1 and
         -- power_zero recasts it as base^0.
-        Natural.power(base, 0 + b)
-           = Natural.power(base, b)
-           = 1 * Natural.power(base, b)
-           = Natural.power(base, 0) * Natural.power(base, b)
+        base ^ (0 + b)
+           = base ^ b
+           = 1 * base ^ b
+           = base ^ 0 * base ^ b
     case successor(k):
         -- successor(k) + b reduces to successor(k + b); peel via power_succ,
         -- recurse via the IH, then re-roll the leading successor on the left.
-        Natural.power(base, successor(k) + b)
-           = base * Natural.power(base, k + b)
-           = base * (Natural.power(base, k) * Natural.power(base, b)) by IH
-           = (base * Natural.power(base, k)) * Natural.power(base, b)
-           = Natural.power(base, successor(k)) * Natural.power(base, b)
+        base ^ (successor(k) + b)
+           = base * base ^ (k + b)
+           = base * (base ^ k * base ^ b) by IH
+           = (base * base ^ k) * base ^ b
+           = base ^ successor(k) * base ^ b
   }
 
 -- Subtraction-witness extractor for `1 ≤ base^k`: provides a Natural m
 -- with base^k = succ(m). Useful for showing strict positivity.
 theorem Natural.power_succ_form (base k : Natural) (basePositive : 1 ≤ base)
-        : ∃ (m : Natural). Natural.power(base, k) = successor(m) :=
+        : ∃ (m : Natural). base ^ k = successor(m) :=
   unfold Natural.add in
   by induction on k with IH {
     case zero:
         -- base^0 = 1 = successor(0) via power_zero.
-        witness 0 with Natural.power(base, 0) = successor(0)
+        witness 0 with base ^ 0 = successor(0)
     case successor(j): {
         -- IH: there's an m with base^j = succ(m).
-        choose m such that Natural.power(base, j) = successor(m) from IH;
+        choose m such that base ^ j = successor(m) from IH;
         -- base ≥ 1, so base = 1 + c for some c (and `1 + c` reduces to succ(c)).
         choose c such that base = 1 + c from Natural.subtraction_witness;
         witness c + base * m with
-            Natural.power(base, successor(j))
-               = base * Natural.power(base, j)
+            base ^ successor(j)
+               = base * base ^ j
                = base * successor(m)
                = base + base * m
                = (1 + c) + base * m
@@ -96,11 +96,11 @@ theorem Natural.power_succ_form (base k : Natural) (basePositive : 1 ≤ base)
 -- base^k ≥ 1 for base ≥ 1. From the succ form.
 theorem Natural.power_positive
         (base k : Natural) (basePositive : 1 ≤ base)
-        : 1 ≤ Natural.power(base, k) := {
-  ∃ (m : Natural). Natural.power(base, k) = successor(m) as succForm;
-  choose m such that Natural.power(base, k) = successor(m) from succForm;
+        : 1 ≤ base ^ k := {
+  ∃ (m : Natural). base ^ k = successor(m) as succForm;
+  choose m such that base ^ k = successor(m) from succForm;
   -- 1 ≤ successor(m) = base^k.
   1
      ≤ successor(m)
-     = Natural.power(base, k)
+     = base ^ k
 }

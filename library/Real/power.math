@@ -73,13 +73,13 @@ operator (^) on (Real, Natural) := Real.power
 -- exponent without naming the raw constructor (`Natural.add` is opaque,
 -- so `1 + n` is not definitionally the constructor form; bridge via `one_add`).
 theorem Real.power_add_one (base : Real) (n : Natural)
-        : Real.power(base, 1 + n) = base * Real.power(base, n) :=
+        : base ^ (1 + n) = base * base ^ n :=
   done by substituting Natural.one_add
 
 -- Powers of a nonnegative base are nonnegative.
 theorem Real.power_nonneg
         (base : Real) (baseNonneg : base ≥ Real.zero) (n : Natural)
-        : Real.power(base, n) ≥ Real.zero :=
+        : base ^ n ≥ Real.zero :=
   by induction on n with IH {
     case base: {
         Rational.one > Rational.zero;
@@ -89,16 +89,16 @@ theorem Real.power_nonneg
       }
     case step(predecessor): {
         Real.IsNonneg(base);
-        Real.IsNonneg(Real.power(base, predecessor));
-        Real.IsNonneg(base * Real.power(base, predecessor));
-        base * Real.power(base, predecessor) ≥ Real.zero;
+        Real.IsNonneg(base ^ predecessor);
+        Real.IsNonneg(base * base ^ predecessor);
+        base * base ^ predecessor ≥ Real.zero;
         done by substituting Real.power_add_one
       }
   }
 
 -- |xⁿ| = |x|ⁿ, by induction from |x·y| = |x|·|y|.
 theorem Real.absolute_value_power (x : Real) (n : Natural)
-        : abs(Real.power(x, n)) = Real.power(abs(x), n) :=
+        : abs(x ^ n) = abs(x) ^ n :=
   by induction on n with IH {
     case base: {
         Rational.one > Rational.zero;
@@ -109,13 +109,13 @@ theorem Real.absolute_value_power (x : Real) (n : Natural)
         done
       }
     case step(predecessor):
-        abs(Real.power(x, 1 + predecessor))
-           = abs(x * Real.power(x, predecessor))
-           = abs(x) * abs(Real.power(x, predecessor))
+        abs(x ^ (1 + predecessor))
+           = abs(x * x ^ predecessor)
+           = abs(x) * abs(x ^ predecessor)
                  by Real.absolute_value_multiplicative
-           = abs(x) * Real.power(abs(x), predecessor)
+           = abs(x) * abs(x) ^ predecessor
                  by IH
-           = Real.power(abs(x), 1 + predecessor)
+           = abs(x) ^ (1 + predecessor)
   }
 
 -- Powers compare through the embedding: a rational upper bound on the
@@ -123,7 +123,7 @@ theorem Real.absolute_value_power (x : Real) (n : Natural)
 theorem Real.power_le_cast_power
         (q : Real) (c : Rational) (n : Natural)
         (qNonneg : q ≥ Real.zero) (qBound : q ≤ (c : Real))
-        : q^n ≤ (Rational.power(c, n) : Real) :=
+        : q^n ≤ (c ^ n : Real) :=
   by induction on n with IH {
     case base: {
         Real.one ≤ Real.one;
@@ -139,32 +139,32 @@ theorem Real.power_le_cast_power
            ≤ (c : Real) * q^predecessor
                  by Real.LessOrEqual.multiply_by_nonneg_right
            = q^predecessor * (c : Real)
-           ≤ (Rational.power(c, predecessor) : Real) * (c : Real)
+           ≤ (c ^ predecessor : Real) * (c : Real)
                  by Real.LessOrEqual.multiply_by_nonneg_right
-           = (c : Real) * (Rational.power(c, predecessor) : Real)
-           = ((c * Rational.power(c, predecessor) : Rational) : Real)
-           = (Rational.power(c, 1 + predecessor) : Real)
+           = (c : Real) * (c ^ predecessor : Real)
+           = ((c * c ^ predecessor : Rational) : Real)
+           = (c ^ (1 + predecessor) : Real)
       }
   }
 
 -- ----------------------------------------------------------------------
 -- xᵃ⁺ᵇ = xᵃ · xᵇ.
 theorem Real.power_add (x : Real) (exponent1 exponent2 : Natural)
-        : Real.power(x, exponent1 + exponent2)
-          = Real.power(x, exponent1) * Real.power(x, exponent2) :=
+        : x ^ (exponent1 + exponent2)
+          = x ^ exponent1 * x ^ exponent2 :=
   by induction on exponent1 with IH {
     case base:
-        Real.power(x, 0 + exponent2)
-           = Real.power(x, exponent2)
-           = Real.power(x, 0) * Real.power(x, exponent2)
+        x ^ (0 + exponent2)
+           = x ^ exponent2
+           = x ^ 0 * x ^ exponent2
     case step(predecessor):
-        Real.power(x, (1 + predecessor) + exponent2)
-           = Real.power(x, 1 + (predecessor + exponent2))
-           = x * Real.power(x, predecessor + exponent2)
-           = x * (Real.power(x, predecessor) * Real.power(x, exponent2))
+        x ^ ((1 + predecessor) + exponent2)
+           = x ^ (1 + (predecessor + exponent2))
+           = x * x ^ (predecessor + exponent2)
+           = x * (x ^ predecessor * x ^ exponent2)
                  by IH
-           = (x * Real.power(x, predecessor)) * Real.power(x, exponent2)
-           = Real.power(x, 1 + predecessor) * Real.power(x, exponent2)
+           = (x * x ^ predecessor) * x ^ exponent2
+           = x ^ (1 + predecessor) * x ^ exponent2
   }
 
 -- Powers of a base in [0, 1] stay at or below 1.
@@ -172,7 +172,7 @@ theorem Real.power_le_one (q : Real) (qNonneg : q ≥ 0) (qLeqOne : q ≤ 1)
         (n : Natural) : q^n ≤ 1 :=
   by induction on n with IH {
     case base:
-        Real.power(q, 0)
+        q ^ 0
            = 1
            ≤ 1
     case step(predecessor): {
@@ -283,25 +283,25 @@ theorem Real.power_converges_zero
 -- The exponent laws and order facts the means inequality runs on.
 
 theorem Real.power_product (x y : Real) (n : Natural)
-        : Real.power(x * y, n) = Real.power(x, n) * Real.power(y, n) :=
+        : (x * y) ^ n = x ^ n * y ^ n :=
   by induction on n with IH {
     case base:
-        Real.power(x * y, 0)
+        (x * y) ^ 0
            = Real.one
-           = Real.power(x, 0) * Real.power(y, 0)
+           = x ^ 0 * y ^ 0
     case step(predecessor):
-        Real.power(x * y, 1 + predecessor)
-           = (x * y) * Real.power(x * y, predecessor)
-           = (x * y) * (Real.power(x, predecessor) * Real.power(y, predecessor))
+        (x * y) ^ (1 + predecessor)
+           = (x * y) * (x * y) ^ predecessor
+           = (x * y) * (x ^ predecessor * y ^ predecessor)
                  by IH
-           = (x * Real.power(x, predecessor)) * (y * Real.power(y, predecessor))
-           = Real.power(x, 1 + predecessor) * Real.power(y, 1 + predecessor)
+           = (x * x ^ predecessor) * (y * y ^ predecessor)
+           = x ^ (1 + predecessor) * y ^ (1 + predecessor)
   }
 
 -- Powers preserve the order between nonnegative bases.
 theorem Real.power_monotone (u v : Real) (n : Natural)
         (uNonneg : u ≥ Real.zero) (uLeqV : u ≤ v)
-        : Real.power(u, n) ≤ Real.power(v, n) :=
+        : u ^ n ≤ v ^ n :=
   by induction on n with IH {
     case base: {
         Real.one ≤ Real.one;
@@ -309,24 +309,24 @@ theorem Real.power_monotone (u v : Real) (n : Natural)
       }
     case step(predecessor): {
         Real.zero ≤ u ≤ v;
-        Real.power(u, predecessor) ≥ Real.zero;
-        Real.IsNonneg(Real.power(u, predecessor));
+        u ^ predecessor ≥ Real.zero;
+        Real.IsNonneg(u ^ predecessor);
         Real.IsNonneg(v);
-        Real.power(u, 1 + predecessor)
-           = u * Real.power(u, predecessor)
-           ≤ v * Real.power(u, predecessor)
+        u ^ (1 + predecessor)
+           = u * u ^ predecessor
+           ≤ v * u ^ predecessor
                  by Real.LessOrEqual.multiply_by_nonneg_right
-           = Real.power(u, predecessor) * v
-           ≤ Real.power(v, predecessor) * v
+           = u ^ predecessor * v
+           ≤ v ^ predecessor * v
                  by Real.LessOrEqual.multiply_by_nonneg_right
-           = v * Real.power(v, predecessor)
-           = Real.power(v, 1 + predecessor)
+           = v * v ^ predecessor
+           = v ^ (1 + predecessor)
       }
   }
 
 theorem Real.power_positive (x : Real) (n : Natural)
         (xPositive : x > Real.zero)
-        : Real.power(x, n) > Real.zero :=
+        : x ^ n > Real.zero :=
   by induction on n with IH {
     case base: {
         Rational.one > Rational.zero;
@@ -334,8 +334,8 @@ theorem Real.power_positive (x : Real) (n : Natural)
         done
       }
     case step(predecessor): {
-        x * Real.power(x, predecessor) > Real.zero;
-        Real.power(x, 1 + predecessor) > Real.zero
+        x * x ^ predecessor > Real.zero;
+        x ^ (1 + predecessor) > Real.zero
             by substituting Real.power_add_one;
         done
       }
