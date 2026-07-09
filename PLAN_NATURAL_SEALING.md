@@ -35,7 +35,7 @@ session, like `PLAN_LANGUAGE_IMPROVEMENT.md`.
 | Stage | Workstream | Status | Record |
 |-------|------------|--------|--------|
 | 0 | Audit: mechanism + ripple forensics | **not started** | Answer the four open questions below (seal mechanism; numeral/`decide`/`ring` behaviour under a sealed type; `by induction`/`cases` retargeting; the foundational-module inventory). Deliverable: this ledger's rows 1–5 turned from sketch into spec. |
-| 1 | Binary literals + `norm_num` decision procedure | **not started** | Re-desugar numeric literals to binary Horner `2·n + b` over `0/1/2/+/*` (elaborator, `inference.cpp` numeral path); land the bit-recurrence lemma set + a `norm_num`-style tactic proving `=`/`≠`/`<`/`≤`/`+`/`*` on literals. Independently valuable (compact terms, ring-ceiling fix); de-risks the seal. **Lands before Stage 2.** |
+| 1 | Binary literals + `norm_num` decision procedure | **not started** | Re-desugar numeric literals to binary Horner `2·n + b` over `0/1/2/+/*` (elaborator, `inference.cpp` numeral path); land the bit-recurrence lemma set + a `norm_num`-style tactic proving `=`/`≠`/`<`/`≤`/`+`/`*` on literals. Independently valuable (compact terms, ring-ceiling fix); de-risks the seal. **Lands before Stage 2.** **Mechanism undecided — see the Decision record below: GMP kernel extension vs. verified tactic.** |
 | 2 | The sealed boundary (opaque wrap + characterising lemmas) | **not started** | `opaque definition Natural := Natural.Raw`; re-expose `zero`/`successor`, an `induction` theorem, and a primitive-`recursion` combinator as the ONLY boundary; complete the Peano set. Mechanism decision in §Mechanism. |
 | 3 | Tactics speak the boundary | **not started** | `by induction` / `cases` on `Natural` emit the `induction`/`recursion` theorems, not the raw recursor; `decide`/numeral equality route through the Stage-1 tactic. Elaborator change. |
 | 4 | Consumer migration | **not started** | Wean the ~91 external + interior `Natural/` files off `successor`, advisory-driven (the `successor`-outside-`Natural` signal is the worklist). A1-style sweep; gradual. |
@@ -132,6 +132,79 @@ operands and cites the matching recurrence, recursing — the proof depth
 tracks the bit length. This is the tactic `arithmetic_decision_tactic_idea`
 already wants; sealing forces it, and binary makes it tractable.
 
+### Decision record — Stage-1 mechanism: GMP kernel extension vs. verified `norm_num`
+
+**Status: OPEN — needs owner sign-off (it's a trusted-computing-base
+call).** The rest of this section assumes Option B (verified tactic); this
+record captures the fork so we choose it on purpose rather than by inertia.
+
+**The question.** Literal arithmetic must stop being unary. There are two
+mechanisms, and they differ in *what the kernel trusts*, not just in speed.
+
+**Option A — GMP literal kernel extension (Lean 4's approach).** Add a
+big-integer literal node to `Expr` (small values unboxed as machine words,
+large ones boxed GMP `mpz`) and give the kernel *native* reduction rules for
+a fixed set of `Natural` ops (`add`/`sub`/`multiply`/`compare`/`decEq`/…):
+when both operands reduce to literals, the kernel computes the result with
+GMP directly instead of unfolding the recursor. The `zero`/`successor`
+inductive stays as the logical definition — the literal is *defeq* to its
+unary form — and the kernel special-cases `Natural.rec`/pattern-match on a
+literal to expose `successor(n-1)` on demand, so induction still works.
+
+- *Pros:* fastest possible (native C++ arithmetic, no proof term to check);
+  fully resolves the `ring` unary-coefficient ceiling
+  (`ring_unary_coefficient_ceiling`); a well-trodden design (Lean 4 ships
+  exactly this).
+- *Cons:* **grows the TCB** — you now trust that GMP `add` really computes
+  `Natural.add`, plus the literal↔`successor` recursor bridge (the fiddly,
+  trust-sensitive part). This cuts directly against this project's stated
+  value: *the kernel does the typechecking*, small trusted core.
+
+**Option B — verified `norm_num` over binary-Horner literals (this plan's
+current default).** Represent literals as `2·n + b` object-language terms
+(§Desugar target) and prove each arithmetic fact with an `O(log n)`-depth
+*checkable proof term* built from the bit-recurrence lemmas (§the decision
+procedure). The kernel learns nothing new; it just checks the proof.
+
+- *Pros:* **kernel stays small** — no new trusted arithmetic; every literal
+  fact is a proof the existing kernel verifies (de Bruijn criterion).
+  Compact `O(log n)` terms; ring-ceiling fixed if `ring` treats a binary
+  literal as an atomic coefficient.
+- *Cons:* slower (the kernel re-checks an `O(log n)` proof per fact rather
+  than trusting one GMP op); the tactic + lemma set is real work to build
+  and maintain.
+
+**The axis** is the classic de Bruijn tradeoff: *fast kernel extension* vs.
+*small kernel + verified tactic*. Speed and TCB size trade against each
+other; both beat unary decisively.
+
+**What each does and does NOT buy (don't over-attribute):**
+
+- Both fix the **unary performance** blowup and both remove `successor` from
+  **numerals** (the #1 `successor` source — this plan's linchpin).
+- **Neither fixes the variable-`successor` asymmetry** that motivated this
+  plan's ergonomics (`1 + i` not defeq `successor i`, the binomial
+  restatement wart). That is about which argument `Natural.add` recurses on,
+  not about literal representation — Lean has the identical asymmetry
+  (`i + 1` reduces, `1 + i` does not) and its users bridge it with lemmas
+  too. It is **Stage 3** (retarget `by induction`/`cases` to the `1 + n`
+  principle), independent of the Stage-1 mechanism.
+- **Option A is orthogonal to sealing.** Lean's `Nat` is deliberately
+  *unsealed* — fully pattern-matchable — and still gets native numerals. So
+  Option A delivers the performance + numeral-`successor` half **without
+  requiring the opacity project at all**. It does *not* deliver
+  encapsulation (goal A of the plan): anyone can still `match` on
+  `successor`. If the driver is "read like a mathematician, no raw CIC
+  leaks," Option A alone is insufficient; if the driver is performance and
+  compact numerals, Option A may let us skip Stages 2/5 entirely for that
+  benefit.
+
+**Provisional lean (not a decision):** Option B fits the project's
+small-kernel philosophy and is what the Stage-1 detail is written against.
+Option A is the faster, more thorough performance fix and is independently
+adoptable, but it is a TCB-growth decision that must be made explicitly by
+the owner. Resolve this in the Stage-0 audit, before writing Stage-1 code.
+
 ### `ring` interaction (the by-product win)
 
 `ring` holds coefficients in **unary** today (`ring_unary_coefficient_ceiling`):
@@ -189,6 +262,12 @@ its Horner form into the polynomial). Decide in Stage 0.
    stay `successor`-using (the raw floor: `basics`, `peano`,
    `one_plus_induction`, `strong_recursion`, `monus`, `compare`, `order`,
    `decide` …)? Draw the line; everything above it migrates in Stage 4.
+5. **Stage-1 mechanism** — resolve the GMP-kernel-extension vs.
+   verified-`norm_num` fork (see the Decision record in §Stage 1 detail).
+   TCB-growth call; owner sign-off. Note Option A is adoptable independently
+   of sealing (it buys performance + numeral-`successor` without opacity), so
+   this answer also reframes whether Stages 2/5 are on the critical path for
+   the performance goal or only for encapsulation.
 
 ---
 
