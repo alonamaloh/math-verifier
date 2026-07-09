@@ -272,9 +272,11 @@ These have been load-bearing decisions that show up everywhere:
   (analysis depth, geometry/topology, metatheory, abstract linear
   algebra, new quotients) chosen to load one layer — prover, surface
   language, or foundations — at a time and reveal where it bends.
-- `LUX_PLAN.md` — design for the planned higher-level proof surface (Lux).
-- `PLAN_LUX_TRANSITION.md` — the unified plan for migrating the library to
-  Lux (opaque-by-default + successor-free + cite-only prover, in one sweep).
+- `PLAN_LANGUAGE_IMPROVEMENT.md` — the single forward plan for the surface
+  language (opaque-by-default + successor-free + cite-only prover); its
+  Status ledger is the authoritative progress tracker.
+- `LUX_PLAN.md` — the design note behind the planned higher-level proof
+  surface (Lux).
 - `HASH_USE_VS_LEAN.md` — design note pinning down where our
   subtree-hashing plan lines up with Lean's and where it diverges.
 - `library/Test/` — small files that exercise individual elaborator
