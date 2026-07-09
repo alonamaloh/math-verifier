@@ -46,7 +46,6 @@ import Rational.positive
 import Rational.linearity
 import Rational.minimum
 import Rational.reciprocal
-import Rational.reciprocal_function
 import Rational.archimedean
 import Set.basics
 import Algebra.ring
@@ -81,86 +80,9 @@ import ComplexNumber.series
 import ComplexNumber.binomial_theorem
 
 -- ----------------------------------------------------------------------
--- The coefficient identity at ℚ: 1/(i+d)! · C(i+d, i) = 1/i! · 1/d!.
--- The cast of `Natural.binomial_factorial` clears all denominators.
--- (Kept at the ℚ layer for this file's reciprocal-based coefficients;
--- the Real series now use honest `/` and Real.binomial_reciprocal_split.)
-theorem Rational.binomial_reciprocal_split (i d : Natural)
-        : Rational.reciprocal_function((Natural.factorial(i + d) : Rational)) * (Natural.binomial(i + d, i) : Rational)
-          = Rational.reciprocal_function((Natural.factorial(i) : Rational))
-            * Rational.reciprocal_function((Natural.factorial(d) : Rational)) := {
-  -- The closed form, cast into ℚ.
-  (Natural.binomial(i + d, i) : Rational)
-            * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-        = (Natural.factorial(i + d) : Rational)
-      by {
-        (Natural.binomial(i + d, i) : Rational)
-                  * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-            = (Natural.binomial(i + d, i) : Rational)
-                  * ((Natural.factorial(i) * Natural.factorial(d) : Natural) : Rational)
-                  by Rational.from_natural.multiply_preserves
-            = ((Natural.binomial(i + d, i) * (Natural.factorial(i) * Natural.factorial(d)) : Natural) : Rational)
-            = ((Natural.factorial(i + d) : Natural) : Rational)
-                  by Natural.binomial_factorial
-      } as castSplit;
-  -- All three factorial casts are positive, hence nonzero.
-  Rational.zero < (Natural.factorial(i) : Rational);
-  ¬(Rational.zero = (Natural.factorial(i) : Rational));
-  ¬((Natural.factorial(i) : Rational) = Rational.zero);
-  Rational.zero < (Natural.factorial(d) : Rational);
-  ¬(Rational.zero = (Natural.factorial(d) : Rational));
-  ¬((Natural.factorial(d) : Rational) = Rational.zero);
-  Rational.zero < (Natural.factorial(i + d) : Rational);
-  ¬(Rational.zero = (Natural.factorial(i + d) : Rational));
-  ¬((Natural.factorial(i + d) : Rational) = Rational.zero);
-  Rational.zero < (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational);
-  ¬(Rational.zero = (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational));
-  ¬((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational) = Rational.zero);
-  -- The cancellations.
-  ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-            * Rational.reciprocal_function((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-        = Rational.one as productCancel;
-  (Natural.factorial(i + d) : Rational)
-            * Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
-        = Rational.one as wholeCancel;
-  -- Multiply by 1 = (i!·d!)·(1/(i!·d!)), absorb the closed form, cancel.
-  Rational.reciprocal_function((Natural.factorial(i + d) : Rational)) * (Natural.binomial(i + d, i) : Rational)
-     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
-           * ((Natural.binomial(i + d, i) : Rational) * Rational.one)
-     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
-           * ((Natural.binomial(i + d, i) : Rational)
-                  * (((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-                         * Rational.reciprocal_function(
-                               (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))))
-           by productCancel
-     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
-           * (((Natural.binomial(i + d, i) : Rational)
-                   * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)))
-                  * Rational.reciprocal_function(
-                        (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)))
-     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
-           * ((Natural.factorial(i + d) : Rational)
-                  * Rational.reciprocal_function(
-                        (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)))
-           by castSplit
-     = ((Natural.factorial(i + d) : Rational)
-            * Rational.reciprocal_function((Natural.factorial(i + d) : Rational)))
-           * Rational.reciprocal_function(
-                 (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-     = Rational.one
-           * Rational.reciprocal_function(
-                 (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-           by wholeCancel
-     = Rational.reciprocal_function((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
-     = Rational.reciprocal_function((Natural.factorial(i) : Rational))
-           * Rational.reciprocal_function((Natural.factorial(d) : Rational))
-}
-
--- ----------------------------------------------------------------------
 -- The k-th exponential term at z + w is the k-th Cauchy-product
--- diagonal of the two series. The coefficient identity is the rational
--- fact Rational.binomial_reciprocal_split, carried into ℂ through the
--- embedding.
+-- diagonal of the two series. The coefficient identity is
+-- Real.binomial_reciprocal_split, carried into ℂ through the embedding.
 theorem ComplexNumber.exponentialTerm_binomial_split
         (z w : ℂ) (k : Natural)
         : ComplexNumber.exponentialTerm(z + w, k)
@@ -172,14 +94,13 @@ theorem ComplexNumber.exponentialTerm_binomial_split
   -- Each summand below the cut: fold the coefficient into the two
   -- reciprocal factorials.
   (i : Natural) → successor(i) ≤ 1 + k
-        → ((Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real) : ℂ)
+        → (1 / (k! : Real) : ℂ)
               * (ComplexNumber.binomialCoefficient(k, i)
                      * (z ^ i * w ^ Natural.monus(k, i)))
           = ComplexNumber.exponentialTerm(z, i)
             * ComplexNumber.exponentialTerm(w, Natural.monus(k, i))
       by (i : Natural) (iBelow : successor(i) ≤ 1 + k) ↦ {
-           let recipK : Real :=
-               (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real);
+           let recipK : Real := 1 / (k! : Real);
            i ≤ k by Natural.successor_le_cancel;
            choose d such that k = i + d from Natural.subtraction_witness(i, k, (i ≤ k));
            i + d = k as kJoin;
@@ -188,35 +109,16 @@ theorem ComplexNumber.exponentialTerm_binomial_split
                  Natural.monus(i + d, i) = d;
                  done by substituting kJoin
                } as monusCollapse;
-           let recipI : Real :=
-               (Rational.reciprocal_function((Natural.factorial(i) : Rational)) : Real);
-           let recipD : Real :=
-               (Rational.reciprocal_function((Natural.factorial(d) : Rational)) : Real);
-           Rational.reciprocal_function((Natural.factorial(k) : Rational))
-                     * Natural.binomial(k, i)
-                 = Rational.reciprocal_function((Natural.factorial(i) : Rational))
-                   * Rational.reciprocal_function((Natural.factorial(d) : Rational))
-               by {
-                 Rational.reciprocal_function((Natural.factorial(k) : Rational))
-                           * (Natural.binomial(k, i) : Rational)
-                     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
-                           * (Natural.binomial(i + d, i) : Rational)
-                           by kJoin
-                     = Rational.reciprocal_function((Natural.factorial(i) : Rational))
-                           * Rational.reciprocal_function((Natural.factorial(d) : Rational))
-                           by Rational.binomial_reciprocal_split
-               } as coefficientSplit;
-           recipK * (Natural.binomial(k, i) : Rational)
+           let recipI : Real := 1 / (i! : Real);
+           let recipD : Real := 1 / (d! : Real);
+           recipK * ((Natural.binomial(k, i) : Rational) : Real)
                  = recipI * recipD
                by {
                  recipK * ((Natural.binomial(k, i) : Rational) : Real)
-                     = ((Rational.reciprocal_function((Natural.factorial(k) : Rational))
-                             * (Natural.binomial(k, i) : Rational) : Rational) : Real)
-                     = ((Rational.reciprocal_function((Natural.factorial(i) : Rational))
-                             * Rational.reciprocal_function(
-                                   (Natural.factorial(d) : Rational)) : Rational) : Real)
-                           by coefficientSplit
-                     = recipI * recipD
+                     = (1 / ((i + d)! : Real)) * (Natural.binomial(i + d, i) : Real)
+                           by kJoin
+                     = (1 / (i! : Real)) * (1 / (d! : Real))
+                           by Real.binomial_reciprocal_split
                } as coefficientSplitCast;
            (recipK : ℂ)
                     * (ComplexNumber.binomialCoefficient(k, i)
@@ -249,9 +151,9 @@ theorem ComplexNumber.exponentialTerm_binomial_split
          };
   -- Scale the binomial expansion through the sum and rewrite each term.
   ComplexNumber.exponentialTerm(z + w, k)
-     = ((Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real) : ℂ)
+     = (1 / (k! : Real) : ℂ)
            * (z + w) ^ k
-     = ((Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real) : ℂ)
+     = (1 / (k! : Real) : ℂ)
            * ComplexNumber.partialSum(
                  (i : Natural) ↦
                      ComplexNumber.binomialCoefficient(k, i)
@@ -260,7 +162,7 @@ theorem ComplexNumber.exponentialTerm_binomial_split
            by ComplexNumber.binomial_theorem
      = ComplexNumber.partialSum(
            (i : Natural) ↦
-               ((Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real) : ℂ)
+               (1 / (k! : Real) : ℂ)
                * (ComplexNumber.binomialCoefficient(k, i)
                       * (z ^ i * w ^ Natural.monus(k, i))),
            1 + k)

@@ -41,7 +41,6 @@ import Rational.positive
 import Rational.linearity
 import Rational.minimum
 import Rational.reciprocal
-import Rational.reciprocal_function
 import Rational.archimedean
 import Set.basics
 import Algebra.ring
@@ -496,16 +495,13 @@ theorem Natural.factorial_monotone (a b : Natural) (aLeB : a ≤ b)
 -- ℚ → ℝ casts).
 theorem Real.exponentialCoefficient_antitone (i j : Natural) (iLeqJ : i ≤ j)
         : Real.exponentialCoefficient(j) ≤ Real.exponentialCoefficient(i) := {
-  Natural.factorial(i) ≤ Natural.factorial(j)
-      by Natural.factorial_monotone;
-  (Natural.factorial(i) : Rational) ≤ (Natural.factorial(j) : Rational)
-      by Rational.from_natural.LessOrEqual_preserves;
-  Rational.zero < (Natural.factorial(i) : Rational)
-      by Rational.factorial_cast_positive;
-  Rational.reciprocal_function((Natural.factorial(j) : Rational))
-        ≤ Rational.reciprocal_function((Natural.factorial(i) : Rational))
-      by Rational.reciprocal_function_antitone;
-  done by Rational.to_real.LessOrEqual_preserves
+  i! ≤ j! by Natural.factorial_monotone;
+  (i! : Real) ≤ (j! : Real) by Real.from_natural.LessOrEqual_preserves;
+  (i! : Real) > 0 by Real.factorial_cast_positive;
+  (j! : Real) > 0 by Real.factorial_cast_positive;
+  (i! : Real) ≠ 0;
+  (j! : Real) ≠ 0;
+  done by Real.one_divide_antitone
 }
 
 -- ----------------------------------------------------------------------
@@ -678,9 +674,10 @@ theorem Real.cosineCoefficient_one_value (m : Natural)
 -- 1/k! is non-negative.
 theorem Real.exponentialCoefficient_nonneg (k : Natural)
         : Real.zero ≤ Real.exponentialCoefficient(k) := {
-  Rational.zero < (Natural.factorial(k) : Rational);
-  Rational.zero < Rational.reciprocal_function((Natural.factorial(k) : Rational));
-  Real.zero < (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real);
+  (k! : Real) > 0 by Real.factorial_cast_positive;
+  (k! : Real) ≠ 0;
+  1 / (k! : Real) > 0 by Real.divide_positive;
+  1 / (k! : Real) ≥ 0;
   done
 }
 
@@ -960,44 +957,27 @@ theorem Real.from_natural_LessThan (a b : Natural) (succLeqB : successor(a) ≤ 
 -- down to 2·EC 4 + 2·EC 4² < EC 2 — and that follows from 4·EC 4 < EC 2,
 -- which is 8 < 24 in disguise (4·factorial 2 < factorial 4).
 theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
-  let d2 : Real := (Natural.factorial(2) : Real);
-  let d4 : Real := (Natural.factorial(4) : Real);
+  let d2 : Real := (2! : Real);
+  let d4 : Real := (4! : Real);
   let four : Real := (4 : Real);
-  let a : Real := (4 * Natural.factorial(2) : Real);
+  let a : Real := (4 * 2! : Real);
 
-  -- EC 0 = 1.
-  (Natural.factorial(0) : Rational) = Rational.one;
+  -- EC 0 = 1/0! = 1.
+  (0! : Real) = 1 as factorialZero;
   Real.exponentialCoefficient(0)
-            = (Rational.reciprocal_function((Natural.factorial(0) : Rational)) : Real)
-            = (Rational.reciprocal_function(Rational.one) : Real)
-            = (Rational.one : Real)
-                  by Rational.reciprocal_function_one
-            = Real.one as ec0;
+            = 1 / (0! : Real)
+            = 1 / (1 : Real)      by substituting factorialZero
+            = Real.one            by field as ec0;
 
-  -- The reciprocal relations dₖ · EC k = 1 (factorial cancels its
-  -- reciprocal across the ℚ → ℝ cast).
-  ¬((Natural.factorial(2) : Rational) = Rational.zero);
-  (Natural.factorial(2) : Rational)
-            * Rational.reciprocal_function((Natural.factorial(2) : Rational))
-        = Rational.one as recip2;
+  -- The reciprocal relations dₖ · EC k = 1: k! cancels its own reciprocal.
+  (2! : Real) ≠ 0;
   d2 * Real.exponentialCoefficient(2)
-            = d2 * (Rational.reciprocal_function((Natural.factorial(2) : Rational)) : Real)
-            = (((Natural.factorial(2) : Rational)
-                  * Rational.reciprocal_function((Natural.factorial(2) : Rational))) : Real)
-            = (Rational.one : Real)
-                  by recip2
-            = Real.one as relation2;
-  ¬((Natural.factorial(4) : Rational) = Rational.zero);
-  (Natural.factorial(4) : Rational)
-            * Rational.reciprocal_function((Natural.factorial(4) : Rational))
-        = Rational.one as recip4;
+            = (2! : Real) * (1 / (2! : Real))
+            = Real.one            by field as relation2;
+  (4! : Real) ≠ 0;
   d4 * Real.exponentialCoefficient(4)
-            = d4 * (Rational.reciprocal_function((Natural.factorial(4) : Rational)) : Real)
-            = (((Natural.factorial(4) : Rational)
-                  * Rational.reciprocal_function((Natural.factorial(4) : Rational))) : Real)
-            = (Rational.one : Real)
-                  by recip4
-            = Real.one as relation4;
+            = (4! : Real) * (1 / (4! : Real))
+            = Real.one            by field as relation4;
 
   -- Real values of the natural casts: d2 = 2, four = 4.
   (1 : Real) = Real.one;
@@ -1125,15 +1105,13 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
 
   -- Positivity facts about EC 2, EC 4.
   Real.zero < Real.exponentialCoefficient(2)
-      by { Rational.zero < (Natural.factorial(2) : Rational);
-           Rational.zero
-                 < Rational.reciprocal_function((Natural.factorial(2) : Rational));
-           done by Rational.to_real.positive_preserves };
+      by { (2! : Real) > 0 by Real.factorial_cast_positive;
+           (2! : Real) ≠ 0;
+           done by Real.divide_positive };
   Real.zero < Real.exponentialCoefficient(4)
-      by { Rational.zero < (Natural.factorial(4) : Rational);
-           Rational.zero
-                 < Rational.reciprocal_function((Natural.factorial(4) : Rational));
-           done by Rational.to_real.positive_preserves };
+      by { (4! : Real) > 0 by Real.factorial_cast_positive;
+           (4! : Real) ≠ 0;
+           done by Real.divide_positive };
   Real.zero < Real.exponentialCoefficient(2) * Real.exponentialCoefficient(4);
   Real.zero ≤ Real.exponentialCoefficient(4);
   Real.exponentialCoefficient(4)

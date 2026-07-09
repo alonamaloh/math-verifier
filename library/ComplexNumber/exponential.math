@@ -39,7 +39,6 @@ import Rational.positive
 import Rational.linearity
 import Rational.minimum
 import Rational.reciprocal
-import Rational.reciprocal_function
 import Rational.archimedean
 import Set.basics
 import Algebra.ring
@@ -630,50 +629,24 @@ theorem ComplexNumber.modulus_power (z : ComplexNumber)
 -- real coefficient embedded.
 definition ComplexNumber.exponentialTerm (z : ComplexNumber) (k : Natural)
         : ComplexNumber :=
-  ComplexNumber.from_real(
-      (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
-  * ComplexNumber.power(z, k)
+  (1 / (k! : Real) : ℂ) * z ^ k
 
 -- Its modulus is exactly the real exponential term at |z|.
 theorem ComplexNumber.modulus_exponentialTerm (z : ComplexNumber) (k : Natural)
         : ComplexNumber.modulus(ComplexNumber.exponentialTerm(z, k))
           = Real.exponentialTerm(ComplexNumber.modulus(z), k) := {
-  Rational.zero < Natural.factorial(k);
-  Rational.zero
-        < Rational.reciprocal_function((Natural.factorial(k) : Rational));
-  Real.zero
-        < Rational.reciprocal_function((Natural.factorial(k) : Rational));
-  Real.zero
-        ≤ (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real);
-  Real.IsNonneg(
-            (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)) as coefficientNonneg;
-  ¬((Natural.factorial(k) : Rational) = Rational.zero);
-  (Natural.factorial(k) : Real) > 0;
-  (Natural.factorial(k) : Real) ≠ 0;
-  ComplexNumber.modulus(
-           ComplexNumber.from_real(
-               (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
-           * ComplexNumber.power(z, k))
-     = ComplexNumber.modulus(
-           ComplexNumber.from_real(
-               (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)))
-       * ComplexNumber.modulus(ComplexNumber.power(z, k))
-     = abs((Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real))
-       * ComplexNumber.modulus(ComplexNumber.power(z, k))
-           by ComplexNumber.modulus_from_real(
-                  (Rational.reciprocal_function(
-                       (Natural.factorial(k) : Rational)) : Real))
-     = (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
-       * ComplexNumber.modulus(ComplexNumber.power(z, k))
-           by Real.absolute_value_when_nonneg(
-                  (Rational.reciprocal_function(
-                       (Natural.factorial(k) : Rational)) : Real),
-                  coefficientNonneg)
-     = (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
-       * Real.power(ComplexNumber.modulus(z), k)
-           by ComplexNumber.modulus_power(z, k)
-     = (1 / (Natural.factorial(k) : Real)) * Real.power(ComplexNumber.modulus(z), k)
-           by Rational.to_real.reciprocal_preserves
+  (k! : Real) > 0;
+  (k! : Real) ≠ 0;
+  1 / (k! : Real) ≥ 0;
+  Real.IsNonneg(1 / (k! : Real));
+  ComplexNumber.modulus((1 / (k! : Real) : ℂ) * z ^ k)
+     = ComplexNumber.modulus((1 / (k! : Real) : ℂ)) * ComplexNumber.modulus(z ^ k)
+     = abs(1 / (k! : Real)) * ComplexNumber.modulus(z ^ k)
+           by ComplexNumber.modulus_from_real
+     = (1 / (k! : Real)) * ComplexNumber.modulus(z ^ k)
+           by Real.absolute_value_when_nonneg
+     = (1 / (k! : Real)) * ComplexNumber.modulus(z) ^ k
+           by ComplexNumber.modulus_power
 }
 
 -- ----------------------------------------------------------------------
@@ -745,18 +718,12 @@ theorem ComplexNumber.exponential_zero
         let complexZero : ComplexNumber :=
             RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial);
         take k : Natural;
-        ComplexNumber.power(complexZero, successor(k))
-          = complexZero * ComplexNumber.power(complexZero, k)
+        complexZero ^ successor(k)
+          = complexZero * complexZero ^ k
           = complexZero as powerVanishes;
         ComplexNumber.exponentialTerm(complexZero, successor(k))
-           = ComplexNumber.from_real(
-                 (Rational.reciprocal_function(
-                      (Natural.factorial(successor(k)) : Rational)) : Real))
-             * ComplexNumber.power(complexZero, successor(k))
-           = ComplexNumber.from_real(
-                 (Rational.reciprocal_function(
-                      (Natural.factorial(successor(k)) : Rational)) : Real))
-             * complexZero
+           = (1 / ((k + 1)! : Real) : ℂ) * complexZero ^ successor(k)
+           = (1 / ((k + 1)! : Real) : ℂ) * complexZero
                  by powerVanishes
            = complexZero
       } as termSuccessor;
@@ -769,28 +736,26 @@ theorem ComplexNumber.exponential_zero
                   Complex.definingPolynomial)
       by by induction on p with IH {
            case zero: {
-               -- exponentialTerm(z, 0) = from_real(1/0!) · z⁰ = from_real(1) · 1 = one.
-               -- Opacity stalls the Rational `reciprocal_function(1) = 1` reduction the
-               -- auto-prover used to do for free, so cite it directly.
+               -- exponentialTerm(z, 0) = (1/0! : ℂ) · z⁰ = (1 : ℂ) · 1 = one.
                ComplexNumber.exponentialTerm(
                          RingModulo.zero(Real.polynomial_commutative_ring,
                              Complex.definingPolynomial), 0)
                      = RingModulo.one(Real.polynomial_commutative_ring,
                            Complex.definingPolynomial)
                    by {
-                     (Natural.factorial(0) : Rational) = Rational.one;
-                     Rational.reciprocal_function((Natural.factorial(0) : Rational))
-                         = Rational.reciprocal_function(Rational.one)
-                         = Rational.one                                 by Rational.reciprocal_function_one as reciprocalOne;
+                     (0! : Real) = 1 as factorialZero;
+                     1 / (0! : Real)
+                         = 1 / (1 : Real)   by substituting factorialZero
+                         = 1                by field
+                         as reciprocalOne;
                      ComplexNumber.exponentialTerm(
                               RingModulo.zero(Real.polynomial_commutative_ring,
                                   Complex.definingPolynomial), 0)
-                        = ComplexNumber.from_real(
-                              (Rational.reciprocal_function((Natural.factorial(0) : Rational)) : Real))
+                        = (1 / (0! : Real) : ℂ)
                           * ComplexNumber.power(
                                 RingModulo.zero(Real.polynomial_commutative_ring,
                                     Complex.definingPolynomial), 0)
-                        = ComplexNumber.from_real((Rational.one : Real))
+                        = (1 : ℂ)
                           * RingModulo.one(Real.polynomial_commutative_ring,
                                 Complex.definingPolynomial)
                               by substituting reciprocalOne
