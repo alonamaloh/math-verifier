@@ -1040,6 +1040,217 @@ SurfaceDefinitionDeclaration Elaborator::augmentDeclarationWithConventions(
         return augmented;
     }
 
+namespace {
+
+// Is `expr` syntactically `Natural.monus(guardVar, 1)`?
+bool isMonusGuardMinusOne(const SurfaceExpressionPointer& expr,
+                          const std::string& guardVar) {
+    if (!expr) return false;
+    auto* application = std::get_if<SurfaceApplication>(&expr->node);
+    if (!application || application->arguments.size() != 2) return false;
+    auto* function =
+        std::get_if<SurfaceIdentifier>(&application->function->node);
+    if (!function || function->qualifiedName != "Natural.monus") return false;
+    auto* base = std::get_if<SurfaceIdentifier>(
+        &application->arguments[0].value->node);
+    auto* one = std::get_if<SurfaceNumericLiteral>(
+        &application->arguments[1].value->node);
+    return base && base->universeArgs.empty()
+        && base->qualifiedName == guardVar
+        && one && one->digits == "1";
+}
+
+// Replace every `Natural.monus(guardVar, 1)` with the identifier `predName`,
+// across the value-level node types a function body is built from. Nodes with
+// no children (identifiers, numerals) and any construct not listed are
+// returned unchanged — a `monus` buried in an unhandled construct simply
+// isn't rewritten, and the leftover free `guardVar` is then caught by the
+// no-free-guard check in the caller (so the desugaring declines rather than
+// producing something wrong).
+SurfaceExpressionPointer rewriteMonusToPredecessor(
+        SurfaceExpressionPointer expr, const std::string& guardVar,
+        const std::string& predName) {
+    if (!expr) return expr;
+    int line = expr->line, column = expr->column;
+    if (isMonusGuardMinusOne(expr, guardVar)) {
+        return makeSurfaceIdentifier(predName, {}, line, column);
+    }
+    const SurfaceExpression& node = *expr;
+    if (auto* application = std::get_if<SurfaceApplication>(&node.node)) {
+        auto newFunction = rewriteMonusToPredecessor(
+            application->function, guardVar, predName);
+        std::vector<SurfaceArgument> newArguments;
+        for (const auto& argument : application->arguments) {
+            newArguments.push_back(
+                {argument.name, rewriteMonusToPredecessor(
+                                    argument.value, guardVar, predName)});
+        }
+        return makeSurfaceApplication(std::move(newFunction),
+                                       std::move(newArguments), line, column);
+    }
+    if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
+        return makeSurfaceDecide(
+            rewriteMonusToPredecessor(decide->proposition, guardVar, predName),
+            decide->yesBinderName,
+            rewriteMonusToPredecessor(decide->yesBody, guardVar, predName),
+            decide->noBinderName,
+            rewriteMonusToPredecessor(decide->noBody, guardVar, predName),
+            line, column);
+    }
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node.node)) {
+        return makeSurfaceBinaryOperation(
+            binary->opSymbol,
+            rewriteMonusToPredecessor(binary->left, guardVar, predName),
+            rewriteMonusToPredecessor(binary->right, guardVar, predName),
+            line, column);
+    }
+    if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
+        return makeSurfaceUnaryOperation(
+            unary->opSymbol,
+            rewriteMonusToPredecessor(unary->operand, guardVar, predName),
+            line, column);
+    }
+    if (auto* ascription = std::get_if<SurfaceAscription>(&node.node)) {
+        return makeSurfaceAscription(
+            rewriteMonusToPredecessor(ascription->expression, guardVar,
+                                       predName),
+            rewriteMonusToPredecessor(ascription->type, guardVar, predName),
+            line, column);
+    }
+    return expr;
+}
+
+// Does `expr` mention the identifier `name` anywhere (value-level nodes)?
+bool surfaceMentionsIdentifier(const SurfaceExpressionPointer& expr,
+                               const std::string& name) {
+    if (!expr) return false;
+    const SurfaceExpression& node = *expr;
+    if (auto* identifier = std::get_if<SurfaceIdentifier>(&node.node)) {
+        return identifier->qualifiedName == name;
+    }
+    if (auto* application = std::get_if<SurfaceApplication>(&node.node)) {
+        if (surfaceMentionsIdentifier(application->function, name)) return true;
+        for (const auto& argument : application->arguments)
+            if (surfaceMentionsIdentifier(argument.value, name)) return true;
+        return false;
+    }
+    if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
+        return surfaceMentionsIdentifier(decide->proposition, name)
+            || surfaceMentionsIdentifier(decide->yesBody, name)
+            || surfaceMentionsIdentifier(decide->noBody, name);
+    }
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node.node)) {
+        return surfaceMentionsIdentifier(binary->left, name)
+            || surfaceMentionsIdentifier(binary->right, name);
+    }
+    if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
+        return surfaceMentionsIdentifier(unary->operand, name);
+    }
+    if (auto* ascription = std::get_if<SurfaceAscription>(&node.node)) {
+        return surfaceMentionsIdentifier(ascription->expression, name)
+            || surfaceMentionsIdentifier(ascription->type, name);
+    }
+    return false;
+}
+
+}  // namespace
+
+bool Elaborator::tryDesugarGuardedNaturalRecursion(
+        SurfaceDefinitionDeclaration& decl) {
+    if (!decl.body || !decl.cases.empty() || decl.arguments.empty()
+        || decl.isTheorem)
+        return false;
+    // Flatten the named parameters — a single `(n k : T)` binder holds
+    // several names. Every parameter must be explicit and typed.
+    struct Param { std::string name; SurfaceExpressionPointer type; };
+    std::vector<Param> params;
+    for (const auto& binder : decl.arguments) {
+        if (binder.isImplicit || !binder.type) return false;
+        for (const auto& name : binder.names)
+            params.push_back({name, binder.type});
+    }
+    if (params.empty()) return false;
+    const std::string guardVar = params[0].name;
+    // Only self-recursive bodies need the transformation; a plain non-recursive
+    // `:=` body elaborates fine as it stands.
+    if (!surfaceMentionsIdentifier(decl.body, decl.name)) return false;
+    // Body must be `if guardVar = 0 then BASE else STEP`.
+    auto* topDecide = std::get_if<SurfaceDecide>(&decl.body->node);
+    if (!topDecide) return false;
+    auto* condition =
+        std::get_if<SurfaceBinaryOperation>(&topDecide->proposition->node);
+    if (!condition || condition->opSymbol != "=") return false;
+    auto* conditionLeft =
+        std::get_if<SurfaceIdentifier>(&condition->left->node);
+    auto* conditionRight =
+        std::get_if<SurfaceNumericLiteral>(&condition->right->node);
+    if (!conditionLeft || conditionLeft->qualifiedName != guardVar
+        || !conditionRight || conditionRight->digits != "0")
+        return false;
+    int line = decl.body->line, column = decl.body->column;
+    // Base arm (guardVar = 0): substitute guardVar := 0 (the pattern binds
+    // nothing there).
+    SurfaceExpressionPointer base = substituteSurfaceIdentifier(
+        topDecide->yesBody, guardVar,
+        makeSurfaceNumericLiteral("0", line, column));
+    // Step arm (guardVar = 1 + predecessor). The `| 1 + n =>` pattern binds
+    // the predecessor to guardVar's own name (matching the reading). Rewrite
+    // the body over a fresh placeholder so the two substitutions don't
+    // interfere, then rename it back:
+    //   1. Natural.monus(guardVar, 1)  ↦  <predecessor>      (the recursion index)
+    //   2. any remaining bare guardVar ↦  1 + <predecessor>  (the full value)
+    // A self-call that isn't on the predecessor makes the pattern-match form
+    // ill-typed, which the kernel rejects — so no separate termination check.
+    const std::string placeholder = "__namedRecursionPredecessor__";
+    SurfaceExpressionPointer step =
+        rewriteMonusToPredecessor(topDecide->noBody, guardVar, placeholder);
+    step = substituteSurfaceIdentifier(
+        step, guardVar,
+        makeSurfaceBinaryOperation(
+            "+", makeSurfaceNumericLiteral("1", line, column),
+            makeSurfaceIdentifier(placeholder, {}, line, column),
+            line, column));
+    step = substituteSurfaceIdentifier(
+        step, placeholder,
+        makeSurfaceIdentifier(guardVar, {}, line, column));
+    // Rebuild the declared type as an arrow chain T0 → T1 → … → returnType.
+    SurfaceExpressionPointer arrowType = decl.type;
+    for (auto it = params.rbegin(); it != params.rend(); ++it) {
+        arrowType = makeSurfacePiType(
+            SurfaceBinder{{"_"}, it->type, false}, std::move(arrowType),
+            line, column);
+    }
+    auto clausePatterns = [&](SurfacePatternPointer firstPattern) {
+        std::vector<SurfacePatternPointer> patterns;
+        patterns.push_back(std::move(firstPattern));
+        for (size_t i = 1; i < params.size(); ++i)
+            patterns.push_back(
+                makeSurfacePatternBareName(params[i].name, line, column));
+        return patterns;
+    };
+    SurfacePatternCase zeroClause;
+    zeroClause.patterns =
+        clausePatterns(makeSurfacePatternBareName("zero", line, column));
+    zeroClause.body = base;
+    zeroClause.line = line;
+    zeroClause.column = column;
+    std::vector<SurfacePatternPointer> successorInner;
+    successorInner.push_back(
+        makeSurfacePatternBareName(guardVar, line, column));
+    SurfacePatternCase successorClause;
+    successorClause.patterns = clausePatterns(makeSurfacePatternConstructor(
+        "successor", std::move(successorInner), line, column));
+    successorClause.body = step;
+    successorClause.line = line;
+    successorClause.column = column;
+    decl.type = std::move(arrowType);
+    decl.arguments.clear();
+    decl.body = nullptr;
+    decl.cases.push_back(std::move(zeroClause));
+    decl.cases.push_back(std::move(successorClause));
+    return true;
+}
+
 void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDecl) {
         OpacityRestoreScope opacityScope(*this);
         SurfaceDefinitionDeclaration augmented =
@@ -1052,6 +1263,16 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
         if (statementsOnly_ && declaration.isTheorem) {
             elaborateTheoremStatementOnly(declaration);
             return;
+        }
+        // A named-argument recursive body — `definition f (n k) := if n = 0
+        // then … else … f(monus(n,1), …)` — desugars to the structural
+        // pattern-match form before elaboration.
+        if (declaration.body && declaration.cases.empty()) {
+            SurfaceDefinitionDeclaration desugared = declaration;
+            if (tryDesugarGuardedNaturalRecursion(desugared)) {
+                elaboratePatternMatchDefinition(desugared);
+                return;
+            }
         }
         if (!declaration.cases.empty()) {
             elaboratePatternMatchDefinition(declaration);

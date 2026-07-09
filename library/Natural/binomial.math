@@ -20,17 +20,20 @@ import Natural.classical_decidable
 import Natural.divisibility
 import Natural.factorial
 
--- Binomial coefficients (Pascal's triangle). Every row's k = 0 edge is 1;
--- off that edge C(n, k) is the sum of the two entries one row up. The head
--- recursion on the first argument keeps the definition structural, while the
--- k = 0 test is an honest `if` — so consumers compute through the
--- characterizing lemmas below (binomial_zero_right, binomial_zero_succ,
--- binomial_pascal), not by unfolding.
-definition Natural.binomial : Natural → Natural → Natural
-  | 0, k => if k = 0 then 1 else 0
-  | 1 + n, k =>
-      if k = 0 then 1
-      else Natural.binomial(n, Natural.monus(k, 1)) + Natural.binomial(n, k)
+-- Binomial coefficients (Pascal's triangle), written as a formula over named
+-- arguments: the k = 0 edge of every row is 1, and off that edge C(n, k) is the
+-- sum of the two entries one row up. The `if n = 0` guard desugars to the
+-- structural recursion on the first argument (see the named-argument recursion
+-- desugaring in the elaborator), and the `if k = 0` edge test is a classical
+-- `if` — so consumers compute through the characterizing lemmas below
+-- (binomial_zero_right, binomial_zero_succ, binomial_pascal), not by unfolding.
+definition Natural.binomial (n k : Natural) : Natural :=
+  if n = 0
+    then (if k = 0 then 1 else 0)
+    else if k = 0
+      then 1
+      else Natural.binomial(Natural.monus(n, 1), Natural.monus(k, 1))
+             + Natural.binomial(Natural.monus(n, 1), k)
 
 -- The k = 0 edge of every row is 1.
 theorem Natural.binomial_zero_right : ∀ (n : Natural). Natural.binomial(n, 0) = 1

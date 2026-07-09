@@ -1,0 +1,32 @@
+-- Feature test: named-argument recursive definitions. A recursive Natural
+-- function written as
+--   definition f (n …) : R := if n = 0 then base else … f(Natural.monus(n, 1) …)
+-- desugars to the structural pattern-match on n (| 0 => base | 1 + n => step),
+-- so it reads as a formula over named arguments. See Natural/binomial.math for
+-- the real use. This test exercises a `n` used BOTH bare (the full value,
+-- = 1 + predecessor) and as the recursion index Natural.monus(n, 1).
+
+module Test.named_recursion_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.monus
+import Natural.classical_decidable
+
+-- 0 + 1 + … + n, as a named-argument formula.
+definition Test.triangle (n : Natural) : Natural :=
+  if n = 0 then 0
+  else n + Test.triangle(Natural.monus(n, 1))
+
+-- The base characterising equation — the `if n = 0` guard became the
+-- pattern-match split, so triangle(0) reduces to 0 by computation.
+theorem Test.triangle_zero : Test.triangle(0) = 0 := done
+
+-- The step characterising equation — the recursion index monus(1+n, 1) = n.
+theorem Test.triangle_successor (n : Natural)
+        : Test.triangle(1 + n) = (1 + n) + Test.triangle(n) :=
+  unfold Natural.add in done

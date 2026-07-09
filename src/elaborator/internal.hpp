@@ -1167,6 +1167,21 @@ private:
     // recursive calls on something other than a destructured variable
     // at the right position) are left alone — the kernel will reject
     // them as ill-typed if structural recursion was actually required.
+    // Named-argument recursive definitions. Desugar
+    //   definition f (n k : Natural) : R :=
+    //     if n = 0 then BASE else STEP        -- STEP recurses on monus(n,1)
+    // into the structural pattern-match form
+    //   definition f : Natural → ... → R
+    //     | 0, k => BASE
+    //     | 1 + n, k => STEP[Natural.monus(n,1) ↦ n]
+    // so a recursive Natural function reads like a formula over named
+    // arguments. Returns true (rewriting `decl` in place to the pattern
+    // form) when the body matches this guarded shape; false otherwise (the
+    // plain `:=` body is elaborated as usual, and a genuine self-reference
+    // there still errors, as before).
+    bool tryDesugarGuardedNaturalRecursion(
+        SurfaceDefinitionDeclaration& decl);
+
     SurfaceExpressionPointer rewriteRecursiveCalls(
         SurfaceExpressionPointer expression,
         const std::string& thisDeclName,
