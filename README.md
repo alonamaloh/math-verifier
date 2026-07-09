@@ -13,8 +13,8 @@ mathematicians and easy for LLMs to write.
 - An **elaborator** that turns a small math-flavored surface language
   into kernel terms.
 - A **library** of mathematics built on top, from logic and naturals
-  through integers, rationals, reals, p-adics, polynomials, and the
-  finite fields and complex numbers built from them.
+  through integers, rationals, reals, polynomials, and the finite
+  fields and complex numbers built from them.
 - A **caching build system** (`make -j 16 library`) that verifies each
   source file independently and serializes the resulting environment to
   `build/library/.../*.mathv`. Warm rebuilds are sub-second.
@@ -91,11 +91,10 @@ library/
                                   group homomorphisms / subgroups
   Set/                            Set(T), membership, subset
   Natural/                        Naturals through bezout, p-adic valuation
-  Integer/                        Integers as Natural² quotient
+  Integer/                        opaque ℤ as a Natural² quotient
   IntegerMod/                     ℤ/(n)
-  Rational/                       Rationals as (Integer, ℕ⁺) quotient
+  Rational/                       opaque ℚ as a field of fractions over ℤ
   Real/                           Reals as Cauchy quotient of Rational
-  PAdic/                          p-adics as p-adic-Cauchy quotient
   Polynomial/                     polynomials over a ring; division, gcd, Bezout
   RingModulo/                     generic quotient ring R/(ideal)
   ComplexNumber/                  ℂ = ℝ[x]/(x²+1)
@@ -127,13 +126,16 @@ Imports flow up the dependency layers: a file in `Integer/` can import
 - **Natural:** arithmetic, order, divisibility, Bezout, Euclidean
   algorithm, GCD, factorization, primes, p-adic valuation, factorial,
   Euler's totient; the fundamental theorem of arithmetic.
-- **Integer:** commutative ring via the (a, b) representative quotient;
-  Euclidean division; sign / absolute value.
+- **Integer:** commutative ring via the (a, b) representative quotient,
+  now **opaque** — consumers go through the difference-of-naturals
+  boundary; Euclidean division; sign / absolute value.
 - **IntegerMod:** ℤ/(n) as a quotient; ring structure; **F_p is a field
   for prime p**; canonical representatives; the unit group of ℤ/n
   characterised by coprimality.
-- **Rational:** field via (numerator : Integer, denominatorMinusOne : ℕ).
-  Order; absolute value; halving; reciprocal; triangle inequality.
+- **Rational:** an **opaque field of fractions** over ℤ — a quotient of
+  (numerator : Integer, denominator : nonzero Integer), with consumers
+  going through the fraction boundary. Order; absolute value; honest
+  division; reciprocal; triangle inequality.
 - **Real:** Cauchy sequences of Rationals — and a **fully proven
   complete-ordered-field interface** (field, total order compatible
   with + and ×, suprema of bounded-above nonempty sets, an
@@ -147,15 +149,16 @@ Imports flow up the dependency layers: a file in `Integer/` can import
   square root as an honest function, the Cauchy–Schwarz inequality, and
   the **real exponential** `exp(x) = lim Σ xᵏ/k!` with `e`, `1 + x ≤
   exp(x)`, and `exp(x) > 0`.
-- **PAdic:** p-adic-Cauchy sequences of Rationals; full
-  commutative-ring instance; honest p-adic absolute value; embedding.
 - **Polynomial:** polynomials over a ring; degree, division with
   remainder, gcd / Bezout, irreducibility; `R[x]/(f)` is a field when
   `f` is irreducible over a field.
 - **ComplexNumber:** ℂ = ℝ[x]/(x²+1) — commutative ring and field
   (x²+1 irreducible over ℝ), i² = −1, injective ℝ ↪ ℂ; real and
-  imaginary coordinates with reconstruction `z = re + im·i`, and the
-  honest modulus `|z| = √(re² + im²)`.
+  imaginary coordinates with reconstruction `z = re + im·i`, the
+  honest modulus `|z| = √(re² + im²)` with multiplicativity and the
+  triangle inequality, **completeness** (every Cauchy sequence
+  converges coordinate-wise), and the **complex exponential**
+  `exp(z) = lim Σ zᵏ/k!`.
 - **FiniteField:** F_{p^k} = F_p[x]/(f) is a field for irreducible f.
 - **GaussianInteger:** ℤ[i] via the generic RingModulo; coordinates,
   norm, units, Euclidean structure.
@@ -187,13 +190,15 @@ The patterns are documented in detail in `CLAUDE.md`. Highlights:
   ring. `field(h₁, …)` extends it with reciprocal side-relations from
   nonzero hypotheses, and `linear_combination(e)` closes a ring
   equality from a linear combination of equational hypotheses.
-- **Calc with auto-prover.** `by <reason>` is optional on every calc
-  step. When absent, the elaborator tries definitional equality →
+- **Relation chains with auto-prover.** A proof step is a bare stated
+  relation; a run of them written `a = b = c … by <reason>` is a
+  relation chain, mixing `=`/`≤`/`<`/`≥`/`>` (and preorders like `∣`/
+  `⊆`) and picking the strongest relation. `by <reason>` is optional on
+  every step: when absent, the elaborator tries definitional equality →
   reflexivity, single-position diff resolved through a library-wide
   rewrite-lemma index → local-hypothesis match → `ring`-style
-  rearrangement. `calc` chains mix `=`/`≤`/`<`/`≥`/`>` and pick the
-  strongest relation. Lemma registration runs at theorem-declaration
-  time and on `.mathv` load, so the index covers the library uniformly.
+  rearrangement. Lemma registration runs at theorem-declaration time and
+  on `.mathv` load, so the index covers the library uniformly.
 - **Subtree hashing.** Every `Expression` and `Level` carries a cached
   bottom-up structural hash; `structurallyEqual` uses it as an O(1)
   fast-reject, and a coarser spine-head hash drives the lemma-index
@@ -206,23 +211,22 @@ The patterns are documented in detail in `CLAUDE.md`. Highlights:
   implicit structure/operation/instance arguments get them filled at
   concrete call sites (and from unique in-scope hypotheses for abstract
   carriers).
-- **Argument-free citation.** `claim P since <Lemma>` infers every
-  argument: data args from the goal, proof premises discharged from
-  in-scope hypotheses (with back-inference for arguments that occur
-  only in premises). This extends to Pi-typed goals (binders are
-  introduced and the citation runs on the core goal) and to lemmas
-  quantified over a predicate (`P(x)` conclusions recover `P` from the
-  premises, unfolding folded definitions one δ-step at a time). For
-  `obtain … by` / `cases by` — where no goal validates the choice — an
-  ambiguous premise match is an error listing the candidates.
-- **Statement-level proof sugar.** `claim`/`goal`/`obtain`/`choose`/
-  `take`/`suppose`/`let`/`note`/`change` compose as math prose;
-  `by_induction on n with IH`, `by_strong_induction on n with IH`, and
-  `decide P { yes m => … | no n => … }` for case-splits.
-- **`rewrite(lemma)`** in calc steps and **`rewrite(eq, term)`** at the
-  term level; **`congruenceOf(F, eq)`** with diff-inferred congruence,
-  including rewrite-under-binder for heads registered via
-  **`congruence_under_binder`**; **implicit arguments** `{x : T}`;
+- **Argument-free citation.** Citing a lemma `by <Lemma>` (or naming a
+  stated fact with `note P by <Lemma>`) infers every argument: data args
+  from the goal, proof premises discharged from in-scope hypotheses (with
+  back-inference for arguments that occur only in premises). This extends
+  to Pi-typed goals (binders are introduced and the citation runs on the
+  core goal) and to lemmas quantified over a predicate (`P(x)` conclusions
+  recover `P` from the premises, unfolding folded definitions one δ-step
+  at a time). Where no goal validates the choice, an ambiguous premise
+  match is an error listing the candidates.
+- **Statement-level proof sugar.** A bare stated proposition, `goal`/
+  `choose`/`take`/`suppose`/`let`/`note`/`change` compose as math prose;
+  `note P by <reason>` names a verified fact; `by_induction on n with IH`,
+  `by_strong_induction on n with IH`, and `decide P { yes m => … | no n
+  => … }` for case-splits.
+- **Equation transport** through `… by substituting` and diff-inferred
+  `by` steps in a relation chain; **implicit arguments** `{x : T}`;
   **name-bound conventions**; **`opaque definition`** with
   `unfold … in …`.
 
