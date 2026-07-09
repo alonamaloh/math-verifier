@@ -20,52 +20,51 @@ import Natural.divisibility
 import Natural.factorial
 
 definition Natural.binomial : Natural → Natural → Natural
-  | zero, k =>
+  | 0, k =>
       cases k {
-        | zero => 1
-        | successor(_) => 0
+        | 0 => 1
+        | 1 + _ => 0
       }
-  | successor(n), k =>
+  | 1 + n, k =>
       cases k {
-        | zero => 1
-        | successor(kPredecessor) =>
+        | 0 => 1
+        | 1 + kPredecessor =>
             Natural.binomial(n, kPredecessor)
-            + Natural.binomial(n, successor(kPredecessor))
+            + Natural.binomial(n, 1 + kPredecessor)
       }
 
 -- Above the diagonal the coefficients vanish.
 theorem Natural.binomial_overflow (n : Natural)
-        : ∀ (k : Natural). successor(n) ≤ k → Natural.binomial(n, k) = 0 :=
+        : ∀ (k : Natural). 1 + n ≤ k → Natural.binomial(n, k) = 0 :=
   unfold Natural.add in
   by induction on n with IH {
     case zero:
-        (k : Natural) (overflow : successor(0) ≤ k) ↦
+        (k : Natural) (overflow : 1 + 0 ≤ k) ↦
           cases k {
-            | zero => {
+            | 0 => {
                 False;
                 done
               }
-            | successor(kPredecessor) => done
+            | 1 + kPredecessor => done
           }
-    case successor(nPredecessor):
-        (k : Natural) (overflow : successor(successor(nPredecessor)) ≤ k) ↦
+    case 1 + nPredecessor:
+        (k : Natural) (overflow : 1 + (1 + nPredecessor) ≤ k) ↦
           cases k {
-            | zero => {
+            | 0 => {
                 False;
                 done
               }
-            | successor(kPredecessor) => {
-                successor(nPredecessor) ≤ kPredecessor as innerOverflow;
-                successor(nPredecessor) ≤ successor(kPredecessor) as outerOverflow;
+            | 1 + kPredecessor => {
+                1 + nPredecessor ≤ kPredecessor as innerOverflow;
+                1 + nPredecessor ≤ 1 + kPredecessor as outerOverflow;
                 Natural.binomial(nPredecessor, kPredecessor) = 0
                     by IH(kPredecessor, innerOverflow);
-                Natural.binomial(nPredecessor, successor(kPredecessor)) = 0
-                    by IH(successor(kPredecessor), outerOverflow);
-                Natural.binomial(
-                         successor(nPredecessor), successor(kPredecessor))
+                Natural.binomial(nPredecessor, 1 + kPredecessor) = 0
+                    by IH(1 + kPredecessor, outerOverflow);
+                Natural.binomial(1 + nPredecessor, 1 + kPredecessor)
                    = Natural.binomial(nPredecessor, kPredecessor)
-                     + Natural.binomial(nPredecessor, successor(kPredecessor))
-                   = 0 + Natural.binomial(nPredecessor, successor(kPredecessor))
+                     + Natural.binomial(nPredecessor, 1 + kPredecessor)
+                   = 0 + Natural.binomial(nPredecessor, 1 + kPredecessor)
                    = 0 + 0
                    = 0
               }
