@@ -94,8 +94,7 @@ theorem Rational.factorial_cast_positive (k : Natural)
         : Rational.zero < k! := {
   1 ≤ k!;
   choose c such that k! = 1 + c as factorialSplit
-      from Natural.subtraction_witness(1, k!,
-                                       (1 ≤ k!));
+      from Natural.subtraction_witness;
   (0 : Rational) < (1 + c : Rational);
   done by substituting factorialSplit
 }
@@ -223,7 +222,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
   -- A roof over |x|, and a natural K with 2·roof ≤ K + 1.
   choose xRoof from Real.exists_positive_rational_roof(x);
   choose K such that abs(xRoof + xRoof) ≤ ((K + 1) : Rational)
-      from Rational.absolute_value_le_add_one_natural(xRoof + xRoof);
+      from Rational.absolute_value_le_add_one_natural;
   Rational.zero
       = Rational.zero + Rational.zero
       < xRoof + xRoof
@@ -326,7 +325,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                Real.zero ≤ abs(x) * (1 / (1 + (predecessor + K) : Real))
                    by Real.LessOrEqual_zero_of_IsNonneg;
                abs(x) * (1 / (1 + (predecessor + K) : Real)) ≤ (Rational.one_half : Real)
-                   by ratioBound(predecessor + K, (K ≤ predecessor + K));
+                   by ratioBound;
                abs(Real.exponentialTerm(x, (1 + predecessor) + K))
                   = abs(Real.exponentialTerm(x, 1 + (predecessor + K)))
                         by substituting ((1 + predecessor) + K = 1 + (predecessor + K))
@@ -436,7 +435,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
         take k : Natural;
         Real.zero ≤ abs(Real.exponentialTerm(x, k));
         done
-      } as termsNonneg;
+      };
   ∀ (i j : Natural). i ≤ j
       → Real.partialSum(
             (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), i)
@@ -444,10 +443,8 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
               (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), j)
       by {
         take i : Natural; take j : Natural; take iBelowJ : i ≤ j;
-        done by Real.partialSum_monotone_of_nonneg(
-                    (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
-                    termsNonneg, i, j, iBelowJ)
-      } as sumsMonotone;
+        done by Real.partialSum_monotone_of_nonneg
+      };
   -- The roof itself is nonnegative padding.
   Real.zero ≤ abs(Real.exponentialTerm(x, K));
   Real.IsNonneg(abs(Real.exponentialTerm(x, K)));
@@ -497,7 +494,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
             }
           | Natural.StrictComparison.atLeast(KBelowN) => {
               choose c such that n = K + c as nSplit
-                  from Natural.subtraction_witness(K, n, KBelowN);
+                  from Natural.subtraction_witness;
               n
                   = K + c    by nSplit
                   = c + K
@@ -514,10 +511,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                   + Real.partialSum(
                         (j : Natural)
                           ↦ abs(Real.exponentialTerm(x, K + j)), c)
-                      by Real.partialSum_split(
-                             (k : Natural)
-                               ↦ abs(Real.exponentialTerm(x, k)),
-                             K, c)
+                      by Real.partialSum_split
                   as splitSum;
               ∀ (j : Natural). j < c
                   → abs(Real.exponentialTerm(x, K + j))
@@ -529,10 +523,10 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                     abs(Real.exponentialTerm(x, j + K))
                         ≤ abs(Real.exponentialTerm(x, K))
                           * (Rational.one_half : Real) ^ j
-                        by tailDecay(j);
+                        by tailDecay;
                     K + j = j + K as indexCommute;
                     done by substituting indexCommute
-                  } as windowTermBound;
+                  };
               abs(Real.exponentialTerm(x, K)) ≤ abs(Real.exponentialTerm(x, K))
                   by Real.LessOrEqual.reflexive;
               ∀ (j : Natural). Real.zero ≤ (Rational.one_half : Real) ^ j
@@ -541,20 +535,17 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                     Real.zero ≤ (Rational.one_half : Real) ^ j
                         by Real.power_nonneg;
                     done
-                  } as powersNonneg;
+                  };
               Real.zero
                   ≤ Real.partialSum(
                         (j : Natural)
                           ↦ (Rational.one_half : Real) ^ j, c)
-                  by Real.partialSum_nonneg(
-                         (j : Natural)
-                           ↦ (Rational.one_half : Real) ^ j,
-                         c, powersNonneg);
+                  by Real.partialSum_nonneg;
               Real.partialSum(
                     (j : Natural)
                       ↦ (Rational.one_half : Real) ^ j, c)
                   ≤ Real.one + Real.one
-                  by geometricRoof(c);
+                  by geometricRoof;
               Real.partialSum(
                     (j : Natural)
                       ↦ abs(Real.exponentialTerm(x, K + j)), c)
@@ -563,13 +554,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                           ↦ abs(Real.exponentialTerm(x, K))
                             * (Rational.one_half : Real) ^ j,
                         c)
-                        by Real.partialSum_le_pointwise(
-                               (j : Natural)
-                                 ↦ abs(Real.exponentialTerm(x, K + j)),
-                               (j : Natural)
-                                 ↦ abs(Real.exponentialTerm(x, K))
-                                   * (Rational.one_half : Real) ^ j,
-                               c, windowTermBound)
+                        by Real.partialSum_le_pointwise
                   = abs(Real.exponentialTerm(x, K))
                     * Real.partialSum(
                           (j : Natural)
@@ -592,15 +577,8 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                        by Real.add_preserves_LessOrEqual_left
             }
         }
-      } as sumsBounded;
-  done by Real.monotone_bounded_converges(
-              Real.partialSum(
-                  (k : Natural) ↦ abs(Real.exponentialTerm(x, k))),
-              sumsMonotone,
-              Real.partialSum(
-                  (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
-              + abs(Real.exponentialTerm(x, K)) * (Real.one + Real.one),
-              sumsBounded)
+      };
+  done by Real.monotone_bounded_converges
 }
 
 -- ----------------------------------------------------------------------
@@ -614,12 +592,9 @@ theorem Real.exponential_series_convergent (x : Real)
         take k : Natural;
         abs(Real.exponentialTerm(x, k)) ≤ abs(Real.exponentialTerm(x, k));
         done
-      } as domination;
+      };
   done by Real.series_dominated_converges(
-              Real.exponentialTerm(x),
-              (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
-              domination,
-              Real.exponential_series_absolutely_convergent(x))
+              boundConvergent := Real.exponential_series_absolutely_convergent(x))
 }
 
 definition Real.exponential (x : Real) : Real :=
@@ -676,7 +651,7 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
              = Real.one + Real.exponentialTerm(Real.zero, successor(q))
                    by IH
              = Real.one + Real.zero
-                   by termSuccessor(q)
+                   by termSuccessor
              = Real.one
          } as tailConstant;
   Real.SequenceConverges(
@@ -687,7 +662,7 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
         witness 1 with
             (m : Natural) (oneBelow : 1 ≤ m) ↦ {
               choose c such that m = 1 + c as mSplit
-                  from Natural.subtraction_witness(1, m, oneBelow);
+                  from Natural.subtraction_witness;
               m = successor(c) by mSplit as mAsSuccessor;
               Real.partialSum(
                       Real.exponentialTerm(Real.zero), m)
@@ -695,7 +670,7 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
                         Real.exponentialTerm(Real.zero), successor(c))
                         by mAsSuccessor
                   = Real.one
-                        by tailConstant(c)
+                        by tailConstant
                   as sumAtM;
               Real.partialSum(
                       Real.exponentialTerm(Real.zero), m) - Real.one
@@ -715,12 +690,9 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
                  = Real.zero            by absoluteZero
                  < ε              by εPositive
             }
-      } as sumsConvergeToOne;
+      };
   done by Real.SequenceConverges.unique(
-              Real.partialSum(Real.exponentialTerm(Real.zero)),
-              Real.exponential(Real.zero), Real.one,
-              Real.exponential_converges(Real.zero),
-              sumsConvergeToOne)
+              convergesToL1 := Real.exponential_converges(Real.zero))
 }
 
 -- ----------------------------------------------------------------------
@@ -732,11 +704,11 @@ theorem Real.exponential_lower_bound (x : Real) (xNonneg : Real.zero ≤ x)
       = Real.partialSum(Real.exponentialTerm(x), 1)
         + Real.exponentialTerm(x, 1)
       = Real.partialSum(Real.exponentialTerm(x), 1) + x
-            by Real.exponentialTerm_one(x)
+            by Real.exponentialTerm_one
       = (Real.partialSum(Real.exponentialTerm(x), 0)
          + Real.exponentialTerm(x, 0)) + x
       = (Real.partialSum(Real.exponentialTerm(x), 0) + Real.one) + x
-            by Real.exponentialTerm_zero(x)
+            by Real.exponentialTerm_zero
       = (Real.zero + Real.one) + x
       = Real.one + x
             by ring
@@ -744,22 +716,20 @@ theorem Real.exponential_lower_bound (x : Real) (xNonneg : Real.zero ≤ x)
   ∀ (k : Natural). Real.zero ≤ Real.exponentialTerm(x, k)
       by {
         take k : Natural;
-        done by Real.exponentialTerm_nonneg(x, xNonneg, k)
-      } as termsNonneg;
+        done by Real.exponentialTerm_nonneg
+      };
   ∀ (m : Natural). 2 ≤ m → Real.one + x ≤ Real.partialSum(Real.exponentialTerm(x), m)
       by {
         take m : Natural;
         take twoBelow : 2 ≤ m;
         Real.partialSum(Real.exponentialTerm(x), 2)
             ≤ Real.partialSum(Real.exponentialTerm(x), m)
-            by Real.partialSum_monotone_of_nonneg(
-                   Real.exponentialTerm(x), termsNonneg, 2, m, twoBelow);
+            by Real.partialSum_monotone_of_nonneg;
         done by substituting sumAtTwo
-      } as tailAbove;
+      };
   done by Real.SequenceConverges.ge_of_eventually_ge(
-              Real.partialSum(Real.exponentialTerm(x)),
-              Real.exponential(x), Real.one + x,
-              Real.exponential_converges(x), 2, tailAbove)
+              s := Real.partialSum(Real.exponentialTerm(x)),
+              converges := Real.exponential_converges(x), N := 2)
 }
 
 -- ----------------------------------------------------------------------
@@ -816,11 +786,11 @@ theorem Real.e_above_two : Real.one + Real.one < Real.e := {
       = (Real.partialSum(Real.exponentialTerm(Real.one), 1) + Real.exponentialTerm(Real.one, 1)) + 1 / (2 : Real)
             by Real.partialSum_add_one
       = (Real.partialSum(Real.exponentialTerm(Real.one), 1) + Real.one) + 1 / (2 : Real)
-            by Real.exponentialTerm_one(Real.one)
+            by Real.exponentialTerm_one
       = ((Real.partialSum(Real.exponentialTerm(Real.one), 0) + Real.exponentialTerm(Real.one, 0)) + Real.one) + 1 / (2 : Real)
             by Real.partialSum_add_one
       = ((Real.partialSum(Real.exponentialTerm(Real.one), 0) + Real.one) + Real.one) + 1 / (2 : Real)
-            by Real.exponentialTerm_zero(Real.one)
+            by Real.exponentialTerm_zero
       = ((Real.zero + Real.one) + Real.one) + 1 / (2 : Real)
       = Real.one + Real.one + 1 / (2 : Real)
             by ring
@@ -828,24 +798,24 @@ theorem Real.e_above_two : Real.one + Real.one < Real.e := {
   Rational.zero < Rational.one;
   Real.zero < Rational.one;
   Real.zero < Real.one;
-  Real.zero ≤ Real.one as oneNonneg;
+  Real.zero ≤ Real.one;
   ∀ (k : Natural). Real.zero ≤ Real.exponentialTerm(Real.one, k)
       by {
         take k : Natural;
-        done by Real.exponentialTerm_nonneg(Real.one, oneNonneg, k)
-      } as termsNonneg;
+        done by Real.exponentialTerm_nonneg
+      };
   ∀ (m : Natural). 3 ≤ m → Real.one + Real.one + 1 / (2 : Real) ≤ Real.partialSum(Real.exponentialTerm(Real.one), m)
       by {
         take m : Natural;
         take threeBelow : 3 ≤ m;
         Real.partialSum(Real.exponentialTerm(Real.one), 3) ≤ Real.partialSum(Real.exponentialTerm(Real.one), m)
-            by Real.partialSum_monotone_of_nonneg(Real.exponentialTerm(Real.one), termsNonneg, 3, m, threeBelow);
+            by Real.partialSum_monotone_of_nonneg;
         done by substituting sumAtThree
-      } as tailAbove;
+      };
   Real.one + Real.one + 1 / (2 : Real) ≤ Real.exponential(Real.one)
       by Real.SequenceConverges.ge_of_eventually_ge(
-             Real.partialSum(Real.exponentialTerm(Real.one)), Real.exponential(Real.one),
-             Real.one + Real.one + 1 / (2 : Real), Real.exponential_converges(Real.one), 3, tailAbove)
+             s := Real.partialSum(Real.exponentialTerm(Real.one)),
+             converges := Real.exponential_converges(Real.one), N := 3)
       as aboveSumThree;
   (1 : Real) > 0;
   1 / (2 : Real) > 0;
