@@ -20,15 +20,6 @@ import Natural.basics
 import Natural.order
 import Natural.maximum
 import Natural.compare
-import Rational.basics
-import Rational.addition
-import Rational.negation
-import Rational.ring
-import Rational.order
-import Rational.order_arithmetic
-import Rational.order_multiplication
-import Rational.halve
-import Rational.positive
 import Set.basics
 import Real.sequence
 import Real.basics
@@ -49,27 +40,12 @@ import Real.series
 
 -- ----------------------------------------------------------------------
 -- A Cauchy sequence of reals: past some index, any two terms are
--- within ε of each other — for every positive real ε. (ε is a real
--- number, as in convergence; the at_rational bridge below mediates the
--- rational tolerances the supremum machinery still speaks.)
+-- within ε of each other — for every positive real ε.
 definition Real.SequenceIsCauchy (s : Natural → Real) : Proposition :=
   ∀ (ε : Real). ε > 0 →
     ∃ (N : Natural).
       ∀ (m n : Natural). N ≤ m → N ≤ n →
         abs(s(m) - s(n)) < ε
-
--- The Cauchy criterion holds at every positive RATIONAL tolerance too:
--- instantiate the Real-ε definition at the embedded rational.
-theorem Real.SequenceIsCauchy.at_rational (s : Natural → Real)
-        (cauchy : Real.SequenceIsCauchy(s))
-        : ∀ (ε : Rational). ε > Rational.zero →
-            ∃ (N : Natural).
-              ∀ (m n : Natural). N ≤ m → N ≤ n →
-                abs(s(m) - s(n)) < (ε : Real) :=
-  (ε : Rational) (εPositive : ε > Rational.zero) ↦ {
-    (ε : Real) > 0;
-    done by cauchy((ε : Real))
-  }
 
 -- The eventual lower bounds of a sequence: the reals that some tail
 -- of the sequence stays at or above.
@@ -82,7 +58,7 @@ definition Real.eventual_lower_bounds (s : Natural → Real) : Set(Real) :=
 -- of them.
 
 theorem Real.cauchy_tail_gives_lower_bound
-        (s : Natural → Real) (N : Natural) (q : Rational)
+        (s : Natural → Real) (N : Natural) (q : Real)
         (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
                      → abs(s(m) - s(n)) < q)
         : (s(N) - q) ∈ Real.eventual_lower_bounds(s) :=
@@ -91,7 +67,7 @@ theorem Real.cauchy_tail_gives_lower_bound
         N ≤ N;
         abs(s(m) - s(N)) < q
             by tailClose(m, N, mInTail, (N ≤ N));
-        -(q : Real) < s(m) - s(N) ∧ s(m) - s(N) < (q : Real)
+        -q < s(m) - s(N) ∧ s(m) - s(N) < q
             by Real.absolute_value_LessThan_bounds;
         s(N) - q
                     = -q + s(N)
@@ -101,7 +77,7 @@ theorem Real.cauchy_tail_gives_lower_bound
       }
 
 theorem Real.cauchy_tail_gives_upper_bound
-        (s : Natural → Real) (N : Natural) (q : Rational)
+        (s : Natural → Real) (N : Natural) (q : Real)
         (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
                      → abs(s(m) - s(n)) < q)
         : Real.IsUpperBound(Real.eventual_lower_bounds(s),
@@ -117,8 +93,8 @@ theorem Real.cauchy_tail_gives_upper_bound
     abs(s(Natural.maximum(tailStart, N)) - s(N)) < q
         by tailClose(Natural.maximum(tailStart, N), N,
                      (N ≤ Natural.maximum(tailStart, N)), (N ≤ N));
-    -(q : Real) < s(Natural.maximum(tailStart, N)) - s(N)
-        ∧ s(Natural.maximum(tailStart, N)) - s(N) < (q : Real)
+    -q < s(Natural.maximum(tailStart, N)) - s(N)
+        ∧ s(Natural.maximum(tailStart, N)) - s(N) < q
         by Real.absolute_value_LessThan_bounds;
     s(Natural.maximum(tailStart, N))
                 = (s(Natural.maximum(tailStart, N)) - s(N)) + s(N)   by ring
@@ -139,122 +115,91 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
   -- The eventual lower bounds are nonempty (one unit below any Cauchy
   -- tail) and bounded above (one unit above it), so they have a
   -- supremum.
-  Rational.one > Rational.zero;
+  (1 : Real) > 0;
   ∃ (unitIndex : Natural). ∀ (m n : Natural). unitIndex ≤ m → unitIndex ≤ n
-      → abs(s(m) - s(n)) < (Rational.one : Real)
-      by Real.SequenceIsCauchy.at_rational as unitCauchy;
+      → abs(s(m) - s(n)) < 1
+      by cauchy as unitCauchy;
   choose unitIndex from unitCauchy;
-  (s(unitIndex) - (Rational.one : Real)) ∈ Real.eventual_lower_bounds(s)
+  (s(unitIndex) - 1) ∈ Real.eventual_lower_bounds(s)
       by Real.cauchy_tail_gives_lower_bound as unitTailBelow;
   Set.IsNonempty(Real, Real.eventual_lower_bounds(s))
-      by witness s(unitIndex) - (Rational.one : Real) with unitTailBelow;
-  Real.IsUpperBound(Real.eventual_lower_bounds(s),
-                    s(unitIndex) + (Rational.one : Real))
+      by witness s(unitIndex) - 1 with unitTailBelow;
+  Real.IsUpperBound(Real.eventual_lower_bounds(s), s(unitIndex) + 1)
       by Real.cauchy_tail_gives_upper_bound as unitTailAbove;
   Real.IsBoundedAbove(Real.eventual_lower_bounds(s))
-      by witness s(unitIndex) + (Rational.one : Real) with unitTailAbove;
+      by witness s(unitIndex) + 1 with unitTailAbove;
   ∃ (candidate : Real). Real.IsSupremum(Real.eventual_lower_bounds(s), candidate)
       by Real.supremum_exists as supremumExists;
   choose limit such that Real.IsSupremum(Real.eventual_lower_bounds(s), limit)
       as isSupremum from supremumExists;
   let ⟨isUpper, isLeast⟩ := isSupremum;
   witness limit with
-      -- Convergence is established at a rational ε (the Cauchy criterion and
-      -- supremum trapping both work with rational tolerances), lifted by density.
-      Real.SequenceConverges.of_rational(rationalBound :=
-      (ε : Rational)
-      (εPositive : ε > Rational.zero) ↦ {
-        Rational.halve(ε) > Rational.zero;
-        Rational.halve(Rational.halve(ε)) > Rational.zero;
+      (ε : Real)
+      (εPositive : ε > 0) ↦ {
+        ε / 4 > 0 by Real.divide_positive;
         ∃ (N : Natural). ∀ (m n : Natural). N ≤ m → N ≤ n
-            → abs(s(m) - s(n)) < (Rational.halve(Rational.halve(ε)) : Real)
-            by Real.SequenceIsCauchy.at_rational as quarterCauchy;
+            → abs(s(m) - s(n)) < ε / 4
+            by cauchy as quarterCauchy;
         choose N as tailClose from quarterCauchy;
         -- The supremum is trapped within a quarter-ε of s(N).
-        (s(N) - (Rational.halve(Rational.halve(ε)) : Real))
-                ∈ Real.eventual_lower_bounds(s)
+        (s(N) - ε / 4) ∈ Real.eventual_lower_bounds(s)
             by Real.cauchy_tail_gives_lower_bound;
-        s(N) - (Rational.halve(Rational.halve(ε)) : Real) ≤ limit
+        s(N) - ε / 4 ≤ limit
             by isUpper;
-        Real.IsUpperBound(Real.eventual_lower_bounds(s),
-                          s(N) + (Rational.halve(Rational.halve(ε)) : Real))
+        Real.IsUpperBound(Real.eventual_lower_bounds(s), s(N) + ε / 4)
             by Real.cauchy_tail_gives_upper_bound;
-        limit ≤ s(N) + (Rational.halve(Rational.halve(ε)) : Real)
+        limit ≤ s(N) + ε / 4
             by isLeast;
-        Rational.halve(ε) < ε
-            by Rational.halve_less_than_self;
-        (Rational.halve(ε) : Real) < (ε : Real)
-            by Rational.to_real.LessThan_preserves as halveBelowε;
+        ε / 2 < ε
+            by Real.divide_two_less_than_self as halveBelowε;
         witness N with
             (m : Natural) (mInTail : N ≤ m) ↦ {
               N ≤ N;
-              abs(s(m) - s(N))
-                      < (Rational.halve(Rational.halve(ε)) : Real)
+              abs(s(m) - s(N)) < ε / 4
                   by tailClose(m, N, mInTail, (N ≤ N));
-              -(Rational.halve(Rational.halve(ε)) : Real) < s(m) - s(N)
-                  ∧ s(m) - s(N) < (Rational.halve(Rational.halve(ε)) : Real)
+              -(ε / 4) < s(m) - s(N) ∧ s(m) - s(N) < ε / 4
                   by Real.absolute_value_LessThan_bounds;
-              -- Both gaps to the limit stay below 2·(ε/4) < ε.
-              -limit
-                      ≤ -(s(N) - (Rational.halve(Rational.halve(ε))
-                                  : Real))
+              -- Both gaps to the limit stay below 2·(ε/4) = ε/2 < ε.
+              -limit ≤ -(s(N) - ε / 4)
                   by Real.LessOrEqual.negate;
               s(m) - limit
-                          ≤ s(m) - (s(N)
-                                    - (Rational.halve(Rational.halve(ε))
-                                       : Real))
+                          ≤ s(m) - (s(N) - ε / 4)
                                 by Real.add_preserves_LessOrEqual_left
-                          = (s(m) - s(N))
-                            + (Rational.halve(Rational.halve(ε)) : Real)
+                          = (s(m) - s(N)) + ε / 4
                                 by ring
-                          < (Rational.halve(Rational.halve(ε)) : Real)
-                            + (Rational.halve(Rational.halve(ε)) : Real)
+                          < ε / 4 + ε / 4
                                 by Real.add_preserves_LessThan
-                          = ((Rational.halve(Rational.halve(ε))
-                              + Rational.halve(Rational.halve(ε))
-                              : Rational) : Real)
-                          = (Rational.halve(ε) : Real)
-                          < (ε : Real)
+                          = ε / 2
+                                by field
+                          < ε
                                 by halveBelowε;
-              s(N) - (Rational.halve(Rational.halve(ε))
-                               : Real)
-                          = -(Rational.halve(Rational.halve(ε)) : Real)
-                            + s(N)
+              s(N) - ε / 4
+                          = -(ε / 4) + s(N)
                                 by ring
                           < (s(m) - s(N)) + s(N)
                                 by Real.add_preserves_LessThan
                           = s(m);
-              -s(m)
-                      < -(s(N) - (Rational.halve(Rational.halve(ε))
-                                  : Real))
+              -s(m) < -(s(N) - ε / 4)
                   by Real.LessThan.negate;
               limit - s(m)
-                          ≤ (s(N) + (Rational.halve(Rational.halve(ε))
-                                     : Real)) - s(m)
+                          ≤ (s(N) + ε / 4) - s(m)
                                 by Real.add_preserves_LessOrEqual
-                          < (s(N) + (Rational.halve(Rational.halve(ε))
-                                     : Real))
-                            - (s(N) - (Rational.halve(Rational.halve(ε))
-                                       : Real))
+                          < (s(N) + ε / 4) - (s(N) - ε / 4)
                                 by Real.add_left_preserves_LessThan
-                          = (Rational.halve(Rational.halve(ε)) : Real)
-                            + (Rational.halve(Rational.halve(ε)) : Real)
+                          = ε / 4 + ε / 4
                                 by ring
-                          = ((Rational.halve(Rational.halve(ε))
-                              + Rational.halve(Rational.halve(ε))
-                              : Rational) : Real)
-                          = (Rational.halve(ε) : Real)
-                          < (ε : Real)
+                          = ε / 2
+                                by field
+                          < ε
                                 by halveBelowε;
-              -(ε : Real) < -(limit - s(m))
+              -ε < -(limit - s(m))
                   by Real.LessThan.negate;
-              -(ε : Real)
-                          < -(limit - s(m))    by (-(ε : Real)
-                                                   < -(limit - s(m)))
+              -ε
+                          < -(limit - s(m))    by (-ε < -(limit - s(m)))
                           = s(m) - limit;
               done by Real.absolute_value_LessThan_of_bounds
             }
-      })
+      }
 }
 
 -- ----------------------------------------------------------------------
