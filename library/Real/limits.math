@@ -67,6 +67,59 @@ theorem Real.constant_sequence_converges (c : Real)
                    by εPositive
 
 -- ----------------------------------------------------------------------
+-- The Archimedean core: 1/(n+1) → 0. This is the one place ℝ's Archimedean
+-- property descends to ℚ's: the decay tolerance is the rational bound
+-- `Rational.scaled_reciprocal_eventually_below`, built at a rational ε and
+-- lifted to real ε by density (`of_rational`). Callers get a clean real-ε
+-- convergence and never see a rational tolerance.
+theorem Real.reciprocal_successor_converges_zero
+        : Real.SequenceConverges((n : Natural) ↦ 1 / (1 + n : Real), Real.zero) :=
+  by Real.SequenceConverges.of_rational(
+      rationalBound :=
+  (ε : Rational)
+  (εPositive : ε > Rational.zero) ↦ {
+    Rational.zero ≤ (1 : Rational) by Rational.LessThan.weaken;
+    Rational.IsNonneg((1 : Rational)) by Rational.IsNonneg_of_LessOrEqual_zero;
+    choose N such that
+        ∀ (m : Natural). N ≤ m
+          → (1 : Rational) * Rational.reciprocal_function((1 + m : Rational)) < ε
+        as tailBelow
+        from Rational.scaled_reciprocal_eventually_below;
+    witness N with
+        (m : Natural) (aboveThreshold : N ≤ m) ↦ {
+          (1 + m : Rational) > Rational.zero;
+          (1 + m : Rational) ≠ Rational.zero;
+          (1 + m : Real) > 0;
+          (1 + m : Real) ≠ 0;
+          (((1 : Rational)
+                 * Rational.reciprocal_function((1 + m : Rational))) : Real)
+             = ((1 : Rational) : Real)
+               * ((Rational.reciprocal_function((1 + m : Rational))) : Real)
+             = ((1 : Rational) : Real) * (1 / (1 + m : Real))
+             = 1 / (1 + m : Real)
+             as boundaryBridge;
+          (1 : Rational)
+                      * Rational.reciprocal_function((1 + m : Rational))
+                  < ε
+              by tailBelow;
+          (((1 : Rational) * Rational.reciprocal_function((1 + m : Rational))) : Real) < (ε : Real);
+          1 / (1 + m : Real) < (ε : Real)
+              by substituting boundaryBridge as tailBelowCast;
+          (1 : Real) > 0;
+          1 / (1 + m : Real) > 0;
+          1 / (1 + m : Real) ≥ 0;
+          Real.IsNonneg(1 / (1 + m : Real));
+          abs(1 / (1 + m : Real) - Real.zero)
+             = abs(1 / (1 + m : Real))
+                   by (1 / (1 + m : Real) - Real.zero
+                       = 1 / (1 + m : Real))
+             = 1 / (1 + m : Real)
+             < (ε : Real)
+                   by tailBelowCast
+        }
+  })
+
+-- ----------------------------------------------------------------------
 -- Sum of limits: each summand within ε/2 puts the sum within ε.
 theorem Real.SequenceConverges.add (s t : Natural → Real)
         (sLimit tLimit : Real)
@@ -268,6 +321,30 @@ theorem Real.SequenceConverges.multiply (s t : Natural → Real)
              < ε       by Real.divide_two_less_than_self
         }
   }
+
+-- ----------------------------------------------------------------------
+-- Any real multiple of the reciprocal-successor sequence still vanishes:
+-- c/(n+1) → 0. Pure real ε — the ℚ Archimedean descent lives entirely in
+-- `reciprocal_successor_converges_zero`; here the limit is only scaled by a
+-- constant, via the product of limits and pointwise `c·(1/(n+1)) = c/(n+1)`.
+theorem Real.scaled_reciprocal_successor_converges_zero (c : Real)
+        : Real.SequenceConverges((n : Natural) ↦ c / (1 + n : Real), Real.zero) := {
+  Real.constant_sequence_converges(c);
+  Real.reciprocal_successor_converges_zero;
+  Real.SequenceConverges((n : Natural) ↦ c * (1 / (1 + n : Real)), c * Real.zero)
+      by Real.SequenceConverges.multiply(
+             s := (n : Natural) ↦ c,
+             t := (n : Natural) ↦ 1 / (1 + n : Real));
+  Real.SequenceConverges((n : Natural) ↦ c * (1 / (1 + n : Real)), Real.zero)
+      by substituting (ring : c * Real.zero = Real.zero);
+  ∀ (n : Natural). c * (1 / (1 + n : Real)) = c / (1 + n : Real)
+      by (n : Natural) ↦ {
+           (1 + n : Real) ≠ 0;
+           done by field
+         };
+  done by Real.SequenceConverges.of_pointwise(
+             s := (n : Natural) ↦ c * (1 / (1 + n : Real)))
+}
 
 -- ----------------------------------------------------------------------
 -- Monotone convergence. The range of the sequence, as a set.

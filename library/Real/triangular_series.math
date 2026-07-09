@@ -6,8 +6,8 @@
 -- Partial fractions: 1/T(k+1) = 2/(k+1) − 2/(k+2) (from the product
 -- form 2·T(k+1) = (k+1)(k+2) and the field tactic), so the partial
 -- sums telescope to 2 − 2/(n+1), and the tail dies by the Archimedean
--- bound. The terms are honest real divisions; only the Archimedean
--- decay is fetched from the Rational layer, through the ℚ→ℝ boundary.
+-- convergence 2/(n+1) → 0. The terms are honest real divisions and all
+-- reasoning stays in ℝ.
 
 module Real.triangular_series
 
@@ -24,24 +24,6 @@ import Natural.add_order
 import Natural.triangular
 import Integer.basics
 import Integer.embedding
-import Rational.basics
-import Rational.embedding
-import Rational.addition
-import Rational.multiplication
-import Rational.negation
-import Rational.ring
-import Rational.algebra
-import Rational.order
-import Rational.order_arithmetic
-import Rational.order_multiplication
-import Rational.absolute_value
-import Rational.triangle
-import Rational.triangle_more
-import Rational.positive
-import Rational.linearity
-import Rational.reciprocal
-import Rational.reciprocal_function
-import Rational.archimedean
 import Algebra.ring_lemmas
 import Set.basics
 import Real.interface
@@ -129,60 +111,14 @@ theorem Real.triangular_term_telescopes (k : Natural)
 }
 
 -- ----------------------------------------------------------------------
--- The tail 2/(n+1) converges to zero. The decay rate is the Rational
--- Archimedean bound, carried across the ℚ→ℝ boundary term by term.
+-- The tail 2/(n+1) converges to zero — a constant multiple of the
+-- Archimedean core 1/(n+1) → 0. Every ε here is real; the ℚ Archimedean
+-- descent is confined to Real.reciprocal_successor_converges_zero.
 theorem Real.triangular_tail_converges
         : Real.SequenceConverges(
               (n : Natural) ↦ 2 / (1 + n : Real),
-              Real.zero) := {
-  -- The decay tolerance is rational (`scaled_reciprocal_eventually_below`),
-  -- so build at a rational ε and lift by density.
-  done by Real.SequenceConverges.of_rational(
-      rationalBound :=
-  (ε : Rational)
-  (εPositive : ε > Rational.zero) ↦ {
-    Rational.IsNonneg((2 : Rational));
-    choose N such that
-        ∀ (m : Natural). N ≤ m
-          → (2 : Rational) * Rational.reciprocal_function((1 + m : Rational)) < ε
-        as tailBelow
-        from Rational.scaled_reciprocal_eventually_below;
-    witness N with
-        (m : Natural) (aboveThreshold : N ≤ m) ↦ {
-          -- Carry the rational bound across the boundary.
-          (1 + m : Rational) > Rational.zero;
-          (1 + m : Rational) ≠ Rational.zero;
-          (1 + m : Real) > 0;
-          (1 + m : Real) ≠ 0;
-          (((2 : Rational)
-                 * Rational.reciprocal_function((1 + m : Rational))) : Real)
-             = ((2 : Rational) : Real)
-               * ((Rational.reciprocal_function((1 + m : Rational))) : Real)
-             = ((2 : Rational) : Real) * (1 / (1 + m : Real))
-             = 2 / (1 + m : Real)
-             as boundaryBridge;
-          (2 : Rational)
-                      * Rational.reciprocal_function((1 + m : Rational))
-                  < ε
-              by tailBelow;
-          (((2 : Rational) * Rational.reciprocal_function((1 + m : Rational))) : Real) < (ε : Real);
-          2 / (1 + m : Real) < (ε : Real)
-              by substituting boundaryBridge as tailBelowCast;
-          -- The tail is nonnegative, so it is its own absolute value.
-          (2 : Real) > 0;
-          2 / (1 + m : Real) > 0;
-          2 / (1 + m : Real) ≥ 0;
-          Real.IsNonneg(2 / (1 + m : Real));
-          abs(2 / (1 + m : Real) - Real.zero)
-             = abs(2 / (1 + m : Real))
-                   by (2 / (1 + m : Real) - Real.zero
-                       = 2 / (1 + m : Real))
-             = 2 / (1 + m : Real)
-             < (ε : Real)
-                   by tailBelowCast
-        }
-  })
-}
+              Real.zero) :=
+  by Real.scaled_reciprocal_successor_converges_zero
 
 -- ----------------------------------------------------------------------
 -- Freek #42: the reciprocals of the triangular numbers sum to 2.
