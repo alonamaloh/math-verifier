@@ -104,6 +104,25 @@ field-of-fractions quotient.
   deep-β/ι matching (expensive) or `isDefinitionallyEqual`-based
   matching with unique-occurrence detection (open design question).
 
+- **`well_defined by` obligation bodies get no expected type.** The
+  `well_defined by` block of a `by representatives` definition elaborates
+  its obligation term bottom-up with no expected type threaded in from the
+  generated respect-goal. So the statement-sugar that reads best there is
+  unreachable: argument-free `by <lemma>` / a trailing `done` / a final
+  stated fact all error "bare claim/done needs an expected type", `take` /
+  `suppose` demand explicit annotations, and `↦ by { … }` doesn't parse.
+  The only ways to cite the respect lemma cleanly are a full positional
+  call (`add_respects(modulus, a, a', b, b, congruentA, reflexive(…))` —
+  a raw-CIC leak) or a locally-ascribed block
+  (`({ <fact> by reflexive; done by add_respects } : <obligation type>)`,
+  which restates the obligation type as verbose machinery). Seen in the
+  CIC-leak sweep on `IntegerMod/operations.math` (chose the ascribed block,
+  15→1) and `Polynomial/multiplication.math` (left the positional form,
+  13→4) — the divergence is purely this missing expected type. Fix: thread
+  the generated obligation goal into the `well_defined by` body as its
+  expected type, so argument-free `by`/`done`/`take`/`suppose` work there
+  directly (and both files collapse to the clean form).
+
 - **`rewrite` outside `calc` — reverse-direction + in-place forms.**
   The 2-arg `rewrite(eq, term)` term-level form covers the
   witness-transport sites. Still missing: a reverse-direction form

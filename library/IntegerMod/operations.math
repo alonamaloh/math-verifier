@@ -43,8 +43,7 @@ theorem Integer.CongruentModulo.add_respects (modulus : Natural)
         (congruentA : Integer.CongruentModulo(modulus, a, a'))
         (congruentB : Integer.CongruentModulo(modulus, b, b'))
         : Integer.CongruentModulo(modulus, a + b, a' + b') := {
-  Integer.divides((modulus : Integer), (a - a') + (b - b'))
-      by Integer.divides_add((modulus : Integer), a - a', b - b', congruentA, congruentB);
+  Integer.divides((modulus : Integer), (a - a') + (b - b')) by Integer.divides_add;
   (a - a') + (b - b') = (a + b) - (a' + b');
   Integer.divides((modulus : Integer), (a + b) - (a' + b'))
 }
@@ -54,7 +53,7 @@ theorem Integer.CongruentModulo.negate_respects (modulus : Natural)
         (a a' : Integer)
         (congruentA : Integer.CongruentModulo(modulus, a, a'))
         : Integer.CongruentModulo(modulus, -a, -a') := {
-  Integer.divides((modulus : Integer), -(a - a')) by Integer.divides_negate((modulus : Integer), a - a', congruentA);
+  Integer.divides((modulus : Integer), -(a - a')) by Integer.divides_negate;
   -(a - a') = (-a) - (-a');
   Integer.divides((modulus : Integer), (-a) - (-a'))
 }
@@ -66,11 +65,9 @@ theorem Integer.CongruentModulo.multiply_respects (modulus : Natural)
         (congruentA : Integer.CongruentModulo(modulus, a, a'))
         (congruentB : Integer.CongruentModulo(modulus, b, b'))
         : Integer.CongruentModulo(modulus, a * b, a' * b') := {
-  Integer.divides((modulus : Integer), (a - a') * b + (b - b') * a')
-      by Integer.divides_add((modulus : Integer),
-             (a - a') * b, (b - b') * a',
-             Integer.divides_multiply_right((modulus : Integer), a - a', b, congruentA),
-             Integer.divides_multiply_right((modulus : Integer), b - b', a', congruentB));
+  Integer.divides((modulus : Integer), (a - a') * b) by Integer.divides_multiply_right;
+  Integer.divides((modulus : Integer), (b - b') * a') by Integer.divides_multiply_right;
+  Integer.divides((modulus : Integer), (a - a') * b + (b - b') * a') by Integer.divides_add;
   (a - a') * b + (b - b') * a' = a * b - a' * b';
   Integer.divides((modulus : Integer), a * b - a' * b')
 }
@@ -100,11 +97,13 @@ definition IntegerMod.add {modulus : Natural}
   by representatives a, b ↦ IntegerMod.make(modulus, a + b)
   well_defined by
     (a a' b : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
-        Integer.CongruentModulo.add_respects(modulus, a, a', b, b,
-            congruentA, Integer.CongruentModulo.reflexive(modulus, b)),
+        ({ Integer.CongruentModulo(modulus, b, b) by Integer.CongruentModulo.reflexive;
+           done by Integer.CongruentModulo.add_respects
+         } : Integer.CongruentModulo(modulus, a + b, a' + b)),
     (a b b' : Integer) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
-        Integer.CongruentModulo.add_respects(modulus, a, a, b, b',
-            Integer.CongruentModulo.reflexive(modulus, a), congruentB)
+        ({ Integer.CongruentModulo(modulus, a, a) by Integer.CongruentModulo.reflexive;
+           done by Integer.CongruentModulo.add_respects
+         } : Integer.CongruentModulo(modulus, a + b, a + b'))
 
 -- ----------------------------------------------------------------------
 -- Negation. A single lift. `modulus` is implicit: it is recovered from
@@ -116,9 +115,10 @@ definition IntegerMod.add {modulus : Natural}
 definition IntegerMod.negate {modulus : Natural}
         : IntegerMod(modulus) → IntegerMod(modulus)
   by representatives a ↦ IntegerMod.make(modulus, -a)
-  well_defined by (a a' : Integer)
-               (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
-          Integer.CongruentModulo.negate_respects(modulus, a, a', congruentA)
+  well_defined by
+    (a a' : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
+        ({ done by Integer.CongruentModulo.negate_respects
+         } : Integer.CongruentModulo(modulus, -a, -a'))
 
 -- ----------------------------------------------------------------------
 -- Multiplication. Same two-lift shape as addition.
@@ -128,11 +128,13 @@ definition IntegerMod.multiply {modulus : Natural}
   by representatives a, b ↦ IntegerMod.make(modulus, a * b)
   well_defined by
     (a a' b : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
-        Integer.CongruentModulo.multiply_respects(modulus, a, a', b, b,
-            congruentA, Integer.CongruentModulo.reflexive(modulus, b)),
+        ({ Integer.CongruentModulo(modulus, b, b) by Integer.CongruentModulo.reflexive;
+           done by Integer.CongruentModulo.multiply_respects
+         } : Integer.CongruentModulo(modulus, a * b, a' * b)),
     (a b b' : Integer) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
-        Integer.CongruentModulo.multiply_respects(modulus, a, a, b, b',
-            Integer.CongruentModulo.reflexive(modulus, a), congruentB)
+        ({ Integer.CongruentModulo(modulus, a, a) by Integer.CongruentModulo.reflexive;
+           done by Integer.CongruentModulo.multiply_respects
+         } : Integer.CongruentModulo(modulus, a * b, a * b'))
 
 -- ----------------------------------------------------------------------
 -- Constants.

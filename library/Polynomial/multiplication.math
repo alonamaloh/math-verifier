@@ -42,18 +42,30 @@ definition Polynomial.Coefficients.scale (r : Ring) (a : Ring.carrier(r))
 -- Bridge: the i-th coefficient of `scale(a, p)` is `a · p_i`. The nil
 -- case needs `Ring.multiply_zero_right` (a · 0 = 0).
 theorem Polynomial.nth_scale (r : Ring) (a : Ring.carrier(r))
-        : (p : Polynomial.Coefficients(Ring.carrier(r)))
-          → ∀ (index : Natural).
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : ∀ (index : Natural).
           Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, p), index)
-            = (a * Polynomial.coefficient(r, p, index))
-  | Polynomial.Coefficients.nil, index =>
-      Equality.symmetry(?, ?, Ring.multiply_zero_right(r, a))
-  | Polynomial.Coefficients.cons(c, rest), index =>
-      cases index {
-        | zero => reflexivity(Ring.carrier(r), (a * c))
-        | successor(predecessor) =>
-            Polynomial.nth_scale(r, a, rest, predecessor)
-      }
+            = (a * Polynomial.coefficient(r, p, index)) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+        (index : Natural) ↦
+            Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.nil(Ring.carrier(r))), index)
+               = Ring.zero(r)
+               = (a * Ring.zero(r))   by Ring.multiply_zero_right
+               = (a * Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index))
+    case Polynomial.Coefficients.cons(c, rest):
+        (index : Natural) ↦
+            cases index {
+              | zero =>
+                  Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.cons(Ring.carrier(r), c, rest)), 0)
+                     = (a * Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), c, rest), 0))
+              | successor(predecessor) => {
+                  Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, rest), predecessor)
+                     = (a * Polynomial.coefficient(r, rest, predecessor))
+                         by IH
+                }
+            }
+  }
 
 -- ----------------------------------------------------------------------
 -- Shifting: multiply by x (prepend a zero coefficient).
@@ -69,13 +81,15 @@ theorem Polynomial.nth_shift_zero (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r)))
         : Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), 0)
           = Ring.zero(r) :=
-  reflexivity(Ring.carrier(r), Ring.zero(r))
+  Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), 0)
+     = Ring.zero(r)
 
 theorem Polynomial.nth_shift_successor (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r))) (j : Natural)
         : Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), successor(j))
           = Polynomial.coefficient(r, p, j) :=
-  reflexivity(Ring.carrier(r), Polynomial.coefficient(r, p, j))
+  Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), successor(j))
+     = Polynomial.coefficient(r, p, j)
 
 -- ----------------------------------------------------------------------
 -- Multiplication of coefficient lists: the standard recursion
@@ -95,22 +109,24 @@ definition Polynomial.Coefficients.multiply (r : Ring)
 
 -- ----------------------------------------------------------------------
 -- The convolution bridge: the k-th coefficient of a product is
--- Σ_{i=0}^{k} p_i · q_{k-i}. Induction on the first list; `Natural.monus`
--- is unfolded so the index arithmetic (k+1−(j+1) = k−j) computes, and
--- the recursive call is bound before the `unfold` block (where the
--- self-name is not in scope).
+-- Σ_{i=0}^{k} p_i · q_{k-i}. By induction on the first list, then a split
+-- on k; the `convolution_zero` / `convolution_shift` sum identities carry
+-- the index arithmetic (k+1−(j+1) = k−j).
 theorem Polynomial.nth_multiply (r : Ring)
-        : (p q : Polynomial.Coefficients(Ring.carrier(r))) → ∀ (k : Natural).
+        (p q : Polynomial.Coefficients(Ring.carrier(r)))
+        : ∀ (k : Natural).
           Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, q), k)
             = Ring.Sum(r,
                   (i : Natural) ↦
                       (Polynomial.coefficient(r, p, i) * Polynomial.coefficient(r, q, Natural.monus(k, i))),
-                  k)
-  | Polynomial.Coefficients.nil, q, k =>
+                  k) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+      (k : Natural) ↦
       Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.nil(Ring.carrier(r)), q), k)
          = Ring.zero(r)
          = Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), k)
-             by Ring.Sum.zero(r, k)
+             by Ring.Sum.zero
          = Ring.Sum(r,
                (i : Natural) ↦
                    (Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), i) * Polynomial.coefficient(r, q, Natural.monus(k, i))),
@@ -120,7 +136,8 @@ theorem Polynomial.nth_multiply (r : Ring)
                     = (Ring.zero(r) * Polynomial.coefficient(r, q, Natural.monus(k, i)))
                     = (Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), i)
                            * Polynomial.coefficient(r, q, Natural.monus(k, i)))
-  | Polynomial.Coefficients.cons(a, restA), q, k =>
+    case Polynomial.Coefficients.cons(a, restA):
+      (k : Natural) ↦
       cases k {
         | zero =>
               Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q), 0)
@@ -133,16 +150,16 @@ theorem Polynomial.nth_multiply (r : Ring)
                        (i : Natural) ↦
                            (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i) * Polynomial.coefficient(r, q, Natural.monus(0, i))),
                        0)
-                     by Ring.Sum.convolution_zero(r,
-                            (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
-                            (m : Natural) ↦ Polynomial.coefficient(r, q, m))
+                     by Ring.Sum.convolution_zero(
+                            A := (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
+                            B := (m : Natural) ↦ Polynomial.coefficient(r, q, m))
         | successor(predecessor) => {
             Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor)
                   = Ring.Sum(r,
                         (j : Natural) ↦
                             (Polynomial.coefficient(r, restA, j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
                         predecessor)
-                by Polynomial.nth_multiply(r, restA, q, predecessor);
+                by IH;
             
               Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q), successor(predecessor))
                  = (Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, q), successor(predecessor)) + Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), successor(predecessor)))
@@ -157,12 +174,13 @@ theorem Polynomial.nth_multiply (r : Ring)
                        (i : Natural) ↦
                            (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i) * Polynomial.coefficient(r, q, Natural.monus(successor(predecessor), i))),
                        successor(predecessor))
-                     by Ring.Sum.convolution_shift(r,
-                            (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
-                            (m : Natural) ↦ Polynomial.coefficient(r, q, m),
-                            predecessor)
+                     by Ring.Sum.convolution_shift(
+                            A := (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
+                            B := (m : Natural) ↦ Polynomial.coefficient(r, q, m),
+                            k := predecessor)
           }
       }
+  }
 
 -- ----------------------------------------------------------------------
 -- Multiplication respects the equivalence in both arguments at once:
@@ -195,7 +213,7 @@ theorem Polynomial.Coefficients.multiply_respects (r : Ring)
                              = (Polynomial.coefficient(r, pPrime, i) * Polynomial.coefficient(r, qPrime, Natural.monus(k, i)))
                                    by secondEqual(Natural.monus(k, i)))
          = Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, pPrime, qPrime), k)
-               by Polynomial.nth_multiply(r, pPrime, qPrime, k)
+               by Polynomial.nth_multiply
 
 -- ----------------------------------------------------------------------
 -- Lift to the quotient (two lifts, as for addition).
