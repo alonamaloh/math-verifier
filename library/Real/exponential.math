@@ -78,7 +78,7 @@ import Real.cauchy_complete
 -- ----------------------------------------------------------------------
 -- The k-th term of the exponential series: (1/k!) · xᵏ.
 definition Real.exponentialTerm (x : Real) (k : Natural) : Real :=
-  (1 / (k! : Real)) * Real.power(x, k)
+  (1 / (k! : Real)) * x ^ k
 
 -- ----------------------------------------------------------------------
 -- The factorial's cast is positive (so dividing by it is honest).
@@ -138,12 +138,12 @@ theorem Real.exponentialTerm_successor (x : Real) (k : Natural)
      = (1 / (1 + k : Real)) * (1 / (k! : Real))
      as reciprocalSplit;
   Real.exponentialTerm(x, 1 + k)
-     = (1 / ((1 + k)! : Real)) * Real.power(x, 1 + k)
-     = ((1 / (1 + k : Real)) * (1 / (k! : Real))) * Real.power(x, 1 + k)
+     = (1 / ((1 + k)! : Real)) * x ^ (1 + k)
+     = ((1 / (1 + k : Real)) * (1 / (k! : Real))) * x ^ (1 + k)
            by reciprocalSplit
-     = ((1 / (1 + k : Real)) * (1 / (k! : Real))) * (x * Real.power(x, k))
+     = ((1 / (1 + k : Real)) * (1 / (k! : Real))) * (x * x ^ k)
            by Real.power_add_one
-     = (1 / (1 + k : Real)) * (x * ((1 / (k! : Real)) * Real.power(x, k)))
+     = (1 / (1 + k : Real)) * (x * ((1 / (k! : Real)) * x ^ k))
      = (1 / (1 + k : Real)) * (x * Real.exponentialTerm(x, k))
 }
 
@@ -163,10 +163,10 @@ theorem Real.exponentialTerm_zero (x : Real)
      = 1
      as reciprocalOne;
   Real.exponentialTerm(x, 0)
-     = (1 / (0! : Real)) * Real.power(x, 0)
-     = 1 * Real.power(x, 0)
+     = (1 / (0! : Real)) * x ^ 0
+     = 1 * x ^ 0
            by reciprocalOne
-     = Real.power(x, 0)
+     = x ^ 0
      = Real.one
 }
 
@@ -186,10 +186,10 @@ theorem Real.exponentialTerm_one (x : Real)
            by castOne
      = 1
      as reciprocalOne;
-  Real.power(x, 1) = x * Real.one;
+  x ^ 1 = x * Real.one;
   Real.exponentialTerm(x, 1)
-     = (1 / (1! : Real)) * Real.power(x, 1)
-     = 1 * Real.power(x, 1)
+     = (1 / (1! : Real)) * x ^ 1
+     = 1 * x ^ 1
            by reciprocalOne
      = Real.one * (x * Real.one)
      = x
@@ -203,10 +203,10 @@ theorem Real.exponentialTerm_nonneg (x : Real)
   1 / (k! : Real) > 0;
   Real.zero ≤ 1 / (k! : Real);
   Real.IsNonneg(1 / (k! : Real));
-  Real.zero ≤ Real.power(x, k);
-  Real.IsNonneg(Real.power(x, k));
-  Real.IsNonneg((1 / (k! : Real)) * Real.power(x, k));
-  Real.zero ≤ (1 / (k! : Real)) * Real.power(x, k)
+  Real.zero ≤ x ^ k;
+  Real.IsNonneg(x ^ k);
+  Real.IsNonneg((1 / (k! : Real)) * x ^ k);
+  Real.zero ≤ (1 / (k! : Real)) * x ^ k
       by Real.LessOrEqual_zero_of_IsNonneg;
   done
 }
@@ -284,15 +284,15 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
   -- Geometric decay of the terms past K, by induction on the offset.
   ∀ (j : Natural).
       abs(Real.exponentialTerm(x, j + K))
-      ≤ abs(Real.exponentialTerm(x, K)) * Real.power((Rational.one_half : Real), j)
+      ≤ abs(Real.exponentialTerm(x, K)) * (Rational.one_half : Real) ^ j
       by by induction on j with IH {
            case base: {
-               Real.power((Rational.one_half : Real), 0) = Real.one;
+               (Rational.one_half : Real) ^ 0 = Real.one;
                abs(Real.exponentialTerm(x, K)) ≤ abs(Real.exponentialTerm(x, K));
                abs(Real.exponentialTerm(x, K))
                    = abs(Real.exponentialTerm(x, K)) * Real.one
                    = abs(Real.exponentialTerm(x, K))
-                     * Real.power((Rational.one_half : Real), 0)
+                     * (Rational.one_half : Real) ^ 0
                    as productForm;
                done by substituting productForm
              }
@@ -336,11 +336,11 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                   = (abs(x) * (1 / (1 + (predecessor + K) : Real)))
                     * abs(Real.exponentialTerm(x, predecessor + K))
                   ≤ (Rational.one_half : Real)
-                    * (abs(Real.exponentialTerm(x, K)) * Real.power((Rational.one_half : Real), predecessor))
+                    * (abs(Real.exponentialTerm(x, K)) * (Rational.one_half : Real) ^ predecessor)
                         by Real.LessOrEqual.multiply_monotone_nonneg
                   = abs(Real.exponentialTerm(x, K))
-                    * ((Rational.one_half : Real) * Real.power((Rational.one_half : Real), predecessor))
-                  = abs(Real.exponentialTerm(x, K)) * Real.power((Rational.one_half : Real), 1 + predecessor)
+                    * ((Rational.one_half : Real) * (Rational.one_half : Real) ^ predecessor)
+                  = abs(Real.exponentialTerm(x, K)) * (Rational.one_half : Real) ^ (1 + predecessor)
                         by Real.power_add_one
              }
          } as tailDecay;
@@ -368,44 +368,42 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
       as oneMinusHalf;
   ∀ (c : Natural).
       Real.partialSum(
-          (k : Natural) ↦ Real.power((Rational.one_half : Real), k), c)
+          (k : Natural) ↦ (Rational.one_half : Real) ^ k, c)
       ≤ Real.one + Real.one
       by {
         take c : Natural;
         (Real.one - Rational.one_half)
             * Real.partialSum(
-                  (k : Natural) ↦ Real.power((Rational.one_half : Real), k),
+                  (k : Natural) ↦ (Rational.one_half : Real) ^ k,
                   c)
-            = Real.one - Real.power((Rational.one_half : Real), c)
+            = Real.one - (Rational.one_half : Real) ^ c
             by Real.geometric_partialSum as closedForm;
         Rational.one_half
             * Real.partialSum(
-                  (k : Natural) ↦ Real.power((Rational.one_half : Real), k),
+                  (k : Natural) ↦ (Rational.one_half : Real) ^ k,
                   c)
-            = Real.one - Real.power((Rational.one_half : Real), c)
+            = Real.one - (Rational.one_half : Real) ^ c
             by {
                   (Rational.one_half : Real)
                     * Real.partialSum(
-                          (k : Natural) ↦ Real.power(
-                              (Rational.one_half : Real), k), c)
+                          (k : Natural) ↦ (Rational.one_half : Real) ^ k, c)
                   = (Real.one - (Rational.one_half : Real))
                     * Real.partialSum(
-                          (k : Natural) ↦ Real.power(
-                              (Rational.one_half : Real), k), c)
+                          (k : Natural) ↦ (Rational.one_half : Real) ^ k, c)
                         by oneMinusHalf
-                  = Real.one - Real.power((Rational.one_half : Real), c)
+                  = Real.one - (Rational.one_half : Real) ^ c
                         by closedForm
             }
             as halfScaled;
-        Real.zero ≤ Real.power((Rational.one_half : Real), c)
+        Real.zero ≤ (Rational.one_half : Real) ^ c
             by Real.power_nonneg;
-        Real.IsNonneg(Real.power((Rational.one_half : Real), c));
-        Real.one - Real.power((Rational.one_half : Real), c) ≤ Real.one
+        Real.IsNonneg((Rational.one_half : Real) ^ c);
+        Real.one - (Rational.one_half : Real) ^ c ≤ Real.one
             by substituting
-                   (ring : Real.power((Rational.one_half : Real), c)
+                   (ring : (Rational.one_half : Real) ^ c
                        = Real.one
                          - (Real.one
-                            - Real.power((Rational.one_half : Real), c)))
+                            - (Rational.one_half : Real) ^ c))
             as chopped;
         Rational.one_half * (Real.one + Real.one) = Real.one
             by {
@@ -416,15 +414,14 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
             as doubled;
         Rational.one_half
             * Real.partialSum(
-                  (k : Natural) ↦ Real.power((Rational.one_half : Real), k),
+                  (k : Natural) ↦ (Rational.one_half : Real) ^ k,
                   c)
             ≤ (Rational.one_half : Real) * (Real.one + Real.one)
             by {
                   (Rational.one_half : Real)
                     * Real.partialSum(
-                          (k : Natural) ↦ Real.power(
-                              (Rational.one_half : Real), k), c)
-                  = Real.one - Real.power((Rational.one_half : Real), c)
+                          (k : Natural) ↦ (Rational.one_half : Real) ^ k, c)
+                  = Real.one - (Rational.one_half : Real) ^ c
                         by halfScaled
                   ≤ Real.one
                         by chopped
@@ -525,37 +522,37 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
               ∀ (j : Natural). j < c
                   → abs(Real.exponentialTerm(x, K + j))
                     ≤ abs(Real.exponentialTerm(x, K))
-                      * Real.power((Rational.one_half : Real), j)
+                      * (Rational.one_half : Real) ^ j
                   by {
                     take j : Natural;
                     take _ : j < c;
                     abs(Real.exponentialTerm(x, j + K))
                         ≤ abs(Real.exponentialTerm(x, K))
-                          * Real.power((Rational.one_half : Real), j)
+                          * (Rational.one_half : Real) ^ j
                         by tailDecay(j);
                     K + j = j + K as indexCommute;
                     done by substituting indexCommute
                   } as windowTermBound;
               abs(Real.exponentialTerm(x, K)) ≤ abs(Real.exponentialTerm(x, K))
                   by Real.LessOrEqual.reflexive;
-              ∀ (j : Natural). Real.zero ≤ Real.power((Rational.one_half : Real), j)
+              ∀ (j : Natural). Real.zero ≤ (Rational.one_half : Real) ^ j
                   by {
                     take j : Natural;
-                    Real.zero ≤ Real.power((Rational.one_half : Real), j)
+                    Real.zero ≤ (Rational.one_half : Real) ^ j
                         by Real.power_nonneg;
                     done
                   } as powersNonneg;
               Real.zero
                   ≤ Real.partialSum(
                         (j : Natural)
-                          ↦ Real.power((Rational.one_half : Real), j), c)
+                          ↦ (Rational.one_half : Real) ^ j, c)
                   by Real.partialSum_nonneg(
                          (j : Natural)
-                           ↦ Real.power((Rational.one_half : Real), j),
+                           ↦ (Rational.one_half : Real) ^ j,
                          c, powersNonneg);
               Real.partialSum(
                     (j : Natural)
-                      ↦ Real.power((Rational.one_half : Real), j), c)
+                      ↦ (Rational.one_half : Real) ^ j, c)
                   ≤ Real.one + Real.one
                   by geometricRoof(c);
               Real.partialSum(
@@ -564,20 +561,19 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
                   ≤ Real.partialSum(
                         (j : Natural)
                           ↦ abs(Real.exponentialTerm(x, K))
-                            * Real.power((Rational.one_half : Real), j),
+                            * (Rational.one_half : Real) ^ j,
                         c)
                         by Real.partialSum_le_pointwise(
                                (j : Natural)
                                  ↦ abs(Real.exponentialTerm(x, K + j)),
                                (j : Natural)
                                  ↦ abs(Real.exponentialTerm(x, K))
-                                   * Real.power(
-                                         (Rational.one_half : Real), j),
+                                   * (Rational.one_half : Real) ^ j,
                                c, windowTermBound)
                   = abs(Real.exponentialTerm(x, K))
                     * Real.partialSum(
                           (j : Natural)
-                            ↦ Real.power((Rational.one_half : Real), j),
+                            ↦ (Rational.one_half : Real) ^ j,
                           c)
                   ≤ abs(Real.exponentialTerm(x, K))
                     * (Real.one + Real.one)
@@ -648,12 +644,12 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
   ∀ (k : Natural). Real.exponentialTerm(Real.zero, successor(k)) = Real.zero
       by {
         take k : Natural;
-        Real.power(Real.zero, successor(k))
-            = Real.zero * Real.power(Real.zero, k)
+        Real.zero ^ successor(k)
+            = Real.zero * Real.zero ^ k
             = Real.zero    by ring
             as powerVanishes;
         Real.exponentialTerm(Real.zero, successor(k))
-           = (1 / (successor(k)! : Real)) * Real.power(Real.zero, successor(k))
+           = (1 / (successor(k)! : Real)) * Real.zero ^ successor(k)
            = (1 / (successor(k)! : Real)) * Real.zero
                  by powerVanishes
            = Real.zero
@@ -798,14 +794,14 @@ theorem Real.e_above_two : Real.one + Real.one < Real.e := {
             by factorialCancel
       = 1 / (2 : Real)
       as recipTwo;
-  Real.power(Real.one, 2) = Real.one * (Real.one * Real.one);
-  Real.power(Real.one, 2)
+  Real.one ^ 2 = Real.one * (Real.one * Real.one);
+  Real.one ^ 2
       = Real.one * (Real.one * Real.one)
       = Real.one                           by ring
       as powerTwoOne;
   Real.exponentialTerm(Real.one, 2)
-      = (1 / (2! : Real)) * Real.power(Real.one, 2)
-      = (1 / (2 : Real)) * Real.power(Real.one, 2)
+      = (1 / (2! : Real)) * Real.one ^ 2
+      = (1 / (2 : Real)) * Real.one ^ 2
             by recipTwo
       = (1 / (2 : Real)) * Real.one
             by powerTwoOne

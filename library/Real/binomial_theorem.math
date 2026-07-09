@@ -38,14 +38,14 @@ import Real.series
 
 -- Bridge 1: the bundled-ring power at `Real.ring` is ℝ's native power.
 theorem Real.power_eq_ring_power (x : Real) (n : Natural)
-        : Ring.power(Real.ring, x, n) = Real.power(x, n) :=
+        : Ring.power(Real.ring, x, n) = x ^ n :=
   by induction on n with IH {
     case base: done
     case step(k):
         Ring.power(Real.ring, x, 1 + k)
            = x * Ring.power(Real.ring, x, k)
-           = x * Real.power(x, k)              by IH
-           = Real.power(x, 1 + k)
+           = x * x ^ k                         by IH
+           = x ^ (1 + k)
   }
 
 -- Bridge 2: the bundled-ring sum Σ_{i≤n} is ℝ's partial sum over 1+n terms.
@@ -84,25 +84,25 @@ theorem Real.from_natural_eq_ring_from_natural (m : Natural)
 theorem Real.binomialTerm_cast (a b : Real) (n k : Natural)
         : Ring.binomialTerm(Real.ring, a, b, n, k)
           = ((Natural.binomial(n, k) : Rational) : Real)
-            * (Real.power(a, k) * Real.power(b, Natural.monus(n, k))) :=
+            * (a ^ k * b ^ Natural.monus(n, k)) :=
   Ring.binomialTerm(Real.ring, a, b, n, k)
      = Ring.from_natural(Real.ring, Natural.binomial(n, k))
        * (Ring.power(Real.ring, a, k) * Ring.power(Real.ring, b, Natural.monus(n, k)))
      = ((Natural.binomial(n, k) : Rational) : Real) * (Ring.power(Real.ring, a, k) * Ring.power(Real.ring, b, Natural.monus(n, k)))
      = ((Natural.binomial(n, k) : Rational) : Real)
-       * (Real.power(a, k) * Real.power(b, Natural.monus(n, k)))
+       * (a ^ k * b ^ Natural.monus(n, k))
 
 -- ----------------------------------------------------------------------
 -- Freek #44 on ℝ.
 theorem Real.binomial_theorem (a b : Real) (n : Natural)
-        : Real.power(a + b, n)
+        : (a + b) ^ n
           = Real.partialSum(
                 (k : Natural) ↦
                     (Natural.binomial(n, k) : Rational)
-                    * (Real.power(a, k)
-                       * Real.power(b, Natural.monus(n, k))),
+                    * (a ^ k
+                       * b ^ Natural.monus(n, k)),
                 1 + n) :=
-  Real.power(a + b, n)
+  (a + b) ^ n
      = Ring.power(Real.ring, a + b, n)
      = Ring.Sum(Real.ring,
            (k : Natural) ↦ Ring.binomialTerm(Real.ring, a, b, n, k), n)
@@ -112,7 +112,7 @@ theorem Real.binomial_theorem (a b : Real) (n : Natural)
      = Real.partialSum(
            (k : Natural) ↦
                ((Natural.binomial(n, k) : Rational) : Real)
-               * (Real.power(a, k) * Real.power(b, Natural.monus(n, k))),
+               * (a ^ k * b ^ Natural.monus(n, k)),
            1 + n)
            by Real.partialSum_pointwise(
                   pointwiseEqual := (k : Natural) ↦ Real.binomialTerm_cast(a, b, n, k))

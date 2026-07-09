@@ -45,19 +45,19 @@ definition ComplexNumber.commutative_ring : CommutativeRing :=
 
 -- The `1 + n` recursion unfold for ℂ's power.
 theorem ComplexNumber.power_add_one (x : ComplexNumber) (n : Natural)
-        : ComplexNumber.power(x, 1 + n) = x * ComplexNumber.power(x, n) :=
+        : x ^ (1 + n) = x * x ^ n :=
   done by substituting Natural.one_add
 
 -- Bridge 1: the bundled-ring power at `ComplexNumber.ring_bundle` is ℂ's.
 theorem ComplexNumber.power_eq_ring_power (x : ComplexNumber) (n : Natural)
-        : Ring.power(ComplexNumber.ring_bundle, x, n) = ComplexNumber.power(x, n) :=
+        : Ring.power(ComplexNumber.ring_bundle, x, n) = x ^ n :=
   by induction on n with IH {
     case base: done
     case step(k):
         Ring.power(ComplexNumber.ring_bundle, x, 1 + k)
            = x * Ring.power(ComplexNumber.ring_bundle, x, k)
-           = x * ComplexNumber.power(x, k)                     by IH
-           = ComplexNumber.power(x, 1 + k)
+           = x * x ^ k                                         by IH
+           = x ^ (1 + k)
   }
 
 -- Bridge 2: the bundled-ring sum is ℂ's partial sum over 1+n terms.
@@ -103,7 +103,7 @@ theorem ComplexNumber.from_natural_eq_ring_from_natural (m : Natural)
 theorem ComplexNumber.binomialTerm_cast (a b : ComplexNumber) (n k : Natural)
         : Ring.binomialTerm(ComplexNumber.ring_bundle, a, b, n, k)
           = ComplexNumber.binomialCoefficient(n, k)
-            * (ComplexNumber.power(a, k) * ComplexNumber.power(b, Natural.monus(n, k))) :=
+            * (a ^ k * b ^ Natural.monus(n, k)) :=
   Ring.binomialTerm(ComplexNumber.ring_bundle, a, b, n, k)
      = Ring.from_natural(ComplexNumber.ring_bundle, Natural.binomial(n, k))
        * (Ring.power(ComplexNumber.ring_bundle, a, k)
@@ -113,20 +113,20 @@ theorem ComplexNumber.binomialTerm_cast (a b : ComplexNumber) (n k : Natural)
           * Ring.power(ComplexNumber.ring_bundle, b, Natural.monus(n, k)))
            by substituting ComplexNumber.from_natural_eq_ring_from_natural
      = ComplexNumber.binomialCoefficient(n, k)
-       * (ComplexNumber.power(a, k) * ComplexNumber.power(b, Natural.monus(n, k)))
+       * (a ^ k * b ^ Natural.monus(n, k))
            by substituting ComplexNumber.power_eq_ring_power
 
 -- ----------------------------------------------------------------------
 -- Freek #44 on ℂ.
 theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
-        : ComplexNumber.power(a + b, n)
+        : (a + b) ^ n
           = ComplexNumber.partialSum(
                 (k : Natural) ↦
                     ComplexNumber.binomialCoefficient(n, k)
-                    * (ComplexNumber.power(a, k)
-                       * ComplexNumber.power(b, Natural.monus(n, k))),
+                    * (a ^ k
+                       * b ^ Natural.monus(n, k)),
                 1 + n) :=
-  ComplexNumber.power(a + b, n)
+  (a + b) ^ n
      = Ring.power(ComplexNumber.ring_bundle, a + b, n)
            by ComplexNumber.power_eq_ring_power
      = Ring.Sum(ComplexNumber.ring_bundle,
@@ -138,7 +138,7 @@ theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
      = ComplexNumber.partialSum(
            (k : Natural) ↦
                ComplexNumber.binomialCoefficient(n, k)
-               * (ComplexNumber.power(a, k) * ComplexNumber.power(b, Natural.monus(n, k))),
+               * (a ^ k * b ^ Natural.monus(n, k)),
            1 + n)
            by ComplexNumber.partialSum_pointwise(
                   pointwiseEqual := (k : Natural) ↦ ComplexNumber.binomialTerm_cast(a, b, n, k))
