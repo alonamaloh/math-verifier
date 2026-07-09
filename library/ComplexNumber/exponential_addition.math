@@ -102,7 +102,7 @@ theorem ComplexNumber.exponentialTerm_binomial_split
       by (i : Natural) (iBelow : successor(i) ≤ 1 + k) ↦ {
            let recipK : Real := 1 / (k! : Real);
            i ≤ k by Natural.successor_le_cancel;
-           choose d such that k = i + d from Natural.subtraction_witness(i, k, (i ≤ k));
+           choose d such that k = i + d from Natural.subtraction_witness;
            i + d = k as kJoin;
            Natural.monus(k, i) = d
                by {
@@ -339,7 +339,7 @@ theorem ComplexNumber.cauchy_product_difference_bound
             - aModulus(i) * Real.partialSum(bModulus, Natural.monus(n, i))
       by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
            i ≤ n;
-           choose e such that n = i + e from Natural.subtraction_witness(i, n, (i ≤ n));
+           choose e such that n = i + e from Natural.subtraction_witness;
            i + e = n as nJoin;
            Natural.monus(n, i) = e
                by {
@@ -511,16 +511,16 @@ theorem ComplexNumber.cauchy_product_converges
                 ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n),
             aLimit * bLimit)
       by ComplexNumber.SequenceConverges.multiply(
-             ComplexNumber.partialSum(a), ComplexNumber.partialSum(b),
-             aLimit, bLimit, aConverges, bConverges) as productConverges;
+             s := ComplexNumber.partialSum(a), t := ComplexNumber.partialSum(b),
+             sConverges := aConverges, tConverges := bConverges) as productConverges;
   Real.SequenceConverges(
             (n : Natural) ↦
                 Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n),
             aAbsoluteLimit * bAbsoluteLimit)
       by Real.SequenceConverges.multiply(
-             Real.partialSum(aModulus), Real.partialSum(bModulus),
-             aAbsoluteLimit, bAbsoluteLimit,
-             aAbsolutelyConverges, bAbsolutelyConverges) as absoluteProductConverges;
+             s := Real.partialSum(aModulus), t := Real.partialSum(bModulus),
+             sConverges := aAbsolutelyConverges,
+             tConverges := bAbsolutelyConverges) as absoluteProductConverges;
   -- The absolute triangle sums are monotone in n.
   (i : Natural) → Real.zero ≤ aModulus(i)
       by (i : Natural) ↦ ComplexNumber.modulus_nonneg(a(i));
@@ -584,7 +584,7 @@ theorem ComplexNumber.cauchy_product_converges
                     i ≤ n
                         by Natural.less_or_equal_predecessor_less_or_equal;
                     choose e such that n = i + e
-                        from Natural.subtraction_witness(i, n, (i ≤ n));
+                        from Natural.subtraction_witness;
                     Natural.monus(n, i) ≤ n;
                     Real.partialSum(bModulus, Natural.monus(n, i))
                           ≤ Real.partialSum(bModulus, n)
@@ -631,11 +631,7 @@ theorem ComplexNumber.cauchy_product_converges
          } as absoluteTriangleBounded;
   choose triangleAbsoluteLimit such that Real.SequenceConverges(Real.partialSum(absoluteDiagonal), triangleAbsoluteLimit)
       as absoluteTriangleConverges
-      from Real.monotone_bounded_converges(
-               Real.partialSum(absoluteDiagonal),
-               absoluteTriangleMonotone,
-               aAbsoluteLimit * bAbsoluteLimit,
-               absoluteTriangleBounded);
+      from Real.monotone_bounded_converges;
   -- … to the SAME limit as the absolute square, because
   -- Sabs(n) ≤ Tabs(n + n).
   ∀ (n : Natural).
@@ -661,7 +657,7 @@ theorem ComplexNumber.cauchy_product_converges
                     i ≤ n
                         by Natural.less_or_equal_predecessor_less_or_equal;
                     choose e such that n = i + e as nSplit
-                        from Natural.subtraction_witness(i, n, (i ≤ n));
+                        from Natural.subtraction_witness;
                     n + n
                         = (i + e) + n    by nSplit
                         = i + (e + n);
@@ -740,21 +736,17 @@ theorem ComplexNumber.cauchy_product_converges
   -- The two absolute limits agree.
   triangleAbsoluteLimit ≤ aAbsoluteLimit * bAbsoluteLimit
       by Real.SequenceConverges.le_of_eventually_le(
-             Real.partialSum(absoluteDiagonal),
-             triangleAbsoluteLimit,
-             aAbsoluteLimit * bAbsoluteLimit,
-             absoluteTriangleConverges,
-             0,
-             (m : Natural) (_ : 0 ≤ m) ↦ absoluteTriangleBounded(m));
+             s := Real.partialSum(absoluteDiagonal),
+             converges := absoluteTriangleConverges,
+             N := 0,
+             tailBelow := (m : Natural) (_ : 0 ≤ m) ↦ absoluteTriangleBounded(m));
   aAbsoluteLimit * bAbsoluteLimit ≤ triangleAbsoluteLimit
       by Real.SequenceConverges.le_of_eventually_le(
-             (n : Natural) ↦
+             s := (n : Natural) ↦
                  Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n),
-             aAbsoluteLimit * bAbsoluteLimit,
-             triangleAbsoluteLimit,
-             absoluteProductConverges,
-             0,
-             (m : Natural) (_ : 0 ≤ m) ↦ {
+             converges := absoluteProductConverges,
+             N := 0,
+             tailBelow := (m : Natural) (_ : 0 ≤ m) ↦ {
                Real.partialSum(aModulus, m) * Real.partialSum(bModulus, m)
                      ≤ Real.partialSum(absoluteDiagonal, m + m);
                Real.partialSum(absoluteDiagonal, m + m)
@@ -770,19 +762,19 @@ theorem ComplexNumber.cauchy_product_converges
             (n : Natural) ↦ -Real.partialSum(absoluteDiagonal, n),
             -triangleAbsoluteLimit)
       by Real.SequenceConverges.negate(
-             Real.partialSum(absoluteDiagonal),
-             triangleAbsoluteLimit, absoluteTriangleConverges) as negatedTriangleConverges;
+             s := Real.partialSum(absoluteDiagonal),
+             sConverges := absoluteTriangleConverges) as negatedTriangleConverges;
   Real.SequenceConverges(
             (n : Natural) ↦
                 Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
                 + -Real.partialSum(absoluteDiagonal, n),
             aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit)
       by Real.SequenceConverges.add(
-             (n : Natural) ↦
+             s := (n : Natural) ↦
                  Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n),
-             (n : Natural) ↦ -Real.partialSum(absoluteDiagonal, n),
-             aAbsoluteLimit * bAbsoluteLimit, -triangleAbsoluteLimit,
-             absoluteProductConverges, negatedTriangleConverges);
+             t := (n : Natural) ↦ -Real.partialSum(absoluteDiagonal, n),
+             sConverges := absoluteProductConverges,
+             tConverges := negatedTriangleConverges);
   aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit
         = triangleAbsoluteLimit + -triangleAbsoluteLimit
               by limitsAgree
@@ -804,20 +796,14 @@ theorem ComplexNumber.cauchy_product_converges
                   - ComplexNumber.partialSum(signedDiagonal, n))
           ≤ Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
             - Real.partialSum(absoluteDiagonal, n)
-      by (n : Natural) ↦ ComplexNumber.cauchy_product_difference_bound(a, b, n) as signedGapDominated;
+      by (n : Natural) ↦ ComplexNumber.cauchy_product_difference_bound(a, b, n);
   ComplexNumber.SequenceConverges(
             (n : Natural) ↦
                 ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
                 - ComplexNumber.partialSum(signedDiagonal, n),
             complexZero)
       by ComplexNumber.SequenceConverges.squeeze_zero(
-             (n : Natural) ↦
-                 ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
-                 - ComplexNumber.partialSum(signedDiagonal, n),
-             (n : Natural) ↦
-                 Real.partialSum(aModulus, n) * Real.partialSum(bModulus, n)
-                 - Real.partialSum(absoluteDiagonal, n),
-             signedGapDominated, gapVanishes) as signedGapVanishes;
+             uVanishes := gapVanishes) as signedGapVanishes;
   -- Triangle = square − (square − triangle).
   ComplexNumber.SequenceConverges(
             (n : Natural) ↦
@@ -825,10 +811,10 @@ theorem ComplexNumber.cauchy_product_converges
                   - ComplexNumber.partialSum(signedDiagonal, n)),
             -complexZero)
       by ComplexNumber.SequenceConverges.negate(
-             (n : Natural) ↦
+             s := (n : Natural) ↦
                  ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
                  - ComplexNumber.partialSum(signedDiagonal, n),
-             complexZero, signedGapVanishes) as negatedSignedGapConverges;
+             sConverges := signedGapVanishes) as negatedSignedGapConverges;
   ComplexNumber.SequenceConverges(
             (n : Natural) ↦
                 ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
@@ -836,13 +822,13 @@ theorem ComplexNumber.cauchy_product_converges
                     - ComplexNumber.partialSum(signedDiagonal, n)),
             aLimit * bLimit + -complexZero)
       by ComplexNumber.SequenceConverges.add(
-             (n : Natural) ↦
+             s := (n : Natural) ↦
                  ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n),
-             (n : Natural) ↦
+             t := (n : Natural) ↦
                  -(ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
                    - ComplexNumber.partialSum(signedDiagonal, n)),
-             aLimit * bLimit, -complexZero,
-             productConverges, negatedSignedGapConverges);
+             sConverges := productConverges,
+             tConverges := negatedSignedGapConverges);
   aLimit * bLimit = aLimit * bLimit + -complexZero as limitSimplifies;
   ComplexNumber.SequenceConverges(
             (n : Natural) ↦
@@ -863,16 +849,10 @@ theorem ComplexNumber.cauchy_product_converges
                          - ComplexNumber.partialSum(signedDiagonal, n))
                  = ComplexNumber.partialSum(signedDiagonal, n);
            done
-         } as finalPointwise;
+         };
   done by ComplexNumber.SequenceConverges.of_pointwise(
-              (n : Natural) ↦
-                  ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
-                  + -(ComplexNumber.partialSum(a, n) * ComplexNumber.partialSum(b, n)
-                      - ComplexNumber.partialSum(signedDiagonal, n)),
-              ComplexNumber.partialSum(signedDiagonal),
-              aLimit * bLimit,
-              finalPointwise,
-              assembledAtProduct)
+              t := ComplexNumber.partialSum(signedDiagonal),
+              sConverges := assembledAtProduct)
 }
 
 -- ----------------------------------------------------------------------
@@ -887,9 +867,9 @@ theorem ComplexNumber.exponential_add (z w : ℂ)
   -- The absolute series converge: the modulus of the k-th term IS the
   -- real exponential term at the modulus.
   choose zAbsoluteLimit such that Real.SequenceConverges(Real.partialSum(Real.exponentialTerm(abs(z))), zAbsoluteLimit)
-      as zRealConverges from Real.exponential_series_convergent(abs(z));
+      as zRealConverges from Real.exponential_series_convergent;
   choose wAbsoluteLimit such that Real.SequenceConverges(Real.partialSum(Real.exponentialTerm(abs(w))), wAbsoluteLimit)
-      as wRealConverges from Real.exponential_series_convergent(abs(w));
+      as wRealConverges from Real.exponential_series_convergent;
   ∀ (n : Natural).
         Real.partialSum(Real.exponentialTerm(abs(z)), n)
           = Real.partialSum(
@@ -907,7 +887,7 @@ theorem ComplexNumber.exponential_add (z w : ℂ)
                      by ComplexNumber.modulus_exponentialTerm;
                  done
                },
-               n) as zModulusPointwise;
+               n);
   ∀ (n : Natural).
         Real.partialSum(Real.exponentialTerm(abs(w)), n)
           = Real.partialSum(
@@ -925,38 +905,38 @@ theorem ComplexNumber.exponential_add (z w : ℂ)
                      by ComplexNumber.modulus_exponentialTerm;
                  done
                },
-               n) as wModulusPointwise;
+               n);
   Real.SequenceConverges(
             Real.partialSum(
                 (k : Natural) ↦
                     abs(ComplexNumber.exponentialTerm(z, k))),
             zAbsoluteLimit)
       by Real.SequenceConverges.of_pointwise(
-             Real.partialSum(Real.exponentialTerm(abs(z))),
-             Real.partialSum(
+             s := Real.partialSum(Real.exponentialTerm(abs(z))),
+             t := Real.partialSum(
                  (k : Natural) ↦
                      abs(ComplexNumber.exponentialTerm(z, k))),
-             zAbsoluteLimit, zModulusPointwise, zRealConverges) as zAbsolutelyConverges;
+             sConverges := zRealConverges) as zAbsolutelyConverges;
   Real.SequenceConverges(
             Real.partialSum(
                 (k : Natural) ↦
                     abs(ComplexNumber.exponentialTerm(w, k))),
             wAbsoluteLimit)
       by Real.SequenceConverges.of_pointwise(
-             Real.partialSum(Real.exponentialTerm(abs(w))),
-             Real.partialSum(
+             s := Real.partialSum(Real.exponentialTerm(abs(w))),
+             t := Real.partialSum(
                  (k : Natural) ↦
                      abs(ComplexNumber.exponentialTerm(w, k))),
-             wAbsoluteLimit, wModulusPointwise, wRealConverges) as wAbsolutelyConverges;
+             sConverges := wRealConverges) as wAbsolutelyConverges;
   -- The signed series converge to the two exponentials.
   ComplexNumber.SequenceConverges(
             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z)),
             ComplexNumber.exponential(z))
-      by ComplexNumber.exponential_converges as zConverges;
+      by ComplexNumber.exponential_converges;
   ComplexNumber.SequenceConverges(
             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(w)),
             ComplexNumber.exponential(w))
-      by ComplexNumber.exponential_converges as wConverges;
+      by ComplexNumber.exponential_converges;
   -- Mertens: the triangle sums converge to the product.
   ComplexNumber.SequenceConverges(
             ComplexNumber.partialSum(
@@ -968,11 +948,8 @@ theorem ComplexNumber.exponential_add (z w : ℂ)
                         1 + k)),
             ComplexNumber.exponential(z) * ComplexNumber.exponential(w))
       by ComplexNumber.cauchy_product_converges(
-             ComplexNumber.exponentialTerm(z), ComplexNumber.exponentialTerm(w),
-             ComplexNumber.exponential(z), ComplexNumber.exponential(w),
-             zAbsoluteLimit, wAbsoluteLimit,
-             zConverges, wConverges,
-             zAbsolutelyConverges, wAbsolutelyConverges) as triangleConverges;
+             aAbsolutelyConverges := zAbsolutelyConverges,
+             bAbsolutelyConverges := wAbsolutelyConverges) as triangleConverges;
   -- The triangle sums ARE the partial sums of the series at z + w.
   ∀ (n : Natural).
         ComplexNumber.partialSum(
@@ -1004,21 +981,20 @@ theorem ComplexNumber.exponential_add (z w : ℂ)
                      by ComplexNumber.exponentialTerm_binomial_split;
                  done
                },
-               n) as diagonalsArePowerSeries;
+               n);
   ComplexNumber.SequenceConverges(
             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
             ComplexNumber.exponential(z) * ComplexNumber.exponential(w))
       by ComplexNumber.SequenceConverges.of_pointwise(
-             ComplexNumber.partialSum(
+             s := ComplexNumber.partialSum(
                  (k : Natural) ↦
                      ComplexNumber.partialSum(
                          (i : Natural) ↦
                              ComplexNumber.exponentialTerm(z, i)
                              * ComplexNumber.exponentialTerm(w, Natural.monus(k, i)),
                          1 + k)),
-             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
-             ComplexNumber.exponential(z) * ComplexNumber.exponential(w),
-             diagonalsArePowerSeries, triangleConverges);
+             t := ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
+             sConverges := triangleConverges);
   ComplexNumber.SequenceConverges(
             ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z + w)),
             ComplexNumber.exponential(z + w))
