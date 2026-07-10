@@ -644,18 +644,46 @@ ExpressionPointer Elaborator::applyCoercionChain(
         return expr;
     }
 
+// The coercion-preservation registry (PLAN_CALC_WIDENING §D): which
+// `<edge>.<slot>` lemma carries a relation up a coercion edge. `=` is
+// handled separately (congruence of the coercion — always available);
+// a relation with no slot (`∈`: membership relates an element to a
+// set, it does not transport along the element's tower) cannot be
+// lifted at all. Coverage is registry coverage: a symbol listed here
+// lifts across exactly the edges that declare its lemma, and a
+// missing lemma is a legible per-edge error.
+static std::string relationPreservesSlot(const std::string& symbol) {
+    if (symbol == "≤") return "LessOrEqual_preserves";
+    if (symbol == "<") return "LessThan_preserves";
+    if (symbol == "∣") return "Divides_preserves";
+    if (symbol == "⊆") return "Subset_preserves";
+    if (symbol == "≈") return "Approx_preserves";
+    return "";
+}
+
 ExpressionPointer Elaborator::liftRelationProofAcrossCoercions(
         ExpressionPointer proof,
         ExpressionPointer lhs, ExpressionPointer rhs,
-        RelationLiftKind kind,
+        const std::string& relationSymbol,
         const std::vector<std::string>& chain,
         const std::vector<LocalBinder>& localBinders) {
+        std::string preservesSlot;
+        if (relationSymbol != "=") {
+            preservesSlot = relationPreservesSlot(relationSymbol);
+            if (preservesSlot.empty() && !chain.empty()) {
+                throwElaborate(
+                    "cannot lift '" + relationSymbol + "' across a "
+                    "coercion — this relation has no preservation "
+                    "convention (it does not transport along the "
+                    "coercion tower); keep the chain at one carrier");
+            }
+        }
         for (const auto& coercionName : chain) {
             ExpressionPointer lhsLifted = makeApplication(
                 makeConstant(coercionName), lhs);
             ExpressionPointer rhsLifted = makeApplication(
                 makeConstant(coercionName), rhs);
-            if (kind == RelationLiftKind::Equality) {
+            if (relationSymbol == "=") {
                 // Equality survives every edge, by congruence of the
                 // coercion function itself: no per-edge lemma needed.
                 ExpressionPointer domainType = closeOverLocalBinders(
@@ -679,15 +707,11 @@ ExpressionPointer Elaborator::liftRelationProofAcrossCoercions(
                 call = makeApplication(std::move(call), std::move(proof));
                 proof = std::move(call);
             } else {
-                const char* relationSymbol =
-                    kind == RelationLiftKind::LessThan ? "<" : "≤";
-                std::string lemmaName = coercionName
-                    + (kind == RelationLiftKind::LessThan
-                           ? std::string(".LessThan_preserves")
-                           : std::string(".LessOrEqual_preserves"));
+                std::string lemmaName =
+                    coercionName + "." + preservesSlot;
                 if (environment_.lookup(lemmaName) == nullptr) {
                     throwElaborate(
-                        std::string("cannot lift '") + relationSymbol
+                        "cannot lift '" + relationSymbol
                         + "' across the coercion '" + coercionName
                         + "' — the relation-preservation lemma '"
                         + lemmaName + "' is not declared; add it "

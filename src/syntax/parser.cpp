@@ -4297,7 +4297,8 @@ private:
                || peek().kind == TokenKind::Greater
                || peek().kind == TokenKind::Divides
                || peek().kind == TokenKind::SubsetOf
-               || peek().kind == TokenKind::Approx) {
+               || peek().kind == TokenKind::Approx
+               || peek().kind == TokenKind::ElementOf) {
             Token relationToken = consumeAny();
             CalcRelation relation = CalcRelation::Equality;
             std::string relationOperator;
@@ -4310,15 +4311,19 @@ private:
                     relation = CalcRelation::GreaterOrEqual; break;
                 case TokenKind::Greater:
                     relation = CalcRelation::GreaterThan; break;
-                // Generic preorder relations: keep `relation` at its
-                // Equality placeholder and record the operator symbol; the
-                // elaborator routes the whole chain to the preorder fold.
+                // Named relations (`∣`, `⊆`, `≈`, `∈`): keep `relation` at
+                // its Equality placeholder and record the operator symbol;
+                // the elaborator resolves the relation at the chain's
+                // carrier and composes it via the relation-composition
+                // registry.
                 case TokenKind::Divides:
                     relationOperator = "∣"; break;
                 case TokenKind::SubsetOf:
                     relationOperator = "⊆"; break;
                 case TokenKind::Approx:
                     relationOperator = "≈"; break;
+                case TokenKind::ElementOf:
+                    relationOperator = "∈"; break;
                 default:
                     relation = CalcRelation::Equality; break;
             }

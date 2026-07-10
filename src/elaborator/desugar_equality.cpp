@@ -495,7 +495,20 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             leftKernel = makeApplication(
                 makeConstant("successor"), std::move(leftKernel));
         }
-        ExpressionPointer call = makeConstant(targetFunction);
+        ExpressionPointer call = applyOperatorImplicitFillers(
+            makeConstant(targetFunction), targetFunction, leftTypeClosed);
+        call = makeApplication(std::move(call), std::move(leftKernel));
+        call = makeApplication(std::move(call), std::move(rightKernel));
+        // Discharge any trailing propositional side-condition the operator
+        // function still expects after its two operands — e.g. the `d ≠ 0`
+        // argument behind `/`. This is what lets `/` omit the nonzero witness.
+        return dischargeTrailingSideConditions(
+            std::move(call), localBinders, operatorSymbol, line);
+    }
+
+ExpressionPointer Elaborator::applyOperatorImplicitFillers(
+        ExpressionPointer call, const std::string& targetFunction,
+        ExpressionPointer leftTypeClosed) {
         // Fill any leading implicit binders the dispatch function may
         // have. Two patterns are common:
         //   (a) `Set.member {T : Type(0)} (x : T) (S : Set(T))` —
@@ -509,7 +522,11 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // binders). Works for both patterns above and any
         // structurally-decomposable shape — in particular, it doesn't
         // trip when the LEFT operand's type is itself a parameterised
-        // alias like `Real = Quotient(_, _)`.
+        // alias like `Real = Quotient(_, _)`. Shared by the operator
+        // desugaring, the calc relation-head builder, and the calc
+        // relation-composition fold (whose transitivity lemmas — e.g.
+        // `Set.subset.transitive {T}` — carry the same leading-implicit
+        // shape, with the first explicit argument at the operand type).
         int implicitCount =
             environment_.implicitArgumentCount(targetFunction);
         if (implicitCount > 0) {
@@ -585,13 +602,7 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 }
             }
         }
-        call = makeApplication(std::move(call), std::move(leftKernel));
-        call = makeApplication(std::move(call), std::move(rightKernel));
-        // Discharge any trailing propositional side-condition the operator
-        // function still expects after its two operands — e.g. the `d ≠ 0`
-        // argument behind `/`. This is what lets `/` omit the nonzero witness.
-        return dischargeTrailingSideConditions(
-            std::move(call), localBinders, operatorSymbol, line);
+        return call;
     }
 
 ExpressionPointer Elaborator::tryProvePositive(

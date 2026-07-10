@@ -746,19 +746,23 @@ private:
     ExpressionPointer applyCoercionChain(
         ExpressionPointer expr, const std::vector<std::string>& chain);
 
-    // PLAN_CALC_WIDENING §B — the relation-proof companion of
+    // PLAN_CALC_WIDENING §B/§D — the relation-proof companion of
     // `applyCoercionChain`: lift `proof : lhs R rhs` up the coercion
-    // `chain` edge by edge, `=` via `Equality.congruence`, `≤` via
-    // `<edge>.LessOrEqual_preserves`, `<` via `<edge>.LessThan_preserves`.
-    // Returns a proof of `(chain lhs) R (chain rhs)` — the endpoints in
-    // raw cast form (apply `applyCoercionChain` to the endpoints to name
-    // them). An edge without the needed preservation lemma is a local,
-    // legible error, never a silent wrong answer.
-    enum class RelationLiftKind { Equality, LessOrEqual, LessThan };
+    // `chain` edge by edge. The relation is named by its operator
+    // symbol: `=` lifts via `Equality.congruence` (no per-edge lemma),
+    // every other relation via the coercion-preservation registry slot
+    // `<edge>.<Slot>_preserves` (`≤` → LessOrEqual_preserves, `<` →
+    // LessThan_preserves, `∣` → Divides_preserves, …; see
+    // relationPreservesSlot in statements.cpp). Returns a proof of
+    // `(chain lhs) R (chain rhs)` — the endpoints in raw cast form
+    // (apply `applyCoercionChain` to the endpoints to name them). An
+    // edge without the needed preservation lemma — or a relation with
+    // no slot at all (`∈` does not transport) — is a local, legible
+    // error, never a silent wrong answer.
     ExpressionPointer liftRelationProofAcrossCoercions(
         ExpressionPointer proof,
         ExpressionPointer lhs, ExpressionPointer rhs,
-        RelationLiftKind kind,
+        const std::string& relationSymbol,
         const std::vector<std::string>& chain,
         const std::vector<LocalBinder>& localBinders);
 
@@ -2018,18 +2022,14 @@ private:
     // For a single step the result is just the step proof (no transitivity
     // wrapper). For N ≥ 2 steps the result is left-folded:
     //   transitivity(... transitivity(transitivity(p1, p2), p3) ..., pN).
-    // `calc` over a generic preorder relation R (e.g. `∣`, `⊆`): a chain
-    // of `R` steps and `=` steps proving `R(first, last)`. Resolves R's
-    // function and transitivity lemma from the carrier, folds the `R`
-    // steps via transitivity, and absorbs interleaved `=` steps by
-    // `Equality.transport_proposition`. All terms are closed-over-
+    // Named relations (`∣`, `⊆`, `≈`, `∈`) are first-class steps of the
+    // same fold (PLAN_CALC_WIDENING §D): each is resolved at the chain's
+    // carrier via the operator registry, same-relation steps compose by
+    // the relation's transitivity lemma (`<R>.transitive` or
+    // `<R>_transitive`), interleaved `=` steps by
+    // `Equality.transport_proposition`, and mixed ≤/< pairs by the
+    // relation-composition table in calc.cpp. All terms are closed-over-
     // localBinders form, like the rest of the elaborator.
-    ExpressionPointer elaborateCalcPreorder(
-        const SurfaceCalc& calc,
-        const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer expectedType,
-        int line, int column);
-
     ExpressionPointer elaborateCalc(
         const SurfaceCalc& calc,
         const std::vector<LocalBinder>& localBinders,
@@ -4731,6 +4731,17 @@ private:
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line);
+
+    // Apply `targetFunction`'s leading implicit arguments to `call`,
+    // recovered by unifying the function's first-explicit-argument type
+    // template against `leftTypeClosed` (the first explicit operand's
+    // type). Returns `call` unchanged when the function has no leading
+    // implicits. Shared by the operator desugaring and the calc
+    // relation-head / transitivity-lemma builders (e.g. the `{T}` of
+    // `Set.member` and `Set.subset.transitive`).
+    ExpressionPointer applyOperatorImplicitFillers(
+        ExpressionPointer call, const std::string& targetFunction,
+        ExpressionPointer leftTypeClosed);
 
     // Fill any trailing *propositional* side-conditions an operator's
     // dispatch function still expects after its operands — e.g. the `b ≠ 0`

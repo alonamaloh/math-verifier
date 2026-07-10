@@ -71,19 +71,22 @@ a  = b       by abEqual
 ```
 
 proves `(a : Integer) < (e : Integer)`. A relation that does not survive
-an edge (an edge without its `_preserves` lemma) is a local, legible
-error naming the missing lemma. `make audit-coercions` lists the
-preservation slots per edge. (See `PLAN_CALC_WIDENING.md`;
+an edge (an edge without its `<coercionFn>.<Slot>_preserves` lemma — the
+slot names per relation live in the coercion-preservation registry:
+`LessOrEqual_preserves`, `LessThan_preserves`, `Divides_preserves`, …) is
+a local, legible error naming the missing lemma. `make audit-coercions`
+lists the preservation slots per edge. (See `PLAN_CALC_WIDENING.md`;
 `Test/calc_widening_test.math` has worked examples, including the
 triangular numbers as `n·(n+1)/2` in ℚ.)
 
-## Relation chains over preorders (`∣`, `⊆`, `≈`, …)
+## Named relations in chains (`∣`, `⊆`, `≈`, `∈`, …)
 
 A relation chain also chains any transitive relation, not just the order
-ones. A step separated by `∣` (divides), `⊆` (subset), or `≈`
-(equinumerous) routes the whole chain to a generic-preorder fold that
-uses the carrier's relation and its transitivity lemma (`<R>.transitive`
-or `<R>_transitive`), absorbing interleaved `=` steps by transport:
+ones — one fold serves them all. A step separated by `∣` (divides), `⊆`
+(subset), or `≈` (equinumerous) resolves the carrier's relation via the
+operator registry; same-relation steps compose by its transitivity lemma
+(`<R>.transitive` or `<R>_transitive`), and interleaved `=` steps by
+transport, on either side of any relation:
 
 ```math
 p
@@ -91,13 +94,31 @@ p
    = b                 -- 0 = b         (auto: the b = 0 fact, flipped)
 ```
 
-proves `p ∣ b`, and `a = b ∣ c = d` proves `a ∣ d`. A single chain
-uses one non-`=` relation. The carrier may even be `Type(0)` itself — `≈`
-(`Equinumerous`, registered `operator (≈) on (_, _)`) chains types:
-`X ≈ Y ≈ NaturalsBelow(n)` (see `Set/finite.math`). Reusing one of the
-existing relation symbols (`∣`/`⊆`/`≈`) needs only its operator + a
-`<R>.transitive` lemma in scope; a brand-new symbol also needs a lexer/parser
-token (the relation separators are a fixed set).
+proves `p ∣ b`, and `a = b ∣ c = d` proves `a ∣ d`. The carrier may even
+be `Type(0)` itself — `≈` (`Equinumerous`, registered
+`operator (≈) on (_, _)`) chains types: `X ≈ Y ≈ NaturalsBelow(n)` (see
+`Set/finite.math`). Reusing one of the existing relation symbols
+(`∣`/`⊆`/`≈`/`∈`) needs only its operator + a `<R>.transitive` lemma in
+scope (leading implicits like the `{T}` of `Set.subset.transitive` are
+inferred); a brand-new symbol also needs a lexer/parser token (the
+relation separators are a fixed set).
+
+`∈` (membership) is a **heterogeneous** step: it hands the chain off
+from the element type to the set type, so the steps before it relate
+elements and the steps after it relate sets —
+
+```math
+a  = b   by abEqual        -- element equality moves the member
+   ∈ S   by bMember
+   = X   by setsEqual      -- set equality moves the set
+```
+
+proves `a ∈ X` (`Test/calc_membership_test.math`). Two `∈` steps cannot
+compose (membership is not transitive), and an `∈` chain cannot widen
+across the coercion tower — both are legible errors. More generally,
+mixed pairs of distinct non-`=` relations (`a ∣ b ≤ c`) compose only
+where the relation-composition registry has a rule (today: the ≤/<
+strictness arithmetic); anything else is rejected by name.
 
 ### `let` for local abbreviations — the auto-prover sees through
 

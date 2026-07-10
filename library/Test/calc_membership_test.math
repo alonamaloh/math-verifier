@@ -1,0 +1,45 @@
+module Test.calc_membership_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Set.basics
+
+-- `∈` as a first-class calc relation (PLAN_CALC_WIDENING §D). It is
+-- heterogeneous — the chain hands off from the element type to the set
+-- type — and composes with `=` on either side by transport: element
+-- equalities move the member, set equalities move the set.
+
+-- The plan's headline example: `a = b ∈ S = X` concludes `a ∈ X`.
+theorem Test.member_through_equalities (a b : Natural)
+        (S X : Set(Natural))
+        (abEqual : a = b) (bMember : b ∈ S) (setsEqual : S = X)
+        : a ∈ X :=
+  a = b   by abEqual
+    ∈ S   by bMember
+    = X   by setsEqual
+
+-- Set-side equalities may keep chaining after the membership step.
+theorem Test.member_set_rewrites (a : Natural) (S X Y : Set(Natural))
+        (member : a ∈ S) (firstEqual : S = X) (secondEqual : X = Y)
+        : a ∈ Y :=
+  a ∈ S   by member
+    = X   by firstEqual
+    = Y   by secondEqual
+
+-- A `⊆` chain folds through `Set.subset.transitive` — the composition
+-- registry's same-relation rule, with the lemma's implicit `{T}`
+-- recovered from the endpoint type.
+theorem Test.subset_chain (A B C : Set(Natural))
+        (aInB : A ⊆ B) (bInC : B ⊆ C)
+        : A ⊆ C :=
+  A ⊆ B   by aInB
+    ⊆ C   by bInC
+
+-- Interleaved `=` steps transport through a `⊆` chain like any other.
+theorem Test.subset_with_equalities (A B C D : Set(Natural))
+        (abEqual : A = B) (bInC : B ⊆ C) (cdEqual : C = D)
+        : A ⊆ D :=
+  A = B   by abEqual
+    ⊆ C   by bInC
+    = D   by cdEqual

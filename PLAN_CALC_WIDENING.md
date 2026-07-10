@@ -10,10 +10,10 @@ Status ledger below is authoritative — read/update it each session.
 |-------|------------|--------|--------|
 | 0 | Honest `-`/`/` operators + `_preserves` prereqs | **DONE** (2026-07-10) | §A landed: `Integer/natural_subtraction.math` (ℕ`-`→ℤ + unary `-`→ℤ + the `subtract_from_difference` boundary lemma), `Rational/natural_division.math` (ℕ`/`→ℚ + `Rational.from_natural.nonzero_preserves`); the old floor division was renamed `Natural.floor_divide` to free the honest name. §B was already complete (ℕ→ℤ `_preserves` landed earlier; `make audit-coercions` clean on all three edges). Tests: `Test/honest_natural_arithmetic_test.math`. Unary `+` skipped (low value, per plan). |
 | 1 | Carrier-raising `calc` fold | **DONE** (2026-07-10) | §C landed: `liftRelationProofAcrossCoercions` (statements.cpp, the §B relation companion of `applyCoercionChain`) + `raiseCarrier` in `elaborateCalc`'s pass 1 (lift recorded endpoints raw-cast + step proofs, clear/re-resolve relation names, carrier = running max). Also added the missing `Integer.LessThan.transitive_left/right`. Tests: `Test/calc_widening_test.math` (headline `a = b = c = d−1 < e` chain, ≤/< lifts, 2-edge ℕ→ℚ raise, triangular `n(n+1)/2` in ℚ). Full library+tests+error-tests green. Residual friction (pre-existing, noted for follow-up): `ring`/`field` don't cast-push operands (`cast(T*2)` ≠ atom `cast(T)*2`), and ℚ `field` needs the nonzero hypothesis in `¬(t = Rational.zero)` shape. |
-| 2 | Data-driven relation registry + `∈`/preorder unification | **deferred** | §D: replace the hard-coded composition branch + merge `elaborateCalcPreorder` + add `∈` into one fold + two tables. The "small language" endgame. A separate, later session. |
+| 2 | Data-driven relation registry + `∈`/preorder unification | **DONE** (2026-07-10) | §D landed: `elaborateCalcPreorder` deleted — ONE fold (calc.cpp) serves `=`/≤/</≥/> and the named relations (`∣`/`⊆`/`≈`/`∈`, the last newly admitted to the calc grammar). Composition is `=`-transport on either side of any relation + a same-relation transitivity default (`<R>.transitive` / `<R>_transitive`, leading implicits inferred — `Set.subset.transitive {T}` works) + a 3-row mixed table (the ≤/< strictness arithmetic); a missing pair/lemma errors by name. Coercion-preservation is symbol-keyed slots (`relationPreservesSlot`, statements.cpp): ≤/< as before, `∣`→`Divides_preserves` (no edge declares it yet ⇒ ∣-meets-widening errors legibly), `∈` non-liftable. `∈` is heterogeneous — the chain hands off element→set type; per-step carriers keep `=`-transport sound after the handoff. The operator implicit-filler was factored (`applyOperatorImplicitFillers`) and is shared by dispatch, relation heads, and composition lemmas; `upgradeEqualityToLessOrEqual` retired (transport subsumes it). Tests: `Test/calc_membership_test.math` (`a = b ∈ S = X`, ⊆ chains), `ErrorTest/calc_divides_widening`, `ErrorTest/calc_composition_gap`. Full `library tests error-tests` green. Residual: mixed-pair table rows (e.g. `∈`·`⊆`) and per-edge `Divides_preserves` lemmas are additive future work. |
 
-**This session targets Stage 0 + Stage 1** (owner decision, 2026-07-10). Stage 2
-is an explicit follow-on — do not start it in the same session.
+**Stage 0 + Stage 1 landed 2026-07-10; Stage 2 landed in its own session the
+same day. The plan is complete.**
 
 ---
 
@@ -158,7 +158,7 @@ In `elaborateCalc`'s fold (`calc.cpp`), make the carrier a *running* value, not 
 This is a contained change to `calc.cpp` (the fold 1404-1583, the carrier setup 256-313, the
 per-step reconciliation 456-474) plus the §B helper. It delivers all the arithmetic examples.
 
-### D. (Stage 2, deferred) Unify into a data-driven relation fold
+### D. (Stage 2 — DONE, see ledger) Unify into a data-driven relation fold
 
 Replace the hard-coded 4-way composition branch **and** merge `elaborateCalcPreorder` into one
 fold driven by a **relation-composition registry** (a `Trans`-style table: `(R, R′) → R″` + the
@@ -193,7 +193,8 @@ paths. Bigger and riskier; a separate session, after Stage 1 is green.
    `(a:ℤ) < (e:ℤ)`; sum-of-odds in honest `2·n − 1` form; a `n(n+1)/2` triangular identity in ℚ.
    Confirm the manual-cast calc steps in `library/Real/harmonic_series.math:101` /
    `library/Real/density.math:119` still elaborate (regression), and ideally simplify.
-3. **Heterogeneous (Stage 2, later):** `a = b ∈ S = X` ⟶ `a ∈ X`; `a ∣ b = c` ⟶ `a ∣ c`; a
-   `∣` step meeting a `/`-widening must produce a clear "cannot lift `∣` across ℤ↪ℚ" error.
+3. **Heterogeneous (Stage 2 — done):** `a = b ∈ S = X` ⟶ `a ∈ X` (`Test/calc_membership_test.math`);
+   `a ∣ b = c` ⟶ `a ∣ c` (`Test/calc_divides_test.math`); a `∣` step meeting a widening produces
+   the "cannot lift '∣' across the coercion" error (`ErrorTest/calc_divides_widening`).
 4. **Global:** full `make -j 16 library tests` green after every stage; existing calc regression
    tests (`library/Test/*calc*`, `series_relation_test`, `fold_binder_test`) unchanged.
