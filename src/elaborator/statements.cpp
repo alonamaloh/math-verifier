@@ -644,6 +644,70 @@ ExpressionPointer Elaborator::applyCoercionChain(
         return expr;
     }
 
+ExpressionPointer Elaborator::liftRelationProofAcrossCoercions(
+        ExpressionPointer proof,
+        ExpressionPointer lhs, ExpressionPointer rhs,
+        RelationLiftKind kind,
+        const std::vector<std::string>& chain,
+        const std::vector<LocalBinder>& localBinders) {
+        for (const auto& coercionName : chain) {
+            ExpressionPointer lhsLifted = makeApplication(
+                makeConstant(coercionName), lhs);
+            ExpressionPointer rhsLifted = makeApplication(
+                makeConstant(coercionName), rhs);
+            if (kind == RelationLiftKind::Equality) {
+                // Equality survives every edge, by congruence of the
+                // coercion function itself: no per-edge lemma needed.
+                ExpressionPointer domainType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, lhs),
+                    localBinders, localBinders.size());
+                ExpressionPointer codomainType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, lhsLifted),
+                    localBinders, localBinders.size());
+                LevelPointer domainLevel =
+                    typeUniverseOf(localBinders, lhs);
+                LevelPointer codomainLevel =
+                    typeUniverseOf(localBinders, lhsLifted);
+                ExpressionPointer call = makeConstant(
+                    "Equality.congruence", {domainLevel, codomainLevel});
+                call = makeApplication(std::move(call), domainType);
+                call = makeApplication(std::move(call), codomainType);
+                call = makeApplication(std::move(call),
+                    makeConstant(coercionName));
+                call = makeApplication(std::move(call), lhs);
+                call = makeApplication(std::move(call), rhs);
+                call = makeApplication(std::move(call), std::move(proof));
+                proof = std::move(call);
+            } else {
+                const char* relationSymbol =
+                    kind == RelationLiftKind::LessThan ? "<" : "≤";
+                std::string lemmaName = coercionName
+                    + (kind == RelationLiftKind::LessThan
+                           ? std::string(".LessThan_preserves")
+                           : std::string(".LessOrEqual_preserves"));
+                if (environment_.lookup(lemmaName) == nullptr) {
+                    throwElaborate(
+                        std::string("cannot lift '") + relationSymbol
+                        + "' across the coercion '" + coercionName
+                        + "' — the relation-preservation lemma '"
+                        + lemmaName + "' is not declared; add it "
+                        "((a b : <source>) → a " + relationSymbol
+                        + " b → (a : <target>) " + relationSymbol
+                        + " (b : <target>)) or keep the chain at one "
+                        "carrier (see PLAN_CALC_WIDENING.md §B)");
+                }
+                ExpressionPointer call = makeConstant(lemmaName);
+                call = makeApplication(std::move(call), lhs);
+                call = makeApplication(std::move(call), rhs);
+                call = makeApplication(std::move(call), std::move(proof));
+                proof = std::move(call);
+            }
+            lhs = std::move(lhsLifted);
+            rhs = std::move(rhsLifted);
+        }
+        return proof;
+    }
+
 std::optional<Elaborator::CombineResult> Elaborator::combineOperands(
         const std::string& leftHead, const std::string& rightHead,
         ExpressionPointer leftTypeClosed,

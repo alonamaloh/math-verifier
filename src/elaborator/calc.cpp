@@ -428,6 +428,63 @@ ExpressionPointer Elaborator::elaborateCalc(
         std::vector<ExpressionPointer> endpointKernels;
         endpointKernels.push_back(previousKernel);
 
+        // PLAN_CALC_WIDENING §C — raise the running carrier. A step's
+        // endpoint sits HIGHER in the coercion tower than everything
+        // folded so far (e.g. a `d - 1 : Integer` endpoint in a chain
+        // that started on Natural), so lift the recorded endpoints and
+        // step proofs up `chain` — `=` by congruence of the coercion,
+        // `≤`/`<` by the `<edge>.{LessOrEqual,LessThan}_preserves`
+        // lemmas — and continue the fold at the new carrier. Coercions
+        // only go up the tower, so the carrier is a running maximum and
+        // nothing is ever down-cast. The lifted endpoints stay in raw
+        // cast form (not pushed to the leaves): that is exactly the
+        // form the lifted proofs are typed at.
+        auto raiseCarrier = [&](const std::vector<std::string>& chain,
+                                ExpressionPointer newCarrierClosed) {
+            for (size_t i = 0; i < steps.size(); ++i) {
+                RelationLiftKind kind;
+                switch (strictnessOf(steps[i].relation)) {
+                    case Strictness::Equality:
+                        kind = RelationLiftKind::Equality;
+                        break;
+                    case Strictness::Weak:
+                        kind = RelationLiftKind::LessOrEqual;
+                        break;
+                    default:
+                        kind = RelationLiftKind::LessThan;
+                        break;
+                }
+                // A ≥/> step's proof is typed in the normalized forward
+                // direction (next R previous); = and ≤/< proofs in the
+                // user direction.
+                bool flipped = directionOf(steps[i].relation)
+                    == Direction::Backward;
+                ExpressionPointer lhs = flipped
+                    ? endpointKernels[i + 1] : endpointKernels[i];
+                ExpressionPointer rhs = flipped
+                    ? endpointKernels[i] : endpointKernels[i + 1];
+                steps[i].proof = liftRelationProofAcrossCoercions(
+                    steps[i].proof, lhs, rhs, kind, chain, localBinders);
+            }
+            for (auto& endpoint : endpointKernels) {
+                endpoint = applyCoercionChain(endpoint, chain);
+            }
+            previousKernel = endpointKernels.back();
+            carrierType = newCarrierClosed;
+            carrierTypeName = headConstantName(newCarrierClosed);
+            carrierLevel = typeUniverseOf(localBinders, previousKernel);
+            // The relation lemma names were resolved at the old carrier;
+            // clear them so they re-resolve lazily at the new one.
+            leqRelationName.clear();
+            leqReflexiveName.clear();
+            leqTransitiveName.clear();
+            transitiveTakesProofsSwapped = false;
+            ltRelationName.clear();
+            ltTransitiveLeftName.clear();
+            ltTransitiveRightName.clear();
+            ltWeakenName.clear();
+        };
+
         for (size_t k = 0; k < calc.steps.size(); ++k) {
             const auto& step = calc.steps[k];
             Frame stepFrame(*this,
@@ -468,6 +525,12 @@ ExpressionPointer Elaborator::elaborateCalc(
                                 std::move(nextKernel), combined->coerceLeft);
                             nextKernel = castPushToLeaves(
                                 nextKernel, localBinders).term;
+                        }
+                        if (!combined->coerceRight.empty()) {
+                            // The endpoint's type is the join: the chain
+                            // widens here (§C) — raise the carrier.
+                            raiseCarrier(combined->coerceRight,
+                                         combined->resultType);
                         }
                     }
                 }
@@ -1329,6 +1392,12 @@ ExpressionPointer Elaborator::elaborateCalc(
                 chainStrictness = Strictness::Weak;
             }
         }
+
+        // A mid-chain carrier raise clears the relation lemma names; the
+        // composition below uses them directly, so resolve them (at the
+        // final carrier) up front.
+        if (chainStrictness != Strictness::Equality) resolveLeqNames();
+        if (chainStrictness == Strictness::Strict) resolveLtNames();
 
         // Helper: upgrade an =-proof to a ≤-proof via transport on the
         // relation's right argument. Given p : a = b, returns p' :

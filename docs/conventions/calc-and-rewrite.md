@@ -43,6 +43,40 @@ to the same `autoProveClaim` an equality stated fact uses — context-fact
 match, the equality bridge, and the symmetry flip (so `0 = b` closes from
 a `b = 0` fact). A chain `=` step and an equality stated fact are one prover.
 
+## Type-widening chains and honest `-`/`/` on ℕ
+
+Operations return their result in the smallest closure where they are
+total and honest: between naturals, `a - b : Integer` (`4 - 5` is `-1`,
+no truncation, no proof obligation), `a / b : Rational` (the `b ≠ 0`
+side condition is discharged at the use site like every other `/`), and
+unary `-n : Integer`. `Natural.floor_divide`/`Natural.modulo` remain the
+ℕ-valued quotient and remainder. Because the results are genuine ring /
+field operations in ℤ/ℚ, `ring` and `field` apply to them — a truncating
+or proof-guarded ℕ subtraction would be an opaque atom instead.
+
+Consequently an expression — and a relation chain — may change type
+mid-stream. The chain's carrier is a **running maximum** up the coercion
+tower ℕ ↪ ℤ ↪ ℚ ↪ ℝ ↪ ℂ: when a step's endpoint lives higher than the
+chain so far, the fold lifts the accumulated endpoints and step proofs
+up to it (`=` by congruence of the coercion, `≤`/`<` by the
+`<coercionFn>.{LessOrEqual,LessThan}_preserves` lemmas) and continues at
+the wider carrier; endpoints below the carrier are lifted per-step as
+before. The plan's headline example, with ℕ variables throughout:
+
+```math
+a  = b       by abEqual
+   = c       by bcEqual
+   = d - 1   by cIsDifference     -- the chain widens ℕ → ℤ here
+   < e       by differenceBelow   -- composed at ℤ
+```
+
+proves `(a : Integer) < (e : Integer)`. A relation that does not survive
+an edge (an edge without its `_preserves` lemma) is a local, legible
+error naming the missing lemma. `make audit-coercions` lists the
+preservation slots per edge. (See `PLAN_CALC_WIDENING.md`;
+`Test/calc_widening_test.math` has worked examples, including the
+triangular numbers as `n·(n+1)/2` in ℚ.)
+
 ## Relation chains over preorders (`∣`, `⊆`, `≈`, …)
 
 A relation chain also chains any transitive relation, not just the order

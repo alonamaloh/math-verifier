@@ -98,6 +98,32 @@ theorem Integer.LessThan.weaken (a b : Integer) (aLessThanB : a < b) : a ≤ b :
   done
 }
 
+-- Weak-then-strict: x ≤ y ∧ y < z → x < z. With y = x + a and
+-- z = (y + 1) + b, the difference between z and x + 1 is a + b.
+theorem Integer.LessThan.transitive_left (x y z : Integer)
+        (xLessOrEqualY : x ≤ y) (yLessThanZ : y < z)
+        : x < z := {
+  y + Integer.one ≤ z as yPlusOneBelowZ;
+  choose a such that y = x + (a : Integer) from xLessOrEqualY;
+  choose b such that z = (y + Integer.one) + (b : Integer) from yPlusOneBelowZ;
+  witness a + b with
+      z
+         = (y + Integer.one) + (b : Integer)
+         = ((x + (a : Integer)) + Integer.one) + (b : Integer)
+         = (x + Integer.one) + ((a : Integer) + (b : Integer))
+         = (x + Integer.one) + (a + b : Integer)
+}
+
+-- Strict-then-weak: x < y ∧ y ≤ z → x < z. Both sides speak x + 1 ≤ ·,
+-- so ≤-transitivity carries the strict bound through.
+theorem Integer.LessThan.transitive_right (x y z : Integer)
+        (xLessThanY : x < y) (yLessOrEqualZ : y ≤ z)
+        : x < z := {
+  x + Integer.one ≤ y;
+  x + Integer.one ≤ z by Integer.LessOrEqual.transitive;
+  done
+}
+
 -- ----------------------------------------------------------------------
 -- The Natural→Integer embedding preserves order (the ℕ→ℤ rung of the tower).
 

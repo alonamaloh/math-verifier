@@ -1,0 +1,84 @@
+module Test.calc_widening_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.triangular
+import Integer.basics
+import Integer.addition
+import Integer.ring
+import Integer.negation
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Integer.natural_subtraction
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.ring
+import Rational.order
+import Rational.reciprocal_function
+import Rational.division
+import Rational.archimedean
+import Rational.natural_division
+
+-- Type-widening calc chains (PLAN_CALC_WIDENING §C): a chain may start
+-- on ℕ and widen mid-chain when a step's endpoint lives higher in the
+-- coercion tower (here through honest `-` and `/`). The fold lifts the
+-- accumulated endpoints and proofs up the tower — `=` by congruence,
+-- `≤`/`<` by the `_preserves` lemmas — and continues at the new carrier.
+
+-- The plan's headline example: `a = b = c = d − 1 < e` starts in ℕ and
+-- finishes in ℤ. The two ℕ `=` steps are lifted by congruence when the
+-- subtraction endpoint raises the carrier.
+theorem widening_to_integer (a b c d e : Natural)
+        (abEqual : a = b) (bcEqual : b = c)
+        (cIsDifference : (c : Integer) = d - 1)
+        (differenceBelow : d - 1 < (e : Integer))
+        : (a : Integer) < (e : Integer) :=
+  a  = b       by abEqual
+     = c       by bcEqual
+     = d - 1   by cIsDifference
+     < e       by differenceBelow
+
+-- A ≤ accumulated on ℕ survives the raise via LessOrEqual_preserves.
+theorem widening_weak_lift (a b d : Natural)
+        (abBelow : a ≤ b)
+        (bBelow : (b : Integer) ≤ d - 1)
+        : (a : Integer) ≤ d - 1 :=
+  a  ≤ b       by abBelow
+     ≤ d - 1   by bBelow
+
+-- A strict < accumulated on ℕ survives the raise via LessThan_preserves.
+theorem widening_strict_lift (a b d : Natural)
+        (abStrict : a < b)
+        (bBelow : (b : Integer) ≤ d - 3)
+        : (a : Integer) < d - 3 :=
+  a  < b       by abStrict
+     ≤ d - 3   by bBelow
+
+-- A raise across two tower edges at once (ℕ → ℤ → ℚ), triggered by
+-- honest division: congruence lifts compose along the chain.
+theorem widening_to_rational (a b n : Natural) (nNonzero : n ≠ 0)
+        (abEqual : a = b)
+        (bAsRatio : (b : Rational) = n / n)
+        : (a : Rational) = n / n :=
+  a  = b       by abEqual
+     = n / n   by bAsRatio
+
+-- The triangular numbers in their honest form: T(n) = n·(n+1)/2 as a
+-- statement in ℚ, driven by the ℕ-level `triangular_doubled` under the
+-- honest `/`. The chain starts on ℕ and widens to ℚ at the first step.
+theorem triangular_as_division (k : Natural)
+        : (Natural.triangular(1 + k) : Rational)
+          = successor(k) * successor(successor(k)) / 2 := {
+  ((2 : Natural) : Rational) ≠ Rational.zero as twoNonzero;
+  Natural.triangular(1 + k)
+     = ((Natural.triangular(1 + k) : Rational) * 2) / 2   by field(twoNonzero)
+     = (Natural.triangular(1 + k) * 2) / 2
+     = successor(k) * successor(successor(k)) / 2         by Natural.triangular_doubled
+}

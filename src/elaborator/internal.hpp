@@ -746,6 +746,22 @@ private:
     ExpressionPointer applyCoercionChain(
         ExpressionPointer expr, const std::vector<std::string>& chain);
 
+    // PLAN_CALC_WIDENING §B — the relation-proof companion of
+    // `applyCoercionChain`: lift `proof : lhs R rhs` up the coercion
+    // `chain` edge by edge, `=` via `Equality.congruence`, `≤` via
+    // `<edge>.LessOrEqual_preserves`, `<` via `<edge>.LessThan_preserves`.
+    // Returns a proof of `(chain lhs) R (chain rhs)` — the endpoints in
+    // raw cast form (apply `applyCoercionChain` to the endpoints to name
+    // them). An edge without the needed preservation lemma is a local,
+    // legible error, never a silent wrong answer.
+    enum class RelationLiftKind { Equality, LessOrEqual, LessThan };
+    ExpressionPointer liftRelationProofAcrossCoercions(
+        ExpressionPointer proof,
+        ExpressionPointer lhs, ExpressionPointer rhs,
+        RelationLiftKind kind,
+        const std::vector<std::string>& chain,
+        const std::vector<LocalBinder>& localBinders);
+
     // Cast normalization (PLAN_CAST_NORMALIZATION.md). The result of
     // driving every coercion over a compound subterm down to the leaves:
     // `term` is the leaf-cast-normalized expression, and `proof` proves
