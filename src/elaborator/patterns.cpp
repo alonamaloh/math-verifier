@@ -346,11 +346,15 @@ void Elaborator::elaboratePatternMatchDefinition(
         bool recursorHasMotiveLevel =
             recursorDeclaration->universeParameters.size()
             > inductive->universeParameters.size();
-        std::vector<LevelPointer> recursorUniverseArguments =
-            inductiveUniverseArguments;
+        // The motive level leads the recursor's universe arguments
+        // (Lean's convention, mirrored by addInductive).
+        std::vector<LevelPointer> recursorUniverseArguments;
         if (recursorHasMotiveLevel) {
             recursorUniverseArguments.push_back(motiveLevel);
         }
+        recursorUniverseArguments.insert(recursorUniverseArguments.end(),
+                                         inductiveUniverseArguments.begin(),
+                                         inductiveUniverseArguments.end());
         ExpressionPointer recursorReference =
             makeConstant(std::move(recursorName),
                           std::move(recursorUniverseArguments));
@@ -1265,11 +1269,16 @@ ExpressionPointer Elaborator::buildBodyForCase(
         bool recursorHasMotiveLevel =
             recursorInfo->universeParameters.size()
             > innerInductive->universeParameters.size();
-        std::vector<LevelPointer> recursorUniverseArguments =
-            indConstant->universeArguments;
+        // The motive level leads the recursor's universe arguments
+        // (Lean's convention, mirrored by addInductive).
+        std::vector<LevelPointer> recursorUniverseArguments;
         if (recursorHasMotiveLevel) {
             recursorUniverseArguments.push_back(motiveLevel);
         }
+        recursorUniverseArguments.insert(
+            recursorUniverseArguments.end(),
+            indConstant->universeArguments.begin(),
+            indConstant->universeArguments.end());
 
         // Build the case lambda. Step 1: bind the constructor's value
         // args; step 2: derive the post-beta motive type and peel its

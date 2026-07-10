@@ -1358,30 +1358,33 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                                 constructor &&
                                 constructor->inductiveName == recursor->inductiveName) {
                                 // Defensive universe-argument compatibility
-                                // check: the constructor's universe args
-                                // must match the prefix of the recursor's.
-                                // (Currently the two sets are the same size;
-                                // when universe-polymorphic motives land,
-                                // the recursor will have one extra trailing
-                                // universe arg for the motive level.) On
-                                // mismatch, refuse to ι-reduce; the
-                                // expression is stuck.
+                                // check: the constructor carries the
+                                // inductive's universe args, which sit at
+                                // the TAIL of the recursor's (a large-
+                                // eliminating recursor has one extra
+                                // LEADING universe arg for the motive
+                                // level — Lean's convention, mirrored by
+                                // addInductive). On mismatch, refuse to
+                                // ι-reduce; the expression is stuck.
                                 const auto& recursorArgs =
                                     headConstant->universeArguments;
                                 const auto& constructorArgs =
                                     ctorConstant->universeArguments;
-                                bool prefixMatches =
+                                bool suffixMatches =
                                     constructorArgs.size() <= recursorArgs.size();
+                                std::size_t offset = suffixMatches
+                                    ? recursorArgs.size() - constructorArgs.size()
+                                    : 0;
                                 for (std::size_t i = 0;
-                                     prefixMatches && i < constructorArgs.size();
+                                     suffixMatches && i < constructorArgs.size();
                                      ++i) {
                                     if (!levelsDefinitionallyEqual(
-                                            recursorArgs[i],
+                                            recursorArgs[i + offset],
                                             constructorArgs[i])) {
-                                        prefixMatches = false;
+                                        suffixMatches = false;
                                     }
                                 }
-                                if (!prefixMatches) {
+                                if (!suffixMatches) {
                                     return applyArguments(spine.head, spine.args);
                                 }
                                 // Also verify the parameter values match.
@@ -3113,10 +3116,17 @@ void addInductive(Environment& environment, std::string inductiveName,
         rollback();
         throw;
     }
-    std::vector<std::string> recursorUniverseParameters = universeParameters;
+    // The motive level comes FIRST in the recursor's universe-parameter
+    // list, before the inductive's own parameters — Lean's convention,
+    // which an external checker's re-derivation matches positionally
+    // (PLAN_KERNEL_EXPORT).
+    std::vector<std::string> recursorUniverseParameters;
     if (!motiveLevelName.empty()) {
         recursorUniverseParameters.push_back(motiveLevelName);
     }
+    recursorUniverseParameters.insert(recursorUniverseParameters.end(),
+                                      universeParameters.begin(),
+                                      universeParameters.end());
     environment.declarations.emplace(
         recursorName,
         Recursor{std::move(recursorUniverseParameters), inductiveName,

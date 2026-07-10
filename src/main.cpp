@@ -2292,8 +2292,8 @@ void runNaturalNumberGameProofs() {
                                             makeApplication(
                                                 makeConstant(
                                                     "Equality_recursor",
-                                                    {makeLevelParam("u"),
-                                                     makeLevelConst(0)}),
+                                                    {makeLevelConst(0),
+                                                     makeLevelParam("u")}),
                                                 makeBoundVariable(3) /* A */),
                                             makeBoundVariable(2) /* x */),
                                         motive),
@@ -2383,8 +2383,8 @@ void runNaturalNumberGameProofs() {
                                                     makeApplication(
                                                         makeConstant(
                                                             "Equality_recursor",
-                                                            {makeLevelParam("u"),
-                                                             makeLevelConst(0)}),
+                                                            {makeLevelConst(0),
+                                                             makeLevelParam("u")}),
                                                         makeBoundVariable(5) /* A */),
                                                     makeBoundVariable(3) /* y */),
                                                 motive),

@@ -499,12 +499,16 @@ ExpressionPointer Elaborator::tryConstructorDisjointness(
             if (static_cast<int>(carrierArguments.size())
                 != numParameters + numIndices) continue;
 
-            // Recursor universe arguments: the inductive's own levels
-            // followed by the motive level. The motive returns `Prop`
+            // Recursor universe arguments: the motive level leads,
+            // followed by the inductive's own levels (Lean's convention,
+            // mirrored by addInductive). The motive returns `Prop`
             // (Sort 0), whose type is Sort 1, so the motive universe is 1.
-            std::vector<LevelPointer> recursorUniverseArguments =
-                inductiveUniverseArguments;
+            std::vector<LevelPointer> recursorUniverseArguments;
             recursorUniverseArguments.push_back(makeLevelConst(1));
+            recursorUniverseArguments.insert(
+                recursorUniverseArguments.end(),
+                inductiveUniverseArguments.begin(),
+                inductiveUniverseArguments.end());
             ExpressionPointer recursorType = substituteUniverseLevels(
                 recursor->type, recursor->universeParameters,
                 recursorUniverseArguments);

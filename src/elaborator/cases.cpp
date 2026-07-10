@@ -1502,15 +1502,18 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
 
         // Assemble the recursor call. For large-eliminating recursors
         // the motive's universe level is an additional universe arg
-        // appended after the inductive's own universe args.
+        // in FRONT of the inductive's own universe args (Lean's
+        // convention, mirrored by addInductive).
         bool recursorHasMotiveLevel =
             recursor->universeParameters.size()
             > inductive->universeParameters.size();
-        std::vector<LevelPointer> recursorUniverseArguments =
-            inductiveUniverseArguments;
+        std::vector<LevelPointer> recursorUniverseArguments;
         if (recursorHasMotiveLevel) {
             recursorUniverseArguments.push_back(motiveLevel);
         }
+        recursorUniverseArguments.insert(recursorUniverseArguments.end(),
+                                         inductiveUniverseArguments.begin(),
+                                         inductiveUniverseArguments.end());
         ExpressionPointer applied =
             makeConstant(recursorName,
                           std::move(recursorUniverseArguments));
