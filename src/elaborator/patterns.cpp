@@ -655,109 +655,91 @@ ExpressionPointer Elaborator::buildCaseLambda(
             destructuredNames.size() == maxNames;
         size_t nextHypothesisIndex = constructorArguments.size();
 
-        // The case lambda's binders, in order:
-        //   For each constructor argument i:
-        //     - destructuredNames[i] : constructorArguments[i].type
-        //     - if recursive, an induction hypothesis
-        //       "_inductionHypothesisFor_<name>" of type
-        //       motive(argument_i)
+        // The case lambda's binders, in the recursor's minor-premise
+        // order (Lean's layout, mirrored by the kernel's buildCaseType):
+        //   - all constructor value arguments first,
+        //     destructuredNames[i] : constructorArguments[i].type;
+        //   - then one induction hypothesis per recursive argument, in
+        //     argument order, "_inductionHypothesisFor_<name>" of type
+        //     motive(<indices>, argument_i);
         //   Then the remaining function arguments (in order), using
         //   names from matchedCase->patterns[1..n-1] (must be
         //   bare-name patterns).
         std::vector<LocalBinder> lambdaBinders;
         std::map<std::string, std::string> recursiveArgToHypothesis;
         // Position of each destructured constructor argument inside
-        // lambdaBinders (the loop interleaves induction hypotheses for
-        // recursive args, so positions aren't 0,1,2,...).
+        // lambdaBinders (with the value arguments bound contiguously
+        // these are 0,1,2,…; kept as a list for the consumers below).
         std::vector<size_t> destructuredArgumentPositions;
-        // The motive needs to be referenced when constructing rec-hypothesis
-        // types. It currently has no free variables (it was elaborated in
-        // an empty stack). Each time we use it under N additional binders,
-        // we need to shift by N to keep de Bruijn indices valid.
-        int binderDepth = 0;  // counter of binders we're adding
+        for (size_t i = 0; i < constructorArguments.size(); ++i) {
+            // Within one constructor, the kernel-emitted types reference
+            // earlier constructor arguments via Bound(i - 1 - j); the
+            // value arguments are bound contiguously, so the lambda
+            // depth already matches — no shift.
+            destructuredArgumentPositions.push_back(lambdaBinders.size());
+            lambdaBinders.push_back(
+                {destructuredNames[i], constructorArguments[i].type});
+        }
         for (size_t i = 0; i < constructorArguments.size(); ++i) {
             const auto& constructorArgument = constructorArguments[i];
+            if (!constructorArgument.isRecursive) continue;
             const std::string& destructuredName = destructuredNames[i];
-            // The constructor's type Pis use BoundVariables that reference
-            // previously-bound constructor arguments. We must shift
-            // the type
-            // by (binderDepth - i) to account for our current binder count
-            // — i is the number of OTHER constructor arguments already
-            // in the lambda binder list (each constructor argument adds
-            // 1, each induction hypothesis adds 1). For a non-recursive
-            // constructor like zero, this loop runs zero times. For
-            // successor, just one constructor argument (and its
-            // induction hypothesis).
-            // Within one constructor, the kernel-emitted types reference
-            // earlier constructor arguments via Bound(i - 1 - j).
-            // After shifting by
-            // (binderDepth - i), the types match our actual lambda depth.
-            ExpressionPointer constructorArgumentType =
-                shift(constructorArgument.type, binderDepth - static_cast<int>(i));
-            destructuredArgumentPositions.push_back(lambdaBinders.size());
-            lambdaBinders.push_back({destructuredName, constructorArgumentType});
-            binderDepth++;
-            if (constructorArgument.isRecursive) {
-                // Recursive hypothesis: type = motive(<indices>,
-                // <this destructured>). For non-indexed inductives the
-                // index list is empty and the motive takes a single
-                // argument (the scrutinee). For indexed ones (e.g.
-                // LessOrEqual.step's recursive proof argument has type
-                // LessOrEqual(smaller, larger)), we must extract those
-                // indices from the value-arg's type and feed them to
-                // the motive in order.
-                ExpressionPointer shiftedMotive = shift(motive, binderDepth);
-                ExpressionPointer recursionHypothesisType = shiftedMotive;
-                // Peel the constructor-argument type (now in our
-                // lambdaBinder scope, since constructorArgumentType is
-                // shifted) to extract its arguments. The first
-                // `numParameters` are parameter values; the rest are
-                // index values.
-                ExpressionPointer typeCursor =
-                    shift(constructorArgumentType, 1);
-                std::vector<ExpressionPointer> recursiveTypeArguments;
-                while (auto* application =
-                           std::get_if<Application>(&typeCursor->node)) {
-                    recursiveTypeArguments.insert(
-                        recursiveTypeArguments.begin(),
-                        application->argument);
-                    typeCursor = application->function;
-                }
-                for (size_t k = parameterValues.size();
-                     k < recursiveTypeArguments.size(); ++k) {
-                    recursionHypothesisType = makeApplication(
-                        recursionHypothesisType,
-                        recursiveTypeArguments[k]);
-                }
-                recursionHypothesisType =
-                    makeApplication(recursionHypothesisType,
-                                    makeBoundVariable(0));
-                // ^ Bound(0) is the most-recently-bound name, which is
-                // the constructor argument we just added
-                // (destructuredName).
-                // Beta-reduce the motive application so the hypothesis
-                // binder carries the DECLARED result type (e.g. the
-                // alias `ComplexNumber`), not a stuck
-                // `(λ …)(…)` redex — operator dispatch and implicit
-                // inference in the arm body match on the binder type
-                // as written. Beta only: a weak-head normalisation
-                // would also δ-unfold the alias to its underlying
-                // quotient and lose the dispatch.
-                recursionHypothesisType =
-                    deepBetaReduce(recursionHypothesisType);
-                std::string hypothesisName;
-                if (userProvidedHypothesisNames) {
-                    hypothesisName =
-                        destructuredNames[nextHypothesisIndex++];
-                } else {
-                    hypothesisName =
-                        "_inductionHypothesisFor_" + destructuredName;
-                }
-                lambdaBinders.push_back({hypothesisName,
-                                          recursionHypothesisType});
-                recursiveArgToHypothesis[destructuredName] = hypothesisName;
-                binderDepth++;
+            // Recursive hypothesis: type = motive(<indices>,
+            // <the destructured argument>). For non-indexed inductives
+            // the index list is empty and the motive takes a single
+            // argument (the scrutinee). For indexed ones (e.g.
+            // LessOrEqual.step's recursive proof argument has type
+            // LessOrEqual(smaller, larger)), we must extract those
+            // indices from the value-arg's type and feed them to
+            // the motive in order.
+            int binderDepth = static_cast<int>(lambdaBinders.size());
+            // The motive has no free variables (it was elaborated in an
+            // empty stack); shift it to the current binder depth. The
+            // argument's type was written at depth i; view it from here.
+            ExpressionPointer recursionHypothesisType =
+                shift(motive, binderDepth);
+            ExpressionPointer typeCursor = shift(
+                constructorArgument.type,
+                binderDepth - static_cast<int>(i));
+            std::vector<ExpressionPointer> recursiveTypeArguments;
+            while (auto* application =
+                       std::get_if<Application>(&typeCursor->node)) {
+                recursiveTypeArguments.insert(
+                    recursiveTypeArguments.begin(),
+                    application->argument);
+                typeCursor = application->function;
             }
+            for (size_t k = parameterValues.size();
+                 k < recursiveTypeArguments.size(); ++k) {
+                recursionHypothesisType = makeApplication(
+                    recursionHypothesisType,
+                    recursiveTypeArguments[k]);
+            }
+            recursionHypothesisType = makeApplication(
+                recursionHypothesisType,
+                makeBoundVariable(
+                    binderDepth - 1 - static_cast<int>(i)));
+            // Beta-reduce the motive application so the hypothesis
+            // binder carries the DECLARED result type (e.g. the
+            // alias `ComplexNumber`), not a stuck
+            // `(λ …)(…)` redex — operator dispatch and implicit
+            // inference in the arm body match on the binder type
+            // as written. Beta only: a weak-head normalisation
+            // would also δ-unfold the alias to its underlying
+            // quotient and lose the dispatch.
+            recursionHypothesisType =
+                deepBetaReduce(recursionHypothesisType);
+            std::string hypothesisName;
+            if (userProvidedHypothesisNames) {
+                hypothesisName =
+                    destructuredNames[nextHypothesisIndex++];
+            } else {
+                hypothesisName =
+                    "_inductionHypothesisFor_" + destructuredName;
+            }
+            lambdaBinders.push_back({hypothesisName,
+                                      recursionHypothesisType});
+            recursiveArgToHypothesis[destructuredName] = hypothesisName;
         }
 
         // Compute the motive applied to (constructorIndexValues..., Ctor
@@ -777,10 +759,10 @@ ExpressionPointer Elaborator::buildCaseLambda(
             // may reference value-arg BoundVariables (Bound(0..n-1))
             // and outer binders via parameter-value lifts. Shift by
             // (totalBinderDepth - constructorValueArgCount) to map
-            // them to body coordinates — relies on the value args
-            // sitting contiguously at the bottom of lambdaBinders
-            // (i.e. no induction hypotheses interspersed between
-            // them). See limitation note in commit message.
+            // them to body coordinates — the value args sit
+            // contiguously at the bottom of lambdaBinders (the
+            // induction hypotheses all come after them), so this
+            // shift is exact.
             for (const auto& indexValue : constructorIndexValuesRaw) {
                 motiveAtCase = makeApplication(
                     motiveAtCase,
@@ -894,7 +876,6 @@ ExpressionPointer Elaborator::buildCaseLambda(
             otherFunctionArgumentPositions.push_back(lambdaBinders.size());
             lambdaBinders.push_back({positionName, pi->domain});
             motiveAtCase = pi->codomain;
-            binderDepth++;
         }
 
         // The expected body type is what's left of the motive after

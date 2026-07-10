@@ -955,8 +955,11 @@ ExpressionPointer buildIotaReduction(
     }
 
     // Remaining Pis are non-param arguments. Apply the case to each one,
-    // inserting an inductive-hypothesis recursive call for each recursive
-    // argument.
+    // collecting an inductive-hypothesis recursive call for each recursive
+    // argument; the hypotheses are applied AFTER all the values (the minor
+    // premise binds every argument first, then the hypotheses in argument
+    // order — Lean's layout, mirrored by buildCaseType).
+    std::vector<ExpressionPointer> recursiveCalls;
     while (auto* pi = std::get_if<Pi>(&walker->node)) {
         auto argValue = constructorArgs[argIndex];
         result = makeApplication(result, argValue);
@@ -992,13 +995,16 @@ ExpressionPointer buildIotaReduction(
                 recursiveCall = makeApplication(recursiveCall, idx);
             }
             recursiveCall = makeApplication(recursiveCall, argValue);
-            result = makeApplication(result, recursiveCall);
+            recursiveCalls.push_back(std::move(recursiveCall));
         }
 
         // Advance through the binder; substitute the arg value to keep
         // de Bruijn indices coherent in the remaining codomain.
         walker = substitute(pi->codomain, 0, argValue);
         argIndex++;
+    }
+    for (const auto& recursiveCall : recursiveCalls) {
+        result = makeApplication(result, recursiveCall);
     }
     return result;
 }
@@ -2735,22 +2741,27 @@ ExpressionPointer buildCaseType(
     }
     body = makeApplication(body, constructorApplied);
 
-    // Wrap each non-param arg's Pi (and its hypothesis Pi if recursive),
-    // innermost first.
+    // Wrap the minor premise in Lean's layout: the constructor's value
+    // arguments first, then one inductive-hypothesis Pi per recursive
+    // argument, in argument order — an external checker re-derives
+    // recursors in exactly this shape (PLAN_KERNEL_EXPORT). The
+    // hypothesis types reference the arguments' FreeVariables, which
+    // the field pass below re-binds along with every other occurrence.
     for (int j = (int)nonParamArgs.size() - 1; j >= 0; --j) {
         const auto& argument = nonParamArgs[j];
-        if (argument.isRecursive) {
-            auto hypothesisType =
-                makeInternalFreeVariable(motivePlaceholder);
-            for (const auto& idx : argument.indicesForRecursiveCall) {
-                hypothesisType = makeApplication(hypothesisType, idx);
-            }
-            hypothesisType = makeApplication(
-                hypothesisType,
-                makeInternalFreeVariable(argument.freshName));
-            body = makePi("hypothesis_" + argument.displayHint,
-                          hypothesisType, body);
+        if (!argument.isRecursive) continue;
+        auto hypothesisType = makeInternalFreeVariable(motivePlaceholder);
+        for (const auto& idx : argument.indicesForRecursiveCall) {
+            hypothesisType = makeApplication(hypothesisType, idx);
         }
+        hypothesisType = makeApplication(
+            hypothesisType,
+            makeInternalFreeVariable(argument.freshName));
+        body = makePi("hypothesis_" + argument.displayHint,
+                      hypothesisType, body);
+    }
+    for (int j = (int)nonParamArgs.size() - 1; j >= 0; --j) {
+        const auto& argument = nonParamArgs[j];
         body = closeBinder(body, argument.freshName,
                            FreeVariableOrigin::Internal);
         body = makePi(argument.displayHint, argument.type, body);
