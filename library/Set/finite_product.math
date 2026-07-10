@@ -5,8 +5,8 @@
 -- yardstick — `NaturalsBelow(m) × NaturalsBelow(n) ≅ NaturalsBelow(m·n)`
 -- — pairing (i, j) with the single index `n·i + j`, the row-major
 -- layout of an m-by-n grid. The inverse recovers (i, j) by Euclidean
--- division: i is the quotient `divide(n, k)` and j the remainder
--- `modulo(n, k)`. Uniqueness of quotient/remainder closes the round trip.
+-- division: i is the quotient `divide(k, n)` and j the remainder
+-- `modulo(k, n)`. Uniqueness of quotient/remainder closes the round trip.
 
 module Set.finite_product
 
@@ -77,34 +77,34 @@ theorem NaturalsBelow.product_index_bound (m n i j : Natural)
      = n * successor(i)
      ≤ n * m
      = m * n;
-  done by Natural.lt_of_successor_le
+  done
 }
 
--- The quotient `divide(n, k)` of an index below m·n is itself below m: it is
+-- The quotient `divide(k, n)` of an index below m·n is itself below m: it is
 -- the row of the cell. From the decomposition n·q + r = k we read q ≤ k, so
 -- n·q < n·m; were m ≤ q we would get n·m ≤ n·q, putting successor(n·q) below
 -- itself. (n is the divisor, so it must be positive.)
 theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
         (oneLeN : 1 ≤ n) (belowProduct : k < m * n)
-        : Natural.floor_divide(n, k) < m := {
+        : Natural.floor_divide(k, n) < m := {
   successor(k) ≤ m * n;
-  n * Natural.floor_divide(n, k) + Natural.modulo(n, k) = k;
-  n * Natural.floor_divide(n, k)
-      ≤ n * Natural.floor_divide(n, k) + Natural.modulo(n, k)
+  n * Natural.floor_divide(k, n) + Natural.modulo(k, n) = k;
+  n * Natural.floor_divide(k, n)
+      ≤ n * Natural.floor_divide(k, n) + Natural.modulo(k, n)
       = k;
-  successor(n * Natural.floor_divide(n, k))
+  successor(n * Natural.floor_divide(k, n))
       ≤ successor(k)
       ≤ m * n
       = n * m;
-  cases Natural.compare_strict(Natural.floor_divide(n, k), m) {
+  cases Natural.compare_strict(Natural.floor_divide(k, n), m) {
     | Natural.StrictComparison.below(strictlyBelow) =>
-        { done by Natural.lt_of_successor_le }
+        { done }
     | Natural.StrictComparison.atLeast(atLeast) => {
         -- m ≤ q forces n·m ≤ n·q, so successor(n·q) ≤ n·m ≤ n·q: impossible.
-        successor(n * Natural.floor_divide(n, k))
+        successor(n * Natural.floor_divide(k, n))
             ≤ n * m
-            ≤ n * Natural.floor_divide(n, k)   as selfBelow;
-        absurd(Natural.not_successor_less_or_equal_self(n * Natural.floor_divide(n, k), selfBelow))
+            ≤ n * Natural.floor_divide(k, n)   as selfBelow;
+        absurd(Natural.not_successor_less_or_equal_self(n * Natural.floor_divide(k, n), selfBelow))
       }
   }
 }
@@ -126,11 +126,11 @@ definition NaturalsBelow.product_into (m n : Natural) (oneLeN : 1 ≤ n)
 definition NaturalsBelow.product_out_of (m n : Natural) (oneLeN : 1 ≤ n)
         : NaturalsBelow(m * n) → Pair(NaturalsBelow(m), NaturalsBelow(n)) :=
   (k : NaturalsBelow(m * n)) ↦
-    Product.make(NaturalsBelow.make(Natural.floor_divide(n, NaturalsBelow.value(k)),
+    Product.make(NaturalsBelow.make(Natural.floor_divide(NaturalsBelow.value(k), n),
             NaturalsBelow.product_quotient_bound(m, n, NaturalsBelow.value(k), oneLeN, NaturalsBelow.below(k))),
-        NaturalsBelow.make(Natural.modulo(n, NaturalsBelow.value(k)),
-            Natural.lt_of_successor_le(Natural.modulo(n, NaturalsBelow.value(k)), n,
-                Natural.modulo_bound(n, NaturalsBelow.value(k), oneLeN))))
+        NaturalsBelow.make(Natural.modulo(NaturalsBelow.value(k), n),
+            Natural.lt_of_successor_le(Natural.modulo(NaturalsBelow.value(k), n), n,
+                Natural.modulo_bound(NaturalsBelow.value(k), n, oneLeN))))
 
 -- ----------------------------------------------------------------------
 -- The two inverse laws.
@@ -149,37 +149,37 @@ theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : 1 ≤ n)
             NaturalsBelow.product_index_bound(m, n,
                 NaturalsBelow.value(first), NaturalsBelow.value(second),
                 NaturalsBelow.below(first), NaturalsBelow.below(second));
-        successor(Natural.modulo(n, index)) ≤ n by Natural.modulo_bound as remainderBelowN;
+        successor(Natural.modulo(index, n)) ≤ n by Natural.modulo_bound as remainderBelowN;
         successor(NaturalsBelow.value(second)) ≤ n as secondBelowN;
         -- Dividing the index by n recovers quotient i and remainder j.
-        n * Natural.floor_divide(n, index) + Natural.modulo(n, index) = index as decompose;
-        Natural.floor_divide(n, index) = NaturalsBelow.value(first)
+        n * Natural.floor_divide(index, n) + Natural.modulo(index, n) = index as decompose;
+        Natural.floor_divide(index, n) = NaturalsBelow.value(first)
             by Natural.quotient_remainder_unique(n,
-                   Natural.floor_divide(n, index), Natural.modulo(n, index),
+                   Natural.floor_divide(index, n), Natural.modulo(index, n),
                    NaturalsBelow.value(first), NaturalsBelow.value(second),
                    remainderBelowN, secondBelowN, decompose);
-        Natural.modulo(n, index) = NaturalsBelow.value(second) by Natural.remainder_unique;
+        Natural.modulo(index, n) = NaturalsBelow.value(second) by Natural.remainder_unique;
         let recoveredFirst : NaturalsBelow(m) :=
-            NaturalsBelow.make(Natural.floor_divide(n, index),
+            NaturalsBelow.make(Natural.floor_divide(index, n),
                 NaturalsBelow.product_quotient_bound(m, n, index, oneLeN, indexBound));
         let recoveredSecond : NaturalsBelow(n) :=
-            NaturalsBelow.make(Natural.modulo(n, index),
-                Natural.lt_of_successor_le(Natural.modulo(n, index), n, remainderBelowN));
+            NaturalsBelow.make(Natural.modulo(index, n),
+                Natural.lt_of_successor_le(Natural.modulo(index, n), n, remainderBelowN));
         recoveredFirst = first;
         recoveredSecond = second;
-        done by Product.make_equal
+        done
       }
   }
 
--- into reassembles whatever out_of split. out_of(k) has row divide(n, value k)
--- and column modulo(n, value k); into sends them back to the single index
--- n·divide(n, value k) + modulo(n, value k), which is value k exactly — that
+-- into reassembles whatever out_of split. out_of(k) has row divide(value k, n)
+-- and column modulo(value k, n); into sends them back to the single index
+-- n·divide(value k, n) + modulo(value k, n), which is value k exactly — that
 -- is the division identity.
 theorem NaturalsBelow.product_round_trip_right (m n : Natural) (oneLeN : 1 ≤ n)
         (k : NaturalsBelow(m * n))
         : NaturalsBelow.product_into(m, n, oneLeN, NaturalsBelow.product_out_of(m, n, oneLeN, k)) = k := {
-  n * Natural.floor_divide(n, NaturalsBelow.value(k)) + Natural.modulo(n, NaturalsBelow.value(k))
-      = NaturalsBelow.value(k) by Natural.floor_divide_modulo_decompose;
+  n * Natural.floor_divide(NaturalsBelow.value(k), n) + Natural.modulo(NaturalsBelow.value(k), n)
+      = NaturalsBelow.value(k);
   done
 }
 

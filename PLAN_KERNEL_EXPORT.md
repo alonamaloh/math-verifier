@@ -20,15 +20,16 @@ is the tie-breaker where the book is silent). We want the invariant:
 
 > **Everything our kernel accepts, an external Lean-kernel checker
 > accepts** — witnessed continuously by exporting our whole environment
-> in the lean4export text format and replaying it through an
+> in the lean4export format (**NDJSON 3.1.0** — the Stage-0 PoC found
+> the classic text format retired upstream) and replaying it through an
 > independent checker in CI.
 
 ## Status ledger
 
 | Stage | Workstream | Status | Record |
 |-------|------------|--------|--------|
-| 0 | Audit + toolchain proof-of-concept | **not started** | §A: settle the open decision gates with the owner; inventory table-op defeq dependence; run a candidate external checker on a *Lean-produced* export file to validate our understanding of the format + tooling before writing any exporter code. |
-| 1 | In-source op-table alignment (kernel + `Natural/`) | **not started** | §B: `floor_divide`/`modulo` → Lean's argument order + zero conventions; drop `factorial`/`maximum`/`predecessor` from the table; adopt Lean's `pow` exponent cap. **Time-sensitive: every new library file accretes onto the current conventions.** |
+| 0 | Audit + toolchain proof-of-concept | **DONE 2026-07-10** | §A. All five gates settled with the owner: adopt Lean's subsingleton rule; pow cap 2²⁴; nanoda primary (lean4lean **dropped** — the PoC found it has no export-file frontend, .olean input only); full-library trail; `maximum` off the table. Inventory: ground uses of `factorial`/`maximum`/`predecessor` exist only in `Test/` with tiny arguments; no `power` exponent near the cap — all drops risk-free. PoC (notes: `docs/kernel-export-poc.md`): Lean 4.31.0 + lean4export v4.31.0 emit **NDJSON format 3.1.0** — the classic text format is retired upstream (ammkrn moved his own tooling to NDJSON, Dec 2025); `nanoda_bin` (0.4.10-beta) natively replays it — 58,703 declarations in 23 s, config-file driven, `nat_extension: true` required, axiom allowlist built in. Lean needs a 16 GB `ulimit -v` (per-thread VA reservations), not our default 8. |
+| 1 | In-source op-table alignment (kernel + `Natural/`) | **DONE 2026-07-10** | §B. `floor_divide`/`modulo` now take **(dividend, divisor)** with `n / 0 = 0` (a `cases` guard in the definition; new `floor_divide_zero_divisor`/`modulo_zero_divisor` lemmas) and `n % 0 = n`; `factorial`/`maximum`/`predecessor` dropped from the table (replay-by-unfolding pinned in `Test/natural_literal_test.math`); `power` accelerated only below 2²⁴; self-check re-ranged with divisor 0 covered. Conventions pinned at the defeq level in `Test/lean_kernel_conventions_test.math`. Full `library tests error-tests` + numeral-table self-check green. |
 | 2 | Kernel-semantics parity residuals | **not started** | §C: recursor-derivation parity (elimination levels — the And/Iff subsingleton gap), quotient primitive mapping audit, closed-body + axiom inventory checks. |
 | 3 | The exporter (untrusted tool) | **not started** | §D: `kernel export --lean4` emitting the lean4export text format with the `Natural`→`Nat` / `Quotient`→`Quot` name maps. Prelude slice first, then the full library. |
 | 4 | External checking in CI | **not started** | §E: `make export-check` — full-library trail through ≥1 independent checker, axiom report asserted against the documented inventory. Nightly at first. |
@@ -203,9 +204,14 @@ re-verifies the world; `.mathv` cache bump as usual).
 
 A new **untrusted** tool (`kernel export --lean4`, or a separate
 binary): walk the environment in declaration order and emit the
-lean4export text format (version pinned per the Stage-0 PoC; the book's
-ch. 3 is the spec — names/levels/exprs as numbered items, `#DEF`,
-`#AX`, `#IND`, `#QUOT`, nat literals as literal items).
+lean4export **NDJSON format 3.1.0** (pinned by the Stage-0 PoC; the
+spec is `lean4export/format_ndjson.md` at tag v4.31.0, summarized in
+`docs/kernel-export-poc.md` §f — one JSON object per line, a leading
+`meta` line with the format version, three back-reference namespaces
+keyed `"in"`/`"il"`/`"ie"`, declarations as `def`/`axiom`/`thm`/
+`inductive`/`quot` objects, and nat literals as arbitrary-precision
+decimal strings `{"natVal":"..."}`, onto which our GMP `NaturalLiteral`
+maps 1:1).
 
 - **Name maps** (mechanical, total):
   - `Natural` → `Nat`, `zero` → `Nat.zero`, `successor` → `Nat.succ`
@@ -230,11 +236,13 @@ ch. 3 is the spec — names/levels/exprs as numbered items, `#DEF`,
 ## E. Stage 4 — external checking in CI
 
 - **Primary checker: `nanoda_lib`** (independent Rust implementation by
-  the book's author, consumes the export format natively).
-  **Secondary (optional): `lean4lean`** (Lean-verified checker — the
-  strongest witness if its export-file frontend proves workable in the
-  Stage-0 PoC). `lean4checker` replays Lean's own C++ kernel and needs
-  `.olean` input — out of scope unless the PoC shows otherwise.
+  the book's author, consumes the NDJSON export natively; validated in
+  the Stage-0 PoC — invocation, config knobs, and axiom-report format
+  in `docs/kernel-export-poc.md` §d; set `nat_extension: true` and
+  drive the axiom policy through `permitted_axioms`).
+  **`lean4lean` is dropped** (Stage-0 PoC verdict: it consumes `.olean`
+  module data off the Lean search path only — no export-file frontend —
+  so like `lean4checker` it can re-check Lean libraries, not our trail).
 - `make export-check`: build the export, run the checker(s), require
   (i) zero errors and (ii) the axiom report **exactly equals** the
   Stage-2 documented inventory (so a stray `sorry` or accidental axiom
@@ -253,18 +261,22 @@ ch. 3 is the spec — names/levels/exprs as numbered items, `#DEF`,
 
 ---
 
-## Open questions for the owner (Stage 0 gates)
+## Open questions for the owner (Stage 0 gates) — ALL SETTLED 2026-07-10
 
-1. **Elimination levels**: adopt Lean's subsingleton rule (recommended —
-   it's the only declaration-level mismatch, and it's monotone-safe)?
-2. **`pow` cap**: adopt Lean's 2²⁴ (recommended: never certify what a
-   checker can't replay) or keep `ulong`?
-3. **Checkers**: `nanoda` primary + `lean4lean` stretch (recommended),
-   pending the Stage-0 proof-of-concept?
-4. **Trail scope**: full library from the start (recommended — the
-   export is cheap once written), or clean-manifest first?
-5. **`maximum`** off the table: confirm after the Stage-0 usage
-   inventory (expected yes).
+1. **Elimination levels**: adopt Lean's subsingleton rule. → **Adopted**
+   (Stage-2 work).
+2. **`pow` cap**: adopt Lean's 2²⁴. → **Adopted** (landed in Stage 1;
+   we decline exponents ≥ 2²⁴ — declining strictly more than Lean is
+   always safe, accepting more never is).
+3. **Checkers**: nanoda primary. → **Settled**; the lean4lean stretch
+   goal died in the PoC (no export-file frontend).
+4. **Trail scope**: full library from the start. → **Settled**. (The
+   PoC also validated lean4export's *selective* mode — a two-theorem
+   dependency cone is ~1000x smaller — as the model for fast
+   per-theorem trails if we ever want them.)
+5. **`maximum`** off the table. → **Confirmed** by the usage inventory
+   (ground uses only in `Test/`, tiny arguments; library uses are all
+   symbolic).
 
 ## Verification
 

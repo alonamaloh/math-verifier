@@ -1030,19 +1030,23 @@ bool g_acceleratedNaturalOpsEnabled = true;
 // 2026-07-10): WHNF computes these ops on literals directly with GMP
 // instead of unfolding the library recursion (which opacity blocks for
 // most of them anyway). Each entry's semantics mirror the library
-// definition EXACTLY — including the fuel conventions
-// `floor_divide(0, n) = n` and `modulo(0, n) = n` — and the
-// MATH_CHECK_NUMERAL_TABLE self-check re-verifies every entry against
-// the definition bodies over a sample range.
+// definition EXACTLY, and the MATH_CHECK_NUMERAL_TABLE self-check
+// re-verifies every entry against the definition bodies over a sample
+// range.
+//
+// PLAN_KERNEL_EXPORT Stage 1: the op set and its conventions match
+// Lean's kernel language (the core set of "Type Checking in Lean 4"
+// minus beq/ble, which our ground relations prove via certificate
+// lemmas instead): add/mul/sub/pow/div/mod semantics under our names
+// add/multiply/monus/power/floor_divide/modulo, with (dividend,
+// divisor) argument order, `n / 0 = 0`, `n % 0 = n`, and the exponent
+// accelerated only below 2^24. factorial/maximum/predecessor have no
+// Lean counterpart and are NOT table ops — they replay by unfolding.
 int acceleratedNaturalOpArity(const std::string& name) {
     if (name == "Natural.add" || name == "Natural.multiply"
         || name == "Natural.monus" || name == "Natural.power"
-        || name == "Natural.floor_divide" || name == "Natural.modulo"
-        || name == "Natural.maximum") {
+        || name == "Natural.floor_divide" || name == "Natural.modulo") {
         return 2;
-    }
-    if (name == "Natural.factorial" || name == "Natural.predecessor") {
-        return 1;
     }
     return 0;
 }
@@ -1065,41 +1069,34 @@ std::optional<NaturalValue> evaluateAcceleratedNaturalOp(
     }
     if (name == "Natural.power") {
         // power(base, exponent) = base^exponent; power(base, 0) = 1.
-        if (!arguments[1].fits_ulong_p()) return std::nullopt;
+        // Accelerate only exponents below 2^24 — Lean's cap, so we never
+        // certify by defeq what an external checker declines to replay.
+        if (!arguments[1].fits_ulong_p()
+            || arguments[1] >= (1ul << 24)) {
+            return std::nullopt;
+        }
         NaturalValue result;
         mpz_pow_ui(result.get_mpz_t(), arguments[0].get_mpz_t(),
                    arguments[1].get_ui());
         return result;
     }
     if (name == "Natural.floor_divide") {
-        // floor_divide(divisor, dividend); the fuel convention makes
-        // floor_divide(0, n) = n (traced from floor_divide_step).
-        if (arguments[0] == 0) return arguments[1];
+        // floor_divide(dividend, divisor); n / 0 = 0 (Lean's convention,
+        // matched by the definition's `cases` guard on the divisor).
+        if (arguments[1] == 0) return NaturalValue(0);
         NaturalValue result;
-        mpz_fdiv_q(result.get_mpz_t(), arguments[1].get_mpz_t(),
-                   arguments[0].get_mpz_t());
+        mpz_fdiv_q(result.get_mpz_t(), arguments[0].get_mpz_t(),
+                   arguments[1].get_mpz_t());
         return result;
     }
     if (name == "Natural.modulo") {
-        // modulo(divisor, dividend); modulo(0, n) = n (fuel convention).
-        if (arguments[0] == 0) return arguments[1];
+        // modulo(dividend, divisor); n % 0 = n (Lean's convention — the
+        // fuel recursion carries the dividend when the divisor is zero).
+        if (arguments[1] == 0) return arguments[0];
         NaturalValue result;
-        mpz_fdiv_r(result.get_mpz_t(), arguments[1].get_mpz_t(),
-                   arguments[0].get_mpz_t());
+        mpz_fdiv_r(result.get_mpz_t(), arguments[0].get_mpz_t(),
+                   arguments[1].get_mpz_t());
         return result;
-    }
-    if (name == "Natural.maximum") {
-        return arguments[0] >= arguments[1] ? arguments[0] : arguments[1];
-    }
-    if (name == "Natural.factorial") {
-        if (!arguments[0].fits_ulong_p()) return std::nullopt;
-        NaturalValue result;
-        mpz_fac_ui(result.get_mpz_t(), arguments[0].get_ui());
-        return result;
-    }
-    if (name == "Natural.predecessor") {
-        if (arguments[0] == 0) return NaturalValue(0);
-        return NaturalValue(arguments[0] - 1);
     }
     return std::nullopt;
 }

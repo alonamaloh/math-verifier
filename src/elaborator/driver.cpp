@@ -370,8 +370,9 @@ void Elaborator::runNumeralTableSelfCheck() {
         // helpers temporarily transparent — and compare the fully
         // reduced result against the GMP evaluation. The table is
         // trusted-computing-base code; this check keeps its trust
-        // grounded in the library's own semantics (including the fuel
-        // conventions `floor_divide(0, n) = n` / `modulo(0, n) = n`).
+        // grounded in the library's own semantics (including the
+        // Lean-aligned zero conventions `floor_divide(n, 0) = 0` /
+        // `modulo(n, 0) = n`, PLAN_KERNEL_EXPORT Stage 1).
         struct SampledOp {
             const char* name;
             std::vector<std::vector<unsigned long>> samples;
@@ -384,11 +385,6 @@ void Elaborator::runNumeralTableSelfCheck() {
             }
             return result;
         };
-        auto singlesOf = [](std::vector<unsigned long> values) {
-            std::vector<std::vector<unsigned long>> result;
-            for (unsigned long a : values) result.push_back({a});
-            return result;
-        };
         const std::vector<unsigned long> smalls = {0, 1, 2, 3, 5, 7, 12};
         const std::vector<unsigned long> tiny = {0, 1, 2, 3, 5, 7};
         const std::vector<SampledOp> sampledOps = {
@@ -396,14 +392,10 @@ void Elaborator::runNumeralTableSelfCheck() {
             {"Natural.multiply",     pairsOf(tiny, tiny)},
             {"Natural.monus",        pairsOf(smalls, smalls)},
             {"Natural.power",        pairsOf({0, 1, 2, 3}, {0, 1, 2, 3, 5})},
-            {"Natural.floor_divide", pairsOf(tiny, smalls)},
-            {"Natural.modulo",       pairsOf(tiny, smalls)},
-            {"Natural.maximum",      pairsOf(smalls, smalls)},
-            // factorial(6) already exhausts the definitional evaluation's
-            // reduction budget (unary multiply cascades); 5! = 120 still
-            // exercises the full recursion.
-            {"Natural.factorial",    singlesOf({0, 1, 2, 3, 4, 5})},
-            {"Natural.predecessor",  singlesOf(smalls)},
+            // (dividend, divisor) — the divisor range starts at 0 so the
+            // zero conventions are checked against the definitions.
+            {"Natural.floor_divide", pairsOf(smalls, tiny)},
+            {"Natural.modulo",       pairsOf(smalls, tiny)},
         };
         // The ops plus the recursion helpers behind them, made
         // transparent for the duration so the kernel can reduce the
@@ -411,8 +403,7 @@ void Elaborator::runNumeralTableSelfCheck() {
         static const char* transparencyNames[] = {
             "Natural.add", "Natural.multiply", "Natural.monus",
             "Natural.power", "Natural.floor_divide", "Natural.modulo",
-            "Natural.floor_divide_step", "Natural.modulo_step",
-            "Natural.maximum", "Natural.factorial", "Natural.predecessor"};
+            "Natural.floor_divide_step", "Natural.modulo_step"};
         std::vector<std::pair<std::string, Opacity>> opacityRestores;
         for (const char* name : transparencyNames) {
             auto iterator = environment_.declarations.find(name);
