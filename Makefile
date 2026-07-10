@@ -63,8 +63,15 @@ LDFLAGS_MIMALLOC := -Wl,--whole-archive $(MIMALLOC_LIB) -Wl,--no-whole-archive
 endif
 endif
 
+# GMP (PLAN_FAST_NUMERALS): the kernel's NaturalLiteral node stores an
+# mpz_class, so libgmpxx/libgmp are hard build dependencies (owner
+# decision, 2026-07-10). Debian/Ubuntu: `apt install libgmp-dev`;
+# macOS: `brew install gmp` (add -I/-L via CXXFLAGS if not on the
+# default search path).
+LDFLAGS_GMP := -lgmpxx -lgmp
+
 kernel: $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS_MIMALLOC)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS_MIMALLOC) $(LDFLAGS_GMP)
 
 $(OBJDIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
@@ -185,6 +192,12 @@ clean-check: $(CLEAN_MATHV_FILES)
 checker-tests: library $(TEST_MATHV_FILES)
 	@./kernel verify 	    --source library/Test/redundant_check_cache_isolation_test.math 	    --output build/checker-tests.mathv --cache-root build 	    --check-redundant-by --no-check-unused-names > /dev/null 2>&1 	  && echo "checker-tests: PASS" 	  || { echo "checker-tests: FAIL — a clean file broke under --check-redundant-by"; exit 1; }
 	@bash scripts/redundancy_probe_test.sh
+	@MATH_CHECK_NUMERAL_TABLE=1 ./kernel verify \
+	    --source library/Test/numeral_table_check.math \
+	    --output build/numeral-table-check.mathv --cache-root build \
+	    > /dev/null 2> build/numeral-table-check.log \
+	  && echo "numeral-table-check: PASS" \
+	  || { echo "numeral-table-check: FAIL — the accelerated GMP op table disagrees with the library definitions:"; cat build/numeral-table-check.log; exit 1; }
 
 # B3.4 — morphism-packet audit: re-verify the audit surface module
 # (which imports every packet-lemma home) with the audit flag on and

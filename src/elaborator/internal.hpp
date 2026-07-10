@@ -324,6 +324,12 @@ public:
     // proof body.
     void seedAlgebraicRegistryFromEnvironment();
 
+    // PLAN_FAST_NUMERALS §B — cross-verify the kernel's accelerated GMP
+    // op table against the library definitions loaded in this
+    // environment (MATH_CHECK_NUMERAL_TABLE=1; wired into `make tests`).
+    // Throws when any table entry disagrees with its definition.
+    void runNumeralTableSelfCheck();
+
     ExpressionPointer runExpression(const SurfaceExpression& expression);
 
 private:

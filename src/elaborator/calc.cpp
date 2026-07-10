@@ -408,6 +408,16 @@ ExpressionPointer Elaborator::elaborateCalc(
                 if (!stepProofKernel) {
                     stepProofKernel = elaborateExpression(
                         *step.stepProof, localBinders, stepRelationType);
+                    if (std::getenv("MATH_DEBUG_CALC_STEP")) {
+                        try {
+                            std::cerr << "[calc-step] line " << step.line
+                                << ": primary elaboration type: "
+                                << prettyPrintForDisplay(
+                                       inferTypeInLocalContext(
+                                           localBinders, stepProofKernel))
+                                << "\n";
+                        } catch (...) {}
+                    }
                     // `by (<fact>)`: when the proof position elaborates to a
                     // proposition P (its type is the `Proposition` sort) rather
                     // than a proof, the user cited a fact. Prove P and bridge
@@ -955,6 +965,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                                             stepProofType,
                                             stepRelationTypeOpened,
                                             kDefeqProbeFuel)) {
+                const bool debugCalcStep =
+                    std::getenv("MATH_DEBUG_CALC_STEP") != nullptr;
                 try {
                     ExpressionPointer filled = autoFillHintForClaim(
                         stepProofKernel, stepProofType, stepRelationType,
@@ -967,10 +979,32 @@ ExpressionPointer Elaborator::elaborateCalc(
                                                     stepRelationTypeOpened)) {
                             stepProofKernel = filled;
                             stepProofType = filledType;
+                        } else if (debugCalcStep) {
+                            std::cerr << "[calc-step] line " << step.line
+                                << ": whole-conclusion fill produced a "
+                                "proof but its type failed the final "
+                                "defeq:\n  filled: "
+                                << prettyPrintForDisplay(filledType)
+                                << "\n  wanted: "
+                                << prettyPrintForDisplay(
+                                       stepRelationTypeOpened) << "\n";
                         }
+                    } else if (debugCalcStep) {
+                        std::cerr << "[calc-step] line " << step.line
+                            << ": whole-conclusion fill returned null\n";
                     }
-                } catch (const ElaborateError&) {
-                } catch (const TypeError&) {
+                } catch (const ElaborateError& e) {
+                    if (debugCalcStep) {
+                        std::cerr << "[calc-step] line " << step.line
+                            << ": whole-conclusion fill threw: "
+                            << e.what() << "\n";
+                    }
+                } catch (const TypeError& e) {
+                    if (debugCalcStep) {
+                        std::cerr << "[calc-step] line " << step.line
+                            << ": whole-conclusion fill TypeError: "
+                            << e.what() << "\n";
+                    }
                 }
             }
             // Orientation retry. A citation whose conclusion has a bare

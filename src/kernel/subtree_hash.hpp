@@ -27,6 +27,7 @@ constexpr uint64_t kTagLambda          = 0x05;
 constexpr uint64_t kTagApplication     = 0x06;
 constexpr uint64_t kTagConstant        = 0x07;
 constexpr uint64_t kTagLet             = 0x08;
+constexpr uint64_t kTagNaturalLiteral  = 0x09;
 constexpr uint64_t kTagLevelConst      = 0x11;
 constexpr uint64_t kTagLevelParam      = 0x12;
 constexpr uint64_t kTagLevelSuccessor  = 0x13;

@@ -1303,6 +1303,28 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                     abstractStructuralOccurrence(
                         goalClosed, fromSide,
                         /*currentDepth=*/0, occurrences);
+                // Numeral-bridge retry (PLAN_FAST_NUMERALS §C, same
+                // last-resort widening as the transported-claim rewrite
+                // in claim.cpp): a library equation instantiated from a
+                // literal-bearing statement (`0 + a = a`, `0` a
+                // NaturalLiteral) must still find a goal occurrence
+                // spelled through the constructor (`zero + n`, from an
+                // induction arm). Bare-numeral endpoints stay excluded —
+                // they would match every same-valued numeral in the goal.
+                if (occurrences == 0
+                    && containsNumeralLiteral(fromSide)
+                    && !asNumeralLiteral(fromSide)) {
+                    StructuralNodeMatcher numeralBridge =
+                        [this](const ExpressionPointer& candidate,
+                               const ExpressionPointer& shiftedTarget)
+                            -> bool {
+                            return numeralAwareStructurallyEqual(
+                                candidate, shiftedTarget);
+                        };
+                    abstractedBody = abstractStructuralOccurrence(
+                        goalClosed, fromSide,
+                        /*currentDepth=*/0, occurrences, &numeralBridge);
+                }
                 if (occurrences == 0) continue;
                 ExpressionPointer rewrittenGoal = substitute(
                     abstractedBody, 0, toSide);
@@ -1587,13 +1609,23 @@ ExpressionPointer Elaborator::tryContextFactDiffBridge(
                     for (const ContextEquality& eq : candidates) {
                         // Need a proof of `factSide = goalSide`; the
                         // equation may be stated either way round.
+                        // Numeral-aware endpoint comparison: a library
+                        // equation instantiated from a literal-bearing
+                        // statement (`0 + a = a` with `0` a
+                        // NaturalLiteral) must still line up with a
+                        // goal node spelled through the constructor
+                        // (`zero + N`, from an induction arm). The
+                        // transported result is defeq-validated by the
+                        // caller either way (PLAN_FAST_NUMERALS §C).
                         ExpressionPointer proof;
-                        if (structurallyEqual(eq.lhs, factSub)
-                            && structurallyEqual(eq.rhs, goalSub)) {
+                        if (numeralAwareStructurallyEqual(eq.lhs, factSub)
+                            && numeralAwareStructurallyEqual(
+                                   eq.rhs, goalSub)) {
                             proof = eq.proofExpr;
-                        } else if (structurallyEqual(eq.lhs, goalSub)
-                                   && structurallyEqual(eq.rhs,
-                                                        factSub)) {
+                        } else if (numeralAwareStructurallyEqual(
+                                       eq.lhs, goalSub)
+                                   && numeralAwareStructurallyEqual(
+                                          eq.rhs, factSub)) {
                             ExpressionPointer symm = makeConstant(
                                 "Equality.symmetry", {eq.carrierLevel});
                             for (ExpressionPointer a

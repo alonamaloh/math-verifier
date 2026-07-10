@@ -341,7 +341,17 @@ void Elaborator::elaborateFoldOperationDeclaration(
         }
         std::string operationName = headConstantName(operationArgument);
         std::string identityName = headConstantName(identityArgument);
-        if (operationName == "<unknown>" || identityName == "<unknown>") {
+        // A Natural identity written as a numeral is a NaturalLiteral
+        // node; register it under the canonical constant name it
+        // denotes (`0` ⇝ `zero`, `1` ⇝ `one`) so the registry keeps its
+        // name-keyed contract (PLAN_FAST_NUMERALS §C).
+        if (auto* identityLiteral =
+                std::get_if<NaturalLiteral>(&identityArgument->node)) {
+            if (identityLiteral->value == 0) identityName = "zero";
+            else if (identityLiteral->value == 1) identityName = "one";
+        }
+        if (operationName.empty() || operationName == "<unknown>"
+            || identityName.empty() || identityName == "<unknown>") {
             throwElaborate(
                 "fold_operation: the witness's operation and identity "
                 "must be named constants (e.g. Real.add, Real.zero)");

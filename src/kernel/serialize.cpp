@@ -25,7 +25,9 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // which gzip kept 17 (every shared subterm of the ring certificate
 // written out in full at every occurrence).
 // Version 10 adds the fold-operation registry section at the tail.
-constexpr uint32_t cacheVersion = 11;
+// Version 12 adds expression tag 9: NaturalLiteral (GMP-backed ground
+// naturals, PLAN_FAST_NUMERALS), serialized as its decimal digit string.
+constexpr uint32_t cacheVersion = 12;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -222,6 +224,10 @@ void writeExpression(Writer& writer, ExpressionPointer expression) {
         writeExpression(writer, letNode->type);
         writeExpression(writer, letNode->value);
         writeExpression(writer, letNode->body);
+    } else if (auto* literal = std::get_if<NaturalLiteral>(&expression->node)) {
+        // Tag 8 is the backreference; literals take 9.
+        writer.writeU8(9);
+        writer.writeString(naturalValueToString(literal->value));
     } else {
         throw SerializationError("writeExpression: unknown variant");
     }
@@ -343,6 +349,10 @@ ExpressionPointer readExpressionNode(Reader& reader, uint8_t tag) {
             return makeLet(std::move(hint), std::move(type),
                            std::move(value), std::move(body));
         }
+        case 9: {
+            std::string digits = reader.readString();
+            return makeNaturalLiteral(NaturalValue(digits));
+        }
         default:
             throw SerializationError("readExpression: bad tag");
     }
@@ -388,6 +398,7 @@ void skipExpression(Reader& reader) {
             skipExpression(reader);
             skipExpression(reader);
             return;
+        case 9: reader.readString(); return;                   // NaturalLiteral
         default:
             throw SerializationError("skipExpression: bad tag");
     }

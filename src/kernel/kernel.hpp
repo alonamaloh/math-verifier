@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -502,6 +503,22 @@ void invalidateKernelCaches();
 ExpressionPointer weakHeadNormalForm(const Environment& environment,
                                  ExpressionPointer expression,
                                  int fuel = defaultFuel);
+
+// PLAN_FAST_NUMERALS §B — the NaturalLiteral bridge (see kernel.cpp).
+// The one-peel constructor view: 0 ⇝ `zero`, n>0 ⇝
+// `successor(NaturalLiteral(n-1))`.
+ExpressionPointer naturalLiteralConstructorView(const NaturalValue& value);
+// The accelerated ground-arithmetic table: arity of an accelerated op
+// (0 = not in the table) and its GMP evaluation (empty optional =
+// decline; the application stays stuck). Trusted-computing-base code —
+// the MATH_CHECK_NUMERAL_TABLE self-check cross-verifies it against the
+// library definitions.
+int acceleratedNaturalOpArity(const std::string& name);
+std::optional<NaturalValue> evaluateAcceleratedNaturalOp(
+    const std::string& name, const std::vector<NaturalValue>& arguments);
+// Toggle consulted by WHNF; the self-check turns it off so the library
+// definitions compute the reference results.
+extern bool g_acceleratedNaturalOpsEnabled;
 
 // Definitional equality: same up to reduction, alpha-renaming, η, and
 // proof irrelevance. The `context` is consulted when proof irrelevance

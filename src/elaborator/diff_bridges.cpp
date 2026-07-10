@@ -802,6 +802,15 @@ std::optional<std::pair<std::string, int>> Elaborator::asNumeralLiteral(
             && name.compare(name.size() - dotted.size(),
                             dotted.size(), dotted) == 0;
     };
+    if (auto* literal = std::get_if<NaturalLiteral>(&term->node)) {
+        // Kernel literals carry any magnitude; this canonicalization is
+        // scoped to the 0/1 story (a680123), so map only those.
+        if (literal->value == 0)
+            return std::make_pair(std::string("Natural"), 0);
+        if (literal->value == 1)
+            return std::make_pair(std::string("Natural"), 1);
+        return std::nullopt;
+    }
     if (auto* constant = std::get_if<Constant>(&term->node)) {
         const std::string& name = constant->name;
         if (name == "zero") return std::make_pair(std::string("Natural"), 0);
@@ -927,6 +936,70 @@ bool Elaborator::matchAgainstPattern(
         if (auto patternLiteral = asNumeralLiteral(pattern)) {
             if (auto subjectLiteral = asNumeralLiteral(subject)) {
                 if (*patternLiteral == *subjectLiteral) return true;
+            }
+        }
+        // NaturalLiteral bridging (PLAN_FAST_NUMERALS §C): a kernel
+        // literal is defeq-interchangeable with the `zero`/`successor`
+        // constructor form, so the syntactic match must not fail on the
+        // spelling. Equal literals match outright; a literal against a
+        // `zero` is its zero test; against a `successor`-headed side the
+        // constructor is peeled INLINE and the match recurses on
+        // (value-1, successor's argument) — a lemma stated as
+        // `0 ≠ successor(k)` then matches a goal `¬(0 = 1)` with k := 0.
+        // The peel must be inline (not constructor-view + re-match):
+        // WHNF re-compacts `successor(lit(n-1))` to `lit(n)` and the
+        // generic retry would loop. Anything else falls through — in
+        // particular a pattern METAVARIABLE still binds the literal
+        // below, and a reducible subject (`Natural.add(2, 3)` against
+        // pattern `5`) still reaches the WHNF retry.
+        {
+            auto* patternNaturalLiteral =
+                std::get_if<NaturalLiteral>(&pattern->node);
+            auto* subjectNaturalLiteral =
+                std::get_if<NaturalLiteral>(&subject->node);
+            if (patternNaturalLiteral && subjectNaturalLiteral) {
+                return patternNaturalLiteral->value
+                    == subjectNaturalLiteral->value;
+            }
+            if (subjectNaturalLiteral) {
+                if (auto* patternConstant =
+                        std::get_if<Constant>(&pattern->node);
+                    patternConstant && patternConstant->name == "zero") {
+                    return subjectNaturalLiteral->value == 0;
+                }
+                if (auto* patternApp =
+                        std::get_if<Application>(&pattern->node)) {
+                    auto* head = std::get_if<Constant>(
+                        &patternApp->function->node);
+                    if (head && head->name == "successor") {
+                        if (subjectNaturalLiteral->value == 0) return false;
+                        return matchAgainstPattern(
+                            patternApp->argument,
+                            makeNaturalLiteral(
+                                subjectNaturalLiteral->value - 1),
+                            binderCount, bindings, piDepth, deferredOut);
+                    }
+                }
+            }
+            if (patternNaturalLiteral) {
+                if (auto* subjectConstant =
+                        std::get_if<Constant>(&subject->node);
+                    subjectConstant && subjectConstant->name == "zero") {
+                    return patternNaturalLiteral->value == 0;
+                }
+                if (auto* subjectApp =
+                        std::get_if<Application>(&subject->node)) {
+                    auto* head = std::get_if<Constant>(
+                        &subjectApp->function->node);
+                    if (head && head->name == "successor") {
+                        if (patternNaturalLiteral->value == 0) return false;
+                        return matchAgainstPattern(
+                            makeNaturalLiteral(
+                                patternNaturalLiteral->value - 1),
+                            subjectApp->argument,
+                            binderCount, bindings, piDepth, deferredOut);
+                    }
+                }
             }
         }
         // Canonical-bundle resolution: pattern `<Structure>.carrier(BV(slot))`

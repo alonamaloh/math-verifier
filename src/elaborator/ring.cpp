@@ -9,6 +9,8 @@
 
 #include "elaborator/internal.hpp"
 
+#include <limits>
+
 // ---- Numerical fast-fail fingerprints (GF(2^64 - 59)) --------------------
 //
 // Before the expensive symbolic normalise + polynomial-dict comparison,
@@ -2490,7 +2492,7 @@ bool Elaborator::matchRingOne(ExpressionPointer expression,
 
 bool Elaborator::tryParseNaturalLiteral(
         ExpressionPointer expression, int& value) {
-        int count = 0;
+        long long count = 0;
         ExpressionPointer cursor = expression;
         while (auto* app = std::get_if<Application>(&cursor->node)) {
             auto* head =
@@ -2499,9 +2501,21 @@ bool Elaborator::tryParseNaturalLiteral(
             ++count;
             cursor = app->argument;
         }
+        // A NaturalLiteral node (bare, or under successor wrappers)
+        // reads off directly. Decline values past int — the ring
+        // normaliser's coefficient type (Stage 4 of PLAN_FAST_NUMERALS
+        // lifts it to mpz); the literal then stays an atom, which is
+        // sound (just less complete).
+        if (auto* literal = std::get_if<NaturalLiteral>(&cursor->node)) {
+            if (!literal->value.fits_sint_p()) return false;
+            long long total = count + literal->value.get_si();
+            if (total > std::numeric_limits<int>::max()) return false;
+            value = static_cast<int>(total);
+            return true;
+        }
         auto* head = std::get_if<Constant>(&cursor->node);
         if (!head || head->name != "zero") return false;
-        value = count;
+        value = static_cast<int>(count);
         return true;
     }
 
@@ -2585,12 +2599,9 @@ void Elaborator::populateRingEmbeddingChain(RingNormalisationContext& context) {
     }
 
 ExpressionPointer Elaborator::buildNaturalLiteralKernel(int value) {
-        ExpressionPointer expr = makeConstant("zero");
-        for (int i = 0; i < value; ++i) {
-            expr = makeApplication(
-                makeConstant("successor"), std::move(expr));
-        }
-        return expr;
+        // One GMP-backed literal node (PLAN_FAST_NUMERALS) — the kernel
+        // treats it as defeq to the successor chain this used to build.
+        return makeNaturalLiteral(NaturalValue(value));
     }
 
 ExpressionPointer Elaborator::buildRingZeroKernel(
@@ -3203,14 +3214,14 @@ ExpressionPointer Elaborator::proveEqualsCanonical_impl(
         // 1 + e, so a reflexivity bridge routes it through the add path.
         if (context.carrierName == "Natural") {
             int literalValue = 0;
-            // Base case only: the ring one `successor(zero)` (and the never-
-            // reached zero) is its own canonical kernel, so reflexivity bridges
-            // with no add reduction. Larger literals are successor-headed and
-            // fall through to the successor branch below — under opaque
-            // Natural.add the tower `successor^k(zero)` is no longer defeq to
-            // the sum-of-ones, so we cannot close them by reflexivity.
-            if (tryParseNaturalLiteral(expression, literalValue)
-                    && literalValue <= 1) {
+            // Any recognized ground literal bridges by reflexivity: the
+            // canonical sum-of-ones kernel is built from NaturalLiteral
+            // ones, which the kernel's accelerated add table reduces to
+            // the single literal — and a legacy `successor^k(zero)` tower
+            // is defeq to that literal through the one-peel bridge. (Under
+            // the pre-literal representation only 0/1 could bridge, since
+            // opaque Natural.add blocked the sum-of-ones reduction.)
+            if (tryParseNaturalLiteral(expression, literalValue)) {
                 RingPolynomial polynomial;
                 if (literalValue > 0) {
                     polynomial[RingMonomialSignature{}] = literalValue;

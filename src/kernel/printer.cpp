@@ -169,6 +169,10 @@ void writeAtomic(std::ostringstream& output,
         }
         return;
     }
+    if (auto* literal = std::get_if<NaturalLiteral>(&expression->node)) {
+        output << naturalValueToString(literal->value);
+        return;
+    }
     if (auto* constant = std::get_if<Constant>(&expression->node)) {
         // The bare Natural zero constructor prints as the numeral.
         if (constant->name == "zero"
@@ -238,11 +242,12 @@ void writeAtPrecedence(std::ostringstream& output,
         return;
     }
     if (auto* application = std::get_if<Application>(&expression->node)) {
-        // Numeral compression: a pure `successor^n(zero)` chain prints as
-        // the digit string `n` — the spelling users write. (Purely
-        // syntactic prettification, like the operator table below.)
+        // Numeral compression: a pure `successor^n(zero)` chain — or a
+        // chain bottoming out at a NaturalLiteral — prints as the digit
+        // string it denotes, the spelling users write. (Purely syntactic
+        // prettification, like the operator table below.)
         {
-            unsigned long long count = 0;
+            NaturalValue count = 0;
             ExpressionPointer cursor = expression;
             bool pure = true;
             while (true) {
@@ -256,12 +261,17 @@ void writeAtPrecedence(std::ostringstream& output,
                     pure = false;
                     break;
                 }
+                if (auto* literal =
+                        std::get_if<NaturalLiteral>(&cursor->node)) {
+                    count += literal->value;
+                    break;
+                }
                 auto* constant = std::get_if<Constant>(&cursor->node);
                 pure = constant && constant->name == "zero";
                 break;
             }
             if (pure) {
-                output << count;
+                output << naturalValueToString(count);
                 return;
             }
         }
@@ -289,6 +299,16 @@ void writeAtPrecedence(std::ostringstream& output,
                         -> std::optional<unsigned long long> {
                     unsigned long long count = 0;
                     while (true) {
+                        // A NaturalLiteral (bare or under successor
+                        // wrappers) reads off directly; decline values
+                        // past unsigned long long.
+                        if (auto* literal = std::get_if<NaturalLiteral>(
+                                &cursor->node)) {
+                            if (!literal->value.fits_ulong_p()) {
+                                return std::nullopt;
+                            }
+                            return count + literal->value.get_ui();
+                        }
                         if (auto* app = std::get_if<Application>(
                                 &cursor->node)) {
                             auto* head = std::get_if<Constant>(
@@ -309,12 +329,8 @@ void writeAtPrecedence(std::ostringstream& output,
                     }
                 };
                 auto makeNumeral = [](unsigned long long value) {
-                    ExpressionPointer result = makeConstant("zero");
-                    for (unsigned long long i = 0; i < value; ++i) {
-                        result = makeApplication(
-                            makeConstant("successor"), result);
-                    }
-                    return result;
+                    return makeNaturalLiteral(
+                        NaturalValue(static_cast<unsigned long>(value)));
                 };
                 auto* lambda = std::get_if<Lambda>(&spineArgs[3]->node);
                 auto* opConstant = std::get_if<Constant>(

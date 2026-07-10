@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kernel/level.hpp"
+#include "kernel/natural_value.hpp"
 #include "kernel/subtree_hash.hpp"
 
 #include <cstddef>
@@ -138,9 +139,15 @@ struct Let           { std::string displayHint;
                        ExpressionPointer type;
                        ExpressionPointer value;
                        ExpressionPointer body; };
+// A ground natural number as one GMP-backed leaf (PLAN_FAST_NUMERALS).
+// Typed at `Natural` and definitionally interchangeable with the
+// constructor form: WHNF exposes `successor(NaturalLiteral(n-1))` /
+// `zero` on demand (one peel at a time), and re-compacts
+// `successor(NaturalLiteral(n))` to `NaturalLiteral(n+1)`.
+struct NaturalLiteral { NaturalValue value; };
 
 struct Expression {
-    std::variant<BoundVariable, FreeVariable, Sort, Pi, Lambda, Application, Constant, Let> node;
+    std::variant<BoundVariable, FreeVariable, Sort, Pi, Lambda, Application, Constant, Let, NaturalLiteral> node;
     // Bottom-up structural hash, populated by the make* helpers below.
     // 0 means uninitialised — kernel code goes through the helpers so
     // this should never appear in well-formed terms. Used as a
@@ -351,6 +358,15 @@ inline ExpressionPointer makeConstant(std::string name,
 }
 inline ExpressionPointer makeConstant(std::string name) {
     return makeConstant(std::move(name), {});
+}
+inline ExpressionPointer makeNaturalLiteral(NaturalValue value) {
+    uint64_t valueHash = naturalValueHash(value);
+    auto expression = makeRawExpression(NaturalLiteral{std::move(value)});
+    expression->hash = subtree_hash::mix(
+        subtree_hash::mix(subtree_hash::kSeed,
+                           subtree_hash::kTagNaturalLiteral),
+        valueHash);
+    return expression;  // Leaf — don't intern
 }
 inline ExpressionPointer makeLet(std::string displayHint,
                                  ExpressionPointer type,

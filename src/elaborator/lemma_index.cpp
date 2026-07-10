@@ -374,6 +374,12 @@ std::string signSpineHead(ExpressionPointer term,
     if (auto* constant = std::get_if<Constant>(&cursor->node)) {
         return constant->name;
     }
+    // A NaturalLiteral subject tags by the constructor head it denotes,
+    // keeping sign-index keys identical to the successor-chain era
+    // (PLAN_FAST_NUMERALS §C).
+    if (auto* literal = std::get_if<NaturalLiteral>(&cursor->node)) {
+        return literal->value == 0 ? "zero" : "successor";
+    }
     return std::string();
 }
 
@@ -899,7 +905,12 @@ bool Elaborator::parseOrderJudgment(ExpressionPointer proposition,
 
 namespace {
 // The head constant of an application spine, or "" for anything else
-// (bare variables, lambdas, …).
+// (bare variables, lambdas, …). A NaturalLiteral reports the
+// constructor head it denotes (`zero` / `successor`), so index keys
+// built from numeral endpoints stay identical to the pre-literal
+// successor-chain era — `one_le_of_nonzero : 1 ≤ n` keys under
+// `successor` whether its `1` is a literal or a chain
+// (PLAN_FAST_NUMERALS §C).
 std::string spineHeadConstantName(ExpressionPointer expression) {
     while (auto* application =
                std::get_if<Application>(&expression->node)) {
@@ -907,6 +918,9 @@ std::string spineHeadConstantName(ExpressionPointer expression) {
     }
     if (auto* constant = std::get_if<Constant>(&expression->node)) {
         return constant->name;
+    }
+    if (auto* literal = std::get_if<NaturalLiteral>(&expression->node)) {
+        return literal->value == 0 ? "zero" : "successor";
     }
     return "";
 }

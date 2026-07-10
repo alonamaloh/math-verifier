@@ -687,9 +687,10 @@ ExpressionPointer shift(ExpressionPointer expression, int amount, int cutoff) {
         }
         return expression;
     }
-    if (std::holds_alternative<FreeVariable>(expression->node)) return expression;
-    if (std::holds_alternative<Sort>(expression->node))         return expression;
-    if (std::holds_alternative<Constant>(expression->node))     return expression;
+    if (std::holds_alternative<FreeVariable>(expression->node))   return expression;
+    if (std::holds_alternative<Sort>(expression->node))           return expression;
+    if (std::holds_alternative<Constant>(expression->node))       return expression;
+    if (std::holds_alternative<NaturalLiteral>(expression->node)) return expression;
     // Structural-sharing fast path: if recursive shifts return the
     // same children (no BV at or above cutoff appeared in the subtree),
     // hand the original expression back unchanged. Most shifts touch
@@ -751,9 +752,10 @@ ExpressionPointer substitute(ExpressionPointer expression,
         }
         return expression;
     }
-    if (std::holds_alternative<FreeVariable>(expression->node)) return expression;
-    if (std::holds_alternative<Sort>(expression->node))         return expression;
-    if (std::holds_alternative<Constant>(expression->node))     return expression;
+    if (std::holds_alternative<FreeVariable>(expression->node))   return expression;
+    if (std::holds_alternative<Sort>(expression->node))           return expression;
+    if (std::holds_alternative<Constant>(expression->node))       return expression;
+    if (std::holds_alternative<NaturalLiteral>(expression->node)) return expression;
     // Structural-sharing fast path: if recursive substitutes return the
     // same children, hand back the original. Most substitutes leave
     // most subterms untouched (the target BV appears in only one
@@ -850,8 +852,9 @@ ExpressionPointer closeAtDepth(ExpressionPointer expression,
         }
         return expression;
     }
-    if (std::holds_alternative<Sort>(expression->node))     return expression;
-    if (std::holds_alternative<Constant>(expression->node)) return expression;
+    if (std::holds_alternative<Sort>(expression->node))           return expression;
+    if (std::holds_alternative<Constant>(expression->node))       return expression;
+    if (std::holds_alternative<NaturalLiteral>(expression->node)) return expression;
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
         return makePi(pi->displayHint,
                       closeAtDepth(pi->domain,   name, origin, depth),
@@ -1002,6 +1005,120 @@ ExpressionPointer buildIotaReduction(
 
 } // namespace
 
+// ----------------------------------------------------------------------
+// PLAN_FAST_NUMERALS §B — the NaturalLiteral/constructor bridge and the
+// accelerated ground-arithmetic table.
+
+// The one-peel constructor view of a literal: 0 ⇝ `zero`, n>0 ⇝
+// `successor(NaturalLiteral(n-1))`. Recursors and defeq consume a
+// literal one constructor at a time, on demand, so induction and
+// pattern matching work over literals without ever materialising the
+// full successor chain.
+ExpressionPointer naturalLiteralConstructorView(const NaturalValue& value) {
+    if (value == 0) return makeConstant("zero");
+    return makeApplication(makeConstant("successor"),
+                           makeNaturalLiteral(value - 1));
+}
+
+// Toggle for the accelerated-op table. The numeral-table self-check
+// (driver.cpp, MATH_CHECK_NUMERAL_TABLE) turns it off so the library
+// definitions themselves compute the reference results.
+bool g_acceleratedNaturalOpsEnabled = true;
+
+// Arity of an accelerated op, or 0 when `name` is not in the table.
+// The table is part of the trusted computing base (owner decision,
+// 2026-07-10): WHNF computes these ops on literals directly with GMP
+// instead of unfolding the library recursion (which opacity blocks for
+// most of them anyway). Each entry's semantics mirror the library
+// definition EXACTLY — including the fuel conventions
+// `floor_divide(0, n) = n` and `modulo(0, n) = n` — and the
+// MATH_CHECK_NUMERAL_TABLE self-check re-verifies every entry against
+// the definition bodies over a sample range.
+int acceleratedNaturalOpArity(const std::string& name) {
+    if (name == "Natural.add" || name == "Natural.multiply"
+        || name == "Natural.monus" || name == "Natural.power"
+        || name == "Natural.floor_divide" || name == "Natural.modulo"
+        || name == "Natural.maximum") {
+        return 2;
+    }
+    if (name == "Natural.factorial" || name == "Natural.predecessor") {
+        return 1;
+    }
+    return 0;
+}
+
+// Evaluate an accelerated op on ground arguments. Empty optional means
+// "decline" (an operand out of practical range, e.g. an exponent past
+// unsigned long); the application is then left stuck, never mis-reduced.
+std::optional<NaturalValue> evaluateAcceleratedNaturalOp(
+    const std::string& name, const std::vector<NaturalValue>& arguments) {
+    if (name == "Natural.add") {
+        return NaturalValue(arguments[0] + arguments[1]);
+    }
+    if (name == "Natural.multiply") {
+        return NaturalValue(arguments[0] * arguments[1]);
+    }
+    if (name == "Natural.monus") {
+        // monus(a, b) = a - b, truncated at zero.
+        if (arguments[0] <= arguments[1]) return NaturalValue(0);
+        return NaturalValue(arguments[0] - arguments[1]);
+    }
+    if (name == "Natural.power") {
+        // power(base, exponent) = base^exponent; power(base, 0) = 1.
+        if (!arguments[1].fits_ulong_p()) return std::nullopt;
+        NaturalValue result;
+        mpz_pow_ui(result.get_mpz_t(), arguments[0].get_mpz_t(),
+                   arguments[1].get_ui());
+        return result;
+    }
+    if (name == "Natural.floor_divide") {
+        // floor_divide(divisor, dividend); the fuel convention makes
+        // floor_divide(0, n) = n (traced from floor_divide_step).
+        if (arguments[0] == 0) return arguments[1];
+        NaturalValue result;
+        mpz_fdiv_q(result.get_mpz_t(), arguments[1].get_mpz_t(),
+                   arguments[0].get_mpz_t());
+        return result;
+    }
+    if (name == "Natural.modulo") {
+        // modulo(divisor, dividend); modulo(0, n) = n (fuel convention).
+        if (arguments[0] == 0) return arguments[1];
+        NaturalValue result;
+        mpz_fdiv_r(result.get_mpz_t(), arguments[1].get_mpz_t(),
+                   arguments[0].get_mpz_t());
+        return result;
+    }
+    if (name == "Natural.maximum") {
+        return arguments[0] >= arguments[1] ? arguments[0] : arguments[1];
+    }
+    if (name == "Natural.factorial") {
+        if (!arguments[0].fits_ulong_p()) return std::nullopt;
+        NaturalValue result;
+        mpz_fac_ui(result.get_mpz_t(), arguments[0].get_ui());
+        return result;
+    }
+    if (name == "Natural.predecessor") {
+        if (arguments[0] == 0) return NaturalValue(0);
+        return NaturalValue(arguments[0] - 1);
+    }
+    return std::nullopt;
+}
+
+namespace {
+
+// True when `name` resolves to the given constructor of the inductive
+// `Natural` in this environment — guards the literal hooks against a
+// user type that happens to reuse the constructor names.
+bool isNaturalConstructor(const Environment& environment,
+                          const std::string& name) {
+    auto* declaration = environment.lookup(name);
+    auto* constructor =
+        declaration ? std::get_if<Constructor>(declaration) : nullptr;
+    return constructor && constructor->inductiveName == "Natural";
+}
+
+} // namespace
+
 namespace {
 
 // Body of WHNF without the caching wrapper. Made anonymous so callers
@@ -1079,6 +1196,120 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
             // and we have enough args, with the target being a constructor
             // application of the right inductive type.
             if (auto* headConstant = std::get_if<Constant>(&spine.head->node)) {
+                // PLAN_FAST_NUMERALS §B — literal re-compaction and the
+                // accelerated-op table.
+                //
+                // `successor(NaturalLiteral(n))` compacts eagerly to
+                // `NaturalLiteral(n+1)`, so ground terms re-enter literal
+                // form after a constructor peel. Deliberately LITERAL-only
+                // (a legacy `successor(zero)` chain keeps its shape): the
+                // compaction exists to undo the one-peel constructor view,
+                // not to re-canonicalise constructor spellings the
+                // elaborator's matchers may still expect.
+                if (headConstant->name == "successor"
+                    && !spine.args.empty()
+                    && isNaturalConstructor(environment, "successor")) {
+                    ExpressionPointer argument = spine.args[0];
+                    if (!std::holds_alternative<NaturalLiteral>(
+                            argument->node)
+                        && (std::holds_alternative<Application>(
+                                argument->node)
+                            || std::holds_alternative<Constant>(
+                                   argument->node)
+                            || std::holds_alternative<Let>(
+                                   argument->node))) {
+                        auto reduced = weakHeadNormalForm(
+                            environment, argument, fuel);
+                        if (std::holds_alternative<NaturalLiteral>(
+                                reduced->node)) {
+                            argument = reduced;
+                        }
+                    }
+                    if (auto* literal =
+                            std::get_if<NaturalLiteral>(&argument->node)) {
+                        expression = applyArguments(
+                            makeNaturalLiteral(literal->value + 1),
+                            spine.args, 1);
+                        continue;
+                    }
+                }
+                // A table op whose arguments are all GROUND naturals — a
+                // literal, `zero`, or a successor chain over either, in
+                // any mixture — computes directly via GMP (the trusted-op
+                // table). Reading every ground spelling (not just
+                // literals) keeps the table from splitting defeq classes:
+                // `add(1, zero)` and `add(1, 0)` must reduce to the SAME
+                // literal, or two previously-convertible terms would
+                // normalize apart.
+                if (int arity =
+                        acceleratedNaturalOpArity(headConstant->name);
+                    g_acceleratedNaturalOpsEnabled && arity > 0
+                    && static_cast<int>(spine.args.size()) >= arity) {
+                    auto groundNaturalValue =
+                        [&](ExpressionPointer argument)
+                            -> std::optional<NaturalValue> {
+                        NaturalValue offset = 0;
+                        for (int guard = 0; guard < 100000; ++guard) {
+                            if (auto* literal = std::get_if<NaturalLiteral>(
+                                    &argument->node)) {
+                                return NaturalValue(offset + literal->value);
+                            }
+                            if (std::holds_alternative<BoundVariable>(
+                                    argument->node)
+                                || std::holds_alternative<FreeVariable>(
+                                       argument->node)) {
+                                return std::nullopt;
+                            }
+                            ExpressionPointer reduced = weakHeadNormalForm(
+                                environment, argument, fuel);
+                            if (auto* literal = std::get_if<NaturalLiteral>(
+                                    &reduced->node)) {
+                                return NaturalValue(offset + literal->value);
+                            }
+                            if (auto* constant = std::get_if<Constant>(
+                                    &reduced->node)) {
+                                if (constant->name == "zero"
+                                    && isNaturalConstructor(
+                                           environment, "zero")) {
+                                    return offset;
+                                }
+                                return std::nullopt;
+                            }
+                            if (auto* application = std::get_if<Application>(
+                                    &reduced->node)) {
+                                auto* head = std::get_if<Constant>(
+                                    &application->function->node);
+                                if (head && head->name == "successor"
+                                    && isNaturalConstructor(
+                                           environment, "successor")) {
+                                    ++offset;
+                                    argument = application->argument;
+                                    continue;
+                                }
+                            }
+                            return std::nullopt;
+                        }
+                        return std::nullopt;
+                    };
+                    std::vector<NaturalValue> groundArguments;
+                    bool allGround = true;
+                    for (int i = 0; i < arity && allGround; ++i) {
+                        if (auto value = groundNaturalValue(spine.args[i])) {
+                            groundArguments.push_back(std::move(*value));
+                        } else {
+                            allGround = false;
+                        }
+                    }
+                    if (allGround) {
+                        if (auto result = evaluateAcceleratedNaturalOp(
+                                headConstant->name, groundArguments)) {
+                            expression = applyArguments(
+                                makeNaturalLiteral(std::move(*result)),
+                                spine.args, arity);
+                            continue;
+                        }
+                    }
+                }
                 auto* declaration = environment.lookup(headConstant->name);
                 if (auto* recursor = (declaration ? std::get_if<Recursor>(declaration)
                                                   : nullptr)) {
@@ -1089,6 +1320,17 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                         // Reduce the target to whnf and inspect.
                         auto reducedTarget =
                             weakHeadNormalForm(environment, spine.args[needed - 1], fuel);
+                        // A literal target of Natural's recursor exposes
+                        // its constructor view one peel at a time
+                        // (PLAN_FAST_NUMERALS §B), so ι fires on ground
+                        // literals exactly as it does on `zero`/`successor`.
+                        if (recursor->inductiveName == "Natural") {
+                            if (auto* literalTarget = std::get_if<NaturalLiteral>(
+                                    &reducedTarget->node)) {
+                                reducedTarget = naturalLiteralConstructorView(
+                                    literalTarget->value);
+                            }
+                        }
                         auto targetSpine = peelApplicationSpine(reducedTarget);
                         if (auto* ctorConstant =
                                 std::get_if<Constant>(&targetSpine.head->node)) {
@@ -1367,6 +1609,10 @@ bool structurallyEqual(ExpressionPointer left, ExpressionPointer right) {
             && structurallyEqual(leftLet->value, rightLet->value)
             && structurallyEqual(leftLet->body,  rightLet->body);
     }
+    if (auto* leftLiteral = std::get_if<NaturalLiteral>(&left->node)) {
+        auto* rightLiteral = std::get_if<NaturalLiteral>(&right->node);
+        return leftLiteral->value == rightLiteral->value;
+    }
     return false;
 }
 
@@ -1552,6 +1798,62 @@ bool isDefinitionallyEqualImpl(const Environment& environment,
     }
     if (structurallyEqual(leftReduced, rightReduced)) {
         return true;
+    }
+
+    // NaturalLiteral bridging (PLAN_FAST_NUMERALS §B): a literal is
+    // defeq-interchangeable with its constructor form. Two literals are
+    // equal exactly when their values agree — the structural check above
+    // already accepted equal values, so reaching here means unequal.
+    // A literal against a `zero` is its zero test; against a
+    // `successor`-headed term the constructor is peeled INLINE and the
+    // comparison recurses on (value-1, successor's argument). The peel
+    // must not go through naturalLiteralConstructorView + a general
+    // recursion: WHNF would eagerly re-compact `successor(lit(n-1))`
+    // back to `lit(n)` and the comparison would loop. Anything else
+    // genuinely differs (a Natural lives in Type 0, so no later
+    // fallback can apply).
+    {
+        auto* leftLiteral  = std::get_if<NaturalLiteral>(&leftReduced->node);
+        auto* rightLiteral = std::get_if<NaturalLiteral>(&rightReduced->node);
+        if (leftLiteral && rightLiteral) {
+            return false;
+        }
+        auto compareLiteralAgainst =
+            [&](const NaturalValue& value,
+                const ExpressionPointer& other) -> std::optional<bool> {
+            if (auto* constant = std::get_if<Constant>(&other->node)) {
+                if (constant->name == "zero"
+                    && isNaturalConstructor(environment, "zero")) {
+                    return value == 0;
+                }
+                return std::nullopt;
+            }
+            if (auto* application = std::get_if<Application>(&other->node)) {
+                auto* head =
+                    std::get_if<Constant>(&application->function->node);
+                if (head && head->name == "successor"
+                    && isNaturalConstructor(environment, "successor")) {
+                    if (value == 0) return false;
+                    return isDefinitionallyEqual(
+                        environment, context,
+                        makeNaturalLiteral(value - 1),
+                        application->argument, fuel);
+                }
+            }
+            return std::nullopt;
+        };
+        if (leftLiteral) {
+            if (auto verdict = compareLiteralAgainst(
+                    leftLiteral->value, rightReduced)) {
+                return *verdict;
+            }
+        }
+        if (rightLiteral) {
+            if (auto verdict = compareLiteralAgainst(
+                    rightLiteral->value, leftReduced)) {
+                return *verdict;
+            }
+        }
     }
 
     // Structural cases. When recursing into a Pi or Lambda body/codomain,
@@ -2071,6 +2373,14 @@ ExpressionPointer inferTypeWork(const Environment& environment,
             throw error;
         }
         return substitute(functionAsPi->codomain, 0, application->argument);
+    }
+    if (std::holds_alternative<NaturalLiteral>(expression->node)) {
+        if (environment.lookup("Natural") == nullptr) {
+            throw TypeError(
+                "natural literal: the inductive `Natural` is not declared "
+                "in this environment (import Natural.basics)");
+        }
+        return makeConstant("Natural");
     }
     if (auto* let = std::get_if<Let>(&expression->node)) {
         // Check the declared type is itself a type.

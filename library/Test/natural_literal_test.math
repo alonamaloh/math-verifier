@@ -1,0 +1,62 @@
+module Test.natural_literal_test
+
+-- GMP-backed ground arithmetic (PLAN_FAST_NUMERALS §B/§C): numerals are
+-- single NaturalLiteral kernel nodes, ground operations compute in the
+-- kernel via the accelerated-op table, and literals stay
+-- defeq-interchangeable with the `zero`/`successor` constructor form.
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.monus
+import Natural.power
+import Natural.floor_divide
+import Natural.factorial
+import Natural.maximum
+
+-- Ground facts close silently: both sides reduce to the same literal.
+theorem Test.ground_add : 3 + 4 = 7 :=
+  done
+
+theorem Test.ground_multiply : 6 * 7 = 42 :=
+  done
+
+theorem Test.ground_monus_truncates : Natural.monus(3, 5) = 0 :=
+  done
+
+theorem Test.ground_monus : Natural.monus(12, 5) = 7 :=
+  done
+
+theorem Test.ground_floor_divide : Natural.floor_divide(7, 100) = 14 :=
+  done
+
+theorem Test.ground_modulo : Natural.modulo(7, 100) = 2 :=
+  done
+
+theorem Test.ground_maximum : Natural.maximum(12, 7) = 12 :=
+  done
+
+-- factorial(20) — far beyond anything unary reduction could touch.
+theorem Test.ground_factorial : 20! = 2432902008176640000 :=
+  done
+
+-- 2^100 — the result exceeds 64 bits; both the computation and the
+-- 31-digit numeral literal are exercised (the old `stoi` path capped
+-- numerals at 2^31).
+theorem Test.ground_power : 2 ^ 100 = 1267650600228229401496703205376 :=
+  done
+
+-- Mixed spellings are one defeq class: constructor form, literal form,
+-- and computed form all bridge.
+theorem Test.literal_is_successor_chain : successor(successor(zero)) = 2 :=
+  done
+
+theorem Test.computed_meets_constructor (n : Natural) (h : n = successor(1 + 1))
+        : n = 3 :=
+  h
+
+-- Induction and pattern matching consume literals through the one-peel
+-- constructor view: `predecessor` pattern-matches on its argument.
+theorem Test.predecessor_of_literal : Natural.predecessor(12) = 11 :=
+  done

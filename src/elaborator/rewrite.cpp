@@ -153,6 +153,57 @@ bool Elaborator::tryFirstOrderMatch(
             if (!termVar) return false;
             return termVar->deBruijnIndex == idx - numPatternBinders;
         }
+        // NaturalLiteral bridging (PLAN_FAST_NUMERALS §C): a literal on
+        // either side matches the `zero`/`successor` constructor form it
+        // denotes, one inline peel at a time — a lemma stated with `0`
+        // (a literal) still rewrites an occurrence spelled `zero` (an
+        // arm-substituted constructor), and vice versa. Mirrors the
+        // bridge in matchAgainstPattern.
+        {
+            auto* patternLiteral =
+                std::get_if<NaturalLiteral>(&pattern->node);
+            auto* termLiteral = std::get_if<NaturalLiteral>(&term->node);
+            if (patternLiteral && termLiteral) {
+                return patternLiteral->value == termLiteral->value;
+            }
+            if (patternLiteral) {
+                if (auto* termConstant = std::get_if<Constant>(&term->node);
+                    termConstant && termConstant->name == "zero") {
+                    return patternLiteral->value == 0;
+                }
+                if (auto* termApp = std::get_if<Application>(&term->node)) {
+                    auto* head = std::get_if<Constant>(
+                        &termApp->function->node);
+                    if (head && head->name == "successor") {
+                        if (patternLiteral->value == 0) return false;
+                        return tryFirstOrderMatch(
+                            makeNaturalLiteral(patternLiteral->value - 1),
+                            termApp->argument, numPatternBinders, bindings);
+                    }
+                }
+                return false;
+            }
+            if (termLiteral) {
+                if (auto* patternConstant =
+                        std::get_if<Constant>(&pattern->node);
+                    patternConstant && patternConstant->name == "zero") {
+                    return termLiteral->value == 0;
+                }
+                if (auto* patternApp =
+                        std::get_if<Application>(&pattern->node)) {
+                    auto* head = std::get_if<Constant>(
+                        &patternApp->function->node);
+                    if (head && head->name == "successor") {
+                        if (termLiteral->value == 0) return false;
+                        return tryFirstOrderMatch(
+                            patternApp->argument,
+                            makeNaturalLiteral(termLiteral->value - 1),
+                            numPatternBinders, bindings);
+                    }
+                }
+                return false;
+            }
+        }
         if (auto* application =
                 std::get_if<Application>(&pattern->node)) {
             auto* termApp =

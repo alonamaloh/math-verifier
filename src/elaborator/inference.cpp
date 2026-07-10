@@ -920,6 +920,18 @@ ExpressionPointer Elaborator::bridgeCitedFact(
                 candidate, goalClosed, localBinders)) {
             return candidate;
         }
+        // The fact may have become UNNECESSARY rather than wrong: ground
+        // arithmetic now computes in the kernel (PLAN_FAST_NUMERALS), so
+        // a step once bridged by `(1 + 0 = 1)` can be defeq-trivial with
+        // nothing left for the citation to rewrite. Accept when the goal
+        // closes on its own — the redundancy checker is the tool that
+        // flags the stale hint for deletion.
+        try {
+            candidate = autoProveClaim(goalClosed, localBinders, line);
+        } catch (...) { candidate = nullptr; }
+        if (candidate) {
+            return candidate;
+        }
         throwElaborate(
             "`by (<fact>)`: proved `"
             + prettyPrintInLocalScope(factProposition, localBinders)
@@ -1627,6 +1639,7 @@ ExpressionPointer Elaborator::recoverClaimHint(
         // fits but an argument/premise couldn't be pinned.
         std::string conclusionHeadRaw;
         std::string conclusionHeadWhnf;
+        ExpressionPointer conclusionWhnfForHeads;
         if (hintTerm) {
             ExpressionPointer hintTypeClosed = closeOverLocalBinders(
                 inferTypeInLocalContext(localBinders, hintTerm),
@@ -1642,12 +1655,75 @@ ExpressionPointer Elaborator::recoverClaimHint(
                 conclusion = pi->codomain;
             }
             conclusionHeadRaw = headConstantName(conclusion);
-            conclusionHeadWhnf = headConstantName(
-                weakHeadNormalForm(environment_, conclusion));
+            conclusionWhnfForHeads =
+                weakHeadNormalForm(environment_, conclusion);
+            conclusionHeadWhnf = headConstantName(conclusionWhnfForHeads);
         }
         std::string goalHeadRaw = headConstantName(goalClosed);
         std::string goalHeadWhnf = headConstantName(
             weakHeadNormalForm(environment_, goalClosed));
+        // A citation whose conclusion genuinely targets this goal shape
+        // may still fail to INSTANTIATE — e.g. a slot pinned by two
+        // spellings the matcher cannot reconcile (`monus(0 + b, 0) = b`
+        // by `monus_zero`: the slot wants both `0 + b` and `b`). When
+        // the by-less prover closes the same goal — typically through
+        // the very lemma cited, via its index — accept: claims and calc
+        // steps are one language, and a signpost hint must not fail a
+        // goal the bare claim proves. A lemma about a DIFFERENT head
+        // still errors loudly below (a wrong name stays a wrong name);
+        // for EQUALITY conclusions the relation head alone is vacuous
+        // (every equality lemma "matches" every equality goal), so an
+        // endpoint head must agree too — `multiply_commutative` cited
+        // on an `add` goal stays an error even when the goal happens to
+        // auto-close.
+        bool conclusionTargetsGoal =
+            !conclusionHeadWhnf.empty() && !goalHeadWhnf.empty()
+            && conclusionHeadWhnf == goalHeadWhnf;
+        if (conclusionTargetsGoal && conclusionHeadWhnf == "Equality"
+            && hintTerm) {
+            auto endpointHead =
+                [&](ExpressionPointer equality, bool left)
+                    -> std::string {
+                auto* outer = std::get_if<Application>(&equality->node);
+                if (!outer) return std::string();
+                if (!left) return headConstantName(outer->argument);
+                auto* inner =
+                    std::get_if<Application>(&outer->function->node);
+                return inner ? headConstantName(inner->argument)
+                             : std::string();
+            };
+            ExpressionPointer conclusionForHeads = conclusionWhnfForHeads;
+            if (conclusionForHeads) {
+                std::string goalLeft = endpointHead(
+                    weakHeadNormalForm(environment_, goalClosed), true);
+                std::string goalRight = endpointHead(
+                    weakHeadNormalForm(environment_, goalClosed), false);
+                std::string conclusionLeft =
+                    endpointHead(conclusionForHeads, true);
+                std::string conclusionRight =
+                    endpointHead(conclusionForHeads, false);
+                bool someEndpointAgrees =
+                    (!conclusionLeft.empty()
+                     && (conclusionLeft == goalLeft
+                         || conclusionLeft == goalRight))
+                    || (!conclusionRight.empty()
+                        && (conclusionRight == goalLeft
+                            || conclusionRight == goalRight));
+                bool conclusionEndpointsBare =
+                    conclusionLeft.empty() && conclusionRight.empty();
+                conclusionTargetsGoal =
+                    someEndpointAgrees || conclusionEndpointsBare;
+            }
+        }
+        if (conclusionTargetsGoal) {
+            ExpressionPointer unaided;
+            try {
+                unaided = autoProveClaim(goalClosed, localBinders, line);
+            } catch (...) { unaided = nullptr; }
+            if (unaided) {
+                return unaided;
+            }
+        }
         if (!conclusionHeadWhnf.empty() && !goalHeadWhnf.empty()
             && conclusionHeadWhnf != goalHeadWhnf) {
             std::string conclusionShown = conclusionHeadRaw.empty()
@@ -2546,24 +2622,20 @@ ExpressionPointer Elaborator::elaborateConstructorCallInferringParameters(
 ExpressionPointer Elaborator::elaborateNumericLiteral(
         const SurfaceNumericLiteral& numeric,
         int line, int column) {
-        // Desugar `25` to successor(successor(...zero)) with 25 successors.
-        // Requires Natural, zero, successor to be in the environment.
-        if (environment_.lookup("Natural") == nullptr
-            || environment_.lookup("zero") == nullptr
-            || environment_.lookup("successor") == nullptr) {
+        // `25` elaborates to one GMP-backed NaturalLiteral kernel node
+        // (PLAN_FAST_NUMERALS §C) — no successor chain, no digit-count
+        // ceiling. The kernel treats the literal as defeq-interchangeable
+        // with the constructor form (WHNF exposes `successor`/`zero` one
+        // peel at a time), so induction, pattern matching, and `decide`
+        // work unchanged.
+        if (environment_.lookup("Natural") == nullptr) {
             throw ElaborateError(
                 "numeric literal at line " + std::to_string(line)
-                + " requires Natural, zero, and successor to be in the "
-                "environment (import Natural.basics)");
-        }
-        int value = std::stoi(numeric.digits);
-        ExpressionPointer term = makeConstant("zero");
-        for (int i = 0; i < value; ++i) {
-            term = makeApplication(makeConstant("successor"),
-                                    std::move(term));
+                + " requires Natural to be in the environment "
+                "(import Natural.basics)");
         }
         (void)column;
-        return term;
+        return makeNaturalLiteral(NaturalValue(numeric.digits));
     }
 
 ExpressionPointer Elaborator::elaboratePiType(

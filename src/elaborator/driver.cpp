@@ -264,6 +264,17 @@ void Elaborator::runModule(const SurfaceModule& module) {
         if (enableKernelCache) kernelCacheEnabled = previousKernelCache;
         if (enableKernelProfile) kernelProfileEnabled = previousKernelProfile;
         if (enableHashCons) g_hashConsEnabled = previousHashCons;
+        // PLAN_FAST_NUMERALS §B — numeral-table self-check
+        // (`MATH_CHECK_NUMERAL_TABLE=1`): cross-verify the kernel's
+        // accelerated GMP op table against the library definitions
+        // loaded in this module. A disagreement fails the build.
+        {
+            const char* checkFlag =
+                std::getenv("MATH_CHECK_NUMERAL_TABLE");
+            if (checkFlag && checkFlag[0] != '\0' && checkFlag[0] != '0') {
+                runNumeralTableSelfCheck();
+            }
+        }
         // B3.4 — morphism-packet audit (`MATH_AUDIT_COERCION_PACKETS=1`):
         // after the module elaborates, report each registered coercion
         // hop's missing packet slots. Run against a module at the top of
@@ -349,5 +360,182 @@ void Elaborator::seedAlgebraicRegistryFromEnvironment() {
 
 ExpressionPointer Elaborator::runExpression(const SurfaceExpression& expression) {
         return elaborateExpression(expression, {});
+    }
+
+void Elaborator::runNumeralTableSelfCheck() {
+        // PLAN_FAST_NUMERALS §B — cross-verify the kernel's accelerated
+        // GMP op table against the library definitions. For every table
+        // op declared in this environment, evaluate the DEFINITION on
+        // successor-chain arguments — the table disabled, the op and its
+        // helpers temporarily transparent — and compare the fully
+        // reduced result against the GMP evaluation. The table is
+        // trusted-computing-base code; this check keeps its trust
+        // grounded in the library's own semantics (including the fuel
+        // conventions `floor_divide(0, n) = n` / `modulo(0, n) = n`).
+        struct SampledOp {
+            const char* name;
+            std::vector<std::vector<unsigned long>> samples;
+        };
+        auto pairsOf = [](std::vector<unsigned long> lefts,
+                          std::vector<unsigned long> rights) {
+            std::vector<std::vector<unsigned long>> result;
+            for (unsigned long a : lefts) {
+                for (unsigned long b : rights) result.push_back({a, b});
+            }
+            return result;
+        };
+        auto singlesOf = [](std::vector<unsigned long> values) {
+            std::vector<std::vector<unsigned long>> result;
+            for (unsigned long a : values) result.push_back({a});
+            return result;
+        };
+        const std::vector<unsigned long> smalls = {0, 1, 2, 3, 5, 7, 12};
+        const std::vector<unsigned long> tiny = {0, 1, 2, 3, 5, 7};
+        const std::vector<SampledOp> sampledOps = {
+            {"Natural.add",          pairsOf(smalls, smalls)},
+            {"Natural.multiply",     pairsOf(tiny, tiny)},
+            {"Natural.monus",        pairsOf(smalls, smalls)},
+            {"Natural.power",        pairsOf({0, 1, 2, 3}, {0, 1, 2, 3, 5})},
+            {"Natural.floor_divide", pairsOf(tiny, smalls)},
+            {"Natural.modulo",       pairsOf(tiny, smalls)},
+            {"Natural.maximum",      pairsOf(smalls, smalls)},
+            // factorial(6) already exhausts the definitional evaluation's
+            // reduction budget (unary multiply cascades); 5! = 120 still
+            // exercises the full recursion.
+            {"Natural.factorial",    singlesOf({0, 1, 2, 3, 4, 5})},
+            {"Natural.predecessor",  singlesOf(smalls)},
+        };
+        // The ops plus the recursion helpers behind them, made
+        // transparent for the duration so the kernel can reduce the
+        // definition bodies.
+        static const char* transparencyNames[] = {
+            "Natural.add", "Natural.multiply", "Natural.monus",
+            "Natural.power", "Natural.floor_divide", "Natural.modulo",
+            "Natural.floor_divide_step", "Natural.modulo_step",
+            "Natural.maximum", "Natural.factorial", "Natural.predecessor"};
+        std::vector<std::pair<std::string, Opacity>> opacityRestores;
+        for (const char* name : transparencyNames) {
+            auto iterator = environment_.declarations.find(name);
+            if (iterator == environment_.declarations.end()) continue;
+            if (auto* definition =
+                    std::get_if<Definition>(&iterator->second)) {
+                opacityRestores.emplace_back(name, definition->opacity);
+                definition->opacity = Opacity::Transparent;
+            }
+        }
+        bool tableWasEnabled = g_acceleratedNaturalOpsEnabled;
+        g_acceleratedNaturalOpsEnabled = false;
+        invalidateKernelCaches();
+        auto restoreEverything = [&]() {
+            g_acceleratedNaturalOpsEnabled = tableWasEnabled;
+            for (const auto& [name, opacity] : opacityRestores) {
+                auto iterator = environment_.declarations.find(name);
+                if (iterator == environment_.declarations.end()) continue;
+                if (auto* definition =
+                        std::get_if<Definition>(&iterator->second)) {
+                    definition->opacity = opacity;
+                }
+            }
+            invalidateKernelCaches();
+        };
+        auto successorChain = [](unsigned long n) {
+            ExpressionPointer term = makeConstant("zero");
+            for (unsigned long i = 0; i < n; ++i) {
+                term = makeApplication(makeConstant("successor"),
+                                       std::move(term));
+            }
+            return term;
+        };
+        // Fully evaluate a ground Natural term by iterated WHNF,
+        // counting the exposed constructors. Returns nothing when the
+        // term is stuck on a non-constructor head.
+        auto evaluateGroundNatural = [&](ExpressionPointer term)
+                -> std::optional<NaturalValue> {
+            NaturalValue count = 0;
+            while (true) {
+                term = weakHeadNormalForm(environment_, term);
+                if (auto* application =
+                        std::get_if<Application>(&term->node)) {
+                    auto* head = std::get_if<Constant>(
+                        &application->function->node);
+                    if (head && head->name == "successor") {
+                        ++count;
+                        term = application->argument;
+                        continue;
+                    }
+                    return std::nullopt;
+                }
+                if (auto* constant = std::get_if<Constant>(&term->node);
+                    constant && constant->name == "zero") {
+                    return count;
+                }
+                if (auto* literal =
+                        std::get_if<NaturalLiteral>(&term->node)) {
+                    return NaturalValue(count + literal->value);
+                }
+                return std::nullopt;
+            }
+        };
+        bool allAgree = true;
+        try {
+            for (const auto& op : sampledOps) {
+                if (environment_.lookup(op.name) == nullptr) continue;
+                std::size_t checked = 0;
+                bool opAgrees = true;
+                for (const auto& sample : op.samples) {
+                    std::vector<NaturalValue> groundArguments;
+                    ExpressionPointer application = makeConstant(op.name);
+                    for (unsigned long argument : sample) {
+                        groundArguments.push_back(NaturalValue(argument));
+                        application = makeApplication(
+                            std::move(application),
+                            successorChain(argument));
+                    }
+                    auto tableResult = evaluateAcceleratedNaturalOp(
+                        op.name, groundArguments);
+                    std::optional<NaturalValue> definitionResult;
+                    try {
+                        definitionResult =
+                            evaluateGroundNatural(application);
+                    } catch (const TypeError&) {
+                        definitionResult = std::nullopt;
+                    }
+                    if (!tableResult || !definitionResult
+                        || *tableResult != *definitionResult) {
+                        allAgree = false;
+                        opAgrees = false;
+                        std::cerr << "[numeral-table] MISMATCH "
+                            << op.name << "(";
+                        for (std::size_t i = 0; i < sample.size(); ++i) {
+                            if (i > 0) std::cerr << ", ";
+                            std::cerr << sample[i];
+                        }
+                        std::cerr << "): table="
+                            << (tableResult
+                                    ? naturalValueToString(*tableResult)
+                                    : std::string("<declined>"))
+                            << " definition="
+                            << (definitionResult
+                                    ? naturalValueToString(*definitionResult)
+                                    : std::string("<stuck>"))
+                            << "\n";
+                    }
+                    ++checked;
+                }
+                std::cerr << "[numeral-table] " << op.name << ": "
+                    << (opAgrees ? "OK" : "MISMATCHED") << " ("
+                    << checked << " samples)\n";
+            }
+        } catch (...) {
+            restoreEverything();
+            throw;
+        }
+        restoreEverything();
+        if (!allAgree) {
+            throwElaborate(
+                "numeral-table self-check FAILED — the kernel's "
+                "accelerated GMP op table disagrees with the library "
+                "definitions (see the [numeral-table] MISMATCH lines)");
+        }
     }
 

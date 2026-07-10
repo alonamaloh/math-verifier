@@ -85,31 +85,49 @@ ExpressionPointer Elaborator::desugarAbsurd(
                         environment_, lessThanOuter->argument);
                     auto* lessThanRhsZero =
                         std::get_if<Constant>(&lessThanRhs->node);
+                    auto* lessThanRhsLiteral =
+                        std::get_if<NaturalLiteral>(&lessThanRhs->node);
+                    bool rhsIsZero =
+                        (lessThanRhsZero && lessThanRhsZero->name == "zero")
+                        || (lessThanRhsLiteral
+                            && lessThanRhsLiteral->value == 0);
                     auto* lessThanInner = std::get_if<Application>(
                         &lessThanOuter->function->node);
                     auto* lessThanHead = lessThanInner
                         ? std::get_if<Constant>(
                               &lessThanInner->function->node)
                         : nullptr;
-                    if (lessThanRhsZero
-                        && lessThanRhsZero->name == "zero"
+                    if (rhsIsZero
                         && lessThanHead
                         && lessThanHead->name == "Natural.LessThan") {
                         ExpressionPointer lhsNormalised =
                             weakHeadNormalForm(
                                 environment_, lessThanInner->argument);
-                        auto* succApp = std::get_if<Application>(
-                            &lhsNormalised->node);
-                        auto* succHead = succApp
-                            ? std::get_if<Constant>(
-                                  &succApp->function->node)
-                            : nullptr;
-                        if (succHead && succHead->name == "successor") {
+                        // successor-headed, or a positive literal (one
+                        // constructor peel — PLAN_FAST_NUMERALS §C).
+                        ExpressionPointer successorArgument;
+                        if (auto* literal = std::get_if<NaturalLiteral>(
+                                &lhsNormalised->node);
+                            literal && literal->value > 0) {
+                            successorArgument =
+                                makeNaturalLiteral(literal->value - 1);
+                        } else if (auto* succApp =
+                                       std::get_if<Application>(
+                                           &lhsNormalised->node)) {
+                            auto* succHead = std::get_if<Constant>(
+                                &succApp->function->node);
+                            if (succHead
+                                && succHead->name == "successor") {
+                                successorArgument = succApp->argument;
+                            }
+                        }
+                        if (successorArgument) {
                             ExpressionPointer call = makeConstant(
                                 "Natural.not_less_or_equal_successor_zero",
                                 {});
                             call = makeApplication(
-                                std::move(call), succApp->argument);
+                                std::move(call),
+                                std::move(successorArgument));
                             call = makeApplication(
                                 std::move(call), witnessKernel);
                             falseProof = std::move(call);
@@ -142,6 +160,14 @@ ExpressionPointer Elaborator::desugarAbsurd(
                                        -> bool {
                     ExpressionPointer normalised =
                         weakHeadNormalForm(environment_, expression);
+                    // A positive literal IS a successor: peel one
+                    // constructor (PLAN_FAST_NUMERALS §C).
+                    if (auto* literal = std::get_if<NaturalLiteral>(
+                            &normalised->node)) {
+                        if (literal->value == 0) return false;
+                        inner = makeNaturalLiteral(literal->value - 1);
+                        return true;
+                    }
                     auto* application = std::get_if<Application>(
                         &normalised->node);
                     if (!application) return false;
@@ -157,6 +183,10 @@ ExpressionPointer Elaborator::desugarAbsurd(
                                   -> bool {
                     ExpressionPointer normalised =
                         weakHeadNormalForm(environment_, expression);
+                    if (auto* literal = std::get_if<NaturalLiteral>(
+                            &normalised->node)) {
+                        return literal->value == 0;
+                    }
                     auto* constant = std::get_if<Constant>(
                         &normalised->node);
                     return constant && constant->name == "zero";

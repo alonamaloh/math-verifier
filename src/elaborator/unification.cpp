@@ -137,6 +137,27 @@ void Elaborator::unifyConstructorParameters(
         }
         if (auto* patternApplication =
                 std::get_if<Application>(&pattern->node)) {
+            // NaturalLiteral peel (PLAN_FAST_NUMERALS §C): a pattern
+            // `successor(?k)` pins against a literal target by one
+            // inline constructor peel (`successor(?k)` vs `1` solves
+            // `?k := 0`), mirroring matchAgainstPattern's bridge. The
+            // assignment is validated downstream by the kernel's defeq
+            // (which bridges the spellings), exactly like every other
+            // binding this walker collects.
+            if (auto* targetLiteral =
+                    std::get_if<NaturalLiteral>(&target->node)) {
+                auto* successorHead = std::get_if<Constant>(
+                    &patternApplication->function->node);
+                if (successorHead && successorHead->name == "successor"
+                    && targetLiteral->value > 0) {
+                    unifyConstructorParameters(
+                        patternApplication->argument,
+                        makeNaturalLiteral(targetLiteral->value - 1),
+                        metavariableNames, assignment, binderDepth,
+                        binderTypeStack);
+                }
+                return;
+            }
             ExpressionPointer patternHead = patternApplication->function;
             while (auto* nestedApp =
                        std::get_if<Application>(&patternHead->node)) {
