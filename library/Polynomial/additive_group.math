@@ -40,11 +40,11 @@ theorem Polynomial.add_associative (r : Ring)
         (x y z : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : ((x + y) + z)
           = (x + (y + z)) :=
-  by_representatives x as p, y as q, z as s =>
-      Polynomial.make_equal_of_coefficients_equal(r,
+  by_representatives x as p, y as q, z as s => {
+      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
               Polynomial.Coefficients.add(r, Polynomial.Coefficients.add(r, p, q), s),
-              Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.add(r, q, s)),
-              (index : Natural) ↦ {
+              Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.add(r, q, s)))
+          by (index : Natural) ↦ {
                   Polynomial.coefficient(Polynomial.Coefficients.add(r,
                                Polynomial.Coefficients.add(r, p, q), s), index)
                      = (Polynomial.coefficient(Polynomial.Coefficients.add(r, p, q), index) + Polynomial.coefficient(s, index))
@@ -52,7 +52,9 @@ theorem Polynomial.add_associative (r : Ring)
                      = (Polynomial.coefficient(p, index) + (Polynomial.coefficient(q, index) + Polynomial.coefficient(s, index)))
                      = (Polynomial.coefficient(p, index) + Polynomial.coefficient(Polynomial.Coefficients.add(r, q, s), index))
                      = Polynomial.coefficient(Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.add(r, q, s)), index)
-              })
+          } as coefficientsEqual;
+      done by Polynomial.make_equal_of_coefficients_equal(equal := coefficientsEqual)
+  }
 
 -- ----------------------------------------------------------------------
 -- Commutativity.
@@ -61,9 +63,7 @@ theorem Polynomial.add_commutative (r : Ring)
         (x y : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : (x + y) = (y + x) :=
   by_representatives x as p, y as q =>
-      Polynomial.make_equal_of_coefficients_equal(r,
-              Polynomial.Coefficients.add(r, p, q),
-              Polynomial.Coefficients.add(r, q, p),
+      Polynomial.make_equal_of_coefficients_equal(equal :=
               (index : Natural) ↦
                   Polynomial.coefficient(Polynomial.Coefficients.add(r, p, q), index)
                      = (Polynomial.coefficient(p, index) + Polynomial.coefficient(q, index))
@@ -85,9 +85,7 @@ theorem Polynomial.add_identity_right (r : Ring)
         (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : (x + Polynomial.zero(r)) = x :=
   cases x { | p =>
-    Polynomial.make_equal_of_coefficients_equal(r,
-        Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.nil(Ring.carrier(r))),
-        p,
+    Polynomial.make_equal_of_coefficients_equal(equal :=
         (index : Natural) ↦
             Polynomial.coefficient(Polynomial.Coefficients.add(r, p,
                          Polynomial.Coefficients.nil(Ring.carrier(r))), index)
@@ -101,9 +99,7 @@ theorem Polynomial.add_negate_left (r : Ring)
         (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : ((- x) + x) = Polynomial.zero(r) :=
   cases x { | p =>
-    Polynomial.make_equal_of_coefficients_equal(r,
-        Polynomial.Coefficients.add(r, Polynomial.Coefficients.negate(r, p), p),
-        Polynomial.Coefficients.nil(Ring.carrier(r)),
+    Polynomial.make_equal_of_coefficients_equal(equal :=
         (index : Natural) ↦
             Polynomial.coefficient(Polynomial.Coefficients.add(r,
                          Polynomial.Coefficients.negate(r, p), p), index)
@@ -115,9 +111,7 @@ theorem Polynomial.add_negate_right (r : Ring)
         (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : (x + (- x)) = Polynomial.zero(r) :=
   cases x { | p =>
-    Polynomial.make_equal_of_coefficients_equal(r,
-        Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.negate(r, p)),
-        Polynomial.Coefficients.nil(Ring.carrier(r)),
+    Polynomial.make_equal_of_coefficients_equal(equal :=
         (index : Natural) ↦
             Polynomial.coefficient(Polynomial.Coefficients.add(r, p,
                          Polynomial.Coefficients.negate(r, p)), index)
@@ -131,19 +125,34 @@ theorem Polynomial.add_negate_right (r : Ring)
 
 theorem Polynomial.add_is_monoid (r : Ring)
         : IsMonoid(Polynomial(Ring.carrier(r), Ring.zero(r)),
-                   Polynomial.add, Polynomial.zero(r)) :=
-    ⟨Polynomial.add_associative(r),
-     Polynomial.add_identity_left(r),
-     Polynomial.add_identity_right(r)⟩
+                   Polynomial.add, Polynomial.zero(r)) := {
+    (∀ (x y z : Polynomial(Ring.carrier(r), Ring.zero(r))). ((x + y) + z) = (x + (y + z)))
+        by Polynomial.add_associative;
+    (∀ (x : Polynomial(Ring.carrier(r), Ring.zero(r))). (Polynomial.zero(r) + x) = x)
+        by Polynomial.add_identity_left;
+    (∀ (x : Polynomial(Ring.carrier(r), Ring.zero(r))). (x + Polynomial.zero(r)) = x)
+        by Polynomial.add_identity_right;
+    done
+}
 
 theorem Polynomial.add_is_group (r : Ring)
         : IsGroup(Polynomial(Ring.carrier(r), Ring.zero(r)),
-                  Polynomial.add, Polynomial.zero(r), Polynomial.negate) :=
-    ⟨Polynomial.add_is_monoid(r),
-     Polynomial.add_negate_left(r),
-     Polynomial.add_negate_right(r)⟩
+                  Polynomial.add, Polynomial.zero(r), Polynomial.negate) := {
+    IsMonoid(Polynomial(Ring.carrier(r), Ring.zero(r)), Polynomial.add, Polynomial.zero(r))
+        by Polynomial.add_is_monoid;
+    (∀ (x : Polynomial(Ring.carrier(r), Ring.zero(r))). ((- x) + x) = Polynomial.zero(r))
+        by Polynomial.add_negate_left;
+    (∀ (x : Polynomial(Ring.carrier(r), Ring.zero(r))). (x + (- x)) = Polynomial.zero(r))
+        by Polynomial.add_negate_right;
+    done
+}
 
 theorem Polynomial.add_is_abelian_group (r : Ring)
         : IsAbelianGroup(Polynomial(Ring.carrier(r), Ring.zero(r)),
-                         Polynomial.add, Polynomial.zero(r), Polynomial.negate) :=
-    ⟨Polynomial.add_is_group(r), Polynomial.add_commutative(r)⟩
+                         Polynomial.add, Polynomial.zero(r), Polynomial.negate) := {
+    IsGroup(Polynomial(Ring.carrier(r), Ring.zero(r)), Polynomial.add, Polynomial.zero(r), Polynomial.negate)
+        by Polynomial.add_is_group;
+    (∀ (x y : Polynomial(Ring.carrier(r), Ring.zero(r))). (x + y) = (y + x))
+        by Polynomial.add_commutative;
+    done
+}
