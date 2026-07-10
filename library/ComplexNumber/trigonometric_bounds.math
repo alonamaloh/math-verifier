@@ -245,7 +245,7 @@ theorem Real.cosine_paired_series_converges (x : Real)
                         ComplexNumber.exponentialTerm(
                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
             cos(x))
-      by Real.cosine_series_converges(x);
+      by Real.cosine_series_converges;
   Real.SequenceConverges(
             (N : Natural) ↦
                 Real.partialSum(
@@ -321,20 +321,20 @@ theorem Real.cosine_paired_series_converges (x : Real)
                                           2 * m))
                            }) as pairsCollapse;
   done by Real.SequenceConverges.of_pointwise(
-              (N : Natural) ↦
+              s := (N : Natural) ↦
                   Real.partialSum(
                       (k : Natural) ↦
                           ComplexNumber.realPart(
                               ComplexNumber.exponentialTerm(
                                   ComplexNumber.i * ComplexNumber.from_real(x), k)),
                       2 * N),
-              Real.partialSum(
+              t := Real.partialSum(
                   (m : Natural) ↦
                       ComplexNumber.realPart(
                           ComplexNumber.exponentialTerm(
                               ComplexNumber.i * ComplexNumber.from_real(x), 2 * m))),
-              cos(x),
-              pairsCollapse, evenSubsequence)
+              limit := cos(x),
+              pointwiseEqual := pairsCollapse, sConverges := evenSubsequence)
 }
 
 -- ----------------------------------------------------------------------
@@ -356,7 +356,7 @@ theorem Real.sine_paired_series_converges (x : Real)
                         ComplexNumber.exponentialTerm(
                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
             sin(x))
-      by Real.sine_series_converges(x);
+      by Real.sine_series_converges;
   Real.SequenceConverges(
             (N : Natural) ↦
                 Real.partialSum(
@@ -412,7 +412,7 @@ theorem Real.sine_paired_series_converges (x : Real)
                                            ComplexNumber.i * ComplexNumber.from_real(x),
                                            2 * m))
                                    = Real.zero
-                                 by Real.sine_term_even(x, m) as evenVanishes;
+                                 by Real.sine_term_even as evenVanishes;
                              ComplexNumber.imaginaryPart(
                                       ComplexNumber.exponentialTerm(
                                           ComplexNumber.i * ComplexNumber.from_real(x),
@@ -433,21 +433,21 @@ theorem Real.sine_paired_series_converges (x : Real)
                                           successor(2 * m)))
                            }) as pairsCollapse;
   done by Real.SequenceConverges.of_pointwise(
-              (N : Natural) ↦
+              s := (N : Natural) ↦
                   Real.partialSum(
                       (k : Natural) ↦
                           ComplexNumber.imaginaryPart(
                               ComplexNumber.exponentialTerm(
                                   ComplexNumber.i * ComplexNumber.from_real(x), k)),
                       2 * N),
-              Real.partialSum(
+              t := Real.partialSum(
                   (m : Natural) ↦
                       ComplexNumber.imaginaryPart(
                           ComplexNumber.exponentialTerm(
                               ComplexNumber.i * ComplexNumber.from_real(x),
                               successor(2 * m)))),
-              sin(x),
-              pairsCollapse, evenSubsequence)
+              limit := sin(x),
+              pointwiseEqual := pairsCollapse, sConverges := evenSubsequence)
 }
 
 -- ----------------------------------------------------------------------
@@ -616,16 +616,14 @@ theorem Real.partialSum_nonnegative (g : Natural → Real)
       by (j : Natural) ↦
            -g(2 * j)
               ≤ -Real.zero
-                    by Real.LessOrEqual.negate(Real.zero, g(2 * j), leadNonnegative(j))
+                    by Real.LessOrEqual.negate
               = Real.zero;
   ∀ (j : Natural). -g(2 * j) + -g(successor(2 * j)) ≤ Real.zero
       by (j : Natural) ↦
            -g(2 * j) + -g(successor(2 * j))
               = -(g(2 * j) + g(successor(2 * j)))
               ≤ -Real.zero
-                    by Real.LessOrEqual.negate(
-                           Real.zero, g(2 * j) + g(successor(2 * j)),
-                           pairNonnegative(j))
+                    by Real.LessOrEqual.negate
               = Real.zero;
   Real.partialSum((k : Natural) ↦ -g(k), n) ≤ Real.zero;
   -Real.partialSum(g, n) ≤ Real.zero
@@ -633,11 +631,11 @@ theorem Real.partialSum_nonnegative (g : Natural → Real)
         Real.partialSum((k : Natural) ↦ -g(k), n) = -Real.partialSum(g, n);
         done by substituting (Real.partialSum((k : Natural) ↦ -g(k), n)
                                   = -Real.partialSum(g, n))
-      } as negated;
+      };
   Real.zero
      = -Real.zero
      ≤ -(-Real.partialSum(g, n))
-           by Real.LessOrEqual.negate(-Real.partialSum(g, n), Real.zero, negated)
+           by Real.LessOrEqual.negate
      = Real.partialSum(g, n)
 }
 
@@ -703,7 +701,7 @@ theorem Real.cosineCoefficient_one_odd (j : Natural)
   (-Real.one) ^ successor(2 * j)
             = -(Real.one ^ successor(2 * j))
             = -Real.one
-                  by Real.power_one(successor(2 * j)) as signNegOne;
+                  by Real.power_one as signNegOne;
   Real.cosineCoefficient(Real.one, successor(2 * j))
      = Real.exponentialCoefficient(2 * successor(2 * j))
            * (-Real.one) ^ successor(2 * j)
@@ -729,16 +727,12 @@ theorem Real.cosine_one_upper_bound
                      = -Real.exponentialCoefficient(
                             2 * successor(2 * successor(k))) as ccValue;
            Real.zero
-                 ≤ Real.exponentialCoefficient(2 * successor(2 * successor(k))) as ecNonneg;
+                 ≤ Real.exponentialCoefficient(2 * successor(2 * successor(k)));
            Real.cosineCoefficient(Real.one, 3 + 2 * k)
               = -Real.exponentialCoefficient(2 * successor(2 * successor(k)))
                     by ccValue
               ≤ -Real.zero
-                    by Real.LessOrEqual.negate(
-                           Real.zero,
-                           Real.exponentialCoefficient(
-                               2 * successor(2 * successor(k))),
-                           ecNonneg)
+                    by Real.LessOrEqual.negate
               = Real.zero
          };
   -- Each consecutive pair (odd then even) sums to ≤ 0 (magnitudes shrink).
@@ -788,7 +782,7 @@ theorem Real.cosine_one_upper_bound
         → Real.partialSum(Real.cosineCoefficient(Real.one), M)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), 3)
       by (M : Natural) (threeLeqM : 3 ≤ M) ↦ {
-           choose r such that M = r + 3 as mEqual from Natural.le_to_add(3, M, threeLeqM);
+           choose r such that M = r + 3 as mEqual from Natural.le_to_add;
            Real.partialSum(
                      (j : Natural) ↦ Real.cosineCoefficient(Real.one, 3 + j), r)
                  ≤ Real.zero;
@@ -875,7 +869,7 @@ theorem Real.cosine_one_lower_bound
         → Real.partialSum(Real.cosineCoefficient(Real.one), 2)
           ≤ Real.partialSum(Real.cosineCoefficient(Real.one), M)
       by (M : Natural) (twoLeqM : 2 ≤ M) ↦ {
-           choose r such that M = r + 2 as mEqual from Natural.le_to_add(2, M, twoLeqM);
+           choose r such that M = r + 2 as mEqual from Natural.le_to_add;
            Real.zero
                  ≤ Real.partialSum(
                        (j : Natural) ↦ Real.cosineCoefficient(Real.one, 2 + j), r)
@@ -909,7 +903,7 @@ theorem Real.cosine_double
         : cos(Real.one + Real.one)
           = (Real.one + Real.one) * (cos(Real.one) * cos(Real.one)) - Real.one := {
   cos(Real.one) * cos(Real.one) + sin(Real.one) * sin(Real.one) = Real.one
-      by Real.pythagorean_identity(Real.one) as pythagorean;
+      by Real.pythagorean_identity as pythagorean;
   sin(Real.one) * sin(Real.one) = Real.one - cos(Real.one) * cos(Real.one)
       by linear_combination(pythagorean) as sinSquare;
   cos(Real.one + Real.one)
@@ -928,10 +922,10 @@ theorem Real.cosine_double
 -- a real one.
 theorem Real.from_natural_LessThan (a b : Natural) (succLeqB : successor(a) ≤ b)
         : (a : Real) < (b : Real) := {
+  (successor(a) : Rational) ≤ (b : Rational)
+      by Rational.from_natural.LessOrEqual_preserves;
   (successor(a) : Real) ≤ (b : Real)
-      by Rational.to_real.LessOrEqual_preserves(
-             (successor(a) : Rational), (b : Rational),
-             Rational.from_natural.LessOrEqual_preserves(successor(a), b, succLeqB));
+      by Rational.to_real.LessOrEqual_preserves;
   successor(a) = a + 1 as successorAsAdd;
   (successor(a) : Real)
             = (a + 1 : Real)
@@ -1116,7 +1110,7 @@ theorem Real.cosine_two_negative : cos(Real.one + Real.one) < Real.zero := {
   Real.zero ≤ Real.exponentialCoefficient(4);
   Real.exponentialCoefficient(4)
             ≤ Real.exponentialCoefficient(0)
-                  by Real.exponentialCoefficient_antitone(iLeqJ := Natural.zero_least(4))
+                  by Real.exponentialCoefficient_antitone
             = Real.one
                   by ec0;
   -- EC 4² ≤ EC 4 (EC 4 ≤ 1).
