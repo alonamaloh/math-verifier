@@ -1693,6 +1693,65 @@ void runRestrictedEliminationTests() {
         }
     }
 
+    // A one-constructor Proposition inductive whose fields are all proofs
+    // (a conjunction over a fixed pair): a SUBSINGLETON under Lean's
+    // criterion — large elimination is granted, so the recursor takes a
+    // motive-level universe arg.
+    {
+        Environment env;
+        addAxiom(env, "P", makeProposition());
+        addAxiom(env, "Q", makeProposition());
+        addInductive(env, "And_PQ", makeProposition(), {
+            {"both", makePi("_", makeConstant("P"),
+                         makePi("_", makeConstant("Q"),
+                             makeConstant("And_PQ")))},
+        });
+        auto type = inferType(env, {},
+            makeConstant("And_PQ_recursor", {makeLevelConst(1)}));
+        EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
+        // Without a universe arg it's wrong arity.
+        EXPECT_THROW(inferType(env, {}, makeConstant("And_PQ_recursor")));
+    }
+
+    // A one-constructor Proposition inductive with a DATA field (an
+    // existential's witness) appearing in no index: NOT a subsingleton —
+    // the motive stays forced to Proposition.
+    {
+        Environment env;
+        addAxiom(env, "A", makeType(0));
+        addAxiom(env, "p",
+            makePi("_", makeConstant("A"), makeProposition()));
+        addInductive(env, "Exists_Ap", makeProposition(), {
+            {"witness",
+             makePi("a", makeConstant("A"),
+                 makePi("_",
+                     makeApplication(makeConstant("p"), makeBoundVariable(0)),
+                     makeConstant("Exists_Ap")))},
+        });
+        auto type = inferType(env, {}, makeConstant("Exists_Ap_recursor"));
+        EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
+        EXPECT_THROW(inferType(env, {},
+            makeConstant("Exists_Ap_recursor", {makeLevelConst(1)})));
+    }
+
+    // A one-constructor Proposition inductive whose data field appears as
+    // the conclusion's index (the Accessible shape): the index pins the
+    // field, so it IS a subsingleton and large elimination is granted.
+    {
+        Environment env;
+        addAxiom(env, "A", makeType(0));
+        addInductive(env, "Pinned",
+            makePi("_", makeConstant("A"), makeProposition()),
+            /*numParameters=*/ 0,
+            {{"Pinned.here",
+              makePi("a", makeConstant("A"),
+                  makeApplication(makeConstant("Pinned"),
+                                  makeBoundVariable(0)))}});
+        auto type = inferType(env, {},
+            makeConstant("Pinned_recursor", {makeLevelConst(1)}));
+        EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
+    }
+
     // An empty Proposition inductive (zero constructors, like False) DOES allow
     // large elimination — there's no proof to extract from, so any motive
     // universe is sound. The recursor takes a motive-level universe arg.
@@ -2568,9 +2627,10 @@ void runInductiveLibraryProofs() {
             }});
 
         // And.swap : Π(A B : Proposition). And A B → And B A.
-        // Proof: λ A B p. And_recursor A B (λ _. And B A) (λ a b. And.introduction B A b a) p.
-        // And is multi-arg Proposition ctor → restricted elim. Recursor has 0
-        // motive-universe args (motive forced to Proposition).
+        // Proof: λ A B p. And_recursor.{0} A B (λ _. And B A) (λ a b. And.introduction B A b a) p.
+        // And is a subsingleton (one constructor, both fields proofs) →
+        // large elimination; the recursor takes a motive-level universe
+        // arg, instantiated at 0 here (a Proposition motive).
         //
         // Inside the 3 outer lambdas (A, B, p): p=0, B=1, A=2.
         // Inside motive's `_` body (one more binder): _=0, p=1, B=2, A=3.
@@ -2606,7 +2666,7 @@ void runInductiveLibraryProofs() {
                     // At this position: p=0, B=1, A=2.
                     makeApplication(makeApplication(makeApplication(
                             makeApplication(makeApplication(
-                                makeConstant("And_recursor"),
+                                makeConstant("And_recursor", {makeLevelConst(0)}),
                                 makeBoundVariable(2) /* A */),
                                 makeBoundVariable(1) /* B */),
                             motiveAndSwap),

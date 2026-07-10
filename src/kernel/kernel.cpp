@@ -2993,26 +2993,82 @@ void addInductive(Environment& environment, std::string inductiveName,
     }
     // Large elimination from Proposition is sound when there's nothing to extract:
     //   - empty inductives (zero constructors): no proof to extract from,
-    //   - singleton inductives (exactly one constructor with zero non-
-    //     parameter arguments): the constructor carries only what's already
-    //     fixed by the parameters, so eliminating doesn't reveal anything
-    //     that wasn't already determined. The canonical example is
-    //     Equality / Eq: refl's only "data" is the proof itself, which is
-    //     the J principle's purpose to exploit.
-    bool isSingleton = false;
+    //   - subsingleton inductives (exactly one constructor, each of whose
+    //     non-parameter fields either is itself a proof — its type lives in
+    //     Proposition — or appears among the indices of the constructor's
+    //     conclusion): eliminating reveals nothing beyond what proof
+    //     irrelevance and the index values already determine. This is
+    //     Lean's criterion (type_checker book ch. 8), adopted verbatim so
+    //     an external checker re-deriving our recursors from the inductive
+    //     spec derives the same universe signature. Equality/And/Iff/Accessible
+    //     large-eliminate; Exists does not (its witness field is data that
+    //     appears in no index), exactly as in Lean.
+    bool isSubsingleton = false;
     if (inductiveLivesInProposition && constructors.size() == 1) {
-        auto walker = constructors[0].type;
-        int totalCtorPiCount = 0;
-        while (auto* pi = std::get_if<Pi>(&walker->node)) {
-            walker = pi->codomain;
-            totalCtorPiCount++;
-        }
-        if (totalCtorPiCount - numParameters == 0) {
-            isSingleton = true;
+        try {
+            isSubsingleton = true;
+            Context fieldContext;
+            std::vector<std::string> fieldsThatMustBeIndices;
+            auto walker = constructors[0].type;
+            int piIndex = 0;
+            while (auto* pi = std::get_if<Pi>(&walker->node)) {
+                std::string freshName =
+                    "subsingletonField_" + std::to_string(piIndex);
+                if (piIndex >= numParameters) {
+                    auto fieldKind = weakHeadNormalForm(
+                        environment,
+                        inferType(environment, fieldContext, pi->domain));
+                    auto* fieldSort = std::get_if<Sort>(&fieldKind->node);
+                    auto fieldLevel =
+                        fieldSort ? levelAsConstant(fieldSort->level)
+                                  : std::nullopt;
+                    bool fieldIsProof = fieldLevel && *fieldLevel == 0;
+                    if (!fieldIsProof) {
+                        fieldsThatMustBeIndices.push_back(freshName);
+                    }
+                }
+                fieldContext.push_back(
+                    {freshName, pi->domain, FreeVariableOrigin::Internal});
+                walker = openBinder(pi->codomain, freshName,
+                                    FreeVariableOrigin::Internal);
+                piIndex++;
+            }
+            // The walker is now the conclusion `T params indices`. A field
+            // "appears among the indices" when it is literally one of the
+            // conclusion's index arguments.
+            std::vector<ExpressionPointer> conclusionArgs;
+            auto conclusionHead = walker;
+            while (auto* application =
+                       std::get_if<Application>(&conclusionHead->node)) {
+                conclusionArgs.push_back(application->argument);
+                conclusionHead = application->function;
+            }
+            std::reverse(conclusionArgs.begin(), conclusionArgs.end());
+            for (const auto& fieldName : fieldsThatMustBeIndices) {
+                bool appearsAsIndex = false;
+                for (std::size_t i = numParameters;
+                     i < conclusionArgs.size(); ++i) {
+                    auto* freeVariable =
+                        std::get_if<FreeVariable>(&conclusionArgs[i]->node);
+                    if (freeVariable &&
+                        freeVariable->origin == FreeVariableOrigin::Internal &&
+                        freeVariable->name == fieldName) {
+                        appearsAsIndex = true;
+                        break;
+                    }
+                }
+                if (!appearsAsIndex) {
+                    isSubsingleton = false;
+                    break;
+                }
+            }
+        } catch (const TypeError&) {
+            rollback();
+            throw;
         }
     }
     bool allowLargeElimination =
-        !inductiveLivesInProposition || constructors.empty() || isSingleton;
+        !inductiveLivesInProposition || constructors.empty() || isSubsingleton;
 
     LevelPointer motiveLevel;
     std::string motiveLevelName;  // empty if motive level is fixed at Proposition.

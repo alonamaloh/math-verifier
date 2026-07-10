@@ -462,9 +462,12 @@ ExpressionPointer Elaborator::tryConstructorDisjointness(
             const Recursor* recursor = recursorDeclaration
                 ? std::get_if<Recursor>(recursorDeclaration) : nullptr;
             if (!recursor) continue;
-            // Skip Prop-valued inductives: their recursor lacks the extra
-            // motive-universe parameter (small elimination only), so a
-            // `T → Prop` discriminator cannot be built.
+            // Skip small-elimination-only inductives: their recursor lacks
+            // the extra motive-universe parameter, so a `T → Prop`
+            // discriminator cannot be built. (Only multi-constructor
+            // Prop-valued inductives land here — disjointness needs two
+            // distinct constructors — and those never large-eliminate;
+            // subsingleton Props large-eliminate but have one constructor.)
             bool hasMotiveLevel =
                 recursor->universeParameters.size()
                 > inductive->universeParameters.size();
