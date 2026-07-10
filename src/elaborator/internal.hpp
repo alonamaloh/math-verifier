@@ -3376,20 +3376,26 @@ private:
     //
     // A `monomialSignature` is the lex-sorted vector of factor hashes
     // appearing in a monomial (with multiplicity). A polynomial is a
-    // `std::map<monomialSignature, signed coefficient>`, with the zero
-    // coefficient entries omitted.
+    // `std::map<monomialSignature, signed mpz coefficient>`, with the
+    // zero coefficient entries omitted.
     //
-    // The proof emitter restricts coefficients to {-1, 0, +1}. Goals
-    // that, after distributivity, collect a like-term coefficient outside
-    // that range (e.g. `a + a = 2 · a`) report a clear "not yet
-    // supported" error rather than silently failing.
+    // Coefficients are arbitrary-precision (GMP), and on carriers with
+    // a literal story (Natural, or an embedding chain from Natural —
+    // Integer/Rational/Real) the canonical monomial renders its
+    // coefficient as ONE embedded literal (`2 · (x · y)`) with
+    // like-term combining proved through distributivity + the chain's
+    // `add_preserves`/`multiply_preserves` lemmas. Carriers without a
+    // literal story (bundled rings, RingModulo) keep the historical
+    // unit-expansion form: coefficient k appears as k repeated ±1
+    // monomials (their coefficients only arise from syntactic
+    // repetition, so they stay small).
     // =====================================================================
 
     // One step in the embedding chain from the source of a numeric
     // literal (Natural, the source of every literal) up through
     // coercions to the goal carrier. Holds the coercion function name
-    // plus the three preservation lemma names (zero, one, add) needed
-    // to push the coercion through a sum-of-ones canonical form.
+    // plus the preservation lemma names (zero, one, add, multiply)
+    // needed to push the coercion through embedded-literal arithmetic.
     //
     // "outer" refers to the target carrier of THIS step's coercion.
     // E.g. for `Natural.to_integer`: outer = Integer. For
@@ -3399,6 +3405,7 @@ private:
         std::string zeroPreservesName;       // e.g. "Natural.to_integer.zero_preserves"
         std::string onePreservesName;        // e.g. "Natural.to_integer.one_preserves"
         std::string addPreservesName;        // e.g. "Natural.to_integer.add_preserves"
+        std::string multiplyPreservesName;   // e.g. "Natural.to_integer.multiply_preserves"
         // Target carrier names (the "outer" side of this coercion):
         std::string outerCarrierName;        // e.g. "Integer"
         ExpressionPointer outerCarrierType;
@@ -3438,6 +3445,14 @@ private:
         // length 2 for Rational; length 3 for Real.
         std::vector<RingEmbeddingStep> embeddingChain;
 
+        // Literal-coefficient story available? True on Natural, and on
+        // a chained carrier when every chain step's zero/one/add/
+        // multiply preservation lemmas are in scope (a file that
+        // doesn't import the embedding modules falls back to the
+        // historical unit-expansion canonical form). Computed by
+        // populateRingEmbeddingChain.
+        bool useLiteralCoefficients = false;
+
         // Atom table: hash → kernel expression. Filled lazily while
         // normalising. We trust 64-bit hashes — the canonicalisation is
         // sound even on a collision (different terms would happen to be
@@ -3450,9 +3465,11 @@ private:
 
     // A polynomial as map<signature, coefficient>, signature = sorted
     // vector of atom hashes (with multiplicity), coefficient = signed
-    // integer.
+    // arbitrary-precision integer (GMP — kills the unary/int ceiling,
+    // PLAN_FAST_NUMERALS Stage 4).
     using RingMonomialSignature = std::vector<uint64_t>;
-    using RingPolynomial = std::map<RingMonomialSignature, int>;
+    using RingCoefficient = mpz_class;
+    using RingPolynomial = std::map<RingMonomialSignature, RingCoefficient>;
 
     // Drop zero-coefficient entries (caller is expected to call this
     // after any arithmetic that can produce a zero).
@@ -3523,10 +3540,11 @@ private:
     bool matchRingOne(ExpressionPointer expression,
                          const std::string& oneName);
 
-    // True if `expression` is a Natural literal `successor^k(zero)`
-    // for some k >= 0. Sets `value` to k on match.
+    // True if `expression` is a ground Natural numeral — a NaturalLiteral
+    // node, `zero`, or either under `successor` wrappers. Sets `value`
+    // (arbitrary precision) on match.
     static bool tryParseNaturalLiteral(
-        ExpressionPointer expression, int& value);
+        ExpressionPointer expression, RingCoefficient& value);
 
     // True if `expression` is `successor(inner)` for some inner term
     // (literal or not). Sets `innerOut` on match. Used by the Natural
@@ -3554,15 +3572,31 @@ private:
     bool tryParseCarrierEmbeddedNaturalLiteral(
         ExpressionPointer expression,
         const RingNormalisationContext& context,
-        int& value);
+        RingCoefficient& value);
 
     // Populate context.embeddingChain and scalar-multiply operator
     // names based on context.carrierName. Caller has already filled in
     // the carrier names (add, multiply, etc).
     void populateRingEmbeddingChain(RingNormalisationContext& context);
 
-    // Build the Natural-level kernel for `successor^k(zero)`.
-    ExpressionPointer buildNaturalLiteralKernel(int value);
+    // Build the Natural-level literal kernel node for `value`.
+    ExpressionPointer buildNaturalLiteralKernel(const RingCoefficient& value);
+
+    // True when the carrier has a literal-coefficient story: the
+    // Natural carrier itself (bare literal nodes) or any carrier
+    // reached from Natural by the embedding chain (Integer, Rational,
+    // Real). Bundled rings / RingModulo return false and keep the
+    // historical unit-expansion canonical form.
+    static bool ringContextUsesLiteralCoefficients(
+        const RingNormalisationContext& context);
+
+    // Render the coefficient literal `magnitude` (>= 2) at the carrier:
+    // the bare literal node on Natural, or the embedding-chain tower
+    // `to_real(to_rational(to_integer(<literal>)))` on a chained
+    // carrier. Only valid when ringContextUsesLiteralCoefficients.
+    ExpressionPointer buildEmbeddedCoefficientKernel(
+        const RingCoefficient& magnitude,
+        const RingNormalisationContext& context);
 
     // The kernel terms for the carrier's zero and one. Almost always the
     // named constants `<carrier>.zero` / `<carrier>.one`; the exception
@@ -3579,9 +3613,12 @@ private:
         ExpressionPointer expression, RingNormalisationContext& context);
 
     // Build the kernel expression for `1 + 1 + ... + 1` with N copies
-    // of `<context.oneName>`, left-associated.  N must be >= 1.
+    // of `<context.oneName>`, left-associated. N must be >= 1. Only
+    // used for carriers WITHOUT literal coefficients (bundled rings),
+    // whose coefficients stay small by construction.
     ExpressionPointer buildRingCoefficientExpression(
-        int count, const RingNormalisationContext& context);
+        const RingCoefficient& count,
+        const RingNormalisationContext& context);
 
     // Build the kernel expression for one monomial in canonical form.
     // Coefficient must be non-zero. Factors is the sorted signature.
@@ -3591,18 +3628,19 @@ private:
     // we drop the `coefficientExpr *` prefix (with a `negate` wrap if
     // the coefficient is negative). If the factor list is empty, the
     // monomial is just `coefficientExpr` (possibly negated).
+    // `coefficientExpr` is the embedded literal on literal-coefficient
+    // carriers, the `1 + ... + 1` tower otherwise.
     ExpressionPointer buildCanonicalMonomial(
         const RingMonomialSignature& factors,
-        int coefficient,
+        const RingCoefficient& coefficient,
         const RingNormalisationContext& context);
 
     // Build the canonical-form kernel expression for a polynomial.
-    // Empty polynomial → `zero`. Each entry (sig, coef) contributes
-    // |coef| copies of the unit monomial; the whole polynomial is
-    // the left-associated sum of all unit monomials in std::map sig
-    // order. So [{x}:2, {y}:1] canonicalizes to ((x + x) + y), not
-    // ((1+1)*x + y) — every monomial in the canonical form has
-    // coefficient ±1.
+    // Empty polynomial → `zero`. On a literal-coefficient carrier each
+    // entry (sig, coef) contributes ONE monomial `coef · (atoms)`; on
+    // other carriers it contributes |coef| copies of the unit monomial.
+    // The whole polynomial is the left-associated sum in std::map sig
+    // order.
     ExpressionPointer buildCanonicalPolynomial(
         const RingPolynomial& polynomial,
         const RingNormalisationContext& context);
@@ -3709,33 +3747,35 @@ private:
                             const std::string& description,
                             const std::string& carrierName);
 
+    // Require a coercion preservation lemma (zero/one/add/multiply
+    // `_preserves`) to be in scope; throw a clear error otherwise.
+    void demandCoercionLemma(const std::string& lemmaName);
+
     // Build `<negateName>(inner)`.
     ExpressionPointer buildRingNegate(
         const std::string& negateName, ExpressionPointer inner);
 
-    // Render a signed-monomial pair `(signature, sign)` to its canonical
-    // kernel form. Just an alias for buildCanonicalMonomial.
+    // Render a signed monomial `(signature, coefficient)` to its
+    // canonical kernel form. Just an alias for buildCanonicalMonomial.
     ExpressionPointer buildSignedMonomialKernel(
         const RingMonomialSignature& signature,
-        int sign,
+        const RingCoefficient& coefficient,
         const RingNormalisationContext& context);
 
     struct SignedMonomial {
         RingMonomialSignature signature;
-        int sign;  // +1 or -1
+        RingCoefficient coefficient;  // signed, non-zero
     };
 
-    // Explode each polynomial entry (sig, coef) into |coef| unit
-    // signed monomials, each with sign = sign(coef). The canonical
-    // form of a polynomial is a left-associated sum of these unit
-    // monomials, so coefficient k > 1 shows up as k repeated
-    // (sig, ±1) entries rather than as a `(1+1+...+1) * factors`
-    // product. This keeps proof generation in proveAddMerge etc.
-    // sign-agnostic: each entry is always ±1, and group-merging is
-    // just "this signature has p positives and q negatives, net
-    // (p - q) of sign sign(p - q), with min(p, q) cancel pairs".
+    // The polynomial's entries as a flat vector matching the canonical
+    // form. On a literal-coefficient carrier: one entry per (sig, coef),
+    // coefficient carried whole. Otherwise: each entry explodes into
+    // |coef| unit (sig, ±1) monomials (the historical unit-expansion
+    // form; such carriers' coefficients only arise from syntactic
+    // repetition and stay small — a guard errors past 1024).
     std::vector<SignedMonomial> polynomialToSignedMonomials(
-        const RingPolynomial& polynomial);
+        const RingPolynomial& polynomial,
+        const RingNormalisationContext& context);
 
     // Left-associated sum of kernel summands. summands must be non-empty.
     ExpressionPointer assembleLeftAssociatedSum(
@@ -3798,53 +3838,73 @@ private:
         const RingLawNames& axiomNames,
         RingPolynomial& polynomialOut);
 
-    // Build the canonical kernel form of "k copies of `oneName` added,
-    // left-associated" — the standard polynomial canonical form for
-    // the constant polynomial `[{}: k]`. For k = 0 returns `zeroName`.
-    ExpressionPointer buildSumOfOnesKernel(
-        int k,
-        const std::string& addName,
-        const std::string& zeroName,
-        const std::string& oneName);
+    // Prove `expression = canonical([{}: value])` for a ground embedded
+    // literal recognised by tryParseCarrierEmbeddedNaturalLiteral on a
+    // chained carrier. When the parse bottomed out at a Natural ground
+    // term the canonical rendering is the same coercion tower and the
+    // proof is reflexivity (kernel defeq bridges literal/successor-chain
+    // spellings); when it bottomed at a mid-chain `zero`/`one` constant
+    // (`(1 : Rational)` spelt `Integer.to_rational(Integer.one)`), the
+    // proof lifts `zero_preserves`/`one_preserves` up the remaining
+    // steps by congruence.
+    ExpressionPointer proveEmbeddedLiteralEqualsCanonical(
+        ExpressionPointer expression,
+        const RingCoefficient& value,
+        const RingNormalisationContext& context);
 
-    // Step 0 of the chain (Natural→Integer flavor): prove
-    //   step.coercion(successor^k(zero)) = c_k
-    // where c_k = `step.outerOne + step.outerOne + ... + step.outerOne`
-    // (k copies, left-associated; or `step.outerZero` for k = 0).
-    //
-    // This uses the Natural-source shape where the literal is
-    // successor^k(zero) and add_preserves' LHS exploits the kernel
-    // reduction succ^j(zero) + succ(zero) ≡ succ^{j+1}(zero).
-    ExpressionPointer proveNaturalLiteralPushThroughStep(
-        int literalValue,
-        const RingEmbeddingStep& step);
+    // Prove `tower(v) = <carrier zero/one constant>` for v ∈ {0, 1},
+    // where tower(v) is the full embedding-chain rendering
+    // `to_real(to_rational(to_integer(<literal v>)))`. A chain of
+    // zero/one_preserves steps lifted by congruence. Chained carriers
+    // only.
+    ExpressionPointer proveCoefficientTowerEqualsConstant(
+        bool isOne, const RingNormalisationContext& context);
 
-    // Push a coercion through a "k copies of innerOne added" canonical:
-    //   step.coercion(innerOne + innerOne + ... + innerOne) = outerOne + ... + outerOne
-    // (or step.coercion(innerZero) = outerZero for k = 0).
-    // `innerAddName` is the add operator of the inner carrier;
-    // `innerOneName` is its one constant.
-    //
-    // The inductive step at j is analogous to proveNaturalLiteral... but
-    // operates on the literal `innerCanonical_j + innerOne` form,
-    // without any successor-side kernel reductions.
-    ExpressionPointer proveCoercionThroughSumOfOnes(
-        int literalValue,
-        const RingEmbeddingStep& step,
-        const std::string& innerAddName,
-        const std::string& innerZeroName,
-        const std::string& innerOneName);
+    // Prove `E'(a) + E'(b) = E(a + b)` at the carrier, where E' is the
+    // canonical coefficient rendering (`one` for 1, the embedded
+    // literal tower for >= 2) and a, b >= 1. On Natural this is
+    // reflexivity (the kernel's accelerated table computes ground
+    // adds); on chained carriers it is an `add_preserves` spine, one
+    // step per chain level, with `one`-endpoints bridged through
+    // proveCoefficientTowerEqualsConstant.
+    ExpressionPointer proveCoefficientSum(
+        const RingCoefficient& a, const RingCoefficient& b,
+        const RingNormalisationContext& context);
 
-    // Prove `<chain>(successor^k(zero)) = canonical_k` where:
-    //   - chain[0] is Natural.to_integer (always present for non-empty
-    //     chains)
-    //   - subsequent steps push through Integer→Rational, Rational→Real
-    //   - canonical_k uses the OUTERMOST step's outer add/zero/one
-    //
-    // Used by the literal-detection branch of proveEqualsCanonical_impl
-    // when the goal's carrier is Integer, Rational, or Real.
-    ExpressionPointer proveIntegerLiteralEqualsCanonical(
-        int literalValue, const RingNormalisationContext& context);
+    // Prove `E(a) · E(b) = E(a · b)` for a, b >= 2 — the
+    // `multiply_preserves` spine, mirror of proveCoefficientSum.
+    ExpressionPointer proveCoefficientProduct(
+        const RingCoefficient& a, const RingCoefficient& b,
+        const RingNormalisationContext& context);
+
+    // Prove `K(c1, sig) + K(c2, sig) = K(c1 + c2, sig)` for positive
+    // coefficients c1, c2 (K = the canonical positive monomial
+    // rendering). Empty signature: proveCoefficientSum directly.
+    // Otherwise: bridge coefficient-1 sides through `one_multiply`,
+    // pull the sum together with distributivity_right (reversed), and
+    // finish with proveCoefficientSum under a `· atoms` congruence.
+    ExpressionPointer provePositiveMonomialCombine(
+        const RingCoefficient& c1, const RingCoefficient& c2,
+        const RingMonomialSignature& signature,
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames);
+
+    // Literal-coefficient counterpart of
+    // proveSignedMonomialSumEqualsCanonical: prove
+    //   leftAssoc(kernels) = canonical(mergedPoly)
+    // by sorting the summands so same-signature monomials become
+    // adjacent (signature groups in canonical order, positives before
+    // negatives within a group) and then folding each group in place —
+    // positive/negative subfolds via provePositiveMonomialCombine (+
+    // negate_add for the negative side), then the mixed-sign resolution
+    // (combine, or cancel to zero and drop the zero summand).
+    ExpressionPointer proveLiteralMonomialSumEqualsCanonical(
+        const std::vector<SignedMonomial>& combinedMonomials,
+        const std::vector<ExpressionPointer>& combinedKernels,
+        const RingPolynomial& mergedPoly,
+        ExpressionPointer mergedCanonical,
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames);
 
     ExpressionPointer proveEqualsCanonical(
         ExpressionPointer expression,
@@ -3871,12 +3931,12 @@ private:
         const RingLawNames& axiomNames);
 
     // Prove `leftAssoc(combinedKernels) = canonical(mergedPoly)` for a
-    // flat list of signed monomials, SORTING into canonical order and
-    // CANCELLING opposite-sign like-term pairs (and keeping same-sign
-    // duplicates, which match a coefficient>1 canonical entry). Shared
-    // by the additive merge and the multiplicative merge's final phase
-    // (so a product expansion `(a+b)(a-b)` whose cross terms cancel is
-    // handled the same way a sum's like terms are). `combinedMonomials`
+    // flat list of UNIT (±1) signed monomials, SORTING into canonical
+    // order and CANCELLING opposite-sign like-term pairs (and keeping
+    // same-sign duplicates, which match a coefficient>1 canonical
+    // entry). The unit-expansion path — carriers WITHOUT literal
+    // coefficients only; literal-coefficient carriers use
+    // proveLiteralMonomialSumEqualsCanonical. `combinedMonomials`
     // and `combinedKernels` are parallel; `mergedCanonical` is
     // `canonical(mergedPoly)`.
     ExpressionPointer proveSignedMonomialSumEqualsCanonical(
@@ -4042,7 +4102,7 @@ private:
     ExpressionPointer proveSignedProductEqualsMonomial(
         ExpressionPointer Li, ExpressionPointer Rj,
         const SignedMonomial& leftMono, const SignedMonomial& rightMono,
-        const RingMonomialSignature& /*mergedSig*/, int mergedSign,
+        const RingMonomialSignature& mergedSig,
         ExpressionPointer targetMonomial,
         const RingNormalisationContext& context,
         const RingLawNames& axiomNames);
@@ -4181,7 +4241,7 @@ private:
     // in `contractionRecords` for the proof emitter.
     struct FieldMonomialContraction {
         RingMonomialSignature originalSignature;
-        int originalCoefficient;
+        RingCoefficient originalCoefficient;
         RingMonomialSignature contractedSignature;
         std::vector<int> pairsRemoved;  // by pair index
     };
@@ -4231,11 +4291,12 @@ private:
     // caller).
     //
     // The proof is built on the factor-product level (without the
-    // outer sign-wrap) and then lifted through the negate (if the
-    // coefficient is -1) via congruence.
+    // outer coefficient/sign wrap) and then lifted through the
+    // `coefficient ·` prefix (|coefficient| >= 2) and the negate
+    // (coefficient < 0) via congruence.
     ExpressionPointer buildMonomialContractionProof(
         const RingMonomialSignature& originalSignature,
-        int coefficient,
+        const RingCoefficient& coefficient,
         const RingMonomialSignature& contractedSignature,
         const std::vector<int>& pairsRemoved,
         const std::vector<FieldReciprocalPair>& pairs,

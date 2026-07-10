@@ -1,0 +1,81 @@
+module Test.ring_coefficient_test
+
+-- Stage 4 of PLAN_FAST_NUMERALS (§E): `ring`/`field` hold coefficients
+-- as GMP literals. The canonical monomial is `coefficient · (atoms)`
+-- with ONE embedded literal — not |coefficient| repeated unit
+-- monomials — and like terms combine through the embedding chain's
+-- `add_preserves`/`multiply_preserves` lemmas. So 10¹²-scale (and
+-- past-2³¹) coefficients close in fixed-size proofs, with the ground
+-- Natural arithmetic absorbed by the kernel's accelerated-op table.
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Integer.multiplication
+import Integer.embedding
+import Integer.order
+import Integer.ring
+import Integer.ground_arithmetic
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.ring
+import Rational.reciprocal_function
+import Rational.division
+import Rational.ground_arithmetic
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.ring
+import Real.reciprocal
+import Real.field
+import Real.division
+
+-- ── ℕ: like-term combining (coefficients are bare literal nodes) ──────
+
+theorem Test.natural_double (x : Natural) : x + x = 2 * x := ring
+theorem Test.natural_combine (x : Natural) : 2 * x + 3 * x = 5 * x := ring
+theorem Test.natural_coefficient_product (x y : Natural)
+        : (2 * x) * (3 * y) = 6 * (x * y) := ring
+
+-- ── ℤ: signed combining, cancellation, cross terms ────────────────────
+
+theorem Test.integer_combine (x : Integer) : 3 * x - 5 * x = -(2 * x) := ring
+theorem Test.integer_cancel (x y : Integer)
+        : (x + y) * (x - y) = x * x - y * y := ring
+theorem Test.integer_square (x y : Integer)
+        : (x + y) * (x + y) = x * x + 2 * (x * y) + y * y := ring
+
+-- ── Large coefficients: 10¹²-scale, and past the old 2³¹ ceiling ──────
+
+theorem Test.integer_large_combine (x : Integer)
+        : 1000000000000 * x + 1000000000000 * x = 2000000000000 * x := ring
+theorem Test.integer_past_int32 (x : Integer)
+        : 4294967296 * x + 4294967296 * x = 8589934592 * x := ring
+theorem Test.integer_large_product (x : Integer)
+        : (1000000 * x) * (1000000 * x) = 1000000000000 * (x * x) := ring
+
+-- ── ℝ: the full three-step embedding chain ────────────────────────────
+
+theorem Test.real_combine (x : Real) : 2 * x + 3 * x = 5 * x := ring
+theorem Test.real_large (x : Real)
+        : 1000000000000 * x + x = 1000000000001 * x := ring
+
+-- ── ℚ `field`: the mixed-denominator residual, closed by Stage 4 ──────
+
+-- Same denominator (the direct cofactor path, ℚ flavour).
+theorem Test.rational_half (x : Rational) : x / 2 + x / 2 = x := field
+
+-- Mixed denominators at ℚ — the Stage-3 residual: clearing by D = 6
+-- used to die at the unary-coefficient ceiling; literal coefficients
+-- close it with no hypotheses at all.
+theorem Test.rational_sixths (x : Rational)
+        : x / 2 + x / 3 + x / 6 = x := field

@@ -1182,67 +1182,24 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
         // Application: peel the spine, reduce the head, then try β or ι.
         if (std::holds_alternative<Application>(expression->node)) {
             auto spine = peelApplicationSpine(expression);
-            spine.head = weakHeadNormalForm(environment, spine.head, fuel);
-
-            // β-reduction: if the head is a Lambda and we have at least one arg.
-            if (auto* lambda = std::get_if<Lambda>(&spine.head->node);
-                lambda && !spine.args.empty()) {
-                expression = substitute(lambda->body, 0, spine.args[0]);
-                expression = applyArguments(expression, spine.args, 1);
-                continue;
-            }
-
-            // ι-reduction: if the head is a Constant referring to a Recursor
-            // and we have enough args, with the target being a constructor
-            // application of the right inductive type.
-            if (auto* headConstant = std::get_if<Constant>(&spine.head->node)) {
-                // PLAN_FAST_NUMERALS §B — literal re-compaction and the
-                // accelerated-op table.
-                //
-                // `successor(NaturalLiteral(n))` compacts eagerly to
-                // `NaturalLiteral(n+1)`, so ground terms re-enter literal
-                // form after a constructor peel. Deliberately LITERAL-only
-                // (a legacy `successor(zero)` chain keeps its shape): the
-                // compaction exists to undo the one-peel constructor view,
-                // not to re-canonicalise constructor spellings the
-                // elaborator's matchers may still expect.
-                if (headConstant->name == "successor"
-                    && !spine.args.empty()
-                    && isNaturalConstructor(environment, "successor")) {
-                    ExpressionPointer argument = spine.args[0];
-                    if (!std::holds_alternative<NaturalLiteral>(
-                            argument->node)
-                        && (std::holds_alternative<Application>(
-                                argument->node)
-                            || std::holds_alternative<Constant>(
-                                   argument->node)
-                            || std::holds_alternative<Let>(
-                                   argument->node))) {
-                        auto reduced = weakHeadNormalForm(
-                            environment, argument, fuel);
-                        if (std::holds_alternative<NaturalLiteral>(
-                                reduced->node)) {
-                            argument = reduced;
-                        }
-                    }
-                    if (auto* literal =
-                            std::get_if<NaturalLiteral>(&argument->node)) {
-                        expression = applyArguments(
-                            makeNaturalLiteral(literal->value + 1),
-                            spine.args, 1);
-                        continue;
-                    }
-                }
-                // A table op whose arguments are all GROUND naturals — a
-                // literal, `zero`, or a successor chain over either, in
-                // any mixture — computes directly via GMP (the trusted-op
-                // table). Reading every ground spelling (not just
-                // literals) keeps the table from splitting defeq classes:
-                // `add(1, zero)` and `add(1, 0)` must reduce to the SAME
-                // literal, or two previously-convertible terms would
-                // normalize apart.
+            // Accelerated-op table, dispatched on the RAW head name
+            // BEFORE the head is reduced: a TRANSPARENT table op
+            // (`Natural.multiply`) would otherwise δ-unfold into its
+            // recursor body and grind out the product in unary — the
+            // table would never see it (only opaque `Natural.add`
+            // survived head reduction as a stuck constant). A table op
+            // whose arguments are all GROUND naturals — a literal,
+            // `zero`, or a successor chain over either, in any mixture
+            // — computes directly via GMP (the trusted-op table).
+            // Reading every ground spelling (not just literals) keeps
+            // the table from splitting defeq classes: `add(1, zero)`
+            // and `add(1, 0)` must reduce to the SAME literal, or two
+            // previously-convertible terms would normalize apart.
+            // Non-ground arguments fall through to normal reduction.
+            if (auto* rawHeadConstant =
+                    std::get_if<Constant>(&spine.head->node)) {
                 if (int arity =
-                        acceleratedNaturalOpArity(headConstant->name);
+                        acceleratedNaturalOpArity(rawHeadConstant->name);
                     g_acceleratedNaturalOpsEnabled && arity > 0
                     && static_cast<int>(spine.args.size()) >= arity) {
                     auto groundNaturalValue =
@@ -1302,7 +1259,7 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                     }
                     if (allGround) {
                         if (auto result = evaluateAcceleratedNaturalOp(
-                                headConstant->name, groundArguments)) {
+                                rawHeadConstant->name, groundArguments)) {
                             expression = applyArguments(
                                 makeNaturalLiteral(std::move(*result)),
                                 spine.args, arity);
@@ -1310,6 +1267,62 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                         }
                     }
                 }
+            }
+            spine.head = weakHeadNormalForm(environment, spine.head, fuel);
+
+            // β-reduction: if the head is a Lambda and we have at least one arg.
+            if (auto* lambda = std::get_if<Lambda>(&spine.head->node);
+                lambda && !spine.args.empty()) {
+                expression = substitute(lambda->body, 0, spine.args[0]);
+                expression = applyArguments(expression, spine.args, 1);
+                continue;
+            }
+
+            // ι-reduction: if the head is a Constant referring to a Recursor
+            // and we have enough args, with the target being a constructor
+            // application of the right inductive type.
+            if (auto* headConstant = std::get_if<Constant>(&spine.head->node)) {
+                // PLAN_FAST_NUMERALS §B — literal re-compaction and the
+                // accelerated-op table.
+                //
+                // `successor(NaturalLiteral(n))` compacts eagerly to
+                // `NaturalLiteral(n+1)`, so ground terms re-enter literal
+                // form after a constructor peel. Deliberately LITERAL-only
+                // (a legacy `successor(zero)` chain keeps its shape): the
+                // compaction exists to undo the one-peel constructor view,
+                // not to re-canonicalise constructor spellings the
+                // elaborator's matchers may still expect.
+                if (headConstant->name == "successor"
+                    && !spine.args.empty()
+                    && isNaturalConstructor(environment, "successor")) {
+                    ExpressionPointer argument = spine.args[0];
+                    if (!std::holds_alternative<NaturalLiteral>(
+                            argument->node)
+                        && (std::holds_alternative<Application>(
+                                argument->node)
+                            || std::holds_alternative<Constant>(
+                                   argument->node)
+                            || std::holds_alternative<Let>(
+                                   argument->node))) {
+                        auto reduced = weakHeadNormalForm(
+                            environment, argument, fuel);
+                        if (std::holds_alternative<NaturalLiteral>(
+                                reduced->node)) {
+                            argument = reduced;
+                        }
+                    }
+                    if (auto* literal =
+                            std::get_if<NaturalLiteral>(&argument->node)) {
+                        expression = applyArguments(
+                            makeNaturalLiteral(literal->value + 1),
+                            spine.args, 1);
+                        continue;
+                    }
+                }
+                // (The accelerated-op table dispatched above, on the
+                // raw head, before this point — see the pre-reduction
+                // block. Heads that survive reduction as stuck
+                // constants were already covered there.)
                 auto* declaration = environment.lookup(headConstant->name);
                 if (auto* recursor = (declaration ? std::get_if<Recursor>(declaration)
                                                   : nullptr)) {

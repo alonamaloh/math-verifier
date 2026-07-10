@@ -1566,8 +1566,11 @@ ExpressionPointer Elaborator::elaborateExpression(
             // Natural-then-coerce semantics.
             if (auto* numeric = std::get_if<SurfaceNumericLiteral>(
                     &ascription->expression->node)) {
-                int value = std::stoi(numeric->digits);
-                if (value == 0 || value == 1) {
+                // Only 0/1 have named carrier constants; compare the
+                // digit string directly (stoi would overflow on the
+                // arbitrary-precision literals GMP numerals allow).
+                if (numeric->digits == "0" || numeric->digits == "1") {
+                    bool value = numeric->digits == "1";
                     ExpressionPointer cursor = ascribedType;
                     while (auto* application =
                                std::get_if<Application>(&cursor->node)) {
