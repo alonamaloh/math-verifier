@@ -1,0 +1,257 @@
+-- Rational/ground_arithmetic.math
+--
+-- The certificate spine for ground Rational arithmetic (PLAN_FAST_NUMERALS
+-- §D), mirroring Integer/ground_arithmetic.math one level up the tower. A
+-- ground Rational term — casts, `fraction` forms, and any mixture of
+-- `-`/`+`/`*`/`/` over them — normalizes to a canonical
+-- `fraction(from_difference(…), from_difference(…), _)` of Natural literals
+-- by composing the `*_evaluates` lemmas below; ground relations between two
+-- canonical forms then discharge through the `ground_*` lemmas, whose
+-- cross-multiplication premises are ground Integer facts one certificate
+-- layer down. The elaborator's ground-relation decision procedure emits
+-- these lemmas mechanically; they are equally citable by hand.
+
+module Rational.ground_arithmetic
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
+import Integer.order
+import Integer.integral_domain
+import Integer.ground_arithmetic
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.reciprocal_function
+import Rational.division
+import Rational.natural_division
+
+-- ── Renaming the components of a fraction ──────────────────────────────
+
+-- A fraction is unchanged when numerator and denominator are rewritten to
+-- equal values (the nonzero witness may be swapped freely). This is the
+-- step that replaces computed Integer components by their canonical forms.
+theorem Rational.fraction_normalizes
+        (n d : Integer) (dNonzero : d ≠ Integer.zero)
+        (nOut dOut : Integer) (dOutNonzero : dOut ≠ Integer.zero)
+        (numeratorEquation : n = nOut)
+        (denominatorEquation : d = dOut)
+        : Rational.fraction(n, d, dNonzero) = Rational.fraction(nOut, dOut, dOutNonzero) := {
+  n * dOut
+     = nOut * dOut   by substituting numeratorEquation
+     = nOut * d      by substituting denominatorEquation;
+  done by Rational.fraction_equal
+}
+
+-- ── Evaluation: each arithmetic operation, at fraction forms ───────────
+
+-- −(n / d) = (−n) / d.
+theorem Rational.negate_evaluates
+        (x : Rational) (n d : Integer) (dNonzero : d ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n, d, dNonzero))
+        (nOut : Integer)
+        (numeratorEquation : -n = nOut)
+        : -x = Rational.fraction(nOut, d, dNonzero) :=
+  -x
+     = -Rational.fraction(n, d, dNonzero)    by substituting xEquation
+     = Rational.fraction(-n, d, dNonzero)    by unfolding Rational
+     = Rational.fraction(nOut, d, dNonzero)  by substituting numeratorEquation
+
+-- n1/d1 + n2/d2 = (n1·d2 + n2·d1) / (d1·d2).
+theorem Rational.add_evaluates
+        (x y : Rational)
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (nOut dOut : Integer) (dOutNonzero : dOut ≠ Integer.zero)
+        (numeratorEquation : n1 * d2 + n2 * d1 = nOut)
+        (denominatorEquation : d1 * d2 = dOut)
+        : x + y = Rational.fraction(nOut, dOut, dOutNonzero) :=
+  x + y
+     = Rational.fraction(n1, d1, d1Nonzero) + y                                       by substituting xEquation
+     = Rational.fraction(n1, d1, d1Nonzero) + Rational.fraction(n2, d2, d2Nonzero)    by substituting yEquation
+     = Rational.fraction(n1 * d2 + n2 * d1, d1 * d2,
+           Integer.multiply_nonzero(d1, d2, d1Nonzero, d2Nonzero))                    by unfolding Rational
+     = Rational.fraction(nOut, dOut, dOutNonzero)                                     by Rational.fraction_normalizes
+
+-- (n1/d1) · (n2/d2) = (n1·n2) / (d1·d2).
+theorem Rational.multiply_evaluates
+        (x y : Rational)
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (nOut dOut : Integer) (dOutNonzero : dOut ≠ Integer.zero)
+        (numeratorEquation : n1 * n2 = nOut)
+        (denominatorEquation : d1 * d2 = dOut)
+        : x * y = Rational.fraction(nOut, dOut, dOutNonzero) :=
+  x * y
+     = Rational.fraction(n1, d1, d1Nonzero) * y                                       by substituting xEquation
+     = Rational.fraction(n1, d1, d1Nonzero) * Rational.fraction(n2, d2, d2Nonzero)    by substituting yEquation
+     = Rational.fraction(n1 * n2, d1 * d2,
+           Integer.multiply_nonzero(d1, d2, d1Nonzero, d2Nonzero))                    by unfolding Rational
+     = Rational.fraction(nOut, dOut, dOutNonzero)                                     by Rational.fraction_normalizes
+
+-- n1/d1 − n2/d2 = (n1·d2 − n2·d1) / (d1·d2).
+theorem Rational.subtract_evaluates
+        (x y : Rational)
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (nOut dOut : Integer) (dOutNonzero : dOut ≠ Integer.zero)
+        (numeratorEquation : n1 * d2 - n2 * d1 = nOut)
+        (denominatorEquation : d1 * d2 = dOut)
+        : x - y = Rational.fraction(nOut, dOut, dOutNonzero) := {
+  -y = Rational.fraction(-n2, d2, d2Nonzero) by Rational.negate_evaluates;
+  n1 * d2 + -n2 * d1
+     = n1 * d2 - n2 * d1
+     = nOut               by numeratorEquation;
+  x + -y = Rational.fraction(nOut, dOut, dOutNonzero) by Rational.add_evaluates;
+  done
+}
+
+-- (n/d)⁻¹ = d/n, for nonzero n.
+theorem Rational.reciprocal_evaluates
+        (x : Rational) (n d : Integer) (dNonzero : d ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n, d, dNonzero))
+        (nNonzero : n ≠ Integer.zero)
+        : Rational.reciprocal_function(x) = Rational.fraction(d, n, nNonzero) := {
+  x * Rational.fraction(d, n, nNonzero)
+     = Rational.fraction(n, d, dNonzero) * Rational.fraction(d, n, nNonzero)   by substituting xEquation
+     = Rational.fraction(n * d, d * n,
+           Integer.multiply_nonzero(d, n, dNonzero, nNonzero))                 by unfolding Rational
+     = Rational.one                                                            by Rational.fraction_equal;
+  x * Rational.fraction(d, n, nNonzero) = Rational.one
+      ∨ x = Rational.zero ∧ Rational.fraction(d, n, nNonzero) = Rational.zero;
+  Rational.reciprocal_predicate(x, Rational.reciprocal_function(x))
+      by Rational.reciprocal_function_satisfies;
+  done by Rational.reciprocal_unique
+}
+
+-- (n1/d1) / (n2/d2) = (n1·d2) / (d1·n2), for nonzero n2.
+theorem Rational.divide_evaluates
+        (x y : Rational) (yNonzero : ¬(y = Rational.zero))
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (n2Nonzero : n2 ≠ Integer.zero)
+        (nOut dOut : Integer) (dOutNonzero : dOut ≠ Integer.zero)
+        (numeratorEquation : n1 * d2 = nOut)
+        (denominatorEquation : d1 * n2 = dOut)
+        : Rational.divide(x, y, yNonzero) = Rational.fraction(nOut, dOut, dOutNonzero) := {
+  Rational.reciprocal_function(y) = Rational.fraction(d2, n2, n2Nonzero) by Rational.reciprocal_evaluates;
+  x * Rational.reciprocal_function(y) = Rational.fraction(nOut, dOut, dOutNonzero) by Rational.multiply_evaluates;
+  done
+}
+
+-- a / b at two Integers is the fraction a / b.
+theorem Integer.divide_evaluates
+        (a b : Integer) (bNonzero : b ≠ Integer.zero)
+        (nOut dOut : Integer) (dOutNonzero : dOut ≠ Integer.zero)
+        (numeratorEquation : a = nOut)
+        (denominatorEquation : b = dOut)
+        : Integer.divide(a, b, bNonzero) = Rational.fraction(nOut, dOut, dOutNonzero) :=
+  Integer.divide(a, b, bNonzero)
+     = Rational.fraction(a, b, bNonzero)
+     = Rational.fraction(nOut, dOut, dOutNonzero)   by Rational.fraction_normalizes
+
+-- a / b at two Naturals is the fraction of the casts.
+theorem Natural.divide_evaluates
+        (a b : Natural) (bNonzero : b ≠ 0)
+        (castDenominatorNonzero : (b : Integer) ≠ Integer.zero)
+        (nOut dOut : Integer) (dOutNonzero : dOut ≠ Integer.zero)
+        (numeratorEquation : (a : Integer) * Integer.one = nOut)
+        (denominatorEquation : Integer.one * (b : Integer) = dOut)
+        : Natural.divide(a, b, bNonzero) = Rational.fraction(nOut, dOut, dOutNonzero) := {
+  (b : Rational) ≠ Rational.zero by Rational.from_natural.nonzero_preserves as castNonzero;
+  (a : Rational) = Rational.fraction((a : Integer), Integer.one, Integer.one_is_nonzero);
+  (b : Rational) = Rational.fraction((b : Integer), Integer.one, Integer.one_is_nonzero);
+  Rational.divide((a : Rational), (b : Rational), castNonzero)
+      = Rational.fraction(nOut, dOut, dOutNonzero)   by Rational.divide_evaluates;
+  done
+}
+
+-- ── Relations between two canonical forms, by Integer cross-facts ─────
+
+-- n1/d1 = n2/d2 exactly when n1·d2 = n2·d1.
+theorem Rational.ground_equal
+        (x y : Rational)
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (crossEquation : n1 * d2 = n2 * d1)
+        : x = y :=
+  x
+     = Rational.fraction(n1, d1, d1Nonzero)
+     = Rational.fraction(n2, d2, d2Nonzero)   by Rational.fraction_equal
+     = y
+
+theorem Rational.ground_not_equal
+        (x y : Rational)
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (crossDisequality : ¬(n1 * d2 = n2 * d1))
+        : ¬(x = y) := {
+  suppose x = y as xEqualsY;
+  Rational.fraction(n1, d1, d1Nonzero)
+     = x
+     = y
+     = Rational.fraction(n2, d2, d2Nonzero);
+  n1 * d2 = n2 * d1 by Rational.fraction_equal_implies;
+  done
+}
+
+-- n1/d1 ≤ n2/d2 exactly when (n2·d1 − n1·d2) · (d2·d1) is non-negative
+-- (the sign of the difference, cleared of both denominators).
+theorem Rational.ground_less_or_equal
+        (x y : Rational)
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (productNonneg : Integer.IsNonneg((n2 * d1 - n1 * d2) * (d2 * d1)))
+        : x ≤ y := {
+  d2 * d1 ≠ Integer.zero by Integer.multiply_nonzero as productDenominatorNonzero;
+  y - x = Rational.fraction(n2 * d1 - n1 * d2, d2 * d1, productDenominatorNonzero)
+      by Rational.subtract_evaluates;
+  Rational.IsNonneg(Rational.fraction(n2 * d1 - n1 * d2, d2 * d1, productDenominatorNonzero))
+      by Rational.IsNonneg.of_numerator_denominator;
+  Rational.IsNonneg(y - x)
+      by substituting (y - x = Rational.fraction(n2 * d1 - n1 * d2, d2 * d1, productDenominatorNonzero));
+  done
+}
+
+-- n1/d1 < n2/d2 when the weak comparison holds and the fractions differ.
+theorem Rational.ground_less_than
+        (x y : Rational)
+        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (xEquation : x = Rational.fraction(n1, d1, d1Nonzero))
+        (yEquation : y = Rational.fraction(n2, d2, d2Nonzero))
+        (productNonneg : Integer.IsNonneg((n2 * d1 - n1 * d2) * (d2 * d1)))
+        (crossDisequality : ¬(n1 * d2 = n2 * d1))
+        : x < y := {
+  x ≤ y by Rational.ground_less_or_equal;
+  ¬(x = y) by Rational.ground_not_equal;
+  done
+}

@@ -1,0 +1,81 @@
+module Test.ground_relation_test
+
+-- The ground-relation decision procedure (PLAN_FAST_NUMERALS §D): every
+-- relation between specific numbers at ℕ/ℤ/ℚ closes silently — by-less
+-- steps, `done`, and the `/` and `field` side conditions. The elaborator
+-- decides the relation with GMP and certifies it through the
+-- ground_arithmetic lemma spines, so each fact below is one fixed-size
+-- proof term, never a search.
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.factorial
+import Natural.power
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Integer.multiplication
+import Integer.embedding
+import Integer.order
+import Integer.natural_subtraction
+import Integer.ground_arithmetic
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.division
+import Rational.natural_division
+import Rational.ground_arithmetic
+
+-- ── ℕ: strict order, weak order, disequality ──────────────────────────
+
+theorem Test.natural_less : (4 : Natural) < 7 := done
+theorem Test.natural_less_or_equal : (4 : Natural) ≤ 7 := done
+theorem Test.natural_less_or_equal_at_equal : (7 : Natural) ≤ 7 := done
+theorem Test.natural_not_equal : (4 : Natural) ≠ 5 := done
+theorem Test.natural_not_equal_flipped : (5 : Natural) ≠ 4 := done
+
+-- Far beyond unary reduction: the comparison is one GMP call.
+theorem Test.natural_factorial_less : 10! < 11! := done
+theorem Test.natural_big_power_not_equal : 2 ^ 100 ≠ 2 ^ 100 + 1 := done
+
+-- ── ℤ: the honest-subtraction acceptance facts ────────────────────────
+
+-- The PLAN_FAST_NUMERALS Stage-3 acceptance: 4 − 5 is −1, by bare `done`
+-- (compare the hand-written boundary chain kept as a before/after exhibit
+-- in Test/honest_natural_arithmetic_test.math).
+theorem Test.four_minus_five : (4 : Natural) - (5 : Natural) = -(1 : Integer) := done
+
+theorem Test.integer_not_equal : (4 : Natural) - 5 ≠ (0 : Integer) := done
+theorem Test.integer_less : (4 : Natural) - 5 < (2 : Natural) - 1 := done
+theorem Test.integer_less_or_equal : -(3 : Integer) ≤ (2 : Integer) := done
+theorem Test.integer_compound
+        : ((2 : Integer) + 3) * (1 - (3 : Natural)) = -(10 : Integer) := done
+
+-- ── ℚ: equality, order, and the nonzero side conditions ───────────────
+
+-- Ground fractions compare exactly, whatever mixture of ℕ-division,
+-- ℚ-division, and casts spells them.
+theorem Test.rational_sixths : (1 : Natural) / 3 + (1 : Natural) / 6 = (1 : Rational) / 2 := done
+theorem Test.rational_less : (1 : Natural) / 3 < (1 : Natural) / 2 := done
+theorem Test.rational_less_or_equal_unreduced : (2 : Natural) / 4 ≤ (1 : Natural) / 2 := done
+theorem Test.rational_negative_less : -((1 : Natural) / 2) < (1 : Natural) / 3 := done
+theorem Test.rational_nonzero : (3 : Rational) ≠ Rational.zero := done
+
+-- `/` between two Integers: the denominator's nonzero side condition
+-- discharges silently on a ground denominator, and the value is pinned.
+definition Test.integer_ratio : Rational := (4 : Integer) / (3 : Integer)
+theorem Test.integer_ratio_value : (4 : Integer) / (3 : Integer) = (8 : Natural) / 6 := done
+
+-- `field` with no stated nonzeros: the ground denominator's
+-- `¬(t = Rational.zero)` is synthesized, not hypothesized. (Mixed ground
+-- denominators like x/2 + x/3 + x/6 = x still exceed the ℚ
+-- reciprocal-clearing itself — a pre-existing `field` limitation,
+-- independent of the nonzero side conditions.)
+theorem Test.field_without_nonzero_hypotheses (x : Rational) : x / 2 + x / 2 = x := field

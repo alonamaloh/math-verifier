@@ -1,0 +1,158 @@
+-- Integer/ground_arithmetic.math
+--
+-- The certificate spine for ground Integer arithmetic (PLAN_FAST_NUMERALS
+-- §D). A ground Integer term — casts, `from_difference` forms, and any
+-- mixture of `-`/`+`/`*` over them — normalizes to a canonical
+-- `from_difference(p, q)` of Natural literals by composing the
+-- `*_evaluates` lemmas below; ground relations between two canonical forms
+-- then discharge through the `ground_*` lemmas, whose premises are
+-- Natural-literal facts the kernel computes directly. The elaborator's
+-- ground-relation decision procedure emits these lemmas mechanically; they
+-- are equally citable by hand.
+
+module Integer.ground_arithmetic
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.subtraction
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
+import Integer.order
+import Integer.sign
+
+-- ── Evaluation: each arithmetic operation, at difference classes ──────
+
+-- (a − b) negated is (b − a).
+theorem Integer.negate_evaluates
+        (x : Integer) (a b : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        : -x = Integer.from_difference(b, a) :=
+  -x
+     = -Integer.from_difference(a, b)   by substituting xEquation
+     = Integer.from_difference(b, a)    by unfolding Integer
+
+-- (a − b) + (c − d) = (a + c) − (b + d).
+theorem Integer.add_evaluates
+        (x y : Integer) (a b c d : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (yEquation : y = Integer.from_difference(c, d))
+        : x + y = Integer.from_difference(a + c, b + d) :=
+  x + y
+     = Integer.from_difference(a, b) + y                               by substituting xEquation
+     = Integer.from_difference(a, b) + Integer.from_difference(c, d)   by substituting yEquation
+     = Integer.from_difference(a + c, b + d)                           by unfolding Integer
+
+-- (a − b) − (c − d) = (a + d) − (b + c).
+theorem Integer.subtract_evaluates
+        (x y : Integer) (a b c d : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (yEquation : y = Integer.from_difference(c, d))
+        : x - y = Integer.from_difference(a + d, b + c) := {
+  -y = Integer.from_difference(d, c) by Integer.negate_evaluates;
+  x + -y = Integer.from_difference(a + d, b + c) by Integer.add_evaluates;
+  done
+}
+
+-- (a − b) · (c − d) = (ac + bd) − (ad + bc).
+theorem Integer.multiply_evaluates
+        (x y : Integer) (a b c d : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (yEquation : y = Integer.from_difference(c, d))
+        : x * y = Integer.from_difference(a * c + b * d, a * d + b * c) :=
+  x * y
+     = Integer.from_difference(a, b) * y                               by substituting xEquation
+     = Integer.from_difference(a, b) * Integer.from_difference(c, d)   by substituting yEquation
+     = Integer.from_difference(a * c + b * d, a * d + b * c)           by unfolding Integer
+
+-- ── Relations between two canonical forms, by Natural cross-facts ─────
+
+-- a − b = c − d exactly when a + d = b + c.
+theorem Integer.ground_equal
+        (x y : Integer) (a b c d : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (yEquation : y = Integer.from_difference(c, d))
+        (crossEquation : a + d = b + c)
+        : x = y :=
+  x
+     = Integer.from_difference(a, b)
+     = Integer.from_difference(c, d)   by Integer.difference_equal
+     = y
+
+theorem Integer.ground_not_equal
+        (x y : Integer) (a b c d : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (yEquation : y = Integer.from_difference(c, d))
+        (crossDisequality : ¬(a + d = b + c))
+        : ¬(x = y) := {
+  suppose x = y as xEqualsY;
+  Integer.from_difference(a, b)
+     = x
+     = y
+     = Integer.from_difference(c, d);
+  a + d = b + c by Integer.difference_equal_implies;
+  done
+}
+
+-- a − b ≤ c − d exactly when a + d ≤ c + b.
+theorem Integer.ground_less_or_equal
+        (x y : Integer) (a b c d : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (yEquation : y = Integer.from_difference(c, d))
+        (crossInequality : a + d ≤ c + b)
+        : x ≤ y := {
+  choose gap such that c + b = (a + d) + gap from Natural.subtraction_witness;
+  (gap : Integer) = Integer.from_difference(gap, 0);
+  x + (gap : Integer) = Integer.from_difference(a + gap, b + 0) by Integer.add_evaluates;
+  c + (b + 0)
+     = c + b
+     = (a + d) + gap    by (c + b = (a + d) + gap)
+     = d + (a + gap);
+  Integer.from_difference(c, d) = Integer.from_difference(a + gap, b + 0) by Integer.difference_equal;
+  y
+     = Integer.from_difference(c, d)
+     = Integer.from_difference(a + gap, b + 0)
+     = x + (gap : Integer);
+  witness gap with done
+}
+
+-- a − b < c − d exactly when a + d < c + b.
+theorem Integer.ground_less_than
+        (x y : Integer) (a b c d : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (yEquation : y = Integer.from_difference(c, d))
+        (crossInequality : a + d < c + b)
+        : x < y := {
+  Integer.one = Integer.from_difference(1, 0);
+  x + Integer.one = Integer.from_difference(a + 1, b + 0) by Integer.add_evaluates;
+  (a + d) + 1 ≤ c + b by Natural.add_one_le_of_lt;
+  (a + 1) + (b + 0)
+     = (a + b) + 1;
+  (a + 1) + d
+     = (a + d) + 1
+     ≤ c + b            by ((a + d) + 1 ≤ c + b)
+     = c + (b + 0);
+  x + Integer.one ≤ y by Integer.ground_less_or_equal;
+  done
+}
+
+-- a − b is non-negative exactly when b ≤ a.
+theorem Integer.ground_is_nonneg
+        (x : Integer) (a b : Natural)
+        (xEquation : x = Integer.from_difference(a, b))
+        (componentInequality : b ≤ a)
+        : Integer.IsNonneg(x) := {
+  choose k such that a = b + k from Natural.subtraction_witness;
+  x
+     = Integer.from_difference(a, b)
+     = (k : Integer)    by Integer.from_subtraction_witness;
+  witness k with done
+}

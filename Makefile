@@ -28,6 +28,7 @@ SRCS := \
     src/elaborator/levels.cpp \
     src/elaborator/ring.cpp src/elaborator/group.cpp src/elaborator/calc.cpp \
     src/elaborator/prover.cpp src/elaborator/claim.cpp \
+    src/elaborator/ground_relations.cpp \
     src/elaborator/coercion.cpp src/elaborator/cast_normal.cpp \
     src/elaborator/diff_bridges.cpp \
     src/elaborator/warnings.cpp src/elaborator/lemma_index.cpp \

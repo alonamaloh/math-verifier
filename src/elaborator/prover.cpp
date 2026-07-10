@@ -2505,6 +2505,19 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
                 goalClosed, localBinders, line, transportBudget);
         }
 
+        // Ground-relation decision tier (PLAN_FAST_NUMERALS §D): a relation
+        // goal whose operands are all specific numbers is DECIDED — GMP
+        // computes the answer and a fixed ground_arithmetic lemma spine
+        // certifies it. First because it is the cheapest tactic here (name
+        // dispatch + literal reads; declines instantly on non-ground goals)
+        // and, when it applies, strictly better than searching.
+        {
+            ExpressionPointer attempt = runTactic("groundRelation",
+                [&] { return tryGroundRelationTier(
+                    goalClosed, localBinders); });
+            if (attempt) return attempt;
+        }
+
         // Experimental: a cheap, purely-syntactic congruence diff that runs
         // BEFORE the defeq-heavy equality battery. When it applies it closes
         // the goal without unfolding any definition (the battery's diff walk
@@ -2828,6 +2841,9 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             bucket.totalMicros += attempt.micros;
         };
 
+        runProfiled("groundRelation", [&] {
+            return tryGroundRelationTier(goalClosed, localBinders);
+        });
         runProfiled("equalityBattery", [&] {
             return tryAutoProveEqualityGoal(
                 goalClosed, localBinders, line);

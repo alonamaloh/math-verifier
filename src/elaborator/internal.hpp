@@ -1941,6 +1941,64 @@ private:
         const std::string& typeName,
         const std::vector<LocalBinder>& localBinders, int line);
 
+    // ---- Ground-relation decision tier (PLAN_FAST_NUMERALS §D;
+    //      implementations in ground_relations.cpp) ----
+    //
+    // A ground ℕ term WHNFs to a NaturalLiteral (or `zero` / a successor
+    // chain); ground ℤ/ℚ terms are operation trees over ground leaves,
+    // stuck at the opaque quotient. The tier recognizes a ground relation
+    // goal (`=` / `≠` / `≤` / `<` at ℕ/ℤ/ℚ, plus `Integer.IsNonneg`),
+    // decides it with GMP arithmetic, and emits a fixed spine of
+    // `ground_arithmetic` library lemmas whose leaf premises the kernel
+    // checks by literal computation. Every lemma is looked up by name and
+    // the tier declines silently when one is out of scope, so files that
+    // never import the ground_arithmetic modules are unaffected.
+    //
+    // Certificates carry OPENED terms/proofs (kernel-operation form); only
+    // the tier's entry point closes its final result.
+    struct GroundIntegerCertificate {
+        NaturalValue positivePart;   // value = positivePart − negativePart
+        NaturalValue negativePart;
+        ExpressionPointer proof;     // : term = from_difference(litP, litN)
+    };
+    struct GroundRationalCertificate {
+        NaturalValue numeratorPositive, numeratorNegative;
+        NaturalValue denominatorPositive, denominatorNegative;
+        ExpressionPointer numeratorTerm;    // the ground ℤ terms the
+        ExpressionPointer denominatorTerm;  // proof's fraction is stated with
+        ExpressionPointer denominatorNonzeroProof;
+        ExpressionPointer proof; // : term = fraction(numTerm, denTerm, nonzero)
+    };
+    std::optional<NaturalValue> tryGroundNaturalValue(
+        ExpressionPointer termOpened);
+    std::optional<GroundIntegerCertificate> tryGroundIntegerCertificate(
+        ExpressionPointer termOpened, int depth);
+    std::optional<GroundRationalCertificate> tryGroundRationalCertificate(
+        ExpressionPointer termOpened, int depth);
+    ExpressionPointer makeGroundNaturalLessThanProof(
+        const NaturalValue& smaller, const NaturalValue& larger);
+    ExpressionPointer makeGroundNaturalLessOrEqualProof(
+        const NaturalValue& smaller, const NaturalValue& larger);
+    ExpressionPointer makeGroundNaturalNotEqualProof(
+        const NaturalValue& left, const NaturalValue& right);
+    ExpressionPointer makeGroundIntegerEqualityProof(
+        ExpressionPointer leftOpened, ExpressionPointer rightOpened,
+        int depth);
+    ExpressionPointer makeGroundIntegerDisequalityProof(
+        ExpressionPointer leftOpened, ExpressionPointer rightOpened,
+        int depth);
+    ExpressionPointer makeGroundIntegerIsNonnegProof(
+        ExpressionPointer termOpened, int depth);
+    // Ground `¬(term = <carrier>.zero)` — the shape the `/` side condition
+    // and `field`'s nonzero hypotheses want. OPENED in, OPENED out; used by
+    // the tier's ≠ path and by `field`'s unmatched-denominator fallback.
+    ExpressionPointer trySynthesizeGroundNonzero(
+        ExpressionPointer termOpened, const std::string& carrierName);
+    // The tier's entry point (CLOSED in, CLOSED out, nullptr on decline).
+    ExpressionPointer tryGroundRelationTier(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders);
+
     // The tactic-dispatch body of autoProveClaim. Split out so the
     // outermost (budget-owning) frame can wrap it in a single try/catch
     // that enriches a raw AutoProverBudgetError with the goal + search

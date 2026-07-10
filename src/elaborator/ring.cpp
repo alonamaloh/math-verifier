@@ -6200,7 +6200,16 @@ ExpressionPointer Elaborator::unfoldFieldDivides(
         }
         if (applicationDepth == 3) {
             if (auto* headConstant = std::get_if<Constant>(&cursor->node)) {
-                if (headConstant->name == carrierName + ".divide") {
+                // Any `<X>.divide(a, b, _proof)` — the carrier's own, or a
+                // lower carrier's whose result lands here (`Natural.divide`
+                // and `Integer.divide` are ℚ-valued wrappers around
+                // `Rational.divide`, so a ground `1/3` unfolds through
+                // them to `cast · reciprocal(cast)` like any division).
+                const std::string& name = headConstant->name;
+                const std::string suffix = ".divide";
+                if (name.size() > suffix.size()
+                    && name.compare(name.size() - suffix.size(),
+                                    suffix.size(), suffix) == 0) {
                     ExpressionPointer unfolded =
                         unfoldHeadConstantOneStep(expression);
                     if (unfolded && !structurallyEqual(unfolded, expression)) {
@@ -6752,9 +6761,15 @@ ExpressionPointer Elaborator::elaborateField(
             pair.reciprocalHash = reciprocalAtom->hash;
             pairs.push_back(pair);
         }
-        // Check we matched all reciprocal_function arguments.
+        // Check we matched all reciprocal_function arguments. A ground
+        // denominator (a specific number) needs no hypothesis: the
+        // ground-relation tier synthesizes its `¬(t = zero)` directly
+        // (PLAN_FAST_NUMERALS §D), so `field` stays argument-free there.
         for (size_t i = 0; i < recipArgHashes.size(); ++i) {
-            if (!matchedArguments[i]) {
+            if (matchedArguments[i]) continue;
+            ExpressionPointer groundNonzero = trySynthesizeGroundNonzero(
+                recipArgKernels[i], carrierName);
+            if (!groundNonzero) {
                 throwElaborate(
                     "`field`: no nonzero hypothesis supplied for one "
                     "of the `reciprocal_function` arguments — pass a "
@@ -6763,6 +6778,21 @@ ExpressionPointer Elaborator::elaborateField(
                     "`reciprocal_function(t)` on either side of the "
                     "goal");
             }
+            ExpressionPointer baseAtom = recipArgKernels[i];
+            ExpressionPointer reciprocalAtom = makeApplication(
+                makeConstant(reciprocalFunctionName), baseAtom);
+            ExpressionPointer multipliesProof = makeConstant(
+                reciprocalMultipliesName);
+            multipliesProof = makeApplication(multipliesProof, baseAtom);
+            multipliesProof = makeApplication(multipliesProof, groundNonzero);
+            FieldReciprocalPair pair;
+            pair.baseAtom = baseAtom;
+            pair.reciprocalAtom = reciprocalAtom;
+            pair.multipliesProof = multipliesProof;
+            pair.nonzeroProof = groundNonzero;
+            pair.baseHash = recipArgHashes[i];
+            pair.reciprocalHash = reciprocalAtom->hash;
+            pairs.push_back(pair);
         }
         } else if (hasPartialReciprocal) {
             // Partial reciprocal: the nonzero proof rides on each
