@@ -35,7 +35,7 @@ import Polynomial.instances
 
 theorem Natural.monus_add_cancel_left
         : ∀ (a b : Natural). Natural.monus(a + b, a) = b
-  | zero, b => Natural.monus_zero(b)
+  | zero, b => { done by Natural.monus_zero }
   | successor(predecessor), b =>
       Natural.monus(successor(predecessor) + b, successor(predecessor))
          = Natural.monus(predecessor + b, predecessor)
@@ -52,7 +52,7 @@ theorem Natural.monus_add_involution (i d : Natural)
 
 theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
         : Natural.monus(k, Natural.monus(k, i)) = i := {
-  choose d such that k = i + d as decomposition from Natural.subtraction_witness(i, k, h);
+  choose d such that k = i + d as decomposition from Natural.subtraction_witness;
   -- rewrite k throughout, then it's the monus/add involution.
   Natural.monus(k, Natural.monus(k, i))
      = Natural.monus(i + d, Natural.monus(i + d, i))   by substituting decomposition
@@ -68,7 +68,7 @@ theorem Ring.Sum.extensional_range (r : Ring)
   | zero => (h : ∀ (i : Natural). i ≤ 0 → f(i) = g(i)) ↦
       Ring.Sum(r, f, 0)
          = f(0)
-         = g(0)               by h(0, Natural.LessOrEqual.reflexive(0))
+         = g(0)               by h(0, Natural.LessOrEqual.reflexive)
          = Ring.Sum(r, g, 0)
   | successor(k) => (h : ∀ (i : Natural). i ≤ successor(k) → f(i) = g(i)) ↦
       Ring.Sum(r, f, successor(k))
@@ -80,7 +80,7 @@ theorem Ring.Sum.extensional_range (r : Ring)
                                  ≤ k             by smaller
                                  ≤ successor(k)  by Natural.le_successor }))
          = (Ring.Sum(r, g, k) + g(successor(k)))
-             by h(successor(k), Natural.LessOrEqual.reflexive(successor(k)))
+             by h(successor(k), Natural.LessOrEqual.reflexive)
          = Ring.Sum(r, g, successor(k))
 
 -- Register the range-restricted variant too: a `Sum(r,f,n) = Sum(r,g,n)`
@@ -130,8 +130,7 @@ theorem Ring.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
                     (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))), k))
                by substituting tailReindex
            = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(successor(k), i)), successor(k))
-               by Ring.Sum.shift(r,
-                      (i : Natural) ↦ f(Natural.monus(successor(k), i)), k)
+               by Ring.Sum.shift
   }
   }
 
@@ -164,17 +163,19 @@ theorem Polynomial.Coefficients.multiply_commutative (r : Ring)
                                by ringCommutative(Polynomial.coefficient(p, Natural.monus(k, i)),
                                       Polynomial.coefficient(q, i)))
          = Polynomial.coefficient(Polynomial.Coefficients.multiply(r, q, p), k)
-               by Polynomial.nth_multiply(r, q, p, k)
+               by Polynomial.nth_multiply
 
 theorem Polynomial.multiply_commutative (r : Ring)
         (ringCommutative : ∀ (x y : Ring.carrier(r)). (x * y) = (y * x))
         (x y : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : (x * y) = (y * x) :=
-  by_representatives x as p, y as q =>
-      Polynomial.make_equal_of_coefficients_equal(r,
+  by_representatives x as p, y as q => {
+      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
           Polynomial.Coefficients.multiply(r, p, q),
-          Polynomial.Coefficients.multiply(r, q, p),
-          Polynomial.Coefficients.multiply_commutative(r, ringCommutative, p, q))
+          Polynomial.Coefficients.multiply(r, q, p))
+              by Polynomial.Coefficients.multiply_commutative as coefficientsCommute;
+      done by Polynomial.make_equal_of_coefficients_equal(equal := coefficientsCommute)
+  }
 
 -- The polynomial ring over a commutative ring is commutative.
 theorem Polynomial.is_commutative_ring (r : Ring)
@@ -182,4 +183,12 @@ theorem Polynomial.is_commutative_ring (r : Ring)
         : IsCommutativeRing(Polynomial(Ring.carrier(r), Ring.zero(r)),
               Polynomial.add, Polynomial.zero(r), Polynomial.negate,
               Polynomial.multiply, Polynomial.one(r)) :=
-    ⟨Polynomial.is_ring(r), Polynomial.multiply_commutative(r, ringCommutative)⟩
+  {
+      IsRing(Polynomial(Ring.carrier(r), Ring.zero(r)),
+             Polynomial.add, Polynomial.zero(r), Polynomial.negate,
+             Polynomial.multiply, Polynomial.one(r))
+          by Polynomial.is_ring;
+      (∀ (x y : Polynomial(Ring.carrier(r), Ring.zero(r))). (x * y) = (y * x))
+          by Polynomial.multiply_commutative;
+      done
+  }

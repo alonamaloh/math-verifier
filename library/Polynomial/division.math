@@ -84,8 +84,7 @@ theorem Polynomial.exists_degree_bound (r : Ring)
         (i : Natural)
                  (lengthLessOrEqual
                      : Polynomial.Coefficients.length(Ring.carrier(r), coefficients) ≤ i) ↦
-            Polynomial.coefficient_vanishes_beyond_length(r, coefficients, i,
-                lengthLessOrEqual) }
+            done by Polynomial.coefficient_vanishes_beyond_length }
 
 -- ----------------------------------------------------------------------
 -- The division step, run as an induction on the excess `e` of the bound
@@ -116,7 +115,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
          { dividend
              = (Polynomial.zero(r) + dividend)
              = ((Polynomial.zero(r) * f) + dividend) },
-         { degreeF + 0 = degreeF by Natural.add_zero(degreeF);
+         { degreeF + 0 = degreeF by Natural.add_zero;
            Polynomial.DegreeLessThan(r, dividend, degreeF) }⟩
       }
     case successor(ePredecessor):
@@ -124,7 +123,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
                (dividendBound
                    : Polynomial.DegreeLessThan(r, dividend, degreeF + successor(ePredecessor))) ↦ {
         degreeF + successor(ePredecessor) = successor(degreeF + ePredecessor)
-            by Natural.add_successor(degreeF, ePredecessor);
+            by Natural.add_successor;
         Polynomial.DegreeLessThan(r, dividend, successor(degreeF + ePredecessor))
             as dividendBoundSuccessor;
         let leadingCoefficient : Ring.carrier(r) :=
@@ -164,19 +163,18 @@ theorem Polynomial.divide_by_excess (r : Ring)
                          = Polynomial.coefficientOf(dividend, i)
                   otherwise as indexNotTop: {
                       successor(degreeF + ePredecessor) ≤ i
-                          by Natural.less_or_equal_not_equal_successor(
-                                 degreeF + ePredecessor, i, topLessOrEqual, indexNotTop)
+                          by Natural.less_or_equal_not_equal_successor
                           as successorLessOrEqual;
                       ePredecessor
                           ≤ degreeF + ePredecessor   by Natural.less_or_equal_add_left
                           ≤ i                          by Natural.less_or_equal_predecessor_less_or_equal;
+                      successor(degreeF) ≤ Natural.monus(i, ePredecessor)
+                          by Natural.degree_bound_helper as monusAboveDegree;
                       Polynomial.coefficientOf(stepProduct, i)
                                 = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, Natural.monus(i, ePredecessor)))
                                       by Polynomial.coefficientOf_monomial_multiply
                                 = ((leadingCoefficient * leadingInverseValue) * Ring.zero(r))
-                                      by fDegreeBound(Natural.monus(i, ePredecessor),
-                                             Natural.degree_bound_helper(degreeF, ePredecessor, i,
-                                                 successorLessOrEqual))
+                                      by fDegreeBound(Natural.monus(i, ePredecessor), monusAboveDegree)
                                 = Ring.zero(r);
                       Polynomial.coefficientOf(stepProduct, i)
                          = Ring.zero(r)
@@ -216,8 +214,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
             = (stepProduct + ((quotientRest * f) + remainderRest))
             = ((stepProduct + (quotientRest * f)) + remainderRest)
             = (((quotientStep + quotientRest) * f) + remainderRest)
-                  by Polynomial.multiply_distributivity_right(r,
-                         quotientStep, quotientRest, f) },
+                  by Polynomial.multiply_distributivity_right },
          remainderRestBound⟩
       }
   }
@@ -241,12 +238,11 @@ theorem Polynomial.division_with_remainder (r : Ring)
             ∧ Polynomial.DegreeLessThan(r, remainder, degreeF) := {
   choose leadingInverseValue such that
       (Polynomial.coefficientOf(f, degreeF) * leadingInverseValue) = Ring.one(r)
-      as leadingInverseEquation
       from leadingInverse;
-  choose bound such that Polynomial.DegreeLessThan(r, g, bound) as gBound
-      from Polynomial.exists_degree_bound(r, g);
-  Polynomial.divide_by_excess(r, commutativity, f, degreeF, fDegreeBound,
-      leadingInverseValue, leadingInverseEquation, bound, g,
-      Polynomial.DegreeLessThan.weaken(r, g, bound, degreeF + bound,
-          Natural.less_or_equal_add_left(bound, degreeF), gBound))
+  choose bound such that Polynomial.DegreeLessThan(r, g, bound)
+      from Polynomial.exists_degree_bound;
+  bound ≤ degreeF + bound by Natural.less_or_equal_add_left;
+  Polynomial.DegreeLessThan(r, g, degreeF + bound)
+      by Polynomial.DegreeLessThan.weaken(n := bound);
+  done by Polynomial.divide_by_excess(e := bound)
 }
