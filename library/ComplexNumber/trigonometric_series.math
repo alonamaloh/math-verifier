@@ -89,7 +89,7 @@ theorem ComplexNumber.realPart_from_real_multiply (r : Real) (w : ComplexNumber)
      = r * ComplexNumber.realPart(w)
        - ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
              * ComplexNumber.imaginaryPart(w)
-           by ComplexNumber.realPart_from_real(r)
+           by ComplexNumber.realPart_from_real
      = r * ComplexNumber.realPart(w) - Real.zero * ComplexNumber.imaginaryPart(w)
      = r * ComplexNumber.realPart(w)
            by ring
@@ -104,7 +104,7 @@ theorem ComplexNumber.imaginaryPart_from_real_multiply (r : Real) (w : ComplexNu
      = r * ComplexNumber.imaginaryPart(w)
        + ComplexNumber.imaginaryPart(ComplexNumber.from_real(r))
              * ComplexNumber.realPart(w)
-           by ComplexNumber.realPart_from_real(r)
+           by ComplexNumber.realPart_from_real
      = r * ComplexNumber.imaginaryPart(w) + Real.zero * ComplexNumber.realPart(w)
      = r * ComplexNumber.imaginaryPart(w)
            by ring
@@ -124,9 +124,7 @@ theorem ComplexNumber.realPart_exponentialTerm_imaginaryAxis (x : Real) (k : Nat
           = Real.exponentialCoefficient(k)
             * ComplexNumber.realPart(
                   (ComplexNumber.i * ComplexNumber.from_real(x)) ^ k) :=
-  ComplexNumber.realPart_from_real_multiply(
-      Real.exponentialCoefficient(k),
-      (ComplexNumber.i * ComplexNumber.from_real(x)) ^ k)
+  by ComplexNumber.realPart_from_real_multiply
 
 theorem ComplexNumber.imaginaryPart_exponentialTerm_imaginaryAxis (x : Real) (k : Natural)
         : ComplexNumber.imaginaryPart(
@@ -135,9 +133,7 @@ theorem ComplexNumber.imaginaryPart_exponentialTerm_imaginaryAxis (x : Real) (k 
           = Real.exponentialCoefficient(k)
             * ComplexNumber.imaginaryPart(
                   (ComplexNumber.i * ComplexNumber.from_real(x)) ^ k) :=
-  ComplexNumber.imaginaryPart_from_real_multiply(
-      Real.exponentialCoefficient(k),
-      (ComplexNumber.i * ComplexNumber.from_real(x)) ^ k)
+  by ComplexNumber.imaginaryPart_from_real_multiply
 
 -- ----------------------------------------------------------------------
 -- The even/odd evaluations, from the i-power 4-cycle.
@@ -160,7 +156,7 @@ theorem Real.cosine_term_even (x : Real) (m : Natural)
     ∧ ComplexNumber.imaginaryPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ successor(2 * m))
       = x * (-(x * x)) ^ m
-      by ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+      by ComplexNumber.imaginaryAxis_power_coordinates;
   ComplexNumber.realPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ (2 * m))
       = (-(x * x)) ^ m as evenReal;
@@ -192,7 +188,7 @@ theorem Real.cosine_term_odd (x : Real) (m : Natural)
     ∧ ComplexNumber.imaginaryPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ successor(2 * m))
       = x * (-(x * x)) ^ m
-      by ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+      by ComplexNumber.imaginaryAxis_power_coordinates;
   ComplexNumber.realPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ successor(2 * m))
       = Real.zero as oddReal;
@@ -226,7 +222,7 @@ theorem Real.sine_term_even (x : Real) (m : Natural)
     ∧ ComplexNumber.imaginaryPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ successor(2 * m))
       = x * (-(x * x)) ^ m
-      by ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+      by ComplexNumber.imaginaryAxis_power_coordinates;
   ComplexNumber.imaginaryPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ (2 * m))
       = Real.zero as evenImaginary;
@@ -260,7 +256,7 @@ theorem Real.sine_term_odd (x : Real) (m : Natural)
     ∧ ComplexNumber.imaginaryPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ successor(2 * m))
       = x * (-(x * x)) ^ m
-      by ComplexNumber.imaginaryAxis_power_coordinates(x, m);
+      by ComplexNumber.imaginaryAxis_power_coordinates;
   ComplexNumber.imaginaryPart(
           (ComplexNumber.i * ComplexNumber.from_real(x)) ^ successor(2 * m))
       = x * (-(x * x)) ^ m as oddImaginary;
@@ -292,8 +288,7 @@ theorem Real.cosine_series_converges (x : Real)
           ComplexNumber.exponentialTerm(
               ComplexNumber.i * ComplexNumber.from_real(x))),
       ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)))
-      by ComplexNumber.exponential_converges(
-             ComplexNumber.i * ComplexNumber.from_real(x)) as complexConverges;
+      by ComplexNumber.exponential_converges;
   Real.SequenceConverges(
       (n : Natural) ↦
           ComplexNumber.realPart(
@@ -305,11 +300,9 @@ theorem Real.cosine_series_converges (x : Real)
           ComplexNumber.exponential(
               ComplexNumber.i * ComplexNumber.from_real(x))))
       by ComplexNumber.SequenceConverges.realPart(
-             ComplexNumber.partialSum(
-                 ComplexNumber.exponentialTerm(
-                     ComplexNumber.i * ComplexNumber.from_real(x))),
-             ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)),
-             complexConverges) as realPartConverges;
+             s := ComplexNumber.partialSum(
+                      ComplexNumber.exponentialTerm(
+                          ComplexNumber.i * ComplexNumber.from_real(x))));
   ∀ (n : Natural).
       ComplexNumber.realPart(
             ComplexNumber.partialSum(
@@ -322,11 +315,7 @@ theorem Real.cosine_series_converges (x : Real)
                       ComplexNumber.exponentialTerm(
                           ComplexNumber.i * ComplexNumber.from_real(x), k)),
               n)
-      by (n : Natural) ↦
-           ComplexNumber.realPart_partialSum(
-               ComplexNumber.exponentialTerm(
-                   ComplexNumber.i * ComplexNumber.from_real(x)),
-               n) as pointwise;
+      by ComplexNumber.realPart_partialSum;
   -- cos x is exactly Re(exp(ix)) by definition.
   Real.SequenceConverges(
       Real.partialSum(
@@ -338,21 +327,17 @@ theorem Real.cosine_series_converges (x : Real)
           ComplexNumber.exponential(
               ComplexNumber.i * ComplexNumber.from_real(x))))
       by Real.SequenceConverges.of_pointwise(
-             (n : Natural) ↦
-                 ComplexNumber.realPart(
-                     ComplexNumber.partialSum(
-                         ComplexNumber.exponentialTerm(
-                             ComplexNumber.i * ComplexNumber.from_real(x)),
-                         n)),
-             Real.partialSum(
-                 (k : Natural) ↦
-                     ComplexNumber.realPart(
-                         ComplexNumber.exponentialTerm(
-                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
-             ComplexNumber.realPart(
-                 ComplexNumber.exponential(
-                     ComplexNumber.i * ComplexNumber.from_real(x))),
-             pointwise, realPartConverges);
+             s := (n : Natural) ↦
+                      ComplexNumber.realPart(
+                          ComplexNumber.partialSum(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x)),
+                              n)),
+             t := Real.partialSum(
+                      (k : Natural) ↦
+                          ComplexNumber.realPart(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x), k))));
   done
 }
 
@@ -369,8 +354,7 @@ theorem Real.sine_series_converges (x : Real)
           ComplexNumber.exponentialTerm(
               ComplexNumber.i * ComplexNumber.from_real(x))),
       ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)))
-      by ComplexNumber.exponential_converges(
-             ComplexNumber.i * ComplexNumber.from_real(x)) as complexConverges;
+      by ComplexNumber.exponential_converges;
   Real.SequenceConverges(
       (n : Natural) ↦
           ComplexNumber.imaginaryPart(
@@ -382,11 +366,9 @@ theorem Real.sine_series_converges (x : Real)
           ComplexNumber.exponential(
               ComplexNumber.i * ComplexNumber.from_real(x))))
       by ComplexNumber.SequenceConverges.imaginaryPart(
-             ComplexNumber.partialSum(
-                 ComplexNumber.exponentialTerm(
-                     ComplexNumber.i * ComplexNumber.from_real(x))),
-             ComplexNumber.exponential(ComplexNumber.i * ComplexNumber.from_real(x)),
-             complexConverges) as imaginaryPartConverges;
+             s := ComplexNumber.partialSum(
+                      ComplexNumber.exponentialTerm(
+                          ComplexNumber.i * ComplexNumber.from_real(x))));
   ∀ (n : Natural).
       ComplexNumber.imaginaryPart(
             ComplexNumber.partialSum(
@@ -399,11 +381,7 @@ theorem Real.sine_series_converges (x : Real)
                       ComplexNumber.exponentialTerm(
                           ComplexNumber.i * ComplexNumber.from_real(x), k)),
               n)
-      by (n : Natural) ↦
-           ComplexNumber.imaginaryPart_partialSum(
-               ComplexNumber.exponentialTerm(
-                   ComplexNumber.i * ComplexNumber.from_real(x)),
-               n) as pointwise;
+      by ComplexNumber.imaginaryPart_partialSum;
   Real.SequenceConverges(
       Real.partialSum(
           (k : Natural) ↦
@@ -414,20 +392,16 @@ theorem Real.sine_series_converges (x : Real)
           ComplexNumber.exponential(
               ComplexNumber.i * ComplexNumber.from_real(x))))
       by Real.SequenceConverges.of_pointwise(
-             (n : Natural) ↦
-                 ComplexNumber.imaginaryPart(
-                     ComplexNumber.partialSum(
-                         ComplexNumber.exponentialTerm(
-                             ComplexNumber.i * ComplexNumber.from_real(x)),
-                         n)),
-             Real.partialSum(
-                 (k : Natural) ↦
-                     ComplexNumber.imaginaryPart(
-                         ComplexNumber.exponentialTerm(
-                             ComplexNumber.i * ComplexNumber.from_real(x), k))),
-             ComplexNumber.imaginaryPart(
-                 ComplexNumber.exponential(
-                     ComplexNumber.i * ComplexNumber.from_real(x))),
-             pointwise, imaginaryPartConverges);
+             s := (n : Natural) ↦
+                      ComplexNumber.imaginaryPart(
+                          ComplexNumber.partialSum(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x)),
+                              n)),
+             t := Real.partialSum(
+                      (k : Natural) ↦
+                          ComplexNumber.imaginaryPart(
+                              ComplexNumber.exponentialTerm(
+                                  ComplexNumber.i * ComplexNumber.from_real(x), k))));
   done
 }
