@@ -56,7 +56,7 @@ leak dashboard that measures everything *outside* the layer is
   them in user space is what makes that leak measurable.
 
 - **Files with an `opaque definition` and its characterizing lemmas**
-  (`Real/order.math`, `Real/supremum.math`, `Natural/divide.math`, …). The
+  (`Real/order.math`, `Real/supremum.math`, `Natural/floor_divide.math`, …). The
   plan lists "opaque characterizing-lemma files" as candidates, but these
   files are *mixed*: a little legitimate `unfold` at the opacity boundary,
   surrounded by ordinary order theory. The foundational concept here is

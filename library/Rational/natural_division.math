@@ -1,0 +1,45 @@
+-- Rational/natural_division.math
+--
+-- Honest division on Natural: the result lives in the smallest closure
+-- where division by a nonzero denominator is total — the rationals. The
+-- nonzero side condition is a trailing hypothesis discharged at the use
+-- site, exactly like every other `/` in the tower. (`Natural.floor_divide`
+-- remains the ℕ-valued quotient-with-remainder.)
+
+module Rational.natural_division
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.embedding
+import Integer.sign
+import Rational.basics
+import Rational.embedding
+import Rational.multiplication
+import Rational.reciprocal_function
+import Rational.archimedean
+import Rational.division
+
+-- ℕ→ℚ preserves nonzero-ness: the cast of a nonzero natural is a nonzero
+-- rational (both embeddings are injective). `automatic` so the `/` side
+-- condition below — and every later `n / m` with `m ≠ 0` in scope —
+-- discharges without ceremony.
+automatic theorem Rational.from_natural.nonzero_preserves
+        (n : Natural) (nNonzero : n ≠ 0)
+        : (n : Rational) ≠ Rational.zero := {
+  suppose (n : Rational) = Rational.zero for contradiction {
+    (n : Integer) = Integer.zero by Integer.to_rational.injective;
+    n = 0 by Natural.to_integer.injective;
+    done
+  }
+}
+
+definition Natural.divide
+        (a b : Natural) (denominatorNonzero : b ≠ 0)
+        : Rational :=
+  (a : Rational) / (b : Rational)
+
+operator (/) on (Natural, Natural) := Natural.divide

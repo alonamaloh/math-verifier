@@ -21,7 +21,7 @@ import Natural.basics
 import Natural.order
 import Natural.arithmetic
 import Natural.add_order
-import Natural.divide
+import Natural.floor_divide
 import Natural.compare
 import Natural.strong_recursion
 import Natural.multiply_bounds
@@ -86,25 +86,25 @@ theorem NaturalsBelow.product_index_bound (m n i j : Natural)
 -- itself. (n is the divisor, so it must be positive.)
 theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
         (oneLeN : 1 ≤ n) (belowProduct : k < m * n)
-        : Natural.divide(n, k) < m := {
+        : Natural.floor_divide(n, k) < m := {
   successor(k) ≤ m * n;
-  n * Natural.divide(n, k) + Natural.modulo(n, k) = k;
-  n * Natural.divide(n, k)
-      ≤ n * Natural.divide(n, k) + Natural.modulo(n, k)
+  n * Natural.floor_divide(n, k) + Natural.modulo(n, k) = k;
+  n * Natural.floor_divide(n, k)
+      ≤ n * Natural.floor_divide(n, k) + Natural.modulo(n, k)
       = k;
-  successor(n * Natural.divide(n, k))
+  successor(n * Natural.floor_divide(n, k))
       ≤ successor(k)
       ≤ m * n
       = n * m;
-  cases Natural.compare_strict(Natural.divide(n, k), m) {
+  cases Natural.compare_strict(Natural.floor_divide(n, k), m) {
     | Natural.StrictComparison.below(strictlyBelow) =>
         { done by Natural.lt_of_successor_le }
     | Natural.StrictComparison.atLeast(atLeast) => {
         -- m ≤ q forces n·m ≤ n·q, so successor(n·q) ≤ n·m ≤ n·q: impossible.
-        successor(n * Natural.divide(n, k))
+        successor(n * Natural.floor_divide(n, k))
             ≤ n * m
-            ≤ n * Natural.divide(n, k)   as selfBelow;
-        absurd(Natural.not_successor_less_or_equal_self(n * Natural.divide(n, k), selfBelow))
+            ≤ n * Natural.floor_divide(n, k)   as selfBelow;
+        absurd(Natural.not_successor_less_or_equal_self(n * Natural.floor_divide(n, k), selfBelow))
       }
   }
 }
@@ -126,7 +126,7 @@ definition NaturalsBelow.product_into (m n : Natural) (oneLeN : 1 ≤ n)
 definition NaturalsBelow.product_out_of (m n : Natural) (oneLeN : 1 ≤ n)
         : NaturalsBelow(m * n) → Pair(NaturalsBelow(m), NaturalsBelow(n)) :=
   (k : NaturalsBelow(m * n)) ↦
-    Product.make(NaturalsBelow.make(Natural.divide(n, NaturalsBelow.value(k)),
+    Product.make(NaturalsBelow.make(Natural.floor_divide(n, NaturalsBelow.value(k)),
             NaturalsBelow.product_quotient_bound(m, n, NaturalsBelow.value(k), oneLeN, NaturalsBelow.below(k))),
         NaturalsBelow.make(Natural.modulo(n, NaturalsBelow.value(k)),
             Natural.lt_of_successor_le(Natural.modulo(n, NaturalsBelow.value(k)), n,
@@ -152,15 +152,15 @@ theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : 1 ≤ n)
         successor(Natural.modulo(n, index)) ≤ n by Natural.modulo_bound as remainderBelowN;
         successor(NaturalsBelow.value(second)) ≤ n as secondBelowN;
         -- Dividing the index by n recovers quotient i and remainder j.
-        n * Natural.divide(n, index) + Natural.modulo(n, index) = index as decompose;
-        Natural.divide(n, index) = NaturalsBelow.value(first)
+        n * Natural.floor_divide(n, index) + Natural.modulo(n, index) = index as decompose;
+        Natural.floor_divide(n, index) = NaturalsBelow.value(first)
             by Natural.quotient_remainder_unique(n,
-                   Natural.divide(n, index), Natural.modulo(n, index),
+                   Natural.floor_divide(n, index), Natural.modulo(n, index),
                    NaturalsBelow.value(first), NaturalsBelow.value(second),
                    remainderBelowN, secondBelowN, decompose);
         Natural.modulo(n, index) = NaturalsBelow.value(second) by Natural.remainder_unique;
         let recoveredFirst : NaturalsBelow(m) :=
-            NaturalsBelow.make(Natural.divide(n, index),
+            NaturalsBelow.make(Natural.floor_divide(n, index),
                 NaturalsBelow.product_quotient_bound(m, n, index, oneLeN, indexBound));
         let recoveredSecond : NaturalsBelow(n) :=
             NaturalsBelow.make(Natural.modulo(n, index),
@@ -178,8 +178,8 @@ theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : 1 ≤ n)
 theorem NaturalsBelow.product_round_trip_right (m n : Natural) (oneLeN : 1 ≤ n)
         (k : NaturalsBelow(m * n))
         : NaturalsBelow.product_into(m, n, oneLeN, NaturalsBelow.product_out_of(m, n, oneLeN, k)) = k := {
-  n * Natural.divide(n, NaturalsBelow.value(k)) + Natural.modulo(n, NaturalsBelow.value(k))
-      = NaturalsBelow.value(k) by Natural.divide_modulo_decompose;
+  n * Natural.floor_divide(n, NaturalsBelow.value(k)) + Natural.modulo(n, NaturalsBelow.value(k))
+      = NaturalsBelow.value(k) by Natural.floor_divide_modulo_decompose;
   done
 }
 

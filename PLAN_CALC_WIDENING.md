@@ -8,7 +8,7 @@ Status ledger below is authoritative — read/update it each session.
 
 | Stage | Workstream | Status | Record |
 |-------|------------|--------|--------|
-| 0 | Honest `-`/`/` operators + `_preserves` prereqs | **not started** | §A operator defs (ℕ`-`→ℤ, ℕ`/`→ℚ, unary `-`→ℤ) in their own file; §B complete the missing `<coercionFn>.{LessOrEqual,LessThan}_preserves` slots (audit-driven). No calc changes. |
+| 0 | Honest `-`/`/` operators + `_preserves` prereqs | **DONE** (2026-07-10) | §A landed: `Integer/natural_subtraction.math` (ℕ`-`→ℤ + unary `-`→ℤ + the `subtract_from_difference` boundary lemma), `Rational/natural_division.math` (ℕ`/`→ℚ + `Rational.from_natural.nonzero_preserves`); the old floor division was renamed `Natural.floor_divide` to free the honest name. §B was already complete (ℕ→ℤ `_preserves` landed earlier; `make audit-coercions` clean on all three edges). Tests: `Test/honest_natural_arithmetic_test.math`. Unary `+` skipped (low value, per plan). |
 | 1 | Carrier-raising `calc` fold | **not started** | §C: make the fold carrier a running max — raise it (lift the accumulator proof via `_preserves`/congruence) when a step needs a higher tower type. Delivers widening chains. |
 | 2 | Data-driven relation registry + `∈`/preorder unification | **deferred** | §D: replace the hard-coded composition branch + merge `elaborateCalcPreorder` + add `∈` into one fold + two tables. The "small language" endgame. A separate, later session. |
 

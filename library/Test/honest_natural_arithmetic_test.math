@@ -1,0 +1,55 @@
+module Test.honest_natural_arithmetic_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.ring
+import Integer.negation
+import Integer.embedding
+import Integer.sign
+import Integer.natural_subtraction
+import Rational.basics
+import Rational.embedding
+import Rational.multiplication
+import Rational.reciprocal_function
+import Rational.division
+import Rational.natural_division
+
+-- Honest arithmetic on ℕ (PLAN_CALC_WIDENING Stage 0): `-` and `/` between
+-- naturals return their result in the smallest closure where the operation
+-- is total — ℤ and ℚ. Each definition elaborates only if the operator
+-- dispatches and (for `/`) the nonzero side condition discharges; the
+-- theorems pin the values.
+
+-- `-` on naturals lands in ℤ, with no truncation.
+definition difference (a b : Natural) : Integer := a - b
+
+-- ...and is definitionally the subtraction of the casts.
+theorem difference_of_casts (a b : Natural) : a - b = (a : Integer) - (b : Integer) :=
+  done
+
+-- 4 − 5 is genuinely −1, not the truncated 0.
+theorem four_minus_five : (4 : Natural) - (5 : Natural) = -(1 : Integer) :=
+  (4 : Natural) - (5 : Natural)
+     = Integer.from_difference(4, 5)
+     = -(1 : Integer)   by Integer.from_reverse_subtraction_witness(k := 1)
+
+-- Unary minus on a natural lands in ℤ.
+definition negated (n : Natural) : Integer := -n
+
+theorem negate_cancels (n : Natural) : -n + (n : Integer) = (0 : Integer) :=
+  done by Integer.add_negate_left
+
+-- `/` on naturals lands in ℚ; the side condition discharges on a numeral
+-- denominator...
+definition half : Rational := (1 : Natural) / (2 : Natural)
+
+theorem half_value : (1 : Natural) / (2 : Natural) = (1 : Rational) / (2 : Rational) :=
+  done
+
+-- ...and on a variable denominator whose nonzero-ness is in scope.
+definition ratio (a b : Natural) (bNonzero : b ≠ 0) : Rational := a / b
