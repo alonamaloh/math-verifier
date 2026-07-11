@@ -23,11 +23,31 @@ session.
 | 4 | `ring`/`field` coefficients on mpz | **DONE** (2026-07-10) | §E landed: `RingPolynomial` coefficients are `mpz_class` and the canonical monomial renders its coefficient as ONE embedded literal (`2 · (x · y)` — the coercion tower over a literal node at ℤ/ℚ/ℝ, the bare node at ℕ), replacing the |coef|-unit-monomial expansion. Like terms COMBINE (new — the old form only sorted/cancelled): distributivity_right pulls `a·m + b·m` to `(a+b)·m` and a fixed `add_preserves`/`multiply_preserves` spine (one step per chain level, ground ℕ arithmetic absorbed by the kernel table) settles the coefficient; the same machinery folds coefficient products in monomial merges. proveAddMerge/proveMultiplyMerge route through a new group-fold sum merger (`proveLiteralMonomialSumEqualsCanonical`); the ~270-line sum-of-ones push-through provers are deleted. Carriers WITHOUT the preserves lemmas in scope (bundled rings, RingModulo, or a file that doesn't import the embeddings) keep the historical unit-expansion form — `context.useLiteralCoefficients` decides once, in populateRingEmbeddingChain. `field`: the ±1 coefficient guards are gone on literal carriers, contraction lifts through the `E(c)·` wrap, and cofactor/clearing arithmetic is mpz. Two root-cause fixes surfaced: (i) **kernel** — the accelerated-op table now dispatches on the RAW spine head BEFORE head reduction (a transparent `Natural.multiply` previously δ-unfolded past the table and ground `1000·1000` defeq FAILED; only opaque `Natural.add` ever hit it — `1000000·1000000 = 10¹²` and `20! = 2432902008176640000` now close by bare reflexivity); (ii) an uncaught `std::stoi` in dispatch.cpp's numeral-at-carrier ascription probe crashed on `(10¹² : T)`. Plus NEW `Rational.equal_of_multiply_left` (division.math), which was the ℚ mixed-denominator gap: `x/2 + x/3 + x/6 = x := field` at ℚ now closes with NO hypotheses (the Stage-3 residual is CLOSED; the deferred symbolic-coefficient rewrite is moot). Acceptance in `Test/ring_coefficient_test.math` (10¹²-scale and past-2³¹ combines, coefficient products, cross-term squares, ℚ mixed denominators). Full re-verify 19.6s (no regression). |
 | 5 | Native ℤ/ℚ literal values | **deferred — likely unnecessary** | Stage-3 certificates are fixed-size lemma spines checked at GMP speed (full re-verify unchanged at 21s); revisit only if a profile ever shows them hot. |
 
-Queued follow-up (not started): pick a central re-export point for
-`Integer/Rational.ground_arithmetic` (e.g. `Real.interface`) and run the
-scaffolding-deletion sweep the AGM exhibit (`3f8d1937`) demonstrated —
-per-numeral automatic lemmas, `decide`-based ground checks, hand-written
-boundary chains.
+Queued follow-up — **DONE 2026-07-11** (e117e61d + b4ae97b1): the plan is
+fully closed out.
+- **Re-export point = `Real.interface`**: the two ground_arithmetic
+  modules joined its imports, and the interface's transitive
+  interface-cache pull makes the tier ambient for every consumer
+  (`Test/ground_interface_reexport_test` pins it — ground ℤ/ℚ facts and
+  `/` side conditions close with no direct imports). Fallout root-fixed:
+  the re-export puts `Natural.divide` (ℕ,ℕ)→ℚ in consumer scope, so (a)
+  `Natural.nonzero_of_positive` (automatic, order.math) now completes the
+  nonzero_of_positive family the structural `/`-side-condition fallback
+  looks up by carrier name, and (b) triangular_series ascribes its
+  denominator `(… : Real)` (the exponential `1/(k! : ℝ)` idiom) since the
+  bare (ℕ,ℕ) spelling now resolves at ℚ.
+- **Scaffolding sweep** (scoped to the clean manifest's interface
+  consumers): the stop-gap died at its ROOT — the speculative context
+  scan's search-free ground-premise lookup consults the ground-relation
+  tier first (induction.cpp), so any closed numeral premise on a scanned
+  automatic lemma discharges without a dedicated automatic fact
+  (`Test/ground_premise_scan_test`: `2 ≤ 5`, which no automatic fact
+  states). `Natural.one_le_two` deleted; 4 ground breadcrumbs deleted
+  (harmonic_series ×3, uncountable ×1). Kept deliberately: AGM's consumed
+  `0 ≤ (2 : Real)`, mixed-carrier casts like
+  `Rational.one ≤ (Rational.one : Real)` (outside the tier's ℕ/ℤ/ℚ
+  reach), the honest_natural_arithmetic exhibit, and characterising
+  boundary lemmas (`Natural.subtract_from_difference`).
 
 ---
 
