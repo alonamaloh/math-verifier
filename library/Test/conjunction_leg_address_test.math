@@ -1,0 +1,61 @@
+-- Feature test (A2 stage 2): conjunction legs participate in statement
+-- addressing. given() — and so function position and `choose` sources —
+-- scans the prover's fact list (base hypotheses plus recursively
+-- decomposed ∧-legs), so one leg of an in-scope `A ∧ B` addresses
+-- exactly like the whole.
+module Test.conjunction_leg_address_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- The ∃-leg of a conjunction as a `choose` source.
+theorem Test.choose_from_conjunction_leg (Q : Natural → Proposition)
+        (R : Proposition)
+        (h : (∃ (w : Natural). Q(w)) ∧ R)
+        : ∃ (v : Natural). Q(v) := {
+  choose w as qw from ∃ (w : Natural). Q(w);
+  witness w with qw
+}
+
+-- The ∀-leg of a conjunction applied in function position.
+theorem Test.apply_conjunction_leg (P : Natural → Proposition) (m : Natural)
+        (R : Proposition)
+        (h : (∀ (k : Natural). P(k)) ∧ R)
+        : P(m) :=
+  (∀ (k : Natural). P(k))(m)
+
+-- Nested conjunctions fully decompose (right leg of a right leg).
+theorem Test.address_nested_leg (Q : Natural → Proposition)
+        (R S : Proposition)
+        (h : R ∧ ((∃ (w : Natural). Q(w)) ∧ S))
+        : ∃ (v : Natural). Q(v) := {
+  choose w as qw from ∃ (w : Natural). Q(w);
+  witness w with qw
+}
+
+-- Tier rule: a fact that IS a hypothesis wins over a leg carrying the
+-- same statement, so a bundle next to an exact hypothesis creates no
+-- new ambiguity.
+theorem Test.exact_hypothesis_wins_over_leg (P : Natural → Proposition)
+        (m : Natural) (R : Proposition)
+        (exact : ∀ (k : Natural). P(k))
+        (bundle : (∀ (k : Natural). P(k)) ∧ R)
+        : P(m) :=
+  (∀ (k : Natural). P(k))(m)
+
+-- Legs transport along a case arm's equation like whole hypotheses.
+theorem Test.leg_transports_in_case_arm (P : Natural → Proposition)
+        (n : Natural) (R : Proposition)
+        (h : P(n) ∧ R)
+        : n = n :=
+  done by cases {
+    case n = 0: reflexivity(n)
+    case n = successor(k) for some (k : Natural): {
+        P(successor(k)) by given(P(successor(k)));
+        reflexivity(n)
+      }
+  }

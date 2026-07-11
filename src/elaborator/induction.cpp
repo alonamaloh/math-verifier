@@ -1758,6 +1758,117 @@ ExpressionPointer Elaborator::autoFillHintForClaimCore(
                 }
             }
         }
+        // ∧-leg projection (A2 stage 2): a conclusion `A ∧ B` where ONE
+        // leg unifies with the goal proves the goal through the matching
+        // projection — `P(m) by h` for `h : (k : Natural) → P(k) ∧ Q(k)`
+        // wraps `h(m)` in `And.left`, so the unused leg rides along
+        // inside the call and never reaches the page. Mirrors the
+        // Not-peel and Or.self precedents (a rigid logical connective in
+        // conclusion position that plain first-order matching cannot see
+        // through). PROMPTED citations only: the block is gated off the
+        // speculative context scan, keeping the unprompted pool's cost
+        // and power exactly as before.
+        if (matchedDepth == -1 && !inSpeculativeContextScan_
+            && environment_.lookup("And.left")
+            && environment_.lookup("And.right")) {
+            ExpressionPointer conclusion = weakHeadNormalForm(
+                environment_, cursorsAtDepth[totalBinders]);
+            auto* conclusionOuter =
+                std::get_if<Application>(&conclusion->node);
+            auto* conclusionInner = conclusionOuter
+                ? std::get_if<Application>(&conclusionOuter->function->node)
+                : nullptr;
+            auto* conclusionHead = conclusionInner
+                ? std::get_if<Constant>(&conclusionInner->function->node)
+                : nullptr;
+            if (conclusionHead && conclusionHead->name == "And") {
+                ExpressionPointer conclusionLegs[2] = {
+                    conclusionInner->argument, conclusionOuter->argument};
+                for (int legIndex = 0; legIndex < 2; ++legIndex) {
+                    for (ExpressionPointer goalForm :
+                             {goalReduced, goalClosed}) {
+                        std::vector<ExpressionPointer> trial(totalBinders);
+                        if (!matchAgainstPatternWithDeferredProjections(
+                                conclusionLegs[legIndex], goalForm,
+                                totalBinders, trial)) {
+                            continue;
+                        }
+                        ExpressionPointer conjunctionProof;
+                        try {
+                            conjunctionProof = completeCitationFromBindings(
+                                hintTerm, goalClosed, goalOpened,
+                                openedContext, localBinders,
+                                domainsOutermostFirst, cursorsAtDepth,
+                                totalBinders, totalBinders,
+                                std::move(trial),
+                                /*conclusionWasFlexApplication=*/false);
+                        } catch (const ElaborateError&) {
+                            continue;
+                        } catch (const TypeError&) {
+                            continue;
+                        }
+                        // Read the INSTANTIATED conjunction off the
+                        // completed call's type, project the matched
+                        // leg, and accept only if the projection really
+                        // is the goal.
+                        try {
+                            ExpressionPointer conjunctionType =
+                                weakHeadNormalForm(
+                                    environment_,
+                                    openOverLocalBinders(
+                                        inferTypeInLocalContext(
+                                            localBinders,
+                                            conjunctionProof),
+                                        localBinders,
+                                        localBinders.size()));
+                            auto* instantiatedOuter =
+                                std::get_if<Application>(
+                                    &conjunctionType->node);
+                            auto* instantiatedInner = instantiatedOuter
+                                ? std::get_if<Application>(
+                                      &instantiatedOuter->function->node)
+                                : nullptr;
+                            auto* instantiatedHead = instantiatedInner
+                                ? std::get_if<Constant>(
+                                      &instantiatedInner->function->node)
+                                : nullptr;
+                            if (!instantiatedHead
+                                || instantiatedHead->name != "And") {
+                                continue;
+                            }
+                            ExpressionPointer projectedOpened =
+                                legIndex == 0
+                                    ? instantiatedInner->argument
+                                    : instantiatedOuter->argument;
+                            if (!isDefinitionallyEqual(
+                                    environment_, openedContext,
+                                    projectedOpened, goalOpened)) {
+                                continue;
+                            }
+                            int N = static_cast<int>(localBinders.size());
+                            return makeApplication(
+                                makeApplication(
+                                    makeApplication(
+                                        makeConstant(
+                                            legIndex == 0 ? "And.left"
+                                                          : "And.right",
+                                            {}),
+                                        closeOverLocalBinders(
+                                            instantiatedInner->argument,
+                                            localBinders, N)),
+                                    closeOverLocalBinders(
+                                        instantiatedOuter->argument,
+                                        localBinders, N)),
+                                conjunctionProof);
+                        } catch (const ElaborateError&) {
+                            continue;
+                        } catch (const TypeError&) {
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
         // The conclusion may be an APPLICATION OF A PEELED BINDER —
         // `P(x)` for a lemma quantified over the predicate P. First-order
         // matching can then "succeed" with the wrong split (binding P to
@@ -2418,8 +2529,16 @@ ExpressionPointer Elaborator::elaborateGiven(
         ExpressionPointer requestedTypeClosed = elaborateExpression(
             *given.proposition, localBinders);
         int N = static_cast<int>(localBinders.size());
-        int matchIndex = -1;
-        int duplicateIndex = -1;
+        // The scan runs over the PROVER'S view of the context —
+        // `collectLocalBinderFacts` — not the raw binders: the fact list
+        // is the base hypotheses plus their recursively decomposed
+        // conjunction legs (each leg carrying its projection proof
+        // term), so a statement that is one leg of an in-scope `A ∧ B`
+        // addresses exactly like the whole. One decomposition, two
+        // consumers: the prover discharges through this list, and
+        // given() addresses through it.
+        std::vector<ContextFact> facts =
+            collectLocalBinderFacts(localBinders);
         // Use isDefinitionallyEqual rather than a structural compare:
         // hypotheses introduced by destructure desugarings (e.g.
         // `choose N such that P(N);`) carry their predicate type in
@@ -2429,20 +2548,28 @@ ExpressionPointer Elaborator::elaborateGiven(
             buildContextFromLocalBinders(localBinders);
         ExpressionPointer requestedOpened = openOverLocalBinders(
             requestedTypeClosed, localBinders, N);
-        for (int b = N - 1; b >= 0; --b) {
-            int lift = N - b;
-            ExpressionPointer binderTypeInScope =
-                liftBoundVariables(localBinders[b].type, lift, 0);
-            ExpressionPointer binderTypeOpened = openOverLocalBinders(
-                binderTypeInScope, localBinders, N);
-            if (isDefinitionallyEqual(environment_, openedContext,
-                                        binderTypeOpened,
-                                        requestedOpened)) {
-                if (matchIndex == -1) {
-                    matchIndex = b;
-                } else {
-                    duplicateIndex = b;
-                    break;
+        // Two tiers: a fact that IS a hypothesis (cost 1) wins over a
+        // conjunction leg (cost ≥ 2), so a leg duplicating an exact
+        // hypothesis's statement cannot create new ambiguity — the
+        // whole-hypothesis scan is exactly the pre-leg behaviour.
+        // Within a tier, two matches stay the loud error.
+        int matchIndex = -1;
+        int duplicateIndex = -1;
+        for (int tier = 0; tier < 2 && matchIndex == -1; ++tier) {
+            for (int f = 0; f < static_cast<int>(facts.size()); ++f) {
+                bool factIsLeg = facts[f].cost > 1;
+                if (factIsLeg != (tier == 1)) continue;
+                ExpressionPointer factTypeOpened = openOverLocalBinders(
+                    facts[f].type, localBinders, N);
+                if (isDefinitionallyEqual(environment_, openedContext,
+                                            factTypeOpened,
+                                            requestedOpened)) {
+                    if (matchIndex == -1) {
+                        matchIndex = f;
+                    } else {
+                        duplicateIndex = f;
+                        break;
+                    }
                 }
             }
         }
@@ -2450,34 +2577,39 @@ ExpressionPointer Elaborator::elaborateGiven(
             // A2 by-cases transport: no fact carries the statement as
             // written, but one may differ from it at a single position
             // bridged by an in-scope equation — the canonical shape
-            // being a `cases … with eq` arm addressing `P(pattern)`
+            // being an equation-shaped case arm addressing `P(pattern)`
             // while the context holds `h : P(scrutinee)` and
             // `eq : scrutinee = pattern`. Transport silently; two
-            // transported matches are the same ambiguity error.
+            // transported matches are the same ambiguity error. Same
+            // two-tier rule and the same fact list, so conjunction legs
+            // transport too.
             ExpressionPointer transported;
             int transportedIndex = -1;
             int transportedDuplicate = -1;
-            for (int b = N - 1; b >= 0; --b) {
-                int lift = N - b;
-                ExpressionPointer binderTypeInScope =
-                    liftBoundVariables(localBinders[b].type, lift, 0);
-                ExpressionPointer candidate;
-                try {
-                    candidate = tryDiffBridgeViaContextEquality(
-                        localBinders, makeBoundVariable(N - 1 - b),
-                        binderTypeInScope, requestedTypeClosed);
-                } catch (const ElaborateError&) {
-                    candidate = nullptr;
-                } catch (const TypeError&) {
-                    candidate = nullptr;
-                }
-                if (candidate) {
-                    if (transportedIndex == -1) {
-                        transported = candidate;
-                        transportedIndex = b;
-                    } else {
-                        transportedDuplicate = b;
-                        break;
+            for (int tier = 0; tier < 2 && transportedIndex == -1;
+                 ++tier) {
+                for (int f = 0; f < static_cast<int>(facts.size());
+                     ++f) {
+                    bool factIsLeg = facts[f].cost > 1;
+                    if (factIsLeg != (tier == 1)) continue;
+                    ExpressionPointer candidate;
+                    try {
+                        candidate = tryDiffBridgeViaContextEquality(
+                            localBinders, facts[f].proofTerm,
+                            facts[f].type, requestedTypeClosed);
+                    } catch (const ElaborateError&) {
+                        candidate = nullptr;
+                    } catch (const TypeError&) {
+                        candidate = nullptr;
+                    }
+                    if (candidate) {
+                        if (transportedIndex == -1) {
+                            transported = candidate;
+                            transportedIndex = f;
+                        } else {
+                            transportedDuplicate = f;
+                            break;
+                        }
                     }
                 }
             }
@@ -2490,10 +2622,10 @@ ExpressionPointer Elaborator::elaborateGiven(
                     + prettyPrintInLocalScope(
                           requestedTypeClosed, localBinders)
                     + "`): proposition is ambiguous — at least two "
-                    "in-scope hypotheses transport to this statement "
-                    "('" + localBinders[transportedIndex].name + "' and '"
-                    + localBinders[transportedDuplicate].name
-                    + "'); name one of them explicitly");
+                    "in-scope facts transport to this statement ("
+                    + facts[transportedIndex].source + " and "
+                    + facts[transportedDuplicate].source
+                    + "); name one of them explicitly");
             }
             throwElaborate(
                 "given(`"
@@ -2509,12 +2641,11 @@ ExpressionPointer Elaborator::elaborateGiven(
                 + prettyPrintInLocalScope(
                       requestedTypeClosed, localBinders)
                 + "`): proposition is ambiguous — at least two "
-                "in-scope hypotheses have this type ('"
-                + localBinders[matchIndex].name
-                + "' and '"
-                + localBinders[duplicateIndex].name
-                + "'); name one of them explicitly");
+                "in-scope facts carry this statement ("
+                + facts[matchIndex].source + " and "
+                + facts[duplicateIndex].source
+                + "); name one of them explicitly");
         }
-        return makeBoundVariable(N - 1 - matchIndex);
+        return facts[matchIndex].proofTerm;
     }
 

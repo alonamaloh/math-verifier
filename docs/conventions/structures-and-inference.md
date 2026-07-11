@@ -162,6 +162,11 @@ from the goal and the local context, so you rarely spell them out:
   `list = prepend(head, tail)`, now fully determined, is discharged by
   **reflexivity**. So `:= claim by NaturalList.all_prime_under_prepend_equality`
   replaces an eight-argument call.
+- **Conjunction-conclusion projection**: a cited fact whose conclusion is
+  `A ∧ B` proves a goal matching ONE leg — `P(m) by h` works for
+  `h : ∀ (k : Natural). P(k) ∧ Q(k)`; the citation instantiates the fact
+  and wraps the matching projection, so the unused leg never reaches the
+  page.
 
 ```math
 claim productHasDegree : Polynomial.HasDegree(Real.ring, a * b, da + db)

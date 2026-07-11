@@ -170,15 +170,27 @@ End each with `;`; the block returns its final non-`;` expression.
   `(∀ (k : Natural). P(k))(m)` — or as a `choose` source addresses
   the in-scope fact with that statement (defeq match, anonymous facts
   included); two matching facts is a loud error naming both. `given (P)`
-  is the same lookup as a bare term. Inside an equation-shaped case
-  arm (`case x = successor(k) for some k:`), addressing the REFINED
+  is the same lookup as a bare term. **Conjunction legs participate**:
+  one leg of an in-scope `A ∧ B` (recursively) addresses exactly like a
+  whole hypothesis; a fact that IS a hypothesis wins over a leg carrying
+  the same statement, and two matching legs are the same loud error.
+  Inside an equation-shaped case arm
+  (`case x = successor(k) for some k:`), addressing the REFINED
   statement (`P(successor(k))` when the context holds `P(x)`)
   transports silently along the arm's equation — including facts
-  mentioning the scrutinee several times, at any nesting depth.
+  mentioning the scrutinee several times, at any nesting depth, and
+  conjunction legs likewise.
 - `?` — a hole in a function-call argument position, solved by unification
   from the goal/other arguments (does not invoke the auto-prover).
 - `recalling f, g` after a `by` hint — bring extra named facts into
   the discharge scope.
 - A context hypothesis `A ∧ B` makes both `A` and `B` available as facts
   (conjunction-elimination, recursive) — no manual `And.left`/`And.right`.
+  This is consumption-time decomposition (the legs are not separate
+  context entries); it powers the prover's discharge AND statement
+  addressing alike.
+- A cited fact whose conclusion is a conjunction proves a goal matching
+  ONE leg: `P(m) by h` works for `h : ∀ (k : Natural). P(k) ∧ Q(k)` —
+  the citation instantiates `h` and projects, so the unused leg stays
+  off the page.
 - `{x : T}` — an implicit parameter, solved by unification at call sites.
