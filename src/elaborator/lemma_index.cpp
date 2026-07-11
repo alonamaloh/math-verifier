@@ -637,6 +637,29 @@ void Elaborator::registerSignJudgmentRule(const std::string& theoremName,
     signRuleIndex_[key].push_back(std::move(rule));
 }
 
+namespace {
+// The head constant of an application spine, or "" for anything else
+// (bare variables, lambdas, …). A NaturalLiteral reports the
+// constructor head it denotes (`zero` / `successor`), so index keys
+// built from numeral endpoints stay identical to the pre-literal
+// successor-chain era — `one_le_of_nonzero : 1 ≤ n` keys under
+// `successor` whether its `1` is a literal or a chain
+// (PLAN_FAST_NUMERALS §C).
+std::string spineHeadConstantName(ExpressionPointer expression) {
+    while (auto* application =
+               std::get_if<Application>(&expression->node)) {
+        expression = application->function;
+    }
+    if (auto* constant = std::get_if<Constant>(&expression->node)) {
+        return constant->name;
+    }
+    if (auto* literal = std::get_if<NaturalLiteral>(&expression->node)) {
+        return literal->value == 0 ? "zero" : "successor";
+    }
+    return "";
+}
+} // namespace
+
 ExpressionPointer Elaborator::trySignJudgmentRecursion(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -658,6 +681,10 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
             judgment.kindTag + "\x1f" + judgment.relationName + "\x1f*",
             true);
     }
+    // Conjunction-leg premise pool, collected lazily on the first premise
+    // the binder scan can't discharge (most calls never need it) — the
+    // same gated fallback the monotonicity recursion uses.
+    std::optional<std::vector<ContextFact>> conjunctionLegFacts;
     for (const auto& [key, bridgeHop] : probes) {
     auto bucket = signRuleIndex_.find(key);
     if (bucket == signRuleIndex_.end()) continue;
@@ -721,6 +748,48 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
                             static_cast<int>(localBinders.size())
                             - 1 - j);
                         break;
+                    }
+                }
+                // Conjunction legs participate as premises exactly like
+                // separately-stated hypotheses (`fδ > 0` from a chosen
+                // `fδ > 0 ∧ ∀y. …` bundle supplies the minimum rule's
+                // positivity premise). Gated hard (stated-head
+                // prefilter, structural check before defeq): this runs
+                // inside budgeted speculative searches, and an ungated
+                // scan starves the downstream tactics.
+                if (!proof) {
+                    if (!conjunctionLegFacts) {
+                        conjunctionLegFacts =
+                            collectLocalBinderFacts(localBinders);
+                    }
+                    std::string slotHead =
+                        spineHeadConstantName(slotType);
+                    for (const ContextFact& fact : *conjunctionLegFacts) {
+                        if (slotHead.empty()
+                            || spineHeadConstantName(fact.type)
+                                   != slotHead) {
+                            continue;
+                        }
+                        ExpressionPointer candidateType =
+                            openOverLocalBinders(
+                                fact.type, localBinders,
+                                localBinders.size());
+                        bool equal =
+                            structurallyEqual(candidateType,
+                                              slotTypeNormalised);
+                        if (!equal) {
+                            try {
+                                equal = isDefinitionallyEqual(
+                                    environment_, openedContext,
+                                    candidateType, slotTypeNormalised);
+                            } catch (const TypeError&) {
+                                equal = false;
+                            }
+                        }
+                        if (equal) {
+                            proof = fact.proofTerm;
+                            break;
+                        }
                     }
                 }
             }
@@ -902,29 +971,6 @@ bool Elaborator::parseOrderJudgment(ExpressionPointer proposition,
     out.leftSide = spineArgs[1];
     return true;
 }
-
-namespace {
-// The head constant of an application spine, or "" for anything else
-// (bare variables, lambdas, …). A NaturalLiteral reports the
-// constructor head it denotes (`zero` / `successor`), so index keys
-// built from numeral endpoints stay identical to the pre-literal
-// successor-chain era — `one_le_of_nonzero : 1 ≤ n` keys under
-// `successor` whether its `1` is a literal or a chain
-// (PLAN_FAST_NUMERALS §C).
-std::string spineHeadConstantName(ExpressionPointer expression) {
-    while (auto* application =
-               std::get_if<Application>(&expression->node)) {
-        expression = application->function;
-    }
-    if (auto* constant = std::get_if<Constant>(&expression->node)) {
-        return constant->name;
-    }
-    if (auto* literal = std::get_if<NaturalLiteral>(&expression->node)) {
-        return literal->value == 0 ? "zero" : "successor";
-    }
-    return "";
-}
-} // namespace
 
 void Elaborator::registerMonotonicityRule(const std::string& theoremName,
                                           ExpressionPointer typeExpr) {

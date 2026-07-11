@@ -40,7 +40,7 @@ Steps refer to the suggested order at the end of the plan.
 | Step | Workstream | Status |
 |------|------------|--------|
 | 1 | B5 classifier (instrument hinted claims/calc steps) | **done** |
-| 2 | B1–B3 tier skeleton, context index, cast tier | **B1/B2/B3 done; residue forensics done — verdict: no norm_cast mechanism needed; F1–F5 queue CLOSED 2026-07-11** |
+| 2 | B1–B3 tier skeleton, context index, cast tier | **B1/B2/B3 done; residue forensics done — verdict: no norm_cast mechanism needed; F1–F5 queue CLOSED 2026-07-11; tier4-sign forensics + tactic-order/∧-leg fixes landed 2026-07-11** |
 | 3 | A1 keyword-free claims/calc | **DONE — keywords retired** |
 | 4 | B4 order automation in calc | **v1 DONE** |
 | 5 | A2 statement addressability + A7 `contradiction` kit | **A2 stage 1 + transport done; A7 done** |
@@ -334,6 +334,49 @@ paste-ins. Gates across all three commits: make check fully green, error-tests
 51/0, warning-site diff vs pre-F5 HEAD EMPTY. Row 2 has no open work;
 next-in-plan lives in rows 4 (B4 residue), 5 (A2 stage 2), and the D
 residuals.**
+
+**RE-BASELINE + TIER4-SIGN FORENSICS + TWO PROVER FIXES (2026-07-11, the B
+goal-metric follow-up the ∨-syllogism close-out queued).** Fresh serial
+classifier run at the post-close-out tree: **3958 hinted sites** (the week's
+sweeps consumed ~225), closes-today 1148/29.0%, B4-order-step 111→65,
+tier4-sign 183, tier3-cast 408, tier2-ground 184. Goal-metric reading note:
+closes-today's SHARE falls as sweeps succeed — a deleted hint leaves the
+population entirely (5807 sites at the original baseline → 3958 today = ~1850
+hints off the pages), so the "31% vs the 64.6% ceiling" framing undercounts
+realized wins; track the population shrink alongside the share. Forensics on
+tier4-sign (183 — the largest well-specified bucket without a pass; tier3-cast
+kept its no-mechanism verdict, tier2-ground its DIFFUSE one): per-module
+probes split it 23 close-at-10k (classifier-cap artifact) / 10 budget-bound
+(close at 100k) / 150 capability decliners. Two root causes probed, profiled,
+and FIXED: **(α) tactic-order defect** — transitivityBridge ran before
+localFactExactMatch and the sign/mono index recursions; at Real.derivative:434
+(`abs(y−x) ≥ 0` in a fat ε-δ context) its failed chain search burned 50k+
+kernel-steps before signJudgmentRecursion closed the goal in 25µs
+(MATH_PROFILE_AUTOPROVER aggregate over the module: sign hits 67% at avg
+341µs; contextEqualityBridge 73s total with zero wins). Fix: transitivityBridge
+demoted below the sign/mono recursions, real + profiling twin paths
+(prover.cpp). **(β) ∧-leg premise gap in trySignJudgmentRecursion** — premise
+discharge scanned whole binders only, so `min(fδ, gδ) > 0` whose positivity
+premises live inside `choose δ such that δ > 0 ∧ ∀y.…` bundles declined
+(probe-proven in a clean context); fix = the same lazy/prefiltered
+conjunctionLegFacts fallback B4 landed for the mono recursion
+(lemma_index.cpp; Test/sign_conjunction_leg_test pins both fixes). **Measured
+yield: closes-today 1148→1191 (+43, 30.1%) at the identical population**;
+tier4-sign 183→171, B4-order-step 65→46, sign-cast 28→24; the movers are
+exactly the forensics families (continuity:102, derivative:434-448/135/548).
+The +43 now-closing hinted sites are polish-loop sweep material. Remaining
+decliner taxonomy, deferred WITH reasons: **~120 genuine content** (rep-level
+IsNonneg witnesses in the foundational order files, inline nonzero-ness
+arguments, `unfolding` characterizing equations at opaque boundaries, real
+transitivity middle-terms — the 0-anchor shape test over-captures content);
+**~6 ζ-let opaque subjects** (continuity's let-bound tolerances — the
+numeral_let_ring_elaborator_gaps family, needs the ζ-expansion design, not a
+one-off); **~6 positive→nonzero form-bridge candidates** at ℚ/ℝ
+(Rational.LessThan.distinct sites — likely a library `automatic`-twin
+question à la F3, measure before building). Gates: full re-verify + tests +
+checker/probe-tests green, error-tests 52/0, export-check 2554, warning-site
+diff EMPTY (serial capture both sides; build_classify cache committed per
+precedent).
 
 #### Row 3 — A1 keyword-free claims/calc
 

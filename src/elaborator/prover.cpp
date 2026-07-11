@@ -2131,9 +2131,10 @@ ExpressionPointer Elaborator::autoProveClaim(
         int transportBudget) {
         // Tactic order is chosen to minimise total time, not to match
         // the docstring narrative above. The cheap shape-gated tactics
-        // (equalityBattery, transitivityBridge, conjunctionIntro,
-        // contradiction) run first because each does an O(1) head
-        // check and bails on the wrong goal shape. After those, we
+        // (equalityBattery, the direct-hypothesis match, the sign and
+        // monotonicity index recursions, then transitivityBridge,
+        // conjunctionIntro, contradiction) run first because each does
+        // an O(1) head check and bails on the wrong goal shape. After those, we
         // try contextFactMatch — empirically the highest-hit-rate
         // tactic (~10% per call on math-heavy files), so promoting
         // it past the per-call-expensive disjunctionIntro and
@@ -2577,13 +2578,6 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
         }
 
         {
-            ExpressionPointer attempt = runTactic("transitivityBridge",
-                [&] { return tryTransitivityBridge(
-                    goalClosed, localBinders, line); });
-            if (attempt) return attempt;
-        }
-
-        {
             ExpressionPointer attempt = runTactic("localFactExactMatch",
                 [&] { return tryLocalFactExactMatch(
                     goalClosed, localBinders); });
@@ -2614,6 +2608,21 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             ExpressionPointer attempt = runTactic("monotonicityRecursion",
                 [&] { return tryMonotonicityRecursion(
                     goalClosed, localBinders, 12); });
+            if (attempt) return attempt;
+        }
+
+        // Transitivity chains through in-scope order facts. Placed
+        // AFTER the syntax-directed sign/monotonicity recursions: those
+        // are deterministic index dispatches (microseconds), while this
+        // is a context scan whose failed searches on fat ε-δ contexts
+        // cost tens of thousands of kernel steps — running it first
+        // starved the cheap tiers out of tight speculative budgets
+        // (measured at Real.derivative's abs-nonneg bookkeeping: 50k
+        // steps, of which the sign win itself was 25µs).
+        {
+            ExpressionPointer attempt = runTactic("transitivityBridge",
+                [&] { return tryTransitivityBridge(
+                    goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
 
@@ -2897,10 +2906,6 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             return tryAutoProveEqualityGoal(
                 goalClosed, localBinders, line);
         });
-        runProfiled("transitivityBridge", [&] {
-            return tryTransitivityBridge(
-                goalClosed, localBinders, line);
-        });
         runProfiled("localFactExactMatch", [&] {
             return tryLocalFactExactMatch(goalClosed, localBinders);
         });
@@ -2912,6 +2917,10 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         runProfiled("monotonicityRecursion", [&] {
             return tryMonotonicityRecursion(
                 goalClosed, localBinders, 12);
+        });
+        runProfiled("transitivityBridge", [&] {
+            return tryTransitivityBridge(
+                goalClosed, localBinders, line);
         });
         runProfiled("castOrderTier", [&] {
             return tryCastOrderTier(
