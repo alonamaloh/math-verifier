@@ -402,4 +402,15 @@ self-tests: kernel
 
 .PHONY: self-tests
 
+# PLAN_KERNEL_EXPORT Stage 4: export the full library as a lean4export
+# NDJSON trail, replay it through an independent Lean-kernel checker
+# (nanoda), and assert the axiom report exactly matches the documented
+# inventory. Manual/nightly — not part of the inner `tests` loop.
+# Override NANODA_BIN if the checker lives elsewhere.
+NANODA_BIN ?= $(HOME)/claude/export-tools/nanoda_bin
+export-check: library
+	@scripts/export_check.sh ./kernel build/export $(NANODA_BIN)
+
+.PHONY: export-check
+
 .PHONY: check
