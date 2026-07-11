@@ -534,3 +534,51 @@ each improvement is measured and protected against regression.
   "this step involves subtraction — `a - b` and `a + -b` print alike and are
   ring-equal, but the matcher treats `subtract(a,b)` and `add(a,-b)` as DISTINCT
   … write both sides the same way, or close with `ring`." (calc.cpp)
+
+### 22. "unbound internal variable: X (in-scope: … X …)" — CAPABILITY FIXED, message PENDING
+
+- **Trigger (2026-07-11, Stage 4 of PLAN_NATURAL_SEALING):** a block-bodied
+  lambda argument to a citation (`by IH(restB, (i : Natural) ↦ { …; done by
+  substituting … })`) whose block goal derives from the citation's expected
+  type. The generic application path handed each argument the OPENED
+  `pi->domain` (from `inferTypeInLocalContext`, local binders as
+  Internal-origin FreeVariables) as its expected type, and substituted CLOSED
+  argument terms into the opened codomain while walking — so the lambda's
+  block goal arrived MIXED (`nth(FV-rest, i) = nth(BV-restB, i)`), and any
+  proof built by abstracting that goal (the `substituting` transport's motive)
+  embedded the stray FreeVariable. Repro was the pre-workaround spelling of
+  `ComplexNumber/coordinates.math`'s tailCoordinates lambda.
+- **Was (still is, for future instances):**
+  ```
+  elaborate error: theorem 'ComplexNumber.coordinatesOfCoefficients_respects' (pattern-match form)
+    kernel: unbound internal variable: rest (in-scope: a b _argument0 c rest … i _rewriteHole)
+  ```
+  Three failures. (1) *Cause 0:* the message says `rest` is unbound while
+  listing `rest` as in-scope — the two differ only in ORIGIN (the unbound one
+  is Internal, the context entries User); the `@`-prefix convention marks
+  Internal *context entries* but nothing marks the unbound variable itself, so
+  the one signal ("internal variable" in prose vs no `@` in the list) is
+  illegible. (2) *Location 0:* it surfaces at the enclosing theorem's FINAL
+  kernel check, not at the claim that built the bad term — the transport is
+  assembled without a closed-form check, so the bad term travels. (3) The
+  in-scope dump names elaborator gensyms (`_rewriteHole`, `_argument0`).
+- **Diagnosis:** mixed opened/closed de Bruijn frames — the same trap as the
+  2026-06-15 congruence-over-bundle lesson ("mixed opened/closed scope in a
+  single term is the trap"). The CAPABILITY is fixed at the root
+  (dispatch.cpp: the head-type walk stays purely opened; each peeled domain is
+  closed before being handed out; arguments are opened before substitution),
+  regression-locked by `library/Test/substituting_under_binder_test.math`, and
+  the coordinates workarounds are reverted to the intended one-step
+  `substituting` spelling.
+- **Message wishes (open):** (a) print the origin on the unbound variable
+  itself (`unbound internal variable: @rest`) and explain the `@` legend when
+  a same-named entry with a DIFFERENT origin is in scope — "a variable with
+  this name is in scope but with a different origin; an elaborator desugar
+  mixed opened and closed sub-expressions" (the kernel comment at the lookup
+  site already names this as the common confusion); (b) proof-BUILDING paths
+  should assert closed-form invariants at construction time the way calc.cpp's
+  auto-prover result check does (`containsFreeVariable` → warn + treat as
+  unproven) — claim.cpp's substituting transport had no such guard, which is
+  why this surfaced at the final check with the claim's line lost.
+- **Rubric (0/1):** cause 0 · location 0 · actionable 0 · folded-types 1 ·
+  no-jargon 0.

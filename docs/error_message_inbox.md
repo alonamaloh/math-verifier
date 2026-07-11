@@ -1111,3 +1111,69 @@ diagnosis (PARTIAL, 2026-06-28):
   fix is verified manifest-wide (0 errors) with a regression guard
   (scripts/redundancy_probe_test.sh in `make checker-tests`). PROMOTE this whole
   entry to the corpus and delete from the inbox.
+
+---
+
+### (good message) application mismatch localised the equation-arm spelling bug in one read — 2026-07-11 (Stage 4, natural sealing)
+note: while re-routing `case n = 1 + k` induction arms, the failure printed:
+```
+this argument has the wrong type for the function it is given to
+  the function expects: (k : Natural) → ((j : Natural) → j + k = h → j ≤ h) → (j : Natural) → j + (successor k) = h → j ≤ h
+  but this argument is: (k : Natural) → ((j : Natural) → j + k = h → j ≤ h) → (j : Natural) → j + (1 + k) = h → j ≤ h
+```
+The side-by-side expects/is made the diagnosis (`successor k` vs `1 + k`, not
+defeq under opaque add) instant — the two spellings differ at exactly one
+visible spot. One demerit: the message goes on to dump the ENTIRE elaborated
+case lambda (~40 lines of Equality.transitivity plumbing) after the two type
+lines that carried all the signal; consider truncating the term dump (or
+gating it behind a verbosity knob) when the type mismatch already localises.
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
+
+### (good pattern) the sealed-Natural teaching errors made 32-file flip fallout self-classifying — 2026-07-11 (Stage 4 flip)
+note: the opacity flip's new errors follow the house style and it paid off
+immediately — the whole-library `-k` sweep produced a worklist needing no
+further triage. Both messages name the cause AND both escape routes:
+```
+pattern-match definition 'X': the scrutinee type 'Natural' is sealed and the
+result does not land in a Type universe the boundary combinator
+'Natural.recursion' can produce (a Proposition-valued match cannot ride it) —
+restate the definition as a theorem by induction, or move it to the raw floor
+(`unfold Natural in …`)
+
+cases at line N: the scrutinee type 'Natural' is sealed and the goal does not
+land in a Type universe … — split through a boundary theorem
+(`Natural.cases_on_successor`), or move the proof to the raw floor (…)
+```
+Every hit sorted itself into "Prop-valued pattern-def → ride
+induction_on_successor" / "raw floor → unfold" by message text alone. Once the
+flip commits, lock both texts with `library/ErrorTest/` cases (a sealed-Natural
+Prop pattern-match outside the boundary's scope, and a sealed Prop `cases`
+below the boundary lemmas).
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
+
+### (residual wish) citation failures on `1 + k`-stuck goals can't see the real blocker — 2026-07-11 (Stage 4 flip fallout)
+note: after equation arms started presenting goals in their own spelling, two
+proofs that silently relied on constructor-goal ι broke
+(`Natural.binomial_zero_right`, `Real.avoidingIntervals_ordered`) with the
+citation message:
+```
+the `Logic.if_positive` citation does not prove this goal
+  goal:        (Natural.binomial (1 + k) 0) = 1
+  `Logic.if_positive` has type: … (Decidable_recursor … ) = a
+the conclusion shape fits, but an argument could not be inferred …
+```
+The message is GOOD as far as it can see (goal + lemma side by side, the
+inference diagnosis), and it localised both regressions immediately. The
+invisible part is WHY nothing matches: `1 + k` is opaque-add-stuck, so the
+definition never ι-reduces to expose the `if`/recursor the lemma speaks —
+the actual fix is a `<Name>_one_plus` recurrence bridge or constructor arms.
+Wish (speculative, collect more instances first): when a citation fails and
+the goal contains a redex of a recursive definition whose scrutinee argument
+is a stuck `Natural.add(1, _)` application, append the Stage-3 recipe hint —
+"`1 + k` is not definitionally `successor(k)`; bridge with the definition's
+`_one_plus` recurrence lemma (or spell constructor arms at the raw floor)."
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
