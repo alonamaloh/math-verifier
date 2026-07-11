@@ -171,7 +171,11 @@ tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
 #                     CLEAN_LEAK_BUDGET, so a cleaned file cannot regress.
 CLEAN_MATH_FILES := $(shell grep -vE '^\#|^\s*$$' scripts/clean_manifest.txt)
 CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
-CLEAN_LEAK_BUDGET ?= 204
+# 2026-07-10: re-armed 204 → 205. e433b96f (Natural/binomial via
+# if-then-else) added one intended `unfold Natural.add` — its commit
+# message documents the residual (the `1 + n` head un-sticking gap) —
+# and `make check` wasn't run to catch the ratchet.
+CLEAN_LEAK_BUDGET ?= 205
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the

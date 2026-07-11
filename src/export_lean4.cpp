@@ -161,6 +161,23 @@ private:
     std::set<std::string> emitted_;   // by OUR declaration name
     std::map<std::string, int> definitionHeight_;
     bool bridgesEmitted_ = false;
+    // Every name DECLARED in the trail, keyed by its mapped spelling —
+    // catches a future library declaration colliding with the prelude
+    // (`Eq`, `Quot.*`, the bridges) or with a mapped name (`Nat.*`,
+    // `<T>.rec`) as a clear error instead of a confusing checker
+    // failure far from the cause.
+    std::map<std::string, std::string> declaredMappedNames_;
+
+    void registerDeclaredName(const std::string& ourName) {
+        std::string mapped = mapDeclarationName(ourName);
+        auto [existing, inserted] =
+            declaredMappedNames_.emplace(mapped, ourName);
+        if (!inserted) {
+            throw ExportError(
+                "mapped-name collision in the trail: '" + ourName + "' and '"
+                + existing->second + "' both export as '" + mapped + "'");
+        }
+    }
 
     // ------------------------------------------------------------------
     // Cache loading: full caches only, dependency post-order, first
@@ -505,6 +522,7 @@ private:
                 emitted_.insert(name);
                 return;
             }
+            registerDeclaredName(name);
             int nameIdx = nameIndexForDeclaration(name);
             std::string parameters =
                 levelParamsJson(axiom->universeParameters);
@@ -565,6 +583,7 @@ private:
                                  const ExpressionPointer& body,
                                  std::optional<bool> forceTheorem
                                      = std::nullopt) {
+        registerDeclaredName(name);
         bool isTheorem;
         try {
             isTheorem = forceTheorem ? *forceTheorem
@@ -784,6 +803,11 @@ private:
         bool kLikeReduction = livesInProposition && constructors.size() == 1
             && constructors[0].numFields == 0;
 
+        registerDeclaredName(name);
+        registerDeclaredName(recursorName);
+        for (const auto& constructorName : inductive->constructorNames) {
+            registerDeclaredName(constructorName);
+        }
         int inductiveNameIdx = nameIndexForDeclaration(name);
         std::string uparams = levelParamsJson(inductive->universeParameters);
 
@@ -974,6 +998,7 @@ private:
                                        {B(4), B(3), B(2)}),
                                    app(makeConstant("Quot.mk", {u}),
                                        {B(4), B(3), B(1)})}))))));
+        registerDeclaredName("Quot.sound");
         int soundNameIdx = internNameComponents("Quot.sound");
         std::string soundParameters = levelParamsJson({"u"});
         int soundTypeIdx = exprIndex(quotSoundType);
@@ -986,6 +1011,7 @@ private:
                       const std::vector<std::string>& parameters,
                       const ExpressionPointer& type,
                       const std::string& kind) {
+        registerDeclaredName(name);
         int nameIdx = internNameComponents(name);
         std::string parametersJson = levelParamsJson(parameters);
         int typeIdx = exprIndex(type);

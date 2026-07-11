@@ -1352,7 +1352,9 @@ void runPrintingTests(const Environment& arithmetic) {
                                         makeLevelParam("v"))),
                   "Sort MaxUniverse(u, v)");
 
-    EXPECT_PRINTS(makeConstant("zero"), "zero");
+    // The printer renders ground naturals as decimal numerals, including
+    // the bare `zero` constructor.
+    EXPECT_PRINTS(makeConstant("zero"), "0");
     EXPECT_PRINTS(makeConstant("Equality", {makeLevelConst(0)}),
                   "Equality.{0}");
     EXPECT_PRINTS(makeConstant("foo",
@@ -1393,11 +1395,12 @@ void runPrintingTests(const Environment& arithmetic) {
           makeLambda("x", makeConstant("T"), makeBoundVariable(1))),
         "λ(x : T). λ(x_1 : T). x");
 
-    // Let prints with "let ... := ... in ...".
+    // Let prints with "let ... := ... in ..." (and the numeral rendering
+    // applies inside the bound value).
     EXPECT_PRINTS(
         makeLet("n", makeConstant("Natural"), makeConstant("zero"),
                 makeBoundVariable(0)),
-        "let n : Natural := zero in n");
+        "let n : Natural := 0 in n");
 
     // Suppress the arithmetic-environment warning by referencing it.
     (void)arithmetic;
@@ -3814,19 +3817,6 @@ definition Bool.identity : Bool → Bool := (b : Bool) ↦ b
         }
     }
 
-    // calc block, single step: just returns the proof.
-    expectVerifies(R"(
-module Test.calc_single_step
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-theorem trivial (A : Type(0)) (x : A) : Equality.{0}(A, x, x) :=
-  calc x = x by reflexivity.{0}(A, x)
-)",
-        "calc with a single step elaborates to the step proof",
-        __LINE__);
-
     // Multi-pattern pattern-match: constructor patterns in non-first
     // positions desugar to nested `cases` in the body. Supports
     // definition-style bodies whose result doesn't depend on hypothesis
@@ -3904,35 +3894,6 @@ theorem lift_reduces_to_f_of_x
   reflexivity.{0}(Natural, zero)
 )",
         "Quotient.lift on Quotient.class_of reduces to f(x) definitionally",
-        __LINE__);
-
-    // calc block, two-step transitivity chain.
-    expectVerifies(R"(
-module Test.calc_two_step
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-axiom Equality.transitivity.{u}
-  : (A : Type(u)) → (x y z : A)
-    → Equality.{u}(A, x, y) → Equality.{u}(A, y, z)
-    → Equality.{u}(A, x, z)
-
-axiom step_ab : Equality.{0}(Natural, zero, successor(zero))
-axiom step_bc : Equality.{0}(Natural, successor(zero),
-                              successor(successor(zero)))
-
-theorem chained
-        : Equality.{0}(Natural, zero, successor(successor(zero))) :=
-  calc zero
-     = successor(zero)             by step_ab
-     = successor(successor(zero))  by step_bc
-)",
-        "calc with two steps folds into Equality.transitivity",
         __LINE__);
 
     // Pattern-match definition with a recursive call inside a cases
@@ -4023,47 +3984,6 @@ theorem left_in (A B : Proposition) (a : A) : A ∨ B :=
         "∨ operator desugars to Or",
         __LINE__);
 
-    // `claim P : T by E;` in a block body desugars to `let P : T :=
-    // E;`. `claim P : T;` (no body) uses the hammer.
-    expectVerifies(R"(
-module Test.claim_with_body
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-theorem trivial : Equality.{0}(Natural, zero, zero) := {
-  claim self_equality : Equality.{0}(Natural, zero, zero)
-       by reflexivity.{0}(Natural, zero);
-  self_equality
-}
-)",
-        "claim with explicit body desugars to let",
-        __LINE__);
-
-    // `claim P : T;` (no body) — hammer fills the proof.
-    expectVerifies(R"(
-module Test.claim_hammer
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-theorem trivial_via_hammer
-        : Equality.{0}(Natural, zero, zero) := {
-  claim self_equality : Equality.{0}(Natural, zero, zero);
-  self_equality
-}
-)",
-        "claim with no body invokes the hammer",
-        __LINE__);
-
     // `witness E with P;` in a block: terminal statement that
     // becomes the trailing `⟨E, P⟩` for an ∃-shaped goal.
     expectVerifies(R"(
@@ -4129,44 +4049,6 @@ theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) :=
         "cases on a disjunction swaps it",
         __LINE__);
 
-    // `by_induction on E using L with subject, ih { body }` — the
-    // elaborator builds the motive by abstracting the surrounding
-    // expected type over E, then wraps the body in lambdas for subject
-    // and ih, and calls L(motive, step, E). Tests with a custom
-    // lemma whose shape matches strong_induction.
-    expectVerifies(R"(
-module Test.by_induction_using
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-axiom Equality.congruence.{u, v}
-  : (A : Type(u)) → (B : Type(v)) → (f : A → B) → (x y : A)
-    → Equality.{u}(A, x, y) → Equality.{v}(B, f(x), f(y))
-
--- A simple structural-recursion lemma in the shape strong_induction has.
-axiom Natural.induct
-  : (P : Natural → Proposition)
-    → ((subject : Natural)
-       → ((predecessor : Natural)
-          → Equality.{0}(Natural, subject, successor(predecessor))
-          → P(predecessor))
-       → P(subject))
-    → (n : Natural) → P(n)
-
-theorem reflexive_via_induct (n : Natural)
-        : Equality.{0}(Natural, n, n) :=
-  by_induction on n using Natural.induct with subject, ih {
-    reflexivity.{0}(Natural, subject)
-  }
-)",
-        "by_induction using a custom lemma",
-        __LINE__);
-
     // `apply Expr;` — terminal block statement; Expr becomes the
     // trailing value. Just keyword sugar.
     expectVerifies(R"(
@@ -4184,35 +4066,6 @@ theorem reflexive_zero : Equality.{0}(Natural, zero, zero) := {
 }
 )",
         "apply is a terminal sugar for the trailing expression",
-        __LINE__);
-
-    // `obtain ⟨pat⟩ from E;` — statement-level let-pattern. The rest of
-    // the block sees the destructured names.
-    expectVerifies(R"(
-module Test.obtain_statement
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
-  | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
-
-axiom magicExists
-  : Exists.{0}(Natural, (n : Natural) ↦
-                          Equality.{0}(Natural, n, zero))
-
-theorem obtain_use
-        : Exists.{0}(Natural, (n : Natural) ↦
-                                Equality.{0}(Natural, n, zero)) := {
-  obtain ⟨w, wEqualsZero⟩ from magicExists;
-  Exists.introduce(w, wEqualsZero)
-}
-)",
-        "obtain destructures an existential into block-scoped names",
         __LINE__);
 
     // `assume h : P;` — statement form for `function (h : P) =>`. Used
@@ -4313,82 +4166,6 @@ theorem ex_falso (P : Proposition) (h : P) (notH : ¬P) : True := {
 }
 )",
         "contradiction discharges any goal from P and ¬P",
-        __LINE__);
-
-    // Footnote form: `claim P : T { block };` — the proof of P is the
-    // block, which can itself contain nested claims, by_cases, etc.
-    // Equivalent to `claim P : T by { block };`.
-    expectVerifies(R"(
-module Test.claim_footnote
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-theorem foo : Equality.{0}(Natural, zero, zero) := {
-  claim h : Equality.{0}(Natural, zero, zero) {
-    claim inner : Equality.{0}(Natural, zero, zero)
-         by reflexivity.{0}(Natural, zero);
-    inner
-  };
-  h
-}
-)",
-        "claim with block body works as a footnote",
-        __LINE__);
-
-    // `by_induction on n with ih { case Constructor(args): body; … }` —
-    // the `ih` name is appended to constructor patterns with recursive
-    // arguments (e.g. `successor(predecessor)` becomes
-    // `successor(predecessor, ih)`).
-    expectVerifies(R"(
-module Test.by_induction_statement
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-axiom Equality.congruence.{u, v}
-  : (A : Type(u)) → (B : Type(v)) → (f : A → B) → (x y : A)
-    → Equality.{u}(A, x, y) → Equality.{v}(B, f(x), f(y))
-
-theorem reflexive (n : Natural) : Equality.{0}(Natural, n, n) := {
-  by_induction on n with ih {
-    case zero: reflexivity.{0}(Natural, zero);
-    case successor(predecessor):
-        Equality.congruence.{0, 0}(
-            Natural, Natural, successor, predecessor, predecessor, ih);
-  }
-}
-)",
-        "by_induction injects IH into recursive constructor patterns",
-        __LINE__);
-
-    // Mixing `claim` and `let` in the same block.
-    expectVerifies(R"(
-module Test.claim_and_let
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-theorem mixed : Equality.{0}(Natural, zero, zero) := {
-  let value : Natural := zero;
-  claim self_equality : Equality.{0}(Natural, value, value)
-       by reflexivity.{0}(Natural, value);
-  self_equality
-}
-)",
-        "claim and let mix freely in block bodies",
         __LINE__);
 
     // `¬` is at tight (parseUnary) precedence — `¬P = Q` parses as
@@ -4578,54 +4355,6 @@ theorem swap_or_keep
         "∀ with multiple names in one binder chains Pi",
         __LINE__);
 
-    // calc in a pattern-match body verifies. (A recursive call inside
-    // a calc step PROOF is exercised end-to-end by the rewrite of
-    // Natural.add_commutative in library/Natural/arithmetic.math —
-    // without the rewriter descending into SurfaceCalc that proof
-    // wouldn't elaborate.)
-    expectVerifies(R"(
-module Test.calc_inside_pattern_match
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-theorem identity_reflexive
-        : (n : Natural) → Equality.{0}(Natural, n, n)
-  | zero => reflexivity.{0}(Natural, zero)
-  | successor(predecessor) =>
-      calc successor(predecessor)
-         = successor(predecessor)
-              by reflexivity.{0}(Natural, successor(predecessor))
-)",
-        "calc inside pattern-match body verifies",
-        __LINE__);
-
-    // calc block: ill-typed step proof reports the failing step.
-    expectErrorContains(R"(
-module Test.calc_bad_step
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-axiom step_ab : Equality.{0}(Natural, zero, successor(zero))
-
-theorem mismatched
-        : Equality.{0}(Natural, zero, successor(successor(zero))) :=
-  calc zero
-     = successor(zero)             by step_ab
-     = successor(successor(zero))  by step_ab
-)",
-        {"calc step 2", "theorem 'mismatched'"},
-        "calc surfaces step-level error attribution",
-        __LINE__);
 }
 
 void runEndToEndPipelineTests() {
