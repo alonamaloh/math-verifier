@@ -183,7 +183,13 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # table ops into raw-floor recursions + alias wrappers (basics/monus/power/
 # floor_divide): the eleven new `unfold Natural in` are the seal's own
 # boundary plumbing — the raw floor piercing the alias it defines.
-CLEAN_LEAK_BUDGET ?= 218
+# 2026-07-11: re-armed 218 → 230. The Stage-4 flip itself: the raw floor's
+# bootstraps (peano's zero_or_successor, arithmetic's coverage/cancellation
+# splits, the five boundary theorems in one_plus_induction, binomial,
+# multiply_order) destructure the now-sealed alias, so each gains the
+# documented `unfold Natural in` escape hatch — twelve tokens, all below
+# the boundary they bootstrap.
+CLEAN_LEAK_BUDGET ?= 230
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
@@ -340,12 +346,14 @@ leak-ratchet:
 # `successor`-outside-Natural ratchet (independent of the CIC-leak total).
 # `successor` is the Natural constructor; outside the Natural/ definitional
 # modules it is leakage — speak `n + 1` / numerals. Stage 3 of
-# PLAN_NATURAL_SEALING drove this to its floor: the 7 remaining tokens are
-# ErrorTest fixtures that deliberately exercise constructor patterns
-# (pattern_shadows_constructor, cases_with_eq_retired,
-# choose_from_ambiguous_premise, refining_retired); their fate is decided
-# at the Stage-4 flip.
-SUCCESSOR_BUDGET ?= 7
+# PLAN_NATURAL_SEALING drove this to its floor, and the Stage-4 flip
+# settled the survivors: all 11 tokens are ErrorTest fixtures that
+# deliberately exercise constructor patterns — the four Stage-3 survivors
+# kept verbatim (pattern_shadows_constructor, cases_with_eq_retired,
+# choose_from_ambiguous_premise, refining_retired) plus the two fixtures
+# locking the seal's own teaching errors (sealed_natural_pattern_match,
+# sealed_natural_cases).
+SUCCESSOR_BUDGET ?= 11
 
 successor-ratchet:
 	@scripts/cic_leak_report --successor-max $(SUCCESSOR_BUDGET)

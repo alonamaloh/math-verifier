@@ -40,6 +40,7 @@ definition Natural.binomial (n k : Natural) : Natural :=
 -- constructor arms are deliberate: the `if` guard needs the scrutinee's
 -- structure (an equation arm's `1 + k` goal is opaque-add-stuck).
 theorem Natural.binomial_zero_right (n : Natural) : Natural.binomial(n, 0) = 1 :=
+  unfold Natural in
   by induction on n {
     case zero:         done by Logic.if_positive
     case successor(k): done by Logic.if_positive
@@ -57,7 +58,7 @@ theorem Natural.binomial_zero_succ (k : Natural)
 theorem Natural.binomial_pascal (n k : Natural)
         : Natural.binomial(1 + n, 1 + k)
           = Natural.binomial(n, k) + Natural.binomial(n, 1 + k) :=
-  unfold Natural.add in
+  unfold Natural.add, Natural in
   if 1 + k = 0
   then { 1 + k ≠ 0; done }
   else {
@@ -72,7 +73,7 @@ theorem Natural.binomial_overflow (n : Natural)
     case zero:
         (k : Natural) (overflow : 1 + 0 ≤ k) ↦
           cases k {
-            | 0 => unfold Natural.add in {
+            | 0 => unfold Natural.add, Natural in {
                 False;
                 done
               }
@@ -84,7 +85,7 @@ theorem Natural.binomial_overflow (n : Natural)
     case 1 + nPredecessor:
         (k : Natural) (overflow : 1 + (1 + nPredecessor) ≤ k) ↦
           cases k {
-            | 0 => unfold Natural.add in {
+            | 0 => unfold Natural.add, Natural in {
                 False;
                 done
               }
@@ -118,7 +119,7 @@ theorem Natural.binomial_factorial_row (i : Natural)
         (n : Natural)
         : Natural.binomial((1 + i) + n, 1 + i) * ((1 + i)! * n!) = ((1 + i) + n)! :=
   by induction on n with IH {
-    case n = 0: unfold Natural.add in {
+    case n = 0: unfold Natural.add, Natural in {
         i + 0 = i;
         (1 + (i + 0)) ≤ 1 + i;
         Natural.binomial(i + 0, 1 + i) = 0;
@@ -132,7 +133,7 @@ theorem Natural.binomial_factorial_row (i : Natural)
            = (1 + (i + 0)) * (i + 0)!
            = ((1 + i) + 0)!
       }
-    case n = 1 + m: unfold Natural.add in {
+    case n = 1 + m: unfold Natural.add, Natural in {
         Natural.binomial(i + (1 + m), i) * (i! * (1 + m)!) = (i + (1 + m))! by previousRow(1 + m);
         Natural.binomial((1 + i) + m, 1 + i) * ((1 + i)! * m!) = ((1 + i) + m)! by IH;
         i + (1 + m) = (1 + i) + m;

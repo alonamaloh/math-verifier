@@ -1137,6 +1137,12 @@ private:
         std::string combinatorName;   // e.g. "Natural.recursion"
         std::string inductiveName;    // e.g. "Natural.Raw"
         std::string aliasName;        // e.g. "Natural"
+        // The Proposition-level twin — `<Alias>.induction_on_successor`,
+        // whose (motive, base, step-with-IH, scrutinee) layout matches
+        // the recursor's exactly — when it is in scope; empty otherwise.
+        // Proposition-valued matches and case splits ride it the way
+        // Type-valued ones ride the recursion combinator.
+        std::string propositionCombinatorName;
         bool aliasIsOpaque = false;
     };
     std::optional<BoundaryRecursion> resolveBoundaryRecursion(

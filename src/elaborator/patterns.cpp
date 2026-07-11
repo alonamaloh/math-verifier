@@ -77,6 +77,15 @@ Elaborator::resolveBoundaryRecursion(
         result.combinatorName = std::move(combinatorName);
         result.inductiveName = bodyConstant->name;
         result.aliasName = aliasConstant->name;
+        std::string propositionCombinatorName =
+            aliasConstant->name + ".induction_on_successor";
+        const Declaration* propositionLookup =
+            environment_.lookup(propositionCombinatorName);
+        if (propositionLookup
+            && std::get_if<Definition>(propositionLookup)) {
+            result.propositionCombinatorName =
+                std::move(propositionCombinatorName);
+        }
         result.aliasIsOpaque =
             aliasDefinition->opacity == Opacity::Opaque;
         return result;
@@ -446,10 +455,22 @@ void Elaborator::elaboratePatternMatchDefinition(
         if (boundaryRecursion) {
             LevelPointer combinatorUniverse =
                 boundaryRecursionUniverse(motiveLevel);
+            auto* motiveLevelConstant =
+                std::get_if<LevelConst>(&motiveLevel->node);
+            bool motiveIsProposition =
+                motiveLevelConstant && motiveLevelConstant->value == 0;
             if (combinatorUniverse) {
                 recursorReference = makeConstant(
                     boundaryRecursion->combinatorName,
                     {std::move(combinatorUniverse)});
+            } else if (motiveIsProposition
+                       && !boundaryRecursion->propositionCombinatorName
+                               .empty()) {
+                // A Proposition-valued match rides the Prop-level twin
+                // (`induction_on_successor`), whose argument layout
+                // matches the recursor's exactly.
+                recursorReference = makeConstant(
+                    boundaryRecursion->propositionCombinatorName);
             } else if (boundaryRecursion->aliasIsOpaque) {
                 throw ElaborateError(
                     "pattern-match definition '" + declaration.name

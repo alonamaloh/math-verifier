@@ -1920,10 +1920,22 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         if (boundaryRecursion) {
             LevelPointer combinatorUniverse =
                 boundaryRecursionUniverse(motiveLevel);
+            auto* motiveLevelConstant =
+                std::get_if<LevelConst>(&motiveLevel->node);
+            bool motiveIsProposition =
+                motiveLevelConstant && motiveLevelConstant->value == 0;
             if (combinatorUniverse) {
                 applied = makeConstant(
                     boundaryRecursion->combinatorName,
                     {std::move(combinatorUniverse)});
+            } else if (motiveIsProposition
+                       && !boundaryRecursion->propositionCombinatorName
+                               .empty()) {
+                // A Proposition case split rides the Prop-level twin
+                // (`induction_on_successor` — its step carries the IH
+                // slot the recursor-shaped case lambdas already bind).
+                applied = makeConstant(
+                    boundaryRecursion->propositionCombinatorName);
             } else if (boundaryRecursion->aliasIsOpaque) {
                 throw ElaborateError(
                     "cases at line " + std::to_string(line)

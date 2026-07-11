@@ -13,11 +13,15 @@ inductive Natural.Raw : Type(0) where
   | Natural.Raw.zero : Natural.Raw
   | Natural.Raw.successor : Natural.Raw → Natural.Raw
 
--- The public type is an alias over the raw inductive. Transparent for
--- now — the seal (Stage 4 of PLAN_NATURAL_SEALING) is the one-keyword
--- flip to `opaque definition`; everything below already speaks through
--- the boundary, so the flip changes nothing else in this file.
-definition Natural : Type(0) := Natural.Raw
+-- The public type is SEALED over the raw inductive (Stage 4 of
+-- PLAN_NATURAL_SEALING): consumers cannot pattern-match on it or reach
+-- the raw recursor — structural recursion and case analysis go through
+-- `Natural.recursion` and the boundary theorems
+-- (`Natural.induction_on_successor`, `Natural.cases_on_successor`,
+-- `Natural.induction_on_one_plus`, …), exactly as ℤ/ℚ/ℝ are reasoned
+-- about through their boundaries. The raw floor pierces the seal with
+-- `unfold Natural in`.
+opaque definition Natural : Type(0) := Natural.Raw
 
 -- The constructors under their historical bare names, re-exposed AT THE
 -- ALIAS. Transparent on purpose: they δ-reduce onto the raw
