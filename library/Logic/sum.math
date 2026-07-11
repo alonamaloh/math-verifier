@@ -10,15 +10,15 @@
 
 module Logic.sum
 
-inductive Sum (A B : Type) : Type where
+inductive Sum.{u, v} (A : Type(u)) (B : Type(v)) : Type(MaxUniverse(u, v)) where
   | Sum.left  : A → Sum(A, B)
   | Sum.right : B → Sum(A, B)
 
 -- The disjoint union of two `Type(0)`s. `Sum` is universe-polymorphic, and
--- at `Type(0)` its three levels can't be inferred from the operands, so the
--- bare `Sum(A, B)` forces a `.{0,0,0}` annotation at every use. This alias
+-- at `Type(0)` its levels can't be inferred from the operands, so the
+-- bare `Sum(A, B)` forces a `.{0,0}` annotation at every use. This alias
 -- fixes the levels once, so surface code reads `DisjointUnion(A, B)` with no
 -- ceremony. It unfolds to `Sum`, so the constructors `Sum.left` / `Sum.right`
 -- and `cases` on it work unchanged (and bare `Sum.left(value)` infers its
 -- arguments from the expected `DisjointUnion` type).
-definition DisjointUnion (A B : Type(0)) : Type(0) := Sum.{0, 0, 0}(A, B)
+definition DisjointUnion (A B : Type(0)) : Type(0) := Sum.{0, 0}(A, B)

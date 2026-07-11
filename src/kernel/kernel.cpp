@@ -2913,6 +2913,15 @@ void addInductive(Environment& environment, std::string inductiveName,
             "addInductive: numParameters out of range for kind: " + inductiveName);
     }
     int numIndices = totalPiCount - numParameters;
+    // The kind's terminal Sort: Proposition-valued inductives are exempt
+    // from the constructor-field universe bound (impredicativity);
+    // Type-valued ones must contain their fields (checked below).
+    auto* terminalSort = std::get_if<Sort>(&kindWalker->node);
+    bool livesInProposition = false;
+    {
+        auto terminalLevel = levelAsConstant(terminalSort->level);
+        livesInProposition = terminalLevel && *terminalLevel == 0;
+    }
 
     // Pre-register the inductive so that constructor types can reference it.
     std::vector<std::string> constructorNames;
@@ -2969,6 +2978,48 @@ void addInductive(Environment& environment, std::string inductiveName,
                     "addInductive: constructor " + constructor.name +
                     " does not end in " + inductiveName);
             }
+            // Universe containment (Lean's rule, PLAN_KERNEL_EXPORT):
+            // unless the inductive lives in Proposition, every
+            // non-parameter constructor field's sort must fit inside the
+            // inductive's sort — otherwise the inductive smuggles large
+            // data into a small universe (a size violation an external
+            // checker rejects). levelLessOrEqual is a conservative
+            // partial decision: an undecided comparison rejects, which
+            // is only ever stricter.
+            if (!livesInProposition) {
+                Context fieldContext;
+                auto fieldWalker = constructor.type;
+                int fieldPiIndex = 0;
+                while (auto* pi = std::get_if<Pi>(&fieldWalker->node)) {
+                    std::string freshName =
+                        "universeCheckField_" + std::to_string(fieldPiIndex);
+                    if (fieldPiIndex >= numParameters) {
+                        auto fieldKind = weakHeadNormalForm(
+                            environment,
+                            inferType(environment, fieldContext, pi->domain));
+                        auto* fieldSort = std::get_if<Sort>(&fieldKind->node);
+                        if (!fieldSort
+                            || !levelLessOrEqual(fieldSort->level,
+                                                 terminalSort->level)) {
+                            rollback();
+                            throw TypeError(
+                                "addInductive: constructor " +
+                                constructor.name + " has a field whose "
+                                "universe is not contained in the "
+                                "universe of " + inductiveName +
+                                " (a Type-valued inductive must be "
+                                "declared in a universe at least as "
+                                "large as each of its fields — use a "
+                                "MaxUniverse(...) codomain)");
+                        }
+                    }
+                    fieldContext.push_back({freshName, pi->domain,
+                                            FreeVariableOrigin::Internal});
+                    fieldWalker = openBinder(pi->codomain, freshName,
+                                             FreeVariableOrigin::Internal);
+                    fieldPiIndex++;
+                }
+            }
         } catch (const TypeError&) {
             rollback();
             throw;
@@ -2992,19 +3043,7 @@ void addInductive(Environment& environment, std::string inductiveName,
         throw TypeError(
             "addInductive: recursor name already taken: " + recursorName);
     }
-    bool inductiveLivesInProposition = false;
-    {
-        auto terminal = kind;
-        while (auto* pi = std::get_if<Pi>(&terminal->node)) {
-            terminal = pi->codomain;
-        }
-        if (auto* sort = std::get_if<Sort>(&terminal->node)) {
-            auto level = levelAsConstant(sort->level);
-            if (level && *level == 0) {
-                inductiveLivesInProposition = true;
-            }
-        }
-    }
+    bool inductiveLivesInProposition = livesInProposition;
     // Large elimination from Proposition is sound when there's nothing to extract:
     //   - empty inductives (zero constructors): no proof to extract from,
     //   - subsingleton inductives (exactly one constructor, each of whose

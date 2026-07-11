@@ -164,6 +164,8 @@ bool levelLessOrEqual(LevelPointer subLevel, LevelPointer superLevel) {
     if (subConcrete && superConcrete) {
         return *subConcrete <= *superConcrete;
     }
+    // 0 <= anything (levels denote naturals under every valuation).
+    if (subConcrete && *subConcrete == 0) return true;
     // sub <= max(a, b) if sub <= a OR sub <= b.
     if (auto* superMax = std::get_if<LevelMax>(&superLevel->node)) {
         return levelLessOrEqual(subLevel, superMax->left)
@@ -188,6 +190,18 @@ bool levelLessOrEqual(LevelPointer subLevel, LevelPointer superLevel) {
             return levelLessOrEqual(
                 subSuccessor->base, makeLevelConst(*superConcrete - 1));
         }
+    }
+    // LevelConst n <= successor(b)  iff  LevelConst (n-1) <= b (n >= 1;
+    // n = 0 was handled above).
+    if (auto* superSuccessor = std::get_if<LevelSuccessor>(&superLevel->node);
+        superSuccessor && subConcrete && *subConcrete >= 1) {
+        return levelLessOrEqual(makeLevelConst(*subConcrete - 1),
+                                superSuccessor->base);
+    }
+    // Weakening: sub <= successor(b) if sub <= b.
+    if (auto* superSuccessor =
+            std::get_if<LevelSuccessor>(&superLevel->node)) {
+        return levelLessOrEqual(subLevel, superSuccessor->base);
     }
     return false;
 }

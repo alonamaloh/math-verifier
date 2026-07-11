@@ -7251,6 +7251,12 @@ static int kernelMain(int argc, char* argv[]) {
         }
     }
 
+    if (argc >= 2 && std::string(argv[1]) == "export-lean4") {
+        // PLAN_KERNEL_EXPORT Stage 3: the untrusted lean4export-format
+        // exporter (src/export_lean4.cpp).
+        extern int runExportLean4(int argc, char* argv[]);
+        return runExportLean4(argc, argv);
+    }
     if (argc >= 3 && std::string(argv[1]) == "verify") {
         // Enable WHNF memoization for the verify command. The test suite
         // (default argv) doesn't enable it because some integration tests

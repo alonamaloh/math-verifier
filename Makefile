@@ -35,6 +35,7 @@ SRCS := \
     src/elaborator/normalization.cpp src/elaborator/rewrite.cpp \
     src/elaborator/desugar_eliminators.cpp src/elaborator/unification.cpp \
     src/elaborator/term_utilities.cpp src/elaborator/lemma_search.cpp \
+    src/export_lean4.cpp \
     src/main.cpp
 
 OBJS := $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRCS))
