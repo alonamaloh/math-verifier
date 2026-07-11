@@ -170,6 +170,17 @@ definition IntegerMod.residues_product (p top : Natural) : IntegerMod(p) :=
   List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
       IntegerMod.residues_up_to(p, top))
 
+-- The recursion in `1 + n` form: the top residue times the rest.
+theorem IntegerMod.residues_product_one_plus (p n : Natural)
+        : IntegerMod.residues_product(p, 1 + n)
+          = IntegerMod.residue(p, 1 + n) * IntegerMod.residues_product(p, n) :=
+  IntegerMod.residues_product(p, 1 + n)
+     = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+           List.prepend(IntegerMod(p), IntegerMod.residue(p, 1 + n),
+               IntegerMod.residues_up_to(p, n)))
+           by substituting IntegerMod.residues_up_to_one_plus
+     = IntegerMod.residue(p, 1 + n) * IntegerMod.residues_product(p, n)
+
 -- ----------------------------------------------------------------------
 -- The pairing behind Wilson: once the residue list is rearranged into
 -- 1 :: −1 :: rest, every class z in `rest` keeps a partner inside `rest`:
@@ -396,25 +407,27 @@ theorem IntegerMod.residues_product_is_factorial (p top : Natural)
         : IntegerMod.residues_product(p, top)
           = IntegerMod.make(p, (top! : Integer)) :=
   by induction on top with IH {
-    case zero:
+    case top = 0:
         IntegerMod.residues_product(p, 0)
            = IntegerMod.make(p, (0! : Integer))
-    case successor(predecessor): {
-        ((successor(predecessor) * predecessor! : Natural) : Integer)
-              = (successor(predecessor) : Integer) * (predecessor! : Integer) as castProduct;
-        IntegerMod.residues_product(p, successor(predecessor))
-           = IntegerMod.residue(p, successor(predecessor))
+    case top = 1 + predecessor for some predecessor: {
+        (((1 + predecessor) * predecessor! : Natural) : Integer)
+              = ((1 + predecessor) : Integer) * (predecessor! : Integer) as castProduct;
+        IntegerMod.residues_product(p, 1 + predecessor)
+           = IntegerMod.residue(p, 1 + predecessor)
                  * IntegerMod.residues_product(p, predecessor)
-           = IntegerMod.residue(p, successor(predecessor))
+                 by IntegerMod.residues_product_one_plus
+           = IntegerMod.residue(p, 1 + predecessor)
                  * IntegerMod.make(p, (predecessor! : Integer))
                  by substituting IH
-           = IntegerMod.make(p, (successor(predecessor) : Integer)
+           = IntegerMod.make(p, (1 + predecessor : Integer)
                  * (predecessor! : Integer))
            = IntegerMod.make(p,
-                 ((successor(predecessor) * predecessor!
+                 (((1 + predecessor) * predecessor!
                      : Natural) : Integer))
                  by substituting castProduct
-           = IntegerMod.make(p, (successor(predecessor)! : Integer))
+           = IntegerMod.make(p, ((1 + predecessor)! : Integer))
+                 by substituting Natural.factorial_add_one
       }
   }
 
@@ -463,7 +476,7 @@ theorem Natural.wilson (p n : Natural)
         : Integer.divides((p : Integer),
               (n! : Integer) + Integer.one) :=
   cases n {
-    | zero => {
+    | 0 => {
         -- n = 0 would make p = 1, which is not prime.
         2 ≤ p;
         2 ≤ 1 + 0 by substituting pEquation;
@@ -471,9 +484,9 @@ theorem Natural.wilson (p n : Natural)
         False as impossible;
         absurd(impossible)
       }
-    | successor(m) =>
+    | 1 + m =>
         cases m {
-          | zero => {
+          | 0 => {
               -- p = 2: 1! + 1 = 2 divides itself.
               ((1 + 1 : Natural) : Integer)
                     = ((1 : Natural) : Integer) + ((1 : Natural) : Integer);
@@ -488,10 +501,10 @@ theorem Natural.wilson (p n : Natural)
                      = (Integer.one + Integer.one) * Integer.one        by ring
                      = (p : Integer) * Integer.one                      by substituting castP
             }
-          | successor(k) => {
+          | 1 + k => {
               -- n = 2 + k ≥ 2: the pairing argument applies.
-              1 ≤ successor(k);
-              2 ≤ successor(successor(k));
+              1 ≤ 1 + k;
+              2 ≤ 1 + (1 + k);
               done by Natural.wilson_divides
             }
         }
@@ -521,19 +534,17 @@ theorem Natural.divisor_one_or_self_of_divides_factorial_plus_one
           case divisor ≤ p as divisorAtMostP: {
               divisor
                  ≤ p             by divisorAtMostP
-                 = 1 + n
-                 = successor(n);
-              divisor ≠ successor(n)
+                 = 1 + n;
+              divisor ≠ 1 + n
                   by {
-                      suppose divisor = successor(n) as isTop;
+                      suppose divisor = 1 + n as isTop;
                       divisor
-                         = successor(n)
                          = 1 + n
                          = p;
                       done
                     };
               divisor ≤ n
-                  by Natural.less_or_equal_successor_not_equal;
+                  by Natural.le_of_le_one_plus_of_ne;
               divisor ≠ 0
                   by {
                       suppose divisor = 0 as isZero;

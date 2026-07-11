@@ -102,7 +102,7 @@ theorem Rational.factorial_cast_positive (k : Natural)
 -- ----------------------------------------------------------------------
 -- The defining recurrence, with the factorial unwound one step:
 -- term(x, k+1) = (1/(k+1)) · x · term(x, k).
-theorem Real.exponentialTerm_successor (x : Real) (k : Natural)
+theorem Real.exponentialTerm_one_plus (x : Real) (k : Natural)
         : Real.exponentialTerm(x, 1 + k)
           = (1 / (1 + k : Real))
             * (x * Real.exponentialTerm(x, k)) := {
@@ -471,8 +471,7 @@ theorem Real.exponential_series_absolutely_convergent (x : Real)
         take n : Natural;
         cases Natural.compare_strict(n, K) {
           | Natural.StrictComparison.below(nStrictlyBelow) => {
-              n ≤ successor(n);
-              n ≤ K;
+              n ≤ K by Natural.LessThan.weaken;
               Real.partialSum(
                     (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), n)
                 ≤ Real.partialSum(
@@ -616,24 +615,24 @@ theorem Real.exponential_converges (x : Real)
 -- 0^(k+1) = 0.
 theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
   Real.exponentialTerm(Real.zero, 0) = Real.one as termZero;
-  ∀ (k : Natural). Real.exponentialTerm(Real.zero, successor(k)) = Real.zero
+  ∀ (k : Natural). Real.exponentialTerm(Real.zero, 1 + k) = Real.zero
       by {
         take k : Natural;
-        Real.zero ^ successor(k)
+        Real.zero ^ (1 + k)
             = Real.zero * Real.zero ^ k
             = Real.zero    by ring
             as powerVanishes;
-        Real.exponentialTerm(Real.zero, successor(k))
-           = (1 / (successor(k)! : Real)) * Real.zero ^ successor(k)
-           = (1 / (successor(k)! : Real)) * Real.zero
+        Real.exponentialTerm(Real.zero, 1 + k)
+           = (1 / ((1 + k)! : Real)) * Real.zero ^ (1 + k)
+           = (1 / ((1 + k)! : Real)) * Real.zero
                  by powerVanishes
            = Real.zero
                  by ring
-      } as termSuccessor;
+      } as laterTermsVanish;
   ∀ (p : Natural).
-      Real.partialSum(Real.exponentialTerm(Real.zero), successor(p)) = Real.one
+      Real.partialSum(Real.exponentialTerm(Real.zero), 1 + p) = Real.one
       by by induction on p with IH {
-           case zero:
+           case p = 0:
                Real.partialSum(
                    Real.exponentialTerm(Real.zero), 1)
              = Real.partialSum(Real.exponentialTerm(Real.zero), 0)
@@ -641,17 +640,16 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
              = Real.zero + Real.one
                    by termZero
              = Real.one
-           case successor(q):
+           case p = 1 + q for some q:
                Real.partialSum(
-                   Real.exponentialTerm(Real.zero),
-                   successor(successor(q)))
+                   Real.exponentialTerm(Real.zero), 1 + (1 + q))
              = Real.partialSum(
-                   Real.exponentialTerm(Real.zero), successor(q))
-               + Real.exponentialTerm(Real.zero, successor(q))
-             = Real.one + Real.exponentialTerm(Real.zero, successor(q))
+                   Real.exponentialTerm(Real.zero), 1 + q)
+               + Real.exponentialTerm(Real.zero, 1 + q)
+             = Real.one + Real.exponentialTerm(Real.zero, 1 + q)
                    by IH
              = Real.one + Real.zero
-                   by termSuccessor
+                   by laterTermsVanish
              = Real.one
          } as tailConstant;
   Real.SequenceConverges(
@@ -663,12 +661,11 @@ theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
             (m : Natural) (oneBelow : 1 ≤ m) ↦ {
               choose c such that m = 1 + c as mSplit
                   from Natural.subtraction_witness;
-              m = successor(c) by mSplit as mAsSuccessor;
               Real.partialSum(
                       Real.exponentialTerm(Real.zero), m)
                   = Real.partialSum(
-                        Real.exponentialTerm(Real.zero), successor(c))
-                        by mAsSuccessor
+                        Real.exponentialTerm(Real.zero), 1 + c)
+                        by mSplit
                   = Real.one
                         by tailConstant
                   as sumAtM;

@@ -62,49 +62,50 @@ theorem Equinumerous.product_congruence (A A' B B' : Type(0))
 -- The core bijection, by cases on n (the divisor must be positive).
 
 -- The forward index n·i + j of a grid cell stays below m·n. Reading the
--- chain: successor(n·i + j) = n·i + successor(j) ≤ n·i + n = n·successor(i)
--- ≤ n·m = m·n, using successor(j) ≤ n (the second component's bound) and
--- successor(i) ≤ m (the first component's bound).
+-- chain: (n·i + j) + 1 = n·i + (j + 1) ≤ n·i + n = n·(i + 1)
+-- ≤ n·m = m·n, using j + 1 ≤ n (the second component's bound) and
+-- i + 1 ≤ m (the first component's bound).
 theorem NaturalsBelow.product_index_bound (m n i j : Natural)
         (belowM : i < m) (belowN : j < n)
         : n * i + j < m * n := {
-  successor(i) ≤ m;
-  successor(j) ≤ n;
-  successor(n * i + j)
-     = n * i + successor(j)
+  i + 1 ≤ m by Natural.add_one_le_of_lt;
+  j + 1 ≤ n by Natural.add_one_le_of_lt;
+  n * i + j + 1
+     = n * i + (j + 1)
      ≤ n * i + n
      = n + n * i
-     = n * successor(i)
+     = n * (i + 1)
      ≤ n * m
      = m * n;
-  done
+  done by Natural.lt_of_add_one_le
 }
 
 -- The quotient `divide(k, n)` of an index below m·n is itself below m: it is
 -- the row of the cell. From the decomposition n·q + r = k we read q ≤ k, so
--- n·q < n·m; were m ≤ q we would get n·m ≤ n·q, putting successor(n·q) below
+-- n·q < n·m; were m ≤ q we would get n·m ≤ n·q, putting n·q below
 -- itself. (n is the divisor, so it must be positive.)
 theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
         (oneLeN : 1 ≤ n) (belowProduct : k < m * n)
         : Natural.floor_divide(k, n) < m := {
-  successor(k) ≤ m * n;
+  k + 1 ≤ m * n by Natural.add_one_le_of_lt;
   n * Natural.floor_divide(k, n) + Natural.modulo(k, n) = k;
   n * Natural.floor_divide(k, n)
       ≤ n * Natural.floor_divide(k, n) + Natural.modulo(k, n)
       = k;
-  successor(n * Natural.floor_divide(k, n))
-      ≤ successor(k)
+  n * Natural.floor_divide(k, n) + 1
+      ≤ k + 1
       ≤ m * n
       = n * m;
   cases Natural.compare_strict(Natural.floor_divide(k, n), m) {
     | Natural.StrictComparison.below(strictlyBelow) =>
         { done }
     | Natural.StrictComparison.atLeast(atLeast) => {
-        -- m ≤ q forces n·m ≤ n·q, so successor(n·q) ≤ n·m ≤ n·q: impossible.
-        successor(n * Natural.floor_divide(k, n))
+        -- m ≤ q forces n·m ≤ n·q, so n·q below itself: impossible.
+        n * Natural.floor_divide(k, n) + 1
             ≤ n * m
             ≤ n * Natural.floor_divide(k, n)   as selfBelow;
-        absurd(Natural.not_successor_less_or_equal_self(n * Natural.floor_divide(k, n), selfBelow))
+        absurd(Natural.lt_irreflexive(n * Natural.floor_divide(k, n))
+                   (Natural.lt_of_add_one_le(n * Natural.floor_divide(k, n), n * Natural.floor_divide(k, n), selfBelow)))
       }
   }
 }
@@ -149,22 +150,24 @@ theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : 1 ≤ n)
             NaturalsBelow.product_index_bound(m, n,
                 NaturalsBelow.value(first), NaturalsBelow.value(second),
                 NaturalsBelow.below(first), NaturalsBelow.below(second));
-        successor(Natural.modulo(index, n)) ≤ n by Natural.modulo_bound as remainderBelowN;
-        successor(NaturalsBelow.value(second)) ≤ n as secondBelowN;
+        Natural.modulo(index, n) < n
+            by Natural.lt_of_successor_le(h := Natural.modulo_bound(index, n, oneLeN)) as remainderBelowN;
+        NaturalsBelow.value(second) < n as secondBelowN;
         -- Dividing the index by n recovers quotient i and remainder j.
-        n * Natural.floor_divide(index, n) + Natural.modulo(index, n) = index as decompose;
+        n * Natural.floor_divide(index, n) + Natural.modulo(index, n) = index;
         Natural.floor_divide(index, n) = NaturalsBelow.value(first)
-            by Natural.quotient_remainder_unique(n,
-                   Natural.floor_divide(index, n), Natural.modulo(index, n),
-                   NaturalsBelow.value(first), NaturalsBelow.value(second),
-                   remainderBelowN, secondBelowN, decompose);
-        Natural.modulo(index, n) = NaturalsBelow.value(second) by Natural.remainder_unique;
+            by Natural.quotient_remainder_unique(
+                   remOneBound := Natural.successor_le_of_lt(Natural.modulo(index, n), n, remainderBelowN),
+                   remTwoBound := Natural.successor_le_of_lt(NaturalsBelow.value(second), n, secondBelowN));
+        Natural.modulo(index, n) = NaturalsBelow.value(second)
+            by Natural.remainder_unique(
+                   remOneBound := Natural.successor_le_of_lt(Natural.modulo(index, n), n, remainderBelowN),
+                   remTwoBound := Natural.successor_le_of_lt(NaturalsBelow.value(second), n, secondBelowN));
         let recoveredFirst : NaturalsBelow(m) :=
             NaturalsBelow.make(Natural.floor_divide(index, n),
                 NaturalsBelow.product_quotient_bound(m, n, index, oneLeN, indexBound));
         let recoveredSecond : NaturalsBelow(n) :=
-            NaturalsBelow.make(Natural.modulo(index, n),
-                Natural.lt_of_successor_le(Natural.modulo(index, n), n, remainderBelowN));
+            NaturalsBelow.make(Natural.modulo(index, n), remainderBelowN);
         recoveredFirst = first;
         recoveredSecond = second;
         done
@@ -192,7 +195,7 @@ theorem NaturalsBelow.product_round_trip_right (m n : Natural) (oneLeN : 1 ≤ n
 theorem NaturalsBelow.product_equinumerous (m n : Natural)
         : Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n)) :=
   cases n {
-    | zero => {
+    | 0 => {
         -- Both sides are empty: the product has no second component (below 0),
         -- and the target NaturalsBelow(m·0) is empty since m·0 = 0.
         Pair(NaturalsBelow(m), NaturalsBelow(0)) → False
@@ -206,17 +209,20 @@ theorem NaturalsBelow.product_equinumerous (m n : Natural)
             };
         done by Equinumerous.empty_types
       }
-    | successor(predecessorN) => {
-        1 ≤ successor(predecessorN) as oneLeN;
-        ∀ (p : Pair(NaturalsBelow(m), NaturalsBelow(successor(predecessorN)))).
-              NaturalsBelow.product_out_of(m, successor(predecessorN), oneLeN,
-                  NaturalsBelow.product_into(m, successor(predecessorN), oneLeN, p)) = p as leftInverse;
-        ∀ (k : NaturalsBelow(m * successor(predecessorN))).
-              NaturalsBelow.product_into(m, successor(predecessorN), oneLeN,
-                  NaturalsBelow.product_out_of(m, successor(predecessorN), oneLeN, k)) = k as rightInverse;
-        witness NaturalsBelow.product_into(m, successor(predecessorN), oneLeN)
-         with witness NaturalsBelow.product_out_of(m, successor(predecessorN), oneLeN)
-         with And.introduction(leftInverse, rightInverse)
+    | 1 + predecessorN => {
+        1 ≤ 1 + predecessorN as oneLeN;
+        ∀ (p : Pair(NaturalsBelow(m), NaturalsBelow(1 + predecessorN))).
+              NaturalsBelow.product_out_of(m, 1 + predecessorN, oneLeN,
+                  NaturalsBelow.product_into(m, 1 + predecessorN, oneLeN, p)) = p as leftInverse;
+        ∀ (k : NaturalsBelow(m * (1 + predecessorN))).
+              NaturalsBelow.product_into(m, 1 + predecessorN, oneLeN,
+                  NaturalsBelow.product_out_of(m, 1 + predecessorN, oneLeN, k)) = k as rightInverse;
+        Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(1 + predecessorN)),
+                     NaturalsBelow(m * (1 + predecessorN)))
+            by witness NaturalsBelow.product_into(m, 1 + predecessorN, oneLeN)
+                with witness NaturalsBelow.product_out_of(m, 1 + predecessorN, oneLeN)
+                with And.introduction(leftInverse, rightInverse);
+        done by substituting Natural.one_add
       }
   }
 

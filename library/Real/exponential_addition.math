@@ -143,8 +143,7 @@ theorem Real.exponentialTerm_binomial_split (x y : ℝ) (k : ℕ)
               * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ Natural.monus(k, i)))
           = Real.exponentialTerm(x, i) * Real.exponentialTerm(y, Natural.monus(k, i))
       by (i : ℕ) (iLessThan : i < 1 + k) ↦ {
-           successor(i) ≤ 1 + k;
-           i ≤ k by Natural.successor_le_cancel;
+           i ≤ k by Natural.le_of_lt_one_plus;
            choose d such that k = i + d from Natural.subtraction_witness;
            i + d = k as kJoin;
            Natural.monus(k, i) = d
@@ -208,8 +207,8 @@ theorem Real.cauchy_product_exchange (a b : ℕ → ℝ) (n : ℕ)
                     a(i) * Real.partialSum(b, Natural.monus(n, i)),
                 n) :=
   by induction on n with IH {
-    case zero: done
-    case successor(p): {
+    case n = 0: done
+    case n = 1 + p for some p: {
       Real.partialSum(
                 (k : ℕ) ↦
                     Real.partialSum(
@@ -226,7 +225,7 @@ theorem Real.cauchy_product_exchange (a b : ℕ → ℝ) (n : ℕ)
       Real.partialSum(
                 (i : ℕ) ↦
                     a(i) * Real.partialSum(b, Natural.monus(p, i)),
-                successor(p))
+                1 + p)
             = Real.partialSum(
                   (i : ℕ) ↦
                       a(i) * Real.partialSum(b, Natural.monus(p, i)),
@@ -248,36 +247,28 @@ theorem Real.cauchy_product_exchange (a b : ℕ → ℝ) (n : ℕ)
                       a(i) * Real.partialSum(b, Natural.monus(p, i)),
                   p)
                   by ring as headPadding;
-      -- Below the cut, peeling the successor off n − i absorbs one
+      -- Below the cut, peeling one term off n − i absorbs one
       -- diagonal term into each weight.
-      ∀ (i : ℕ). i < successor(p)
+      ∀ (i : ℕ). i < 1 + p
             → a(i) * Real.partialSum(b, Natural.monus(p, i))
                   + a(i) * b(Natural.monus(p, i))
-              = a(i) * Real.partialSum(b, Natural.monus(successor(p), i))
-          by (i : ℕ) (iLessThan : i < successor(p)) ↦ {
-               successor(i) ≤ successor(p);
-               i ≤ p;
-               Natural.monus(successor(p), i)
-                     = successor(Natural.monus(p, i)) as monusStep;
+              = a(i) * Real.partialSum(b, Natural.monus(1 + p, i))
+          by (i : ℕ) (iLessThan : i < 1 + p) ↦ {
+               i ≤ p by Natural.le_of_lt_one_plus;
+               Natural.monus(1 + p, i) = 1 + Natural.monus(p, i) as monusStep;
                a(i) * Real.partialSum(b, Natural.monus(p, i))
                         + a(i) * b(Natural.monus(p, i))
                   = a(i) * (Real.partialSum(b, Natural.monus(p, i))
                                 + b(Natural.monus(p, i)))
-                  = a(i) * Real.partialSum(b, successor(Natural.monus(p, i)))
-                  = a(i) * Real.partialSum(b, Natural.monus(successor(p), i))
+                  = a(i) * Real.partialSum(b, 1 + Natural.monus(p, i))
+                  = a(i) * Real.partialSum(b, Natural.monus(1 + p, i))
                         by monusStep
              };
       Real.partialSum(
                (k : ℕ) ↦
                    Real.partialSum(
                        (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
-               successor(p))
-         = Real.partialSum(
-               (k : ℕ) ↦
-                   Real.partialSum(
-                       (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
                1 + p)
-               by substituting Natural.one_add
          = Real.partialSum(
                (k : ℕ) ↦
                    Real.partialSum(
@@ -296,20 +287,20 @@ theorem Real.cauchy_product_exchange (a b : ℕ → ℝ) (n : ℕ)
          = Real.partialSum(
                (i : ℕ) ↦
                    a(i) * Real.partialSum(b, Natural.monus(p, i)),
-               successor(p))
+               1 + p)
            + Real.partialSum(
-                 (i : ℕ) ↦ a(i) * b(Natural.monus(p, i)), successor(p))
+                 (i : ℕ) ↦ a(i) * b(Natural.monus(p, i)), 1 + p)
                by headPadding
          = Real.partialSum(
                (i : ℕ) ↦
                    a(i) * Real.partialSum(b, Natural.monus(p, i))
                    + a(i) * b(Natural.monus(p, i)),
-               successor(p))
+               1 + p)
                by Real.partialSum_add
          = Real.partialSum(
                (i : ℕ) ↦
-                   a(i) * Real.partialSum(b, Natural.monus(successor(p), i)),
-               successor(p))
+                   a(i) * Real.partialSum(b, Natural.monus(1 + p, i)),
+               1 + p)
                by Real.partialSum_pointwise_below
     }
   }
@@ -366,8 +357,7 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
             - abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)),
                   Natural.monus(n, i))
       by (i : ℕ) (iLessThan : i < n) ↦ {
-           successor(i) ≤ n;
-           i ≤ n;
+           i ≤ n by Natural.LessThan.weaken;
            choose e such that n = i + e from Natural.subtraction_witness;
            i + e = n as nJoin;
            Natural.monus(n, i) = e
@@ -587,9 +577,7 @@ theorem Real.cauchy_product_converges
                              Natural.monus(n, i))
                    ≤ abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                by (i : ℕ) (iLessThan : i < n) ↦ {
-                    successor(i) ≤ n;
-                    i ≤ n
-                        by Natural.less_or_equal_predecessor_less_or_equal;
+                    i ≤ n by Natural.LessThan.weaken;
                     choose e such that n = i + e
                         from Natural.subtraction_witness;
                     Natural.monus(n, i) ≤ n;
@@ -710,9 +698,7 @@ theorem Real.cauchy_product_converges
                      * Real.partialSum((k : ℕ) ↦ abs(b(k)),
                            Natural.monus(n + n, i))
                by (i : ℕ) (iLessThan : i < n) ↦ {
-                    successor(i) ≤ n;
-                    i ≤ n
-                        by Natural.less_or_equal_predecessor_less_or_equal;
+                    i ≤ n by Natural.LessThan.weaken;
                     choose e such that n = i + e as nSplit
                         from Natural.subtraction_witness;
                     n + n

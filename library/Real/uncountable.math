@@ -266,8 +266,14 @@ definition Real.avoidingIntervals
         (f : Natural → Real) : Natural → Real.NestedInterval
   | zero =>
       Real.NestedInterval.make(Real.zero, Real.one)
-  | successor(n) =>
+  | 1 + n =>
       Real.avoidStep(Real.avoidingIntervals(f, n), f(n))
+
+-- The recursion characterised in `1 + n` form, so consumers step the
+-- index without naming the raw constructor.
+theorem Real.avoidingIntervals_one_plus (f : Natural → Real) (n : Natural)
+        : Real.avoidingIntervals(f, 1 + n) = Real.avoidStep(Real.avoidingIntervals(f, n), f(n)) :=
+  done by substituting Natural.one_add
 
 definition Real.avoidingLeft (f : Natural → Real) (n : Natural) : Real :=
   Real.NestedInterval.left(Real.avoidingIntervals(f, n))
@@ -275,17 +281,30 @@ definition Real.avoidingLeft (f : Natural → Real) (n : Natural) : Real :=
 definition Real.avoidingRight (f : Natural → Real) (n : Natural) : Real :=
   Real.NestedInterval.right(Real.avoidingIntervals(f, n))
 
+-- The nesting inequality for a single step, restated at `1 + n`.
+theorem Real.avoidingLeft_avoidingRight_nested
+        (f : Natural → Real) (n : Natural)
+        (ordered : Real.avoidingLeft(f, n) < Real.avoidingRight(f, n))
+        : Real.avoidingLeft(f, n) ≤ Real.avoidingLeft(f, 1 + n) ∧ Real.avoidingRight(f, 1 + n) ≤ Real.avoidingRight(f, n) := {
+  Real.avoidingLeft(f, n)
+          ≤ Real.NestedInterval.left(Real.avoidStep(Real.avoidingIntervals(f, n), f(n)))
+        ∧ Real.NestedInterval.right(Real.avoidStep(Real.avoidingIntervals(f, n), f(n)))
+          ≤ Real.avoidingRight(f, n)
+      by Real.avoidStep_nested(state := Real.avoidingIntervals(f, n), point := f(n));
+  done by substituting Real.avoidingIntervals_one_plus
+}
+
 -- Every interval in the sequence is strictly ordered.
 theorem Real.avoidingIntervals_ordered (f : Natural → Real) (n : Natural)
         : Real.avoidingLeft(f, n) < Real.avoidingRight(f, n) :=
   by induction on n with IH {
-    case zero: {
+    case n = 0: {
         -- I₀ = [0, 1].
         Rational.zero < Rational.one;
         Real.zero < Rational.one;
         done
       }
-    case successor(predecessor): {
+    case n = 1 + predecessor for some predecessor: {
         done by Real.avoidStep_ordered(
             state := Real.avoidingIntervals(f, predecessor),
             point := f(predecessor))
@@ -297,23 +316,21 @@ theorem Real.avoidingLeft_le_subsequent
         (f : Natural → Real) (N k : Natural)
         : Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, k + N) :=
   by induction on k with IH {
-    case zero: {
+    case k = 0: {
         Real.avoidingLeft(f, N) ≤ Real.avoidingLeft(f, N);
         done
       }
-    case successor(predecessor): {
+    case k = 1 + predecessor for some predecessor: {
         Real.avoidingLeft(f, predecessor + N) < Real.avoidingRight(f, predecessor + N);
         Real.avoidingLeft(f, predecessor + N)
-                ≤ Real.avoidingLeft(f, successor(predecessor + N))
-              ∧ Real.avoidingRight(f, successor(predecessor + N))
+                ≤ Real.avoidingLeft(f, 1 + (predecessor + N))
+              ∧ Real.avoidingRight(f, 1 + (predecessor + N))
                 ≤ Real.avoidingRight(f, predecessor + N)
-            by Real.avoidStep_nested(
-                state := Real.avoidingIntervals(f, predecessor + N),
-                point := f(predecessor + N));
+            by Real.avoidingLeft_avoidingRight_nested;
         Real.avoidingLeft(f, N)
            ≤ Real.avoidingLeft(f, predecessor + N)        by IH
-           ≤ Real.avoidingLeft(f, successor(predecessor + N))
-           = Real.avoidingLeft(f, successor(predecessor) + N)
+           ≤ Real.avoidingLeft(f, 1 + (predecessor + N))
+           = Real.avoidingLeft(f, (1 + predecessor) + N)
       }
   }
 
@@ -322,21 +339,19 @@ theorem Real.avoidingRight_le_subsequent
         (f : Natural → Real) (N k : Natural)
         : Real.avoidingRight(f, k + N) ≤ Real.avoidingRight(f, N) :=
   by induction on k with IH {
-    case zero: {
+    case k = 0: {
         Real.avoidingRight(f, N) ≤ Real.avoidingRight(f, N);
         done
       }
-    case successor(predecessor): {
+    case k = 1 + predecessor for some predecessor: {
         Real.avoidingLeft(f, predecessor + N) < Real.avoidingRight(f, predecessor + N);
         Real.avoidingLeft(f, predecessor + N)
-                ≤ Real.avoidingLeft(f, successor(predecessor + N))
-              ∧ Real.avoidingRight(f, successor(predecessor + N))
+                ≤ Real.avoidingLeft(f, 1 + (predecessor + N))
+              ∧ Real.avoidingRight(f, 1 + (predecessor + N))
                 ≤ Real.avoidingRight(f, predecessor + N)
-            by Real.avoidStep_nested(
-                state := Real.avoidingIntervals(f, predecessor + N),
-                point := f(predecessor + N));
-        Real.avoidingRight(f, successor(predecessor) + N)
-           = Real.avoidingRight(f, successor(predecessor + N))
+            by Real.avoidingLeft_avoidingRight_nested;
+        Real.avoidingRight(f, (1 + predecessor) + N)
+           = Real.avoidingRight(f, 1 + (predecessor + N))
            ≤ Real.avoidingRight(f, predecessor + N)
            ≤ Real.avoidingRight(f, N)                     by IH
       }
@@ -382,8 +397,12 @@ theorem Real.avoidingLeft_le_avoidingRight
 theorem Real.avoiding_avoids (f : Natural → Real) (n : Natural)
         : f(n) < Real.avoidingLeft(f, 1 + n) ∨ Real.avoidingRight(f, 1 + n) < f(n) := {
   Real.avoidingLeft(f, n) < Real.avoidingRight(f, n);
-  f(n) < Real.avoidingLeft(f, successor(n)) ∨ Real.avoidingRight(f, successor(n)) < f(n);
-  done by substituting Natural.one_add
+  f(n) < Real.NestedInterval.left(Real.avoidStep(Real.avoidingIntervals(f, n), f(n)))
+      ∨ Real.NestedInterval.right(Real.avoidStep(Real.avoidingIntervals(f, n), f(n))) < f(n)
+    by Real.avoidStep_avoids(
+        state := Real.avoidingIntervals(f, n),
+        point := f(n));
+  done by substituting Real.avoidingIntervals_one_plus
 }
 
 -- ----------------------------------------------------------------------

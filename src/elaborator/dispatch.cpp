@@ -2180,6 +2180,18 @@ ExpressionPointer Elaborator::elaborateBlockTail(
         // goal (`a ≤ c` under goal `a ≤ c + 0`) elaborates to the
         // Proposition itself without throwing, so a plain success check
         // would wrongly bind the proposition as the block's value.
+        // A `cases`/`by induction`-style tail is a PROOF construct — it can
+        // never be read as a stated proposition, so the claim fallbacks
+        // below would only mask its real error behind a misleading
+        // "needs an expected type from context" (the statement reading
+        // elaborates the tail as a TypedLet's type). Remember that, and
+        // rethrow the direct reading's failure for such tails.
+        bool tailIsProofOnly =
+            std::holds_alternative<SurfaceCases>(blockTail.expression->node)
+            || std::holds_alternative<SurfaceByInductionUsing>(
+                   blockTail.expression->node)
+            || std::holds_alternative<SurfaceByStrongInduction>(
+                   blockTail.expression->node);
         try {
             ExpressionPointer direct = elaborateExpression(
                 *blockTail.expression, localBinders, expectedType);
@@ -2197,7 +2209,9 @@ ExpressionPointer Elaborator::elaborateBlockTail(
                 return coercedDirect;
             }
         } catch (const ElaborateError&) {
+            if (tailIsProofOnly) throw;
         } catch (const TypeError&) {
+            if (tailIsProofOnly) throw;
         } catch (const AutoProverBudgetError&) {
             // Speculative reading only — a budget blow here must fall
             // through to the statement route, never fail the build.

@@ -35,11 +35,13 @@ import Polynomial.instances
 
 theorem Natural.monus_add_cancel_left
         : ∀ (a b : Natural). Natural.monus(a + b, a) = b
-  | zero, b => { done by Natural.monus_zero }
-  | successor(predecessor), b =>
-      Natural.monus(successor(predecessor) + b, successor(predecessor))
+  | 0, b => { done by Natural.monus_zero }
+  | 1 + predecessor, b =>
+      Natural.monus((1 + predecessor) + b, 1 + predecessor)
+         = Natural.monus(1 + (predecessor + b), 1 + predecessor)
+             by Natural.add_associative
          = Natural.monus(predecessor + b, predecessor)
-             by Natural.monus_succ_succ
+             by Natural.monus_one_plus_one_plus
          = b
              by Natural.monus_add_cancel_left(predecessor, b)
 
@@ -61,27 +63,31 @@ theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
 
 -- Sum respects pointwise equality on the summation range 0..n.
 theorem Ring.Sum.extensional_range (r : Ring)
-        (f g : Natural → Ring.carrier(r))
-        : ∀ (n : Natural).
-          (∀ (i : Natural). i ≤ n → f(i) = g(i))
-          → Ring.Sum(r, f, n) = Ring.Sum(r, g, n)
-  | zero => (h : ∀ (i : Natural). i ≤ 0 → f(i) = g(i)) ↦
-      Ring.Sum(r, f, 0)
-         = f(0)
-         = g(0)               by h(0, Natural.LessOrEqual.reflexive)
-         = Ring.Sum(r, g, 0)
-  | successor(k) => (h : ∀ (i : Natural). i ≤ successor(k) → f(i) = g(i)) ↦
-      Ring.Sum(r, f, successor(k))
-         = (Ring.Sum(r, f, k) + f(successor(k)))
-         = (Ring.Sum(r, g, k) + f(successor(k)))
-             by Ring.Sum.extensional_range(r, f, g, k,
-                    (i : Natural) (smaller : i ≤ k) ↦
-                        h(i, { i
-                                 ≤ k             by smaller
-                                 ≤ successor(k)  by Natural.le_successor }))
-         = (Ring.Sum(r, g, k) + g(successor(k)))
-             by h(successor(k), Natural.LessOrEqual.reflexive)
-         = Ring.Sum(r, g, successor(k))
+        (f g : Natural → Ring.carrier(r)) (n : Natural)
+        (h : ∀ (i : Natural). i ≤ n → f(i) = g(i))
+        : Ring.Sum(r, f, n) = Ring.Sum(r, g, n) :=
+  by induction on n with IH {
+    case base:
+        Ring.Sum(r, f, 0)
+           = f(0)
+           = g(0)               by h(0, Natural.LessOrEqual.reflexive)
+           = Ring.Sum(r, g, 0)
+    case step(k): {
+        ∀ (i : Natural). i ≤ k → f(i) = g(i) by {
+            take i : Natural;
+            suppose i ≤ k as smaller;
+            i ≤ 1 + k;
+            done
+          };
+        Ring.Sum(r, f, 1 + k)
+           = (Ring.Sum(r, f, k) + f(1 + k))
+           = (Ring.Sum(r, g, k) + f(1 + k))
+               by IH
+           = (Ring.Sum(r, g, k) + g(1 + k))
+               by h(1 + k, Natural.LessOrEqual.reflexive)
+           = Ring.Sum(r, g, 1 + k)
+      }
+  }
 
 -- Register the range-restricted variant too: a `Sum(r,f,n) = Sum(r,g,n)`
 -- step also closes from `(i) => i ≤ n => f(i) = g(i)`. The elaborator
@@ -96,41 +102,37 @@ theorem Ring.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
         : Ring.Sum(r, f, n)
           = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(n, i)), n) :=
   by induction on n with IH {
-    -- Base: monus(0, 0) = 0, so both sides are f(0).
-    case zero:
+    case base:
         Ring.Sum(r, f, 0)
            = f(0)
            = f(Natural.monus(0, 0))
            = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(0, i)), 0)   by substituting Ring.Sum.base
-    case successor(k): {
-        -- The tail reindexes by monus_succ_succ, pointwise over the range.
+    case step(k): {
         Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k)
               = Ring.Sum(r,
-                    (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))), k)
+                    (i : Natural) ↦ f(Natural.monus(1 + k, 1 + i)), k)
           by Ring.Sum.extensional_range(r,
                  (i : Natural) ↦ f(Natural.monus(k, i)),
-                 (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))),
+                 (i : Natural) ↦ f(Natural.monus(1 + k, 1 + i)),
                  k,
                  (i : Natural) (_ : i ≤ k) ↦
                      { f(Natural.monus(k, i))
-                        = f(Natural.monus(successor(k), successor(i)))
-                            by substituting Natural.monus_succ_succ }) as tailReindex;
-        -- Peel f(succ k) = f(monus(succ k, 0)) off the top, reindex the
-        -- tail, then Sum.shift re-rolls head and tail into one Σ.
-        Ring.Sum(r, f, successor(k))
-           = (Ring.Sum(r, f, k) + f(successor(k)))
-           = (f(successor(k)) + Ring.Sum(r, f, k))
-           = (f(successor(k))
+                        = f(Natural.monus(1 + k, 1 + i))
+                            by substituting Natural.monus_one_plus_one_plus }) as tailReindex;
+        Ring.Sum(r, f, 1 + k)
+           = (Ring.Sum(r, f, k) + f(1 + k))
+           = (f(1 + k) + Ring.Sum(r, f, k))
+           = (f(1 + k)
               + Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
-           = (f(Natural.monus(successor(k), 0))
+           = (f(Natural.monus(1 + k, 0))
               + Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
-               by substituting Natural.monus_succ_zero
-           = (f(Natural.monus(successor(k), 0))
+               by substituting Natural.monus_one_plus_zero
+           = (f(Natural.monus(1 + k, 0))
               + Ring.Sum(r,
-                    (i : Natural) ↦ f(Natural.monus(successor(k), successor(i))), k))
+                    (i : Natural) ↦ f(Natural.monus(1 + k, 1 + i)), k))
                by substituting tailReindex
-           = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(successor(k), i)), successor(k))
-               by Ring.Sum.shift
+           = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(1 + k, i)), 1 + k)
+               by Ring.Sum.shift_one_plus
   }
   }
 

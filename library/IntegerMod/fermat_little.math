@@ -51,8 +51,8 @@ import IntegerMod.wilson
 -- x^(1+k) = x · x^k.
 definition IntegerMod.power (modulus : Natural)
         (x : IntegerMod(modulus)) : Natural → IntegerMod(modulus)
-  | zero => IntegerMod.one(modulus)
-  | successor(k) => IntegerMod.multiply(x, IntegerMod.power(modulus, x, k))
+  | 0 => IntegerMod.one(modulus)
+  | 1 + k => IntegerMod.multiply(x, IntegerMod.power(modulus, x, k))
 
 -- Multiplication by a fixed x, with the modulus explicit so the partial
 -- application `multiply_by(p, x)` is a clean one-argument function to map
@@ -91,8 +91,7 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
                by List.length_empty
   | List.prepend(head, tail) =>
       -- Peel the head and exchange the four factors, then step the exponent:
-      -- x · x^|tail| = x^successor(|tail|) = x^|head :: tail| (the last step
-      -- through |head :: tail| = 1 + |tail|).
+      -- x · x^|tail| = x^(1 + |tail|) = x^|head :: tail|.
       List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
                List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
                    List.prepend(IntegerMod(p), head, tail)))
@@ -108,13 +107,10 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
          = (x * IntegerMod.power(p, x, List.length(IntegerMod(p), tail)))
                * (head * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), tail))
-         = IntegerMod.power(p, x, successor(List.length(IntegerMod(p), tail)))
-               * List.product(IntegerMod(p), IntegerMod.multiply,
-                     IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
          = IntegerMod.power(p, x, 1 + List.length(IntegerMod(p), tail))
                * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
-               by Natural.one_add
+               by substituting Natural.one_add
          = IntegerMod.power(p, x,
                List.length(IntegerMod(p), List.prepend(IntegerMod(p), head, tail)))
                * List.product(IntegerMod(p), IntegerMod.multiply,
@@ -298,25 +294,27 @@ theorem IntegerMod.fermat_little (p n : Natural)
 theorem IntegerMod.power_of_class (p a : Natural)
         : ∀ (k : Natural).
           IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), k)
-            = IntegerMod.make(p, (a ^ k : Integer))
-  | zero =>
-      -- Both sides are the class of 1 (a⁰ = 1 by power_zero).
-      IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), 0)
-         = IntegerMod.make(p, ((1 : Natural) : Integer))
-         = IntegerMod.make(p, (a ^ 0 : Integer))
-               by Natural.power_zero(a)
-  | successor(k) =>
-      IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), successor(k))
-         = IntegerMod.make(p, (a : Integer))
-               * IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), k)
-         = IntegerMod.make(p, (a : Integer))
-               * IntegerMod.make(p, (a ^ k : Integer))
-               by substituting IntegerMod.power_of_class(p, a, k)
-         = IntegerMod.make(p, (a : Integer) * (a ^ k : Integer))
-         = IntegerMod.make(p, ((a * a ^ k : Natural) : Integer))
-               by Natural.to_integer.multiply_preserves(a, a ^ k)
-         = IntegerMod.make(p, (a ^ successor(k) : Integer))
-               by Natural.power_succ(a, k)
+            = IntegerMod.make(p, (a ^ k : Integer)) :=
+  by induction on k with IH {
+    case base:
+        -- Both sides are the class of 1 (a⁰ = 1 by power_zero).
+        IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), 0)
+           = IntegerMod.make(p, ((1 : Natural) : Integer))
+           = IntegerMod.make(p, (a ^ 0 : Integer))
+                 by Natural.power_zero(a)
+    case step(j):
+        IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), 1 + j)
+           = IntegerMod.make(p, (a : Integer))
+                 * IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), j)
+           = IntegerMod.make(p, (a : Integer))
+                 * IntegerMod.make(p, (a ^ j : Integer))
+                 by substituting IH
+           = IntegerMod.make(p, (a : Integer) * (a ^ j : Integer))
+           = IntegerMod.make(p, ((a * a ^ j : Natural) : Integer))
+                 by Natural.to_integer.multiply_preserves(a, a ^ j)
+           = IntegerMod.make(p, (a ^ (1 + j) : Integer))
+                 by Natural.power_one_plus
+  }
 
 -- A natural number not divisible by p has a nonzero class.
 theorem IntegerMod.class_nonzero_of_not_divides (p a : Natural)
