@@ -264,6 +264,13 @@ struct SurfaceCases {
     // hypothesis); recorded here too so the elaborator can recognise — and
     // for a NON-recursive constructor, drop — that spurious trailing name.
     std::string inductionHypothesisName;
+    // True when the block came from `by induction` (with OR without a
+    // header hypothesis name — the header-less form names each arm's
+    // hypothesis inline). The `base`/`step` boundary-vocabulary routing
+    // keys on this, so a plain `cases` over an inductive that happens to
+    // have a constructor named `step` (e.g. `LessOrEqual.step`) is never
+    // misrouted.
+    bool isInductionBlock = false;
 };
 
 // `sorry` — placeholder for an unwritten proof. Desugars at elaboration
@@ -958,10 +965,12 @@ inline SurfaceExpressionPointer makeSurfaceCases(
     SurfaceExpressionPointer scrutinee,
     std::vector<SurfaceCasesClause> clauses,
     int line, int column,
-    std::string inductionHypothesisName = {}) {
+    std::string inductionHypothesisName = {},
+    bool isInductionBlock = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses), {}, {},
-                      std::move(inductionHypothesisName)},
+                      std::move(inductionHypothesisName),
+                      isInductionBlock},
         line, column});
 }
 
@@ -1020,12 +1029,14 @@ inline SurfaceExpressionPointer makeSurfaceCasesWithRefining(
     std::string equalityHypothesisName,
     std::vector<std::string> refiningNames,
     int line, int column,
-    std::string inductionHypothesisName = {}) {
+    std::string inductionHypothesisName = {},
+    bool isInductionBlock = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses),
                       std::move(equalityHypothesisName),
                       std::move(refiningNames),
-                      std::move(inductionHypothesisName)},
+                      std::move(inductionHypothesisName),
+                      isInductionBlock},
         line, column});
 }
 

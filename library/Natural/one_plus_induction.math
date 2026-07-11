@@ -64,3 +64,37 @@ theorem Natural.cases_on_one_plus
     case base:    base
     case step(k): step(k)
   }
+
+-- The constructor-spelled principle: what a `by induction` block in the
+-- `case zero:` / `case successor(k):` vocabulary (or the equation
+-- spellings that desugar to it) elaborates through wherever this lemma
+-- is in scope, so the raw recursor stays confined to this module.
+-- Proved from the `1 + n` principle — the explicit `base`/`step`
+-- vocabulary below routes there, never to this theorem itself.
+theorem Natural.induction_on_successor
+        {P : Natural → Proposition}
+        (base : P(0))
+        (step : ∀ (k : Natural). P(k) → P(successor(k)))
+        (n : Natural) : P(n) :=
+  by induction on n with IH {
+    case base: base
+    case step(k): {
+        P(successor(k)) by step(k, IH);
+        done by substituting Natural.one_add
+      }
+  }
+
+-- Its case-analysis twin, for plain `cases n { | zero => … |
+-- successor(k) => … }` blocks — no induction hypothesis.
+theorem Natural.cases_on_successor
+        {P : Natural → Proposition}
+        (base : P(0))
+        (step : ∀ (k : Natural). P(successor(k)))
+        (n : Natural) : P(n) :=
+  by induction on n with IH {
+    case base: base
+    case step(k): {
+        P(successor(k)) by step(k);
+        done by substituting Natural.one_add
+      }
+  }

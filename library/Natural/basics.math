@@ -50,6 +50,20 @@ definition Natural.multiply : Natural → Natural → Natural
   | 0,     _  =>  0
   | 1 + k, m  =>  Natural.add(m, Natural.multiply(k, m))
 
+-- Primitive recursion into Type — the boundary form of structural
+-- recursion on a Natural, and what `definition … | 0 => … | 1 + k => …`
+-- compiles onto once the alias is sealed. The step speaks `successor`
+-- (the wrapper): a Type-valued result cannot ride the propositional
+-- `1 + k = successor(k)` bridge, so the constructor-defeq spelling is
+-- the honest one here.
+definition Natural.recursion.{u}
+    {C : Natural → Type(u)}
+    (base : C(0))
+    (step : ∀ (k : Natural). C(k) → C(successor(k)))
+    (n : Natural)
+    : C(n) :=
+  Natural.Raw_recursor(C, base, step, n)
+
 -- Operator overloads: `+` and `*` on Naturals route here.
 operator (+) on (Natural, Natural) := Natural.add
 operator (*) on (Natural, Natural) := Natural.multiply

@@ -4605,14 +4605,14 @@ private:
             return makeSurfaceCases(
                 std::move(scrutinee), std::move(clauses),
                 inductionToken.line, inductionToken.column,
-                ihName);
+                ihName, /*isInductionBlock=*/true);
         }
         return makeSurfaceCasesWithRefining(
             std::move(scrutinee), std::move(clauses),
             /*equalityHypothesisName=*/std::string(),
             std::move(refiningNames),
             inductionToken.line, inductionToken.column,
-            ihName);
+            ihName, /*isInductionBlock=*/true);
     }
 
     // `claim P by cases on E [refining …] { case zero: …  case

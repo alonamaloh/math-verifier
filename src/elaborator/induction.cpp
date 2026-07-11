@@ -756,7 +756,8 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlusReverted(
         const std::vector<std::string>& refiningNames,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int column) {
+        int line, int column,
+        const std::string& lemmaSuffix) {
         Frame frame(*this,
             "by induction (1+n) refining at line " + std::to_string(line));
         if (!expectedType) {
@@ -818,7 +819,8 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlusReverted(
             clause.body = std::move(wrappedBody);
         }
         ExpressionPointer result = elaborateByInductionOnePlus(
-            reverted, localBinders, revertedGoal, line, column);
+            reverted, localBinders, revertedGoal, line, column,
+            lemmaSuffix);
         // Apply the actual hypotheses to unwind the Π chain back to Goal.
         for (int i = 0; i < count; ++i) {
             result = makeApplication(std::move(result),
@@ -832,7 +834,8 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
         const SurfaceCases& cases,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int column) {
+        int line, int column,
+        const std::string& lemmaSuffix) {
         Frame frame(*this,
             "by induction (1+n) at line " + std::to_string(line));
         if (!expectedType) {
@@ -866,7 +869,8 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                         introduced.push_back(
                             {pi->displayHint, pi->domain});
                         ExpressionPointer inner = elaborateByInductionOnePlus(
-                            cases, introduced, pi->codomain, line, column);
+                            cases, introduced, pi->codomain, line, column,
+                            lemmaSuffix);
                         return makeLambda(
                             pi->displayHint, pi->domain, inner);
                     }
@@ -907,6 +911,18 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                             "must be a plain name (the predecessor `k`)");
                     }
                     stepSubjectName = predecessorName->name;
+                    // A second binder is the arm's own induction-
+                    // hypothesis name (the parser appends it for the
+                    // header-less `case n = k + 1 for some k, with ih:`
+                    // spelling); it overrides the header's name.
+                    if (constructorPattern->arguments.size() >= 2) {
+                        if (auto* armIhPattern =
+                                std::get_if<SurfacePatternBareName>(
+                                    &constructorPattern->arguments[1]
+                                         ->node)) {
+                            ihName = armIhPattern->name;
+                        }
+                    }
                     stepBody = clause.body.get();
                     continue;
                 }
@@ -981,7 +997,7 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
             return headConstant ? headConstant->name : std::string();
         };
         std::string carrierName = carrierHeadName(scrutineeTypeInferred);
-        std::string lemmaName = carrierName + ".induction_on_one_plus";
+        std::string lemmaName = carrierName + lemmaSuffix;
         if (carrierName.empty() || !environment_.lookup(lemmaName)) {
             std::string reducedCarrierName = carrierHeadName(
                 weakHeadNormalForm(environment_, scrutineeTypeInferred));
@@ -991,7 +1007,7 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
                     "(head must be a constant like `Natural`)");
             }
             carrierName = reducedCarrierName;
-            lemmaName = carrierName + ".induction_on_one_plus";
+            lemmaName = carrierName + lemmaSuffix;
         }
         if (!environment_.lookup(lemmaName)) {
             throwElaborate(
@@ -1075,9 +1091,14 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
         ExpressionPointer stepBodyType = weakHeadNormalForm(
             environment_, stepIhPi->codomain);      // P(1+k), ctx [k, ih]
 
-        // --- Base body: prove P(0).
+        // --- Base body: prove P(0). The diff coercion after elaboration
+        // mirrors buildBodyForCase on the recursor path — it is what lets
+        // a bare stated-proposition arm (`case zero: <chain>`) elaborate
+        // as a proof of that proposition.
         ExpressionPointer baseKernel = elaborateExpression(
             *baseBody, localBinders, baseType);
+        baseKernel = coerceToExpectedTypeViaDiff(
+            localBinders, baseKernel, baseType);
 
         // --- Step body: prove P(1 + k) given k and IH : P(k). The step
         // body's context is localBinders ++ [(k, T), (IH, P(k))], with k at
@@ -1088,6 +1109,8 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
         stepBinders.push_back({ihName, ihType});
         ExpressionPointer stepBodyKernel = elaborateExpression(
             *stepBody, stepBinders, stepBodyType);
+        stepBodyKernel = coerceToExpectedTypeViaDiff(
+            stepBinders, stepBodyKernel, stepBodyType);
         ExpressionPointer ihLambda = makeLambda(
             ihName, ihType, stepBodyKernel);
         ExpressionPointer stepLambda = makeLambda(

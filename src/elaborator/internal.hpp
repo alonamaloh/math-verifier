@@ -1409,17 +1409,35 @@ private:
         ExpressionPointer expectedType,
         int line, int column);
 
-    // The `1 + n` ordinary induction (the successor-sealing keystone,
-    // PLAN_LUX_TRANSITION.md). Triggered additively from
-    // `elaborateCasesExpression` when a `by induction` cases-block uses the
-    // `case base:` / `case step(k):` vocabulary (legacy `case zero` /
-    // `case successor` keeps the raw-recursor path). Resolves
-    // `<Carrier>.induction_on_one_plus`, builds the motive from the goal —
-    // exactly as `elaborateByInductionUsingInner` does — and elaborates the
-    // base body against `P(0)` and the step body against `P(1 + k)` with
-    // `IH : P(k)`, so no `successor` token reaches user space.
+    // Boundary-theorem ordinary induction (the successor-sealing
+    // keystone, PLAN_LUX_TRANSITION.md / PLAN_NATURAL_SEALING Stage 2).
+    // Triggered from `elaborateCasesExpression` when a `by induction`
+    // cases-block uses the `case base:` / `case step(k):` vocabulary,
+    // and — via a pattern rename in the routing — for `case zero:` /
+    // `case successor(k):` (and the equation spellings that desugar to
+    // them) whenever `<Carrier>.induction_on_successor` is in scope.
+    // Resolves `<Carrier><lemmaSuffix>`, builds the motive from the
+    // goal — exactly as `elaborateByInductionUsingInner` does — and
+    // elaborates the base body against `P(0)` and the step body against
+    // the step type read off the lemma (`P(1 + k)` for the one-plus
+    // lemma, `P(successor(k))` for the successor form) with `IH : P(k)`.
     ExpressionPointer elaborateByInductionOnePlus(
         const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column,
+        const std::string& lemmaSuffix = ".induction_on_one_plus");
+
+    // Plain `cases` on a Natural scrutinee through the case-analysis
+    // boundary theorem `<Carrier>.cases_on_successor`
+    // (PLAN_NATURAL_SEALING Stage 2): motive from the goal, base body
+    // against `P(0)`, step body against `P(successor(k))` with only `k`
+    // bound (no induction hypothesis — that is what distinguishes it
+    // from the induction path above). The caller has already checked
+    // the vocabulary and the lemma's availability.
+    ExpressionPointer elaborateCasesViaBoundaryTheorem(
+        const SurfaceCases& cases,
+        const std::string& lemmaName,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column);
@@ -1436,7 +1454,8 @@ private:
         const std::vector<std::string>& refiningNames,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int column);
+        int line, int column,
+        const std::string& lemmaSuffix = ".induction_on_one_plus");
 
     // Step 2 of the structured-proof feature. Elaborates
     // `claim P [by Hint]` (and the bare-claim trailing form, where

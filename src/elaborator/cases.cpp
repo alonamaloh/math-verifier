@@ -977,13 +977,18 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
         ExpressionPointer expectedType,
         int line, int column) {
         // Keystone (PLAN_LUX_TRANSITION.md): a `by induction` cases-block
-        // (inductionHypothesisName set) that uses the `case base:` /
-        // `case step(k):` vocabulary routes to the `1 + n` principle
+        // that uses the `case base:` / `case step(k):` vocabulary — which
+        // the parser also produces for the equation spelling `case n = 0:`
+        // / `case n = k + 1:` — routes to the `1 + n` principle
         // `<Carrier>.induction_on_one_plus`. `base` / `step` are never real
-        // carrier constructors, so this is additive — legacy `case zero` /
-        // `case successor` blocks fall through to the raw-recursor path
-        // below, and the bulk keeps building until the sweep migrates it.
-        if (!cases.inductionHypothesisName.empty()) {
+        // carrier constructors within an induction block, so this is
+        // additive — legacy `case zero` / `case successor` blocks fall
+        // through to the raw-recursor path below, and the raw floor keeps
+        // building until the sweep migrates it. Gated on the block being a
+        // `by induction` (not plain `cases`) so an inductive with a real
+        // `step` constructor (`LessOrEqual.step`) is never misrouted.
+        if (!cases.inductionHypothesisName.empty()
+            || cases.isInductionBlock) {
             bool usesOnePlusVocabulary = false;
             for (const auto& clause : cases.clauses) {
                 if (auto* constructorPattern =
@@ -1027,6 +1032,124 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                     cases, localBinders, expectedType, line, column);
             }
         }
+        // PLAN_NATURAL_SEALING Stage 2: an induction block in the
+        // constructor vocabulary — `case zero:` / `case successor(k):`,
+        // which the equation spellings `case n = 0:` / `case n = k + 1:`
+        // also desugar to — routes through the constructor-spelled
+        // boundary theorem `<Carrier>.induction_on_successor` when that
+        // lemma is in scope. The arm goals keep their constructor
+        // spelling (read off the lemma's step type), so existing proofs
+        // elaborate unchanged; only the emitted term changes, citing the
+        // theorem instead of the raw recursor. Where the lemma is not
+        // importable — the raw floor below Natural/one_plus_induction, or
+        // a non-Natural carrier — fall through to the recursor path.
+        if (cases.isInductionBlock) {
+            bool constructorVocabulary = !cases.clauses.empty();
+            for (const auto& clause : cases.clauses) {
+                bool clauseFits = false;
+                if (auto* bareName = std::get_if<SurfacePatternBareName>(
+                        &clause.pattern->node)) {
+                    clauseFits = bareName->name == "zero";
+                }
+                if (auto* constructorPattern =
+                        std::get_if<SurfacePatternConstructor>(
+                            &clause.pattern->node)) {
+                    clauseFits =
+                        constructorPattern->constructorName == "successor"
+                        && !constructorPattern->arguments.empty()
+                        && std::get_if<SurfacePatternBareName>(
+                               &constructorPattern->arguments[0]->node)
+                               != nullptr;
+                }
+                if (!clauseFits) {
+                    constructorVocabulary = false;
+                    break;
+                }
+            }
+            bool lemmaAvailable = false;
+            if (constructorVocabulary) {
+                auto carrierHeadName =
+                    [](ExpressionPointer type) -> std::string {
+                    ExpressionPointer spineHead = type;
+                    while (auto* app =
+                               std::get_if<Application>(&spineHead->node)) {
+                        spineHead = app->function;
+                    }
+                    auto* headConstant =
+                        std::get_if<Constant>(&spineHead->node);
+                    return headConstant ? headConstant->name
+                                        : std::string();
+                };
+                try {
+                    ExpressionPointer scrutineeKernel = elaborateExpression(
+                        *cases.scrutinee, localBinders);
+                    ExpressionPointer scrutineeType =
+                        inferTypeInLocalContext(localBinders,
+                                                scrutineeKernel);
+                    std::string carrierName =
+                        carrierHeadName(scrutineeType);
+                    if (carrierName.empty()
+                        || !environment_.lookup(
+                               carrierName + ".induction_on_successor")) {
+                        carrierName = carrierHeadName(weakHeadNormalForm(
+                            environment_, scrutineeType));
+                    }
+                    lemmaAvailable = !carrierName.empty()
+                        && environment_.lookup(
+                               carrierName + ".induction_on_successor")
+                               != nullptr;
+                } catch (const ElaborateError&) {
+                    // Scrutinee not resolvable here (e.g. a goal-∀
+                    // variable) — let the raw path handle or report it.
+                    lemmaAvailable = false;
+                } catch (const TypeError&) {
+                    lemmaAvailable = false;
+                }
+            }
+            if (lemmaAvailable) {
+                SurfaceCases renamed = cases;
+                for (auto& clause : renamed.clauses) {
+                    if (auto* bareName =
+                            std::get_if<SurfacePatternBareName>(
+                                &clause.pattern->node);
+                        bareName && bareName->name == "zero") {
+                        clause.pattern = makeSurfacePatternBareName(
+                            "base", clause.line, clause.column);
+                    } else if (auto* constructorPattern =
+                                   std::get_if<SurfacePatternConstructor>(
+                                       &clause.pattern->node)) {
+                        std::vector<SurfacePatternPointer> stepArguments(
+                            constructorPattern->arguments);
+                        clause.pattern = makeSurfacePatternConstructor(
+                            "step", std::move(stepArguments),
+                            clause.line, clause.column);
+                    }
+                }
+                static const std::string successorSuffix =
+                    ".induction_on_successor";
+                if (!renamed.refiningNames.empty()) {
+                    std::vector<std::string> refiningNames =
+                        renamed.refiningNames;
+                    renamed.refiningNames.clear();
+                    return elaborateByInductionOnePlusReverted(
+                        renamed, refiningNames, localBinders,
+                        expectedType, line, column, successorSuffix);
+                }
+                if (expectedType) {
+                    std::vector<std::string> autoRefine =
+                        scrutineeDependentBinders(renamed.scrutinee,
+                                                  localBinders);
+                    if (!autoRefine.empty()) {
+                        return elaborateByInductionOnePlusReverted(
+                            renamed, autoRefine, localBinders,
+                            expectedType, line, column, successorSuffix);
+                    }
+                }
+                return elaborateByInductionOnePlus(
+                    renamed, localBinders, expectedType, line, column,
+                    successorSuffix);
+            }
+        }
         bool plain = cases.refiningNames.empty()
             && cases.equalityHypothesisName.empty();
         if (plain && expectedType) {
@@ -1043,9 +1166,219 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                 return elaborateCasesExpressionInner(
                     reverted, localBinders, expectedType, line, column);
             }
+            // PLAN_NATURAL_SEALING Stage 2: a plain propositional
+            // `cases n { | zero => … | successor(k) => … }` on a
+            // local-binder scrutinee routes through the case-analysis
+            // boundary theorem `<Carrier>.cases_on_successor` when it is
+            // in scope — arm goals keep their constructor spelling, only
+            // the emitted term stops citing the raw recursor. Anything
+            // else (Type-level result, non-variable scrutinee, other
+            // vocabularies, lemma not importable) keeps the recursor
+            // path.
+            if (!cases.isInductionBlock && cases.clauses.size() == 2) {
+                const SurfaceCasesClause* zeroClause = nullptr;
+                const SurfaceCasesClause* successorClause = nullptr;
+                for (const auto& clause : cases.clauses) {
+                    if (auto* bareName =
+                            std::get_if<SurfacePatternBareName>(
+                                &clause.pattern->node);
+                        bareName && bareName->name == "zero") {
+                        zeroClause = &clause;
+                    } else if (auto* constructorPattern =
+                                   std::get_if<SurfacePatternConstructor>(
+                                       &clause.pattern->node);
+                               constructorPattern
+                               && constructorPattern->constructorName
+                                      == "successor"
+                               && constructorPattern->arguments.size() == 1
+                               && std::get_if<SurfacePatternBareName>(
+                                      &constructorPattern->arguments[0]
+                                           ->node)) {
+                        successorClause = &clause;
+                    }
+                }
+                if (zeroClause && successorClause) {
+                    std::string boundaryLemmaName;
+                    if (auto* scrutineeId =
+                            std::get_if<SurfaceIdentifier>(
+                                &cases.scrutinee->node)) {
+                        for (const auto& binder : localBinders) {
+                            if (binder.name
+                                    != scrutineeId->qualifiedName) {
+                                continue;
+                            }
+                            std::string carrierName =
+                                headConstantName(binder.type);
+                            std::string candidate =
+                                carrierName + ".cases_on_successor";
+                            if (!carrierName.empty()
+                                && environment_.lookup(candidate)) {
+                                boundaryLemmaName = candidate;
+                            }
+                            break;
+                        }
+                    }
+                    if (!boundaryLemmaName.empty()) {
+                        // Prop-goals only: the boundary theorem's motive
+                        // lands in Proposition; a Type-level cases result
+                        // stays on the recursor.
+                        ExpressionPointer goalOpened =
+                            openOverLocalBinders(expectedType,
+                                                 localBinders,
+                                                 localBinders.size());
+                        bool goalIsProposition = false;
+                        try {
+                            ExpressionPointer goalSort =
+                                weakHeadNormalForm(
+                                    environment_,
+                                    inferTypeInLocalContext(localBinders,
+                                                            goalOpened));
+                            if (auto* sortNode =
+                                    std::get_if<Sort>(&goalSort->node)) {
+                                if (auto* level = std::get_if<LevelConst>(
+                                        &sortNode->level->node)) {
+                                    goalIsProposition = level->value == 0;
+                                }
+                            }
+                        } catch (const TypeError&) {
+                            goalIsProposition = false;
+                        }
+                        if (goalIsProposition) {
+                            return elaborateCasesViaBoundaryTheorem(
+                                cases, boundaryLemmaName, localBinders,
+                                expectedType, line, column);
+                        }
+                    }
+                }
+            }
         }
         return elaborateCasesExpressionInner(
             cases, localBinders, expectedType, line, column);
+    }
+
+ExpressionPointer Elaborator::elaborateCasesViaBoundaryTheorem(
+        const SurfaceCases& cases,
+        const std::string& lemmaName,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "cases via " + lemmaName + " at line " + std::to_string(line));
+
+        // The caller checked the vocabulary; re-extract the two bodies.
+        const SurfaceExpression* baseBody = nullptr;
+        const SurfaceExpression* stepBody = nullptr;
+        std::string stepSubjectName;
+        for (const auto& clause : cases.clauses) {
+            if (auto* bareName = std::get_if<SurfacePatternBareName>(
+                    &clause.pattern->node);
+                bareName && bareName->name == "zero") {
+                baseBody = clause.body.get();
+            } else if (auto* constructorPattern =
+                           std::get_if<SurfacePatternConstructor>(
+                               &clause.pattern->node)) {
+                auto* subjectName = std::get_if<SurfacePatternBareName>(
+                    &constructorPattern->arguments[0]->node);
+                stepSubjectName = subjectName->name;
+                stepBody = clause.body.get();
+            }
+        }
+        if (!baseBody || !stepBody) {
+            throwElaborate(
+                "cases (boundary form): internal — vocabulary check "
+                "passed but a clause body is missing");
+        }
+
+        // Scrutinee: a local-binder variable (the caller matched it by
+        // name against localBinders).
+        ExpressionPointer scrutineeKernel = elaborateExpression(
+            *cases.scrutinee, localBinders);
+        auto* boundVariable =
+            std::get_if<BoundVariable>(&scrutineeKernel->node);
+        if (!boundVariable) {
+            throwElaborate(
+                "cases (boundary form): internal — scrutinee is not a "
+                "local-binder variable");
+        }
+        int scrutineeDeBruijn = boundVariable->deBruijnIndex;
+        int scrutineeArrayIndex =
+            static_cast<int>(localBinders.size()) - 1 - scrutineeDeBruijn;
+        ExpressionPointer scrutineeType =
+            localBinders[scrutineeArrayIndex].type;
+
+        ExpressionPointer lemmaKernel = elaborateExpression(
+            *makeSurfaceIdentifier(lemmaName, {}, line, column),
+            localBinders);
+
+        // Motive: λ(subject : T). Goal[scrutinee := Bound 0].
+        ExpressionPointer motiveBody =
+            abstractOverBoundVariables(expectedType, {scrutineeDeBruijn});
+        ExpressionPointer motive = makeLambda(
+            stepSubjectName, scrutineeType, motiveBody);
+
+        // Read the base/step goal shapes off the lemma's type with the
+        // motive substituted, β-reduced into clean goals (exactly as the
+        // induction path does).
+        ExpressionPointer lemmaAppliedToMotive =
+            makeApplication(lemmaKernel, motive);
+        ExpressionPointer remainingType = weakHeadNormalForm(
+            environment_,
+            closeOverLocalBinders(
+                inferTypeInLocalContext(localBinders, lemmaAppliedToMotive),
+                localBinders, localBinders.size()));
+        auto* basePi = std::get_if<Pi>(&remainingType->node);
+        if (!basePi) {
+            throwElaborate(
+                lemmaName + " has no base argument after the motive");
+        }
+        ExpressionPointer baseType = weakHeadNormalForm(
+            environment_, basePi->domain);  // P(0)
+        ExpressionPointer afterBase = weakHeadNormalForm(
+            environment_,
+            liftBoundVariables(basePi->codomain, -1, 1));
+        auto* stepPi = std::get_if<Pi>(&afterBase->node);
+        if (!stepPi) {
+            throwElaborate(
+                lemmaName + " has no step argument after the base");
+        }
+        ExpressionPointer stepType = weakHeadNormalForm(
+            environment_, stepPi->domain);
+        auto* stepSubjectPi = std::get_if<Pi>(&stepType->node);
+        if (!stepSubjectPi) {
+            throwElaborate(
+                lemmaName + "'s step must begin with a subject "
+                "argument (Pi)");
+        }
+        ExpressionPointer stepGoal = weakHeadNormalForm(
+            environment_, stepSubjectPi->codomain);  // P(successor k), ctx [k]
+
+        // Base body: prove P(0). The diff coercion mirrors
+        // buildBodyForCase, so bare stated-proposition arms elaborate as
+        // proofs.
+        ExpressionPointer baseKernel = elaborateExpression(
+            *baseBody, localBinders, baseType);
+        baseKernel = coerceToExpectedTypeViaDiff(
+            localBinders, baseKernel, baseType);
+
+        // Step body: prove P(successor(k)) with k in scope.
+        std::vector<LocalBinder> stepBinders = localBinders;
+        stepBinders.push_back({stepSubjectName, scrutineeType});
+        ExpressionPointer stepKernel = elaborateExpression(
+            *stepBody, stepBinders, stepGoal);
+        stepKernel = coerceToExpectedTypeViaDiff(
+            stepBinders, stepKernel, stepGoal);
+        ExpressionPointer stepLambda = makeLambda(
+            stepSubjectName, scrutineeType, stepKernel);
+
+        // Assemble lemma(motive)(base)(step)(scrutinee).
+        ExpressionPointer application =
+            makeApplication(lemmaAppliedToMotive, std::move(baseKernel));
+        application = makeApplication(
+            std::move(application), std::move(stepLambda));
+        application = makeApplication(
+            std::move(application), std::move(scrutineeKernel));
+        (void)column;
+        return application;
     }
 
 ExpressionPointer Elaborator::elaborateCasesExpressionInner(
