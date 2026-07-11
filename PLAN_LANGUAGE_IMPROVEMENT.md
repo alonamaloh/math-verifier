@@ -187,18 +187,28 @@ already graduated (see above); `refining` is retired.
    `by`/expected-type positions, which already bridge symmetry.
 
 **Stage-2 scope (decided; build next):**
-1. **∧-leg participation in `given()`** — in `elaborateGiven`'s scan,
-   when a binder's direct defeq match fails, WHNF the binder type; if
-   And-headed, recursively match the requested statement against each
-   leg (proof term = the `And.left`/`And.right` projection chain).
-   Matches accumulate across binders AND legs; two distinct matches stay
-   the loud ambiguity error (same rule, now naming leg-carrying facts
-   too). The transport retry stays binder-level (no leg transport) until
-   a site demands it. Covers both function position and choose sources
-   through the existing desugar. Seal caveat: legs are only visible
-   through TRANSPARENT Prop definitions — same class row 9 flagged; an
-   interface that seals a conjunction-shaped definition needs its
-   boundary lemmas regardless.
+1. **∧-leg participation in `given()`** — `elaborateGiven` stops
+   scanning raw `localBinders` and instead scans the PROVER'S fact list,
+   `collectLocalBinderFacts(localBinders)`: the context is the single
+   source of hypotheses, but the decomposed VIEW of it (base binders
+   plus recursively-appended ∧-legs, each entry carrying its statement
+   and its `And.left`/`And.right` projection proof term) already exists
+   for prover consumption — one decomposition, two consumers, no new
+   recursion in given(). (Design clarification this forces on the docs:
+   conjunction legs are NOT context entries — reference.md's "makes both
+   available as facts" is consumption-time decomposition inside
+   `collectLocalBinderFacts`, which is exactly why the prover saw legs
+   and given() didn't.) Defeq match over the fact list; two distinct
+   matches stay the loud ambiguity error, now naming leg-carrying facts
+   via the entries' `source` strings ("local binder h (∧-left)"). The
+   transport retry runs over the SAME fact list (legs get by-cases
+   transport for free — one scan source beats two) unless validation
+   shows a cost. Fact-list types are already lifted to scope depth,
+   matching given()'s current lift handling. Covers both function
+   position and choose sources through the existing desugar. Seal
+   caveat: legs are only visible through TRANSPARENT Prop definitions —
+   same class row 9 flagged; an interface that seals a
+   conjunction-shaped definition needs its boundary lemmas regardless.
 2. **Citation conclusion ∧-projection** — extend the `by <hint>`
    conclusion match (autoFillHintForClaim path): after the direct match
    fails, if the instantiated conclusion WHNFs to `And`, try each leg
