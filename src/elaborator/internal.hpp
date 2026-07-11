@@ -1122,6 +1122,35 @@ private:
     void elaboratePatternMatchDefinition(
         const SurfaceDefinitionDeclaration& declaration);
 
+    // PLAN_NATURAL_SEALING Stage 4: a case split — pattern-match
+    // definition or value-level `cases` — whose scrutinee type's
+    // SYNTACTIC head is a definition-alias over a parameterless,
+    // non-indexed inductive (`Natural` over `Natural.Raw`) compiles onto
+    // the boundary combinator `<Alias>.recursion` whenever that
+    // combinator is in scope and the motive lands in Type. The emitted
+    // term then speaks only the public carrier, so it keeps elaborating
+    // after the alias is sealed (`opaque definition`); the constructor
+    // set is resolved by peeking at the alias body — deliberately
+    // opacity-independent elaborator knowledge, sound because the term
+    // handed to the kernel never destructures the alias.
+    struct BoundaryRecursion {
+        std::string combinatorName;   // e.g. "Natural.recursion"
+        std::string inductiveName;    // e.g. "Natural.Raw"
+        std::string aliasName;        // e.g. "Natural"
+        bool aliasIsOpaque = false;
+    };
+    std::optional<BoundaryRecursion> resolveBoundaryRecursion(
+        const ExpressionPointer& scrutineeType) const;
+
+    // The combinator's universe argument for a recursor motive landing
+    // in Sort(k): `<Alias>.recursion.{u}` declares its motive at
+    // `Type(u)` = Sort(u + 1), so u = k - 1. Returns nullptr for a
+    // Proposition-level motive (k = 0) or a level that has no syntactic
+    // predecessor — those stay on the raw recursor (the raw floor
+    // pierces the seal with `unfold Natural in`).
+    static LevelPointer boundaryRecursionUniverse(
+        const LevelPointer& motiveLevel);
+
     struct FunctionArgumentPair {
         std::string name;
         SurfaceExpressionPointer surfaceType;

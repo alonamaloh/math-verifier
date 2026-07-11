@@ -40,6 +40,63 @@ ExpressionPointer publicTypeSpelling(ExpressionPointer type) {
 
 } // namespace
 
+std::optional<Elaborator::BoundaryRecursion>
+Elaborator::resolveBoundaryRecursion(
+        const ExpressionPointer& scrutineeType) const {
+        auto* aliasConstant = std::get_if<Constant>(&scrutineeType->node);
+        if (!aliasConstant || !aliasConstant->universeArguments.empty()) {
+            return std::nullopt;
+        }
+        const Declaration* aliasLookup =
+            environment_.lookup(aliasConstant->name);
+        if (!aliasLookup) return std::nullopt;
+        auto* aliasDefinition = std::get_if<Definition>(aliasLookup);
+        if (!aliasDefinition
+            || !aliasDefinition->universeParameters.empty()) {
+            return std::nullopt;
+        }
+        std::string combinatorName = aliasConstant->name + ".recursion";
+        const Declaration* combinatorLookup =
+            environment_.lookup(combinatorName);
+        if (!combinatorLookup
+            || !std::get_if<Definition>(combinatorLookup)) {
+            return std::nullopt;
+        }
+        auto* bodyConstant =
+            std::get_if<Constant>(&aliasDefinition->body->node);
+        if (!bodyConstant) return std::nullopt;
+        const Declaration* inductiveLookup =
+            environment_.lookup(bodyConstant->name);
+        if (!inductiveLookup) return std::nullopt;
+        auto* inductive = std::get_if<Inductive>(inductiveLookup);
+        if (!inductive || inductive->numParameters != 0
+            || !std::get_if<Sort>(&inductive->kind->node)) {
+            return std::nullopt;
+        }
+        BoundaryRecursion result;
+        result.combinatorName = std::move(combinatorName);
+        result.inductiveName = bodyConstant->name;
+        result.aliasName = aliasConstant->name;
+        result.aliasIsOpaque =
+            aliasDefinition->opacity == Opacity::Opaque;
+        return result;
+    }
+
+LevelPointer Elaborator::boundaryRecursionUniverse(
+        const LevelPointer& motiveLevel) {
+        if (auto* constant = std::get_if<LevelConst>(&motiveLevel->node)) {
+            if (constant->value >= 1) {
+                return makeLevelConst(constant->value - 1);
+            }
+            return nullptr;
+        }
+        if (auto* successor =
+                std::get_if<LevelSuccessor>(&motiveLevel->node)) {
+            return successor->base;
+        }
+        return nullptr;
+    }
+
 void Elaborator::elaboratePatternMatchDefinition(
         const SurfaceDefinitionDeclaration& declaration) {
 
@@ -133,7 +190,17 @@ void Elaborator::elaboratePatternMatchDefinition(
         std::string inductiveName;
         std::vector<LevelPointer> inductiveUniverseArguments;
         std::vector<ExpressionPointer> inductiveArguments;
-        {
+        // Boundary route (PLAN_NATURAL_SEALING Stage 4): a scrutinee
+        // spelled at a sealed-inductive alias with a `.recursion`
+        // combinator in scope compiles onto the combinator, never the
+        // raw recursor. Resolved on the SYNTACTIC head so the routing
+        // is identical whether the alias is still transparent or
+        // already sealed.
+        std::optional<BoundaryRecursion> boundaryRecursion =
+            resolveBoundaryRecursion(argumentKernelTypes[0]);
+        if (boundaryRecursion) {
+            inductiveName = boundaryRecursion->inductiveName;
+        } else {
             ExpressionPointer cursor = weakHeadNormalForm(
                 environment_, argumentKernelTypes[0]);
             while (auto* application =
@@ -358,40 +425,70 @@ void Elaborator::elaboratePatternMatchDefinition(
                                 outerBinderStack));
         }
 
-        // Build the recursor call. The recursor's universe arguments
-        // are the inductive's universe arguments followed (for large-
-        // eliminating recursors) by the motive's universe level. For
-        // restricted-elimination recursors (Proposition inductives that
-        // aren't singletons), the motive is forced to Proposition and the
+        // Build the eliminator call — the boundary combinator when the
+        // scrutinee is spelled at a sealed-inductive alias (its motive
+        // lives at `Type(u)`, so u = motiveLevel - 1), the raw recursor
+        // otherwise. The recursor's universe arguments are the
+        // inductive's universe arguments preceded (for large-eliminating
+        // recursors) by the motive's universe level. For restricted-
+        // elimination recursors (Proposition inductives that aren't
+        // singletons), the motive is forced to Proposition and the
         // recursor takes no extra universe argument.
-        std::string recursorName = inductiveName + "_recursor";
-        const Declaration* recursorLookup =
-            environment_.lookup(recursorName);
-        if (!recursorLookup) {
-            throw ElaborateError(
-                "recursor '" + recursorName + "' not in environment");
+        ExpressionPointer recursorReference;
+        if (boundaryRecursion) {
+            LevelPointer combinatorUniverse =
+                boundaryRecursionUniverse(motiveLevel);
+            if (combinatorUniverse) {
+                recursorReference = makeConstant(
+                    boundaryRecursion->combinatorName,
+                    {std::move(combinatorUniverse)});
+            } else if (boundaryRecursion->aliasIsOpaque) {
+                throw ElaborateError(
+                    "pattern-match definition '" + declaration.name
+                    + "': the scrutinee type '"
+                    + boundaryRecursion->aliasName
+                    + "' is sealed and the result does not land in a "
+                    "Type universe the boundary combinator '"
+                    + boundaryRecursion->combinatorName
+                    + "' can produce (a Proposition-valued match cannot "
+                    "ride it) — restate the definition as a theorem by "
+                    "induction, or move it to the raw floor (`unfold "
+                    + boundaryRecursion->aliasName + " in …`)");
+            }
+            // A Proposition-level motive over a still-transparent alias
+            // falls through to the raw recursor below.
         }
-        const Recursor* recursorDeclaration =
-            std::get_if<Recursor>(recursorLookup);
-        if (!recursorDeclaration) {
-            throw ElaborateError(
-                "'" + recursorName + "' is not a recursor");
+        if (!recursorReference) {
+            std::string recursorName = inductiveName + "_recursor";
+            const Declaration* recursorLookup =
+                environment_.lookup(recursorName);
+            if (!recursorLookup) {
+                throw ElaborateError(
+                    "recursor '" + recursorName + "' not in environment");
+            }
+            const Recursor* recursorDeclaration =
+                std::get_if<Recursor>(recursorLookup);
+            if (!recursorDeclaration) {
+                throw ElaborateError(
+                    "'" + recursorName + "' is not a recursor");
+            }
+            bool recursorHasMotiveLevel =
+                recursorDeclaration->universeParameters.size()
+                > inductive->universeParameters.size();
+            // The motive level leads the recursor's universe arguments
+            // (Lean's convention, mirrored by addInductive).
+            std::vector<LevelPointer> recursorUniverseArguments;
+            if (recursorHasMotiveLevel) {
+                recursorUniverseArguments.push_back(motiveLevel);
+            }
+            recursorUniverseArguments.insert(
+                recursorUniverseArguments.end(),
+                inductiveUniverseArguments.begin(),
+                inductiveUniverseArguments.end());
+            recursorReference =
+                makeConstant(std::move(recursorName),
+                              std::move(recursorUniverseArguments));
         }
-        bool recursorHasMotiveLevel =
-            recursorDeclaration->universeParameters.size()
-            > inductive->universeParameters.size();
-        // The motive level leads the recursor's universe arguments
-        // (Lean's convention, mirrored by addInductive).
-        std::vector<LevelPointer> recursorUniverseArguments;
-        if (recursorHasMotiveLevel) {
-            recursorUniverseArguments.push_back(motiveLevel);
-        }
-        recursorUniverseArguments.insert(recursorUniverseArguments.end(),
-                                         inductiveUniverseArguments.begin(),
-                                         inductiveUniverseArguments.end());
-        ExpressionPointer recursorReference =
-            makeConstant(std::move(recursorName),
-                          std::move(recursorUniverseArguments));
         ExpressionPointer applied = std::move(recursorReference);
         // The recursor call lives inside the function-argument lambdas
         // (which we wrap below), which are themselves inside the
@@ -888,10 +985,12 @@ ExpressionPointer Elaborator::buildCaseLambda(
                     const Inductive* slotInductive = slotDeclaration
                         ? std::get_if<Inductive>(slotDeclaration)
                         : nullptr;
-                    // The slot type may be spelled at a transparent
-                    // alias over the inductive (`Natural` over
-                    // `Natural.Raw`) — resolve through it so the guard
-                    // still sees the constructors.
+                    // The slot type may be spelled at an alias over the
+                    // inductive (`Natural` over `Natural.Raw`) — resolve
+                    // through it so the guard still sees the
+                    // constructors. WHNF handles a transparent alias;
+                    // the body-peek loop handles a sealed (opaque) one,
+                    // where the footgun is just as baffling.
                     if (!slotInductive && slotDeclaration
                         && std::get_if<Definition>(slotDeclaration)) {
                         std::string reducedHead = headConstantName(
@@ -904,6 +1003,31 @@ ExpressionPointer Elaborator::buildCaseLambda(
                             ? std::get_if<Inductive>(reducedDeclaration)
                             : nullptr;
                         if (slotInductive) slotHead = reducedHead;
+                    }
+                    if (!slotInductive && slotDeclaration
+                        && std::get_if<Definition>(slotDeclaration)) {
+                        std::string aliasCursor = slotHead;
+                        for (int guard = 0; guard < 8; ++guard) {
+                            const Declaration* cursorLookup =
+                                environment_.lookup(aliasCursor);
+                            auto* cursorDefinition = cursorLookup
+                                ? std::get_if<Definition>(cursorLookup)
+                                : nullptr;
+                            if (!cursorDefinition) break;
+                            std::string bodyHead = headConstantName(
+                                cursorDefinition->body);
+                            if (bodyHead.empty()
+                                || bodyHead == aliasCursor) {
+                                break;
+                            }
+                            aliasCursor = bodyHead;
+                        }
+                        const Declaration* peekedDeclaration =
+                            environment_.lookup(aliasCursor);
+                        slotInductive = peekedDeclaration
+                            ? std::get_if<Inductive>(peekedDeclaration)
+                            : nullptr;
+                        if (slotInductive) slotHead = aliasCursor;
                     }
                     if (slotInductive) {
                         for (const std::string& ctor :

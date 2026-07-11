@@ -1424,19 +1424,56 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         // in BoundVariable form.
         ExpressionPointer scrutinee =
             elaborateExpression(*cases.scrutinee, localBinders);
+        ExpressionPointer scrutineeTypeInferred =
+            inferTypeInLocalContext(localBinders, scrutinee);
+        // Boundary route (PLAN_NATURAL_SEALING Stage 4): a scrutinee at a
+        // sealed-inductive alias with a `.recursion` combinator in scope
+        // splits through the combinator, never the raw recursor (Type-
+        // valued goals; Proposition goals that reached this far fall back
+        // to the recursor while the alias is transparent). Resolved on
+        // the SYNTACTIC head, before normalisation loses the alias
+        // spelling.
+        std::optional<BoundaryRecursion> boundaryRecursion =
+            resolveBoundaryRecursion(scrutineeTypeInferred);
         ExpressionPointer scrutineeTypeOpened = weakHeadNormalForm(
-            environment_, inferTypeInLocalContext(localBinders, scrutinee));
+            environment_, scrutineeTypeInferred);
         // Opaque quotient-type alias (e.g. `opaque definition Integer :=
         // Quotient(...)`): WHNF stops at the opaque head, so the `Quotient`
         // dispatch below wouldn't fire and `by_representatives x` would be
         // rejected as "not an inductive". Engage the alias's unfold (as the
         // eliminator short forms do) and re-normalise.
-        if (engageOpaqueQuotientAlias(scrutineeTypeOpened)) {
+        if (!boundaryRecursion
+            && engageOpaqueQuotientAlias(scrutineeTypeOpened)) {
             scrutineeTypeOpened = weakHeadNormalForm(
                 environment_,
                 inferTypeInLocalContext(localBinders, scrutinee));
         }
 
+        std::string inductiveName;
+        const Inductive* inductive = nullptr;
+        std::vector<LevelPointer> inductiveUniverseArguments;
+        ExpressionPointer scrutineeType;
+        std::vector<ExpressionPointer> parameterValues;
+        std::vector<ExpressionPointer> indexValues;
+        std::vector<int> indexLocalIndices;
+        if (boundaryRecursion) {
+            inductiveName = boundaryRecursion->inductiveName;
+            const Declaration* inductiveDecl =
+                environment_.lookup(inductiveName);
+            inductive = inductiveDecl
+                ? std::get_if<Inductive>(inductiveDecl) : nullptr;
+            if (!inductive) {
+                throw ElaborateError(
+                    "internal: boundary combinator '"
+                    + boundaryRecursion->combinatorName
+                    + "' resolved but '" + inductiveName
+                    + "' is not an inductive");
+            }
+            // The motive's target binder keeps the alias spelling — the
+            // emitted term speaks only the public carrier.
+            scrutineeType = closeOverLocalBinders(
+                scrutineeTypeInferred, localBinders, localBinders.size());
+        } else {
         std::vector<ExpressionPointer> inductiveArguments;
         ExpressionPointer cursor = scrutineeTypeOpened;
         while (auto* application =
@@ -1497,9 +1534,10 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                 inductiveArguments, *constant,
                 localBinders, expectedType, line, column);
         }
+        inductiveName = constant->name;
         const Declaration* inductiveDecl =
             environment_.lookup(constant->name);
-        auto* inductive = inductiveDecl
+        inductive = inductiveDecl
             ? std::get_if<Inductive>(inductiveDecl) : nullptr;
         if (!inductive) {
             throw ElaborateError(
@@ -1517,22 +1555,20 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         // local-binder BoundVariables. The motive and parameterValues
         // passed to buildCaseLambda must live in the same scope as
         // localBinders (BoundVariables, not Internal FreeVariables).
-        ExpressionPointer scrutineeType = closeOverLocalBinders(
+        scrutineeType = closeOverLocalBinders(
             scrutineeTypeOpened, localBinders, localBinders.size());
-        std::vector<ExpressionPointer> parameterValues;
         for (int p = 0; p < inductive->numParameters; ++p) {
             parameterValues.push_back(closeOverLocalBinders(
                 inductiveArguments[p], localBinders,
                 localBinders.size()));
         }
-        std::vector<ExpressionPointer> indexValues(
+        indexValues.assign(
             inductiveArguments.begin() + inductive->numParameters,
             inductiveArguments.end());
         // For indexed inductives, each index must be a distinct local
         // variable BoundVariable. The motive will abstract over those
         // variables, and the recursor will take their values back as
         // arguments after the case lambdas.
-        std::vector<int> indexLocalIndices;
         for (size_t k = 0; k < indexValues.size(); ++k) {
             // After closeOverLocalBinders the value is in localBinders'
             // BoundVariable form. Look up the index value's variable.
@@ -1575,23 +1611,28 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
             // so downstream code uses local-binder BoundVariables.
             indexValues[k] = indexClosed;
         }
-        const std::vector<LevelPointer>& inductiveUniverseArguments =
-            constant->universeArguments;
-
-        // Look up the recursor.
-        std::string recursorName = constant->name + "_recursor";
-        const Declaration* recursorDecl =
-            environment_.lookup(recursorName);
-        if (!recursorDecl) {
-            throw ElaborateError(
-                "cases at line " + std::to_string(line)
-                + ": no recursor for inductive '" + constant->name + "'");
+        inductiveUniverseArguments = constant->universeArguments;
         }
-        auto* recursor = std::get_if<Recursor>(recursorDecl);
-        if (!recursor) {
-            throw ElaborateError(
-                "cases at line " + std::to_string(line)
-                + ": '" + recursorName + "' is not a recursor");
+
+        // Look up the recursor. The boundary route skips this — it cites
+        // the combinator instead (raw fallback below still re-checks).
+        const Recursor* recursor = nullptr;
+        if (!boundaryRecursion) {
+            std::string recursorName = inductiveName + "_recursor";
+            const Declaration* recursorDecl =
+                environment_.lookup(recursorName);
+            if (!recursorDecl) {
+                throw ElaborateError(
+                    "cases at line " + std::to_string(line)
+                    + ": no recursor for inductive '" + inductiveName
+                    + "'");
+            }
+            recursor = std::get_if<Recursor>(recursorDecl);
+            if (!recursor) {
+                throw ElaborateError(
+                    "cases at line " + std::to_string(line)
+                    + ": '" + recursorName + "' is not a recursor");
+            }
         }
 
         // Build the motive. The structure depends on whether the
@@ -1729,10 +1770,10 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                     &pattern->node)) {
                 if (anonTupleConnectiveCheckEnabled()
                     && tupleNode->userWritten
-                    && isConnectiveNotPubliclyTuple(constant->name)) {
+                    && isConnectiveNotPubliclyTuple(inductiveName)) {
                     std::cerr << "warning: " << moduleName_ << ":"
                         << clause.line
-                        << ": ⟨…⟩ destructures a '" << constant->name
+                        << ": ⟨…⟩ destructures a '" << inductiveName
                         << "' — a logical connective, not publicly a tuple;"
                            " use `choose … such that …` (for ∃) or take the"
                            " conjuncts via `done`/`by cases` (for ∧)"
@@ -1743,7 +1784,7 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                         "cases at line " + std::to_string(clause.line)
                         + ": anonymous tuple pattern '⟨...⟩' only works "
                           "for single-constructor inductives, but '"
-                        + constant->name + "' has "
+                        + inductiveName + "' has "
                         + std::to_string(
                             inductive->constructorNames.size())
                         + " constructors");
@@ -1828,28 +1869,69 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         std::vector<ExpressionPointer> caseLambdas;
         for (const auto& constructorName : inductive->constructorNames) {
             caseLambdas.push_back(buildCaseLambda(
-                syntheticDeclaration, constructorName, constant->name,
+                syntheticDeclaration, constructorName, inductiveName,
                 inductiveUniverseArguments, motive, parameterValues,
                 localBinders, cases.inductionHypothesisName));
         }
 
-        // Assemble the recursor call. For large-eliminating recursors
-        // the motive's universe level is an additional universe arg
-        // in FRONT of the inductive's own universe args (Lean's
-        // convention, mirrored by addInductive).
-        bool recursorHasMotiveLevel =
-            recursor->universeParameters.size()
-            > inductive->universeParameters.size();
-        std::vector<LevelPointer> recursorUniverseArguments;
-        if (recursorHasMotiveLevel) {
-            recursorUniverseArguments.push_back(motiveLevel);
+        // Assemble the eliminator call — the boundary combinator when
+        // the scrutinee is spelled at a sealed-inductive alias and the
+        // goal lands in Type (its motive lives at `Type(u)`, so
+        // u = motiveLevel - 1), the raw recursor otherwise. For large-
+        // eliminating recursors the motive's universe level is an
+        // additional universe arg in FRONT of the inductive's own
+        // universe args (Lean's convention, mirrored by addInductive).
+        ExpressionPointer applied;
+        if (boundaryRecursion) {
+            LevelPointer combinatorUniverse =
+                boundaryRecursionUniverse(motiveLevel);
+            if (combinatorUniverse) {
+                applied = makeConstant(
+                    boundaryRecursion->combinatorName,
+                    {std::move(combinatorUniverse)});
+            } else if (boundaryRecursion->aliasIsOpaque) {
+                throw ElaborateError(
+                    "cases at line " + std::to_string(line)
+                    + ": the scrutinee type '"
+                    + boundaryRecursion->aliasName
+                    + "' is sealed and the goal does not land in a Type "
+                    "universe the boundary combinator '"
+                    + boundaryRecursion->combinatorName
+                    + "' can produce — split through a boundary theorem "
+                    "(`" + boundaryRecursion->aliasName
+                    + ".cases_on_successor`), or move the proof to the "
+                    "raw floor (`unfold " + boundaryRecursion->aliasName
+                    + " in …`)");
+            }
+            // A Proposition goal over a still-transparent alias falls
+            // back to the raw recursor below.
         }
-        recursorUniverseArguments.insert(recursorUniverseArguments.end(),
-                                         inductiveUniverseArguments.begin(),
-                                         inductiveUniverseArguments.end());
-        ExpressionPointer applied =
-            makeConstant(recursorName,
-                          std::move(recursorUniverseArguments));
+        if (!applied) {
+            std::string recursorName = inductiveName + "_recursor";
+            const Declaration* recursorDecl =
+                environment_.lookup(recursorName);
+            recursor = recursorDecl
+                ? std::get_if<Recursor>(recursorDecl) : nullptr;
+            if (!recursor) {
+                throw ElaborateError(
+                    "cases at line " + std::to_string(line)
+                    + ": no recursor for inductive '" + inductiveName
+                    + "'");
+            }
+            bool recursorHasMotiveLevel =
+                recursor->universeParameters.size()
+                > inductive->universeParameters.size();
+            std::vector<LevelPointer> recursorUniverseArguments;
+            if (recursorHasMotiveLevel) {
+                recursorUniverseArguments.push_back(motiveLevel);
+            }
+            recursorUniverseArguments.insert(
+                recursorUniverseArguments.end(),
+                inductiveUniverseArguments.begin(),
+                inductiveUniverseArguments.end());
+            applied = makeConstant(recursorName,
+                                    std::move(recursorUniverseArguments));
+        }
         for (const auto& parameterValue : parameterValues) {
             applied = makeApplication(applied, parameterValue);
         }

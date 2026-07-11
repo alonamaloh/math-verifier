@@ -1,0 +1,52 @@
+-- Pattern-match definitions and Type-valued `cases` over `Natural`
+-- compile onto the boundary combinator `Natural.recursion`, never the
+-- raw recursor (PLAN_NATURAL_SEALING Stage 4) — so they keep elaborating
+-- once the alias is sealed. The observable contract: the defining
+-- equations hold definitionally and ground values compute through the
+-- accelerated table, exactly as they did on the raw recursor.
+
+module Test.pattern_boundary_recursion_test
+
+import Natural.basics
+import Natural.arithmetic
+import Equality.basics
+
+-- A recursive pattern-match definition over the sealed alias.
+definition Test.sumBelow : Natural → Natural
+  | 0     => 0
+  | 1 + k => (1 + k) + Test.sumBelow(k)
+
+theorem Test.sumBelow_of_zero : Test.sumBelow(0) = 0 := reflexivity(0)
+
+-- The step equation holds definitionally, with the arm body's own
+-- spelling on the right (`1 + k` is opaque-add-stuck, so it is NOT the
+-- constructor — the reduct keeps the arm's spelling verbatim).
+theorem Test.sumBelow_of_successor (k : Natural)
+        : Test.sumBelow(successor(k)) = (1 + k) + Test.sumBelow(k) :=
+  reflexivity((1 + k) + Test.sumBelow(k))
+
+theorem Test.sumBelow_of_four : Test.sumBelow(4) = 10 := reflexivity(10)
+
+-- A pattern-match definition with a non-scrutinee argument and a
+-- constructor-vocabulary spelling.
+definition Test.applyTimes (A : Type(0)) (f : A → A) : Natural → A → A
+  | zero,         a => a
+  | successor(k), a => f(Test.applyTimes(A, f, k, a))
+
+theorem Test.applyTimes_twice : Test.applyTimes(Natural, successor, 2, 5) = 7 :=
+  reflexivity(7)
+
+-- A Type-valued `cases` over a Natural inside a definition body — the
+-- `Polynomial.nth` shape.
+definition Test.zeroOrPredecessor (n : Natural) : Natural :=
+  cases n {
+    | 0     => 0
+    | 1 + k => k
+  }
+
+theorem Test.zeroOrPredecessor_of_zero : Test.zeroOrPredecessor(0) = 0 :=
+  reflexivity(0)
+
+theorem Test.zeroOrPredecessor_of_successor (k : Natural)
+        : Test.zeroOrPredecessor(successor(k)) = k :=
+  reflexivity(k)
