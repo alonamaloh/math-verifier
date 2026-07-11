@@ -1115,11 +1115,18 @@ ExpressionPointer Elaborator::tryMonotonicityRecursionAtSpelling(
             ExpressionPointer proof;
             OrderJudgment premise;
             if (parseOrderJudgment(slotType, premise)) {
-                // Structural nesting first (f(g a) ≤ f(g b) peels twice),
-                // then the 0-anchored sign machinery.
+                // Structural nesting first (f(g a) ≤ f(g b) peels twice).
                 proof = tryMonotonicityRecursion(
                     slotType, localBinders, depth - 1);
-                if (!proof) {
+            }
+            if (!proof) {
+                // The 0-anchored sign machinery — independently of the
+                // order parse: a pure sign-FORM premise (`IsNonneg(c)`
+                // on multiply_by_nonneg rules) is not an order judgment,
+                // and only the sign recursion's form bridges can reach
+                // it from a `0 ≤ c` hypothesis.
+                SignJudgment signPremise;
+                if (parseSignJudgment(slotType, signPremise)) {
                     proof = trySignJudgmentRecursion(
                         slotType, localBinders, depth - 1,
                         /*allowFormBridge=*/true);
