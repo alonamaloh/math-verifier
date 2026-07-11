@@ -6,6 +6,12 @@
 -- (β) an APPLIED source whose existential instantiates a definition
 --     leaves β-redexes in the destructured hypothesis's type unless
 --     reduced — the arm's order-relation steps must see the clean form.
+-- (γ) premises BURIED behind a definition-spelled conclusion (the
+--     Real linearity `isCauchy` shape): the syntactic hole count sees
+--     only the stated Pis, so the citation retries with holes for the
+--     WHNF-exposed slots too — stated count first, since e.g. Not(P)
+--     also δ-unfolds to a Pi and an eager extra hole would break
+--     negation-concluding citations.
 module Test.choose_from_lemma_test
 
 import Logic.basics
@@ -50,4 +56,20 @@ theorem Test.choose_from_applied_definition (f : Natural → Natural)
         f(m) ≤ c + 3;
         done
       }
+}
+
+-- (γ) The lemma concludes Test.Roof(f) — a definition burying the c
+-- and nonnegativity slots — cited UNAPPLIED: the retry opens holes for
+-- the buried premises, pins c from the stated predicate, and
+-- discharges the nonnegativity from scope.
+axiom Test.roof_of_small
+        : ∀ (f : Natural → Natural). Test.Small(f) → Test.Roof(f)
+
+theorem Test.choose_through_buried_premises (f : Natural → Natural)
+        (fSmall : Test.Small(f))
+        (c : Natural)
+        : ∃ (start : Natural). ∀ (m : Natural). start ≤ m → f(m) ≤ c + 3 := {
+  choose N such that ∀ (m : Natural). N ≤ m → f(m) ≤ c + 3
+      from Test.roof_of_small;
+  witness N with ∀ (m : Natural). N ≤ m → f(m) ≤ c + 3
 }

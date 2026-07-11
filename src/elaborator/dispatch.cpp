@@ -319,29 +319,90 @@ ExpressionPointer Elaborator::elaborateExpression(
                 throwElaborate("lemma '" + identifier->qualifiedName
                                + "' takes no explicit arguments to infer");
             }
-            std::vector<SurfaceArgument> holeArgs;
-            for (int i = 0; i < explicitCount; ++i) {
-                holeArgs.push_back(
-                    {"", makeSurfaceHole(expression.line, expression.column)});
-            }
-            SurfaceExpressionPointer call = makeSurfaceApplication(
-                makeSurfaceIdentifier(
-                    identifier->qualifiedName, identifier->universeArgs,
-                    expression.line, expression.column),
-                std::move(holeArgs), expression.line, expression.column);
-            // No goal validates this citation's outcome (the obtained
-            // existential just flows onward), so a silently-guessed
-            // premise surfaces as a confusing failure far away — demand
-            // an unambiguous discharge instead.
-            requireUnambiguousDischarge_ = true;
+            auto elaborateWithHoles =
+                [&](int holeCount) -> ExpressionPointer {
+                std::vector<SurfaceArgument> holeArgs;
+                for (int i = 0; i < holeCount; ++i) {
+                    holeArgs.push_back(
+                        {"", makeSurfaceHole(expression.line,
+                                             expression.column)});
+                }
+                SurfaceExpressionPointer call = makeSurfaceApplication(
+                    makeSurfaceIdentifier(
+                        identifier->qualifiedName, identifier->universeArgs,
+                        expression.line, expression.column),
+                    std::move(holeArgs), expression.line, expression.column);
+                // No goal validates this citation's outcome (the obtained
+                // existential just flows onward), so a silently-guessed
+                // premise surfaces as a confusing failure far away — demand
+                // an unambiguous discharge instead.
+                requireUnambiguousDischarge_ = true;
+                try {
+                    ExpressionPointer cited = elaborateExpression(
+                        *call, localBinders, expectedType);
+                    requireUnambiguousDischarge_ = false;
+                    return cited;
+                } catch (...) {
+                    requireUnambiguousDischarge_ = false;
+                    throw;
+                }
+            };
+            // The expected type here is the real destructure target (the
+            // choose paths build it), so a citation that resolves at a
+            // DIFFERENT type — e.g. the unapplied definition-spelled
+            // conclusion when a premise pinned every stated hole — is
+            // never useful; treat it like a failure for retry purposes.
+            auto typeMatchesExpected =
+                [&](ExpressionPointer term) -> bool {
+                if (!expectedType) return true;
+                try {
+                    ExpressionPointer termType = inferTypeInLocalContext(
+                        localBinders, term);
+                    ExpressionPointer expectedOpened = openOverLocalBinders(
+                        expectedType, localBinders, localBinders.size());
+                    Context context =
+                        buildContextFromLocalBinders(localBinders);
+                    return isDefinitionallyEqual(
+                        environment_, context, termType, expectedOpened);
+                } catch (const TypeError&) {
+                    return true;  // can't judge — keep the old behaviour
+                } catch (const ElaborateError&) {
+                    return true;
+                }
+            };
+            // Retry with holes for the premises a definition-spelled
+            // conclusion buries (`isCauchy : … → IsCauchy(f)` where
+            // IsCauchy(f) = ∀ ε. 0 < ε → ∃ N. … — the ε and positivity
+            // slots exist only after WHNF, so the syntactic count above
+            // never opened them). The stated count stays primary:
+            // `Not(P)` also δ-unfolds to a Pi, and an eager extra hole
+            // would break every negation-concluding citation. On a
+            // failed retry, the stated-form outcome stands — its
+            // diagnostics match what the user wrote.
+            int throughWhnf = declType
+                ? countLeadingPisThroughWhnf(declType) : 0;
+            int extendedCount = throughWhnf - implicitCount;
             try {
-                ExpressionPointer cited = elaborateExpression(
-                    *call, localBinders, expectedType);
-                requireUnambiguousDischarge_ = false;
-                return cited;
-            } catch (...) {
-                requireUnambiguousDischarge_ = false;
-                throw;
+                ExpressionPointer stated =
+                    elaborateWithHoles(explicitCount);
+                if (extendedCount <= explicitCount
+                    || typeMatchesExpected(stated)) {
+                    return stated;
+                }
+                try {
+                    ExpressionPointer extended =
+                        elaborateWithHoles(extendedCount);
+                    if (typeMatchesExpected(extended)) return extended;
+                } catch (const ElaborateError&) {
+                }
+                return stated;
+            } catch (const ElaborateError& statedError) {
+                if (extendedCount <= explicitCount) throw;
+                try {
+                    return elaborateWithHoles(extendedCount);
+                } catch (const ElaborateError&) {
+                    throw statedError;
+                }
             }
         }
 

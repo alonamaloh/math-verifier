@@ -5799,6 +5799,15 @@ private:
     static ExpressionPointer declarationType(
         const Declaration& declaration);
 
+    // Leading-Pi count that keeps peeling through WHNF, so premises
+    // buried behind a definition-spelled conclusion count too
+    // (`IsCauchy(f)` = ∀ ε. 0 < ε → ∃ N. … contributes its ε and
+    // positivity slots). Used by the CiteInferred retry only — the
+    // syntactic count stays primary, since e.g. `Not(P)` δ-unfolds to
+    // a Pi and an eager extra hole would break negation-concluding
+    // citations.
+    int countLeadingPisThroughWhnf(ExpressionPointer type);
+
     // Unifies a single level expression with a concrete level, collecting
     // assignments for universe-parameter names. The "expected" side comes
     // from the signature being instantiated (may contain LevelParams that

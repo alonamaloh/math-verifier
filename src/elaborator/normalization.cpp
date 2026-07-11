@@ -184,6 +184,31 @@ ExpressionPointer Elaborator::deepBetaReduce(ExpressionPointer expression) {
         return expression;
     }
 
+int Elaborator::countLeadingPisThroughWhnf(ExpressionPointer type) {
+        // Peels the same way the choose-from-lemma witness reader does
+        // (induction.cpp): syntactic Pis first, WHNF when stuck, stop
+        // when WHNF makes no progress (an inductive head like Exists /
+        // Equality, or a genuinely non-Pi conclusion).
+        int count = 0;
+        ExpressionPointer cursor = type;
+        for (;;) {
+            if (auto* pi = std::get_if<Pi>(&cursor->node)) {
+                ++count;
+                cursor = pi->codomain;
+                continue;
+            }
+            ExpressionPointer reduced;
+            try {
+                reduced = weakHeadNormalForm(environment_, cursor);
+            } catch (const TypeError&) {
+                break;
+            }
+            if (reduced.get() == cursor.get()) break;
+            cursor = reduced;
+        }
+        return count;
+    }
+
 bool Elaborator::expressionReferencesConstant(
         ExpressionPointer expression,
         const std::string& targetHeadName,

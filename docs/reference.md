@@ -144,7 +144,7 @@ End each with `;`; the block returns its final non-`;` expression.
 | `suppose Not(X) [as h] for contradiction { … };` | reductio (forward): the braced block derives `False`, establishing `X` into the context, then the proof continues at the original goal |
 | `suppose P [as h] for proving Q { … };` | forward implication: prove `Q` under `h : P`, adding `P → Q` to the context for the rest of the block |
 | `take x : T for proving Q { … };` | forward ∀-introduction: prove `Q` under `x : T`, adding `∀ (x : T). Q` to the context for the rest of the block |
-| `choose w [such that P] [as h] from S;` | `∃`-elimination (preferred): `S` a hypothesis, a lemma cited argument-free, or an applied term |
+| `choose w [such that P] [as h] from S;` | `∃`-elimination (preferred): `S` a hypothesis, a lemma cited argument-free, or an applied term; works through a definition-spelled conclusion (`IsCauchy(f)` = `∀ ε. 0 < ε → ∃ N. …`) — the buried premises instantiate from `P` and discharge from scope |
 | `choose n such that P(n);` | `∃`-elimination from the most-recent in-scope `∃` |
 | `choose m, n such that P;` | witness list — flattens a nested `∃` (with an `∧`-chain under the innermost binder) in one step |
 | `eventually (m). P(m)` | "P holds from some index on" — `Natural.Eventually((m : Natural) ↦ P(m))`; combine via `Eventually.and` (max of thresholds) / `Eventually.monotone`; `choose N such that … from h` opens the threshold |

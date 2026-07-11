@@ -612,6 +612,7 @@ private:
             consumeAny();
             SurfaceAxiomDeclaration declaration;
             declaration.name = consumeQualifiedNameString();
+            rejectInterfaceUniverseParameters();
             declaration.type = makeSurfaceType(
                 makeSurfaceLevelNumeric(0, peek().line, peek().column),
                 peek().line, peek().column);
@@ -628,6 +629,7 @@ private:
             consumeAny();
             SurfaceAxiomDeclaration declaration;
             declaration.name = consumeQualifiedNameString();
+            rejectInterfaceUniverseParameters();
             std::vector<SurfaceBinder> binders;
             while (peek().kind == TokenKind::LeftParen
                    || peek().kind == TokenKind::LeftBrace) {
@@ -656,6 +658,7 @@ private:
             consumeAny();
             SurfaceAxiomDeclaration declaration;
             declaration.name = consumeQualifiedNameString();
+            rejectInterfaceUniverseParameters();
             expect(TokenKind::Colon, "after the constant's name");
             declaration.type = parseExpression();
             declaration.interfaceRole =
@@ -2805,6 +2808,25 @@ private:
     // Universe parameter declaration form: `.{u, v}` after a name in a
     // declaration introduces u and v as universe-parameter names. Empty
     // result if no `.{...}` is present.
+    // Interface obligations are MONOMORPHIC: the obligation check
+    // elaborates the stated type without universe parameters in scope
+    // and the seal re-emits at the stated spelling, so a `.{u}` here
+    // would silently misbind. Measured 2026-07-11: nothing needs it —
+    // the only interface (Real) is Type₀/Prop throughout, and the bulk
+    // `export theorems of` path already carries an implementation
+    // lemma's universe parameters through the seal. Reject loudly
+    // until a real polymorphic interface arrives.
+    void rejectInterfaceUniverseParameters() {
+        if (peek().kind != TokenKind::DotLeftBrace) return;
+        throwHere(
+            "universe-polymorphic interface obligations are not "
+            "supported: the obligation check and the sealed re-emit "
+            "are monomorphic. State the obligation at the universe "
+            "consumers use, or keep the polymorphic lemma "
+            "construction-side and reach it via `export theorems of "
+            "<module>` (which preserves universe parameters)");
+    }
+
     std::vector<std::string> parseUniverseParameterList() {
         std::vector<std::string> parameters;
         if (peek().kind != TokenKind::DotLeftBrace) return parameters;

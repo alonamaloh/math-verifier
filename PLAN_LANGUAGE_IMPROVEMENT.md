@@ -43,11 +43,11 @@ Steps refer to the suggested order at the end of the plan.
 | 2 | B1–B3 tier skeleton, context index, cast tier | **B1/B2/B3 done; residue forensics done — verdict: no norm_cast mechanism needed; F1–F5 queue CLOSED 2026-07-11; tier4-sign forensics + tactic-order/∧-leg fixes landed 2026-07-11; ζ-let opacity family CLOSED 2026-07-11 (sign ζ-retry + field consistent ζ)** |
 | 3 | A1 keyword-free claims/calc | **DONE — keywords retired** |
 | 4 | B4 order automation in calc | **v1 DONE** |
-| 5 | A2 statement addressability + A7 `contradiction` kit | **A2 stage 1 + transport done; A7 done** |
+| 5 | A2 statement addressability + A7 `contradiction` kit | **A2 stage 1 + transport done; A7 done; γ buried-premise citation gap CLOSED 2026-07-11** |
 | 6 | A3/A4/A5 construct distillation | **A3/A4/A5 DONE** (A4 closed 2026-07-07: multi-binder equation-shaped induction arms) |
 | 7 | A6 `eventually` | **DONE incl. the analytic acceptance target (SequenceIsCauchy two-index tail deliberately outside)** |
 | 8 | C1–C6 (continuous; C4 with each construct) | **in progress** |
-| 9 | D: sealed structures (Phase 0 ℝ prototype first) | **DONE through the flip campaign (residuals: visibility lint, universe-polymorphic obligations)** |
+| 9 | D: sealed structures (Phase 0 ℝ prototype first) | **DONE; both residuals CLOSED 2026-07-11 (visibility lint OBE — the landed seal filters, nothing is present-but-unadvertised; universe-polymorphic obligations = measured won't-build, loud parse rejection)** |
 | 10 | A8: Fold library → binder form → recognizer → series | **done** (all six steps, 2026-07-02 night) |
 
 ### Ledger row logs
@@ -995,6 +995,27 @@ ground refutation).
 candidates for a per-declaration-per-goal peel cost; the prompted projection
 covers citations. Gates: make check green, error-tests 52/0.
 
+**γ BURIED-PREMISE CITATION GAP CLOSED (2026-07-11).** The residual: a
+`choose … such that … from <lemma>` whose ∃ sits behind definition-buried
+premises (`isCauchy : cs → IsCauchy(seqFn(cs))` where IsCauchy(f) =
+∀ ε. 0 < ε → ∃ N. …) declined — the CiteInferred expansion counted holes
+with the SYNTACTIC countLeadingPis, so the WHNF-exposed ε/positivity slots
+never opened (the reader half had already learned to peel through WHNF).
+Fix at the citation root (dispatch.cpp CiteInferred): stated hole count
+first — `Not(P)` also δ-unfolds to a Pi, so an eager extra hole would break
+negation-concluding citations — then ONE retry at
+countLeadingPisThroughWhnf when the stated attempt fails OR resolves at a
+type that is not defeq to the expected destructure target (a premise can
+pin every stated hole and "succeed" at the unapplied definition-spelled
+conclusion; the ascription is advisory, so that wrong-type success
+previously surfaced as a distant cases error). Reverted linearity site now
+lands as the one-liner (`choose cauchyIndex such that … as cauchyAt from
+CauchyRationalSequence.isCauchy`); Test/choose_from_lemma_test gained the
+(γ) pin (Test.Roof buried-premise shape, premise-pinned variant included).
+Library sweep found no other collapsible claim-first site of this shape.
+Remaining named residual at this row: the multiplication.math (b)-class
+opacity fragility (unchanged, banked with its backtrace signature).
+
 #### Row 6 — A3/A4/A5 construct distillation
 
 **A3 (2026-07-04): one `for` grammar for both suppose exits** — `suppose P for
@@ -1485,6 +1506,32 @@ that upgrade path — and the gate — green. D4 (the `Natural` seal) now has it
 own refreshed spec: `PLAN_NATURAL_SEALING.md` (2026-07-10 rewrite — its old
 numeral/norm_num half landed via PLAN_FAST_NUMERALS; what remains is pure
 encapsulation)
+
+**BOTH RESIDUALS CLOSED BY MEASUREMENT (2026-07-11).** (1) **Visibility
+lint: OVERTAKEN BY EVENTS.** The lint's premise was the D-sketch's
+"unlisted names remain present but unadvertised" cache; the LANDED seal
+filters + prunes instead — the interface cache holds exactly the
+obligations, bulk exports, transparent definitions, and filtered wiring,
+its kept imports are all non-Real vocabulary, so a construction-internal
+name is ABSENT from a consumer's environment and a citation fails loudly
+at name lookup (probed: `Real.bisectionLeft_below_witness` through
+Real.interface → "unknown lemma"; pinned as
+ErrorTest/interface_seals_out_internals). Sealed placeholder bodies are
+Prop-typed throughout, so even an `unfolding` pierce is harmless (proof
+irrelevance). Nothing exists for a lint to advise on. (2)
+**Universe-polymorphic obligations: measured WON'T-BUILD.** The only
+interface (Real) is Type₀/Prop throughout; the bulk `export theorems of`
+path already carries an implementation lemma's universe parameters through
+the seal, so polymorphic FACTS are reachable today. What can't work is a
+polymorphic obligation stated in the interface SOURCE (the obligation
+check elaborates the stated type with no universe parameters in scope and
+the seal re-emits at the stated spelling) — previously a bare parse
+error; now a targeted parse-time rejection on all three obligation forms
+(`type`/`constant`/theorem signature) naming the monomorphic-seal reason
+and the bulk-export alternative
+(ErrorTest/interface_universe_polymorphic_obligation pins it). Build the
+real support only when a polymorphic interface (group theory / category
+theory class) actually arrives.
 
 #### Row 10 — A8: Fold library → binder form → recognizer → series
 
