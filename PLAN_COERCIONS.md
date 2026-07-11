@@ -206,6 +206,14 @@ not the universal one.
 3. **Tier 1.5** — `push_cast`/`norm_cast` normalizer + the coherence-lemma
    audit (which homomorphism/injectivity lemmas already exist in
    `Integer`/`Rational`/`Real` embeddings vs. what is missing).
+   **CLOSED BY FORENSICS (2026-07-11): no standalone normalizer will be
+   built** — the B3 cast tiers (push/pull/lower + context-fact matching,
+   `src/elaborator/cast_normal.cpp`) already carry both directions, and a
+   full re-measure of the tier3-cast bucket showed the residue is not
+   cast machinery (by-less `field`, ∣/≠ relation transport, packet gaps).
+   The coherence-lemma audit exists as `make audit-coercions`. Findings +
+   the follow-up queue: PLAN_LANGUAGE_IMPROVEMENT.md ledger row 2, the
+   2026-07-11 block.
 4. **Library sweep** — delete now-redundant explicit casts across the
    analysis cone; measure the noise reduction.
 5. **Tier 2** *(deferred)* — heterogeneous-operator registry for scalar
