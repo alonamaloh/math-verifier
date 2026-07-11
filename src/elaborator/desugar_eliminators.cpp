@@ -88,7 +88,8 @@ ExpressionPointer Elaborator::desugarAbsurd(
                     auto* lessThanRhsLiteral =
                         std::get_if<NaturalLiteral>(&lessThanRhs->node);
                     bool rhsIsZero =
-                        (lessThanRhsZero && lessThanRhsZero->name == "zero")
+                        (lessThanRhsZero
+                         && lessThanRhsZero->name == "Natural.Raw.zero")
                         || (lessThanRhsLiteral
                             && lessThanRhsLiteral->value == 0);
                     auto* lessThanInner = std::get_if<Application>(
@@ -117,7 +118,8 @@ ExpressionPointer Elaborator::desugarAbsurd(
                             auto* succHead = std::get_if<Constant>(
                                 &succApp->function->node);
                             if (succHead
-                                && succHead->name == "successor") {
+                                && succHead->name
+                                       == "Natural.Raw.successor") {
                                 successorArgument = succApp->argument;
                             }
                         }
@@ -173,7 +175,7 @@ ExpressionPointer Elaborator::desugarAbsurd(
                     if (!application) return false;
                     auto* head = std::get_if<Constant>(
                         &application->function->node);
-                    if (!head || head->name != "successor") {
+                    if (!head || head->name != "Natural.Raw.successor") {
                         return false;
                     }
                     inner = application->argument;
@@ -189,7 +191,8 @@ ExpressionPointer Elaborator::desugarAbsurd(
                     }
                     auto* constant = std::get_if<Constant>(
                         &normalised->node);
-                    return constant && constant->name == "zero";
+                    return constant
+                        && constant->name == "Natural.Raw.zero";
                 };
                 ExpressionPointer kValue;
                 if (carrierIsNatural

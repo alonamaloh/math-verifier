@@ -19,27 +19,37 @@ ExpressionPointer Elaborator::elaborateByStrongInduction(
             *form.scrutinee, localBinders);
         ExpressionPointer scrutineeTypeOpened = inferTypeInLocalContext(
             localBinders, scrutineeKernel);
-        ExpressionPointer scrutineeTypeWhnf = weakHeadNormalForm(
-            environment_, scrutineeTypeOpened);
-        // Peel Application heads to find the spine constant.
-        ExpressionPointer spineHead = scrutineeTypeWhnf;
-        while (auto* app = std::get_if<Application>(&spineHead->node)) {
-            spineHead = app->function;
+        // Prefer the SYNTACTIC head — the public carrier name the
+        // strong-induction lemma is keyed on (`Natural` is an alias
+        // over the raw inductive); WHNF only as a fallback.
+        auto carrierHeadName =
+            [](ExpressionPointer type) -> std::string {
+            ExpressionPointer spineHead = type;
+            while (auto* app = std::get_if<Application>(&spineHead->node)) {
+                spineHead = app->function;
+            }
+            auto* headConstant = std::get_if<Constant>(&spineHead->node);
+            return headConstant ? headConstant->name : std::string();
+        };
+        std::string carrierName = carrierHeadName(scrutineeTypeOpened);
+        std::string lemmaName = carrierName + ".strong_induction";
+        if (carrierName.empty() || !environment_.lookup(lemmaName)) {
+            std::string reducedCarrierName = carrierHeadName(
+                weakHeadNormalForm(environment_, scrutineeTypeOpened));
+            if (reducedCarrierName.empty()) {
+                throwElaborate(
+                    "by strong induction: scrutinee's type has no "
+                    "named carrier (head must be a constant like "
+                    "`Natural` or `Integer`)");
+            }
+            carrierName = reducedCarrierName;
+            lemmaName = carrierName + ".strong_induction";
         }
-        auto* headConstant = std::get_if<Constant>(&spineHead->node);
-        if (!headConstant) {
-            throwElaborate(
-                "by strong induction: scrutinee's type has no "
-                "named carrier (head must be a constant like "
-                "`Natural` or `Integer`)");
-        }
-        std::string lemmaName =
-            headConstant->name + ".strong_induction";
         if (!environment_.lookup(lemmaName)) {
             throwElaborate(
                 "by strong induction: no `" + lemmaName
                 + "` in scope (expected the strong-induction "
-                  "principle for carrier `" + headConstant->name
+                  "principle for carrier `" + carrierName
                 + "` to be defined under that name; import the "
                   "module that provides it)");
         }
@@ -954,27 +964,40 @@ ExpressionPointer Elaborator::elaborateByInductionOnePlus(
             localBinders[scrutineeArrayIndex].type;
 
         // --- Resolve `<Carrier>.induction_on_one_plus` from the scrutinee's
-        // carrier head.
-        ExpressionPointer scrutineeTypeWhnf = weakHeadNormalForm(
-            environment_,
-            inferTypeInLocalContext(localBinders, scrutineeKernel));
-        ExpressionPointer spineHead = scrutineeTypeWhnf;
-        while (auto* app = std::get_if<Application>(&spineHead->node)) {
-            spineHead = app->function;
+        // carrier head. Prefer the SYNTACTIC head of the inferred type —
+        // the public carrier name the induction lemmas are keyed on
+        // (`Natural`, an alias over the raw inductive) — and only fall
+        // back to the reduced head when the un-reduced type has no named
+        // constant or no lemma under that name.
+        ExpressionPointer scrutineeTypeInferred =
+            inferTypeInLocalContext(localBinders, scrutineeKernel);
+        auto carrierHeadName =
+            [](ExpressionPointer type) -> std::string {
+            ExpressionPointer spineHead = type;
+            while (auto* app = std::get_if<Application>(&spineHead->node)) {
+                spineHead = app->function;
+            }
+            auto* headConstant = std::get_if<Constant>(&spineHead->node);
+            return headConstant ? headConstant->name : std::string();
+        };
+        std::string carrierName = carrierHeadName(scrutineeTypeInferred);
+        std::string lemmaName = carrierName + ".induction_on_one_plus";
+        if (carrierName.empty() || !environment_.lookup(lemmaName)) {
+            std::string reducedCarrierName = carrierHeadName(
+                weakHeadNormalForm(environment_, scrutineeTypeInferred));
+            if (reducedCarrierName.empty()) {
+                throwElaborate(
+                    "by induction: scrutinee's type has no named carrier "
+                    "(head must be a constant like `Natural`)");
+            }
+            carrierName = reducedCarrierName;
+            lemmaName = carrierName + ".induction_on_one_plus";
         }
-        auto* headConstant = std::get_if<Constant>(&spineHead->node);
-        if (!headConstant) {
-            throwElaborate(
-                "by induction: scrutinee's type has no named carrier "
-                "(head must be a constant like `Natural`)");
-        }
-        std::string lemmaName =
-            headConstant->name + ".induction_on_one_plus";
         if (!environment_.lookup(lemmaName)) {
             throwElaborate(
                 "by induction: no `" + lemmaName + "` in scope (the "
                 "`1 + n` induction principle for carrier `"
-                + headConstant->name + "`); import the module that "
+                + carrierName + "`); import the module that "
                 "provides it, or use `case zero` / `case successor` for "
                 "the raw-recursor form");
         }

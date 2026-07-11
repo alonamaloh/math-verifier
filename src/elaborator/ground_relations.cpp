@@ -126,12 +126,12 @@ std::optional<NaturalValue> Elaborator::tryGroundNaturalValue(
             return NaturalValue(offset + literal->value);
         }
         if (auto* constant = std::get_if<Constant>(&reduced->node)) {
-            if (constant->name == "zero") return offset;
+            if (constant->name == "Natural.Raw.zero") return offset;
             return std::nullopt;
         }
         if (auto* application = std::get_if<Application>(&reduced->node)) {
             auto* head = std::get_if<Constant>(&application->function->node);
-            if (head && head->name == "successor") {
+            if (head && head->name == "Natural.Raw.successor") {
                 ++offset;
                 argument = application->argument;
                 continue;

@@ -41,9 +41,13 @@ struct ExportError : std::runtime_error {
 
 std::string mapDeclarationName(const std::string& name) {
     static const std::map<std::string, std::string> fixed = {
-        {"Natural", "Nat"},
-        {"zero", "Nat.zero"},
-        {"successor", "Nat.succ"},
+        // The RAW inductive is what the checker's builtin `Nat` must be
+        // (PLAN_NATURAL_SEALING); the public `Natural` alias exports
+        // under its own name as a transparent def over it. Mapping the
+        // alias to `Nat` too would trip the mapped-name collision guard.
+        {"Natural.Raw", "Nat"},
+        {"Natural.Raw.zero", "Nat.zero"},
+        {"Natural.Raw.successor", "Nat.succ"},
         {"Natural.add", "Nat.add"},
         {"Natural.multiply", "Nat.mul"},
         {"Natural.monus", "Nat.sub"},

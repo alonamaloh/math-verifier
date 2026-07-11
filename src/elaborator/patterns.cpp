@@ -6,6 +6,40 @@
 
 #include "elaborator/internal.hpp"
 
+namespace {
+
+// The spelling of a constructor in ARM GOALS. The raw Natural
+// constructors live in the `Natural.Raw` namespace, but consumers (and
+// the whole lemma library) spell their transparent alias-typed wrappers
+// `zero`/`successor` (PLAN_NATURAL_SEALING). Instantiating a case
+// motive with the wrapper keeps arm goals structurally aligned with
+// those spellings; the kernel accepts the recursor application either
+// way because the wrapper δ-reduces to the constructor.
+const std::string& publicConstructorSpelling(const std::string& name) {
+    static const std::string zeroWrapper = "zero";
+    static const std::string successorWrapper = "successor";
+    if (name == "Natural.Raw.zero") return zeroWrapper;
+    if (name == "Natural.Raw.successor") return successorWrapper;
+    return name;
+}
+
+// The same public preference for a destructured BINDER's type: a
+// constructor argument declared at the raw type binds at the public
+// alias (defeq through the transparent alias), so every carrier-keyed
+// reader downstream — operator dispatch, calc relation registries,
+// certificate tiers — sees `Natural`, exactly as consumers spell it.
+ExpressionPointer publicTypeSpelling(ExpressionPointer type) {
+    if (auto* constant = std::get_if<Constant>(&type->node)) {
+        if (constant->name == "Natural.Raw"
+            && constant->universeArguments.empty()) {
+            return makeConstant("Natural");
+        }
+    }
+    return type;
+}
+
+} // namespace
+
 void Elaborator::elaboratePatternMatchDefinition(
         const SurfaceDefinitionDeclaration& declaration) {
 
@@ -463,6 +497,13 @@ ExpressionPointer Elaborator::buildCaseLambda(
             + inductiveName + "'");
 
         // Find the case in the declaration matching this constructor.
+        // A pattern label matches on the constructor's full name or on
+        // its last component (`| successor(k)` matches the qualified
+        // constructor `Natural.Raw.successor` — patterns keep the
+        // historical bare spelling while the constructor lives in the
+        // raw namespace, PLAN_NATURAL_SEALING).
+        const std::string constructorLastComponent =
+            constructorName.substr(constructorName.rfind('.') + 1);
         const SurfacePatternCase* matchedCase = nullptr;
         for (const auto& caseDeclaration : declaration.cases) {
             const SurfacePattern& firstPattern = *caseDeclaration.patterns.front();
@@ -476,7 +517,8 @@ ExpressionPointer Elaborator::buildCaseLambda(
                                &firstPattern.node)) {
                 seenName = bareName->name;
             }
-            if (seenName == constructorName) {
+            if (seenName == constructorName
+                || seenName == constructorLastComponent) {
                 matchedCase = &caseDeclaration;
                 break;
             }
@@ -682,7 +724,8 @@ ExpressionPointer Elaborator::buildCaseLambda(
             // depth already matches — no shift.
             destructuredArgumentPositions.push_back(lambdaBinders.size());
             lambdaBinders.push_back(
-                {destructuredNames[i], constructorArguments[i].type});
+                {destructuredNames[i],
+                 publicTypeSpelling(constructorArguments[i].type)});
         }
         for (size_t i = 0; i < constructorArguments.size(); ++i) {
             const auto& constructorArgument = constructorArguments[i];
@@ -775,9 +818,11 @@ ExpressionPointer Elaborator::buildCaseLambda(
                            - constructorValueArgCount));
             }
             // Apply to the constructor application of (params,
-            // destructured-values).
+            // destructured-values) — spelled publicly (see
+            // publicConstructorSpelling) so arm goals match the
+            // library's spellings.
             ExpressionPointer constructorApplication =
-                makeConstant(constructorName,
+                makeConstant(publicConstructorSpelling(constructorName),
                               inductiveUniverseArguments);
             for (const auto& parameterValue : parameterValues) {
                 constructorApplication = makeApplication(
@@ -843,6 +888,23 @@ ExpressionPointer Elaborator::buildCaseLambda(
                     const Inductive* slotInductive = slotDeclaration
                         ? std::get_if<Inductive>(slotDeclaration)
                         : nullptr;
+                    // The slot type may be spelled at a transparent
+                    // alias over the inductive (`Natural` over
+                    // `Natural.Raw`) — resolve through it so the guard
+                    // still sees the constructors.
+                    if (!slotInductive && slotDeclaration
+                        && std::get_if<Definition>(slotDeclaration)) {
+                        std::string reducedHead = headConstantName(
+                            weakHeadNormalForm(environment_, pi->domain));
+                        const Declaration* reducedDeclaration =
+                            reducedHead.empty()
+                                ? nullptr
+                                : environment_.lookup(reducedHead);
+                        slotInductive = reducedDeclaration
+                            ? std::get_if<Inductive>(reducedDeclaration)
+                            : nullptr;
+                        if (slotInductive) slotHead = reducedHead;
+                    }
                     if (slotInductive) {
                         for (const std::string& ctor :
                              slotInductive->constructorNames) {
@@ -1170,7 +1232,7 @@ ExpressionPointer Elaborator::buildBodyForCase(
                     }
                     originalCursor = originalPi->codomain;
                 }
-                ctorArgTypes.push_back(pi->domain);
+                ctorArgTypes.push_back(publicTypeSpelling(pi->domain));
                 ctorCursor = pi->codomain;
             }
         }
@@ -1298,7 +1360,8 @@ ExpressionPointer Elaborator::buildBodyForCase(
         // to put them in caseBodyStack scope (which has the ctor-arg
         // binders above bodyStack).
         ExpressionPointer ctorApp = makeConstant(
-            expectedCtorName, indConstant->universeArguments);
+            publicConstructorSpelling(expectedCtorName),
+            indConstant->universeArguments);
         for (const auto& paramValue : innerParameterValues) {
             ctorApp = makeApplication(
                 ctorApp,

@@ -1021,8 +1021,8 @@ ExpressionPointer buildIotaReduction(
 // pattern matching work over literals without ever materialising the
 // full successor chain.
 ExpressionPointer naturalLiteralConstructorView(const NaturalValue& value) {
-    if (value == 0) return makeConstant("zero");
-    return makeApplication(makeConstant("successor"),
+    if (value == 0) return makeConstant("Natural.Raw.zero");
+    return makeApplication(makeConstant("Natural.Raw.successor"),
                            makeNaturalLiteral(value - 1));
 }
 
@@ -1110,14 +1110,15 @@ std::optional<NaturalValue> evaluateAcceleratedNaturalOp(
 namespace {
 
 // True when `name` resolves to the given constructor of the inductive
-// `Natural` in this environment — guards the literal hooks against a
-// user type that happens to reuse the constructor names.
+// `Natural.Raw` (the raw naturals under the `Natural` alias,
+// PLAN_NATURAL_SEALING) in this environment — guards the literal hooks
+// against a user type that happens to reuse the constructor names.
 bool isNaturalConstructor(const Environment& environment,
                           const std::string& name) {
     auto* declaration = environment.lookup(name);
     auto* constructor =
         declaration ? std::get_if<Constructor>(declaration) : nullptr;
-    return constructor && constructor->inductiveName == "Natural";
+    return constructor && constructor->inductiveName == "Natural.Raw";
 }
 
 } // namespace
@@ -1228,9 +1229,9 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                             }
                             if (auto* constant = std::get_if<Constant>(
                                     &reduced->node)) {
-                                if (constant->name == "zero"
+                                if (constant->name == "Natural.Raw.zero"
                                     && isNaturalConstructor(
-                                           environment, "zero")) {
+                                           environment, "Natural.Raw.zero")) {
                                     return offset;
                                 }
                                 return std::nullopt;
@@ -1239,9 +1240,9 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                                     &reduced->node)) {
                                 auto* head = std::get_if<Constant>(
                                     &application->function->node);
-                                if (head && head->name == "successor"
+                                if (head && head->name == "Natural.Raw.successor"
                                     && isNaturalConstructor(
-                                           environment, "successor")) {
+                                           environment, "Natural.Raw.successor")) {
                                     ++offset;
                                     argument = application->argument;
                                     continue;
@@ -1295,9 +1296,10 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                 // compaction exists to undo the one-peel constructor view,
                 // not to re-canonicalise constructor spellings the
                 // elaborator's matchers may still expect.
-                if (headConstant->name == "successor"
+                if (headConstant->name == "Natural.Raw.successor"
                     && !spine.args.empty()
-                    && isNaturalConstructor(environment, "successor")) {
+                    && isNaturalConstructor(environment,
+                                            "Natural.Raw.successor")) {
                     ExpressionPointer argument = spine.args[0];
                     if (!std::holds_alternative<NaturalLiteral>(
                             argument->node)
@@ -1336,11 +1338,11 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
                         // Reduce the target to whnf and inspect.
                         auto reducedTarget =
                             weakHeadNormalForm(environment, spine.args[needed - 1], fuel);
-                        // A literal target of Natural's recursor exposes
-                        // its constructor view one peel at a time
+                        // A literal target of the naturals' recursor
+                        // exposes its constructor view one peel at a time
                         // (PLAN_FAST_NUMERALS §B), so ι fires on ground
                         // literals exactly as it does on `zero`/`successor`.
-                        if (recursor->inductiveName == "Natural") {
+                        if (recursor->inductiveName == "Natural.Raw") {
                             if (auto* literalTarget = std::get_if<NaturalLiteral>(
                                     &reducedTarget->node)) {
                                 reducedTarget = naturalLiteralConstructorView(
@@ -1841,8 +1843,8 @@ bool isDefinitionallyEqualImpl(const Environment& environment,
             [&](const NaturalValue& value,
                 const ExpressionPointer& other) -> std::optional<bool> {
             if (auto* constant = std::get_if<Constant>(&other->node)) {
-                if (constant->name == "zero"
-                    && isNaturalConstructor(environment, "zero")) {
+                if (constant->name == "Natural.Raw.zero"
+                    && isNaturalConstructor(environment, "Natural.Raw.zero")) {
                     return value == 0;
                 }
                 return std::nullopt;
@@ -1850,8 +1852,9 @@ bool isDefinitionallyEqualImpl(const Environment& environment,
             if (auto* application = std::get_if<Application>(&other->node)) {
                 auto* head =
                     std::get_if<Constant>(&application->function->node);
-                if (head && head->name == "successor"
-                    && isNaturalConstructor(environment, "successor")) {
+                if (head && head->name == "Natural.Raw.successor"
+                    && isNaturalConstructor(environment,
+                                            "Natural.Raw.successor")) {
                     if (value == 0) return false;
                     return isDefinitionallyEqual(
                         environment, context,

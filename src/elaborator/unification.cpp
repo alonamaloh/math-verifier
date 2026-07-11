@@ -474,7 +474,8 @@ bool Elaborator::headsMatch(ExpressionPointer left, ExpressionPointer right) {
         if (auto* leftConstant = std::get_if<Constant>(&left->node)) {
             if (auto* rightConstant =
                     std::get_if<Constant>(&right->node)) {
-                return leftConstant->name == rightConstant->name;
+                return constantNamesMatchModuloNaturalWrapper(
+                    leftConstant->name, rightConstant->name);
             }
             return false;
         }

@@ -91,6 +91,25 @@ inline std::string openingNameFor(
 std::string headConstantName(const Environment& environment,
                              ExpressionPointer typeExpression);
 
+// Constant-name equality modulo the Natural constructor wrappers
+// (PLAN_NATURAL_SEALING): the bare alias-typed `zero`/`successor` and
+// the raw `Natural.Raw.zero`/`Natural.Raw.successor` denote the same
+// value up to a transparent δ, so structural matchers — whose pattern
+// side comes from statements (wrapper spelling) while the subject side
+// may be weak-head-normalised (raw spelling) — compare through this.
+inline bool constantNamesMatchModuloNaturalWrapper(
+        const std::string& left, const std::string& right) {
+    if (left == right) return true;
+    auto canonical = [](const std::string& name) -> const std::string& {
+        static const std::string successorWrapper = "successor";
+        static const std::string zeroWrapper = "zero";
+        if (name == "Natural.Raw.successor") return successorWrapper;
+        if (name == "Natural.Raw.zero") return zeroWrapper;
+        return name;
+    };
+    return canonical(left) == canonical(right);
+}
+
 // ---- de Bruijn / local-binder term utilities (defs in .cpp) ----
 
 ExpressionPointer abstractOverBoundVariables(

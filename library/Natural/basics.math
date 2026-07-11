@@ -5,15 +5,34 @@
 
 module Natural.basics
 
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
+-- The raw inductive, out of the public namespace with qualified
+-- constructors, mirroring `IntegerRepresentative.make`
+-- (PLAN_NATURAL_SEALING). The kernel's literal machinery and the
+-- export trail key on these qualified names.
+inductive Natural.Raw : Type(0) where
+  | Natural.Raw.zero : Natural.Raw
+  | Natural.Raw.successor : Natural.Raw → Natural.Raw
+
+-- The public type is an alias over the raw inductive. Transparent for
+-- now — consumers still pattern-match and speak `successor` through it
+-- while they migrate to the boundary; the seal (Stage 4 of
+-- PLAN_NATURAL_SEALING) is the one-keyword flip to `opaque definition`.
+definition Natural : Type(0) := Natural.Raw
+
+-- The constructors under their historical bare names, re-exposed AT THE
+-- ALIAS. Transparent on purpose: they δ-reduce onto the raw
+-- constructors, so kernel defeq and literal compaction see through
+-- them, while every consumer spelling `successor(n)` keeps inferring
+-- the public carrier `Natural`.
+definition zero : Natural := Natural.Raw.zero
+definition successor : Natural → Natural := Natural.Raw.successor
 
 -- Small constants used throughout the library.
 definition one : Natural := successor(zero)
 definition two : Natural := successor(one)
 
--- Addition. Pattern-matches on the first argument.
+-- Addition. Pattern-matches on the first argument (through the
+-- transparent alias; moves to the raw floor at the Stage-4 flip).
 --
 -- Definitional reduction rules (visible to the kernel after elaboration):
 --   add(zero, m)         ≡ m

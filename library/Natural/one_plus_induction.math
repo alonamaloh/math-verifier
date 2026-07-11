@@ -35,3 +35,32 @@ theorem Natural.induction_on_one_plus
         done by substituting Natural.one_add
       }
   }
+
+-- The `n + 1` twin: the same principle with the step stated in the
+-- `k + 1` spelling, so consumers pick whichever form their goal speaks
+-- (there is no house preference between `1 + n` and `n + 1`).
+theorem Natural.induction_on_plus_one
+        {P : Natural → Proposition}
+        (base : P(0))
+        (step : ∀ (k : Natural). P(k) → P(k + 1))
+        (n : Natural) : P(n) :=
+  by induction on n with IH {
+    case zero: base
+    case successor(k): {
+        P(k + 1) by step(k, IH);
+        done by substituting Natural.add_one
+      }
+  }
+
+-- Case analysis without an induction hypothesis: every natural is `0`
+-- or `1 + k`. The boundary form of `cases` on a Natural — proofs that
+-- only need the split cite this and never touch the constructors.
+theorem Natural.cases_on_one_plus
+        {P : Natural → Proposition}
+        (base : P(0))
+        (step : ∀ (k : Natural). P(1 + k))
+        (n : Natural) : P(n) :=
+  by induction on n with IH {
+    case base:    base
+    case step(k): step(k)
+  }

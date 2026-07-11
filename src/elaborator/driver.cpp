@@ -430,10 +430,10 @@ void Elaborator::runNumeralTableSelfCheck() {
             invalidateKernelCaches();
         };
         auto successorChain = [](unsigned long n) {
-            ExpressionPointer term = makeConstant("zero");
+            ExpressionPointer term = makeConstant("Natural.Raw.zero");
             for (unsigned long i = 0; i < n; ++i) {
-                term = makeApplication(makeConstant("successor"),
-                                       std::move(term));
+                term = makeApplication(
+                    makeConstant("Natural.Raw.successor"), std::move(term));
             }
             return term;
         };
@@ -449,7 +449,7 @@ void Elaborator::runNumeralTableSelfCheck() {
                         std::get_if<Application>(&term->node)) {
                     auto* head = std::get_if<Constant>(
                         &application->function->node);
-                    if (head && head->name == "successor") {
+                    if (head && head->name == "Natural.Raw.successor") {
                         ++count;
                         term = application->argument;
                         continue;
@@ -457,7 +457,7 @@ void Elaborator::runNumeralTableSelfCheck() {
                     return std::nullopt;
                 }
                 if (auto* constant = std::get_if<Constant>(&term->node);
-                    constant && constant->name == "zero") {
+                    constant && constant->name == "Natural.Raw.zero") {
                     return count;
                 }
                 if (auto* literal =

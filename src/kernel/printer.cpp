@@ -174,8 +174,10 @@ void writeAtomic(std::ostringstream& output,
         return;
     }
     if (auto* constant = std::get_if<Constant>(&expression->node)) {
-        // The bare Natural zero constructor prints as the numeral.
-        if (constant->name == "zero"
+        // The Natural zero — the raw constructor or its bare alias
+        // wrapper — prints as the numeral.
+        if ((constant->name == "zero"
+             || constant->name == "Natural.Raw.zero")
             && constant->universeArguments.empty()) {
             output << "0";
             return;
@@ -253,7 +255,8 @@ void writeAtPrecedence(std::ostringstream& output,
             while (true) {
                 if (auto* app = std::get_if<Application>(&cursor->node)) {
                     auto* head = std::get_if<Constant>(&app->function->node);
-                    if (head && head->name == "successor") {
+                    if (head && (head->name == "successor"
+                                 || head->name == "Natural.Raw.successor")) {
                         ++count;
                         cursor = app->argument;
                         continue;
@@ -267,7 +270,8 @@ void writeAtPrecedence(std::ostringstream& output,
                     break;
                 }
                 auto* constant = std::get_if<Constant>(&cursor->node);
-                pure = constant && constant->name == "zero";
+                pure = constant && (constant->name == "zero"
+                                    || constant->name == "Natural.Raw.zero");
                 break;
             }
             if (pure) {
@@ -313,7 +317,10 @@ void writeAtPrecedence(std::ostringstream& output,
                                 &cursor->node)) {
                             auto* head = std::get_if<Constant>(
                                 &app->function->node);
-                            if (head && head->name == "successor") {
+                            if (head
+                                && (head->name == "successor"
+                                    || head->name
+                                           == "Natural.Raw.successor")) {
                                 ++count;
                                 cursor = app->argument;
                                 continue;
@@ -322,7 +329,9 @@ void writeAtPrecedence(std::ostringstream& output,
                         }
                         auto* constant =
                             std::get_if<Constant>(&cursor->node);
-                        if (constant && constant->name == "zero") {
+                        if (constant
+                            && (constant->name == "zero"
+                                || constant->name == "Natural.Raw.zero")) {
                             return count;
                         }
                         return std::nullopt;

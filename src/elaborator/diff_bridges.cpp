@@ -1249,7 +1249,9 @@ bool Elaborator::matchAgainstPattern(
         }
         if (auto* p = std::get_if<Constant>(&pattern->node)) {
             auto* s = std::get_if<Constant>(&subject->node);
-            if (p->name != s->name) return false;
+            if (!constantNamesMatchModuloNaturalWrapper(p->name, s->name)) {
+                return false;
+            }
             if (p->universeArguments.size()
                     != s->universeArguments.size()) {
                 return false;
