@@ -123,7 +123,7 @@ theorem GaussianInteger.normInteger_embedInteger (a : Integer)
 
 -- ----------------------------------------------------------------------
 -- embed(1) is the ring unit (the constant polynomial 1 is the one of ℤ[i]).
-theorem GaussianInteger.embedInteger_one
+theorem GaussianInteger.embedInteger.one_preserves
         : GaussianInteger.embedInteger(Integer.one)
           = Ring.one(GaussianInteger.ring_bundle) :=
   GaussianInteger.embedInteger(Integer.one)
@@ -168,7 +168,7 @@ theorem GaussianInteger.coordinates_embedInteger_multiply (p : Integer) (w : Gau
 }
 
 -- embed is multiplicative: embed(a·b) = embed a · embed b.
-theorem GaussianInteger.embedInteger_multiply (a b : Integer)
+theorem GaussianInteger.embedInteger.multiply_preserves (a b : Integer)
         : GaussianInteger.embedInteger(a * b)
           = GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b) := {
   a * Integer.zero = Integer.zero;
@@ -186,6 +186,79 @@ theorem GaussianInteger.embedInteger_multiply (a b : Integer)
               = coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
                     by rightCoordinates;
   done by GaussianInteger.coordinates_injective
+}
+
+-- embed is additive: embed(a+b) = embed a + embed b (both sides have
+-- coordinates (a+b, 0)).
+theorem GaussianInteger.embedInteger.add_preserves (a b : Integer)
+        : GaussianInteger.embedInteger(a + b)
+          = GaussianInteger.embedInteger(a) + GaussianInteger.embedInteger(b) := {
+  coords(GaussianInteger.embedInteger(a)) = Product.make(a, Integer.zero) as aCoordinates;
+  coords(GaussianInteger.embedInteger(b)) = Product.make(b, Integer.zero) as bCoordinates;
+  coords(GaussianInteger.embedInteger(a) + GaussianInteger.embedInteger(b))
+              = Product.make(
+                    Product.first(coords(GaussianInteger.embedInteger(a)))
+                        + Product.first(coords(GaussianInteger.embedInteger(b))),
+                    Product.second(coords(GaussianInteger.embedInteger(a)))
+                        + Product.second(coords(GaussianInteger.embedInteger(b))))
+                    by GaussianInteger.coordinates_add
+              = Product.make(a + Product.first(coords(GaussianInteger.embedInteger(b))),
+                    Integer.zero + Product.second(coords(GaussianInteger.embedInteger(b))))
+                    by substituting aCoordinates
+              = Product.make(a + b, Integer.zero + Integer.zero)
+                    by substituting bCoordinates
+              = Product.make(a + b, Integer.zero)
+      as rightCoordinates;
+  coords(GaussianInteger.embedInteger(a + b))
+              = Product.make(a + b, Integer.zero)
+              = coords(GaussianInteger.embedInteger(a) + GaussianInteger.embedInteger(b))
+                    by rightCoordinates;
+  done by GaussianInteger.coordinates_injective
+}
+
+-- embed preserves negation: embed(−a) and −embed(a) both cancel embed(a).
+theorem GaussianInteger.embedInteger.negate_preserves (a : Integer)
+        : GaussianInteger.embedInteger(-a) = RingModulo.negate(GaussianInteger.embedInteger(a)) := {
+  -a + a = Integer.zero as negateCancels;
+  GaussianInteger.embedInteger(-a) + GaussianInteger.embedInteger(a)
+              = GaussianInteger.embedInteger(-a + a)
+                    by GaussianInteger.embedInteger.add_preserves
+              = GaussianInteger.embedInteger(Integer.zero)
+                    by substituting negateCancels
+              = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
+                    by GaussianInteger.embedInteger.zero_preserves
+      as sumZero;
+  GaussianInteger.embedInteger(-a)
+     = (GaussianInteger.embedInteger(-a) + GaussianInteger.embedInteger(a))
+         - GaussianInteger.embedInteger(a)   by ring
+     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial)
+         - GaussianInteger.embedInteger(a)   by substituting sumZero
+     = RingModulo.negate(GaussianInteger.embedInteger(a))   by ring
+}
+
+-- Subtraction through the embedding, assembled from the additive and
+-- negation halves (mirror of Integer.to_rational.subtract_preserves).
+theorem GaussianInteger.embedInteger.subtract_preserves (a b : Integer)
+        : GaussianInteger.embedInteger(a - b)
+          = GaussianInteger.embedInteger(a) - GaussianInteger.embedInteger(b) :=
+  GaussianInteger.embedInteger(a - b)
+     = GaussianInteger.embedInteger(a) + GaussianInteger.embedInteger(-b)
+           by GaussianInteger.embedInteger.add_preserves
+     = GaussianInteger.embedInteger(a) + RingModulo.negate(GaussianInteger.embedInteger(b))
+           by GaussianInteger.embedInteger.negate_preserves
+     = GaussianInteger.embedInteger(a) - GaussianInteger.embedInteger(b)
+
+-- The embedding is injective: read the integer back off the first
+-- coordinate.
+theorem GaussianInteger.embedInteger.injective (a b : Integer)
+        (equalImages : GaussianInteger.embedInteger(a) = GaussianInteger.embedInteger(b))
+        : a = b := {
+  coords(GaussianInteger.embedInteger(a)) = Product.make(a, Integer.zero) as aCoordinates;
+  coords(GaussianInteger.embedInteger(b)) = Product.make(b, Integer.zero) as bCoordinates;
+  a
+     = Product.first(coords(GaussianInteger.embedInteger(a)))   by substituting aCoordinates
+     = Product.first(coords(GaussianInteger.embedInteger(b)))   by substituting equalImages
+     = b   by substituting bCoordinates
 }
 
 -- If embed(p) divides z then p divides z's imaginary part.

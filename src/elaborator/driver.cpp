@@ -286,12 +286,10 @@ void Elaborator::runModule(const SurfaceModule& module) {
             const char* auditFlag =
                 std::getenv("MATH_AUDIT_COERCION_PACKETS");
             if (auditFlag && auditFlag[0] != '\0' && auditFlag[0] != '0') {
-                static const std::array<const char*, 11> slots{
+                static const std::array<const char*, 7> slots{
                     "zero_preserves", "one_preserves", "add_preserves",
                     "multiply_preserves", "subtract_preserves",
-                    "negate_preserves", "LessOrEqual_preserves",
-                    "LessThan_preserves", "LessOrEqual_reflects",
-                    "LessThan_reflects", "injective"};
+                    "negate_preserves", "injective"};
                 for (const auto& [key, chain]
                          : environment_.coercionRegistry) {
                     if (chain.size() != 1) continue;
@@ -304,17 +302,26 @@ void Elaborator::runModule(const SurfaceModule& module) {
                             missing += slot;
                         }
                     }
-                    // ∣ transport slots — audited only where BOTH
-                    // carriers have a divisibility relation (a field
-                    // target like ℚ has none, so the transport lemma
-                    // cannot even be stated there — structural absence,
-                    // same as ℕ's missing subtraction).
-                    if (environment_.lookup(
-                            std::get<0>(key) + ".divides") != nullptr
-                        && environment_.lookup(
-                            std::get<1>(key) + ".divides") != nullptr) {
-                        for (const char* slot :
-                                 {"divides_preserves", "divides_reflects"}) {
+                    // Relation-transport slots — audited only where BOTH
+                    // carriers have the relation (a field target like ℚ
+                    // has no ∣, an unordered target like ℤ[i] or ℂ has
+                    // no ≤/<, so the transport lemma cannot even be
+                    // stated there — structural absence, same as ℕ's
+                    // missing subtraction).
+                    for (const char* relation :
+                             {"LessOrEqual", "LessThan", "divides"}) {
+                        if (environment_.lookup(
+                                std::get<0>(key) + "." + relation)
+                                == nullptr
+                            || environment_.lookup(
+                                std::get<1>(key) + "." + relation)
+                                == nullptr) {
+                            continue;
+                        }
+                        for (const char* suffix :
+                                 {"_preserves", "_reflects"}) {
+                            std::string slot =
+                                std::string(relation) + suffix;
                             if (environment_.lookup(hop + "." + slot)
                                 == nullptr) {
                                 if (!missing.empty()) missing += ", ";

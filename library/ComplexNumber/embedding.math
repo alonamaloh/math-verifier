@@ -140,13 +140,13 @@ definition ComplexNumber.from_real (a : Real) : ComplexNumber :=
 coercion (Real, ComplexNumber) := ComplexNumber.from_real
 
 -- 1 ↦ 1 (the constant polynomial 1 is literally Polynomial.one).
-theorem ComplexNumber.from_real_one
+theorem ComplexNumber.from_real.one_preserves
         : ComplexNumber.from_real(Real.one)
           = RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial) :=
   reflexivity(ComplexNumber, RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial))
 
 -- 0 ↦ 0.
-theorem ComplexNumber.from_real_zero
+theorem ComplexNumber.from_real.zero_preserves
         : ComplexNumber.from_real(Real.zero)
           = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial) :=
   Complex.constant_zero
@@ -155,7 +155,7 @@ theorem ComplexNumber.from_real_zero
 -- the constants add coefficientwise (constant_add), and the class of a sum
 -- is the sum of the classes (definitionally, since RingModulo.add acts on
 -- representatives).
-theorem ComplexNumber.from_real_add (a b : Real)
+theorem ComplexNumber.from_real.add_preserves (a b : Real)
         : ComplexNumber.from_real(a + b)
           = ComplexNumber.from_real(a) + ComplexNumber.from_real(b) :=
   ComplexNumber.from_real(a + b)
@@ -168,7 +168,7 @@ theorem ComplexNumber.from_real_add (a b : Real)
 
 -- Preserves multiplication (same shape: constant_multiply, then class of a
 -- product is the product of the classes).
-theorem ComplexNumber.from_real_multiply (a b : Real)
+theorem ComplexNumber.from_real.multiply_preserves (a b : Real)
         : ComplexNumber.from_real(a * b)
           = ComplexNumber.from_real(a) * ComplexNumber.from_real(b) :=
   ComplexNumber.from_real(a * b)
@@ -178,3 +178,36 @@ theorem ComplexNumber.from_real_multiply (a b : Real)
            (Polynomial.monomial(Real.ring, a, 0) * Polynomial.monomial(Real.ring, b, 0)))
            by Complex.constant_multiply
      = ComplexNumber.from_real(a) * ComplexNumber.from_real(b)
+
+-- Preserves negation: from_real(−a) and −from_real(a) both cancel
+-- from_real(a).
+theorem ComplexNumber.from_real.negate_preserves (a : Real)
+        : ComplexNumber.from_real(-a) = RingModulo.negate(ComplexNumber.from_real(a)) := {
+  -a + a = Real.zero as negateCancels;
+  ComplexNumber.from_real(-a) + ComplexNumber.from_real(a)
+              = ComplexNumber.from_real(-a + a)
+                    by ComplexNumber.from_real.add_preserves
+              = ComplexNumber.from_real(Real.zero)
+                    by substituting negateCancels
+              = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+                    by ComplexNumber.from_real.zero_preserves
+      as sumZero;
+  ComplexNumber.from_real(-a)
+     = (ComplexNumber.from_real(-a) + ComplexNumber.from_real(a))
+         - ComplexNumber.from_real(a)   by ring
+     = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+         - ComplexNumber.from_real(a)   by substituting sumZero
+     = RingModulo.negate(ComplexNumber.from_real(a))   by ring
+}
+
+-- Subtraction through the embedding, assembled from the additive and
+-- negation halves (mirror of Integer.to_rational.subtract_preserves).
+theorem ComplexNumber.from_real.subtract_preserves (a b : Real)
+        : ComplexNumber.from_real(a - b)
+          = ComplexNumber.from_real(a) - ComplexNumber.from_real(b) :=
+  ComplexNumber.from_real(a - b)
+     = ComplexNumber.from_real(a) + ComplexNumber.from_real(-b)
+           by ComplexNumber.from_real.add_preserves
+     = ComplexNumber.from_real(a) + RingModulo.negate(ComplexNumber.from_real(b))
+           by ComplexNumber.from_real.negate_preserves
+     = ComplexNumber.from_real(a) - ComplexNumber.from_real(b)
