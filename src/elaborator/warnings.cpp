@@ -664,11 +664,46 @@ void Elaborator::emitHintClassification(
         signShape = true;
     }
 
+    // A coercion tower that bottoms out in a ground numeral is spelling,
+    // not reasoning content — `ε/4` prints as
+    // `Rational.to_real (Integer.to_rational (Natural.to_integer 4))`, and
+    // counting it made the tier3-cast bucket measure numeral spellings
+    // instead of cast reasoning. Such towers do not trip the cast bit.
+    auto isGroundNumeralTower = [&](ExpressionPointer term) {
+        auto endsWith = [](const std::string& name, const char* suffix) {
+            std::string dotted = suffix;
+            return name.size() > dotted.size()
+                && name.compare(name.size() - dotted.size(),
+                                dotted.size(), dotted) == 0;
+        };
+        while (auto* application = std::get_if<Application>(&term->node)) {
+            auto* head =
+                std::get_if<Constant>(&application->function->node);
+            if (!head) return false;
+            if (!isCoercionFunctionName(head->name)
+                && head->name != "successor"
+                && !endsWith(head->name, ".successor")) {
+                return false;
+            }
+            term = application->argument;
+        }
+        if (std::get_if<NaturalLiteral>(&term->node)) return true;
+        if (auto* constant = std::get_if<Constant>(&term->node)) {
+            return constant->name == "zero" || constant->name == "one"
+                || endsWith(constant->name, ".zero")
+                || endsWith(constant->name, ".one");
+        }
+        return false;
+    };
     bool containsCast = false;
     bool containsFree = false;
     visitEverySubterm(goalClosed, [&](const ExpressionPointer& sub) {
-        if (auto* constant = std::get_if<Constant>(&sub->node)) {
-            if (!containsCast && isCoercionFunctionName(constant->name)) {
+        if (auto* application = std::get_if<Application>(&sub->node)) {
+            if (containsCast) return;
+            auto* head =
+                std::get_if<Constant>(&application->function->node);
+            if (head && isCoercionFunctionName(head->name)
+                && !isGroundNumeralTower(sub)) {
                 containsCast = true;
             }
         } else if (std::get_if<FreeVariable>(&sub->node)) {
@@ -701,7 +736,16 @@ void Elaborator::emitHintClassification(
         if (character == '\n' || character == '\t') character = ' ';
     }
     if (goalText.size() > 140) {
-        goalText.resize(137);
+        size_t cut = 137;
+        // Back off to a UTF-8 boundary — a mid-codepoint cut emits an
+        // invalid byte sequence that makes text tools treat the whole
+        // log as binary.
+        while (cut > 0
+               && (static_cast<unsigned char>(goalText[cut]) & 0xC0)
+                      == 0x80) {
+            --cut;
+        }
+        goalText.resize(cut);
         goalText += "...";
     }
 
