@@ -378,6 +378,23 @@ checker/probe-tests green, error-tests 52/0, export-check 2554, warning-site
 diff EMPTY (serial capture both sides; build_classify cache committed per
 precedent).
 
+**Follow-up sweep + nonzero-twin measurement (2026-07-11, same day).** The
++45-entered/−2-left closes-today delta maps to modules as: Real.derivative 27,
+Real.exponential 6, Real.continuity 4, cauchy_complete 3, others 5 — only FIVE
+sites live in clean-manifest files (derivative and friends await their cone
+cleanups per the scoping rule). All five folded after reading (continuity's
+minimum-positivity claim + four routine mid-chain triangle-inequality steps;
+both files verify bare). The 2 sites that LEFT closes-today
+(Integer.balanced_division:109, Rational.order:70) close at 10k — pure
+1000-budget churn from the reorder's few-hundred-step cheap-tier prefix, no
+capability lost. **positive→nonzero measurement verdict: WON'T-BUILD** — the
+suspected ℚ twin gap dissolved on reading: `Rational.nonzero_of_positive`
+EXISTS and is already `automatic` (archimedean:198 is that lemma's own
+one-line body, which the classifier counts as a hinted site), the ℝ shape
+closes bare in a clean context, and the residual reciprocal/field sites cite
+`nonzero_of_absolute_value_positive` — a different fact (subject `|x|` vs
+`x`) whose citation IS the reasoning; content, kept.
+
 #### Row 3 — A1 keyword-free claims/calc
 
 **Residual CLOSED 2026-07-10:** the 13 stale kernel self-tests (11 asserting
