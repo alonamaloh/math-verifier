@@ -51,9 +51,7 @@ theorem Algebra.indexedAggregate_add_one (A : Type(0)) (operation : A → A → 
           = operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n)) :=
   Algebra.indexedAggregate(A, operation, identity, s, 1 + n)
      = operation(Algebra.Fold(A, operation, identity, s, 0, n), s(0 + n))
-           by substituting Natural.one_add
      = operation(Algebra.indexedAggregate(A, operation, identity, s, n), s(n))
-           by (0 + n = n)
 
 -- The empty range aggregates to the identity (the base case, definitional).
 theorem Algebra.indexedAggregate_zero (A : Type(0)) (operation : A → A → A)
@@ -68,8 +66,8 @@ theorem Algebra.indexedAggregate_one (A : Type(0)) (operation : A → A → A)
         : Algebra.indexedAggregate(A, operation, identity, s, 1) = s(0) :=
   Algebra.indexedAggregate(A, operation, identity, s, 1)
      = operation(identity, s(0 + 0))
-     = operation(identity, s(0))   by (0 + 0 = 0)
-     = s(0)   by identityLeft(s(0))
+     = operation(identity, s(0))
+     = s(0)
 
 -- ----------------------------------------------------------------------
 -- The Lists bridge: the aggregate is the fold-product over the mapped
@@ -190,14 +188,12 @@ theorem Algebra.indexedAggregate_split (A : Type(0)) (operation : A → A → A)
         Algebra.indexedAggregate(A, operation, identity, s, 0 + n)
            = Algebra.indexedAggregate(A, operation, identity, s, n)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, n), identity)
-                 by identityRight(Algebra.indexedAggregate(A, operation, identity, s, n))
            = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
                        Algebra.indexedAggregate(A, operation, identity,
                            (j : Natural) ↦ s(n + j), 0))
     case step(predecessor):
         Algebra.indexedAggregate(A, operation, identity, s, (1 + predecessor) + n)
            = Algebra.indexedAggregate(A, operation, identity, s, 1 + (predecessor + n))
-                 by ((1 + predecessor) + n = 1 + (predecessor + n))
            = operation(Algebra.indexedAggregate(A, operation, identity, s, predecessor + n),
                        s(predecessor + n))
            = operation(operation(Algebra.indexedAggregate(A, operation, identity, s, n),
@@ -209,19 +205,13 @@ theorem Algebra.indexedAggregate_split (A : Type(0)) (operation : A → A → A)
                        operation(Algebra.indexedAggregate(A, operation, identity,
                                      (j : Natural) ↦ s(n + j), predecessor),
                                  s(predecessor + n)))
-                 by associativity(Algebra.indexedAggregate(A, operation, identity, s, n),
-                        Algebra.indexedAggregate(A, operation, identity,
-                            (j : Natural) ↦ s(n + j), predecessor),
-                        s(predecessor + n))
            = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
                        operation(Algebra.indexedAggregate(A, operation, identity,
                                      (j : Natural) ↦ s(n + j), predecessor),
                                  s(n + predecessor)))
-                 by (predecessor + n = n + predecessor)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, n),
                        Algebra.indexedAggregate(A, operation, identity,
                            (j : Natural) ↦ s(n + j), 1 + predecessor))
-                 by Algebra.indexedAggregate_add_one
   }
 
 -- Peel the first term: the split at cut 1, with the singleton collapsed.
@@ -237,7 +227,6 @@ theorem Algebra.indexedAggregate_shift (A : Type(0)) (operation : A → A → A)
                 (j : Natural) ↦ s(1 + j), n)) :=
   Algebra.indexedAggregate(A, operation, identity, s, 1 + n)
      = Algebra.indexedAggregate(A, operation, identity, s, n + 1)
-           by (1 + n = n + 1)
      = operation(Algebra.indexedAggregate(A, operation, identity, s, 1),
                  Algebra.indexedAggregate(A, operation, identity,
                      (j : Natural) ↦ s(1 + j), n))
@@ -279,7 +268,7 @@ theorem Algebra.indexedAggregate_add (A : Type(0)) (operation : A → A → A)
         Algebra.indexedAggregate(A, operation, identity,
                  (k : Natural) ↦ operation(s(k), t(k)), 0)
            = identity
-           = operation(identity, identity)   by identityLeft(identity)
+           = operation(identity, identity)
            = operation(Algebra.indexedAggregate(A, operation, identity, s, 0),
                        Algebra.indexedAggregate(A, operation, identity, t, 0))
     case step(predecessor):
@@ -328,7 +317,6 @@ theorem Algebra.indexedAggregate_scale (A : Type(0)) (operation : A → A → A)
            = operation(Algebra.indexedAggregate(A, operation, identity,
                            (k : Natural) ↦ scale(c, s(k)), predecessor),
                        scale(c, s(predecessor)))
-                 by Algebra.indexedAggregate_add_one
            = operation(scale(c, Algebra.indexedAggregate(A, operation, identity, s, predecessor)),
                        scale(c, s(predecessor)))
                  by IH
@@ -351,11 +339,9 @@ theorem Algebra.indexedAggregate_constant (A : Type(0)) (operation : A → A →
     case step(predecessor):
         Algebra.indexedAggregate(A, operation, identity, (k : Natural) ↦ c, 1 + predecessor)
            = operation(Algebra.indexedAggregate(A, operation, identity, (k : Natural) ↦ c, predecessor), c)
-                 by Algebra.indexedAggregate_add_one
            = operation(Monoid.power(A, operation, identity, c, predecessor), c)
                  by IH
            = operation(c, Monoid.power(A, operation, identity, c, predecessor))
-                 by commutativity(Monoid.power(A, operation, identity, c, predecessor), c)
            = Monoid.power(A, operation, identity, c, 1 + predecessor)
   }
 
@@ -374,7 +360,7 @@ automatic theorem Algebra.Fold_add_one (A : Type(0)) (operation : A → A → A)
         (identity : A) (f : Natural → A) (start c : Natural)
         : Algebra.Fold(A, operation, identity, f, start, 1 + c)
           = operation(Algebra.Fold(A, operation, identity, f, start, c), f(start + c)) :=
-  done by substituting Natural.one_add
+  done
 
 -- A singleton range folds to its one term.
 theorem Algebra.Fold_one (A : Type(0)) (operation : A → A → A)
@@ -384,7 +370,7 @@ theorem Algebra.Fold_one (A : Type(0)) (operation : A → A → A)
   Algebra.Fold(A, operation, identity, f, start, 1)
      = operation(identity, f(start + 0))
      = operation(identity, f(start))
-     = f(start)   by identityLeft(f(start))
+     = f(start)
 
 -- Splitting at a cut: the first c terms, then the block of d terms starting
 -- past them.
@@ -402,7 +388,6 @@ theorem Algebra.Fold_split (A : Type(0)) (operation : A → A → A)
         Algebra.Fold(A, operation, identity, f, start, c + 0)
            = Algebra.Fold(A, operation, identity, f, start, c)
            = operation(Algebra.Fold(A, operation, identity, f, start, c), identity)
-                 by identityRight(Algebra.Fold(A, operation, identity, f, start, c))
            = operation(Algebra.Fold(A, operation, identity, f, start, c),
                        Algebra.Fold(A, operation, identity, f, start + c, 0))
     case step(predecessor):
@@ -418,13 +403,9 @@ theorem Algebra.Fold_split (A : Type(0)) (operation : A → A → A)
            = operation(Algebra.Fold(A, operation, identity, f, start, c),
                        operation(Algebra.Fold(A, operation, identity, f, start + c, predecessor),
                                  f(start + (c + predecessor))))
-                 by associativity(Algebra.Fold(A, operation, identity, f, start, c),
-                        Algebra.Fold(A, operation, identity, f, start + c, predecessor),
-                        f(start + (c + predecessor)))
            = operation(Algebra.Fold(A, operation, identity, f, start, c),
                        operation(Algebra.Fold(A, operation, identity, f, start + c, predecessor),
                                  f((start + c) + predecessor)))
-                 by (start + (c + predecessor) = (start + c) + predecessor)
            = operation(Algebra.Fold(A, operation, identity, f, start, c),
                        Algebra.Fold(A, operation, identity, f, start + c, 1 + predecessor))
   }
@@ -445,7 +426,6 @@ theorem Algebra.Fold_shift (A : Type(0)) (operation : A → A → A)
            by Algebra.Fold_split
      = operation(f(start), Algebra.Fold(A, operation, identity, f, start + 1, c))
      = operation(f(start), Algebra.Fold(A, operation, identity, f, 1 + start, c))
-           by (start + 1 = 1 + start)
 
 -- Rebasing the range: reading f from 1 + start is reading f(1 + ·) from
 -- start. Pure index arithmetic — no monoid law is needed.
@@ -464,7 +444,6 @@ theorem Algebra.Fold_rebase (A : Type(0)) (operation : A → A → A)
                  by IH
            = operation(Algebra.Fold(A, operation, identity, (j : Natural) ↦ f(1 + j), start, predecessor),
                        f(1 + (start + predecessor)))
-                 by ((1 + start) + predecessor = 1 + (start + predecessor))
            = Algebra.Fold(A, operation, identity, (j : Natural) ↦ f(1 + j), start, 1 + predecessor)
   }
 

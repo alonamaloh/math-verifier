@@ -2044,8 +2044,10 @@ private:
                 //     under the assumption P, adding `P → Q` to the
                 //     context for the rest of the block.
                 wrapper.type = parseExpression();
-                // Optional `as <pattern>` — required for plain suppose,
-                // optional for the modifier forms.
+                // Optional `as <pattern>` — an anonymous hypothesis joins
+                // the context under a fresh name and is consumed by
+                // type-match (same as the take-header's desugared form),
+                // so `as` is only for hypotheses the body cites by name.
                 SurfacePatternPointer asPattern;
                 if (peek().kind == TokenKind::KeywordAs) {
                     consumeAny();  // 'as'
@@ -2103,10 +2105,6 @@ private:
                     }
                 } else {
                     wrapper.kind = BlockWrapper::Suppose;
-                    if (!asPattern) {
-                        throwHere("expected 'as' after suppose proposition "
-                                  "(suppose P as h;)");
-                    }
                 }
                 // Resolve the `as` pattern into a name (bare) or, for
                 // plain suppose, a fresh binder plus destructure pattern.
