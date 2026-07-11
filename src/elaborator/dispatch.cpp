@@ -1286,6 +1286,15 @@ ExpressionPointer Elaborator::elaborateExpression(
             // parameter inference inside lambda-shaped arguments see
             // the right expected type (e.g. for the handler functions
             // passed to Or.eliminate / Exists.eliminate).
+            //
+            // The walk stays in OPENED form (inferTypeInLocalContext
+            // opens local binders into Internal FreeVariables), and each
+            // peeled domain is CLOSED back over the local binders before
+            // it is handed out — expected types are closed by convention.
+            // Handing out the opened domain leaks Internal FreeVariables
+            // into everything derived from it (a lambda argument's block
+            // goal, and from there into proof terms the kernel rejects
+            // as "unbound internal variable").
             ExpressionPointer headType;
             try {
                 headType = weakHeadNormalForm(environment_,
@@ -1298,7 +1307,9 @@ ExpressionPointer Elaborator::elaborateExpression(
                 if (headType) {
                     if (auto* pi =
                             std::get_if<Pi>(&headType->node)) {
-                        argumentExpectedType = pi->domain;
+                        argumentExpectedType = closeOverLocalBinders(
+                            pi->domain, localBinders,
+                            localBinders.size());
                     }
                 }
                 ExpressionPointer argumentTerm =
@@ -1329,8 +1340,14 @@ ExpressionPointer Elaborator::elaborateExpression(
                 if (headType) {
                     if (auto* pi =
                             std::get_if<Pi>(&headType->node)) {
+                        // The argument is CLOSED; the walk is OPENED.
+                        // Open the argument before substituting so the
+                        // running type never mixes the two frames.
                         headType = weakHeadNormalForm(environment_,
-                            substitute(pi->codomain, 0, argumentTerm));
+                            substitute(pi->codomain, 0,
+                                openOverLocalBinders(
+                                    argumentTerm, localBinders,
+                                    localBinders.size())));
                     } else {
                         headType = nullptr;
                     }

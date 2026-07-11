@@ -29,6 +29,15 @@ struct SurfaceCasesClause {
     SurfaceExpressionPointer body;
     int line = 0;
     int column = 0;
+    // Equation-shaped induction arm (`case n = 1 + k:` / `case n = k + 1:`):
+    // the offset spelling the user wrote. Elaboration routes the block
+    // through the boundary lemma with the SAME spelling
+    // (induction_on_one_plus / induction_on_plus_one), so the arm goal —
+    // and everything the arm states against it — matches the arm's own
+    // text byte-for-byte; `1 + k` is not definitionally `successor(k)`
+    // under the sealed Natural.
+    enum class EquationOffset { none, onePlus, plusOne };
+    EquationOffset equationOffset = EquationOffset::none;
 };
 
 // -------- universe levels --------

@@ -1066,6 +1066,37 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                     break;
                 }
             }
+            // An equation-spelled arm (`case n = 1 + k:` / `case n =
+            // k + 1:`) routes through the boundary lemma with the SAME
+            // offset spelling, so the arm goal matches the arm's own
+            // text (`1 + k` is not definitionally `successor(k)` under
+            // the sealed Natural); constructor vocabulary keeps the
+            // constructor-spelled lemma.
+            bool anyOnePlusArm = false;
+            bool anyPlusOneArm = false;
+            if (constructorVocabulary) {
+                for (const auto& clause : cases.clauses) {
+                    if (clause.equationOffset
+                            == SurfaceCasesClause::EquationOffset::onePlus) {
+                        anyOnePlusArm = true;
+                    }
+                    if (clause.equationOffset
+                            == SurfaceCasesClause::EquationOffset::plusOne) {
+                        anyPlusOneArm = true;
+                    }
+                }
+                if (anyOnePlusArm && anyPlusOneArm) {
+                    throwElaborate(
+                        "this induction block mixes `1 + k` and `k + 1` "
+                        "equation arms — the arm goals follow the arm's "
+                        "own spelling, so pick one form for the whole "
+                        "block");
+                }
+            }
+            const std::string boundaryLemmaSuffix =
+                anyOnePlusArm ? ".induction_on_one_plus"
+                : anyPlusOneArm ? ".induction_on_plus_one"
+                                : ".induction_on_successor";
             bool lemmaAvailable = false;
             if (constructorVocabulary) {
                 auto carrierHeadName =
@@ -1090,13 +1121,13 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                         carrierHeadName(scrutineeType);
                     if (carrierName.empty()
                         || !environment_.lookup(
-                               carrierName + ".induction_on_successor")) {
+                               carrierName + boundaryLemmaSuffix)) {
                         carrierName = carrierHeadName(weakHeadNormalForm(
                             environment_, scrutineeType));
                     }
                     lemmaAvailable = !carrierName.empty()
                         && environment_.lookup(
-                               carrierName + ".induction_on_successor")
+                               carrierName + boundaryLemmaSuffix)
                                != nullptr;
                 } catch (const ElaborateError&) {
                     // Scrutinee not resolvable here (e.g. a goal-∀
@@ -1125,15 +1156,13 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                             clause.line, clause.column);
                     }
                 }
-                static const std::string successorSuffix =
-                    ".induction_on_successor";
                 if (!renamed.refiningNames.empty()) {
                     std::vector<std::string> refiningNames =
                         renamed.refiningNames;
                     renamed.refiningNames.clear();
                     return elaborateByInductionOnePlusReverted(
                         renamed, refiningNames, localBinders,
-                        expectedType, line, column, successorSuffix);
+                        expectedType, line, column, boundaryLemmaSuffix);
                 }
                 if (expectedType) {
                     std::vector<std::string> autoRefine =
@@ -1142,12 +1171,12 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
                     if (!autoRefine.empty()) {
                         return elaborateByInductionOnePlusReverted(
                             renamed, autoRefine, localBinders,
-                            expectedType, line, column, successorSuffix);
+                            expectedType, line, column, boundaryLemmaSuffix);
                     }
                 }
                 return elaborateByInductionOnePlus(
                     renamed, localBinders, expectedType, line, column,
-                    successorSuffix);
+                    boundaryLemmaSuffix);
             }
         }
         bool plain = cases.refiningNames.empty()

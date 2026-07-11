@@ -4090,6 +4090,30 @@ private:
                                 innerToken.line, innerToken.column);
                         }
                         clause.pattern = std::move(inner);
+                        if (wraps == 1) {
+                            clause.equationOffset = SurfaceCasesClause::
+                                EquationOffset::plusOne;
+                        }
+                    } else if (peek().kind == TokenKind::NumericLiteral
+                               && peek().lexeme == "1"
+                               && peekAt(1).kind == TokenKind::Plus
+                               && isIdentifierLike(peekAt(2).kind)
+                               && peekAt(3).kind != TokenKind::Plus) {
+                        // `1 + k` — record the spelling so elaboration
+                        // routes through `induction_on_one_plus` (the
+                        // pattern itself is the same successor form).
+                        Token numeralToken = consumeAny();
+                        consumeAny();  // '+'
+                        Token innerToken = consumeAny();
+                        std::vector<SurfacePatternPointer> wrapped;
+                        wrapped.push_back(makeSurfacePatternBareName(
+                            innerToken.lexeme,
+                            innerToken.line, innerToken.column));
+                        clause.pattern = makeSurfacePatternConstructor(
+                            "successor", std::move(wrapped),
+                            numeralToken.line, numeralToken.column);
+                        clause.equationOffset = SurfaceCasesClause::
+                            EquationOffset::onePlus;
                     } else {
                         clause.pattern = parsePattern();
                     }

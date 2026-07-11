@@ -1,0 +1,35 @@
+-- A citation argument's expected type is peeled off the head's inferred
+-- type. That walk runs in opened form, and the peeled domain used to be
+-- handed out un-closed — a lambda argument's block goal then carried an
+-- Internal FreeVariable, and any `by substituting` proof built from that
+-- goal embedded it (kernel: "unbound internal variable"). The regression
+-- shape: a block-bodied lambda argument whose final `done by substituting`
+-- rewrites TWO instances of a quantified equation, where the function
+-- head is a LOCAL binder whose type mentions other locals.
+
+module Test.substituting_under_binder_test
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Polynomial.basics
+import Equality.basics
+import Logic.basics
+
+theorem Test.substituting_two_instances_under_lambda
+        (R : Type(0)) (zero : R) (c d : R)
+        (rest restB : Polynomial.Coefficients(R))
+        (consume : ((∀ (i : Natural).
+                        Polynomial.nth(R, zero, rest, i)
+                        = Polynomial.nth(R, zero, restB, i))
+                    → Polynomial.ExtensionallyEqual(R, zero, rest, restB)))
+        (headwise : ∀ (j : Natural).
+            Polynomial.nth(R, zero, Polynomial.Coefficients.cons(R, c, rest), j)
+            = Polynomial.nth(R, zero, Polynomial.Coefficients.cons(R, d, restB), j))
+        : Polynomial.ExtensionallyEqual(R, zero, rest, restB) :=
+  consume((i : Natural) ↦ {
+    Polynomial.nth(R, zero, Polynomial.Coefficients.cons(R, c, rest), 1 + i)
+       = Polynomial.nth(R, zero, Polynomial.Coefficients.cons(R, d, restB), 1 + i)
+       by headwise(1 + i);
+    done by substituting Polynomial.nth_cons_one_plus
+  })

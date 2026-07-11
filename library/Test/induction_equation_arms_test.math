@@ -47,3 +47,33 @@ theorem Test.product_self_multi_binder (xs : NaturalList) :
         done
       }
   }
+
+-- The arm goal follows the arm's own offset spelling. With a motive that
+-- embeds a count-dependent hypothesis (∀ j. j + count = h → …), the
+-- `1 + k` arm routes through `induction_on_one_plus`, so the arm's
+-- `suppose j + (1 + k) = h` matches the goal premise byte-for-byte —
+-- `1 + k` is not definitionally `successor(k)`, and the old
+-- constructor-lemma routing rejected the arm outright.
+theorem Test.equation_arm_hypothesis_bearing_motive (h count : Natural)
+        : ∀ (j : Natural). j + count = h → j ≤ h :=
+  by induction on count with IH {
+    case count = 0: {
+        take j : Natural;
+        suppose j + 0 = h as jEquation;
+        j
+           = j + 0
+           = h;
+        done by Natural.LessOrEqual.reflexive
+      }
+    case count = 1 + k: {
+        take j : Natural;
+        suppose j + (1 + k) = h as jEquation;
+        (1 + j) + k
+           = j + (1 + k)
+           = h
+           as shifted;
+        j ≤ 1 + j;
+        1 + j ≤ h by IH(1 + j, shifted);
+        done by Natural.LessOrEqual.transitive
+      }
+  }
