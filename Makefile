@@ -175,7 +175,11 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # if-then-else) added one intended `unfold Natural.add` — its commit
 # message documents the residual (the `1 + n` head un-sticking gap) —
 # and `make check` wasn't run to catch the ratchet.
-CLEAN_LEAK_BUDGET ?= 205
+# 2026-07-11: re-armed 205 → 207. Stage 2 of PLAN_NATURAL_SEALING landed
+# `Natural.recursion.{u}` in Natural/basics.math — the boundary recursion
+# combinator is universe-polymorphic by nature, so its two universe
+# annotations are an intended boundary.
+CLEAN_LEAK_BUDGET ?= 207
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
@@ -331,9 +335,9 @@ leak-ratchet:
 
 # `successor`-outside-Natural ratchet (independent of the CIC-leak total).
 # `successor` is the Natural constructor; outside the Natural/ definitional
-# modules it is leakage — speak `n + 1` / numerals. Re-armed at the measured
-# total; the ratchet only stops growth, the cone refactor drives it down.
-SUCCESSOR_BUDGET ?= 2166
+# modules it is leakage — speak `n + 1` / numerals. Ratcheted down as the
+# Stage-3 migration (PLAN_NATURAL_SEALING) converts files.
+SUCCESSOR_BUDGET ?= 829
 
 successor-ratchet:
 	@scripts/cic_leak_report --successor-max $(SUCCESSOR_BUDGET)

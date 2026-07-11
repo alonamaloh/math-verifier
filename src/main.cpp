@@ -3918,13 +3918,17 @@ definition recursive_through_cases : Natural → Natural
         "recursive call inside cases body is rewritten",
         __LINE__);
 
-    // Numeric literal: `2` desugars to `successor(successor(zero))`.
+    // Numeric literal: `2` bridges to `successor(successor(zero))`.
     expectVerifies(R"(
 module Test.numeric_literal_desugar
 
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
+inductive Natural.Raw : Type(0) where
+  | Natural.Raw.zero : Natural.Raw
+  | Natural.Raw.successor : Natural.Raw → Natural.Raw
+
+definition Natural : Type(0) := Natural.Raw
+definition zero : Natural := Natural.Raw.zero
+definition successor : Natural → Natural := Natural.Raw.successor
 
 inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
   | reflexivity : Equality(A, x, x)
@@ -3939,9 +3943,13 @@ theorem two_equals_two : Equality.{0}(Natural, 2, successor(successor(zero)))
     expectVerifies(R"(
 module Test.le_operator
 
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
+inductive Natural.Raw : Type(0) where
+  | Natural.Raw.zero : Natural.Raw
+  | Natural.Raw.successor : Natural.Raw → Natural.Raw
+
+definition Natural : Type(0) := Natural.Raw
+definition zero : Natural := Natural.Raw.zero
+definition successor : Natural → Natural := Natural.Raw.successor
 
 inductive LessOrEqual : Natural → Natural → Proposition where
   | LessOrEqual.reflexivity
@@ -4277,9 +4285,13 @@ theorem one_divides_one : 1 ∣ 1 :=
     expectVerifies(R"(
 module Test.lt_operator
 
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
+inductive Natural.Raw : Type(0) where
+  | Natural.Raw.zero : Natural.Raw
+  | Natural.Raw.successor : Natural.Raw → Natural.Raw
+
+definition Natural : Type(0) := Natural.Raw
+definition zero : Natural := Natural.Raw.zero
+definition successor : Natural → Natural := Natural.Raw.successor
 
 inductive LessOrEqual : Natural → Natural → Proposition where
   | LessOrEqual.reflexivity
@@ -4447,14 +4459,18 @@ definition two : Natural := successor(successor(zero))
         EXPECT_TRUE(environment.lookup("two") != nullptr);
     }
 
-    // Numeric literals desugar to successor(...(zero)) once Natural is in
-    // scope.
+    // Numeric literals bridge to the constructor chain once the sealed
+    // Natural shape (raw inductive + alias + wrappers) is in scope.
     {
         auto environment = verifyMathSource(R"(
 module Test.numerics
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural -> Natural
+inductive Natural.Raw : Type(0) where
+  | Natural.Raw.zero : Natural.Raw
+  | Natural.Raw.successor : Natural.Raw -> Natural.Raw
+
+definition Natural : Type(0) := Natural.Raw
+definition zero : Natural := Natural.Raw.zero
+definition successor : Natural -> Natural := Natural.Raw.successor
 
 definition three : Natural := 3
 )");

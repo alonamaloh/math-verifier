@@ -78,35 +78,30 @@ theorem ComplexNumber.partialSum_pointwise
 -- The bounded variant: agreement below the cut is enough (the terms at
 -- or above n are never read).
 theorem ComplexNumber.partialSum_pointwise_below
-        (s sequencePrime : Natural → ComplexNumber)
-        : ∀ (n : Natural).
-          (∀ (k : Natural). successor(k) ≤ n → s(k) = sequencePrime(k))
-          → ComplexNumber.partialSum(s, n) = ComplexNumber.partialSum(sequencePrime, n)
-  | zero =>
-      (pointwiseEqual : ∀ (k : Natural). successor(k) ≤ 0
-           → s(k) = sequencePrime(k)) ↦
-        done
-  | successor(predecessor) =>
-      (pointwiseEqual : ∀ (k : Natural). successor(k) ≤ successor(predecessor)
-           → s(k) = sequencePrime(k)) ↦ {
-        ComplexNumber.partialSum(s, predecessor)
-            = ComplexNumber.partialSum(sequencePrime, predecessor)
-            by ComplexNumber.partialSum_pointwise_below(s, sequencePrime, predecessor,
-                   (k : Natural) (kBelow : successor(k) ≤ predecessor) ↦ {
-                     predecessor ≤ successor(predecessor);
-                     successor(k) ≤ successor(predecessor);
-                     done by pointwiseEqual(k, (successor(k) ≤ successor(predecessor)))
-                   }) as tailEqual;
-        successor(predecessor) ≤ successor(predecessor);
+        (s sequencePrime : Natural → ComplexNumber) (n : Natural)
+        (pointwiseEqual : ∀ (k : Natural). k < n → s(k) = sequencePrime(k))
+        : ComplexNumber.partialSum(s, n) = ComplexNumber.partialSum(sequencePrime, n) :=
+  by induction on n with IH {
+    case base: done
+    case step(predecessor): {
+        predecessor < 1 + predecessor;
+        ∀ (k : Natural). k < predecessor → s(k) = sequencePrime(k) by {
+            take k : Natural;
+            suppose k < predecessor as kBelow;
+            k < 1 + predecessor;
+            done
+          };
         s(predecessor) = sequencePrime(predecessor) as headEqual;
-        ComplexNumber.partialSum(s, successor(predecessor))
+        ComplexNumber.partialSum(s, 1 + predecessor)
            = ComplexNumber.partialSum(s, predecessor) + s(predecessor)
            = ComplexNumber.partialSum(sequencePrime, predecessor) + s(predecessor)
-                 by tailEqual
+                 by IH
            = ComplexNumber.partialSum(sequencePrime, predecessor)
              + sequencePrime(predecessor)
                  by headEqual
+           = ComplexNumber.partialSum(sequencePrime, 1 + predecessor)
       }
+  }
 
 -- ----------------------------------------------------------------------
 -- Linearity of partial sums.

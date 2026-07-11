@@ -93,15 +93,15 @@ theorem ComplexNumber.exponentialTerm_binomial_split
                 1 + k) := {
   -- Each summand below the cut: fold the coefficient into the two
   -- reciprocal factorials.
-  (i : Natural) → successor(i) ≤ 1 + k
+  (i : Natural) → i < 1 + k
         → (1 / (k! : Real) : ℂ)
               * (ComplexNumber.binomialCoefficient(k, i)
                      * (z ^ i * w ^ Natural.monus(k, i)))
           = ComplexNumber.exponentialTerm(z, i)
             * ComplexNumber.exponentialTerm(w, Natural.monus(k, i))
-      by (i : Natural) (iBelow : successor(i) ≤ 1 + k) ↦ {
+      by (i : Natural) (iBelow : i < 1 + k) ↦ {
            let recipK : Real := 1 / (k! : Real);
-           i ≤ k by Natural.successor_le_cancel;
+           i ≤ k by Natural.le_of_lt_one_plus;
            choose d such that k = i + d from Natural.subtraction_witness;
            i + d = k as kJoin;
            Natural.monus(k, i) = d
@@ -189,8 +189,8 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ℂ) (n : Natur
                     a(i) * ComplexNumber.partialSum(b, Natural.monus(n, i)),
                 n) :=
   by induction on n with IH {
-    case zero: done
-    case successor(p): {
+    case n = 0: done
+    case n = 1 + p for some p: {
       let zero : ℂ :=
           RingModulo.zero(Real.polynomial_commutative_ring,
               Complex.definingPolynomial);
@@ -210,7 +210,7 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ℂ) (n : Natur
       ComplexNumber.partialSum(
                       (i : Natural) ↦
                           a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
-                      successor(p))
+                      1 + p)
                 = ComplexNumber.partialSum(
                       (i : Natural) ↦
                           a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
@@ -231,28 +231,28 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ℂ) (n : Natur
                       (i : Natural) ↦
                           a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
                       p) as headPadding;
-      -- Below the cut, peeling the successor off n − i absorbs one
+      -- Below the cut, peeling one term off n − i absorbs one
       -- diagonal term into each weight.
-      (i : Natural) → successor(i) ≤ successor(p)
+      (i : Natural) → i < 1 + p
             → a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i))
                   + a(i) * b(Natural.monus(p, i))
-              = a(i) * ComplexNumber.partialSum(b, Natural.monus(successor(p), i))
-          by (i : Natural) (iBelow : successor(i) ≤ successor(p)) ↦ {
-               i ≤ p;
-               Natural.monus(successor(p), i) = successor(Natural.monus(p, i)) as monusStep;
+              = a(i) * ComplexNumber.partialSum(b, Natural.monus(1 + p, i))
+          by (i : Natural) (iBelow : i < 1 + p) ↦ {
+               i ≤ p by Natural.le_of_lt_one_plus;
+               Natural.monus(1 + p, i) = 1 + Natural.monus(p, i) as monusStep;
                a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i))
                         + a(i) * b(Natural.monus(p, i))
                   = a(i) * (ComplexNumber.partialSum(b, Natural.monus(p, i))
                                 + b(Natural.monus(p, i)))
-                  = a(i) * ComplexNumber.partialSum(b, successor(Natural.monus(p, i)))
-                  = a(i) * ComplexNumber.partialSum(b, Natural.monus(successor(p), i))
+                  = a(i) * ComplexNumber.partialSum(b, 1 + Natural.monus(p, i))
+                  = a(i) * ComplexNumber.partialSum(b, Natural.monus(1 + p, i))
                         by monusStep
              };
       ComplexNumber.partialSum(
                (k : Natural) ↦
                    ComplexNumber.partialSum(
                        (i : Natural) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
-               successor(p))
+               1 + p)
          = ComplexNumber.partialSum(
                (k : Natural) ↦
                    ComplexNumber.partialSum(
@@ -270,20 +270,20 @@ theorem ComplexNumber.cauchy_product_exchange (a b : Natural → ℂ) (n : Natur
          = ComplexNumber.partialSum(
                (i : Natural) ↦
                    a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i)),
-               successor(p))
+               1 + p)
            + ComplexNumber.partialSum(
-                 (i : Natural) ↦ a(i) * b(Natural.monus(p, i)), successor(p))
+                 (i : Natural) ↦ a(i) * b(Natural.monus(p, i)), 1 + p)
                by headPadding
          = ComplexNumber.partialSum(
                (i : Natural) ↦
                    a(i) * ComplexNumber.partialSum(b, Natural.monus(p, i))
                    + a(i) * b(Natural.monus(p, i)),
-               successor(p))
+               1 + p)
                by ComplexNumber.partialSum_add
          = ComplexNumber.partialSum(
                (i : Natural) ↦
-                   a(i) * ComplexNumber.partialSum(b, Natural.monus(successor(p), i)),
-               successor(p))
+                   a(i) * ComplexNumber.partialSum(b, Natural.monus(1 + p, i)),
+               1 + p)
                by ComplexNumber.partialSum_pointwise_below
     }
   }
