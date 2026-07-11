@@ -1412,6 +1412,244 @@ ExpressionPointer Elaborator::tryCastOrderTier(
 
 // Does `term` mention any registered coercion function? Cheap
 // syntactic pre-filter shared by the cast tactics.
+// F4 — ≠ across the coercion tower (see the declaration note). The
+// two directions share the Not-fact scan; every term placed under the
+// introduced supposition lambda is lifted by one.
+ExpressionPointer Elaborator::tryCastNotEqualTier(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+    // The goal must be Not-shaped over an equality whose sides involve
+    // a registered coercion (either side of the transport).
+    ExpressionPointer goalWhnf;
+    try {
+        goalWhnf = weakHeadNormalForm(environment_, goalClosed);
+    } catch (const TypeError&) {
+        return nullptr;
+    }
+    auto* goalPi = std::get_if<Pi>(&goalWhnf->node);
+    if (!goalPi) return nullptr;
+    auto* goalCodomain = std::get_if<Constant>(&goalPi->codomain->node);
+    if (!goalCodomain || goalCodomain->name != "False") return nullptr;
+    EqualityComponents goal;
+    try {
+        goal = extractEqualityComponents(
+            goalPi->domain, "cast-not-equal tier", line);
+    } catch (const ElaborateError&) {
+        return nullptr;
+    } catch (const TypeError&) {
+        return nullptr;
+    }
+    autoProveSpend(1);
+
+    // Collect the Not-shaped equality facts once (Not is transparent
+    // sugar for `E → False`, so recognize the Pi shape at WHNF).
+    struct NotEqualFact {
+        EqualityComponents equality;
+        ExpressionPointer proofTerm;
+    };
+    std::vector<NotEqualFact> notEqualFacts;
+    for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
+        ExpressionPointer factWhnf;
+        try {
+            factWhnf = weakHeadNormalForm(environment_, fact.type);
+        } catch (const TypeError&) {
+            continue;
+        }
+        auto* factPi = std::get_if<Pi>(&factWhnf->node);
+        if (!factPi) continue;
+        auto* factCodomain = std::get_if<Constant>(&factPi->codomain->node);
+        if (!factCodomain || factCodomain->name != "False") continue;
+        try {
+            notEqualFacts.push_back({
+                extractEqualityComponents(
+                    factPi->domain, "cast-not-equal fact", line),
+                fact.proofTerm});
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+    }
+    if (notEqualFacts.empty()) return nullptr;
+
+    // Orientation of a candidate pair against a fact's endpoints:
+    // 0 = no match, 1 = direct, -1 = swapped.
+    auto orientationAgainst = [&](const EqualityComponents& factEquality,
+                                  ExpressionPointer left,
+                                  ExpressionPointer right) -> int {
+        if (structurallyEqual(factEquality.leftEndpoint, left)
+            && structurallyEqual(factEquality.rightEndpoint, right)) {
+            return 1;
+        }
+        if (structurallyEqual(factEquality.leftEndpoint, right)
+            && structurallyEqual(factEquality.rightEndpoint, left)) {
+            return -1;
+        }
+        return 0;
+    };
+    // The finished proof must land on the goal as stated; a lambda over
+    // the WHNF'd domain is defeq, but verify rather than trust the
+    // de Bruijn assembly (the quotientSoundBridge lesson).
+    auto verifiedAgainstGoal =
+            [&](ExpressionPointer candidate) -> ExpressionPointer {
+        try {
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            ExpressionPointer candidateType = inferTypeInLocalContext(
+                localBinders, candidate);
+            ExpressionPointer goalOpened = openOverLocalBinders(
+                goalClosed, localBinders, localBinders.size());
+            ExpressionPointer candidateOpened = openOverLocalBinders(
+                candidateType, localBinders, localBinders.size());
+            if (isDefinitionallyEqual(environment_, openedContext,
+                                      candidateOpened, goalOpened)) {
+                return candidate;
+            }
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        return nullptr;
+    };
+
+    // Direction A (preserves): the goal's sides are ι-images — lower
+    // the supposed equality through `<hop>.injective` until a context
+    // ¬ fact matches the lowered endpoints.
+    {
+        ExpressionPointer left = goal.leftEndpoint;
+        ExpressionPointer right = goal.rightEndpoint;
+        // The injective chain, innermost hop last: applied under the
+        // lambda to BoundVariable(0) after lifting the endpoints.
+        std::vector<std::tuple<std::string, ExpressionPointer,
+                               ExpressionPointer>> loweringChain;
+        for (int hopCount = 0; hopCount < 3; ++hopCount) {
+            auto* leftApp = std::get_if<Application>(&left->node);
+            auto* rightApp = std::get_if<Application>(&right->node);
+            if (!leftApp || !rightApp) break;
+            auto* leftHead = std::get_if<Constant>(&leftApp->function->node);
+            auto* rightHead =
+                std::get_if<Constant>(&rightApp->function->node);
+            if (!leftHead || !rightHead
+                || leftHead->name != rightHead->name
+                || !isCoercionFunctionName(leftHead->name)
+                || environment_.lookup(leftHead->name + ".injective")
+                       == nullptr) {
+                break;
+            }
+            left = leftApp->argument;
+            right = rightApp->argument;
+            loweringChain.emplace_back(
+                leftHead->name + ".injective", left, right);
+            for (const NotEqualFact& notFact : notEqualFacts) {
+                int orientation =
+                    orientationAgainst(notFact.equality, left, right);
+                if (orientation == 0) continue;
+                autoProveSpend(1);
+                ExpressionPointer proof = makeBoundVariable(0);
+                for (const auto& [injectiveName, lowLeft, lowRight]
+                         : loweringChain) {
+                    proof = makeApplication(
+                        makeApplication(
+                            makeApplication(
+                                makeConstant(injectiveName),
+                                liftBoundVariables(lowLeft, 1, 0)),
+                            liftBoundVariables(lowRight, 1, 0)),
+                        proof);
+                }
+                if (orientation < 0) {
+                    ExpressionPointer loweredCarrier;
+                    LevelPointer loweredLevel;
+                    try {
+                        loweredCarrier = inferTypeInLocalContext(
+                            localBinders, left);
+                        loweredLevel = typeUniverseOf(localBinders, left);
+                    } catch (const ElaborateError&) {
+                        continue;
+                    } catch (const TypeError&) {
+                        continue;
+                    }
+                    proof = buildEqualitySymmetry(
+                        loweredLevel,
+                        liftBoundVariables(loweredCarrier, 1, 0),
+                        liftBoundVariables(left, 1, 0),
+                        liftBoundVariables(right, 1, 0), proof);
+                }
+                ExpressionPointer candidate = makeLambda(
+                    "_cast_ne", goalPi->domain,
+                    makeApplication(
+                        liftBoundVariables(notFact.proofTerm, 1, 0),
+                        proof));
+                if (ExpressionPointer verified =
+                        verifiedAgainstGoal(candidate)) {
+                    return verified;
+                }
+            }
+        }
+    }
+
+    // Direction B (reflects): a context fact `¬(ι a = ι b)` refutes the
+    // goal's lower-carrier equality — push the supposed `a = b` up
+    // through ι-congruence (single hop; no packet lemma needed).
+    for (const NotEqualFact& notFact : notEqualFacts) {
+        auto* leftApp =
+            std::get_if<Application>(&notFact.equality.leftEndpoint->node);
+        auto* rightApp =
+            std::get_if<Application>(&notFact.equality.rightEndpoint->node);
+        if (!leftApp || !rightApp) continue;
+        auto* leftHead = std::get_if<Constant>(&leftApp->function->node);
+        auto* rightHead = std::get_if<Constant>(&rightApp->function->node);
+        if (!leftHead || !rightHead || leftHead->name != rightHead->name
+            || !isCoercionFunctionName(leftHead->name)) {
+            continue;
+        }
+        int orientation = orientationAgainst(
+            {nullptr, leftApp->argument, rightApp->argument, nullptr},
+            goal.leftEndpoint, goal.rightEndpoint);
+        if (orientation == 0) continue;
+        autoProveSpend(1);
+        ExpressionPointer liftedSourceCarrier =
+            liftBoundVariables(goal.carrierType, 1, 0);
+        ExpressionPointer proof = makeBoundVariable(0);
+        ExpressionPointer congruenceLeft = goal.leftEndpoint;
+        ExpressionPointer congruenceRight = goal.rightEndpoint;
+        if (orientation < 0) {
+            proof = buildEqualitySymmetry(
+                goal.carrierUniverseLevel, liftedSourceCarrier,
+                liftBoundVariables(goal.leftEndpoint, 1, 0),
+                liftBoundVariables(goal.rightEndpoint, 1, 0), proof);
+            std::swap(congruenceLeft, congruenceRight);
+        }
+        ExpressionPointer targetCarrier;
+        LevelPointer targetLevel;
+        try {
+            targetCarrier = inferTypeInLocalContext(
+                localBinders, notFact.equality.leftEndpoint);
+            targetLevel = typeUniverseOf(
+                localBinders, notFact.equality.leftEndpoint);
+        } catch (const ElaborateError&) {
+            continue;
+        } catch (const TypeError&) {
+            continue;
+        }
+        ExpressionPointer hopLambda = makeLambda(
+            "_cast_z", liftedSourceCarrier,
+            makeApplication(makeConstant(leftHead->name),
+                            makeBoundVariable(0)));
+        proof = buildEqualityCongruence(
+            goal.carrierUniverseLevel, liftedSourceCarrier,
+            targetLevel, liftBoundVariables(targetCarrier, 1, 0),
+            hopLambda,
+            liftBoundVariables(congruenceLeft, 1, 0),
+            liftBoundVariables(congruenceRight, 1, 0), proof);
+        ExpressionPointer candidate = makeLambda(
+            "_cast_ne", goalPi->domain,
+            makeApplication(
+                liftBoundVariables(notFact.proofTerm, 1, 0), proof));
+        if (ExpressionPointer verified = verifiedAgainstGoal(candidate)) {
+            return verified;
+        }
+    }
+    return nullptr;
+}
+
 bool Elaborator::containsCoercionConstant(ExpressionPointer term) const {
     if (!term) return false;
     if (auto* constant = std::get_if<Constant>(&term->node)) {

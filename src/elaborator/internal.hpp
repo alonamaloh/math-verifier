@@ -889,6 +889,18 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // F4 — ≠ across the coercion tower. A goal `¬(ι a = ι b)` closes
+    // from an in-scope `¬(a = b)` through the hop's `injective` lemma
+    // (the preserves direction, iterated down the acyclic tower), and
+    // a goal `¬(a = b)` closes from an in-scope `¬(ι a = ι b)` by
+    // pushing the supposed equality through ι-congruence (the
+    // reflects direction — needs no packet lemma). Pure context scan
+    // over the Not-shaped facts; runs right after the cast-order tier.
+    ExpressionPointer tryCastNotEqualTier(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
     // B3.3b — context-fact cast normalization: match the diff walk's
     // sub-goal `subLeft = subRight` against the local equality
     // hypotheses at the shared leaf-cast normal form (placement

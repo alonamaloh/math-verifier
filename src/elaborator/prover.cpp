@@ -2597,6 +2597,16 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             if (attempt) return attempt;
         }
 
+        // F4 — ≠ across the coercion tower: `¬(ι a = ι b)` from an
+        // in-scope `¬(a = b)` through `<hop>.injective`, and the
+        // reflects twin through ι-congruence. Pure context scan.
+        {
+            ExpressionPointer attempt = runTactic("castNotEqualTier",
+                [&] { return tryCastNotEqualTier(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
         {
             ExpressionPointer attempt = runTactic("conjunctionIntro",
                 [&] { return tryConjunctionIntro(
@@ -2873,6 +2883,10 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
         });
         runProfiled("castOrderTier", [&] {
             return tryCastOrderTier(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("castNotEqualTier", [&] {
+            return tryCastNotEqualTier(
                 goalClosed, localBinders, line);
         });
         runProfiled("conjunctionIntro", [&] {

@@ -304,6 +304,24 @@ void Elaborator::runModule(const SurfaceModule& module) {
                             missing += slot;
                         }
                     }
+                    // ∣ transport slots — audited only where BOTH
+                    // carriers have a divisibility relation (a field
+                    // target like ℚ has none, so the transport lemma
+                    // cannot even be stated there — structural absence,
+                    // same as ℕ's missing subtraction).
+                    if (environment_.lookup(
+                            std::get<0>(key) + ".divides") != nullptr
+                        && environment_.lookup(
+                            std::get<1>(key) + ".divides") != nullptr) {
+                        for (const char* slot :
+                                 {"divides_preserves", "divides_reflects"}) {
+                            if (environment_.lookup(hop + "." + slot)
+                                == nullptr) {
+                                if (!missing.empty()) missing += ", ";
+                                missing += slot;
+                            }
+                        }
+                    }
                     std::cerr << "[coercion-packet] " << hop
                               << " (" << std::get<0>(key) << " -> "
                               << std::get<1>(key) << "): "
