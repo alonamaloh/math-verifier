@@ -1833,8 +1833,20 @@ ExpressionPointer Elaborator::autoProveCalcStepRaw(
             previousKernel, localBinders, localBinders.size());
         ExpressionPointer nextOpened = openOverLocalBinders(
             nextKernel, localBinders, localBinders.size());
-        if (isDefinitionallyEqual(environment_, openedContext,
-                                    previousOpened, nextOpened)) {
+        bool endpointsDefinitionallyEqual = false;
+        try {
+            endpointsDefinitionallyEqual = isDefinitionallyEqual(
+                environment_, openedContext, previousOpened, nextOpened);
+        } catch (const TypeError&) {
+            // The defeq recursion re-types subterms it manufactures
+            // mid-unfold (proof irrelevance), and across the soft-opaque
+            // quotient-alias boundary that inference can fail on a term
+            // neither side wrote. This probe is SPECULATIVE — treat the
+            // mishap as "not equal by this strategy" and let the later
+            // strategies (or the step's own loud failure) speak.
+            endpointsDefinitionallyEqual = false;
+        }
+        if (endpointsDefinitionallyEqual) {
             ExpressionPointer call =
                 makeConstant("reflexivity", {carrierLevel});
             call = makeApplication(std::move(call), carrierType);

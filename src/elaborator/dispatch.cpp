@@ -2208,6 +2208,12 @@ ExpressionPointer Elaborator::elaborateBlockTail(
             || std::holds_alternative<SurfaceByInductionUsing>(
                    blockTail.expression->node)
             || std::holds_alternative<SurfaceByStrongInduction>(
+                   blockTail.expression->node)
+            // `witness E with proof` desugars to an anonymous tuple —
+            // a proof term, never a stateable proposition; without this
+            // the claim fallback masks the direct reading's real error
+            // behind "anonymous tuple needs an expected type".
+            || std::holds_alternative<SurfaceAnonymousTuple>(
                    blockTail.expression->node);
         try {
             ExpressionPointer direct = elaborateExpression(

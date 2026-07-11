@@ -127,6 +127,19 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
                 expectedTypeClosed, localBinders, localBinders.size());
             barePropositionCouldFire =
                 structurallyEqual(termOpened, expectedOpenedForCompare);
+            // The expected type may carry a REDUCED spelling of the same
+            // proposition (`to_rational(to_integer 0) < δ` where the user
+            // wrote `Rational.zero < δ` — instantiated theorem premises
+            // arrive δ-unfolded). Structural equality misses those; a
+            // matching relation head is a cheap admission — strategy (d)
+            // still demands full definitional equality before acting.
+            if (!barePropositionCouldFire) {
+                std::string termHead = headConstantName(termOpened);
+                barePropositionCouldFire =
+                    !termHead.empty()
+                    && termHead
+                           == headConstantName(expectedOpenedForCompare);
+            }
         }
         // Disjunction-injection prefilter: a proof of one disjunct where
         // `Or(A, B)` is expected wraps with the matching Or.introduce*.

@@ -1,0 +1,53 @@
+-- Feature test: the `choose … such that … from <source>` forms landed
+-- with the A2 stage-2 gap fixes.
+--
+-- (α) MULTI-WITNESS from a lemma: one ∃ layer is read off the lemma's
+--     conclusion per witness name.
+-- (β) an APPLIED source whose existential instantiates a definition
+--     leaves β-redexes in the destructured hypothesis's type unless
+--     reduced — the arm's order-relation steps must see the clean form.
+module Test.choose_from_lemma_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+definition Test.Small (f : Natural → Natural) : Proposition :=
+  ∀ (m : Natural). f(m) ≤ 3
+
+axiom Test.small_is_bounded
+        : ∀ (f : Natural → Natural). Test.Small(f)
+          → ∃ (K : Natural). ∃ (N : Natural). ∀ (m : Natural). N ≤ m → f(m) ≤ K
+
+-- (α) Two witnesses, one line: both ∃ layers read off the conclusion,
+-- the premise Test.Small(f) discharged from context.
+theorem Test.multi_witness_from_lemma (f : Natural → Natural)
+        (fSmall : Test.Small(f))
+        : ∃ (bound : Natural). ∃ (start : Natural).
+            ∀ (m : Natural). start ≤ m → f(m) ≤ bound := {
+  choose K, N such that ∀ (m : Natural). N ≤ m → f(m) ≤ K
+      from Test.small_is_bounded;
+  witness K with witness N with ∀ (m : Natural). N ≤ m → f(m) ≤ K
+}
+
+-- (β) Applied source through a definition: the destructured
+-- hypothesis's type instantiates Test.Roof's body (a β-redex until
+-- reduced), and the arm's ≤-step consumes it structurally.
+definition Test.Roof (f : Natural → Natural) : Proposition :=
+  ∀ (c : Natural). 0 ≤ c → ∃ (N : Natural). ∀ (m : Natural). N ≤ m → f(m) ≤ c + 3
+
+theorem Test.choose_from_applied_definition (f : Natural → Natural)
+        (roof : Test.Roof(f))
+        (c : Natural)
+        : ∃ (start : Natural). ∀ (m : Natural). start ≤ m → f(m) ≤ c + 3 := {
+  choose N such that ∀ (m : Natural). N ≤ m → f(m) ≤ c + 3
+      from roof(c, 0 ≤ c);
+  witness N with
+      (m : Natural) (mPast : N ≤ m) ↦ {
+        f(m) ≤ c + 3;
+        done
+      }
+}

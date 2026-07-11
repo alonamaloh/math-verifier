@@ -341,6 +341,7 @@ ExpressionPointer Elaborator::elaborateChoose(
             // terms aren't mistaken for lemmas.
             bool sourceIsExistential = false;
             bool sourceIsStatement = false;
+            std::exception_ptr sourceProbeError;
             try {
                 ExpressionPointer sourceTerm = elaborateExpression(
                     *choose.source, localBinders);
@@ -382,7 +383,19 @@ ExpressionPointer Elaborator::elaborateChoose(
                     }
                 }
             } catch (const ElaborateError&) {
+                sourceProbeError = std::current_exception();
             } catch (const TypeError&) {
+                sourceProbeError = std::current_exception();
+            }
+            // The remaining branches read the source as a LEMMA CITATION,
+            // which only makes sense for an identifier head. An APPLIED
+            // source that failed the probe is a real error in the
+            // application itself — re-raise it rather than mislabeling it
+            // a malformed lemma name downstream.
+            if (!sourceIsStatement && !sourceIsExistential
+                && sourceProbeError
+                && !std::get_if<SurfaceIdentifier>(&choose.source->node)) {
+                std::rethrow_exception(sourceProbeError);
             }
             if (sourceIsStatement) {
                 scrutinee = makeSurfaceGiven(choose.source, line, column);
@@ -398,65 +411,95 @@ ExpressionPointer Elaborator::elaborateChoose(
                     choose.source, line, column);
             } else {
                 // Lemma source WITH `such that`: cite it against the explicit
-                // `∃ (name : T). prop`, so the body disambiguates which
-                // hypothesis the lemma's premise discharges against; the
-                // witness type T is read off the lemma's own conclusion.
-                if (!choose.additionalNames.empty()) {
-                    throwElaborate(
-                        "choose with several witnesses takes its source "
-                        "from a hypothesis or an argument-free lemma "
-                        "citation; for a lemma that needs `such that` "
-                        "disambiguation, claim the existential first "
-                        "(`claim ∃ …; by <lemma>`) and choose from it");
-                }
+                // nested `∃ (name : T). … prop`, so the body disambiguates
+                // which hypothesis the lemma's premise discharges against;
+                // one ∃ layer is read off the lemma's conclusion per witness
+                // name. Premise peeling iterates through WHNF so a
+                // conclusion spelled through a definition (`IsCauchy(…)` =
+                // ∀ε. 0 < ε → ∃N. …) exposes its buried Pis and ∃s.
                 ExpressionPointer lemmaTerm = elaborateExpression(
                     *choose.source, localBinders);
                 ExpressionPointer lemmaType = inferTypeInLocalContext(
                     localBinders, lemmaTerm);
                 ExpressionPointer conclusion = openOverLocalBinders(
                     lemmaType, localBinders, N);
-                while (auto* pi = std::get_if<Pi>(&conclusion->node)) {
-                    conclusion = pi->codomain;
+                std::vector<std::string> witnessNames = {choose.name};
+                for (const std::string& extra : choose.additionalNames) {
+                    witnessNames.push_back(extra);
                 }
-                conclusion = weakHeadNormalForm(environment_, conclusion);
-                // Exists(T, motive) = App(App(Const "Exists"), T, motive).
-                ExpressionPointer witnessType;
-                if (auto* outer =
-                        std::get_if<Application>(&conclusion->node)) {
-                    if (auto* inner = std::get_if<Application>(
-                            &outer->function->node)) {
-                        if (auto* head = std::get_if<Constant>(
-                                &inner->function->node)) {
-                            if (head->name == "Exists") {
-                                witnessType = inner->argument;
-                            }
-                        }
-                    }
-                }
-                auto* witnessConstant = witnessType
-                    ? std::get_if<Constant>(&witnessType->node) : nullptr;
-                if (!witnessConstant) {
+                std::vector<std::string> witnessTypeNames;
+                auto failSimpleWitness = [&]() {
                     throwElaborate(
                         "choose " + choose.name + " from <lemma>: could not "
                         "read a simple (closed) witness type from the "
-                        "lemma's existential conclusion. Use the explicit "
-                        "form `claim ∃ (" + choose.name + " : <T>). <prop> "
-                        "by <lemma>; choose " + choose.name + " …` instead.");
+                        "lemma's existential conclusion (one ∃ layer per "
+                        "witness name). Use the explicit form `claim ∃ ("
+                        + choose.name + " : <T>). <prop> by <lemma>; choose "
+                        + choose.name + " …` instead.");
+                };
+                for (size_t w = 0; w < witnessNames.size(); ++w) {
+                    // Peel premises (syntactic Pis, then WHNF-exposed ones)
+                    // until the cursor is Exists-headed.
+                    while (true) {
+                        if (auto* pi = std::get_if<Pi>(&conclusion->node)) {
+                            conclusion = pi->codomain;
+                            continue;
+                        }
+                        ExpressionPointer reduced = weakHeadNormalForm(
+                            environment_, conclusion);
+                        if (reduced.get() == conclusion.get()) break;
+                        conclusion = reduced;
+                    }
+                    // Exists(T, motive) = App(App(Const "Exists", T), motive).
+                    ExpressionPointer witnessType;
+                    ExpressionPointer motiveExpression;
+                    if (auto* outer =
+                            std::get_if<Application>(&conclusion->node)) {
+                        if (auto* inner = std::get_if<Application>(
+                                &outer->function->node)) {
+                            if (auto* head = std::get_if<Constant>(
+                                    &inner->function->node)) {
+                                if (head->name == "Exists") {
+                                    witnessType = inner->argument;
+                                    motiveExpression = outer->argument;
+                                }
+                            }
+                        }
+                    }
+                    auto* witnessConstant = witnessType
+                        ? std::get_if<Constant>(&witnessType->node) : nullptr;
+                    if (!witnessConstant) failSimpleWitness();
+                    witnessTypeNames.push_back(witnessConstant->name);
+                    if (w + 1 == witnessNames.size()) break;
+                    // Descend into the next ∃ layer: the motive is a
+                    // lambda whose body holds it. (The body's reference
+                    // to this witness doesn't matter here — only the
+                    // remaining layers' TYPES are read, and each must be
+                    // a closed constant anyway.)
+                    auto* motiveLambda = motiveExpression
+                        ? std::get_if<Lambda>(&motiveExpression->node)
+                        : nullptr;
+                    if (!motiveLambda) failSimpleWitness();
+                    conclusion = motiveLambda->body;
                 }
-                SurfaceExpressionPointer witnessTypeSurface =
-                    makeSurfaceIdentifier(witnessConstant->name, {},
-                        line, column);
-                SurfaceBinder witnessBinder;
-                witnessBinder.names = {choose.name};
-                witnessBinder.type = witnessTypeSurface;
-                SurfaceExpressionPointer motive = makeSurfaceLambda(
-                    witnessBinder, choose.predicate, line, column);
-                SurfaceExpressionPointer existential =
-                    makeSurfaceApplication(
+                // Assemble the nested surface existential around the
+                // user's predicate, innermost-first.
+                SurfaceExpressionPointer existential = choose.predicate;
+                for (size_t w = witnessNames.size(); w-- > 0;) {
+                    SurfaceExpressionPointer witnessTypeSurface =
+                        makeSurfaceIdentifier(witnessTypeNames[w], {},
+                            line, column);
+                    SurfaceBinder witnessBinder;
+                    witnessBinder.names = {witnessNames[w]};
+                    witnessBinder.type = witnessTypeSurface;
+                    SurfaceExpressionPointer motive = makeSurfaceLambda(
+                        witnessBinder, existential, line, column);
+                    existential = makeSurfaceApplication(
                         makeSurfaceIdentifier("Exists", {}, line, column),
                         std::vector<SurfaceExpressionPointer>{
                             witnessTypeSurface, motive},
                         line, column);
+                }
                 scrutinee = makeSurfaceAscription(
                     makeSurfaceCiteInferred(choose.source, line, column),
                     existential, line, column);

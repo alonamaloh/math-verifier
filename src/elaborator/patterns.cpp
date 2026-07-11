@@ -850,11 +850,22 @@ ExpressionPointer Elaborator::buildCaseLambda(
             // value arguments are bound contiguously, so the lambda
             // depth already matches — no shift.
             destructuredArgumentPositions.push_back(lambdaBinders.size());
+            // Beta-reduce the argument type, mirroring the motive and
+            // recursion-hypothesis treatments below: destructuring an
+            // existential whose predicate was INSTANTIATED from a
+            // definition (`choose … from sumNonneg(ε, εPositive)` where
+            // the source's type unfolds to `∃ N. … f(m) …` with f a
+            // lambda) leaves `(λ …)(…)` redexes inside the hypothesis
+            // binder's type, and the arm body's structural matchers
+            // (order steps, premise instantiation) match on the binder
+            // type as written. Beta only — no δ, so declared aliases
+            // survive.
+            ExpressionPointer valueArgumentType = spellPublicly
+                ? publicTypeSpelling(constructorArguments[i].type)
+                : constructorArguments[i].type;
             lambdaBinders.push_back(
                 {destructuredNames[i],
-                 spellPublicly
-                     ? publicTypeSpelling(constructorArguments[i].type)
-                     : constructorArguments[i].type});
+                 deepBetaReduce(valueArgumentType)});
         }
         for (size_t i = 0; i < constructorArguments.size(); ++i) {
             const auto& constructorArgument = constructorArguments[i];
