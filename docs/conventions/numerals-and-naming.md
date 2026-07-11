@@ -147,17 +147,18 @@ and its base case (`let mean := (x + y) / 2; let halfDiff := (x - y) / 2`) read
 as the mathematics — `(firstSum - secondSum) * (firstSum - secondSum)`,
 `mean < g → g * g < g * g` — and the file shrank ~25%.
 
-**Caveat — `let` is ζ-transparent *except to `ring`/`field`*.** The kernel
-unfolds the `let` for def-eq, and the matcher unfolds it too (so `by <lemma>`,
+**Caveat — `let` is ζ-transparent *except to `linear_combination`*.** The
+kernel unfolds the `let` for def-eq, the matcher unfolds it (so `by <lemma>`,
 `IsNonneg(…)` decomposition, relation steps, and `by substituting` all see
-through the name to its value). But `ring` / `field` / `linear_combination`
-treat a `let`-bound value as an opaque **atom** — they do NOT unfold it. So a
-*structural ring/field identity* over a `let` must use the explicit form: with
-`let mean := (x + y) / 2`, the claim `mean * mean - x*y = halfDiff * halfDiff
-by field` FAILS (false with `mean`, `halfDiff` as atoms) — state that one claim
-with explicit `((x+y)/2) * …` and keep `mean`/`halfDiff` for the surrounding
-relations and citations. The dual caveat is reduction: a `cases`/`if`
-refinement won't compute *through* a `let`, so when a goal `P(augmentedRow(k))`
-must ι-reduce as `k` is refined, keep the full application
-`P(augmentedScaledRow(s, m, k))` in the claim's *type* (only the `let` name in
-the surrounding prose).
+through the name to its value), `ring` and `field` ζ-unfold the goal (and
+`field` reads its nonzero hypotheses at the same let-free spelling), and the
+sign battery retries a declined sign/positivity goal at the ζ-unfolded
+spelling — so `mean * mean - x*y = halfDiff * halfDiff by field` with
+`let mean := (x + y) / 2` and bare `tolerance > 0` claims over a `let` both
+work as written (pinned by `Test/zeta_let_test.math`). The one remaining atom
+treatment is `linear_combination`, whose cited hypothesis equations feed its
+coefficient bookkeeping at their stated spellings — keep explicit forms
+there. The dual caveat is reduction: a `cases`/`if` refinement won't compute
+*through* a `let`, so when a goal `P(augmentedRow(k))` must ι-reduce as `k`
+is refined, keep the full application `P(augmentedScaledRow(s, m, k))` in the
+claim's *type* (only the `let` name in the surrounding prose).

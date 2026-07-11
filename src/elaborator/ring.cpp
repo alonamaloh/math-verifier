@@ -7506,10 +7506,17 @@ ExpressionPointer Elaborator::elaborateField(
                 "as the body of a theorem with a declared equality "
                 "conclusion");
         }
-        // NOTE: do NOT ζ-unfold let-binders here (unlike `ring`): `field`
-        // discharges hypothesis side conditions whose types keep the
-        // let-bound spelling — unfolding only the goal would make the
-        // goal's atoms diverge from the hypotheses' atoms.
+        // ζ-unfold let-binders in the goal, so a let-bound abbreviation
+        // (`let half := ε / 2; half + half = ε by field`) is seen
+        // structurally by the normaliser instead of as an opaque atom
+        // that makes the identity FALSE. Unfolding the goal alone would
+        // make its atoms diverge from the hypotheses' atoms (the reason
+        // this was previously skipped) — so the hypothesis-side atom
+        // reads below unfold with the same helper, keeping every
+        // participating spelling let-free and the bookkeeping aligned.
+        // The unfolded type is ζ-equal to the original, so the returned
+        // proof still discharges the stated goal (checked up to defeq).
+        expectedType = zetaUnfoldLetBinders(expectedType, localBinders);
         // Open the expected type over local binders so that local
         // variables appear as FreeVariables — this lets us match
         // against hypothesis types (which arrive opened).
@@ -7663,8 +7670,12 @@ ExpressionPointer Elaborator::elaborateField(
                     "`field`: hypothesis is not of shape `¬(t = "
                     + context.zeroName + ")`");
             }
-            // Locate which recipArg matches.
-            ExpressionPointer baseAtom = domainComponents.leftEndpoint;
+            // Locate which recipArg matches. The recipArgs come from the
+            // ζ-unfolded goal, so read the hypothesis's subject at the
+            // same let-free spelling (`field(halfNonzero)` with
+            // `halfNonzero : ¬(half = 0)` must meet a `ε / 2` atom).
+            ExpressionPointer baseAtom = zetaUnfoldLetBindersOpened(
+                domainComponents.leftEndpoint, localBinders);
             uint64_t baseHash = baseAtom->hash;
             // Find recipArg with same hash.
             size_t matchedIndex = recipArgHashes.size();

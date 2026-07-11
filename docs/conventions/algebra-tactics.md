@@ -37,13 +37,18 @@ real limitation:
   relation step or claim, no `by field` needed. Write the hint only
   when the bare step genuinely fails (pinned by
   `Test/field_battery_test.math`).
-- **`let`-bound values are atoms to `ring`/`field`/`linear_combination`.**
-  These normalisers do NOT ζ-unfold a local `let`, so an identity that is
-  only true *after* unfolding — `mean * mean - x*y = halfDiff * halfDiff`
-  with `let mean := (x+y)/2` — won't close; state that one fact in the
-  explicit `((x+y)/2) * …` form. The *matcher* does unfold `let`s, so
-  `by <lemma>` and relation steps over a `let` are fine; only the
-  algebra normalisers are blind. See `numerals-and-naming.md`.
+- **`let`-bound values are transparent to `ring`/`field` (and the sign
+  battery); still atoms to `linear_combination`.** `ring` and `field`
+  ζ-unfold local `let`s in the goal (and `field` reads its nonzero
+  hypotheses at the same let-free spelling), so
+  `mean * mean - x*y = halfDiff * halfDiff by field` with
+  `let mean := (x+y)/2` closes as written; so do bare sign/positivity
+  claims over a `let` (`let tolerance := ε / 2 / fRoof;
+  tolerance > 0;` — pinned by `Test/zeta_let_test.math`). The one
+  remaining blind spot is `linear_combination`: its cited hypothesis
+  equations feed the coefficient bookkeeping at their stated
+  spellings, so keep explicit forms on those identities. See
+  `numerals-and-naming.md`.
 - **`ring` requires the carrier's `.add`, `.multiply`, and ring laws
   in scope.** For Real proofs, that typically means importing
   `Real.addition`, `Real.multiplication`, `Real.negation`, `Real.ring`,

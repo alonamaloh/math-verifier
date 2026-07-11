@@ -6330,7 +6330,16 @@ private:
     // bare binder, e.g. `IsNonneg(x) → 0 ≤ x`) may fire at this level.
     // A bridge's own premise recurses with it false, so bridges never
     // chain — the subject must strictly shrink between form switches.
+    // The entry point tries the goal as stated first, then retries once
+    // at the ζ-unfolded spelling (a let-bound subject has no head for
+    // the rule index; its value does) — same stated-spelling-first
+    // shape as tryMonotonicityRecursion's subtract retry.
     ExpressionPointer trySignJudgmentRecursion(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth,
+        bool allowFormBridge);
+    ExpressionPointer trySignJudgmentRecursionAtSpelling(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
         int depth,

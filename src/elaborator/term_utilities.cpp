@@ -774,6 +774,23 @@ static bool referencesLetValuedBinder(
     return false;
 }
 
+namespace {
+// FreeVariable-name → opened-value assignment for every value-carrying
+// binder, shared by the closed- and opened-form ζ-unfold entry points.
+std::map<std::string, ExpressionPointer> letValueAssignment(
+    const std::vector<LocalBinder>& localBinders) {
+    std::map<std::string, ExpressionPointer> assignment;
+    for (size_t i = 0; i < localBinders.size(); ++i) {
+        if (localBinders[i].value) {
+            assignment[openingNameFor(localBinders, i)] =
+                openOverLocalBinders(
+                    localBinders[i].value, localBinders, i);
+        }
+    }
+    return assignment;
+}
+} // namespace
+
 ExpressionPointer zetaUnfoldLetBinders(
     ExpressionPointer term,
     const std::vector<LocalBinder>& localBinders) {
@@ -783,21 +800,40 @@ ExpressionPointer zetaUnfoldLetBinders(
     // the auto-prover's context-fact scan ζ-probes the (unchanged) goal
     // against many candidate hints.
     if (!referencesLetValuedBinder(term, localBinders, 0)) return term;
-    std::map<std::string, ExpressionPointer> assignment;
-    for (size_t i = 0; i < localBinders.size(); ++i) {
-        if (localBinders[i].value) {
-            assignment[openingNameFor(localBinders, i)] =
-                openOverLocalBinders(
-                    localBinders[i].value, localBinders, i);
-        }
-    }
+    std::map<std::string, ExpressionPointer> assignment =
+        letValueAssignment(localBinders);
     if (assignment.empty()) return term;
     ExpressionPointer opened = openOverLocalBinders(
         term, localBinders, localBinders.size());
-    ExpressionPointer substituted =
-        substituteFreeVariables(opened, assignment);
+    // To fixpoint: a let's value may itself reference an earlier let
+    // (`let gTolerance := ε / 2 / fRoof` with `let fRoof := …`), and
+    // substituteFreeVariables does not re-scan the substituted values.
+    // Each pass eliminates one let layer; lets cannot be cyclic, so
+    // this terminates within |localBinders| passes.
+    for (size_t pass = 0; pass < localBinders.size(); ++pass) {
+        ExpressionPointer substituted =
+            substituteFreeVariables(opened, assignment);
+        if (substituted == opened) break;
+        opened = substituted;
+    }
     return closeOverLocalBinders(
-        substituted, localBinders, localBinders.size());
+        opened, localBinders, localBinders.size());
+}
+
+ExpressionPointer zetaUnfoldLetBindersOpened(
+    ExpressionPointer term,
+    const std::vector<LocalBinder>& localBinders) {
+    std::map<std::string, ExpressionPointer> assignment =
+        letValueAssignment(localBinders);
+    if (assignment.empty()) return term;
+    // Same fixpoint discipline as the closed-form entry point above.
+    for (size_t pass = 0; pass < localBinders.size(); ++pass) {
+        ExpressionPointer substituted =
+            substituteFreeVariables(term, assignment);
+        if (substituted == term) break;
+        term = substituted;
+    }
+    return term;
 }
 
 ExpressionPointer substituteFreeVariables(

@@ -40,7 +40,7 @@ Steps refer to the suggested order at the end of the plan.
 | Step | Workstream | Status |
 |------|------------|--------|
 | 1 | B5 classifier (instrument hinted claims/calc steps) | **done** |
-| 2 | B1–B3 tier skeleton, context index, cast tier | **B1/B2/B3 done; residue forensics done — verdict: no norm_cast mechanism needed; F1–F5 queue CLOSED 2026-07-11; tier4-sign forensics + tactic-order/∧-leg fixes landed 2026-07-11** |
+| 2 | B1–B3 tier skeleton, context index, cast tier | **B1/B2/B3 done; residue forensics done — verdict: no norm_cast mechanism needed; F1–F5 queue CLOSED 2026-07-11; tier4-sign forensics + tactic-order/∧-leg fixes landed 2026-07-11; ζ-let opacity family CLOSED 2026-07-11 (sign ζ-retry + field consistent ζ)** |
 | 3 | A1 keyword-free claims/calc | **DONE — keywords retired** |
 | 4 | B4 order automation in calc | **v1 DONE** |
 | 5 | A2 statement addressability + A7 `contradiction` kit | **A2 stage 1 + transport done; A7 done** |
@@ -394,6 +394,43 @@ one-line body, which the classifier counts as a hinted site), the ℝ shape
 closes bare in a clean context, and the residual reciprocal/field sites cite
 `nonzero_of_absolute_value_positive` — a different fact (subject `|x|` vs
 `x`) whose citation IS the reasoning; content, kept.
+
+**ζ-LET OPACITY FAMILY CLOSED (2026-07-11, the deferred "~6 ζ-let subjects"
+follow-up).** Measured first: a fresh serial classifier + a bare-bound-subject
+extraction + source reads found the family's true size across ALL buckets —
+9 ζ-blocked sign sites (continuity:222/223, intermediate_value:88/150, AGM
+62/155/157/159, exponential_addition:361 — a let-bound FUNCTION subject) plus
+9 look-alikes that close at 10k (budget artifacts, not ζ; incl. all 3
+derivative mono-shapes and the sole `by ring` ground site). Probes: `ring`
+and the by-less `=` battery already ζ-unfold; `field` and bare sign
+judgments genuinely fail on let atoms. The compounding `field` wart (the
+CLAUDE.md let-caveat, AGM's forced-explicit productValue) tipped the verdict
+to BUILD. Design (once, at the root): ζ-expansion stays in the one shared
+helper `zetaUnfoldLetBinders` (now fixpoint over chained lets + an
+opened-form twin), consulted stated-spelling-first per tactic family — the
+unfoldSubtractSpellings pattern, NOT a battery-root re-run (that would
+double every let-mentioning decliner's failed search behind the expensive
+bridges, the exact cost family the tier4-sign forensics just demoted).
+Landed: (α) trySignJudgmentRecursion = stated pass, then one retry at the
+ζ-unfolded + β-collapsed goal (β kills the redex a let-bound function
+leaves; all callers — battery, cast tier, mono premise discharge — inherit;
+chained lets unfold one layer per premise-level retry so descent stays
+strict); (β) `field` ζ-unfolds its goal AND reads each nonzero hypothesis
+subject at the let-free spelling — the old "goal-only unfolding diverges
+from hypothesis atoms" objection dissolves when both sides unfold.
+DEFERRED with reason: `linear_combination` keeps let atoms (cited
+hypothesis equations feed coefficient bookkeeping at stated spellings —
+the ComplexNumber/irreducible breakage class; zero measured sites).
+All 9 sites verified closing; the 8 clean-manifest hints folded
+(exponential_addition awaits its cone per the scoping rule; its site now
+flags). Test/zeta_let_test.math pins ring/field(ℝ+ℚ)/battery/sign/chained/
+β-function shapes. Teaching updated: CLAUDE.md caveat, algebra-tactics.md,
+numerals-and-naming.md (let-caveat now names linear_combination only).
+Fresh serial baseline: 3945 sites (8 folds left the population),
+closes-today 1197/30.3%, tier4-sign 171→158. Gates: full re-verify +
+tests + checker/probe-tests green, error-tests 52/0, export-check 2554,
+warning-site diff EMPTY (serial capture both sides; classify cache
+committed).
 
 #### Row 3 — A1 keyword-free claims/calc
 

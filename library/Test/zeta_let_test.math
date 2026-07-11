@@ -1,0 +1,88 @@
+-- Feature test: `let`-bound abbreviations are transparent to the sign
+-- recursion and to `field` (they already were to `ring` and the by-less
+-- `=` battery). The sign recursion tries the goal as stated first, then
+-- retries once at the ζ-unfolded (and β-collapsed) spelling — so
+-- `let tolerance := ε / 2 / fRoof; tolerance > 0` closes bare exactly
+-- like its inlined twin (the Real.continuity ε-δ shape). `field`
+-- ζ-unfolds the goal AND reads each nonzero hypothesis's subject at the
+-- same let-free spelling, so the atoms stay aligned. Deliberately NOT
+-- covered: `linear_combination` keeps let atoms opaque (its cited
+-- hypothesis equations feed coefficient bookkeeping at their stated
+-- spellings; no measured site needs it).
+module Test.zeta_let_test
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.reciprocal_function
+import Rational.division
+import Rational.ground_arithmetic
+import Real.interface
+
+-- `ring` on a goal that is FALSE with `double` as an opaque atom.
+theorem Test.zeta_let_ring (x : Real) : True := {
+  let double : Real := x + x;
+  double = 2 * x by ring;
+  done
+}
+
+-- `field` at ℝ (partial reciprocal, no hypotheses).
+theorem Test.zeta_let_field_real (ε : Real) : True := {
+  let half : Real := ε / 2;
+  half + half = ε by field;
+  done
+}
+
+-- `field(h)` at ℚ: the hypothesis speaks `q`, the goal's denominator
+-- atom is let-bound — both sides read at the let-free spelling.
+theorem Test.zeta_let_field_rational (q : Rational)
+        (qNonzero : q ≠ Rational.zero) : True := {
+  let ratio : Rational := 1 / q;
+  ratio * q = 1 by field(qNonzero);
+  done
+}
+
+-- The by-less `=` battery (its ring seat ζ-unfolds).
+theorem Test.zeta_let_battery (x : Real) : True := {
+  let double : Real := x + x;
+  double = 2 * x;
+  done
+}
+
+-- The sign recursion: a bare let-bound subject has no head constant for
+-- the rule index; the ζ-retry finds `divide` and recurses.
+theorem Test.zeta_let_sign (ε : Real) (εPositive : ε > 0) : True := {
+  let half : Real := ε / 2;
+  half > 0;
+  done
+}
+
+-- Chained lets: `quarter` unfolds to `half / 2`; the premise-level
+-- retry unfolds `half` one more layer.
+theorem Test.zeta_let_sign_chained (ε : Real) (εPositive : ε > 0) : True := {
+  let half : Real := ε / 2;
+  let quarter : Real := half / 2;
+  quarter > 0;
+  done
+}
+
+-- A let-bound FUNCTION: ζ leaves a β-redex behind; the retry collapses
+-- it so the subject head (`absolute_value`) reaches the rule index (the
+-- ComplexNumber.exponential_addition aModulus shape).
+theorem Test.zeta_let_sign_function (f : Natural → Real) (i : Natural) : True := {
+  let magnitude : Natural → Real := (k : Natural) ↦ Real.absolute_value(f(k));
+  magnitude(i) ≥ 0;
+  done
+}

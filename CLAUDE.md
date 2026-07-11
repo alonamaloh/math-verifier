@@ -45,8 +45,9 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   `zero`/`successor(zero)`/`two`. Bare numerals now coerce in
   argument/operand positions (`Real.power(2, m)`, `x + 2`), so drop the
   ascription there; prefer `(x + y) / 2` over `* (one_half)`. Caveat:
-  `(2 : Real)` is *not* defeq to `1 + 1`, and `let`s are opaque to
-  `ring`/`field` — see the `2`-vs-`1+1` and `let`-caveat rules. No house
+  `(2 : Real)` is *not* defeq to `1 + 1`, and `let`s are still opaque to
+  `linear_combination` (`ring`/`field` and the sign battery now ζ-unfold
+  them) — see the `2`-vs-`1+1` and `let`-caveat rules. No house
   preference on `1 + n` vs `n + 1`. See
   `docs/conventions/numerals-and-naming.md`.
 

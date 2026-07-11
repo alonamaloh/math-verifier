@@ -666,6 +666,37 @@ ExpressionPointer Elaborator::trySignJudgmentRecursion(
         int depth,
         bool allowFormBridge) {
     if (depth <= 0) return nullptr;
+    // Stated spelling first — sign facts and rules stated over the let
+    // name must keep matching as written. Only when that fails, retry
+    // once at the ζ-unfolded goal: a let-bound subject (`tolerance > 0`
+    // for `let tolerance := ε / 2 / fRoof`) has no head constant for
+    // the rule index, while its value does. The β pass collapses the
+    // redex a let-bound FUNCTION leaves behind (`aModulus(i)` for
+    // `let aModulus := k ↦ abs(a(k))` unfolds to a lambda application).
+    // Both are defeq, so the proof built at the unfolded spelling
+    // type-checks at the stated goal (proof-valued binders ride kernel
+    // proof irrelevance). Chained lets unfold one layer per
+    // premise-level retry, so the recursion still strictly descends.
+    if (ExpressionPointer proof = trySignJudgmentRecursionAtSpelling(
+            goalClosed, localBinders, depth, allowFormBridge)) {
+        return proof;
+    }
+    ExpressionPointer unfolded =
+        zetaUnfoldLetBinders(goalClosed, localBinders);
+    if (unfolded != goalClosed) {
+        return trySignJudgmentRecursionAtSpelling(
+            deepBetaReduce(unfolded), localBinders, depth,
+            allowFormBridge);
+    }
+    return nullptr;
+}
+
+ExpressionPointer Elaborator::trySignJudgmentRecursionAtSpelling(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth,
+        bool allowFormBridge) {
+    if (depth <= 0) return nullptr;
     SignJudgment judgment;
     if (!parseSignJudgment(goalClosed, judgment)) return nullptr;
     // Subject-headed rules first; if none fires and we didn't just

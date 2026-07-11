@@ -210,6 +210,13 @@ ExpressionPointer zetaUnfoldLetBinders(
     ExpressionPointer term,
     const std::vector<LocalBinder>& localBinders);
 
+// ζ-unfold for a term already OPENED over `localBinders` (FreeVariable
+// form) — e.g. an inferred hypothesis type. Same fixpoint semantics as
+// the closed-form entry point.
+ExpressionPointer zetaUnfoldLetBindersOpened(
+    ExpressionPointer term,
+    const std::vector<LocalBinder>& localBinders);
+
 ExpressionPointer substituteFreeVariables(
     ExpressionPointer expression,
     const std::map<std::string, ExpressionPointer>& assignment,
