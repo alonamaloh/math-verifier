@@ -195,13 +195,10 @@ theorem Real.exists_rational_below_at_make
         let ε ∈ Rational with (0 : Rational) < ε;
         witness N with {
           let m ∈ Natural with N ≤ m;
-          N ≤ N;
           abs(seq(m) - seq(N)) < (1: Rational)
-            by cauchyAt1(m, given(N ≤ m), N, given(N ≤ N));
-          (-(1 : Rational) < seq(m) - seq(N))
-                  ∧ (seq(m) - seq(N) < (1 : Rational))
+            by cauchyAt1(m, N ≤ m, N, N ≤ N);
+          -(1 : Rational) < seq(m) - seq(N)
             by Rational.absolute_value_LessThan_bounds;
-          -(1 : Rational) < seq(m) - seq(N);
           -- 0 = -1 + 1 < (seq(m) - seq(N)) + 1, adding 1 on the right;
           -- ring rearranges the RHS to `seq(m) - (seq(N) - 1)`.
           (0 : Rational)
@@ -240,13 +237,10 @@ theorem Real.exists_rational_above_at_make
                    (εPositive : (0 : Rational) < ε) ↦
             witness N with
                 (m : Natural) (mGeN : N ≤ m) ↦ {
-                  N ≤ N;
                   abs(seq(m) - seq(N)) < (1 : Rational)
-                    by cauchyAt1(m, mGeN, N, given(N ≤ N));
-                  (-(1 : Rational) < seq(m) - seq(N))
-                          ∧ (seq(m) - seq(N) < (1 : Rational))
+                    by cauchyAt1(m, mGeN, N, N ≤ N);
+                  seq(m) - seq(N) < (1 : Rational)
                     by Rational.absolute_value_LessThan_bounds;
-                  seq(m) - seq(N) < (1 : Rational);
                   -- Negate both sides: from `seq(m) - seq(N) < 1` we
                   -- get `-1 < -(seq(m) - seq(N)) = seq(N) - seq(m)`.
                   -- Then add 1 to both sides:
@@ -275,7 +269,7 @@ theorem Real.exists_rational_above (x : Real)
 theorem Real.exists_positive_rational_roof (x : Real)
         : ∃ (q : Rational). Rational.zero < q ∧ abs(x) ≤ (q : Real) := {
   ∃ (q : Rational). abs(x) ≤ (q : Real);
-  choose bound from given(∃ (q : Rational). abs(x) ≤ (q : Real));
+  choose bound such that abs(x) ≤ (bound : Real);
   Real.zero ≤ abs(x);
   Rational.zero < Rational.one;
   Real.zero < (Rational.one : Real);
@@ -810,14 +804,11 @@ theorem Real.LessOrEqual_of_pointwise_at_make
                  (mGeMax : Natural.maximum(N_s, N_b) ≤ m) ↦ {
           N_s ≤ m as m_geq_N_s;
           N_b ≤ m as m_geq_N_b;
-          N_s ≤ N_s;
           -- |s(m) - s(N_s)| < halve(ε)
           abs(s(m) - s(N_s)) < Rational.halve(ε)
-            by sCauchyAt(m, m_geq_N_s, N_s, given(N_s ≤ N_s));
-          (-Rational.halve(ε) < s(m) - s(N_s))
-                  ∧ (s(m) - s(N_s) < Rational.halve(ε))
+            by sCauchyAt(m, m_geq_N_s, N_s, N_s ≤ N_s);
+          s(m) - s(N_s) < Rational.halve(ε)
             by Rational.absolute_value_LessThan_bounds;
-          s(m) - s(N_s) < Rational.halve(ε);
           -- Flip: -halve(ε) < s(N_s) - s(m). LessThan.negate gives
           -- -halve(ε) < -(s(m) - s(N_s)) = s(N_s) - s(m).
           -Rational.halve(ε)
@@ -887,7 +878,7 @@ theorem Real.LessOrEqual_of_pointwise_lower
       by Real.eventually_below_cast_of_LessOrEqual;
 
   eventually (m): {
-    (-Rational.halve(ε) < s(m) - s(N)) ∧ (s(m) - s(N) < Rational.halve(ε))
+    -Rational.halve(ε) < s(m) - s(N)
         by Rational.absolute_value_LessThan_bounds;
     -ε
        = -Rational.halve(ε) + -Rational.halve(ε)
@@ -1251,8 +1242,7 @@ theorem Real.bisectionLeft_le_at_le
           ≤ Real.bisectionLeft(subset, initial, m) := {
   -- Write m as k + N (justified by N ≤ m), then the step-monotone
   -- lemma at k iterations closes the rewritten goal.
-  ∃ (k : Natural). m = k + N   by Natural.le_to_add;
-  choose k from given(∃ (k : Natural). m = k + N);
+  choose k such that m = k + N from Natural.le_to_add;
   Real.bisectionLeft(subset, initial, N)
         ≤ Real.bisectionLeft(subset, initial, k + N);
   done
@@ -1266,8 +1256,7 @@ theorem Real.bisectionRight_le_at_le
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.bisectionRight(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
-  ∃ (k : Natural). m = k + N   by Natural.le_to_add;
-  choose k from given(∃ (k : Natural). m = k + N);
+  choose k such that m = k + N from Natural.le_to_add;
   Real.bisectionRight(subset, initial, k + N)
         ≤ Real.bisectionRight(subset, initial, N);
   done
@@ -1281,8 +1270,7 @@ theorem Real.bisectionLeft_le_bisectionRight_at_le
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.bisectionLeft(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
-  ∃ (k : Natural). m = k + N   by Natural.le_to_add;
-  choose k from given(∃ (k : Natural). m = k + N);
+  choose k such that m = k + N from Natural.le_to_add;
   Real.bisectionLeft(subset, initial, k + N)
         ≤ Real.bisectionRight(subset, initial, N);
   done
@@ -1301,15 +1289,11 @@ theorem Real.exists_bisectionWidth_below
         (εPositive : (0 : Rational) < ε)
         : ∃ (N : Natural).
               Real.bisectionWidth(initial, N) < ε := {
-  ∃ (K : Natural).
+  choose K such that
             (Real.BisectionInterval.right(initial)
              - Real.BisectionInterval.left(initial))
             ≤ (1 + K : Rational) * ε
-    by Rational.archimedean_for_positives;
-  choose K from given(∃ (K : Natural).
-            (Real.BisectionInterval.right(initial)
-             - Real.BisectionInterval.left(initial))
-            ≤ (1 + K : Rational) * ε);
+      from Rational.archimedean_for_positives;
   Real.bisectionWidth(initial, 1 + K)
             * (1 + (1 + K) : Rational)
           ≤ Real.BisectionInterval.right(initial)
@@ -1429,8 +1413,8 @@ theorem Real.bisectionLeft_is_cauchy
               Real.bisectionLeft(subset, initial)) :=
   (ε : Rational)
            (εPositive : (0 : Rational) < ε) ↦ {
-    ∃ (N : Natural). Real.bisectionWidth(initial, N) < ε;
-    choose N from given(∃ (N : Natural). Real.bisectionWidth(initial, N) < ε);
+    choose N such that Real.bisectionWidth(initial, N) < ε
+        from Real.exists_bisectionWidth_below;
     witness N with
         (m : Natural) (NLeqM : N ≤ m)
                  (n : Natural) (NLeqN : N ≤ n) ↦
@@ -1475,8 +1459,7 @@ theorem Rational.LessOrEqual_of_real_LessOrEqual
             -- realLeq at ε = a - b yields the contradiction.
             choose N as bound
                 from (unfold Real.IsNonneg in realLeq)(a - b, diffPositive);
-            N ≤ N;
-            -(a - b) < b - a by bound(N, given(N ≤ N));
+            -(a - b) < b - a by bound(N, N ≤ N);
             b - a < b - a;
             b - a ≠ b - a as selfNotSelf;
             absurd(selfNotSelf(done))
@@ -1530,10 +1513,8 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
   ((ε : Rational)
            (εPositive : (0 : Rational) < ε) ↦ {
     (0 : Rational) < Rational.halve(ε) as halvedPositive;
-    ∃ (N : Natural).
-              Real.bisectionWidth(initial, N) < Rational.halve(ε);
-    choose K from given(∃ (N : Natural).
-              Real.bisectionWidth(initial, N) < Rational.halve(ε));
+    choose K such that Real.bisectionWidth(initial, K) < Rational.halve(ε)
+        from Real.exists_bisectionWidth_below;
     Real.IsUpperBound(
               subset, (Real.bisectionRight(subset, initial, K) : Real));
     Real.from_cauchy_sequence(yseq, yIsCauchy)
@@ -1624,9 +1605,7 @@ theorem Real.bisectionLimit_is_least
                   y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ y;
         choose witnessY such that
                  witnessY ∈ subset
-                 ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ witnessY
-            from given(∃ (y : Real).
-                  y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ y);
+                 ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ witnessY;
         witnessY ∈ subset;
         (Real.bisectionLeft(subset, initial, n) : Real) ≤ witnessY;
         witnessY ≤ otherBound;
@@ -1647,10 +1626,8 @@ theorem Real.supremum_exists
         : ∃ (s : Real). Real.IsSupremum(subset, s) := {
   choose x0 from nonempty;
   choose B0real from bounded;
-  ∃ (q : Rational). (q : Real) ≤ x0;
-  choose a0 from given(∃ (q : Rational). (q : Real) ≤ x0);
-  ∃ (q : Rational). B0real ≤ (q : Real);
-  choose b0 from given(∃ (q : Rational). B0real ≤ (q : Real));
+  choose a0 such that (a0 : Real) ≤ x0 from Real.exists_rational_below;
+  choose b0 such that B0real ≤ (b0 : Real) from Real.exists_rational_above;
   let initial : Real.BisectionInterval :=
       Real.BisectionInterval.make(a0, b0);
   -- b0 is an upper bound for S: for any y ∈ S, y ≤ B0real ≤ (b0 : Real).
@@ -1706,7 +1683,7 @@ theorem Real.IsSupremum.exists_above
             by (uBelowY : u < y) ↦ {
                  ∃ (x : Real). x ∈ subset ∧ u < x
                      by { witness y with done };
-                 noneAbove(given(∃ (x : Real). x ∈ subset ∧ u < x))
+                 noneAbove(∃ (x : Real). x ∈ subset ∧ u < x)
                };
         done by Real.LessOrEqual_of_not_LessThan
       };

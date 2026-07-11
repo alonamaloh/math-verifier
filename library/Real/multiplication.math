@@ -147,54 +147,33 @@ theorem Rational.sequence.product_is_cauchy
               (n : Natural) ↦ s(n) * t(n)) :=
   (ε : Rational)
            (εPositive : Rational.zero < ε) ↦ {
-    -- `obtain` cannot infer these existentials through the opaque Rational,
-    -- so each is stated top-down before destructuring.
     -- Step 1: bound |s| eventually by (succ K_s : R) starting from N_s_bound.
     ∃ (K : Natural). ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → abs(s(m)) ≤ ((K + 1) : Rational)
-        by Rational.sequence.cauchy_is_naturally_bounded as sNaturallyBounded;
-    choose K_s as sBoundedAtN_s from sNaturallyBounded;
-    choose N_s_bound from sBoundedAtN_s;
+        by Rational.sequence.cauchy_is_naturally_bounded;
+    choose K_s, N_s_bound such that
+            ∀ (m : Natural). N_s_bound ≤ m → abs(s(m)) ≤ ((K_s + 1) : Rational);
     -- Step 2: similar for t.
     ∃ (K : Natural). ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → abs(t(m)) ≤ ((K + 1) : Rational)
-        by Rational.sequence.cauchy_is_naturally_bounded as tNaturallyBounded;
-    choose K_t as tBoundedAtN_t from tNaturallyBounded;
-    choose N_t_bound from tBoundedAtN_t;
+        by Rational.sequence.cauchy_is_naturally_bounded;
+    choose K_t, N_t_bound such that
+            ∀ (m : Natural). N_t_bound ≤ m → abs(t(m)) ≤ ((K_t + 1) : Rational);
     -- Step 3: get δ_s and δ_t with (succ K_·) · δ ≤ ε/4. Both need ε/4 > 0.
     Rational.zero < Rational.halve(ε);
     Rational.zero < Rational.halve(Rational.halve(ε));
-    ∃ (δ : Rational).
-            Rational.zero < δ ∧ Rational.LessOrEqual(
-                    ((K_t + 1) : Rational) * δ,
-                    Rational.halve(Rational.halve(ε)))
-        by Rational.divide_by_succ_positive as δSExists;
-    choose δ_s from δSExists;
-    Rational.zero < δ_s;
-    Rational.LessOrEqual(
-              ((K_t + 1) : Rational) * δ_s,
-              Rational.halve(Rational.halve(ε)));
+    choose δ_s such that
+            Rational.zero < δ_s
+            ∧ ((K_t + 1) : Rational) * δ_s ≤ Rational.halve(Rational.halve(ε))
+        from Rational.divide_by_succ_positive;
     -- Step 4: get δ_t.
-    ∃ (δ : Rational).
-            Rational.zero < δ ∧ Rational.LessOrEqual(
-                    ((K_s + 1) : Rational) * δ,
-                    Rational.halve(Rational.halve(ε)))
-        by Rational.divide_by_succ_positive as δTExists;
-    choose δ_t from δTExists;
-    Rational.zero < δ_t;
-    Rational.LessOrEqual(
-              ((K_s + 1) : Rational) * δ_t,
-              Rational.halve(Rational.halve(ε)));
-    -- Step 5: apply sCauchy(δ_s) and tCauchy(δ_t). State the existentials
-    -- top-down: `choose` can't infer them through the opaque Rational.
-    ∃ (N : Natural).
-            ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < δ_s
-        as sCauchyBound;
-    choose N_s from sCauchyBound;
-    ∃ (N : Natural).
-            ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(t(m) - t(n)) < δ_t
-        as tCauchyBound;
-    choose N_t from tCauchyBound;
+    choose δ_t such that
+            Rational.zero < δ_t
+            ∧ ((K_s + 1) : Rational) * δ_t ≤ Rational.halve(Rational.halve(ε))
+        from Rational.divide_by_succ_positive;
+    -- Step 5: apply the Cauchy witnesses at δ_s and δ_t.
+    choose N_s from sIsCauchy(δ_s, (Rational.zero < δ_s));
+    choose N_t from tIsCauchy(δ_t, (Rational.zero < δ_t));
     -- Final N := max(N_s_bound, N_t_bound, N_s, N_t).
     witness max(max(N_s_bound, N_t_bound), max(N_s, N_t)) with
         (m : Natural) (m_ge : max(max(N_s_bound, N_t_bound), max(N_s, N_t)) ≤ m)
@@ -298,18 +277,14 @@ theorem Real.multiply_after_first_respects_at_rep_inner
                 < ε := {
     ∃ (K : Natural). ∃ (N : Natural).
             ∀ (m : Natural). N ≤ m → abs(s_x(m)) ≤ ((K + 1) : Rational)
-        by Rational.sequence.cauchy_is_naturally_bounded as xNaturallyBounded;
-    choose K as xBoundedAtN from xNaturallyBounded;
-    choose N_x_bound from xBoundedAtN;
+        by Rational.sequence.cauchy_is_naturally_bounded;
+    choose K, N_x_bound such that
+            ∀ (m : Natural). N_x_bound ≤ m → abs(s_x(m)) ≤ ((K + 1) : Rational);
     Rational.zero < Rational.halve(ε);
-    ∃ (δ : Rational).
-            Rational.zero < δ ∧ Rational.LessOrEqual(
-                    ((K + 1) : Rational) * δ, Rational.halve(ε))
-        by Rational.divide_by_succ_positive as δExists;
-    choose δ from δExists;
-    Rational.zero < δ as δ_pos;
-    Rational.LessOrEqual(((K + 1) : Rational) * δ, Rational.halve(ε));
-    choose N_y as yEquivAt from refinedYEquiv(δ, δ_pos);
+    choose δ such that
+            Rational.zero < δ ∧ ((K + 1) : Rational) * δ ≤ Rational.halve(ε)
+        from Rational.divide_by_succ_positive;
+    choose N_y as yEquivAt from refinedYEquiv(δ, (Rational.zero < δ));
     witness max(N_x_bound, N_y) with
         (m : Natural) (m_ge_max : max(N_x_bound, N_y) ≤ m) ↦ {
           N_x_bound ≤ m;
