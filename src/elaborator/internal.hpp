@@ -208,25 +208,59 @@ public:
         return result;
     }
 
+    // Extract a surface-citable name from a context-fact source string
+    // ("library lemma X" / "library X" / "local binder h"); empty when the
+    // source is anonymous machinery (fresh claim/choose/suppose binders,
+    // ∧-projection legs) that no `by` could spell.
+    static std::string citableNameFromFactSource(const std::string& source) {
+        std::string name;
+        if (source.rfind("library lemma ", 0) == 0) {
+            name = source.substr(14);
+        } else if (source.rfind("library ", 0) == 0) {
+            name = source.substr(8);
+        } else if (source.rfind("local binder ", 0) == 0) {
+            name = source.substr(13);
+        } else {
+            return "";
+        }
+        if (name.rfind("_claim_anon", 0) == 0
+            || name.rfind("_choice", 0) == 0
+            || name.rfind("_supposed_", 0) == 0
+            || name.find(" (") != std::string::npos) {
+            return "";
+        }
+        return name;
+    }
+
     // For the expensive-by-less-step warning: name what actually closed the
-    // step so the suggested `by` is concrete. Prefers a citable lemma /
-    // hypothesis from a contextFactMatch win; falls back to the strategy
-    // name; empty when nothing nameable (e.g. ring/diff with no single cite).
+    // step so the suggested `by` is concrete — the citing fact for a
+    // contextFactMatch win, the rewriting equation for a
+    // contextEqualityBridge win, the chained facts for a transitivityBridge
+    // win. Falls back to the strategy name; empty when nothing nameable
+    // (e.g. ring/diff with no single cite).
     std::string expensiveStepWinnerHint() const {
         if (lastWinningTactic_ == "contextFactMatch"
             && !lastWinningDetail_.empty()) {
-            if (lastWinningDetail_.rfind("library ", 0) == 0) {
-                return " (try `by " + lastWinningDetail_.substr(8) + "`)";
-            }
-            if (lastWinningDetail_.rfind("local binder ", 0) == 0) {
-                std::string name = lastWinningDetail_.substr(13);
-                if (name.rfind("_claim_anon", 0) != 0
-                    && name.rfind("_choice", 0) != 0
-                    && name.find(" (") == std::string::npos) {
-                    return " (try `by " + name + "`)";
-                }
-            }
+            std::string name =
+                citableNameFromFactSource(lastWinningDetail_);
+            if (!name.empty()) return " (try `by " + name + "`)";
             return "";
+        }
+        if (lastWinningTactic_ == "contextEqualityBridge"
+            && !lastWinningDetail_.empty()) {
+            std::string name =
+                citableNameFromFactSource(lastWinningDetail_);
+            if (!name.empty()) {
+                return " (rewrote with `" + name
+                    + "` — try `by substituting " + name + "`)";
+            }
+            return " (via the contextEqualityBridge strategy)";
+        }
+        if (lastWinningTactic_ == "transitivityBridge"
+            && !lastWinningDetail_.empty()) {
+            // Detail is pre-joined citable names ("h1`, `h2").
+            return " (chained `" + lastWinningDetail_
+                + "` — try citing them as relation-chain steps)";
         }
         if (!lastWinningTactic_.empty()) {
             return " (via the " + lastWinningTactic_ + " strategy)";

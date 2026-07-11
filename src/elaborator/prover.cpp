@@ -1423,6 +1423,7 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
                 call = makeApplication(call, transportRhs);
                 call = makeApplication(call, eqForTransport);
                 call = makeApplication(call, proofRewritten);
+                lastWinningDetail_ = eq.source;
                 return call;
             }
           }
@@ -1794,6 +1795,7 @@ ExpressionPointer Elaborator::tryTransitivityBridge(
             ExpressionPointer source;  // opened
             ExpressionPointer target;  // opened
             ExpressionPointer proof;   // closed at depth N
+            std::string factSource;    // for the expensive-step winner hint
         };
         std::vector<HypEdge> edges;
         for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
@@ -1813,7 +1815,8 @@ ExpressionPointer Elaborator::tryTransitivityBridge(
                 &hInner->function->node);
             if (!hHead || hHead->name != head->name) continue;
             edges.push_back(
-                {hInner->argument, hOuter->argument, fact.proofTerm});
+                {hInner->argument, hOuter->argument, fact.proofTerm,
+                 fact.source});
         }
         if (edges.empty()) return nullptr;
 
@@ -1881,8 +1884,22 @@ ExpressionPointer Elaborator::tryTransitivityBridge(
         }
         if (pathEdges.empty()) return nullptr;
 
+        // The chained facts, for the expensive-step winner hint —
+        // pre-joined citable names, empty as soon as any leg is anonymous.
+        // Assigned only at the success returns so a failed fold below
+        // can't leave a stale detail behind.
+        std::string chainedFactNames;
+        for (int e : pathEdges) {
+            std::string name =
+                citableNameFromFactSource(edges[e].factSource);
+            if (name.empty()) { chainedFactNames.clear(); break; }
+            if (!chainedFactNames.empty()) chainedFactNames += "`, `";
+            chainedFactNames += name;
+        }
+
         // Single-edge path: the fact IS the proof.
         if (pathEdges.size() == 1) {
+            lastWinningDetail_ = chainedFactNames;
             return edges[pathEdges[0]].proof;
         }
 
@@ -1901,6 +1918,7 @@ ExpressionPointer Elaborator::tryTransitivityBridge(
             accProof = combined;
             accTarget = nextEdge.target;
         }
+        lastWinningDetail_ = chainedFactNames;
         return accProof;
     }
 
