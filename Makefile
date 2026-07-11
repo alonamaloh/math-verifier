@@ -335,9 +335,13 @@ leak-ratchet:
 
 # `successor`-outside-Natural ratchet (independent of the CIC-leak total).
 # `successor` is the Natural constructor; outside the Natural/ definitional
-# modules it is leakage — speak `n + 1` / numerals. Ratcheted down as the
-# Stage-3 migration (PLAN_NATURAL_SEALING) converts files.
-SUCCESSOR_BUDGET ?= 15
+# modules it is leakage — speak `n + 1` / numerals. Stage 3 of
+# PLAN_NATURAL_SEALING drove this to its floor: the 7 remaining tokens are
+# ErrorTest fixtures that deliberately exercise constructor patterns
+# (pattern_shadows_constructor, cases_with_eq_retired,
+# choose_from_ambiguous_premise, refining_retired); their fate is decided
+# at the Stage-4 flip.
+SUCCESSOR_BUDGET ?= 7
 
 successor-ratchet:
 	@scripts/cic_leak_report --successor-max $(SUCCESSOR_BUDGET)

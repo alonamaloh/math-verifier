@@ -63,7 +63,12 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
     case Polynomial.Coefficients.cons(c, rest): {
         c = Integer.zero by allZero(0) as cIsZero;
         coords(rest) = Product.make(Integer.zero, Integer.zero)
-            by IH((i : Natural) ↦ allZero(successor(i))) as restCoordinates;
+            by IH((i : Natural) ↦ {
+                     Polynomial.nth(Integer, Integer.zero,
+                             Polynomial.Coefficients.cons(Integer, c, rest), 1 + i) = Integer.zero
+                         by allZero;
+                     done by substituting Polynomial.nth_cons_one_plus
+                   }) as restCoordinates;
         -- coords(c :: rest) = (c − Product.second(coords(rest)), Product.first(coords(rest))) = (0, 0).
         c - Product.second(coords(rest))
            = c - Product.second(Product.make(Integer.zero, Integer.zero))
@@ -115,7 +120,16 @@ theorem GaussianInteger.coords_extensional
           | Polynomial.Coefficients.cons(d, restB) => {
               c = d by extensionallyEqual(0) as headsEqual;
               coords(rest) = coords(restB)
-                  by IH(restB, (i : Natural) ↦ extensionallyEqual(successor(i)))
+                  by IH(restB, (i : Natural) ↦
+                           Polynomial.nth(Integer, Integer.zero, rest, i)
+                              = Polynomial.nth(Integer, Integer.zero,
+                                    Polynomial.Coefficients.cons(Integer, c, rest), 1 + i)
+                                    by Polynomial.nth_cons_one_plus
+                              = Polynomial.nth(Integer, Integer.zero,
+                                    Polynomial.Coefficients.cons(Integer, d, restB), 1 + i)
+                                    by extensionallyEqual(1 + i)
+                              = Polynomial.nth(Integer, Integer.zero, restB, i)
+                                    by Polynomial.nth_cons_one_plus)
                   as tailCoordinates;
               -- coords(c :: rest) = (c − Product.second(coords(rest)), Product.first(coords(rest))), likewise for d :: restB.
               c - Product.second(coords(rest))

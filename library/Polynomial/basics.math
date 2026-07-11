@@ -22,6 +22,7 @@ import Logic.quotient
 import Equality.basics
 import Natural.basics
 import Natural.peano
+import Natural.arithmetic
 
 -- Finite coefficient list, low degree first.
 inductive Polynomial.Coefficients (R : Type(0)) : Type(0) where
@@ -37,10 +38,19 @@ definition Polynomial.nth (R : Type(0)) (zeroCoefficient : R)
   | Polynomial.Coefficients.nil,           index => zeroCoefficient
   | Polynomial.Coefficients.cons(c, rest), index =>
       cases index {
-        | zero                   => c
-        | successor(predecessor) =>
+        | 0     => c
+        | 1 + predecessor =>
             Polynomial.nth(R, zeroCoefficient, rest, predecessor)
       }
+
+-- Reading past the head: the (1 + j)-th entry of cons(c, rest) is the
+-- j-th entry of rest (`Natural.add` is opaque, so `1 + j` is not
+-- definitionally the constructor; bridge via `one_add`).
+theorem Polynomial.nth_cons_one_plus (R : Type(0)) (zeroCoefficient : R)
+        (c : R) (rest : Polynomial.Coefficients(R)) (j : Natural)
+        : Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.cons(R, c, rest), 1 + j)
+          = Polynomial.nth(R, zeroCoefficient, rest, j) :=
+  done by substituting Natural.one_add
 
 -- Two coefficient lists represent the same polynomial when they agree
 -- at every index (trailing zeros become invisible).

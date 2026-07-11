@@ -106,7 +106,7 @@ definition Natural.has_quotient_remainder
         (divisor dividend : Natural) : Proposition :=
     ∃ (quotient : Natural). ∃ (remainder : Natural).
         dividend = quotient * divisor + remainder
-        ∧ successor(remainder) ≤ divisor
+        ∧ remainder < divisor
 
 -- ----------------------------------------------------------------------
 -- Recurse-case kernel: from `dividend = divisor + smallerDividend` and
@@ -146,14 +146,14 @@ theorem Natural.divide_with_remainder_recurse_case
     choose recursedQuotient such that
         ∃ (remainder : Natural).
             smallerDividend = recursedQuotient * divisor + remainder
-            ∧ successor(remainder) ≤ divisor
+            ∧ remainder < divisor
         from smallerWitness;
     choose recursedRemainder such that
         smallerDividend = recursedQuotient * divisor + recursedRemainder
-        ∧ successor(recursedRemainder) ≤ divisor;
+        ∧ recursedRemainder < divisor;
     -- Bump the quotient by one to absorb the extra `divisor`.
     dividend = successor(recursedQuotient) * divisor + recursedRemainder
-        ∧ successor(recursedRemainder) ≤ divisor
+        ∧ recursedRemainder < divisor
         as decomposition;
     witness successor(recursedQuotient) with witness recursedRemainder with decomposition
 }
@@ -164,7 +164,7 @@ theorem Natural.divide_with_remainder_recurse_case
 -- reduces to zero, and add on zero first arg is the identity).
 theorem Natural.divide_with_remainder_base_case
         (divisor dividend : Natural)
-        (dividendBelowDivisor : successor(dividend) ≤ divisor)
+        (dividendBelowDivisor : dividend < divisor)
         : Natural.has_quotient_remainder(divisor, dividend) :=
   witness 0 with witness dividend with done
 
@@ -181,8 +181,10 @@ theorem Natural.divide_with_remainder_step
         : Natural.has_quotient_remainder(divisor, dividend) := {
   (successor(dividend) ≤ divisor) ∨ (divisor ≤ dividend);
   done by cases {
-    case successor(dividend) ≤ divisor as dividendBelowDivisor:
+    case successor(dividend) ≤ divisor as dividendBelowDivisor: {
+        dividend < divisor;
         done
+      }
     case divisor ≤ dividend as divisorBelowOrEqualDividend: {
         choose smallerDividend such that dividend = divisor + smallerDividend
             from Natural.subtraction_witness;
