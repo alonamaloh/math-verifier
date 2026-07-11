@@ -30,6 +30,13 @@ real limitation:
   `linear_combination` + `halfSum` scaffolding it used to need. Prefer
   writing a mean as `(x + y) / 2`, not `(x + y) * (Rational.one_half :
   Real)`, so `field` (and the reader) see the division directly.
+  Better still: the by-less equality battery tries `field` itself when
+  an endpoint mentions the carrier's `/` or reciprocal and the nonzero
+  facts are ground or in scope — so routine division arithmetic
+  (`ε/4 + ε/4 = ε/2`, `(1/a)·(1/b) = 1/(a·b)`) closes as a bare
+  relation step or claim, no `by field` needed. Write the hint only
+  when the bare step genuinely fails (pinned by
+  `Test/field_battery_test.math`).
 - **`let`-bound values are atoms to `ring`/`field`/`linear_combination`.**
   These normalisers do NOT ζ-unfold a local `let`, so an identity that is
   only true *after* unfolding — `mean * mean - x*y = halfDiff * halfDiff`

@@ -6010,6 +6010,10 @@ private:
     // speculative bare re-elaboration runs.
     bool reportRedundantCasts_ = false;
     bool inRedundantCastProbe_ = false;
+    // True while the equality battery's speculative `field` seat runs
+    // (tryAcRearrangement): its nonzero side-condition discharge runs the
+    // claim prover, which must not speculate a nested `field` of its own.
+    bool inSpeculativeFieldAttempt_ = false;
     // > 0 while elaborating a calc chain. The cast-redundancy check is
     // suppressed inside a calc: a step endpoint's cast can be redundant for the
     // step's *relation proposition* (which the join lifts) yet load-bearing for

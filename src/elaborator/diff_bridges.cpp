@@ -776,12 +776,69 @@ ExpressionPointer Elaborator::tryAcRearrangement(
         } catch (const TypeError&) {
         }
         try {
-            return elaborateRing(localBinders, expectedType, line, 0);
+            ExpressionPointer ringProof =
+                elaborateRing(localBinders, expectedType, line, 0);
+            if (ringProof) return ringProof;
         } catch (const ElaborateError&) {
-            return nullptr;
         } catch (const TypeError&) {
-            return nullptr;
         }
+        // `field` seat: an `=` goal that mentions the carrier's division
+        // or reciprocal is out of `ring`'s reach — the reciprocal is an
+        // opaque atom to the polynomial normaliser, so `ε/4 + ε/4 = ε/2`
+        // never closes there. `field` clears the denominators and
+        // discharges the nonzero side conditions from context/structure
+        // (the structural nonzero fallback). Gated on a division
+        // operation actually appearing in an endpoint (`field` strictly
+        // contains `ring` in cost, so a division-free goal gains
+        // nothing), and reentrancy-guarded: the side-condition discharge
+        // runs the claim prover, which must not speculate a nested
+        // `field` of its own.
+        std::string carrierName = headConstantName(carrierType);
+        auto mentionsFieldDivision = [&carrierName](
+                ExpressionPointer term) {
+            const std::string divideName = carrierName + ".divide";
+            const std::string reciprocalName = carrierName + ".reciprocal";
+            const std::string reciprocalFunctionName =
+                carrierName + ".reciprocal_function";
+            std::function<bool(ExpressionPointer)> walk =
+                [&](ExpressionPointer node) -> bool {
+                if (!node) return false;
+                if (auto* constant = std::get_if<Constant>(&node->node)) {
+                    return constant->name == divideName
+                        || constant->name == reciprocalName
+                        || constant->name == reciprocalFunctionName;
+                }
+                if (auto* application =
+                        std::get_if<Application>(&node->node)) {
+                    return walk(application->function)
+                        || walk(application->argument);
+                }
+                if (auto* lambda = std::get_if<Lambda>(&node->node)) {
+                    return walk(lambda->domain) || walk(lambda->body);
+                }
+                return false;
+            };
+            return walk(term);
+        };
+        if (!inSpeculativeFieldAttempt_
+            && (mentionsFieldDivision(previousKernel)
+                || mentionsFieldDivision(nextKernel))) {
+            inSpeculativeFieldAttempt_ = true;
+            struct FieldAttemptGuard {
+                bool& flag;
+                ~FieldAttemptGuard() { flag = false; }
+            } fieldAttemptGuard{inSpeculativeFieldAttempt_};
+            autoProveSpend(4);
+            try {
+                SurfaceField bareField;
+                ExpressionPointer fieldProof = elaborateField(
+                    bareField, localBinders, expectedType, line, 0);
+                if (fieldProof) return fieldProof;
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
+        }
+        return nullptr;
     }
 
 std::string Elaborator::coercionTargetTypeName(
