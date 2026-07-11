@@ -150,7 +150,7 @@ theorem Polynomial.Coefficients.nth_cons_zero_nil (r : Ring) (k : ℕ)
           = Ring.zero(r) :=
   cases k {
     | zero => reflexivity(Ring.carrier(r), Ring.zero(r))
-    | successor(j) => reflexivity(Ring.carrier(r), Ring.zero(r))
+    | 1 + j => reflexivity(Ring.carrier(r), Ring.zero(r))
   }
 
 automatic theorem Polynomial.Coefficients.multiply_one_left (r : Ring)
@@ -216,20 +216,28 @@ theorem Polynomial.Coefficients.multiply_one_right (r : Ring)
                      = ((a * Ring.one(r)) + Ring.zero(r))
                      = (a + Ring.zero(r))
                      = a
-              | successor(j) =>
+              | 1 + j => {
                   Polynomial.coefficient(Polynomial.Coefficients.multiply(r,
                                Polynomial.Coefficients.cons(Ring.carrier(r), a, rest),
                                Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                   Polynomial.Coefficients.nil(Ring.carrier(r)))), successor(j))
-                     = (Polynomial.coefficient(Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), successor(j)) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), j))
-                     = ((a * Ring.zero(r)) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), j))
+                                   Polynomial.Coefficients.nil(Ring.carrier(r)))), 1 + j)
+                     = (Polynomial.coefficient(Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), 1 + j) + Polynomial.coefficient(Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))))), 1 + j))
+                           by Polynomial.nth_add
+                     = ((a * Polynomial.coefficient(Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))), 1 + j)) + Polynomial.coefficient(Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))))), 1 + j))
                            by Polynomial.nth_scale
+                     = ((a * Polynomial.coefficient(Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))), 1 + j)) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), j))
+                           by Polynomial.nth_shift_one_plus
+                     = ((a * Polynomial.coefficient(Polynomial.Coefficients.nil(Ring.carrier(r)), j)) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), j))
+                           by Polynomial.nth_cons_one_plus
+                     = ((a * Ring.zero(r)) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), j))
                      = (Ring.zero(r) + Polynomial.coefficient(Polynomial.Coefficients.multiply(r, rest, Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r)))), j))
                      = Polynomial.coefficient(Polynomial.Coefficients.multiply(r, rest,
                                Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
                                    Polynomial.Coefficients.nil(Ring.carrier(r)))), j)
                      = Polynomial.coefficient(rest, j)
-                           by IH(j)
+                           by IH(j);
+                  done by substituting Natural.one_add
+                }
             }
   }
 
@@ -258,7 +266,10 @@ theorem Polynomial.Coefficients.shift_respects (r : Ring)
   (k : ℕ) ↦
       cases k {
         | zero => reflexivity(Ring.carrier(r), Ring.zero(r))
-        | successor(j) => equal(j)
+        | 1 + j => {
+            Polynomial.coefficient(x, j) = Polynomial.coefficient(y, j) by equal(j);
+            done by substituting Natural.one_add
+          }
       }
 
 -- (a·q)·s = a·(q·s):  multiply(scale(a, q), s) ~ scale(a, multiply(q, s)).
@@ -314,25 +325,39 @@ theorem Polynomial.Coefficients.shift_multiply (r : Ring)
                = (Ring.zero(r) * Polynomial.coefficient(s, Natural.monus(0, 0)))
                = Ring.zero(r)
                = Polynomial.coefficient(Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, y, s)), 0)
-        | successor(predecessor) =>
-              Polynomial.coefficient(Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.shift(r, y), s), successor(predecessor))
+        | 1 + predecessor => {
+              Polynomial.coefficient(Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.shift(r, y), s), 1 + predecessor)
                  = Ring.Sum(r,
                        (i : ℕ) ↦
-                           (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), i) * Polynomial.coefficient(s, Natural.monus(successor(predecessor), i))), successor(predecessor))
+                           (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), i) * Polynomial.coefficient(s, Natural.monus(1 + predecessor, i))), 1 + predecessor)
                      by Polynomial.nth_multiply
-                 = ((Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 0) * Polynomial.coefficient(s, successor(predecessor))) + Ring.Sum(r, (j : ℕ) ↦ (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), successor(j)) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
+                 = ((Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 0) * Polynomial.coefficient(s, 1 + predecessor)) + Ring.Sum(r, (j : ℕ) ↦ (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 1 + j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
                      by Ring.Sum.convolution_shift(r,
                             (i : ℕ) ↦ Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), i),
                             (m : ℕ) ↦ Polynomial.coefficient(s, m),
                             predecessor)
-                 = ((Ring.zero(r) * Polynomial.coefficient(s, successor(predecessor))) + Ring.Sum(r, (j : ℕ) ↦ (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
-                 = (Ring.zero(r) + Ring.Sum(r, (j : ℕ) ↦ (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
+                 = ((Ring.zero(r) * Polynomial.coefficient(s, 1 + predecessor)) + Ring.Sum(r, (j : ℕ) ↦ (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 1 + j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
+                 = (Ring.zero(r) + Ring.Sum(r, (j : ℕ) ↦ (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 1 + j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor))
+                 = Ring.Sum(r,
+                       (j : ℕ) ↦
+                           (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 1 + j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor)
                  = Ring.Sum(r,
                        (j : ℕ) ↦
                            (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))), predecessor)
+                     by Ring.Sum.extensional(r,
+                            (j : ℕ) ↦ (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 1 + j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))),
+                            (j : ℕ) ↦ (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j))),
+                            (j : ℕ) ↦
+                                { (Polynomial.coefficient(Polynomial.Coefficients.shift(r, y), 1 + j) * Polynomial.coefficient(s, Natural.monus(predecessor, j)))
+                                      = (Polynomial.coefficient(y, j) * Polynomial.coefficient(s, Natural.monus(predecessor, j)))
+                                      by substituting Polynomial.nth_shift_one_plus },
+                            predecessor)
                  = Polynomial.coefficient(Polynomial.Coefficients.multiply(r, y, s), predecessor)
                      by Polynomial.nth_multiply
-                 = Polynomial.coefficient(Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, y, s)), successor(predecessor))
+                 = Polynomial.coefficient(Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, y, s)), 1 + predecessor)
+                     by Polynomial.nth_shift_one_plus;
+              done by substituting Natural.one_add
+          }
       }
 
 -- ----------------------------------------------------------------------

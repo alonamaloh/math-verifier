@@ -337,7 +337,7 @@ leak-ratchet:
 # `successor` is the Natural constructor; outside the Natural/ definitional
 # modules it is leakage — speak `n + 1` / numerals. Ratcheted down as the
 # Stage-3 migration (PLAN_NATURAL_SEALING) converts files.
-SUCCESSOR_BUDGET ?= 592
+SUCCESSOR_BUDGET ?= 15
 
 successor-ratchet:
 	@scripts/cic_leak_report --successor-max $(SUCCESSOR_BUDGET)

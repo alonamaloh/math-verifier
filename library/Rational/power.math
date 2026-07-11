@@ -52,8 +52,8 @@ import Rational.archimedean
 -- ----------------------------------------------------------------------
 -- cⁿ, by recursion on the exponent.
 definition Rational.power (base : Rational) : Natural → Rational
-  | zero => Rational.one
-  | successor(n) => base * Rational.power(base, n)
+  | 0 => Rational.one
+  | 1 + n => base * Rational.power(base, n)
 
 operator (^) on (Rational, Natural) := Rational.power
 
@@ -68,24 +68,24 @@ theorem Rational.power_nonneg
         (base : Rational) (baseNonneg : Rational.zero ≤ base) (n : Natural)
         : Rational.zero ≤ base ^ n :=
   by induction on n with IH {
-    case zero: {
+    case base: {
         Rational.zero < Rational.one;
         done
       }
-    case successor(predecessor): {
+    case step(predecessor): {
         Rational.IsNonneg(base);
         Rational.IsNonneg(base ^ predecessor);
         Rational.IsNonneg(base * base ^ predecessor);
         Rational.zero ≤ base * base ^ predecessor;
-        done
+        done by substituting Rational.power_add_one
       }
   }
 
 -- ----------------------------------------------------------------------
 -- 1 + n·step, by recursion — the Bernoulli linear factor.
 definition Rational.linearGrowth (step : Rational) : Natural → Rational
-  | zero => Rational.one
-  | successor(n) => Rational.linearGrowth(step, n) + step
+  | 0 => Rational.one
+  | 1 + n => Rational.linearGrowth(step, n) + step
 
 -- The recursion characterised in `1 + n` form (successor-free stepping).
 theorem Rational.linearGrowth_add_one (step : Rational) (n : Natural)
@@ -97,19 +97,21 @@ theorem Rational.linearGrowth_at_least_one
         (step : Rational) (stepNonneg : Rational.zero ≤ step) (n : Natural)
         : Rational.one ≤ Rational.linearGrowth(step, n) :=
   by induction on n with IH {
-    case zero: {
+    case base: {
         Rational.one ≤ Rational.one;
         done
       }
-    case successor(predecessor):
+    case step(predecessor):
         Rational.one
            ≤ Rational.linearGrowth(step, predecessor)      by IH
            = Rational.linearGrowth(step, predecessor) + Rational.zero
            ≤ Rational.linearGrowth(step, predecessor) + step
                  by Rational.add_general_LessOrEqual_left
+           = Rational.linearGrowth(step, 1 + predecessor)
+                 by Rational.linearGrowth_add_one
   }
 
--- The closed form, recovered through the successor cast.
+-- The closed form.
 theorem Rational.linearGrowth_closed_form
         (step : Rational) (n : Natural)
         : Rational.linearGrowth(step, n)
@@ -142,11 +144,11 @@ theorem Rational.power_bernoulli
         : c ^ n * Rational.linearGrowth(h, n)
           ≤ Rational.one :=
   by induction on n with IH {
-    case zero:
+    case base:
         c ^ 0 * Rational.linearGrowth(h, 0)
            = Rational.one
            ≤ Rational.one
-    case successor(predecessor): {
+    case step(predecessor): {
         -- c ≤ 1 ≤ L, so L − c ≥ 0.
         c
            = c + Rational.zero
@@ -172,10 +174,14 @@ theorem Rational.power_bernoulli
                 ≤ Rational.linearGrowth(h, predecessor)
             by substituting keyEquation;
         Rational.zero ≤ c ^ predecessor;
-        c ^ successor(predecessor)
-                 * Rational.linearGrowth(h, successor(predecessor))
+        c ^ (1 + predecessor)
+                 * Rational.linearGrowth(h, 1 + predecessor)
+           = (c * c ^ predecessor)
+                 * Rational.linearGrowth(h, 1 + predecessor)
+                 by Rational.power_add_one
            = (c * c ^ predecessor)
                  * (Rational.linearGrowth(h, predecessor) + h)
+                 by Rational.linearGrowth_add_one
            = (c * (Rational.linearGrowth(h, predecessor) + h))
                  * c ^ predecessor
                  by ring
@@ -206,36 +212,37 @@ theorem Rational.power_decay_witness
   Rational.zero < Rational.one;
   Rational.zero ≤ Rational.one;
   Rational.IsNonneg(Rational.one);
-  choose K such that Rational.one ≤ (successor(K) : Rational) * (ε * (Rational.one - c))
+  choose K such that Rational.one ≤ (1 + K : Rational) * (ε * (Rational.one - c))
       from Rational.archimedean_for_positives;
   -- … so at N = K+1 the scaled linear factor exceeds 1 strictly.
-  Rational.linearGrowth(Rational.one - c, successor(K))
-          = Rational.one + successor(K) * (Rational.one - c)
+  Rational.linearGrowth(Rational.one - c, 1 + K)
+          = Rational.one + (1 + K : Rational) * (Rational.one - c)
+      by Rational.linearGrowth_closed_form
       as lgClosed;
   Rational.one
      = Rational.one + Rational.zero
      < Rational.one + ε
            by Rational.add_left_preserves_LessThan
-     ≤ (successor(K) : Rational) * (ε * (Rational.one - c)) + ε
+     ≤ (1 + K : Rational) * (ε * (Rational.one - c)) + ε
            by Rational.add_preserves_LessOrEqual
-     = ε * Rational.linearGrowth(Rational.one - c, successor(K))
+     = ε * Rational.linearGrowth(Rational.one - c, 1 + K)
            by linear_combination(ε - ε * lgClosed);
   -- Bernoulli at N, then cancel the (positive) linear factor.
-  c ^ successor(K)
-              * Rational.linearGrowth(Rational.one - c, successor(K))
+  c ^ (1 + K)
+              * Rational.linearGrowth(Rational.one - c, 1 + K)
           ≤ Rational.one
       by Rational.power_bernoulli;
-  Rational.one ≤ Rational.linearGrowth(Rational.one - c, successor(K));
-  Rational.zero < Rational.linearGrowth(Rational.one - c, successor(K))
+  Rational.one ≤ Rational.linearGrowth(Rational.one - c, 1 + K);
+  Rational.zero < Rational.linearGrowth(Rational.one - c, 1 + K)
       by Rational.LessThan.transitive_right;
-  c ^ successor(K)
-              * Rational.linearGrowth(Rational.one - c, successor(K))
-          < ε * Rational.linearGrowth(Rational.one - c, successor(K))
+  c ^ (1 + K)
+              * Rational.linearGrowth(Rational.one - c, 1 + K)
+          < ε * Rational.linearGrowth(Rational.one - c, 1 + K)
       by Rational.LessThan.transitive_left;
-  c ^ successor(K) < ε
+  c ^ (1 + K) < ε
       by Rational.LessThan.multiply_cancel_right_positive
       as powerBelow;
-  witness successor(K) with powerBelow
+  witness (1 + K) with powerBelow
 }
 
 -- ----------------------------------------------------------------------
@@ -246,14 +253,17 @@ theorem Rational.power_le_subsequent
         (N k : Natural)
         : c ^ (k + N) ≤ c ^ N :=
   by induction on k with IH {
-    case zero: {
+    case base: {
         c ^ N ≤ c ^ N;
         done
       }
-    case successor(predecessor): {
+    case step(predecessor): {
         Rational.zero ≤ c ^ (predecessor + N);
-        c ^ (successor(predecessor) + N)
+        c ^ ((1 + predecessor) + N)
+           = c ^ (1 + (predecessor + N))
+                 by Natural.add_associative
            = c * c ^ (predecessor + N)
+                 by Rational.power_add_one
            ≤ Rational.one * c ^ (predecessor + N)
                  by Rational.LessOrEqual.multiply_by_nonneg_right
            = c ^ (predecessor + N)

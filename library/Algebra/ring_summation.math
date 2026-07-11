@@ -39,16 +39,6 @@ theorem Ring.Sum.add_one (r : Ring) (f : Natural → Ring.carrier(r))
      = (Ring.Sum(r, f, n) + f(0 + (1 + n)))   by Algebra.Fold_add_one
      = (Ring.Sum(r, f, n) + f(1 + n))         by (0 + (1 + n) = 1 + n)
 
--- The same peel in constructor form, for the polynomial layer's
--- `case successor(k)` inductions.
-theorem Ring.Sum.successor (r : Ring) (f : Natural → Ring.carrier(r))
-        (k : Natural)
-        : Ring.Sum(r, f, successor(k)) = (Ring.Sum(r, f, k) + f(successor(k))) :=
-  Ring.Sum(r, f, successor(k))
-     = Ring.Sum(r, f, 1 + k)
-     = (Ring.Sum(r, f, k) + f(1 + k))
-     = (Ring.Sum(r, f, k) + f(successor(k)))    by substituting Natural.one_add
-
 -- The sum of the constant-zero function is zero.
 theorem Ring.Sum.zero (r : Ring) (n : Natural)
         : Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), n)
@@ -91,23 +81,7 @@ theorem Ring.Sum.shift_one_plus (r : Ring) (f : Natural → Ring.carrier(r))
      = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(1 + j), n))
            by substituting Algebra.Fold_rebase
 
--- The constructor form of the shift, for the polynomial layer's
--- `case successor(k)` inductions.
-theorem Ring.Sum.shift (r : Ring) (f : Natural → Ring.carrier(r))
-        (n : Natural)
-        : Ring.Sum(r, f, successor(n))
-          = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n)) := {
-  Ring.Sum(r, (j : Natural) ↦ f(1 + j), n)
-     = Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n)
-         by (j : Natural) ↦ { done by substituting Natural.one_add }
-     as reindex;
-  Ring.Sum(r, f, successor(n))
-     = Ring.Sum(r, f, 1 + n)                                       by substituting Natural.one_add
-     = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(1 + j), n))           by Ring.Sum.shift_one_plus
-     = (f(0) + Ring.Sum(r, (j : Natural) ↦ f(successor(j)), n))    by substituting reindex
-}
-
--- Σ (f+g) = Σ f + Σ g. The successor step rearranges with the
+-- Σ (f+g) = Σ f + Σ g. The induction step rearranges with the
 -- four-term swap on the bundle.
 theorem Ring.Sum.add (r : Ring) (f g : Natural → Ring.carrier(r))
         (n : Natural)
@@ -183,37 +157,35 @@ theorem Ring.Sum.convolution_zero (r : Ring)
 theorem Ring.Sum.convolution_shift (r : Ring)
         (A B : Natural → Ring.carrier(r)) (k : Natural)
         : Ring.Sum(r,
-              (i : Natural) ↦ (A(i) * B(Natural.monus(successor(k), i))), successor(k))
-          = ((A(0) * B(successor(k)))
+              (i : Natural) ↦ (A(i) * B(Natural.monus(1 + k, i))), 1 + k)
+          = ((A(0) * B(1 + k))
              + Ring.Sum(r,
-                   (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))), k)) := {
-    -- The tail reindexes by monus_succ_succ, pointwise under the Σ.
+                   (j : Natural) ↦ (A(1 + j) * B(Natural.monus(k, j))), k)) := {
     Ring.Sum(r,
-              (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))), k)
+              (j : Natural) ↦ (A(1 + j) * B(Natural.monus(1 + k, 1 + j))), k)
           = Ring.Sum(r,
-              (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))), k)
+              (j : Natural) ↦ (A(1 + j) * B(Natural.monus(k, j))), k)
       by Ring.Sum.extensional(r,
-             (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))),
-             (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))),
+             (j : Natural) ↦ (A(1 + j) * B(Natural.monus(1 + k, 1 + j))),
+             (j : Natural) ↦ (A(1 + j) * B(Natural.monus(k, j))),
              (j : Natural) ↦
-                 { (A(successor(j)) * B(Natural.monus(successor(k), successor(j))))
-                       = (A(successor(j)) * B(Natural.monus(k, j)))
-                       by substituting Natural.monus_succ_succ },
+                 { (A(1 + j) * B(Natural.monus(1 + k, 1 + j)))
+                       = (A(1 + j) * B(Natural.monus(k, j)))
+                       by substituting Natural.monus_one_plus_one_plus },
              k) as tailReindex;
-    -- Sum.shift exposes the i = 0 head; monus_succ_zero clears its index.
     Ring.Sum(r,
-             (i : Natural) ↦ (A(i) * B(Natural.monus(successor(k), i))), successor(k))
-       = ((A(0) * B(Natural.monus(successor(k), 0)))
+             (i : Natural) ↦ (A(i) * B(Natural.monus(1 + k, i))), 1 + k)
+       = ((A(0) * B(Natural.monus(1 + k, 0)))
           + Ring.Sum(r,
-                (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))), k))
-           by Ring.Sum.shift(r,
-                  (i : Natural) ↦ (A(i) * B(Natural.monus(successor(k), i))), k)
-       = ((A(0) * B(successor(k)))
+                (j : Natural) ↦ (A(1 + j) * B(Natural.monus(1 + k, 1 + j))), k))
+           by Ring.Sum.shift_one_plus(r,
+                  (i : Natural) ↦ (A(i) * B(Natural.monus(1 + k, i))), k)
+       = ((A(0) * B(1 + k))
           + Ring.Sum(r,
-                (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(successor(k), successor(j)))), k))
-           by substituting Natural.monus_succ_zero
-       = ((A(0) * B(successor(k)))
+                (j : Natural) ↦ (A(1 + j) * B(Natural.monus(1 + k, 1 + j))), k))
+           by substituting Natural.monus_one_plus_zero
+       = ((A(0) * B(1 + k))
           + Ring.Sum(r,
-                (j : Natural) ↦ (A(successor(j)) * B(Natural.monus(k, j))), k))
+                (j : Natural) ↦ (A(1 + j) * B(Natural.monus(k, j))), k))
            by substituting tailReindex
   }

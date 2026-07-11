@@ -170,40 +170,32 @@ theorem Integer.to_rational.LessThan_reflects (a b : Integer)
   };
   choose gap such that b = a + (gap : Integer) from weakPart;
   cases gap {
-    | zero => {
+    | 0 => {
         b = a;
         a = b;
         False;
         done
       }
-    | successor(gapPredecessor) =>
+    | 1 + gapPredecessor =>
         witness gapPredecessor with
             b
-               = a + (successor(gapPredecessor) : Integer)
+               = a + (1 + gapPredecessor : Integer)
                = a + ((gapPredecessor + 1 : Natural) : Integer)
                = a + ((gapPredecessor : Integer) + Integer.one)
                = (a + Integer.one) + (gapPredecessor : Integer)
   }
 }
 
--- (successor(n) : Rational) = (1 : Rational) + (n : Rational). The cast
--- of (succ(n) : Integer) reduces definitionally to Integer.one + (n :
--- Integer); applying Integer.to_rational.add_preserves bridges to the
--- Rational sum.
-theorem Rational.successor_cast (n : Natural)
-        : (successor(n) : Rational) = (1 : Rational) + (n : Rational) :=
-  -- (successor n : Integer) no longer folds to Integer.one + (n : Integer)
-  -- on its own (Natural.add opaque); bridge it, then split the cast.
-  (successor(n) : Rational)
-     = ((n + 1 : Natural) : Rational)
-     = (((n : Integer) + Integer.one) : Rational)
-     = ((Integer.one + (n : Integer)) : Rational)
-     = ((Integer.one : Integer) : Rational) + ((n : Integer) : Rational)
-     = (1 : Rational) + (n : Rational)
+-- (1 + n : Rational) = (1 : Rational) + (n : Rational). The Natural →
+-- Rational cast is additive, so this is `Rational.from_natural.add_preserves`
+-- applied at the summand 1.
+theorem Rational.one_plus_cast (n : Natural)
+        : (1 + n : Rational) = (1 : Rational) + (n : Rational) :=
+  done by Rational.from_natural.add_preserves
 
--- 0 < (successor(n) : Rational). 0 < 1 (strict) ≤ 1 + (n : R) = succ(n).
-theorem Rational.successor_cast_positive (n : Natural)
-        : (0 : Rational) < (successor(n) : Rational) := {
+-- 0 < (1 + n : Rational). 0 < 1 (strict) ≤ 1 + (n : R).
+theorem Rational.one_plus_cast_positive (n : Natural)
+        : (0 : Rational) < (1 + n : Rational) := {
   Rational.IsNonneg((n : Rational));
   (0 : Rational) ≤ (n : Rational);
   (0 : Rational)
@@ -211,42 +203,8 @@ theorem Rational.successor_cast_positive (n : Natural)
      = (1 : Rational) + (0 : Rational)
      ≤ (1 : Rational) + (n : Rational)
           by Rational.add_general_LessOrEqual_left
-     = (successor(n) : Rational)
-}
-
--- (successor(successor(n)) : Rational) = (1 : Rational) + (1 : Rational)
--- + (n : Rational). Two applications of add_preserves, bridging
--- (Integer.one + Integer.one + (n : Integer)) up to Rational.
-theorem Rational.successor_successor_cast (n : Natural)
-        : (successor(successor(n)) : Rational)
-          = (1 : Rational) + (1 : Rational) + (n : Rational) :=
-  {
-    (successor(successor(n)) : Integer)
-       = ((successor(n) + 1 : Natural) : Integer)
-       = (successor(n) : Integer) + Integer.one
-       = ((n + 1 : Natural) : Integer) + Integer.one
-       = ((n : Integer) + Integer.one) + Integer.one
-       = Integer.one + Integer.one + (n : Integer);
-    (successor(successor(n)) : Rational)
-       = ((Integer.one + Integer.one + (n : Integer)) : Rational)
-       = ((Integer.one + Integer.one : Integer) : Rational) + (n : Rational)
-       = (1 : Rational) + (1 : Rational) + (n : Rational)
-  }
-
--- The `1 + n` forms of the cast lemmas. `Natural.add` is opaque, so a goal
--- phrased with `1 + n` does not reduce to `successor(n)` on its own — a
--- consumer that wants to keep `successor` out of its statements cites these
--- instead, and the `successor` token stays confined to this layer.
-theorem Rational.one_plus_cast (n : Natural)
-        : (1 + n : Rational) = (1 : Rational) + (n : Rational) :=
-  (1 + n : Rational)
-     = (successor(n) : Rational)
-     = (1 : Rational) + (n : Rational)
-
-theorem Rational.one_plus_cast_positive (n : Natural)
-        : (0 : Rational) < (1 + n : Rational) := {
-  (0 : Rational) < (successor(n) : Rational);
-  done by substituting Natural.one_add
+     = (1 + n : Rational)
+          by Rational.one_plus_cast
 }
 
 
@@ -343,21 +301,6 @@ theorem Rational.archimedean_for_positives
          ≤ (1 + K : Rational) * ε
 }
 
--- The `successor(K)` face of the same bound, for consumers still phrased with
--- the constructor. (Temporary: delete once they migrate to the `1 + K` form.)
-theorem Rational.archimedean_for_positives_successor
-        (c ε : Rational)
-        (cNonneg : Rational.IsNonneg(c))
-        (εPositive : (0 : Rational) < ε)
-        : ∃ (K : Natural). c ≤ (successor(K) : Rational) * ε := {
-  choose K such that c ≤ (1 + K : Rational) * ε as bound
-      from Rational.archimedean_for_positives;
-  witness K with
-      c
-         ≤ (1 + K : Rational) * ε          by bound
-         = (successor(K) : Rational) * ε
-}
-
 -- ----------------------------------------------------------------------
 -- Strict multiplicative cancellation: from a * c < b * c and 0 < c,
 -- conclude a < b.
@@ -389,24 +332,25 @@ theorem Rational.LessThan.multiply_cancel_right_positive
 }
 
 -- ----------------------------------------------------------------------
--- Strict step: succ(K) * ε < succ(succ(K)) * ε for 0 < ε.
+-- Strict step: (1 + K) * ε < (1 + (1 + K)) * ε for 0 < ε.
 
-theorem Rational.succ_K_strictly_less_succ_succ_K_times_ε
+theorem Rational.one_plus_K_strictly_less_one_plus_one_plus_K_times_ε
         (K : Natural) (ε : Rational)
         (εPositive : (0 : Rational) < ε)
-        : (successor(K) : Rational) * ε
-          < (successor(successor(K)) : Rational) * ε :=
-  (successor(K) : Rational) * ε
-     = (successor(K) : Rational) * ε + (0 : Rational)
-     < (successor(K) : Rational) * ε + ε
+        : (1 + K : Rational) * ε
+          < (1 + (1 + K) : Rational) * ε :=
+  (1 + K : Rational) * ε
+     = (1 + K : Rational) * ε + (0 : Rational)
+     < (1 + K : Rational) * ε + ε
           by Rational.add_left_preserves_LessThan
-     = ((1 : Rational) + (successor(K) : Rational)) * ε
-     = (successor(successor(K)) : Rational) * ε
+     = ((1 : Rational) + (1 + K : Rational)) * ε
+     = (1 + (1 + K) : Rational) * ε
+          by Rational.one_plus_cast
 
 
 -- ----------------------------------------------------------------------
--- Tail bound for c/(m+1): past some index every scaled reciprocal of a
--- successor drops below any positive ε. Archimedes pins K with
+-- Tail bound for c/(m+1): past some index every scaled reciprocal of the
+-- form c/(m+1) drops below any positive ε. Archimedes pins K with
 -- c ≤ (K+1)·(ε/2); past K the factor (m+1) only grows, and the spare
 -- factor of two makes the bound strict.
 theorem Rational.scaled_reciprocal_eventually_below

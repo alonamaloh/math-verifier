@@ -59,7 +59,7 @@ theorem Polynomial.nth_scale (r : Ring) (a : Ring.carrier(r))
               | zero =>
                   Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.cons(Ring.carrier(r), c, rest)), 0)
                      = (a * Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), c, rest), 0))
-              | successor(predecessor) => {
+              | 1 + predecessor => {
                   Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, rest), predecessor)
                      = (a * Polynomial.coefficient(r, rest, predecessor))
                          by IH
@@ -75,8 +75,8 @@ definition Polynomial.Coefficients.shift (r : Ring)
         : Polynomial.Coefficients(Ring.carrier(r)) :=
   Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r), p)
 
--- Bridges: the 0-th coefficient of a shift is zero; the (j+1)-th is
--- the j-th of the original. Both hold definitionally.
+-- Bridges: the 0-th coefficient of a shift is zero (definitional); the
+-- (1+j)-th is the j-th of the original (via the Natural.one_add bridge).
 theorem Polynomial.nth_shift_zero (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r)))
         : Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), 0)
@@ -84,11 +84,11 @@ theorem Polynomial.nth_shift_zero (r : Ring)
   Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), 0)
      = Ring.zero(r)
 
-theorem Polynomial.nth_shift_successor (r : Ring)
+theorem Polynomial.nth_shift_one_plus (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r))) (j : Natural)
-        : Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), successor(j))
+        : Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), 1 + j)
           = Polynomial.coefficient(r, p, j) :=
-  Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), successor(j))
+  Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), 1 + j)
      = Polynomial.coefficient(r, p, j)
 
 -- ----------------------------------------------------------------------
@@ -106,6 +106,17 @@ definition Polynomial.Coefficients.multiply (r : Ring)
           Polynomial.Coefficients.scale(r, a, q),
           Polynomial.Coefficients.shift(r,
               Polynomial.Coefficients.multiply(r, restA, q)))
+
+-- Bridge: the (1+j)-th coefficient of `cons(a, rest)` is the j-th
+-- coefficient of `rest`. The 0-th case (= a) is definitional; this one
+-- needs the Natural.one_add bridge, since `Polynomial.nth`'s pattern
+-- match peels the constructor form, not the opaque `1 + j`.
+theorem Polynomial.nth_cons_one_plus (r : Ring) (a : Ring.carrier(r))
+        (rest : Polynomial.Coefficients(Ring.carrier(r))) (j : Natural)
+        : Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, rest), 1 + j)
+          = Polynomial.coefficient(r, rest, j) :=
+  Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, rest), 1 + j)
+     = Polynomial.coefficient(r, rest, j)
 
 -- ----------------------------------------------------------------------
 -- The convolution bridge: the k-th coefficient of a product is
@@ -153,31 +164,55 @@ theorem Polynomial.nth_multiply (r : Ring)
                      by Ring.Sum.convolution_zero(
                             A := (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
                             B := (m : Natural) ↦ Polynomial.coefficient(r, q, m))
-        | successor(predecessor) => {
+        | 1 + predecessor => {
             Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor)
                   = Ring.Sum(r,
                         (j : Natural) ↦
                             (Polynomial.coefficient(r, restA, j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
                         predecessor)
                 by IH;
-            
-              Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q), successor(predecessor))
-                 = (Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, q), successor(predecessor)) + Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), successor(predecessor)))
+
+            Ring.Sum(r,
+                  (j : Natural) ↦
+                      (Polynomial.coefficient(r, restA, j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
+                  predecessor)
+                = Ring.Sum(r,
+                      (j : Natural) ↦
+                          (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), 1 + j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
+                      predecessor)
+              by Ring.Sum.extensional(r,
+                     (j : Natural) ↦ (Polynomial.coefficient(r, restA, j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
+                     (j : Natural) ↦ (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), 1 + j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
+                     (j : Natural) ↦
+                         { (Polynomial.coefficient(r, restA, j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j)))
+                               = (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), 1 + j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j)))
+                               by substituting Polynomial.nth_cons_one_plus },
+                     predecessor) as tailReindex;
+
+              Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q), 1 + predecessor)
+                 = (Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, q), 1 + predecessor) + Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), 1 + predecessor))
                      by Polynomial.nth_add
-                 = ((a * Polynomial.coefficient(r, q, successor(predecessor))) + Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), successor(predecessor)))
-                 = ((a * Polynomial.coefficient(r, q, successor(predecessor))) + Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor))
-                 = ((a * Polynomial.coefficient(r, q, successor(predecessor))) + Ring.Sum(r,
+                 = ((a * Polynomial.coefficient(r, q, 1 + predecessor)) + Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), 1 + predecessor))
+                 = ((a * Polynomial.coefficient(r, q, 1 + predecessor)) + Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor))
+                     by Polynomial.nth_shift_one_plus
+                 = ((a * Polynomial.coefficient(r, q, 1 + predecessor)) + Ring.Sum(r,
                            (j : Natural) ↦
                                (Polynomial.coefficient(r, restA, j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
                            predecessor))
+                 = ((a * Polynomial.coefficient(r, q, 1 + predecessor)) + Ring.Sum(r,
+                           (j : Natural) ↦
+                               (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), 1 + j) * Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
+                           predecessor))
+                     by substituting tailReindex
                  = Ring.Sum(r,
                        (i : Natural) ↦
-                           (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i) * Polynomial.coefficient(r, q, Natural.monus(successor(predecessor), i))),
-                       successor(predecessor))
+                           (Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i) * Polynomial.coefficient(r, q, Natural.monus(1 + predecessor, i))),
+                       1 + predecessor)
                      by Ring.Sum.convolution_shift(
                             A := (i : Natural) ↦ Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
                             B := (m : Natural) ↦ Polynomial.coefficient(r, q, m),
-                            k := predecessor)
+                            k := predecessor);
+              done by substituting Natural.one_add
           }
       }
   }

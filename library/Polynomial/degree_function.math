@@ -51,15 +51,15 @@ theorem Polynomial.exists_degree_within (r : Ring)
         (y : Polynomial(Ring.carrier(r), Ring.zero(r))) (n : Natural)
         : Polynomial.DegreeLessThan(r, y, n)
           → (∃ (d : Natural).
-                 Polynomial.DegreeLessThan(r, y, successor(d))
+                 Polynomial.DegreeLessThan(r, y, 1 + d)
                  ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)))
             ∨ (∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r)) :=
   by induction on n with IH {
-    case zero:
+    case base:
       (boundN : Polynomial.DegreeLessThan(r, y, 0)) ↦
           Or.introduceRight((i : Natural) ↦ boundN(i, Natural.zero_least(i)))
-    case successor(m):
-      (boundN : Polynomial.DegreeLessThan(r, y, successor(m))) ↦
+    case step(m):
+      (boundN : Polynomial.DegreeLessThan(r, y, 1 + m)) ↦
           done by cases {
             case Polynomial.coefficientOf(r, y, m) = Ring.zero(r) as coefficientZero: {
                 Polynomial.DegreeLessThan(r, y, m)
@@ -70,7 +70,7 @@ theorem Polynomial.exists_degree_within (r : Ring)
                                  = Polynomial.coefficientOf(r, y, m)
                                  = Ring.zero(r)
                           otherwise as indexNotM:
-                              boundN(i, Natural.less_or_equal_not_equal_successor(m, i,
+                              boundN(i, Natural.one_plus_le_of_le_of_ne(m, i,
                                   mLessOrEqualI, indexNotM))
                         }
                     as boundM;
@@ -86,7 +86,7 @@ theorem Polynomial.exists_degree_of_nonzero (r : Ring)
         (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (notZero : ¬(y = Polynomial.zero(r)))
         : ∃ (d : Natural).
-            Polynomial.DegreeLessThan(r, y, successor(d))
+            Polynomial.DegreeLessThan(r, y, 1 + d)
             ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)) := {
   choose bound such that Polynomial.DegreeLessThan(r, y, bound) as boundProof
       from Polynomial.exists_degree_bound(r, y);

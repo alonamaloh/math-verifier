@@ -195,9 +195,9 @@ theorem ComplexNumber.modulus_subtract_swap (z w : ComplexNumber)
 
 definition ComplexNumber.partialSum (s : Natural → ComplexNumber)
         : Natural → ComplexNumber
-  | zero =>
+  | 0 =>
       RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
-  | successor(n) => RingModulo.add(ComplexNumber.partialSum(s, n), s(n))
+  | 1 + n => RingModulo.add(ComplexNumber.partialSum(s, n), s(n))
 
 -- The recursion characterised in `1 + n` form, so consumers step the
 -- index without naming the raw constructor.
@@ -206,42 +206,44 @@ theorem ComplexNumber.partialSum_add_one (s : Natural → ComplexNumber) (n : Na
   done by substituting Natural.one_add
 
 theorem ComplexNumber.realPart_partialSum (s : Natural → ComplexNumber)
-        : ∀ (n : Natural).
-          ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
-            = Real.partialSum(
-                  (k : Natural) ↦ ComplexNumber.realPart(s(k)), n)
-  | zero => done
-  | successor(n) =>
-      ComplexNumber.realPart(ComplexNumber.partialSum(s, successor(n)))
-         = ComplexNumber.realPart(ComplexNumber.partialSum(s, n) + s(n))
-         = ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
-           + ComplexNumber.realPart(s(n))
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), n)
-           + ComplexNumber.realPart(s(n))
-               by ComplexNumber.realPart_partialSum(s, n)
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), 1 + n)
-               by Real.partialSum_add_one
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), successor(n))
-               by substituting Natural.one_add
+        (n : Natural)
+        : ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
+          = Real.partialSum(
+                (k : Natural) ↦ ComplexNumber.realPart(s(k)), n) :=
+  by induction on n with IH {
+    case base: done
+    case step(n):
+        ComplexNumber.realPart(ComplexNumber.partialSum(s, 1 + n))
+           = ComplexNumber.realPart(ComplexNumber.partialSum(s, n) + s(n))
+                 by ComplexNumber.partialSum_add_one
+           = ComplexNumber.realPart(ComplexNumber.partialSum(s, n))
+             + ComplexNumber.realPart(s(n))
+           = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), n)
+             + ComplexNumber.realPart(s(n))
+                 by IH
+           = Real.partialSum((k : Natural) ↦ ComplexNumber.realPart(s(k)), 1 + n)
+                 by Real.partialSum_add_one
+  }
 
 theorem ComplexNumber.imaginaryPart_partialSum (s : Natural → ComplexNumber)
-        : ∀ (n : Natural).
-          ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
-            = Real.partialSum(
-                  (k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n)
-  | zero => done
-  | successor(n) =>
-      ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, successor(n)))
-         = ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n) + s(n))
-         = ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
-           + ComplexNumber.imaginaryPart(s(n))
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n)
-           + ComplexNumber.imaginaryPart(s(n))
-               by ComplexNumber.imaginaryPart_partialSum(s, n)
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), 1 + n)
-               by Real.partialSum_add_one
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), successor(n))
-               by substituting Natural.one_add
+        (n : Natural)
+        : ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
+          = Real.partialSum(
+                (k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n) :=
+  by induction on n with IH {
+    case base: done
+    case step(n):
+        ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, 1 + n))
+           = ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n) + s(n))
+                 by ComplexNumber.partialSum_add_one
+           = ComplexNumber.imaginaryPart(ComplexNumber.partialSum(s, n))
+             + ComplexNumber.imaginaryPart(s(n))
+           = Real.partialSum((k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), n)
+             + ComplexNumber.imaginaryPart(s(n))
+                 by IH
+           = Real.partialSum((k : Natural) ↦ ComplexNumber.imaginaryPart(s(k)), 1 + n)
+                 by Real.partialSum_add_one
+  }
 
 -- Splitting a ℂ partial sum at a cut, through the coordinates.
 theorem ComplexNumber.partialSum_split (s : Natural → ComplexNumber)
@@ -287,31 +289,33 @@ theorem ComplexNumber.add_cancel_left (u v : ComplexNumber)
 -- The modulus of a partial sum is at most the real partial sum of the
 -- moduli (the triangle inequality, summed).
 theorem ComplexNumber.modulus_partialSum_le (s : Natural → ComplexNumber)
-        : ∀ (n : Natural).
-          ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
-            ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
-  | zero => {
-      ComplexNumber.modulus(ComplexNumber.partialSum(s, 0)) = Real.zero
-          by ComplexNumber.modulus_zero;
-      Real.zero ≤ Real.zero;
-      done
-    }
-  | successor(n) => {
-      ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
-            ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
-          by ComplexNumber.modulus_partialSum_le(s, n);
-      ComplexNumber.modulus(ComplexNumber.partialSum(s, n) + s(n))
-         ≤ ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
-           + ComplexNumber.modulus(s(n))
+        (n : Natural)
+        : ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
+          ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n) :=
+  by induction on n with IH {
+    case base: {
+        ComplexNumber.modulus(ComplexNumber.partialSum(s, 0)) = Real.zero
+            by ComplexNumber.modulus_zero;
+        Real.zero ≤ Real.zero;
+        done
+      }
+    case step(n): {
+        ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
+              ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
+            by IH;
+        ComplexNumber.modulus(ComplexNumber.partialSum(s, 1 + n))
+           = ComplexNumber.modulus(ComplexNumber.partialSum(s, n) + s(n))
+               by ComplexNumber.partialSum_add_one
+           ≤ ComplexNumber.modulus(ComplexNumber.partialSum(s, n))
+             + ComplexNumber.modulus(s(n))
                by ComplexNumber.modulus_triangle
-         ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
-           + ComplexNumber.modulus(s(n))
+           ≤ Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), n)
+             + ComplexNumber.modulus(s(n))
                by Real.add_preserves_LessOrEqual
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), 1 + n)
+           = Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), 1 + n)
                by Real.partialSum_add_one
-         = Real.partialSum((k : Natural) ↦ ComplexNumber.modulus(s(k)), successor(n))
-               by substituting Natural.one_add
-    }
+      }
+  }
 
 -- ----------------------------------------------------------------------
 -- A series dominated in modulus by a real series with Cauchy partial
@@ -554,9 +558,9 @@ theorem ComplexNumber.limit_converges (s : Natural → ComplexNumber)
 -- Powers and the exponential series in ℂ.
 
 definition ComplexNumber.power (base : ComplexNumber) : Natural → ComplexNumber
-  | zero =>
+  | 0 =>
       RingModulo.one(Real.polynomial_commutative_ring, Complex.definingPolynomial)
-  | successor(n) => RingModulo.multiply(base, ComplexNumber.power(base, n))
+  | 1 + n => RingModulo.multiply(base, ComplexNumber.power(base, n))
 
 operator (^) on (ComplexNumber, Natural) := ComplexNumber.power
 
@@ -570,21 +574,24 @@ theorem ComplexNumber.modulus_one
 }
 
 -- |zⁿ| = |z|ⁿ.
-theorem ComplexNumber.modulus_power (z : ComplexNumber)
-        : ∀ (n : Natural).
-          ComplexNumber.modulus(z ^ n)
-            = ComplexNumber.modulus(z) ^ n
-  | zero => {
-      ComplexNumber.modulus(z ^ 0) = Real.one
-          by ComplexNumber.modulus_one;
-      done
-    }
-  | successor(n) =>
-      ComplexNumber.modulus(z * z ^ n)
-         = ComplexNumber.modulus(z)
-           * ComplexNumber.modulus(z ^ n)
-         = ComplexNumber.modulus(z) * ComplexNumber.modulus(z) ^ n
-               by ComplexNumber.modulus_power(z, n)
+theorem ComplexNumber.modulus_power (z : ComplexNumber) (n : Natural)
+        : ComplexNumber.modulus(z ^ n)
+          = ComplexNumber.modulus(z) ^ n :=
+  by induction on n with IH {
+    case base: {
+        ComplexNumber.modulus(z ^ 0) = Real.one
+            by ComplexNumber.modulus_one;
+        done
+      }
+    case step(n):
+        ComplexNumber.modulus(z ^ (1 + n))
+           = ComplexNumber.modulus(z * z ^ n)
+           = ComplexNumber.modulus(z)
+             * ComplexNumber.modulus(z ^ n)
+           = ComplexNumber.modulus(z) * ComplexNumber.modulus(z) ^ n
+                 by IH
+           = ComplexNumber.modulus(z) ^ (1 + n)
+  }
 
 -- The k-th term of the exponential series at z: (1/k!) · zᵏ, with the
 -- real coefficient embedded.
@@ -681,7 +688,7 @@ theorem ComplexNumber.exponential_zero
   -- The head term is 1/0! · z⁰ = 1, so every partial sum from index 1 on is 1.
   ∀ (p : Natural). ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), p + 1) = (1 : ℂ)
       by by induction on p with IH {
-           case zero: {
+           case base: {
                ComplexNumber.exponentialTerm(z, 0) = (1 : ℂ)
                    by {
                      (0! : Real) = 1 as factorialZero;
@@ -696,13 +703,17 @@ theorem ComplexNumber.exponential_zero
                    } as firstTermIsOne;
                ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), 1)
                   = z + ComplexNumber.exponentialTerm(z, 0)
+                        by substituting zIsRepZero
                   = z + (1 : ℂ)          by substituting firstTermIsOne
                   = (1 : ℂ)              by substituting zIsRepZero
              }
-           case successor(q):
-               ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), (q + 1) + 1)
+           case step(q):
+               ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), (1 + q) + 1)
+                  = ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), 1 + (q + 1))
+                        by ((1 + q) + 1 = 1 + (q + 1))
                   = ComplexNumber.partialSum(ComplexNumber.exponentialTerm(z), q + 1)
                     + ComplexNumber.exponentialTerm(z, q + 1)
+                        by ComplexNumber.partialSum_add_one
                   = (1 : ℂ) + ComplexNumber.exponentialTerm(z, q + 1)   by IH
                   = (1 : ℂ) + z                                          by termSuccessor(q)
                   = (1 : ℂ)                                              by substituting zIsRepZero

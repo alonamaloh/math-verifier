@@ -47,28 +47,29 @@ theorem Natural.both_one_of_add_two (da db : Natural)
         (daPositive : 1 ≤ da) (dbPositive : 1 ≤ db) (sumTwo : da + db = 2)
         : da = 1 ∧ db = 1 :=
   cases da {
-    | zero => absurd(daPositive)
-    | successor(daPredecessor) =>
+    | 0 => absurd(daPositive)
+    | 1 + daPredecessor =>
         cases db {
-          | zero => absurd(dbPositive)
-          | successor(dbPredecessor) => {
-              -- successor(da') + successor(db') = 2 = 2,
-              -- so peeling two successors gives da' + db' = 0.
-              successor(successor(daPredecessor + dbPredecessor))
-                        = successor(daPredecessor + successor(dbPredecessor))
-                        = (successor(daPredecessor) + successor(dbPredecessor))
-                        = 2;
-              successor(daPredecessor + dbPredecessor) = 1
-                  by Natural.successor_injective;
-              Natural.add(daPredecessor, dbPredecessor) = 0
-                  by Natural.successor_injective;
+          | 0 => absurd(dbPositive)
+          | 1 + dbPredecessor => {
+              -- (1 + da') + (1 + db') = 2, so cancelling the two ones
+              -- gives da' + db' = 0.
+              1 + (1 + (daPredecessor + dbPredecessor))
+                        = (1 + daPredecessor) + (1 + dbPredecessor)
+                        = 2
+                        = 1 + (1 + 0);
+              1 + (daPredecessor + dbPredecessor) = 1 + 0
+                  by Natural.add_cancel_left;
+              daPredecessor + dbPredecessor = 0
+                  by Natural.add_cancel_left;
               -- both predecessors are 0 (each is ≤ their zero sum), so
-              -- da = 1 = 1 and likewise db.
+              -- da = 1 and likewise db.
               daPredecessor = 0 as daPredecessorZero;
               dbPredecessor = 0 as dbPredecessorZero;
-              successor(daPredecessor) = 1 by substituting daPredecessorZero;
-              successor(dbPredecessor) = 1 by substituting dbPredecessorZero;
-              done by And.introduction
+              1 + daPredecessor = 1 by substituting daPredecessorZero;
+              1 + dbPredecessor = 1 by substituting dbPredecessorZero;
+              (1 + daPredecessor) = 1 ∧ (1 + dbPredecessor) = 1 by And.introduction;
+              done by substituting Natural.one_add
             }
         }
   }
@@ -123,7 +124,7 @@ theorem Complex.no_degree_one_factorization
                        (Polynomial.coefficientOf(Real.ring, a, i)
                         * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, i))), 0)
                + (aOne * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
-                  by Ring.Sum.successor
+                  by Ring.Sum.add_one(n := 0)
             = ((aZero * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 0))) + (aOne * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
                   by Ring.Sum.base
             = ((aZero * bOne) + (aOne * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
@@ -171,7 +172,7 @@ theorem Complex.definingPolynomial_not_unit
           done by Real.zero_not_equal_one
         }
       otherwise as gNonzero: {
-          choose degreeG such that Polynomial.DegreeLessThan(Real.ring, g, successor(degreeG))
+          choose degreeG such that Polynomial.DegreeLessThan(Real.ring, g, 1 + degreeG)
                   ∧ ¬(Polynomial.coefficientOf(Real.ring, g, degreeG) = Ring.zero(Real.ring))
               from Polynomial.exists_degree_of_nonzero;
           Polynomial.HasDegree(Real.ring, g, degreeG);
@@ -232,10 +233,10 @@ theorem Complex.definingPolynomial_irreducible
                                       = Real.zero;
                                done by Real.zero_not_equal_one
                              };
-                      choose degreeA such that Polynomial.DegreeLessThan(Real.ring, a, successor(degreeA))
+                      choose degreeA such that Polynomial.DegreeLessThan(Real.ring, a, 1 + degreeA)
                               ∧ ¬(Polynomial.coefficientOf(Real.ring, a, degreeA) = Ring.zero(Real.ring))
                           from Polynomial.exists_degree_of_nonzero;
-                      choose degreeB such that Polynomial.DegreeLessThan(Real.ring, b, successor(degreeB))
+                      choose degreeB such that Polynomial.DegreeLessThan(Real.ring, b, 1 + degreeB)
                               ∧ ¬(Polynomial.coefficientOf(Real.ring, b, degreeB) = Ring.zero(Real.ring))
                           from Polynomial.exists_degree_of_nonzero;
                       Polynomial.HasDegree(Real.ring, a, degreeA);

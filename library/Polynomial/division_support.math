@@ -4,8 +4,8 @@
 -- algorithm (Polynomial/division.math). Two groups:
 --
 --   * Small Natural facts the standard library happens not to carry yet
---     (successor-≤ inversion, ¬(successor(m) ≤ m), the monus/add cancel
---     law, the ≤-successor split).
+--     (`1 + n ≤ m` inversion, the monus/add cancel law, the
+--     at-the-bound-or-below ≤ split).
 --   * `Ring.Sum.single_point`: a sum whose summand vanishes off a
 --     single index j (with j ≤ n) collapses to its value at j. This is
 --     what turns the convolution for a monomial times a polynomial into
@@ -33,23 +33,23 @@ import Polynomial.commutative
 -- ----------------------------------------------------------------------
 -- Degree-specific Natural fact.
 
--- The high-index degree bound: successor(d + j) ≤ i forces
--- successor(d) ≤ i − j. Writing i = successor(d + j) + c and
--- regrouping, i − j = successor(d + c) ≥ successor(d).
+-- The high-index degree bound: 1 + (d + j) ≤ i forces
+-- 1 + d ≤ i − j. Writing i = (1 + (d + j)) + c and
+-- regrouping, i − j = 1 + (d + c) ≥ 1 + d.
 theorem Natural.degree_bound_helper (d j i : Natural)
-        (bound : successor(d + j) ≤ i)
-        : successor(d) ≤ Natural.monus(i, j) := {
-  choose c such that i = successor(d + j) + c
-      from Natural.subtraction_witness(successor(d + j), i, bound);
+        (bound : 1 + (d + j) ≤ i)
+        : 1 + d ≤ Natural.monus(i, j) := {
+  choose c such that i = (1 + (d + j)) + c
+      from Natural.subtraction_witness(1 + (d + j), i, bound);
   i
-            = successor(d + j) + c
-            = successor((d + j) + c)
-            = successor((j + d) + c)
-            = successor(j + (d + c))
-            = j + successor(d + c);
+            = (1 + (d + j)) + c
+            = 1 + ((d + j) + c)
+            = 1 + ((j + d) + c)
+            = 1 + (j + (d + c))
+            = j + (1 + (d + c));
   Natural.monus(i, j)
-            = Natural.monus(j + successor(d + c), j)
-            = successor(d + c) as monusEquation;
+            = Natural.monus(j + (1 + (d + c)), j)
+            = 1 + (d + c) as monusEquation;
   done by substituting Equality.symmetry(monusEquation)
 }
 
@@ -73,7 +73,7 @@ theorem Ring.Sum.single_point (r : Ring)
           → (∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r))
           → Ring.Sum(r, h, n) = h(j) :=
   by induction on n with IH {
-    case zero:
+    case base:
       (jLessOrEqualZero : j ≤ 0)
                (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦ {
         j = 0;
@@ -81,35 +81,35 @@ theorem Ring.Sum.single_point (r : Ring)
            = h(0)
            = h(j)
       }
-    case successor(m):
-      (jLessOrEqualSuccessor : j ≤ successor(m))
+    case step(m):
+      (jLessOrEqualOnePlus : j ≤ 1 + m)
                (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦
           done by cases {
-            case j = successor(m) as jEqualsSuccessor: {
+            case j = 1 + m as jEqualsOnePlus: {
                 Ring.Sum(r, h, m) = Ring.zero(r)
                     by Ring.Sum.vanishes_below(r, h, m,
                            (i : Natural) (iLessOrEqualM : i ≤ m) ↦
                                vanish(i,
                                    (iEqualsJ : i = j) ↦
-                                       Natural.not_successor_less_or_equal_self(m,
-                                           { successor(m) = j
-                                                          = i
-                                                          ≤ m   by iLessOrEqualM })));
-                Ring.Sum(r, h, successor(m))
-                   = (Ring.Sum(r, h, m) + h(successor(m)))
-                   = (Ring.zero(r) + h(successor(m)))
-                   = h(successor(m))
+                                       Natural.not_one_plus_le_self(m,
+                                           { 1 + m = j
+                                                   = i
+                                                   ≤ m   by iLessOrEqualM })));
+                Ring.Sum(r, h, 1 + m)
+                   = (Ring.Sum(r, h, m) + h(1 + m))
+                   = (Ring.zero(r) + h(1 + m))
+                   = h(1 + m)
                    = h(j)
               }
-            otherwise as jNotEqualsSuccessor: {
-                j ≤ m by Natural.less_or_equal_successor_not_equal as jLessOrEqualM;
-                h(successor(m)) = Ring.zero(r)
-                    by vanish(successor(m),
-                           (successorEqualsJ : successor(m) = j) ↦
-                               jNotEqualsSuccessor(Equality.symmetry(successorEqualsJ)));
-                Ring.Sum(r, h, successor(m))
-                   = (Ring.Sum(r, h, m) + h(successor(m)))
-                   = (h(j) + h(successor(m)))
+            otherwise as jNotEqualsOnePlus: {
+                j ≤ m by Natural.le_of_le_one_plus_of_ne as jLessOrEqualM;
+                h(1 + m) = Ring.zero(r)
+                    by vanish(1 + m,
+                           (onePlusEqualsJ : 1 + m = j) ↦
+                               jNotEqualsOnePlus(Equality.symmetry(onePlusEqualsJ)));
+                Ring.Sum(r, h, 1 + m)
+                   = (Ring.Sum(r, h, m) + h(1 + m))
+                   = (h(j) + h(1 + m))
                          by IH(jLessOrEqualM, vanish)
                    = (h(j) + Ring.zero(r))
                    = h(j)

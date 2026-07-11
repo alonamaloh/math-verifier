@@ -11,8 +11,8 @@
 -- (leadingCoeff(g)·leadingCoeff(f)⁻¹)·x^{deg g − degreeF}·f to kill the
 -- top term — run as an induction on the "excess" e in the degree bound
 -- degreeF + e. At excess 0 the dividend is already below degreeF and is
--- its own remainder; each successor step kills one leading term and
--- recurses with the excess reduced by one.
+-- its own remainder; each step kills one leading term and recurses with
+-- the excess reduced by one.
 
 module Polynomial.division
 
@@ -53,7 +53,7 @@ definition Polynomial.Coefficients.length (R : Type(0))
         : Polynomial.Coefficients(R) → Natural
   | Polynomial.Coefficients.nil => 0
   | Polynomial.Coefficients.cons(c, rest) =>
-      successor(Polynomial.Coefficients.length(R, rest))
+      1 + Polynomial.Coefficients.length(R, rest)
 
 theorem Polynomial.coefficient_vanishes_beyond_length (r : Ring)
         : (p : Polynomial.Coefficients(Ring.carrier(r))) → ∀ (i : Natural).
@@ -65,15 +65,23 @@ theorem Polynomial.coefficient_vanishes_beyond_length (r : Ring)
   | Polynomial.Coefficients.cons(coefficientValue, rest) =>
       (i : Natural)
                (lengthLessOrEqual
-                   : successor(Polynomial.Coefficients.length(Ring.carrier(r), rest)) ≤ i) ↦
+                   : 1 + Polynomial.Coefficients.length(Ring.carrier(r), rest) ≤ i) ↦
           cases i {
-            | zero =>
-                absurd(lengthLessOrEqual)
-            | successor(iPredecessor) =>
-                Polynomial.coefficient_vanishes_beyond_length(r, rest, iPredecessor,
-                    Natural.less_or_equal_successor_successor_descend(
-                        Polynomial.Coefficients.length(Ring.carrier(r), rest),
-                        iPredecessor, lengthLessOrEqual))
+            | 0 => {
+                (1 : Natural)
+                   ≤ 1 + Polynomial.Coefficients.length(Ring.carrier(r), rest)
+                         by Natural.less_or_equal_add_right
+                   ≤ 0                                              by lengthLessOrEqual;
+                False; done
+              }
+            | 1 + iPredecessor => {
+                1 + Polynomial.Coefficients.length(Ring.carrier(r), rest) ≤ 1 + iPredecessor
+                    by lengthLessOrEqual;
+                Polynomial.Coefficients.length(Ring.carrier(r), rest) ≤ iPredecessor
+                    by Natural.le_cancel_one_plus
+                    as lengthDescended;
+                Polynomial.coefficient_vanishes_beyond_length(r, rest, iPredecessor, lengthDescended)
+              }
           }
 
 theorem Polynomial.exists_degree_bound (r : Ring)
@@ -95,7 +103,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
             : ∀ (x y : Ring.carrier(r)). (x * y) = (y * x))
         (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (degreeF : Natural)
-        (fDegreeBound : Polynomial.DegreeLessThan(r, f, successor(degreeF)))
+        (fDegreeBound : Polynomial.DegreeLessThan(r, f, 1 + degreeF))
         (leadingInverseValue : Ring.carrier(r))
         (leadingInverseEquation
             : (Polynomial.coefficientOf(f, degreeF) * leadingInverseValue) = Ring.one(r))
@@ -106,7 +114,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
               dividend = ((quotient * f) + remainder)
               ∧ Polynomial.DegreeLessThan(r, remainder, degreeF) :=
   by induction on e with IH {
-    case zero:
+    case base:
       (dividend : Polynomial(Ring.carrier(r), Ring.zero(r)))
                (dividendBound : Polynomial.DegreeLessThan(r, dividend, degreeF + 0)) ↦ {
         (Polynomial.zero(r) * f) = Polynomial.zero(r)
@@ -118,14 +126,13 @@ theorem Polynomial.divide_by_excess (r : Ring)
          { degreeF + 0 = degreeF by Natural.add_zero;
            Polynomial.DegreeLessThan(r, dividend, degreeF) }⟩
       }
-    case successor(ePredecessor):
+    case step(ePredecessor):
       (dividend : Polynomial(Ring.carrier(r), Ring.zero(r)))
                (dividendBound
-                   : Polynomial.DegreeLessThan(r, dividend, degreeF + successor(ePredecessor))) ↦ {
-        degreeF + successor(ePredecessor) = successor(degreeF + ePredecessor)
-            by Natural.add_successor;
-        Polynomial.DegreeLessThan(r, dividend, successor(degreeF + ePredecessor))
-            as dividendBoundSuccessor;
+                   : Polynomial.DegreeLessThan(r, dividend, degreeF + (1 + ePredecessor))) ↦ {
+        degreeF + (1 + ePredecessor) = 1 + (degreeF + ePredecessor);
+        Polynomial.DegreeLessThan(r, dividend, 1 + (degreeF + ePredecessor))
+            as dividendBoundOnePlus;
         let leadingCoefficient : Ring.carrier(r) :=
             Polynomial.coefficientOf(dividend, degreeF + ePredecessor);
         let quotientStep : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
@@ -162,13 +169,13 @@ theorem Polynomial.divide_by_excess (r : Ring)
                          = Polynomial.coefficientOf(dividend, degreeF + ePredecessor)
                          = Polynomial.coefficientOf(dividend, i)
                   otherwise as indexNotTop: {
-                      successor(degreeF + ePredecessor) ≤ i
-                          by Natural.less_or_equal_not_equal_successor
-                          as successorLessOrEqual;
+                      1 + (degreeF + ePredecessor) ≤ i
+                          by Natural.one_plus_le_of_le_of_ne
+                          as onePlusLessOrEqual;
                       ePredecessor
                           ≤ degreeF + ePredecessor   by Natural.less_or_equal_add_left
                           ≤ i                          by Natural.less_or_equal_predecessor_less_or_equal;
-                      successor(degreeF) ≤ Natural.monus(i, ePredecessor)
+                      1 + degreeF ≤ Natural.monus(i, ePredecessor)
                           by Natural.degree_bound_helper as monusAboveDegree;
                       Polynomial.coefficientOf(stepProduct, i)
                                 = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, Natural.monus(i, ePredecessor)))
@@ -179,7 +186,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
                       Polynomial.coefficientOf(stepProduct, i)
                          = Ring.zero(r)
                          = Polynomial.coefficientOf(dividend, i)
-                               by dividendBoundSuccessor(i, successorLessOrEqual)
+                               by dividendBoundOnePlus(i, onePlusLessOrEqual)
                     }
                 } as productAgreesWithDividend;
 
@@ -228,7 +235,7 @@ theorem Polynomial.division_with_remainder (r : Ring)
             : ∀ (x y : Ring.carrier(r)). (x * y) = (y * x))
         (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (degreeF : Natural)
-        (fDegreeBound : Polynomial.DegreeLessThan(r, f, successor(degreeF)))
+        (fDegreeBound : Polynomial.DegreeLessThan(r, f, 1 + degreeF))
         (leadingInverse
             : ∃ (inverse : Ring.carrier(r)).
                 (Polynomial.coefficientOf(f, degreeF) * inverse) = Ring.one(r))

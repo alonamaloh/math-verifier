@@ -31,20 +31,36 @@ import Polynomial.division_support
 -- The coefficient list of c·x^j: j zeros followed by c.
 definition Polynomial.Coefficients.monomial (r : Ring) (c : Ring.carrier(r))
         : Natural → Polynomial.Coefficients(Ring.carrier(r))
-  | zero =>
+  | 0 =>
       Polynomial.Coefficients.cons(Ring.carrier(r), c,
           Polynomial.Coefficients.nil(Ring.carrier(r)))
-  | successor(k) =>
+  | 1 + k =>
       Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r),
           Polynomial.Coefficients.monomial(r, c, k))
+
+-- The recursion in `1 + n` form: one more zero coefficient prepended.
+theorem Polynomial.Coefficients.monomial_one_plus (r : Ring) (c : Ring.carrier(r)) (k : Natural)
+        : Polynomial.Coefficients.monomial(r, c, 1 + k)
+          = Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r),
+                Polynomial.Coefficients.monomial(r, c, k)) :=
+  done by substituting Natural.one_add
 
 -- Coefficient of the monomial list at its own degree is c.
 theorem Polynomial.coefficient_monomial_at (r : Ring) (c : Ring.carrier(r))
         (j : Natural)
         : Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, j), j) = c :=
   by induction on j with IH {
-    case zero: reflexivity(Ring.carrier(r), c)
-    case successor(k): IH
+    case base: reflexivity(Ring.carrier(r), c)
+    case step(k):
+        Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, 1 + k), 1 + k)
+           = Polynomial.coefficient(r,
+                 Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r), Polynomial.Coefficients.monomial(r, c, k)),
+                 1 + k)
+               by Polynomial.Coefficients.monomial_one_plus
+           = Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, k), k)
+               by Polynomial.nth_cons_one_plus
+           = c
+               by IH
   }
 
 -- Coefficient of the monomial list off its degree is zero.
@@ -54,20 +70,47 @@ theorem Polynomial.coefficient_monomial_off (r : Ring) (c : Ring.carrier(r))
           → Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, j), i)
             = Ring.zero(r) :=
   by induction on j with IH {
-    case zero:
+    case base:
       (i : Natural) (notEqual : ¬(i = 0)) ↦
-          cases i {
-            | zero => absurd(notEqual(reflexivity(Natural, 0)))
-            | successor(iPredecessor) => reflexivity(Ring.carrier(r), Ring.zero(r))
+          done by cases {
+            case i = 0 as iEqualsZero: absurd(notEqual(iEqualsZero))
+            case i = 1 + iPredecessor for some (iPredecessor : Natural) as iEqualsOnePlus:
+                Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, 0), i)
+                   = Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, 0), 1 + iPredecessor)
+                         by substituting iEqualsOnePlus
+                   = Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), iPredecessor)
+                         by Polynomial.nth_cons_one_plus
+                   = Ring.zero(r)
           }
-    case successor(k):
-      (i : Natural) (notEqual : ¬(i = successor(k))) ↦
-          cases i {
-            | zero => reflexivity(Ring.carrier(r), Ring.zero(r))
-            | successor(iPredecessor) =>
-                IH(iPredecessor,
-                   (predecessorEqual : iPredecessor = k) ↦
-                       notEqual(predecessorEqual))
+    case step(k):
+      (i : Natural) (notEqual : ¬(i = 1 + k)) ↦
+          done by cases {
+            case i = 0 as iEqualsZero:
+                Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, 1 + k), i)
+                   = Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, 1 + k), 0)
+                         by substituting iEqualsZero
+                   = Polynomial.coefficient(r,
+                         Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r), Polynomial.Coefficients.monomial(r, c, k)),
+                         0)
+                         by Polynomial.Coefficients.monomial_one_plus
+                   = Ring.zero(r)
+            case i = 1 + iPredecessor for some (iPredecessor : Natural) as iEqualsOnePlus:
+                Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, 1 + k), i)
+                   = Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, 1 + k), 1 + iPredecessor)
+                         by substituting iEqualsOnePlus
+                   = Polynomial.coefficient(r,
+                         Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r), Polynomial.Coefficients.monomial(r, c, k)),
+                         1 + iPredecessor)
+                         by Polynomial.Coefficients.monomial_one_plus
+                   = Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, k), iPredecessor)
+                         by Polynomial.nth_cons_one_plus
+                   = Ring.zero(r)
+                         by IH(iPredecessor,
+                                (predecessorEqual : iPredecessor = k) ↦
+                                    notEqual({
+                                      i = 1 + iPredecessor   by iEqualsOnePlus
+                                        = 1 + k              by substituting predecessorEqual
+                                    }))
           }
   }
 

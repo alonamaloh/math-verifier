@@ -35,8 +35,8 @@ import Polynomial.multiply_coefficient
 import Polynomial.division_support
 
 -- i ≤ m or m < i.
-theorem Natural.le_or_successor_le (i m : Natural)
-        : i ≤ m ∨ successor(m) ≤ i := {
+theorem Natural.le_or_one_plus_le (i m : Natural)
+        : i ≤ m ∨ 1 + m ≤ i := {
   i ≤ m ∨ m ≤ i;
   done by cases {
     case i ≤ m: done
@@ -44,7 +44,7 @@ theorem Natural.le_or_successor_le (i m : Natural)
         done by cases {
           case i = m: done
           otherwise: {
-              successor(m) ≤ i;
+              1 + m ≤ i;
               done
           }
         }
@@ -54,7 +54,7 @@ theorem Natural.le_or_successor_le (i m : Natural)
 -- Degree exactly d.
 definition Polynomial.HasDegree (r : Ring)
         (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (d : Natural) : Proposition :=
-  Polynomial.DegreeLessThan(r, p, successor(d))
+  Polynomial.DegreeLessThan(r, p, 1 + d)
   ∧ ¬(Polynomial.coefficientOf(p, d) = Ring.zero(r))
 
 -- A field has no zero divisors: x ≠ 0 and x·y = 0 force y = 0.
@@ -83,8 +83,8 @@ theorem Ring.field_no_zero_divisors (r : Ring)
 -- Top coefficient of a product: coefficientOf(a·b, m+n) = coeff(a,m)·coeff(b,n).
 theorem Polynomial.coefficientOf_product_at_sum (r : Ring)
         (a b : Polynomial(Ring.carrier(r), Ring.zero(r))) (m n : Natural)
-        (aBound : Polynomial.DegreeLessThan(r, a, successor(m)))
-        (bBound : Polynomial.DegreeLessThan(r, b, successor(n)))
+        (aBound : Polynomial.DegreeLessThan(r, a, 1 + m))
+        (bBound : Polynomial.DegreeLessThan(r, b, 1 + n))
         : Polynomial.coefficientOf((a * b), m + n)
           = (Polynomial.coefficientOf(a, m) * Polynomial.coefficientOf(b, n)) := {
   m ≤ m + n;
@@ -97,12 +97,12 @@ theorem Polynomial.coefficientOf_product_at_sum (r : Ring)
              -- i ≤ m: the b-index m+n−i ≥ n+1, so coeff(b,·) = 0.
              case i ≤ m: {
                  m ≠ i by indexNotM;
-                 successor(i) ≤ m;
-                 successor(n + i)
-                       = n + successor(i)
+                 1 + i ≤ m;
+                 1 + (n + i)
+                       = n + (1 + i)
                        ≤ n + m
                        = m + n;
-                 successor(n) ≤ Natural.monus(m + n, i) by Natural.degree_bound_helper as degreeBound;
+                 1 + n ≤ Natural.monus(m + n, i) by Natural.degree_bound_helper as degreeBound;
                  (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
                     = (Polynomial.coefficientOf(a, i) * Ring.zero(r))
                           by bBound(Natural.monus(m + n, i), degreeBound)
@@ -110,10 +110,10 @@ theorem Polynomial.coefficientOf_product_at_sum (r : Ring)
                }
              -- m < i: coeff(a,i) = 0.
              case m ≤ i: {
-                 successor(m) ≤ i as successorMLessOrEqualI;
+                 1 + m ≤ i as onePlusMLessOrEqualI;
                  (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
                     = (Ring.zero(r) * Polynomial.coefficientOf(b, Natural.monus(m + n, i)))
-                          by aBound(i, successorMLessOrEqualI)
+                          by aBound(i, onePlusMLessOrEqualI)
                     = Ring.zero(r)
                }
            }
@@ -131,29 +131,29 @@ theorem Polynomial.coefficientOf_product_at_sum (r : Ring)
 -- A product has degree < (m+n)+1 when the factors are bounded by m+1, n+1.
 theorem Polynomial.product_DegreeLessThan (r : Ring)
         (a b : Polynomial(Ring.carrier(r), Ring.zero(r))) (m n : Natural)
-        (aBound : Polynomial.DegreeLessThan(r, a, successor(m)))
-        (bBound : Polynomial.DegreeLessThan(r, b, successor(n)))
-        : Polynomial.DegreeLessThan(r, (a * b), successor(m + n)) :=
-  (k : Natural) (successorMNLessOrEqualK : successor(m + n) ≤ k) ↦ {
+        (aBound : Polynomial.DegreeLessThan(r, a, 1 + m))
+        (bBound : Polynomial.DegreeLessThan(r, b, 1 + n))
+        : Polynomial.DegreeLessThan(r, (a * b), 1 + (m + n)) :=
+  (k : Natural) (onePlusMNLessOrEqualK : 1 + (m + n) ≤ k) ↦ {
     ∀ (i : Natural). i ≤ k
         → (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(k, i)))
             = Ring.zero(r)
         by (i : Natural) (iLessOrEqualK : i ≤ k) ↦ {
-             i ≤ m ∨ successor(m) ≤ i;
+             i ≤ m ∨ 1 + m ≤ i;
              done by cases {
                case i ≤ m: {
                    n + i ≤ n + m = m + n;
-                   successor(n + i) ≤ successor(m + n) ≤ k;
-                   successor(n) ≤ Natural.monus(k, i) by Natural.degree_bound_helper as degreeBound;
+                   1 + (n + i) ≤ 1 + (m + n) ≤ k;
+                   1 + n ≤ Natural.monus(k, i) by Natural.degree_bound_helper as degreeBound;
                    (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(k, i)))
                       = (Polynomial.coefficientOf(a, i) * Ring.zero(r))
                             by bBound(Natural.monus(k, i), degreeBound)
                       = Ring.zero(r)
                  }
-               case successor(m) ≤ i as successorMLessOrEqualI:
+               case 1 + m ≤ i as onePlusMLessOrEqualI:
                    (Polynomial.coefficientOf(a, i) * Polynomial.coefficientOf(b, Natural.monus(k, i)))
                       = (Ring.zero(r) * Polynomial.coefficientOf(b, Natural.monus(k, i)))
-                            by aBound(i, successorMLessOrEqualI)
+                            by aBound(i, onePlusMLessOrEqualI)
                       = Ring.zero(r)
              }
            };
@@ -178,7 +178,7 @@ theorem Polynomial.HasDegree_product (r : Ring)
         : Polynomial.HasDegree(r, (a * b), m + n) := {
   let ⟨aBound, aLeadingNonzero⟩ := aDegree;
   let ⟨bBound, bLeadingNonzero⟩ := bDegree;
-  Polynomial.DegreeLessThan(r, (a * b), successor(m + n)) by Polynomial.product_DegreeLessThan;
+  Polynomial.DegreeLessThan(r, (a * b), 1 + (m + n)) by Polynomial.product_DegreeLessThan;
   ¬(Polynomial.coefficientOf((a * b), m + n) = Ring.zero(r))
       by (topZero : Polynomial.coefficientOf((a * b), m + n) = Ring.zero(r)) ↦ {
           -- coeff(a,m)·coeff(b,n) is the top coefficient of a·b, which is 0;
@@ -205,7 +205,7 @@ theorem Polynomial.HasDegree_unique (r : Ring)
     case d ≤ e: {
         suppose d ≠ e as dNotEqualsE for contradiction {
             e ≠ d by dNotEqualsE;
-            successor(d) ≤ e;
+            1 + d ≤ e;
             Polynomial.coefficientOf(p, e) = Ring.zero(r);
             done
         };
@@ -213,7 +213,7 @@ theorem Polynomial.HasDegree_unique (r : Ring)
       }
     case e ≤ d: {
         suppose d ≠ e as dNotEqualsE for contradiction {
-            successor(e) ≤ d;
+            1 + e ≤ d;
             Polynomial.coefficientOf(p, d) = Ring.zero(r);
             done
         };
