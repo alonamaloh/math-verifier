@@ -173,8 +173,8 @@ End each with `;`; the block returns its final non-`;` expression.
   is the same lookup as a bare term. Inside an equation-shaped case
   arm (`case x = successor(k) for some k:`), addressing the REFINED
   statement (`P(successor(k))` when the context holds `P(x)`)
-  transports silently along the arm's equation (single-position
-  shapes).
+  transports silently along the arm's equation — including facts
+  mentioning the scrutinee several times, at any nesting depth.
 - `?` — a hole in a function-call argument position, solved by unification
   from the goal/other arguments (does not invoke the auto-prover).
 - `recalling f, g` after a `by` hint — bring extra named facts into
