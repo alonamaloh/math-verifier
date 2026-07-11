@@ -483,7 +483,13 @@ void Elaborator::warnIfArmIsContradictionOnly(
         ExpressionPointer armBody, size_t armCount, bool hasOtherwise,
         const SurfaceStructuredClaimArm& arm) {
         if (!reportUnusedNames_) return;
-        if (armCount != 2 || !hasOtherwise) return;
+        // Standing lint: EM splits only (the fold there is always clean).
+        // MATH_LINT_CONTRADICTION_ARMS_ALL widens to every by-cases arm —
+        // the sweep instrument for cited-disjunction splits whose refuted
+        // arm the disjunctive-syllogism prover step can absorb.
+        if (!getenv("MATH_LINT_CONTRADICTION_ARMS_ALL")) {
+            if (armCount != 2 || !hasOtherwise) return;
+        }
         if (!proofConcludesByExFalso(armBody)) return;
         std::cerr << "warning: " << moduleName_ << ":" << arm.line
                   << ":" << arm.column

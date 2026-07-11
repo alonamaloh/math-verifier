@@ -281,6 +281,20 @@ ExpressionPointer Elaborator::tryDisjunctiveSyllogism(
                 } catch (const TypeError&) {
                 }
             }
+            // Ground fallback: a numeral side (`(1 : Natural) = 0` in a
+            // divides-alternative disjunction) is refuted by the
+            // ground-relation tier — search-free, and exactly the
+            // decision the cited-disjunction sites' absurd arms perform
+            // by hand.
+            ExpressionPointer notSide = makePi(
+                "_refuted", sideClosed, makeConstant("False", {}));
+            try {
+                ExpressionPointer ground =
+                    tryGroundRelationTier(notSide, localBinders);
+                if (ground) return ground;
+            } catch (const ElaborateError&) {
+            } catch (const TypeError&) {
+            }
             return nullptr;
         };
         for (const ContextFact& fact : facts) {
