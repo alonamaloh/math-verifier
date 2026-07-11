@@ -2133,18 +2133,33 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                     }
                     ExpressionPointer proved;
                     if (inSpeculativeContextScan_) {
-                        // Under the scan, a GROUND premise gets a
-                        // SEARCH-FREE lookup only: a premise-free
-                        // `automatic` fact whose statement is
-                        // definitionally the premise (the cancellation
-                        // lemmas' `1 ≤ 2` against `one_le_two`).
-                        // Running the full bare prover here multiplies
-                        // per-candidate cost catastrophically on
-                        // disjunction-shaped goals. The hash prefilter
-                        // admits BOTH spellings: the premise as stated
-                        // and its WHNF (a transparent `≤` premise
-                        // unfolds to its Exists body while the fact is
-                        // stored in `≤` form).
+                        // Under the scan, a GROUND premise gets
+                        // SEARCH-FREE discharge only: running the full
+                        // bare prover here multiplies per-candidate
+                        // cost catastrophically on disjunction-shaped
+                        // goals. The ground-relation tier is the
+                        // canonical search-free decision for closed
+                        // numeral relations (a cancellation lemma's
+                        // `1 ≤ 2`) — try it first.
+                        try {
+                            proved = tryGroundRelationTier(
+                                concretePremise, localBinders);
+                        } catch (const ElaborateError&) {
+                            proved = nullptr;
+                        } catch (const TypeError&) {
+                            proved = nullptr;
+                        }
+                        if (proved) {
+                            bindings[innerIndex] = proved;
+                            continue;
+                        }
+                        // Fallback: a premise-free `automatic` fact
+                        // whose statement is definitionally the premise
+                        // (non-numeral ground facts). The hash
+                        // prefilter admits BOTH spellings: the premise
+                        // as stated and its WHNF (a transparent `≤`
+                        // premise unfolds to its Exists body while the
+                        // fact is stored in `≤` form).
                         uint64_t premiseHash = spineHash(concreteOpened);
                         uint64_t premiseHashUnreduced = spineHash(
                             openOverLocalBinders(
