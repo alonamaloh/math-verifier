@@ -1178,7 +1178,13 @@ private:
         // appends it as a trailing pattern arg to EVERY case; for a
         // non-recursive constructor (no IH slot) that trailing name is
         // spurious and is dropped here. Empty for ordinary pattern matches.
-        const std::string& injectedInductionHypothesisName = "");
+        const std::string& injectedInductionHypothesisName = "",
+        // Whether arm goals and destructured binders use the PUBLIC
+        // spellings (`zero`/`successor` wrappers, carrier `Natural`) —
+        // true for scrutinees spelled at the sealed alias, false for
+        // raw-floor case splits over `Natural.Raw` itself, whose binders
+        // must stay raw once the alias is opaque.
+        bool spellPublicly = true);
 
     // Builds the body for one outer case of a pattern-match definition,
     // walking the user's pattern positions from `patternIndex` onwards.

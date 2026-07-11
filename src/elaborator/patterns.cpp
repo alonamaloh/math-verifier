@@ -416,13 +416,21 @@ void Elaborator::elaboratePatternMatchDefinition(
         // The outer-binder stack lets the case body and any
         // non-scrutinee argument types reference outer binders.
         std::vector<ExpressionPointer> caseLambdas;
+        // Arm goals and destructured binders keep the scrutinee's own
+        // spelling: public wrappers for an alias-spelled scrutinee, raw
+        // constructors for a raw-floor definition over the inductive
+        // itself.
+        bool spellPublicly =
+            headConstantName(argumentKernelTypes[0]) != inductiveName;
         for (const auto& constructorName : inductive->constructorNames) {
             caseLambdas.push_back(
                 buildCaseLambda(declaration, constructorName,
                                 inductiveName,
                                 inductiveUniverseArguments, motive,
                                 parameterValues,
-                                outerBinderStack));
+                                outerBinderStack,
+                                /*injectedInductionHypothesisName=*/"",
+                                spellPublicly));
         }
 
         // Build the eliminator call — the boundary combinator when the
@@ -587,7 +595,8 @@ ExpressionPointer Elaborator::buildCaseLambda(
         ExpressionPointer motive,
         const std::vector<ExpressionPointer>& parameterValues,
         const std::vector<LocalBinder>& outerBinderStack,
-        const std::string& injectedInductionHypothesisName) {
+        const std::string& injectedInductionHypothesisName,
+        bool spellPublicly) {
 
         Frame frame(*this,
             "case for '" + constructorName + "' of '"
@@ -822,7 +831,9 @@ ExpressionPointer Elaborator::buildCaseLambda(
             destructuredArgumentPositions.push_back(lambdaBinders.size());
             lambdaBinders.push_back(
                 {destructuredNames[i],
-                 publicTypeSpelling(constructorArguments[i].type)});
+                 spellPublicly
+                     ? publicTypeSpelling(constructorArguments[i].type)
+                     : constructorArguments[i].type});
         }
         for (size_t i = 0; i < constructorArguments.size(); ++i) {
             const auto& constructorArgument = constructorArguments[i];
@@ -917,9 +928,12 @@ ExpressionPointer Elaborator::buildCaseLambda(
             // Apply to the constructor application of (params,
             // destructured-values) — spelled publicly (see
             // publicConstructorSpelling) so arm goals match the
-            // library's spellings.
+            // library's spellings; raw-floor splits over the raw
+            // inductive itself keep the constructor spelling.
             ExpressionPointer constructorApplication =
-                makeConstant(publicConstructorSpelling(constructorName),
+                makeConstant(spellPublicly
+                                 ? publicConstructorSpelling(constructorName)
+                                 : constructorName,
                               inductiveUniverseArguments);
             for (const auto& parameterValue : parameterValues) {
                 constructorApplication = makeApplication(

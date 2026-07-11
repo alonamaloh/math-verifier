@@ -15,9 +15,10 @@ import Equality.basics
 import Logic.basics
 
 -- monus(a, b) = a -̇ b. Structural on the first argument; inner case
--- on the second when needed.
+-- on the second when needed. The recursion lives at the raw floor
+-- (self-contained, below the seal) and is re-exposed at the alias.
 --
--- Declared `opaque` so the kernel won't δ-unfold `monus` during
+-- The wrapper is `opaque` so the kernel won't δ-unfold `monus` during
 -- typechecking. Downstream proofs reason about monus through the
 -- characterising lemmas below (`monus_zero_left`, `monus_zero`,
 -- `monus_succ_succ`) rather than by relying on β/ι firing through
@@ -25,13 +26,16 @@ import Logic.basics
 -- definitional shape — e.g. `rewrite` finds the un-reduced form
 -- `monus(succ(k), succ(predD))` in goal types because the kernel
 -- leaves it as a stuck `monus(_, _)` application.
-opaque definition Natural.monus : Natural → Natural → Natural
-  | zero,         _ => zero
+definition Natural.Raw.monus : Natural.Raw → Natural.Raw → Natural.Raw
+  | zero,         _ => Natural.Raw.zero
   | successor(k), b =>
       cases b {
-        | zero         => successor(k)
-        | successor(j) => Natural.monus(k, j)
+        | zero         => Natural.Raw.successor(k)
+        | successor(j) => Natural.Raw.monus(k, j)
       }
+
+opaque definition Natural.monus : Natural → Natural → Natural :=
+  unfold Natural in Natural.Raw.monus
 
 -- ----------------------------------------------------------------------
 -- Characterising lemmas. The `by unfolding Natural.monus` here is

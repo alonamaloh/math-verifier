@@ -179,7 +179,11 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # `Natural.recursion.{u}` in Natural/basics.math — the boundary recursion
 # combinator is universe-polymorphic by nature, so its two universe
 # annotations are an intended boundary.
-CLEAN_LEAK_BUDGET ?= 207
+# 2026-07-11: re-armed 207 → 218. Stage 4 of PLAN_NATURAL_SEALING split the
+# table ops into raw-floor recursions + alias wrappers (basics/monus/power/
+# floor_divide): the eleven new `unfold Natural in` are the seal's own
+# boundary plumbing — the raw floor piercing the alias it defines.
+CLEAN_LEAK_BUDGET ?= 218
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the

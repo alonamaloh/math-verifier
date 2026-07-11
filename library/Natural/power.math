@@ -17,15 +17,21 @@ import Logic.exists
 import Equality.basics
 
 -- Base first, recursion on the exponent — the same shape as
--- `Real.power`, so `Natural.power(base, k) = base^k`.
+-- `Real.power`, so `Natural.power(base, k) = base^k`. The recursion
+-- lives at the raw floor; its step calls the PUBLIC `Natural.multiply`
+-- so the reduct keeps the spelling downstream proofs read.
 --
--- Opaque: downstream proofs reason through `power_zero` /
--- `power_succ` rather than letting the kernel ι-reduce on
+-- The wrapper is opaque: downstream proofs reason through `power_zero`
+-- / `power_succ` rather than letting the kernel ι-reduce on
 -- constructor-shaped exponents. The two characterising lemmas
 -- below are the only places that touch the body.
-opaque definition Natural.power (base : Natural) : Natural → Natural
-  | zero         => successor(zero)
-  | successor(k) => base * Natural.power(base, k)
+definition Natural.Raw.power (base : Natural.Raw) : Natural.Raw → Natural.Raw
+  | zero         => Natural.Raw.successor(Natural.Raw.zero)
+  | successor(k) =>
+      unfold Natural in Natural.multiply(base, Natural.Raw.power(base, k))
+
+opaque definition Natural.power (base : Natural) : Natural → Natural :=
+  unfold Natural in Natural.Raw.power(base)
 
 operator (^) on (Natural, Natural) := Natural.power
 

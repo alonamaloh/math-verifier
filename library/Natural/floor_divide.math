@@ -30,37 +30,49 @@ import Logic.exists
 -- args because the elaborator's induction-hypothesis handling doesn't
 -- expose the parameter names.)
 --
--- Both step functions are `opaque`: downstream proofs reason
--- through the characterising lemmas (`*_zero_fuel`, `*_succ_fits`,
--- `*_succ_too_big`) rather than letting the kernel reduce through
--- a fully concrete fuel/dividend.
-opaque definition Natural.floor_divide_step
-        : (fuel divisor dividend : Natural) → Natural
-  | zero,            _,       _        => zero
+-- The recursions live at the raw floor; the arm bodies call the PUBLIC
+-- `Natural.monus` so the reducts keep the spelling the characterising
+-- proofs below substitute along. The wrappers are `opaque`: downstream
+-- proofs reason through the characterising lemmas (`*_zero_fuel`,
+-- `*_succ_fits`, `*_succ_too_big`) rather than letting the kernel
+-- reduce through a fully concrete fuel/dividend.
+definition Natural.Raw.floor_divide_step
+        : (fuel divisor dividend : Natural.Raw) → Natural.Raw
+  | zero,            _,       _        => Natural.Raw.zero
   | successor(fuel), divisor, dividend =>
+      unfold Natural in
       cases Natural.monus(divisor, dividend) {
         | zero =>
             -- divisor ≤ dividend: recurse with dividend - divisor,
             -- count one more.
             successor(
-                Natural.floor_divide_step(
+                Natural.Raw.floor_divide_step(
                     fuel, divisor, Natural.monus(dividend, divisor)))
         | successor(_) =>
             -- divisor > dividend: stop.
             0
       }
 
-opaque definition Natural.modulo_step
-        : (fuel divisor dividend : Natural) → Natural
+opaque definition Natural.floor_divide_step
+        : (fuel divisor dividend : Natural) → Natural :=
+  unfold Natural in Natural.Raw.floor_divide_step
+
+definition Natural.Raw.modulo_step
+        : (fuel divisor dividend : Natural.Raw) → Natural.Raw
   | zero,            _,       dividend => dividend
   | successor(fuel), divisor, dividend =>
+      unfold Natural in
       cases Natural.monus(divisor, dividend) {
         | zero =>
-            Natural.modulo_step(
+            Natural.Raw.modulo_step(
                 fuel, divisor, Natural.monus(dividend, divisor))
         | successor(_) =>
             dividend
       }
+
+opaque definition Natural.modulo_step
+        : (fuel divisor dividend : Natural) → Natural :=
+  unfold Natural in Natural.Raw.modulo_step
 
 -- Top-level functions in Lean's argument order (dividend, divisor),
 -- with fuel = dividend (always enough since each iteration reduces the

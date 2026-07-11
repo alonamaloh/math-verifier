@@ -399,11 +399,16 @@ void Elaborator::runNumeralTableSelfCheck() {
         };
         // The ops plus the recursion helpers behind them, made
         // transparent for the duration so the kernel can reduce the
-        // definition bodies.
+        // definition bodies. The public ops are wrappers over raw-floor
+        // twins (PLAN_NATURAL_SEALING Stage 4), so the twins join the
+        // list — the reduction must reach the actual recursions.
         static const char* transparencyNames[] = {
             "Natural.add", "Natural.multiply", "Natural.monus",
             "Natural.power", "Natural.floor_divide", "Natural.modulo",
-            "Natural.floor_divide_step", "Natural.modulo_step"};
+            "Natural.floor_divide_step", "Natural.modulo_step",
+            "Natural.Raw.add", "Natural.Raw.multiply",
+            "Natural.Raw.monus", "Natural.Raw.power",
+            "Natural.Raw.floor_divide_step", "Natural.Raw.modulo_step"};
         std::vector<std::pair<std::string, Opacity>> opacityRestores;
         for (const char* name : transparencyNames) {
             auto iterator = environment_.declarations.find(name);

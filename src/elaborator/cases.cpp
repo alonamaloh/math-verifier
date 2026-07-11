@@ -1866,12 +1866,18 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
         }
 
         // Build a case lambda for each constructor (in declared order).
+        // Arm goals and destructured binders keep the scrutinee's own
+        // spelling: public wrappers for an alias-spelled scrutinee, raw
+        // constructors for a raw-floor split over the inductive itself.
+        bool spellPublicly =
+            headConstantName(scrutineeType) != inductiveName;
         std::vector<ExpressionPointer> caseLambdas;
         for (const auto& constructorName : inductive->constructorNames) {
             caseLambdas.push_back(buildCaseLambda(
                 syntheticDeclaration, constructorName, inductiveName,
                 inductiveUniverseArguments, motive, parameterValues,
-                localBinders, cases.inductionHypothesisName));
+                localBinders, cases.inductionHypothesisName,
+                spellPublicly));
         }
 
         // Assemble the eliminator call — the boundary combinator when
