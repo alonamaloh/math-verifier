@@ -5749,6 +5749,21 @@ private:
     // Constant), i.e. when no δ-step is available.
     ExpressionPointer unfoldHeadConstantOneStep(ExpressionPointer expr);
 
+    // Rewrite every `<T>.subtract` application in `term` to its unfolded
+    // add∘negate body (defeq — subtraction is stated sugar). The
+    // monotonicity index matches rule conclusions structurally, so a goal
+    // spelled `x − z < y − z` never meets the `+`-stated rules without
+    // this. Returns `term` itself when nothing unfolds.
+    ExpressionPointer unfoldSubtractSpellings(ExpressionPointer term);
+
+    // The monotonicity-index body at ONE goal spelling; the public
+    // tryMonotonicityRecursion tries the stated spelling first, then the
+    // subtract-unfolded one.
+    ExpressionPointer tryMonotonicityRecursionAtSpelling(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth);
+
     void unifyConstructorParameters(
         ExpressionPointer pattern,
         ExpressionPointer target,

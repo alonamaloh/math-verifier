@@ -1015,11 +1015,61 @@ void Elaborator::registerMonotonicityRule(const std::string& theoremName,
     monotonicityRuleIndex_[key].push_back(std::move(rule));
 }
 
+ExpressionPointer Elaborator::unfoldSubtractSpellings(
+        ExpressionPointer term) {
+    if (!term) return term;
+    auto endsWith = [](const std::string& name, const char* suffix) {
+        std::string dotted = suffix;
+        return name.size() > dotted.size()
+            && name.compare(name.size() - dotted.size(),
+                            dotted.size(), dotted) == 0;
+    };
+    if (endsWith(spineHeadConstantName(term), ".subtract")) {
+        if (ExpressionPointer unfolded = unfoldHeadConstantOneStep(term)) {
+            return unfoldSubtractSpellings(unfolded);
+        }
+    }
+    if (auto* application = std::get_if<Application>(&term->node)) {
+        ExpressionPointer function =
+            unfoldSubtractSpellings(application->function);
+        ExpressionPointer argument =
+            unfoldSubtractSpellings(application->argument);
+        if (function == application->function
+            && argument == application->argument) {
+            return term;
+        }
+        return makeApplication(std::move(function), std::move(argument));
+    }
+    return term;
+}
+
 ExpressionPointer Elaborator::tryMonotonicityRecursion(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
         int depth) {
     if (depth <= 0) return nullptr;
+    // Stated spelling first — some rules genuinely speak subtraction
+    // (`x − ε < x`) and must keep matching. Only when that fails, retry
+    // at the add∘negate unfolding of any subtracted endpoints: most rules
+    // are stated over `+`, so `x − z < y − z` never meets them at the
+    // stated spelling, and the proof built at the unfolded spelling
+    // type-checks at the stated goal by defeq.
+    if (ExpressionPointer proof = tryMonotonicityRecursionAtSpelling(
+            goalClosed, localBinders, depth)) {
+        return proof;
+    }
+    ExpressionPointer normalized = unfoldSubtractSpellings(goalClosed);
+    if (normalized != goalClosed) {
+        return tryMonotonicityRecursionAtSpelling(
+            normalized, localBinders, depth);
+    }
+    return nullptr;
+}
+
+ExpressionPointer Elaborator::tryMonotonicityRecursionAtSpelling(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int depth) {
     OrderJudgment judgment;
     if (!parseOrderJudgment(goalClosed, judgment)) return nullptr;
     std::string leftHead = spineHeadConstantName(judgment.leftSide);
@@ -1040,6 +1090,9 @@ ExpressionPointer Elaborator::tryMonotonicityRecursion(
         probeKeys.push_back(prefix + leftHead + "\x1f*");
     }
     Context openedContext = buildContextFromLocalBinders(localBinders);
+    // Conjunction-leg premise pool, collected lazily on the first premise
+    // the binder scan can't discharge (most calls never need it).
+    std::optional<std::vector<ContextFact>> conjunctionLegFacts;
     for (const std::string& key : probeKeys) {
     auto bucket = monotonicityRuleIndex_.find(key);
     if (bucket == monotonicityRuleIndex_.end()) continue;
@@ -1101,6 +1154,49 @@ ExpressionPointer Elaborator::tryMonotonicityRecursion(
                             static_cast<int>(localBinders.size())
                             - 1 - j);
                         break;
+                    }
+                }
+                // Conjunction legs participate as premises exactly like
+                // separately-stated hypotheses (`-q < d ∧ d < q` from an
+                // absolute-value bounds split supplies `d < q`) — the
+                // same projection the transitivity bridge draws edges
+                // from. Gated hard (stated-head prefilter, structural
+                // check before defeq): this runs inside budgeted
+                // speculative searches, and an ungated scan starves the
+                // downstream tactics.
+                if (!proof) {
+                    if (!conjunctionLegFacts) {
+                        conjunctionLegFacts =
+                            collectLocalBinderFacts(localBinders);
+                    }
+                    std::string slotHead =
+                        spineHeadConstantName(slotType);
+                    for (const ContextFact& fact : *conjunctionLegFacts) {
+                        if (slotHead.empty()
+                            || spineHeadConstantName(fact.type)
+                                   != slotHead) {
+                            continue;
+                        }
+                        ExpressionPointer candidateType =
+                            openOverLocalBinders(
+                                fact.type, localBinders,
+                                localBinders.size());
+                        bool equal =
+                            structurallyEqual(candidateType,
+                                              slotTypeNormalised);
+                        if (!equal) {
+                            try {
+                                equal = isDefinitionallyEqual(
+                                    environment_, openedContext,
+                                    candidateType, slotTypeNormalised);
+                            } catch (const TypeError&) {
+                                equal = false;
+                            }
+                        }
+                        if (equal) {
+                            proof = fact.proofTerm;
+                            break;
+                        }
                     }
                 }
             }
