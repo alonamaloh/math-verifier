@@ -1194,8 +1194,11 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // — narrow the bridge to the supplied equality (passed via
         // byHint).
         if (claim.bySubstitution) {
-            return elaborateClaimBySubstitution(
-                claim, goalClosed, localBinders, line);
+            ExpressionPointer substitutionResult =
+                elaborateClaimBySubstitution(
+                    claim, goalClosed, localBinders, line);
+            reportClaimHintDiagnostics(claim, goalClosed, localBinders, line);
+            return substitutionResult;
         }
 
         // `claim P by induction on E …` — the byHint is the
@@ -1340,6 +1343,21 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             }
         }
 
+        reportClaimHintDiagnostics(claim, goalClosed, localBinders, line);
+        return result;
+    }
+
+// Hinted-claim diagnostics shared by every hint form that reaches a
+// proof: the B5 classifier record and the `--check-redundant-by`
+// probe. One body so `claim P by H` and `claim P by substituting E`
+// are measured identically — the substitution path's early return had
+// kept its hints invisible to both instruments (B3-residue forensics,
+// 2026-07-11).
+void Elaborator::reportClaimHintDiagnostics(
+        const SurfaceStructuredClaim& claim,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
         // B5 classifier (`MATH_CLASSIFY_HINTS`): record this hinted claim's
         // shape for the tier-sizing report. The `closes` bit is the same
         // budget-capped speculative re-proof the redundancy check runs;
@@ -1347,7 +1365,9 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // speculative success spurious (see the exemption note below).
         if (classifyHintsEnabled()) {
             ExpressionPointer classifyAttempt;
-            if (std::get_if<SurfaceUnfold>(&claim.byHint->node) == nullptr) {
+            if (!claim.byHint
+                || std::get_if<SurfaceUnfold>(&claim.byHint->node)
+                       == nullptr) {
                 uint64_t stepsBefore = kernelStepsSoFar();
                 RedundancyBudgetGuard budgetGuard(*this);
                 try {
@@ -1436,13 +1456,15 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                             << prettyPrint(localBinders[bi].type) << "\n";
                     }
                 }
-            } else if (claim.byHint) {
+            } else if (claim.byHint && !claim.bySubstitution) {
                 // The whole `by` isn't removable, but maybe its ARGUMENTS are:
                 // `claim T by Lemma(args)` where `by Lemma` alone (args
                 // inferred from the goal, premises discharged from context or
                 // backward-chained) would also close it. Mirrors the calc-step
                 // args check in calc.cpp. Only a real theorem cited with
                 // explicit args; congruenceOf has its own dedicated check.
+                // Substitution hints stay out: their byHint is the equality
+                // to rewrite with, not a citation whose arguments could drop.
                 auto* surfApp = std::get_if<SurfaceApplication>(
                     &claim.byHint->node);
                 auto* head = surfApp
@@ -1505,7 +1527,6 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                 }
             }
         }
-        return result;
     }
 
 bool Elaborator::hintShapeIsProofTerm(const SurfaceExpression& byHint) {

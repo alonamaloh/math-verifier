@@ -2127,6 +2127,15 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // Hinted-claim diagnostics (B5 classifier + `--check-redundant-by`),
+    // shared by the ordinary byHint path and the substitution path so
+    // every hint form is measured by the same instruments.
+    void reportClaimHintDiagnostics(
+        const SurfaceStructuredClaim& claim,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
     //   4. Elaborate each arm body under an anonymous binder of its
     //      disjunct's type; build the two lambdas.
     //   5. Emit `Or.eliminate(A, B, Goal, leftLambda, rightLambda,

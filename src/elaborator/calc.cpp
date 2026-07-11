@@ -422,12 +422,13 @@ ExpressionPointer Elaborator::elaborateCalc(
                     // proposition P (its type is the `Proposition` sort) rather
                     // than a proof, the user cited a fact. Prove P and bridge
                     // its proof to the step exactly like `by <proof-of-P>`.
-                    bool fromFactCitation = false;
+                    // Fact citations get the same redundancy probe as any
+                    // other hint: removing the `by (P)` leaves exactly the
+                    // bare step, which the probe below re-proves faithfully.
                     if (termIsProposition(localBinders, stepProofKernel)) {
                         stepProofKernel = bridgeCitedFact(
                             stepProofKernel, stepRelationType,
                             localBinders, step.line);
-                        fromFactCitation = true;
                     }
                     // B5 classifier (`MATH_CLASSIFY_HINTS`): record this
                     // hinted step's shape for the tier-sizing report. The
@@ -443,17 +444,15 @@ ExpressionPointer Elaborator::elaborateCalc(
                             uint64_t stepsBefore = kernelStepsSoFar();
                             RedundancyBudgetGuard budgetGuard(*this);
                             try {
-                                if (isEqualityStep) {
-                                    classifyAttempt = autoProveCalcStep(
-                                        localBinders, previousKernel,
-                                        nextKernel, carrierType, carrierLevel,
-                                        stepRelationType,
-                                        step.line, step.column);
-                                } else {
-                                    classifyAttempt = autoProveClaim(
-                                        stepRelationType, localBinders,
-                                        step.line);
-                                }
+                                // Faithful to the bare-step path for EVERY
+                                // relation: a by-less `=` step also runs the
+                                // full autoProveClaim (see the one-path note
+                                // at the bare-equality branch below), so
+                                // probing with the narrower autoProveCalcStep
+                                // under-counted closes.
+                                classifyAttempt = autoProveClaim(
+                                    stepRelationType, localBinders,
+                                    step.line);
                             } catch (const ElaborateError&) {
                                 classifyAttempt = nullptr;
                             } catch (const TypeError&) {
@@ -474,39 +473,30 @@ ExpressionPointer Elaborator::elaborateCalc(
                             step.stepProof.get(),
                             classifyAttempt != nullptr, step.line);
                     }
-                    bool checkThisStep = !fromFactCitation
-                        && reportRedundantBy_
+                    bool checkThisStep = reportRedundantBy_
                         && (isEqualityStep || reportRedundantByNonEq_);
                     if (checkThisStep) {
                         ExpressionPointer autoAttempt;
                         uint64_t stepsBefore = kernelStepsSoFar();
                         RedundancyBudgetGuard budgetGuard(*this);
                         try {
-                            if (isEqualityStep) {
-                                autoAttempt = autoProveCalcStep(
-                                    localBinders, previousKernel, nextKernel,
-                                    carrierType, carrierLevel,
-                                    stepRelationType,
-                                    step.line, step.column);
-                            } else {
-                                // Non-= step (≤/</≥/>): re-prove EXACTLY as a
-                                // by-less step would at build time — the full
-                                // autoProveClaim, not the cheap targeted
-                                // tryContextFactMatch. The targeted match jumps
-                                // straight to the closing hypothesis and looks
-                                // near-free, but removing the `by` makes the
-                                // real build run autoProveClaim, whose library
-                                // scan / equality battery can burn 50k+ kernel
-                                // steps before that hypothesis wins. Only the
-                                // faithful path measures the TRUE by-less cost,
-                                // so the budget guard can leave a genuinely
-                                // expensive re-proof unflagged (the hint earns
-                                // its keep on speed). Gated behind
-                                // --check-redundant-by-non-eq; the budget caps
-                                // the search so the check stays bounded.
-                                autoAttempt = autoProveClaim(
-                                    stepRelationType, localBinders, step.line);
-                            }
+                            // Re-prove EXACTLY as a by-less step would at
+                            // build time — the full autoProveClaim for every
+                            // relation. A bare `=` step runs autoProveClaim
+                            // too (the one-path note at the bare-equality
+                            // branch below), so the narrower autoProveCalcStep
+                            // this probe once used missed every hint whose
+                            // bare close needs the later tactics (context-fact
+                            // match, equality bridges, cast tiers). And only
+                            // the faithful path measures the TRUE by-less
+                            // cost, so the budget guard can leave a genuinely
+                            // expensive re-proof unflagged (the hint earns
+                            // its keep on speed). Non-`=` relations stay
+                            // gated behind --check-redundant-by-non-eq; the
+                            // budget caps the search so the check stays
+                            // bounded.
+                            autoAttempt = autoProveClaim(
+                                stepRelationType, localBinders, step.line);
                         } catch (const ElaborateError&) {
                             autoAttempt = nullptr;
                         } catch (const TypeError&) {
