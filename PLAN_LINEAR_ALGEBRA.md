@@ -234,15 +234,26 @@ Update this section before ending any session that works on the plan.
   - **FinitelyGenerated ⟹ finite basis (pruning) — NOT STARTED.** Prune a
     finite spanning family down to an independent one (choice-free); needs
     "remove one index from a `NaturalsBelow(count)` family" reindexing.
-  - **Friction found this session (the branch's deliverable):** (1) `by
-    substituting eq1, eq2` (comma-separated) does NOT parse — `substituting`
-    takes a SINGLE equation; split into one step per equation. (2) The
-    Stage-C "accessor-under-congruence mis-pins implicits" recurred — a
-    backward scale-rewrite nested under `+` fails; fix = extract the leg as
-    a named reversed equation, then `by substituting <leg>`. (3) `by cases`
-    cannot justify a CALC STEP — pull the split into a named fact `<prop>
-    by { cases <disj> { | Or.introduceLeft … | Or.introduceRight … } }`.
-    (4) `Natural.lt_or_le` lives in `Natural.division`, not `Natural.order`.
+  - **Friction found this session, re-triaged (the branch's deliverable):**
+    (1) `by substituting eq1, eq2` (comma) is not supported — `substituting`
+    rewrites with ONE equation (the search picks a single candidate, it does
+    not chain rewrites); split into one `substituting` per step. FIXED AT
+    THE SOURCE: the parser now rejects the comma with a clear message
+    (`ErrorTest/substituting_comma_list`) instead of a confusing downstream
+    "expected expression". (2) GENUINE recurring BUG — the Stage-C
+    "accessor-under-congruence mis-pins implicits" (backward unification
+    from the outer step equation beats forward from the premise) recurred
+    for a backward scale-rewrite nested under `+`; workaround = extract the
+    leg as a named reversed equation, then `by substituting <leg>`. A root
+    fix in the citation/diff matcher is still open. (3) NON-BUG (my usage
+    error): the decidable `by cases { case P as h: … otherwise as h2: … }`
+    form DOES work as a calc-step justification (needs `import axioms` for
+    `otherwise`) — I had wrongly used the raw `cases E { | Or.introduceLeft
+    … }` pattern-match, which is not the calc-step hint grammar AND is the
+    discouraged raw-CIC form. Prefer the decidable form. (4) NON-BUG:
+    `Natural.lt_or_le` is in `Natural.division` BY DESIGN (its proof needs
+    the trichotomy helpers that live there — see the file header); a
+    discoverability note, not a misplacement.
   - Note: bundled induced spaces of kernel/image (`Subspace.vector_space`
     applied to `kernel_is_subspace`) were left to consumers — construct
     them where Stage G needs dimensions.
