@@ -293,6 +293,24 @@ theorem Natural.lt_of_not_le (a b : Natural)
   }
 }
 
+-- Dual of `lt_of_not_le`: a strict order that fails to hold gives the
+-- reverse `≤`. The decidability of the Natural order — the fact that makes
+-- `cases Natural.compare_strict …` avoidable, proving an order by refuting
+-- its opposite (`¬(a < b) by { … }; b ≤ a`) instead of case-splitting the
+-- comparison.
+theorem Natural.less_or_equal_of_not_less_than (a b : Natural)
+        (notLessThan : ¬(a < b)) : b ≤ a := {
+  a < b ∨ a = b ∨ b < a by Natural.lt_trichotomy;
+  done by cases {
+    case a < b as aBelowB: done
+    case a = b ∨ b < a as equalOrAbove:
+        done by cases {
+          case a = b as equal: { b ≤ a; done }
+          case b < a as bBelowA: { b ≤ a by Natural.LessThan.weaken; done }
+        }
+  }
+}
+
 -- Successor preserves ≤.
 automatic theorem Natural.successor_less_or_equal_successor (a b : Natural)
         (proof : a ≤ b) : successor(a) ≤ successor(b) :=

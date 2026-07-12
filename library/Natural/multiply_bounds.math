@@ -43,28 +43,26 @@ automatic theorem Natural.multiply_monotone_left (c a b : Natural) (aLeB : a ≤
 theorem Natural.quotient_strict_absurd
         (divisor quotientLow remainderLow quotientHigh remainderHigh : Natural)
         (remainderLowBound : successor(remainderLow) ≤ divisor)
-        (strictlyBelow : successor(quotientLow) ≤ quotientHigh)
+        (strictlyBelow : quotientLow < quotientHigh)
         (equation : divisor * quotientLow + remainderLow = divisor * quotientHigh + remainderHigh)
         : False := {
-  choose gap such that quotientHigh = successor(quotientLow) + gap
-       from Natural.subtraction_witness;
+  choose gap such that quotientLow + (1 + gap) = quotientHigh
+       from Natural.lt_elim;
+  quotientLow + (1 + gap) = quotientHigh as gapEquation;
   -- Cancel divisor*quotientLow from the equation, exposing rLow on the left
   -- and divisor + divisor*gap + rHigh on the right.
   divisor * quotientLow + remainderLow
      = divisor * quotientHigh + remainderHigh
-     = divisor * (successor(quotientLow) + gap) + remainderHigh
-     = (divisor * successor(quotientLow) + divisor * gap) + remainderHigh
-     = ((divisor + divisor * quotientLow) + divisor * gap) + remainderHigh
+     = divisor * (quotientLow + (1 + gap)) + remainderHigh
+           by substituting gapEquation
      = divisor * quotientLow + (divisor + divisor * gap + remainderHigh);
   remainderLow = divisor + divisor * gap + remainderHigh;
-  -- So divisor ≤ rLow, hence successor(rLow) ≤ divisor ≤ rLow: impossible.
+  -- So divisor ≤ rLow, forcing rLow strictly below itself.
   divisor
         ≤ divisor + (divisor * gap + remainderHigh)
         = divisor + divisor * gap + remainderHigh
         = remainderLow;
-  successor(remainderLow)
-        ≤ divisor
-        ≤ remainderLow;
+  remainderLow < divisor ≤ remainderLow;
   done
 }
 
@@ -81,28 +79,20 @@ theorem Natural.quotient_remainder_unique
   -- compare_strict(quotientTwo, quotientOne): the `below` branch is
   -- quotientTwo < quotientOne (refuted), the `atLeast` branch is exactly
   -- quotientOne ≤ quotientTwo.
-  quotientOne ≤ quotientTwo by {
-    cases Natural.compare_strict(quotientTwo, quotientOne) {
-      | Natural.StrictComparison.below(strictlyBelow) => {
-          divisor * quotientTwo + remainderTwo
-             = divisor * quotientOne + remainderOne;
-          False;
-          done
-        }
-      | Natural.StrictComparison.atLeast(atLeast) =>
-          atLeast
-    }
+  ¬(quotientTwo < quotientOne) by {
+    suppose quotientTwo < quotientOne as strictlyBelow;
+    divisor * quotientTwo + remainderTwo
+       = divisor * quotientOne + remainderOne;
+    False;
+    done
   };
-  quotientTwo ≤ quotientOne by {
-    cases Natural.compare_strict(quotientOne, quotientTwo) {
-      | Natural.StrictComparison.below(strictlyBelow) => {
-          False;
-          done
-        }
-      | Natural.StrictComparison.atLeast(atLeast) =>
-          atLeast
-    }
+  quotientOne ≤ quotientTwo by Natural.less_or_equal_of_not_less_than;
+  ¬(quotientOne < quotientTwo) by {
+    suppose quotientOne < quotientTwo as strictlyBelow;
+    False;
+    done
   };
+  quotientTwo ≤ quotientOne by Natural.less_or_equal_of_not_less_than;
   done by Natural.le_antisymmetric
 }
 
