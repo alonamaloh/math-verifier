@@ -70,12 +70,23 @@ Use the condition forms instead — they read as the branch they are:
 - **proof-level**: `by cases { case i < m as h: … otherwise as h2: … }`
   — the decidable split (`import axioms` for `otherwise`).
 
-Reserve `cases <compare_strict …> { | … }` for the genuine case where a
-branch needs the **ordering proof** the constructor carries and
-re-deciding would be circular (e.g. `NaturalsBelow.sum_out_of` builds a
-`NaturalsBelow` witness from the `below` proof). If the branch bodies
-don't use that proof, the condition form is strictly more readable — and
-the leak linter does not yet catch the difference, so this is on you.
+**Even a branch that needs the decision PROOF** (building a dependent
+value like a `NaturalsBelow` witness, `NaturalsBelow.sum_out_of`) does
+NOT need `cases`: `if` binds the proof anonymously but leaves it in
+scope, so restate the condition as a claim in the branch block to
+recover a named handle —
+
+```math
+if i < 1 + m
+then { i < 1 + m as h;  NaturalsBelow.make(i, h) }   -- h : i < 1 + m
+else { m ≤ i by …;      … }                          -- from ¬(i < 1 + m)
+```
+
+So `cases <compare_strict …> { | … }` is never REQUIRED — always prefer
+the condition form. (The restatement line is mild friction; an
+`if P as h then …` sugar that binds the proof directly is a candidate,
+not yet built.) The leak linter does not catch the raw form, so this is
+on the author.
 
 ### Multi-pattern bindings (when the pattern-match form is used)
 
