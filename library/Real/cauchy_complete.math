@@ -304,22 +304,23 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                    by bWindowBelow
         } as oneSided;
     witness N with
-        (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦
-          cases Natural.compare_strict(m, n) {
-            | Natural.StrictComparison.below(mStrictlyBelowN) => {
-                m ≤ n;
+        (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
+          m ≤ n ∨ n ≤ m by Natural.totality_of_less_or_equal;
+          done by cases {
+            case m ≤ n as mLeqN: {
                 abs(Real.partialSum(t, n) - Real.partialSum(t, m))
                         < ε
-                    by oneSided(m, n, mInTail, nInTail, (m ≤ n));
+                    by oneSided(m, n, mInTail, nInTail, mLeqN);
                 abs(Real.partialSum(t, m) - Real.partialSum(t, n))
                         = abs(Real.partialSum(t, n) - Real.partialSum(t, m));
                 abs(Real.partialSum(t, m) - Real.partialSum(t, n))
                    = abs(Real.partialSum(t, n) - Real.partialSum(t, m))
                    < ε
               }
-            | Natural.StrictComparison.atLeast(nLeqM) =>
+            case n ≤ m as nLeqM:
                 oneSided(n, m, nInTail, mInTail, nLeqM)
           }
+        }
   }
 
 -- The comparison test: a series termwise dominated by a convergent
