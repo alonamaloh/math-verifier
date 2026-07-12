@@ -105,7 +105,10 @@ by strong induction on n with hypothesis IH { … }  -- subject shadows n; IH : 
 by strong induction on n with hypothesis IH;       -- statement form: the REST of the block is the body (no braces)
 by strong induction on n with subject, IH { … }    -- explicit subject name (needed when `on` isn't a plain variable)
 
-cases e { | pat => … }                 -- split an inductive value
+cases e { | pat => … }                 -- split a VARIABLE/datum's constructors
+-- branching on a decidable CONDITION? use `if`/`by cases`, NOT
+--   `cases compare_strict(i,m) { | below => … | atLeast => … }`
+--   (see proof-style.md "Branch on a condition, not a constructor")
 -- need the split equation on the page? state it in a by-cases arm:
 --   by cases { case e = pat [for some x] [as eq]: … }  (`cases e with eq` is retired)
 cases by L { | C(args) => … }          -- split a lemma's disjunction (args inferred)

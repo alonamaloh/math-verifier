@@ -43,6 +43,40 @@ IH must be polymorphic over (`Natural.decides_equality` recursing on
 by default; reach for pattern-match definitions only when the
 recursion really demands it.
 
+### Branch on a *condition*, not a constructor, when you can
+
+`cases E { | Ctor(x) => … }` — the arm form above — is for
+destructuring a **variable's** constructors (`cases n { | zero => … |
+successor(k) => … }`). Do NOT reach for it to branch on a **decidable
+condition** dressed up as a data comparison — the tempting
+anti-pattern is
+
+```math
+-- AVOID — reads as a recursor dispatch, and in a `definition` (value
+-- position) it drags in the "cases motive must end in a Sort" quirk:
+(i : Natural) ↦ cases Natural.compare_strict(i, m) {
+    | Natural.StrictComparison.below(_)   => a
+    | Natural.StrictComparison.atLeast(_) => b
+  }
+```
+
+Use the condition forms instead — they read as the branch they are:
+
+- **value-level** (in a `definition`): `if i < m then a else b` — the
+  classical conditional (see `reference.md`); reason about it with
+  `Logic.if_positive` / `Logic.if_negative`. A generic value type
+  (`{A : Type(0)}`) also sidesteps the Sort-motive quirk that a
+  projection return type (`Field.carrier(f)`) triggers.
+- **proof-level**: `by cases { case i < m as h: … otherwise as h2: … }`
+  — the decidable split (`import axioms` for `otherwise`).
+
+Reserve `cases <compare_strict …> { | … }` for the genuine case where a
+branch needs the **ordering proof** the constructor carries and
+re-deciding would be circular (e.g. `NaturalsBelow.sum_out_of` builds a
+`NaturalsBelow` witness from the `below` proof). If the branch bodies
+don't use that proof, the condition form is strictly more readable — and
+the leak linter does not yet catch the difference, so this is on you.
+
 ### Multi-pattern bindings (when the pattern-match form is used)
 
 Constructor patterns at non-scrutinee positions of a pattern-match
