@@ -83,8 +83,10 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
   Ring.divides(Polynomial.ring(r), m, f) as mDividesF;
   Ring.divides(Polynomial.ring(r), m, g) as mDividesG;
   choose quotientFM such that f = (m * quotientFM) as fEqualsMquotient from mDividesF;
-  cases factorClause(m, quotientFM, fEqualsMquotient) {
-    | Or.introduceLeft(mIsUnit) => {
+  Polynomial.IsUnit(r, m) ∨ Polynomial.IsUnit(r, quotientFM)
+      by factorClause(m, quotientFM, fEqualsMquotient);
+  done by cases {
+    case Polynomial.IsUnit(r, m) as mIsUnit: {
         choose mInverse such that Polynomial.one(r) = (m * mInverse) from mIsUnit;
         ⟨(coefficientF * mInverse),
          (coefficientG * mInverse),
@@ -95,7 +97,7 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
               = (m * mInverse)
               = Polynomial.one(r) }⟩
       }
-    | Or.introduceRight(quotientIsUnit) => {
+    case Polynomial.IsUnit(r, quotientFM) as quotientIsUnit: {
         choose quotientInverse such that
             Polynomial.one(r) = (quotientFM * quotientInverse)
             from quotientIsUnit;
@@ -105,12 +107,13 @@ theorem Polynomial.bezout_one_of_irreducible (r : Ring)
                   = ((m * quotientFM) * quotientInverse)
                   = (f * quotientInverse);
         choose cofactorG such that g = (m * cofactorG) from mDividesG;
-        absurd(notDivides(
-            ⟨(quotientInverse * cofactorG),
-             { g
-                = (m * cofactorG)
-                = ((f * quotientInverse) * cofactorG)
-                = (f * (quotientInverse * cofactorG)) }⟩))
+        Ring.divides(Polynomial.ring(r), f, g)
+            by ⟨(quotientInverse * cofactorG),
+                { g
+                   = (m * cofactorG)
+                   = ((f * quotientInverse) * cofactorG)
+                   = (f * (quotientInverse * cofactorG)) }⟩;
+        done
       }
   }
 }
