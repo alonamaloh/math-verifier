@@ -4272,6 +4272,20 @@ private:
             consumeAny();  // 'substituting'
             SurfaceExpressionPointer eq = eqAtAdditiveLevel
                 ? parseAdditive() : parseExpression();
+            // `substituting` rewrites with ONE equation. A comma here means
+            // the user tried `substituting eq1, eq2` — not supported (the
+            // substitution search picks a single equation, it does not chain
+            // rewrites). Diagnose it here rather than letting the stray comma
+            // surface as a confusing "expected expression" further downstream.
+            if (peek().kind == TokenKind::Comma) {
+                throw ParseError(
+                    "`substituting` takes a single equation; to rewrite with "
+                    "several, use one `substituting` per step — split into "
+                    "separate calc steps (`= … by substituting eq1 = … by "
+                    "substituting eq2`) or separate `claim … by substituting "
+                    "…;` lines (line "
+                    + std::to_string(peek().line) + ")");
+            }
             return makeSurfaceStructuredClaim(
                 proposition, /*label=*/"",
                 std::move(eq), /*byCases=*/false, {},
