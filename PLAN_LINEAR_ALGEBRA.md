@@ -189,12 +189,64 @@ Update this section before ending any session that works on the plan.
   Kept-despite-warning hints: the `by selectionInjective` /
   `below_one_is_zero` / assembling citations in span.math (operative
   reasons, deliberate).
-- **Stages E–H** — not started. Next: Stage E (exchange lemma, finite
-  basis existence, `F[x]` with the {xⁿ} basis — check the Polynomial
-  representation first per the plan). Note: bundled induced spaces of
-  kernel/image (`Subspace.vector_space` applied to
-  `kernel_is_subspace`) were left to consumers — construct them where
-  Stage G needs dimensions.
+- **Stage E — PARTIALLY DONE (2026-07-12).** Two of the four pieces
+  landed; the two abstract pieces (exchange lemma, pruning) remain.
+  - **`FiniteDimensional` — DONE.** `Algebra/finite_dimensional.math`:
+    `VectorSpace.FiniteDimensional(V) := ∃ n. ∃ (b : NaturalsBelow(n) →
+    carrier). IsBasis(b)` (the propositional finite-basis predicate; the
+    `dimension` value + bundled record wait for Stage F invariance, which
+    needs the exchange lemma). Instance: `Field.vector_space_finite_dimensional`
+    (F is finite-dimensional over itself, dimension 1, via the {1} basis).
+    IN the clean manifest.
+  - **`F[x]` with the {xⁿ} basis — DONE (the worked infinite instance).**
+    `Algebra/polynomial_vector_space.math`. Checked the Polynomial rep
+    first (per the plan): it is a quotient of coefficient lists with
+    `Polynomial.coefficientOf`, a `Polynomial.monomial(r,c,j)` = c·xʲ with
+    `coefficientOf_monomial_at`/`_off`/`_multiply`, and
+    `Polynomial.exists_degree_bound` — but NO reconstruction lemma and NO
+    lifted scale, so those were built. Scalar action `a•p :=
+    monomial(a,0)*p` (coeff = a·coeff, from `_monomial_multiply` at
+    exponent 0); the four module laws reduce index-by-index to base-ring
+    identities via `equal_of_coefficientOf_equal`. The base ring is
+    `Field.coefficient_ring(f) = CommutativeRing.ring(Field.commutative_ring(f))`,
+    whose carrier/constants are the field's BY DEFINITION (so Polynomial
+    ops and field scalars share a carrier, no coercion — the key that made
+    it tractable). Basis: bridge lemma
+    (`coefficientOf` is additive ⟹ commutes with the combination fold,
+    landing on a field-side `Algebra.Fold`), single-term extraction over
+    that fold (`fold_vanishes` + a BOUNDED `fold_single_point` — bounded
+    because a general injective selection's off-diagonal is controlled only
+    in range), spanning (degree-bound + identity selection + diagonal
+    single-point) and independence (evaluate the vanishing combination at
+    `selection(i)`; injectivity kills the other monomials). `F[x]` is a
+    basis-carrying space that is NOT `FiniteDimensional` (Natural-indexed
+    basis). Choice-free (export-check axiom inventory unchanged).
+    Correct + all gates green, but NOT YET in the clean manifest: it holds
+    15 positional proof-lemma citations + 2 `Equality.symmetry` (17 leaks).
+    A first argument-free pass FAILED — the auto-prover cannot discharge
+    the multi-premise citations (`fold_single_point`, `pBounded`) from
+    context, and it triggers the unused-name cascade — so manifest polish
+    is a real follow-up (named-gap form or deliberate keeps), like
+    `coordinate_space` was initially kept out.
+  - **Exchange lemma (Steinitz) — NOT STARTED.** The independent-≤-spanning,
+    one-swap-at-a-time argument (where `Field.reciprocal` enters). This is
+    the abstract crux and the transport probe feeding Stage F dimension.
+  - **FinitelyGenerated ⟹ finite basis (pruning) — NOT STARTED.** Prune a
+    finite spanning family down to an independent one (choice-free); needs
+    "remove one index from a `NaturalsBelow(count)` family" reindexing.
+  - **Friction found this session (the branch's deliverable):** (1) `by
+    substituting eq1, eq2` (comma-separated) does NOT parse — `substituting`
+    takes a SINGLE equation; split into one step per equation. (2) The
+    Stage-C "accessor-under-congruence mis-pins implicits" recurred — a
+    backward scale-rewrite nested under `+` fails; fix = extract the leg as
+    a named reversed equation, then `by substituting <leg>`. (3) `by cases`
+    cannot justify a CALC STEP — pull the split into a named fact `<prop>
+    by { cases <disj> { | Or.introduceLeft … | Or.introduceRight … } }`.
+    (4) `Natural.lt_or_le` lives in `Natural.division`, not `Natural.order`.
+  - Note: bundled induced spaces of kernel/image (`Subspace.vector_space`
+    applied to `kernel_is_subspace`) were left to consumers — construct
+    them where Stage G needs dimensions.
+- **Stages F–H** — not started.
 
 ## What is already in place (so this isn't re-litigated)
 
