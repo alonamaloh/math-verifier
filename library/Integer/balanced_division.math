@@ -68,8 +68,11 @@ theorem Integer.divide_balanced (a m : Integer) (mPositive : m > (0 : Integer))
       from Integer.divide_by_positive(a, 1 + k, (1 ≤ 1 + k));
   a = m * quotient0 + (naturalRemainder : Integer)
       by substituting mCast as aEquationM;
-  cases Natural.totality_of_less_or_equal(naturalRemainder + naturalRemainder, 1 + k) {
-    | Or.introduceLeft(smallRemainder) => {
+  naturalRemainder + naturalRemainder ≤ 1 + k
+      ∨ 1 + k ≤ naturalRemainder + naturalRemainder
+      by Natural.totality_of_less_or_equal;
+  done by cases {
+    case naturalRemainder + naturalRemainder ≤ 1 + k as smallRemainder: {
         -- r + r ≤ 1 + k: keep r. remainder = (r : ℤ), quotient = quotient0.
         witness quotient0 with
         witness (naturalRemainder : Integer) with
@@ -79,7 +82,7 @@ theorem Integer.divide_balanced (a m : Integer) (mPositive : m > (0 : Integer))
                   by substituting mCast as keepBound;
               And.introduction(aEquationM, keepBound) }
       }
-    | Or.introduceRight(largeRemainder) => {
+    case 1 + k ≤ naturalRemainder + naturalRemainder as largeRemainder: {
         -- 1 + k ≤ r + r: bump. With 1 + k = r + d, remainder = −(d : ℤ),
         -- quotient = quotient0 + 1.
         naturalRemainder ≤ 1 + k by Natural.LessThan.weaken;

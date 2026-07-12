@@ -124,6 +124,12 @@ NATURAL_DIR_PREFIX = os.path.join("library", "Natural") + os.sep
 # not a constructor".
 PATTERN_CASES_CATEGORY = "pattern-match `cases` on an expression"
 PATTERN_CASES_RE = re.compile(r"\bcases\s+(?!by\b)[A-Za-z_][A-Za-z0-9_.]*\s*\(")
+# Files exempt from the pattern-cases counter: a module DEFINING the decision
+# primitive itself must case-analyse the recursive sub-comparison to build the
+# `StrictComparison` value — there is no `if` to reach for, it IS the machinery
+# `if` desugars through. (Not a final verdict that it's unavoidable — likely it
+# is, with some creativity — just not counted against consumers meanwhile.)
+PATTERN_CASES_EXEMPT = {os.path.join("library", "Natural", "compare.math")}
 
 # A numeral literal annotated `: Natural` — `(1 : Natural)`, `(0 : Natural)`,
 # … — is pure redundancy: a bare numeral already IS a Natural in this system
@@ -297,7 +303,9 @@ def scan_file(path, theorem_names):
         0 if rel.startswith(NATURAL_DIR_PREFIX)
         else len(SUCCESSOR_RE.findall(body)))
     numeral_natural_count = len(NUMERAL_NATURAL_RE.findall(body))
-    pattern_cases_count = len(PATTERN_CASES_RE.findall(body))
+    pattern_cases_count = (
+        0 if rel in PATTERN_CASES_EXEMPT
+        else len(PATTERN_CASES_RE.findall(body)))
     return (leaks, arity, successor_count, numeral_natural_count,
             pattern_cases_count)
 

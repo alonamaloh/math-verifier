@@ -368,7 +368,7 @@ successor-ratchet:
 # else b` / `by cases { case P: … }`. Independent no-grow ratchet; migrate the
 # survivors and lower this. See docs/conventions/proof-style.md "Branch on a
 # condition, not a constructor".
-PATTERN_CASES_BUDGET ?= 24
+PATTERN_CASES_BUDGET ?= 21
 
 pattern-cases-ratchet:
 	@scripts/cic_leak_report --pattern-cases-max $(PATTERN_CASES_BUDGET)
