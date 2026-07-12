@@ -2119,17 +2119,44 @@ ExpressionPointer Elaborator::elaborateExpression(
                     }
                 }
                 if (!postfixFunction.empty()) {
+                    std::vector<SurfaceExpressionPointer> callArguments{
+                        unary->operand};
+                    // A dispatch function with IMPLICIT leading binders
+                    // (`Field.reciprocal {f} (x, x≠0)`) must be
+                    // saturated for the plain call path to insert the
+                    // implicit prefix (it only fires when the explicit
+                    // count matches) — pad the trailing side-condition
+                    // slots with `?` holes, which discharge from scope
+                    // exactly like the trailing-argument path below.
+                    // Operators without implicits keep the partial-call
+                    // route untouched.
+                    int implicitCount = environment_.implicitArgumentCount(
+                        postfixFunction);
+                    if (implicitCount > 0) {
+                        const Declaration* postfixDecl =
+                            environment_.lookup(postfixFunction);
+                        ExpressionPointer postfixType = postfixDecl
+                            ? declarationType(*postfixDecl) : nullptr;
+                        int explicitCount = postfixType
+                            ? countLeadingPis(postfixType) - implicitCount
+                            : 1;
+                        for (int i = 1; i < explicitCount; ++i) {
+                            callArguments.push_back(makeSurfaceHole(
+                                expression.line, expression.column));
+                        }
+                    }
                     SurfaceExpressionPointer call = makeSurfaceApplication(
                         makeSurfaceIdentifier(postfixFunction, {},
                             expression.line, expression.column),
-                        std::vector<SurfaceExpressionPointer>{unary->operand},
+                        std::move(callArguments),
                         expression.line, expression.column);
-                    // Elaborate the bare `f(operand)` then discharge any
-                    // trailing propositional side-condition — a partial
-                    // operator like `Real.reciprocal(x, x≠0)` behind `⁻¹`
-                    // carries the proof as a trailing argument, exactly as
-                    // `Real.divide` does behind `/`. (A total operator like
-                    // `Group.inverse` has none, so this is a no-op there.)
+                    // Elaborate the call then discharge any trailing
+                    // propositional side-condition — a partial operator
+                    // like `Real.reciprocal(x, x≠0)` behind `⁻¹` carries
+                    // the proof as a trailing argument, exactly as
+                    // `Real.divide` does behind `/`. (A total operator
+                    // like `Group.inverse` has none, and a hole-saturated
+                    // call arrives complete, so this is a no-op there.)
                     ExpressionPointer reciprocalCall =
                         elaborateExpression(*call, localBinders);
                     return dischargeTrailingSideConditions(

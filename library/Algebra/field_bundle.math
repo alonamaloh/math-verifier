@@ -1,0 +1,284 @@
+-- Algebra/field_bundle.math
+--
+-- A *bundled* field: a `CommutativeRing` together with proofs that it
+-- is nontrivial (0 ≠ 1) and that every nonzero element is invertible.
+-- This is the consumer-facing layer for constructions indexed by a
+-- scalar field — a `VectorSpace` recovers the whole scalar structure
+-- from one `Field` value, the way `RingModulo` recovers its base ring
+-- from a `CommutativeRing`.
+--
+-- Inverse EXISTENCE is propositional (`∃ y. x·y = 1`, matching
+-- `IsField`); the inverse FUNCTION `Field.reciprocal` is derived from
+-- it by definite description (`Logic.the`) over its uniqueness —
+-- unique choice, no new axiom (the `Real.reciprocal` construction,
+-- generalized).
+--
+-- The operation wrappers, operators, `instance Field.is_ring`, and the
+-- flattened law layer mirror `Algebra/commutative_ring_algebra.math`:
+-- the named laws are what the `ring` normaliser demands when it works
+-- over `Field.carrier(f)` goals (computeRingScheme treats `Field` like
+-- `CommutativeRing` — commutativity is available, so it is a sound
+-- `ring` target).
+
+module Algebra.field_bundle
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+
+-- The two field-defining properties of a bundled commutative ring,
+-- named so `Field.make` reads as its mathematical content.
+definition CommutativeRing.Nontrivial (c : CommutativeRing) : Proposition :=
+  CommutativeRing.zero(c) ≠ CommutativeRing.one(c)
+
+definition CommutativeRing.NonzeroInvertible (c : CommutativeRing) : Proposition :=
+  ∀ (x : CommutativeRing.carrier(c)). x ≠ CommutativeRing.zero(c)
+      → ∃ (y : CommutativeRing.carrier(c)). x * y = CommutativeRing.one(c)
+
+-- A commutative ring bundled with the two field properties. Lives in
+-- Type(1) because it carries a `CommutativeRing` (itself in Type(1)).
+inductive Field : Type(1) where
+  | Field.make
+      : (underlyingCommutativeRing : CommutativeRing)
+        → CommutativeRing.Nontrivial(underlyingCommutativeRing)
+        → CommutativeRing.NonzeroInvertible(underlyingCommutativeRing)
+        → Field
+
+-- ----------------------------------------------------------------------
+-- Field projections.
+
+definition Field.commutative_ring : Field → CommutativeRing
+  | Field.make(underlyingCommutativeRing, nontrivial, invertible) =>
+      underlyingCommutativeRing
+
+definition Field.carrier (f : Field) : Type(0) :=
+  CommutativeRing.carrier(Field.commutative_ring(f))
+
+definition Field.nontrivial (f : Field)
+        : CommutativeRing.Nontrivial(Field.commutative_ring(f)) :=
+  cases f { | Field.make(underlyingCommutativeRing, nontrivial, invertible) =>
+    nontrivial }
+
+definition Field.nonzero_invertible (f : Field)
+        : CommutativeRing.NonzeroInvertible(Field.commutative_ring(f)) :=
+  cases f { | Field.make(underlyingCommutativeRing, nontrivial, invertible) =>
+    invertible }
+
+-- ----------------------------------------------------------------------
+-- Operations: each is the underlying commutative ring's, re-typed at
+-- `Field.carrier`. The binary/unary ones take `f` implicitly (recovered
+-- from the operand type); the constants take it explicitly.
+
+definition Field.add {f : Field}
+        : Field.carrier(f) → Field.carrier(f) → Field.carrier(f) :=
+  CommutativeRing.add
+
+definition Field.negate {f : Field}
+        : Field.carrier(f) → Field.carrier(f) :=
+  CommutativeRing.negate
+
+definition Field.multiply {f : Field}
+        : Field.carrier(f) → Field.carrier(f) → Field.carrier(f) :=
+  CommutativeRing.multiply
+
+definition Field.zero (f : Field) : Field.carrier(f) :=
+  CommutativeRing.zero(Field.commutative_ring(f))
+
+definition Field.one (f : Field) : Field.carrier(f) :=
+  CommutativeRing.one(Field.commutative_ring(f))
+
+definition Field.subtract {f : Field}
+        (x y : Field.carrier(f)) : Field.carrier(f) :=
+  Field.add(x, Field.negate(y))
+
+operator (+) on (Field.carrier, Field.carrier) := Field.add
+operator (-) on (Field.carrier, Field.carrier) := Field.subtract
+operator (*) on (Field.carrier, Field.carrier) := Field.multiply
+
+-- ----------------------------------------------------------------------
+-- The bundled IsRing instance, in the Field operation vocabulary
+-- (definitionally the underlying ring's). Registered so the direct
+-- ring axioms discharge bare over `Field.carrier`.
+
+definition Field.is_ring (f : Field)
+        : IsRing(Field.carrier(f), Field.add, Field.zero(f),
+                 Field.negate, Field.multiply, Field.one(f)) :=
+  CommutativeRing.is_ring(Field.commutative_ring(f))
+
+instance Field.is_ring
+
+-- ----------------------------------------------------------------------
+-- Flattened law layer in the Field vocabulary — the names the `ring`
+-- normaliser demands over `Field.carrier` goals, mirroring
+-- `commutative_ring_algebra`. Each projects from the registered
+-- instance; `multiply_commutative` is the bundle's commutativity field.
+
+theorem Field.add_associative (f : Field)
+        (x y z : Field.carrier(f))
+        : (x + y) + z = x + (y + z) :=
+  done
+
+theorem Field.add_commutative (f : Field)
+        (x y : Field.carrier(f))
+        : x + y = y + x :=
+  done
+
+theorem Field.zero_add (f : Field) (x : Field.carrier(f))
+        : Field.zero(f) + x = x :=
+  done
+
+theorem Field.add_zero (f : Field) (x : Field.carrier(f))
+        : x + Field.zero(f) = x :=
+  done
+
+theorem Field.add_negate_left (f : Field) (x : Field.carrier(f))
+        : -x + x = Field.zero(f) :=
+  done
+
+theorem Field.add_negate_right (f : Field) (x : Field.carrier(f))
+        : x + -x = Field.zero(f) :=
+  done
+
+theorem Field.multiply_associative (f : Field)
+        (x y z : Field.carrier(f))
+        : (x * y) * z = x * (y * z) :=
+  done
+
+theorem Field.multiply_commutative (f : Field)
+        (x y : Field.carrier(f))
+        : x * y = y * x :=
+  done by CommutativeRing.commutative
+
+theorem Field.one_multiply (f : Field) (x : Field.carrier(f))
+        : Field.one(f) * x = x :=
+  done
+
+theorem Field.multiply_one (f : Field) (x : Field.carrier(f))
+        : x * Field.one(f) = x :=
+  done
+
+theorem Field.distributivity_left (f : Field)
+        (x y z : Field.carrier(f))
+        : x * (y + z) = x * y + x * z :=
+  done
+
+theorem Field.distributivity_right (f : Field)
+        (x y z : Field.carrier(f))
+        : (x + y) * z = x * z + y * z :=
+  done
+
+theorem Field.negate_negate (f : Field) (a : Field.carrier(f))
+        : -(-a) = a := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  done
+}
+
+theorem Field.negate_add (f : Field) (a b : Field.carrier(f))
+        : -(a + b) = -a + -b := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  IsAbelianGroup(Field.carrier(f), Field.add, Field.zero(f), Field.negate);
+  done by AbelianGroup.inverse_operation
+}
+
+theorem Field.zero_multiply (f : Field) (x : Field.carrier(f))
+        : Field.zero(f) * x = Field.zero(f) := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  done
+}
+
+theorem Field.multiply_zero (f : Field) (x : Field.carrier(f))
+        : x * Field.zero(f) = Field.zero(f) := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  done
+}
+
+theorem Field.multiply_negate_left (f : Field) (a b : Field.carrier(f))
+        : -a * b = -(a * b) := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  done
+}
+
+theorem Field.multiply_negate_right (f : Field) (a b : Field.carrier(f))
+        : a * -b = -(a * b) := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The unbundled view: a `Field`'s carrier and operations satisfy
+-- `IsField`, tying the bundle back to the predicate the concrete
+-- carriers (ℝ, ℚ, ℤ/p, …) prove directly.
+
+theorem Field.is_field (f : Field)
+        : IsField(Field.carrier(f), Field.add, Field.zero(f),
+                  Field.negate, Field.multiply, Field.one(f)) := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  ∀ (x y : Field.carrier(f)). x * y = y * x by Field.multiply_commutative;
+  Field.zero(f) ≠ Field.one(f) by Field.nontrivial;
+  ∀ (x : Field.carrier(f)). x ≠ Field.zero(f)
+      → ∃ (y : Field.carrier(f)). x * y = Field.one(f)
+    by Field.nonzero_invertible;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The reciprocal, by definite description.
+
+-- A multiplicative inverse is unique: associate y1 across x · y2 = 1.
+theorem Field.inverse_unique (f : Field) (x y1 y2 : Field.carrier(f))
+        (firstInverse : x * y1 = Field.one(f))
+        (secondInverse : x * y2 = Field.one(f))
+        : y1 = y2 :=
+  y1
+     = y1 * Field.one(f)
+     = y1 * (x * y2)      by substituting secondInverse
+     = (x * y1) * y2
+     = Field.one(f) * y2  by substituting firstInverse
+     = y2
+
+-- THE reciprocal: existence from the bundle's invertibility field,
+-- uniqueness from the lemma above. An honest function of (x, x ≠ 0).
+definition Field.reciprocal {f : Field} (x : Field.carrier(f))
+        (nonzero : x ≠ Field.zero(f)) : Field.carrier(f) := {
+  ∃ (y : Field.carrier(f)). x * y = Field.one(f)
+      by Field.nonzero_invertible as reciprocalExists;
+  Logic.the(
+      Field.carrier(f),
+      (y : Field.carrier(f)) ↦ x * y = Field.one(f),
+      reciprocalExists,
+      Field.inverse_unique(f, x))
+}
+
+-- Postfix `x⁻¹`, like the concrete carriers: the nonzero side condition
+-- is the trailing argument the operator leaves for the auto-prover to
+-- discharge at the use site.
+operator (⁻¹) on (Field.carrier) := Field.reciprocal
+
+theorem Field.reciprocal_multiplies (f : Field) (x : Field.carrier(f))
+        (nonzero : x ≠ Field.zero(f))
+        : x * Field.reciprocal(x, nonzero) = Field.one(f) := {
+  ∃ (y : Field.carrier(f)). x * y = Field.one(f)
+      by Field.nonzero_invertible as reciprocalExists;
+  Logic.the_satisfies(
+      Field.carrier(f),
+      (y : Field.carrier(f)) ↦ x * y = Field.one(f),
+      reciprocalExists,
+      Field.inverse_unique(f, x))
+}

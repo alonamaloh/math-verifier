@@ -977,16 +977,21 @@ Elaborator::RingScheme Elaborator::computeRingScheme(ExpressionPointer carrierTy
         RingScheme scheme;
         scheme.carrierHead = headConstantName(carrierType);
         scheme.opNamespace = scheme.carrierHead;
-        // Bundled commutative-ring carrier `CommutativeRing.carrier(c)`:
-        // operations/laws are the `CommutativeRing.*` projections applied
-        // to `c`. This is the only sound `ring` target among the bundles,
-        // since `ring` needs multiplicative commutativity (a plain
+        // Bundled commutative-ring carrier `CommutativeRing.carrier(c)`
+        // (and its field refinement `Field.carrier(f)`): operations/laws
+        // are the bundle's projections applied to the structure value.
+        // These are the sound `ring` targets among the bundles, since
+        // `ring` needs multiplicative commutativity (a plain
         // `Ring.carrier(s)` has no `multiply_commutative`); see
-        // Algebra/commutative_ring_algebra.math.
-        if (scheme.carrierHead == "CommutativeRing.carrier") {
+        // Algebra/commutative_ring_algebra.math and
+        // Algebra/field_bundle.math.
+        if (scheme.carrierHead == "CommutativeRing.carrier"
+            || scheme.carrierHead == "Field.carrier") {
             if (auto* app =
                     std::get_if<Application>(&carrierType->node)) {
-                scheme.opNamespace = "CommutativeRing";
+                scheme.opNamespace =
+                    scheme.carrierHead == "Field.carrier"
+                        ? "Field" : "CommutativeRing";
                 scheme.structurePrefix = { app->argument };
             }
             return scheme;

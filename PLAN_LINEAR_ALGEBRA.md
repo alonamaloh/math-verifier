@@ -27,6 +27,42 @@ provably choice-free; only the general infinite-dimensional invariance/existence
 results take a `(choice : AxiomOfChoice)` parameter. No step here may add an
 axiom to the trusted base.
 
+## Status ledger
+
+Update this section before ending any session that works on the plan.
+
+- **Stage 0 (decisions)** — 0.1/0.2 SETTLED by the Stage A landing
+  (2026-07-11): `Field` = `CommutativeRing` + `Nontrivial` +
+  `NonzeroInvertible` (predicates over the bundle, so `Field.make` reads
+  as its content); universe check confirmed (`Field : Type(1)` carrying
+  a `Type(1)` bundle is fine); reciprocal via `Logic.the` over
+  `Field.inverse_unique`. 0.3 (two layers) and 0.4 (index bridge) are
+  settled on paper, exercised by Stages B/D.
+- **Stage A — DONE (2026-07-11).** `Algebra/field_bundle.math`: the
+  `Field` record, projections, operation wrappers + operators
+  (`+ - * ⁻¹`), `instance Field.is_ring`, the flattened law layer (the
+  names `ring` demands), `Field.is_field`, `Field.inverse_unique`,
+  `Field.reciprocal`, `Field.reciprocal_multiplies`. Instances:
+  `Real.field` (`Real/field_bundle.math`), `Rational.field`
+  (`Rational/field_bundle.math`, over the new
+  `Rational/ring_bundle.math` — ℚ had no `Ring`/`CommutativeRing`
+  bundle). A `FiniteField`/ℤp instance is deferred until a consumer
+  wants it (IntegerMod lacks a `CommutativeRing` bundle; measure
+  first). Elaborator support landed with it: `computeRingScheme`
+  treats `Field.carrier(f)` like `CommutativeRing.carrier(c)` (sound —
+  commutativity is a bundle field), `carrierProjectionField` recurses
+  through the bundle layers (Field.make → CommutativeRing value → Ring
+  value → carrier; also fixes the latent CommutativeRing-instance
+  case), and the postfix-operator path saturates implicit-carrying
+  dispatch functions with holes (`x⁻¹` over an abstract field).
+  Acceptance: `Test/field_bundle_test.math` (ring-normalisation over
+  abstract `Field.carrier`, bare instance axioms, by-less reciprocal
+  cancellation, concrete-instance reduction). All five files in the
+  clean manifest.
+- **Stages B–H** — not started. Next: Stage B (`VectorSpace` over a
+  `Field`; the `Fⁿ` instance is the first real `NaturalsBelow`-indexed
+  object).
+
 ## What is already in place (so this isn't re-litigated)
 
 - **The finite-index type already exists.** `NaturalsBelow(n)`

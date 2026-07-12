@@ -453,7 +453,8 @@ ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
             std::get_if<Constant>(&application->function->node);
         if (!projector) return nullptr;
         if (projector->name != "Ring.carrier"
-            && projector->name != "CommutativeRing.carrier") {
+            && projector->name != "CommutativeRing.carrier"
+            && projector->name != "Field.carrier") {
             return nullptr;
         }
         ExpressionPointer bundle = weakHeadNormalForm(
@@ -466,12 +467,24 @@ ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
         }
         auto* constructor = std::get_if<Constant>(&cursor->node);
         if (!constructor) return nullptr;
-        if (constructor->name != "Ring.make"
-            && constructor->name != "CommutativeRing.make") {
-            return nullptr;
-        }
         if (arguments.empty()) return nullptr;
-        return arguments.back();  // first constructor arg = the carrier
+        // `Ring.make`'s first constructor argument IS the carrier type;
+        // each refinement bundle (`CommutativeRing`, `Field`) holds the
+        // next structure layer DOWN as its first argument, so the
+        // carrier is read by recursing through that layer's own
+        // carrier projection.
+        if (constructor->name == "Ring.make") {
+            return arguments.back();
+        }
+        if (constructor->name == "CommutativeRing.make") {
+            return carrierProjectionField(makeApplication(
+                makeConstant("Ring.carrier"), arguments.back()));
+        }
+        if (constructor->name == "Field.make") {
+            return carrierProjectionField(makeApplication(
+                makeConstant("CommutativeRing.carrier"), arguments.back()));
+        }
+        return nullptr;
     }
 
 bool Elaborator::signatureAcceptsArgumentTypes(
