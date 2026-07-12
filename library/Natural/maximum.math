@@ -1,9 +1,9 @@
 -- Natural/maximum.math
 --
--- Maximum of two Naturals, defined by recursion on the first arg with
--- an explicit `cases` on the second (the kernel only reduces multi-
--- constructor patterns when the inner case is explicit). Provides the
--- two key inequalities: a ≤ max(a, b) and b ≤ max(a, b).
+-- Maximum of two Naturals as `a + (b ∸ a)`: the truncated difference
+-- lifts `a` up to `b` when `b` is larger and contributes nothing when
+-- it is not. Provides the two key inequalities: a ≤ max(a, b) and
+-- b ≤ max(a, b).
 
 module Natural.maximum
 
@@ -11,72 +11,42 @@ import axioms
 import Natural.basics
 import Natural.peano
 import Natural.order
+import Natural.monus
+import Natural.subtraction
 import Equality.basics
 
-definition Natural.maximum : Natural → Natural → Natural
-  | zero,         b => b
-  | successor(k), b =>
-      cases b {
-        | zero         => successor(k)
-        | successor(m) => successor(Natural.maximum(k, m))
-      }
+definition Natural.maximum (a b : Natural) : Natural := a + Natural.monus(b, a)
 
--- a ≤ max(a, b). By induction on a (b stays universally quantified so the IH
--- applies at the inner case-split's m), case-split b in the successor case.
--- The standard name, freed by renaming the universe-level keyword to
--- MaxUniverse (2026-06-12): max is an ordinary overload like min/abs.
 overload max := Natural.maximum
 
-automatic theorem Natural.left_le_max (a : Natural)
-        : ∀ (b : Natural). a ≤ Natural.maximum(a, b) :=
-  unfold Natural.add, Natural in
-  by induction on a with IH {
-    case base: {
-        -- max(0, b) ≡ b, and zero is least.
-        take b : Natural;
-        done by Natural.zero_least
-      }
-    case step(k): {
-        take b : Natural;
-        -- Under the unfold, 1 + k reduces to the raw constructor and max
-        -- ι-reduces; split b.
-        by induction on b with innerIH {
-          case base:
-              -- max(1 + k, 0) ≡ 1 + k.
-              done
-          case step(m): {
-              -- max(1 + k, 1 + m) ≡ 1 + max(k, m); monotone on the IH.
-              k ≤ Natural.maximum(k, m) by IH(m);
-              done by Natural.successor_less_or_equal_successor
-            }
-        }
-      }
-  }
+-- a ≤ max(a, b): adding the truncated difference only grows a.
+automatic theorem Natural.left_le_max (a b : Natural) : a ≤ Natural.maximum(a, b) :=
+  a ≤ a + Natural.monus(b, a) = Natural.maximum(a, b)
 
--- b ≤ max(a, b). Symmetric induction.
-automatic theorem Natural.right_le_max (a : Natural)
-        : ∀ (b : Natural). b ≤ Natural.maximum(a, b) :=
-  unfold Natural.add, Natural in
-  by induction on a with IH {
-    case base: {
-        -- max(0, b) ≡ b.
-        take b : Natural;
+-- b ≤ max(a, b). When a ≤ b the difference lifts a exactly up to b;
+-- when b ≤ a the difference is zero and max is a ≥ b.
+automatic theorem Natural.right_le_max (a b : Natural) : b ≤ Natural.maximum(a, b) := {
+  a ≤ b ∨ b ≤ a;
+  done by cases {
+    case a ≤ b as aLeB: {
+        choose c such that b = a + c from Natural.subtraction_witness(a, b, aLeB);
+        b
+           = a + c
+           = a + Natural.monus(a + c, a)
+           = a + Natural.monus(b, a)
+           = Natural.maximum(a, b);
         done
       }
-    case step(k): {
-        take b : Natural;
-        by induction on b with innerIH {
-          case base:
-              -- max(1 + k, 0) ≡ 1 + k; 0 is least.
-              done by Natural.zero_least
-          case step(m): {
-              -- max(1 + k, 1 + m) ≡ 1 + max(k, m); monotone on the IH.
-              m ≤ Natural.maximum(k, m) by IH(m);
-              done by Natural.successor_less_or_equal_successor
-            }
-        }
+    case b ≤ a as bLeA: {
+        Natural.monus(b, a) = 0 by Natural.le_implies_monus_zero(a, b, bLeA);
+        b
+           ≤ a
+           = a + Natural.monus(b, a)
+           = Natural.maximum(a, b);
+        done
       }
   }
+}
 
 -- max(a, b) ≤ x ⇒ a ≤ x. Composes left_le_max with transitivity.
 -- Pairs naturally with le_through_max_right to project either side of a
