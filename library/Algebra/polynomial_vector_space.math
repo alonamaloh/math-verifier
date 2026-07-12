@@ -25,6 +25,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.division
 import Natural.monus
 import Algebra.monoid
 import Algebra.group
@@ -254,3 +255,332 @@ definition Field.polynomial_vector_space (f : Field) : VectorSpace(f) :=
       Polynomial.add, Polynomial.zero(Field.coefficient_ring(f)),
       Polynomial.negate, Field.polynomial_scale(f),
       Field.polynomial_is_vector_space)
+
+-- ----------------------------------------------------------------------
+-- Single-term extraction from a field sum. These are the additive-fold
+-- analogues of `Ring.Sum.vanishes_below`/`single_point`, proved directly
+-- over `Algebra.Fold` on the field so the monomial-basis arguments never
+-- leave the field carrier. `fold_single_point` is BOUNDED — its
+-- vanishing hypothesis is only required below the count — because a
+-- linear combination's off-diagonal terms (with an arbitrary injective
+-- selection) are controlled only for indices actually in range.
+
+theorem Field.fold_vanishes (f : Field) (g : Natural → Field.carrier(f))
+        (count : Natural)
+        : (∀ (j : Natural). j < count → g(j) = Field.zero(f))
+          → Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, count)
+            = Field.zero(f) :=
+  by induction on count with IH {
+    case base: (vanish : ∀ (j : Natural). j < 0 → g(j) = Field.zero(f)) ↦ done
+    case step(m):
+        (vanish : ∀ (j : Natural). j < 1 + m → g(j) = Field.zero(f)) ↦ {
+          m < 1 + m by Natural.lt_one_plus as mBelow;
+          g(m) = Field.zero(f) by vanish(m, mBelow) as gmZero;
+          ∀ (j : Natural). j < m → g(j) = Field.zero(f)
+              by {
+                take j : Natural;
+                suppose j < m as jLessM;
+                j < 1 + m by { j < m by jLessM < 1 + m by Natural.lt_one_plus } as jBelow;
+                done by vanish(j, jBelow)
+              }
+            as vanishBelowM;
+          Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, m)
+              = Field.zero(f) by IH(vanishBelowM) as foldBelowZero;
+          Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, 1 + m)
+             = Field.add(Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, m), g(0 + m))
+                   by Algebra.Fold_add_one
+             = Field.add(Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, m), g(m))
+             = Field.add(Field.zero(f), g(m)) by substituting foldBelowZero
+             = Field.add(Field.zero(f), Field.zero(f)) by substituting gmZero
+             = Field.zero(f)
+        }
+  }
+
+theorem Field.fold_single_point (f : Field) (g : Natural → Field.carrier(f))
+        (target : Natural) (count : Natural)
+        : target < count
+          → (∀ (j : Natural). j < count → ¬(j = target) → g(j) = Field.zero(f))
+          → Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, count)
+            = g(target) :=
+  by induction on count with IH {
+    case base:
+        (targetBelow : target < 0)
+                (vanish : ∀ (j : Natural). j < 0 → ¬(j = target) → g(j) = Field.zero(f)) ↦ {
+          ¬(target < 0) by Natural.not_less_than_zero;
+          done
+        }
+    case step(m):
+        (targetBelow : target < 1 + m)
+                (vanish : ∀ (j : Natural). j < 1 + m → ¬(j = target)
+                          → g(j) = Field.zero(f)) ↦
+            done by cases {
+              case target = m as targetIsM: {
+                  ∀ (j : Natural). j < m → g(j) = Field.zero(f)
+                      by {
+                        take j : Natural;
+                        suppose j < m as jLessM;
+                        j < target by { j < m by jLessM = target by targetIsM } as jLessTarget;
+                        j < 1 + m by { j < m by jLessM < 1 + m by Natural.lt_one_plus } as jBelow;
+                        done by vanish(j, jBelow, Natural.not_equal_of_less_than(j, target, jLessTarget))
+                      }
+                    as vanishBelowM;
+                  Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, m)
+                      = Field.zero(f) by Field.fold_vanishes(f, g, m, vanishBelowM) as foldBelowZero;
+                  Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, 1 + m)
+                     = Field.add(Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, m), g(0 + m))
+                           by Algebra.Fold_add_one
+                     = Field.add(Field.zero(f), g(m)) by substituting foldBelowZero
+                     = g(m)
+                     = g(target) by substituting targetIsM
+                }
+              otherwise as targetNotM: {
+                  target ≤ m by Natural.le_of_lt_one_plus as targetAtMostM;
+                  target < m by Natural.lt_of_le_of_ne(targetAtMostM, targetNotM) as targetLessM;
+                  m < 1 + m by Natural.lt_one_plus as mBelow;
+                  ¬(m = target) by {
+                    suppose m = target as mIsTarget;
+                    target = m by mIsTarget;
+                    done by Natural.not_equal_of_less_than(target, m, targetLessM)
+                  } as mNotTarget;
+                  g(m) = Field.zero(f) by vanish(m, mBelow, mNotTarget) as gmZero;
+                  ∀ (j : Natural). j < m → ¬(j = target) → g(j) = Field.zero(f)
+                      by {
+                        take j : Natural;
+                        suppose j < m as jLessM;
+                        suppose ¬(j = target) as jNotTarget;
+                        j < 1 + m by { j < m by jLessM < 1 + m by Natural.lt_one_plus } as jBelow;
+                        done by vanish(j, jBelow, jNotTarget)
+                      }
+                    as vanishBelowM;
+                  Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, m)
+                      = g(target) by IH(targetLessM, vanishBelowM) as foldBelowTarget;
+                  Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, 1 + m)
+                     = Field.add(Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f), g, 0, m), g(0 + m))
+                           by Algebra.Fold_add_one
+                     = Field.add(g(target), g(m)) by substituting foldBelowTarget
+                     = Field.add(g(target), Field.zero(f)) by substituting gmZero
+                     = g(target)
+                }
+            }
+  }
+
+-- ----------------------------------------------------------------------
+-- The monomial family {xⁿ} and its basis property.
+
+-- The n-th monomial xⁿ as a vector of F[x].
+definition Field.monomial_family (f : Field)
+        : Natural → VectorSpace.carrier(Field.polynomial_vector_space(f)) :=
+  (n : Natural) ↦ Polynomial.monomial(Field.coefficient_ring(f), Field.one(f), n)
+
+-- The coefficient at index m of a linear combination of monomials is the
+-- field sum of each term's coefficient contribution — `coefficientOf` is
+-- an additive homomorphism, so it commutes with the combination fold.
+theorem Field.coefficientOf_monomial_linearCombination (f : Field)
+        (coefficients : Natural → Field.carrier(f))
+        (selection : Natural → Natural) (count : Natural) (m : Natural)
+        : Polynomial.coefficientOf(Field.coefficient_ring(f),
+              VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, count), m)
+          = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                (j : Natural) ↦ coefficients(j)
+                    * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                          Field.monomial_family(f)(selection(j)), m),
+                0, count) :=
+  by induction on count with IH {
+    case base: {
+        Polynomial.coefficientOf(Field.coefficient_ring(f),
+                VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, 0), m)
+           = Polynomial.coefficientOf(Field.coefficient_ring(f),
+                 VectorSpace.zero(Field.polynomial_vector_space(f)), m)
+                 by substituting VectorSpace.linearCombination_zero
+           = Field.zero(f) by Polynomial.coefficientOf_zero
+           = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                 (j : Natural) ↦ coefficients(j)
+                     * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                           Field.monomial_family(f)(selection(j)), m),
+                 0, 0)
+                 by Algebra.Fold_zero
+      }
+    case step(n): {
+        Polynomial.coefficientOf(Field.coefficient_ring(f),
+                VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, 1 + n), m)
+           = Polynomial.coefficientOf(Field.coefficient_ring(f),
+                 VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, n)
+                 + coefficients(n) • Field.monomial_family(f)(selection(n)), m)
+                 by substituting VectorSpace.linearCombination_add_one
+           = Polynomial.coefficientOf(Field.coefficient_ring(f),
+                 VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, n), m)
+             + Polynomial.coefficientOf(Field.coefficient_ring(f),
+                 coefficients(n) • Field.monomial_family(f)(selection(n)), m)
+                 by Polynomial.coefficientOf_add
+           = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                 (j : Natural) ↦ coefficients(j)
+                     * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                           Field.monomial_family(f)(selection(j)), m),
+                 0, n)
+             + Polynomial.coefficientOf(Field.coefficient_ring(f),
+                 coefficients(n) • Field.monomial_family(f)(selection(n)), m)
+                 by IH
+           = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                 (j : Natural) ↦ coefficients(j)
+                     * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                           Field.monomial_family(f)(selection(j)), m),
+                 0, n)
+             + coefficients(n)
+                 * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                       Field.monomial_family(f)(selection(n)), m)
+                 by Field.coefficientOf_polynomial_scale
+           = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                 (j : Natural) ↦ coefficients(j)
+                     * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                           Field.monomial_family(f)(selection(j)), m),
+                 0, n)
+             + coefficients(0 + n)
+                 * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                       Field.monomial_family(f)(selection(0 + n)), m)
+                 by substituting Natural.zero_add
+           = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                 (j : Natural) ↦ coefficients(j)
+                     * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                           Field.monomial_family(f)(selection(j)), m),
+                 0, 1 + n)
+                 by Algebra.Fold_add_one
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- {xⁿ} spans F[x]: a polynomial of degree < N is the combination, with
+-- the identity selection, of its first N coefficients against x⁰,…,x^{N−1}.
+
+theorem Field.monomial_family_spans (f : Field)
+        : VectorSpace.Spans(Field.monomial_family(f)) := {
+  take p : VectorSpace.carrier(Field.polynomial_vector_space(f));
+  choose degreeBound such that Polynomial.DegreeLessThan(Field.coefficient_ring(f), p, degreeBound)
+      as pBounded
+      from Polynomial.exists_degree_bound(Field.coefficient_ring(f), p);
+  VectorSpace.linearCombination(Field.monomial_family(f),
+          (i : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, i),
+          (i : Natural) ↦ i, degreeBound)
+      = p
+      by {
+        suffices ∀ (m : Natural).
+            Polynomial.coefficientOf(Field.coefficient_ring(f),
+                VectorSpace.linearCombination(Field.monomial_family(f),
+                    (i : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, i),
+                    (i : Natural) ↦ i, degreeBound), m)
+            = Polynomial.coefficientOf(Field.coefficient_ring(f), p, m)
+          by Polynomial.equal_of_coefficientOf_equal;
+        take m : Natural;
+        Natural.lt_or_le(m, degreeBound) as orderCase;
+        Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                (j : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                    * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                          Field.monomial_family(f)(j), m),
+                0, degreeBound)
+            = Polynomial.coefficientOf(Field.coefficient_ring(f), p, m)
+            by {
+              cases orderCase {
+                   | Or.introduceLeft(mLessBound) => {
+                       Polynomial.coefficientOf(Field.coefficient_ring(f),
+                               Field.monomial_family(f)(m), m) = Field.one(f)
+                           by Polynomial.coefficientOf_monomial_at as diagonalOne;
+                       ∀ (j : Natural). j < degreeBound → ¬(j = m)
+                           → Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                               * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                     Field.monomial_family(f)(j), m)
+                             = Field.zero(f)
+                           by {
+                             take j : Natural;
+                             suppose j < degreeBound as jBelowBound;
+                             suppose ¬(j = m) as jNotM;
+                             ¬(m = j) by {
+                               suppose m = j as mIsJ;
+                               done by jNotM(Equality.symmetry(mIsJ))
+                             } as mNotJ;
+                             Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                     Field.monomial_family(f)(j), m) = Field.zero(f)
+                                 by Polynomial.coefficientOf_monomial_off(mNotJ) as offZero;
+                             Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                                 * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                       Field.monomial_family(f)(j), m)
+                                = Polynomial.coefficientOf(Field.coefficient_ring(f), p, j) * Field.zero(f)
+                                      by substituting offZero
+                                = Field.zero(f)
+                           }
+                         as vanishOff;
+                       Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                             (j : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                                 * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                       Field.monomial_family(f)(j), m),
+                             0, degreeBound)
+                          = Polynomial.coefficientOf(Field.coefficient_ring(f), p, m)
+                            * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                  Field.monomial_family(f)(m), m)
+                                by Field.fold_single_point(mLessBound, vanishOff)
+                          = Polynomial.coefficientOf(Field.coefficient_ring(f), p, m) * Field.one(f)
+                                by substituting diagonalOne
+                          = Polynomial.coefficientOf(Field.coefficient_ring(f), p, m)
+                     }
+                   | Or.introduceRight(boundLeM) => {
+                       Polynomial.coefficientOf(Field.coefficient_ring(f), p, m) = Field.zero(f)
+                           by pBounded(m, boundLeM) as coeffPZero;
+                       ∀ (j : Natural). j < degreeBound
+                           → Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                               * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                     Field.monomial_family(f)(j), m)
+                             = Field.zero(f)
+                           by {
+                             take j : Natural;
+                             suppose j < degreeBound as jBelowBound;
+                             j < m by { j < degreeBound by jBelowBound ≤ m by boundLeM } as jLessM;
+                             ¬(m = j) by Natural.not_equal_of_less_than(j, m, jLessM) as mNotJ;
+                             Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                     Field.monomial_family(f)(j), m) = Field.zero(f)
+                                 by Polynomial.coefficientOf_monomial_off(mNotJ) as offZero;
+                             Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                                 * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                       Field.monomial_family(f)(j), m)
+                                = Polynomial.coefficientOf(Field.coefficient_ring(f), p, j) * Field.zero(f)
+                                      by substituting offZero
+                                = Field.zero(f)
+                           }
+                         as vanishAll;
+                       Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                             (j : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                                 * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                       Field.monomial_family(f)(j), m),
+                             0, degreeBound)
+                          = Field.zero(f) by Field.fold_vanishes(f,
+                                (j : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                                    * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                                          Field.monomial_family(f)(j), m),
+                                degreeBound, vanishAll)
+                          = Polynomial.coefficientOf(Field.coefficient_ring(f), p, m)
+                                by coeffPZero
+                     }
+              }
+            }
+            as foldEqCoeff;
+        Polynomial.coefficientOf(Field.coefficient_ring(f),
+                VectorSpace.linearCombination(Field.monomial_family(f),
+                    (i : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, i),
+                    (i : Natural) ↦ i, degreeBound), m)
+           = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+                 (j : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, j)
+                     * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                           Field.monomial_family(f)(j), m),
+                 0, degreeBound)
+                 by Field.coefficientOf_monomial_linearCombination
+           = Polynomial.coefficientOf(Field.coefficient_ring(f), p, m)
+                 by foldEqCoeff
+      }
+      as combinationIsP;
+  p = VectorSpace.linearCombination(Field.monomial_family(f),
+          (i : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, i),
+          (i : Natural) ↦ i, degreeBound)
+      by combinationIsP
+      as targetIsCombination;
+  witness degreeBound
+      with witness ((i : Natural) ↦ i)
+      with witness ((i : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, i))
+      with targetIsCombination
+}
