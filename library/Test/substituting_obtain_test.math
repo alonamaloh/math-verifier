@@ -41,19 +41,22 @@ theorem obtain_binder_substitution_unnamed
 
 -- (4) bug B repro — `claim by substituting` should see structural
 -- occurrences exposed by `unfold`. An `opaque definition` whose body
--- case-splits on `monus(p, n)` doesn't expose that scrutinee in the
--- closed goal; the goal's RHS deliberately doesn't mention 0 either
--- (we ascribe `(_ : Natural)` arithmetic so the LHS / RHS only share
--- bound variables). Under `unfold` the scrutinee IS visible inside
--- the recursor's spine. The substituter walks the WHNF tree to find
--- the `monus(p, n)` slot, substitutes 0 (selecting the zero arm),
--- and lands on a goal closeable by ι-reduction.
+-- dispatches on `monus(p, n)` (via a helper that pattern-matches its
+-- argument) doesn't expose that scrutinee in the closed goal; the goal's
+-- RHS deliberately doesn't mention 0 either (we ascribe `(_ : Natural)`
+-- arithmetic so the LHS / RHS only share bound variables). Under `unfold`
+-- the scrutinee IS visible inside the helper's recursor spine. The
+-- substituter walks the WHNF tree to find the `monus(p, n)` slot,
+-- substitutes 0 (selecting the zero arm), and lands on a goal closeable
+-- by ι-reduction.
+
+definition Test.pick_on_zero
+        : (overshoot ifZero ifSuccessor : Natural) → Natural
+  | zero,         ifZero, _           => ifZero
+  | successor(_), _,      ifSuccessor => ifSuccessor
 
 opaque definition Test.boxed_via_cases (p n : Natural) : Natural :=
-  cases Natural.monus(p, n) {
-    | zero         => p
-    | successor(_) => n
-  }
+  Test.pick_on_zero(Natural.monus(p, n), p, n)
 
 theorem under_unfold_via_cases
         (p n : Natural) (pFits : Natural.monus(p, n) = 0)

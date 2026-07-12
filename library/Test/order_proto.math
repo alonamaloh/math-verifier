@@ -90,53 +90,58 @@ theorem Proto.le_transitive (a b c : Natural)
 theorem Proto.trichotomy (a : Natural)
         : ∀ (b : Natural). Proto.lt(a, b) ∨ a = b ∨ Proto.lt(b, a) :=
   by induction on a with IH {
-    case base: (b : Natural) ↦
-      cases Natural.zero_or_successor(b) {
-        | Or.introduceLeft(bZero) =>
-            Or.introduceRight(Or.introduceLeft(Equality.symmetry(bZero)))
-        | Or.introduceRight(bSucc) => {
-            choose k such that b = successor(k) as bEqSucc from bSucc;
-            Or.introduceLeft(Proto.lt_intro(0, b, k,
-                { 0 + (1 + k)
-                     = 1 + k         by Natural.zero_add(1 + k)
-                     = successor(k)  by Natural.one_add(k)
-                     = b             by Equality.symmetry(bEqSucc) }))
-          }
+    case base: (b : Natural) ↦ {
+        b = 0 ∨ ∃ (k : Natural). b = successor(k) by Natural.zero_or_successor;
+        done by cases {
+          case b = 0 as bZero:
+              Or.introduceRight(Or.introduceLeft(Equality.symmetry(bZero)))
+          case ∃ (k : Natural). b = successor(k) as bSucc: {
+              choose k such that b = successor(k) as bEqSucc from bSucc;
+              Or.introduceLeft(Proto.lt_intro(0, b, k,
+                  { 0 + (1 + k)
+                       = 1 + k         by Natural.zero_add(1 + k)
+                       = successor(k)  by Natural.one_add(k)
+                       = b             by Equality.symmetry(bEqSucc) }))
+            }
+        }
       }
-    case step(a'): (b : Natural) ↦
-      cases IH(b) {
-        | Or.introduceLeft(a'LtB) => {
-            choose c such that a' + (1 + c) = b as hc from Proto.lt_elim(a', b, a'LtB);
-            cases Natural.zero_or_successor(c) {
-              | Or.introduceLeft(cZero) =>
-                  Or.introduceRight(Or.introduceLeft(
-                      { 1 + a'
-                           = a' + (1 + 0)  by ring
-                           = a' + (1 + c)  by substituting Equality.symmetry(cZero)
-                           = b             by hc }))
-              | Or.introduceRight(cSucc) => {
-                  choose c' such that c = successor(c') as cEqSucc from cSucc;
-                  1 + c'
-                      = successor(c')  by Natural.one_add(c')
-                      = c              by Equality.symmetry(cEqSucc) as cBridge;
-                  Or.introduceLeft(Proto.lt_intro(1 + a', b, c',
-                      { (1 + a') + (1 + c')
-                           = a' + (1 + (1 + c'))  by ring
-                           = a' + (1 + c)         by substituting cBridge
-                           = b                    by hc }))
-                }
+    case step(a'): (b : Natural) ↦ {
+        Proto.lt(a', b) ∨ a' = b ∨ Proto.lt(b, a') by IH;
+        done by cases {
+          case Proto.lt(a', b) as a'LtB: {
+              choose c such that a' + (1 + c) = b as hc from Proto.lt_elim(a', b, a'LtB);
+              c = 0 ∨ ∃ (k : Natural). c = successor(k) by Natural.zero_or_successor;
+              done by cases {
+                case c = 0 as cZero:
+                    Or.introduceRight(Or.introduceLeft(
+                        { 1 + a'
+                             = a' + (1 + 0)  by ring
+                             = a' + (1 + c)  by substituting Equality.symmetry(cZero)
+                             = b             by hc }))
+                case ∃ (k : Natural). c = successor(k) as cSucc: {
+                    choose c' such that c = successor(c') as cEqSucc from cSucc;
+                    1 + c'
+                        = successor(c')  by Natural.one_add(c')
+                        = c              by Equality.symmetry(cEqSucc) as cBridge;
+                    Or.introduceLeft(Proto.lt_intro(1 + a', b, c',
+                        { (1 + a') + (1 + c')
+                             = a' + (1 + (1 + c'))  by ring
+                             = a' + (1 + c)         by substituting cBridge
+                             = b                    by hc }))
+                  }
+              }
             }
-          }
-        | Or.introduceRight(rest) =>
-            cases rest {
-              | Or.introduceLeft(a'EqB) =>
-                  Or.introduceRight(Or.introduceRight(
-                      { Proto.lt(a', 1 + a') by Proto.lt_one_plus(a');
-                        Proto.lt(b, 1 + a') }))
-              | Or.introduceRight(bLtA') =>
-                  Or.introduceRight(Or.introduceRight(
-                      Proto.lt_transitive(b, a', 1 + a', bLtA',
-                          Proto.lt_one_plus(a'))))
-            }
+          case a' = b ∨ Proto.lt(b, a') as rest:
+              done by cases {
+                case a' = b as a'EqB:
+                    Or.introduceRight(Or.introduceRight(
+                        { Proto.lt(a', 1 + a') by Proto.lt_one_plus(a');
+                          Proto.lt(b, 1 + a') }))
+                case Proto.lt(b, a') as bLtA':
+                    Or.introduceRight(Or.introduceRight(
+                        Proto.lt_transitive(b, a', 1 + a', bLtA',
+                            Proto.lt_one_plus(a'))))
+              }
+        }
       }
   }

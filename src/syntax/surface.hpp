@@ -283,9 +283,10 @@ struct SurfaceCases {
     // True only for a SurfaceCases the parser built directly from the `cases`
     // keyword. The many desugarings that synthesise a `cases` (an `if`/decide,
     // a `choose`'s ∃-elimination, a tuple-`let` destructure, the `with`/
-    // `refining` re-synthesis) leave this false, so the MATH_CHECK_PATTERN_CASES
-    // audit fires only on what the user actually typed. Default false so any
-    // un-updated synthesiser is treated as synthetic (fail safe).
+    // `refining` re-synthesis) leave this false, so the computed-scrutinee
+    // REJECTION (elaborateCasesExpression) fires only on what the user actually
+    // typed — the desugarings legitimately case on a computed value. Default
+    // false so any un-updated synthesiser is treated as synthetic (fail safe).
     bool userWritten = false;
 };
 

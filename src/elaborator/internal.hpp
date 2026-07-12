@@ -2904,13 +2904,14 @@ private:
         ExpressionPointer armBody, size_t armCount, bool hasOtherwise,
         const SurfaceStructuredClaimArm& arm);
 
-    // MATH_CHECK_PATTERN_CASES audit: whether a pattern-match `cases`
-    // scrutinee is a COMPUTED expression (a function/constructor application),
-    // directly or laundered through a `let` alias — the recursor-dispatch
-    // reading (`cases compare_strict(a,b) { | below => … }`) that should read
-    // as `if P then …` / `by cases { case P: … }`. A genuine variable
-    // destructure (`cases s { | Sum.left => … }`, `cases n { | zero => … }`)
-    // returns false. `let`-bound aliases are resolved via LocalBinder::value.
+    // Whether a user-written pattern-match `cases` scrutinee is a COMPUTED
+    // expression (a function/constructor application), directly or laundered
+    // through a `let` alias — the recursor-dispatch reading
+    // (`cases compare_strict(a,b) { | below => … }`) that is REJECTED by
+    // elaborateCasesExpression (branch on a condition / bind a variable
+    // instead). A genuine variable destructure (`cases s { | Sum.left => … }`,
+    // `cases n { | zero => … }`) returns false. `let`-bound aliases are
+    // resolved via LocalBinder::value.
     bool casesScrutineeIsComputed(
         const SurfaceExpressionPointer& scrutinee,
         const std::vector<LocalBinder>& localBinders) const;

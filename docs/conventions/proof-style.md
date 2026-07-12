@@ -43,32 +43,53 @@ IH must be polymorphic over (`Natural.decides_equality` recursing on
 by default; reach for pattern-match definitions only when the
 recursion really demands it.
 
-### Branch on a *condition*, not a constructor, when you can
+### Branch on a *condition*, not a constructor — the scrutinee must be a variable
 
 `cases E { | Ctor(x) => … }` — the arm form above — is for
 destructuring a **variable's** constructors (`cases n { | zero => … |
-successor(k) => … }`). Do NOT reach for it to branch on a **decidable
-condition** dressed up as a data comparison — the tempting
-anti-pattern is
+successor(k) => … }`). Its scrutinee **must be a variable**: the
+elaborator **rejects** a `cases` on a *computed* expression (a function
+application). So this does not compile —
 
 ```math
--- AVOID — reads as a recursor dispatch, and in a `definition` (value
--- position) it drags in the "cases motive must end in a Sort" quirk:
+-- REJECTED: "pattern-match `cases` on a computed expression is not
+-- supported — a `cases` scrutinee must be a variable."
 (i : Natural) ↦ cases Natural.compare_strict(i, m) {
     | Natural.StrictComparison.below(_)   => a
     | Natural.StrictComparison.atLeast(_) => b
   }
 ```
 
-Use the condition forms instead — they read as the branch they are:
+and neither does laundering the scrutinee through a `let` — the check
+resolves the binding's value:
 
-- **value-level** (in a `definition`): `if i < m then a else b` — the
-  classical conditional (see `reference.md`); reason about it with
-  `Logic.if_positive` / `Logic.if_negative`. A generic value type
-  (`{A : Type(0)}`) also sidesteps the Sort-motive quirk that a
-  projection return type (`Field.carrier(f)`) triggers.
-- **proof-level**: `by cases { case i < m as h: … otherwise as h2: … }`
-  — the decidable split (`import axioms` for `otherwise`).
+```math
+-- ALSO REJECTED — `overshoot` is a `let` alias for an application:
+let overshoot := Natural.monus(a, b) in cases overshoot { | zero => … | … }
+```
+
+Reach for a **condition** or an **argument-matching helper** instead —
+they read as the branch they are:
+
+- **value-level, a decidable condition** (in a `definition`):
+  `if i < m then a else b` — the classical conditional (see
+  `reference.md`); reason about it with `Logic.if_positive` /
+  `Logic.if_negative`. A generic value type (`{A : Type(0)}`) sidesteps
+  the "cases motive must end in a Sort" quirk a projection return type
+  (`Field.carrier(f)`) would trigger.
+- **proof-level, a decidable condition**:
+  `by cases { case i < m as h: … otherwise as h2: … }` — the decidable
+  split (`import axioms` for `otherwise`).
+- **dispatching on a computed *data* value** (not a `Prop` condition —
+  e.g. a `StrictComparison`, or `monus(a,b)`'s zero/successor shape):
+  push the destructure into a **helper that pattern-matches its
+  argument** (the pattern-match-*definition* form `definition f | Ctor(x)
+  => …`, whose scrutinee IS a bound parameter). The library does exactly
+  this — `Natural.compare_strict_shift` (matches the `StrictComparison`
+  passed to it) and `Natural.Raw.select_on_zero` (matches the overshoot
+  argument, forming both branches eagerly). Even foundational primitives
+  that must dispatch on a computed sub-result need no `cases <expr>`, so
+  there are **no exemptions**.
 
 **Even a branch that needs the decision PROOF** (building a dependent
 value like a `NaturalsBelow` witness, `NaturalsBelow.sum_out_of`) does
@@ -82,28 +103,12 @@ then { i < 1 + m as h;  NaturalsBelow.make(i, h) }   -- h : i < 1 + m
 else { m ≤ i by …;      … }                          -- from ¬(i < 1 + m)
 ```
 
-So `cases <compare_strict …> { | … }` is never REQUIRED — always prefer
-the condition form. (The restatement line is mild friction; an
-`if P as h then …` sugar that binds the proof directly is a candidate,
-not yet built.)
-
-This is enforced, and enforced *robustly*: the elaborator audit
-(`MATH_CHECK_PATTERN_CASES`, run by `make pattern-cases-audit` and wired
-into `make check`) flags every user `cases` whose scrutinee is a computed
-expression — a function application. It resolves `let` aliases, so the
-tempting dodge
-
-```math
--- ALSO flagged — the `let` only hides the application from a source regex,
--- not from the elaborator, which sees `overshoot`'s bound value:
-let overshoot := Natural.monus(a, b) in cases overshoot { | zero => … | … }
-```
-
-does not work: bind a *real* binder (a lambda / choose / theorem
-parameter) or use the condition forms. The only exemptions are
-foundational primitives that case a computed sub-result to *build* their
-own value (`Natural.compare`, `Natural.floor_divide`) — there is no `if`
-below them to reach for; it IS the machinery `if` desugars through.
+(The restatement line is mild friction; an `if P as h then …` sugar that
+binds the proof directly is a candidate, not yet built.) The
+computed-scrutinee capability still exists in the elaborator — it is what
+`if`/decide, `choose`, and destructuring-`let ⟨a,b⟩` desugar onto — but it
+is no longer reachable from surface `cases`. `library/ErrorTest/
+cases_on_computed_expression.math` locks the rejection message.
 
 ### Multi-pattern bindings (when the pattern-match form is used)
 

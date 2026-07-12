@@ -105,9 +105,12 @@ by strong induction on n with hypothesis IH { … }  -- subject shadows n; IH : 
 by strong induction on n with hypothesis IH;       -- statement form: the REST of the block is the body (no braces)
 by strong induction on n with subject, IH { … }    -- explicit subject name (needed when `on` isn't a plain variable)
 
-cases e { | pat => … }                 -- split a VARIABLE/datum's constructors
--- branching on a decidable CONDITION? use `if`/`by cases`, NOT
---   `cases compare_strict(i,m) { | below => … | atLeast => … }`
+cases e { | pat => … }                 -- split a VARIABLE's constructors — `e` MUST be a variable
+-- `cases <computed expression>` is REJECTED (`cases compare_strict(i,m) { … }`,
+--   even laundered as `let d := compare_strict(i,m) in cases d`). Instead:
+--   • decidable CONDITION → `if P then a else b` (value) / `by cases` (proof)
+--   • dispatching on computed DATA → a helper that pattern-matches its ARGUMENT
+--       (`definition f | Ctor(x) => …`, e.g. `Natural.compare_strict_shift`)
 --   (see proof-style.md "Branch on a condition, not a constructor")
 -- need the split equation on the page? state it in a by-cases arm:
 --   by cases { case e = pat [for some x] [as eq]: … }  (`cases e with eq` is retired)

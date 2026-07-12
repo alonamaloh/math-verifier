@@ -26,17 +26,6 @@ static bool anonTupleConnectiveCheckEnabled() {
     return on;
 }
 
-// Opt-in audit (MATH_CHECK_PATTERN_CASES=1): surface every pattern-match
-// `cases` whose scrutinee is a computed expression — the recursor-dispatch
-// reading that should be `if` / `by cases { case P: … }`. Unlike the source
-// regex it replaces, this sees through `let`-bound aliases (`let d := f(x);
-// cases d { … }`), since it inspects the elaborated scrutinee / binder value.
-static bool patternCasesComputedCheckEnabled() {
-    static const bool on =
-        std::getenv("MATH_CHECK_PATTERN_CASES") != nullptr;
-    return on;
-}
-
 bool Elaborator::casesScrutineeIsComputed(
         const SurfaceExpressionPointer& scrutinee,
         const std::vector<LocalBinder>& localBinders) const {
@@ -1020,21 +1009,32 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
-        // MATH_CHECK_PATTERN_CASES audit (fires once per user-written cases —
-        // the refining / with-equality desugarings call the INNER elaborator
-        // directly, never re-entering here). An induction block cases a
-        // variable subject, so it is never a computed-expression dispatch.
-        if (patternCasesComputedCheckEnabled()
-            && cases.userWritten
+        // A user-written `cases` on a COMPUTED expression is rejected: the
+        // scrutinee must be a variable. Branch on a condition instead
+        // (`if P then a else b` / `by cases { case P: … }`), or push the
+        // destructure into a helper that pattern-matches its argument
+        // (`definition f | Ctor => …`). Checked here at the single user-facing
+        // entry — the `if`/decide, `choose`, tuple-`let`, and refining/
+        // with-equality desugarings synthesise their `cases` with
+        // `userWritten = false` (and call the INNER elaborator directly), so
+        // this fires only on what the user typed. An induction block cases a
+        // variable subject, so it is never a computed-expression dispatch. The
+        // `let`-alias form is caught too: `casesScrutineeIsComputed` resolves
+        // the binding's value.
+        if (cases.userWritten
             && !cases.isInductionBlock
             && cases.inductionHypothesisName.empty()
             && casesScrutineeIsComputed(cases.scrutinee, localBinders)) {
-            std::cerr << "warning: " << moduleName_ << ":" << line
-                << ": pattern-match `cases` on a computed expression — a"
-                   " recursor dispatch that should read as `if P then a else b`"
-                   " / `by cases { case P: … }`; a genuine destructure of `f(x)`"
-                   " cases a bound variable, so bind it in a real binder, not a"
-                   " `let` alias\n";
+            throw ElaborateError(
+                "pattern-match `cases` on a computed expression is not "
+                "supported (line " + std::to_string(line) + "): a `cases` "
+                "scrutinee must be a variable. Branch on a condition — "
+                "`if P then a else b` (value position) or "
+                "`by cases { case P: … }` (proof) — or push the destructure "
+                "into a helper that pattern-matches its argument "
+                "(`definition f | Ctor(x) => …`). See "
+                "docs/conventions/proof-style.md, \"Branch on a condition, not "
+                "a constructor\".");
         }
         // Keystone (PLAN_LUX_TRANSITION.md): a `by induction` cases-block
         // that uses the `case base:` / `case step(k):` vocabulary — which
