@@ -363,6 +363,16 @@ SUCCESSOR_BUDGET ?= 11
 successor-ratchet:
 	@scripts/cic_leak_report --successor-max $(SUCCESSOR_BUDGET)
 
+# Pattern-match `cases` on a computed expression (`cases compare_strict(i,m)
+# { | below => … }`) — a decidable dispatch that should read as `if P then a
+# else b` / `by cases { case P: … }`. Independent no-grow ratchet; migrate the
+# survivors and lower this. See docs/conventions/proof-style.md "Branch on a
+# condition, not a constructor".
+PATTERN_CASES_BUDGET ?= 27
+
+pattern-cases-ratchet:
+	@scripts/cic_leak_report --pattern-cases-max $(PATTERN_CASES_BUDGET)
+
 # Type-aware audit: every user-written `⟨…⟩` that builds or destructures a
 # logical connective (`And`/`Exists`) — the "conjunctions are secretly tuples"
 # tell. The check lives in the elaborator (it needs the expected/scrutinee
@@ -393,7 +403,7 @@ clean-anon-ratchet:
 	  fi; \
 	  echo "anon-tuple ratchet OK: $$n connective-⟨…⟩ site(s) <= budget $(CLEAN_ANON_BUDGET)"
 
-.PHONY: leak-report leak-ratchet successor-ratchet anon-tuple-report clean-anon-ratchet
+.PHONY: leak-report leak-ratchet successor-ratchet pattern-cases-ratchet anon-tuple-report clean-anon-ratchet
 
 # ----------------------------------------------------------------------
 # Error-provenance audit (PLAN_LESS_CIC_STYLE.md, Phase 0.3). Runs the
@@ -418,7 +428,7 @@ corpus-update: library
 # provenance gate) and the CIC leak count has not increased (Phase 0
 # ratchet). This is the "CI" entry point — run it before committing
 # elaborator/kernel changes.
-check: tests self-tests corpus-audit leak-ratchet successor-ratchet clean-check clean-anon-ratchet
+check: tests self-tests corpus-audit leak-ratchet successor-ratchet pattern-cases-ratchet clean-check clean-anon-ratchet
 	@echo "check: library + tests + self-tests verified; provenance gate, leak ratchet, clean set, and anon-tuple ratchet OK"
 
 # The kernel binary's built-in C++ test suite (./kernel with no args).
