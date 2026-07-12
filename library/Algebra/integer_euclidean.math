@@ -62,13 +62,16 @@ theorem Integer.absolute_value_natural_of_negate_natural (k : Natural)
 theorem Integer.positive_natural_of_image_nonzero (m : Natural)
         (imageNonzero : ¬((m : Integer) = Integer.zero))
         : 1 ≤ m := {
-  cases Natural.is_zero_or_at_least_one(m) {
-    | Or.introduceLeft(mZero) =>
-        absurd(imageNonzero(
-            { (m : Integer)
-               = Natural.to_integer(0)
-               = Integer.zero }))
-    | Or.introduceRight(positive) => positive
+  m = 0 ∨ 1 ≤ m by Natural.is_zero_or_at_least_one;
+  done by cases {
+    case m = 0 as mZero: {
+        (m : Integer)
+           = Natural.to_integer(0)
+           = Integer.zero;
+        done
+      }
+    case 1 ≤ m as positive:
+        positive
   }
 }
 
@@ -79,8 +82,9 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
         : ∃ (quotient : Integer). ∃ (remainder : Natural).
             a = (m : Integer) * quotient + (remainder : Integer)
             ∧ remainder < m := {
-  cases Integer.sign_split(a) {
-    | Or.introduceLeft(aNonneg) => {
+  Integer.IsNonneg(a) ∨ ∃ (k : Natural). a = -(k : Integer) by Integer.sign_split;
+  done by cases {
+    case Integer.IsNonneg(a) as aNonneg: {
         choose j such that a = (j : Integer) from aNonneg;
         choose naturalQuotient, naturalRemainder such that
             j = naturalQuotient * m + naturalRemainder ∧ naturalRemainder < m
@@ -97,7 +101,7 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
              = (m : Integer) * (naturalQuotient : Integer) + (naturalRemainder : Integer) },
           remainderLessThanM⟩⟩
       }
-    | Or.introduceRight(aNegative) => {
+    case ∃ (k : Natural). a = -(k : Integer) as aNegative: {
         choose j such that a = -(j : Integer) from aNegative;
         choose naturalQuotient, naturalRemainder such that
             j = naturalQuotient * m + naturalRemainder ∧ naturalRemainder < m
@@ -162,8 +166,9 @@ theorem Integer.has_euclidean_division (a b : Integer)
             ∧ (remainder = Integer.zero
                ∨ Integer.absolute_value_natural(remainder)
                  < Integer.absolute_value_natural(b)) := {
-  cases Integer.sign_split(b) {
-    | Or.introduceLeft(bNonneg) => {
+  Integer.IsNonneg(b) ∨ ∃ (k : Natural). b = -(k : Integer) by Integer.sign_split;
+  done by cases {
+    case Integer.IsNonneg(b) as bNonneg: {
         choose m such that b = (m : Integer) as bIsImage from bNonneg;
         ¬((m : Integer) = Integer.zero)
             by (mImageZero : (m : Integer) = Integer.zero) ↦
@@ -187,7 +192,7 @@ theorem Integer.has_euclidean_division (a b : Integer)
              = b * quotient + (remainder : Integer) by bIsImage },
           Or.introduceRight(remainderNormBelow)⟩⟩
       }
-    | Or.introduceRight(bNegative) => {
+    case ∃ (k : Natural). b = -(k : Integer) as bNegative: {
         choose m such that b = -(m : Integer) as bIsNegativeImage from bNegative;
         ¬((m : Integer) = Integer.zero)
             by (mImageZero : (m : Integer) = Integer.zero) ↦
