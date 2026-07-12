@@ -87,6 +87,69 @@ definition VectorSpace.FinitelyGenerated {f : Field} (V : VectorSpace(f))
       VectorSpace.Spans(generators)
 
 -- ----------------------------------------------------------------------
+-- Membership in the span of a family: `v` is some finite combination of
+-- family members. `Spans` is exactly "every vector is in the span", so
+-- the two convert definitionally; naming the single-vector predicate
+-- lets span arguments reason one vector at a time (and the closure
+-- properties below read as the subspace laws they are).
+
+definition VectorSpace.InSpanOf {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) (v : VectorSpace.carrier(V))
+        : Proposition :=
+  ∃ (count : Natural). ∃ (selection : Natural → I).
+  ∃ (coefficients : Natural → Field.carrier(f)).
+      v = VectorSpace.linearCombination(family, coefficients, selection, count)
+
+-- Spanning is membership at every vector.
+definition VectorSpace.InSpanOf.of_spans {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
+        (spanning : VectorSpace.Spans(family)) (v : VectorSpace.carrier(V))
+        : VectorSpace.InSpanOf(family, v) :=
+  spanning(v)
+
+definition VectorSpace.Spans.of_in_span {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
+        (member : ∀ (v : VectorSpace.carrier(V)). VectorSpace.InSpanOf(family, v))
+        : VectorSpace.Spans(family) :=
+  member
+
+-- Every family member lies in the span (the length-one combination).
+theorem VectorSpace.InSpanOf.member {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V)) (i : I)
+        : VectorSpace.InSpanOf(family, family(i)) := {
+  family(i)
+     = Field.one(f) • family(i)   by VectorSpace.one_scale
+     = VectorSpace.linearCombination(family,
+           (k : Natural) ↦ Field.one(f), (k : Natural) ↦ i, 1)
+           by VectorSpace.linearCombination_one
+     as memberIsCombination;
+  witness 1 with witness ((k : Natural) ↦ i)
+       with witness ((k : Natural) ↦ Field.one(f)) with memberIsCombination
+}
+
+-- The span is closed under scaling: a scalar multiple of a member is a
+-- member, scaling every coefficient.
+theorem VectorSpace.InSpanOf.scale {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (a : Field.carrier(f)) (v : VectorSpace.carrier(V))
+        (member : VectorSpace.InSpanOf(family, v))
+        : VectorSpace.InSpanOf(family, a • v) := {
+  choose count, selection, coefficients such that
+      v = VectorSpace.linearCombination(family, coefficients, selection, count)
+      from member;
+  v = VectorSpace.linearCombination(family, coefficients, selection, count) as vIsCombination;
+  a • v
+     = a • VectorSpace.linearCombination(family, coefficients, selection, count)
+           by substituting vIsCombination
+     = VectorSpace.linearCombination(family,
+           (i : Natural) ↦ a * coefficients(i), selection, count)
+           by VectorSpace.linearCombination_scale
+     as scaledIsCombination;
+  witness count with witness selection
+       with witness ((i : Natural) ↦ a * coefficients(i)) with scaledIsCombination
+}
+
+-- ----------------------------------------------------------------------
 -- The first basis: the one-element family {1} for a field over itself.
 -- Spanning is v = v·1; independence is field cancellation, and a
 -- selection of two or more indices into a one-element index type cannot
