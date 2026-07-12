@@ -584,3 +584,82 @@ theorem Field.monomial_family_spans (f : Field)
       with witness ((i : Natural) ↦ Polynomial.coefficientOf(Field.coefficient_ring(f), p, i))
       with targetIsCombination
 }
+
+-- ----------------------------------------------------------------------
+-- {xⁿ} is linearly independent: read a vanishing combination's
+-- coefficient at index selection(i). Injectivity makes every other
+-- monomial vanish there, so that coefficient is exactly coefficients(i),
+-- and the combination being zero forces it to zero.
+
+theorem Field.monomial_family_independent (f : Field)
+        : VectorSpace.LinearlyIndependent(Field.monomial_family(f)) := {
+  take count : Natural;
+  take selection : Natural → Natural;
+  take coefficients : Natural → Field.carrier(f);
+  suppose ∀ (i j : Natural). i < count → j < count → selection(i) = selection(j) → i = j
+      as selectionInjective;
+  suppose VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, count)
+              = VectorSpace.zero(Field.polynomial_vector_space(f))
+      as combinationVanishes;
+  take i : Natural;
+  suppose i < count as indexBelowCount;
+  Polynomial.coefficientOf(Field.coefficient_ring(f),
+          Field.monomial_family(f)(selection(i)), selection(i)) = Field.one(f)
+      by Polynomial.coefficientOf_monomial_at as diagonalOne;
+  ∀ (j : Natural). j < count → ¬(j = i)
+      → coefficients(j) * Polynomial.coefficientOf(Field.coefficient_ring(f),
+            Field.monomial_family(f)(selection(j)), selection(i))
+        = Field.zero(f)
+      by {
+        take j : Natural;
+        suppose j < count as jBelowCount;
+        suppose ¬(j = i) as jNotI;
+        ¬(selection(i) = selection(j)) by {
+          suppose selection(i) = selection(j) as selectionsEqual;
+          i = j by selectionInjective(i, j, indexBelowCount, jBelowCount, selectionsEqual)
+              as indicesEqual;
+          done by jNotI(Equality.symmetry(indicesEqual))
+        } as selectionsDistinct;
+        Polynomial.coefficientOf(Field.coefficient_ring(f),
+                Field.monomial_family(f)(selection(j)), selection(i)) = Field.zero(f)
+            by Polynomial.coefficientOf_monomial_off(selectionsDistinct) as offZero;
+        coefficients(j) * Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.monomial_family(f)(selection(j)), selection(i))
+           = coefficients(j) * Field.zero(f) by substituting offZero
+           = Field.zero(f)
+      }
+    as vanishOff;
+  Polynomial.coefficientOf(Field.coefficient_ring(f),
+          VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, count),
+          selection(i))
+     = Algebra.Fold(Field.carrier(f), Field.add, Field.zero(f),
+           (j : Natural) ↦ coefficients(j)
+               * Polynomial.coefficientOf(Field.coefficient_ring(f),
+                     Field.monomial_family(f)(selection(j)), selection(i)),
+           0, count)
+           by Field.coefficientOf_monomial_linearCombination
+     = coefficients(i)
+         * Polynomial.coefficientOf(Field.coefficient_ring(f),
+               Field.monomial_family(f)(selection(i)), selection(i))
+           by Field.fold_single_point(indexBelowCount, vanishOff)
+     = coefficients(i) * Field.one(f) by substituting diagonalOne
+     = coefficients(i)
+     as combinationCoefficientIsCi;
+  coefficients(i)
+     = Polynomial.coefficientOf(Field.coefficient_ring(f),
+           VectorSpace.linearCombination(Field.monomial_family(f), coefficients, selection, count),
+           selection(i))
+           by combinationCoefficientIsCi
+     = Polynomial.coefficientOf(Field.coefficient_ring(f),
+           VectorSpace.zero(Field.polynomial_vector_space(f)), selection(i))
+           by substituting combinationVanishes
+     = Field.zero(f) by Polynomial.coefficientOf_zero
+}
+
+theorem Field.monomial_family_is_basis (f : Field)
+        : VectorSpace.IsBasis(Field.monomial_family(f)) := {
+  VectorSpace.LinearlyIndependent(Field.monomial_family(f))
+      by Field.monomial_family_independent;
+  VectorSpace.Spans(Field.monomial_family(f)) by Field.monomial_family_spans;
+  done
+}
