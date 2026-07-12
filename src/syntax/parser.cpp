@@ -300,13 +300,19 @@ SurfaceExpressionPointer substituteSurfaceName(
             && cases->refiningNames.empty()) {
             return makeSurfaceCases(std::move(newScrutinee),
                                      std::move(newClauses),
-                                     line, column);
+                                     line, column,
+                                     cases->inductionHypothesisName,
+                                     cases->isInductionBlock,
+                                     cases->userWritten);
         }
         return makeSurfaceCasesWithRefining(
             std::move(newScrutinee), std::move(newClauses),
             cases->equalityHypothesisName,
             cases->refiningNames,
-            line, column);
+            line, column,
+            cases->inductionHypothesisName,
+            cases->isInductionBlock,
+            cases->userWritten);
     }
     if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
         auto newInitial = substituteSurfaceName(
@@ -3906,13 +3912,19 @@ private:
         if (equalityHypothesisName.empty() && refiningNames.empty()) {
             return makeSurfaceCases(std::move(scrutinee),
                                      std::move(clauses),
-                                     casesToken.line, casesToken.column);
+                                     casesToken.line, casesToken.column,
+                                     /*inductionHypothesisName=*/std::string(),
+                                     /*isInductionBlock=*/false,
+                                     /*userWritten=*/true);
         }
         return makeSurfaceCasesWithRefining(
             std::move(scrutinee), std::move(clauses),
             std::move(equalityHypothesisName),
             std::move(refiningNames),
-            casesToken.line, casesToken.column);
+            casesToken.line, casesToken.column,
+            /*inductionHypothesisName=*/std::string(),
+            /*isInductionBlock=*/false,
+            /*userWritten=*/true);
     }
 
     // `by_representatives x as <pat>, y as <pat>, … => body` —

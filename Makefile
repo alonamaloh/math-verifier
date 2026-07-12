@@ -365,13 +365,46 @@ successor-ratchet:
 
 # Pattern-match `cases` on a computed expression (`cases compare_strict(i,m)
 # { | below => … }`) — a decidable dispatch that should read as `if P then a
-# else b` / `by cases { case P: … }`. Independent no-grow ratchet; migrate the
-# survivors and lower this. See docs/conventions/proof-style.md "Branch on a
-# condition, not a constructor".
+# else b` / `by cases { case P: … }`. The fast source-regex first line; the
+# authoritative gate is `pattern-cases-audit` below, which sees through
+# `let`-aliased scrutinees the regex cannot. See docs/conventions/proof-style.md
+# "Branch on a condition, not a constructor".
 PATTERN_CASES_BUDGET ?= 0
 
 pattern-cases-ratchet:
 	@scripts/cic_leak_report --pattern-cases-max $(PATTERN_CASES_BUDGET)
+
+# Robust, elaborator-instrumented pattern-cases gate. Where the regex above
+# inspects source text, MATH_CHECK_PATTERN_CASES asks the elaborator, which
+# resolves `let` aliases (`let d := f(x); cases d`) and desugarings — so a
+# scrutinee laundered through a binding cannot slip past. Rebuilds the whole
+# library with the audit on and fails on any non-exempt survivor. Exempt
+# modules (foundational primitives that case a computed sub-result to BUILD
+# their value) mirror scripts/cic_leak_report's PATTERN_CASES_EXEMPT — keep in
+# sync. `pattern-cases-audit-report` lists survivors without failing.
+PATTERN_CASES_EXEMPT_RE := ^warning: (Natural\.compare|Natural\.floor_divide):
+
+pattern-cases-audit-report:
+	@rm -f $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
+	@MATH_CHECK_PATTERN_CASES=1 $(MAKE) library 2>&1 \
+	  | grep "pattern-match .cases. on a computed" \
+	  | grep -vE "$(PATTERN_CASES_EXEMPT_RE)" \
+	  | sed -E 's/^warning: ([A-Za-z0-9_.]+):[0-9]+:.*/\1/' \
+	  | sort | uniq -c | sort -rn
+
+pattern-cases-audit:
+	@rm -f $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
+	@MATH_CHECK_PATTERN_CASES=1 $(MAKE) library 2>&1 \
+	  | grep "pattern-match .cases. on a computed" \
+	  | grep -vE "$(PATTERN_CASES_EXEMPT_RE)" \
+	  | sort -u > $(BUILD_DIR)/pattern-cases.log || true; \
+	  n=$$(wc -l < $(BUILD_DIR)/pattern-cases.log); \
+	  if [ $$n -gt 0 ]; then \
+	    echo "pattern-cases audit FAIL: $$n user `cases` on a computed expression (bind a variable, or use \`if\` / \`by cases { case P: … }\`):"; \
+	    sed -E 's/^warning: /  /' $(BUILD_DIR)/pattern-cases.log; \
+	    exit 1; \
+	  fi; \
+	  echo "pattern-cases audit OK: 0 non-exempt user cases on a computed expression"
 
 # Type-aware audit: every user-written `⟨…⟩` that builds or destructures a
 # logical connective (`And`/`Exists`) — the "conjunctions are secretly tuples"
@@ -403,7 +436,7 @@ clean-anon-ratchet:
 	  fi; \
 	  echo "anon-tuple ratchet OK: $$n connective-⟨…⟩ site(s) <= budget $(CLEAN_ANON_BUDGET)"
 
-.PHONY: leak-report leak-ratchet successor-ratchet pattern-cases-ratchet anon-tuple-report clean-anon-ratchet
+.PHONY: leak-report leak-ratchet successor-ratchet pattern-cases-ratchet pattern-cases-audit pattern-cases-audit-report anon-tuple-report clean-anon-ratchet
 
 # ----------------------------------------------------------------------
 # Error-provenance audit (PLAN_LESS_CIC_STYLE.md, Phase 0.3). Runs the
@@ -428,8 +461,8 @@ corpus-update: library
 # provenance gate) and the CIC leak count has not increased (Phase 0
 # ratchet). This is the "CI" entry point — run it before committing
 # elaborator/kernel changes.
-check: tests self-tests corpus-audit leak-ratchet successor-ratchet pattern-cases-ratchet clean-check clean-anon-ratchet
-	@echo "check: library + tests + self-tests verified; provenance gate, leak ratchet, clean set, and anon-tuple ratchet OK"
+check: tests self-tests corpus-audit leak-ratchet successor-ratchet pattern-cases-ratchet clean-check clean-anon-ratchet pattern-cases-audit
+	@echo "check: library + tests + self-tests verified; provenance gate, leak ratchet, clean set, anon-tuple ratchet, and pattern-cases audit OK"
 
 # The kernel binary's built-in C++ test suite (./kernel with no args).
 # Wired into `check` 2026-06-12 after three expectation drifts sat

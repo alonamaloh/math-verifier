@@ -26,6 +26,50 @@ static bool anonTupleConnectiveCheckEnabled() {
     return on;
 }
 
+// Opt-in audit (MATH_CHECK_PATTERN_CASES=1): surface every pattern-match
+// `cases` whose scrutinee is a computed expression — the recursor-dispatch
+// reading that should be `if` / `by cases { case P: … }`. Unlike the source
+// regex it replaces, this sees through `let`-bound aliases (`let d := f(x);
+// cases d { … }`), since it inspects the elaborated scrutinee / binder value.
+static bool patternCasesComputedCheckEnabled() {
+    static const bool on =
+        std::getenv("MATH_CHECK_PATTERN_CASES") != nullptr;
+    return on;
+}
+
+bool Elaborator::casesScrutineeIsComputed(
+        const SurfaceExpressionPointer& scrutinee,
+        const std::vector<LocalBinder>& localBinders) const {
+    if (!scrutinee) {
+        return false;
+    }
+    // Direct application: `cases f(x) { … }` / `cases compare_strict(a,b) { … }`.
+    if (std::holds_alternative<SurfaceApplication>(scrutinee->node)) {
+        return true;
+    }
+    // Bare name: computed only when it aliases a `let`-bound DATA value whose
+    // head is an application (`let d := monus(a,b); cases d { … }`). Genuine
+    // binders (lambda / choose / theorem parameters, pattern binders) carry no
+    // bound value; PROOF bindings (`… as h`, `claim`, `calc … as h`, a chosen
+    // proof) are honest And/Or/Exists eliminations, not data-dispatch dodges,
+    // and stay unflagged.
+    if (auto* identifier =
+            std::get_if<SurfaceIdentifier>(&scrutinee->node)) {
+        for (auto entry = localBinders.rbegin();
+             entry != localBinders.rend(); ++entry) {
+            if (entry->name != identifier->qualifiedName) {
+                continue;  // keep looking for the innermost binder of this name
+            }
+            if (entry->valueIsProof) {
+                return false;
+            }
+            return entry->value
+                && std::get_if<Application>(&entry->value->node) != nullptr;
+        }
+    }
+    return false;
+}
+
 ExpressionPointer Elaborator::elaborateSorry(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
@@ -976,6 +1020,22 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
+        // MATH_CHECK_PATTERN_CASES audit (fires once per user-written cases —
+        // the refining / with-equality desugarings call the INNER elaborator
+        // directly, never re-entering here). An induction block cases a
+        // variable subject, so it is never a computed-expression dispatch.
+        if (patternCasesComputedCheckEnabled()
+            && cases.userWritten
+            && !cases.isInductionBlock
+            && cases.inductionHypothesisName.empty()
+            && casesScrutineeIsComputed(cases.scrutinee, localBinders)) {
+            std::cerr << "warning: " << moduleName_ << ":" << line
+                << ": pattern-match `cases` on a computed expression — a"
+                   " recursor dispatch that should read as `if P then a else b`"
+                   " / `by cases { case P: … }`; a genuine destructure of `f(x)`"
+                   " cases a bound variable, so bind it in a real binder, not a"
+                   " `let` alias\n";
+        }
         // Keystone (PLAN_LUX_TRANSITION.md): a `by induction` cases-block
         // that uses the `case base:` / `case step(k):` vocabulary — which
         // the parser also produces for the equation spelling `case n = 0:`

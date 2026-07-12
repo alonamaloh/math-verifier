@@ -2904,6 +2904,17 @@ private:
         ExpressionPointer armBody, size_t armCount, bool hasOtherwise,
         const SurfaceStructuredClaimArm& arm);
 
+    // MATH_CHECK_PATTERN_CASES audit: whether a pattern-match `cases`
+    // scrutinee is a COMPUTED expression (a function/constructor application),
+    // directly or laundered through a `let` alias — the recursor-dispatch
+    // reading (`cases compare_strict(a,b) { | below => … }`) that should read
+    // as `if P then …` / `by cases { case P: … }`. A genuine variable
+    // destructure (`cases s { | Sum.left => … }`, `cases n { | zero => … }`)
+    // returns false. `let`-bound aliases are resolved via LocalBinder::value.
+    bool casesScrutineeIsComputed(
+        const SurfaceExpressionPointer& scrutinee,
+        const std::vector<LocalBinder>& localBinders) const;
+
     // Whether every BoundVariable reference in `expression` that maps
     // to a lemma binder (relative index < bindings.size()) has a
     // non-null entry in `bindings`. Used by the precondition-discharge

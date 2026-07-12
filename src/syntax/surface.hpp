@@ -280,6 +280,13 @@ struct SurfaceCases {
     // have a constructor named `step` (e.g. `LessOrEqual.step`) is never
     // misrouted.
     bool isInductionBlock = false;
+    // True only for a SurfaceCases the parser built directly from the `cases`
+    // keyword. The many desugarings that synthesise a `cases` (an `if`/decide,
+    // a `choose`'s ∃-elimination, a tuple-`let` destructure, the `with`/
+    // `refining` re-synthesis) leave this false, so the MATH_CHECK_PATTERN_CASES
+    // audit fires only on what the user actually typed. Default false so any
+    // un-updated synthesiser is treated as synthetic (fail safe).
+    bool userWritten = false;
 };
 
 // `sorry` — placeholder for an unwritten proof. Desugars at elaboration
@@ -975,11 +982,12 @@ inline SurfaceExpressionPointer makeSurfaceCases(
     std::vector<SurfaceCasesClause> clauses,
     int line, int column,
     std::string inductionHypothesisName = {},
-    bool isInductionBlock = false) {
+    bool isInductionBlock = false,
+    bool userWritten = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses), {}, {},
                       std::move(inductionHypothesisName),
-                      isInductionBlock},
+                      isInductionBlock, userWritten},
         line, column});
 }
 
@@ -1039,13 +1047,14 @@ inline SurfaceExpressionPointer makeSurfaceCasesWithRefining(
     std::vector<std::string> refiningNames,
     int line, int column,
     std::string inductionHypothesisName = {},
-    bool isInductionBlock = false) {
+    bool isInductionBlock = false,
+    bool userWritten = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses),
                       std::move(equalityHypothesisName),
                       std::move(refiningNames),
                       std::move(inductionHypothesisName),
-                      isInductionBlock},
+                      isInductionBlock, userWritten},
         line, column});
 }
 

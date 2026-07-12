@@ -1802,7 +1802,9 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 return makeSurfaceCases(std::move(rewrittenScrutinee),
                                          std::move(rewrittenClauses),
                                          node.line, node.column,
-                                         cases->inductionHypothesisName);
+                                         cases->inductionHypothesisName,
+                                         cases->isInductionBlock,
+                                         cases->userWritten);
             }
             return makeSurfaceCasesWithRefining(
                 std::move(rewrittenScrutinee),
@@ -1810,7 +1812,9 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 cases->equalityHypothesisName,
                 cases->refiningNames,
                 node.line, node.column,
-                cases->inductionHypothesisName);
+                cases->inductionHypothesisName,
+                cases->isInductionBlock,
+                cases->userWritten);
         }
         if (auto* claim = std::get_if<SurfaceStructuredClaim>(&node.node)) {
             // Anonymous `claim T by V;` desugars to a SurfaceLet whose

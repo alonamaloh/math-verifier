@@ -85,8 +85,25 @@ else { m ≤ i by …;      … }                          -- from ¬(i < 1 + m)
 So `cases <compare_strict …> { | … }` is never REQUIRED — always prefer
 the condition form. (The restatement line is mild friction; an
 `if P as h then …` sugar that binds the proof directly is a candidate,
-not yet built.) The leak linter does not catch the raw form, so this is
-on the author.
+not yet built.)
+
+This is enforced, and enforced *robustly*: the elaborator audit
+(`MATH_CHECK_PATTERN_CASES`, run by `make pattern-cases-audit` and wired
+into `make check`) flags every user `cases` whose scrutinee is a computed
+expression — a function application. It resolves `let` aliases, so the
+tempting dodge
+
+```math
+-- ALSO flagged — the `let` only hides the application from a source regex,
+-- not from the elaborator, which sees `overshoot`'s bound value:
+let overshoot := Natural.monus(a, b) in cases overshoot { | zero => … | … }
+```
+
+does not work: bind a *real* binder (a lambda / choose / theorem
+parameter) or use the condition forms. The only exemptions are
+foundational primitives that case a computed sub-result to *build* their
+own value (`Natural.compare`, `Natural.floor_divide`) — there is no `if`
+below them to reach for; it IS the machinery `if` desugars through.
 
 ### Multi-pattern bindings (when the pattern-match form is used)
 

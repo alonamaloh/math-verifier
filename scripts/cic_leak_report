@@ -124,12 +124,21 @@ NATURAL_DIR_PREFIX = os.path.join("library", "Natural") + os.sep
 # not a constructor".
 PATTERN_CASES_CATEGORY = "pattern-match `cases` on an expression"
 PATTERN_CASES_RE = re.compile(r"\bcases\s+(?!by\b)[A-Za-z_][A-Za-z0-9_.]*\s*\(")
-# Files exempt from the pattern-cases counter: a module DEFINING the decision
-# primitive itself must case-analyse the recursive sub-comparison to build the
-# `StrictComparison` value — there is no `if` to reach for, it IS the machinery
-# `if` desugars through. (Not a final verdict that it's unavoidable — likely it
-# is, with some creativity — just not counted against consumers meanwhile.)
-PATTERN_CASES_EXEMPT = {os.path.join("library", "Natural", "compare.math")}
+# Files exempt from the pattern-cases counter: a module DEFINING a foundational
+# decision/arithmetic primitive must case-analyse a computed sub-result to build
+# its value — there is no `if` to reach for, it IS the machinery `if` desugars
+# through. `compare.math` cases the recursive sub-comparison to build the
+# `StrictComparison`; `floor_divide.math` cases `monus(divisor, dividend)` to
+# peel the fuel recursion (its characterising `*_succ_fits`/`*_too_big` lemmas
+# reduce THROUGH that `cases` via `substituting`, which a classical `if` at the
+# raw sealed-Natural layer would break). (Not a final verdict that either is
+# unavoidable — just not counted against consumers meanwhile.) The elaborator
+# audit (MATH_CHECK_PATTERN_CASES, wired via `pattern-cases-audit`) uses the
+# same exempt set; keep the two in sync.
+PATTERN_CASES_EXEMPT = {
+    os.path.join("library", "Natural", "compare.math"),
+    os.path.join("library", "Natural", "floor_divide.math"),
+}
 
 # A numeral literal annotated `: Natural` — `(1 : Natural)`, `(0 : Natural)`,
 # … — is pure redundancy: a bare numeral already IS a Natural in this system
@@ -464,9 +473,12 @@ def main():
         print("=" * 62)
         print(f"  {pattern_cases_total:5d}  across {len(per_file_pattern_cases)} files")
         print("        hint: `cases compare_strict(i,m) { | below => … }` is a"
-              " decidable dispatch — use the condition forms. A genuine"
-              " destructure of `f(x)` should bind it first (`let d := f(x);"
-              " cases d { … }`).")
+              " decidable dispatch — use the condition forms `if P then a else"
+              " b` / `by cases { case P: … }`. Do NOT launder the scrutinee"
+              " through `let d := f(x); cases d` — that only fools this regex;"
+              " the elaborator audit (`make pattern-cases-audit`) resolves the"
+              " alias and still flags it. A genuine destructure cases a real"
+              " binder (a lambda / choose / theorem parameter).")
         if args.by_file and per_file_pattern_cases:
             print("  Per-file (most first):")
             for rel, count in sorted(per_file_pattern_cases.items(),
