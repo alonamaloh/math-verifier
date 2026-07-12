@@ -26,10 +26,35 @@ This plan removes those too, then deletes the keyword.
 - [x] The 3 foundational/holdout sites migrated to argument-matching helpers:
   `Natural.compare_strict_shift`, `Natural.Raw.select_on_zero`,
   `Test.pick_on_zero` (in substituting_obtain_test).
-- [ ] **STEP 1 — Spike the residue** (the one measurement that sizes the job).
-- [ ] **STEP 2 — Migrate 129 single-constructor destructures** → `let ⟨…⟩ :=`.
-- [ ] **STEP 3 — Migrate 98 multi-constructor splits** → `by cases` /
-  `by induction` / `choose` / helper.
+- [x] **STEP 1 — Spike the residue.** Of the 98 multi-arm sites only 10 are
+  value-level (9 `definition` + 1 `opaque`); the other 88 are proof-level
+  (`theorem` ×80 + `automatic theorem` coverage lemmas ×8). Of the 10:
+  3 `cases decision` lift to a pattern-match on the `Decidable` parameter;
+  `floor_divide` reorders to a single-column match; `diagonalStep` is a
+  nested single-param pattern (all verified against the kernel). The **only**
+  hard residue is **5 double-split functions** (`monus`, `distance`,
+  `maximum`, `Polynomial.Coefficients.add`, `Polynomial.nth`) that split two
+  independent data args — no multi-column pattern rows (ErrorTest
+  `pattern_shadows_constructor`), no helper (mutual recursion rejected).
+  **BUT** all 5 admit single-column / non-recursive **reformulations** using
+  existing primitives (monus/relu identity, value-level `if`, list head/tail,
+  single-recursion) — so the genuine residue needing a NEW language feature is
+  **0**. Recommendation adopted: reformulate rather than build multi-column
+  matching or a value-level data-match keyword.
+- [~] **STEP 2 — Migrate 129 single-constructor destructures** → `let ⟨…⟩ :=`.
+- [~] **STEP 3 — Migrate 98 multi-constructor splits** → `by cases` /
+  `by induction` / `choose` / helper / **reformulation** (for the 5 residue).
+  Done so far (reformulations, full library + tests green, downstream untouched):
+  - `Natural.maximum := a + monus(b, a)` — non-recursive; inequalities re-prove
+    from monus lemmas (left = less_or_equal_add_right; right = totality split).
+  - `Natural.distance := monus(a,b) + monus(b,a)` — char lemmas
+    (zero_left/_right/_succ_succ + 1+ form) recover the recursion; metric
+    proofs re-derive through them; `add_left_cancel`/`respects` collapse via new
+    `Natural.monus_add_common_left`/`_right` (added to monus.math).
+  Remaining residue reformulations: `Natural.monus` (single-recursion on 2nd
+  arg via predecessor), `Polynomial.nth` (value-level `if index = 0`),
+  `Polynomial.Coefficients.add` (single-recursion + head/tail helpers). Plus the
+  5 clean value-level lifts and the 88 proof-level migrations.
 - [ ] **STEP 4 — Remove the `cases` keyword** from parser + elaborator surface;
   keep the recursor engine for desugarings. Add an ErrorTest that a bare
   `cases` keyword is now unknown syntax.
