@@ -89,3 +89,110 @@ theorem VectorSpace.linearCombination_add_one {f : Field} {V : VectorSpace(f)}
            by Algebra.Fold_add_one
      = VectorSpace.linearCombination(family, coefficients, selection, count)
        + coefficients(count) • family(selection(count))
+
+-- ----------------------------------------------------------------------
+-- Combinations over a fixed family and selection form a module in the
+-- coefficients: scaling scales every coefficient, and adding two
+-- combinations adds their coefficients index by index. These are the
+-- algebraic bricks every span/exchange argument leans on.
+
+-- The medial law for vector addition: regroup a sum of two pairs by
+-- their positions. Used to line the two combinations' running sums up
+-- against their two new last terms when peeling.
+theorem VectorSpace.add_pair_interchange {f : Field} (V : VectorSpace(f))
+        (a b c d : VectorSpace.carrier(V))
+        : (a + b) + (c + d) = (a + c) + (b + d) :=
+  (a + b) + (c + d)
+     = a + (b + (c + d))       by VectorSpace.add_associative
+     = a + ((b + c) + d)       by VectorSpace.add_associative
+     = a + ((c + b) + d)       by VectorSpace.add_commutative
+     = a + (c + (b + d))       by VectorSpace.add_associative
+     = (a + c) + (b + d)       by VectorSpace.add_associative
+
+-- Scaling a combination scales every coefficient.
+theorem VectorSpace.linearCombination_scale {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        (a : Field.carrier(f)) (count : Natural)
+        : a • VectorSpace.linearCombination(family, coefficients, selection, count)
+          = VectorSpace.linearCombination(family,
+                (i : Natural) ↦ a * coefficients(i), selection, count) :=
+  by induction on count with IH {
+    case base:
+        a • VectorSpace.linearCombination(family, coefficients, selection, 0)
+           = a • VectorSpace.zero(V)                 by VectorSpace.linearCombination_zero
+           = VectorSpace.zero(V)                     by VectorSpace.scale_zero
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ a * coefficients(i), selection, 0)
+                 by VectorSpace.linearCombination_zero
+    case step(m):
+        a • VectorSpace.linearCombination(family, coefficients, selection, 1 + m)
+           = a • (VectorSpace.linearCombination(family, coefficients, selection, m)
+                  + coefficients(m) • family(selection(m)))
+                 by VectorSpace.linearCombination_add_one
+           = a • VectorSpace.linearCombination(family, coefficients, selection, m)
+                  + a • (coefficients(m) • family(selection(m)))
+                 by VectorSpace.scale_vector_add
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ a * coefficients(i), selection, m)
+                  + a • (coefficients(m) • family(selection(m)))
+                 by IH
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ a * coefficients(i), selection, m)
+                  + (a * coefficients(m)) • family(selection(m))
+                 by VectorSpace.scale_scalar_multiply
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ a * coefficients(i), selection, 1 + m)
+                 by VectorSpace.linearCombination_add_one
+  }
+
+-- Adding two combinations over the same family and selection adds their
+-- coefficients index by index.
+theorem VectorSpace.linearCombination_add_coefficients {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficientsLeft coefficientsRight : Natural → Field.carrier(f))
+        (selection : Natural → I) (count : Natural)
+        : VectorSpace.linearCombination(family, coefficientsLeft, selection, count)
+              + VectorSpace.linearCombination(family, coefficientsRight, selection, count)
+          = VectorSpace.linearCombination(family,
+                (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, count) :=
+  by induction on count with IH {
+    case base:
+        VectorSpace.linearCombination(family, coefficientsLeft, selection, 0)
+              + VectorSpace.linearCombination(family, coefficientsRight, selection, 0)
+           = VectorSpace.zero(V) + VectorSpace.zero(V)
+                 by VectorSpace.linearCombination_zero
+           = VectorSpace.zero(V)                     by VectorSpace.add_zero
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, 0)
+                 by VectorSpace.linearCombination_zero
+    case step(m):
+        VectorSpace.linearCombination(family, coefficientsLeft, selection, 1 + m)
+              + VectorSpace.linearCombination(family, coefficientsRight, selection, 1 + m)
+           = (VectorSpace.linearCombination(family, coefficientsLeft, selection, m)
+                  + coefficientsLeft(m) • family(selection(m)))
+             + VectorSpace.linearCombination(family, coefficientsRight, selection, 1 + m)
+                 by VectorSpace.linearCombination_add_one
+           = (VectorSpace.linearCombination(family, coefficientsLeft, selection, m)
+                  + coefficientsLeft(m) • family(selection(m)))
+             + (VectorSpace.linearCombination(family, coefficientsRight, selection, m)
+                  + coefficientsRight(m) • family(selection(m)))
+                 by VectorSpace.linearCombination_add_one
+           = (VectorSpace.linearCombination(family, coefficientsLeft, selection, m)
+                  + VectorSpace.linearCombination(family, coefficientsRight, selection, m))
+             + (coefficientsLeft(m) • family(selection(m))
+                  + coefficientsRight(m) • family(selection(m)))
+                 by VectorSpace.add_pair_interchange
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, m)
+             + (coefficientsLeft(m) • family(selection(m))
+                  + coefficientsRight(m) • family(selection(m)))
+                 by IH
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, m)
+             + (coefficientsLeft(m) + coefficientsRight(m)) • family(selection(m))
+                 by VectorSpace.scale_scalar_add
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, 1 + m)
+                 by VectorSpace.linearCombination_add_one
+  }
