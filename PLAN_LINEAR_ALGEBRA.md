@@ -59,9 +59,47 @@ Update this section before ending any session that works on the plan.
   abstract `Field.carrier`, bare instance axioms, by-less reciprocal
   cancellation, concrete-instance reduction). All five files in the
   clean manifest.
-- **Stages B–H** — not started. Next: Stage B (`VectorSpace` over a
-  `Field`; the `Fⁿ` instance is the first real `NaturalsBelow`-indexed
-  object).
+- **Stage B — DONE (2026-07-12).** `Algebra/vector_space.math`:
+  `IsVectorSpace` (abelian group + the four scalar-action laws), the
+  bundled `VectorSpace(f)` record INDEXED by its field (Type(1),
+  parameterized inductive — the first in the library), projections,
+  operations + operators (`+ - •`), `instance
+  VectorSpace.is_abelian_group`, an `automatic` flattened law layer
+  (no `ring` normaliser exists over a vector carrier, so the scan is
+  what discharges bare vector arithmetic — six group laws + the four
+  scale laws), and the `F`-over-itself instance
+  (`Field.vector_space`). `Algebra/coordinate_space.math`: `Fⁿ` as
+  `NaturalsBelow(n) → Field.carrier(f)` under pointwise operations —
+  the first genuinely dependent-indexed carrier — with
+  `CoordinateSpace.equal_of_pointwise` as the one extensionality
+  bridge and every law a pointwise field fact closed by `ring`.
+  FOUNDATIONAL PREREQUISITE LANDED WITH IT: **function extensionality
+  is now a THEOREM** (`Function.extensionality`, Logic/functions.math)
+  — derived from the quotient axioms + η (evaluate through the
+  pointwise-equality quotient; the round trip computes back by lift-ι
+  + η), no new axiom, honoring the no-axiom guardrail. Elaborator
+  support: the `•` token (lexer/parser, multiplicative precedence);
+  two-phase operator implicit recovery (a heterogeneous operator's
+  left operand may not pin every implicit — `•` pins {f} from the
+  scalar, the RIGHT operand's type against the second explicit domain
+  pins {V}); `carrierProjectionField` peels implicit-carrying
+  projections and reads through `VectorSpace.make` (parameter first,
+  carrier second). Acceptance: `Test/vector_space_test.math`.
+  PROBE FINDINGS (the branch's purpose): (1) the `by <lemma>` citation
+  path does NOT ∀-intro a Pi goal before matching, so the ∀-shaped
+  law legs need explicit binder lambdas around the pointwise bridge —
+  a candidate follow-up for the citation machinery; (2) the leak
+  taxonomy counts `equal_of_pointwise(<pointwise lambda>)` term calls
+  as direct proof-lemma calls (same class as ComplexNumber's accepted
+  `extensionallyEqual` applications) — `coordinate_space.math` is
+  KEPT OUT of the clean manifest pending an owner style call (bless
+  the pointwise-bridge application as data-like, or grow a surface
+  form for it); `vector_space.math` is in the manifest.
+  CLEAN_LEAK_BUDGET resynced 230→232 (field_bundle's two `Logic.the`
+  proof-data tokens, the Real.reciprocal idiom — my Stage A gate ran
+  before the manifest edit, so the +2 surfaced here).
+- **Stages C–H** — not started. Next: Stage C (subspaces, linear maps,
+  kernel/image).
 
 ## What is already in place (so this isn't re-litigated)
 

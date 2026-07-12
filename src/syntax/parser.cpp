@@ -71,6 +71,7 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::Slash:
         case TokenKind::Caret:
         case TokenKind::CenterDot:
+        case TokenKind::Bullet:
         case TokenKind::Less:
         case TokenKind::Greater:
         case TokenKind::LessOrEqual:
@@ -3279,13 +3280,15 @@ private:
         auto left = parseUnary();
         while (peek().kind == TokenKind::Star
                || peek().kind == TokenKind::Slash
-               || peek().kind == TokenKind::CenterDot) {
+               || peek().kind == TokenKind::CenterDot
+               || peek().kind == TokenKind::Bullet) {
             Token op = consumeAny();
             const char* sym = nullptr;
             switch (op.kind) {
                 case TokenKind::Star:      sym = "*"; break;
                 case TokenKind::Slash:     sym = "/"; break;
                 case TokenKind::CenterDot: sym = "·"; break;
+                case TokenKind::Bullet:    sym = "•"; break;
                 default: break;
             }
             if (peek().kind == TokenKind::Ellipsis) {

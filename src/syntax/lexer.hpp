@@ -90,6 +90,7 @@ enum class TokenKind {
     // Operators
     Plus, Minus, Star, Slash, Caret,
     CenterDot,       // "·" (binary operation symbol, multiplicative precedence)
+    Bullet,          // "•" (scalar action, multiplicative precedence)
     InverseSuperscript,  // "⁻¹" (postfix operator symbol, e.g. group inverse)
     SquareSuperscript,   // "²" (postfix squaring; parse-time sugar for E * E)
     Bang,            // "!" (postfix operator symbol, e.g. factorial). There is

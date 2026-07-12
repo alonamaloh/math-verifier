@@ -370,6 +370,7 @@ private:
             {"⟨", TokenKind::LeftAngle},
             {"⟩", TokenKind::RightAngle},
             {"·", TokenKind::CenterDot},
+            {"•", TokenKind::Bullet},
             {"⁻¹", TokenKind::InverseSuperscript},
             {"²", TokenKind::SquareSuperscript},
         };
@@ -581,6 +582,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Slash:                return "'/'";
         case TokenKind::Caret:                return "'^'";
         case TokenKind::CenterDot:            return "'·'";
+        case TokenKind::Bullet:               return "'•'";
         case TokenKind::InverseSuperscript:   return "'⁻¹'";
         case TokenKind::SquareSuperscript:    return "'²'";
         case TokenKind::Bang:                 return "'!'";

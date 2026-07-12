@@ -1,0 +1,144 @@
+-- Algebra/coordinate_space.math
+--
+-- The standard coordinate space Fⁿ over a field: families
+-- `NaturalsBelow(n) → F` under pointwise operations — the library's
+-- first genuinely dependent-indexed carrier (the index type carries a
+-- proof). All the vector-space laws are pointwise field facts lifted
+-- through function extensionality, so the file's one bridge is
+-- `CoordinateSpace.equal_of_pointwise`.
+
+module Algebra.coordinate_space
+
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Set.subtype
+import Set.finite
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+
+definition CoordinateSpace (f : Field) (n : Natural) : Type(0) :=
+  NaturalsBelow(n) → Field.carrier(f)
+
+-- ----------------------------------------------------------------------
+-- Pointwise operations.
+
+definition CoordinateSpace.add {f : Field} {n : Natural}
+        (u v : CoordinateSpace(f, n)) : CoordinateSpace(f, n) :=
+  (k : NaturalsBelow(n)) ↦ u(k) + v(k)
+
+definition CoordinateSpace.zero (f : Field) (n : Natural)
+        : CoordinateSpace(f, n) :=
+  (k : NaturalsBelow(n)) ↦ Field.zero(f)
+
+definition CoordinateSpace.negate {f : Field} {n : Natural}
+        (u : CoordinateSpace(f, n)) : CoordinateSpace(f, n) :=
+  (k : NaturalsBelow(n)) ↦ Field.negate(u(k))
+
+definition CoordinateSpace.scale {f : Field} {n : Natural}
+        (a : Field.carrier(f)) (u : CoordinateSpace(f, n))
+        : CoordinateSpace(f, n) :=
+  (k : NaturalsBelow(n)) ↦ a * u(k)
+
+operator (+) on (CoordinateSpace, CoordinateSpace) := CoordinateSpace.add
+operator (•) on (Field.carrier, CoordinateSpace) := CoordinateSpace.scale
+
+-- Two coordinate vectors with equal coordinates are equal — the file's
+-- one extensionality bridge.
+theorem CoordinateSpace.equal_of_pointwise {f : Field} {n : Natural}
+        {u v : CoordinateSpace(f, n)}
+        (pointwise : ∀ (k : NaturalsBelow(n)). u(k) = v(k))
+        : u = v :=
+  Function.extensionality(NaturalsBelow(n), Field.carrier(f), u, v, pointwise)
+
+-- ----------------------------------------------------------------------
+-- Fⁿ is a vector space: every law is its pointwise field counterpart.
+
+theorem CoordinateSpace.is_vector_space (f : Field) (n : Natural)
+        : IsVectorSpace(f, CoordinateSpace(f, n), CoordinateSpace.add,
+                        CoordinateSpace.zero(f, n), CoordinateSpace.negate,
+                        CoordinateSpace.scale) := {
+  ∀ (u v w : CoordinateSpace(f, n)). (u + v) + w = u + (v + w)
+      by (u v w : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            (u(k) + v(k)) + w(k) = u(k) + (v(k) + w(k));
+            done
+          });
+  ∀ (u : CoordinateSpace(f, n)). CoordinateSpace.zero(f, n) + u = u
+      by (u : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            Field.zero(f) + u(k) = u(k);
+            done
+          });
+  ∀ (u : CoordinateSpace(f, n)). u + CoordinateSpace.zero(f, n) = u
+      by (u : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            u(k) + Field.zero(f) = u(k);
+            done
+          });
+  ∀ (u : CoordinateSpace(f, n)).
+      CoordinateSpace.negate(u) + u = CoordinateSpace.zero(f, n)
+      by (u : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            Field.negate(u(k)) + u(k) = Field.zero(f);
+            done
+          });
+  ∀ (u : CoordinateSpace(f, n)).
+      u + CoordinateSpace.negate(u) = CoordinateSpace.zero(f, n)
+      by (u : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            u(k) + Field.negate(u(k)) = Field.zero(f);
+            done
+          });
+  ∀ (u v : CoordinateSpace(f, n)). u + v = v + u
+      by (u v : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            u(k) + v(k) = v(k) + u(k);
+            done
+          });
+  ∀ (a : Field.carrier(f)). ∀ (u v : CoordinateSpace(f, n)).
+      a • (u + v) = a • u + a • v
+      by (a : Field.carrier(f)) (u v : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            a * (u(k) + v(k)) = a * u(k) + a * v(k);
+            done
+          });
+  ∀ (a b : Field.carrier(f)). ∀ (v : CoordinateSpace(f, n)).
+      (a + b) • v = a • v + b • v
+      by (a b : Field.carrier(f)) (v : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            (a + b) * v(k) = a * v(k) + b * v(k);
+            done
+          });
+  ∀ (a b : Field.carrier(f)). ∀ (v : CoordinateSpace(f, n)).
+      (a * b) • v = a • (b • v)
+      by (a b : Field.carrier(f)) (v : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            (a * b) * v(k) = a * (b * v(k));
+            done
+          });
+  ∀ (v : CoordinateSpace(f, n)). Field.one(f) • v = v
+      by (v : CoordinateSpace(f, n)) ↦
+          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
+            Field.one(f) * v(k) = v(k);
+            done
+          });
+  done
+}
+
+-- Fⁿ as a bundled space over its field.
+definition CoordinateSpace.vector_space (f : Field) (n : Natural)
+        : VectorSpace(f) :=
+  VectorSpace.make(CoordinateSpace(f, n), CoordinateSpace.add,
+      CoordinateSpace.zero(f, n), CoordinateSpace.negate,
+      CoordinateSpace.scale, CoordinateSpace.is_vector_space)

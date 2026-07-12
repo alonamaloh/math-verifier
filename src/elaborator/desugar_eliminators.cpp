@@ -449,12 +449,20 @@ bool Elaborator::structureHeadIsClass(const std::string& name) {
 ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
         auto* application = std::get_if<Application>(&type->node);
         if (!application) return nullptr;
-        auto* projector =
-            std::get_if<Constant>(&application->function->node);
+        // The bundle is the projection's LAST argument — peel the spine
+        // for the projector head, so implicit-carrying projections
+        // (`VectorSpace.carrier {f} (V)`) read like single-argument ones.
+        ExpressionPointer projectorHead = application->function;
+        while (auto* inner =
+                   std::get_if<Application>(&projectorHead->node)) {
+            projectorHead = inner->function;
+        }
+        auto* projector = std::get_if<Constant>(&projectorHead->node);
         if (!projector) return nullptr;
         if (projector->name != "Ring.carrier"
             && projector->name != "CommutativeRing.carrier"
-            && projector->name != "Field.carrier") {
+            && projector->name != "Field.carrier"
+            && projector->name != "VectorSpace.carrier") {
             return nullptr;
         }
         ExpressionPointer bundle = weakHeadNormalForm(
@@ -483,6 +491,13 @@ ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
         if (constructor->name == "Field.make") {
             return carrierProjectionField(makeApplication(
                 makeConstant("CommutativeRing.carrier"), arguments.back()));
+        }
+        // `VectorSpace(f)` is a PARAMETERIZED inductive, so the make's
+        // first argument is the field parameter and the carrier type is
+        // the second.
+        if (constructor->name == "VectorSpace.make"
+            && arguments.size() >= 2) {
+            return arguments[arguments.size() - 2];
         }
         return nullptr;
     }

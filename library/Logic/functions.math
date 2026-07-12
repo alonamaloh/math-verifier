@@ -14,6 +14,7 @@
 
 module Logic.functions
 
+import axioms
 import Logic.basics
 import Logic.exists
 import Equality.basics
@@ -66,3 +67,45 @@ theorem Function.compose_surjective
          = g(y)
          = z
   }
+
+-- ----------------------------------------------------------------------
+-- Function extensionality: pointwise-equal functions are equal. NOT an
+-- axiom — derived from the quotient axioms plus η, the standard
+-- construction: divide the function space by pointwise equality,
+-- evaluate through the quotient (evaluation at a point respects the
+-- relation), and observe that the round trip
+-- `x ↦ applyClass(pointwiseClass(f), x)` computes back to `f`. The two
+-- classes are equal by soundness, so the round trips — and hence the
+-- functions — agree.
+
+-- Pointwise equality — the relation the extensionality quotient
+-- divides by.
+definition Function.PointwiseEqual (A B : Type(0)) (f g : A → B) : Proposition :=
+  ∀ (x : A). f(x) = g(x)
+
+-- The class of a function under pointwise equality (names the relation,
+-- which `Quotient.class_of` cannot read off the function alone).
+definition Function.pointwiseClass (A B : Type(0)) (f : A → B)
+        : Quotient(A → B, Function.PointwiseEqual(A, B)) :=
+  Quotient.class_of(f)
+
+-- Evaluation at a point, through the quotient: pointwise-equal
+-- functions agree at every point, so it is well-defined.
+definition Function.applyClass (A B : Type(0))
+        (q : Quotient(A → B, Function.PointwiseEqual(A, B))) (x : A) : B :=
+  Quotient.lift(
+      (h : A → B) ↦ h(x),
+      (h1 h2 : A → B)
+          (pointwise : Function.PointwiseEqual(A, B, h1, h2)) ↦ pointwise(x),
+      q)
+
+theorem Function.extensionality (A B : Type(0)) (f g : A → B)
+        (pointwiseEqual : ∀ (x : A). f(x) = g(x))
+        : f = g := {
+  Function.pointwiseClass(A, B, f) = Function.pointwiseClass(A, B, g)
+      by Quotient.equivalent_implies_equal;
+  f
+     = ((x : A) ↦ Function.applyClass(A, B, Function.pointwiseClass(A, B, f), x))
+     = ((x : A) ↦ Function.applyClass(A, B, Function.pointwiseClass(A, B, g), x))
+     = g
+}

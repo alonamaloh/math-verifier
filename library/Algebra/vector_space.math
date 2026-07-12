@@ -1,0 +1,237 @@
+-- Algebra/vector_space.math
+--
+-- Vector spaces over a bundled `Field`, fully general — nothing here is
+-- capped at finite dimension ("finite-dimensional" is a separate,
+-- stronger structure layered on later, the way `CommutativeRing` layers
+-- over `Ring`). `IsVectorSpace` is the unbundled predicate: an abelian
+-- group of vectors plus the four scalar-action laws. The bundled
+-- `VectorSpace(f)` record is INDEXED by its scalar field, so scalar
+-- multiplication recovers the whole scalar structure from the operand
+-- type — the same implicit recovery `RingModulo` uses for its modulus.
+--
+-- Scalar action is spelled `a • v` (`•` is scalar-specific, distinct
+-- from the group `·` and ring `*`).
+
+module Algebra.vector_space
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+
+-- The unbundled predicate: vectors form an abelian group, and scaling
+-- distributes over vector addition, distributes over scalar addition,
+-- composes with scalar multiplication, and is unital.
+definition IsVectorSpace
+        (f : Field)
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (scale : Field.carrier(f) → carrier → carrier)
+        : Proposition :=
+    IsAbelianGroup(carrier, add, zero, negate)
+    ∧ (∀ (a : Field.carrier(f)). ∀ (u v : carrier).
+           scale(a, add(u, v)) = add(scale(a, u), scale(a, v)))
+    ∧ (∀ (a b : Field.carrier(f)). ∀ (v : carrier).
+           scale(a + b, v) = add(scale(a, v), scale(b, v)))
+    ∧ (∀ (a b : Field.carrier(f)). ∀ (v : carrier).
+           scale(a * b, v) = scale(a, scale(b, v)))
+    ∧ (∀ (v : carrier). scale(Field.one(f), v) = v)
+
+-- The bundled record, indexed by the scalar field. Lives in Type(1)
+-- because it carries a Type(0) carrier.
+inductive VectorSpace (f : Field) : Type(1) where
+  | VectorSpace.make
+      : (carrier : Type(0))
+        → (add : carrier → carrier → carrier)
+        → (zero : carrier)
+        → (negate : carrier → carrier)
+        → (scale : Field.carrier(f) → carrier → carrier)
+        → IsVectorSpace(f, carrier, add, zero, negate, scale)
+        → VectorSpace(f)
+
+-- ----------------------------------------------------------------------
+-- Field projections. The operations take `f` and `V` implicitly
+-- (recovered from the operand type `VectorSpace.carrier(V)`); the
+-- constants take `V` explicitly.
+
+definition VectorSpace.carrier {f : Field} (V : VectorSpace(f)) : Type(0) :=
+  cases V { | VectorSpace.make(carrier, add, zero, negate, scale, laws) =>
+    carrier }
+
+definition VectorSpace.add {f : Field} {V : VectorSpace(f)}
+        : VectorSpace.carrier(V) → VectorSpace.carrier(V) → VectorSpace.carrier(V) :=
+  cases V { | VectorSpace.make(carrier, add, zero, negate, scale, laws) =>
+    add }
+
+definition VectorSpace.zero {f : Field} (V : VectorSpace(f))
+        : VectorSpace.carrier(V) :=
+  cases V { | VectorSpace.make(carrier, add, zero, negate, scale, laws) =>
+    zero }
+
+definition VectorSpace.negate {f : Field} {V : VectorSpace(f)}
+        : VectorSpace.carrier(V) → VectorSpace.carrier(V) :=
+  cases V { | VectorSpace.make(carrier, add, zero, negate, scale, laws) =>
+    negate }
+
+definition VectorSpace.scale {f : Field} {V : VectorSpace(f)}
+        : Field.carrier(f) → VectorSpace.carrier(V) → VectorSpace.carrier(V) :=
+  cases V { | VectorSpace.make(carrier, add, zero, negate, scale, laws) =>
+    scale }
+
+definition VectorSpace.subtract {f : Field} {V : VectorSpace(f)}
+        (u v : VectorSpace.carrier(V)) : VectorSpace.carrier(V) :=
+  VectorSpace.add(u, VectorSpace.negate(v))
+
+operator (+) on (VectorSpace.carrier, VectorSpace.carrier) := VectorSpace.add
+operator (-) on (VectorSpace.carrier, VectorSpace.carrier) := VectorSpace.subtract
+operator (•) on (Field.carrier, VectorSpace.carrier) := VectorSpace.scale
+
+-- ----------------------------------------------------------------------
+-- The bundled laws, registered so the vector-group axioms discharge
+-- bare over `VectorSpace.carrier`.
+
+definition VectorSpace.is_vector_space {f : Field} (V : VectorSpace(f))
+        : IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                        VectorSpace.zero(V), VectorSpace.negate,
+                        VectorSpace.scale) :=
+  cases V { | VectorSpace.make(carrier, add, zero, negate, scale, laws) =>
+    laws }
+
+definition VectorSpace.is_abelian_group {f : Field} (V : VectorSpace(f))
+        : IsAbelianGroup(VectorSpace.carrier(V), VectorSpace.add,
+                         VectorSpace.zero(V), VectorSpace.negate) := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+instance VectorSpace.is_abelian_group
+
+-- ----------------------------------------------------------------------
+-- Flattened vector-group laws, `automatic` so bare vector arithmetic
+-- closes at consumers (mirroring `Ring.add_associative` and friends —
+-- there is no `ring` normaliser over a vector carrier, so the scan is
+-- what discharges these shapes).
+
+automatic theorem VectorSpace.add_associative {f : Field} (V : VectorSpace(f))
+        (u v w : VectorSpace.carrier(V))
+        : (u + v) + w = u + (v + w) := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.add_commutative {f : Field} (V : VectorSpace(f))
+        (u v : VectorSpace.carrier(V))
+        : u + v = v + u := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.zero_add {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : VectorSpace.zero(V) + v = v := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.add_zero {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : v + VectorSpace.zero(V) = v := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.add_negate_left {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : VectorSpace.negate(v) + v = VectorSpace.zero(V) := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.add_negate_right {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : v + VectorSpace.negate(v) = VectorSpace.zero(V) := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+-- The four scalar-action laws, as named projections — `automatic` so
+-- the stated shapes close bare at consumers too.
+
+automatic theorem VectorSpace.scale_vector_add {f : Field} (V : VectorSpace(f))
+        (a : Field.carrier(f)) (u v : VectorSpace.carrier(V))
+        : a • (u + v) = a • u + a • v := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.scale_scalar_add {f : Field} (V : VectorSpace(f))
+        (a b : Field.carrier(f)) (v : VectorSpace.carrier(V))
+        : (a + b) • v = a • v + b • v := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.scale_scalar_multiply {f : Field} (V : VectorSpace(f))
+        (a b : Field.carrier(f)) (v : VectorSpace.carrier(V))
+        : (a * b) • v = a • (b • v) := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+automatic theorem VectorSpace.one_scale {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : Field.one(f) • v = v := {
+  IsVectorSpace(f, VectorSpace.carrier(V), VectorSpace.add,
+                VectorSpace.zero(V), VectorSpace.negate, VectorSpace.scale);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The scalar field over itself: scaling is field multiplication. The
+-- abelian group is the field's additive group, and the four action
+-- laws are ring identities.
+
+theorem Field.is_vector_space_over_itself (f : Field)
+        : IsVectorSpace(f, Field.carrier(f), Field.add, Field.zero(f),
+                        Field.negate, Field.multiply) := {
+  IsRing(Field.carrier(f), Field.add, Field.zero(f),
+         Field.negate, Field.multiply, Field.one(f));
+  IsAbelianGroup(Field.carrier(f), Field.add, Field.zero(f), Field.negate);
+  ∀ (a : Field.carrier(f)). ∀ (u v : Field.carrier(f)).
+      a * (u + v) = a * u + a * v
+    by Field.distributivity_left;
+  ∀ (a b : Field.carrier(f)). ∀ (v : Field.carrier(f)).
+      (a + b) * v = a * v + b * v
+    by Field.distributivity_right;
+  ∀ (a b : Field.carrier(f)). ∀ (v : Field.carrier(f)).
+      (a * b) * v = a * (b * v)
+    by Field.multiply_associative;
+  ∀ (v : Field.carrier(f)). Field.one(f) * v = v
+    by Field.one_multiply;
+  done
+}
+
+definition Field.vector_space (f : Field) : VectorSpace(f) :=
+  VectorSpace.make(Field.carrier(f), Field.add, Field.zero(f),
+      Field.negate, Field.multiply, Field.is_vector_space_over_itself)

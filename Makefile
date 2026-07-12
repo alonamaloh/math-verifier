@@ -189,7 +189,12 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # multiply_order) destructure the now-sealed alias, so each gains the
 # documented `unfold Natural in` escape hatch — twelve tokens, all below
 # the boundary they bootstrap.
-CLEAN_LEAK_BUDGET ?= 230
+# 2026-07-12: 230 → 232. Algebra/field_bundle's `Field.reciprocal` /
+# `reciprocal_multiplies` pass `Field.inverse_unique(f, x)` as the
+# uniqueness DATA of `Logic.the` — the established `Real.reciprocal`
+# definite-description idiom (Real/field.math carries the same two
+# tokens inside the budget).
+CLEAN_LEAK_BUDGET ?= 232
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the

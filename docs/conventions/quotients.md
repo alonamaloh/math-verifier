@@ -16,21 +16,21 @@ operation. Use the SHORT forms by default. The verbose forms exist
 only as fallbacks when the elaborator can't infer; expect that to
 be rare.
 
-### Quotient.mk(rep)
+### Quotient.class_of(rep)
 
 ```math
 -- Short (preferred): T inferred from rep's type, R from expected type.
--- (`Rational` is opaque, so the mk is pierced once with `unfold Rational`;
+-- (`Rational` is opaque, so the class_of is pierced once with `unfold Rational`;
 -- normally you'd write `Rational.fraction(…)` and never see this.)
 definition Rational.zero : Rational :=
   unfold Rational in
-    Quotient.mk(RationalRepresentative.make(
+    Quotient.class_of(RationalRepresentative.make(
         Integer.zero, Integer.one, Integer.one_is_nonzero))
 
 -- Verbose (avoid unless necessary):
 definition Rational.zero : Rational :=
   unfold Rational in
-    Quotient.mk(RationalRepresentative, RationalEquivalent,
+    Quotient.class_of(RationalRepresentative, RationalEquivalent,
                 RationalRepresentative.make(
                     Integer.zero, Integer.one, Integer.one_is_nonzero))
 ```
@@ -47,19 +47,19 @@ argument). The short form does NOT fire in these positions:
 - Inside `congruenceOf` lambdas without an explicit annotation.
 
 **Trick:** in those positions, an explicit type ascription on the
-`mk` recovers the inference: `(Quotient.mk(rep) : Rational)`. The
+`mk` recovers the inference: `(Quotient.class_of(rep) : Rational)`. The
 ascription is the expected type the short form needs.
 
 ```math
 -- Fails:
-Rational.absolute_value(Quotient.mk(rep))
+Rational.absolute_value(Quotient.class_of(rep))
 
 -- Works:
-Rational.absolute_value((Quotient.mk(rep) : Rational))
+Rational.absolute_value((Quotient.class_of(rep) : Rational))
 
 -- Also works (verbose fallback):
 Rational.absolute_value(
-    Quotient.mk(RationalRepresentative, RationalEquivalent, rep))
+    Quotient.class_of(RationalRepresentative, RationalEquivalent, rep))
 ```
 
 ### Quotient.sound(x, y, proof)
@@ -78,7 +78,7 @@ Quotient.sound(RationalRepresentative, RationalEquivalent,
 The converse of `Quotient.sound`: from a proof that two classes are equal,
 `Quotient.exact` recovers the equivalence of their representatives. You never
 name it. The auto-prover discharges a goal `R(a, b)` whenever an in-scope
-hypothesis proves `Quotient.mk(a) = Quotient.mk(b)` — so a proof reads "since
+hypothesis proves `Quotient.class_of(a) = Quotient.class_of(b)` — so a proof reads "since
 the classes are equal" and the goal closes as a bare stated fact or a
 by-less chain step. The class-equality endpoints may be `construction`
 forms or coercions that δ-reduce to `mk` (the match WHNFs them).
@@ -154,7 +154,7 @@ respects the relation".
 
 ```math
 definition Rational.negate : Rational → Rational
-  by representatives rep ↦ Quotient.mk(Rational.negate_representatives(rep))
+  by representatives rep ↦ Quotient.class_of(Rational.negate_representatives(rep))
   well_defined by Rational.negate_respects
 ```
 
@@ -177,7 +177,7 @@ named):
 
 ```math
 definition Integer.add : Integer → Integer → Integer
-  by representatives a, c ↦ Quotient.mk(Integer.add_representatives(a, c))
+  by representatives a, c ↦ Quotient.class_of(Integer.add_representatives(a, c))
   well_defined by Integer.add_respects_first, Integer.add_respects_second
 ```
 
@@ -231,17 +231,17 @@ Quotient.induct_three(at_make_lemma, x, y, z)
 `construction Name(args) : T := <intro body>` declares a **canonical
 introduction form** for a quotient. It is an ordinary *transparent*
 definition (the kernel δ-reduces `Name(args)` to the body), so it is
-def-equal to the underlying `Quotient.mk(...)` and needs no special
+def-equal to the underlying `Quotient.class_of(...)` and needs no special
 support in `cases` / `lift` / `reflexivity`. The win is readability:
 proofs and printed goals say `Rational.fraction(n, d, dNonzero)` instead of
-`Quotient.mk(RationalRepresentative.make(n, d, dNonzero))`. (`Rational` is an
+`Quotient.class_of(RationalRepresentative.make(n, d, dNonzero))`. (`Rational` is an
 opaque type, so the body pierces it once with `unfold Rational`; see
 `opaque.md`.)
 
 ```math
 construction Rational.fraction
         (n d : Integer) (dNonzero : ¬(d = Integer.zero)) : Rational :=
-  unfold Rational in Quotient.mk(RationalRepresentative.make(n, d, dNonzero))
+  unfold Rational in Quotient.class_of(RationalRepresentative.make(n, d, dNonzero))
 
 -- Downstream, prefer the named form:
 definition Rational.zero : Rational :=
@@ -250,7 +250,7 @@ definition Rational.zero : Rational :=
 
 It parses exactly like a `definition` (same binder / `: T` / `:= body`
 syntax), so the return type is written explicitly — that expected type
-is also what lets the short `Quotient.mk(rep)` body infer its relation.
+is also what lets the short `Quotient.class_of(rep)` body infer its relation.
 
 **Soft convention (preferred, not enforced):** once a quotient has a
 `construction` intro and a `by_representatives` eliminator, prefer them
@@ -286,7 +286,7 @@ theorem Rational.triangle_inequality (x y : Rational)
 The pattern can be a bare name (bind the rep), a constructor pattern
 over the carrier type (destructure the rep), a tuple `⟨a, b⟩` (same, with
 the constructor name resolved from the type), or the explicit
-`Quotient.mk(<inner>)` wrap (legacy). Prefer `by_representatives` (above)
+`Quotient.class_of(<inner>)` wrap (legacy). Prefer `by_representatives` (above)
 when destructuring one or more scrutinees with no extra `cases` plumbing.
 
 ```math

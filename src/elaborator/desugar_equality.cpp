@@ -496,7 +496,9 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 makeConstant("successor"), std::move(leftKernel));
         }
         ExpressionPointer call = applyOperatorImplicitFillers(
-            makeConstant(targetFunction), targetFunction, leftTypeClosed);
+            makeConstant(targetFunction), targetFunction, leftTypeClosed,
+            closeOverLocalBinders(rightTypeRaw, localBinders,
+                                  localBinders.size()));
         call = makeApplication(std::move(call), std::move(leftKernel));
         call = makeApplication(std::move(call), std::move(rightKernel));
         // Discharge any trailing propositional side-condition the operator
@@ -508,7 +510,8 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
 
 ExpressionPointer Elaborator::applyOperatorImplicitFillers(
         ExpressionPointer call, const std::string& targetFunction,
-        ExpressionPointer leftTypeClosed) {
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed) {
         // Fill any leading implicit binders the dispatch function may
         // have. Two patterns are common:
         //   (a) `Set.member {T : Type(0)} (x : T) (S : Set(T))` —
@@ -552,6 +555,13 @@ ExpressionPointer Elaborator::applyOperatorImplicitFillers(
                         // (`{c}{m}`) are recovered from the type the alias
                         // abbreviates. Single-step so we stop at `RingModulo`
                         // rather than blowing past it to `Quotient`.
+                        // A structural match that binds only SOME implicits
+                        // is kept: a heterogeneous operator's left type may
+                        // not mention them all (`VectorSpace.scale {f} {V} :
+                        // Field.carrier(f) → VectorSpace.carrier(V) → …`
+                        // behind `•` pins only {f} from the scalar) — the
+                        // right-operand phase below fills the rest.
+                        std::vector<ExpressionPointer> partialBindings;
                         ExpressionPointer leftCandidate = leftTypeClosed;
                         for (int step = 0; step < 64 && !inferredByUnification;
                              ++step) {
@@ -567,12 +577,79 @@ ExpressionPointer Elaborator::applyOperatorImplicitFillers(
                                         break;
                                     }
                                 }
+                                if (!inferredByUnification
+                                    && partialBindings.empty()) {
+                                    partialBindings = implicitBindings;
+                                }
                             }
                             if (inferredByUnification) break;
                             ExpressionPointer next =
                                 unfoldHeadConstantOneStep(leftCandidate);
                             if (!next) break;
                             leftCandidate = next;
+                        }
+                        if (!inferredByUnification) {
+                            std::fill(implicitBindings.begin(),
+                                      implicitBindings.end(), nullptr);
+                            if (!partialBindings.empty()) {
+                                implicitBindings = partialBindings;
+                            }
+                        }
+                        // Right-operand phase: recover the implicits the
+                        // left type left open from the RIGHT operand's type
+                        // against the SECOND explicit domain (whose pattern
+                        // additionally binds the first explicit binder —
+                        // one extra metavariable slot, unused).
+                        if (!inferredByUnification && rightTypeClosed) {
+                            auto* secondExplicit = std::get_if<Pi>(
+                                &firstExplicit->codomain->node);
+                            if (secondExplicit) {
+                                std::vector<ExpressionPointer>
+                                    rightBindings(implicitCount + 1);
+                                bool rightMatched = false;
+                                ExpressionPointer rightCandidate =
+                                    rightTypeClosed;
+                                for (int step = 0;
+                                     step < 64 && !rightMatched; ++step) {
+                                    std::fill(rightBindings.begin(),
+                                              rightBindings.end(), nullptr);
+                                    rightMatched = matchAgainstPattern(
+                                        secondExplicit->domain,
+                                        rightCandidate,
+                                        implicitCount + 1, rightBindings);
+                                    if (rightMatched) break;
+                                    ExpressionPointer next =
+                                        unfoldHeadConstantOneStep(
+                                            rightCandidate);
+                                    if (!next) break;
+                                    rightCandidate = next;
+                                }
+                                if (rightMatched) {
+                                    inferredByUnification = true;
+                                    for (int i = 0; i < implicitCount;
+                                         ++i) {
+                                        ExpressionPointer fromRight =
+                                            rightBindings[i + 1];
+                                        if (!implicitBindings[i]) {
+                                            implicitBindings[i] = fromRight;
+                                        } else if (fromRight
+                                                   && !structurallyEqual(
+                                                          implicitBindings[i],
+                                                          fromRight)) {
+                                            // The two operands disagree —
+                                            // fall back to the heuristic
+                                            // (the kernel typecheck will
+                                            // report honestly).
+                                            inferredByUnification = false;
+                                            break;
+                                        }
+                                        if (!implicitBindings[i]) {
+                                            inferredByUnification = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

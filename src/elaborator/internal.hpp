@@ -4975,13 +4975,17 @@ private:
     // Apply `targetFunction`'s leading implicit arguments to `call`,
     // recovered by unifying the function's first-explicit-argument type
     // template against `leftTypeClosed` (the first explicit operand's
-    // type). Returns `call` unchanged when the function has no leading
-    // implicits. Shared by the operator desugaring and the calc
-    // relation-head / transitivity-lemma builders (e.g. the `{T}` of
-    // `Set.member` and `Set.subset.transitive`).
+    // type); implicits the left type does not mention are recovered
+    // from `rightTypeClosed` against the SECOND explicit domain when
+    // provided (heterogeneous operators like `•`, whose scalar operand
+    // pins only the field). Returns `call` unchanged when the function
+    // has no leading implicits. Shared by the operator desugaring and
+    // the calc relation-head / transitivity-lemma builders (e.g. the
+    // `{T}` of `Set.member` and `Set.subset.transitive`).
     ExpressionPointer applyOperatorImplicitFillers(
         ExpressionPointer call, const std::string& targetFunction,
-        ExpressionPointer leftTypeClosed);
+        ExpressionPointer leftTypeClosed,
+        ExpressionPointer rightTypeClosed = nullptr);
 
     // Fill any trailing *propositional* side-conditions an operator's
     // dispatch function still expects after its operands — e.g. the `b ≠ 0`
