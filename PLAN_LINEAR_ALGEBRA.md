@@ -230,12 +230,43 @@ Update this section before ending any session that works on the plan.
     context, and it triggers the unused-name cascade — so manifest polish
     is a real follow-up (named-gap form or deliberate keeps), like
     `coordinate_space` was initially kept out.
-  - **Exchange lemma (Steinitz) — NOT STARTED.** The independent-≤-spanning,
-    one-swap-at-a-time argument (where `Field.reciprocal` enters). This is
-    the abstract crux and the transport probe feeding Stage F dimension.
+  - **Exchange lemma (Steinitz) — IN PROGRESS (foundation laid 2026-07-12).**
+    The independent-≤-spanning, one-swap-at-a-time argument (where
+    `Field.reciprocal` enters). This is the abstract crux and the transport
+    probe feeding Stage F dimension. Foundation landed toward it:
+    - **Combination module-algebra** (`Algebra/linear_combination.math`):
+      `linearCombination_scale` (`a·Σcᵢbᵢ = Σ(a·cᵢ)bᵢ`) and
+      `linearCombination_add_coefficients` (`Σcᵢbᵢ + Σdᵢbᵢ = Σ(cᵢ+dᵢ)bᵢ`),
+      plus the medial-law helper `VectorSpace.add_pair_interchange`. By
+      induction, peeling `linearCombination_add_one`.
+    - **Span-membership API** (`Algebra/span.math`):
+      `VectorSpace.InSpanOf(family, v)` (v is a finite combination of
+      members) with `of_spans`/`Spans.of_in_span` (definitional bridge),
+      `InSpanOf.member`, and `InSpanOf.scale`. NOTE: `InSpanOf(family, 0)`
+      is NOT provable for an arbitrary (possibly empty) index type `I` — the
+      empty combination still needs a `selection : Natural → I` — so there is
+      no bare `InSpanOf.zero`; membership lemmas carry an `I` inhabitant.
+    - **NEXT BRICK = combination concatenation → `InSpanOf.add`.** Confirmed
+      `Algebra.Fold_split` cites argument-free over the vector carrier (the
+      auto-prover discharges its ∀ assoc/identity premises from the automatic
+      vector laws — no ∀-packaged monoid laws needed). Path: (1) a generic
+      `Algebra.Fold_rebase_start` (`Fold(f,start,n) = Fold(f(start+·),0,n)`,
+      ~15 lines, by induction; needs the `0 + predecessor = predecessor`
+      arithmetic bridge on the peel, like `Fold_split`); (2) merged
+      piecewise `combineSelection`/`combineCoefficients` via
+      `cases Natural.compare_strict(i, count1) { below => left; atLeast =>
+      right(i − count1) }`; (3) branch-reduction helpers proved with the
+      `finite_sum.math` idiom (`cases compare_strict` in the proof, the
+      impossible branch is `x < c ≤ x → False`); (4) assemble
+      `linearCombination_concatenate = combo₁ + combo₂` via Fold_split +
+      rebase_start + Fold_pointwise; (5) `InSpanOf.add` witnesses the merged
+      data. Then span-transitivity (each generator in the new family's span
+      ⟹ span ⊆ new span) closes from member/scale/add, and the exchange
+      induction's replacement step reuses it.
   - **FinitelyGenerated ⟹ finite basis (pruning) — NOT STARTED.** Prune a
     finite spanning family down to an independent one (choice-free); needs
-    "remove one index from a `NaturalsBelow(count)` family" reindexing.
+    "remove one index from a `NaturalsBelow(count)` family" reindexing. Shares
+    the concatenation/`InSpanOf` machinery above.
   - **Friction found this session, re-triaged (the branch's deliverable):**
     (1) `by substituting eq1, eq2` (comma) is not supported — `substituting`
     rewrites with ONE equation (the search picks a single candidate, it does
