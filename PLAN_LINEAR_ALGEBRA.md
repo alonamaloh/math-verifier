@@ -223,13 +223,16 @@ Update this section before ending any session that works on the plan.
     `selection(i)`; injectivity kills the other monomials). `F[x]` is a
     basis-carrying space that is NOT `FiniteDimensional` (Natural-indexed
     basis). Choice-free (export-check axiom inventory unchanged).
-    Correct + all gates green, but NOT YET in the clean manifest: it holds
-    15 positional proof-lemma citations + 2 `Equality.symmetry` (17 leaks).
-    A first argument-free pass FAILED — the auto-prover cannot discharge
-    the multi-premise citations (`fold_single_point`, `pBounded`) from
-    context, and it triggers the unused-name cascade — so manifest polish
-    is a real follow-up (named-gap form or deliberate keeps), like
-    `coordinate_space` was initially kept out.
+    **IN THE CLEAN MANIFEST as of 2026-07-12 (commit a85db753).** It had
+    held 15 positional proof-lemma citations + 2 `Equality.symmetry` (17
+    leaks); the earlier "argument-free pass FAILED / multi-premise
+    citations can't discharge" note turned out stale — every positional
+    theorem call is now an argument-free `by Lemma` (the auto-prover
+    discharges the premises from context; the multi-premise fold citations
+    included), the two `Equality.symmetry(h)` reductios became bare
+    `x = y by h; done`, and the resulting unused-name cascade settled by
+    dropping the now-dead `as <name>` labels. 17 → 0 leaks; clean-check 174
+    files / 232 residual leaks unchanged.
   - **Exchange lemma (Steinitz) — IN PROGRESS (foundation laid 2026-07-12).**
     The independent-≤-spanning, one-swap-at-a-time argument (where
     `Field.reciprocal` enters). This is the abstract crux and the transport
