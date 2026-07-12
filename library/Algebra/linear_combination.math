@@ -23,6 +23,8 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.monus
+import Natural.classical_decidable
 import Algebra.monoid
 import Algebra.group
 import Algebra.group_lemmas
@@ -195,4 +197,154 @@ theorem VectorSpace.linearCombination_add_coefficients {f : Field} {V : VectorSp
            = VectorSpace.linearCombination(family,
                  (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, 1 + m)
                  by VectorSpace.linearCombination_add_one
+  }
+
+-- ----------------------------------------------------------------------
+-- Concatenating two `Natural`-indexed families at a cut: the left family
+-- below the cut, the right family (reindexed) at or above it. One generic
+-- definition serves both the selections (into the index type) and the
+-- coefficients (into the field).
+definition VectorSpace.combineFunctions {A : Type(0)}
+        (left right : Natural → A) (count : Natural) : Natural → A :=
+  (i : Natural) ↦
+    if i < count then left(i) else right(Natural.monus(i, count))
+
+-- Branch reductions: below the cut the merged family is the left family;
+-- the shifted index above the cut is the right family.
+theorem VectorSpace.combineFunctions_below {A : Type(0)}
+        (left right : Natural → A) (count i : Natural) (below : i < count)
+        : VectorSpace.combineFunctions(left, right, count)(i) = left(i) :=
+  done by Logic.if_positive
+
+theorem VectorSpace.combineFunctions_shifted {A : Type(0)}
+        (left right : Natural → A) (count j : Natural)
+        : VectorSpace.combineFunctions(left, right, count)(count + j) = right(j) := {
+  ¬(count + j < count) by {
+    suppose count + j < count as shifted;
+    count + j < count ≤ count + j;
+    done
+  };
+  VectorSpace.combineFunctions(left, right, count)(count + j)
+     = right(Natural.monus(count + j, count))   by Logic.if_negative
+     = right(j)   by substituting Natural.monus_add_left
+}
+
+-- Combinations agree when their coefficients and selections agree below
+-- the count (the terms past the count are never read).
+theorem VectorSpace.linearCombination_pointwise_below {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficientsLeft coefficientsRight : Natural → Field.carrier(f))
+        (selectionLeft selectionRight : Natural → I) (count : Natural)
+        (coefficientsAgree : ∀ (i : Natural). i < count → coefficientsLeft(i) = coefficientsRight(i))
+        (selectionsAgree : ∀ (i : Natural). i < count → selectionLeft(i) = selectionRight(i))
+        : VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, count)
+          = VectorSpace.linearCombination(family, coefficientsRight, selectionRight, count) := {
+  ∀ (i : Natural). i < count →
+      coefficientsLeft(i) • family(selectionLeft(i))
+      = coefficientsRight(i) • family(selectionRight(i))
+    by {
+      take i : Natural;
+      suppose i < count as iBelow;
+      coefficientsLeft(i) = coefficientsRight(i) by coefficientsAgree as coeffEqual;
+      selectionLeft(i) = selectionRight(i) by selectionsAgree as selEqual;
+      coefficientsLeft(i) • family(selectionLeft(i))
+         = coefficientsRight(i) • family(selectionLeft(i))   by substituting coeffEqual
+         = coefficientsRight(i) • family(selectionRight(i))  by substituting selEqual
+    };
+  VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, count)
+     = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
+           (i : Natural) ↦ coefficientsLeft(i) • family(selectionLeft(i)), count)
+     = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
+           (i : Natural) ↦ coefficientsRight(i) • family(selectionRight(i)), count)
+           by Algebra.indexedAggregate_pointwise_below
+     = VectorSpace.linearCombination(family, coefficientsRight, selectionRight, count)
+}
+
+-- Concatenation: the sum of two combinations over the same family is the
+-- single combination over the merged coefficients and selections.
+theorem VectorSpace.linearCombination_concatenate {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficientsLeft coefficientsRight : Natural → Field.carrier(f))
+        (selectionLeft selectionRight : Natural → I)
+        (countLeft countRight : Natural)
+        : VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
+              + VectorSpace.linearCombination(family, coefficientsRight, selectionRight, countRight)
+          = VectorSpace.linearCombination(family,
+                VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft),
+                countLeft + countRight) :=
+  by induction on countRight with IH {
+    case base: {
+        ∀ (i : Natural). i < countLeft →
+            coefficientsLeft(i)
+            = VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft)(i)
+          by { take i : Natural; suppose i < countLeft as iBelow;
+               done by VectorSpace.combineFunctions_below };
+        ∀ (i : Natural). i < countLeft →
+            selectionLeft(i)
+            = VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft)(i)
+          by { take i : Natural; suppose i < countLeft as iBelow;
+               done by VectorSpace.combineFunctions_below };
+        VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
+              + VectorSpace.linearCombination(family, coefficientsRight, selectionRight, 0)
+           = VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
+                 + VectorSpace.zero(V)
+                 by VectorSpace.linearCombination_zero
+           = VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
+                 by VectorSpace.add_zero
+           = VectorSpace.linearCombination(family,
+                 VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                 VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft), countLeft)
+                 by VectorSpace.linearCombination_pointwise_below
+           = VectorSpace.linearCombination(family,
+                 VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                 VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft), countLeft + 0)
+      }
+    case step(predecessor): {
+        1 + (countLeft + predecessor)
+           = (1 + countLeft) + predecessor
+           = (countLeft + 1) + predecessor   by substituting Natural.add_commutative
+           = countLeft + (1 + predecessor)
+           as countReassociate;
+        VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
+              + VectorSpace.linearCombination(family, coefficientsRight, selectionRight, 1 + predecessor)
+           = VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
+                 + (VectorSpace.linearCombination(family, coefficientsRight, selectionRight, predecessor)
+                    + coefficientsRight(predecessor) • family(selectionRight(predecessor)))
+                 by VectorSpace.linearCombination_add_one
+           = (VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
+                 + VectorSpace.linearCombination(family, coefficientsRight, selectionRight, predecessor))
+                 + coefficientsRight(predecessor) • family(selectionRight(predecessor))
+                 by VectorSpace.add_associative
+           = VectorSpace.linearCombination(family,
+                   VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                   VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft),
+                   countLeft + predecessor)
+                 + coefficientsRight(predecessor) • family(selectionRight(predecessor))
+                 by IH
+           = VectorSpace.linearCombination(family,
+                   VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                   VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft),
+                   countLeft + predecessor)
+                 + VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft)(countLeft + predecessor)
+                   • family(selectionRight(predecessor))
+                 by VectorSpace.combineFunctions_shifted
+           = VectorSpace.linearCombination(family,
+                   VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                   VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft),
+                   countLeft + predecessor)
+                 + VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft)(countLeft + predecessor)
+                   • family(VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft)(countLeft + predecessor))
+                 by VectorSpace.combineFunctions_shifted
+           = VectorSpace.linearCombination(family,
+                   VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                   VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft),
+                   1 + (countLeft + predecessor))
+                 by VectorSpace.linearCombination_add_one
+           = VectorSpace.linearCombination(family,
+                   VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft),
+                   VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft),
+                   countLeft + (1 + predecessor))
+                 by substituting countReassociate
+      }
   }

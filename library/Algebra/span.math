@@ -149,6 +149,35 @@ theorem VectorSpace.InSpanOf.scale {f : Field} {V : VectorSpace(f)}
        with witness ((i : Natural) ↦ a * coefficients(i)) with scaledIsCombination
 }
 
+-- The span is closed under addition: concatenate the two witnessing
+-- combinations into one.
+theorem VectorSpace.InSpanOf.add {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) (u v : VectorSpace.carrier(V))
+        (uMember : VectorSpace.InSpanOf(family, u))
+        (vMember : VectorSpace.InSpanOf(family, v))
+        : VectorSpace.InSpanOf(family, u + v) := {
+  choose countU, selectionU, coefficientsU such that
+      u = VectorSpace.linearCombination(family, coefficientsU, selectionU, countU) from uMember;
+  u = VectorSpace.linearCombination(family, coefficientsU, selectionU, countU) as uCombo;
+  choose countV, selectionV, coefficientsV such that
+      v = VectorSpace.linearCombination(family, coefficientsV, selectionV, countV) from vMember;
+  v = VectorSpace.linearCombination(family, coefficientsV, selectionV, countV) as vCombo;
+  u + v
+     = VectorSpace.linearCombination(family, coefficientsU, selectionU, countU) + v
+           by substituting uCombo
+     = VectorSpace.linearCombination(family, coefficientsU, selectionU, countU)
+           + VectorSpace.linearCombination(family, coefficientsV, selectionV, countV)
+           by substituting vCombo
+     = VectorSpace.linearCombination(family,
+           VectorSpace.combineFunctions(coefficientsU, coefficientsV, countU),
+           VectorSpace.combineFunctions(selectionU, selectionV, countU), countU + countV)
+           by VectorSpace.linearCombination_concatenate
+     as sumIsCombination;
+  witness countU + countV with witness VectorSpace.combineFunctions(selectionU, selectionV, countU)
+       with witness VectorSpace.combineFunctions(coefficientsU, coefficientsV, countU)
+       with sumIsCombination
+}
+
 -- ----------------------------------------------------------------------
 -- The first basis: the one-element family {1} for a field over itself.
 -- Spanning is v = v·1; independence is field cancellation, and a
