@@ -2415,6 +2415,43 @@ ExpressionPointer Elaborator::elaborateBlockTail(
     }
 
 
+namespace {
+
+// First-order match of an open template (FreeVariable metavariables)
+// against a target term: Applications recurse, a metavariable binds once
+// (structural consistency on repeats), every other node must be
+// structurally equal. Used to instantiate a parameterized fold_operation
+// witness at the body's actual carrier.
+bool matchTemplateFirstOrder(
+        const ExpressionPointer& pattern, const ExpressionPointer& target,
+        const std::set<std::string>& metavariables,
+        std::map<std::string, ExpressionPointer>& assignment) {
+    if (auto* freeVariable = std::get_if<FreeVariable>(&pattern->node)) {
+        if (metavariables.count(freeVariable->name)) {
+            auto existing = assignment.find(freeVariable->name);
+            if (existing != assignment.end()) {
+                return structurallyEqual(existing->second, target);
+            }
+            assignment[freeVariable->name] = target;
+            return true;
+        }
+    }
+    if (auto* patternApplication =
+            std::get_if<Application>(&pattern->node)) {
+        auto* targetApplication = std::get_if<Application>(&target->node);
+        if (!targetApplication) return false;
+        return matchTemplateFirstOrder(
+                   patternApplication->function,
+                   targetApplication->function, metavariables, assignment)
+            && matchTemplateFirstOrder(
+                   patternApplication->argument,
+                   targetApplication->argument, metavariables, assignment);
+    }
+    return structurallyEqual(pattern, target);
+}
+
+}  // namespace
+
 ExpressionPointer Elaborator::elaborateFoldBinder(
         const SurfaceFoldBinder& fold,
         const std::vector<LocalBinder>& localBinders,
@@ -2524,8 +2561,27 @@ ExpressionPointer Elaborator::elaborateFoldBinder(
                            + "' is not in scope (internal)");
         }
         ExpressionPointer witnessType = declarationType(*witness);
+        // A parameterized witness (`{f} (V) → IsMonoid(
+        // VectorSpace.carrier(f, V), …)`) is instantiated per use: open
+        // its leading Pis as metavariables, match its carrier template
+        // against the body's actual carrier type, and substitute the
+        // solution into the carrier/operation/identity cores. A ground
+        // witness has no binders and takes the same path with an empty
+        // metavariable set.
+        std::set<std::string> witnessMetavariables;
+        ExpressionPointer witnessBody = witnessType;
+        {
+            int witnessArgumentIndex = 0;
+            while (auto* witnessPi = std::get_if<Pi>(&witnessBody->node)) {
+                std::string fresh = "_foldWitnessArgument_"
+                    + std::to_string(witnessArgumentIndex++);
+                witnessMetavariables.insert(fresh);
+                witnessBody = openBinder(witnessPi->codomain, fresh,
+                                          FreeVariableOrigin::Internal);
+            }
+        }
         std::vector<ExpressionPointer> reversedArguments;
-        ExpressionPointer cursor = witnessType;
+        ExpressionPointer cursor = witnessBody;
         while (auto* application = std::get_if<Application>(&cursor->node)) {
             reversedArguments.push_back(application->argument);
             cursor = application->function;
@@ -2539,6 +2595,33 @@ ExpressionPointer Elaborator::elaborateFoldBinder(
         ExpressionPointer carrierCore = reversedArguments[2];
         ExpressionPointer operationCore = reversedArguments[1];
         ExpressionPointer identityCore = reversedArguments[0];
+        if (!witnessMetavariables.empty()) {
+            std::map<std::string, ExpressionPointer> witnessAssignment;
+            if (!matchTemplateFirstOrder(carrierCore, pi->codomain,
+                                          witnessMetavariables,
+                                          witnessAssignment)
+                || witnessAssignment.size() != witnessMetavariables.size()) {
+                throwElaborate(
+                    "fold binder: could not instantiate the parameterized "
+                    "IsMonoid witness '" + entry->second.witnessName
+                    + "' at the body's carrier type — the witness's "
+                    "carrier must match it structurally");
+            }
+            // The assignments come from an INFERRED type (open over the
+            // local binders); the assembly below expects the uniform
+            // closed-over-binders representation, so close the cores.
+            // (A no-op for a ground witness, whose cores mention no
+            // locals.)
+            carrierCore = closeOverLocalBinders(
+                substituteFreeVariables(carrierCore, witnessAssignment),
+                localBinders, localBinders.size());
+            operationCore = closeOverLocalBinders(
+                substituteFreeVariables(operationCore, witnessAssignment),
+                localBinders, localBinders.size());
+            identityCore = closeOverLocalBinders(
+                substituteFreeVariables(identityCore, witnessAssignment),
+                localBinders, localBinders.size());
+        }
         ExpressionPointer naturalType = makeConstant("Natural");
         ExpressionPointer lowerKernel = elaborateExpression(
             *fold.lowerBound, localBinders, naturalType);
@@ -2560,9 +2643,16 @@ ExpressionPointer Elaborator::elaborateFoldBinder(
             try {
                 ExpressionPointer termType =
                     inferTypeInLocalContext(localBinders, term);
+                // `expectedType` arrives CLOSED over the local binders;
+                // the inferred type is open (FreeVariables) — open the
+                // expected side before comparing, as the coercion path
+                // does. (Invisible for ground carriers, which mention no
+                // locals either way.)
+                ExpressionPointer expectedTypeOpened = openOverLocalBinders(
+                    expectedType, localBinders, localBinders.size());
                 Context context = buildContextFromLocalBinders(localBinders);
                 matches = isDefinitionallyEqual(
-                    environment_, context, termType, expectedType);
+                    environment_, context, termType, expectedTypeOpened);
             } catch (...) { matches = false; }
             if (!matches) {
                 throwElaborate(

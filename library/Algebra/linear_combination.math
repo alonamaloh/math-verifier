@@ -1,0 +1,91 @@
+-- Algebra/linear_combination.math
+--
+-- Finite sums of scaled vectors. The vector additive monoid registers
+-- as fold-capable, so a linear combination is the ordinary sum binder
+-- over the vector carrier:
+--
+--     sum i from 0 to count - 1 of coefficients(i) • family(selection(i))
+--
+-- Combination data are functions with a bound (the aggregation layer's
+-- native interface — see the index-bridge note in
+-- docs/PLAN_GENERIC_AGGREGATION.md): coefficients and the selection
+-- read `Natural`, only the first `count` are ever used, and a family
+-- over an arbitrary index type `I` enters through composition. The
+-- characterizing lemmas below are the empty, singleton, and peel-last
+-- laws every span/independence argument reduces to.
+
+module Algebra.linear_combination
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.aggregation
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+
+-- The vectors of any space form a monoid under addition; registering it
+-- makes `+` fold-capable over every `VectorSpace.carrier(V)`.
+definition VectorSpace.add_is_monoid {f : Field} (V : VectorSpace(f))
+        : IsMonoid(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V)) := {
+  IsAbelianGroup(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
+                 VectorSpace.negate);
+  done
+}
+
+fold_operation (+) on VectorSpace.carrier := VectorSpace.add_is_monoid
+
+-- The linear combination of `count` terms drawn from a family: term i
+-- is the vector at selection(i), scaled by coefficients(i).
+definition VectorSpace.linearCombination {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f))
+        (selection : Natural → I)
+        (count : Natural) : VectorSpace.carrier(V) :=
+  sum i from 0 to count - 1 of coefficients(i) • family(selection(i))
+
+-- The empty combination is the zero vector.
+automatic theorem VectorSpace.linearCombination_zero {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        : VectorSpace.linearCombination(family, coefficients, selection, 0)
+          = VectorSpace.zero(V) :=
+  done
+
+-- A single term: the combination collapses to its one scaled vector.
+theorem VectorSpace.linearCombination_one {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        : VectorSpace.linearCombination(family, coefficients, selection, 1)
+          = coefficients(0) • family(selection(0)) := {
+  ∀ (v : VectorSpace.carrier(V)). VectorSpace.zero(V) + v = v by VectorSpace.zero_add;
+  done by Algebra.Fold_one
+}
+
+-- Peel the last term.
+theorem VectorSpace.linearCombination_add_one {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        (count : Natural)
+        : VectorSpace.linearCombination(family, coefficients, selection, 1 + count)
+          = VectorSpace.linearCombination(family, coefficients, selection, count)
+            + coefficients(count) • family(selection(count)) :=
+  VectorSpace.linearCombination(family, coefficients, selection, 1 + count)
+     = VectorSpace.linearCombination(family, coefficients, selection, count)
+       + coefficients(0 + count) • family(selection(0 + count))
+           by Algebra.Fold_add_one
+     = VectorSpace.linearCombination(family, coefficients, selection, count)
+       + coefficients(count) • family(selection(count))

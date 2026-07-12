@@ -1,0 +1,177 @@
+-- Algebra/span.math
+--
+-- Span, linear independence, and bases, over an ARBITRARY index type:
+-- a family `b : I → V` spans when every vector is a finite linear
+-- combination of its members, and is independent when only the trivial
+-- combination of distinct members vanishes. Finiteness lives in the
+-- combinations (a count, a selection into I, coefficients — see
+-- Algebra/linear_combination.math), not in the family, so infinite
+-- bases ({xⁿ} for F[x]) are first-class; `NaturalsBelow(n)` families
+-- are the finite case, and only `FinitelyGenerated` mentions them.
+--
+-- The first instance closes the file: the one-element family {1} is a
+-- basis of a field over itself.
+
+module Algebra.span
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Set.subtype
+import Set.finite
+import Set.finite_successor
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.aggregation
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+import Algebra.linear_combination
+
+-- The family spans: every vector is a finite linear combination of
+-- family members.
+definition VectorSpace.Spans {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) : Proposition :=
+  ∀ (v : VectorSpace.carrier(V)).
+      ∃ (count : Natural). ∃ (selection : Natural → I).
+      ∃ (coefficients : Natural → Field.carrier(f)).
+          v = VectorSpace.linearCombination(family, coefficients, selection, count)
+
+-- The family is linearly independent: a vanishing combination of
+-- DISTINCT members (the selection is injective below the count) has
+-- all its coefficients zero.
+definition VectorSpace.LinearlyIndependent {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) : Proposition :=
+  ∀ (count : Natural). ∀ (selection : Natural → I).
+  ∀ (coefficients : Natural → Field.carrier(f)).
+      (∀ (i j : Natural). i < count → j < count → selection(i) = selection(j) → i = j)
+      → VectorSpace.linearCombination(family, coefficients, selection, count) = VectorSpace.zero(V)
+      → ∀ (i : Natural). i < count → coefficients(i) = Field.zero(f)
+
+-- A basis is an independent spanning family.
+definition VectorSpace.IsBasis {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) : Proposition :=
+  VectorSpace.LinearlyIndependent(family) ∧ VectorSpace.Spans(family)
+
+definition VectorSpace.IsBasis.linearly_independent {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
+        (basis : VectorSpace.IsBasis(family))
+        : VectorSpace.LinearlyIndependent(family) := {
+  VectorSpace.IsBasis(family);
+  done
+}
+
+definition VectorSpace.IsBasis.spans {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
+        (basis : VectorSpace.IsBasis(family))
+        : VectorSpace.Spans(family) := {
+  VectorSpace.IsBasis(family);
+  done
+}
+
+-- Finitely generated: some finite family spans.
+definition VectorSpace.FinitelyGenerated {f : Field} (V : VectorSpace(f))
+        : Proposition :=
+  ∃ (count : Natural). ∃ (generators : NaturalsBelow(count) → VectorSpace.carrier(V)).
+      VectorSpace.Spans(generators)
+
+-- ----------------------------------------------------------------------
+-- The first basis: the one-element family {1} for a field over itself.
+-- Spanning is v = v·1; independence is field cancellation, and a
+-- selection of two or more indices into a one-element index type cannot
+-- be injective.
+
+definition Field.one_family (f : Field)
+        : NaturalsBelow(1) → VectorSpace.carrier(Field.vector_space(f)) :=
+  (k : NaturalsBelow(1)) ↦ Field.one(f)
+
+theorem Field.one_family_spans (f : Field)
+        : VectorSpace.Spans(Field.one_family(f)) := {
+  take v : Field.carrier(f);
+  v = v * Field.one(f)
+    = VectorSpace.linearCombination(Field.one_family(f), (i : Natural) ↦ v,
+                                    (i : Natural) ↦ NaturalsBelow.one_point, 1)
+          by VectorSpace.linearCombination_one
+    as targetIsCombination;
+  witness 1 with witness ((i : Natural) ↦ NaturalsBelow.one_point) with
+      witness ((i : Natural) ↦ v) with targetIsCombination
+}
+
+theorem Field.one_family_independent (f : Field)
+        : VectorSpace.LinearlyIndependent(Field.one_family(f)) := {
+  take count : Natural;
+  take selection : Natural → NaturalsBelow(1);
+  take coefficients : Natural → Field.carrier(f);
+  suppose ∀ (i j : Natural). i < count → j < count → selection(i) = selection(j) → i = j
+      as selectionInjective;
+  suppose VectorSpace.linearCombination(Field.one_family(f), coefficients, selection, count)
+              = VectorSpace.zero(Field.vector_space(f))
+      as combinationVanishes;
+  take i : Natural;
+  suppose i < count as indexBelowCount;
+  -- Injectivity caps the count at one — a selection of two indices into
+  -- the one-element index type repeats — so the combination is the
+  -- single term coefficients(0)·1 and the vanishing forces it to zero.
+  done by cases {
+    case count = 0: {
+        i < 0;
+        ¬(i < 0) by Natural.not_less_than_zero;
+        done
+      }
+    case count = 1 + predecessor for some (predecessor : Natural) as countShape:
+        done by cases {
+          case predecessor = 0: {
+              count = 1 + predecessor = 1 + 0 = 1 as countIsOne;
+              i < 1;
+              i = 0 by NaturalsBelow.below_one_is_zero as indexIsZero;
+              VectorSpace.linearCombination(Field.one_family(f), coefficients, selection, count)
+                 = VectorSpace.linearCombination(Field.one_family(f), coefficients, selection, 1)
+                 by substituting countIsOne;
+              coefficients(0)
+                 = coefficients(0) * Field.one(f)
+                 = VectorSpace.linearCombination(Field.one_family(f), coefficients, selection, 1)
+                       by VectorSpace.linearCombination_one
+                 = VectorSpace.linearCombination(Field.one_family(f), coefficients, selection, count)
+                 = Field.zero(f)
+                       by combinationVanishes;
+              done by substituting indexIsZero
+            }
+          case predecessor = 1 + deeper for some (deeper : Natural) as predecessorShape: {
+              count = 1 + predecessor = 1 + (1 + deeper);
+              0 < 1 ≤ 1 + (1 + deeper);
+              0 < count;
+              1 ≤ 1 + deeper;
+              1 < 1 + 1 ≤ 1 + (1 + deeper);
+              1 < count;
+              selection(0) = selection(1) by NaturalsBelow.one_subsingleton;
+              0 = 1 by selectionInjective;
+              absurd(0 = 1)
+            }
+        }
+  }
+}
+
+theorem Field.one_family_is_basis (f : Field)
+        : VectorSpace.IsBasis(Field.one_family(f)) := {
+  VectorSpace.LinearlyIndependent(Field.one_family(f)) by Field.one_family_independent;
+  VectorSpace.Spans(Field.one_family(f)) by Field.one_family_spans;
+  done
+}
+
+-- A field is finitely generated over itself: {1} spans.
+theorem Field.vector_space_finitely_generated (f : Field)
+        : VectorSpace.FinitelyGenerated(Field.vector_space(f)) := {
+  VectorSpace.Spans(Field.one_family(f)) by Field.one_family_spans as oneFamilySpans;
+  witness 1 with witness Field.one_family(f) with oneFamilySpans
+}

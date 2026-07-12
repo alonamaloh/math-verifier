@@ -312,11 +312,19 @@ void Elaborator::elaborateFoldOperationDeclaration(
             throwElaborate("fold_operation: could not determine the type "
                            "of witness '" + declaration.witnessName + "'");
         }
-        // The witness must be a ground (unparameterized) proof of
-        // `IsMonoid(Carrier, operation, identity)` — read the three
-        // arguments straight off the application spine.
+        // The witness proves `IsMonoid(Carrier, operation, identity)`,
+        // possibly under leading Pi binders (a parameterized carrier —
+        // `VectorSpace.add_is_monoid : {f} (V) → IsMonoid(
+        // VectorSpace.carrier(f, V), …)`). Registration is name-keyed,
+        // so peel the binders and read the three heads off the body's
+        // application spine; the fold-binder use site re-instantiates
+        // the binders against the actual carrier per call.
+        ExpressionPointer body = type;
+        while (auto* pi = std::get_if<Pi>(&body->node)) {
+            body = pi->codomain;
+        }
         std::vector<ExpressionPointer> reversedArguments;
-        ExpressionPointer cursor = type;
+        ExpressionPointer cursor = body;
         while (auto* application =
                    std::get_if<Application>(&cursor->node)) {
             reversedArguments.push_back(application->argument);
@@ -326,8 +334,9 @@ void Elaborator::elaborateFoldOperationDeclaration(
             || reversedArguments.size() != 3) {
             throwElaborate(
                 "fold_operation: witness '" + declaration.witnessName
-                + "' must prove IsMonoid(Carrier, operation, identity) "
-                "with a concrete carrier (no parameters)");
+                + "' must prove IsMonoid(Carrier, operation, identity), "
+                "possibly under leading binders for a parameterized "
+                "carrier");
         }
         ExpressionPointer carrierArgument = reversedArguments[2];
         ExpressionPointer operationArgument = reversedArguments[1];

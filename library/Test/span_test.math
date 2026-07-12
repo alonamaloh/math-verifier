@@ -1,0 +1,69 @@
+-- Stage D acceptance (PLAN_LINEAR_ALGEBRA): linear combinations and the
+-- span/independence/basis layer work as consumers will use them — the
+-- sum binder aggregates over an ABSTRACT vector carrier (the
+-- fold_operation registry instantiates the parameterized IsMonoid
+-- witness), the characterizing combination lemmas fire, and the basis
+-- accessors project.
+
+module Test.span_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Set.subtype
+import Set.finite
+import Set.finite_successor
+import Algebra.monoid
+import Algebra.group
+import Algebra.aggregation
+import Algebra.ring
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+import Algebra.linear_combination
+import Algebra.span
+
+-- The sum binder elaborates over an abstract vector carrier: the
+-- parameterized fold witness instantiates at (f, V).
+theorem Test.vector_sum_is_fold (f : Field) (V : VectorSpace(f))
+        (s : Natural → VectorSpace.carrier(V)) (n : Natural)
+        : (sum i from 0 to n - 1 of s(i))
+          = Algebra.Fold(VectorSpace.carrier(V), VectorSpace.add,
+                         VectorSpace.zero(V), s, 0, n) :=
+  done
+
+-- The empty combination discharges bare (automatic).
+theorem Test.empty_combination (f : Field) (V : VectorSpace(f))
+        (family : Natural → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → Natural)
+        : VectorSpace.linearCombination(family, coefficients, selection, 0)
+          = VectorSpace.zero(V) :=
+  done
+
+-- The singleton combination cites its characterizing lemma.
+theorem Test.singleton_combination (f : Field) (V : VectorSpace(f))
+        (family : Natural → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → Natural)
+        : VectorSpace.linearCombination(family, coefficients, selection, 1)
+          = coefficients(0) • family(selection(0)) :=
+  done by VectorSpace.linearCombination_one
+
+-- A basis projects to its two halves through the accessors.
+theorem Test.basis_projects_spanning {I : Type(0)} (f : Field) (V : VectorSpace(f))
+        (family : I → VectorSpace.carrier(V))
+        (basis : VectorSpace.IsBasis(family))
+        : VectorSpace.Spans(family) :=
+  VectorSpace.IsBasis.spans(basis)
+
+-- The field over itself is spanned by {1} (the Stage D instance).
+theorem Test.field_is_finitely_generated (f : Field)
+        : VectorSpace.FinitelyGenerated(Field.vector_space(f)) :=
+  done by Field.vector_space_finitely_generated

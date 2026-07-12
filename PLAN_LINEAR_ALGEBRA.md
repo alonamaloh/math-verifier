@@ -151,11 +151,50 @@ Update this section before ending any session that works on the plan.
   (all three files manifest-added leak-free, re-run after the manifest
   edit), serial warning-site diff IDENTICAL (6 standing advisory
   sites both sides).
-- **Stages D–H** — not started. Next: Stage D (span, independence,
-  IsBasis — generic aggregation Stage 1 is landed, so unblocked).
-  Note for D: bundled induced spaces of kernel/image
-  (`Subspace.vector_space` applied to `kernel_is_subspace`) were left
-  to consumers — construct them where Stage G needs dimensions.
+- **Stage D — DONE (2026-07-12).** Stage 0.4 index bridge DECIDED and
+  recorded in docs/PLAN_GENERIC_AGGREGATION.md: combination data are
+  FUNCTIONS WITH A BOUND (`selection : Natural → I`, `coefficients :
+  Natural → Field.carrier(f)`, `count`), aggregated by the existing
+  `Algebra.Fold` below the count; `I`-indexed families enter through
+  composition; injectivity is stated below the bound;
+  `NaturalsBelow(n)` appears only as an instance of `I` — never as an
+  aggregation index (rejected: extending families with a default,
+  which needs proof-carrying conditionals and a second fold).
+  `Algebra/linear_combination.math`: `VectorSpace.add_is_monoid`,
+  `fold_operation (+) on VectorSpace.carrier`, and
+  `VectorSpace.linearCombination` DEFINED VIA THE SUM BINDER —
+  `sum i from 0 to count - 1 of coefficients(i) • family(selection(i))`
+  — plus the `_zero`/`_one`/`_add_one` characterizing lemmas.
+  ELABORATOR EXTENSION (root, not workaround): the `fold_operation`
+  registry now accepts Pi-quantified IsMonoid witnesses (registration
+  peels binders, name-keyed as before) and the fold binder
+  instantiates the witness per use by first-order-matching its carrier
+  template against the body's actual carrier (then closes the cores
+  over the local binders; the expected-type check opens the expected
+  side, as the coercion path does). Σ-notation now works over ANY
+  bundled carrier — Stage H's matrix sums get it for free.
+  `Algebra/span.math`: index-generic `VectorSpace.Spans` /
+  `LinearlyIndependent` (selection injective below the count) /
+  `IsBasis` (∧, with proof-data accessors) / `FinitelyGenerated`
+  (`NaturalsBelow(count)` generators — the finite case as an `I`
+  instance). First instance: `Field.one_family_is_basis` — {1} is a
+  basis of F over itself (spanning = v·1 via `linearCombination_one`;
+  independence via `NaturalsBelow.one_subsingleton` + injectivity
+  capping the count at 1) — and `Field.vector_space_finitely_generated`.
+  Acceptance: `Test/span_test.math`. Gates: library+tests, error-tests
+  54/0, export-check 2693, clean-check GREEN 172 files at budget 232
+  (both files manifest-added leak-free; the one flagged token — an
+  applied `recalling VectorSpace.zero_add(V)` — was restructured to an
+  argument-free citation), serial warning-site diff IDENTICAL.
+  Kept-despite-warning hints: the `by selectionInjective` /
+  `below_one_is_zero` / assembling citations in span.math (operative
+  reasons, deliberate).
+- **Stages E–H** — not started. Next: Stage E (exchange lemma, finite
+  basis existence, `F[x]` with the {xⁿ} basis — check the Polynomial
+  representation first per the plan). Note: bundled induced spaces of
+  kernel/image (`Subspace.vector_space` applied to
+  `kernel_is_subspace`) were left to consumers — construct them where
+  Stage G needs dimensions.
 
 ## What is already in place (so this isn't re-litigated)
 

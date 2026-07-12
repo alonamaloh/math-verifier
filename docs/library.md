@@ -37,7 +37,9 @@ may import from its own layer and below, never above. (Build/layout depth:
   bundled `Field`: `vector_space` (+ `vector_space_lemmas`),
   `coordinate_space` (Fⁿ), `subspace` (+ the induced space on the
   subtype), `linear_map` (kernel/image as subspaces, injective ⟺
-  trivial kernel).
+  trivial kernel), `linear_combination` (Σ over the vector carrier),
+  `span` (index-generic `Spans`/`LinearlyIndependent`/`IsBasis`,
+  `FinitelyGenerated`).
 - **`Polynomial/`** — the polynomial ring over a coefficient ring:
   `addition`/`multiplication`, `degree` (+ degree-of-product), `division`,
   `bezout`, `irreducible`, `units`, `quotient_field`.

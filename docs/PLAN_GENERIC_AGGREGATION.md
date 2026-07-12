@@ -70,6 +70,28 @@
 
 **All stages complete.** Library + tests green.
 
+## Index bridge for finite families (PLAN_LINEAR_ALGEBRA Stage 0.4, decided 2026-07-12)
+
+Linear-algebra combination data are **functions with a bound**, matching this
+layer's native interface — never `NaturalsBelow`-indexed:
+
+- a combination over a family `b : I → V` is `(selection : Natural → I,
+  coefficients : Natural → Field.carrier(f), count : Natural)`, aggregated by
+  `Algebra.Fold`/`indexedAggregate` below `count`; terms at or above `count`
+  are junk the fold never reads (`_pointwise_below` is the containment lemma);
+- an `I`-indexed family enters through **composition** (`i ↦ c(i) • b(σ(i))`),
+  so no conversion of families is ever needed;
+- side conditions (injectivity of a selection) are stated **below the bound**:
+  `∀ i j. i < count → j < count → σ(i) = σ(j) → i = j`;
+- `NaturalsBelow(n)` appears only as an *instance of `I`* (finite generating
+  families, the Stage-E/F bundled bases), never as an aggregation index.
+
+Rejected alternative: extending a `NaturalsBelow(k) → A` family to
+`Natural → A` with a default — needs a proof-carrying conditional per use and
+either a second fold or a bridge lemma family; the function+bound form needs
+zero new machinery and is how the analysis layer (`Real.partialSum`) already
+speaks.
+
 ## Why
 
 `Real.partialSum` / `Real.partialProduct` (series.math, finite_products.math)
