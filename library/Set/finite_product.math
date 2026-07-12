@@ -96,18 +96,17 @@ theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
       ≤ k + 1
       ≤ m * n
       = n * m;
-  cases Natural.compare_strict(Natural.floor_divide(k, n), m) {
-    | Natural.StrictComparison.below(strictlyBelow) =>
-        { done }
-    | Natural.StrictComparison.atLeast(atLeast) => {
-        -- m ≤ q forces n·m ≤ n·q, so n·q below itself: impossible.
-        n * Natural.floor_divide(k, n) + 1
-            ≤ n * m
-            ≤ n * Natural.floor_divide(k, n)   as selfBelow;
-        absurd(Natural.lt_irreflexive(n * Natural.floor_divide(k, n))
-                   (Natural.lt_of_add_one_le(n * Natural.floor_divide(k, n), n * Natural.floor_divide(k, n), selfBelow)))
-      }
-  }
+  -- m ≤ q would force n·m ≤ n·q, putting n·q + 1 ≤ n·q: impossible.
+  ¬(m ≤ Natural.floor_divide(k, n)) by {
+    suppose m ≤ Natural.floor_divide(k, n) as atLeast;
+    n * Natural.floor_divide(k, n) + 1
+        ≤ n * m
+        ≤ n * Natural.floor_divide(k, n);
+    n * Natural.floor_divide(k, n) < n * Natural.floor_divide(k, n)
+        by Natural.lt_of_add_one_le;
+    done
+  };
+  done by Natural.lt_of_not_le
 }
 
 -- ----------------------------------------------------------------------
