@@ -84,6 +84,18 @@ definition Or.self (A : Proposition) : Or(A, A) → A
   | Or.introduceLeft(proof)  => proof
   | Or.introduceRight(proof) => proof
 
+-- Disjunctive syllogism: given `A ∨ B`, refuting one alternative leaves the
+-- other. This is the honest shape of a proof that eliminates a disjunction by
+-- ruling out a side (rather than a symmetric two-arm case split where one arm
+-- is vacuous) — cite it as `done by Or.resolveLeft` / `done by Or.resolveRight`.
+definition Or.resolveLeft (A B : Proposition) (notRight : Not(B)) : Or(A, B) → A
+  | Or.introduceLeft(leftProof)   => leftProof
+  | Or.introduceRight(rightProof) => False.eliminate_proposition(A, notRight(rightProof))
+
+definition Or.resolveRight (A B : Proposition) (notLeft : Not(A)) : Or(A, B) → B
+  | Or.introduceLeft(leftProof)   => False.eliminate_proposition(B, notLeft(leftProof))
+  | Or.introduceRight(rightProof) => rightProof
+
 -- Or.eliminate (case analysis to a Proposition goal). Lets us
 -- handle the left and right alternatives separately.
 definition Or.eliminate

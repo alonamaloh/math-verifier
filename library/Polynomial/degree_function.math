@@ -90,19 +90,19 @@ theorem Polynomial.exists_degree_of_nonzero (r : Ring)
             ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)) := {
   choose bound such that Polynomial.DegreeLessThan(r, y, bound)
       from Polynomial.exists_degree_bound(r, y);
+  -- Either some coefficient below the bound is nonzero (giving the degree), or
+  -- every coefficient vanishes — which would make y zero, against hypothesis.
   (∃ (d : Natural).
        Polynomial.DegreeLessThan(r, y, 1 + d)
        ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)))
    ∨ (∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r))
       by Polynomial.exists_degree_within(n := bound);
-  done by cases {
-    case ∃ (d : Natural).
-             Polynomial.DegreeLessThan(r, y, 1 + d)
-             ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)) as existsDegree:
-        existsDegree
-    case ∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r) as allZero: {
-        y = Polynomial.zero(r) by Polynomial.zero_of_coefficients_zero(r, y, allZero);
-        done
+  ¬(∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r)) by {
+      suppose ∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r) as allZero
+          for contradiction {
+          y = Polynomial.zero(r) by Polynomial.zero_of_coefficients_zero(r, y, allZero);
+          done
       }
-  }
+  };
+  done by Or.resolveLeft
 }
