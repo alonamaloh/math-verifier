@@ -98,8 +98,59 @@ Update this section before ending any session that works on the plan.
   CLEAN_LEAK_BUDGET resynced 230→232 (field_bundle's two `Logic.the`
   proof-data tokens, the Real.reciprocal idiom — my Stage A gate ran
   before the manifest edit, so the +2 surfaced here).
-- **Stages C–H** — not started. Next: Stage C (subspaces, linear maps,
-  kernel/image).
+- **Stage C — DONE (2026-07-12).** `Algebra/vector_space_lemmas.math`:
+  the derived scale facts as `automatic` lemmas (no `ring` over vector
+  carriers, so the scan is the normaliser): `zero_scale` (0·v = 0),
+  `scale_zero` (a·0 = 0), `negate_one_scale` ((−1)·v = −v),
+  `subtract_self`, `subtract_add_cancel`.
+  `Algebra/subspace.math`: `IsSubspace` (zero + add/scale closure;
+  negate-closure DERIVED via (−1)·v), accessor projections as
+  proof-data `definition`s (the bundle-file pattern — keeps
+  constructions leak-free), and the induced space on the subtype
+  mirroring `subgroup_group`: ops inherit from V with closure
+  membership proofs, every law reduces through
+  `Subtype.equal_of_value_equal`, `Subspace.is_vector_space` assembles
+  by argument-free `by Subspace.<law>` citations (the `Field.is_field`
+  idiom), `Subspace.vector_space : VectorSpace(f)` bundles it. DESIGN
+  CALL: `Subspace.carrier(V, subset, subspace)` is parameterized by
+  the closure PROOF so the `+`/`•` operators recover it from the
+  operand type (the PAdic `(p, primality)` recovery precedent) —
+  subspace arithmetic reads `(x + y) + z`, no five-argument spellings.
+  `Algebra/linear_map.math`: `IsLinearMap` (∧ of additivity +
+  homogeneity), `LinearMap.additive`/`homogeneous` accessor
+  definitions, preserves zero/negate/subtract, identity map + compose,
+  `kernel`/`image` + both `*_is_subspace` (take/suppose/choose/witness
+  shapes, no tuples), injective ⟺ trivial kernel via
+  `Function.IsInjective` (reused from Logic/functions), and
+  `Subspace.inclusion_is_linear`/`_is_injective`. Acceptance:
+  `Test/linear_map_test.math`. TWO ELABORATOR GAPS fixed at the root
+  (both in the Stage C commit): (1) the operator desugarer elaborated
+  the RIGHT operand with the left's type as a hard expected type — a
+  heterogeneous operator's right operand (`a • Subtype.value(x)`) got
+  its implicits poisoned; the propagation is now a HINT with a
+  bottom-up retry (elaboration + type inference share the retry).
+  (2) The plain-call path inferred a declared implicit prefix only for
+  EXACTLY-fully-applied calls, so a genuine partial application after
+  the prefix (`Subspace.inclusion(V, subset, subspace)` leaving its
+  function argument open) jammed V into the `{f}` slot; the guard is
+  now `<=` (positional-with-implicits spellings are outside the
+  window). PROBE FINDINGS: the conjunction-leg projection (`P by h`)
+  does not δ-unfold a defined proposition (`by tLinear` fails with a
+  `<unknown>`-head message — inbox entry filed); the robust idiom is
+  accessor citations `by LinearMap.additive(tLinear)` at stated-leg
+  expected types, then hypothesis application in chains. Accessor
+  citations under a congruence wrapper mis-pin implicits (backward
+  unification from the outer step equation wins over forward from the
+  premise) — extract legs first there. Gates: library+tests,
+  error-tests 54/0, export-check 2677, clean-check GREEN at budget 232
+  (all three files manifest-added leak-free, re-run after the manifest
+  edit), serial warning-site diff IDENTICAL (6 standing advisory
+  sites both sides).
+- **Stages D–H** — not started. Next: Stage D (span, independence,
+  IsBasis — generic aggregation Stage 1 is landed, so unblocked).
+  Note for D: bundled induced spaces of kernel/image
+  (`Subspace.vector_space` applied to `kernel_is_subspace`) were left
+  to consumers — construct them where Stage G needs dimensions.
 
 ## What is already in place (so this isn't re-litigated)
 

@@ -159,11 +159,32 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // R inferred from expected type) fire in operand position of
         // homogeneous operators like `+`, `*`, `≤`, `<` on Rational,
         // Real, etc. — mirrors the `=` desugaring's identical trick.
+        // The propagation is a HINT, not a requirement: a heterogeneous
+        // operator's right operand lives at a different carrier (the
+        // vector of `a • v`), and pushing the scalar's type into it can
+        // poison its own implicit inference (e.g. the `{A}` of a
+        // `Subtype.value(x)` operand). The poisoned term may only fail
+        // at type inference, so checked-mode elaboration and the type
+        // inference of its result share one retry: if either fails,
+        // re-elaborate bottom-up — the registry lookup below dispatches
+        // on the operand's own type either way.
         ExpressionPointer leftTypeClosed = closeOverLocalBinders(
             leftTypeRaw, localBinders, localBinders.size());
-        ExpressionPointer rightKernel =
-            elaborateExpression(rightSurface, localBinders,
-                                 leftTypeClosed);
+        ExpressionPointer rightKernel;
+        ExpressionPointer rightTypeRaw;
+        auto elaborateRightBottomUp = [&]() {
+            rightKernel = elaborateExpression(rightSurface, localBinders);
+            rightTypeRaw = inferTypeInLocalContext(localBinders, rightKernel);
+        };
+        try {
+            rightKernel = elaborateExpression(rightSurface, localBinders,
+                                              leftTypeClosed);
+            rightTypeRaw = inferTypeInLocalContext(localBinders, rightKernel);
+        } catch (const ElaborateError&) {
+            elaborateRightBottomUp();
+        } catch (const TypeError&) {
+            elaborateRightBottomUp();
+        }
         // Use `headConstantName` to extract the type head — peels through
         // Applications so parameterised types like `Set(T)` report `Set`
         // and `Quotient(IR, IE)` reports `Quotient`. Falls back to WHNF
@@ -175,8 +196,6 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // the extensible path — Rational, Real, Complex, polynomial
         // rings, etc. all hook in here. Wildcard `_` registrations
         // (e.g. `∈` on `(_, Set)`) match any LHS or RHS type.
-        ExpressionPointer rightTypeRaw =
-            inferTypeInLocalContext(localBinders, rightKernel);
         std::string rightTypeName = headConstantName(rightTypeRaw);
         // Heterogeneous operators register at an exact (left, right) pair
         // whose sides are DIFFERENT carriers — `^` : base^exponent is

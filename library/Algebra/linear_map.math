@@ -1,0 +1,303 @@
+-- Algebra/linear_map.math
+--
+-- A linear map between two vector spaces over the same field is a
+-- function between their carriers that preserves addition and scalar
+-- multiplication. From those two axioms the basic structure
+-- preservation follows — a linear map sends zero to zero and commutes
+-- with negation and subtraction — and linear maps compose, with the
+-- identity map linear. These are the lemmas every later result (rank,
+-- nullity, matrix representation) leans on.
+--
+-- The headline results are the two structural facts about a linear
+-- map T : V → W:
+--
+--   * its kernel  { v | T(v) = 0 }      is a subspace of V, and
+--   * its image   { w | ∃ v. T(v) = w } is a subspace of W;
+--
+-- together with the classical criterion that T is injective exactly
+-- when its kernel is trivial. Everything mirrors
+-- `Algebra/group_homomorphism.math` and `Algebra/subgroup.math`, one
+-- level of structure up.
+
+module Algebra.linear_map
+
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Equality.basics
+import Set.basics
+import Set.subtype
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+import Algebra.subspace
+
+-- `T : carrier(V) → carrier(W)` is linear when it preserves addition
+-- and scalar multiplication.
+definition IsLinearMap {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) : Proposition :=
+  (∀ (u v : VectorSpace.carrier(V)). T(u + v) = T(u) + T(v))
+  ∧ (∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(V)). T(a • v) = a • T(v))
+
+-- The two axioms as named components, so a proof cites "additivity of
+-- T" rather than destructuring the ∧ by hand.
+
+definition LinearMap.additive {f : Field} {V W : VectorSpace(f)}
+        {T : VectorSpace.carrier(V) → VectorSpace.carrier(W)}
+        (linear : IsLinearMap(V, W, T))
+        : ∀ (u v : VectorSpace.carrier(V)). T(u + v) = T(u) + T(v) := {
+  IsLinearMap(V, W, T);
+  done
+}
+
+definition LinearMap.homogeneous {f : Field} {V W : VectorSpace(f)}
+        {T : VectorSpace.carrier(V) → VectorSpace.carrier(W)}
+        (linear : IsLinearMap(V, W, T))
+        : ∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(V)). T(a • v) = a • T(v) := {
+  IsLinearMap(V, W, T);
+  done
+}
+
+-- A linear map sends zero to zero: T(0) = T(0·0) = 0·T(0) = 0.
+theorem LinearMap.preserves_zero {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        : T(VectorSpace.zero(V)) = VectorSpace.zero(W) :=
+  T(VectorSpace.zero(V))
+     = T(Field.zero(f) • VectorSpace.zero(V))
+     = Field.zero(f) • T(VectorSpace.zero(V))
+           by LinearMap.homogeneous(linear, Field.zero(f), VectorSpace.zero(V))
+     = VectorSpace.zero(W)
+
+-- A linear map commutes with negation: T(−v) = T((−1)·v) = (−1)·T(v) = −T(v).
+theorem LinearMap.preserves_negate {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        (v : VectorSpace.carrier(V))
+        : T(VectorSpace.negate(v)) = VectorSpace.negate(T(v)) :=
+  T(VectorSpace.negate(v))
+     = T(Field.negate(Field.one(f)) • v)
+     = Field.negate(Field.one(f)) • T(v)
+           by LinearMap.homogeneous(linear, Field.negate(Field.one(f)), v)
+     = VectorSpace.negate(T(v))
+
+-- A linear map commutes with subtraction.
+theorem LinearMap.preserves_subtract {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        (u v : VectorSpace.carrier(V))
+        : T(u - v) = T(u) - T(v) := {
+  T(VectorSpace.negate(v)) = VectorSpace.negate(T(v)) by LinearMap.preserves_negate;
+  T(u - v)
+     = T(u) + T(VectorSpace.negate(v))
+           by LinearMap.additive(linear, u, VectorSpace.negate(v))
+     = T(u) + VectorSpace.negate(T(v))
+     = T(u) - T(v)
+}
+
+-- The identity map on a space is linear.
+theorem LinearMap.identity_map {f : Field} (V : VectorSpace(f))
+        : IsLinearMap(V, V, (v : VectorSpace.carrier(V)) ↦ v) := {
+  ∀ (u v : VectorSpace.carrier(V)). u + v = u + v
+      by { take u : VectorSpace.carrier(V); take v : VectorSpace.carrier(V); done };
+  ∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(V)). a • v = a • v
+      by { take a : Field.carrier(f); take v : VectorSpace.carrier(V); done };
+  done
+}
+
+-- The composite of two linear maps is linear.
+theorem LinearMap.compose {f : Field} (U V W : VectorSpace(f))
+        (T : VectorSpace.carrier(U) → VectorSpace.carrier(V))
+        (S : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (tLinear : IsLinearMap(U, V, T))
+        (sLinear : IsLinearMap(V, W, S))
+        : IsLinearMap(U, W, (u : VectorSpace.carrier(U)) ↦ S(T(u))) := {
+  ∀ (u v : VectorSpace.carrier(U)). T(u + v) = T(u) + T(v) by LinearMap.additive(tLinear) as tAdditive;
+  ∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(U)). T(a • v) = a • T(v) by LinearMap.homogeneous(tLinear) as tHomogeneous;
+  ∀ (u v : VectorSpace.carrier(V)). S(u + v) = S(u) + S(v) by LinearMap.additive(sLinear) as sAdditive;
+  ∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(V)). S(a • v) = a • S(v) by LinearMap.homogeneous(sLinear) as sHomogeneous;
+  ∀ (u v : VectorSpace.carrier(U)). S(T(u + v)) = S(T(u)) + S(T(v))
+      by {
+        take u : VectorSpace.carrier(U);
+        take v : VectorSpace.carrier(U);
+        S(T(u + v))
+           = S(T(u) + T(v))        by tAdditive(u, v)
+           = S(T(u)) + S(T(v))     by sAdditive(T(u), T(v))
+      };
+  ∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(U)). S(T(a • v)) = a • S(T(v))
+      by {
+        take a : Field.carrier(f);
+        take v : VectorSpace.carrier(U);
+        S(T(a • v))
+           = S(a • T(v))           by tHomogeneous(a, v)
+           = a • S(T(v))           by sHomogeneous(a, T(v))
+      };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Kernel and image.
+
+-- The kernel: the vectors V sends to the zero of W.
+definition LinearMap.kernel {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        : Set(VectorSpace.carrier(V)) :=
+  (v : VectorSpace.carrier(V)) ↦ T(v) = VectorSpace.zero(W)
+
+-- The image: the vectors of W hit by some vector of V.
+definition LinearMap.image {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        : Set(VectorSpace.carrier(W)) :=
+  (w : VectorSpace.carrier(W)) ↦ ∃ (v : VectorSpace.carrier(V)). T(v) = w
+
+-- The kernel is a subspace of V: it contains zero because T(0) = 0,
+-- and both closures follow from linearity — a sum or scaling of
+-- vectors that map to zero maps to zero.
+theorem LinearMap.kernel_is_subspace {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        : IsSubspace(V, LinearMap.kernel(V, W, T)) := {
+  VectorSpace.zero(V) ∈ LinearMap.kernel(V, W, T) by LinearMap.preserves_zero;
+  ∀ (u v : VectorSpace.carrier(V)).
+      u ∈ LinearMap.kernel(V, W, T) → v ∈ LinearMap.kernel(V, W, T)
+      → (u + v) ∈ LinearMap.kernel(V, W, T)
+    by {
+      take u : VectorSpace.carrier(V);
+      take v : VectorSpace.carrier(V);
+      suppose T(u) = VectorSpace.zero(W) as uInKernel;
+      suppose T(v) = VectorSpace.zero(W) as vInKernel;
+      T(u + v)
+         = T(u) + T(v)                                 by LinearMap.additive(linear, u, v)
+         = VectorSpace.zero(W) + T(v)                  by substituting uInKernel
+         = VectorSpace.zero(W) + VectorSpace.zero(W)   by substituting vInKernel
+         = VectorSpace.zero(W)
+    };
+  ∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(V)).
+      v ∈ LinearMap.kernel(V, W, T) → (a • v) ∈ LinearMap.kernel(V, W, T)
+    by {
+      take a : Field.carrier(f);
+      take v : VectorSpace.carrier(V);
+      suppose T(v) = VectorSpace.zero(W) as vInKernel;
+      T(a • v)
+         = a • T(v)                    by LinearMap.homogeneous(linear, a, v)
+         = a • VectorSpace.zero(W)     by substituting vInKernel
+         = VectorSpace.zero(W)
+    };
+  done
+}
+
+-- The image is a subspace of W: zero is hit by zero, and a sum or
+-- scaling of hit vectors is hit by the sum or scaling of their
+-- preimages.
+theorem LinearMap.image_is_subspace {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        : IsSubspace(W, LinearMap.image(V, W, T)) := {
+  VectorSpace.zero(W) ∈ LinearMap.image(V, W, T)
+    by {
+      T(VectorSpace.zero(V)) = VectorSpace.zero(W) by LinearMap.preserves_zero as zeroHits;
+      witness VectorSpace.zero(V) with zeroHits
+    };
+  ∀ (w1 w2 : VectorSpace.carrier(W)).
+      w1 ∈ LinearMap.image(V, W, T) → w2 ∈ LinearMap.image(V, W, T)
+      → (w1 + w2) ∈ LinearMap.image(V, W, T)
+    by {
+      take w1 : VectorSpace.carrier(W);
+      take w2 : VectorSpace.carrier(W);
+      suppose w1 ∈ LinearMap.image(V, W, T) as w1InImage;
+      suppose w2 ∈ LinearMap.image(V, W, T) as w2InImage;
+      choose u1 such that T(u1) = w1 as u1Hits from w1InImage;
+      choose u2 such that T(u2) = w2 as u2Hits from w2InImage;
+      T(u1 + u2)
+         = T(u1) + T(u2)   by LinearMap.additive(linear, u1, u2)
+         = w1 + T(u2)      by substituting u1Hits
+         = w1 + w2         by substituting u2Hits
+         as sumHits;
+      witness u1 + u2 with sumHits
+    };
+  ∀ (a : Field.carrier(f)). ∀ (w : VectorSpace.carrier(W)).
+      w ∈ LinearMap.image(V, W, T) → (a • w) ∈ LinearMap.image(V, W, T)
+    by {
+      take a : Field.carrier(f);
+      take w : VectorSpace.carrier(W);
+      suppose w ∈ LinearMap.image(V, W, T) as wInImage;
+      choose u such that T(u) = w as uHits from wInImage;
+      T(a • u)
+         = a • T(u)   by LinearMap.homogeneous(linear, a, u)
+         = a • w      by substituting uHits
+         as scaledHits;
+      witness a • u with scaledHits
+    };
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Injectivity ⟺ trivial kernel.
+
+-- The kernel is trivial: it contains only the zero vector.
+definition LinearMap.HasTrivialKernel {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) : Proposition :=
+  ∀ (v : VectorSpace.carrier(V)).
+      v ∈ LinearMap.kernel(V, W, T) → v = VectorSpace.zero(V)
+
+-- An injective linear map has trivial kernel: if T(v) = 0 = T(0),
+-- injectivity forces v = 0.
+theorem LinearMap.injective_implies_trivial_kernel {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        (injective : Function.IsInjective(VectorSpace.carrier(V), VectorSpace.carrier(W), T))
+        : LinearMap.HasTrivialKernel(V, W, T) := {
+  take v : VectorSpace.carrier(V);
+  suppose T(v) = VectorSpace.zero(W) as vInKernel;
+  T(VectorSpace.zero(V)) = VectorSpace.zero(W) by LinearMap.preserves_zero;
+  T(v) = VectorSpace.zero(W) = T(VectorSpace.zero(V)) as imagesEqual;
+  injective(v, VectorSpace.zero(V), imagesEqual)
+}
+
+-- A linear map with trivial kernel is injective: from T(u) = T(v) the
+-- difference u − v lands in the kernel, hence is zero, and adding v
+-- back gives u = v.
+theorem LinearMap.trivial_kernel_implies_injective {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        (trivialKernel : LinearMap.HasTrivialKernel(V, W, T))
+        : Function.IsInjective(VectorSpace.carrier(V), VectorSpace.carrier(W), T) := {
+  take u : VectorSpace.carrier(V);
+  take v : VectorSpace.carrier(V);
+  suppose T(u) = T(v) as imagesEqual;
+  T(u - v) = T(u) - T(v) by LinearMap.preserves_subtract;
+  T(u - v)
+     = T(u) - T(v)
+     = T(v) - T(v)            by substituting imagesEqual
+     = VectorSpace.zero(W)
+     as differenceInKernel;
+  u - v = VectorSpace.zero(V) by trivialKernel(u - v, differenceInKernel);
+  u = (u - v) + v
+    = VectorSpace.zero(V) + v   by substituting (u - v = VectorSpace.zero(V))
+    = v
+}
+
+-- ----------------------------------------------------------------------
+-- The inclusion of a subspace is a linear map (its injectivity is
+-- `Subspace.inclusion_is_injective`, with the subspace itself as
+-- domain): both preservation laws hold definitionally — the value of a
+-- subspace sum is the sum of the values.
+theorem Subspace.inclusion_is_linear {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        : IsLinearMap(Subspace.vector_space(V, subset, subspace), V,
+                      Subspace.inclusion(V, subset, subspace)) := {
+  ∀ (x y : Subspace.carrier(V, subset, subspace)). Subtype.value(x + y) = Subtype.value(x) + Subtype.value(y)
+      by { take x : Subspace.carrier(V, subset, subspace); take y : Subspace.carrier(V, subset, subspace); done };
+  ∀ (a : Field.carrier(f)). ∀ (x : Subspace.carrier(V, subset, subspace)). Subtype.value(a • x) = a • Subtype.value(x)
+      by { take a : Field.carrier(f); take x : Subspace.carrier(V, subset, subspace); done };
+  done
+}

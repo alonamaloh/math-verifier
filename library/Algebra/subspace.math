@@ -1,0 +1,270 @@
+-- Algebra/subspace.math
+--
+-- A subspace of a vector space `V` over a field is a subset of its
+-- carrier that contains the zero vector and is closed under addition
+-- and under scalar multiplication. Closure under negation is derived
+-- (negation is scaling by −1), so `IsSubspace` states only the
+-- textbook three conditions.
+--
+-- The second half bundles the subtype { v : carrier(V) | v ∈ S } into
+-- a `VectorSpace(f)` of its own, with the operations inherited from V
+-- and the membership proofs supplied by the closure conditions —
+-- mirroring `Algebra/subgroup_group.math`. Every law reduces, via
+-- `Subtype.equal_of_value_equal`, to the same law on the underlying
+-- values.
+--
+-- The subspace proof parameterizes `Subspace.carrier` even though the
+-- subtype does not depend on it: with the proof in the operand's type,
+-- the `+`/`•` operators recover it — alongside V and the subset — from
+-- the operands, so subspace arithmetic reads like vector arithmetic.
+
+module Algebra.subspace
+
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Equality.basics
+import Set.basics
+import Set.subtype
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+
+-- A subset is a subspace when it contains the zero vector and is
+-- closed under addition and under scalar multiplication.
+definition IsSubspace {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) : Proposition :=
+  (VectorSpace.zero(V) ∈ subset)
+  ∧ (∀ (u v : VectorSpace.carrier(V)). u ∈ subset → v ∈ subset → (u + v) ∈ subset)
+  ∧ (∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(V)). v ∈ subset → (a • v) ∈ subset)
+
+-- Component accessors, so a consumer pulls a single closure fact
+-- without destructuring the nested ∧ by hand.
+
+definition IsSubspace.contains_zero {f : Field} {V : VectorSpace(f)}
+        {subset : Set(VectorSpace.carrier(V))} (subspace : IsSubspace(V, subset))
+        : VectorSpace.zero(V) ∈ subset := {
+  IsSubspace(V, subset);
+  done
+}
+
+definition IsSubspace.closed_under_add {f : Field} {V : VectorSpace(f)}
+        {subset : Set(VectorSpace.carrier(V))} (subspace : IsSubspace(V, subset))
+        : ∀ (u v : VectorSpace.carrier(V)). u ∈ subset → v ∈ subset → (u + v) ∈ subset := {
+  IsSubspace(V, subset);
+  done
+}
+
+definition IsSubspace.closed_under_scale {f : Field} {V : VectorSpace(f)}
+        {subset : Set(VectorSpace.carrier(V))} (subspace : IsSubspace(V, subset))
+        : ∀ (a : Field.carrier(f)). ∀ (v : VectorSpace.carrier(V)). v ∈ subset → (a • v) ∈ subset := {
+  IsSubspace(V, subset);
+  done
+}
+
+-- Closure under negation is a consequence: −v is (−1)·v, which the
+-- scale closure keeps in the subset.
+theorem IsSubspace.closed_under_negate {f : Field} {V : VectorSpace(f)}
+        {subset : Set(VectorSpace.carrier(V))} (subspace : IsSubspace(V, subset))
+        (v : VectorSpace.carrier(V)) (member : v ∈ subset)
+        : VectorSpace.negate(v) ∈ subset := {
+  IsSubspace(V, subset);
+  (Field.negate(Field.one(f)) • v) ∈ subset;
+  Field.negate(Field.one(f)) • v = VectorSpace.negate(v);
+  done by substitution
+}
+
+-- ----------------------------------------------------------------------
+-- The subspace as a vector space of its own: the subtype cut out by
+-- the subset, under the operations inherited from V.
+
+definition Subspace.carrier {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        : Type(0) :=
+  Subtype(VectorSpace.carrier(V), subset)
+
+definition Subspace.add {f : Field} {V : VectorSpace(f)}
+        {subset : Set(VectorSpace.carrier(V))} {subspace : IsSubspace(V, subset)}
+        (x y : Subspace.carrier(V, subset, subspace))
+        : Subspace.carrier(V, subset, subspace) :=
+  Subtype.make(VectorSpace.carrier(V), subset, Subtype.value(x) + Subtype.value(y),
+      IsSubspace.closed_under_add(subspace, Subtype.value(x), Subtype.value(y),
+          Subtype.property(x), Subtype.property(y)))
+
+definition Subspace.zero {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        : Subspace.carrier(V, subset, subspace) :=
+  Subtype.make(VectorSpace.carrier(V), subset, VectorSpace.zero(V),
+      IsSubspace.contains_zero(subspace))
+
+definition Subspace.negate {f : Field} {V : VectorSpace(f)}
+        {subset : Set(VectorSpace.carrier(V))} {subspace : IsSubspace(V, subset)}
+        (x : Subspace.carrier(V, subset, subspace))
+        : Subspace.carrier(V, subset, subspace) :=
+  Subtype.make(VectorSpace.carrier(V), subset, VectorSpace.negate(Subtype.value(x)),
+      { Subtype.value(x) ∈ subset by Subtype.property(x);
+        VectorSpace.negate(Subtype.value(x)) ∈ subset by IsSubspace.closed_under_negate })
+
+definition Subspace.scale {f : Field} {V : VectorSpace(f)}
+        {subset : Set(VectorSpace.carrier(V))} {subspace : IsSubspace(V, subset)}
+        (a : Field.carrier(f)) (x : Subspace.carrier(V, subset, subspace))
+        : Subspace.carrier(V, subset, subspace) :=
+  Subtype.make(VectorSpace.carrier(V), subset, VectorSpace.scale(a, Subtype.value(x)),
+      IsSubspace.closed_under_scale(subspace, a, Subtype.value(x), Subtype.property(x)))
+
+operator (+) on (Subspace.carrier, Subspace.carrier) := Subspace.add
+operator (•) on (Field.carrier, Subspace.carrier) := Subspace.scale
+
+-- ----------------------------------------------------------------------
+-- The vector-space laws. Each reduces to the value-level law of V: the
+-- value of a subspace sum is the sum of the values, so
+-- `Subtype.equal_of_value_equal` discharges the goal from V's own law.
+
+theorem Subspace.add_associative {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x y z : Subspace.carrier(V, subset, subspace))
+        : (x + y) + z = x + (y + z) := {
+  (Subtype.value(x) + Subtype.value(y)) + Subtype.value(z)
+      = Subtype.value(x) + (Subtype.value(y) + Subtype.value(z));
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.add_commutative {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x y : Subspace.carrier(V, subset, subspace))
+        : x + y = y + x := {
+  Subtype.value(x) + Subtype.value(y) = Subtype.value(y) + Subtype.value(x);
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.zero_add {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x : Subspace.carrier(V, subset, subspace))
+        : Subspace.zero(V, subset, subspace) + x = x := {
+  VectorSpace.zero(V) + Subtype.value(x) = Subtype.value(x);
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.add_zero {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x : Subspace.carrier(V, subset, subspace))
+        : x + Subspace.zero(V, subset, subspace) = x := {
+  Subtype.value(x) + VectorSpace.zero(V) = Subtype.value(x);
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.add_negate_left {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x : Subspace.carrier(V, subset, subspace))
+        : Subspace.negate(x) + x = Subspace.zero(V, subset, subspace) := {
+  VectorSpace.negate(Subtype.value(x)) + Subtype.value(x) = VectorSpace.zero(V);
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.add_negate_right {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x : Subspace.carrier(V, subset, subspace))
+        : x + Subspace.negate(x) = Subspace.zero(V, subset, subspace) := {
+  Subtype.value(x) + VectorSpace.negate(Subtype.value(x)) = VectorSpace.zero(V);
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.scale_vector_add {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (a : Field.carrier(f)) (x y : Subspace.carrier(V, subset, subspace))
+        : a • (x + y) = a • x + a • y := {
+  a • (Subtype.value(x) + Subtype.value(y)) = a • Subtype.value(x) + a • Subtype.value(y);
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.scale_scalar_add {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (a b : Field.carrier(f)) (x : Subspace.carrier(V, subset, subspace))
+        : (a + b) • x = a • x + b • x := {
+  (a + b) • Subtype.value(x) = a • Subtype.value(x) + b • Subtype.value(x);
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.scale_scalar_multiply {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (a b : Field.carrier(f)) (x : Subspace.carrier(V, subset, subspace))
+        : (a * b) • x = a • (b • x) := {
+  (a * b) • Subtype.value(x) = a • (b • Subtype.value(x));
+  done by Subtype.equal_of_value_equal
+}
+
+theorem Subspace.one_scale {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x : Subspace.carrier(V, subset, subspace))
+        : Field.one(f) • x = x := {
+  Field.one(f) • Subtype.value(x) = Subtype.value(x);
+  done by Subtype.equal_of_value_equal
+}
+
+-- ----------------------------------------------------------------------
+-- The subspace is a vector space, bundled.
+
+theorem Subspace.is_vector_space {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        : IsVectorSpace(f, Subspace.carrier(V, subset, subspace), Subspace.add,
+                        Subspace.zero(V, subset, subspace), Subspace.negate,
+                        Subspace.scale) := {
+  ∀ (x y z : Subspace.carrier(V, subset, subspace)). (x + y) + z = x + (y + z)
+      by Subspace.add_associative;
+  ∀ (x : Subspace.carrier(V, subset, subspace)). Subspace.zero(V, subset, subspace) + x = x
+      by Subspace.zero_add;
+  ∀ (x : Subspace.carrier(V, subset, subspace)). x + Subspace.zero(V, subset, subspace) = x
+      by Subspace.add_zero;
+  ∀ (x : Subspace.carrier(V, subset, subspace)). Subspace.negate(x) + x = Subspace.zero(V, subset, subspace)
+      by Subspace.add_negate_left;
+  ∀ (x : Subspace.carrier(V, subset, subspace)). x + Subspace.negate(x) = Subspace.zero(V, subset, subspace)
+      by Subspace.add_negate_right;
+  ∀ (x y : Subspace.carrier(V, subset, subspace)). x + y = y + x
+      by Subspace.add_commutative;
+  ∀ (a : Field.carrier(f)). ∀ (x y : Subspace.carrier(V, subset, subspace)). a • (x + y) = a • x + a • y
+      by Subspace.scale_vector_add;
+  ∀ (a b : Field.carrier(f)). ∀ (x : Subspace.carrier(V, subset, subspace)). (a + b) • x = a • x + b • x
+      by Subspace.scale_scalar_add;
+  ∀ (a b : Field.carrier(f)). ∀ (x : Subspace.carrier(V, subset, subspace)). (a * b) • x = a • (b • x)
+      by Subspace.scale_scalar_multiply;
+  ∀ (x : Subspace.carrier(V, subset, subspace)). Field.one(f) • x = x
+      by Subspace.one_scale;
+  done
+}
+
+-- The bundled vector-space structure on the subspace S ≤ V.
+definition Subspace.vector_space {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        : VectorSpace(f) :=
+  VectorSpace.make(Subspace.carrier(V, subset, subspace), Subspace.add,
+      Subspace.zero(V, subset, subspace), Subspace.negate, Subspace.scale,
+      Subspace.is_vector_space)
+
+-- ----------------------------------------------------------------------
+-- The inclusion S ↪ V is the value projection; it is injective (equal
+-- values mean equal subtype elements). That it is a linear map is
+-- proved in Algebra/linear_map.math, once linear maps exist.
+
+definition Subspace.inclusion {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        : Subspace.carrier(V, subset, subspace) → VectorSpace.carrier(V) :=
+  (x : Subspace.carrier(V, subset, subspace)) ↦ Subtype.value(x)
+
+theorem Subspace.inclusion_is_injective {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        : Function.IsInjective(Subspace.carrier(V, subset, subspace), VectorSpace.carrier(V),
+                               Subspace.inclusion(V, subset, subspace)) := {
+  take x : Subspace.carrier(V, subset, subspace);
+  take y : Subspace.carrier(V, subset, subspace);
+  suppose Subtype.value(x) = Subtype.value(y) as valuesEqual;
+  done by Subtype.equal_of_value_equal
+}

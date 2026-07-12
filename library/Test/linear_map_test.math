@@ -1,0 +1,84 @@
+-- Stage C acceptance (PLAN_LINEAR_ALGEBRA): subspaces and linear maps
+-- work as consumers will use them — the derived scale facts discharge
+-- bare from the `automatic` layer, subspace arithmetic dispatches
+-- through `+`/`•` (the operators recover V, the subset, AND the
+-- closure proof from the operand's type), the induced bundle is a
+-- first-class `VectorSpace(f)` whose generic laws fire, kernel
+-- membership is definitionally the defining equation, and the
+-- preservation lemmas cite argument-free.
+
+module Test.linear_map_test
+
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Equality.basics
+import Set.basics
+import Set.subtype
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+import Algebra.subspace
+import Algebra.linear_map
+
+-- The derived scale facts discharge bare over an abstract space.
+theorem Test.zero_scale_fires (f : Field) (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : Field.zero(f) • v = VectorSpace.zero(V) :=
+  done
+
+theorem Test.subtract_self_fires (f : Field) (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : v - v = VectorSpace.zero(V) :=
+  done
+
+-- Subspace arithmetic dispatches through the operators: `+` and `•`
+-- recover {V, subset, subspace} from the operand type, and the value
+-- of a subspace sum reduces to the sum of the values.
+theorem Test.subspace_sum_value (f : Field) (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x y : Subspace.carrier(V, subset, subspace))
+        : Subtype.value(x + y) = Subtype.value(x) + Subtype.value(y) :=
+  done
+
+theorem Test.subspace_scale_cites (f : Field) (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (a : Field.carrier(f)) (x y : Subspace.carrier(V, subset, subspace))
+        : a • (x + y) = a • x + a • y :=
+  done by Subspace.scale_vector_add
+
+-- The induced bundle is a first-class space: the generic vector-group
+-- laws fire at its carrier.
+theorem Test.induced_space_zero_add (f : Field) (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (x : VectorSpace.carrier(Subspace.vector_space(V, subset, subspace)))
+        : VectorSpace.zero(Subspace.vector_space(V, subset, subspace)) + x = x :=
+  done
+
+-- Kernel membership is definitionally the defining equation.
+theorem Test.kernel_membership_is_equation (f : Field) (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (v : VectorSpace.carrier(V))
+        (member : v ∈ LinearMap.kernel(V, W, T))
+        : T(v) = VectorSpace.zero(W) :=
+  member
+
+-- The preservation lemmas cite argument-free.
+theorem Test.preserves_zero_cites (f : Field) (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T))
+        : T(VectorSpace.zero(V)) = VectorSpace.zero(W) :=
+  done by LinearMap.preserves_zero
+
+theorem Test.preserves_negate_cites (f : Field) (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W))
+        (linear : IsLinearMap(V, W, T)) (v : VectorSpace.carrier(V))
+        : T(VectorSpace.negate(v)) = VectorSpace.negate(T(v)) :=
+  done by LinearMap.preserves_negate

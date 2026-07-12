@@ -33,7 +33,11 @@ may import from its own layer and below, never above. (Build/layout depth:
   (+ homomorphisms, subgroups, normal subgroups, quotient groups, the
   isomorphism theorems), `ring`/`commutative_ring`, `field`,
   `integral_domain` → `principal_ideal_domain` → `unique_factorization`,
-  `euclidean_domain`, `ideal`, `group_action`.
+  `euclidean_domain`, `ideal`, `group_action`; linear algebra over a
+  bundled `Field`: `vector_space` (+ `vector_space_lemmas`),
+  `coordinate_space` (Fⁿ), `subspace` (+ the induced space on the
+  subtype), `linear_map` (kernel/image as subspaces, injective ⟺
+  trivial kernel).
 - **`Polynomial/`** — the polynomial ring over a coefficient ring:
   `addition`/`multiplication`, `degree` (+ degree-of-product), `division`,
   `bezout`, `irreducible`, `units`, `quotient_field`.

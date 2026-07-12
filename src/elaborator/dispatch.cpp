@@ -1119,11 +1119,21 @@ ExpressionPointer Elaborator::elaborateExpression(
                             environment_.implicitArgumentCount(name);
                         // Two engagement modes:
                         //   (a) Declaration uses `{x : T}` implicit
-                        //       binders. The user provides exactly the
+                        //       binders. The user provides AT MOST the
                         //       explicit-arg count and we infer the
-                        //       declared implicit prefix. (PAdic-style
-                        //       convention prefixes also land here, since
-                        //       `convention` adds implicit binders.)
+                        //       declared implicit prefix — a shorter
+                        //       call is a genuine partial application
+                        //       after the prefix (e.g.
+                        //       `Subspace.inclusion(V, subset, subspace)`
+                        //       leaving its function argument open), and
+                        //       the prefix is still recovered from the
+                        //       supplied args by forward unification. A
+                        //       positional spelling that includes the
+                        //       implicits has argumentCount == the full
+                        //       Pi count, which this window excludes.
+                        //       (PAdic-style convention prefixes also
+                        //       land here, since `convention` adds
+                        //       implicit binders.)
                         //   (b) Declaration has no implicit binders and
                         //       is under-applied AGAINST A NON-FUNCTION
                         //       expected type. Some desugarings (e.g.
@@ -1145,7 +1155,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                         int numLeadingToInfer = 0;
                         if (declaredImplicitCount > 0) {
                             if (static_cast<int>(argumentCount)
-                                == totalPiCount - declaredImplicitCount) {
+                                <= totalPiCount - declaredImplicitCount) {
                                 numLeadingToInfer = declaredImplicitCount;
                             }
                         } else if (expectedType) {

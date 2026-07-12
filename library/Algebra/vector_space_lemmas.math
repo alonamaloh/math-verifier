@@ -1,0 +1,81 @@
+-- Algebra/vector_space_lemmas.math
+--
+-- Generic consequences of the vector-space axioms, proved once over an
+-- abstract `VectorSpace(f)`: the zero scalar and the zero vector both
+-- scale to zero, scaling by −1 is negation, and the two subtraction
+-- cancellation facts. There is no `ring` normaliser over a vector
+-- carrier, so these are `automatic` — the scan discharges their shapes
+-- bare at consumers, the way the flattened law layer already does.
+
+module Algebra.vector_space_lemmas
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+
+-- The zero scalar scales every vector to the zero vector: 0·v absorbs
+-- a second copy of itself (0 = 0 + 0), so adding its negation kills it.
+automatic theorem VectorSpace.zero_scale {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : Field.zero(f) • v = VectorSpace.zero(V) :=
+  Field.zero(f) • v
+     = Field.zero(f) • v + VectorSpace.zero(V)
+     = Field.zero(f) • v + (Field.zero(f) • v + VectorSpace.negate(Field.zero(f) • v))
+     = (Field.zero(f) • v + Field.zero(f) • v) + VectorSpace.negate(Field.zero(f) • v)
+     = (Field.zero(f) + Field.zero(f)) • v + VectorSpace.negate(Field.zero(f) • v)
+     = Field.zero(f) • v + VectorSpace.negate(Field.zero(f) • v)
+     = VectorSpace.zero(V)
+
+-- Every scalar scales the zero vector to itself: the same absorption
+-- argument, with 0 = 0 + 0 read on the vector side.
+automatic theorem VectorSpace.scale_zero {f : Field} (V : VectorSpace(f))
+        (a : Field.carrier(f))
+        : a • VectorSpace.zero(V) = VectorSpace.zero(V) :=
+  a • VectorSpace.zero(V)
+     = a • VectorSpace.zero(V) + VectorSpace.zero(V)
+     = a • VectorSpace.zero(V) + (a • VectorSpace.zero(V) + VectorSpace.negate(a • VectorSpace.zero(V)))
+     = (a • VectorSpace.zero(V) + a • VectorSpace.zero(V)) + VectorSpace.negate(a • VectorSpace.zero(V))
+     = a • (VectorSpace.zero(V) + VectorSpace.zero(V)) + VectorSpace.negate(a • VectorSpace.zero(V))
+     = a • VectorSpace.zero(V) + VectorSpace.negate(a • VectorSpace.zero(V))
+     = VectorSpace.zero(V)
+
+-- Scaling by −1 is negation: (−1)·v + v = ((−1) + 1)·v = 0·v = 0, so
+-- (−1)·v is the additive inverse of v.
+automatic theorem VectorSpace.negate_one_scale {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : Field.negate(Field.one(f)) • v = VectorSpace.negate(v) :=
+  Field.negate(Field.one(f)) • v
+     = Field.negate(Field.one(f)) • v + VectorSpace.zero(V)
+     = Field.negate(Field.one(f)) • v + (v + VectorSpace.negate(v))
+     = (Field.negate(Field.one(f)) • v + v) + VectorSpace.negate(v)
+     = (Field.negate(Field.one(f)) • v + Field.one(f) • v) + VectorSpace.negate(v)
+     = (Field.negate(Field.one(f)) + Field.one(f)) • v + VectorSpace.negate(v)
+     = Field.zero(f) • v + VectorSpace.negate(v)
+     = VectorSpace.zero(V) + VectorSpace.negate(v)
+     = VectorSpace.negate(v)
+
+-- A vector minus itself is zero.
+automatic theorem VectorSpace.subtract_self {f : Field} (V : VectorSpace(f))
+        (v : VectorSpace.carrier(V))
+        : v - v = VectorSpace.zero(V) :=
+  done
+
+-- Subtracting and adding back cancels: (u − v) + v = u.
+automatic theorem VectorSpace.subtract_add_cancel {f : Field} (V : VectorSpace(f))
+        (u v : VectorSpace.carrier(V))
+        : (u - v) + v = u :=
+  (u - v) + v
+     = u + (VectorSpace.negate(v) + v)
+     = u + VectorSpace.zero(V)
+     = u
