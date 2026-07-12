@@ -144,9 +144,11 @@ Update this section before ending any session that works on the plan.
   `<unknown>`-head message — inbox entry filed); the robust idiom is
   accessor citations `by LinearMap.additive(tLinear)` at stated-leg
   expected types, then hypothesis application in chains. Accessor
-  citations under a congruence wrapper mis-pin implicits (backward
-  unification from the outer step equation wins over forward from the
-  premise) — extract legs first there. Gates: library+tests,
+  citations under a congruence wrapper used to fail to reach the
+  differing subterm (ROOT-FIXED — see the Stage-E friction ledger, item
+  (2): the diff descent's structural gate broke above a defeq-but-not-
+  structural shared operand; now cite argument-free straight through the
+  congruence). Gates: library+tests,
   error-tests 54/0, export-check 2677, clean-check GREEN at budget 232
   (all three files manifest-added leak-free, re-run after the manifest
   edit), serial warning-site diff IDENTICAL (6 standing advisory
@@ -241,11 +243,24 @@ Update this section before ending any session that works on the plan.
     THE SOURCE: the parser now rejects the comma with a clear message
     (`ErrorTest/substituting_comma_list`) instead of a confusing downstream
     "expected expression". (2) GENUINE recurring BUG — the Stage-C
-    "accessor-under-congruence mis-pins implicits" (backward unification
-    from the outer step equation beats forward from the premise) recurred
-    for a backward scale-rewrite nested under `+`; workaround = extract the
-    leg as a named reversed equation, then `by substituting <leg>`. A root
-    fix in the citation/diff matcher is still open. (3) NON-BUG (my usage
+    "accessor-under-congruence mis-pins implicits", which recurred for a
+    backward scale-rewrite nested under `+`. ROOT-FIXED (`diff_bridges.cpp`,
+    `tryApplyBareLemmaToDiff`): the diagnosis was NOT backward-vs-forward
+    unification but the descent's structural-equality gate — the two calc
+    endpoints elaborate independently, so a shared operand (an operator's
+    ring instance) can come out `Field.commutative_ring f` on one side and
+    `CommutativeRing.ring (Field.commutative_ring f)` on the other, defeq
+    but not structural. Requiring structural equality to pick the shared
+    sibling broke the descent one level ABOVE the differing subterm, so the
+    cited accessor never reached it. Fix: keep structural equality primary
+    (a definitional test alone would wrongly mark a defeq-lemma's CHANGED
+    operand "unchanged" too — the `embed(-b)`/`negate(embed b)` case), and
+    fall back to defeq ONLY to break the tie when NEITHER component is
+    structurally equal. The scale-law workarounds in
+    `Algebra/polynomial_vector_space.math` are deleted — all four laws now
+    cite `Field.coefficientOf_polynomial_scale` argument-free straight
+    through the congruence. Regression: `Test/accessor_congruence_repro.math`.
+    Gates: library+tests green, error-tests 55/0. (3) NON-BUG (my usage
     error): the decidable `by cases { case P as h: … otherwise as h2: … }`
     form DOES work as a calc-step justification (needs `import axioms` for
     `otherwise`) — I had wrongly used the raw `cases E { | Or.introduceLeft

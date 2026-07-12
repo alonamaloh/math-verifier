@@ -1,0 +1,34 @@
+-- Regression: an accessor lemma cited argument-free THROUGH a congruence,
+-- on one summand of an `x + y` step, over an abstract field carrier.
+--
+-- `Field.coefficientOf_polynomial_scale` states
+-- `coeff(scale(a,p), k) = a · coeff(p, k)`. Each step below rewrites ONE
+-- summand with it (reversed), leaving the other summand shared. The two
+-- calc endpoints are elaborated independently, so the shared `+`'s ring
+-- instance can come out `Field.commutative_ring f` on one side and
+-- `CommutativeRing.ring (Field.commutative_ring f)` on the other — defeq
+-- but not structurally equal. The bare-lemma diff descent must tolerate
+-- that spelling drift to reach the differing summand; before the fix it
+-- broke one level above and the citation failed, forcing the caller to
+-- extract each leg as a named equation and `by substituting` it.
+module Test.accessor_congruence_repro
+
+import Algebra.polynomial_vector_space
+
+theorem Test.accessor_congruence_summand (f : Field) (a : Field.carrier(f))
+        (p q : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                          Ring.zero(Field.coefficient_ring(f))))
+        (k : Natural)
+        : a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+              + a * Polynomial.coefficientOf(Field.coefficient_ring(f), q, k)
+          = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+              + Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, q), k) := {
+  a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+        + a * Polynomial.coefficientOf(Field.coefficient_ring(f), q, k)
+     = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+           + a * Polynomial.coefficientOf(Field.coefficient_ring(f), q, k)
+           by Field.coefficientOf_polynomial_scale
+     = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+           + Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, q), k)
+           by Field.coefficientOf_polynomial_scale
+}

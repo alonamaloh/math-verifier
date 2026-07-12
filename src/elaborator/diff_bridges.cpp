@@ -714,6 +714,13 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
             auto* leftApp = std::get_if<Application>(&fromTerm->node);
             auto* rightApp = std::get_if<Application>(&toTerm->node);
             if (!leftApp || !rightApp) break;
+            // Structural equality is the primary signal: the SHARED sibling
+            // the diff rides through is the component equal on both sides, so
+            // we descend into the OTHER one. It stays primary because a
+            // cited lemma is frequently a DEFINITIONAL equality (e.g.
+            // `embed(-b)` and `negate(embed b)`): the changed component is
+            // then defeq to its counterpart, and a defeq test would wrongly
+            // mark it "unchanged" too, leaving nothing to descend into.
             bool functionEqual = structurallyEqual(
                 leftApp->function, rightApp->function);
             bool argumentEqual = structurallyEqual(
@@ -727,6 +734,51 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
                 fromTerm = leftApp->function;
                 toTerm = rightApp->function;
                 continue;
+            }
+            // Neither component is structurally equal, so the structural
+            // signal can't localise the diff. This happens when the shared
+            // sibling picked up a defeq-but-not-structural spelling from the
+            // two endpoints being elaborated independently — most often an
+            // operator's instance argument resolved as `Field.commutative_ring
+            // f` on one endpoint and `CommutativeRing.ring (Field.commutative_
+            // ring f)` on the other. Break the tie with a definitional check,
+            // used ONLY to confirm which side is the shared sibling: descend
+            // into the component that is NOT defeq (the genuine diff). If both
+            // are defeq the whole application is defeq — no diff to localise.
+            if (!functionEqual && !argumentEqual) {
+                auto definitionallyAgrees = [&](ExpressionPointer a,
+                                                ExpressionPointer b) -> bool {
+                    try {
+                        Context context =
+                            buildContextFromLocalBinders(localBinders);
+                        ExpressionPointer aOpened = openOverLocalBinders(
+                            a, localBinders, localBinders.size());
+                        ExpressionPointer bOpened = openOverLocalBinders(
+                            b, localBinders, localBinders.size());
+                        return isDefinitionallyEqual(environment_, context,
+                                                       aOpened, bOpened);
+                    } catch (const TypeError&) {
+                        return false;
+                    } catch (const ElaborateError&) {
+                        return false;
+                    }
+                };
+                bool functionDefeq =
+                    definitionallyAgrees(leftApp->function, rightApp->function);
+                bool argumentDefeq = functionDefeq
+                    ? false
+                    : definitionallyAgrees(leftApp->argument,
+                                             rightApp->argument);
+                if (functionDefeq && !argumentDefeq) {
+                    fromTerm = leftApp->argument;
+                    toTerm = rightApp->argument;
+                    continue;
+                }
+                if (argumentDefeq && !functionDefeq) {
+                    fromTerm = leftApp->function;
+                    toTerm = rightApp->function;
+                    continue;
+                }
             }
             break;
         }
