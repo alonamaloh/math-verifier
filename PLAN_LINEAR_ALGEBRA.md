@@ -90,11 +90,16 @@ Update this section before ending any session that works on the plan.
   law legs need explicit binder lambdas around the pointwise bridge —
   a candidate follow-up for the citation machinery; (2) the leak
   taxonomy counts `equal_of_pointwise(<pointwise lambda>)` term calls
-  as direct proof-lemma calls (same class as ComplexNumber's accepted
-  `extensionallyEqual` applications) — `coordinate_space.math` is
-  KEPT OUT of the clean manifest pending an owner style call (bless
-  the pointwise-bridge application as data-like, or grow a surface
-  form for it); `vector_space.math` is in the manifest.
+  as direct proof-lemma calls. RESOLVED 2026-07-12 (owner ruling: keep
+  judging by the two criteria, prefer bottom-up): the lambda idiom was
+  never necessary — the legs are now take-blocks stating the pointwise
+  fact (`∀ (k …). … by Field.<law>;`) closed by an argument-free
+  `done by CoordinateSpace.equal_of_pointwise`, and the bridge itself
+  is `done by Function.extensionality`; `coordinate_space.math` is IN
+  the manifest at unchanged budget. The idiom (and its top-down
+  `suffices … by <bridge>` variant for multi-step pointwise chains —
+  the construct already existed in reference.md, undocumented in
+  proof-style.md) is now recorded in proof-style.md's raw-CIC tells.
   CLEAN_LEAK_BUDGET resynced 230→232 (field_bundle's two `Logic.the`
   proof-data tokens, the Real.reciprocal idiom — my Stage A gate ran
   before the manifest edit, so the +2 surfaced here).

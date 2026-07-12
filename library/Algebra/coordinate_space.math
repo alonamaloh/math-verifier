@@ -59,7 +59,7 @@ theorem CoordinateSpace.equal_of_pointwise {f : Field} {n : Natural}
         {u v : CoordinateSpace(f, n)}
         (pointwise : ∀ (k : NaturalsBelow(n)). u(k) = v(k))
         : u = v :=
-  Function.extensionality(NaturalsBelow(n), Field.carrier(f), u, v, pointwise)
+  done by Function.extensionality
 
 -- ----------------------------------------------------------------------
 -- Fⁿ is a vector space: every law is its pointwise field counterpart.
@@ -69,70 +69,74 @@ theorem CoordinateSpace.is_vector_space (f : Field) (n : Natural)
                         CoordinateSpace.zero(f, n), CoordinateSpace.negate,
                         CoordinateSpace.scale) := {
   ∀ (u v w : CoordinateSpace(f, n)). (u + v) + w = u + (v + w)
-      by (u v w : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            (u(k) + v(k)) + w(k) = u(k) + (v(k) + w(k));
-            done
-          });
+      by {
+        take u : CoordinateSpace(f, n);
+        take v : CoordinateSpace(f, n);
+        take w : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). (u(k) + v(k)) + w(k) = u(k) + (v(k) + w(k)) by Field.add_associative;
+        done by CoordinateSpace.equal_of_pointwise
+      };
   ∀ (u : CoordinateSpace(f, n)). CoordinateSpace.zero(f, n) + u = u
-      by (u : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            Field.zero(f) + u(k) = u(k);
-            done
-          });
+      by {
+        take u : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). Field.zero(f) + u(k) = u(k) by Field.zero_add;
+        done by CoordinateSpace.equal_of_pointwise
+      };
   ∀ (u : CoordinateSpace(f, n)). u + CoordinateSpace.zero(f, n) = u
-      by (u : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            u(k) + Field.zero(f) = u(k);
-            done
-          });
-  ∀ (u : CoordinateSpace(f, n)).
-      CoordinateSpace.negate(u) + u = CoordinateSpace.zero(f, n)
-      by (u : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            Field.negate(u(k)) + u(k) = Field.zero(f);
-            done
-          });
-  ∀ (u : CoordinateSpace(f, n)).
-      u + CoordinateSpace.negate(u) = CoordinateSpace.zero(f, n)
-      by (u : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            u(k) + Field.negate(u(k)) = Field.zero(f);
-            done
-          });
+      by {
+        take u : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). u(k) + Field.zero(f) = u(k) by Field.add_zero;
+        done by CoordinateSpace.equal_of_pointwise
+      };
+  ∀ (u : CoordinateSpace(f, n)). CoordinateSpace.negate(u) + u = CoordinateSpace.zero(f, n)
+      by {
+        take u : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). Field.negate(u(k)) + u(k) = Field.zero(f) by Field.add_negate_left;
+        done by CoordinateSpace.equal_of_pointwise
+      };
+  ∀ (u : CoordinateSpace(f, n)). u + CoordinateSpace.negate(u) = CoordinateSpace.zero(f, n)
+      by {
+        take u : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). u(k) + Field.negate(u(k)) = Field.zero(f) by Field.add_negate_right;
+        done by CoordinateSpace.equal_of_pointwise
+      };
   ∀ (u v : CoordinateSpace(f, n)). u + v = v + u
-      by (u v : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            u(k) + v(k) = v(k) + u(k);
-            done
-          });
-  ∀ (a : Field.carrier(f)). ∀ (u v : CoordinateSpace(f, n)).
-      a • (u + v) = a • u + a • v
-      by (a : Field.carrier(f)) (u v : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            a * (u(k) + v(k)) = a * u(k) + a * v(k);
-            done
-          });
-  ∀ (a b : Field.carrier(f)). ∀ (v : CoordinateSpace(f, n)).
-      (a + b) • v = a • v + b • v
-      by (a b : Field.carrier(f)) (v : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            (a + b) * v(k) = a * v(k) + b * v(k);
-            done
-          });
-  ∀ (a b : Field.carrier(f)). ∀ (v : CoordinateSpace(f, n)).
-      (a * b) • v = a • (b • v)
-      by (a b : Field.carrier(f)) (v : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            (a * b) * v(k) = a * (b * v(k));
-            done
-          });
+      by {
+        take u : CoordinateSpace(f, n);
+        take v : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). u(k) + v(k) = v(k) + u(k) by Field.add_commutative;
+        done by CoordinateSpace.equal_of_pointwise
+      };
+  ∀ (a : Field.carrier(f)). ∀ (u v : CoordinateSpace(f, n)). a • (u + v) = a • u + a • v
+      by {
+        take a : Field.carrier(f);
+        take u : CoordinateSpace(f, n);
+        take v : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). a * (u(k) + v(k)) = a * u(k) + a * v(k) by Field.distributivity_left;
+        done by CoordinateSpace.equal_of_pointwise
+      };
+  ∀ (a b : Field.carrier(f)). ∀ (v : CoordinateSpace(f, n)). (a + b) • v = a • v + b • v
+      by {
+        take a : Field.carrier(f);
+        take b : Field.carrier(f);
+        take v : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). (a + b) * v(k) = a * v(k) + b * v(k) by Field.distributivity_right;
+        done by CoordinateSpace.equal_of_pointwise
+      };
+  ∀ (a b : Field.carrier(f)). ∀ (v : CoordinateSpace(f, n)). (a * b) • v = a • (b • v)
+      by {
+        take a : Field.carrier(f);
+        take b : Field.carrier(f);
+        take v : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). (a * b) * v(k) = a * (b * v(k)) by Field.multiply_associative;
+        done by CoordinateSpace.equal_of_pointwise
+      };
   ∀ (v : CoordinateSpace(f, n)). Field.one(f) • v = v
-      by (v : CoordinateSpace(f, n)) ↦
-          CoordinateSpace.equal_of_pointwise((k : NaturalsBelow(n)) ↦ {
-            Field.one(f) * v(k) = v(k);
-            done
-          });
+      by {
+        take v : CoordinateSpace(f, n);
+        ∀ (k : NaturalsBelow(n)). Field.one(f) * v(k) = v(k) by Field.one_multiply;
+        done by CoordinateSpace.equal_of_pointwise
+      };
   done
 }
 

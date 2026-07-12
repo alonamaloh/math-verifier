@@ -313,6 +313,30 @@ reach for the math-like form instead:
   spelling. Writing the interface costs a dozen lines once and removes the
   CIC spelling from every theorem that follows.
 
+- **An extensionality bridge applied to a lambda** —
+  `CoordinateSpace.equal_of_pointwise((k : …) ↦ { … })`,
+  `Function.extensionality(…, (x : …) ↦ …)` — is a raw-CIC tell: it
+  spells "apply the lemma to the function k ↦ proof" where a
+  mathematician writes "check it coordinatewise". State the pointwise
+  fact, then close by the bridge, argument-free:
+  ```
+  take u : CoordinateSpace(f, n);
+  take v : CoordinateSpace(f, n);
+  ∀ (k : NaturalsBelow(n)). u(k) + v(k) = v(k) + u(k) by Field.add_commutative;
+  done by CoordinateSpace.equal_of_pointwise
+  ```
+  The stated ∀-fact needs its `by` (the auto-prover does not
+  ∀-introduce a bare fact): name the operative lemma when one instance
+  carries it, otherwise `by { take k : …; <chain or done> }`. The same
+  move reads top-down as `suffices ∀ (k : …). … by <bridge>; take k; …`
+  (see reference.md) — prefer whichever the two criteria favor at the
+  site: bottom-up is usually shorter when the coordinatewise fact is a
+  one-liner; `suffices` keeps a genuinely multi-step coordinatewise
+  chain at statement level instead of nested inside a `by { … }`.
+  Keep the closing `done by <bridge>` even where the prover closes
+  without it — how the pointwise fact yields the equality is the one
+  step the reader must not have to guess.
+
 - **Direct proof-lemma calls** — applying a `theorem` to positional
   arguments — are discouraged *entirely*, at every arity. Not just
   `LessOrEqual.transitive(a, b, c, p, q)` but also the one-argument
