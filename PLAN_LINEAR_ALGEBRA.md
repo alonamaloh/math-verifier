@@ -249,23 +249,33 @@ Update this section before ending any session that works on the plan.
       is NOT provable for an arbitrary (possibly empty) index type `I` — the
       empty combination still needs a `selection : Natural → I` — so there is
       no bare `InSpanOf.zero`; membership lemmas carry an `I` inhabitant.
-    - **NEXT BRICK = combination concatenation → `InSpanOf.add`.** Confirmed
-      `Algebra.Fold_split` cites argument-free over the vector carrier (the
-      auto-prover discharges its ∀ assoc/identity premises from the automatic
-      vector laws — no ∀-packaged monoid laws needed). Path: (1) a generic
-      `Algebra.Fold_rebase_start` (`Fold(f,start,n) = Fold(f(start+·),0,n)`,
-      ~15 lines, by induction; needs the `0 + predecessor = predecessor`
-      arithmetic bridge on the peel, like `Fold_split`); (2) merged
-      piecewise `combineSelection`/`combineCoefficients` via
-      `cases Natural.compare_strict(i, count1) { below => left; atLeast =>
-      right(i − count1) }`; (3) branch-reduction helpers proved with the
-      `finite_sum.math` idiom (`cases compare_strict` in the proof, the
-      impossible branch is `x < c ≤ x → False`); (4) assemble
-      `linearCombination_concatenate = combo₁ + combo₂` via Fold_split +
-      rebase_start + Fold_pointwise; (5) `InSpanOf.add` witnesses the merged
-      data. Then span-transitivity (each generator in the new family's span
-      ⟹ span ⊆ new span) closes from member/scale/add, and the exchange
-      induction's replacement step reuses it.
+    - **Combination concatenation → `InSpanOf.add` — DONE (commit 615adf9d).**
+      `VectorSpace.combineFunctions left right count` concatenates two
+      `Natural`-indexed families at a cut (`if i < count then left(i) else
+      right(i − count)`); ONE generic `{A : Type(0)}` definition serves both
+      selection and coefficients (`Field.carrier(f)` as the RETURN type
+      trips the "cases motive not a Sort" quirk, but a plain type variable
+      `A` does not — generalize). `combineFunctions_below`/`_shifted` reduce
+      the branches via `Logic.if_positive`/`if_negative`.
+      `linearCombination_pointwise_below` (bridges `linearCombination` to
+      `indexedAggregate` to reuse `indexedAggregate_pointwise_below`) then
+      `linearCombination_concatenate` by induction on the RIGHT count (peel +
+      IH + associativity — NOT the Fold_split/rebase route first sketched;
+      induction is cleaner and `Fold_rebase_start` proved unnecessary and was
+      dropped). `InSpanOf.add` witnesses the merged data — the `InSpanOf`
+      subspace trio (member/scale/add) is complete. `if` rests on
+      `Logic.classical_decidable` (theorem over the documented `Logic.the`) →
+      NO new axiom (export-check inventory unchanged). NOTE: the raw
+      `cases … { | Ctor(x) => … }` pattern-match is a discouraged CIC form —
+      use `if P then a else b` for value-level branching, not `cases` on
+      `compare_strict`.
+    - **NEXT = span-transitivity, then the exchange induction.**
+      Span-transitivity (each generator of one family lies in another's span
+      ⟹ the first's span ⊆ the second's) closes from member/scale/add — it
+      is the substitution the exchange lemma's replacement step performs.
+      Then the Steinitz induction itself (where `Field.reciprocal` finally
+      enters: solve for the swapped-out vector by dividing by its nonzero
+      coefficient).
   - **FinitelyGenerated ⟹ finite basis (pruning) — NOT STARTED.** Prune a
     finite spanning family down to an independent one (choice-free); needs
     "remove one index from a `NaturalsBelow(count)` family" reindexing. Shares
