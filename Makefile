@@ -378,17 +378,14 @@ pattern-cases-ratchet:
 # inspects source text, MATH_CHECK_PATTERN_CASES asks the elaborator, which
 # resolves `let` aliases (`let d := f(x); cases d`) and desugarings — so a
 # scrutinee laundered through a binding cannot slip past. Rebuilds the whole
-# library with the audit on and fails on any non-exempt survivor. Exempt
-# modules (foundational primitives that case a computed sub-result to BUILD
-# their value) mirror scripts/cic_leak_report's PATTERN_CASES_EXEMPT — keep in
-# sync. `pattern-cases-audit-report` lists survivors without failing.
-PATTERN_CASES_EXEMPT_RE := ^warning: (Natural\.compare|Natural\.floor_divide):
-
+# library with the audit on and fails on ANY survivor: the count is 0
+# library-wide with no exemptions (the two former foundational holdouts,
+# compare/floor_divide, were migrated to helpers that pattern-match an
+# argument). `pattern-cases-audit-report` lists survivors without failing.
 pattern-cases-audit-report:
 	@rm -f $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 	@MATH_CHECK_PATTERN_CASES=1 $(MAKE) library 2>&1 \
 	  | grep "pattern-match .cases. on a computed" \
-	  | grep -vE "$(PATTERN_CASES_EXEMPT_RE)" \
 	  | sed -E 's/^warning: ([A-Za-z0-9_.]+):[0-9]+:.*/\1/' \
 	  | sort | uniq -c | sort -rn
 
@@ -396,7 +393,6 @@ pattern-cases-audit:
 	@rm -f $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 	@MATH_CHECK_PATTERN_CASES=1 $(MAKE) library 2>&1 \
 	  | grep "pattern-match .cases. on a computed" \
-	  | grep -vE "$(PATTERN_CASES_EXEMPT_RE)" \
 	  | sort -u > $(BUILD_DIR)/pattern-cases.log || true; \
 	  n=$$(wc -l < $(BUILD_DIR)/pattern-cases.log); \
 	  if [ $$n -gt 0 ]; then \

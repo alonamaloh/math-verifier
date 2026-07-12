@@ -32,9 +32,22 @@ definition Natural.compare_strict_zero_against
   | successor(predecessorM) =>
       Natural.StrictComparison.below(0, successor(predecessorM), ?)
 
+-- Shift a comparison of the predecessors up to their successors: a strict
+-- `<` stays strict and an `≥` stays `≥` once one successor is added to each
+-- side. Pattern-matching the comparison ARGUMENT (a real binder) keeps the
+-- inductive row free of a `cases` on the recursive sub-comparison.
+definition Natural.compare_strict_shift
+        (predecessorK predecessorM : Natural)
+        : Natural.StrictComparison(predecessorK, predecessorM)
+          → Natural.StrictComparison(successor(predecessorK), successor(predecessorM))
+  | Natural.StrictComparison.below(strictlyBelow) =>
+      Natural.StrictComparison.below(successor(predecessorK), successor(predecessorM), ?)
+  | Natural.StrictComparison.atLeast(atLeast) =>
+      Natural.StrictComparison.atLeast(successor(predecessorK), successor(predecessorM), ?)
+
 -- Inductive row: compare successor(predecessorK) against m, given the
 -- comparison of predecessorK against every m. Zero is below every
--- successor; otherwise peel one successor off each side and recurse.
+-- successor; otherwise shift the recursive sub-comparison up one row.
 definition Natural.compare_strict_successor_against
         (predecessorK : Natural)
         (comparePredecessor
@@ -43,12 +56,8 @@ definition Natural.compare_strict_successor_against
   | zero =>
       Natural.StrictComparison.atLeast(successor(predecessorK), 0, ?)
   | successor(predecessorM) =>
-      cases comparePredecessor(predecessorM) {
-        | Natural.StrictComparison.below(strictlyBelow) =>
-            Natural.StrictComparison.below(successor(predecessorK), successor(predecessorM), ?)
-        | Natural.StrictComparison.atLeast(atLeast) =>
-            Natural.StrictComparison.atLeast(successor(predecessorK), successor(predecessorM), ?)
-      }
+      Natural.compare_strict_shift(
+          predecessorK, predecessorM, comparePredecessor(predecessorM))
 
 -- `compare_strict(k, m)` : either `k < m` (as `successor(k) ≤ m`) or
 -- `m ≤ k`, delivered as data a function can branch on.

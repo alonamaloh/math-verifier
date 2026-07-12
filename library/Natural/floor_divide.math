@@ -36,22 +36,31 @@ import Logic.exists
 -- proofs reason through the characterising lemmas (`*_zero_fuel`,
 -- `*_succ_fits`, `*_succ_too_big`) rather than letting the kernel
 -- reduce through a fully concrete fuel/dividend.
+-- Pick `ifZero` when the overshoot `monus(divisor, dividend)` is zero (i.e.
+-- divisor ≤ dividend), else `ifSuccessor`. Pattern-matching the overshoot
+-- ARGUMENT keeps the step functions free of a `cases` on the computed `monus`,
+-- while the characterising lemmas still ι-reduce: `substituting` the overshoot
+-- to `0` / `successor(_)` selects the matching arm. Both branches are formed
+-- eagerly; the recursive call discarded in the too-big case is on strictly
+-- smaller fuel, so the recursion stays structural.
+definition Natural.Raw.select_on_zero
+        : (overshoot ifZero ifSuccessor : Natural.Raw) → Natural.Raw
+  | zero,         ifZero, _           => ifZero
+  | successor(_), _,      ifSuccessor => ifSuccessor
+
 definition Natural.Raw.floor_divide_step
         : (fuel divisor dividend : Natural.Raw) → Natural.Raw
   | zero,            _,       _        => Natural.Raw.zero
   | successor(fuel), divisor, dividend =>
       unfold Natural in
-      cases Natural.monus(divisor, dividend) {
-        | zero =>
-            -- divisor ≤ dividend: recurse with dividend - divisor,
-            -- count one more.
-            successor(
-                Natural.Raw.floor_divide_step(
-                    fuel, divisor, Natural.monus(dividend, divisor)))
-        | successor(_) =>
-            -- divisor > dividend: stop.
-            0
-      }
+      Natural.Raw.select_on_zero(
+          Natural.monus(divisor, dividend),
+          -- divisor ≤ dividend: recurse with dividend - divisor, count one more.
+          successor(
+              Natural.Raw.floor_divide_step(
+                  fuel, divisor, Natural.monus(dividend, divisor))),
+          -- divisor > dividend: stop.
+          0)
 
 opaque definition Natural.floor_divide_step
         : (fuel divisor dividend : Natural) → Natural :=
@@ -62,13 +71,13 @@ definition Natural.Raw.modulo_step
   | zero,            _,       dividend => dividend
   | successor(fuel), divisor, dividend =>
       unfold Natural in
-      cases Natural.monus(divisor, dividend) {
-        | zero =>
-            Natural.Raw.modulo_step(
-                fuel, divisor, Natural.monus(dividend, divisor))
-        | successor(_) =>
-            dividend
-      }
+      Natural.Raw.select_on_zero(
+          Natural.monus(divisor, dividend),
+          -- divisor ≤ dividend: carry on with dividend - divisor.
+          Natural.Raw.modulo_step(
+              fuel, divisor, Natural.monus(dividend, divisor)),
+          -- divisor > dividend: the remainder is the dividend.
+          dividend)
 
 opaque definition Natural.modulo_step
         : (fuel divisor dividend : Natural) → Natural :=
