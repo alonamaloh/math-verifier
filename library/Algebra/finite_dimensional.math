@@ -1,0 +1,49 @@
+-- Algebra/finite_dimensional.math
+--
+-- Finite-dimensionality as a PROPOSITION: a space is finite-dimensional
+-- when it has a basis indexed by `NaturalsBelow(n)` for some `n` — a
+-- genuinely finite family, in contrast to the arbitrary index type a
+-- bare `IsBasis` allows (so `F[x]`, with its `Natural`-indexed monomial
+-- basis, is a basis but NOT finite-dimensional). The `dimension` value
+-- and the stronger bundled record layer over `VectorSpace` in the way
+-- `CommutativeRing` layers over `Ring`) come later, with invariance
+-- (Stage F): defining a `dimension : Natural` needs any two finite bases
+-- to have the same size, which is the exchange lemma's payoff.
+--
+-- The field over itself is the smallest example: {1} is a basis indexed
+-- by `NaturalsBelow(1)`, so every field is finite-dimensional over
+-- itself (dimension one).
+
+module Algebra.finite_dimensional
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Set.subtype
+import Set.finite
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.linear_combination
+import Algebra.span
+
+-- Finite-dimensional: some `NaturalsBelow(dimension)`-indexed family is a
+-- basis. The witness `dimension` is not yet claimed to be unique (that is
+-- Stage F, via the exchange lemma) — this is only the existence statement.
+definition VectorSpace.FiniteDimensional {f : Field} (V : VectorSpace(f))
+        : Proposition :=
+  ∃ (dimension : Natural).
+      ∃ (basis : NaturalsBelow(dimension) → VectorSpace.carrier(V)).
+          VectorSpace.IsBasis(basis)
+
+-- A field is finite-dimensional over itself: {1} is a basis indexed by
+-- `NaturalsBelow(1)`, so the dimension is one.
+theorem Field.vector_space_finite_dimensional (f : Field)
+        : VectorSpace.FiniteDimensional(Field.vector_space(f)) := {
+  VectorSpace.IsBasis(Field.one_family(f)) by Field.one_family_is_basis
+      as oneFamilyBasis;
+  witness 1 with witness Field.one_family(f) with oneFamilyBasis
+}

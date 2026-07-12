@@ -1,0 +1,256 @@
+-- Algebra/polynomial_vector_space.math
+--
+-- The polynomial ring F[x] as a vector space over its field of scalars —
+-- the worked INFINITE-dimensional example (its monomial basis {xⁿ} is
+-- indexed by all of `Natural`, so F[x] is a basis-carrying space that is
+-- NOT `FiniteDimensional`). Everything here is choice-free and direct.
+--
+-- Scalar action is multiplication by the constant polynomial: `a • p` is
+-- `(a·x⁰)·p`, whose coefficients are `a` times those of `p`
+-- (`Polynomial.coefficientOf_monomial_multiply` at exponent zero). The
+-- module laws then reduce, index by index, to base-ring identities via
+-- polynomial extensionality (`Polynomial.equal_of_coefficientOf_equal`).
+--
+-- The base ring of the polynomials is the field's own commutative ring,
+-- `Field.coefficient_ring(f)`, whose carrier and constants are the
+-- field's by definition — so the Polynomial operations and the field
+-- scalars share a carrier with no coercion.
+
+module Algebra.polynomial_vector_space
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.monus
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.aggregation
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.ring_bundle
+import Algebra.ring_summation
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+import Algebra.linear_combination
+import Algebra.span
+import Algebra.finite_dimensional
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.degree_function
+import Polynomial.division
+import Polynomial.monomial
+
+-- The coefficient ring of F[x]: the field's own commutative ring, viewed
+-- as a plain `Ring`. Its carrier and constants are the field's — e.g.
+-- `Ring.carrier(Field.coefficient_ring(f))` reduces to `Field.carrier(f)`
+-- — so no coercion stands between the polynomial coefficients and the
+-- field scalars.
+definition Field.coefficient_ring (f : Field) : Ring :=
+  CommutativeRing.ring(Field.commutative_ring(f))
+
+-- Scalar multiplication of a polynomial by a field element: multiply by
+-- the constant polynomial `a·x⁰`.
+definition Field.polynomial_scale (f : Field) (a : Field.carrier(f))
+        (p : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                        Ring.zero(Field.coefficient_ring(f))))
+        : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                     Ring.zero(Field.coefficient_ring(f))) :=
+  Polynomial.monomial(Field.coefficient_ring(f), a, 0) * p
+
+-- Its coefficients: `a` times those of `p`, index by index. The
+-- convolution with a degree-zero monomial collapses to a single term.
+theorem Field.coefficientOf_polynomial_scale (f : Field) (a : Field.carrier(f))
+        (p : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                        Ring.zero(Field.coefficient_ring(f))))
+        (k : Natural)
+        : Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, a, p), k)
+          = a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k) :=
+  Polynomial.coefficientOf(Field.coefficient_ring(f),
+          Polynomial.monomial(Field.coefficient_ring(f), a, 0) * p, k)
+     = a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, Natural.monus(k, 0))
+           by Polynomial.coefficientOf_monomial_multiply
+     = a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+           by substituting Natural.monus_zero
+
+-- ----------------------------------------------------------------------
+-- The four scalar-action laws, each reduced index by index to a
+-- base-ring identity through polynomial extensionality.
+
+theorem Field.polynomial_scale_vector_add (f : Field) (a : Field.carrier(f))
+        (p q : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                          Ring.zero(Field.coefficient_ring(f))))
+        : Field.polynomial_scale(f, a, (p + q))
+          = Field.polynomial_scale(f, a, p) + Field.polynomial_scale(f, a, q) := {
+  suffices ∀ (k : Natural).
+      Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, a, (p + q)), k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, a, p) + Field.polynomial_scale(f, a, q), k)
+    by Polynomial.equal_of_coefficientOf_equal;
+  take k : Natural;
+  a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+    by Field.coefficientOf_polynomial_scale as legP;
+  a * Polynomial.coefficientOf(Field.coefficient_ring(f), q, k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, q), k)
+    by Field.coefficientOf_polynomial_scale as legQ;
+  Polynomial.coefficientOf(Field.coefficient_ring(f),
+          Field.polynomial_scale(f, a, (p + q)), k)
+     = a * Polynomial.coefficientOf(Field.coefficient_ring(f), (p + q), k)
+           by Field.coefficientOf_polynomial_scale
+     = a * (Polynomial.coefficientOf(Field.coefficient_ring(f), p, k) + Polynomial.coefficientOf(Field.coefficient_ring(f), q, k))
+           by Polynomial.coefficientOf_add
+     = a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+           + a * Polynomial.coefficientOf(Field.coefficient_ring(f), q, k)
+     = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+           + a * Polynomial.coefficientOf(Field.coefficient_ring(f), q, k)
+           by substituting legP
+     = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+           + Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, q), k)
+           by substituting legQ
+     = Polynomial.coefficientOf(Field.coefficient_ring(f),
+           Field.polynomial_scale(f, a, p) + Field.polynomial_scale(f, a, q), k)
+           by Polynomial.coefficientOf_add
+}
+
+theorem Field.polynomial_scale_scalar_add (f : Field) (a b : Field.carrier(f))
+        (p : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                        Ring.zero(Field.coefficient_ring(f))))
+        : Field.polynomial_scale(f, (a + b), p)
+          = Field.polynomial_scale(f, a, p) + Field.polynomial_scale(f, b, p) := {
+  suffices ∀ (k : Natural).
+      Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, (a + b), p), k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, a, p) + Field.polynomial_scale(f, b, p), k)
+    by Polynomial.equal_of_coefficientOf_equal;
+  take k : Natural;
+  a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+    by Field.coefficientOf_polynomial_scale as legA;
+  b * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, b, p), k)
+    by Field.coefficientOf_polynomial_scale as legB;
+  Polynomial.coefficientOf(Field.coefficient_ring(f),
+          Field.polynomial_scale(f, (a + b), p), k)
+     = (a + b) * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+           by Field.coefficientOf_polynomial_scale
+     = a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+           + b * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+     = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+           + b * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+           by substituting legA
+     = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, a, p), k)
+           + Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, b, p), k)
+           by substituting legB
+     = Polynomial.coefficientOf(Field.coefficient_ring(f),
+           Field.polynomial_scale(f, a, p) + Field.polynomial_scale(f, b, p), k)
+           by Polynomial.coefficientOf_add
+}
+
+theorem Field.polynomial_scale_scalar_multiply (f : Field) (a b : Field.carrier(f))
+        (p : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                        Ring.zero(Field.coefficient_ring(f))))
+        : Field.polynomial_scale(f, (a * b), p)
+          = Field.polynomial_scale(f, a, Field.polynomial_scale(f, b, p)) := {
+  suffices ∀ (k : Natural).
+      Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, (a * b), p), k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, a, Field.polynomial_scale(f, b, p)), k)
+    by Polynomial.equal_of_coefficientOf_equal;
+  take k : Natural;
+  b * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, b, p), k)
+    by Field.coefficientOf_polynomial_scale as legB;
+  Polynomial.coefficientOf(Field.coefficient_ring(f),
+          Field.polynomial_scale(f, (a * b), p), k)
+     = (a * b) * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+           by Field.coefficientOf_polynomial_scale
+     = a * (b * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k))
+     = a * Polynomial.coefficientOf(Field.coefficient_ring(f), Field.polynomial_scale(f, b, p), k)
+           by substituting legB
+     = Polynomial.coefficientOf(Field.coefficient_ring(f),
+           Field.polynomial_scale(f, a, Field.polynomial_scale(f, b, p)), k)
+           by Field.coefficientOf_polynomial_scale
+}
+
+theorem Field.polynomial_one_scale (f : Field)
+        (p : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                        Ring.zero(Field.coefficient_ring(f))))
+        : Field.polynomial_scale(f, Field.one(f), p) = p := {
+  suffices ∀ (k : Natural).
+      Polynomial.coefficientOf(Field.coefficient_ring(f),
+              Field.polynomial_scale(f, Field.one(f), p), k)
+      = Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+    by Polynomial.equal_of_coefficientOf_equal;
+  take k : Natural;
+  Polynomial.coefficientOf(Field.coefficient_ring(f),
+          Field.polynomial_scale(f, Field.one(f), p), k)
+     = Field.one(f) * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+           by Field.coefficientOf_polynomial_scale
+     = Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
+}
+
+-- ----------------------------------------------------------------------
+-- The bundled vector space F[x] over F.
+
+theorem Field.polynomial_is_vector_space (f : Field)
+        : IsVectorSpace(f,
+              Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                         Ring.zero(Field.coefficient_ring(f))),
+              Polynomial.add, Polynomial.zero(Field.coefficient_ring(f)),
+              Polynomial.negate, Field.polynomial_scale(f)) := {
+  IsAbelianGroup(Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                            Ring.zero(Field.coefficient_ring(f))),
+                 Polynomial.add, Polynomial.zero(Field.coefficient_ring(f)),
+                 Polynomial.negate)
+      by Polynomial.add_is_abelian_group;
+  ∀ (a : Field.carrier(f)).
+      ∀ (u v : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                          Ring.zero(Field.coefficient_ring(f)))).
+      Field.polynomial_scale(f, a, (u + v))
+      = Field.polynomial_scale(f, a, u) + Field.polynomial_scale(f, a, v)
+    by Field.polynomial_scale_vector_add;
+  ∀ (a b : Field.carrier(f)).
+      ∀ (v : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                        Ring.zero(Field.coefficient_ring(f)))).
+      Field.polynomial_scale(f, (a + b), v)
+      = Field.polynomial_scale(f, a, v) + Field.polynomial_scale(f, b, v)
+    by Field.polynomial_scale_scalar_add;
+  ∀ (a b : Field.carrier(f)).
+      ∀ (v : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                        Ring.zero(Field.coefficient_ring(f)))).
+      Field.polynomial_scale(f, (a * b), v)
+      = Field.polynomial_scale(f, a, Field.polynomial_scale(f, b, v))
+    by Field.polynomial_scale_scalar_multiply;
+  ∀ (v : Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                    Ring.zero(Field.coefficient_ring(f)))).
+      Field.polynomial_scale(f, Field.one(f), v) = v
+    by Field.polynomial_one_scale;
+  done
+}
+
+definition Field.polynomial_vector_space (f : Field) : VectorSpace(f) :=
+  VectorSpace.make(
+      Polynomial(Ring.carrier(Field.coefficient_ring(f)),
+                 Ring.zero(Field.coefficient_ring(f))),
+      Polynomial.add, Polynomial.zero(Field.coefficient_ring(f)),
+      Polynomial.negate, Field.polynomial_scale(f),
+      Field.polynomial_is_vector_space)
