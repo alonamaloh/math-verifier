@@ -16,10 +16,11 @@
 -- `Group.inverse_involution`,
 -- …) re-export the generic `group_lemmas.math` results at the bundle.
 --
--- As with the ring bundle, the field projections are written with
--- `cases g { … }` rather than the pattern-match-definition form,
--- because the operation's return type mentions `Group.carrier(g)` and
--- the pattern-match codegen does not yet handle that dependent motive.
+-- As with the ring bundle, the field projections are written with a
+-- destructuring `let ⟨…⟩ := g in …` rather than the
+-- pattern-match-definition form, because the operation's return type
+-- mentions `Group.carrier(g)` and the pattern-match codegen does not yet
+-- handle that dependent motive.
 
 module Algebra.group_bundle
 
@@ -54,17 +55,17 @@ definition Group.carrier : Group → Type(0)
 -- constant `identity` keeps an explicit group (no operand to recover from).
 definition Group.operation {g : Group}
         : Group.carrier(g) → Group.carrier(g) → Group.carrier(g) :=
-  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
-    operation }
+  let ⟨carrier, operation, identity, inverse, isGroup⟩ := g in
+    operation
 
 definition Group.identity (g : Group) : Group.carrier(g) :=
-  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
-    identity }
+  let ⟨carrier, operation, identity, inverse, isGroup⟩ := g in
+    identity
 
 definition Group.inverse {g : Group}
         : Group.carrier(g) → Group.carrier(g) :=
-  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
-    inverse }
+  let ⟨carrier, operation, identity, inverse, isGroup⟩ := g in
+    inverse
 
 -- The group operation dispatches on the carrier-projection head, distinct
 -- from any concrete carrier's head and from `Ring.carrier`, so it never
@@ -83,8 +84,8 @@ operator (⁻¹) on (Group.carrier) := Group.inverse
 definition Group.is_group (g : Group)
         : IsGroup(Group.carrier(g), Group.operation, Group.identity(g),
                   Group.inverse) :=
-  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
-    isGroup }
+  let ⟨carrier, operation, identity, inverse, isGroup⟩ := g in
+    isGroup
 
 -- ----------------------------------------------------------------------
 -- Flattened law projections. Each brings `IsGroup(…)` into context via

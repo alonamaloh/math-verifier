@@ -30,11 +30,8 @@ import GaussianInteger.coordinate_multiplicative
 theorem GaussianInteger.coordinates_multiply (z w : GaussianInteger)
         : coords(RingModulo.multiply(z, w))
           = GaussianInteger.gaussianProduct(coords(z), coords(w)) :=
-  cases z { | p =>
-    cases w { | q =>
-      GaussianInteger.coordinatesOfPolynomial_multiply(p, q)
-    }
-  }
+  by_representatives z as p, w as q =>
+    GaussianInteger.coordinatesOfPolynomial_multiply(p, q)
 
 -- ----------------------------------------------------------------------
 -- The norm of a coordinate pair, N(a, b) = a² + b².
@@ -54,16 +51,16 @@ theorem GaussianInteger.normPair_gaussianProduct (u v : Pair(Integer, Integer))
   -- destructure the pairs so the re/im projections of the gaussianProduct
   -- compute; the middle line is the plain Brahmagupta identity for `ring`,
   -- and the two outer `=` steps just fold the definitions back in (defeq).
-  cases u { | Product.make(a, b) =>
-    cases v { | Product.make(c, d) =>
-      GaussianInteger.normPair(GaussianInteger.gaussianProduct(
-               Product.make(a, b), Product.make(c, d)))
-         = (a * c - b * d) * (a * c - b * d) + (a * d + b * c) * (a * d + b * c)
-         = (a * a + b * b) * (c * c + d * d)
-               by ring
-         = GaussianInteger.normPair(Product.make(a, b))
-               * GaussianInteger.normPair(Product.make(c, d))
-    }
+  {
+    let ⟨a, b⟩ := u;
+    let ⟨c, d⟩ := v;
+    GaussianInteger.normPair(GaussianInteger.gaussianProduct(
+             Product.make(a, b), Product.make(c, d)))
+       = (a * c - b * d) * (a * c - b * d) + (a * d + b * c) * (a * d + b * c)
+       = (a * a + b * b) * (c * c + d * d)
+             by ring
+       = GaussianInteger.normPair(Product.make(a, b))
+             * GaussianInteger.normPair(Product.make(c, d))
   }
 
 -- ----------------------------------------------------------------------

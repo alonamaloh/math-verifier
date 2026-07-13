@@ -841,15 +841,13 @@ theorem Real.LessOrEqual_of_pointwise
         (pointwiseLeq : ∀ (n : Natural). (s(n) : Real) ≤ B)
         : Real.from_cauchy_sequence(s, sIsCauchy)
             ≤ B :=
-  cases B {
-    | CauchyRationalSequence.make(b, bIsCauchy) => {
-        -- The goal β-reduces (through the quotient) to the eventually-nonneg
-        -- form; state the `≤` the at-make lemma proves and let `done` cross
-        -- the opaque `Real.IsNonneg` to close the reduced goal.
-        Real.from_cauchy_sequence(s, sIsCauchy)
-                ≤ Real.from_cauchy_sequence(b, bIsCauchy);
-        done
-      }
+  by_representatives B as ⟨b, bIsCauchy⟩ => {
+    -- The goal β-reduces (through the quotient) to the eventually-nonneg
+    -- form; state the `≤` the at-make lemma proves and let `done` cross
+    -- the opaque `Real.IsNonneg` to close the reduced goal.
+    Real.from_cauchy_sequence(s, sIsCauchy)
+            ≤ Real.from_cauchy_sequence(b, bIsCauchy);
+    done
   }
 
 -- Dual: lower bound by the limit. If every term of s dominates B
@@ -1574,8 +1572,8 @@ theorem Real.bisectionLimit_is_upper_bound
               subset,
               Real.bisectionLimit(subset, initial, initialLeftLeqRight)) :=
   (y : Real) (yInSubset : y ∈ subset) ↦
-    cases y { | rep =>
-      done by Real.bisectionLimit_is_upper_bound_at_rep }
+    by_representatives y as rep =>
+      done by Real.bisectionLimit_is_upper_bound_at_rep
 
 -- The limit is the LEAST upper bound: every other upper bound `B`
 -- satisfies `limit ≤ B`. Pointwise: `bisectionLeft(n) ≤ y_n ≤ otherBound`

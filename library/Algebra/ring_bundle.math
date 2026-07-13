@@ -14,11 +14,11 @@
 -- equations out of the nested-∧ `IsRing` once, so consumers never walk
 -- the hierarchy by hand.
 --
--- NOTE: the field projections are written with `cases r { … }` rather
--- than the pattern-match-definition form `| Ring.make(…) => …`. The
--- latter's codegen does not yet handle a dependent motive (the return
--- type of `add` mentions `Ring.carrier(r)`); `cases` builds the motive
--- correctly.
+-- NOTE: the field projections are written with a destructuring
+-- `let ⟨…⟩ := r in …` rather than the pattern-match-definition form
+-- `| Ring.make(…) => …`. The latter's codegen does not yet handle a
+-- dependent motive (the return type of `add` mentions `Ring.carrier(r)`);
+-- the destructuring-let builds the motive correctly.
 
 module Algebra.ring_bundle
 
@@ -58,26 +58,26 @@ definition Ring.carrier : Ring → Type(0)
 -- explicit ring (no operands to recover from).
 definition Ring.add {r : Ring}
         : Ring.carrier(r) → Ring.carrier(r) → Ring.carrier(r) :=
-  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
-    add }
+  let ⟨carrier, add, zero, negate, multiply, one, isRing⟩ := r in
+    add
 
 definition Ring.zero (r : Ring) : Ring.carrier(r) :=
-  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
-    zero }
+  let ⟨carrier, add, zero, negate, multiply, one, isRing⟩ := r in
+    zero
 
 definition Ring.negate {r : Ring}
         : Ring.carrier(r) → Ring.carrier(r) :=
-  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
-    negate }
+  let ⟨carrier, add, zero, negate, multiply, one, isRing⟩ := r in
+    negate
 
 definition Ring.multiply {r : Ring}
         : Ring.carrier(r) → Ring.carrier(r) → Ring.carrier(r) :=
-  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
-    multiply }
+  let ⟨carrier, add, zero, negate, multiply, one, isRing⟩ := r in
+    multiply
 
 definition Ring.one (r : Ring) : Ring.carrier(r) :=
-  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
-    one }
+  let ⟨carrier, add, zero, negate, multiply, one, isRing⟩ := r in
+    one
 
 -- x − y := x + (−y) on the bundle's carrier.
 definition Ring.subtract {r : Ring} (x y : Ring.carrier(r)) : Ring.carrier(r) :=
@@ -93,8 +93,8 @@ operator (*) on (Ring.carrier, Ring.carrier) := Ring.multiply
 definition Ring.is_ring (r : Ring)
         : IsRing(Ring.carrier(r), Ring.add, Ring.zero(r),
                  Ring.negate, Ring.multiply, Ring.one(r)) :=
-  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
-    isRing }
+  let ⟨carrier, add, zero, negate, multiply, one, isRing⟩ := r in
+    isRing
 
 -- ----------------------------------------------------------------------
 -- Flattened law projections. Each brings the ring structure into
