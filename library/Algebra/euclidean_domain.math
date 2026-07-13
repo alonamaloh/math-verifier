@@ -131,7 +131,7 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
               ∧ (remainder = Ring.zero(s) ∨ norm(remainder) < norm(generator))
               from EuclideanDomain.division(euclidean, x, generator,
                        generatorDistinct);
-          (remainder = Ring.zero(s) ∨ norm(remainder) < norm(generator)) as remainderCase;
+          (remainder = Ring.zero(s) ∨ norm(remainder) < norm(generator));
           -- Re-type the quotient at `s` so the `*` operator below spells its
           -- ring as `s` (matching the ideal's `s`-spelled facts in `rewrite`).
           let quotient : Ring.carrier(s) := rawQuotient;
@@ -147,12 +147,10 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
           -- The remainder must vanish: otherwise it is a nonzero member of
           -- norm below the least, contradicting minimality.
           suppose remainder ≠ Ring.zero(s) as remainderNonzero for contradiction {
-              norm(remainder) < norm(generator) by {
-                cases remainderCase {
-                  | Or.introduceLeft(remainderZero) =>
-                      absurd(remainderNonzero(remainderZero))
-                  | Or.introduceRight(normLess) => normLess
-                }
+              norm(remainder) < norm(generator) by cases {
+                case remainder = Ring.zero(s) as remainderZero:
+                    absurd(remainderNonzero(remainderZero))
+                case norm(remainder) < norm(generator) as normLess: normLess
               };
               norm(remainder) < leastNorm as remainderNormBelowLeast;
               ∃ (x : Ring.carrier(s)).

@@ -54,10 +54,19 @@ theorem Polynomial.nth_negate (r : Ring)
          = (- Ring.zero(r))                                                                by Ring.negate_zero
          = (- Polynomial.coefficient(Polynomial.Coefficients.nil(Ring.carrier(r)), index)) by substituting Polynomial.nth_nil
   | Polynomial.Coefficients.cons(a, rest), index =>
-      cases index {
-        | 0 => reflexivity(Ring.carrier(r), (- a))
-        | 1 + predecessor =>
-            Polynomial.nth_negate(r, rest, predecessor)
+      done by cases {
+        case index = 0: reflexivity(Ring.carrier(r), (- a))
+        case index = 1 + predecessor for some predecessor:
+            Polynomial.coefficient(
+                    Polynomial.Coefficients.negate(r,
+                        Polynomial.Coefficients.cons(Ring.carrier(r), a, rest)),
+                    1 + predecessor)
+               = Polynomial.coefficient(Polynomial.Coefficients.negate(r, rest), predecessor)
+               = (- Polynomial.coefficient(rest, predecessor))
+                     by Polynomial.nth_negate(r, rest, predecessor)
+               = (- Polynomial.coefficient(
+                       Polynomial.Coefficients.cons(Ring.carrier(r), a, rest),
+                       1 + predecessor))
       }
 
 -- Negation respects the equivalence (pointwise via the bridge).
