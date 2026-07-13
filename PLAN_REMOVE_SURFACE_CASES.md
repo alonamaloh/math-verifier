@@ -15,34 +15,47 @@ Two things are already true (done in the prior session — see Status):
 
 This plan removes those too, then deletes the keyword.
 
-## SESSION HANDOFF (2026-07-12) — cases keyword GONE; next = polish, then STEP 5
+## SESSION HANDOFF (2026-07-12b) — polish DONE; STEP 5 conversion DONE (17 residue); next = STEP 6
 
-STEPS 1–4 COMPLETE. The surface `cases <scrutinee>` keyword is retired
-(`make library`+`tests`+`error-tests` green; 0 surface `cases <var>` in real
-code; `cases by <lemma>` survives, 4 uses). Guiding principle for all remaining
-work: [[no_computation_needed]] — only proving theorems; proofs → `by
-induction`/`by cases`, functions → whatever reads best, never "needs to compute".
+STEPS 1–5 (conversion) COMPLETE. Surface `cases` keyword retired (STEPS 1–4);
+the STEP-2/3 migration polish and the STEP-5 pattern-match-theorem conversion
+both landed this session, `make library`+`tests`+`error-tests` green throughout.
+Guiding principle: [[no_computation_needed]].
 
-**Next session, two tasks:**
-1. **POLISH the ~200 STEP-2/3 migrations** (readability debt, correctness is
-   already kernel-verified). Use the `polish-proofs` skill / `--check-redundant-by`.
-   Known warts from the parallel sweep: `by cases` supplies a case-equation
-   *hypothesis* (doesn't substitute into other hypotheses), so agents added
-   small bridge facts and some reductio arms read `absurd(impossible)` where the
-   owner idiom wants a bare `done` ([[reductio_done_idiom]]); also dropped-name
-   and over-annotated-witness noise. Scope to the clean manifest
-   ([[scope_to_clean_manifest]]). Pre-existing expensive-by-less warnings
-   (conjugation/series/exponential/multiply_laws:236) are NOT this project's —
-   leave them.
-2. **STEP 5 — the "weird proofs"** (~113 pattern-match THEOREM proofs
-   `theorem T : (x:A)→P | Ctor(x) => …` → `by induction`/`by cases`). Spike the
-   awkward-recursion residue first (multi-arg → `generalizing`; the rest
-   mechanical), then a parallel sweep — same shape as this project. Then STEP 6
-   (explore whether function defs need pattern-match at all).
+**Done this session:**
+1. **POLISHED the STEP-2/3 migrations** (commit `c277b3ad`): all 21
+   migration-introduced redundancy findings + 3 `absurd(impossible)`→`False; done`
+   reductio warts, scoped to migration-touched lines in the clean manifest.
+2. **STEP 5 — the "weird proofs" CONVERTED** (spike `367c7066`, sweep
+   `2e7253e8`, polish `178ae777`): of 106 pattern-match THEOREM proofs, **89
+   converted** to `by induction`/`by cases`/`let ⟨⟩`/`choose` (5-agent parallel
+   sweep on disjoint file areas + 51-finding redundancy polish). Recipe:
+   /tmp scratch STEP5_RECIPE.md; exemplars are the 5 spike conversions.
+   - ∀-data + recursion → `by induction on x with IH` (move ∀ to a parameter,
+     type-identical); recursion self-call → `IH` / `IH(<derived premise>)`.
+   - single-ctor rep/struct/And → `{ let ⟨…⟩ := v; body }` (wrap body in braces).
+   - non-recursive Natural/Or → `done by cases`, reductio arm `<false>; False; done`.
+     Exists → `choose`.
+   - **17 RESIDUE left as pattern-match** — INDEXED Prop inductives whose motive
+     `by induction` cannot build (confirmed by a failing `map_member` spike +
+     the permutation.math:120 code note "until `by induction` learns to drive a
+     derivation"): `List.member` (4), `List.Permutation` (5), `List.Distinct`
+     (2), `NaturalList.member` (3), `Equality/reflexivity` (3). These need an
+     elaborator extension (indexed-family induction) or stay as-is.
 
-**Parallel-agent lesson:** the shared working tree + agents running `git
-stash`/`reset` clobbered in-progress work twice. Next time, tell agents
-NEVER to run any `git` command; the orchestrator commits checkpoints.
+**Next session:**
+- **STEP 6** (explore) — do the pattern-match FUNCTION definitions need to stay?
+  (~112 of them; owner not chasing computability, so closed-form / opaque+axioms
+  are options where they read better.)
+- **Optional** — the 17 indexed-Prop residue if/when `by induction` learns
+  indexed families; and a broader pre-existing redundant-`by`/unused-name
+  cleanup across the clean manifest (in progress / TBD this session).
+
+**Parallel-agent lesson (reconfirmed):** shared working tree — agents must
+NEVER run any `git` command (clobbered work twice in a prior session). This
+session's model: agents EDIT disjoint file sets only (no `make`, no `git`); the
+orchestrator verifies centrally (`make library`) and commits. Worked cleanly:
+89 conversions, zero build errors on first central build.
 
 ## Status ledger (update every session)
 
@@ -142,6 +155,9 @@ NEVER to run any `git` command; the orchestrator commits checkpoints.
   `cases` on coverage lemmas → `by induction`, not `by cases`.
 
 ## STEP 5 — the "weird proofs": pattern-match THEOREM proofs → by induction/by cases
+
+**[x] DONE 2026-07-12b — 89/106 converted; 17 indexed-Prop residue (see SESSION
+HANDOFF above for the recipe, commits, and residue list).**
 
 Owner directive (2026-07-12): the same north-star extends to the ~113
 pattern-match *theorem* proofs (`theorem T : (x:A) → P | Ctor(x) => proof`) — a
