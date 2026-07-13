@@ -90,7 +90,35 @@ This plan removes those too, then deletes the keyword.
     (nth: cons-at-0), make the other (nil-at-symbolic) a char lemma + cite it.
 - [ ] **STEP 4 — Remove the `cases` keyword** from parser + elaborator surface;
   keep the recursor engine for desugarings. Add an ErrorTest that a bare
-  `cases` keyword is now unknown syntax.
+  `cases` keyword is now unknown syntax. **Sole surface entry: parser.cpp:3697
+  (`if KeywordCases → parseCasesExpression()`) — flip to `throw ParseError`.
+  `by cases` (parser.cpp:4232), `by_representatives`, if/decide/choose/tuple-let
+  all reach `makeSurfaceCases` by other paths and keep working.**
+  CAVEAT (found in STEP 3): the auto-generated coverage lemmas
+  (`Natural.zero_or_successor` etc.) that `by cases` DESUGARS to cannot use
+  `by cases` themselves (circular) — prove them with **`by induction`** (rides
+  the raw recursor directly, no coverage dependency). So the residual proof-level
+  `cases` on coverage lemmas → `by induction`, not `by cases`.
+
+## STEP 5 — the "weird proofs": pattern-match THEOREM proofs → by induction/by cases
+
+Owner directive (2026-07-12): the same north-star extends to the ~113
+pattern-match *theorem* proofs (`theorem T : (x:A) → P | Ctor(x) => proof`) — a
+proof written as raw recursor rows instead of `by induction on x`. These are the
+"weird proofs"; get rid of them. Guided by [[no_computation_needed]]: proofs are
+Prop-valued, so `by induction` (with `generalizing` for multi-arg) / `by cases`
+is complete — every one converts, a handful of non-standard-recursion ones may
+need `generalizing`/a helper. Method mirrors this plan: STEP-5 spike (size the
+awkward-recursion residue) → parallel sweep. Keep pattern-match *function*
+definitions for now.
+
+## STEP 6 (explore) — do the pattern-match FUNCTION definitions need to stay?
+
+Owner is NOT interested in computability/constructivity ([[no_computation_needed]]).
+So a function need not be defined by structural recursion — it can be a closed
+form, a classical choice, or opaque + characterising axioms. STEP 6 explores
+converting the remaining pattern-match function definitions to non-recursive /
+specification forms where that reads as well or better. Exploratory, after 5.
 
 ## The data (measured 2026-07-12, library proper, excludes Test/ErrorTest)
 
