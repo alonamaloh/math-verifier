@@ -1,0 +1,59 @@
+-- Logic/well_founded.math
+--
+-- Accessibility and well-founded recursion, order-agnostic: for ANY relation
+-- `r : A → A → Proposition`, a value is accessible when every r-predecessor is,
+-- and `WellFounded.recursion` recurses along that accessibility. Naturals with
+-- `<` are one instance (see Natural.well_founded); an ordinal with its order
+-- would be another — the same recursion. `Accessible` lives in `Type` so its
+-- recursor eliminates into `Type` (defining data functions); we do not need
+-- proof irrelevance for it. `Accessible` has a HIGHER-ORDER recursive field
+-- (the recursive occurrence sits under `(predecessor : A) → r(…) →`), so this
+-- module is what exercises the kernel's higher-order recursor machinery.
+
+module Logic.well_founded
+
+import Logic.basics
+
+-- `subject` is accessible under `r` when every `predecessor` with
+-- `r(predecessor, subject)` is itself accessible.
+inductive Accessible.{u} (A : Type(u)) (r : A → A → Proposition) : A → Type(u) where
+  | Accessible.introduce
+      : (subject : A)
+        → ((predecessor : A) → r(predecessor, subject) → Accessible(A, r, predecessor))
+        → Accessible(A, r, subject)
+
+-- A relation is well-founded when every element is accessible.
+definition WellFounded.{u} (A : Type(u)) (r : A → A → Proposition) : Type(u) :=
+  (subject : A) → Accessible(A, r, subject)
+
+-- Well-founded recursion from an accessibility proof: to define `C(subject)`
+-- you may use `C(predecessor)` for every r-predecessor. The kernel recursor
+-- hands `step` the recursion for every predecessor directly.
+definition WellFounded.recursionFromAccessible.{u, w}
+        (A : Type(u)) (r : A → A → Proposition) (C : A → Type(w))
+        (step : (subject : A)
+                → ((predecessor : A) → r(predecessor, subject) → C(predecessor))
+                → C(subject))
+        (subject : A) (accessibility : Accessible(A, r, subject))
+        : C(subject) :=
+  Accessible_recursor(
+    A, r,
+    (element : A) (_ : Accessible(A, r, element)) ↦ C(element),
+    (element : A)
+        (below : (predecessor : A) → r(predecessor, element)
+                 → Accessible(A, r, predecessor))
+        (belowRecursion : (predecessor : A) → r(predecessor, element)
+                          → C(predecessor)) ↦
+      step(element, belowRecursion),
+    subject, accessibility)
+
+-- The public entry point: given well-foundedness, recurse at any `subject`.
+definition WellFounded.recursion.{u, w}
+        (A : Type(u)) (r : A → A → Proposition) (C : A → Type(w))
+        (wellFounded : WellFounded(A, r))
+        (step : (subject : A)
+                → ((predecessor : A) → r(predecessor, subject) → C(predecessor))
+                → C(subject))
+        (subject : A)
+        : C(subject) :=
+  WellFounded.recursionFromAccessible(A, r, C, step, subject, wellFounded(subject))

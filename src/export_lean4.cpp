@@ -626,10 +626,16 @@ private:
         int numFields = 0;
         // Per field: the field's domain (in the scope of params +
         // earlier fields) and, when recursive, the index arguments of
-        // the recursive occurrence (same scope).
+        // the recursive occurrence (same scope). For a HIGHER-ORDER
+        // recursive field the recursive occurrence sits under a Pi
+        // telescope; `fieldRecursiveTelescope` holds those domains (in the
+        // scope of params + earlier fields + earlier telescope binders) and
+        // the indices then live in that extended scope. Empty for a direct
+        // recursive field.
         std::vector<ExpressionPointer> fieldDomains;
         std::vector<bool> fieldIsRecursive;
         std::vector<std::vector<ExpressionPointer>> fieldRecursiveIndices;
+        std::vector<std::vector<ExpressionPointer>> fieldRecursiveTelescope;
         std::vector<std::string> fieldHints;
     };
 
@@ -658,8 +664,17 @@ private:
         while (auto* pi = std::get_if<Pi>(&walker->node)) {
             analysis.fieldDomains.push_back(pi->domain);
             analysis.fieldHints.push_back(pi->displayHint);
+            // Peel any leading Pi telescope — for a higher-order recursive
+            // field the recursive occurrence is under binders — then peel the
+            // base's Application chain to detect the recursive occurrence.
+            std::vector<ExpressionPointer> telescope;
+            auto fieldBase = pi->domain;
+            while (auto* telePi = std::get_if<Pi>(&fieldBase->node)) {
+                telescope.push_back(telePi->domain);
+                fieldBase = telePi->codomain;
+            }
             std::vector<ExpressionPointer> args;
-            auto head = peelApplications(pi->domain, args);
+            auto head = peelApplications(fieldBase, args);
             bool recursive = false;
             std::vector<ExpressionPointer> recursiveIndices;
             if (auto* constant = std::get_if<Constant>(&head->node);
@@ -670,23 +685,25 @@ private:
                     recursiveIndices.push_back(args[i]);
                 }
             } else {
-                // A nested/reflexive occurrence (the inductive under a
-                // Pi or deeper in the field type) would need recursor
-                // machinery we do not generate — fail loudly rather
-                // than emit a mismatching group.
+                telescope.clear();
+                // A genuinely nested occurrence (the inductive appears in the
+                // field type but NOT as the base of a higher-order recursive
+                // field — e.g. `List(T)`) would need machinery we do not
+                // generate — fail loudly rather than emit a mismatching group.
                 std::set<std::string> mentioned;
                 collectConstantNames(pi->domain, mentioned);
                 if (mentioned.count(inductiveName)) {
                     throw ExportError(
                         "constructor '" + constructorName
                         + "' mentions '" + inductiveName
-                        + "' in a non-direct position (reflexive/nested "
-                          "inductives are unsupported)");
+                        + "' in a non-direct position (nested inductives are "
+                          "unsupported)");
                 }
             }
             analysis.fieldIsRecursive.push_back(recursive);
             analysis.fieldRecursiveIndices.push_back(
                 std::move(recursiveIndices));
+            analysis.fieldRecursiveTelescope.push_back(std::move(telescope));
             walker = pi->codomain;
         }
         analysis.numFields = (int)analysis.fieldDomains.size();
@@ -735,28 +752,47 @@ private:
         }
         for (int i = 0; i < F; ++i) {
             if (!analysis.fieldIsRecursive[i]) continue;
+            // Higher-order field: the recursive call is wrapped in `λ telescope`
+            // with the field applied to the telescope binders (a direct field
+            // is the empty telescope — this collapses to the plain call).
+            int telescopeSize = (int)analysis.fieldRecursiveTelescope[i].size();
             ExpressionPointer call =
                 makeConstant(recursorName, recursorLevels);
             for (int p = 0; p < P; ++p) {
                 call = makeApplication(
-                    call, makeBoundVariable(F + C + 1 + (P - 1 - p)));
+                    call,
+                    makeBoundVariable(F + C + 1 + (P - 1 - p) + telescopeSize));
             }
-            call = makeApplication(call, makeBoundVariable(F + C));
+            call = makeApplication(call,
+                                   makeBoundVariable(F + C + telescopeSize));
             for (int j = 0; j < C; ++j) {
-                call = makeApplication(call,
-                                       makeBoundVariable(F + (C - 1 - j)));
+                call = makeApplication(
+                    call, makeBoundVariable(F + (C - 1 - j) + telescopeSize));
             }
             for (const auto& indexArgument :
                  analysis.fieldRecursiveIndices[i]) {
-                // The argument lives in scope [params, fields<i]; in the
-                // body's scope the params sit past the motive+minors and
-                // the earlier fields past the later ones.
+                // The argument lives in scope [params, fields<i, telescope]; in
+                // the body's scope the params sit past the motive+minors and the
+                // earlier fields past the later ones, all under the telescope.
                 ExpressionPointer rebased =
-                    shift(indexArgument, C + 1, /*cutoff=*/i);
-                rebased = shift(rebased, F - i, /*cutoff=*/0);
+                    shift(indexArgument, C + 1, /*cutoff=*/telescopeSize + i);
+                rebased = shift(rebased, F - i, /*cutoff=*/telescopeSize);
                 call = makeApplication(call, rebased);
             }
-            call = makeApplication(call, makeBoundVariable(F - 1 - i));
+            // Recursion target: the field applied to its telescope binders.
+            ExpressionPointer target =
+                makeBoundVariable(F - 1 - i + telescopeSize);
+            for (int b = telescopeSize - 1; b >= 0; --b) {
+                target = makeApplication(target, makeBoundVariable(b));
+            }
+            call = makeApplication(call, target);
+            for (int t = telescopeSize - 1; t >= 0; --t) {
+                ExpressionPointer domain =
+                    analysis.fieldRecursiveTelescope[i][t];
+                domain = shift(domain, C + 1, /*cutoff=*/t + i);
+                domain = shift(domain, F - i, /*cutoff=*/t);
+                call = makeLambda("recursivePredecessor", domain, call);
+            }
             body = makeApplication(body, call);
         }
 
