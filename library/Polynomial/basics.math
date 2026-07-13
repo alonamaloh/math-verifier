@@ -23,6 +23,7 @@ import Equality.basics
 import Natural.basics
 import Natural.peano
 import Natural.arithmetic
+import Natural.one_plus_induction
 
 -- Finite coefficient list, low degree first.
 inductive Polynomial.Coefficients (R : Type(0)) : Type(0) where
@@ -30,27 +31,71 @@ inductive Polynomial.Coefficients (R : Type(0)) : Type(0) where
   | Polynomial.Coefficients.cons
       : R → Polynomial.Coefficients(R) → Polynomial.Coefficients(R)
 
--- The coefficient at a given index, reading past the end of the list
--- as the zero coefficient. Recurses on the list; the index is split
--- inside the cons case.
+-- The head coefficient (zero past the end of the list) and the tail.
+definition Polynomial.Coefficients.head (R : Type(0)) (zeroCoefficient : R)
+        : Polynomial.Coefficients(R) → R
+  | Polynomial.Coefficients.nil        => zeroCoefficient
+  | Polynomial.Coefficients.cons(c, _) => c
+
+definition Polynomial.Coefficients.tail (R : Type(0))
+        : Polynomial.Coefficients(R) → Polynomial.Coefficients(R)
+  | Polynomial.Coefficients.nil           => Polynomial.Coefficients.nil(R)
+  | Polynomial.Coefficients.cons(_, rest) => rest
+
+-- The coefficient at a given index, reading past the end of the list as
+-- the zero coefficient. Recurses on the INDEX: entry 0 is the head, and
+-- entry 1 + p of a list is entry p of its tail. Because the index drives
+-- the recursion, `nth(cons(c, rest), 0)` reduces to `c` (head of a cons)
+-- definitionally — the reduction low-degree coefficient proofs rely on.
+definition Polynomial.nthFromIndex (R : Type(0)) (zeroCoefficient : R)
+        : Natural → Polynomial.Coefficients(R) → R
+  | 0,     coeffs => Polynomial.Coefficients.head(R, zeroCoefficient, coeffs)
+  | 1 + p, coeffs =>
+      Polynomial.nthFromIndex(R, zeroCoefficient, p, Polynomial.Coefficients.tail(R, coeffs))
+
 definition Polynomial.nth (R : Type(0)) (zeroCoefficient : R)
-        : Polynomial.Coefficients(R) → Natural → R
-  | Polynomial.Coefficients.nil,           index => zeroCoefficient
-  | Polynomial.Coefficients.cons(c, rest), index =>
-      cases index {
-        | 0     => c
-        | 1 + predecessor =>
-            Polynomial.nth(R, zeroCoefficient, rest, predecessor)
-      }
+        (coeffs : Polynomial.Coefficients(R)) (index : Natural) : R :=
+  Polynomial.nthFromIndex(R, zeroCoefficient, index, coeffs)
+
+-- Past the end: every entry of the empty list is the zero coefficient.
+-- (Recursing on the index, the tail of nil stays nil at each step.)
+theorem Polynomial.nth_nil (R : Type(0)) (zeroCoefficient : R) (index : Natural)
+        : Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.nil(R), index)
+            = zeroCoefficient :=
+  by induction on index with IH {
+    case base: done
+    case step(p):
+        Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.nil(R), 1 + p)
+           = Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.nil(R), p)
+                 by substituting Natural.one_add
+           = zeroCoefficient by IH
+  }
+
+-- Reading the head: the 0-th entry of cons(c, rest) is c.
+theorem Polynomial.nth_cons_zero (R : Type(0)) (zeroCoefficient : R)
+        (c : R) (rest : Polynomial.Coefficients(R))
+        : Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.cons(R, c, rest), 0) = c :=
+  done
+
+-- The (1 + j)-th entry of any list is the j-th entry of its tail
+-- (`Natural.add` is opaque, so `1 + j` is not definitionally the
+-- constructor; bridge via `one_add`).
+theorem Polynomial.nth_one_plus (R : Type(0)) (zeroCoefficient : R)
+        (coeffs : Polynomial.Coefficients(R)) (j : Natural)
+        : Polynomial.nth(R, zeroCoefficient, coeffs, 1 + j)
+          = Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.tail(R, coeffs), j) :=
+  done by substituting Natural.one_add
 
 -- Reading past the head: the (1 + j)-th entry of cons(c, rest) is the
--- j-th entry of rest (`Natural.add` is opaque, so `1 + j` is not
--- definitionally the constructor; bridge via `one_add`).
+-- j-th entry of rest — the tail of a cons.
 theorem Polynomial.nth_cons_one_plus (R : Type(0)) (zeroCoefficient : R)
         (c : R) (rest : Polynomial.Coefficients(R)) (j : Natural)
         : Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.cons(R, c, rest), 1 + j)
           = Polynomial.nth(R, zeroCoefficient, rest, j) :=
-  done by substituting Natural.one_add
+  Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.cons(R, c, rest), 1 + j)
+     = Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.tail(R, Polynomial.Coefficients.cons(R, c, rest)), j)
+           by Polynomial.nth_one_plus
+     = Polynomial.nth(R, zeroCoefficient, rest, j)
 
 -- Two coefficient lists represent the same polynomial when they agree
 -- at every index (trailing zeros become invisible).

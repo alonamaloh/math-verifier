@@ -29,57 +29,73 @@ definition Polynomial.coefficient {r : Ring}
   Polynomial.nth(Ring.carrier(r), Ring.zero(r), p, index)
 
 -- Position-wise addition of coefficient lists. Recurses on the first
--- list; the second is split inside the cons case so a shorter list's
--- tail carries through unchanged.
+-- list, pairing its head with the head of the second and its tail with
+-- the tail; where the second runs out, `head` reads 0 and `tail` stays
+-- nil, so the first list's remaining coefficients carry through.
 definition Polynomial.Coefficients.add (r : Ring)
         : Polynomial.Coefficients(Ring.carrier(r))
           → Polynomial.Coefficients(Ring.carrier(r))
           → Polynomial.Coefficients(Ring.carrier(r))
   | Polynomial.Coefficients.nil, ys => ys
   | Polynomial.Coefficients.cons(a, restA), ys =>
-      cases ys {
-        | Polynomial.Coefficients.nil =>
-            Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)
-        | Polynomial.Coefficients.cons(b, restB) =>
-            Polynomial.Coefficients.cons(Ring.carrier(r),
-                (a + b),
-                Polynomial.Coefficients.add(r, restA, restB))
-      }
+      Polynomial.Coefficients.cons(Ring.carrier(r),
+          (a + Polynomial.Coefficients.head(Ring.carrier(r), Ring.zero(r), ys)),
+          Polynomial.Coefficients.add(r, restA,
+              Polynomial.Coefficients.tail(Ring.carrier(r), ys)))
+
+-- Right identity: adding the empty list changes nothing. At a cons the
+-- head reads 0 (absorbed by `Ring.add_zero`) and the tail recursion peels
+-- the list; `add(nil, ys) = ys` is the left identity, definitional.
+theorem Polynomial.Coefficients.add_nil_right (r : Ring)
+        : (p : Polynomial.Coefficients(Ring.carrier(r)))
+          → Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.nil(Ring.carrier(r))) = p
+  | Polynomial.Coefficients.nil =>
+      reflexivity(Polynomial.Coefficients(Ring.carrier(r)), Polynomial.Coefficients.nil(Ring.carrier(r)))
+  | Polynomial.Coefficients.cons(a, restA) =>
+      Polynomial.Coefficients.cons(Ring.carrier(r), (a + Ring.zero(r)),
+            Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))
+         = Polynomial.Coefficients.cons(Ring.carrier(r), a,
+               Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))   by substituting Ring.add_zero
+         = Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)   by substitution
 
 -- Bridge: the i-th coefficient of p + q is the ring-sum of the i-th
 -- coefficients. Structural recursion on the first list, with q and the
 -- index universally quantified (the recursion calls itself at the tail
 -- with a different q and index, so they cannot be fixed parameters).
--- The two base cases are exactly where `Ring.zero_add` / `Ring.add_zero`
--- absorb the missing coefficient.
+-- At the nil list `nth_nil` supplies the absorbed zero coefficient; the
+-- index split reads the head (`nth_cons_zero`) or drops to the tails
+-- (`nth_cons_one_plus` / `nth_one_plus`), where the recursion applies.
 theorem Polynomial.nth_add (r : Ring)
         : (p q : Polynomial.Coefficients(Ring.carrier(r)))
           → ∀ (index : Natural).
           Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), index)
             = (Polynomial.coefficient(r, p, index) + Polynomial.coefficient(r, q, index))
-  | Polynomial.Coefficients.nil, q, index =>
-      -- p + q = q and coefficient(nil, i) = 0, so the claim is
-      -- coefficient(q, i) = 0 + coefficient(q, i).
-      Equality.symmetry(?, ?,
-          Ring.zero_add(r, Polynomial.coefficient(r, q, index)))
-  | Polynomial.Coefficients.cons(a, restA), q, index =>
-      cases q {
-        | Polynomial.Coefficients.nil =>
-            -- p + nil = p and coefficient(nil, i) = 0, so the claim is
-            -- coefficient(p, i) = coefficient(p, i) + 0.
-            Equality.symmetry(?, ?,
-                Ring.add_zero(r,
-                    Polynomial.coefficient(r,
-                        Polynomial.Coefficients.cons(Ring.carrier(r), a, restA),
-                        index)))
-        | Polynomial.Coefficients.cons(b, restB) =>
-            cases index {
-              | 0 =>
-                  reflexivity(Ring.carrier(r), (a + b))
-              | 1 + predecessor =>
-                  Polynomial.nth_add(r, restA, restB, predecessor)
-            }
+  | Polynomial.Coefficients.nil, q, index => {
+      Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index) = Ring.zero(r)
+          by Polynomial.nth_nil;
+      Polynomial.coefficient(r, Polynomial.Coefficients.add(r, Polynomial.Coefficients.nil(Ring.carrier(r)), q), index)
+         = Polynomial.coefficient(r, q, index)
+         = Ring.zero(r) + Polynomial.coefficient(r, q, index)
+         = Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index)
+             + Polynomial.coefficient(r, q, index)
+    }
+  | Polynomial.Coefficients.cons(a, restA), q, index => {
+      let tail : Polynomial.Coefficients(Ring.carrier(r)) := Polynomial.Coefficients.tail(Ring.carrier(r), q);
+      let cell : Polynomial.Coefficients(Ring.carrier(r)) := Polynomial.Coefficients.cons(Ring.carrier(r), a, restA);
+      done by cases {
+        case index = 0: done
+        case index = 1 + j for some j: {
+            Polynomial.coefficient(r, cell, 1 + j) = Polynomial.coefficient(r, restA, j)
+                by Polynomial.nth_cons_one_plus;
+            Polynomial.coefficient(r, q, 1 + j) = Polynomial.coefficient(r, tail, j)
+                by Polynomial.nth_one_plus;
+            Polynomial.coefficient(r, Polynomial.Coefficients.add(r, cell, q), 1 + j)
+               = Polynomial.coefficient(r, Polynomial.Coefficients.add(r, restA, tail), j)   by Polynomial.nth_cons_one_plus
+               = (Polynomial.coefficient(r, restA, j) + Polynomial.coefficient(r, tail, j))   by Polynomial.nth_add(r, restA, tail, j)
+               = (Polynomial.coefficient(r, cell, 1 + j) + Polynomial.coefficient(r, q, 1 + j))   by substitution
+          }
       }
+    }
 
 -- Coefficient-list addition respects the equivalence: equal-as-functions
 -- inputs give equal-as-functions outputs. Pointwise in the index via
