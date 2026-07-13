@@ -152,23 +152,31 @@ theorem IntegralDomain.prime_list_unit_product_empty (d : IntegralDomain)
     case l = List.empty(Ring.carrier(s)): reflexivity(List(Ring.carrier(s)),
                         List.empty(Ring.carrier(s)))
     case l = List.prepend(Ring.carrier(s), head, tail)
-             for some (head : Ring.carrier(s)), (tail : List(Ring.carrier(s))): {
+             for some (head : Ring.carrier(s)), (tail : List(Ring.carrier(s)))
+             as lEqualsPrepend: {
         -- head is prime (it is a member), and head divides the unit
         -- product, so head divides 1 — a unit — contradiction.
+        List.member(Ring.carrier(s), head,
+                List.prepend(Ring.carrier(s), head, tail))
+            by List.member.here(Ring.carrier(s), head, tail);
+        List.member(Ring.carrier(s), head, l)
+            by substituting lEqualsPrepend as headInList;
         IntegralDomain.IsPrimeElement(d, head)
-            by allPrime(head,
-                   List.member.here(Ring.carrier(s), head, tail))
+            by allPrime(head, headInList)
             as headIsPrime;
         let ⟨_, headNotUnit, _⟩ := headIsPrime;
         choose unitInverse such that
-            Ring.one(s) = IntegralDomain.listProduct(d,
-                              List.prepend(Ring.carrier(s), head, tail)) * unitInverse
+            Ring.one(s) = IntegralDomain.listProduct(d, l) * unitInverse
             from productIsUnit;
         -- 1 = head · (listProduct(tail) · unitInverse), so head is a unit —
         -- contradicting that a prime is not a unit.
         Ring.IsUnit(s, head)
             by witness IntegralDomain.listProduct(d, tail) * unitInverse with
                 Ring.one(s)
+                   = IntegralDomain.listProduct(d, l) * unitInverse
+                   = IntegralDomain.listProduct(d,
+                         List.prepend(Ring.carrier(s), head, tail)) * unitInverse
+                         by substituting lEqualsPrepend
                    = (head * IntegralDomain.listProduct(d, tail)) * unitInverse
                    = head * (IntegralDomain.listProduct(d, tail) * unitInverse)
             as headIsUnit;
