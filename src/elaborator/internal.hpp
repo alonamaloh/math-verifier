@@ -1287,13 +1287,32 @@ private:
     //   definition f : Natural → ... → R
     //     | 0, k => BASE
     //     | 1 + n, k => STEP[Natural.monus(n,1) ↦ n]
-    // so a recursive Natural function reads like a formula over named
-    // arguments. Returns true (rewriting `decl` in place to the pattern
-    // form) when the body matches this guarded shape; false otherwise (the
-    // plain `:=` body is elaborated as usual, and a genuine self-reference
-    // there still errors, as before).
-    bool tryDesugarGuardedNaturalRecursion(
+    // so a recursive function reads like a formula over named arguments. The
+    // general (non-Natural) shape guards on a discriminator and reaches
+    // sub-terms through field accessors:
+    //   definition List.length (A : Type) (l : List(A)) : Natural :=
+    //     if List.is_empty(A, l) then 0 else 1 + List.length(A, List.tail(A, l))
+    // desugaring to `| List.empty => 0 | List.prepend(head, tail) => 1 + …tail`.
+    // Returns true (rewriting `decl` in place to the pattern form) when the
+    // body matches a guarded shape; false otherwise (the plain `:=` body is
+    // elaborated as usual, and a genuine self-reference there still errors).
+    bool tryDesugarGuardedRecursion(
         SurfaceDefinitionDeclaration& decl);
+
+    // The step/base data recovered from a general discriminator guard
+    // `if <Prefix>.is_<baseCtor>(…, guardVar) then … else …`, for a
+    // two-constructor inductive whose base constructor is nullary.
+    struct GuardedRecursionShape {
+        std::string prefix;                     // accessor namespace, e.g. List
+        std::string baseCtorName;               // e.g. List.empty
+        std::string stepCtorName;               // e.g. List.prepend
+        std::vector<std::string> fieldNames;    // step fields, e.g. head, tail
+        SurfaceExpressionPointer baseValue;     // baseCtor applied to params
+        SurfaceExpressionPointer stepValue;     // stepCtor applied to params+fields
+    };
+    std::optional<GuardedRecursionShape> resolveGuardedShape(
+        const SurfaceExpressionPointer& guard, const std::string& guardVar,
+        int line, int column);
 
     SurfaceExpressionPointer rewriteRecursiveCalls(
         SurfaceExpressionPointer expression,

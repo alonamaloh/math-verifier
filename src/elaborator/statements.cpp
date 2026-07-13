@@ -1227,6 +1227,112 @@ SurfaceExpressionPointer rewriteMonusToPredecessor(
     return expr;
 }
 
+// Rewrite each sub-structure accessor `<prefix>.<field>(…, guardVar)` — the
+// generalisation of `monus(guardVar, 1)` to an arbitrary inductive's field
+// projections — to the bare field-binder name. `prefix` is the accessor
+// namespace (e.g. `List`), `fieldNames` the step constructor's field names
+// (e.g. head, tail), and the accessor only fires when its LAST argument is
+// the guard variable, so `List.tail(A, l)` on the scrutinee `l` becomes `tail`
+// while a `List.tail` applied to some other list is left untouched.
+SurfaceExpressionPointer rewriteAccessorsToFields(
+        SurfaceExpressionPointer expr, const std::string& prefix,
+        const std::vector<std::string>& fieldNames,
+        const std::string& guardVar) {
+    if (!expr) return expr;
+    int line = expr->line, column = expr->column;
+    const SurfaceExpression& node = *expr;
+    if (auto* application = std::get_if<SurfaceApplication>(&node.node)) {
+        if (auto* function = std::get_if<SurfaceIdentifier>(
+                &application->function->node);
+            function && !application->arguments.empty()) {
+            auto* lastArgument = std::get_if<SurfaceIdentifier>(
+                &application->arguments.back().value->node);
+            if (lastArgument && lastArgument->universeArgs.empty()
+                && lastArgument->qualifiedName == guardVar) {
+                for (const auto& field : fieldNames) {
+                    std::string accessorName =
+                        prefix.empty() ? field : prefix + "." + field;
+                    if (function->qualifiedName == accessorName) {
+                        return makeSurfaceIdentifier(field, {}, line, column);
+                    }
+                }
+            }
+        }
+        auto newFunction = rewriteAccessorsToFields(
+            application->function, prefix, fieldNames, guardVar);
+        std::vector<SurfaceArgument> newArguments;
+        for (const auto& argument : application->arguments) {
+            newArguments.push_back(
+                {argument.name, rewriteAccessorsToFields(
+                                    argument.value, prefix, fieldNames,
+                                    guardVar)});
+        }
+        return makeSurfaceApplication(std::move(newFunction),
+                                       std::move(newArguments), line, column);
+    }
+    if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
+        return makeSurfaceDecide(
+            rewriteAccessorsToFields(decide->proposition, prefix, fieldNames,
+                                     guardVar),
+            decide->yesBinderName,
+            rewriteAccessorsToFields(decide->yesBody, prefix, fieldNames,
+                                     guardVar),
+            decide->noBinderName,
+            rewriteAccessorsToFields(decide->noBody, prefix, fieldNames,
+                                     guardVar),
+            line, column);
+    }
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node.node)) {
+        return makeSurfaceBinaryOperation(
+            binary->opSymbol,
+            rewriteAccessorsToFields(binary->left, prefix, fieldNames, guardVar),
+            rewriteAccessorsToFields(binary->right, prefix, fieldNames,
+                                     guardVar),
+            line, column);
+    }
+    if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
+        return makeSurfaceUnaryOperation(
+            unary->opSymbol,
+            rewriteAccessorsToFields(unary->operand, prefix, fieldNames,
+                                     guardVar),
+            line, column);
+    }
+    if (auto* ascription = std::get_if<SurfaceAscription>(&node.node)) {
+        return makeSurfaceAscription(
+            rewriteAccessorsToFields(ascription->expression, prefix, fieldNames,
+                                     guardVar),
+            rewriteAccessorsToFields(ascription->type, prefix, fieldNames,
+                                     guardVar),
+            line, column);
+    }
+    return expr;
+}
+
+// The variable a guard splits on: `n` in `n = 0`, or the scrutinee `l` in a
+// discriminator application `List.is_empty(A, l)` (its last argument). Empty
+// if the guard is neither shape. Read from the guard so the recursion can be
+// on any parameter, not just the first (polymorphic functions lead with type
+// parameters that ride along).
+std::string guardVariableOfGuard(const SurfaceExpressionPointer& guard) {
+    if (!guard) return "";
+    if (auto* binary =
+            std::get_if<SurfaceBinaryOperation>(&guard->node);
+        binary && binary->opSymbol == "=") {
+        auto* left = std::get_if<SurfaceIdentifier>(&binary->left->node);
+        auto* right = std::get_if<SurfaceNumericLiteral>(&binary->right->node);
+        if (left && left->universeArgs.empty() && right
+            && right->digits == "0")
+            return left->qualifiedName;
+    }
+    if (auto* application = std::get_if<SurfaceApplication>(&guard->node);
+        application && !application->arguments.empty()) {
+        auto* last = std::get_if<SurfaceIdentifier>(
+            &application->arguments.back().value->node);
+        if (last && last->universeArgs.empty()) return last->qualifiedName;
+    }
+    return "";
+}
+
 // Does `expr` mention the identifier `name` anywhere (value-level nodes)?
 bool surfaceMentionsIdentifier(const SurfaceExpressionPointer& expr,
                                const std::string& name) {
@@ -1262,7 +1368,112 @@ bool surfaceMentionsIdentifier(const SurfaceExpressionPointer& expr,
 
 }  // namespace
 
-bool Elaborator::tryDesugarGuardedNaturalRecursion(
+std::optional<Elaborator::GuardedRecursionShape>
+Elaborator::resolveGuardedShape(
+        const SurfaceExpressionPointer& guard, const std::string& guardVar,
+        int line, int column) {
+    // The guard is a discriminator application `<Disc>(paramArgs…, guardVar)`.
+    auto* application = std::get_if<SurfaceApplication>(&guard->node);
+    if (!application || application->arguments.empty()) return std::nullopt;
+    auto* discriminator =
+        std::get_if<SurfaceIdentifier>(&application->function->node);
+    if (!discriminator) return std::nullopt;
+    auto* lastArgument = std::get_if<SurfaceIdentifier>(
+        &application->arguments.back().value->node);
+    if (!lastArgument || !lastArgument->universeArgs.empty()
+        || lastArgument->qualifiedName != guardVar)
+        return std::nullopt;
+    // Parameter arguments are everything before the scrutinee; the base and
+    // step constructor values are re-applied to them.
+    std::vector<SurfaceExpressionPointer> paramArgs;
+    for (size_t i = 0; i + 1 < application->arguments.size(); ++i)
+        paramArgs.push_back(application->arguments[i].value);
+
+    // The discriminator names the base constructor by the convention
+    // `<Prefix>.is_<baseCtorSuffix>` ↦ `<Prefix>.<baseCtorSuffix>`.
+    const std::string& discriminatorName = discriminator->qualifiedName;
+    std::string::size_type dot = discriminatorName.rfind('.');
+    std::string prefix =
+        (dot == std::string::npos) ? "" : discriminatorName.substr(0, dot);
+    std::string lastSegment = (dot == std::string::npos)
+        ? discriminatorName : discriminatorName.substr(dot + 1);
+    if (lastSegment.rfind("is_", 0) != 0) return std::nullopt;
+    std::string baseCtorSuffix = lastSegment.substr(3);
+    if (baseCtorSuffix.empty()) return std::nullopt;
+    std::string baseCtorName =
+        prefix.empty() ? baseCtorSuffix : prefix + "." + baseCtorSuffix;
+
+    const Declaration* baseDeclaration = environment_.lookup(baseCtorName);
+    auto* baseConstructor =
+        baseDeclaration ? std::get_if<Constructor>(baseDeclaration) : nullptr;
+    if (!baseConstructor) return std::nullopt;
+    const std::string& inductiveName = baseConstructor->inductiveName;
+    const Declaration* inductiveDeclaration =
+        environment_.lookup(inductiveName);
+    auto* inductive = inductiveDeclaration
+        ? std::get_if<Inductive>(inductiveDeclaration) : nullptr;
+    // Prototype scope: a two-constructor inductive whose base constructor is
+    // nullary (its type is exactly the parameter Pis, no fields).
+    if (!inductive || inductive->constructorNames.size() != 2)
+        return std::nullopt;
+    {
+        int leadingPis = 0;
+        ExpressionPointer cursor = baseConstructor->type;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            ++leadingPis;
+            cursor = pi->codomain;
+        }
+        if (leadingPis != inductive->numParameters) return std::nullopt;
+    }
+    std::string stepCtorName =
+        (inductive->constructorNames[0] == baseCtorName)
+            ? inductive->constructorNames[1]
+            : inductive->constructorNames[0];
+    if (stepCtorName == baseCtorName) return std::nullopt;
+    const Declaration* stepDeclaration = environment_.lookup(stepCtorName);
+    auto* stepConstructor =
+        stepDeclaration ? std::get_if<Constructor>(stepDeclaration) : nullptr;
+    if (!stepConstructor) return std::nullopt;
+
+    // The step constructor's field names are the binder display-hints past the
+    // parameter Pis; the accessor convention is `<Prefix>.<field>`.
+    std::vector<std::string> fieldNames;
+    {
+        ExpressionPointer cursor = stepConstructor->type;
+        for (int p = 0; p < inductive->numParameters; ++p) {
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) return std::nullopt;
+            cursor = pi->codomain;
+        }
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            if (pi->displayHint.empty() || pi->displayHint == "_")
+                return std::nullopt;
+            fieldNames.push_back(pi->displayHint);
+            cursor = pi->codomain;
+        }
+    }
+    if (fieldNames.empty()) return std::nullopt;
+
+    GuardedRecursionShape shape;
+    shape.prefix = prefix;
+    shape.baseCtorName = baseCtorName;
+    shape.stepCtorName = stepCtorName;
+    shape.fieldNames = fieldNames;
+    shape.baseValue = paramArgs.empty()
+        ? makeSurfaceIdentifier(baseCtorName, {}, line, column)
+        : makeSurfaceApplication(
+              makeSurfaceIdentifier(baseCtorName, {}, line, column),
+              paramArgs, line, column);
+    std::vector<SurfaceExpressionPointer> stepArguments = paramArgs;
+    for (const auto& field : fieldNames)
+        stepArguments.push_back(makeSurfaceIdentifier(field, {}, line, column));
+    shape.stepValue = makeSurfaceApplication(
+        makeSurfaceIdentifier(stepCtorName, {}, line, column),
+        std::move(stepArguments), line, column);
+    return shape;
+}
+
+bool Elaborator::tryDesugarGuardedRecursion(
         SurfaceDefinitionDeclaration& decl) {
     if (!decl.body || !decl.cases.empty() || decl.arguments.empty()
         || decl.isTheorem)
@@ -1277,84 +1488,139 @@ bool Elaborator::tryDesugarGuardedNaturalRecursion(
             params.push_back({name, binder.type});
     }
     if (params.empty()) return false;
-    const std::string guardVar = params[0].name;
     // Only self-recursive bodies need the transformation; a plain non-recursive
     // `:=` body elaborates fine as it stands.
     if (!surfaceMentionsIdentifier(decl.body, decl.name)) return false;
-    // Body must be `if guardVar = 0 then BASE else STEP`.
+    // Body must be `if <guard> then BASE else STEP`.
     auto* topDecide = std::get_if<SurfaceDecide>(&decl.body->node);
     if (!topDecide) return false;
-    auto* condition =
-        std::get_if<SurfaceBinaryOperation>(&topDecide->proposition->node);
-    if (!condition || condition->opSymbol != "=") return false;
-    auto* conditionLeft =
-        std::get_if<SurfaceIdentifier>(&condition->left->node);
-    auto* conditionRight =
-        std::get_if<SurfaceNumericLiteral>(&condition->right->node);
-    if (!conditionLeft || conditionLeft->qualifiedName != guardVar
-        || !conditionRight || conditionRight->digits != "0")
-        return false;
     int line = decl.body->line, column = decl.body->column;
-    // Base arm (guardVar = 0): substitute guardVar := 0 (the pattern binds
-    // nothing there).
-    SurfaceExpressionPointer base = substituteSurfaceIdentifier(
-        topDecide->yesBody, guardVar,
-        makeSurfaceNumericLiteral("0", line, column));
-    // Step arm (guardVar = 1 + predecessor). The `| 1 + n =>` pattern binds
-    // the predecessor to guardVar's own name (matching the reading). Rewrite
-    // the body over a fresh placeholder so the two substitutions don't
-    // interfere, then rename it back:
-    //   1. Natural.monus(guardVar, 1)  ↦  <predecessor>      (the recursion index)
-    //   2. any remaining bare guardVar ↦  1 + <predecessor>  (the full value)
-    // A self-call that isn't on the predecessor makes the pattern-match form
-    // ill-typed, which the kernel rejects — so no separate termination check.
-    const std::string placeholder = "__namedRecursionPredecessor__";
-    SurfaceExpressionPointer step =
-        rewriteMonusToPredecessor(topDecide->noBody, guardVar, placeholder);
-    step = substituteSurfaceIdentifier(
-        step, guardVar,
-        makeSurfaceBinaryOperation(
-            "+", makeSurfaceNumericLiteral("1", line, column),
-            makeSurfaceIdentifier(placeholder, {}, line, column),
-            line, column));
-    step = substituteSurfaceIdentifier(
-        step, placeholder,
-        makeSurfaceIdentifier(guardVar, {}, line, column));
-    // Rebuild the declared type as an arrow chain T0 → T1 → … → returnType.
-    SurfaceExpressionPointer arrowType = decl.type;
-    for (auto it = params.rbegin(); it != params.rend(); ++it) {
-        arrowType = makeSurfacePiType(
-            SurfaceBinder{{"_"}, it->type, false}, std::move(arrowType),
-            line, column);
+    // The guard variable — the parameter the recursion splits on — is read
+    // from the guard itself, NOT assumed to be the first parameter, so a
+    // polymorphic `List.length (A : Type) (l : List(A))` recurses on `l` while
+    // the type parameter `A` rides along as a bare-name column.
+    std::string guardVar = guardVariableOfGuard(topDecide->proposition);
+    if (guardVar.empty()) return false;
+    size_t guardIndex = params.size();
+    for (size_t i = 0; i < params.size(); ++i)
+        if (params[i].name == guardVar) { guardIndex = i; break; }
+    if (guardIndex == params.size()) return false;
+
+    // Two guard shapes desugar to a base + step pattern-match clause. Each
+    // path fills in the first pattern and rewritten body of both clauses; the
+    // clause-assembly below is shared. A self-call that isn't on a structural
+    // sub-term makes the pattern-match form ill-typed, which the kernel
+    // rejects — so no separate termination check is needed.
+    SurfacePatternPointer baseFirstPattern, stepFirstPattern;
+    SurfaceExpressionPointer baseBody, stepBody;
+
+    // Shape 1 — Natural: `if guardVar = 0 then BASE else STEP`, recursion on
+    // `Natural.monus(guardVar, 1)`. The step pattern binds the predecessor to
+    // guardVar's own name (matching the reading); the body rewrites
+    // `monus(guardVar,1)` to that predecessor and any bare guardVar to
+    // `1 + predecessor`, staged through a placeholder so the two don't
+    // interfere.
+    auto* naturalCondition =
+        std::get_if<SurfaceBinaryOperation>(&topDecide->proposition->node);
+    bool isNaturalZeroGuard = false;
+    if (naturalCondition && naturalCondition->opSymbol == "=") {
+        auto* left =
+            std::get_if<SurfaceIdentifier>(&naturalCondition->left->node);
+        auto* right =
+            std::get_if<SurfaceNumericLiteral>(&naturalCondition->right->node);
+        isNaturalZeroGuard = left && left->qualifiedName == guardVar
+            && right && right->digits == "0";
     }
-    auto clausePatterns = [&](SurfacePatternPointer firstPattern) {
+    if (isNaturalZeroGuard) {
+        baseBody = substituteSurfaceIdentifier(
+            topDecide->yesBody, guardVar,
+            makeSurfaceNumericLiteral("0", line, column));
+        const std::string placeholder = "__namedRecursionPredecessor__";
+        SurfaceExpressionPointer step =
+            rewriteMonusToPredecessor(topDecide->noBody, guardVar, placeholder);
+        step = substituteSurfaceIdentifier(
+            step, guardVar,
+            makeSurfaceBinaryOperation(
+                "+", makeSurfaceNumericLiteral("1", line, column),
+                makeSurfaceIdentifier(placeholder, {}, line, column),
+                line, column));
+        stepBody = substituteSurfaceIdentifier(
+            step, placeholder,
+            makeSurfaceIdentifier(guardVar, {}, line, column));
+        baseFirstPattern = makeSurfacePatternBareName("zero", line, column);
+        std::vector<SurfacePatternPointer> successorInner;
+        successorInner.push_back(
+            makeSurfacePatternBareName(guardVar, line, column));
+        stepFirstPattern = makeSurfacePatternConstructor(
+            "successor", std::move(successorInner), line, column);
+    } else if (auto shape = resolveGuardedShape(
+                   topDecide->proposition, guardVar, line, column)) {
+        // Shape 2 — a general two-constructor inductive: `if D(…, guardVar)`
+        // where `D` is the discriminator `<Prefix>.is_<baseCtor>` and the STEP
+        // branch reaches sub-terms through the field accessors
+        // `<Prefix>.<field>(…, guardVar)` (e.g. `List.tail(A, l)`). The base
+        // arm binds nothing (the base constructor is nullary); the step arm
+        // binds the step constructor's fields, rewrites each accessor to its
+        // field, and any bare guardVar to the reconstructed constructor value.
+        baseBody = substituteSurfaceIdentifier(
+            topDecide->yesBody, guardVar, shape->baseValue);
+        SurfaceExpressionPointer step = rewriteAccessorsToFields(
+            topDecide->noBody, shape->prefix, shape->fieldNames, guardVar);
+        stepBody =
+            substituteSurfaceIdentifier(step, guardVar, shape->stepValue);
+        baseFirstPattern =
+            makeSurfacePatternBareName(shape->baseCtorName, line, column);
+        std::vector<SurfacePatternPointer> stepFieldPatterns;
+        for (const auto& field : shape->fieldNames)
+            stepFieldPatterns.push_back(
+                makeSurfacePatternBareName(field, line, column));
+        stepFirstPattern = makeSurfacePatternConstructor(
+            shape->stepCtorName, std::move(stepFieldPatterns), line, column);
+    } else {
+        return false;
+    }
+
+    // Parameters BEFORE the guard stay as definition parameters (a leading
+    // type parameter `A` that later columns depend on remains in scope by
+    // name, and the first matched column is the guard — an inductive — not a
+    // non-inductive like `Type`). The guard parameter and any AFTER it become
+    // the matched columns, guard column first. (Threaded arguments, like `k`
+    // in binomial, sit after the guard; a prototype limitation is that a
+    // varying accumulator declared BEFORE the guard would be pinned.)
+    std::vector<SurfaceBinder> keptArguments;
+    for (size_t i = 0; i < guardIndex; ++i)
+        keptArguments.push_back(
+            SurfaceBinder{{params[i].name}, params[i].type, false});
+    // Arrow chain over the columns (guardIndex … end) → returnType, keeping
+    // names so a later column's type can depend on an earlier one.
+    SurfaceExpressionPointer arrowType = decl.type;
+    for (size_t i = params.size(); i-- > guardIndex; )
+        arrowType = makeSurfacePiType(
+            SurfaceBinder{{params[i].name}, params[i].type, false},
+            std::move(arrowType), line, column);
+    auto clausePatterns = [&](SurfacePatternPointer guardPattern) {
         std::vector<SurfacePatternPointer> patterns;
-        patterns.push_back(std::move(firstPattern));
-        for (size_t i = 1; i < params.size(); ++i)
+        patterns.push_back(std::move(guardPattern));
+        for (size_t i = guardIndex + 1; i < params.size(); ++i)
             patterns.push_back(
                 makeSurfacePatternBareName(params[i].name, line, column));
         return patterns;
     };
-    SurfacePatternCase zeroClause;
-    zeroClause.patterns =
-        clausePatterns(makeSurfacePatternBareName("zero", line, column));
-    zeroClause.body = base;
-    zeroClause.line = line;
-    zeroClause.column = column;
-    std::vector<SurfacePatternPointer> successorInner;
-    successorInner.push_back(
-        makeSurfacePatternBareName(guardVar, line, column));
-    SurfacePatternCase successorClause;
-    successorClause.patterns = clausePatterns(makeSurfacePatternConstructor(
-        "successor", std::move(successorInner), line, column));
-    successorClause.body = step;
-    successorClause.line = line;
-    successorClause.column = column;
+    SurfacePatternCase baseClause;
+    baseClause.patterns = clausePatterns(std::move(baseFirstPattern));
+    baseClause.body = baseBody;
+    baseClause.line = line;
+    baseClause.column = column;
+    SurfacePatternCase stepClause;
+    stepClause.patterns = clausePatterns(std::move(stepFirstPattern));
+    stepClause.body = stepBody;
+    stepClause.line = line;
+    stepClause.column = column;
     decl.type = std::move(arrowType);
-    decl.arguments.clear();
+    decl.arguments = std::move(keptArguments);
     decl.body = nullptr;
-    decl.cases.push_back(std::move(zeroClause));
-    decl.cases.push_back(std::move(successorClause));
+    decl.cases.push_back(std::move(baseClause));
+    decl.cases.push_back(std::move(stepClause));
     return true;
 }
 
@@ -1376,7 +1642,7 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
         // pattern-match form before elaboration.
         if (declaration.body && declaration.cases.empty()) {
             SurfaceDefinitionDeclaration desugared = declaration;
-            if (tryDesugarGuardedNaturalRecursion(desugared)) {
+            if (tryDesugarGuardedRecursion(desugared)) {
                 elaboratePatternMatchDefinition(desugared);
                 return;
             }

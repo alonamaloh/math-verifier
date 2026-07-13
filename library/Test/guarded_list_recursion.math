@@ -1,0 +1,44 @@
+-- Prototype: general guarded recursion (the `Natural.binomial` if-formula
+-- style) extended to lists. Functions are written as formulas over named
+-- arguments with a discriminator guard (`List.is_empty`) and field accessors
+-- (`List.head` / `List.tail`) — no `| Ctor =>` pattern rows — and desugar to
+-- the structural pattern-match, so the characterising equations hold by
+-- computation.
+module Test.guarded_list_recursion
+
+import Logic.basics
+import Natural.basics
+import Natural.arithmetic
+import Equality.basics
+import Lists.list
+
+-- (1) length: discriminator guard + one recursive accessor (`tail`).
+definition Test.length (A : Type(0)) (l : List(A)) : Natural :=
+  if List.is_empty(A, l) then 0
+  else 1 + Test.length(A, List.tail(A, l))
+
+theorem Test.length_empty (A : Type(0))
+        : Test.length(A, List.empty(A)) = 0 := done
+theorem Test.length_prepend (A : Type(0)) (head : A) (tail : List(A))
+        : Test.length(A, List.prepend(A, head, tail)) = 1 + Test.length(A, tail) :=
+  done
+
+-- (2) sum: uses the `head` accessor as well.
+definition Test.sum (l : List(Natural)) : Natural :=
+  if List.is_empty(Natural, l) then 0
+  else List.head(Natural, l) + Test.sum(List.tail(Natural, l))
+
+theorem Test.sum_prepend (head : Natural) (tail : List(Natural))
+        : Test.sum(List.prepend(Natural, head, tail)) = head + Test.sum(tail) :=
+  done
+
+-- (3) append: recursion on the first list, second argument threaded.
+definition Test.append (A : Type(0)) (l m : List(A)) : List(A) :=
+  if List.is_empty(A, l) then m
+  else List.prepend(A, List.head(A, l), Test.append(A, List.tail(A, l), m))
+
+theorem Test.append_empty (A : Type(0)) (m : List(A))
+        : Test.append(A, List.empty(A), m) = m := done
+theorem Test.append_prepend (A : Type(0)) (head : A) (tail m : List(A))
+        : Test.append(A, List.prepend(A, head, tail), m)
+          = List.prepend(A, head, Test.append(A, tail, m)) := done
