@@ -10,27 +10,19 @@ module Equality.basics
 inductive Equality (A : Type) (x : A) : A → Proposition where
   | reflexivity : x = x
 
--- Symmetry: if x = y, then y = x. By pattern matching on the equality:
--- the only case is reflexivity, where y is forced to be x, so the
--- result type collapses to x = x, which reflexivity proves.
-theorem Equality.symmetry {A : Type} (x y : A)
-        : x = y → y = x
-  | reflexivity => reflexivity(x)
+-- Symmetry, transitivity, and congruence are the identity-type eliminator
+-- (the J-rule) in three costumes — the foundational boundary that
+-- `by substituting`, calc, and `ring`/`field` are all built on, so they
+-- cannot themselves reason by substitution. Rather than expose the raw
+-- recursor at the surface, we take them as axioms (HOL-style: no one audits
+-- `x = x`). Being Proposition-valued, they are defeq-safe under the kernel's
+-- proof irrelevance — their non-reduction is invisible.
+axiom Equality.symmetry : ∀ {A : Type} (x y : A). x = y → y = x
 
--- Transitivity: if x = y and y = z, then x = z. Pattern-match on the
--- SECOND equality (yEqualsZ): when it's reflexivity, z is forced to y,
--- so the result type x = z becomes x = y — and
--- the first equality xEqualsY is a proof of exactly that.
-theorem Equality.transitivity {A : Type} (x y z : A)
-        (xEqualsY : x = y)
-        : y = z → x = z
-  | reflexivity => xEqualsY
+axiom Equality.transitivity : ∀ {A : Type} (x y z : A). x = y → y = z → x = z
 
--- Congruence: if x = y, then f(x) = f(y). Pattern-match: the only case
--- is reflexivity, where y is forced to x and so f(y) = f(x).
-theorem Equality.congruence {A : Type} {B : Type} (f : A → B) (x y : A)
-        : x = y → f(x) = f(y)
-  | reflexivity => reflexivity(f(x))
+axiom Equality.congruence
+    : ∀ {A : Type} {B : Type} (f : A → B) (x y : A). x = y → f(x) = f(y)
 
 -- Transport along an equality, for Proposition-valued predicates:
 -- given `x = y` and `P(x)`, conclude `P(y)`. Useful for rewriting

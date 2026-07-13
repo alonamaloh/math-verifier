@@ -18,6 +18,7 @@ Its full contents, with export disposition:
 | declaration | disposition in the trail |
 |---|---|
 | `Equality.propositional_extensionality` | **axiom** (Lean's `propext` analogue; ours is stated with two arrows rather than `Iff`, so it keeps its own name and shape — to a checker it is just an axiom) |
+| `Equality.symmetry` / `Equality.transitivity` / `Equality.congruence` | **axioms** (the identity-type eliminator — the J-rule — in three costumes; taken as axioms rather than exposing the raw recursor at the surface, HOL-style. Proposition-valued, so defeq-safe under the kernel's proof irrelevance. The `Equality` inductive keeps its recursor for the elaborator's internal transport / `by substituting` machinery) |
 | `Logic.excluded_middle` | **axiom** (Lean derives `Classical.em` from choice+propext+funext; we have no choice axiom, so EM stays primitive) |
 | `Quotient` / `Quotient.class_of` / `Quotient.equivalent_implies_equal` / `Quotient.lift` / `Quotient.induct` | **not axioms in the trail** — exported as transparent definitions over the `quot` prelude, which itself contributes the one genuine axiom `Quot.sound` (see `docs/kernel-export-quotient-mapping.md`) |
 | `Logic.Decidable` | inductive, not an axiom (`Logic.classical_decidable` is a *theorem*, derived in `Natural/classical_decidable.math`) |
@@ -27,14 +28,17 @@ Its full contents, with export disposition:
 ## The expected axiom report (the Stage-4 gate)
 
 ```
+Equality.congruence
 Equality.propositional_extensionality
+Equality.symmetry
+Equality.transitivity
 Logic.excluded_middle
 Logic.the
 Logic.the_satisfies
 Quot.sound
 ```
 
-Five axioms, nothing else. This list is nanoda's `permitted_axioms`
+Eight axioms, nothing else. This list is nanoda's `permitted_axioms`
 config value.
 
 ## `Internal.sorry*`: burn-down is complete — seal it

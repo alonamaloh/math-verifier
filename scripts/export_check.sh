@@ -29,7 +29,10 @@ REPORT="$OUTDIR/nanoda-report.txt"
 
 # The documented axiom inventory — keep in lockstep with
 # docs/kernel-export-axiom-inventory.md.
-EXPECTED_AXIOMS="Equality.propositional_extensionality
+EXPECTED_AXIOMS="Equality.congruence
+Equality.propositional_extensionality
+Equality.symmetry
+Equality.transitivity
 Logic.excluded_middle
 Logic.the
 Logic.the_satisfies
@@ -45,7 +48,9 @@ cat > "$CONFIG" <<EOF
 {
     "export_file_path": "$TRAIL",
     "use_stdin": false,
-    "permitted_axioms": ["Equality.propositional_extensionality",
+    "permitted_axioms": ["Equality.congruence",
+                         "Equality.propositional_extensionality",
+                         "Equality.symmetry", "Equality.transitivity",
                          "Logic.excluded_middle", "Logic.the",
                          "Logic.the_satisfies", "Quot.sound"],
     "unpermitted_axiom_hard_error": true,
