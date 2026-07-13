@@ -1,0 +1,33 @@
+-- Order-independence of guarded recursion: the guard variable is read from
+-- the guard, so it can sit in ANY parameter position — there is no
+-- pattern-match `:` that forces matched arguments to a fixed side. Here the
+-- guard is the SECOND parameter (foo) or FIRST; both desugar and reduce.
+module Test.guarded_order_probe
+
+import Logic.basics
+import Natural.basics
+import Natural.arithmetic
+import Equality.basics
+import Lists.list
+
+-- guard is the SECOND parameter; a plain argument precedes it.
+definition Test.count (start : Natural) (l : List(Natural)) : Natural :=
+  if List.is_empty(Natural, l) then start
+  else 1 + Test.count(start, List.tail(Natural, l))
+
+theorem Test.count_empty (start : Natural)
+        : Test.count(start, List.empty(Natural)) = start := done by unfolding Test.count
+theorem Test.count_prepend (start head : Natural) (tail : List(Natural))
+        : Test.count(start, List.prepend(Natural, head, tail))
+          = 1 + Test.count(start, tail) := done by unfolding Test.count
+
+-- guard is the FIRST parameter; a plain argument follows it.
+definition Test.foo (l : List(Natural)) (extra : Natural) : Natural :=
+  if List.is_empty(Natural, l) then extra
+  else 1 + Test.foo(List.tail(Natural, l), extra)
+
+theorem Test.foo_empty (extra : Natural)
+        : Test.foo(List.empty(Natural), extra) = extra := done by unfolding Test.foo
+theorem Test.foo_prepend (head : Natural) (tail : List(Natural)) (extra : Natural)
+        : Test.foo(List.prepend(Natural, head, tail), extra)
+          = 1 + Test.foo(tail, extra) := done by unfolding Test.foo

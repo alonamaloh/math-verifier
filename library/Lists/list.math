@@ -51,6 +51,17 @@ definition List.tail_or (A : Type(0)) (default : List(A)) : List(A) → List(A)
   | List.empty            => default
   | List.prepend(_, tail) => tail
 
+-- The empty/nonempty discriminator and the total tail (`empty` on `empty`)
+-- that the guarded-recursion sugar reads: writing `List.tail(A, l)` /
+-- `List.is_empty(A, l)` on a recursion's scrutinee `l` is rewritten to the
+-- bound field / the constructor split, and denotes THESE ordinary functions
+-- everywhere else, so the accessor notation is honest rather than virtual.
+definition List.is_empty (A : Type(0)) (l : List(A)) : Proposition :=
+  l = List.empty(A)
+
+definition List.tail (A : Type(0)) (l : List(A)) : List(A) :=
+  List.tail_or(A, List.empty(A), l)
+
 theorem List.prepend_injective_head (A : Type(0)) (head1 head2 : A)
         (tail1 tail2 : List(A))
         (equality : List.prepend(A, head1, tail1) = List.prepend(A, head2, tail2))
