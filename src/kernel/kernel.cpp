@@ -964,10 +964,17 @@ ExpressionPointer buildIotaReduction(
         auto argValue = constructorArgs[argIndex];
         result = makeApplication(result, argValue);
 
-        // Detect recursive argument by peeling the type's Application chain.
+        // Peel any leading Pi telescope (higher-order recursive arg), then peel
+        // the base's Application chain to detect a recursive argument.
+        std::vector<ExpressionPointer> telescopeDomains;
+        auto argBase = pi->domain;
+        while (auto* telePi = std::get_if<Pi>(&argBase->node)) {
+            telescopeDomains.push_back(telePi->domain);
+            argBase = telePi->codomain;
+        }
         bool isRecursive = false;
         std::vector<ExpressionPointer> recursiveIndices;
-        auto typeHead = pi->domain;
+        auto typeHead = argBase;
         std::vector<ExpressionPointer> typeArgs;
         while (auto* app = std::get_if<Application>(&typeHead->node)) {
             typeArgs.push_back(app->argument);
@@ -981,20 +988,38 @@ ExpressionPointer buildIotaReduction(
             for (std::size_t i = numParameters; i < typeArgs.size(); ++i) {
                 recursiveIndices.push_back(typeArgs[i]);
             }
+        } else {
+            telescopeDomains.clear();
         }
 
         if (isRecursive) {
-            // Build recursor.{us} params motive cases recursiveIndices argValue.
+            // Build `recursor.{us} params motive cases indices target`. For a
+            // higher-order arg this is wrapped in `λ telescope. …` with the arg
+            // applied to the telescope binders — matching the IH the recursor's
+            // type (buildCaseType) declared for that argument.
+            int telescopeSize = (int)telescopeDomains.size();
             auto recursiveCall =
                 makeConstant(recursorName, recursorUniverseArguments);
-            // Params + motive + cases (indices 0..numParameters + numConstructors).
+            // Params + motive + cases live in the outer scope; shift them under
+            // the telescope binders.
             for (int i = 0; i <= numParameters + numConstructors; ++i) {
-                recursiveCall = makeApplication(recursiveCall, recursorArgs[i]);
+                recursiveCall = makeApplication(
+                    recursiveCall, shift(recursorArgs[i], telescopeSize));
             }
+            // Indices already live in the telescope scope (they may mention its
+            // binders), so they need no shift.
             for (const auto& idx : recursiveIndices) {
                 recursiveCall = makeApplication(recursiveCall, idx);
             }
-            recursiveCall = makeApplication(recursiveCall, argValue);
+            auto target = shift(argValue, telescopeSize);
+            for (int b = telescopeSize - 1; b >= 0; --b) {
+                target = makeApplication(target, makeBoundVariable(b));
+            }
+            recursiveCall = makeApplication(recursiveCall, target);
+            for (int t = telescopeSize - 1; t >= 0; --t) {
+                recursiveCall = makeLambda(
+                    "recursivePredecessor", telescopeDomains[t], recursiveCall);
+            }
             recursiveCalls.push_back(std::move(recursiveCall));
         }
 
@@ -2679,18 +2704,36 @@ ExpressionPointer buildCaseType(
         ExpressionPointer type;
         bool isRecursive;
         std::vector<ExpressionPointer> indicesForRecursiveCall;
+        // Higher-order recursive arg: the leading Pi telescope the recursive
+        // occurrence sits under (e.g. `(y : A) → r(y, x) →` for Accessible's
+        // `below` field). Empty for a direct recursive arg. The IH re-abstracts
+        // this telescope and applies the arg to it. Domains and indices are in
+        // FreeVariable scope, opened with these names.
+        std::vector<std::pair<std::string, ExpressionPointer>> recursiveTelescope;
     };
     std::vector<NonParamArg> nonParamArgs;
     int nonParamIndex = 0;
     while (auto* pi = std::get_if<Pi>(&walker->node)) {
         std::string freshName = "ctorArg_" + std::to_string(nonParamIndex);
 
-        // Determine if this argument is a (direct) recursive argument by
-        // peeling its type's Application chain. A recursive argument's
-        // type is `T params indices` for some indices.
+        // Peel any leading Pi telescope — for a higher-order recursive arg the
+        // recursive occurrence sits under binders (strictly positive, so the
+        // domains don't mention T) — opening each with a fresh name, then peel
+        // the base's Application chain. A recursive argument's base is
+        // `T params indices`.
+        std::vector<std::pair<std::string, ExpressionPointer>> telescope;
+        auto argBase = pi->domain;
+        int teleIndex = 0;
+        while (auto* telePi = std::get_if<Pi>(&argBase->node)) {
+            std::string teleName =
+                freshName + "_under_" + std::to_string(teleIndex++);
+            telescope.push_back({teleName, telePi->domain});
+            argBase = openBinder(telePi->codomain, teleName,
+                                 FreeVariableOrigin::Internal);
+        }
         bool isRecursive = false;
         std::vector<ExpressionPointer> recursiveIndices;
-        auto typeHead = pi->domain;
+        auto typeHead = argBase;
         std::vector<ExpressionPointer> typeArgs;
         while (auto* app = std::get_if<Application>(&typeHead->node)) {
             typeArgs.push_back(app->argument);
@@ -2704,11 +2747,15 @@ ExpressionPointer buildCaseType(
             for (std::size_t i = numParameters; i < typeArgs.size(); ++i) {
                 recursiveIndices.push_back(typeArgs[i]);
             }
+        } else {
+            // Not recursive — a plain (possibly function-typed) argument; the
+            // peeled Pis are part of its ordinary type, not a recursion telescope.
+            telescope.clear();
         }
 
         nonParamArgs.push_back({
             freshName, pi->displayHint, pi->domain,
-            isRecursive, recursiveIndices});
+            isRecursive, recursiveIndices, telescope});
         walker = openBinder(pi->codomain, freshName,
                             FreeVariableOrigin::Internal);
         nonParamIndex++;
@@ -2760,9 +2807,24 @@ ExpressionPointer buildCaseType(
         for (const auto& idx : argument.indicesForRecursiveCall) {
             hypothesisType = makeApplication(hypothesisType, idx);
         }
-        hypothesisType = makeApplication(
-            hypothesisType,
-            makeInternalFreeVariable(argument.freshName));
+        // Apply the motive to the recursive arg (direct) or to the arg applied
+        // to its telescope binders (higher-order).
+        auto argApplied = makeInternalFreeVariable(argument.freshName);
+        for (const auto& tele : argument.recursiveTelescope) {
+            argApplied = makeApplication(
+                argApplied, makeInternalFreeVariable(tele.first));
+        }
+        hypothesisType = makeApplication(hypothesisType, argApplied);
+        // Re-abstract the telescope so the IH reads
+        // `Π telescope. motive indices (arg telescope)`.
+        for (int t = (int)argument.recursiveTelescope.size() - 1; t >= 0; --t) {
+            hypothesisType = closeBinder(
+                hypothesisType, argument.recursiveTelescope[t].first,
+                FreeVariableOrigin::Internal);
+            hypothesisType = makePi("recursivePredecessor",
+                                    argument.recursiveTelescope[t].second,
+                                    hypothesisType);
+        }
         body = makePi("hypothesis_" + argument.displayHint,
                       hypothesisType, body);
     }
