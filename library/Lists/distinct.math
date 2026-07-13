@@ -32,33 +32,35 @@ inductive List.Distinct (A : Type(0)) : List(A) → Proposition where
 -- not allowed), then identify the parts by `prepend` injectivity.
 
 theorem List.Distinct_invert_general (A : Type(0)) (list : List(A))
-        : List.Distinct(A, list)
-          → ∀ (head : A). ∀ (tail : List(A)).
+        (distinctProof : List.Distinct(A, list))
+        : ∀ (head : A). ∀ (tail : List(A)).
           list = List.prepend(A, head, tail)
-          → ¬(List.member(A, head, tail)) ∧ List.Distinct(A, tail)
-  | List.Distinct.empty =>
-      (head : A) (tail : List(A))
-      (listEquality : List.empty(A) = List.prepend(A, head, tail)) ↦ {
-        -- empty = prepend is impossible: is_nonempty distinguishes them.
-        List.is_nonempty(A, List.prepend(A, head, tail));
-        List.is_nonempty(A, List.empty(A))
-            by substituting listEquality as impossible;
-        absurd(impossible)
-      }
-  | List.Distinct.prepend(distinctHead, distinctTail, headNotInTail, tailDistinct) =>
-      (head : A) (tail : List(A))
-      (listEquality : List.prepend(A, distinctHead, distinctTail)
-                      = List.prepend(A, head, tail)) ↦ {
-        distinctHead = head by List.prepend_injective_head as headEquality;
-        distinctTail = tail by List.prepend_injective_tail as tailEquality;
-        ¬(List.member(A, head, distinctTail))
-            by substituting headEquality;
-        ¬(List.member(A, head, tail))
-            by substituting tailEquality as headNotMember;
-        List.Distinct(A, tail)
-            by substituting tailEquality as tailIsDistinct;
-        And.introduction(headNotMember, tailIsDistinct)
-      }
+          → ¬(List.member(A, head, tail)) ∧ List.Distinct(A, tail) :=
+  by induction on distinctProof {
+    case List.Distinct.empty:
+        (head : A) (tail : List(A))
+        (listEquality : List.empty(A) = List.prepend(A, head, tail)) ↦ {
+          -- empty = prepend is impossible: is_nonempty distinguishes them.
+          List.is_nonempty(A, List.prepend(A, head, tail));
+          List.is_nonempty(A, List.empty(A))
+              by substituting listEquality as impossible;
+          absurd(impossible)
+        }
+    case List.Distinct.prepend(distinctHead, distinctTail, headNotInTail, tailDistinct):
+        (head : A) (tail : List(A))
+        (listEquality : List.prepend(A, distinctHead, distinctTail)
+                        = List.prepend(A, head, tail)) ↦ {
+          distinctHead = head by List.prepend_injective_head as headEquality;
+          distinctTail = tail by List.prepend_injective_tail as tailEquality;
+          ¬(List.member(A, head, distinctTail))
+              by substituting headEquality;
+          ¬(List.member(A, head, tail))
+              by substituting tailEquality as headNotMember;
+          List.Distinct(A, tail)
+              by substituting tailEquality as tailIsDistinct;
+          And.introduction(headNotMember, tailIsDistinct)
+        }
+  }
 
 -- The head of a distinct list does not recur in the tail.
 theorem List.Distinct.head_not_member (A : Type(0)) (head : A) (tail : List(A))
@@ -85,55 +87,57 @@ theorem List.Distinct.tail_distinct (A : Type(0)) (head : A) (tail : List(A))
 -- creates nor removes duplicates. (Stated forward; the symmetric direction
 -- follows by applying it to the reversed permutation.)
 theorem List.Permutation.distinct_invariant (A : Type(0)) (l1 l2 : List(A))
-        : List.Permutation(A, l1, l2)
-          → List.Distinct(A, l1)
-          → List.Distinct(A, l2)
-  | List.Permutation.empty =>
-      (distinct : List.Distinct(A, List.empty(A))) ↦ distinct
-  | List.Permutation.skip(x, a, b, perm) =>
-      (distinct : List.Distinct(A, List.prepend(A, x, a))) ↦ {
-        -- x does not recur in a, hence (transporting along the
-        -- permutation) not in b either; the tails stay distinct.
-        ¬(List.member(A, x, a));
-        List.Distinct(A, a) as aDistinct;
-        ¬(List.member(A, x, b))
-            by List.Permutation.not_member_forward as xNotInB;
-        List.Distinct.prepend(A, x, b, xNotInB,
-            List.Permutation.distinct_invariant(A, a, b, perm, aDistinct))
-      }
-  | List.Permutation.swap(x, y, l) =>
-      (distinct : List.Distinct(A, List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
-        -- Unpack: x ∉ y::l, y ∉ l, and l is distinct.
-        ¬(List.member(A, x, List.prepend(A, y, l))) as xNotInYL;
-        List.Distinct(A, List.prepend(A, y, l));
-        ¬(List.member(A, y, l)) as yNotInL;
-        List.Distinct(A, l) as lDistinct;
-        -- x ∉ l, since it is not even in y::l.
-        ¬(List.member(A, x, l))
-            by (memberXInL : List.member(A, x, l)) ↦
-                xNotInYL(List.member.there(A, x, y, l, memberXInL)) as xNotInL;
-        -- y ∉ x::l: y is not x (x ∉ y::l rules the head out) and y ∉ l.
-        ¬(List.member(A, y, List.prepend(A, x, l)))
-            by (memberYInXL : List.member(A, y, List.prepend(A, x, l))) ↦ {
-                y = x ∨ List.member(A, y, l)
-                    by List.member_prepend_invert;
-                done by cases {
-                  case y = x as yEqualsX: {
-                      List.member(A, y, List.prepend(A, y, l));
-                      List.member(A, x, List.prepend(A, y, l))
-                          by substituting yEqualsX as memberXInYL;
-                      xNotInYL(memberXInYL)
-                    }
-                  case List.member(A, y, l) as memberYInL: yNotInL(memberYInL)
-                }
-              } as yNotInXL;
-        List.Distinct.prepend(A, y, List.prepend(A, x, l), yNotInXL,
-            List.Distinct.prepend(A, x, l, xNotInL, lDistinct))
-      }
-  | List.Permutation.transitive(a, b, c, p, q) =>
-      (distinct : List.Distinct(A, a)) ↦
-        List.Permutation.distinct_invariant(A, b, c, q,
-            List.Permutation.distinct_invariant(A, a, b, p, distinct))
+        (perm : List.Permutation(A, l1, l2))
+        : List.Distinct(A, l1) → List.Distinct(A, l2) :=
+  by induction on perm {
+    case List.Permutation.empty:
+        (distinct : List.Distinct(A, List.empty(A))) ↦ distinct
+    case List.Permutation.skip(x, a, b, subPerm, skipInvariant):
+        (distinct : List.Distinct(A, List.prepend(A, x, a))) ↦ {
+          -- x does not recur in a, hence (transporting along the
+          -- permutation) not in b either; the tails stay distinct.
+          ¬(List.member(A, x, a))
+              by List.Distinct.head_not_member as xNotInA;
+          List.Distinct(A, a) by List.Distinct.tail_distinct as aDistinct;
+          ¬(List.member(A, x, b))
+              by List.Permutation.not_member_forward as xNotInB;
+          List.Distinct.prepend(A, x, b, xNotInB, skipInvariant(aDistinct))
+        }
+    case List.Permutation.swap(x, y, l):
+        (distinct : List.Distinct(A, List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
+          -- Unpack: x ∉ y::l, y ∉ l, and l is distinct.
+          ¬(List.member(A, x, List.prepend(A, y, l)))
+              by List.Distinct.head_not_member as xNotInYL;
+          List.Distinct(A, List.prepend(A, y, l))
+              by List.Distinct.tail_distinct as ylDistinct;
+          ¬(List.member(A, y, l)) by List.Distinct.head_not_member as yNotInL;
+          List.Distinct(A, l) by List.Distinct.tail_distinct as lDistinct;
+          -- x ∉ l, since it is not even in y::l.
+          ¬(List.member(A, x, l))
+              by (memberXInL : List.member(A, x, l)) ↦
+                  xNotInYL(List.member.there(A, x, y, l, memberXInL)) as xNotInL;
+          -- y ∉ x::l: y is not x (x ∉ y::l rules the head out) and y ∉ l.
+          ¬(List.member(A, y, List.prepend(A, x, l)))
+              by (memberYInXL : List.member(A, y, List.prepend(A, x, l))) ↦ {
+                  y = x ∨ List.member(A, y, l)
+                      by List.member_prepend_invert;
+                  done by cases {
+                    case y = x as yEqualsX: {
+                        List.member(A, y, List.prepend(A, y, l));
+                        List.member(A, x, List.prepend(A, y, l))
+                            by substituting yEqualsX as memberXInYL;
+                        xNotInYL(memberXInYL)
+                      }
+                    case List.member(A, y, l) as memberYInL: yNotInL(memberYInL)
+                  }
+                } as yNotInXL;
+          List.Distinct.prepend(A, y, List.prepend(A, x, l), yNotInXL,
+              List.Distinct.prepend(A, x, l, xNotInL, lDistinct))
+        }
+    case List.Permutation.transitive(a, b, c, p, q, pInvariant, qInvariant):
+        (distinct : List.Distinct(A, a)) ↦
+          qInvariant(pInvariant(distinct))
+  }
 
 -- range_down(n) has no duplicates.
 theorem List.range_down_distinct (n : Natural)
@@ -212,14 +216,15 @@ theorem List.map_distinct_on (A B : Type(0)) (f : A → B) (list : List(A))
 -- An injective map preserves distinctness.
 theorem List.map_distinct (A B : Type(0)) (f : A → B)
         (injective : ∀ (x y : A). f(x) = f(y) → x = y)
-        (list : List(A))
-        : List.Distinct(A, list)
-          → List.Distinct(B, List.map(A, B, f, list))
-  | List.Distinct.empty => List.Distinct.empty(B)
-  | List.Distinct.prepend(head, tail, headNotInTail, tailDistinct) =>
-      List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
-          List.not_member_map_of_not_member(A, B, f, injective, head, tail, headNotInTail),
-          List.map_distinct(A, B, f, injective, tail, tailDistinct))
+        (list : List(A)) (distinctProof : List.Distinct(A, list))
+        : List.Distinct(B, List.map(A, B, f, list)) :=
+  by induction on distinctProof with IH {
+    case List.Distinct.empty: List.Distinct.empty(B)
+    case List.Distinct.prepend(head, tail, headNotInTail, tailDistinct):
+        List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
+            List.not_member_map_of_not_member(A, B, f, injective, head, tail, headNotInTail),
+            IH)
+  }
 
 -- ----------------------------------------------------------------------
 -- Two distinct lists of the same length, one contained in the other, are

@@ -34,17 +34,17 @@ theorem List.map_length (A B : Type(0)) (f : A → B) (list : List(A))
            = List.length(A, List.prepend(A, head, tail))
   }
 
--- `map` carries membership forward: x ∈ l ⟹ f(x) ∈ map(f, l). (Pattern-match
--- on the member proof at definition level — `cases` on it is blocked by the
--- index-must-be-local rule, but a top-level match refines `list` fine.)
+-- `map` carries membership forward: x ∈ l ⟹ f(x) ∈ map(f, l). Induct on the
+-- membership proof; the `there` case recurses into the tail via its IH.
 theorem List.map_member (A B : Type(0)) (f : A → B) (element : A) (list : List(A))
-        : List.member(A, element, list)
-          → List.member(B, f(element), List.map(A, B, f, list))
-  | List.member.here(rest) =>
-      List.member.here(B, f(element), List.map(A, B, f, rest))
-  | List.member.there(head, rest, innerMember) =>
-      List.member.there(B, f(element), f(head), List.map(A, B, f, rest),
-          List.map_member(A, B, f, element, rest, innerMember))
+        (memberProof : List.member(A, element, list))
+        : List.member(B, f(element), List.map(A, B, f, list)) :=
+  by induction on memberProof with IH {
+    case List.member.here(rest):
+        List.member.here(B, f(element), List.map(A, B, f, rest))
+    case List.member.there(head, rest, innerMember):
+        List.member.there(B, f(element), f(head), List.map(A, B, f, rest), IH)
+  }
 
 -- Inversion of map_member: a member of `map(f, l)` comes from a member of `l`.
 theorem List.map_member_invert (A B : Type(0)) (f : A → B) (b : B) (list : List(A))

@@ -83,25 +83,30 @@ theorem NaturalList.all_prime_under_prepend_equality
                         NaturalList.member(k, tail)
                         → Natural.is_prime(k))
         (candidate : Natural) (list : NaturalList)
-        : NaturalList.member(candidate, list)
-          → list = NaturalList.prepend(head, tail)
-          → Natural.is_prime(candidate)
-  | NaturalList.member.here(rest), listEquality => {
-      -- From `here`, list = prepend(candidate, rest); combined with
-      -- listEquality, prepend(candidate, rest) = prepend(head, tail),
-      -- so candidate = head and is_prime(candidate) = is_prime(head).
-      candidate = head;
-      Natural.is_prime(candidate)
-    }
-  | NaturalList.member.there(headInList, restInList, subMembership),
-    listEquality => {
-      -- From `there`, list = prepend(headInList, restInList); combined
-      -- with listEquality, restInList = tail, so subMembership lifts to
-      -- member(candidate, tail) via Equality.transport.
-      restInList = tail;
-      NaturalList.member(candidate, tail) as memberTail;
-      allPrimeTail(candidate, memberTail)
-    }
+        (memberProof : NaturalList.member(candidate, list))
+        : list = NaturalList.prepend(head, tail)
+          → Natural.is_prime(candidate) :=
+  by induction on memberProof {
+    case NaturalList.member.here(rest):
+        (listEquality : NaturalList.prepend(candidate, rest)
+                        = NaturalList.prepend(head, tail)) ↦ {
+          -- From `here`, list = prepend(candidate, rest); combined with
+          -- listEquality, prepend(candidate, rest) = prepend(head, tail),
+          -- so candidate = head and is_prime(candidate) = is_prime(head).
+          candidate = head;
+          Natural.is_prime(candidate)
+        }
+    case NaturalList.member.there(headInList, restInList, subMembership):
+        (listEquality : NaturalList.prepend(headInList, restInList)
+                        = NaturalList.prepend(head, tail)) ↦ {
+          -- From `there`, list = prepend(headInList, restInList); combined
+          -- with listEquality, restInList = tail, so subMembership lifts to
+          -- member(candidate, tail) via Equality.transport.
+          restInList = tail;
+          NaturalList.member(candidate, tail) as memberTail;
+          allPrimeTail(candidate, memberTail)
+        }
+  }
 
 -- Thin wrapper specialising the list to `prepend(head, tail)`. The citation
 -- infers every argument from the hypotheses: matching the lemma's

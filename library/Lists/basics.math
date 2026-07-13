@@ -47,20 +47,19 @@ definition NaturalList.productOf : NaturalList → Natural
 -- via divides_multiple_left.
 theorem NaturalList.member_divides_product
         (n : Natural) (list : NaturalList)
-        : NaturalList.member(n, list)
-          → n ∣ NaturalList.productOf(list)
-  | NaturalList.member.here(rest) => {
-      n ∣ n * NaturalList.productOf(rest);
-      done
-    }
-  | NaturalList.member.there(head, rest, sub_h) => {
-      -- The membership proof is Prop-indexed, so the recursive appeal to
-      -- this theorem on the tail cannot become an induction hypothesis.
-      n ∣ NaturalList.productOf(rest)
-          by NaturalList.member_divides_product(n, rest, sub_h);
-      n ∣ head * NaturalList.productOf(rest) by Natural.divides_multiple_left;
-      done
-    }
+        (memberProof : NaturalList.member(n, list))
+        : n ∣ NaturalList.productOf(list) :=
+  by induction on memberProof with IH {
+    case NaturalList.member.here(rest): {
+        n ∣ n * NaturalList.productOf(rest);
+        done
+      }
+    case NaturalList.member.there(head, rest, sub_h): {
+        n ∣ NaturalList.productOf(rest) by IH;
+        n ∣ head * NaturalList.productOf(rest) by Natural.divides_multiple_left;
+        done
+      }
+  }
 
 -- Discriminator: True on `prepend(_, _)`, False on `empty`. Used to
 -- refute membership claims against the empty list — a `member` proof
@@ -73,10 +72,12 @@ definition NaturalList.is_nonempty : NaturalList → Proposition
 -- have a `prepend(...)` index, where `is_nonempty` is True.
 theorem NaturalList.member_implies_nonempty
         (n : Natural) (list : NaturalList)
-        : NaturalList.member(n, list)
-          → NaturalList.is_nonempty(list)
-  | NaturalList.member.here(_)         => True.trivial
-  | NaturalList.member.there(_, _, _)  => True.trivial
+        (memberProof : NaturalList.member(n, list))
+        : NaturalList.is_nonempty(list) :=
+  by induction on memberProof {
+    case NaturalList.member.here(_):        True.trivial
+    case NaturalList.member.there(_, _, _): True.trivial
+  }
 
 -- No element belongs to the empty list — the standard absurdity proof
 -- for membership in a vacuous list.

@@ -61,19 +61,17 @@ automatic theorem List.Permutation.reflexive (A : Type(0)) (l : List(A))
 -- Permutation is symmetric: invert each generator, recursing into the
 -- sub-permutations the kernel supplies for `skip` and `transitive`.
 theorem List.Permutation.symmetric (A : Type(0)) (l1 l2 : List(A))
-        : List.Permutation(A, l1, l2) → List.Permutation(A, l2, l1)
-  | List.Permutation.empty => List.Permutation.empty(A)
-  | List.Permutation.skip(x, a, b, perm) => {
-      List.Permutation(A, b, a) as invertedTail;
-      List.Permutation.skip(A, x, b, a, invertedTail)
-    }
-  | List.Permutation.swap(x, y, l) => List.Permutation.swap(A, y, x, l)
-  | List.Permutation.transitive(a, b, c, firstLeg, secondLeg) => {
-      -- invert each leg and compose them in the opposite order.
-      List.Permutation(A, b, a) as invertedFirst;
-      List.Permutation(A, c, b) as invertedSecond;
-      List.Permutation.transitive(A, c, b, a, invertedSecond, invertedFirst)
-    }
+        (perm : List.Permutation(A, l1, l2)) : List.Permutation(A, l2, l1) :=
+  by induction on perm {
+    case List.Permutation.empty: List.Permutation.empty(A)
+    case List.Permutation.skip(x, a, b, subPerm, invertedTail):
+        List.Permutation.skip(A, x, b, a, invertedTail)
+    case List.Permutation.swap(x, y, l): List.Permutation.swap(A, y, x, l)
+    case List.Permutation.transitive(a, b, c, firstLeg, secondLeg,
+             invertedFirst, invertedSecond):
+        -- invert each leg (the IHs) and compose them in the opposite order.
+        List.Permutation.transitive(A, c, b, a, invertedSecond, invertedFirst)
+  }
 
 -- ----------------------------------------------------------------------
 -- Product invariance: a commutative-associative fold-product does not
@@ -84,93 +82,89 @@ theorem List.Permutation.product_invariant (A : Type(0))
         (associativity
             : ∀ (x y z : A). multiply(multiply(x, y), z) = multiply(x, multiply(y, z)))
         (commutativity : ∀ (x y : A). multiply(x, y) = multiply(y, x))
-        (l1 l2 : List(A))
-        : List.Permutation(A, l1, l2)
-          → List.product(A, multiply, one, l1)
-            = List.product(A, multiply, one, l2)
-  | List.Permutation.empty => reflexivity(A, one)
-  | List.Permutation.skip(x, a, b, perm) =>
-      -- the tails have equal products by the recursion the kernel supplies.
-      List.product(A, multiply, one, List.prepend(A, x, a))
-         = multiply(x, List.product(A, multiply, one, a))
-         = multiply(x, List.product(A, multiply, one, b))
-         = List.product(A, multiply, one, List.prepend(A, x, b))
-  | List.Permutation.swap(x, y, l) =>
-      List.product(A, multiply, one,
-               List.prepend(A, x, List.prepend(A, y, l)))
-         = multiply(x, multiply(y, List.product(A, multiply, one, l)))
-         = multiply(multiply(x, y), List.product(A, multiply, one, l))
-         = multiply(multiply(y, x), List.product(A, multiply, one, l))
-               by commutativity(x, y)
-         = multiply(y, multiply(x, List.product(A, multiply, one, l)))
-         = List.product(A, multiply, one,
-               List.prepend(A, y, List.prepend(A, x, l)))
-  | List.Permutation.transitive(a, b, c, firstLeg, secondLeg) =>
-      List.product(A, multiply, one, a)
-         = List.product(A, multiply, one, b)
-         = List.product(A, multiply, one, c)
+        (l1 l2 : List(A)) (perm : List.Permutation(A, l1, l2))
+        : List.product(A, multiply, one, l1)
+          = List.product(A, multiply, one, l2) :=
+  by induction on perm {
+    case List.Permutation.empty: reflexivity(A, one)
+    case List.Permutation.skip(x, a, b, subPerm, tailEqual):
+        -- the tails have equal products by the IH.
+        List.product(A, multiply, one, List.prepend(A, x, a))
+           = multiply(x, List.product(A, multiply, one, a))
+           = multiply(x, List.product(A, multiply, one, b))   by substituting tailEqual
+           = List.product(A, multiply, one, List.prepend(A, x, b))
+    case List.Permutation.swap(x, y, l):
+        List.product(A, multiply, one,
+                 List.prepend(A, x, List.prepend(A, y, l)))
+           = multiply(x, multiply(y, List.product(A, multiply, one, l)))
+           = multiply(multiply(x, y), List.product(A, multiply, one, l))
+           = multiply(multiply(y, x), List.product(A, multiply, one, l))
+                 by commutativity(x, y)
+           = multiply(y, multiply(x, List.product(A, multiply, one, l)))
+           = List.product(A, multiply, one,
+                 List.prepend(A, y, List.prepend(A, x, l)))
+    case List.Permutation.transitive(a, b, c, firstLeg, secondLeg,
+             firstEqual, secondEqual):
+        List.product(A, multiply, one, a)
+           = List.product(A, multiply, one, b)   by firstEqual
+           = List.product(A, multiply, one, c)   by secondEqual
+  }
 
 -- ----------------------------------------------------------------------
 -- Membership transports forward across a permutation.
 
--- Implementation note: unlike `symmetric`/`product_invariant`, the
--- membership argument is curried *after* the permutation, so the
--- recursive hypothesis the kernel supplies is a function
--- `member(element, l1) → member(element, l2)` rather than a fact that
--- matches the goal directly. It must therefore be applied by an explicit
--- recursive call until `by induction` learns to drive a derivation.
 theorem List.Permutation.member_forward (A : Type(0)) (element : A)
-        (l1 l2 : List(A))
-        : List.Permutation(A, l1, l2)
-          → List.member(A, element, l1)
-          → List.member(A, element, l2)
-  | List.Permutation.empty =>
-      (mem : List.member(A, element, List.empty(A))) ↦ mem
-  | List.Permutation.skip(x, a, b, perm) =>
-      (mem : List.member(A, element, List.prepend(A, x, a))) ↦ {
-        element = x ∨ List.member(A, element, a)
-            by List.member_invert_general;
-        done by cases {
-          case element = x:
-              -- element = x: it is the (shared) head of prepend(x, b).
-              done
-          case List.member(A, element, a) as memberInA:
-              -- element lies in a; transport it into b, behind the head x.
-              List.member.there(A, element, x, b,
-                  List.Permutation.member_forward(A, element, a, b, perm, memberInA))
+        (l1 l2 : List(A)) (perm : List.Permutation(A, l1, l2))
+        : List.member(A, element, l1)
+          → List.member(A, element, l2) :=
+  by induction on perm {
+    case List.Permutation.empty:
+        (mem : List.member(A, element, List.empty(A))) ↦ mem
+    case List.Permutation.skip(x, a, b, subPerm, tailForward):
+        (mem : List.member(A, element, List.prepend(A, x, a))) ↦ {
+          element = x ∨ List.member(A, element, a)
+              by List.member_invert_general;
+          done by cases {
+            case element = x:
+                -- element = x: it is the (shared) head of prepend(x, b).
+                done
+            case List.member(A, element, a) as memberInA:
+                -- element lies in a; transport it into b (the IH), behind head x.
+                List.member.there(A, element, x, b, tailForward(memberInA))
+          }
         }
-      }
-  | List.Permutation.swap(x, y, l) =>
-      (mem : List.member(A, element,
-                 List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
-        element = x ∨ List.member(A, element, List.prepend(A, y, l))
-            by List.member_prepend_invert;
-        done by cases {
-          case element = x: {
-              -- element = x: in prepend(y, prepend(x, l)) it sits one level deep.
-              List.member(A, x, List.prepend(A, y, List.prepend(A, x, l)))
-                  by List.member.there;
-              done
-            }
-          case List.member(A, element, List.prepend(A, y, l)): {
-              element = y ∨ List.member(A, element, l)
-                  by List.member_prepend_invert;
-              done by cases {
-                case element = y:
-                    -- element = y: the head of prepend(y, prepend(x, l)).
-                    done
-                case List.member(A, element, l) as memberInL:
-                    List.member.there(A, element, y, List.prepend(A, x, l),
-                        List.member.there(A, element, x, l, memberInL))
+    case List.Permutation.swap(x, y, l):
+        (mem : List.member(A, element,
+                   List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
+          element = x ∨ List.member(A, element, List.prepend(A, y, l))
+              by List.member_prepend_invert;
+          done by cases {
+            case element = x: {
+                -- element = x: in prepend(y, prepend(x, l)) it sits one level deep.
+                List.member(A, x, List.prepend(A, y, List.prepend(A, x, l)))
+                    by List.member.there;
+                done
               }
-            }
+            case List.member(A, element, List.prepend(A, y, l)): {
+                element = y ∨ List.member(A, element, l)
+                    by List.member_prepend_invert;
+                done by cases {
+                  case element = y:
+                      -- element = y: the head of prepend(y, prepend(x, l)).
+                      done
+                  case List.member(A, element, l) as memberInL:
+                      List.member.there(A, element, y, List.prepend(A, x, l),
+                          List.member.there(A, element, x, l, memberInL))
+                }
+              }
+          }
         }
-      }
-  | List.Permutation.transitive(a, b, c, firstLeg, secondLeg) =>
-      (mem : List.member(A, element, a)) ↦
-        -- transport through the middle list b, then on to c.
-        List.Permutation.member_forward(A, element, b, c, secondLeg,
-            List.Permutation.member_forward(A, element, a, b, firstLeg, mem))
+    case List.Permutation.transitive(a, b, c, firstLeg, secondLeg,
+             firstForward, secondForward):
+        (mem : List.member(A, element, a)) ↦
+          -- transport through the middle list b (first IH), then on to c (second).
+          secondForward(firstForward(mem))
+  }
 
 -- Non-membership transports as well: transport a hypothetical member of
 -- l2 back across the (symmetric) permutation into the excluded list l1.
@@ -192,26 +186,28 @@ theorem List.Permutation.not_member_forward (A : Type(0)) (element : A)
 -- If `element` occurs in `l`, then `l` is a permutation of
 -- `prepend(element, rest)` for some remainder `rest`.
 theorem List.Permutation.extract (A : Type(0)) (element : A) (l : List(A))
-        : List.member(A, element, l)
-          → ∃ (rest : List(A)).
-              List.Permutation(A, l, List.prepend(A, element, rest))
-  | List.member.here(rest) => {
-      -- element is already the head; the list permutes to itself.
-      List.Permutation(A,
-          List.prepend(A, element, rest), List.prepend(A, element, rest)) as selfPermutation;
-      witness rest with selfPermutation
-    }
-  | List.member.there(head, tail, sub) => {
-      -- element occurs in the tail; recursively rotate it to the tail's front.
-      choose tailRest such that
-          List.Permutation(A, tail, List.prepend(A, element, tailRest)) as perm;
-      -- skip `head` over perm, then swap `head` past `element` to the front.
-      witness List.prepend(A, head, tailRest) with
-        List.Permutation.transitive(A,
-            List.prepend(A, head, tail),
-            List.prepend(A, head, List.prepend(A, element, tailRest)),
-            List.prepend(A, element, List.prepend(A, head, tailRest)),
-            List.Permutation.skip(A, head, tail,
-                List.prepend(A, element, tailRest), perm),
-            List.Permutation.swap(A, head, element, tailRest))
-    }
+        (memberProof : List.member(A, element, l))
+        : ∃ (rest : List(A)).
+              List.Permutation(A, l, List.prepend(A, element, rest)) :=
+  by induction on memberProof with IH {
+    case List.member.here(rest): {
+        -- element is already the head; the list permutes to itself.
+        List.Permutation(A,
+            List.prepend(A, element, rest), List.prepend(A, element, rest)) as selfPermutation;
+        witness rest with selfPermutation
+      }
+    case List.member.there(head, tail, sub): {
+        -- element occurs in the tail; recursively rotate it to the tail's front.
+        choose tailRest such that
+            List.Permutation(A, tail, List.prepend(A, element, tailRest)) as perm from IH;
+        -- skip `head` over perm, then swap `head` past `element` to the front.
+        witness List.prepend(A, head, tailRest) with
+          List.Permutation.transitive(A,
+              List.prepend(A, head, tail),
+              List.prepend(A, head, List.prepend(A, element, tailRest)),
+              List.prepend(A, element, List.prepend(A, head, tailRest)),
+              List.Permutation.skip(A, head, tail,
+                  List.prepend(A, element, tailRest), perm),
+              List.Permutation.swap(A, head, element, tailRest))
+      }
+  }

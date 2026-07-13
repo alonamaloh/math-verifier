@@ -1,0 +1,72 @@
+-- Repro / probe for the index-generalization de Bruijn bug in
+-- `by induction on <indexed proof>` (PLAN_REMOVE_SURFACE_CASES STEP 5).
+-- Also probes MULTI-INDEX + explicit per-recursive-arg IH names in the
+-- `case` pattern (needed for constructors with two recursive premises,
+-- e.g. Permutation.transitive).
+module Test.indexed_induction_repro
+
+import Logic.basics
+import Equality.basics
+import Lists.list
+import Lists.map
+import Lists.permutation
+import Lists.distinct
+
+theorem Test.map_member_repro (A B : Type(0)) (f : A → B) (element : A)
+        (list : List(A)) (m : List.member(A, element, list))
+        : List.member(B, f(element), List.map(A, B, f, list)) :=
+  by induction on m with IH {
+    case List.member.here(rest):
+        List.member.here(B, f(element), List.map(A, B, f, rest))
+    case List.member.there(head, rest, inner):
+        List.member.there(B, f(element), f(head), List.map(A, B, f, rest), IH)
+  }
+
+-- Explicit per-recursive-arg IH names in the case pattern: skip binds one
+-- (skipIH), transitive binds two (pIH, qIH).
+theorem Test.distinct_invariant_repro (A : Type(0)) (l1 l2 : List(A))
+        (perm : List.Permutation(A, l1, l2))
+        : List.Distinct(A, l1) → List.Distinct(A, l2) :=
+  by induction on perm {
+    case List.Permutation.empty:
+        (distinct : List.Distinct(A, List.empty(A))) ↦ distinct
+    case List.Permutation.skip(x, a, b, subPerm, skipIH):
+        (distinct : List.Distinct(A, List.prepend(A, x, a))) ↦ {
+          ¬(List.member(A, x, a))
+              by List.Distinct.head_not_member as xNotInA;
+          List.Distinct(A, a) by List.Distinct.tail_distinct as aDistinct;
+          ¬(List.member(A, x, b))
+              by List.Permutation.not_member_forward as xNotInB;
+          List.Distinct.prepend(A, x, b, xNotInB, skipIH(aDistinct))
+        }
+    case List.Permutation.swap(x, y, l):
+        (distinct : List.Distinct(A, List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
+          ¬(List.member(A, x, List.prepend(A, y, l)))
+              by List.Distinct.head_not_member as xNotInYL;
+          List.Distinct(A, List.prepend(A, y, l))
+              by List.Distinct.tail_distinct as ylDistinct;
+          ¬(List.member(A, y, l)) by List.Distinct.head_not_member as yNotInL;
+          List.Distinct(A, l) by List.Distinct.tail_distinct as lDistinct;
+          ¬(List.member(A, x, l))
+              by (memberXInL : List.member(A, x, l)) ↦
+                  xNotInYL(List.member.there(A, x, y, l, memberXInL)) as xNotInL;
+          ¬(List.member(A, y, List.prepend(A, x, l)))
+              by (memberYInXL : List.member(A, y, List.prepend(A, x, l))) ↦ {
+                  y = x ∨ List.member(A, y, l)
+                      by List.member_prepend_invert;
+                  done by cases {
+                    case y = x as yEqualsX: {
+                        List.member(A, y, List.prepend(A, y, l));
+                        List.member(A, x, List.prepend(A, y, l))
+                            by substituting yEqualsX as memberXInYL;
+                        xNotInYL(memberXInYL)
+                      }
+                    case List.member(A, y, l) as memberYInL: yNotInL(memberYInL)
+                  }
+                } as yNotInXL;
+          List.Distinct.prepend(A, y, List.prepend(A, x, l), yNotInXL,
+              List.Distinct.prepend(A, x, l, xNotInL, lDistinct))
+        }
+    case List.Permutation.transitive(a, b, c, p, q, pIH, qIH):
+        (distinct : List.Distinct(A, a)) ↦ qIH(pIH(distinct))
+  }

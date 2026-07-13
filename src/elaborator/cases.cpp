@@ -1809,8 +1809,22 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
             int deBruijn = indexLocalIndices[k];
             int arrayPosition = static_cast<int>(localBinders.size())
                 - 1 - deBruijn;
+            // A binder's stored `.type` is relative to the binders declared
+            // BEFORE it, but this index Lambda's domain lives in the motive's
+            // scope — the full localBinders context plus the OUTER index
+            // Lambdas idx_0..idx_{k-1} it sits inside. Lift the stored type
+            // into full localBinders scope (shift past every binder declared
+            // at or after this one), then abstract over the preceding index
+            // binders so a reference to one resolves to its index Lambda
+            // rather than to a later-declared local (the de Bruijn skew that
+            // sent `A` in `List(A)` to a subsequent binder `f`).
+            ExpressionPointer indexTypeFull = shift(
+                localBinders[arrayPosition].type,
+                static_cast<int>(localBinders.size()) - arrayPosition);
+            std::vector<int> precedingIndices(
+                indexLocalIndices.begin(), indexLocalIndices.begin() + k);
             ExpressionPointer indexType =
-                localBinders[arrayPosition].type;
+                abstractOverBoundVariables(indexTypeFull, precedingIndices);
             motive = makeLambda(localBinders[arrayPosition].name,
                                  indexType, motive);
         }

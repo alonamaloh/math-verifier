@@ -53,22 +53,24 @@ theorem List.length_positive_of_member (A : Type(0)) (element : A) (list : List(
 -- chains the two sub-permutations (their length equalities are
 -- backward-chained from this lemma on the by-less steps).
 theorem List.Permutation.length_invariant (A : Type(0)) (l1 l2 : List(A))
-        : List.Permutation(A, l1, l2)
-          → List.length(A, l1) = List.length(A, l2)
-  | List.Permutation.empty =>
-      done
-  | List.Permutation.skip(x, a, b, subPermutation) =>
-      List.length(A, List.prepend(A, x, a))
-         = 1 + List.length(A, a)
-         = 1 + List.length(A, b)
-         = List.length(A, List.prepend(A, x, b))
-  | List.Permutation.swap(x, y, l) =>
-      List.length(A, List.prepend(A, x, List.prepend(A, y, l)))
-         = 1 + List.length(A, List.prepend(A, y, l))
-         = 1 + (1 + List.length(A, l))
-         = 1 + List.length(A, List.prepend(A, x, l))
-         = List.length(A, List.prepend(A, y, List.prepend(A, x, l)))
-  | List.Permutation.transitive(a, b, c, leftPermutation, rightPermutation) =>
-      List.length(A, a)
-         = List.length(A, b)
-         = List.length(A, c)
+        (perm : List.Permutation(A, l1, l2))
+        : List.length(A, l1) = List.length(A, l2) :=
+  by induction on perm {
+    case List.Permutation.empty: done
+    case List.Permutation.skip(x, a, b, subPermutation, tailLengthEqual):
+        List.length(A, List.prepend(A, x, a))
+           = 1 + List.length(A, a)
+           = 1 + List.length(A, b)   by substituting tailLengthEqual
+           = List.length(A, List.prepend(A, x, b))
+    case List.Permutation.swap(x, y, l):
+        List.length(A, List.prepend(A, x, List.prepend(A, y, l)))
+           = 1 + List.length(A, List.prepend(A, y, l))
+           = 1 + (1 + List.length(A, l))
+           = 1 + List.length(A, List.prepend(A, x, l))
+           = List.length(A, List.prepend(A, y, List.prepend(A, x, l)))
+    case List.Permutation.transitive(a, b, c, leftPermutation, rightPermutation,
+             leftLengthEqual, rightLengthEqual):
+        List.length(A, a)
+           = List.length(A, b)   by leftLengthEqual
+           = List.length(A, c)   by rightLengthEqual
+  }
