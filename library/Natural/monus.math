@@ -14,9 +14,11 @@ import Natural.strong_recursion
 import Equality.basics
 import Logic.basics
 
--- monus(a, b) = a -̇ b. Structural on the first argument; inner case
--- on the second when needed. The recursion lives at the raw floor
--- (self-contained, below the seal) and is re-exposed at the alias.
+-- monus(a, b) = a -̇ b, defined by recursion on the SUBTRAHEND: taking
+-- away `successor(k)` takes away `k` and then one more predecessor. The
+-- helper is subtrahend-first so the recursion drives its (matched) first
+-- argument; `monus` restores the minuend-first argument order. The
+-- recursion lives at the raw floor (self-contained, below the seal).
 --
 -- The wrapper is `opaque` so the kernel won't δ-unfold `monus` during
 -- typechecking. Downstream proofs reason about monus through the
@@ -26,13 +28,16 @@ import Logic.basics
 -- definitional shape — e.g. `rewrite` finds the un-reduced form
 -- `monus(succ(k), succ(predD))` in goal types because the kernel
 -- leaves it as a stuck `monus(_, _)` application.
-definition Natural.Raw.monus : Natural.Raw → Natural.Raw → Natural.Raw
-  | zero,         _ => Natural.Raw.zero
-  | successor(k), b =>
-      cases b {
-        | zero         => Natural.Raw.successor(k)
-        | successor(j) => Natural.Raw.monus(k, j)
-      }
+definition Natural.Raw.predecessor : Natural.Raw → Natural.Raw
+  | Natural.Raw.zero         => Natural.Raw.zero
+  | Natural.Raw.successor(k) => k
+
+definition Natural.Raw.monusHelper : Natural.Raw → Natural.Raw → Natural.Raw
+  | Natural.Raw.zero,         a => a
+  | Natural.Raw.successor(k), a => Natural.Raw.predecessor(Natural.Raw.monusHelper(k, a))
+
+definition Natural.Raw.monus (minuend subtrahend : Natural.Raw) : Natural.Raw :=
+  Natural.Raw.monusHelper(subtrahend, minuend)
 
 opaque definition Natural.monus : Natural → Natural → Natural :=
   unfold Natural in Natural.Raw.monus
@@ -43,9 +48,25 @@ opaque definition Natural.monus : Natural → Natural → Natural :=
 -- (in this file and downstream) cites these lemmas instead. That's
 -- the discipline the opacity declaration is meant to enforce.
 
--- monus(zero, b) = zero.
-theorem Natural.monus_zero_left (b : Natural) : Natural.monus(0, b) = 0 :=
+-- monus(a, zero) = a. Subtracting nothing (definitional).
+theorem Natural.monus_zero (a : Natural) : Natural.monus(a, 0) = a :=
   done by unfolding Natural.monus
+
+-- The recursion equation: subtracting successor(b) is one more predecessor.
+theorem Natural.monus_successor (a b : Natural)
+        : Natural.monus(a, successor(b)) = Natural.predecessor(Natural.monus(a, b)) :=
+  done by unfolding Natural.monus, Natural.predecessor, Natural.Raw.predecessor, Natural
+
+-- monus(zero, b) = zero. Every predecessor of zero is zero.
+theorem Natural.monus_zero_left (b : Natural) : Natural.monus(0, b) = 0 :=
+  by induction on b with IH {
+    case zero: done by Natural.monus_zero
+    case successor(k):
+        Natural.monus(0, successor(k))
+           = Natural.predecessor(Natural.monus(0, k))   by Natural.monus_successor
+           = Natural.predecessor(0)                      by IH
+           = 0
+  }
 
 -- monus(successor(k), zero) = successor(k).
 theorem Natural.monus_succ_zero (k : Natural)
@@ -53,31 +74,38 @@ theorem Natural.monus_succ_zero (k : Natural)
   done by unfolding Natural.monus
 
 -- monus(successor(k), successor(j)) = monus(k, j). The recursive
--- step. Lets downstream proofs "subtract a 1 from both sides."
+-- step. Lets downstream proofs "subtract a 1 from both sides." Induct
+-- on j, peeling one predecessor off each side via the recursion equation.
 theorem Natural.monus_succ_succ (k j : Natural)
         : Natural.monus(successor(k), successor(j)) = Natural.monus(k, j) :=
-  done by unfolding Natural.monus
+  by induction on j with IH {
+    case zero:
+        Natural.monus(successor(k), successor(0))
+           = Natural.predecessor(Natural.monus(successor(k), 0))   by Natural.monus_successor
+           = Natural.predecessor(successor(k))                      by Natural.monus_succ_zero
+           = k
+           = Natural.monus(k, 0)                                    by Natural.monus_zero
+    case successor(m):
+        Natural.monus(successor(k), successor(successor(m)))
+           = Natural.predecessor(Natural.monus(successor(k), successor(m)))   by Natural.monus_successor
+           = Natural.predecessor(Natural.monus(k, m))                          by IH
+           = Natural.monus(k, successor(m))                                    by Natural.monus_successor
+  }
 
 -- The `1 + n` forms of the two recursive-step characterising lemmas, so
 -- downstream proofs peel a 1 off monus without naming the constructor.
--- `Natural.add` recurses on its left argument, so `1 + k ≡ successor(k)`
--- reduces under the unfold (unlike `k + 1`); the index produced by
--- `by induction`'s `case step(k)` is exactly this `1 + k` form.
 theorem Natural.monus_one_plus_zero (k : Natural)
         : Natural.monus(1 + k, 0) = 1 + k :=
-  done by unfolding Natural.add, Natural.monus
+  Natural.monus(1 + k, 0)
+     = Natural.monus(successor(k), 0)   by substituting Natural.one_add
+     = successor(k)                      by Natural.monus_succ_zero
+     = 1 + k                             by substituting Natural.one_add
 
 theorem Natural.monus_one_plus_one_plus (k j : Natural)
         : Natural.monus(1 + k, 1 + j) = Natural.monus(k, j) :=
-  done by unfolding Natural.add, Natural.monus
-
--- monus(a, zero) = a. Case-split a; cite monus_zero_left and
--- monus_one_plus_zero.
-theorem Natural.monus_zero (a : Natural) : Natural.monus(a, 0) = a :=
-  by induction on a with IH {
-    case base:    done
-    case step(k): done
-  }
+  Natural.monus(1 + k, 1 + j)
+     = Natural.monus(successor(k), successor(j))   by substituting Natural.one_add
+     = Natural.monus(k, j)                          by Natural.monus_succ_succ
 
 -- monus(a, a) = zero. Induct on a, using monus_one_plus_one_plus to peel
 -- a 1 off both sides.
