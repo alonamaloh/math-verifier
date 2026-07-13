@@ -3884,7 +3884,23 @@ private:
 
     SurfaceExpressionPointer parseCasesExpression() {
         Token casesToken = consumeAny();  // 'cases'
+        // The pattern-match `cases <scrutinee> { | Ctor(…) => … }` keyword was
+        // retired: it is a raw recursor split. Only `cases by <lemma> { … }`
+        // (the goal-directed split whose disjunction a lemma supplies) still
+        // uses the keyword. Every pattern-match use has a math-like form.
+        bool isCasesByLemma = (peek().kind == TokenKind::KeywordBy);
         auto scrutinee = parseCasesScrutinee();
+        if (!isCasesByLemma) {
+            throw ParseError(
+                "the `cases <scrutinee>` pattern-match was retired: split a "
+                "PROOF with `by cases { case x = <constructor pattern> "
+                "[for some …]: … }`, or `by induction on x` when the split "
+                "rides the recursor directly (coverage lemmas, `Sum`, "
+                "`Logic.Decidable`); destructure a VALUE with "
+                "`let ⟨…⟩ := x in …`; pick a quotient representative with "
+                "`by_representatives x as <pat> => …` (line "
+                + std::to_string(casesToken.line) + ")");
+        }
         // `cases E with <eq>` (pattern-match on an expression with the
         // refinement equation named) is retired: the equation-shaped
         // by-cases split carries the equation as a stated hypothesis.

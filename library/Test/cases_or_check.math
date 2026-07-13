@@ -9,9 +9,9 @@ import Equality.basics
 import Natural.basics
 
 theorem cases_or_symmetric (A B : Proposition) (h : A ∨ B) : B ∨ A :=
-  cases h {
-    | Or.introduceLeft(left) => Or.introduceRight(B, A, left)
-    | Or.introduceRight(right) => Or.introduceLeft(B, A, right)
+  done by cases {
+    case A as left: Or.introduceRight(B, A, left)
+    case B as right: Or.introduceLeft(B, A, right)
   }
 
 -- Or with existential payload — does `cases` peel both at once?
@@ -19,15 +19,15 @@ theorem cases_or_with_exists
         (P Q : Natural → Proposition)
         (h : Exists(Natural, P) ∨ Exists(Natural, Q))
         : Exists(Natural, (n : Natural) ↦ P(n) ∨ Q(n)) :=
-  cases h {
-    | Or.introduceLeft(existsP) => {
+  done by cases {
+    case Exists(Natural, P) as existsP: {
         choose witnessValue such that P(witnessValue) as witnessValueP from existsP;
         Exists.introduce(Natural,
             (n : Natural) ↦ P(n) ∨ Q(n),
             witnessValue,
             Or.introduceLeft(P(witnessValue), Q(witnessValue), witnessValueP))
       }
-    | Or.introduceRight(existsQ) => {
+    case Exists(Natural, Q) as existsQ: {
         choose witnessValue such that Q(witnessValue) as witnessValueQ from existsQ;
         Exists.introduce(Natural,
             (n : Natural) ↦ P(n) ∨ Q(n),

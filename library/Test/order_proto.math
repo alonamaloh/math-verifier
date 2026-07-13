@@ -72,17 +72,24 @@ theorem Proto.lt_weaken (a b : Natural) (h : Proto.lt(a, b)) : Proto.le(a, b) :=
 
 theorem Proto.le_transitive (a b c : Natural)
         (hab : Proto.le(a, b)) (hbc : Proto.le(b, c)) : Proto.le(a, c) :=
-  cases hab {
-    | Or.introduceLeft(ab) =>
-        cases hbc {
-          | Or.introduceLeft(bc) => Or.introduceLeft(Proto.lt_transitive(a, b, c, ab, bc))
-          | Or.introduceRight(bEqC) => Or.introduceLeft({ Proto.lt(a, c) by substituting bEqC })
+  {
+    Proto.lt(a, b) ∨ a = b by hab;
+    done by cases {
+      case Proto.lt(a, b) as ab: {
+          Proto.lt(b, c) ∨ b = c by hbc;
+          done by cases {
+            case Proto.lt(b, c) as bc: Or.introduceLeft(Proto.lt_transitive(a, b, c, ab, bc))
+            case b = c as bEqC: Or.introduceLeft({ Proto.lt(a, c) by substituting bEqC })
+          }
         }
-    | Or.introduceRight(aEqB) =>
-        cases hbc {
-          | Or.introduceLeft(bc) => Or.introduceLeft({ Proto.lt(a, c) by substituting aEqB })
-          | Or.introduceRight(bEqC) => Or.introduceRight({ a = b by aEqB = c by bEqC })
+      case a = b as aEqB: {
+          Proto.lt(b, c) ∨ b = c by hbc;
+          done by cases {
+            case Proto.lt(b, c) as bc: Or.introduceLeft({ Proto.lt(a, c) by substituting aEqB })
+            case b = c as bEqC: Or.introduceRight({ a = b by aEqB = c by bEqC })
+          }
         }
+    }
   }
 
 -- ── Trichotomy: the elimination test (does opaque `<` support case
