@@ -1,0 +1,42 @@
+-- Natural/well_founded.math
+--
+-- `<` is well-founded on the naturals: every `n` is accessible. This is the
+-- ℕ instance of the order-agnostic Logic.well_founded machinery — the one-time
+-- proof that lets data functions recurse on a decreasing Natural measure (the
+-- `decreasing` clause). Built from the recursor and the `<` lemmas alone.
+
+module Natural.well_founded
+
+import Logic.basics
+import Logic.well_founded
+import Natural.basics
+import Natural.order
+import Natural.peano
+import Equality.basics
+
+-- Every `k` below `n` is accessible under `<`, by recursion on `n`. The
+-- successor case introduces accessibility of `k` from the accessibility of
+-- everything below `m`: any `j < k` satisfies `j < k ≤ m`, so it is covered by
+-- the recursion at `m`.
+definition Natural.accessible_below
+        : (n : Natural) → (k : Natural) → k < n
+          → Accessible(Natural, Natural.LessThan, k)
+  | zero =>
+      (k : Natural) (kBelowZero : k < 0) ↦
+          False.eliminate(
+              Accessible(Natural, Natural.LessThan, k),
+              Natural.not_less_than_zero(k, kBelowZero))
+  | successor(m) =>
+      (k : Natural) (kBelowSuccessor : k < successor(m)) ↦
+          Accessible.introduce(Natural, Natural.LessThan, k,
+              (j : Natural) (jBelowK : j < k) ↦ {
+                k ≤ m by Natural.le_of_lt_one_plus;
+                j < m by Natural.LessThan.transitive_right as jBelowM;
+                Natural.accessible_below(m, j, jBelowM)
+              })
+
+-- `<` is well-founded on the naturals: every `n` is accessible.
+definition Natural.lt_wellFounded : WellFounded(Natural, Natural.LessThan) :=
+  (n : Natural) ↦
+      Accessible.introduce(Natural, Natural.LessThan, n,
+          Natural.accessible_below(n))

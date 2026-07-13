@@ -11,6 +11,8 @@ module Test.well_founded_test
 import Logic.basics
 import Logic.well_founded
 import Natural.basics
+import Natural.order
+import Natural.well_founded
 import Equality.basics
 
 -- Every element is accessible under the empty relation (no predecessors).
@@ -34,3 +36,19 @@ definition Test.constantlyZero (n : Natural) : Natural :=
 theorem Test.constantlyZero_reduces (n : Natural)
         : Test.constantlyZero(n) = 0 :=
   done by unfolding Test.constantlyZero, Test.alwaysAccessible
+
+-- End-to-end: a function built with the PUBLIC WellFounded.recursion + the ℕ
+-- instance Natural.lt_wellFounded. The step ignores the recursion (returns 0),
+-- so it reduces even though `lt_wellFounded` carries a symbolic accessibility.
+definition Test.zeroViaWellFounded (n : Natural) : Natural :=
+  WellFounded.recursion(
+      Natural, Natural.LessThan, (_ : Natural) ↦ Natural,
+      Natural.lt_wellFounded,
+      (subject : Natural)
+          (recurse : (predecessor : Natural) → predecessor < subject → Natural) ↦ 0,
+      n)
+
+theorem Test.zeroViaWellFounded_reduces (n : Natural)
+        : Test.zeroViaWellFounded(n) = 0 :=
+  done by unfolding Test.zeroViaWellFounded, WellFounded.recursion,
+      WellFounded.recursionFromAccessible, Natural.lt_wellFounded
