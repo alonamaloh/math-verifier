@@ -44,9 +44,12 @@ theorem absurdPropositionGoal (k : Natural)
         : 1 = 2 :=
   absurd(impossible)
 
--- (6) In a case body: simulates the real use site where one branch
--- of a destructure is impossible. The destructure refines the type
--- of `dPositive` so it becomes the impossible shape.
-theorem absurdInCaseArm : ∀ (d : Natural). 1 ≤ d → Natural
-  | zero,         dPositive => absurd(dPositive)
-  | successor(_), _          => zero
+-- (6) In an induction arm: simulates the real use site where one branch
+-- of a case split is impossible. Inducting on `d` refines the threaded
+-- hypothesis `dPositive` in the `zero` arm to the impossible shape
+-- `1 ≤ zero`, which `absurd` recognizes and discharges the goal.
+theorem absurdInCaseArm (d : Natural) : 1 ≤ d → 0 = 0 :=
+  by induction on d {
+    case zero:         (dPositive : 1 ≤ zero) ↦ absurd(dPositive)
+    case successor(k): (_dPositive : 1 ≤ successor(k)) ↦ reflexivity(Natural, 0)
+  }

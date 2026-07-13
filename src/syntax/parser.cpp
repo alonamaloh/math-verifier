@@ -1100,6 +1100,21 @@ private:
                     /*allowClaimTail=*/true);
             }
         } else if (peek().kind == TokenKind::Pipe) {
+            // Pattern-match `| Ctor(...) => body` proof rows are a raw
+            // recursor spelling; a theorem proof must read like mathematics.
+            // The surface form is retired for theorems (PLAN_REMOVE_SURFACE_CASES
+            // STEP 5) — write `by induction on <proof> { case Ctor(...): ... }`
+            // (moving the premise being matched to a parameter). Function
+            // `definition`s keep pattern-match clauses.
+            if (isTheorem) {
+                throwHere(
+                    "pattern-match `| Ctor(...) => ...` proof rows are no "
+                    "longer accepted for a `theorem` — this is a raw recursor "
+                    "spelling. Write the proof as `by induction on <proof> "
+                    "{ case Ctor(...): ... }` and move the premise being matched "
+                    "to a parameter. (Pattern-match clauses remain available "
+                    "for `definition`s.)");
+            }
             while (peek().kind == TokenKind::Pipe) {
                 declaration.cases.push_back(parsePatternCase());
             }
