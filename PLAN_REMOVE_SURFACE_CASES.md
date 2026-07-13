@@ -159,6 +159,77 @@ orchestrator verifies centrally (`make library`) and commits. Worked cleanly:
 **[x] DONE 2026-07-12b — 89/106 converted; 17 indexed-Prop residue (see SESSION
 HANDOFF above for the recipe, commits, and residue list).**
 
+### Residue update (2026-07-13): 3 Equality lemmas AXIOMATIZED; 14 need an elaborator fix
+
+- **Equality.symmetry/transitivity/congruence → AXIOMS** (commit `295b3a6f`).
+  They sit below the tactic layer (nothing high-level exists yet to prove them
+  with) and are the J-rule primitives; HOL-style axioms are cleaner than either
+  a raw recursor row or a marginal `by cases`. Defeq-safe: Proposition-valued, so
+  the kernel's definitional **proof irrelevance** (`kernel.cpp:2010`) equates them
+  with anything of the same type — their non-reduction as axioms is invisible.
+  (Owner preference 2026-07-13: minimal-trusted-core is NOT a goal; a CIC-style
+  checked kernel + isolating the high-level language from the recursor plumbing
+  IS. Axiom count 5→8; allowlist in `scripts/export_check.sh` + config + doc
+  `docs/kernel-export-axiom-inventory.md` updated in lockstep. `axiom` decls take
+  the full type after `:` — no binder telescope — so write
+  `axiom N : ∀ {A : Type} (x y : A). …` with bare `Type` auto-binding the universe.)
+
+- **The other 14 (`member` ×4, `Permutation` ×5, `Distinct` ×2,
+  `NaturalList.member` ×3) need the INDEX-GENERALIZATION elaborator fix** below.
+  These are recursive indexed families with real proofs — NOT axiom candidates.
+
+### Implementation spec — index generalization for `by induction on <indexed proof>`
+
+**It's a BUG, not a missing feature.** The residue theorems all have their inductive
+indices as LOCAL PARAMETERS (map_member's `list`, Permutation's `l1 l2`,
+Distinct's `list`), so the existing "index must be a distinct local variable"
+restriction (`cases.cpp:1657-1702`) is already satisfied. `by induction on x` for
+a general inductive falls through `elaborateCasesExpression` (cases.cpp ~1007) to
+**`elaborateCasesExpressionInner` (cases.cpp:1473)**, which already tries to build
+the indexed motive (abstracts over `indexLocalIndices ++ scrutinee`, wraps index
+Lambdas, passes index values to the recursor at 2042-2055). It has a **de Bruijn
+scope bug**, never exercised before (the residue used `|`, which routes through the
+pattern compiler's own motive, not this one).
+
+Minimal repro (kernel only; put in `library/Test/`, verify `--no-check-unused-names`):
+```
+theorem T (A B : Type(0)) (f : A → B) (element : A) (list : List(A))
+        (m : List.member(A, element, list))
+        : List.member(B, f(element), List.map(A, B, f, list)) :=
+  by induction on m with IH {
+    case List.member.here(rest): done
+    case List.member.there(head, rest, inner): done }
+```
+fails: `kernel: this argument has the wrong type … expects Type 0 but this
+argument is A → B, in the application of List to f` — a value (`f`) lands where
+`List`'s type argument (`A`) belongs.
+
+**Prime suspect: `cases.cpp:1812-1813`** — the index-lambda's domain is taken as
+`localBinders[arrayPosition].type` *verbatim*, but a binder's stored type is
+relative to ITS declaration context (only the binders BEFORE it), not the full
+`localBinders` scope the motive lives in. It must be shifted up by
+`(localBinders.size() - 1 - arrayPosition)` (the count of binders declared AFTER
+the index binder) — otherwise references like `A` inside `List(A)` under-shift and
+resolve to a later binder (`f`). Verify `scrutineeTypeInMotive` (1796-1798) and
+`motiveBody` (1759-1760) for the same later-declared-binder skew. buildCaseLambda's
+index handling (`patterns.cpp:733-993`) is CORRECT — the `|` path uses it fine;
+do NOT touch it.
+
+**Also needed — a design change, not just the shift fix:** multi-recursive-argument
+constructors (`Permutation.transitive(a,b,c,firstLeg,secondLeg)` — TWO recursive
+args) produce TWO induction hypotheses, but `with IH` binds ONE name. Give each
+recursive argument's binder its own IH (the arg name denotes "recurse on this leg"),
+so `transitive` cites `firstLeg`/`secondLeg` as the two IHs and drops `with IH`.
+And for the arm bodies to read like math (not raw `member.here(...)` constructor
+calls), the auto-prover needs forward constructor INTRODUCTION for
+`member`/`Permutation`/`Distinct` (or small intro lemmas) so bodies are `done`/
+`done by <recursive-leg>`.
+
+**Then:** convert the 14 (per the STEP-5 recipe), confirm 0 `|`-in-theorem proofs
+remain, and DELETE the pattern-match-theorem surface syntax (STEP 6 territory —
+functions still use `|`, so gate the deletion to theorem bodies). Each kernel edit
+re-verifies the whole library (~18s) + a recompile; budget several cycles.
+
 Owner directive (2026-07-12): the same north-star extends to the ~113
 pattern-match *theorem* proofs (`theorem T : (x:A) → P | Ctor(x) => proof`) — a
 proof written as raw recursor rows instead of `by induction on x`. These are the
