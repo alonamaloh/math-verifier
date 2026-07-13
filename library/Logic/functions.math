@@ -109,3 +109,84 @@ theorem Function.extensionality (A B : Type(0)) (f g : A → B)
      = ((x : A) ↦ Function.applyClass(A, B, Function.pointwiseClass(A, B, g), x))
      = g
 }
+
+-- ----------------------------------------------------------------------
+-- Dependent and Prop-domain extensionality. The same quotient construction
+-- as `Function.extensionality`, generalised to a dependent codomain `B(x)`
+-- and (impredicatively) to a Proposition domain. These are what a
+-- well-founded recursion's accessibility proofs need to be shown equal.
+-- The round trip through the quotient is closed by congruence rather than a
+-- bare calc so no library-theorem search runs on the Prop-domain endpoints.
+
+definition Function.DependentPointwiseEqual (A : Type(0)) (B : A → Type(0))
+        (f g : (x : A) → B(x)) : Proposition :=
+  ∀ (x : A). f(x) = g(x)
+
+definition Function.dependentPointwiseClass (A : Type(0)) (B : A → Type(0))
+        (f : (x : A) → B(x))
+        : Quotient((x : A) → B(x), Function.DependentPointwiseEqual(A, B)) :=
+  Quotient.class_of(f)
+
+definition Function.dependentApplyClass (A : Type(0)) (B : A → Type(0))
+        (q : Quotient((x : A) → B(x), Function.DependentPointwiseEqual(A, B))) (x : A) : B(x) :=
+  Quotient.lift(
+      (h : (x : A) → B(x)) ↦ h(x),
+      (h1 h2 : (x : A) → B(x))
+          (pointwise : Function.DependentPointwiseEqual(A, B, h1, h2)) ↦ pointwise(x),
+      q)
+
+-- Pointwise-equal dependent functions are equal.
+theorem Function.dependent_extensionality (A : Type(0)) (B : A → Type(0))
+        (f g : (x : A) → B(x))
+        (pointwiseEqual : ∀ (x : A). f(x) = g(x))
+        : f = g := {
+  Function.dependentPointwiseClass(A, B, f) = Function.dependentPointwiseClass(A, B, g)
+      by Quotient.equivalent_implies_equal as classEqual;
+  Equality.congruence(
+      (q : Quotient((x : A) → B(x), Function.DependentPointwiseEqual(A, B))) ↦
+          ((x : A) ↦ Function.dependentApplyClass(A, B, q, x)),
+      Function.dependentPointwiseClass(A, B, f), Function.dependentPointwiseClass(A, B, g), classEqual)
+}
+
+definition Function.PropositionPointwiseEqual (P : Proposition) (X : Type(0)) (f g : P → X)
+        : Proposition :=
+  ∀ (p : P). f(p) = g(p)
+
+definition Function.propositionPointwiseClass (P : Proposition) (X : Type(0)) (f : P → X)
+        : Quotient(P → X, Function.PropositionPointwiseEqual(P, X)) :=
+  Quotient.class_of(f)
+
+definition Function.propositionApplyClass (P : Proposition) (X : Type(0))
+        (q : Quotient(P → X, Function.PropositionPointwiseEqual(P, X))) (p : P) : X :=
+  Quotient.lift(
+      (h : P → X) ↦ h(p),
+      (h1 h2 : P → X) (pointwise : Function.PropositionPointwiseEqual(P, X, h1, h2)) ↦ pointwise(p),
+      q)
+
+-- Functions out of a Proposition are equal when they agree on every proof
+-- (the carrier `P → X` is Type(0) by impredicative Prop).
+theorem Function.extensionality_from_proposition (P : Proposition) (X : Type(0)) (f g : P → X)
+        (pointwiseEqual : ∀ (p : P). f(p) = g(p))
+        : f = g := {
+  Function.propositionPointwiseClass(P, X, f) = Function.propositionPointwiseClass(P, X, g)
+      by Quotient.equivalent_implies_equal as classEqual;
+  Equality.congruence(
+      (q : Quotient(P → X, Function.PropositionPointwiseEqual(P, X))) ↦
+          ((p : P) ↦ Function.propositionApplyClass(P, X, q, p)),
+      Function.propositionPointwiseClass(P, X, f), Function.propositionPointwiseClass(P, X, g), classEqual)
+}
+
+-- A function taking an element and then a proof about it — `(x : A) →
+-- P(x) → C(x)` — is determined by its values, combining the two
+-- extensionalities above.
+theorem Function.dependent_extensionality_over_proposition
+        (A : Type(0)) (P : A → Proposition) (C : A → Type(0))
+        (f g : (x : A) → P(x) → C(x))
+        (pointwise : ∀ (x : A). ∀ (p : P(x)). f(x, p) = g(x, p))
+        : f = g := {
+  ∀ (x : A). f(x) = g(x) by {
+    take x : A;
+    Function.extensionality_from_proposition(P(x), C(x), f(x), g(x), pointwise(x))
+  };
+  done by Function.dependent_extensionality(A, (x : A) ↦ (P(x) → C(x)), f, g)
+}

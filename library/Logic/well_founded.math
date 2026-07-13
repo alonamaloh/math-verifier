@@ -13,6 +13,8 @@
 module Logic.well_founded
 
 import Logic.basics
+import Logic.functions
+import Equality.basics
 
 -- `subject` is accessible under `r` when every `predecessor` with
 -- `r(predecessor, subject)` is itself accessible.
@@ -57,3 +59,131 @@ definition WellFounded.recursion.{u, w}
         (subject : A)
         : C(subject) :=
   WellFounded.recursionFromAccessible(A, r, C, step, subject, wellFounded(subject))
+
+-- ----------------------------------------------------------------------
+-- The unfolding lemma. A well-founded recursion does NOT reduce
+-- definitionally on an open measure: the recursion at a predecessor carries
+-- a different accessibility proof than the one `wellFounded` hands back, and
+-- `Accessible` lives in `Type` (no free proof irrelevance). So the
+-- characterising equation of a `decreasing`-recursive function is proved
+-- through `WellFounded.recursion_unfold`, which rests on `Accessible`
+-- being a subsingleton — itself a consequence of function extensionality.
+--
+-- These proofs cite the raw `Accessible_recursor`: they are the foundational
+-- boundary where the induction hypothesis for the higher-order `below` field
+-- is threaded by hand (the `by induction` short form does not yet infer the
+-- field's universe), analogous to `Equality.transport_proposition`.
+
+-- The `below` field of an accessibility proof: for every predecessor, its
+-- own accessibility. Large elimination into the function type.
+definition Accessible.below (A : Type(0)) (r : A → A → Proposition) (subject : A)
+        (accessibility : Accessible(A, r, subject))
+        : (predecessor : A) → r(predecessor, subject) → Accessible(A, r, predecessor) :=
+  Accessible_recursor(
+      A, r,
+      (element : A) (_ : Accessible(A, r, element)) ↦
+          (predecessor : A) → r(predecessor, element) → Accessible(A, r, predecessor),
+      (element : A)
+          (below : (predecessor : A) → r(predecessor, element) → Accessible(A, r, predecessor))
+          (_ : (recursivePredecessor : A) → r(recursivePredecessor, element)
+               → (predecessor : A) → r(predecessor, recursivePredecessor)
+               → Accessible(A, r, predecessor)) ↦
+          below,
+      subject, accessibility)
+
+-- Every accessibility proof is its own constructor applied to its field.
+theorem Accessible.eta (A : Type(0)) (r : A → A → Proposition) (subject : A)
+        (accessibility : Accessible(A, r, subject))
+        : accessibility
+          = Accessible.introduce(A, r, subject, Accessible.below(A, r, subject, accessibility)) :=
+  Accessible_recursor(
+      A, r,
+      (element : A) (a : Accessible(A, r, element)) ↦
+          a = Accessible.introduce(A, r, element, Accessible.below(A, r, element, a)),
+      (element : A)
+          (below : (predecessor : A) → r(predecessor, element) → Accessible(A, r, predecessor))
+          (_ : (recursivePredecessor : A) → (rp : r(recursivePredecessor, element))
+               → below(recursivePredecessor, rp)
+                 = Accessible.introduce(A, r, recursivePredecessor,
+                       Accessible.below(A, r, recursivePredecessor, below(recursivePredecessor, rp)))) ↦
+          reflexivity(
+              Accessible(A, r, element),
+              Accessible.introduce(A, r, element, below)),
+      subject, accessibility)
+
+-- Accessibility proofs at a point are all equal. By recursion on the first,
+-- inverting the second through `Accessible.eta` and matching the fields with
+-- the induction hypothesis under extensionality.
+theorem Accessible.subsingleton (A : Type(0)) (r : A → A → Proposition) (subject : A)
+        (first : Accessible(A, r, subject))
+        : ∀ (second : Accessible(A, r, subject)). first = second :=
+  Accessible_recursor(
+      A, r,
+      (element : A) (a : Accessible(A, r, element)) ↦
+          ∀ (second : Accessible(A, r, element)). a = second,
+      (element : A)
+          (below : (predecessor : A) → r(predecessor, element) → Accessible(A, r, predecessor))
+          (inductionHypothesis : (recursivePredecessor : A) → (rp : r(recursivePredecessor, element))
+               → ∀ (second : Accessible(A, r, recursivePredecessor)).
+                     below(recursivePredecessor, rp) = second) ↦
+          (second : Accessible(A, r, element)) ↦ {
+            second = Accessible.introduce(A, r, element, Accessible.below(A, r, element, second))
+                by Accessible.eta as secondEta;
+            ∀ (predecessor : A). ∀ (rp : r(predecessor, element)).
+                below(predecessor, rp) = Accessible.below(A, r, element, second, predecessor, rp) by {
+              take predecessor : A;
+              take rp : r(predecessor, element);
+              inductionHypothesis(predecessor, rp,
+                  Accessible.below(A, r, element, second, predecessor, rp))
+            };
+            below = Accessible.below(A, r, element, second)
+                by Function.dependent_extensionality_over_proposition(
+                    P := (predecessor : A) ↦ r(predecessor, element),
+                    C := (predecessor : A) ↦ Accessible(A, r, predecessor));
+            Accessible.introduce(A, r, element, below)
+               = Accessible.introduce(A, r, element, Accessible.below(A, r, element, second))
+               = second by secondEta
+          },
+      subject, first)
+
+-- The unfolding equation: a well-founded recursion at `subject` equals the
+-- step applied to the recursion at every predecessor.
+theorem WellFounded.recursion_unfold (A : Type(0)) (r : A → A → Proposition) (C : A → Type(0))
+        (wellFounded : WellFounded(A, r))
+        (step : (subject : A)
+                → ((predecessor : A) → r(predecessor, subject) → C(predecessor))
+                → C(subject))
+        (subject : A)
+        : WellFounded.recursion(A, r, C, wellFounded, step, subject)
+          = step(subject, (predecessor : A) (rp : r(predecessor, subject)) ↦
+                             WellFounded.recursion(A, r, C, wellFounded, step, predecessor)) := {
+  ∀ (predecessor : A). ∀ (rp : r(predecessor, subject)).
+      WellFounded.recursionFromAccessible(A, r, C, step, predecessor,
+          Accessible.below(A, r, subject, wellFounded(subject), predecessor, rp))
+        = WellFounded.recursion(A, r, C, wellFounded, step, predecessor) by {
+    take predecessor : A;
+    take rp : r(predecessor, subject);
+    Accessible.below(A, r, subject, wellFounded(subject), predecessor, rp) = wellFounded(predecessor)
+        by Accessible.subsingleton;
+    done by unfolding WellFounded.recursion
+  };
+  ((predecessor : A) (rp : r(predecessor, subject)) ↦
+      WellFounded.recursionFromAccessible(A, r, C, step, predecessor,
+          Accessible.below(A, r, subject, wellFounded(subject), predecessor, rp)))
+    = ((predecessor : A) (rp : r(predecessor, subject)) ↦
+          WellFounded.recursion(A, r, C, wellFounded, step, predecessor))
+      by Function.dependent_extensionality_over_proposition(
+          P := (predecessor : A) ↦ r(predecessor, subject), C := C);
+  WellFounded.recursion(A, r, C, wellFounded, step, subject)
+     = WellFounded.recursionFromAccessible(A, r, C, step, subject, wellFounded(subject))
+         by unfolding WellFounded.recursion
+     = WellFounded.recursionFromAccessible(A, r, C, step, subject,
+           Accessible.introduce(A, r, subject, Accessible.below(A, r, subject, wellFounded(subject))))
+         by Accessible.eta
+     = step(subject, (predecessor : A) (rp : r(predecessor, subject)) ↦
+                WellFounded.recursionFromAccessible(A, r, C, step, predecessor,
+                    Accessible.below(A, r, subject, wellFounded(subject), predecessor, rp)))
+         by unfolding WellFounded.recursionFromAccessible
+     = step(subject, (predecessor : A) (rp : r(predecessor, subject)) ↦
+                WellFounded.recursion(A, r, C, wellFounded, step, predecessor))
+}
