@@ -41,7 +41,16 @@ This plan removes those too, then deletes the keyword.
   single-recursion) — so the genuine residue needing a NEW language feature is
   **0**. Recommendation adopted: reformulate rather than build multi-column
   matching or a value-level data-match keyword.
-- [~] **STEP 2 — Migrate 129 single-constructor destructures** → `let ⟨…⟩ :=`.
+- [x] **STEP 2 — DONE.** All single-constructor `cases <var> { | pat => body }`
+  destructures migrated: 117 sites across 59 files (a parallel 7-agent sweep +
+  reference exemplars). Struct/bundle/Subtype/Product → `let ⟨…⟩ := v in body`
+  (block position uses `;` not `in`; a multi-step relation-chain body after a
+  `let … in` needs `{ … }` wrapping). Quotient representatives →
+  `by_representatives x as … => body` (bare name, or `as ⟨fields⟩` for a make;
+  nested scrutinees collapse to one line; uses `=>` not `↦`). Genuine single-arm
+  `| pat =>` destructure count is now **0**. Decisive A-vs-B test: is the
+  scrutinee's TYPE a quotient (→ by_representatives) or a single-constructor
+  struct (→ let ⟨⟩) — the build confirms.
 - [~] **STEP 3 — Migrate 98 multi-constructor splits** → `by cases` /
   `by induction` / `choose` / helper / **reformulation** (for the 5 residue).
   **ALL 5 residue reformulations DONE** (full library + tests green, every
