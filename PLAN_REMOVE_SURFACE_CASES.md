@@ -15,12 +15,42 @@ Two things are already true (done in the prior session — see Status):
 
 This plan removes those too, then deletes the keyword.
 
-## SESSION HANDOFF (2026-07-12b) — polish DONE; STEP 5 conversion DONE (17 residue); next = STEP 6
+## SESSION HANDOFF (2026-07-13) — STEP 5 FULLY COMPLETE; `|`-in-theorem syntax RETIRED; next = STEP 6
 
-STEPS 1–5 (conversion) COMPLETE. Surface `cases` keyword retired (STEPS 1–4);
-the STEP-2/3 migration polish and the STEP-5 pattern-match-theorem conversion
-both landed this session, `make library`+`tests`+`error-tests` green throughout.
-Guiding principle: [[no_computation_needed]].
+**STEP 5 is DONE end-to-end.** The 14 indexed-Prop residue converted, the
+elaborator de Bruijn bug fixed, and the surface `|`-in-theorem-proof syntax
+RETIRED at the parser (functions keep `|`). `make library`+`tests`+`error-tests`
+(54)+`export-check` (2749) all green. Two commits: `50304de4` (kernel fix + 14
+conversions), `ef094370` (syntax retirement). Guiding principle: [[no_computation_needed]].
+
+**Done this session (2026-07-13):**
+1. **Fixed the index-generalization de Bruijn bug** (`cases.cpp` motive-wrapping
+   loop, ~line 1807): each index-Lambda's domain was taken as
+   `localBinders[arrayPosition].type` verbatim, but a binder's stored type is
+   relative to the binders declared BEFORE it — so `A` in `List(A)` under-shifted
+   to a later binder (`f`). Fix = `shift(type, size - arrayPosition)` into full
+   localBinders scope, then `abstractOverBoundVariables` over the PRECEDING index
+   binders. (The plan's suggested shift `size-1-arrayPosition` was off by one; the
+   correct amount is `size - arrayPosition`.) Multi-index (Permutation's l1,l2)
+   and multi-IH (transitive's two IHs) both work with NO further change:
+   buildCaseLambda already supports explicit per-recursive-arg IH names written
+   directly in the `case` pattern (`case Ctor(v…, ih1, ih2):`) — that IS the
+   "arg name denotes recurse on this leg" design.
+2. **Converted the 14 residue** to `by induction on <proof>`: List.member ×3,
+   List.Permutation ×6, List.Distinct ×2, NaturalList.member ×3. Recipe: premise
+   → parameter (type-identical); single-IH → `with IH`, two-IH → explicit names
+   in the `case` pattern; **bare inversions of an inductive-proof hypothesis need
+   an explicit `by <lemma>`** — the `by induction` arm prover does NOT auto-invert
+   such hypotheses (the old `|` form did). Regression test in
+   `library/Test/indexed_induction_repro.math`.
+3. **Retired the `|`-in-theorem syntax**: `parseDefinitionDeclaration` throws when
+   `isTheorem` and the body is `|`-rows. Converted 4 Test fixtures; deleted
+   `multi_pattern_refinement_test` (multi-column simultaneous refinement has no
+   `by induction` equivalent and was unused post-conversion); retargeted the
+   `sealed_natural_pattern_match` ErrorTest onto a Prop-valued `definition`; added
+   `pattern_match_theorem_retired` ErrorTest.
+
+**Superseded prior handoff below (STEP 5 was "17 residue remaining"):**
 
 **Done this session:**
 1. **POLISHED the STEP-2/3 migrations** (commit `c277b3ad`): all 21
@@ -156,10 +186,14 @@ orchestrator verifies centrally (`make library`) and commits. Worked cleanly:
 
 ## STEP 5 — the "weird proofs": pattern-match THEOREM proofs → by induction/by cases
 
-**[x] DONE 2026-07-12b — 89/106 converted; 17 indexed-Prop residue (see SESSION
-HANDOFF above for the recipe, commits, and residue list).**
+**[x] FULLY DONE 2026-07-13.** 89/106 converted 2026-07-12b; the 17 residue
+resolved 2026-07-13 (3 Equality → axioms in `295b3a6f`; the other 14 via the
+elaborator de Bruijn fix + conversion in `50304de4`); the `|`-in-theorem surface
+syntax RETIRED in `ef094370`. Zero pattern-match theorem proofs remain (parser
+rejects them). See the 2026-07-13 SESSION HANDOFF above for the fix, recipe, and
+gotchas. Below is the original residue analysis, now historical.
 
-### Residue update (2026-07-13): 3 Equality lemmas AXIOMATIZED; 14 need an elaborator fix
+### Residue update (2026-07-13): 3 Equality lemmas AXIOMATIZED; 14 CONVERTED (elaborator fix landed)
 
 - **Equality.symmetry/transitivity/congruence → AXIOMS** (commit `295b3a6f`).
   They sit below the tactic layer (nothing high-level exists yet to prove them
