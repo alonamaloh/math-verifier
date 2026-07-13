@@ -44,17 +44,41 @@ This plan removes those too, then deletes the keyword.
 - [~] **STEP 2 — Migrate 129 single-constructor destructures** → `let ⟨…⟩ :=`.
 - [~] **STEP 3 — Migrate 98 multi-constructor splits** → `by cases` /
   `by induction` / `choose` / helper / **reformulation** (for the 5 residue).
-  Done so far (reformulations, full library + tests green, downstream untouched):
+  **ALL 5 residue reformulations DONE** (full library + tests green, every
+  characterising-lemma statement preserved so downstream is untouched):
   - `Natural.maximum := a + monus(b, a)` — non-recursive; inequalities re-prove
     from monus lemmas (left = less_or_equal_add_right; right = totality split).
   - `Natural.distance := monus(a,b) + monus(b,a)` — char lemmas
     (zero_left/_right/_succ_succ + 1+ form) recover the recursion; metric
-    proofs re-derive through them; `add_left_cancel`/`respects` collapse via new
-    `Natural.monus_add_common_left`/`_right` (added to monus.math).
-  Remaining residue reformulations: `Natural.monus` (single-recursion on 2nd
-  arg via predecessor), `Polynomial.nth` (value-level `if index = 0`),
-  `Polynomial.Coefficients.add` (single-recursion + head/tail helpers). Plus the
-  5 clean value-level lifts and the 88 proof-level migrations.
+    proofs re-derive; `add_left_cancel`/`respects` collapse via new
+    `Natural.monus_add_common_left`/`_right`.
+  - `Polynomial.nth` — recurse on the INDEX (nthFromIndex + Coefficients
+    head/tail); keeps `nth(cons,0)=c` definitional, `nth(nil,i)=0` becomes
+    lemma `nth_nil`, tail-shift = `nth_one_plus`. Rippled to ~10 files (each
+    cites `nth_nil` where it had relied on the old nil reduction).
+  - `Polynomial.Coefficients.add` — recurse on first list, pair heads/tails;
+    `add(nil,ys)=ys` definitional, `add(p,nil)=p` = new lemma `add_nil_right`;
+    `nth_add` re-proves through the nth char lemmas.
+  - `Natural.monus` — recurse on the SUBTRAHEND via predecessor (Raw.predecessor
+    + monusHelper); `monus(a,0)=a` and `monus(a,succ b)=predecessor(monus(a,b))`
+    definitional (the latter bridges Raw↔Natural predecessor by unfolding the
+    seal); `monus_zero_left`/`monus_succ_succ` re-derive by induction.
+  So the genuine residue needing a new language feature is confirmed **0**.
+  Remaining for full removal: the 5 clean value-level lifts (3 `cases decision`,
+  `floor_divide`, `diagonalStep`), STEP 2's 127 single-arm `let ⟨⟩`, and the
+  ~88 proof-level `cases`→`by cases`/induction/choose migrations.
+
+  Reusable gotchas found this pass (calc/elaborator):
+  - `by substituting` takes ONE lemma; multi-lemma → split into steps or use
+    unnamed `by substitution` (searches in-scope facts, incl. auto IH).
+  - A calc step's `by <justification>` needs its RHS on ONE line; a by-less
+    middle step followed by another step trips the non-associativity parser —
+    give every non-terminal step a `by`, or merge steps.
+  - `by cases`/goal-directed forms can't be a bare pattern-match ROW body; wrap
+    in `{ … }`. Typed `let` in a block needs `: type`.
+  - Reordering a two-arg data function to single-column matching keeps exactly
+    ONE argument's reduction definitional; pick the one used most as a literal
+    (nth: cons-at-0), make the other (nil-at-symbolic) a char lemma + cite it.
 - [ ] **STEP 4 — Remove the `cases` keyword** from parser + elaborator surface;
   keep the recursor engine for desugarings. Add an ErrorTest that a bare
   `cases` keyword is now unknown syntax.
