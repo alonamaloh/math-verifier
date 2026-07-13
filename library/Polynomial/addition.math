@@ -47,16 +47,18 @@ definition Polynomial.Coefficients.add (r : Ring)
 -- head reads 0 (absorbed by `Ring.add_zero`) and the tail recursion peels
 -- the list; `add(nil, ys) = ys` is the left identity, definitional.
 theorem Polynomial.Coefficients.add_nil_right (r : Ring)
-        : (p : Polynomial.Coefficients(Ring.carrier(r)))
-          → Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.nil(Ring.carrier(r))) = p
-  | Polynomial.Coefficients.nil =>
-      reflexivity(Polynomial.Coefficients(Ring.carrier(r)), Polynomial.Coefficients.nil(Ring.carrier(r)))
-  | Polynomial.Coefficients.cons(a, restA) =>
-      Polynomial.Coefficients.cons(Ring.carrier(r), (a + Ring.zero(r)),
-            Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))
-         = Polynomial.Coefficients.cons(Ring.carrier(r), a,
-               Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))   by substituting Ring.add_zero
-         = Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)   by substitution
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.nil(Ring.carrier(r))) = p :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+        reflexivity(Polynomial.Coefficients(Ring.carrier(r)), Polynomial.Coefficients.nil(Ring.carrier(r)))
+    case Polynomial.Coefficients.cons(a, restA):
+        Polynomial.Coefficients.cons(Ring.carrier(r), (a + Ring.zero(r)),
+              Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))
+           = Polynomial.Coefficients.cons(Ring.carrier(r), a,
+                 Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))   by substituting Ring.add_zero
+           = Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)   by substituting IH
+  }
 
 -- Bridge: the i-th coefficient of p + q is the ring-sum of the i-th
 -- coefficients. Structural recursion on the first list, with q and the

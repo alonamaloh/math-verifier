@@ -49,23 +49,23 @@ overload coords := ComplexNumber.coordinatesOfCoefficients
 -- ----------------------------------------------------------------------
 -- An all-zero coefficient list has coordinates (0, 0).
 theorem ComplexNumber.coordinatesOfCoefficients_all_zero
-        : ∀ (a : Polynomial.Coefficients(Real)).
-          (∀ (i : Natural). Polynomial.nth(Real, Real.zero, a, i) = Real.zero)
+        (a : Polynomial.Coefficients(Real))
+        : (∀ (i : Natural). Polynomial.nth(Real, Real.zero, a, i) = Real.zero)
           → ComplexNumber.coordinatesOfCoefficients(a)
-            = Product.make(Real.zero, Real.zero)
-  | Polynomial.Coefficients.nil =>
-      (allZero
-          : ∀ (i : Natural). Polynomial.nth(Real, Real.zero,
-                Polynomial.Coefficients.nil(Real), i) = Real.zero) ↦
-        reflexivity(Pair(Real, Real), Product.make(Real.zero, Real.zero))
-  | Polynomial.Coefficients.cons(c, rest) =>
-      (allZero
-          : ∀ (i : Natural). Polynomial.nth(Real, Real.zero,
-                Polynomial.Coefficients.cons(Real, c, rest), i) = Real.zero) ↦ {
+            = Product.make(Real.zero, Real.zero) :=
+  by induction on a with IH {
+    case Polynomial.Coefficients.nil:
+        (allZero
+            : ∀ (i : Natural). Polynomial.nth(Real, Real.zero,
+                  Polynomial.Coefficients.nil(Real), i) = Real.zero) ↦
+          reflexivity(Pair(Real, Real), Product.make(Real.zero, Real.zero))
+    case Polynomial.Coefficients.cons(c, rest):
+        (allZero
+            : ∀ (i : Natural). Polynomial.nth(Real, Real.zero,
+                  Polynomial.Coefficients.cons(Real, c, rest), i) = Real.zero) ↦ {
         c = Real.zero by allZero(0);
         coords(rest) = Product.make(Real.zero, Real.zero)
-            by ComplexNumber.coordinatesOfCoefficients_all_zero(rest,
-                   (i : Natural) ↦ {
+            by IH((i : Natural) ↦ {
                      Polynomial.nth(Real, Real.zero,
                              Polynomial.Coefficients.cons(Real, c, rest), 1 + i) = Real.zero
                          by allZero;
@@ -94,6 +94,7 @@ theorem ComplexNumber.coordinatesOfCoefficients_all_zero
            = Product.make(Real.zero, Real.zero)
                  by imaginaryCoordinate
       }
+  }
 
 -- ----------------------------------------------------------------------
 -- Coordinates respect extensional equality of coefficient lists: two
