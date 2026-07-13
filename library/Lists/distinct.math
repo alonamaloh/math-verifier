@@ -161,19 +161,19 @@ theorem List.range_down_distinct (n : Natural)
 -- As `map_distinct` below, but requiring injectivity only on the members
 -- of the list. (k ↦ [k] mod p is not globally injective — [0] = [p] — yet
 -- on the members of range_down(p−1) it is, and that is all this asks.)
-theorem List.map_distinct_on (A B : Type(0)) (f : A → B)
-        : ∀ (list : List(A)).
-          (∀ (x y : A). List.member(A, x, list) → List.member(A, y, list)
+theorem List.map_distinct_on (A B : Type(0)) (f : A → B) (list : List(A))
+        : (∀ (x y : A). List.member(A, x, list) → List.member(A, y, list)
                  → f(x) = f(y) → x = y)
           → List.Distinct(A, list)
-          → List.Distinct(B, List.map(A, B, f, list))
-  | List.empty =>
+          → List.Distinct(B, List.map(A, B, f, list)) :=
+  by induction on list with IH {
+    case List.empty:
       (injectiveOnList
           : ∀ (x y : A). List.member(A, x, List.empty(A))
               → List.member(A, y, List.empty(A)) → f(x) = f(y) → x = y)
       (distinct : List.Distinct(A, List.empty(A))) ↦
         List.Distinct.empty(B)
-  | List.prepend(head, tail) =>
+    case List.prepend(head, tail):
       (injectiveOnList
           : ∀ (x y : A). List.member(A, x, List.prepend(A, head, tail))
               → List.member(A, y, List.prepend(A, head, tail))
@@ -205,8 +205,9 @@ theorem List.map_distinct_on (A B : Type(0)) (f : A → B)
             by List.not_member_map_of_not_member_on as imageHeadNotInImageTail;
         List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
             imageHeadNotInImageTail,
-            List.map_distinct_on(A, B, f, tail, injectiveOnTail, tailDistinct))
+            IH(injectiveOnTail, tailDistinct))
       }
+  }
 
 -- An injective map preserves distinctness.
 theorem List.map_distinct (A B : Type(0)) (f : A → B)
@@ -225,14 +226,15 @@ theorem List.map_distinct (A B : Type(0)) (f : A → B)
 -- permutations of each other — the finite-set "injection between equal
 -- cardinalities is a bijection" fact, in list form. Extract the head of
 -- l1 from l2 and recurse on the tails.
-theorem List.permutation_of_distinct_inclusion (A : Type(0))
-        : ∀ (l1 l2 : List(A)).
+theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
+        : ∀ (l2 : List(A)).
           List.Distinct(A, l1)
           → List.Distinct(A, l2)
           → (∀ (x : A). List.member(A, x, l1) → List.member(A, x, l2))
           → List.length(A, l1) = List.length(A, l2)
-          → List.Permutation(A, l1, l2)
-  | List.empty =>
+          → List.Permutation(A, l1, l2) :=
+  by induction on l1 with IH {
+    case List.empty:
       (l2 : List(A))
       (distinct1 : List.Distinct(A, List.empty(A)))
       (distinct2 : List.Distinct(A, l2))
@@ -252,7 +254,7 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0))
               absurd(impossible)
             }
         }
-  | List.prepend(head, tail) =>
+    case List.prepend(head, tail):
       (l2 : List(A))
       (distinct1 : List.Distinct(A, List.prepend(A, head, tail)))
       (distinct2 : List.Distinct(A, l2))
@@ -297,10 +299,10 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0))
         List.length(A, tail) = List.length(A, rest) as restLengthEquation;
         -- Recurse on the tails and reassemble.
         List.Permutation(A, tail, rest)
-            by List.permutation_of_distinct_inclusion(A, tail, rest,
-                   tailDistinct, restDistinct, tailInclusion, restLengthEquation);
+            by IH(rest, tailDistinct, restDistinct, tailInclusion, restLengthEquation);
         List.Permutation(A, List.prepend(A, head, tail), List.prepend(A, head, rest));
         List.Permutation(A, List.prepend(A, head, rest), l2)
             by List.Permutation.symmetric;
         done
       }
+  }

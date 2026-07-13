@@ -68,36 +68,41 @@ theorem Polynomial.Coefficients.add_nil_right (r : Ring)
 -- index split reads the head (`nth_cons_zero`) or drops to the tails
 -- (`nth_cons_one_plus` / `nth_one_plus`), where the recursion applies.
 theorem Polynomial.nth_add (r : Ring)
-        : (p q : Polynomial.Coefficients(Ring.carrier(r)))
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : (q : Polynomial.Coefficients(Ring.carrier(r)))
           → ∀ (index : Natural).
           Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), index)
-            = (Polynomial.coefficient(r, p, index) + Polynomial.coefficient(r, q, index))
-  | Polynomial.Coefficients.nil, q, index => {
-      Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index) = Ring.zero(r)
-          by Polynomial.nth_nil;
-      Polynomial.coefficient(r, Polynomial.Coefficients.add(r, Polynomial.Coefficients.nil(Ring.carrier(r)), q), index)
-         = Polynomial.coefficient(r, q, index)
-         = Ring.zero(r) + Polynomial.coefficient(r, q, index)
-         = Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index)
-             + Polynomial.coefficient(r, q, index)
-    }
-  | Polynomial.Coefficients.cons(a, restA), q, index => {
-      let tail : Polynomial.Coefficients(Ring.carrier(r)) := Polynomial.Coefficients.tail(Ring.carrier(r), q);
-      let cell : Polynomial.Coefficients(Ring.carrier(r)) := Polynomial.Coefficients.cons(Ring.carrier(r), a, restA);
-      done by cases {
-        case index = 0: done
-        case index = 1 + j for some j: {
-            Polynomial.coefficient(r, cell, 1 + j) = Polynomial.coefficient(r, restA, j)
-                by Polynomial.nth_cons_one_plus;
-            Polynomial.coefficient(r, q, 1 + j) = Polynomial.coefficient(r, tail, j)
-                by Polynomial.nth_one_plus;
-            Polynomial.coefficient(r, Polynomial.Coefficients.add(r, cell, q), 1 + j)
-               = Polynomial.coefficient(r, Polynomial.Coefficients.add(r, restA, tail), j)   by Polynomial.nth_cons_one_plus
-               = (Polynomial.coefficient(r, restA, j) + Polynomial.coefficient(r, tail, j))   by Polynomial.nth_add(r, restA, tail, j)
-               = (Polynomial.coefficient(r, cell, 1 + j) + Polynomial.coefficient(r, q, 1 + j))   by substitution
+            = (Polynomial.coefficient(r, p, index) + Polynomial.coefficient(r, q, index)) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+        (q : Polynomial.Coefficients(Ring.carrier(r))) (index : Natural) ↦ {
+          Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index) = Ring.zero(r)
+              by Polynomial.nth_nil;
+          Polynomial.coefficient(r, Polynomial.Coefficients.add(r, Polynomial.Coefficients.nil(Ring.carrier(r)), q), index)
+             = Polynomial.coefficient(r, q, index)
+             = Ring.zero(r) + Polynomial.coefficient(r, q, index)
+             = Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index)
+                 + Polynomial.coefficient(r, q, index)
+        }
+    case Polynomial.Coefficients.cons(a, restA):
+        (q : Polynomial.Coefficients(Ring.carrier(r))) (index : Natural) ↦ {
+          let tail : Polynomial.Coefficients(Ring.carrier(r)) := Polynomial.Coefficients.tail(Ring.carrier(r), q);
+          let cell : Polynomial.Coefficients(Ring.carrier(r)) := Polynomial.Coefficients.cons(Ring.carrier(r), a, restA);
+          done by cases {
+            case index = 0: done
+            case index = 1 + j for some j: {
+                Polynomial.coefficient(r, cell, 1 + j) = Polynomial.coefficient(r, restA, j)
+                    by Polynomial.nth_cons_one_plus;
+                Polynomial.coefficient(r, q, 1 + j) = Polynomial.coefficient(r, tail, j)
+                    by Polynomial.nth_one_plus;
+                Polynomial.coefficient(r, Polynomial.Coefficients.add(r, cell, q), 1 + j)
+                   = Polynomial.coefficient(r, Polynomial.Coefficients.add(r, restA, tail), j)   by Polynomial.nth_cons_one_plus
+                   = (Polynomial.coefficient(r, restA, j) + Polynomial.coefficient(r, tail, j))   by IH(tail, j)
+                   = (Polynomial.coefficient(r, cell, 1 + j) + Polynomial.coefficient(r, q, 1 + j))   by substitution
+              }
           }
-      }
-    }
+        }
+  }
 
 -- Coefficient-list addition respects the equivalence: equal-as-functions
 -- inputs give equal-as-functions outputs. Pointwise in the index via

@@ -29,40 +29,44 @@ import Lists.basics
 -- Helpers (arithmetic + order facts not yet in the upstream modules).
 
 -- Every natural is either zero or ≥ 1.
-theorem Natural.is_zero_or_at_least_one
-        : ∀ (k : Natural). k = 0 ∨ 1 ≤ k
-  | zero                    => okay
-  | successor(kPredecessor) => {
-      1 ≤ successor(kPredecessor);
-      done
-    }
-
--- 1 ≤ n splits into n = 1 ∨ 2 ≤ n. Pattern-match on n: zero
--- contradicts the hypothesis, successor(predN) re-splits via
--- is_zero_or_at_least_one on predN.
-automatic theorem Natural.equals_one_or_at_least_two
-        : ∀ (n : Natural). 1 ≤ n → n = 1 ∨ 2 ≤ n
-  | zero, oneLessOrEqualZero =>
-      absurd(oneLessOrEqualZero)
-  | successor(nPredecessor), _ =>
-      done by cases {
-        case nPredecessor = 0: done
-        case 1 ≤ nPredecessor as predecessorPositive: {
-            2 ≤ successor(nPredecessor);
-            done
-          }
+theorem Natural.is_zero_or_at_least_one (k : Natural) : k = 0 ∨ 1 ≤ k :=
+  done by cases {
+    case k = 0: okay
+    case k = successor(kPredecessor) for some kPredecessor: {
+        1 ≤ successor(kPredecessor);
+        done
       }
+  }
+
+-- 1 ≤ n splits into n = 1 ∨ 2 ≤ n. Case-split on n: zero
+-- contradicts the hypothesis, successor(nPredecessor) re-splits via
+-- is_zero_or_at_least_one on nPredecessor.
+automatic theorem Natural.equals_one_or_at_least_two
+        (n : Natural) (positivity : 1 ≤ n) : n = 1 ∨ 2 ≤ n :=
+  done by cases {
+    case n = 0: {
+        1 ≤ 0;
+        False; done
+      }
+    case n = successor(nPredecessor) for some nPredecessor:
+        done by cases {
+          case nPredecessor = 0: done
+          case 1 ≤ nPredecessor as predecessorPositive: {
+              2 ≤ successor(nPredecessor);
+              done
+            }
+        }
+  }
 
 -- If 1 ≤ n and n = p * q, then 1 ≤ q. By cases on q: q = 0 forces
--- n = p * 0 = 0, contradicting 1 ≤ n. (p and n live outside the
--- pattern-match so the inducted-on argument q is in first position.)
+-- n = p * 0 = 0, contradicting 1 ≤ n.
 automatic theorem Natural.right_factor_at_least_one
-        (p n : Natural)
-        : ∀ (q : Natural). 1 ≤ n → n = p * q → 1 ≤ q
-  | zero, oneLessOrEqualN, nEqualsPTimesZero =>
-      1 ≤ n = p * 0 = 0
-  | successor(qPredecessor), _, _ =>
-      okay
+        (p n : Natural) (q : Natural) (oneLessOrEqualN : 1 ≤ n) (nEqualsPTimesQ : n = p * q)
+        : 1 ≤ q :=
+  done by cases {
+    case q = 0: 1 ≤ n = p * 0 = 0
+    case q = successor(qPredecessor) for some qPredecessor: okay
+  }
 
 -- ----------------------------------------------------------------------
 -- "All-prime" lift across `prepend`: if the head is prime and all

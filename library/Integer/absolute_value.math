@@ -44,14 +44,14 @@ theorem Integer.absolute_value_respect_natural
      = (Natural.distance(c, d) : Integer)
 
 theorem Integer.absolute_value_respect
-        : ∀ (rep1 rep1Prime : IntegerRepresentative).
-          IntegerEquivalent(rep1, rep1Prime)
-          → Integer.absolute_value_at_representative(rep1)
-            = Integer.absolute_value_at_representative(rep1Prime)
-  | IntegerRepresentative.make(a, b),
-    IntegerRepresentative.make(c, d),
-    aPlusDEqualsBPlusC =>
-      done
+        (rep1 rep1Prime : IntegerRepresentative)
+        (aPlusDEqualsBPlusC : IntegerEquivalent(rep1, rep1Prime))
+        : Integer.absolute_value_at_representative(rep1)
+          = Integer.absolute_value_at_representative(rep1Prime) := {
+  let ⟨a, b⟩ := rep1;
+  let ⟨c, d⟩ := rep1Prime;
+  done
+}
 
 -- Absolute value as a function on Integer.
 definition Integer.absolute_value : Integer → Integer
@@ -86,13 +86,14 @@ automatic theorem Integer.absolute_value_of_natural (n : Natural)
 -- |-x| = |x| at the representative level: negate swaps (a, b) to
 -- (b, a), and distance is symmetric.
 theorem Integer.absolute_value_negate_at_representative
-        : ∀ (rep : IntegerRepresentative).
-          Integer.absolute_value_at_representative(
+        (rep : IntegerRepresentative)
+        : Integer.absolute_value_at_representative(
                 Integer.negate_representatives(rep))
-            = Integer.absolute_value_at_representative(rep)
-  | IntegerRepresentative.make(a, b) =>
-      { (Natural.distance(b, a) : Integer)
-         = (Natural.distance(a, b) : Integer) }
+          = Integer.absolute_value_at_representative(rep) := {
+  let ⟨a, b⟩ := rep;
+  (Natural.distance(b, a) : Integer)
+     = (Natural.distance(a, b) : Integer)
+}
 
 -- |-x| = |x| on Integer.
 theorem Integer.absolute_value_negate (x : Integer)
@@ -103,10 +104,12 @@ theorem Integer.absolute_value_negate (x : Integer)
 
 -- -(-x) = x at the representative level: double-negation cancels.
 theorem Integer.negate_negate_at_representative
-        : ∀ (rep : IntegerRepresentative).
-          Integer.negate_representatives(
-                Integer.negate_representatives(rep)) = rep
-  | IntegerRepresentative.make(a, b) => okay
+        (rep : IntegerRepresentative)
+        : Integer.negate_representatives(
+                Integer.negate_representatives(rep)) = rep := {
+  let ⟨a, b⟩ := rep;
+  okay
+}
 
 -- -(-x) = x on Integer. At a representative (a, b) both sides reduce
 -- to make(a, b).
@@ -116,14 +119,16 @@ theorem Integer.negate_negate (x : Integer) : -(-x) = x :=
 -- -(p + q) = -p + -q at the representative level. Both sides reduce
 -- to make(β + δ, α + γ) when p = mk(make(α, β)), q = mk(make(γ, δ)).
 theorem Integer.negate_add_at_representatives
-        : ∀ (rep_p rep_q : IntegerRepresentative).
-          Integer.negate_representatives(
+        (rep_p rep_q : IntegerRepresentative)
+        : Integer.negate_representatives(
                 Integer.add_representatives(rep_p, rep_q))
-            = Integer.add_representatives(
+          = Integer.add_representatives(
                 Integer.negate_representatives(rep_p),
-                Integer.negate_representatives(rep_q))
-  | IntegerRepresentative.make(alpha, beta),
-    IntegerRepresentative.make(gamma, δ) => okay
+                Integer.negate_representatives(rep_q)) := {
+  let ⟨alpha, beta⟩ := rep_p;
+  let ⟨gamma, δ⟩ := rep_q;
+  okay
+}
 
 -- -(p + q) = -p + -q on Integer. Take representatives for both p and q.
 theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=

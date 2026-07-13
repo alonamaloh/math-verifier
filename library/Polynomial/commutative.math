@@ -33,17 +33,21 @@ import Polynomial.instances
 -- ----------------------------------------------------------------------
 -- Natural arithmetic helpers for the reflection.
 
-theorem Natural.monus_add_cancel_left
-        : ∀ (a b : Natural). Natural.monus(a + b, a) = b
-  | 0, b => { done by Natural.monus_zero }
-  | 1 + predecessor, b =>
-      Natural.monus((1 + predecessor) + b, 1 + predecessor)
-         = Natural.monus(1 + (predecessor + b), 1 + predecessor)
-             by Natural.add_associative
-         = Natural.monus(predecessor + b, predecessor)
-             by Natural.monus_one_plus_one_plus
-         = b
-             by Natural.monus_add_cancel_left(predecessor, b)
+theorem Natural.monus_add_cancel_left (a : Natural)
+        : ∀ (b : Natural). Natural.monus(a + b, a) = b :=
+  by induction on a with IH {
+    case 0:
+        (b : Natural) ↦ { done by Natural.monus_zero }
+    case 1 + predecessor:
+        (b : Natural) ↦
+          Natural.monus((1 + predecessor) + b, 1 + predecessor)
+             = Natural.monus(1 + (predecessor + b), 1 + predecessor)
+                 by Natural.add_associative
+             = Natural.monus(predecessor + b, predecessor)
+                 by Natural.monus_one_plus_one_plus
+             = b
+                 by IH(b)
+  }
 
 theorem Natural.monus_add_involution (i d : Natural)
         : Natural.monus(i + d, Natural.monus(i + d, i)) = i :=

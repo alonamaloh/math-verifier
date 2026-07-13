@@ -48,20 +48,19 @@ theorem Rational.absolute_value_respect_at_representatives
 
 -- Respect of Rational.absolute_value via the lift.
 theorem Rational.absolute_value_respect
-        : ∀ (rep1 rep2 : RationalRepresentative).
-          RationalEquivalent(rep1, rep2)
-          → Rational.absolute_value_at_representative(rep1)
-            = Rational.absolute_value_at_representative(rep2)
-  | RationalRepresentative.make(n1, d1, d1Nonzero),
-    RationalRepresentative.make(n2, d2, d2Nonzero),
-    equivalenceHypothesis => {
-      let absD1Nonzero : abs(d1) ≠ Integer.zero := done;
-      let absD2Nonzero : abs(d2) ≠ Integer.zero := done;
-      change Rational.fraction(abs(n1), abs(d1), absD1Nonzero)
-             = Rational.fraction(abs(n2), abs(d2), absD2Nonzero);
-      abs(n1) * abs(d2) = abs(n2) * abs(d1);
-      done
-  }
+        (rep1 rep2 : RationalRepresentative)
+        (equivalenceHypothesis : RationalEquivalent(rep1, rep2))
+        : Rational.absolute_value_at_representative(rep1)
+          = Rational.absolute_value_at_representative(rep2) := {
+  let ⟨n1, d1, d1Nonzero⟩ := rep1;
+  let ⟨n2, d2, d2Nonzero⟩ := rep2;
+  let absD1Nonzero : abs(d1) ≠ Integer.zero := done;
+  let absD2Nonzero : abs(d2) ≠ Integer.zero := done;
+  change Rational.fraction(abs(n1), abs(d1), absD1Nonzero)
+         = Rational.fraction(abs(n2), abs(d2), absD2Nonzero);
+  abs(n1) * abs(d2) = abs(n2) * abs(d1);
+  done
+}
 
 definition Rational.absolute_value : Rational → Rational
   by representatives rep ↦ Rational.absolute_value_at_representative(rep)
@@ -82,14 +81,14 @@ automatic theorem Rational.absolute_value_zero
 -- |-x| = |x| at the representative level: negate negates the numerator
 -- (and leaves the denominator), and |-n| = |n|.
 theorem Rational.absolute_value_negate_at_representative
-        : ∀ (rep : RationalRepresentative).
-          Rational.absolute_value_at_representative(
+        (rep : RationalRepresentative)
+        : Rational.absolute_value_at_representative(
                 Rational.negate_representatives(rep))
-            = Rational.absolute_value_at_representative(rep)
-  | RationalRepresentative.make(n, d, dNonzero) => {
-      let absDNonzero : abs(d) ≠ Integer.zero := done;
-      Rational.fraction(abs(-n), abs(d), absDNonzero) = Rational.fraction(abs(n), abs(d), absDNonzero)
-  }
+          = Rational.absolute_value_at_representative(rep) := {
+  let ⟨n, d, dNonzero⟩ := rep;
+  let absDNonzero : abs(d) ≠ Integer.zero := done;
+  Rational.fraction(abs(-n), abs(d), absDNonzero) = Rational.fraction(abs(n), abs(d), absDNonzero)
+}
 
 -- |-x| = |x| on Rational.
 theorem Rational.absolute_value_negate (x : Rational)
@@ -101,12 +100,13 @@ theorem Rational.absolute_value_negate (x : Rational)
 
 -- -(-x) = x at the representative level.
 theorem Rational.negate_negate_at_representative
-        : ∀ (rep : RationalRepresentative).
-          Rational.negate_representatives(
-                Rational.negate_representatives(rep)) = rep
-  | RationalRepresentative.make(n, d, dNonzero) =>
-      { RationalRepresentative.make(-(-n), d, dNonzero)
-          = RationalRepresentative.make(n, d, dNonzero) }
+        (rep : RationalRepresentative)
+        : Rational.negate_representatives(
+                Rational.negate_representatives(rep)) = rep := {
+  let ⟨n, d, dNonzero⟩ := rep;
+  RationalRepresentative.make(-(-n), d, dNonzero)
+      = RationalRepresentative.make(n, d, dNonzero)
+}
 
 -- -(-x) = x on Rational.
 theorem Rational.negate_negate (x : Rational) : -(-x) = x :=
@@ -122,18 +122,18 @@ theorem Rational.negate_add_numerator_identity
 
 -- -(rep_p + rep_q) = -rep_p + -rep_q at the representative level.
 theorem Rational.negate_add_at_representatives
-        : ∀ (rep_p rep_q : RationalRepresentative).
-          Rational.negate_representatives(
+        (rep_p rep_q : RationalRepresentative)
+        : Rational.negate_representatives(
                 Rational.add_representatives(rep_p, rep_q))
-            = Rational.add_representatives(
+          = Rational.add_representatives(
                 Rational.negate_representatives(rep_p),
-                Rational.negate_representatives(rep_q))
-  | RationalRepresentative.make(n1, d1, d1Nonzero),
-    RationalRepresentative.make(n2, d2, d2Nonzero) => {
-      let productNonzero : d1 * d2 ≠ Integer.zero := done;
-      RationalRepresentative.make(-(n1 * d2 + n2 * d1), d1 * d2, productNonzero)
-         = RationalRepresentative.make(-n1 * d2 + -n2 * d1, d1 * d2, productNonzero)
-  }
+                Rational.negate_representatives(rep_q)) := {
+  let ⟨n1, d1, d1Nonzero⟩ := rep_p;
+  let ⟨n2, d2, d2Nonzero⟩ := rep_q;
+  let productNonzero : d1 * d2 ≠ Integer.zero := done;
+  RationalRepresentative.make(-(n1 * d2 + n2 * d1), d1 * d2, productNonzero)
+     = RationalRepresentative.make(-n1 * d2 + -n2 * d1, d1 * d2, productNonzero)
+}
 
 -- -(p + q) = -p + -q on Rational. Take representatives for both p and q.
 theorem Rational.negate_add (p q : Rational) : -(p + q) = -p + -q :=

@@ -151,24 +151,29 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
 }
 
 -- d ≠ 0 implies 1 ≤ d.
-automatic theorem Natural.geq_one_when_not_zero
-        : ∀ (d : Natural). d ≠ 0 → 1 ≤ d
-  | zero, notZero =>
-      absurd(notZero(done))
-  | successor(predD), _ =>
-      done
+automatic theorem Natural.geq_one_when_not_zero (d : Natural) (notZero : d ≠ 0) : 1 ≤ d :=
+  done by cases {
+    case d = 0: {
+        d = 0;
+        False; done
+      }
+    case d = successor(predD) for some predD: done
+  }
 
--- Helper: if d is neither 0 nor 1, then 2 ≤ d. Pattern-match on d.
+-- Helper: if d is neither 0 nor 1, then 2 ≤ d. Case-split on d.
 theorem Natural.geq_two_when_not_zero_or_one
-        : ∀ (d : Natural).
-          d ≠ 0 → d ≠ 1 → 2 ≤ d
-  | zero, notZero, _ =>
-      absurd(notZero(done))
-  | successor(predD), _, notOne => {
-      predD ≠ 0 by (predecessorEqualsZero : predD = 0) ↦ notOne(predecessorEqualsZero);
-      1 ≤ predD;
-      done
-    }
+        (d : Natural) (notZero : d ≠ 0) (notOne : d ≠ 1) : 2 ≤ d :=
+  done by cases {
+    case d = 0: {
+        d = 0;
+        False; done
+      }
+    case d = successor(predD) for some predD: {
+        predD ≠ 0 by (predecessorEqualsZero : predD = 0) ↦ notOne(done);
+        1 ≤ predD;
+        done
+      }
+  }
 
 -- Antisymmetry-like: if a ≤ b and successor(a) ≰ b, then a = b.
 -- (Equivalently, ≤ is total and ¬less than gives equality.)
@@ -263,13 +268,15 @@ theorem Natural.classify_divisor_when_no_proper
 
 -- The main split: for n ≥ 2, n is prime or has a proper divisor.
 theorem Natural.prime_or_proper_divisor
-        : ∀ (n : Natural).
-          2 ≤ n
-          → Natural.is_prime(n) ∨ Exists(Natural, (divisor : Natural) ↦
-                    2 ≤ divisor ∧ successor(divisor) ≤ n ∧ divisor ∣ n)
-  | zero, atLeastTwo =>
-      absurd(atLeastTwo)
-  | successor(predecessorOfN), atLeastTwo => {
+        (n : Natural) (atLeastTwo : 2 ≤ n)
+        : Natural.is_prime(n) ∨ Exists(Natural, (divisor : Natural) ↦
+                  2 ≤ divisor ∧ successor(divisor) ≤ n ∧ divisor ∣ n) :=
+  done by cases {
+    case n = 0: {
+        2 ≤ 0;
+        False; done
+      }
+    case n = successor(predecessorOfN) for some predecessorOfN: {
       (∃ (divisor : Natural). 2 ≤ divisor ∧ divisor ≤ predecessorOfN ∧ divisor ∣ successor(predecessorOfN))
           ∨ (∀ (divisor : Natural). 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN));
       done by cases {
@@ -292,3 +299,4 @@ theorem Natural.prime_or_proper_divisor
           }
       }
     }
+  }

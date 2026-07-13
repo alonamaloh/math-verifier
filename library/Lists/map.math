@@ -47,33 +47,34 @@ theorem List.map_member (A B : Type(0)) (f : A → B) (element : A) (list : List
           List.map_member(A, B, f, element, rest, innerMember))
 
 -- Inversion of map_member: a member of `map(f, l)` comes from a member of `l`.
-theorem List.map_member_invert (A B : Type(0)) (f : A → B) (b : B)
-        : ∀ (list : List(A)).
-          List.member(B, b, List.map(A, B, f, list))
-          → ∃ (a : A). List.member(A, a, list) ∧ (f(a) = b)
-  | List.empty =>
-      (mem : List.member(B, b, List.map(A, B, f, List.empty(A)))) ↦
-          absurd(List.no_member_empty(B, b, mem))
-  | List.prepend(head, tail) =>
-      (mem : List.member(B, b, List.map(A, B, f, List.prepend(A, head, tail)))) ↦ {
-          b = f(head) ∨ List.member(B, b, List.map(A, B, f, tail))
-              by List.member_prepend_invert;
-          done by cases {
-            case b = f(head) as bEqual:
-                ⟨head, And.introduction(
-                    List.member.here(A, head, tail),
-                    Equality.symmetry(bEqual))⟩
-            case List.member(B, b, List.map(A, B, f, tail)) as memberTail: {
-                choose a such that List.member(A, a, tail) ∧ (f(a) = b)
-                    from List.map_member_invert(A, B, f, b, tail, memberTail);
-                List.member(A, a, tail) as aMember;
-                f(a) = b as faEqualB;
-                ⟨a, And.introduction(
-                    List.member.there(A, a, head, tail, aMember),
-                    faEqualB)⟩
-              }
+theorem List.map_member_invert (A B : Type(0)) (f : A → B) (b : B) (list : List(A))
+        : List.member(B, b, List.map(A, B, f, list))
+          → ∃ (a : A). List.member(A, a, list) ∧ (f(a) = b) :=
+  by induction on list with IH {
+    case List.empty:
+        (mem : List.member(B, b, List.map(A, B, f, List.empty(A)))) ↦
+            absurd(List.no_member_empty(B, b, mem))
+    case List.prepend(head, tail):
+        (mem : List.member(B, b, List.map(A, B, f, List.prepend(A, head, tail)))) ↦ {
+            b = f(head) ∨ List.member(B, b, List.map(A, B, f, tail))
+                by List.member_prepend_invert;
+            done by cases {
+              case b = f(head) as bEqual:
+                  ⟨head, And.introduction(
+                      List.member.here(A, head, tail),
+                      Equality.symmetry(bEqual))⟩
+              case List.member(B, b, List.map(A, B, f, tail)) as memberTail: {
+                  choose a such that List.member(A, a, tail) ∧ (f(a) = b)
+                      from IH(memberTail);
+                  List.member(A, a, tail) as aMember;
+                  f(a) = b as faEqualB;
+                  ⟨a, And.introduction(
+                      List.member.there(A, a, head, tail, aMember),
+                      faEqualB)⟩
+                }
+            }
           }
-        }
+  }
 
 -- If `head ∉ tail` and `f` is injective at `head` relative to the members
 -- of `tail`, then `f(head) ∉ map(f, tail)`. (The local-injectivity form a

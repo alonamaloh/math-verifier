@@ -35,82 +35,85 @@ theorem ComplexNumber.product_eta (a : Pair(Real, Real))
 -- Additivity on coefficient lists: coordinates of a sum are the
 -- componentwise sums of the coordinates.
 theorem ComplexNumber.coordinatesOfCoefficients_add
-        : ∀ (a b : Polynomial.Coefficients(Real)).
-          coords(Polynomial.Coefficients.add(Real.ring, a, b))
+        (p : Polynomial.Coefficients(Real))
+        : ∀ (b : Polynomial.Coefficients(Real)).
+          coords(Polynomial.Coefficients.add(Real.ring, p, b))
             = Product.make(
-                  Product.first(coords(a))
+                  Product.first(coords(p))
                       + Product.first(coords(b)),
-                  Product.second(coords(a))
-                      + Product.second(coords(b)))
-  | Polynomial.Coefficients.nil =>
-      (b : Polynomial.Coefficients(Real)) ↦ {
-        -- add(nil, b) = b and coords(nil) = (0, 0), so each coordinate gains 0.
-        Product.first(coords(b))
-            = Real.zero + Product.first(coords(b));
-        Product.second(coords(b))
-            = Real.zero + Product.second(coords(b));
-        coords(b)
-           = Product.make(
-                 Product.first(coords(b)),
-                 Product.second(coords(b)))
-           = Product.make(
-                 Real.zero + Product.first(coords(b)),
-                 Real.zero + Product.second(coords(b)));
-      }
-  | Polynomial.Coefficients.cons(a, restA) =>
-      (b : Polynomial.Coefficients(Real)) ↦
-        done by cases {
-          case b = Polynomial.Coefficients.nil(Real): {
-              -- add(cons, nil) = cons and coords(nil) = (0, 0); each coordinate gains 0.
-              Polynomial.Coefficients.add(Real.ring,
-                    Polynomial.Coefficients.cons(Real, a, restA), Polynomial.Coefficients.nil(Real))
-                  = Polynomial.Coefficients.cons(Real, a, restA)
-                  by Polynomial.Coefficients.add_nil_right(Real.ring,
-                        Polynomial.Coefficients.cons(Real, a, restA))
-                  as addNilRight;
-              coords(Polynomial.Coefficients.add(Real.ring,
-                        Polynomial.Coefficients.cons(Real, a, restA),
-                        Polynomial.Coefficients.nil(Real)))
-                 = coords(Polynomial.Coefficients.cons(Real, a, restA))
-                       by substituting addNilRight
-                 = Product.make(
-                       Product.first(coords(Polynomial.Coefficients.cons(Real, a, restA))),
-                       Product.second(coords(Polynomial.Coefficients.cons(Real, a, restA))))
-                       by ComplexNumber.product_eta
-                 = Product.make(
-                       Product.first(coords(Polynomial.Coefficients.cons(Real, a, restA))) + Real.zero,
-                       Product.second(coords(Polynomial.Coefficients.cons(Real, a, restA))) + Real.zero)
-            }
-          case b = Polynomial.Coefficients.cons(Real, bb, restB)
-                 for some (bb : Real), (restB : Polynomial.Coefficients(Real)): {
-              -- add(a :: restA, bb :: restB) = (a+bb) :: add(restA, restB).
-              coords(
-                        Polynomial.Coefficients.add(Real.ring, restA, restB))
-                    = Product.make(
-                          Product.first(coords(restA))
-                              + Product.first(coords(restB)),
-                          Product.second(coords(restA))
-                              + Product.second(coords(restB)))
-                  by ComplexNumber.coordinatesOfCoefficients_add(restA, restB) as ih;
-              -- real part: (a+bb) − (im(restA) + im(restB))
-              (a + bb)
-                       - Product.second(coords(
-                             Polynomial.Coefficients.add(Real.ring, restA, restB)))
-                 = (a + bb)
-                       - (Product.second(coords(restA))
-                          + Product.second(coords(restB)))
-                       by ih
-                 = (a - Product.second(coords(restA)))
-                       + (bb - Product.second(coords(restB)));
-              -- imaginary part: re(restA) + re(restB)
-              Product.first(coords(
-                        Polynomial.Coefficients.add(Real.ring, restA, restB)))
-                  = Product.first(coords(restA))
-                      + Product.first(coords(restB))
-                  by ih;
-              done
-            }
+                  Product.second(coords(p))
+                      + Product.second(coords(b))) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+        (b : Polynomial.Coefficients(Real)) ↦ {
+          -- add(nil, b) = b and coords(nil) = (0, 0), so each coordinate gains 0.
+          Product.first(coords(b))
+              = Real.zero + Product.first(coords(b));
+          Product.second(coords(b))
+              = Real.zero + Product.second(coords(b));
+          coords(b)
+             = Product.make(
+                   Product.first(coords(b)),
+                   Product.second(coords(b)))
+             = Product.make(
+                   Real.zero + Product.first(coords(b)),
+                   Real.zero + Product.second(coords(b)));
         }
+    case Polynomial.Coefficients.cons(a, restA):
+        (b : Polynomial.Coefficients(Real)) ↦
+          done by cases {
+            case b = Polynomial.Coefficients.nil(Real): {
+                -- add(cons, nil) = cons and coords(nil) = (0, 0); each coordinate gains 0.
+                Polynomial.Coefficients.add(Real.ring,
+                      Polynomial.Coefficients.cons(Real, a, restA), Polynomial.Coefficients.nil(Real))
+                    = Polynomial.Coefficients.cons(Real, a, restA)
+                    by Polynomial.Coefficients.add_nil_right(Real.ring,
+                          Polynomial.Coefficients.cons(Real, a, restA))
+                    as addNilRight;
+                coords(Polynomial.Coefficients.add(Real.ring,
+                          Polynomial.Coefficients.cons(Real, a, restA),
+                          Polynomial.Coefficients.nil(Real)))
+                   = coords(Polynomial.Coefficients.cons(Real, a, restA))
+                         by substituting addNilRight
+                   = Product.make(
+                         Product.first(coords(Polynomial.Coefficients.cons(Real, a, restA))),
+                         Product.second(coords(Polynomial.Coefficients.cons(Real, a, restA))))
+                         by ComplexNumber.product_eta
+                   = Product.make(
+                         Product.first(coords(Polynomial.Coefficients.cons(Real, a, restA))) + Real.zero,
+                         Product.second(coords(Polynomial.Coefficients.cons(Real, a, restA))) + Real.zero)
+              }
+            case b = Polynomial.Coefficients.cons(Real, bb, restB)
+                   for some (bb : Real), (restB : Polynomial.Coefficients(Real)): {
+                -- add(a :: restA, bb :: restB) = (a+bb) :: add(restA, restB).
+                coords(
+                          Polynomial.Coefficients.add(Real.ring, restA, restB))
+                      = Product.make(
+                            Product.first(coords(restA))
+                                + Product.first(coords(restB)),
+                            Product.second(coords(restA))
+                                + Product.second(coords(restB)))
+                    by IH(restB) as ih;
+                -- real part: (a+bb) − (im(restA) + im(restB))
+                (a + bb)
+                         - Product.second(coords(
+                               Polynomial.Coefficients.add(Real.ring, restA, restB)))
+                   = (a + bb)
+                         - (Product.second(coords(restA))
+                            + Product.second(coords(restB)))
+                         by ih
+                   = (a - Product.second(coords(restA)))
+                         + (bb - Product.second(coords(restB)));
+                -- imaginary part: re(restA) + re(restB)
+                Product.first(coords(
+                          Polynomial.Coefficients.add(Real.ring, restA, restB)))
+                    = Product.first(coords(restA))
+                        + Product.first(coords(restB))
+                    by ih;
+                done
+              }
+          }
+  }
 
 -- ----------------------------------------------------------------------
 -- Multiplying by x rotates the coordinates. At the coefficient level

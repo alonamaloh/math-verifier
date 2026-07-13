@@ -177,10 +177,10 @@ definition Real.IsSupremum (subset : Set(Real)) (s : Real)
 -- positive ε — that's exactly Real.IsNonneg(x - (q : Real)).
 
 theorem Real.exists_rational_below_at_make
-        : ∀ (rep : CauchyRationalSequence).
-            ∃ (q : Rational).
-                (q : Real) ≤ Quotient.class_of(rep)
-  | CauchyRationalSequence.make(seq, seqIsCauchy) => {
+        (rep : CauchyRationalSequence)
+        : ∃ (q : Rational).
+            (q : Real) ≤ Quotient.class_of(rep) := {
+      let ⟨seq, seqIsCauchy⟩ := rep;
       -- Pick N from the Cauchy witness at ε = 1; for m, n ≥ N,
       -- |seq(m) - seq(n)| < 1. The witness rational is q := seq(N) - 1
       -- — every later term `seq(m)` lies in (seq(N) - 1, seq(N) + 1),
@@ -225,10 +225,10 @@ theorem Real.exists_rational_below (x : Real)
 -- seq(m) < seq(N) + 1 = q, so q - seq(m) > 0, hence x ≤ (q : Real).
 
 theorem Real.exists_rational_above_at_make
-        : ∀ (rep : CauchyRationalSequence).
-            ∃ (q : Rational).
-                (Quotient.class_of(rep) : Real) ≤ (q : Real)
-  | CauchyRationalSequence.make(seq, seqIsCauchy) => {
+        (rep : CauchyRationalSequence)
+        : ∃ (q : Rational).
+            (Quotient.class_of(rep) : Real) ≤ (q : Real) := {
+      let ⟨seq, seqIsCauchy⟩ := rep;
       choose N as cauchyAt1
           from seqIsCauchy((1 : Rational), Rational.zero_less_one);
       witness seq(N) + (1 : Rational) with
@@ -1497,12 +1497,12 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
             : Real.IsUpperBound(
                   subset,
                   (Real.BisectionInterval.right(initial) : Real)))
-        : ∀ (y_rep : CauchyRationalSequence).
-            (Quotient.class_of(y_rep) : Real) ∈ subset
-          → (Quotient.class_of(y_rep) : Real)
-              ≤ Real.bisectionLimit(
-                    subset, initial, initialLeftLeqRight)
-  | CauchyRationalSequence.make(yseq, yIsCauchy), yInSubset =>
+        (y_rep : CauchyRationalSequence)
+        (yInSubset : (Quotient.class_of(y_rep) : Real) ∈ subset)
+        : (Quotient.class_of(y_rep) : Real)
+            ≤ Real.bisectionLimit(
+                  subset, initial, initialLeftLeqRight) := {
+  let ⟨yseq, yIsCauchy⟩ := y_rep;
   unfold Real.IsNonneg in
   ((ε : Rational)
            (εPositive : (0 : Rational) < ε) ↦ {
@@ -1554,6 +1554,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
              ≤ Real.bisectionLeft(subset, initial, j) - yseq(j)
         }
   })
+}
 
 -- Take a representative y = [(rep, _)]; the at-rep lemma proves it.
 theorem Real.bisectionLimit_is_upper_bound

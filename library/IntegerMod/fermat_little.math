@@ -65,14 +65,14 @@ definition IntegerMod.multiply_by (modulus : Natural)
 -- ----------------------------------------------------------------------
 -- Scaling every element of a list by x multiplies its product by
 -- x^length: ∏ map(x·_, l) = x^|l| · ∏ l.
-theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
-        : (list : List(IntegerMod(p)))
-          → List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p)) (list : List(IntegerMod(p)))
+        : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
                 List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x), list))
             = IntegerMod.power(p, x, List.length(IntegerMod(p), list))
                 * List.product(IntegerMod(p), IntegerMod.multiply,
-                      IntegerMod.one(p), list)
-  | List.empty =>
+                      IntegerMod.one(p), list) :=
+  by induction on list with IH {
+    case List.empty:
       -- map(x·_) fixes the empty list, and |empty| = 0 with x^0 = 1 the left
       -- identity. (Kept factored as 1 · ∏empty rather than reducing 1·1 — the
       -- latter forces an expensive normalisation through the IntegerMod quotient.)
@@ -89,7 +89,7 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
                * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), List.empty(IntegerMod(p)))
                by List.length_empty
-  | List.prepend(head, tail) =>
+    case List.prepend(head, tail):
       -- Peel the head and exchange the four factors, then step the exponent:
       -- x · x^|tail| = x^(1 + |tail|) = x^|head :: tail|.
       List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
@@ -103,7 +103,7 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
                * (IntegerMod.power(p, x, List.length(IntegerMod(p), tail))
                    * List.product(IntegerMod(p), IntegerMod.multiply,
                          IntegerMod.one(p), tail))
-               by IntegerMod.product_map_multiply(p, x, tail)
+               by IH
          = (x * IntegerMod.power(p, x, List.length(IntegerMod(p), tail)))
                * (head * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), tail))
@@ -116,18 +116,19 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
                * List.product(IntegerMod(p), IntegerMod.multiply,
                      IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
                by List.length_prepend
+  }
 
 -- ----------------------------------------------------------------------
 -- A product of nonzero classes is nonzero.
 theorem IntegerMod.product_nonzero (p : Natural)
-        (primality : Natural.is_prime(p))
-        : (list : List(IntegerMod(p)))
-          → (∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, list)
+        (primality : Natural.is_prime(p)) (list : List(IntegerMod(p)))
+        : (∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, list)
                  → ¬(z = IntegerMod.zero(p)))
           → ¬(List.product(IntegerMod(p), IntegerMod.multiply,
                   IntegerMod.one(p), list)
-              = IntegerMod.zero(p))
-  | List.empty =>
+              = IntegerMod.zero(p)) :=
+  by induction on list with IH {
+    case List.empty:
       (membersNonzero
           : ∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, List.empty(IntegerMod(p)))
               → ¬(z = IntegerMod.zero(p)))
@@ -140,7 +141,7 @@ theorem IntegerMod.product_nonzero (p : Natural)
         False by IntegerMod.zero_not_one as impossible;
         impossible
       }
-  | List.prepend(head, tail) =>
+    case List.prepend(head, tail):
       (membersNonzero
           : ∀ (z : IntegerMod(p)).
               List.member(IntegerMod(p), z, List.prepend(IntegerMod(p), head, tail))
@@ -163,7 +164,7 @@ theorem IntegerMod.product_nonzero (p : Natural)
         ¬(List.product(IntegerMod(p), IntegerMod.multiply,
                 IntegerMod.one(p), tail)
             = IntegerMod.zero(p))
-            by IntegerMod.product_nonzero(p, primality, tail, tailMembersNonzero)
+            by IH(tailMembersNonzero)
             as tailProductNonzero;
         -- Read the hypothesis at its reduced shape: head · ∏tail = 0.
         head * List.product(IntegerMod(p), IntegerMod.multiply,
@@ -176,6 +177,7 @@ theorem IntegerMod.product_nonzero (p : Natural)
             by IntegerMod.no_zero_divisors as tailProductZero;
         tailProductNonzero(tailProductZero)
       }
+  }
 
 -- ----------------------------------------------------------------------
 -- Multiplication by a nonzero class x permutes the nonzero classes: the

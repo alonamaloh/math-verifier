@@ -59,23 +59,24 @@ definition RationalEquivalent
 -- Reflexivity is just reflexivity of Integer equality.
 
 theorem RationalEquivalent.reflexive
-        : ∀ (representative : RationalRepresentative).
-          RationalEquivalent(representative, representative)
-  | RationalRepresentative.make(n, d, _) =>
-      done
+        (representative : RationalRepresentative)
+        : RationalEquivalent(representative, representative) := {
+  let ⟨n, d, _⟩ := representative;
+  done
+}
 
 -- ----------------------------------------------------------------------
 -- Symmetry is just symmetry of Integer equality after destructuring
 -- both representatives.
 
 theorem RationalEquivalent.symmetric
-        : ∀ (x y : RationalRepresentative).
-          RationalEquivalent(x, y)
-          → RationalEquivalent(y, x)
-  | RationalRepresentative.make(n1, d1, _),
-    RationalRepresentative.make(n2, d2, _),
-    equivalenceHypothesis =>
-      done
+        (x y : RationalRepresentative)
+        (equivalenceHypothesis : RationalEquivalent(x, y))
+        : RationalEquivalent(y, x) := {
+  let ⟨n1, d1, _⟩ := x;
+  let ⟨n2, d2, _⟩ := y;
+  done
+}
 
 -- ----------------------------------------------------------------------
 -- Transitivity: from n1·d2 = n2·d1 and n2·d3 = n3·d2, derive n1·d3 = n3·d1.
@@ -83,22 +84,21 @@ theorem RationalEquivalent.symmetric
 -- sides reshape (by ring) through the shared product n2·d1·d3.
 
 theorem RationalEquivalent.transitive
-        : ∀ (x y z : RationalRepresentative).
-          RationalEquivalent(x, y)
-          → RationalEquivalent(y, z)
-          → RationalEquivalent(x, z)
-  | RationalRepresentative.make(n1, d1, _),
-    RationalRepresentative.make(n2, d2, d2Nonzero),
-    RationalRepresentative.make(n3, d3, _),
-    firstEquivalence, secondEquivalence => {
-      (n1 * d3) * d2
-         = (n1 * d2) * d3
-         = (n2 * d1) * d3
-         = (n2 * d3) * d1
-         = (n3 * d2) * d1
-         = (n3 * d1) * d2;
-      done by Integer.multiply_cancel_right_by_nonzero
-  }
+        (x y z : RationalRepresentative)
+        (firstEquivalence : RationalEquivalent(x, y))
+        (secondEquivalence : RationalEquivalent(y, z))
+        : RationalEquivalent(x, z) := {
+  let ⟨n1, d1, _⟩ := x;
+  let ⟨n2, d2, d2Nonzero⟩ := y;
+  let ⟨n3, d3, _⟩ := z;
+  (n1 * d3) * d2
+     = (n1 * d2) * d3
+     = (n2 * d1) * d3
+     = (n2 * d3) * d1
+     = (n3 * d2) * d1
+     = (n3 * d1) * d2;
+  done by Integer.multiply_cancel_right_by_nonzero
+}
 
 -- ----------------------------------------------------------------------
 -- The Rational type and canonical constants.

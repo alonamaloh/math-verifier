@@ -56,35 +56,38 @@ definition Polynomial.Coefficients.length (R : Type(0))
       1 + Polynomial.Coefficients.length(R, rest)
 
 theorem Polynomial.coefficient_vanishes_beyond_length (r : Ring)
-        : (p : Polynomial.Coefficients(Ring.carrier(r))) → ∀ (i : Natural).
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : ∀ (i : Natural).
           Polynomial.Coefficients.length(Ring.carrier(r), p) ≤ i
-          → Polynomial.coefficient(p, i) = Ring.zero(r)
-  | Polynomial.Coefficients.nil =>
-      (i : Natural) (lengthLessOrEqual : 0 ≤ i) ↦
-          Polynomial.nth_nil(Ring.carrier(r), Ring.zero(r), i)
-  | Polynomial.Coefficients.cons(coefficientValue, rest) =>
-      (i : Natural)
-               (lengthLessOrEqual
-                   : 1 + Polynomial.Coefficients.length(Ring.carrier(r), rest) ≤ i) ↦
-          done by cases {
-            case i = 0 as iIsZero: {
-                (1 : Natural)
-                   ≤ 1 + Polynomial.Coefficients.length(Ring.carrier(r), rest)
-                         by Natural.less_or_equal_add_right
-                   ≤ i                                              by lengthLessOrEqual
-                   = 0                                              by iIsZero;
-                False; done
-              }
-            case i = 1 + iPredecessor for some iPredecessor as iIsSuccessor: {
-                1 + Polynomial.Coefficients.length(Ring.carrier(r), rest)
-                    ≤ i                by lengthLessOrEqual
-                    = 1 + iPredecessor by iIsSuccessor;
-                Polynomial.Coefficients.length(Ring.carrier(r), rest) ≤ iPredecessor
-                    by Natural.le_cancel_one_plus
-                    as lengthDescended;
-                Polynomial.coefficient_vanishes_beyond_length(r, rest, iPredecessor, lengthDescended)
-              }
-          }
+          → Polynomial.coefficient(p, i) = Ring.zero(r) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+        (i : Natural) (lengthLessOrEqual : 0 ≤ i) ↦
+            Polynomial.nth_nil(Ring.carrier(r), Ring.zero(r), i)
+    case Polynomial.Coefficients.cons(coefficientValue, rest):
+        (i : Natural)
+                 (lengthLessOrEqual
+                     : 1 + Polynomial.Coefficients.length(Ring.carrier(r), rest) ≤ i) ↦
+            done by cases {
+              case i = 0 as iIsZero: {
+                  (1 : Natural)
+                     ≤ 1 + Polynomial.Coefficients.length(Ring.carrier(r), rest)
+                           by Natural.less_or_equal_add_right
+                     ≤ i                                              by lengthLessOrEqual
+                     = 0                                              by iIsZero;
+                  False; done
+                }
+              case i = 1 + iPredecessor for some iPredecessor as iIsSuccessor: {
+                  1 + Polynomial.Coefficients.length(Ring.carrier(r), rest)
+                      ≤ i                by lengthLessOrEqual
+                      = 1 + iPredecessor by iIsSuccessor;
+                  Polynomial.Coefficients.length(Ring.carrier(r), rest) ≤ iPredecessor
+                      by Natural.le_cancel_one_plus
+                      as lengthDescended;
+                  IH(iPredecessor, lengthDescended)
+                }
+            }
+  }
 
 theorem Polynomial.exists_degree_bound (r : Ring)
         (g : Polynomial(Ring.carrier(r), Ring.zero(r)))

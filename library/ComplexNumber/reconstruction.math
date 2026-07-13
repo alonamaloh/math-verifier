@@ -190,49 +190,51 @@ theorem ComplexNumber.complex_horner
 -- (re, im) = coords(a). Induction on the coefficient list; the cons step
 -- is classOf_cons + IH + complex_horner.
 theorem ComplexNumber.reconstruct_coeffs
-        : ∀ (a : Polynomial.Coefficients(Real)).
-          ComplexNumber.classOf(a)
+        (a : Polynomial.Coefficients(Real))
+        : ComplexNumber.classOf(a)
             = ComplexNumber.from_real(
                   Product.first(ComplexNumber.coordinatesOfCoefficients(a)))
               + ComplexNumber.i
                 * ComplexNumber.from_real(
-                      Product.second(ComplexNumber.coordinatesOfCoefficients(a)))
-  | Polynomial.Coefficients.nil => {
-      -- coords(nil) = (0,0), so the goal is classOf(nil) = from_real(0) + i·from_real(0).
-      -- classOf(nil) = 0 (defeq); from_real(0) = 0 by zero_preserves; i·0 = 0 here.
-      ComplexNumber.from_real(Real.zero)
-            = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
-          by ComplexNumber.from_real.zero_preserves as fromRealZero;
-      ComplexNumber.i * ComplexNumber.from_real(Real.zero)
-            = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
-          by substituting fromRealZero as iTimesZero;
-      ComplexNumber.classOf(Polynomial.Coefficients.nil(Real))
-         = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
-         = ComplexNumber.from_real(Real.zero)
-               + RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
-               by substituting fromRealZero
-         = ComplexNumber.from_real(Real.zero)
-             + ComplexNumber.i * ComplexNumber.from_real(Real.zero)
-               by substituting iTimesZero
-    }
-  | Polynomial.Coefficients.cons(c, rest) =>
-      ComplexNumber.classOf(
-               Polynomial.Coefficients.cons(Real, c, rest))
-         = ComplexNumber.from_real(c) + ComplexNumber.i * ComplexNumber.classOf(rest)
-         = ComplexNumber.from_real(c)
-             + ComplexNumber.i
-               * (ComplexNumber.from_real(
-                      Product.first(ComplexNumber.coordinatesOfCoefficients(rest)))
-                  + ComplexNumber.i
-                    * ComplexNumber.from_real(
-                          Product.second(ComplexNumber.coordinatesOfCoefficients(rest))))
-               by substitution
-         = ComplexNumber.from_real(
-               c - Product.second(ComplexNumber.coordinatesOfCoefficients(rest)))
-             + ComplexNumber.i
-               * ComplexNumber.from_real(
-                     Product.first(ComplexNumber.coordinatesOfCoefficients(rest)))
-               by ComplexNumber.complex_horner
+                      Product.second(ComplexNumber.coordinatesOfCoefficients(a))) :=
+  by induction on a with IH {
+    case Polynomial.Coefficients.nil: {
+        -- coords(nil) = (0,0), so the goal is classOf(nil) = from_real(0) + i·from_real(0).
+        -- classOf(nil) = 0 (defeq); from_real(0) = 0 by zero_preserves; i·0 = 0 here.
+        ComplexNumber.from_real(Real.zero)
+              = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+            by ComplexNumber.from_real.zero_preserves as fromRealZero;
+        ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+              = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+            by substituting fromRealZero as iTimesZero;
+        ComplexNumber.classOf(Polynomial.Coefficients.nil(Real))
+           = RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+           = ComplexNumber.from_real(Real.zero)
+                 + RingModulo.zero(Real.polynomial_commutative_ring, Complex.definingPolynomial)
+                 by substituting fromRealZero
+           = ComplexNumber.from_real(Real.zero)
+               + ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+                 by substituting iTimesZero
+      }
+    case Polynomial.Coefficients.cons(c, rest):
+        ComplexNumber.classOf(
+                 Polynomial.Coefficients.cons(Real, c, rest))
+           = ComplexNumber.from_real(c) + ComplexNumber.i * ComplexNumber.classOf(rest)
+           = ComplexNumber.from_real(c)
+               + ComplexNumber.i
+                 * (ComplexNumber.from_real(
+                        Product.first(ComplexNumber.coordinatesOfCoefficients(rest)))
+                    + ComplexNumber.i
+                      * ComplexNumber.from_real(
+                            Product.second(ComplexNumber.coordinatesOfCoefficients(rest))))
+                 by substituting IH
+           = ComplexNumber.from_real(
+                 c - Product.second(ComplexNumber.coordinatesOfCoefficients(rest)))
+               + ComplexNumber.i
+                 * ComplexNumber.from_real(
+                       Product.first(ComplexNumber.coordinatesOfCoefficients(rest)))
+                 by ComplexNumber.complex_horner
+  }
 
 -- Reconstruction on ℂ: z = re(z) + i·im(z). Double representatives
 -- reduce z to classOf(a) and coords(z) to coordsOfCoefficients(a).

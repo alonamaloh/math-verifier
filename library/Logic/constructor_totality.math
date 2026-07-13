@@ -41,13 +41,14 @@ import Natural.order
 import Integer.basics
 import Rational.basics
 
-theorem Natural.constructor_totality
-        : ∀ (subject : Natural).
-          subject = 0 ∨ ∃ (predecessor : Natural). subject = successor(predecessor)
-  | zero =>
-      Or.introduceLeft(reflexivity(0))
-  | successor(predecessor) =>
-      Or.introduceRight(witness predecessor with reflexivity(successor(predecessor)))
+theorem Natural.constructor_totality (subject : Natural)
+        : subject = 0 ∨ ∃ (predecessor : Natural). subject = successor(predecessor) :=
+  done by cases {
+    case subject = 0:
+        Or.introduceLeft(reflexivity(0))
+    case subject = successor(predecessor) for some predecessor:
+        Or.introduceRight(witness predecessor with reflexivity(successor(predecessor)))
+  }
 
 -- `≤` is now `< ∨ =` (not an inductive), so this "view" is recovered from
 -- the strict-order witness rather than a constructor split: when
@@ -91,15 +92,16 @@ theorem LessOrEqual.constructor_totality
 -- `Or.introduceRight` of a B-proof. Because `A` and `B` are
 -- Propositions we cannot existentially quantify the witness with
 -- `Exists` (which is restricted to Type witnesses). Instead we expose
--- the constructor branches via a pattern-match that re-introduces
+-- the constructor branches via a case-split that re-introduces
 -- each side. The result type is just `A ∨ B` — equationally
 -- equivalent to the input, and meant to be consumed by `Or.eliminate`
 -- (whose handlers have direct access to the witness).
 theorem Or.constructor_totality
-        (A B : Proposition)
-        : ∀ (disjunction : A ∨ B). A ∨ B
-  | Or.introduceLeft(leftProof)   => Or.introduceLeft(leftProof)
-  | Or.introduceRight(rightProof) => Or.introduceRight(rightProof)
+        (A B : Proposition) (disjunction : A ∨ B) : A ∨ B :=
+  done by cases {
+    case A as leftProof: Or.introduceLeft(leftProof)
+    case B as rightProof: Or.introduceRight(rightProof)
+  }
 
 -- Every Exists value is an `Exists.introduce` of a witness and a
 -- predicate proof. Because `Exists` itself is in `Proposition`, we
@@ -109,23 +111,23 @@ theorem Or.constructor_totality
 -- Exists" eliminable shape; the actual destructuring happens through
 -- `Exists.eliminate`.
 theorem Exists.constructor_totality
-        (A : Type) (P : A → Proposition)
-        : ∀ (existsProof : Exists(A, P)). Exists(A, P)
-  | Exists.introduce(witnessValue, predicateProof) =>
-      Exists.introduce(A, P, witnessValue, predicateProof)
+        (A : Type) (P : A → Proposition) (existsProof : Exists(A, P)) : Exists(A, P) := {
+  choose witnessValue such that P(witnessValue) as predicateProof from existsProof;
+  witness witnessValue with predicateProof
+}
 
 -- Every IntegerRepresentative is an `IntegerRepresentative.make` of
 -- its positive and negative parts. The representative lives in Type
 -- (it's the underlying carrier of the Integer quotient), so we get a
 -- clean equational form with `Exists`.
-theorem IntegerRepresentative.constructor_totality
-        : ∀ (representative : IntegerRepresentative).
-          ∃ (positivePart : Natural). ∃ (negativePart : Natural).
-                representative = IntegerRepresentative.make(positivePart, negativePart)
-  | IntegerRepresentative.make(positivePart, negativePart) =>
-      witness positivePart with
-          witness negativePart with
-              reflexivity(IntegerRepresentative.make(positivePart, negativePart))
+theorem IntegerRepresentative.constructor_totality (representative : IntegerRepresentative)
+        : ∃ (positivePart : Natural). ∃ (negativePart : Natural).
+              representative = IntegerRepresentative.make(positivePart, negativePart) := {
+  let ⟨positivePart, negativePart⟩ := representative;
+  witness positivePart with
+      witness negativePart with
+          reflexivity(IntegerRepresentative.make(positivePart, negativePart))
+}
 
 -- (The analogous `RationalRepresentative.constructor_totality` demo was
 -- dropped: `RationalRepresentative.make` now carries a `denominator ≠ 0`

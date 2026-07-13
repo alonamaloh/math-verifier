@@ -220,14 +220,15 @@ theorem GaussianInteger.gauss_horner
 -- (re, im) = coords(a). Induction on the coefficient list; the cons step
 -- is classOf_cons + IH + gauss_horner.
 theorem GaussianInteger.reconstruct_coeffs
-        : (a : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle)))
-          → GaussianInteger.classOf(a)
+        (a : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle)))
+        : GaussianInteger.classOf(a)
             = GaussianInteger.embedInteger(
                   Product.first(GaussianInteger.coordinatesOfCoefficients(a)))
               + GaussianInteger.i
                 * GaussianInteger.embedInteger(
-                      Product.second(GaussianInteger.coordinatesOfCoefficients(a)))
-  | Polynomial.Coefficients.nil => {
+                      Product.second(GaussianInteger.coordinatesOfCoefficients(a))) :=
+  by induction on a with IH {
+    case Polynomial.Coefficients.nil: {
       -- coords(nil) = (0,0), so the goal is classOf(nil) = embed(0) + i·embed(0).
       -- classOf(nil) = 0 (defeq); embed(0) = 0 by zero_preserves; i·0 = 0 here.
       GaussianInteger.embedInteger(Integer.zero)
@@ -244,8 +245,8 @@ theorem GaussianInteger.reconstruct_coeffs
          = GaussianInteger.embedInteger(Integer.zero)
              + GaussianInteger.i * GaussianInteger.embedInteger(Integer.zero)
                by substituting iTimesZero
-    }
-  | Polynomial.Coefficients.cons(c, rest) =>
+      }
+    case Polynomial.Coefficients.cons(c, rest):
       GaussianInteger.classOf(
                Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), c, rest))
          = GaussianInteger.embedInteger(c) + GaussianInteger.i * GaussianInteger.classOf(rest)
@@ -257,13 +258,14 @@ theorem GaussianInteger.reconstruct_coeffs
                   + GaussianInteger.i
                     * GaussianInteger.embedInteger(
                           Product.second(GaussianInteger.coordinatesOfCoefficients(rest))))
-               by substitution
+               by substituting IH
          = GaussianInteger.embedInteger(
                c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest)))
              + GaussianInteger.i
                * GaussianInteger.embedInteger(
                      Product.first(GaussianInteger.coordinatesOfCoefficients(rest)))
                by GaussianInteger.gauss_horner
+  }
 
 -- Reconstruction on ℤ[i]: z = re(z) + i·im(z). Double representatives
 -- reduce z to classOf(a) and coords(z) to coordsOfCoefficients(a).

@@ -44,19 +44,20 @@ import Real.absolute_value
 -- ----------------------------------------------------------------------
 -- x ≤ |x|. Pointwise: the Rational fact x ≤ |x| at every index.
 theorem Real.LessOrEqual_absolute_value_at_make
-        : ∀ (rep : CauchyRationalSequence).
-            (Quotient.class_of(rep) : Real) ≤ abs((Quotient.class_of(rep) : Real))
-  | CauchyRationalSequence.make(s, _) =>
-      unfold Real.IsNonneg in
-      ((ε : Rational)
-               (εPositive : Rational.zero < ε) ↦
-        witness 0 with
-            (m : Natural) (_ : 0 ≤ m) ↦ {
-              s(m) ≤ abs(s(m));
-              Rational.IsNonneg(abs(s(m)) + -(s(m)));
-              -ε < Rational.zero
-                 ≤ abs(s(m)) + -(s(m))
-            })
+        (rep : CauchyRationalSequence)
+        : (Quotient.class_of(rep) : Real) ≤ abs((Quotient.class_of(rep) : Real)) := {
+  let ⟨s, _⟩ := rep;
+  unfold Real.IsNonneg in
+  ((ε : Rational)
+           (εPositive : Rational.zero < ε) ↦
+    witness 0 with
+        (m : Natural) (_ : 0 ≤ m) ↦ {
+          s(m) ≤ abs(s(m));
+          Rational.IsNonneg(abs(s(m)) + -(s(m)));
+          -ε < Rational.zero
+             ≤ abs(s(m)) + -(s(m))
+        })
+}
 
 theorem Real.LessOrEqual_absolute_value (x : Real) : x ≤ abs(x) :=
   by_representatives x as rep =>
@@ -73,28 +74,26 @@ theorem Real.negate_LessOrEqual_absolute_value (x : Real) : -x ≤ abs(x) :=
 -- -2δ < s(m) - |s(m)| (the difference is 0 on the nonnegative side and
 -- 2·s(m) otherwise), so the ε-argument runs at δ = ε/2.
 theorem Real.absolute_value_LessOrEqual_of_nonneg_at_make
-        : ∀ (rep : CauchyRationalSequence).
-            CauchyRationalSequence.IsEventuallyNonneg(rep)
-          → abs((Quotient.class_of(rep) : Real)) ≤ (Quotient.class_of(rep) : Real)
-  | CauchyRationalSequence.make(s, sCauchy) =>
-      unfold Real.IsNonneg in
-      ((eventuallyNonneg
-          : CauchyRationalSequence.IsEventuallyNonneg(
-                CauchyRationalSequence.make(s, sCauchy)))
-      (ε : Rational)
-      (εPositive : Rational.zero < ε) ↦ {
-        Rational.zero < Rational.halve(ε) as halfPositive;
-        choose N as eventuallyAboveHalf
-            from eventuallyNonneg(Rational.halve(ε), halfPositive);
-        witness N with
-            (m : Natural) (NLeqM : N ≤ m) ↦ {
-              -Rational.halve(ε) < s(m)
-                  by eventuallyAboveHalf(m, NLeqM);
-              -- Goal: -ε < s(m) + -|s(m)|; ε is twice the slack δ.
-              -ε = -(Rational.halve(ε) + Rational.halve(ε))
-                 < s(m) + -abs(s(m))   by Rational.subtract_absolute_value_lower_bound
-            }
-      })
+        (rep : CauchyRationalSequence)
+        (eventuallyNonneg : CauchyRationalSequence.IsEventuallyNonneg(rep))
+        : abs((Quotient.class_of(rep) : Real)) ≤ (Quotient.class_of(rep) : Real) := {
+  let ⟨s, sCauchy⟩ := rep;
+  unfold Real.IsNonneg in
+  ((ε : Rational)
+   (εPositive : Rational.zero < ε) ↦ {
+     Rational.zero < Rational.halve(ε) as halfPositive;
+     choose N as eventuallyAboveHalf
+         from eventuallyNonneg(Rational.halve(ε), halfPositive);
+     witness N with
+         (m : Natural) (NLeqM : N ≤ m) ↦ {
+           -Rational.halve(ε) < s(m)
+               by eventuallyAboveHalf(m, NLeqM);
+           -- Goal: -ε < s(m) + -|s(m)|; ε is twice the slack δ.
+           -ε = -(Rational.halve(ε) + Rational.halve(ε))
+              < s(m) + -abs(s(m))   by Rational.subtract_absolute_value_lower_bound
+         }
+   })
+}
 
 theorem Real.absolute_value_LessOrEqual_of_nonneg (x : Real)
         (xNonneg : Real.IsNonneg(x))

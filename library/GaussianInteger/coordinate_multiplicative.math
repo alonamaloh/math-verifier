@@ -40,25 +40,27 @@ definition GaussianInteger.gaussianProduct (u v : Pair(Integer, Integer))
 -- ----------------------------------------------------------------------
 -- Scaling a coefficient list by a constant scales both coordinates.
 theorem GaussianInteger.coordinatesOfCoefficients_scale (a : Integer)
-        : ∀ (k : Polynomial.Coefficients(Integer)).
-          coords(
+        (k : Polynomial.Coefficients(Integer))
+        : coords(
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, k))
             = Product.make(
                   a * Product.first(coords(k)),
-                  a * Product.second(coords(k)))
-  | Polynomial.Coefficients.nil => {
+                  a * Product.second(coords(k))) :=
+  by induction on k with IH {
+    case Polynomial.Coefficients.nil: {
       -- coords(scale(a, [])) = (0, 0) = (a·0, a·0).
       Integer.zero = a * Integer.zero;
       done
     }
-  | Polynomial.Coefficients.cons(c, rest) => {
+    case Polynomial.Coefficients.cons(c, rest): {
       -- scale(a, c :: rest) = (a·c) :: scale(a, rest); the induction
       -- hypothesis gives the coordinates of the scaled tail.
       coords(
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest))
             = Product.make(
                   a * Product.first(coords(rest)),
-                  a * Product.second(coords(rest))) as tail;
+                  a * Product.second(coords(rest)))
+            by IH as tail;
       -- real part
       a * c - Product.second(coords(
                Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest)))
@@ -72,6 +74,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_scale (a : Integer)
           by tail;
       done
     }
+  }
 
 -- ----------------------------------------------------------------------
 -- Multiplicativity on coefficient lists: coords(p·q) = coords(p) ⊗ coords(q).
@@ -79,13 +82,16 @@ theorem GaussianInteger.coordinatesOfCoefficients_scale (a : Integer)
 -- coords(p·q) = a·coords(q) ⊕ i·(coords(restA)⊗coords(q)), which is the
 -- Gaussian product coords(cons(a,restA)) ⊗ coords(q) by ring.
 theorem GaussianInteger.coordinatesOfCoefficients_multiply
-        : ∀ (p q : Polynomial.Coefficients(Integer)).
+        (p : Polynomial.Coefficients(Integer))
+        : ∀ (q : Polynomial.Coefficients(Integer)).
           coords(
                 Polynomial.Coefficients.multiply(Integer.ring_bundle, p, q))
             = GaussianInteger.gaussianProduct(
                   coords(p),
-                  coords(q))
-  | Polynomial.Coefficients.nil, q => {
+                  coords(q)) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+      (q : Polynomial.Coefficients(Integer)) ↦ {
       -- coords(nil·q) = coords(nil) = (0,0) = (0,0) ⊗ coords(q).
       Integer.zero
           = Integer.zero * Product.first(coords(q))
@@ -95,7 +101,8 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
                 + Integer.zero * Product.first(coords(q));
       done
     }
-  | Polynomial.Coefficients.cons(a, restA), q => {
+    case Polynomial.Coefficients.cons(a, restA):
+      (q : Polynomial.Coefficients(Integer)) ↦ {
       -- multiply(a :: restA, q) = scale(a, q) + shift(restA · q). The
       -- induction hypothesis evaluates coords(restA · q) as the Gaussian
       -- product; `scaleCoordinates` and `shiftCoordinates` evaluate the two
@@ -107,7 +114,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
             = GaussianInteger.gaussianProduct(
                   coords(restA),
                   coords(q))
-          by GaussianInteger.coordinatesOfCoefficients_multiply(restA, q) as ihMultiply;
+          by IH(q) as ihMultiply;
       coords(
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, q))
             = Product.make(
@@ -196,6 +203,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
                    Polynomial.Coefficients.cons(Integer, a, restA)),
                coords(q));
     }
+  }
 
 -- ----------------------------------------------------------------------
 -- Lifted to ℤ[x]: coords(p·q) = coords(p) ⊗ coords(q).

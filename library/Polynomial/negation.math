@@ -44,30 +44,34 @@ definition Polynomial.Coefficients.negate (r : Ring)
 -- Bridge: the i-th coefficient of −p is the negation of the i-th
 -- coefficient of p. The nil case needs `Ring.negate_zero`.
 theorem Polynomial.nth_negate (r : Ring)
-        : (p : Polynomial.Coefficients(Ring.carrier(r)))
-          → ∀ (index : Natural).
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : ∀ (index : Natural).
           Polynomial.coefficient(Polynomial.Coefficients.negate(r, p), index)
-            = (- Polynomial.coefficient(p, index))
-  | Polynomial.Coefficients.nil, index =>
-      Polynomial.coefficient(Polynomial.Coefficients.negate(r, Polynomial.Coefficients.nil(Ring.carrier(r))), index)
-         = Ring.zero(r)                                                                    by Polynomial.nth_nil
-         = (- Ring.zero(r))                                                                by Ring.negate_zero
-         = (- Polynomial.coefficient(Polynomial.Coefficients.nil(Ring.carrier(r)), index)) by substituting Polynomial.nth_nil
-  | Polynomial.Coefficients.cons(a, rest), index =>
-      done by cases {
-        case index = 0: reflexivity(Ring.carrier(r), (- a))
-        case index = 1 + predecessor for some predecessor:
-            Polynomial.coefficient(
-                    Polynomial.Coefficients.negate(r,
-                        Polynomial.Coefficients.cons(Ring.carrier(r), a, rest)),
-                    1 + predecessor)
-               = Polynomial.coefficient(Polynomial.Coefficients.negate(r, rest), predecessor)
-               = (- Polynomial.coefficient(rest, predecessor))
-                     by Polynomial.nth_negate(r, rest, predecessor)
-               = (- Polynomial.coefficient(
-                       Polynomial.Coefficients.cons(Ring.carrier(r), a, rest),
-                       1 + predecessor))
-      }
+            = (- Polynomial.coefficient(p, index)) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+        (index : Natural) ↦
+          Polynomial.coefficient(Polynomial.Coefficients.negate(r, Polynomial.Coefficients.nil(Ring.carrier(r))), index)
+             = Ring.zero(r)                                                                    by Polynomial.nth_nil
+             = (- Ring.zero(r))                                                                by Ring.negate_zero
+             = (- Polynomial.coefficient(Polynomial.Coefficients.nil(Ring.carrier(r)), index)) by substituting Polynomial.nth_nil
+    case Polynomial.Coefficients.cons(a, rest):
+        (index : Natural) ↦
+          done by cases {
+            case index = 0: reflexivity(Ring.carrier(r), (- a))
+            case index = 1 + predecessor for some predecessor:
+                Polynomial.coefficient(
+                        Polynomial.Coefficients.negate(r,
+                            Polynomial.Coefficients.cons(Ring.carrier(r), a, rest)),
+                        1 + predecessor)
+                   = Polynomial.coefficient(Polynomial.Coefficients.negate(r, rest), predecessor)
+                   = (- Polynomial.coefficient(rest, predecessor))
+                         by IH(predecessor)
+                   = (- Polynomial.coefficient(
+                           Polynomial.Coefficients.cons(Ring.carrier(r), a, rest),
+                           1 + predecessor))
+          }
+  }
 
 -- Negation respects the equivalence (pointwise via the bridge).
 theorem Polynomial.Coefficients.negate_respects (r : Ring)

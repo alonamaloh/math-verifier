@@ -80,13 +80,14 @@ definition CauchyRationalSequence.absolute_value
 
 -- Bridge: sf(absolute_value(rep), m) = |sf(rep, m)|.
 theorem CauchyRationalSequence.sequenceFunction_absolute_value
-        : ∀ (rep : CauchyRationalSequence). ∀ (m : Natural).
-            CauchyRationalSequence.sequenceFunction(
-                CauchyRationalSequence.absolute_value(rep), m)
-            = abs(
-                  CauchyRationalSequence.sequenceFunction(rep, m))
-  | CauchyRationalSequence.make(s, _), m =>
-      reflexivity(Rational, abs(s(m)))
+        (rep : CauchyRationalSequence) (m : Natural)
+        : CauchyRationalSequence.sequenceFunction(
+              CauchyRationalSequence.absolute_value(rep), m)
+          = abs(
+                CauchyRationalSequence.sequenceFunction(rep, m)) := {
+  let ⟨s, _⟩ := rep;
+  reflexivity(Rational, abs(s(m)))
+}
 
 -- ----------------------------------------------------------------------
 -- Respect: equivalent sequences have equivalent absolute-value
@@ -150,27 +151,28 @@ overload abs := Real.absolute_value
 -- At constructor reps. Pattern-matching exposes the underlying sequences
 -- so every Quotient.lift and CauchyRationalSequence pattern-match reduces.
 theorem Real.triangle_inequality_at_make
-        : ∀ (rep_x rep_y : CauchyRationalSequence).
-            abs(
-                (Quotient.class_of(rep_x) : Real) + Quotient.class_of(rep_y))
-            ≤ abs((Quotient.class_of(rep_x) : Real))
-              + abs((Quotient.class_of(rep_y) : Real))
-  | CauchyRationalSequence.make(sx, _),
-    CauchyRationalSequence.make(sy, _) =>
-      unfold Real.IsNonneg in
-      ((ε : Rational)
-               (εPositive : Rational.zero < ε) ↦
-        witness 0 with
-            (m : Natural) (_ : 0 ≤ m) ↦ {
-              -- 0 ≤ (|sx(m)| + |sy(m)|) − |sx(m) + sy(m)| is the triangle
-              -- inequality; −ε < 0 by positivity of ε.
-              abs(sx(m) + sy(m)) ≤ abs(sx(m)) + abs(sy(m));
-              -ε
-                 < Rational.zero
-                 = abs(sx(m) + sy(m)) + -abs(sx(m) + sy(m))
-                 ≤ (abs(sx(m)) + abs(sy(m)))
-                   + -abs(sx(m) + sy(m))
-            })
+        (rep_x rep_y : CauchyRationalSequence)
+        : abs(
+              (Quotient.class_of(rep_x) : Real) + Quotient.class_of(rep_y))
+          ≤ abs((Quotient.class_of(rep_x) : Real))
+            + abs((Quotient.class_of(rep_y) : Real)) := {
+  let ⟨sx, _⟩ := rep_x;
+  let ⟨sy, _⟩ := rep_y;
+  unfold Real.IsNonneg in
+  ((ε : Rational)
+           (εPositive : Rational.zero < ε) ↦
+    witness 0 with
+        (m : Natural) (_ : 0 ≤ m) ↦ {
+          -- 0 ≤ (|sx(m)| + |sy(m)|) − |sx(m) + sy(m)| is the triangle
+          -- inequality; −ε < 0 by positivity of ε.
+          abs(sx(m) + sy(m)) ≤ abs(sx(m)) + abs(sy(m));
+          -ε
+             < Rational.zero
+             = abs(sx(m) + sy(m)) + -abs(sx(m) + sy(m))
+             ≤ (abs(sx(m)) + abs(sy(m)))
+               + -abs(sx(m) + sy(m))
+        })
+}
 
 -- Triangle on Real. Lift via Quotient.induct_two to the at-make form.
 automatic theorem Real.triangle_inequality (x y : Real)

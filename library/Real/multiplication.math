@@ -209,15 +209,15 @@ operator (*) on (CauchyRationalSequence, CauchyRationalSequence) := CauchyRation
 
 -- sf(multiply(rep_x, rep_y), m) = sf(rep_x, m) * sf(rep_y, m).
 automatic theorem CauchyRationalSequence.sequenceFunction_multiply
-        : ∀ (rep_x rep_y : CauchyRationalSequence). ∀ (m : Natural).
-            CauchyRationalSequence.sequenceFunction(
-                rep_x * rep_y, m)
-            = CauchyRationalSequence.sequenceFunction(rep_x, m)
-              * CauchyRationalSequence.sequenceFunction(rep_y, m)
-  | CauchyRationalSequence.make(sa, _),
-    CauchyRationalSequence.make(sb, _),
-    m =>
-      reflexivity(Rational, sa(m) * sb(m))
+        (rep_x rep_y : CauchyRationalSequence) (m : Natural)
+        : CauchyRationalSequence.sequenceFunction(
+              rep_x * rep_y, m)
+          = CauchyRationalSequence.sequenceFunction(rep_x, m)
+            * CauchyRationalSequence.sequenceFunction(rep_y, m) := {
+  let ⟨sa, _⟩ := rep_x;
+  let ⟨sb, _⟩ := rep_y;
+  reflexivity(Rational, sa(m) * sb(m))
+}
 
 -- Helper: a*b - a*c = a*(b - c) via distributivity_left + multiply_negate_right.
 theorem Rational.factor_subtract_distribute (a b c : Rational)
@@ -302,19 +302,19 @@ theorem Real.multiply_after_first_respects_at_rep_inner
 -- s_x is accessible (cauchy_is_naturally_bounded needs the underlying
 -- sequence); the inner ε-N bound is supplied by _at_rep_inner.
 theorem Real.multiply_respects_second
-        : ∀ (rep_x rep_y rep_yPrime : CauchyRationalSequence).
-            CauchyEquivalent(rep_y, rep_yPrime)
-          → CauchyEquivalent(rep_x * rep_y, rep_x * rep_yPrime)
-  | CauchyRationalSequence.make(s_x, sCauchy_x),
-    CauchyRationalSequence.make(s_y, sCauchy_y),
-    CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime),
-    refinedYEquiv =>
+        (rep_x rep_y rep_yPrime : CauchyRationalSequence)
+        (refinedYEquiv : CauchyEquivalent(rep_y, rep_yPrime))
+        : CauchyEquivalent(rep_x * rep_y, rep_x * rep_yPrime) := {
+      let ⟨s_x, sCauchy_x⟩ := rep_x;
+      let ⟨s_y, sCauchy_y⟩ := rep_y;
+      let ⟨s_yPrime, sCauchy_yPrime⟩ := rep_yPrime;
       (ε : Rational)
                (εPositive : Rational.zero < ε) ↦ {
         change ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
                  abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)) < ε;
         done
       }
+}
 
 -- Symmetric inner-chain helper for multiply_respects_first: y is
 -- bounded, x varies via xEquiv.
@@ -353,19 +353,19 @@ theorem Real.multiply_respects_at_rep_y_inner
 -- _second but with the bound on the y-side. Multi-pattern destructure
 -- on all three reps; inner ε-N bound supplied by _at_rep_y_inner.
 theorem Real.multiply_respects_first
-        : ∀ (rep_x rep_xPrime rep_y : CauchyRationalSequence).
-            CauchyEquivalent(rep_x, rep_xPrime)
-          → CauchyEquivalent(rep_x * rep_y, rep_xPrime * rep_y)
-  | CauchyRationalSequence.make(s_x, sCauchy_x),
-    CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime),
-    CauchyRationalSequence.make(s_y, sCauchy_y),
-    refinedXEquiv =>
+        (rep_x rep_xPrime rep_y : CauchyRationalSequence)
+        (refinedXEquiv : CauchyEquivalent(rep_x, rep_xPrime))
+        : CauchyEquivalent(rep_x * rep_y, rep_xPrime * rep_y) := {
+      let ⟨s_x, sCauchy_x⟩ := rep_x;
+      let ⟨s_xPrime, sCauchy_xPrime⟩ := rep_xPrime;
+      let ⟨s_y, sCauchy_y⟩ := rep_y;
       (ε : Rational)
                (εPositive : Rational.zero < ε) ↦ {
         change ∃ (N : Natural). ∀ (m : Natural). N ≤ m →
                  abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)) < ε;
         done by Real.multiply_respects_at_rep_y_inner
       }
+}
 
 -- Real.multiply: multiply the representative sequences pointwise;
 -- well-defined in each argument by the respect lemmas above.

@@ -37,20 +37,18 @@ theorem Natural.add_equals_zero_left (a b : Natural) (equation : a + b = 0) : a 
 -- is trivial; the successor case reduces (via multiply_successor) to
 -- `c + predB · c = 0`, forcing c = 0 — contradicting c ≥ 1.
 theorem Natural.multiply_equals_zero_with_positive_right
-        : ∀ (b c : Natural).
-          1 ≤ c
-          → b * c = 0
-          → b = 0
-  | zero, _, _, _ =>
-      done
-  | successor(predB), c, positivity, productZero => {
-      -- successor(predB) · c reduces definitionally to c + predB · c
-      -- (Natural.multiply pattern-matches on its first argument), so
-      -- the hypothesis productZero already has the reduced form.
-      c + predB * c = 0;
-      c = 0;
-      1 ≤ 0 as oneLessOrEqualZero;
-      absurd(oneLessOrEqualZero)
+        (b c : Natural) (positivity : 1 ≤ c) (productZero : b * c = 0) : b = 0 :=
+  done by cases {
+    case b = 0: done
+    case b = successor(predB) for some predB: {
+        -- successor(predB) · c reduces definitionally to c + predB · c
+        -- (Natural.multiply pattern-matches on its first argument), so
+        -- the hypothesis productZero already has the reduced form.
+        c + predB * c = 0;
+        c = 0;
+        1 ≤ 0;
+        False; done
+      }
   }
 
 -- The main cancellation lemma: a · c = b · c with c ≥ 1 forces a = b.

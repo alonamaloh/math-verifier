@@ -39,32 +39,34 @@ theorem GaussianInteger.product_eta (a : Pair(Integer, Integer))
 -- Additivity on coefficient lists: coordinates of a sum are the
 -- componentwise sums of the coordinates.
 theorem GaussianInteger.coordinatesOfCoefficients_add
-        : ∀ (a b : Polynomial.Coefficients(Integer)).
-          coords(Polynomial.Coefficients.add(Integer.ring_bundle, a, b))
+        (p : Polynomial.Coefficients(Integer))
+        : ∀ (b : Polynomial.Coefficients(Integer)).
+          coords(Polynomial.Coefficients.add(Integer.ring_bundle, p, b))
             = Product.make(
-                  Product.first(coords(a))
+                  Product.first(coords(p))
                       + Product.first(coords(b)),
-                  Product.second(coords(a))
-                      + Product.second(coords(b)))
-  | Polynomial.Coefficients.nil =>
-      (b : Polynomial.Coefficients(Integer)) ↦ {
-        -- add(nil, b) = b and coords(nil) = (0, 0), so each coordinate gains 0.
-        Product.first(coords(b))
-            = Integer.zero + Product.first(coords(b));
-        Product.second(coords(b))
-            = Integer.zero + Product.second(coords(b));
-        coords(b)
-           = Product.make(
-                 Product.first(coords(b)),
-                 Product.second(coords(b)))
-           = Product.make(
-                 Integer.zero + Product.first(coords(b)),
-                 Integer.zero + Product.second(coords(b)));
-      }
-  | Polynomial.Coefficients.cons(a, restA) =>
-      (b : Polynomial.Coefficients(Integer)) ↦
-        done by cases {
-          case b = Polynomial.Coefficients.nil(Integer): {
+                  Product.second(coords(p))
+                      + Product.second(coords(b))) :=
+  by induction on p with IH {
+    case Polynomial.Coefficients.nil:
+        (b : Polynomial.Coefficients(Integer)) ↦ {
+          -- add(nil, b) = b and coords(nil) = (0, 0), so each coordinate gains 0.
+          Product.first(coords(b))
+              = Integer.zero + Product.first(coords(b));
+          Product.second(coords(b))
+              = Integer.zero + Product.second(coords(b));
+          coords(b)
+             = Product.make(
+                   Product.first(coords(b)),
+                   Product.second(coords(b)))
+             = Product.make(
+                   Integer.zero + Product.first(coords(b)),
+                   Integer.zero + Product.second(coords(b)));
+        }
+    case Polynomial.Coefficients.cons(a, restA):
+        (b : Polynomial.Coefficients(Integer)) ↦
+          done by cases {
+            case b = Polynomial.Coefficients.nil(Integer): {
               -- add(cons, nil) = cons and coords(nil) = (0, 0); each coordinate gains 0.
               Polynomial.Coefficients.add(Integer.ring_bundle,
                     Polynomial.Coefficients.cons(Integer, a, restA), Polynomial.Coefficients.nil(Integer))
@@ -109,7 +111,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_add
                               + Product.first(coords(restB)),
                           Product.second(coords(restA))
                               + Product.second(coords(restB)))
-                  by GaussianInteger.coordinatesOfCoefficients_add(restA, restB) as ih;
+                  by IH(restB) as ih;
               -- real part: (a+bb) − (im(restA) + im(restB))
               (a + bb)
                        - Product.second(coords(
@@ -129,6 +131,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_add
               done
             }
         }
+  }
 
 -- ----------------------------------------------------------------------
 -- Multiplying by x rotates the coordinates. At the coefficient level

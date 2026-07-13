@@ -116,9 +116,10 @@ theorem Real.partialSum_pair (s : Natural → Real) (N : Natural)
 -- step multiplies by −y twice). This carries the alternating sign of
 -- the cosine/sine coefficients: (−x²)^m flips sign with the parity of m.
 theorem Real.power_negate_parity (y : Real)
-        : ∀ (m : Natural).
-          (-y) ^ (2 * m) = y ^ (2 * m) ∧ (-y) ^ (1 + 2 * m) = -(y ^ (1 + 2 * m))
-  | 0 => {
+        (n : Natural)
+        : (-y) ^ (2 * n) = y ^ (2 * n) ∧ (-y) ^ (1 + 2 * n) = -(y ^ (1 + 2 * n)) :=
+  by induction on n with IH {
+    case 0: {
       2 * 0 = 0 as twoTimesZero;
       (-y) ^ (2 * 0)
                 = (-y) ^ 0        by twoTimesZero
@@ -140,10 +141,10 @@ theorem Real.power_negate_parity (y : Real)
           };
       done by And.introduction
     }
-  | 1 + m => {
+    case 1 + m: {
       (-y) ^ (2 * m) = y ^ (2 * m)
           ∧ (-y) ^ (1 + 2 * m) = -(y ^ (1 + 2 * m))
-          by Real.power_negate_parity(y, m);
+          by IH;
       (-y) ^ (2 * m) = y ^ (2 * m) as evenAt;
       (-y) ^ (1 + 2 * m) = -(y ^ (1 + 2 * m));
       2 * (1 + m) = 1 + (1 + 2 * m) as indexEven;
@@ -188,6 +189,7 @@ theorem Real.power_negate_parity (y : Real)
                       by indexOdd;
       done by And.introduction
     }
+  }
 
 -- The two projections, as standalone facts.
 theorem Real.power_negate_even (y : Real) (m : Natural)
@@ -477,25 +479,27 @@ theorem Natural.factorial_le_one_plus (n : Natural)
 }
 
 -- a! ≤ (k + a)!, by induction on the gap k (each step a factorial-le-one_plus).
-theorem Natural.factorial_le_add (a : Natural)
-        : ∀ (k : Natural). a! ≤ (k + a)!
-  | 0 => {
-      a! ≤ a!;
-      done by substituting Natural.zero_add
-    }
-  | 1 + p => {
-      a! ≤ (p + a)!
-          by Natural.factorial_le_add(a, p);
-      (p + a)!
-            ≤ (1 + (p + a))!
-          by Natural.factorial_le_one_plus;
-      a! ≤ (1 + (p + a))!
-          by Natural.LessOrEqual.transitive;
-      1 + (p + a) = (1 + p) + a as indexAssoc;
-      a! ≤ ((1 + p) + a)!
-          by substituting indexAssoc;
-      done by substituting Natural.one_add
-    }
+theorem Natural.factorial_le_add (a : Natural) (k : Natural)
+        : a! ≤ (k + a)! :=
+  by induction on k with IH {
+    case 0: {
+        a! ≤ a!;
+        done by substituting Natural.zero_add
+      }
+    case 1 + p: {
+        a! ≤ (p + a)!
+            by IH;
+        (p + a)!
+              ≤ (1 + (p + a))!
+            by Natural.factorial_le_one_plus;
+        a! ≤ (1 + (p + a))!
+            by Natural.LessOrEqual.transitive;
+        1 + (p + a) = (1 + p) + a as indexAssoc;
+        a! ≤ ((1 + p) + a)!
+            by substituting indexAssoc;
+        done by substituting Natural.one_add
+      }
+  }
 
 theorem Natural.factorial_monotone (a b : Natural) (aLeB : a ≤ b)
         : a! ≤ b! := {
@@ -522,21 +526,23 @@ theorem Real.exponentialCoefficient_antitone (i j : Natural) (iLeqJ : i ≤ j)
 
 -- ----------------------------------------------------------------------
 -- Every natural is even or odd: n = 2j or n = 2j+1.
-theorem Natural.even_or_odd
-        : ∀ (n : Natural). ∃ (j : Natural). n = 2 * j ∨ n = 1 + 2 * j
-  | 0 => {
-      (0 : Natural) = 2 * 0 as base;
-      witness 0 with Or.introduceLeft(base)
-    }
-  | 1 + p => {
-      choose j such that p = 2 * j ∨ p = 1 + 2 * j from Natural.even_or_odd(p);
-      done by cases {
-        case p = 2 * j as pEven:
-            witness j with Or.introduceRight({ successor(2 * j) = 1 + 2 * j })
-        case p = 1 + 2 * j as pOdd:
-            witness (1 + j) with Or.introduceLeft({ successor(1 + 2 * j) = 2 * (1 + j) })
+theorem Natural.even_or_odd (n : Natural)
+        : ∃ (j : Natural). n = 2 * j ∨ n = 1 + 2 * j :=
+  by induction on n with IH {
+    case 0: {
+        (0 : Natural) = 2 * 0 as base;
+        witness 0 with Or.introduceLeft(base)
       }
-    }
+    case 1 + p: {
+        choose j such that p = 2 * j ∨ p = 1 + 2 * j from IH;
+        done by cases {
+          case p = 2 * j as pEven:
+              witness j with Or.introduceRight({ successor(2 * j) = 1 + 2 * j })
+          case p = 1 + 2 * j as pOdd:
+              witness (1 + j) with Or.introduceLeft({ successor(1 + 2 * j) = 2 * (1 + j) })
+        }
+      }
+  }
 
 -- ----------------------------------------------------------------------
 -- Partial sums of an "alternating, decreasing-magnitude" series stay
@@ -547,9 +553,10 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
         (leadNonpositive : ∀ (j : Natural). g(2 * j) ≤ Real.zero)
         (pairNonpositive
             : ∀ (j : Natural). g(2 * j) + g(1 + 2 * j) ≤ Real.zero)
-        : ∀ (j : Natural).
-          Real.partialSum(g, 2 * j) ≤ Real.zero ∧ Real.partialSum(g, 1 + 2 * j) ≤ Real.zero
-  | 0 => {
+        (n : Natural)
+        : Real.partialSum(g, 2 * n) ≤ Real.zero ∧ Real.partialSum(g, 1 + 2 * n) ≤ Real.zero :=
+  by induction on n with IH {
+    case 0: {
       Real.partialSum(g, 2 * 0) ≤ Real.zero;
       Real.partialSum(g, 1 + 2 * 0)
                 = Real.partialSum(g, 2 * 0) + g(2 * 0)
@@ -560,10 +567,10 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
                       by leadNonpositive(0);
       done
     }
-  | 1 + j => {
+    case 1 + j: {
       Real.partialSum(g, 2 * j) ≤ Real.zero
           ∧ Real.partialSum(g, 1 + 2 * j) ≤ Real.zero
-          by Real.partialSum_nonpositive_paired(g, leadNonpositive, pairNonpositive, j);
+          by IH;
       2 * (1 + j) = 1 + (1 + 2 * j) as indexEven;
       g(2 * j) + g(1 + 2 * j) ≤ Real.zero;
       Real.partialSum(g, 2 * (1 + j))
@@ -591,6 +598,7 @@ theorem Real.partialSum_nonpositive_paired (g : Natural → Real)
                 = Real.zero;
       done
     }
+  }
 
 -- … hence non-positive at every cut (split n by parity).
 theorem Real.partialSum_nonpositive (g : Natural → Real)
