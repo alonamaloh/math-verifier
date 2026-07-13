@@ -15,6 +15,35 @@ Two things are already true (done in the prior session — see Status):
 
 This plan removes those too, then deletes the keyword.
 
+## SESSION HANDOFF (2026-07-12) — cases keyword GONE; next = polish, then STEP 5
+
+STEPS 1–4 COMPLETE. The surface `cases <scrutinee>` keyword is retired
+(`make library`+`tests`+`error-tests` green; 0 surface `cases <var>` in real
+code; `cases by <lemma>` survives, 4 uses). Guiding principle for all remaining
+work: [[no_computation_needed]] — only proving theorems; proofs → `by
+induction`/`by cases`, functions → whatever reads best, never "needs to compute".
+
+**Next session, two tasks:**
+1. **POLISH the ~200 STEP-2/3 migrations** (readability debt, correctness is
+   already kernel-verified). Use the `polish-proofs` skill / `--check-redundant-by`.
+   Known warts from the parallel sweep: `by cases` supplies a case-equation
+   *hypothesis* (doesn't substitute into other hypotheses), so agents added
+   small bridge facts and some reductio arms read `absurd(impossible)` where the
+   owner idiom wants a bare `done` ([[reductio_done_idiom]]); also dropped-name
+   and over-annotated-witness noise. Scope to the clean manifest
+   ([[scope_to_clean_manifest]]). Pre-existing expensive-by-less warnings
+   (conjugation/series/exponential/multiply_laws:236) are NOT this project's —
+   leave them.
+2. **STEP 5 — the "weird proofs"** (~113 pattern-match THEOREM proofs
+   `theorem T : (x:A)→P | Ctor(x) => …` → `by induction`/`by cases`). Spike the
+   awkward-recursion residue first (multi-arg → `generalizing`; the rest
+   mechanical), then a parallel sweep — same shape as this project. Then STEP 6
+   (explore whether function defs need pattern-match at all).
+
+**Parallel-agent lesson:** the shared working tree + agents running `git
+stash`/`reset` clobbered in-progress work twice. Next time, tell agents
+NEVER to run any `git` command; the orchestrator commits checkpoints.
+
 ## Status ledger (update every session)
 
 - [x] **Computed-scrutinee `cases` rejected.** `elaborateCasesExpression`
@@ -51,9 +80,14 @@ This plan removes those too, then deletes the keyword.
   `| pat =>` destructure count is now **0**. Decisive A-vs-B test: is the
   scrutinee's TYPE a quotient (→ by_representatives) or a single-constructor
   struct (→ let ⟨⟩) — the build confirms.
-- [~] **STEP 3 — Migrate 98 multi-constructor splits** → `by cases` /
-  `by induction` / `choose` / helper / **reformulation** (for the 5 residue).
-  **ALL 5 residue reformulations DONE** (full library + tests green, every
+- [x] **STEP 3 — DONE.** All 98 multi-arm splits migrated: 5 value-level
+  reformulations (below) + ~91 proof-level → `by cases`, with the recursor-only
+  sites → `by induction` (RULE: `by cases` needs a coverage *disjunction* lemma;
+  it FAILS on coverage lemmas themselves — circular — and on `Sum`-via-alias
+  and `Logic.Decidable` scrutinees, whose fields are proof-valued / have no
+  coverage lemma; those go through `by induction on x`, which rides the recursor
+  directly. Added `Sum.map` (Logic/sum.math) for the 2 value-level Sum
+  function-destructures.) Reformulations (full library + tests green, every
   characterising-lemma statement preserved so downstream is untouched):
   - `Natural.maximum := a + monus(b, a)` — non-recursive; inequalities re-prove
     from monus lemmas (left = less_or_equal_add_right; right = totality split).
@@ -88,9 +122,16 @@ This plan removes those too, then deletes the keyword.
   - Reordering a two-arg data function to single-column matching keeps exactly
     ONE argument's reduction definitional; pick the one used most as a literal
     (nth: cons-at-0), make the other (nil-at-symbolic) a char lemma + cite it.
-- [ ] **STEP 4 — Remove the `cases` keyword** from parser + elaborator surface;
-  keep the recursor engine for desugarings. Add an ErrorTest that a bare
-  `cases` keyword is now unknown syntax. **Sole surface entry: parser.cpp:3697
+- [x] **STEP 4 — DONE. The `cases <scrutinee>` keyword is retired.**
+  `parseCasesExpression` (src/syntax/parser.cpp) throws a migration-grade
+  `ParseError` unless the next token is `by` (so `cases by <lemma>` — 4 uses —
+  survives; that is the ONE remaining `cases`-keyword form). ErrorTest
+  `cases_keyword_retired` locks the message; deleted 4 subsumed fixtures
+  (computed-scrutinee / cases-with-eq / sealed-natural / refining). 13 Test/
+  files migrated. `userWritten` + `casesScrutineeIsComputed` STAY (still used by
+  `cases by`). `make library`+`tests`+`error-tests` all green; surface
+  `cases <var>` count = 0. **(historical note below)** — original plan text:
+  **Sole surface entry: parser.cpp:3697
   (`if KeywordCases → parseCasesExpression()`) — flip to `throw ParseError`.
   `by cases` (parser.cpp:4232), `by_representatives`, if/decide/choose/tuple-let
   all reach `makeSurfaceCases` by other paths and keep working.**
