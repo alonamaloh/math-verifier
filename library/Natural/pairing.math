@@ -19,6 +19,7 @@ import Equality.basics
 import Natural.basics
 import Natural.peano
 import Natural.arithmetic
+import Natural.classical_decidable
 import Natural.order
 import Natural.add_order
 import Natural.triangular
@@ -31,10 +32,25 @@ import Set.enumerable
 definition Natural.diagonalStep
         : Pair(Natural, Natural) → Pair(Natural, Natural)
   | Product.make(i, j) =>
-      cases j {
-        | zero => Product.make(0, successor(i))
-        | successor(jPredecessor) => Product.make(successor(i), jPredecessor)
-      }
+      if j = 0 then Product.make(0, successor(i))
+      else Product.make(successor(i), Natural.predecessor(j))
+
+-- Stepping from a point with a non-exhausted second coordinate walks
+-- down-right: (i, j+1) ↦ (i+1, j). The second coordinate is non-zero,
+-- so the conditional takes its down-right branch.
+theorem Natural.diagonalStep_successor (i j : Natural)
+        : Natural.diagonalStep(Product.make(i, successor(j))) = Product.make(successor(i), j) := {
+  ¬(successor(j) = 0) by Natural.successor_not_zero;
+  Natural.diagonalStep(Product.make(i, successor(j)))
+     = Product.make(successor(i), Natural.predecessor(successor(j)))   by Logic.if_negative
+     = Product.make(successor(i), j)
+}
+
+-- Stepping from an exhausted second coordinate jumps to the top of the
+-- next diagonal: (i, 0) ↦ (0, i+1).
+theorem Natural.diagonalStep_zero (i : Natural)
+        : Natural.diagonalStep(Product.make(i, 0)) = Product.make(0, successor(i)) :=
+  done by Logic.if_positive
 
 definition Natural.diagonalEnumeration : Natural → Pair(Natural, Natural)
   | 0 => Product.make(0, 0)
@@ -71,7 +87,7 @@ theorem Natural.diagonalEnumeration_walks
                    Natural.diagonalEnumeration(
                        kPredecessor + Natural.triangular(d)))
              = Natural.diagonalStep(Product.make(kPredecessor, successor(j)))
-             = Product.make(successor(kPredecessor), j)
+             = Product.make(successor(kPredecessor), j)   by Natural.diagonalStep_successor
         }
   }
 
@@ -98,7 +114,7 @@ theorem Natural.diagonalEnumeration_starts (d : Natural)
                  Natural.diagonalEnumeration(
                      dPredecessor + Natural.triangular(dPredecessor)))
            = Natural.diagonalStep(Product.make(dPredecessor, 0))
-           = Product.make(0, successor(dPredecessor))
+           = Product.make(0, successor(dPredecessor))   by Natural.diagonalStep_zero
       }
   }
 
