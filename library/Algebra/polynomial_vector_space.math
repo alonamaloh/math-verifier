@@ -87,7 +87,6 @@ theorem Field.coefficientOf_polynomial_scale (f : Field) (a : Field.carrier(f))
      = a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, Natural.monus(k, 0))
            by Polynomial.coefficientOf_monomial_multiply
      = a * Polynomial.coefficientOf(Field.coefficient_ring(f), p, k)
-           by substituting Natural.monus_zero
 
 -- ----------------------------------------------------------------------
 -- The four scalar-action laws, each reduced index by index to a
@@ -259,13 +258,13 @@ theorem Field.fold_vanishes (f : Field) (g : Natural → Field.carrier(f))
     case base: (vanish : ∀ (j : Natural). j < 0 → g(j) = Field.zero(f)) ↦ done
     case step(m):
         (vanish : ∀ (j : Natural). j < 1 + m → g(j) = Field.zero(f)) ↦ {
-          m < 1 + m by Natural.lt_one_plus as mBelow;
+          m < 1 + m as mBelow;
           g(m) = Field.zero(f) by vanish(m, mBelow) as gmZero;
           ∀ (j : Natural). j < m → g(j) = Field.zero(f)
               by {
                 take j : Natural;
                 suppose j < m as jLessM;
-                j < 1 + m by { j < m by jLessM < 1 + m by Natural.lt_one_plus } as jBelow;
+                j < 1 + m as jBelow;
                 done by vanish(j, jBelow)
               }
             as vanishBelowM;
@@ -304,8 +303,8 @@ theorem Field.fold_single_point (f : Field) (g : Natural → Field.carrier(f))
                       by {
                         take j : Natural;
                         suppose j < m as jLessM;
-                        j < target by { j < m by jLessM = target by targetIsM };
-                        j < 1 + m by { j < m by jLessM < 1 + m by Natural.lt_one_plus } as jBelow;
+                        j < target;
+                        j < 1 + m as jBelow;
                         ¬(j = target) by Natural.not_equal_of_less_than as jNotTarget;
                         done by vanish(j, jBelow, jNotTarget)
                       };
@@ -316,15 +315,15 @@ theorem Field.fold_single_point (f : Field) (g : Natural → Field.carrier(f))
                            by Algebra.Fold_add_one
                      = Field.add(Field.zero(f), g(m)) by substituting foldBelowZero
                      = g(m)
-                     = g(target) by substituting targetIsM
+                     = g(target)
                 }
               otherwise as targetNotM: {
                   target ≤ m by Natural.le_of_lt_one_plus;
-                  target < m by Natural.lt_of_le_of_ne as targetLessM;
-                  m < 1 + m by Natural.lt_one_plus as mBelow;
+                  target < m as targetLessM;
+                  m < 1 + m as mBelow;
                   ¬(m = target) by {
                     suppose m = target as mIsTarget;
-                    target = m by mIsTarget;
+                    target = m;
                     done
                   } as mNotTarget;
                   g(m) = Field.zero(f) by vanish(m, mBelow, mNotTarget) as gmZero;
@@ -333,7 +332,7 @@ theorem Field.fold_single_point (f : Field) (g : Natural → Field.carrier(f))
                         take j : Natural;
                         suppose j < m as jLessM;
                         suppose ¬(j = target) as jNotTarget;
-                        j < 1 + m by { j < m by jLessM < 1 + m by Natural.lt_one_plus } as jBelow;
+                        j < 1 + m as jBelow;
                         done by vanish(j, jBelow, jNotTarget)
                       }
                     as vanishBelowM;
@@ -595,9 +594,8 @@ theorem Field.monomial_family_independent (f : Field)
         suppose ¬(j = i) as jNotI;
         ¬(selection(i) = selection(j)) by {
           suppose selection(i) = selection(j) as selectionsEqual;
-          i = j by selectionInjective(i, j, indexBelowCount, jBelowCount, selectionsEqual)
-              as indicesEqual;
-          j = i by indicesEqual;
+          i = j;
+          j = i;
           done
         };
         Polynomial.coefficientOf(Field.coefficient_ring(f),
