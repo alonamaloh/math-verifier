@@ -460,3 +460,290 @@ theorem VectorSpace.exchange_find_pivot {f : Field} {V : VectorSpace(f)}
         done
   }
 }
+
+-- ----------------------------------------------------------------------
+-- The one-swap family: `swapIn(g, k, j, v)` moves what sat at slot `k`
+-- into slot `j` and installs `v` at slot `k`. (When `j = k` the inner move
+-- is overwritten — the net effect is just `v` at slot `k`.) Two nested
+-- point-updates.
+definition VectorSpace.swapIn {A : Type(0)} (g : Natural → A) (k j : Natural)
+        (newValue : A) : Natural → A :=
+  Function.updateAt(Function.updateAt(g, j, g(k)), k, newValue)
+
+theorem VectorSpace.swapIn_at_k {A : Type(0)} (g : Natural → A) (k j : Natural) (v : A)
+        : VectorSpace.swapIn(g, k, j, v)(k) = v :=
+  done by Function.updateAt_at
+
+theorem VectorSpace.swapIn_at_j {A : Type(0)} (g : Natural → A) (k j : Natural) (v : A)
+        (distinct : j ≠ k)
+        : VectorSpace.swapIn(g, k, j, v)(j) = g(k) :=
+  VectorSpace.swapIn(g, k, j, v)(j)
+     = Function.updateAt(Function.updateAt(g, j, g(k)), k, v)(j)
+     = Function.updateAt(g, j, g(k))(j)   by Function.updateAt_off
+     = g(k)                                by Function.updateAt_at
+
+theorem VectorSpace.swapIn_off {A : Type(0)} (g : Natural → A) (k j i : Natural) (v : A)
+        (offK : i ≠ k) (offJ : i ≠ j)
+        : VectorSpace.swapIn(g, k, j, v)(i) = g(i) :=
+  VectorSpace.swapIn(g, k, j, v)(i)
+     = Function.updateAt(Function.updateAt(g, j, g(k)), k, v)(i)
+     = Function.updateAt(g, j, g(k))(i)   by Function.updateAt_off
+     = g(i)                                by Function.updateAt_off
+
+-- Cancelling the left summand of a subtraction.
+theorem VectorSpace.add_subtract_cancel_left {f : Field} {V : VectorSpace(f)}
+        (a b : VectorSpace.carrier(V)) : (a + b) - a = b :=
+  (a + b) - a
+     = (a + b) + VectorSpace.negate(a)
+     = (b + a) + VectorSpace.negate(a)    by VectorSpace.add_commutative
+     = b + (a + VectorSpace.negate(a))
+     = b + (a - a)
+     = b + VectorSpace.zero(V)            by VectorSpace.subtract_self
+     = b
+
+-- ----------------------------------------------------------------------
+-- One exchange step. A spanning family whose first `k` entries are the
+-- independent `uu(0..k-1)` yields another spanning family whose first
+-- `k+1` entries are `uu(0..k)` — swap `uu(k)` in for a `w` that carries a
+-- nonzero coefficient in its expansion. `InSpanOf.transitive` discharges
+-- "the swapped family still spans"; `InSpanOf.scale_cancel` (dividing by
+-- that nonzero coefficient) is what recovers the swapped-out vector.
+theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
+        (uu g : Natural → VectorSpace.carrier(V)) (m k n : Natural)
+        (independent : VectorSpace.StandardIndependentBelow(uu, m))
+        (gVanishesPast : ∀ (i : Natural). n ≤ i → g(i) = VectorSpace.zero(V))
+        (gAgreePrefix : ∀ (i : Natural). i < k → g(i) = uu(i))
+        (gSpans : VectorSpace.Spans(g))
+        (kBelowN : k < n) (nBelowOrEqM : n ≤ m)
+        : ∃ (gNew : Natural → VectorSpace.carrier(V)).
+              VectorSpace.Spans(gNew)
+              ∧ (∀ (i : Natural). n ≤ i → gNew(i) = VectorSpace.zero(V))
+              ∧ (∀ (i : Natural). i < 1 + k → gNew(i) = uu(i)) := {
+  -- Expand uu(k) in canonical coordinates over g.
+  VectorSpace.InSpanOf(g, uu(k)) by VectorSpace.InSpanOf.of_spans as ukInSpan;
+  choose count, selection, coeffs such that
+      uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count) from ukInSpan;
+  uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count) as ukLinComb;
+  ∃ (d : Natural → Field.carrier(f)).
+      VectorSpace.linearCombination(g, coeffs, selection, count)
+      = VectorSpace.standardCombination(g, d, n)
+      by VectorSpace.linearCombination_standardize as standardized;
+  choose d such that
+      VectorSpace.linearCombination(g, coeffs, selection, count)
+      = VectorSpace.standardCombination(g, d, n) from standardized;
+  VectorSpace.linearCombination(g, coeffs, selection, count)
+      = VectorSpace.standardCombination(g, d, n) as linCombStandard;
+  uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count)   by ukLinComb
+        = VectorSpace.standardCombination(g, d, n)                     by linCombStandard
+        as ukStandard;
+  -- Independence forces a nonzero coefficient on a remaining slot.
+  ∃ (j : Natural). k ≤ j ∧ j < n ∧ d(j) ≠ Field.zero(f)
+      by VectorSpace.exchange_find_pivot as pivotExists;
+  choose j such that k ≤ j ∧ j < n ∧ d(j) ≠ Field.zero(f) from pivotExists;
+  k ≤ j as kLeJ;
+  j < n as jLtN;
+  d(j) ≠ Field.zero(f) as dJnonzero;
+  -- The swapped family; uu(k) sits at slot k, the old g(k) at slot j.
+  VectorSpace.swapIn(g, k, j, uu(k))(k) = uu(k) by VectorSpace.swapIn_at_k as swapAtK;
+  VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), uu(k))
+      by { VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+                                VectorSpace.swapIn(g, k, j, uu(k))(k))
+               by VectorSpace.InSpanOf.member;
+           done by substituting swapAtK } as ukInNew;
+  -- Every OTHER old generator is trivially in the swapped family's span.
+  ∀ (i : Natural). i ≠ j → VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(i))
+    by {
+      take i : Natural;
+      suppose i ≠ j as offJ;
+      i = k ∨ i ≠ k by Logic.excluded_middle;
+      done by cases {
+        case i = k as atK: {
+            j ≠ k by { suppose j = k as jk; i = j by substituting atK; done };
+            VectorSpace.swapIn(g, k, j, uu(k))(j) = g(k) by VectorSpace.swapIn_at_j as swapAtJ;
+            VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+                                 VectorSpace.swapIn(g, k, j, uu(k))(j))
+                by VectorSpace.InSpanOf.member;
+            VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(k)) by substituting swapAtJ;
+            done by substituting atK
+          }
+        case i ≠ k as offK: {
+            VectorSpace.swapIn(g, k, j, uu(k))(i) = g(i) by VectorSpace.swapIn_off as swapAtI;
+            VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+                                 VectorSpace.swapIn(g, k, j, uu(k))(i))
+                by VectorSpace.InSpanOf.member;
+            done by substituting swapAtI
+          }
+      }
+    } as offJInSpan;
+  -- g with slot j replaced by uu(k): every generator is in the swapped span.
+  ∀ (i : Natural). VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+                                        Function.updateAt(g, j, uu(k))(i))
+    by {
+      take i : Natural;
+      i = j ∨ i ≠ j by Logic.excluded_middle;
+      done by cases {
+        case i = j as atJ: {
+            Function.updateAt(g, j, uu(k))(j) = uu(k) by Function.updateAt_at as primeAtJ;
+            VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+                                 Function.updateAt(g, j, uu(k))(j)) by substituting primeAtJ;
+            done by substituting atJ
+          }
+        case i ≠ j as offJ: {
+            Function.updateAt(g, j, uu(k))(i) = g(i) by Function.updateAt_off as primeOffJ;
+            VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(i)) by offJInSpan;
+            done by substituting primeOffJ
+          }
+      }
+    } as primeInSpan;
+  -- The combination of the modified family with the j-coefficient zeroed
+  -- lands in the swapped span, and equals the same combination of g.
+  VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+        VectorSpace.linearCombination(Function.updateAt(g, j, uu(k)),
+            Function.updateAt(d, j, Field.zero(f)), (i : Natural) ↦ i, n))
+      by VectorSpace.InSpanOf.of_combination(outerInhabitant := 0);
+  VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+        VectorSpace.standardCombination(Function.updateAt(g, j, uu(k)),
+            Function.updateAt(d, j, Field.zero(f)), n)) as primeCombInSpan;
+  Function.updateAt(d, j, Field.zero(f))(j) = Field.zero(f) by Function.updateAt_at as czeroAtJ;
+  ∀ (i : Natural). i < n →
+      Function.updateAt(d, j, Field.zero(f))(i) • Function.updateAt(g, j, uu(k))(i)
+      = Function.updateAt(d, j, Field.zero(f))(i) • g(i)
+    by {
+      take i : Natural;
+      suppose i < n as iLtN;
+      i = j ∨ i ≠ j by Logic.excluded_middle;
+      done by cases {
+        case i = j as atJ: {
+            Function.updateAt(d, j, Field.zero(f))(i) = Field.zero(f)
+                by substituting atJ as czeroHere;
+            Function.updateAt(d, j, Field.zero(f))(i) • Function.updateAt(g, j, uu(k))(i)
+               = Field.zero(f) • Function.updateAt(g, j, uu(k))(i)   by substituting czeroHere
+               = VectorSpace.zero(V)                                 by VectorSpace.zero_scale
+               = Field.zero(f) • g(i)                                by VectorSpace.zero_scale
+               = Function.updateAt(d, j, Field.zero(f))(i) • g(i)    by substituting czeroHere
+          }
+        case i ≠ j as offJ: {
+            Function.updateAt(g, j, uu(k))(i) = g(i) by Function.updateAt_off as primeOffJ;
+            done by substituting primeOffJ
+          }
+      }
+    } as czeroTermsMatch;
+  VectorSpace.standardCombination(Function.updateAt(g, j, uu(k)),
+        Function.updateAt(d, j, Field.zero(f)), n)
+     = VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n)
+       by VectorSpace.standardCombination_congruence as primeToG;
+  VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+        VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n))
+      by substituting primeToG as czeroGInSpan;
+  -- d is the zeroed coefficients bumped by d(j) at slot j, so the full
+  -- combination splits as [j-zeroed combination] + d(j) • g(j).
+  ∀ (i : Natural). VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i)
+      = d(i)
+    by {
+      take i : Natural;
+      i = j ∨ i ≠ j by Logic.excluded_middle;
+      done by cases {
+        case i = j as atJ: {
+            VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i)
+               = VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(j)
+                     by substituting atJ
+               = Function.updateAt(d, j, Field.zero(f))(j) + d(j)   by VectorSpace.bumpCoefficient_at
+               = Field.zero(f) + d(j)                               by substituting czeroAtJ
+               = d(j)
+               = d(i)                                               by substituting atJ
+          }
+        case i ≠ j as offJ: {
+            VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i)
+               = Function.updateAt(d, j, Field.zero(f))(i)   by VectorSpace.bumpCoefficient_off
+               = d(i)                                        by Function.updateAt_off
+          }
+      }
+    } as bumpIsD;
+  ∀ (i : Natural). i < n →
+      VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i) • g(i)
+      = d(i) • g(i)
+    by { take i : Natural; suppose i < n as iLtN;
+         VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i) = d(i)
+             by bumpIsD as here;
+         done by substituting here } as bumpTermsMatch;
+  VectorSpace.standardCombination(g,
+        VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j), n)
+     = VectorSpace.standardCombination(g, d, n)
+       by VectorSpace.standardCombination_congruence as bumpCombIsD;
+  VectorSpace.standardCombination(g, d, n)
+     = VectorSpace.standardCombination(g,
+           VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j), n)
+           by bumpCombIsD
+     = VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n) + d(j) • g(j)
+           by VectorSpace.standardCombination_bump
+     as dSplit;
+  VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n) + d(j) • g(j)
+     = VectorSpace.standardCombination(g, d, n)   by dSplit
+     = uu(k)                                       by ukStandard
+     as ukSplit;
+  -- Solve for g(j): d(j) • g(j) = uu(k) - [j-zeroed combination], both in span.
+  d(j) • g(j)
+     = (VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n) + d(j) • g(j))
+       - VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n)
+           by VectorSpace.add_subtract_cancel_left
+     = uu(k) - VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n)
+           by substituting ukSplit
+     as dJgJ;
+  VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+        uu(k) - VectorSpace.standardCombination(g, Function.updateAt(d, j, Field.zero(f)), n))
+      by VectorSpace.InSpanOf.subtract;
+  VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), d(j) • g(j)) by substituting dJgJ;
+  VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(j))
+      by VectorSpace.InSpanOf.scale_cancel as gJInSpan;
+  -- Every old generator is now in the swapped span (slot j via the solve).
+  ∀ (i : Natural). VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(i))
+    by {
+      take i : Natural;
+      i = j ∨ i ≠ j by Logic.excluded_middle;
+      done by cases {
+        case i = j as atJ: { done by substituting atJ }
+        case i ≠ j as offJ: { done by offJInSpan }
+      }
+    } as allInSpan;
+  -- Assemble the three invariant clauses for the swapped family.
+  VectorSpace.Spans(VectorSpace.swapIn(g, k, j, uu(k)))
+    by {
+      take v : VectorSpace.carrier(V);
+      VectorSpace.InSpanOf(g, v) by VectorSpace.InSpanOf.of_spans;
+      done by VectorSpace.InSpanOf.transitive(outerInhabitant := 0)
+    } as newSpans;
+  ∀ (i : Natural). n ≤ i → VectorSpace.swapIn(g, k, j, uu(k))(i) = VectorSpace.zero(V)
+    by {
+      take i : Natural;
+      suppose n ≤ i as nLeI;
+      k < i by { k < n ≤ i; done };
+      i ≠ k by Natural.not_equal_of_greater_than;
+      j < i by { j < n ≤ i; done };
+      i ≠ j by Natural.not_equal_of_greater_than;
+      VectorSpace.swapIn(g, k, j, uu(k))(i) = g(i) by VectorSpace.swapIn_off;
+      done by gVanishesPast
+    } as newVanishesPast;
+  ∀ (i : Natural). i < 1 + k → VectorSpace.swapIn(g, k, j, uu(k))(i) = uu(i)
+    by {
+      take i : Natural;
+      suppose i < 1 + k as iBelow;
+      i < k ∨ i = k by Natural.le_of_lt_one_plus;
+      done by cases {
+        case i < k as belowK: {
+            i ≠ k by Natural.not_equal_of_less_than;
+            i < j by { i < k ≤ j; done };
+            i ≠ j by Natural.not_equal_of_less_than;
+            VectorSpace.swapIn(g, k, j, uu(k))(i) = g(i) by VectorSpace.swapIn_off;
+            done by gAgreePrefix
+          }
+        case i = k as atK: {
+            VectorSpace.swapIn(g, k, j, uu(k))(i)
+               = VectorSpace.swapIn(g, k, j, uu(k))(k)   by substituting atK
+               = uu(k)                                   by VectorSpace.swapIn_at_k
+               = uu(i)                                   by substituting atK
+          }
+      }
+    } as newAgreePrefix;
+  witness VectorSpace.swapIn(g, k, j, uu(k))
+    with And.introduction(newSpans, And.introduction(newVanishesPast, newAgreePrefix))
+}
