@@ -193,3 +193,29 @@ Works as a calc-step `by` proof too. Scope/limits:
 - Leaves that aren't equality proofs are treated as scalars (the
   trivial `v = v`), so a malformed combination surfaces as a ring
   bridge that doesn't normalise.
+
+## `group` / `monoid` — the (abelian) group normaliser
+
+`group` closes an `=` goal over a group by flattening associativity,
+dropping identity, and cancelling inverses; `monoid` is the
+inverse-free variant. Both find the structure from an in-scope
+`IsGroup` / `IsMonoid` hypothesis and emit an explicit
+`L = canon = R` chain the kernel rechecks. They fire as a bare
+relation-chain step too (the calc bridge probes them off-group as a
+cheap no-op).
+
+**Abelian / vector-space mode.** When the goal's carrier is
+`VectorSpace.carrier(V)`, `group` additionally sorts the reduced word
+to a canonical order (via `VectorSpace.add_commutative`) and re-cancels
+the inverse pairs the sort brings together — so additive rearrangements
+that need commutativity close: the medial law `(a+b)+(c+d) =
+(a+c)+(b+d)`, subtract cancellation `(a+b)-a = b` (the `-` unfolds to
+`add ∘ negate`), `(a+b)-(b+a) = 0`, etc. No `IsGroup` hypothesis is
+needed — the structure is read from the flattened `VectorSpace.*` law
+layer. This is the vector-space analogue of `ring`'s additive
+fragment; **prefer it to hand-written `add_commutative` /
+`add_associative` chains** over a vector carrier (it is what retired
+`add_pair_interchange` and `add_subtract_cancel_left`). Scope: a scalar
+block `a • v` is an opaque atom — pushing `•` through `+`/`−` and
+collecting like coefficients (`a•v + b•v = (a+b)•v`) is a *free-module*
+normaliser, not yet built (see `STRESS_PROBES.md`, tier b).

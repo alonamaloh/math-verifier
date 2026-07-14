@@ -371,12 +371,23 @@ encoding moved the cost off the invariance entirely.
 
 ## Side quests / infrastructure (not blocked on any probe)
 
-- [ ] **Vector-space / free-module normaliser (`vector_ring` / `module` /
-  `linear_combination`-for-vectors).** See the Steinitz verdict above. Tier (a):
-  additive-group normaliser over `IsAbelianGroup`. Tier (b): free-module
-  normaliser collecting like terms with field-coefficient arithmetic. Highest-
-  impact automation for the linear-algebra branch; would erase the manual
-  assoc/comm/`add_subtract_cancel_left` chains throughout `Algebra/*`.
+- [x] **Tier (a) — additive-group normaliser over `VectorSpace.carrier` — DONE
+  (2026-07-14).** The `group` tactic now runs in abelian mode over a vector
+  space's additive group: it sorts the reduced word (via `add_commutative`) and
+  re-cancels, closing the medial law, `(a+b)-a=b` (subtract unfolds to
+  `add∘negate`), and every additive rearrangement — by `group` and as a bare
+  calc step (`src/elaborator/group.cpp`, `Test/vector_group_test.math`). Retired
+  `VectorSpace.add_pair_interchange` and `add_subtract_cancel_left` (deleted) and
+  collapsed the assoc/comm chains in `exchange_lemma`/`basis_pruning`/
+  `linear_combination` to single `by group` steps. `a•v` stays an opaque atom.
+- [ ] **Tier (b) — free-module normaliser (`module` /
+  `linear_combination`-for-vectors).** Treat each distinct vector as an atom,
+  normalise both sides to a canonical `Σ cᵢ • vᵢ` by collecting like terms
+  (adding coefficients in the field, discharged by `ring`/`field`), compare
+  atom-by-atom. Pushes `•` through `+`/`−` and collects `a•v + b•v = (a+b)•v` —
+  what tier (a) leaves opaque. Subsumes tier (a); would collapse the
+  `linearCombination_*` coefficient algebra to one-liners. Owner-requested; the
+  highest-remaining automation for the branch.
 - [ ] **`linarith`.** A linear-arithmetic procedure over ordered fields. The
   analysis probes will keep generating its spec; build it from the captured
   ε-chasing snippets. Highest expected impact on naturalness library-wide.
