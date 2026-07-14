@@ -402,7 +402,35 @@ Update this section before ending any session that works on the plan.
   - Note: bundled induced spaces of kernel/image (`Subspace.vector_space`
     applied to `kernel_is_subspace`) were left to consumers — construct
     them where Stage G needs dimensions.
-- **Stages F–H** — not started.
+- **Stage F — CORE DONE (2026-07-14).** `Algebra/dimension.math`: the choice-free
+  finite half — a well-defined `dimension : Natural` and its invariance, all gates
+  green (library + tests, export-check 2858 decls, axioms unchanged).
+  - `VectorSpace.HasDimension(V, n)` (some `NaturalsBelow(n)`-indexed basis exists;
+    `FiniteDimensional(V)` is definitionally `∃ n. HasDimension(V, n)`).
+  - `basis_size_unique` — two finite bases of a fixed space have equal size:
+    `VectorSpace.exchange` applied in BOTH directions + `Natural.le_antisymmetric`.
+    `dimension_unique` (choose bases, apply it) and `bases_equinumerous` (the
+    invariance re-expressed as `Equinumerous(NaturalsBelow(m), NaturalsBelow(n))`,
+    a single `substituting` over `Equinumerous.reflexive`).
+  - `dimension` via `Logic.the` over `dimension_unique` (structurally identical to
+    `Field.reciprocal`); `dimension_has_basis` (`Logic.the_satisfies`),
+    `dimension_equals` (read a dimension off any exhibited finite basis).
+    `Field.vector_space_dimension`: a field is 1-dimensional over itself.
+  - `SameDimension` — the general, index-agnostic relation via `Equinumerous`
+    (`∃ (I : Type(0)). …`, using the universe-polymorphic `Exists.{1}`; no
+    `Cardinal` type) + `same_dimension_of_equal_dimension` for the finite case.
+  - **PROBE VERDICT (STRESS_PROBES.md):** the `n = m` transport crux the branch
+    was built to measure did NOT bite — it was pre-paid at the exchange bridge.
+    Because Steinitz runs over `Natural`-indexed families with `NaturalsBelow.make`
+    confined to `VectorSpace.exchange`, the invariance proof sees only a clean
+    `m ≤ n` / `IsBasis` interface: no `cast`, no dependent motive, no elaborator
+    help. `Logic.the` for the `Natural`-valued invariant was frictionless.
+  - NOT yet in clean manifest (shares the deferred redundant-by read-through).
+    REMAINING for Stage F (Stage 0.3 bundle): the stronger
+    `FiniteDimensionalVectorSpace` record layered over `VectorSpace` carrying
+    `dimension`/`basis`/`IsBasis` — build when Stage G needs it (currently the
+    unbundled `dimension(V, fd)` view suffices).
+- **Stages G–H** — not started.
 
 ## Remaining worklist (authoritative running order)
 
@@ -515,8 +543,12 @@ library build.
 
 **Phase 3 — dimension + headlines** (Stage F/G/H detail lives in the build-order
 section below)
-- [ ] **Stage F** (M–L, math) — `dimension` (choice-free finite invariance from
-  the exchange lemma). The transport crux the branch was built to measure.
+- [x] **Stage F — CORE DONE (2026-07-14, `Algebra/dimension.math`).** `dimension`
+  (choice-free finite invariance from the exchange lemma) + `SameDimension`. The
+  transport crux the branch was built to measure turned out FRICTIONLESS —
+  pre-paid at the exchange bridge (see the Stage F ledger entry + STRESS_PROBES).
+  Remaining (deferred, optional): the bundled `FiniteDimensionalVectorSpace`
+  record (Stage 0.3) — build when Stage G wants it.
 - [ ] **Stage G** (M, math) — **rank–nullity** (headline #1).
 - [ ] **Stage H0** (M, math) — permutation **sign/parity** — CONFIRMED ABSENT
   from `Lists/permutation.math`, must be built.

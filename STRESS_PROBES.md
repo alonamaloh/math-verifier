@@ -314,6 +314,61 @@ official-`IsBasis` bridge is the next step; both tactic tiers filed below.
 
 ---
 
+## PROBE — Dimension invariance (Stage F, finite) · [SURFACE + FOUNDATION] verdict (2026-07-14)
+
+**What was built.** `Algebra/dimension.math`: a well-defined `dimension : Natural`
+for finite-dimensional spaces and its invariance. `basis_size_unique` (two finite
+bases of a fixed space have equal size), `dimension_unique`, `bases_equinumerous`
+(the invariance through `Equinumerous`), `dimension` via `Logic.the` over the
+invariance (+ `dimension_has_basis`/`dimension_equals`), `Field.vector_space_dimension`
+(a field is 1-dimensional over itself), and the general index-agnostic
+`SameDimension` relation with the finite bridge `same_dimension_of_equal_dimension`.
+All choice-free (export-check axiom inventory unchanged).
+
+**Verdict — the transport crux the branch was built to measure did NOT bite here;
+the cost was pre-paid at the exchange bridge.** This is the single most important
+finding for the branch's thesis.
+
+1. **`n = m` transport was trivial [SURFACE].** The plan flagged finite dimension
+   as "the transport crux — a propositional `n = m` you transport bundled data
+   along; record how heavy it is." In the event it was one line each:
+   `basis_size_unique` is `VectorSpace.exchange` applied both directions +
+   `Natural.le_antisymmetric` (three cited steps); and turning the resulting
+   `m = n` into `Equinumerous(NaturalsBelow(m), NaturalsBelow(n))` is a single
+   `done by substituting` over `Equinumerous.reflexive`. No `cast`, no dependent
+   motive, no elaborator help. The reason: the earlier architectural choice
+   (Steinitz proven over `Natural`-indexed families with bounded predicates, all
+   `NaturalsBelow.make` reindexing confined to `VectorSpace.exchange`) means every
+   consumer of exchange — dimension included — receives a clean `m ≤ n` /
+   `IsBasis`-level interface and never touches the index gymnastics. The transport
+   cost is real but was localised once, at the right boundary, and does not smear
+   into the invariance proof.
+
+2. **`Logic.the` for a value-out-of-a-relation was frictionless [FOUNDATION].**
+   `dimension` is definite description over the invariance, structurally identical
+   to `Field.reciprocal` (existence from `FiniteDimensional`, uniqueness from
+   `dimension_unique`); `dimension_has_basis` is the paired `Logic.the_satisfies`.
+   `FiniteDimensional(V)` being *definitionally* `∃ n. HasDimension(V, n)` meant the
+   existence argument to `Logic.the` typechecked with no restatement. The
+   unique-choice wall the plan worried about is simply not present for a
+   `Natural`-valued invariant.
+
+3. **General `SameDimension` needed universe-polymorphic `Exists` — and had it
+   [FOUNDATION].** Stating "a basis of one is equinumerous to a basis of the other"
+   index-agnostically requires `∃ (I : Type(0)). …`, i.e. an existential quantifier
+   over a `Type(1)` type. `Logic/exists.math`'s `Exists` is universe-polymorphic
+   (`Exists.{u}`, auto-generalised from `A : Type`), so this elaborated as
+   `Exists.{1}` with no change — a latent capability confirmed. Had `Exists` been
+   monomorphic at `Type(0)` the general relation would have been inexpressible and
+   forced a `Natural`-only fallback; worth noting as a capability the design
+   already has.
+
+**Done =** `dimension` well-defined and choice-free; finite invariance verified
+library-green; the transport measurement is the finding — the exchange-bridge
+encoding moved the cost off the invariance entirely.
+
+---
+
 ## Side quests / infrastructure (not blocked on any probe)
 
 - [ ] **Vector-space / free-module normaliser (`vector_ring` / `module` /
