@@ -2559,6 +2559,22 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                     + prettyPrintInLocalScope(goalClosed, localBinders)
                     + "`)");
             }
+        } else {
+            // The conclusion was pinned to the goal by unification, but a
+            // STRUCTURALLY-matched binding can still be ill-typed at the
+            // kernel level — e.g. a lemma whose domain is `Type(0)` matched
+            // against a goal that forces that binder to a `Proposition`
+            // (`Function.extensionality` cited on a Prop-domain funext goal).
+            // Confirm the assembled term typechecks; otherwise this candidate
+            // does not apply, and letting its kernel TypeError escape would
+            // abort an unprompted search that should simply move on.
+            try {
+                inferTypeInLocalContext(localBinders, call);
+            } catch (const ElaborateError&) {
+                throwElaborate("citation instantiation is ill-typed");
+            } catch (const TypeError&) {
+                throwElaborate("citation instantiation is ill-typed");
+            }
         }
         return call;
     }
