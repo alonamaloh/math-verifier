@@ -308,3 +308,114 @@ theorem NaturalsBelow.skipInverse_skipValue (jv i : Natural)
       }
   }
 }
+
+-- `skipInverseValue(jv, x) < count` for an in-range `x ≠ jv`: below `jv` the
+-- value is unchanged (< jv ≤ count), at or above it drops by one.
+theorem NaturalsBelow.skipInverseValue_bound (count jv x : Natural)
+        (xBound : x < 1 + count) (jvBound : jv ≤ count) (ne : x ≠ jv)
+        : NaturalsBelow.skipInverseValue(jv, x) < count := {
+  x < jv ∨ jv ≤ x by Natural.lt_or_le;
+  done by cases {
+    case x < jv as below: {
+        NaturalsBelow.skipInverseValue(jv, x) = x by NaturalsBelow.skipInverseValue_below as siv;
+        x < jv ≤ count;
+        done by substituting siv
+      }
+    case jv ≤ x as ge: {
+        ¬(jv = x) by { suppose jv = x as e; x = jv by e; done };
+        jv < x by Natural.lt_of_le_of_ne;
+        0 < x by { 0 ≤ jv < x; done };
+        ¬(x = 0) by Natural.not_equal_of_greater_than;
+        x = 0 ∨ ∃ (p : Natural). x = 1 + p by Natural.zero_or_one_plus;
+        ∃ (p : Natural). x = 1 + p
+            by cases {
+                 case x = 0 as xZero: { False; done }
+                 case ∃ (p : Natural). x = 1 + p as hasPred: { done }
+               } as predExists;
+        choose p such that x = 1 + p from predExists;
+        x = 1 + p as xIsSucc;
+        jv ≤ p by { jv < x = 1 + p; done by Natural.le_of_lt_one_plus };
+        ¬(x < jv) by { suppose x < jv as bad; jv ≤ x < jv; done };
+        NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1)
+            by NaturalsBelow.skipInverseValue_above as siv;
+        Natural.monus(x, 1) = Natural.monus(1 + p, 1)   by substituting xIsSucc
+                            = p                          by NaturalsBelow.monus_one_plus_one
+            as monusIsP;
+        1 + p < 1 + count by substituting xIsSucc;
+        p < count by {
+          choose c such that (1 + p) + (1 + c) = 1 + count from Natural.lt_elim;
+          1 + (p + (1 + c)) = 1 + count
+              by { 1 + (p + (1 + c)) = (1 + p) + (1 + c) = 1 + count; done };
+          p + (1 + c) = count by Natural.add_cancel_left;
+          done by Natural.lt_intro
+        };
+        NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1)   by siv
+                                              = p                      by monusIsP
+                                              < count;
+        done
+      }
+  }
+}
+
+-- `skip` undoes `skipInverse` off the removed slot: the other round trip.
+theorem NaturalsBelow.skipValue_skipInverse (jv x : Natural) (ne : x ≠ jv)
+        : NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, x)) = x := {
+  x < jv ∨ jv ≤ x by Natural.lt_or_le;
+  done by cases {
+    case x < jv as below: {
+        NaturalsBelow.skipInverseValue(jv, x) = x by NaturalsBelow.skipInverseValue_below as siv;
+        NaturalsBelow.skipValue(jv, x) = x by NaturalsBelow.skipValue_below as sv;
+        NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, x))
+           = NaturalsBelow.skipValue(jv, x)   by substituting siv
+           = x                                 by sv
+      }
+    case jv ≤ x as ge: {
+        ¬(jv = x) by { suppose jv = x as e; x = jv by e; done };
+        jv < x by Natural.lt_of_le_of_ne;
+        0 < x by { 0 ≤ jv < x; done };
+        ¬(x = 0) by Natural.not_equal_of_greater_than;
+        x = 0 ∨ ∃ (p : Natural). x = 1 + p by Natural.zero_or_one_plus;
+        ∃ (p : Natural). x = 1 + p
+            by cases {
+                 case x = 0 as xZero: { False; done }
+                 case ∃ (p : Natural). x = 1 + p as hasPred: { done }
+               } as predExists;
+        choose p such that x = 1 + p from predExists;
+        x = 1 + p as xIsSucc;
+        jv ≤ p by { jv < x = 1 + p; done by Natural.le_of_lt_one_plus };
+        ¬(p < jv) by { suppose p < jv as bad; jv ≤ p < jv; done };
+        ¬(x < jv) by { suppose x < jv as bad; jv ≤ x < jv; done };
+        NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1)
+            by NaturalsBelow.skipInverseValue_above as siv;
+        Natural.monus(x, 1) = Natural.monus(1 + p, 1)   by substituting xIsSucc
+                            = p                          by NaturalsBelow.monus_one_plus_one
+            as monusIsP;
+        NaturalsBelow.skipValue(jv, p) = 1 + p by NaturalsBelow.skipValue_above as svp;
+        NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, x))
+           = NaturalsBelow.skipValue(jv, Natural.monus(x, 1))   by substituting siv
+           = NaturalsBelow.skipValue(jv, p)                      by substituting monusIsP
+           = 1 + p                                                by svp
+           = x                                                    by xIsSucc
+      }
+  }
+}
+
+-- `skip(jv)` hits every index whose value is not `jv`: surjective onto the
+-- complement of the removed slot.
+theorem NaturalsBelow.skip_surjective {count : Natural} (jv : Natural) (jvBound : jv ≤ count)
+        (index : NaturalsBelow(1 + count)) (ne : NaturalsBelow.value(index) ≠ jv)
+        : ∃ (i : NaturalsBelow(count)). NaturalsBelow.skip(jv, i) = index := {
+  NaturalsBelow.value(index) < 1 + count by NaturalsBelow.below as vBound;
+  NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)) < count
+      by NaturalsBelow.skipInverseValue_bound as ivBound;
+  NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)))
+      = NaturalsBelow.value(index) by NaturalsBelow.skipValue_skipInverse as round;
+  NaturalsBelow.value(NaturalsBelow.skip(jv,
+        NaturalsBelow.make(NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)), ivBound)))
+      = NaturalsBelow.value(index) by round;
+  NaturalsBelow.skip(jv,
+        NaturalsBelow.make(NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)), ivBound))
+      = index by NaturalsBelow.equal_of_value as skipEq;
+  witness NaturalsBelow.make(NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)), ivBound)
+      with skipEq
+}
