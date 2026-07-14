@@ -419,3 +419,193 @@ theorem NaturalsBelow.skip_surjective {count : Natural} (jv : Natural) (jvBound 
   witness NaturalsBelow.make(NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)), ivBound)
       with skipEq
 }
+
+-- ----------------------------------------------------------------------
+-- Dropping a redundant vector. `dropIndex(g, j)` is the family with slot `j`
+-- removed (the other `count` vectors, order-preserved via `skip`).
+
+theorem Field.negate_nonzero (f : Field) (a : Field.carrier(f)) (nonzero : a ≠ Field.zero(f))
+        : Field.negate(a) ≠ Field.zero(f) := {
+  suppose Field.negate(a) = Field.zero(f) as negZero;
+  a = a + Field.zero(f)
+    = a + Field.negate(a)   by substituting negZero
+    = Field.zero(f)          by Field.add_negate_right;
+  a ≠ Field.zero(f) by nonzero;
+  done
+}
+
+definition VectorSpace.dropIndex {f : Field} {V : VectorSpace(f)} {count : Natural}
+        (g : NaturalsBelow(1 + count) → VectorSpace.carrier(V)) (j : NaturalsBelow(1 + count))
+        : NaturalsBelow(count) → VectorSpace.carrier(V) :=
+  (i : NaturalsBelow(count)) ↦ g(NaturalsBelow.skip(NaturalsBelow.value(j), i))
+
+-- The redundancy: a vanishing combination with a nonzero coefficient at
+-- position `i0` exhibits `g(σ(i0))` as a combination of the OTHER vectors
+-- (those with index ≠ σ(i0)), i.e. it lies in `span(dropIndex(g, σ(i0)))`.
+-- Isolate the term by bumping its coefficient to zero (position bump), then
+-- solve for it by dividing out the nonzero scalar (`scale_cancel`).
+theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count : Natural}
+        (g : NaturalsBelow(1 + count) → VectorSpace.carrier(V)) (countPos : 0 < count)
+        (len : Natural) (selection : Natural → NaturalsBelow(1 + count))
+        (coefficients : Natural → Field.carrier(f))
+        (injective : ∀ (a b : Natural). a < len → b < len → selection(a) = selection(b) → a = b)
+        (vanishes : VectorSpace.linearCombination(g, coefficients, selection, len) = VectorSpace.zero(V))
+        (i0 : Natural) (i0Below : i0 < len) (nonzero : coefficients(i0) ≠ Field.zero(f))
+        : VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)), g(selection(i0))) := {
+  NaturalsBelow.value(selection(i0)) ≤ count
+      by { NaturalsBelow.value(selection(i0)) < 1 + count by NaturalsBelow.below;
+           done by Natural.le_of_lt_one_plus } as jvBound;
+  NaturalsBelow.value(NaturalsBelow.skip(NaturalsBelow.value(selection(i0)),
+        NaturalsBelow.make(0, countPos))) ≠ NaturalsBelow.value(selection(i0))
+      by NaturalsBelow.skip_avoids as redirectAvoids;
+
+  -- The coefficients with slot i0 zeroed, and the selection redirected there
+  -- to an index that is not selection(i0).
+  Field.negate(coefficients(i0)) ≠ Field.zero(f) by Field.negate_nonzero as negNonzero;
+  coefficients(i0) + Field.negate(coefficients(i0)) = Field.zero(f)
+      by Field.add_negate_right as sumZero;
+
+  -- Position bump: raising slot i0 by -c(i0) zeroes it and adds -c(i0)·g(j).
+  VectorSpace.linearCombination(g,
+        Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0))),
+        selection, len)
+     = VectorSpace.linearCombination(g, coefficients, selection, len)
+       + Field.negate(coefficients(i0)) • g(selection(i0))
+           by VectorSpace.linearCombination_bump_position
+     = VectorSpace.zero(V) + Field.negate(coefficients(i0)) • g(selection(i0))
+           by substituting vanishes
+     = Field.negate(coefficients(i0)) • g(selection(i0))
+     as bumped;
+
+  -- Every term of the zeroed-slot combination, read through the redirected
+  -- selection, is a member of dropIndex(g, selection(i0)).
+  ∀ (i : Natural). i < len →
+      VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)),
+          g(Function.updateAt(selection, i0,
+                NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)))
+    by {
+      take i : Natural;
+      suppose i < len as iBelow;
+      NaturalsBelow.value(Function.updateAt(selection, i0,
+            NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
+          ≠ NaturalsBelow.value(selection(i0))
+        by {
+          i = i0 ∨ i ≠ i0 by Logic.excluded_middle;
+          done by cases {
+            case i = i0 as atI0: {
+                Function.updateAt(selection, i0,
+                      NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
+                   = Function.updateAt(selection, i0,
+                         NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i0)
+                         by substituting atI0
+                   = NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos))
+                         by Function.updateAt_at
+                   as redirectHere;
+                done by substituting redirectHere
+              }
+            case i ≠ i0 as offI0: {
+                Function.updateAt(selection, i0,
+                      NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
+                   = selection(i) by Function.updateAt_off as selHere;
+                selection(i) ≠ selection(i0)
+                    by { suppose selection(i) = selection(i0) as e; i = i0 by injective; done };
+                NaturalsBelow.value(selection(i)) ≠ NaturalsBelow.value(selection(i0))
+                    by { suppose NaturalsBelow.value(selection(i)) = NaturalsBelow.value(selection(i0)) as ve;
+                         selection(i) = selection(i0) by NaturalsBelow.equal_of_value; done };
+                done by substituting selHere
+              }
+          }
+        } as valueNeJ;
+      ∃ (i2 : NaturalsBelow(count)). NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), i2)
+          = Function.updateAt(selection, i0,
+                NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
+          by NaturalsBelow.skip_surjective as preimageExists;
+      choose i2 such that NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), i2)
+          = Function.updateAt(selection, i0,
+                NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
+          from preimageExists;
+      NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), i2)
+          = Function.updateAt(selection, i0,
+                NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
+          as skipEqSel;
+      VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)),
+            VectorSpace.dropIndex(g, selection(i0))(i2)) by VectorSpace.InSpanOf.member;
+      VectorSpace.dropIndex(g, selection(i0))(i2)
+          = g(NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), i2))
+          = g(Function.updateAt(selection, i0,
+                NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
+              by substituting skipEqSel as dropAtI2;
+      done by substituting dropAtI2
+    } as selectedInSpan;
+
+  VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)),
+        VectorSpace.linearCombination(g,
+            Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0))),
+            Function.updateAt(selection, i0,
+                NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos))),
+            len))
+      by VectorSpace.InSpanOf.of_combination_selected(outerInhabitant := NaturalsBelow.make(0, countPos))
+      as combInSpan;
+
+  -- That combination equals the bumped one (they agree below len: at i0 the
+  -- zeroed coefficient kills the redirected term).
+  Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i0)
+      = coefficients(i0) + Field.negate(coefficients(i0))   by Function.updateAt_at
+      = Field.zero(f)                                        by sumZero
+      as zeroedAtI0;
+  ∀ (i : Natural). i < len →
+      Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
+        • g(Function.updateAt(selection, i0,
+              NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
+      = Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
+        • g(selection(i))
+    by {
+      take i : Natural;
+      suppose i < len as iBelow;
+      i = i0 ∨ i ≠ i0 by Logic.excluded_middle;
+      done by cases {
+        case i = i0 as atI0: {
+            Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
+                = Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i0)
+                      by substituting atI0
+                = Field.zero(f) by zeroedAtI0
+                as czeroHere;
+            Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
+                • g(Function.updateAt(selection, i0,
+                      NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
+               = Field.zero(f) • g(Function.updateAt(selection, i0,
+                     NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
+                     by substituting czeroHere
+               = VectorSpace.zero(V)                by VectorSpace.zero_scale
+               = Field.zero(f) • g(selection(i))    by VectorSpace.zero_scale
+               = Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
+                 • g(selection(i))                  by substituting czeroHere
+          }
+        case i ≠ i0 as offI0: {
+            Function.updateAt(selection, i0,
+                  NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
+                = selection(i) by Function.updateAt_off as selHere;
+            done by substituting selHere
+          }
+      }
+    } as termsMatch;
+  VectorSpace.linearCombination(g,
+        Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0))),
+        Function.updateAt(selection, i0,
+            NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos))),
+        len)
+     = VectorSpace.linearCombination(g,
+           Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0))),
+           selection, len)
+         by VectorSpace.linearCombination_congruence as redirectSame;
+
+  VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)),
+        Field.negate(coefficients(i0)) • g(selection(i0)))
+      by { VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)),
+               VectorSpace.linearCombination(g,
+                   Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0))),
+                   selection, len))
+               by substituting redirectSame;
+           done by substituting bumped };
+  done by VectorSpace.InSpanOf.scale_cancel(nonzero := negNonzero)
+}
