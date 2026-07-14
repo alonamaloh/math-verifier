@@ -436,7 +436,7 @@ library build.
   characterizing equations are `by`-less `if i<m then … else …` proofs (the
   `if_split_test` idiom), NOT `if_positive_dependent` citations. Both families
   extend with fallback `zero`; the clamped selection `Natural→NaturalsBelow(m)`
-  is `NaturalsBelow.inclusion(fallback) := extendBelow(identity, fallback)` — the
+  is `NaturalsBelow.clamp(fallback) := extendBelow(identity, fallback)` — the
   reusable "reindex into the finite type" helper (its cousin serves Prune).
   Independence and spanning transport across the reindexing via the new
   `VectorSpace.linearCombination_congruence` (`linear_combination.math`,
