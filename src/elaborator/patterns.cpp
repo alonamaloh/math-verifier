@@ -689,6 +689,25 @@ ExpressionPointer Elaborator::buildCaseLambda(
             throw ElaborateError(
                 "constructor lookup failed for '" + constructorName + "'");
         }
+        // Instantiate the constructor type at THIS scrutinee's universe
+        // arguments before reading off its argument types. Only the
+        // parameter VALUES are substituted below (via β on the parameter
+        // Pis); the universe PARAMETERS must be substituted here, or a
+        // field type that mentions the inductive keeps the raw universe
+        // parameter (`Accessible.{u}` instead of `Accessible.{0}`). A direct
+        // recursive field's binder incidentally reconciles that against the
+        // recursor's minor premise, but a HIGHER-ORDER field's occurrence is
+        // buried under its own Pi telescope and stays `.{u}`, so the
+        // assembled recursor fails to typecheck. No-op for a non-polymorphic
+        // inductive (empty parameter list).
+        ExpressionPointer constructorType = constructor->type;
+        if (!constructor->universeParameters.empty()
+            && constructor->universeParameters.size()
+                   == inductiveUniverseArguments.size()) {
+            constructorType = substituteUniverseLevels(
+                constructor->type, constructor->universeParameters,
+                inductiveUniverseArguments);
+        }
         // Decompose constructor type into per-argument Pis. For a non-
         // parameterised inductive, the constructor's type is exactly
         // a Pi chain over its arguments ending in the inductive type.
@@ -709,7 +728,7 @@ ExpressionPointer Elaborator::buildCaseLambda(
         // variable (a BoundVariable), which is unambiguous.
         std::vector<bool> argumentIsRecursiveOriginal;
         {
-            ExpressionPointer originalCursor = constructor->type;
+            ExpressionPointer originalCursor = constructorType;
             for (size_t p = 0; p < parameterValues.size(); ++p) {
                 auto* pi =
                     std::get_if<Pi>(&originalCursor->node);
@@ -718,7 +737,17 @@ ExpressionPointer Elaborator::buildCaseLambda(
             }
             while (auto* pi =
                        std::get_if<Pi>(&originalCursor->node)) {
+                // Peel any leading Pi telescope: a HIGHER-ORDER recursive
+                // field (Accessible's `below`) sits under binders (strictly
+                // positive, so those domains don't mention the inductive)
+                // before the recursive occurrence. A direct recursive field
+                // has an empty telescope. Then peel the base's application
+                // chain to reach its head.
                 ExpressionPointer typeHead = pi->domain;
+                while (auto* telescopePi =
+                           std::get_if<Pi>(&typeHead->node)) {
+                    typeHead = telescopePi->codomain;
+                }
                 while (auto* application =
                            std::get_if<Application>(&typeHead->node)) {
                     typeHead = application->function;
@@ -746,7 +775,7 @@ ExpressionPointer Elaborator::buildCaseLambda(
             // themselves reference outer binders: each later substitute
             // walks the partially-substituted cursor and collides with
             // BoundVariables introduced by the earlier substitutes.)
-            ExpressionPointer cursor = constructor->type;
+            ExpressionPointer cursor = constructorType;
             for (size_t i = 0; i < parameterValues.size(); ++i) {
                 auto* pi = std::get_if<Pi>(&cursor->node);
                 if (!pi) {
@@ -880,32 +909,55 @@ ExpressionPointer Elaborator::buildCaseLambda(
             // indices from the value-arg's type and feed them to
             // the motive in order.
             int binderDepth = static_cast<int>(lambdaBinders.size());
-            // The motive has no free variables (it was elaborated in an
-            // empty stack); shift it to the current binder depth. The
-            // argument's type was written at depth i; view it from here.
-            ExpressionPointer recursionHypothesisType =
-                shift(motive, binderDepth);
-            ExpressionPointer typeCursor = shift(
+            // View the field type from the current binder depth (it was
+            // written at depth i).
+            ExpressionPointer fieldType = shift(
                 constructorArgument.type,
                 binderDepth - static_cast<int>(i));
-            std::vector<ExpressionPointer> recursiveTypeArguments;
-            while (auto* application =
-                       std::get_if<Application>(&typeCursor->node)) {
-                recursiveTypeArguments.insert(
-                    recursiveTypeArguments.begin(),
-                    application->argument);
-                typeCursor = application->function;
+            // Peel the field's leading Pi telescope — empty for a direct
+            // recursive arg, `(y : A) → r(y, x) →` for a higher-order one
+            // (Accessible's `below`). Each domain is captured in its own
+            // deepening scope, matching the kernel's buildCaseType.
+            std::vector<ExpressionPointer> telescopeDomains;
+            ExpressionPointer recursiveBase = fieldType;
+            while (auto* telescopePi =
+                       std::get_if<Pi>(&recursiveBase->node)) {
+                telescopeDomains.push_back(telescopePi->domain);
+                recursiveBase = telescopePi->codomain;
             }
+            int telescopeSize = static_cast<int>(telescopeDomains.size());
+            // `recursiveBase` is `Inductive params indices` in scope
+            // (binderDepth + telescopeSize); read off its indices.
+            std::vector<ExpressionPointer> recursiveTypeArguments;
+            {
+                ExpressionPointer typeCursor = recursiveBase;
+                while (auto* application =
+                           std::get_if<Application>(&typeCursor->node)) {
+                    recursiveTypeArguments.insert(
+                        recursiveTypeArguments.begin(),
+                        application->argument);
+                    typeCursor = application->function;
+                }
+            }
+            // IH codomain, in scope (binderDepth + telescopeSize):
+            //   motive(indices…) (field applied to the telescope binders).
+            ExpressionPointer recursionHypothesisType =
+                shift(motive, binderDepth + telescopeSize);
             for (size_t k = parameterValues.size();
                  k < recursiveTypeArguments.size(); ++k) {
                 recursionHypothesisType = makeApplication(
                     recursionHypothesisType,
                     recursiveTypeArguments[k]);
             }
+            ExpressionPointer fieldApplied = makeBoundVariable(
+                binderDepth + telescopeSize - 1 - static_cast<int>(i));
+            for (int t = 0; t < telescopeSize; ++t) {
+                fieldApplied = makeApplication(
+                    fieldApplied,
+                    makeBoundVariable(telescopeSize - 1 - t));
+            }
             recursionHypothesisType = makeApplication(
-                recursionHypothesisType,
-                makeBoundVariable(
-                    binderDepth - 1 - static_cast<int>(i)));
+                recursionHypothesisType, fieldApplied);
             // Beta-reduce the motive application so the hypothesis
             // binder carries the DECLARED result type (e.g. the
             // alias `ComplexNumber`), not a stuck
@@ -916,6 +968,13 @@ ExpressionPointer Elaborator::buildCaseLambda(
             // quotient and lose the dispatch.
             recursionHypothesisType =
                 deepBetaReduce(recursionHypothesisType);
+            // Re-abstract the telescope: `Π telescope. motive indices
+            // (field telescope)`. Innermost domain wraps first.
+            for (int t = telescopeSize - 1; t >= 0; --t) {
+                recursionHypothesisType = makePi(
+                    "recursivePredecessor", telescopeDomains[t],
+                    recursionHypothesisType);
+            }
             std::string hypothesisName;
             if (userProvidedHypothesisNames) {
                 hypothesisName =

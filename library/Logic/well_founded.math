@@ -69,13 +69,10 @@ definition WellFounded.recursion.{u, w}
 -- through `WellFounded.recursion_unfold`, which rests on `Accessible`
 -- being a subsingleton — itself a consequence of function extensionality.
 --
--- These proofs cite the raw `Accessible_recursor`: they are the foundational
--- boundary where the induction hypothesis for the higher-order `below` field
--- is threaded by hand (the `by induction` short form does not yet infer the
--- field's universe), analogous to `Equality.transport_proposition`.
-
 -- The `below` field of an accessibility proof: for every predecessor, its
--- own accessibility. Large elimination into the function type.
+-- own accessibility. A one-field projection — large elimination into the
+-- function type — so it cites `Accessible_recursor` directly (the honest
+-- tool for a field accessor); the proofs below read as ordinary induction.
 definition Accessible.below (A : Type(0)) (r : A → A → Proposition) (subject : A)
         (accessibility : Accessible(A, r, subject))
         : (predecessor : A) → r(predecessor, subject) → Accessible(A, r, predecessor) :=
@@ -96,55 +93,38 @@ theorem Accessible.eta (A : Type(0)) (r : A → A → Proposition) (subject : A)
         (accessibility : Accessible(A, r, subject))
         : accessibility
           = Accessible.introduce(A, r, subject, Accessible.below(A, r, subject, accessibility)) :=
-  Accessible_recursor(
-      A, r,
-      (element : A) (a : Accessible(A, r, element)) ↦
-          a = Accessible.introduce(A, r, element, Accessible.below(A, r, element, a)),
-      (element : A)
-          (below : (predecessor : A) → r(predecessor, element) → Accessible(A, r, predecessor))
-          (_ : (recursivePredecessor : A) → (rp : r(recursivePredecessor, element))
-               → below(recursivePredecessor, rp)
-                 = Accessible.introduce(A, r, recursivePredecessor,
-                       Accessible.below(A, r, recursivePredecessor, below(recursivePredecessor, rp)))) ↦
-          reflexivity(
-              Accessible(A, r, element),
-              Accessible.introduce(A, r, element, below)),
-      subject, accessibility)
+  by induction on accessibility {
+    case Accessible.introduce(point, below):
+      done
+  }
 
--- Accessibility proofs at a point are all equal. By recursion on the first,
+-- Accessibility proofs at a point are all equal. By induction on the first,
 -- inverting the second through `Accessible.eta` and matching the fields with
 -- the induction hypothesis under extensionality.
 theorem Accessible.subsingleton (A : Type(0)) (r : A → A → Proposition) (subject : A)
         (first : Accessible(A, r, subject))
         : ∀ (second : Accessible(A, r, subject)). first = second :=
-  Accessible_recursor(
-      A, r,
-      (element : A) (a : Accessible(A, r, element)) ↦
-          ∀ (second : Accessible(A, r, element)). a = second,
-      (element : A)
-          (below : (predecessor : A) → r(predecessor, element) → Accessible(A, r, predecessor))
-          (inductionHypothesis : (recursivePredecessor : A) → (rp : r(recursivePredecessor, element))
-               → ∀ (second : Accessible(A, r, recursivePredecessor)).
-                     below(recursivePredecessor, rp) = second) ↦
-          (second : Accessible(A, r, element)) ↦ {
-            second = Accessible.introduce(A, r, element, Accessible.below(A, r, element, second))
-                by Accessible.eta as secondEta;
-            ∀ (predecessor : A). ∀ (rp : r(predecessor, element)).
-                below(predecessor, rp) = Accessible.below(A, r, element, second, predecessor, rp) by {
-              take predecessor : A;
-              take rp : r(predecessor, element);
-              inductionHypothesis(predecessor, rp,
-                  Accessible.below(A, r, element, second, predecessor, rp))
-            };
-            below = Accessible.below(A, r, element, second)
-                by Function.dependent_extensionality_over_proposition(
-                    P := (predecessor : A) ↦ r(predecessor, element),
-                    C := (predecessor : A) ↦ Accessible(A, r, predecessor));
-            Accessible.introduce(A, r, element, below)
-               = Accessible.introduce(A, r, element, Accessible.below(A, r, element, second))
-               = second by secondEta
-          },
-      subject, first)
+  by induction on first with inductionHypothesis {
+    case Accessible.introduce(point, below):
+      (second : Accessible(A, r, point)) ↦ {
+        second = Accessible.introduce(A, r, point, Accessible.below(A, r, point, second))
+            by Accessible.eta as secondEta;
+        ∀ (predecessor : A). ∀ (rp : r(predecessor, point)).
+            below(predecessor, rp) = Accessible.below(A, r, point, second, predecessor, rp) by {
+          take predecessor : A;
+          take rp : r(predecessor, point);
+          inductionHypothesis(predecessor, rp,
+              Accessible.below(A, r, point, second, predecessor, rp))
+        };
+        below = Accessible.below(A, r, point, second)
+            by Function.dependent_extensionality_over_proposition(
+                P := (predecessor : A) ↦ r(predecessor, point),
+                C := (predecessor : A) ↦ Accessible(A, r, predecessor));
+        Accessible.introduce(A, r, point, below)
+           = Accessible.introduce(A, r, point, Accessible.below(A, r, point, second))
+           = second by secondEta
+      }
+  }
 
 -- The unfolding equation: a well-founded recursion at `subject` equals the
 -- step applied to the recursion at every predecessor.
