@@ -1,0 +1,77 @@
+-- Algebra/rank_nullity.math
+--
+-- The rank–nullity theorem: for a linear map `T : V → W` with `V`
+-- finite-dimensional, `dim(V) = dim(ker T) + dim(im T)`. The route is basis
+-- extension — no quotient space: extend a basis of the kernel to a basis of
+-- `V`, and the `T`-images of the extension vectors form a basis of the image.
+--
+-- Everything the argument moves between a subspace and its ambient space runs
+-- through ONE transport lemma, `Subspace.linearCombination_value`: the value of
+-- a linear combination computed inside the subspace equals the combination of
+-- the values computed in `V`. Independence and spanning transport between a
+-- subspace family and its value-image in `V` are corollaries. This confines the
+-- `Subtype`/`Subspace` boundary cost of the whole proof to that one induction.
+
+module Algebra.rank_nullity
+
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Set.subtype
+import Set.finite
+import Set.equinumerous
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.subspace
+import Algebra.linear_map
+import Algebra.linear_combination
+import Algebra.span
+import Algebra.exchange_lemma
+import Algebra.basis_pruning
+import Algebra.finite_dimensional
+import Algebra.dimension
+
+-- ----------------------------------------------------------------------
+-- Brick 1 — the subtype-transport bridge.
+--
+-- The value of a linear combination formed inside the subspace
+-- `Subspace.vector_space(V, subset, subspace)` is the linear combination of
+-- the underlying values formed in `V`. Both `Subspace.add` and `Subspace.scale`
+-- are defined so their value is the corresponding operation on values, so the
+-- only real step in the induction is peeling the last term.
+theorem Subspace.linearCombination_value {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (family : I → VectorSpace.carrier(Subspace.vector_space(V, subset, subspace)))
+        (coefficients : Natural → Field.carrier(f))
+        (selection : Natural → I) (count : Natural)
+        : Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, count))
+          = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
+                coefficients, selection, count) :=
+  by induction on count with IH {
+    case base:
+        Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, 0))
+           = Subtype.value(VectorSpace.zero(Subspace.vector_space(V, subset, subspace)))
+           = VectorSpace.zero(V)
+           = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
+                 coefficients, selection, 0)
+    case step(m):
+        Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, 1 + m))
+           = Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, m)
+                 + coefficients(m) • family(selection(m)))
+                 by VectorSpace.linearCombination_add_one
+           = Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, m))
+                 + coefficients(m) • Subtype.value(family(selection(m)))
+           = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
+                 coefficients, selection, m)
+                 + coefficients(m) • Subtype.value(family(selection(m)))
+                 by IH
+           = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
+                 coefficients, selection, 1 + m)
+                 by VectorSpace.linearCombination_add_one
+  }
