@@ -178,6 +178,74 @@ theorem VectorSpace.InSpanOf.add {f : Field} {V : VectorSpace(f)} {I : Type(0)}
 }
 
 -- ----------------------------------------------------------------------
+-- Span transitivity: if every member of `inner` lies in the span of
+-- `outer`, then everything in the span of `inner` lies in the span of
+-- `outer`. This is the substitution the exchange lemma performs — replace
+-- each generator by its expansion in the other family. The `outerInhabitant`
+-- feeds the empty combination (`0` is `0 • outer(outerInhabitant)`), which an
+-- arbitrary index type cannot supply on its own.
+
+-- A combination of `inner` members lies in `outer`'s span, by induction on
+-- the combination length: peel the last term (a scaled generator, in span by
+-- scaling the hypothesis) and add it to the shorter combination (in span by
+-- the induction hypothesis).
+theorem VectorSpace.InSpanOf.of_combination {f : Field} {V : VectorSpace(f)}
+        {I J : Type(0)}
+        (inner : I → VectorSpace.carrier(V)) (outer : J → VectorSpace.carrier(V))
+        (outerInhabitant : J)
+        (generatorsInSpan : ∀ (i : I). VectorSpace.InSpanOf(outer, inner(i)))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        (count : Natural)
+        : VectorSpace.InSpanOf(outer,
+              VectorSpace.linearCombination(inner, coefficients, selection, count)) :=
+  by induction on count with IH {
+    case base: {
+        VectorSpace.InSpanOf(outer, outer(outerInhabitant)) by VectorSpace.InSpanOf.member;
+        VectorSpace.InSpanOf(outer, Field.zero(f) • outer(outerInhabitant))
+            by VectorSpace.InSpanOf.scale;
+        VectorSpace.linearCombination(inner, coefficients, selection, 0)
+           = VectorSpace.zero(V)
+           = Field.zero(f) • outer(outerInhabitant)
+               by VectorSpace.zero_scale as emptyIsZero;
+        done by substituting emptyIsZero
+      }
+    case step(m): {
+        VectorSpace.InSpanOf(outer,
+            VectorSpace.linearCombination(inner, coefficients, selection, m)) by IH;
+        VectorSpace.InSpanOf(outer, inner(selection(m))) by generatorsInSpan;
+        VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m)))
+            by VectorSpace.InSpanOf.scale;
+        VectorSpace.InSpanOf(outer,
+            VectorSpace.linearCombination(inner, coefficients, selection, m)
+              + coefficients(m) • inner(selection(m)))
+            by VectorSpace.InSpanOf.add;
+        VectorSpace.linearCombination(inner, coefficients, selection, 1 + m)
+           = VectorSpace.linearCombination(inner, coefficients, selection, m)
+             + coefficients(m) • inner(selection(m))
+               by VectorSpace.linearCombination_add_one as peelLast;
+        done by substituting peelLast
+      }
+  }
+
+-- The span of `inner` is contained in the span of `outer`.
+theorem VectorSpace.InSpanOf.transitive {f : Field} {V : VectorSpace(f)}
+        {I J : Type(0)}
+        (inner : I → VectorSpace.carrier(V)) (outer : J → VectorSpace.carrier(V))
+        (outerInhabitant : J)
+        (generatorsInSpan : ∀ (i : I). VectorSpace.InSpanOf(outer, inner(i)))
+        (v : VectorSpace.carrier(V))
+        (member : VectorSpace.InSpanOf(inner, v))
+        : VectorSpace.InSpanOf(outer, v) := {
+  choose count, selection, coefficients such that
+      v = VectorSpace.linearCombination(inner, coefficients, selection, count) from member;
+  v = VectorSpace.linearCombination(inner, coefficients, selection, count) as vIsCombination;
+  VectorSpace.InSpanOf(outer,
+      VectorSpace.linearCombination(inner, coefficients, selection, count))
+      by VectorSpace.InSpanOf.of_combination;
+  done by substituting vIsCombination
+}
+
+-- ----------------------------------------------------------------------
 -- The first basis: the one-element family {1} for a field over itself.
 -- Spanning is v = v·1; independence is field cancellation, and a
 -- selection of two or more indices into a one-element index type cannot
