@@ -1,0 +1,40 @@
+-- Feature test: nested induction on two values of the SAME indexed family.
+-- Inducting on `second : Accessible(A, r, point)` generalises the index
+-- `point` in the motive, so every hypothesis that mentions `point` — here
+-- `below` and the outer induction hypothesis — is auto-reverted (and
+-- transparently re-introduced in the arm). Without that, the motive picked a
+-- fresh index variable that clashed with the un-reverted `below`.
+module Test.nested_indexed_induction_test
+
+import axioms
+import Logic.basics
+import Logic.well_founded
+import Logic.functions
+import Natural.basics
+import Natural.order
+import Equality.basics
+
+-- Accessibility proofs at a point are all equal — proved by DOUBLE induction,
+-- no `belowField`/eta detour: induct on the first, then on the second.
+theorem Test.accessible_subsingleton (A : Type(0)) (r : A → A → Proposition) (subject : A)
+        (first : Accessible(A, r, subject))
+        : ∀ (second : Accessible(A, r, subject)). first = second :=
+  by induction on first with inductionHypothesis {
+    case Accessible.introduce(point, below):
+      (second : Accessible(A, r, point)) ↦
+        by induction on second {
+          case Accessible.introduce(samePoint, below2): {
+            ∀ (predecessor : A). ∀ (rp : r(predecessor, samePoint)).
+                below(predecessor, rp) = below2(predecessor, rp) by {
+              take predecessor : A;
+              take rp : r(predecessor, samePoint);
+              inductionHypothesis(predecessor, rp, below2(predecessor, rp))
+            };
+            below = below2
+                by Function.dependent_extensionality_over_proposition(
+                    P := (predecessor : A) ↦ r(predecessor, samePoint),
+                    C := (predecessor : A) ↦ Accessible(A, r, predecessor));
+            done
+          }
+        }
+  }

@@ -991,13 +991,89 @@ std::vector<std::string> Elaborator::scrutineeDependentBinders(
         int total = static_cast<int>(localBinders.size());
         int scrutineePosition = total - 1 - boundVariable->deBruijnIndex;
         if (scrutineePosition < 0 || scrutineePosition >= total) return {};
+
+        // Local-variable INDEX arguments of the scrutinee's type. Inducting on
+        // an indexed value generalises those indices in the motive, so every
+        // hypothesis mentioning one — e.g. `below : … → Accessible(A, r,
+        // point)` when inducting on a second `Accessible(A, r, point)` — must
+        // be reverted too, or the motive is ill-typed (a fresh index variable
+        // clashing with the un-reverted hypothesis's original one). A
+        // non-indexed type (Quotient, Natural, …) has none, and this whole
+        // block is inert — the scrutinee-dependent sweep below is then exactly
+        // as it always was.
+        std::set<int> indexRoots;
+        {
+            // The scrutinee's declared type, as stored on its binder, is
+            // closed over binders 0 … scrutineePosition-1 — so a
+            // local-variable index appears as a BoundVariable whose index is
+            // relative to THAT scope. (Inferring the type instead would open
+            // it into FreeVariables, losing the binder-position link.)
+            ExpressionPointer head =
+                weakHeadNormalForm(environment_,
+                                   localBinders[scrutineePosition].type);
+            std::vector<ExpressionPointer> typeArgs;
+            while (auto* application =
+                       std::get_if<Application>(&head->node)) {
+                typeArgs.push_back(application->argument);
+                head = application->function;
+            }
+            std::reverse(typeArgs.begin(), typeArgs.end());
+            // Only a genuine inductive has a parameter/index split we can
+            // read; a non-inductive head (e.g. the `Quotient` axiom, whose
+            // `T`/`R` are ordinary arguments, not recursor indices) has no
+            // indices to generalise, so leave `indexRoots` empty rather than
+            // mistaking its arguments for indices.
+            const Inductive* inductive = nullptr;
+            if (auto* constant = std::get_if<Constant>(&head->node)) {
+                if (const Declaration* declaration =
+                        environment_.lookup(constant->name)) {
+                    inductive = std::get_if<Inductive>(declaration);
+                }
+            }
+            if (inductive) {
+                for (size_t k =
+                         static_cast<size_t>(inductive->numParameters);
+                     k < typeArgs.size(); ++k) {
+                    if (auto* indexBound =
+                            std::get_if<BoundVariable>(&typeArgs[k]->node)) {
+                        int indexPosition = scrutineePosition - 1
+                            - indexBound->deBruijnIndex;
+                        if (indexPosition >= 0 && indexPosition < total) {
+                            indexRoots.insert(indexPosition);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Taint set, propagated in scope order. Seeds: the scrutinee and any
+        // index roots. A later binder is tainted when its type references an
+        // already-tainted binder — transitively, so a chain reverts fully
+        // (`below` mentions `point`, an induction hypothesis mentions `below`,
+        // …). When there are no index roots the seed is the scrutinee alone
+        // and this reduces to the historical direct-dependent sweep (the
+        // transitive step only ever ADDS binders reachable through one that
+        // already had to be reverted, which were always unsound to keep).
+        std::set<int> taintedPositions = indexRoots;
+        taintedPositions.insert(scrutineePosition);
+        int earliestRoot = *taintedPositions.begin();
         std::vector<std::string> names;
-        for (int i = scrutineePosition + 1; i < total; ++i) {
-            // The scrutinee's de Bruijn index within binder i's type
-            // scope (binders 0..i-1 are in scope there).
-            int scrutineeIndexInTypeScope = (i - 1) - scrutineePosition;
-            if (referencesBoundVariable(
-                    localBinders[i].type, scrutineeIndexInTypeScope)) {
+        for (int i = earliestRoot + 1; i < total; ++i) {
+            if (i == scrutineePosition) continue;
+            bool referencesTainted = false;
+            for (int root : taintedPositions) {
+                if (root >= i) continue;
+                // `root`'s de Bruijn index within binder i's type scope
+                // (binders 0..i-1 are in scope there).
+                int rootIndexInTypeScope = (i - 1) - root;
+                if (referencesBoundVariable(
+                        localBinders[i].type, rootIndexInTypeScope)) {
+                    referencesTainted = true;
+                    break;
+                }
+            }
+            if (referencesTainted) {
+                taintedPositions.insert(i);
                 names.push_back(localBinders[i].name);
             }
         }
