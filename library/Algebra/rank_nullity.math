@@ -481,3 +481,433 @@ theorem VectorSpace.appendVector_clamp_injective {f : Field} {V : VectorSpace(f)
   selection(a) = selection(b) by NaturalsBelow.equal_of_value(a := selection(a), b := selection(b));
   done by selInjective
 }
+
+-- Small arithmetic / position facts the append lemma leans on.
+theorem Natural.less_than_one_is_zero (k : Natural) (h : k < 1) : k = 0 := {
+  k ≤ 0 by Natural.le_of_lt_one_plus;
+  done by Natural.less_or_equal_zero_implies_equals_zero
+}
+
+theorem Natural.positive_one_plus_monus_one (n : Natural) (pos : 0 < n)
+        : n = 1 + Natural.monus(n, 1) := {
+  n = 0 ∨ ∃ (k : Natural). n = 1 + k by Natural.zero_or_one_plus;
+  done by cases {
+    case n = 0 as nZero: { 0 < 0 by substituting nZero;
+                           ¬(0 < 0) by Natural.lt_irreflexive; done }
+    case ∃ (k : Natural). n = 1 + k as nPlus: {
+        choose k such that n = 1 + k from nPlus;
+        Natural.monus(n, 1) = Natural.monus(1 + k, 1) by substituting (n = 1 + k)
+           = k by NaturalsBelow.monus_one_plus_one as monusK;
+        n = 1 + k = 1 + Natural.monus(n, 1) by substituting monusK;
+        done
+    }
+  }
+}
+
+theorem NaturalsBelow.skipValue_ne (jv j : Natural) : NaturalsBelow.skipValue(jv, j) ≠ jv := {
+  j < jv ∨ jv ≤ j by Natural.lt_or_le;
+  done by cases {
+    case j < jv as below: {
+        NaturalsBelow.skipValue(jv, j) = j by NaturalsBelow.skipValue_below as sv;
+        j ≠ jv by Natural.not_equal_of_less_than;
+        done by substituting sv
+      }
+    case jv ≤ j as ge: {
+        ¬(j < jv) by { suppose j < jv as jLt; j < jv ≤ j; done };
+        NaturalsBelow.skipValue(jv, j) = 1 + j by NaturalsBelow.skipValue_above as sv;
+        jv < 1 + j by { jv ≤ j < 1 + j; done };
+        1 + j ≠ jv by Natural.not_equal_of_greater_than;
+        done by substituting sv
+      }
+  }
+}
+
+theorem NaturalsBelow.skipValue_injective (jv a b : Natural)
+        (h : NaturalsBelow.skipValue(jv, a) = NaturalsBelow.skipValue(jv, b)) : a = b := {
+  a < jv ∨ jv ≤ a by Natural.lt_or_le;
+  done by cases {
+    case a < jv as aBelow: {
+        NaturalsBelow.skipValue(jv, a) = a by NaturalsBelow.skipValue_below as sa;
+        b < jv ∨ jv ≤ b by Natural.lt_or_le;
+        done by cases {
+          case b < jv as bBelow: {
+              NaturalsBelow.skipValue(jv, b) = b by NaturalsBelow.skipValue_below as sb;
+              a = NaturalsBelow.skipValue(jv, a) by sa
+                = NaturalsBelow.skipValue(jv, b) by h
+                = b by sb;
+              done
+            }
+          case jv ≤ b as bGe: {
+              ¬(b < jv) by { suppose b < jv as bLt; b < jv ≤ b; done };
+              NaturalsBelow.skipValue(jv, b) = 1 + b by NaturalsBelow.skipValue_above as sb;
+              a = 1 + b by { a = NaturalsBelow.skipValue(jv, a) by sa
+                               = NaturalsBelow.skipValue(jv, b) by h = 1 + b by sb; done } as aEq;
+              a < 1 + b by { a < jv ≤ b < 1 + b; done };
+              1 + b < 1 + b by substituting aEq;
+              ¬(1 + b < 1 + b) by Natural.lt_irreflexive;
+              done
+            }
+        }
+      }
+    case jv ≤ a as aGe: {
+        ¬(a < jv) by { suppose a < jv as aLt; a < jv ≤ a; done };
+        NaturalsBelow.skipValue(jv, a) = 1 + a by NaturalsBelow.skipValue_above as sa;
+        b < jv ∨ jv ≤ b by Natural.lt_or_le;
+        done by cases {
+          case b < jv as bBelow: {
+              NaturalsBelow.skipValue(jv, b) = b by NaturalsBelow.skipValue_below as sb;
+              b = 1 + a by { b = NaturalsBelow.skipValue(jv, b) by sb
+                               = NaturalsBelow.skipValue(jv, a) by h = 1 + a by sa; done } as bEq;
+              b < 1 + a by { b < jv ≤ a < 1 + a; done };
+              1 + a < 1 + a by substituting bEq;
+              ¬(1 + a < 1 + a) by Natural.lt_irreflexive;
+              done
+            }
+          case jv ≤ b as bGe: {
+              ¬(b < jv) by { suppose b < jv as bLt; b < jv ≤ b; done };
+              NaturalsBelow.skipValue(jv, b) = 1 + b by NaturalsBelow.skipValue_above as sb;
+              1 + a = 1 + b by { 1 + a = NaturalsBelow.skipValue(jv, a) by sa
+                                   = NaturalsBelow.skipValue(jv, b) by h = 1 + b by sb; done };
+              done by Natural.add_cancel_left
+            }
+        }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The append lemma: a vector outside the span of an independent family
+-- extends it to a larger independent family. This is the growing counterpart
+-- of `independent_or_droppable`, and the engine behind basis EXTENSION.
+--
+-- A vanishing combination of `appendVector(e, x)` cannot use `x` (its
+-- coefficient there would put `x` in the span of the `e`-vectors — the other
+-- indices — contradicting `x ∉ span(e)`), so it reduces to a vanishing
+-- combination of `e` alone, whose coefficients `e`'s independence kills. The
+-- (at most one) position selecting `x` carries a zero coefficient and is
+-- dropped by `linearCombination_drop_zero_position` to keep the reduced
+-- selection injective.
+theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (e : NaturalsBelow(m) → VectorSpace.carrier(V)) (x : VectorSpace.carrier(V))
+        (eIndependent : VectorSpace.LinearlyIndependent(e))
+        (notInSpan : ¬(x = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, x)))
+        : VectorSpace.LinearlyIndependent(VectorSpace.appendVector(e, x)) := {
+  ¬VectorSpace.InSpanOf(e, x)
+      by { suppose VectorSpace.InSpanOf(e, x) as inSpan;
+           x = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, x); done } as xNotInSpan;
+  x ≠ VectorSpace.zero(V)
+      by { suppose x = VectorSpace.zero(V) as isZero;
+           x = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, x); done } as xNonzero;
+  take len : Natural;
+  take selection : Natural → NaturalsBelow(1 + m);
+  take coefficients : Natural → Field.carrier(f);
+  suppose ∀ (a b : Natural). a < len → b < len → selection(a) = selection(b) → a = b
+      as selectionInjective;
+  suppose VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
+          = VectorSpace.zero(V) as vanishes;
+  m = 0 ∨ ∃ (mp : Natural). m = 1 + mp by Natural.zero_or_one_plus;
+  done by cases {
+    case m = 0 as mZero: {
+        -- The empty family: `appendVector` is the singleton `{x}`; any two
+        -- positions select the sole index, so an injective selection has at
+        -- most one position, and its coefficient kills `x`.
+        ∀ (i : Natural). i < len → NaturalsBelow.value(selection(i)) = m
+          by { take i : Natural; suppose i < len as iBelow;
+               NaturalsBelow.value(selection(i)) < 1 + m by NaturalsBelow.below;
+               1 + m = 1 by substituting mZero;
+               NaturalsBelow.value(selection(i)) < 1;
+               NaturalsBelow.value(selection(i)) = 0 by NaturalsBelow.below_one_is_zero;
+               done by substituting mZero } as allAtLast;
+        ¬(1 < len)
+          by { suppose 1 < len as oneLtLen;
+               0 < len by { 0 < 1 < len; done };
+               NaturalsBelow.value(selection(0)) = m by allAtLast;
+               NaturalsBelow.value(selection(1)) = m by allAtLast;
+               NaturalsBelow.value(selection(0)) = NaturalsBelow.value(selection(1));
+               selection(0) = selection(1)
+                   by NaturalsBelow.equal_of_value(a := selection(0), b := selection(1));
+               0 = 1 by selectionInjective(0, 1);
+               done } as notOneLtLen;
+        take i : Natural;
+        suppose i < len as iBelow;
+        0 < len by { 0 ≤ i < len; done } as lenPos;
+        len ≤ 1 by { 1 < len ∨ len ≤ 1 by Natural.lt_or_le;
+                     done by cases { case 1 < len as c: { ¬(1 < len) by notOneLtLen; done }
+                                     case len ≤ 1 as c: { done } } } as lenLeOne;
+        1 ≤ len by Natural.successor_le_of_lt;
+        len = 1 by Natural.le_antisymmetric as lenOne;
+        i < 1 by substituting lenOne as iLtOne;
+        i = 0 by Natural.less_than_one_is_zero as iZero;
+        VectorSpace.appendVector(e, x)(selection(0)) = x
+            by VectorSpace.appendVector_last(atLast := allAtLast(0, lenPos)) as app0;
+        coefficients(i) • x = VectorSpace.zero(V)
+          by {
+            VectorSpace.zero(V)
+               = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
+                     by vanishes
+               = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, 1)
+                     by substituting lenOne
+               = coefficients(0) • VectorSpace.appendVector(e, x)(selection(0))
+                     by VectorSpace.linearCombination_one
+               = coefficients(0) • x by substituting app0
+               = coefficients(i) • x by substituting iZero;
+            done
+          } as termZero;
+        suppose coefficients(i) ≠ Field.zero(f) as ciNonzero for contradiction {
+          x = Field.reciprocal(coefficients(i), ciNonzero) • (coefficients(i) • x)
+                by VectorSpace.scale_reciprocal_cancel
+            = Field.reciprocal(coefficients(i), ciNonzero) • VectorSpace.zero(V)
+                by substituting termZero
+            = VectorSpace.zero(V) by VectorSpace.scale_zero;
+          done
+        }
+      }
+    case ∃ (mp : Natural). m = 1 + mp as mPosExists: {
+        choose mp such that m = 1 + mp from mPosExists;
+        0 < m by { 0 < 1 + mp; done by substituting (m = 1 + mp) } as mPos;
+        let ei0 : NaturalsBelow(m) := NaturalsBelow.make(0, mPos);
+
+        -- Step 1: a position selecting the appended slot `x` carries a zero
+        -- coefficient — else `x` would lie in the span of the other vectors,
+        -- all of which are `e`-vectors, so in `span(e)`.
+        ∀ (p : Natural). p < len → NaturalsBelow.value(selection(p)) = m → coefficients(p) = Field.zero(f)
+          by {
+            take p : Natural;
+            suppose p < len as pBelow;
+            suppose NaturalsBelow.value(selection(p)) = m as pAtLast;
+            suppose coefficients(p) ≠ Field.zero(f) as cpNonzero for contradiction {
+                VectorSpace.InSpanOf(VectorSpace.dropIndex(VectorSpace.appendVector(e, x), selection(p)),
+                    VectorSpace.appendVector(e, x)(selection(p)))
+                    by VectorSpace.dropIndex_redundant(countPos := mPos, i0 := p);
+                VectorSpace.appendVector(e, x)(selection(p)) = x by VectorSpace.appendVector_last as appAtP;
+                VectorSpace.InSpanOf(VectorSpace.dropIndex(VectorSpace.appendVector(e, x), selection(p)), x)
+                    by substituting appAtP as xInDrop;
+                ∀ (i : NaturalsBelow(m)).
+                    VectorSpace.InSpanOf(e, VectorSpace.dropIndex(VectorSpace.appendVector(e, x), selection(p))(i))
+                  by {
+                    take i : NaturalsBelow(m);
+                    NaturalsBelow.value(i) < m by NaturalsBelow.below as iValBelow;
+                    NaturalsBelow.value(NaturalsBelow.skip(NaturalsBelow.value(selection(p)), i))
+                       = NaturalsBelow.skipValue(NaturalsBelow.value(selection(p)), NaturalsBelow.value(i))
+                           by NaturalsBelow.skip_value
+                       = NaturalsBelow.skipValue(m, NaturalsBelow.value(i)) by substituting pAtLast
+                       = NaturalsBelow.value(i)
+                           by NaturalsBelow.skipValue_below(below := iValBelow)
+                       as skipVal;
+                    NaturalsBelow.value(NaturalsBelow.skip(NaturalsBelow.value(selection(p)), i)) < m
+                        by substituting skipVal as skipBelow;
+                    VectorSpace.dropIndex(VectorSpace.appendVector(e, x), selection(p))(i)
+                       = VectorSpace.appendVector(e, x)(NaturalsBelow.skip(NaturalsBelow.value(selection(p)), i))
+                       = e(NaturalsBelow.make(
+                             NaturalsBelow.value(NaturalsBelow.skip(NaturalsBelow.value(selection(p)), i)),
+                             skipBelow))
+                           by VectorSpace.appendVector_below as dropAtI;
+                    VectorSpace.InSpanOf(e, e(NaturalsBelow.make(
+                        NaturalsBelow.value(NaturalsBelow.skip(NaturalsBelow.value(selection(p)), i)), skipBelow)))
+                        by VectorSpace.InSpanOf.member;
+                    done by substituting dropAtI
+                  } as dropInSpanE;
+                VectorSpace.InSpanOf(e, x)
+                    by VectorSpace.InSpanOf.transitive(
+                           outerInhabitant := ei0,
+                           generatorsInSpan := dropInSpanE, member := xInDrop);
+                done
+            }
+          } as xVanish;
+
+        -- Step 2: reduce the whole vanishing combination to one over `e` and
+        -- invoke `e`'s independence.
+        ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m)
+            ∨ (∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m)
+          by { (∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m)
+                   ∨ ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m)
+                   by Logic.excluded_middle;
+               done by cases {
+                 case ∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m as ex: { done }
+                 case ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m) as nex: { done }
+               } };
+        done by cases {
+          case ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m) as noLast: {
+              ∀ (j : Natural). j < len → NaturalsBelow.value(selection(j)) < m
+                by { take j : Natural; suppose j < len as jBelow;
+                     NaturalsBelow.value(selection(j)) < 1 + m by NaturalsBelow.below;
+                     NaturalsBelow.value(selection(j)) ≤ m by Natural.le_of_lt_one_plus;
+                     NaturalsBelow.value(selection(j)) ≠ m
+                         by { suppose NaturalsBelow.value(selection(j)) = m as jAtLast;
+                              ∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m
+                                  by { witness j with And.introduction(jBelow, jAtLast) };
+                              done };
+                     done by Natural.lt_of_le_of_ne } as allBelow;
+              VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
+                 = VectorSpace.linearCombination(e, coefficients,
+                       (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), len)
+                       by VectorSpace.appendVector_reduces_to_e(ei0 := ei0, allBelow := allBelow) as reduceEq;
+              VectorSpace.linearCombination(e, coefficients,
+                    (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), len)
+                 = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
+                       by reduceEq
+                 = VectorSpace.zero(V) by vanishes as eCombZero;
+              ∀ (a b : Natural). a < len → b < len →
+                  NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(a)))
+                  = NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(b))) → a = b
+                  by VectorSpace.appendVector_clamp_injective(ei0 := ei0,
+                         selInjective := selectionInjective, allBelow := allBelow) as clampInj;
+              done by eIndependent(len,
+                  (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))),
+                  coefficients, clampInj, eCombZero)
+            }
+          case ∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m as lastExists: {
+              choose p0 such that p0 < len ∧ NaturalsBelow.value(selection(p0)) = m from lastExists;
+              p0 < len as p0Below;
+              NaturalsBelow.value(selection(p0)) = m as p0AtLast;
+              coefficients(p0) = Field.zero(f) by xVanish(p0, p0Below, p0AtLast) as cp0Zero;
+              len = 1 + Natural.monus(len, 1)
+                  by { 0 < len by { 0 ≤ p0 < len; done };
+                       done by Natural.positive_one_plus_monus_one } as lenShape;
+              p0 < 1 + Natural.monus(len, 1) by substituting lenShape as p0BelowShape;
+              -- Drop position p0 (zero coefficient) to keep injectivity.
+              VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
+                 = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection,
+                       1 + Natural.monus(len, 1)) by substituting lenShape
+                 = VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), Natural.monus(len, 1))
+                       by VectorSpace.linearCombination_drop_zero_position(
+                              VectorSpace.appendVector(e, x), coefficients, selection,
+                              Natural.monus(len, 1), p0, p0BelowShape, cp0Zero)
+                 as droppedComb;
+              -- The dropped selection avoids the x-slot: all below m.
+              ∀ (j : Natural). j < Natural.monus(len, 1) →
+                  NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j))) < m
+                by {
+                  take j : Natural; suppose j < Natural.monus(len, 1) as jBelow;
+                  NaturalsBelow.skipValue(p0, j) < len
+                    by { NaturalsBelow.skipValue(p0, j) < 1 + Natural.monus(len, 1)
+                             by NaturalsBelow.skipValue_bound(jv := p0,
+                                    i := NaturalsBelow.make(j, jBelow));
+                         done by substituting lenShape } as skipInLen;
+                  NaturalsBelow.skipValue(p0, j) ≠ p0 by NaturalsBelow.skipValue_ne(jv := p0, j := j) as skipNeP0;
+                  NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j))) < 1 + m
+                      by NaturalsBelow.below;
+                  NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j))) ≤ m
+                      by Natural.le_of_lt_one_plus;
+                  NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j))) ≠ m
+                    by { suppose NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j))) = m as jAtLast;
+                         NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j)))
+                             = NaturalsBelow.value(selection(p0)) by { done by substituting p0AtLast };
+                         selection(NaturalsBelow.skipValue(p0, j)) = selection(p0)
+                             by NaturalsBelow.equal_of_value(a := selection(NaturalsBelow.skipValue(p0, j)),
+                                    b := selection(p0));
+                         NaturalsBelow.skipValue(p0, j) = p0 by selectionInjective(
+                             NaturalsBelow.skipValue(p0, j), p0, skipInLen, p0Below);
+                         done };
+                  done by Natural.lt_of_le_of_ne
+                } as droppedBelow;
+              VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
+                    (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                    (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), Natural.monus(len, 1))
+                 = VectorSpace.linearCombination(e,
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                       (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
+                           NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
+                       Natural.monus(len, 1))
+                       by VectorSpace.appendVector_reduces_to_e(ei0 := ei0, allBelow := droppedBelow)
+                 as reduceEq;
+              VectorSpace.linearCombination(e,
+                    (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                    (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
+                        NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
+                    Natural.monus(len, 1))
+                 = VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), Natural.monus(len, 1))
+                       by reduceEq
+                 = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
+                       by droppedComb
+                 = VectorSpace.zero(V) by vanishes as eCombZero;
+              -- The dropped selection is injective, so `e`-independence applies.
+              ∀ (a b : Natural). a < Natural.monus(len, 1) → b < Natural.monus(len, 1) →
+                  NaturalsBelow.clamp(ei0)(
+                      NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))))
+                  = NaturalsBelow.clamp(ei0)(
+                      NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b)))) → a = b
+                by {
+                  take a : Natural; take b : Natural;
+                  suppose a < Natural.monus(len, 1) as aBelow;
+                  suppose b < Natural.monus(len, 1) as bBelow;
+                  suppose NaturalsBelow.clamp(ei0)(
+                              NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))))
+                          = NaturalsBelow.clamp(ei0)(
+                              NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b)))) as clampEq;
+                  NaturalsBelow.skipValue(p0, a) < len
+                    by { NaturalsBelow.skipValue(p0, a) < 1 + Natural.monus(len, 1)
+                             by NaturalsBelow.skipValue_bound(jv := p0, i := NaturalsBelow.make(a, aBelow));
+                         done by substituting lenShape } as skipALen;
+                  NaturalsBelow.skipValue(p0, b) < len
+                    by { NaturalsBelow.skipValue(p0, b) < 1 + Natural.monus(len, 1)
+                             by NaturalsBelow.skipValue_bound(jv := p0, i := NaturalsBelow.make(b, bBelow));
+                         done by substituting lenShape } as skipBLen;
+                  NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))) < m
+                      by droppedBelow(a, aBelow) as aValBelow;
+                  NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b))) < m
+                      by droppedBelow(b, bBelow) as bValBelow;
+                  NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a)))
+                     = NaturalsBelow.value(NaturalsBelow.make(
+                           NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))), aValBelow))
+                     = NaturalsBelow.value(NaturalsBelow.clamp(ei0)(
+                           NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))))) by NaturalsBelow.clamp_below
+                     = NaturalsBelow.value(NaturalsBelow.clamp(ei0)(
+                           NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b))))) by substituting clampEq
+                     = NaturalsBelow.value(NaturalsBelow.make(
+                           NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b))), bValBelow))
+                           by NaturalsBelow.clamp_below
+                     = NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b)));
+                  selection(NaturalsBelow.skipValue(p0, a)) = selection(NaturalsBelow.skipValue(p0, b))
+                      by NaturalsBelow.equal_of_value(a := selection(NaturalsBelow.skipValue(p0, a)),
+                             b := selection(NaturalsBelow.skipValue(p0, b)));
+                  NaturalsBelow.skipValue(p0, a) = NaturalsBelow.skipValue(p0, b)
+                      by selectionInjective(NaturalsBelow.skipValue(p0, a), NaturalsBelow.skipValue(p0, b),
+                             skipALen, skipBLen);
+                  done by NaturalsBelow.skipValue_injective(jv := p0)
+                } as droppedInj;
+              ∀ (i : Natural). i < Natural.monus(len, 1) →
+                  coefficients(NaturalsBelow.skipValue(p0, i)) = Field.zero(f)
+                  by eIndependent(Natural.monus(len, 1),
+                      (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
+                          NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
+                      (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                      droppedInj, eCombZero) as skippedCoeffsZero;
+              -- Recover every original coefficient: p0 is zero directly, and
+              -- j ≠ p0 is `skipValue(p0, skipInverse(p0, j))`.
+              take i : Natural;
+              suppose i < len as iBelow;
+              i = p0 ∨ i ≠ p0 by Logic.excluded_middle;
+              done by cases {
+                case i = p0 as iIsP0: {
+                    coefficients(i) = coefficients(p0) by substituting iIsP0
+                       = Field.zero(f) by cp0Zero;
+                    done
+                  }
+                case i ≠ p0 as iNeP0: {
+                    i < 1 + Natural.monus(len, 1) by substituting lenShape as iBelowShape;
+                    p0 ≤ Natural.monus(len, 1)
+                        by { p0 < 1 + Natural.monus(len, 1) by p0BelowShape;
+                             done by Natural.le_of_lt_one_plus } as p0LeMonus;
+                    NaturalsBelow.skipInverseValue(p0, i) < Natural.monus(len, 1)
+                        by NaturalsBelow.skipInverseValue_bound(count := Natural.monus(len, 1), jv := p0,
+                               x := i, xBound := iBelowShape, jvBound := p0LeMonus,
+                               ne := iNeP0) as skipInvBelow;
+                    NaturalsBelow.skipValue(p0, NaturalsBelow.skipInverseValue(p0, i)) = i
+                        by NaturalsBelow.skipValue_skipInverse(ne := iNeP0) as roundTrip;
+                    coefficients(i)
+                       = coefficients(NaturalsBelow.skipValue(p0, NaturalsBelow.skipInverseValue(p0, i)))
+                             by substituting roundTrip
+                       = Field.zero(f) by skippedCoeffsZero(NaturalsBelow.skipInverseValue(p0, i), skipInvBelow);
+                    done
+                  }
+              }
+            }
+        }
+    }
+  }
+}
