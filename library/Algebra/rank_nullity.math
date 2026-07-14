@@ -1104,3 +1104,427 @@ theorem VectorSpace.InSpanOf.append_monotone {f : Field} {V : VectorSpace(f)} {m
   witness count with witness ((i : Natural) ↦ NaturalsBelow.widen(selection(i)))
       with witness coefficients with vAppendCombo
 }
+
+-- Disjunctive span transitivity. When every generator of `inner` is either
+-- zero or in the span of `outer`, a whole combination of `inner` is likewise
+-- either zero or in the span of `outer`. Because the empty combination lands
+-- in the "zero" alternative, this never needs an inhabitant of `outer`'s
+-- index — the obstruction that `InSpanOf.transitive` carries. Induction on the
+-- combination length: the last term is zero-or-in-span (by the generator
+-- hypothesis and scaling), the prefix is zero-or-in-span (by the induction
+-- hypothesis), and their sum stays zero-or-in-span in all four combinations.
+theorem VectorSpace.InSpanOf.of_combination_covered {f : Field} {V : VectorSpace(f)}
+        {I J : Type(0)}
+        (inner : I → VectorSpace.carrier(V)) (outer : J → VectorSpace.carrier(V))
+        (generatorsCovered :
+            ∀ (i : I). inner(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(outer, inner(i)))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        : ∀ (count : Natural).
+              VectorSpace.linearCombination(inner, coefficients, selection, count) = VectorSpace.zero(V)
+              ∨ VectorSpace.InSpanOf(outer,
+                    VectorSpace.linearCombination(inner, coefficients, selection, count)) :=
+  by induction on count with IH {
+    case base: {
+        VectorSpace.linearCombination(inner, coefficients, selection, 0) = VectorSpace.zero(V)
+            by VectorSpace.linearCombination_zero;
+        done
+      }
+    case step(m): {
+        VectorSpace.linearCombination(inner, coefficients, selection, 1 + m)
+           = VectorSpace.linearCombination(inner, coefficients, selection, m)
+             + coefficients(m) • inner(selection(m))
+             by VectorSpace.linearCombination_add_one as peelEq;
+
+        coefficients(m) • inner(selection(m)) = VectorSpace.zero(V)
+            ∨ VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m)))
+          by {
+            inner(selection(m)) = VectorSpace.zero(V)
+                ∨ VectorSpace.InSpanOf(outer, inner(selection(m))) by generatorsCovered;
+            done by cases {
+              case inner(selection(m)) = VectorSpace.zero(V) as innerZero: {
+                  coefficients(m) • inner(selection(m))
+                     = coefficients(m) • VectorSpace.zero(V) by substituting innerZero
+                     = VectorSpace.zero(V) by VectorSpace.scale_zero;
+                  done
+                }
+              case VectorSpace.InSpanOf(outer, inner(selection(m))) as innerInSpan: {
+                  VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m)))
+                      by VectorSpace.InSpanOf.scale;
+                  done
+                }
+            }
+          } as termCovered;
+
+        VectorSpace.linearCombination(inner, coefficients, selection, m) + coefficients(m) • inner(selection(m))
+            = VectorSpace.zero(V)
+            ∨ VectorSpace.InSpanOf(outer,
+                  VectorSpace.linearCombination(inner, coefficients, selection, m)
+                  + coefficients(m) • inner(selection(m)))
+          by {
+            VectorSpace.linearCombination(inner, coefficients, selection, m) = VectorSpace.zero(V)
+                ∨ VectorSpace.InSpanOf(outer, VectorSpace.linearCombination(inner, coefficients, selection, m))
+                by IH;
+            done by cases {
+              case VectorSpace.linearCombination(inner, coefficients, selection, m) = VectorSpace.zero(V)
+                  as prefixZero: {
+                  coefficients(m) • inner(selection(m)) = VectorSpace.zero(V)
+                      ∨ VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m))) by termCovered;
+                  done by cases {
+                    case coefficients(m) • inner(selection(m)) = VectorSpace.zero(V) as termZero: {
+                        VectorSpace.linearCombination(inner, coefficients, selection, m)
+                              + coefficients(m) • inner(selection(m))
+                           = VectorSpace.zero(V) + coefficients(m) • inner(selection(m))
+                                 by substituting prefixZero
+                           = VectorSpace.zero(V) + VectorSpace.zero(V) by substituting termZero
+                           = VectorSpace.zero(V) by VectorSpace.zero_add;
+                        done
+                      }
+                    case VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m))) as termInSpan: {
+                        VectorSpace.linearCombination(inner, coefficients, selection, m)
+                              + coefficients(m) • inner(selection(m))
+                           = VectorSpace.zero(V) + coefficients(m) • inner(selection(m))
+                                 by substituting prefixZero
+                           = coefficients(m) • inner(selection(m)) by VectorSpace.zero_add
+                           as sumIsTerm;
+                        VectorSpace.InSpanOf(outer,
+                            VectorSpace.linearCombination(inner, coefficients, selection, m)
+                            + coefficients(m) • inner(selection(m)))
+                            by { done by substituting sumIsTerm };
+                        done
+                      }
+                  }
+                }
+              case VectorSpace.InSpanOf(outer, VectorSpace.linearCombination(inner, coefficients, selection, m))
+                  as prefixInSpan: {
+                  coefficients(m) • inner(selection(m)) = VectorSpace.zero(V)
+                      ∨ VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m))) by termCovered;
+                  done by cases {
+                    case coefficients(m) • inner(selection(m)) = VectorSpace.zero(V) as termZero: {
+                        VectorSpace.linearCombination(inner, coefficients, selection, m)
+                              + coefficients(m) • inner(selection(m))
+                           = VectorSpace.linearCombination(inner, coefficients, selection, m) + VectorSpace.zero(V)
+                                 by substituting termZero
+                           = VectorSpace.linearCombination(inner, coefficients, selection, m)
+                                 by VectorSpace.add_zero
+                           as sumIsPrefix;
+                        VectorSpace.InSpanOf(outer,
+                            VectorSpace.linearCombination(inner, coefficients, selection, m)
+                            + coefficients(m) • inner(selection(m)))
+                            by { done by substituting sumIsPrefix };
+                        done
+                      }
+                    case VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m))) as termInSpan: {
+                        VectorSpace.InSpanOf(outer,
+                            VectorSpace.linearCombination(inner, coefficients, selection, m)
+                            + coefficients(m) • inner(selection(m)))
+                            by VectorSpace.InSpanOf.add;
+                        done
+                      }
+                  }
+                }
+            }
+          } as sumCovered;
+        done by substituting peelEq
+      }
+  }
+
+-- A family covers a spanning family — each generator is zero or in its span —
+-- then it spans the whole space. The zero vector goes to `Spans`' own zero
+-- alternative; a nonzero vector is a combination of `inner`, carried into
+-- `outer`'s span by the disjunctive transitivity above.
+theorem VectorSpace.Spans.transitive_covered {f : Field} {V : VectorSpace(f)} {I J : Type(0)}
+        (inner : I → VectorSpace.carrier(V)) (outer : J → VectorSpace.carrier(V))
+        (innerSpans : VectorSpace.Spans(inner))
+        (generatorsCovered :
+            ∀ (i : I). inner(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(outer, inner(i)))
+        : VectorSpace.Spans(outer) := {
+  take v : VectorSpace.carrier(V);
+  v = VectorSpace.zero(V)
+      ∨ (∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+             v = VectorSpace.linearCombination(inner, coefficients, selection, count))
+      by innerSpans;
+  done by cases {
+    case v = VectorSpace.zero(V) as vZero: { done }
+    case ∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+           v = VectorSpace.linearCombination(inner, coefficients, selection, count) as vCombo: {
+        choose count, selection, coefficients such that
+            v = VectorSpace.linearCombination(inner, coefficients, selection, count) as vIsCombo from vCombo;
+        VectorSpace.linearCombination(inner, coefficients, selection, count) = VectorSpace.zero(V)
+            ∨ VectorSpace.InSpanOf(outer, VectorSpace.linearCombination(inner, coefficients, selection, count))
+            by VectorSpace.InSpanOf.of_combination_covered;
+        done by cases {
+          case VectorSpace.linearCombination(inner, coefficients, selection, count) = VectorSpace.zero(V)
+              as combZero: {
+              v = VectorSpace.linearCombination(inner, coefficients, selection, count) by vIsCombo
+                = VectorSpace.zero(V) by combZero;
+              done
+            }
+          case VectorSpace.InSpanOf(outer, VectorSpace.linearCombination(inner, coefficients, selection, count))
+              as combInSpan: {
+              VectorSpace.InSpanOf(outer, v) by { done by substituting vIsCombo };
+              done
+            }
+        }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Brick 4 — basis extension. An independent family `e` extends to a basis of
+-- a finite-dimensional `V`, agreeing with `e` on its first `k` indices.
+--
+-- Sift a spanning family `s` of `V` one vector at a time. The running family
+-- `ext` starts as `e` and grows only when the next `s`-vector lies outside its
+-- span (`appendVector` + the append lemma keep it independent); otherwise `ext`
+-- is untouched and the `InSpanOf` facts already collected carry forward under
+-- `append_monotone`. The invariant: `ext` is independent, agrees with `e`
+-- wherever indices match values, and covers every `s`-vector processed so far.
+-- After all of `s` is processed, `ext` covers a spanning family, so it spans.
+
+theorem Natural.one_plus_add (a b : Natural) : 1 + (a + b) = a + (1 + b) := {
+  1 + (a + b) = successor(a + b) by substituting (Natural.one_add(a + b))
+     = a + successor(b) by substituting (Natural.add_successor(a, b))
+     = a + (1 + b) by substituting (Natural.one_add(b));
+  done
+}
+
+theorem VectorSpace.sift_extend_aux {f : Field} {V : VectorSpace(f)} {k d : Natural}
+        (e : NaturalsBelow(k) → VectorSpace.carrier(V))
+        (eIndependent : VectorSpace.LinearlyIndependent(e))
+        (s : NaturalsBelow(d) → VectorSpace.carrier(V))
+        : ∀ (n : Natural). n ≤ d →
+              ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+                  sz = k + r
+                  ∧ VectorSpace.LinearlyIndependent(ext)
+                  ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+                        NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+                  ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < n
+                        → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext, s(i))) :=
+  by induction on n with IH {
+    case base: {
+        suppose 0 ≤ d as zeroBound;
+        k = k + 0 by Natural.add_zero as szEq;
+        ∀ (i : NaturalsBelow(k)). ∀ (j : NaturalsBelow(k)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → e(i) = e(j)
+          by { take i : NaturalsBelow(k); take j : NaturalsBelow(k);
+               suppose NaturalsBelow.value(i) = NaturalsBelow.value(j) as valEq;
+               i = j by NaturalsBelow.equal_of_value(a := i, b := j);
+               done by substituting (i = j) } as prefixAgree;
+        ∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < 0
+            → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, s(i))
+          by { take i : NaturalsBelow(d); suppose NaturalsBelow.value(i) < 0 as belowZero;
+               ¬(NaturalsBelow.value(i) < 0) by Natural.not_less_than_zero; done } as coveredAgree;
+        k = k + 0
+            ∧ VectorSpace.LinearlyIndependent(e)
+            ∧ (∀ (i : NaturalsBelow(k)). ∀ (j : NaturalsBelow(k)).
+                  NaturalsBelow.value(i) = NaturalsBelow.value(j) → e(i) = e(j))
+            ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < 0
+                  → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, s(i)))
+          by { szEq; eIndependent; prefixAgree; coveredAgree; done } as bundle;
+        witness k with witness 0 with witness e with bundle
+      }
+    case step(n0): {
+        suppose 1 + n0 ≤ d as stepBound;
+        n0 ≤ d by { n0 ≤ 1 + n0 by Natural.less_or_equal_add_left;
+                    n0 ≤ 1 + n0 ≤ d; done } as n0LeD;
+        n0 < d by { successor(n0) = 1 + n0 by Natural.one_add;
+                    successor(n0) ≤ d by substituting (successor(n0) = 1 + n0);
+                    done by Natural.lt_of_successor_le } as n0LtD;
+        let sn0 : VectorSpace.carrier(V) := s(NaturalsBelow.make(n0, n0LtD));
+
+        ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+            sz = k + r
+            ∧ VectorSpace.LinearlyIndependent(ext)
+            ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+                  NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+            ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < n0
+                  → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext, s(i)))
+            by IH(n0LeD) as prevExists;
+        choose sz0, r0, ext0 such that
+            sz0 = k + r0
+            ∧ VectorSpace.LinearlyIndependent(ext0)
+            ∧ (∀ (i : NaturalsBelow(sz0)). ∀ (j : NaturalsBelow(k)).
+                  NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext0(i) = e(j))
+            ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < n0
+                  → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, s(i)))
+            from prevExists;
+        sz0 = k + r0 as sz0Eq;
+        VectorSpace.LinearlyIndependent(ext0) as ext0Indep;
+        ∀ (i : NaturalsBelow(sz0)). ∀ (j : NaturalsBelow(k)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext0(i) = e(j) as ext0Prefix;
+        ∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < n0
+            → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, s(i)) as ext0Covered;
+        k ≤ sz0 by { k ≤ k + r0 by Natural.less_or_equal_add_right;
+                     done by substituting sz0Eq } as kLeSz0;
+
+        (sn0 = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, sn0))
+            ∨ ¬(sn0 = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, sn0))
+            by Logic.excluded_middle;
+        done by cases {
+          case sn0 = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, sn0) as sn0Covered: {
+              ∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < 1 + n0
+                  → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, s(i))
+                by {
+                  take i : NaturalsBelow(d);
+                  suppose NaturalsBelow.value(i) < 1 + n0 as iBound;
+                  NaturalsBelow.value(i) = n0 ∨ NaturalsBelow.value(i) ≠ n0 by Logic.excluded_middle;
+                  done by cases {
+                    case NaturalsBelow.value(i) = n0 as iAtN0: {
+                        i = NaturalsBelow.make(n0, n0LtD)
+                            by NaturalsBelow.equal_of_value(a := i, b := NaturalsBelow.make(n0, n0LtD));
+                        s(i) = s(NaturalsBelow.make(n0, n0LtD)) by substituting (i = NaturalsBelow.make(n0, n0LtD))
+                           = sn0 as siIsSn0;
+                        sn0 = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, sn0) by sn0Covered;
+                        done by substituting siIsSn0
+                      }
+                    case NaturalsBelow.value(i) ≠ n0 as iNeN0: {
+                        NaturalsBelow.value(i) ≤ n0 by Natural.le_of_lt_one_plus;
+                        NaturalsBelow.value(i) < n0 by Natural.lt_of_le_of_ne;
+                        done by ext0Covered(i)
+                      }
+                  }
+                } as keepCovered;
+              sz0 = k + r0
+                  ∧ VectorSpace.LinearlyIndependent(ext0)
+                  ∧ (∀ (i : NaturalsBelow(sz0)). ∀ (j : NaturalsBelow(k)).
+                        NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext0(i) = e(j))
+                  ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < 1 + n0
+                        → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, s(i)))
+                by { sz0Eq; ext0Indep; ext0Prefix; keepCovered; done } as bundle;
+              witness sz0 with witness r0 with witness ext0 with bundle
+            }
+          case ¬(sn0 = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, sn0)) as sn0Outside: {
+              let ext1 : NaturalsBelow(1 + sz0) → VectorSpace.carrier(V) :=
+                  VectorSpace.appendVector(ext0, sn0);
+              VectorSpace.LinearlyIndependent(ext1)
+                  by VectorSpace.independent_append_outside_span(ext0, sn0, ext0Indep, sn0Outside)
+                  as ext1Indep;
+              1 + sz0 = k + (1 + r0)
+                  by { 1 + sz0 = 1 + (k + r0) by substituting sz0Eq
+                         = k + (1 + r0) by Natural.one_plus_add; done } as sz1Eq;
+
+              ∀ (i : NaturalsBelow(1 + sz0)). ∀ (j : NaturalsBelow(k)).
+                  NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext1(i) = e(j)
+                by {
+                  take i : NaturalsBelow(1 + sz0); take j : NaturalsBelow(k);
+                  suppose NaturalsBelow.value(i) = NaturalsBelow.value(j) as valEq;
+                  NaturalsBelow.value(j) < k by NaturalsBelow.below;
+                  NaturalsBelow.value(i) < k by substituting valEq;
+                  NaturalsBelow.value(i) < sz0 by { NaturalsBelow.value(i) < k ≤ sz0; done } as iBelowSz0;
+                  ext1(i) = ext0(NaturalsBelow.make(NaturalsBelow.value(i), iBelowSz0))
+                      by VectorSpace.appendVector_below as ext1At;
+                  NaturalsBelow.value(NaturalsBelow.make(NaturalsBelow.value(i), iBelowSz0))
+                      = NaturalsBelow.value(j) by valEq as makeValEq;
+                  ext0(NaturalsBelow.make(NaturalsBelow.value(i), iBelowSz0)) = e(j)
+                      by ext0Prefix(NaturalsBelow.make(NaturalsBelow.value(i), iBelowSz0), j) as ext0AtEqEj;
+                  ext1(i) = ext0(NaturalsBelow.make(NaturalsBelow.value(i), iBelowSz0)) by ext1At
+                     = e(j) by ext0AtEqEj;
+                  done
+                } as ext1Prefix;
+
+              ∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < 1 + n0
+                  → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext1, s(i))
+                by {
+                  take i : NaturalsBelow(d);
+                  suppose NaturalsBelow.value(i) < 1 + n0 as iBound;
+                  NaturalsBelow.value(i) = n0 ∨ NaturalsBelow.value(i) ≠ n0 by Logic.excluded_middle;
+                  done by cases {
+                    case NaturalsBelow.value(i) = n0 as iAtN0: {
+                        i = NaturalsBelow.make(n0, n0LtD)
+                            by NaturalsBelow.equal_of_value(a := i, b := NaturalsBelow.make(n0, n0LtD));
+                        s(i) = s(NaturalsBelow.make(n0, n0LtD)) by substituting (i = NaturalsBelow.make(n0, n0LtD))
+                           = sn0 as siIsSn0;
+                        sz0 < 1 + sz0 by Natural.lt_one_plus as lastBelow;
+                        VectorSpace.appendVector(ext0, sn0)(NaturalsBelow.make(sz0, lastBelow)) = sn0
+                            by VectorSpace.appendVector_last(atLast := reflexivity(sz0)) as lastIsSn0;
+                        VectorSpace.InSpanOf(ext1, VectorSpace.appendVector(ext0, sn0)(NaturalsBelow.make(sz0, lastBelow)))
+                            by VectorSpace.InSpanOf.member;
+                        VectorSpace.InSpanOf(ext1, sn0) by substituting lastIsSn0;
+                        VectorSpace.InSpanOf(ext1, s(i)) by substituting siIsSn0;
+                        done
+                      }
+                    case NaturalsBelow.value(i) ≠ n0 as iNeN0: {
+                        NaturalsBelow.value(i) ≤ n0 by Natural.le_of_lt_one_plus;
+                        NaturalsBelow.value(i) < n0 by Natural.lt_of_le_of_ne;
+                        s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext0, s(i)) by ext0Covered(i);
+                        done by cases {
+                          case s(i) = VectorSpace.zero(V) as siZero: { done }
+                          case VectorSpace.InSpanOf(ext0, s(i)) as siInExt0: {
+                              VectorSpace.InSpanOf(ext1, s(i)) by VectorSpace.InSpanOf.append_monotone;
+                              done
+                            }
+                        }
+                      }
+                  }
+                } as appendCovered;
+
+              1 + sz0 = k + (1 + r0)
+                  ∧ VectorSpace.LinearlyIndependent(ext1)
+                  ∧ (∀ (i : NaturalsBelow(1 + sz0)). ∀ (j : NaturalsBelow(k)).
+                        NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext1(i) = e(j))
+                  ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < 1 + n0
+                        → s(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext1, s(i)))
+                by { sz1Eq; ext1Indep; ext1Prefix; appendCovered; done } as bundle;
+              witness (1 + sz0) with witness (1 + r0) with witness ext1 with bundle
+            }
+        }
+      }
+  }
+
+-- The extension itself: an independent family in a finite-dimensional space
+-- extends to a basis. Sift a basis of `V` through `sift_extend_aux`; every
+-- basis vector ends up covered by the result, so the disjunctive transitivity
+-- makes it span. It is already independent, hence a basis, and the sift never
+-- disturbs the `e`-prefix. The size is `k + r` — `e`'s `k` vectors followed by
+-- the `r` appended ones — which the count in brick 5 reads off.
+theorem VectorSpace.extend_to_basis {f : Field} {V : VectorSpace(f)} {k : Natural}
+        (e : NaturalsBelow(k) → VectorSpace.carrier(V))
+        (eIndependent : VectorSpace.LinearlyIndependent(e))
+        (finiteV : VectorSpace.FiniteDimensional(V))
+        : ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+              sz = k + r
+              ∧ VectorSpace.IsBasis(ext)
+              ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+                    NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j)) := {
+  let d : Natural := VectorSpace.dimension(V, finiteV);
+  VectorSpace.HasDimension(V, d) by VectorSpace.dimension_has_basis as vHasBasis;
+  choose basisV such that VectorSpace.IsBasis(basisV) from vHasBasis;
+  VectorSpace.Spans(basisV) by VectorSpace.IsBasis.spans as basisSpans;
+  d ≤ d by Natural.LessOrEqual.reflexive as dLeD;
+  ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+      sz = k + r
+      ∧ VectorSpace.LinearlyIndependent(ext)
+      ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+      ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < d
+            → basisV(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext, basisV(i)))
+      by VectorSpace.sift_extend_aux(e, eIndependent, basisV, d, dLeD) as extExists;
+  choose sz, r, ext such that
+      sz = k + r
+      ∧ VectorSpace.LinearlyIndependent(ext)
+      ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+      ∧ (∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < d
+            → basisV(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext, basisV(i)))
+      from extExists;
+  sz = k + r as szEq;
+  VectorSpace.LinearlyIndependent(ext) as extIndep;
+  ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+      NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j) as extPrefix;
+  ∀ (i : NaturalsBelow(d)). NaturalsBelow.value(i) < d
+      → basisV(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext, basisV(i)) as extCovered;
+  ∀ (i : NaturalsBelow(d)). basisV(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext, basisV(i))
+    by { take i : NaturalsBelow(d); NaturalsBelow.value(i) < d by NaturalsBelow.below;
+         done by extCovered(i) } as coveredAll;
+  VectorSpace.Spans(ext)
+      by VectorSpace.Spans.transitive_covered(basisV, ext, basisSpans, coveredAll) as extSpans;
+  VectorSpace.IsBasis(ext)
+      by { VectorSpace.LinearlyIndependent(ext) by extIndep;
+           VectorSpace.Spans(ext) by extSpans; done } as extBasis;
+  sz = k + r
+      ∧ VectorSpace.IsBasis(ext)
+      ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+    by { szEq; extBasis; extPrefix; done } as bundle;
+  witness sz with witness r with witness ext with bundle
+}
