@@ -1316,6 +1316,56 @@ ExpressionPointer Elaborator::recoverClaimHint(
                 }
             }
         }
+        // All-holes re-citation: a bare `by Lemma` whose structural match
+        // failed is retried as the explicit spelling `Lemma(?, …, ?)` the
+        // author could write by hand. That form routes through the ordinary
+        // call dispatch — the hole solver AND universe inference — which
+        // closes citations the first-order conclusion matcher cannot align,
+        // e.g. a function-valued conditional (`if P then (a ↦ …) else …`)
+        // cited by `Logic.if_positive`, whose branch holes only pin under
+        // the goal-directed unifier. Cold path: only reached when the
+        // alternative is the citation error, and a failure falls through to
+        // that error unchanged.
+        if (auto* bareIdentifier =
+                std::get_if<SurfaceIdentifier>(&byHint.node)) {
+            ExpressionPointer lemmaTypeClosed;
+            int N = static_cast<int>(localBinders.size());
+            for (int b = N - 1; b >= 0; --b) {
+                if (localBinders[b].name == bareIdentifier->qualifiedName) {
+                    lemmaTypeClosed = liftBoundVariables(
+                        localBinders[b].type, N - b, 0);
+                    break;
+                }
+            }
+            if (!lemmaTypeClosed) {
+                if (const Declaration* declaration =
+                        environment_.lookup(bareIdentifier->qualifiedName)) {
+                    lemmaTypeClosed = declarationType(*declaration);
+                }
+            }
+            int leadingPis =
+                lemmaTypeClosed ? countLeadingPis(lemmaTypeClosed) : 0;
+            if (leadingPis > 0) {
+                std::vector<SurfaceExpressionPointer> holes;
+                for (int i = 0; i < leadingPis; ++i) {
+                    holes.push_back(makeSurfaceHole(line, 0));
+                }
+                SurfaceExpressionPointer allHolesCall =
+                    makeSurfaceApplication(
+                        std::make_shared<const SurfaceExpression>(byHint),
+                        std::move(holes), line, 0);
+                try {
+                    ExpressionPointer filled = elaborateExpression(
+                        *allHolesCall, localBinders, goalClosed);
+                    if (filled
+                        && bridgedResultProvesGoal(
+                               filled, goalClosed, localBinders)) {
+                        return filled;
+                    }
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {}
+            }
+        }
         // Pi-typed goal (structurally, or after one WHNF step — `¬P` is
         // `P → False` behind `Not`): introduce its binders and retry the
         // citation against the inner goal (`claim (x : T) → P by Lemma`

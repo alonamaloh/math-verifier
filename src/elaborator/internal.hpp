@@ -1301,11 +1301,21 @@ private:
 
     // A `decreasing <measure>` guarded body compiles to a
     // `WellFounded.recursion` on the measure instead of the structural
-    // recursor. Rewrites the decl's body in place to the recursion term and
-    // clears `decreasingMeasure`; returns false (leaving the decl untouched)
-    // when the body is not a well-founded-recursion shape it handles.
+    // recursor. Rewrites the decl's body in place to the recursion term
+    // (referencing the named auxiliary step definition in `plan`) and clears
+    // `decreasingMeasure`; returns false (leaving the decl untouched) when
+    // the body is not a well-founded-recursion shape it handles. The plan
+    // carries the companion declarations for the caller to elaborate: the
+    // step definition (before the main declaration) and, for a `measure = 0`
+    // guard, the two characterising-equation theorems (after it).
+    struct WellFoundedRecursionPlan {
+        SurfaceDefinitionDeclaration stepDefinition;
+        bool generateEquations = false;
+        SurfaceDefinitionDeclaration baseEquation;
+        SurfaceDefinitionDeclaration stepEquation;
+    };
     bool tryDesugarWellFoundedRecursion(
-        SurfaceDefinitionDeclaration& decl);
+        SurfaceDefinitionDeclaration& decl, WellFoundedRecursionPlan& plan);
 
     // The step/base data recovered from a general discriminator guard
     // `if <Prefix>.is_<baseCtor>(…, guardVar) then … else …`, for a

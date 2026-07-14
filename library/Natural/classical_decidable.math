@@ -141,3 +141,31 @@ theorem Logic.if_negative.{u}
   if P
   then { False; done }
   else { note goal : b = b; done }
+
+-- Dependent counterparts: the branches may USE the branch hypothesis (the
+-- then branch sees a proof of P, the else branch a proof of ¬P). This is the
+-- conditional a `decreasing` recursion compiles to — its else branch's
+-- decrease witness cites the guard's negation — so these two are the
+-- quarantine boundary for THAT scrutinee refinement, exactly as
+-- `if_positive`/`if_negative` are for the proof-independent conditional.
+-- Proof irrelevance makes `a` at the decision's internal proof and at the
+-- caller's `holds` definitionally equal, so the same case split closes both.
+theorem Logic.if_positive_dependent.{u}
+        (P : Proposition) (T : Type(u))
+        (a : P → T) (b : Not(P) → T) (holds : P)
+        : Logic.Decidable_recursor(P, (_ : Logic.Decidable(P)) ↦ T, a, b,
+              Logic.classical_decidable(P))
+          = a(holds) :=
+  if P
+  then { note goal : a(holds) = a(holds); done }
+  else { False; done }
+
+theorem Logic.if_negative_dependent.{u}
+        (P : Proposition) (T : Type(u))
+        (a : P → T) (b : Not(P) → T) (fails : Not(P))
+        : Logic.Decidable_recursor(P, (_ : Logic.Decidable(P)) ↦ T, a, b,
+              Logic.classical_decidable(P))
+          = b(fails) :=
+  if P
+  then { False; done }
+  else { note goal : b(fails) = b(fails); done }

@@ -5,6 +5,11 @@
 -- `WellFounded.recursion` on `b`: the `else` branch carries `b ≠ 0` as an
 -- anonymous fact, so the decrease obligation `a mod b < b` closes on its own
 -- (via `Natural.modulo_lt`), and no case split on the measure is written.
+--
+-- Each `decreasing` definition also generates and proves its characterising
+-- equations — `<name>.at_zero` and `<name>.recurrence` — via the named step
+-- `<name>.step`, `Logic.if_positive_dependent`/`if_negative_dependent`, and
+-- `WellFounded.recursion_unfold`. The consumer theorems below cite them.
 module Test.well_founded_gcd_test
 
 import Logic.basics
@@ -27,3 +32,15 @@ definition Test.gcd (a b : Natural) : Natural :=
 definition Test.reduce_to_zero (n : Natural) : Natural :=
   if n = 0 then 0 else Test.reduce_to_zero(Natural.modulo(n, n))
   decreasing n
+
+-- The characterising equations are generated with the definition; a consumer
+-- cites them like any other lemma.
+theorem Test.gcd_of_zero_consumer (a : Natural) : Test.gcd(a, 0) = a :=
+  done by Test.gcd.at_zero
+
+theorem Test.gcd_recurrence_consumer (a b : Natural) (bNonzero : b ≠ 0)
+        : Test.gcd(a, b) = Test.gcd(b, Natural.modulo(a, b)) :=
+  done by Test.gcd.recurrence
+
+theorem Test.reduce_to_zero_at_zero_consumer : Test.reduce_to_zero(0) = 0 :=
+  done by Test.reduce_to_zero.at_zero

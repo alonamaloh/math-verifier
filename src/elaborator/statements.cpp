@@ -6,6 +6,8 @@
 
 #include "elaborator/internal.hpp"
 
+#include <functional>
+
 void Elaborator::elaborateTopStatement(const SurfaceTopStatement& statement) {
         try {
             elaborateTopStatementDispatch(statement);
@@ -1367,16 +1369,22 @@ bool surfaceMentionsIdentifier(const SurfaceExpressionPointer& expr,
 }
 
 // Rewrite each self-application `funcName(callArgs…)` in a well-founded
-// recursion's step body into `recurse(newMeasure, <decrease>, otherArgs…)`:
-// the argument in the measure position becomes the recursion's new measure,
-// paired with an auto-proved `newMeasure < measureName` decrease witness (the
-// `else` branch's ¬guard is an anonymous in-scope fact, so a bare claim
-// closes it), and the remaining call arguments thread through afterward.
-// Non-application nodes recurse structurally.
-SurfaceExpressionPointer rewriteSelfCallsToRecurse(
+// recursion's body: the argument in the measure position becomes the
+// recursion's new measure, and `makeReplacement` builds the replacement call
+// from (newMeasure, otherArguments). Used with two builders — the step
+// definition replaces a self-call with `recurse(newMeasure, <decrease>,
+// otherArgs…)`, and the generated characterising equations replace it with
+// the recursion term applied at the new measure. Non-application nodes
+// recurse structurally.
+using SelfCallReplacementBuilder = std::function<SurfaceExpressionPointer(
+    SurfaceExpressionPointer newMeasure,
+    std::vector<SurfaceExpressionPointer> otherArguments,
+    int line, int column)>;
+
+SurfaceExpressionPointer rewriteSelfCalls(
         SurfaceExpressionPointer expr, const std::string& funcName,
         size_t measureIndex, size_t parameterCount,
-        const std::string& recurseName, const std::string& measureName) {
+        const SelfCallReplacementBuilder& makeReplacement) {
     if (!expr) return expr;
     int line = expr->line, column = expr->column;
     const SurfaceExpression& node = *expr;
@@ -1386,77 +1394,63 @@ SurfaceExpressionPointer rewriteSelfCallsToRecurse(
         if (function && function->universeArgs.empty()
             && function->qualifiedName == funcName
             && application->arguments.size() == parameterCount) {
-            SurfaceExpressionPointer newMeasure = rewriteSelfCallsToRecurse(
+            SurfaceExpressionPointer newMeasure = rewriteSelfCalls(
                 application->arguments[measureIndex].value, funcName,
-                measureIndex, parameterCount, recurseName, measureName);
-            SurfaceExpressionPointer decreaseProposition =
-                makeSurfaceBinaryOperation(
-                    "<", newMeasure,
-                    makeSurfaceIdentifier(measureName, {}, line, column),
-                    line, column);
-            SurfaceExpressionPointer decreaseProof = makeSurfaceStructuredClaim(
-                decreaseProposition, "", nullptr, false, {}, line, column);
-            std::vector<SurfaceArgument> recurseArguments;
-            recurseArguments.push_back({"", newMeasure});
-            recurseArguments.push_back({"", decreaseProof});
+                measureIndex, parameterCount, makeReplacement);
+            std::vector<SurfaceExpressionPointer> otherArguments;
             for (size_t i = 0; i < application->arguments.size(); ++i) {
                 if (i == measureIndex) continue;
-                recurseArguments.push_back(
-                    {"", rewriteSelfCallsToRecurse(
-                             application->arguments[i].value, funcName,
-                             measureIndex, parameterCount, recurseName,
-                             measureName)});
+                otherArguments.push_back(rewriteSelfCalls(
+                    application->arguments[i].value, funcName, measureIndex,
+                    parameterCount, makeReplacement));
             }
-            return makeSurfaceApplication(
-                makeSurfaceIdentifier(recurseName, {}, line, column),
-                std::move(recurseArguments), line, column);
+            return makeReplacement(std::move(newMeasure),
+                                   std::move(otherArguments), line, column);
         }
-        auto newFunction = rewriteSelfCallsToRecurse(
+        auto newFunction = rewriteSelfCalls(
             application->function, funcName, measureIndex, parameterCount,
-            recurseName, measureName);
+            makeReplacement);
         std::vector<SurfaceArgument> newArguments;
         for (const auto& argument : application->arguments)
             newArguments.push_back(
-                {argument.name, rewriteSelfCallsToRecurse(
+                {argument.name, rewriteSelfCalls(
                                     argument.value, funcName, measureIndex,
-                                    parameterCount, recurseName, measureName)});
+                                    parameterCount, makeReplacement)});
         return makeSurfaceApplication(std::move(newFunction),
                                        std::move(newArguments), line, column);
     }
     if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
         return makeSurfaceDecide(
-            rewriteSelfCallsToRecurse(decide->proposition, funcName,
-                                      measureIndex, parameterCount, recurseName,
-                                      measureName),
+            rewriteSelfCalls(decide->proposition, funcName, measureIndex,
+                             parameterCount, makeReplacement),
             decide->yesBinderName,
-            rewriteSelfCallsToRecurse(decide->yesBody, funcName, measureIndex,
-                                      parameterCount, recurseName, measureName),
+            rewriteSelfCalls(decide->yesBody, funcName, measureIndex,
+                             parameterCount, makeReplacement),
             decide->noBinderName,
-            rewriteSelfCallsToRecurse(decide->noBody, funcName, measureIndex,
-                                      parameterCount, recurseName, measureName),
+            rewriteSelfCalls(decide->noBody, funcName, measureIndex,
+                             parameterCount, makeReplacement),
             line, column);
     }
     if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node.node)) {
         return makeSurfaceBinaryOperation(
             binary->opSymbol,
-            rewriteSelfCallsToRecurse(binary->left, funcName, measureIndex,
-                                      parameterCount, recurseName, measureName),
-            rewriteSelfCallsToRecurse(binary->right, funcName, measureIndex,
-                                      parameterCount, recurseName, measureName),
+            rewriteSelfCalls(binary->left, funcName, measureIndex,
+                             parameterCount, makeReplacement),
+            rewriteSelfCalls(binary->right, funcName, measureIndex,
+                             parameterCount, makeReplacement),
             line, column);
     }
     if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
         return makeSurfaceUnaryOperation(
             unary->opSymbol,
-            rewriteSelfCallsToRecurse(unary->operand, funcName, measureIndex,
-                                      parameterCount, recurseName, measureName),
+            rewriteSelfCalls(unary->operand, funcName, measureIndex,
+                             parameterCount, makeReplacement),
             line, column);
     }
     if (auto* ascription = std::get_if<SurfaceAscription>(&node.node)) {
         return makeSurfaceAscription(
-            rewriteSelfCallsToRecurse(ascription->expression, funcName,
-                                      measureIndex, parameterCount, recurseName,
-                                      measureName),
+            rewriteSelfCalls(ascription->expression, funcName, measureIndex,
+                             parameterCount, makeReplacement),
             ascription->type, line, column);
     }
     return expr;
@@ -1570,7 +1564,7 @@ Elaborator::resolveGuardedShape(
 }
 
 bool Elaborator::tryDesugarWellFoundedRecursion(
-        SurfaceDefinitionDeclaration& decl) {
+        SurfaceDefinitionDeclaration& decl, WellFoundedRecursionPlan& plan) {
     if (!decl.decreasingMeasure || !decl.body || !decl.cases.empty()
         || decl.arguments.empty() || decl.isTheorem)
         return false;
@@ -1622,6 +1616,20 @@ bool Elaborator::tryDesugarWellFoundedRecursion(
                          "registered well-founded order");
     }
 
+    auto ident = [&](const std::string& name) {
+        return makeSurfaceIdentifier(name, {}, line, column);
+    };
+    auto apply = [&](SurfaceExpressionPointer function,
+                     std::vector<SurfaceExpressionPointer> arguments) {
+        return makeSurfaceApplication(std::move(function),
+                                      std::move(arguments), line, column);
+    };
+    auto equalityOf = [&](SurfaceExpressionPointer left,
+                          SurfaceExpressionPointer right) {
+        return makeSurfaceBinaryOperation("=", std::move(left),
+                                          std::move(right), line, column);
+    };
+
     // Parameters other than the measure thread through the recursion motive,
     // in their original order: `C(measure) = (other₁ : T₁) → … → returnType`.
     std::vector<Param> threaded;
@@ -1639,10 +1647,17 @@ bool Elaborator::tryDesugarWellFoundedRecursion(
         SurfaceBinder{{"wellFoundedSubject"}, measureType, false}, motiveTail,
         line, column);
 
-    // step = (measure : measureType)
-    //          (recurse : (predecessor : measureType)
-    //                     → predecessor < measure → motiveTail)
-    //          ↦ if <guard> then ((threaded) ↦ base) else ((threaded) ↦ step′)
+    // The named step definition:
+    //   definition <name>.step (measure : measureType)
+    //       (recurse : (predecessor : measureType)
+    //                  → predecessor < measure → motiveTail) : motiveTail :=
+    //     if <guard> then ((threaded) ↦ base′) else ((threaded) ↦ step′)
+    // where base′/step′ have each self-call rewritten to
+    // `recurse(newMeasure, <decrease>, otherArgs…)` — the decrease witness an
+    // auto-proved bare claim (the `else` branch's ¬guard is an anonymous
+    // in-scope fact). Naming the step is what makes the characterising
+    // equations below stateable and provable.
+    const std::string stepName = decl.name + ".step";
     const std::string recurseName = "recurse";
     const std::string predecessorName = "predecessor";
     SurfaceExpressionPointer recurseType = makeSurfacePiType(
@@ -1650,8 +1665,7 @@ bool Elaborator::tryDesugarWellFoundedRecursion(
         makeSurfacePiType(
             SurfaceBinder{{"_"},
                 makeSurfaceBinaryOperation(
-                    "<", makeSurfaceIdentifier(predecessorName, {}, line, column),
-                    makeSurfaceIdentifier(measureName, {}, line, column),
+                    "<", ident(predecessorName), ident(measureName),
                     line, column),
                 false},
             motiveTail, line, column),
@@ -1663,44 +1677,284 @@ bool Elaborator::tryDesugarWellFoundedRecursion(
                 std::move(branchBody), line, column);
         return branchBody;
     };
-    SurfaceExpressionPointer rewrittenBase = rewriteSelfCallsToRecurse(
+    SelfCallReplacementBuilder recurseReplacement =
+        [&](SurfaceExpressionPointer newMeasure,
+            std::vector<SurfaceExpressionPointer> otherArguments,
+            int atLine, int atColumn) {
+            SurfaceExpressionPointer decreaseProposition =
+                makeSurfaceBinaryOperation(
+                    "<", newMeasure, ident(measureName), atLine, atColumn);
+            SurfaceExpressionPointer decreaseProof =
+                makeSurfaceStructuredClaim(
+                    decreaseProposition, "", nullptr, false, {},
+                    atLine, atColumn);
+            std::vector<SurfaceExpressionPointer> recurseArguments;
+            recurseArguments.push_back(std::move(newMeasure));
+            recurseArguments.push_back(std::move(decreaseProof));
+            for (auto& other : otherArguments)
+                recurseArguments.push_back(std::move(other));
+            return makeSurfaceApplication(
+                makeSurfaceIdentifier(recurseName, {}, atLine, atColumn),
+                std::move(recurseArguments), atLine, atColumn);
+        };
+    SurfaceExpressionPointer rewrittenBase = rewriteSelfCalls(
         topDecide->yesBody, decl.name, measureIndex, params.size(),
-        recurseName, measureName);
-    SurfaceExpressionPointer rewrittenStep = rewriteSelfCallsToRecurse(
+        recurseReplacement);
+    SurfaceExpressionPointer rewrittenStep = rewriteSelfCalls(
         topDecide->noBody, decl.name, measureIndex, params.size(),
-        recurseName, measureName);
-    SurfaceExpressionPointer stepDecide = makeSurfaceDecide(
+        recurseReplacement);
+    SurfaceDefinitionDeclaration stepDefinition;
+    stepDefinition.name = stepName;
+    stepDefinition.arguments.push_back(
+        SurfaceBinder{{measureName}, measureType, false});
+    stepDefinition.arguments.push_back(
+        SurfaceBinder{{recurseName}, recurseType, false});
+    stepDefinition.type = motiveTail;
+    stepDefinition.body = makeSurfaceDecide(
         topDecide->proposition,
         topDecide->yesBinderName, threadBranch(rewrittenBase),
         topDecide->noBinderName, threadBranch(rewrittenStep),
         line, column);
-    SurfaceExpressionPointer step = makeSurfaceLambda(
-        SurfaceBinder{{measureName}, measureType, false},
-        makeSurfaceLambda(
-            SurfaceBinder{{recurseName}, recurseType, false}, stepDecide,
-            line, column),
-        line, column);
+    plan.stepDefinition = std::move(stepDefinition);
 
-    // Assemble: WellFounded.recursion(measureType, relation, motive,
-    //   wellFounded, step, measure, threaded…) — the recursion at the measure,
-    //   then the threaded arguments in their original order.
-    std::vector<SurfaceArgument> recursionArguments;
-    recursionArguments.push_back({"", measureType});
-    recursionArguments.push_back(
-        {"", makeSurfaceIdentifier(relationName, {}, line, column)});
-    recursionArguments.push_back({"", motive});
-    recursionArguments.push_back(
-        {"", makeSurfaceIdentifier(wellFoundedName, {}, line, column)});
-    recursionArguments.push_back({"", step});
-    recursionArguments.push_back(
-        {"", makeSurfaceIdentifier(measureName, {}, line, column)});
-    for (const auto& parameter : threaded)
-        recursionArguments.push_back(
-            {"", makeSurfaceIdentifier(parameter.name, {}, line, column)});
-    decl.body = makeSurfaceApplication(
-        makeSurfaceIdentifier("WellFounded.recursion", {}, line, column),
-        std::move(recursionArguments), line, column);
+    // The recursion term at a given measure value (shared by the main body
+    // and the generated equation proofs).
+    auto recursionAt = [&](SurfaceExpressionPointer measureValue) {
+        return apply(ident("WellFounded.recursion"),
+                     {measureType, ident(relationName), motive,
+                      ident(wellFoundedName), ident(stepName),
+                      std::move(measureValue)});
+    };
+
+    // Main body: the recursion at the measure, then the threaded arguments
+    // in their original order.
+    {
+        std::vector<SurfaceExpressionPointer> callArguments;
+        callArguments.push_back(ident(measureName));
+        for (const auto& parameter : threaded)
+            callArguments.push_back(ident(parameter.name));
+        SurfaceExpressionPointer body = recursionAt(std::move(callArguments[0]));
+        for (size_t i = 1; i < callArguments.size(); ++i)
+            body = apply(std::move(body), {std::move(callArguments[i])});
+        decl.body = std::move(body);
+    }
     decl.decreasingMeasure = nullptr;
+
+    // ── The characterising equations ─────────────────────────────────────
+    // Generated for the `measure = 0` guard (the only registered shape):
+    //   <name>.at_zero    : <name>(…, 0, …) = base[measure := 0]
+    //   <name>.recurrence : measure ≠ 0 → <name>(…) = step-branch
+    // Proved through Logic.if_positive_dependent / if_negative_dependent +
+    // WellFounded.recursion_unfold, with Function.application_congruence
+    // threading each non-measure argument through.
+    auto* guardEquation =
+        std::get_if<SurfaceBinaryOperation>(&topDecide->proposition->node);
+    bool zeroGuard = false;
+    if (guardEquation && guardEquation->opSymbol == "=") {
+        auto* left =
+            std::get_if<SurfaceIdentifier>(&guardEquation->left->node);
+        auto* right =
+            std::get_if<SurfaceNumericLiteral>(&guardEquation->right->node);
+        zeroGuard = left && left->qualifiedName == measureName
+            && right && right->digits == "0";
+    }
+    if (!zeroGuard) return true;
+    plan.generateEquations = true;
+
+    auto zero = [&]() { return makeSurfaceNumericLiteral("0", line, column); };
+    // An anonymous stated fact `P by <hint>;` wrapping `rest` — the same
+    // Let-of-claim fold the parser produces for a bare statement.
+    int anonymousCounter = 0;
+    auto statedFact = [&](SurfaceExpressionPointer proposition,
+                          SurfaceExpressionPointer byHint,
+                          SurfaceExpressionPointer rest) {
+        std::string bindingName = "_claim_anon_wf_"
+            + std::to_string(++anonymousCounter);
+        return makeSurfaceLet(
+            bindingName, proposition,
+            makeSurfaceStructuredClaim(proposition, "", std::move(byHint),
+                                       false, {}, line, column),
+            std::move(rest), line, column);
+    };
+    auto doneClaim = [&](SurfaceExpressionPointer byHint) {
+        return makeSurfaceStructuredClaim(
+            makeSurfaceGoal(line, column), "", std::move(byHint), false, {},
+            line, column);
+    };
+    // The reduction lemmas need the recursion δ-transparent down to the `if`.
+    std::vector<std::string> recursionUnfolds = {
+        "WellFounded.recursion", "WellFounded.recursionFromAccessible",
+        wellFoundedName, stepName};
+    // application_congruence with only the (un-inferable) argument named.
+    auto applicationCongruenceAt = [&](SurfaceExpressionPointer argument) {
+        std::vector<SurfaceArgument> namedArguments;
+        namedArguments.push_back({"x", std::move(argument)});
+        return makeSurfaceApplication(
+            ident("Function.application_congruence"),
+            std::move(namedArguments), line, column);
+    };
+    // The sugared call <name>(params…) with the measure slot replaced.
+    auto sugaredCall = [&](SurfaceExpressionPointer measureValue) {
+        std::vector<SurfaceExpressionPointer> arguments;
+        for (size_t i = 0; i < params.size(); ++i)
+            arguments.push_back(i == measureIndex ? measureValue
+                                                  : ident(params[i].name));
+        return apply(ident(decl.name), std::move(arguments));
+    };
+    // Base equation: <name>(…, 0, …) = base[measure := 0].
+    SurfaceExpressionPointer baseAtZero = substituteSurfaceIdentifier(
+        topDecide->yesBody, measureName, zero());
+    {
+        SurfaceDefinitionDeclaration baseEquation;
+        baseEquation.name = decl.name + ".at_zero";
+        baseEquation.isTheorem = true;
+        for (const auto& parameter : threaded)
+            baseEquation.arguments.push_back(
+                SurfaceBinder{{parameter.name}, parameter.type, false});
+        baseEquation.type = equalityOf(sugaredCall(zero()), baseAtZero);
+        // Proof: reduce the recursion head at 0 to the then-branch, then
+        // thread each argument through by application congruence.
+        SurfaceExpressionPointer thenArmAtZero = threadBranch(baseAtZero);
+        SurfaceExpressionPointer proof;
+        if (threaded.empty()) {
+            proof = doneClaim(makeSurfaceUnfold(
+                recursionUnfolds, ident("Logic.if_positive_dependent"),
+                line, column));
+        } else {
+            // Chain statements innermost-last: fold from the back.
+            std::vector<SurfaceExpressionPointer> propositions;
+            std::vector<SurfaceExpressionPointer> hints;
+            SurfaceExpressionPointer leftSide = recursionAt(zero());
+            SurfaceExpressionPointer rightSide = thenArmAtZero;
+            propositions.push_back(equalityOf(leftSide, rightSide));
+            hints.push_back(makeSurfaceUnfold(
+                recursionUnfolds, ident("Logic.if_positive_dependent"),
+                line, column));
+            for (size_t i = 0; i < threaded.size(); ++i) {
+                SurfaceExpressionPointer argument = ident(threaded[i].name);
+                bool last = (i + 1 == threaded.size());
+                SurfaceExpressionPointer newLeft = last
+                    ? sugaredCall(zero()) : apply(leftSide, {argument});
+                SurfaceExpressionPointer newRight =
+                    apply(rightSide, {argument});
+                SurfaceExpressionPointer hint =
+                    applicationCongruenceAt(argument);
+                if (last)
+                    hint = makeSurfaceUnfold({decl.name}, std::move(hint),
+                                             line, column);
+                propositions.push_back(equalityOf(newLeft, newRight));
+                hints.push_back(std::move(hint));
+                leftSide = std::move(newLeft);
+                rightSide = std::move(newRight);
+            }
+            proof = doneClaim(nullptr);
+            for (size_t i = propositions.size(); i-- > 0; )
+                proof = statedFact(std::move(propositions[i]),
+                                   std::move(hints[i]), std::move(proof));
+        }
+        baseEquation.body = std::move(proof);
+        plan.baseEquation = std::move(baseEquation);
+    }
+
+    // Recurrence: measure ≠ 0 → <name>(…) = step-branch (self-calls intact).
+    {
+        SurfaceDefinitionDeclaration stepEquation;
+        stepEquation.name = decl.name + ".recurrence";
+        stepEquation.isTheorem = true;
+        for (const auto& parameter : params)
+            stepEquation.arguments.push_back(
+                SurfaceBinder{{parameter.name}, parameter.type, false});
+        stepEquation.arguments.push_back(SurfaceBinder{
+            {measureName + "Nonzero"},
+            makeSurfaceBinaryOperation("≠", ident(measureName), zero(),
+                                       line, column),
+            false});
+        stepEquation.type =
+            equalityOf(sugaredCall(ident(measureName)), topDecide->noBody);
+        // The recursive-call bundle handed to the step by the unfolding
+        // lemma, and the else-branch with each self-call replaced by the
+        // recursion at its new measure (β-reduced form of the same term).
+        SurfaceExpressionPointer bundle = makeSurfaceLambda(
+            SurfaceBinder{{predecessorName}, measureType, false},
+            makeSurfaceLambda(
+                SurfaceBinder{{"decreaseWitness"},
+                    makeSurfaceBinaryOperation(
+                        "<", ident(predecessorName), ident(measureName),
+                        line, column),
+                    false},
+                recursionAt(ident(predecessorName)), line, column),
+            line, column);
+        SelfCallReplacementBuilder recursionReplacement =
+            [&](SurfaceExpressionPointer newMeasure,
+                std::vector<SurfaceExpressionPointer> otherArguments,
+                int atLine, int atColumn) {
+                SurfaceExpressionPointer call =
+                    recursionAt(std::move(newMeasure));
+                for (auto& other : otherArguments)
+                    call = makeSurfaceApplication(
+                        std::move(call),
+                        std::vector<SurfaceExpressionPointer>{
+                            std::move(other)},
+                        atLine, atColumn);
+                return call;
+            };
+        SurfaceExpressionPointer noArmReduced = threadBranch(rewriteSelfCalls(
+            topDecide->noBody, decl.name, measureIndex, params.size(),
+            recursionReplacement));
+        SurfaceExpressionPointer stepAtMeasure =
+            apply(ident(stepName), {ident(measureName), bundle});
+        std::vector<SurfaceExpressionPointer> propositions;
+        std::vector<SurfaceExpressionPointer> hints;
+        // With no threaded arguments the unfolding claim carries the sugared
+        // call on its left directly (the citation's matcher δ-aligns it), so
+        // the closing `done` chains structurally from the goal.
+        if (threaded.empty()) {
+            propositions.push_back(
+                equalityOf(sugaredCall(ident(measureName)), stepAtMeasure));
+            hints.push_back(makeSurfaceUnfold(
+                {decl.name}, ident("WellFounded.recursion_unfold"),
+                line, column));
+        } else {
+            propositions.push_back(
+                equalityOf(recursionAt(ident(measureName)), stepAtMeasure));
+            hints.push_back(ident("WellFounded.recursion_unfold"));
+        }
+        propositions.push_back(equalityOf(stepAtMeasure, noArmReduced));
+        hints.push_back(makeSurfaceUnfold(
+            {stepName}, ident("Logic.if_negative_dependent"), line, column));
+        SurfaceExpressionPointer leftSide = recursionAt(ident(measureName));
+        SurfaceExpressionPointer rightSide = noArmReduced;
+        if (!threaded.empty()) {
+            // Compose the two reductions so the congruence chain has one
+            // head equality to thread.
+            propositions.push_back(equalityOf(leftSide, rightSide));
+            hints.push_back(nullptr);
+            for (size_t i = 0; i < threaded.size(); ++i) {
+                SurfaceExpressionPointer argument = ident(threaded[i].name);
+                bool last = (i + 1 == threaded.size());
+                SurfaceExpressionPointer newLeft = last
+                    ? sugaredCall(ident(measureName))
+                    : apply(leftSide, {argument});
+                SurfaceExpressionPointer newRight =
+                    apply(rightSide, {argument});
+                SurfaceExpressionPointer hint =
+                    applicationCongruenceAt(argument);
+                if (last)
+                    hint = makeSurfaceUnfold({decl.name}, std::move(hint),
+                                             line, column);
+                propositions.push_back(equalityOf(newLeft, newRight));
+                hints.push_back(std::move(hint));
+                leftSide = std::move(newLeft);
+                rightSide = std::move(newRight);
+            }
+        }
+        SurfaceExpressionPointer proof = doneClaim(nullptr);
+        for (size_t i = propositions.size(); i-- > 0; )
+            proof = statedFact(std::move(propositions[i]),
+                               std::move(hints[i]), std::move(proof));
+        stepEquation.body = std::move(proof);
+        plan.stepEquation = std::move(stepEquation);
+    }
     return true;
 }
 
@@ -1860,11 +2114,19 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
         // term (the measure's well-founded order carries the termination
         // proof), then elaborates as an ordinary definition. Rewriting first,
         // on the raw declaration, keeps the rest of the pipeline unaware of
-        // the clause.
+        // the clause. The plan's companions bracket the main declaration:
+        // the named step before it, the characterising-equation theorems
+        // (`<name>.at_zero` / `<name>.recurrence`) after it.
         if (origDecl.decreasingMeasure) {
             SurfaceDefinitionDeclaration desugared = origDecl;
-            if (tryDesugarWellFoundedRecursion(desugared)) {
+            WellFoundedRecursionPlan plan;
+            if (tryDesugarWellFoundedRecursion(desugared, plan)) {
+                elaborateDefinition(plan.stepDefinition);
                 elaborateDefinition(desugared);
+                if (plan.generateEquations) {
+                    elaborateDefinition(plan.baseEquation);
+                    elaborateDefinition(plan.stepEquation);
+                }
                 return;
             }
         }
