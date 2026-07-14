@@ -70,3 +70,155 @@ theorem VectorSpace.InSpanOf.scale_cancel {f : Field} {V : VectorSpace(f)} {I : 
       by VectorSpace.scale_reciprocal_cancel as cancelReciprocal;
   done by substituting cancelReciprocal
 }
+
+-- ----------------------------------------------------------------------
+-- Canonical (identity-selection) combinations. `standardCombination(g, c, n)`
+-- is Σ_{i<n} c(i) • g(i): the linear combination whose selection is the
+-- identity, so the coefficient on `g(i)` is literally `c(i)`. Working in
+-- these coordinates is what makes "the coefficient at a given slot" a
+-- meaningful quantity for the exchange step.
+
+definition VectorSpace.standardCombination {f : Field} {V : VectorSpace(f)}
+        (g : Natural → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (count : Natural)
+        : VectorSpace.carrier(V) :=
+  VectorSpace.linearCombination(g, coefficients, (i : Natural) ↦ i, count)
+
+-- Peel the last term.
+theorem VectorSpace.standardCombination_add_one {f : Field} {V : VectorSpace(f)}
+        (g : Natural → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (count : Natural)
+        : VectorSpace.standardCombination(g, coefficients, 1 + count)
+          = VectorSpace.standardCombination(g, coefficients, count)
+            + coefficients(count) • g(count) :=
+  VectorSpace.standardCombination(g, coefficients, 1 + count)
+     = VectorSpace.linearCombination(g, coefficients, (i : Natural) ↦ i, count)
+       + coefficients(count) • g(count)
+           by VectorSpace.linearCombination_add_one
+     = VectorSpace.standardCombination(g, coefficients, count)
+       + coefficients(count) • g(count)
+
+-- Two standard combinations agree when their terms agree below the count —
+-- even when both the family and the coefficients differ, provided the
+-- scaled vectors coincide index by index.
+theorem VectorSpace.standardCombination_congruence {f : Field} {V : VectorSpace(f)}
+        (g1 g2 : Natural → VectorSpace.carrier(V))
+        (c1 c2 : Natural → Field.carrier(f)) (n : Natural)
+        (termsAgree : ∀ (i : Natural). i < n → c1(i) • g1(i) = c2(i) • g2(i))
+        : VectorSpace.standardCombination(g1, c1, n)
+          = VectorSpace.standardCombination(g2, c2, n) := {
+  VectorSpace.standardCombination(g1, c1, n)
+     = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
+           (i : Natural) ↦ c1(i) • g1(i), n)
+     = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
+           (i : Natural) ↦ c2(i) • g2(i), n)
+           by Algebra.indexedAggregate_pointwise_below
+     = VectorSpace.standardCombination(g2, c2, n)
+}
+
+-- Overwriting one point of a function. Generic in the codomain `A` (a bare
+-- type variable — `Field.carrier(f)` or `VectorSpace.carrier(V)` as the
+-- conditional's return type trips "cases motive not a Sort", the same
+-- generalisation `combineFunctions` makes).
+definition Function.updateAt {A : Type(0)} (h : Natural → A) (pos : Natural) (newValue : A)
+        : Natural → A :=
+  (i : Natural) ↦ if i = pos then newValue else h(i)
+
+theorem Function.updateAt_at {A : Type(0)} (h : Natural → A) (pos : Natural) (newValue : A)
+        : Function.updateAt(h, pos, newValue)(pos) = newValue :=
+  done by Logic.if_positive
+
+theorem Function.updateAt_off {A : Type(0)} (h : Natural → A) (pos i : Natural)
+        (newValue : A) (distinct : i ≠ pos)
+        : Function.updateAt(h, pos, newValue)(i) = h(i) :=
+  done by Logic.if_negative
+
+-- The coefficients `d` with position `pos` raised by `e`.
+definition VectorSpace.bumpCoefficient {f : Field} (d : Natural → Field.carrier(f))
+        (e : Field.carrier(f)) (pos : Natural) : Natural → Field.carrier(f) :=
+  Function.updateAt(d, pos, d(pos) + e)
+
+theorem VectorSpace.bumpCoefficient_at {f : Field} (d : Natural → Field.carrier(f))
+        (e : Field.carrier(f)) (pos : Natural)
+        : VectorSpace.bumpCoefficient(d, e, pos)(pos) = d(pos) + e :=
+  done by Function.updateAt_at
+
+theorem VectorSpace.bumpCoefficient_off {f : Field} (d : Natural → Field.carrier(f))
+        (e : Field.carrier(f)) (pos i : Natural) (distinct : i ≠ pos)
+        : VectorSpace.bumpCoefficient(d, e, pos)(i) = d(i) :=
+  done by Function.updateAt_off
+
+-- Bumping the coefficient at one position by `e` adds `e • g(pos)` to the
+-- combination. This is what lets an arbitrary combination be rebuilt in
+-- canonical coordinates one term at a time, and what installs the `-1`
+-- coefficient the independence contradiction needs.
+theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
+        (g : Natural → VectorSpace.carrier(V)) (d : Natural → Field.carrier(f))
+        (e : Field.carrier(f)) (pos n : Natural) (posBelow : pos < n)
+        : VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), n)
+          = VectorSpace.standardCombination(g, d, n) + e • g(pos) :=
+  by induction on n with IH {
+    case base: {
+        ¬(pos < 0) by Natural.not_less_than_zero;
+        done
+      }
+    case step(q): {
+        pos < q ∨ pos = q by Natural.le_of_lt_one_plus;
+        done by cases {
+          case pos < q as posLtQ: {
+              q ≠ pos by Natural.not_equal_of_greater_than as qNePos;
+              VectorSpace.bumpCoefficient(d, e, pos)(q) = d(q)
+                  by VectorSpace.bumpCoefficient_off as bumpAtQ;
+              VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), 1 + q)
+                 = VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), q)
+                   + VectorSpace.bumpCoefficient(d, e, pos)(q) • g(q)
+                       by VectorSpace.standardCombination_add_one
+                 = (VectorSpace.standardCombination(g, d, q) + e • g(pos))
+                   + VectorSpace.bumpCoefficient(d, e, pos)(q) • g(q)
+                       by IH
+                 = (VectorSpace.standardCombination(g, d, q) + e • g(pos)) + d(q) • g(q)
+                       by substituting bumpAtQ
+                 = (VectorSpace.standardCombination(g, d, q) + d(q) • g(q)) + e • g(pos)
+                 = VectorSpace.standardCombination(g, d, 1 + q) + e • g(pos)
+                       by VectorSpace.standardCombination_add_one
+            }
+          case pos = q as posEqQ: {
+              q = pos by posEqQ as qEqPos;
+              VectorSpace.bumpCoefficient(d, e, pos)(q)
+                 = VectorSpace.bumpCoefficient(d, e, pos)(pos)   by substituting qEqPos
+                 = d(pos) + e                                    by VectorSpace.bumpCoefficient_at
+                 = d(q) + e                                      by substituting posEqQ
+                 as bumpAtQ;
+              ∀ (i : Natural). i < q →
+                  VectorSpace.bumpCoefficient(d, e, pos)(i) • g(i) = d(i) • g(i)
+                by {
+                  take i : Natural;
+                  suppose i < q as iLtQ;
+                  i < pos by substituting posEqQ;
+                  i ≠ pos by Natural.not_equal_of_less_than as iNePos;
+                  VectorSpace.bumpCoefficient(d, e, pos)(i) = d(i)
+                      by VectorSpace.bumpCoefficient_off as bumpAtI;
+                  done by substituting bumpAtI
+                };
+              VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), q)
+                 = VectorSpace.standardCombination(g, d, q)
+                     by VectorSpace.standardCombination_congruence as reduceBelow;
+              VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), 1 + q)
+                 = VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), q)
+                   + VectorSpace.bumpCoefficient(d, e, pos)(q) • g(q)
+                       by VectorSpace.standardCombination_add_one
+                 = VectorSpace.standardCombination(g, d, q)
+                   + VectorSpace.bumpCoefficient(d, e, pos)(q) • g(q)
+                       by substituting reduceBelow
+                 = VectorSpace.standardCombination(g, d, q) + (d(q) + e) • g(q)
+                       by substituting bumpAtQ
+                 = VectorSpace.standardCombination(g, d, q) + (d(q) • g(q) + e • g(q))
+                 = (VectorSpace.standardCombination(g, d, q) + d(q) • g(q)) + e • g(q)
+                 = VectorSpace.standardCombination(g, d, 1 + q) + e • g(q)
+                       by VectorSpace.standardCombination_add_one
+                 = VectorSpace.standardCombination(g, d, 1 + q) + e • g(pos)
+                       by substituting posEqQ
+            }
+        }
+      }
+  }
