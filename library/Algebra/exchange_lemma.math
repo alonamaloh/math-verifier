@@ -747,3 +747,138 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
   witness VectorSpace.swapIn(g, k, j, uu(k))
     with And.introduction(newSpans, And.introduction(newVanishesPast, newAgreePrefix))
 }
+
+-- ----------------------------------------------------------------------
+-- Iterating the swap: for every k ≤ n, a spanning family whose first k
+-- entries are uu(0..k-1). Induction on k, one exchange step per increment.
+theorem VectorSpace.exchange_build {f : Field} {V : VectorSpace(f)}
+        (uu w : Natural → VectorSpace.carrier(V)) (m n : Natural)
+        (independent : VectorSpace.StandardIndependentBelow(uu, m))
+        (wVanishesPast : ∀ (i : Natural). n ≤ i → w(i) = VectorSpace.zero(V))
+        (wSpans : VectorSpace.Spans(w)) (nBelowOrEqM : n ≤ m)
+        : ∀ (k : Natural). k ≤ n →
+              ∃ (gk : Natural → VectorSpace.carrier(V)).
+                  VectorSpace.Spans(gk)
+                  ∧ (∀ (i : Natural). n ≤ i → gk(i) = VectorSpace.zero(V))
+                  ∧ (∀ (i : Natural). i < k → gk(i) = uu(i)) :=
+  by induction on k with IH {
+    case base: {
+        suppose 0 ≤ n as zeroLeN;
+        ∀ (i : Natural). i < 0 → w(i) = uu(i)
+            by { take i : Natural; suppose i < 0 as below;
+                 ¬(i < 0) by Natural.not_less_than_zero; done } as vacuousPrefix;
+        witness w with And.introduction(wSpans, And.introduction(wVanishesPast, vacuousPrefix))
+      }
+    case step(q): {
+        suppose 1 + q ≤ n as succLeN;
+        q < n by { successor(q) ≤ n by Natural.LessThan.weaken; done } as qLtN;
+        q ≤ n by Natural.LessThan.weaken as qLeN;
+        ∃ (gq : Natural → VectorSpace.carrier(V)).
+            VectorSpace.Spans(gq)
+            ∧ (∀ (i : Natural). n ≤ i → gq(i) = VectorSpace.zero(V))
+            ∧ (∀ (i : Natural). i < q → gq(i) = uu(i))
+            by IH as fromIH;
+        choose gq such that
+            VectorSpace.Spans(gq)
+            ∧ (∀ (i : Natural). n ≤ i → gq(i) = VectorSpace.zero(V))
+            ∧ (∀ (i : Natural). i < q → gq(i) = uu(i))
+            from fromIH;
+        VectorSpace.Spans(gq) as gqSpans;
+        ∀ (i : Natural). n ≤ i → gq(i) = VectorSpace.zero(V) as gqVanishesPast;
+        ∀ (i : Natural). i < q → gq(i) = uu(i) as gqAgreePrefix;
+        done by VectorSpace.exchange_step
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The Steinitz exchange lemma (canonical-coordinate form): an independent
+-- family is no larger than a spanning one. If `m > n`, build the family
+-- whose first `n` slots are uu(0..n-1) and still spans; then uu(n) (which
+-- exists) is a combination of uu(0..n-1), a nontrivial vanishing
+-- combination of uu(0..n) once a `-1` is installed — contradicting
+-- independence.
+theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
+        (uu w : Natural → VectorSpace.carrier(V)) (m n : Natural)
+        (independent : VectorSpace.StandardIndependentBelow(uu, m))
+        (wVanishesPast : ∀ (i : Natural). n ≤ i → w(i) = VectorSpace.zero(V))
+        (wSpans : VectorSpace.Spans(w))
+        : m ≤ n := {
+  suppose ¬(m ≤ n) as notLe for contradiction {
+    n < m by Natural.lt_of_not_le as nLtM;
+    n ≤ m by Natural.LessThan.weaken as nLeM;
+    1 + n ≤ m by { successor(n) ≤ m by Natural.successor_le_of_lt; done } as succNLeM;
+    -- The fully swapped family: first n slots are uu(0..n-1), still spans.
+    ∃ (gn : Natural → VectorSpace.carrier(V)).
+        VectorSpace.Spans(gn)
+        ∧ (∀ (i : Natural). n ≤ i → gn(i) = VectorSpace.zero(V))
+        ∧ (∀ (i : Natural). i < n → gn(i) = uu(i))
+        by VectorSpace.exchange_build as built;
+    choose gn such that
+        VectorSpace.Spans(gn)
+        ∧ (∀ (i : Natural). n ≤ i → gn(i) = VectorSpace.zero(V))
+        ∧ (∀ (i : Natural). i < n → gn(i) = uu(i)) from built;
+    VectorSpace.Spans(gn) as gnSpans;
+    ∀ (i : Natural). n ≤ i → gn(i) = VectorSpace.zero(V) as gnVanishesPast;
+    ∀ (i : Natural). i < n → gn(i) = uu(i) as gnAgreePrefix;
+    -- Expand uu(n) in canonical coordinates over gn, then over uu.
+    VectorSpace.InSpanOf(gn, uu(n)) by VectorSpace.InSpanOf.of_spans as unInSpan;
+    choose count, selection, coeffs such that
+        uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count) from unInSpan;
+    uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count) as unLinComb;
+    ∃ (d : Natural → Field.carrier(f)).
+        VectorSpace.linearCombination(gn, coeffs, selection, count)
+        = VectorSpace.standardCombination(gn, d, n)
+        by VectorSpace.linearCombination_standardize as standardized;
+    choose d such that
+        VectorSpace.linearCombination(gn, coeffs, selection, count)
+        = VectorSpace.standardCombination(gn, d, n) from standardized;
+    VectorSpace.linearCombination(gn, coeffs, selection, count)
+        = VectorSpace.standardCombination(gn, d, n) as linCombStd;
+    uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count)   by unLinComb
+          = VectorSpace.standardCombination(gn, d, n)                     by linCombStd
+          as unStandardGn;
+    ∀ (i : Natural). i < n → d(i) • gn(i) = d(i) • uu(i)
+      by { take i : Natural; suppose i < n as iLtN;
+           gn(i) = uu(i) by gnAgreePrefix as gnAtI; done by substituting gnAtI } as termsMatch;
+    VectorSpace.standardCombination(gn, d, n) = VectorSpace.standardCombination(uu, d, n)
+        by VectorSpace.standardCombination_congruence as gnToUu;
+    uu(n) = VectorSpace.standardCombination(gn, d, n)   by unStandardGn
+          = VectorSpace.standardCombination(uu, d, n)   by gnToUu
+          as unStandardUu;
+    -- Install -1 at slot n: a vanishing combination of uu(0..n).
+    Function.updateAt(d, n, Field.negate(Field.one(f)))(n) = Field.negate(Field.one(f))
+        by Function.updateAt_at as eAtN;
+    ∀ (i : Natural). i < n →
+        Function.updateAt(d, n, Field.negate(Field.one(f)))(i) • uu(i) = d(i) • uu(i)
+      by { take i : Natural; suppose i < n as iLtN;
+           i ≠ n by Natural.not_equal_of_less_than;
+           Function.updateAt(d, n, Field.negate(Field.one(f)))(i) = d(i)
+               by Function.updateAt_off as eAtI; done by substituting eAtI } as eBelowMatch;
+    VectorSpace.standardCombination(uu, Function.updateAt(d, n, Field.negate(Field.one(f))), n)
+        = VectorSpace.standardCombination(uu, d, n)
+        by VectorSpace.standardCombination_congruence as eCombBelow;
+    VectorSpace.standardCombination(uu, Function.updateAt(d, n, Field.negate(Field.one(f))), 1 + n)
+       = VectorSpace.standardCombination(uu, Function.updateAt(d, n, Field.negate(Field.one(f))), n)
+         + Function.updateAt(d, n, Field.negate(Field.one(f)))(n) • uu(n)
+             by VectorSpace.standardCombination_add_one
+       = VectorSpace.standardCombination(uu, d, n)
+         + Function.updateAt(d, n, Field.negate(Field.one(f)))(n) • uu(n)
+             by eCombBelow
+       = VectorSpace.standardCombination(uu, d, n) + Field.negate(Field.one(f)) • uu(n)
+             by substituting eAtN
+       = uu(n) + Field.negate(Field.one(f)) • uu(n)   by unStandardUu
+       = uu(n) + VectorSpace.negate(uu(n))            by VectorSpace.negate_one_scale
+       = uu(n) - uu(n)
+       = VectorSpace.zero(V)
+       as eVanishes;
+    ∀ (i : Natural). i < 1 + n → Function.updateAt(d, n, Field.negate(Field.one(f)))(i) = Field.zero(f)
+        by independent as eAllZero;
+    Function.updateAt(d, n, Field.negate(Field.one(f)))(n) = Field.zero(f)
+        by eAllZero as eNzero;
+    Field.negate(Field.one(f))
+       = Function.updateAt(d, n, Field.negate(Field.one(f)))(n)   by eAtN
+       = Field.zero(f)                                            by eNzero;
+    Field.negate(Field.one(f)) ≠ Field.zero(f) by Field.negate_one_nonzero;
+    done
+  }
+}
