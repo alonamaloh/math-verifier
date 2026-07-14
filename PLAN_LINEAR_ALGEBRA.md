@@ -191,12 +191,12 @@ Update this section before ending any session that works on the plan.
   Kept-despite-warning hints: the `by selectionInjective` /
   `below_one_is_zero` / assembling citations in span.math (operative
   reasons, deliberate).
-- **Stage E — NEARLY DONE (2026-07-14).** `FiniteDimensional` + `F[x]`
-  (2026-07-12), the **Steinitz exchange lemma core** (`independent_le_spanning`,
-  2026-07-14 — the abstract crux, where `Field.reciprocal` enters), AND the
-  **official index-generic `exchange`** (packaging bridge, 2026-07-14, commit
-  8e57928b — see the Phase 1 "Bridge" worklist entry). Only the **pruning**
-  piece remains (FinitelyGenerated ⟹ finite basis).
+- **Stage E — DONE (2026-07-14).** `FiniteDimensional` + `F[x]` (2026-07-12), the
+  **Steinitz exchange lemma core** (`independent_le_spanning`) + the **official
+  index-generic `exchange`** (packaging bridge, commit 8e57928b), AND **pruning**
+  (`FinitelyGenerated ⟹ FiniteDimensional`, `Algebra/basis_pruning.math` — see the
+  Phase 1 "Prune" worklist entry). All choice-free. Enabled along the way by a
+  definitional fix (`Spans` now contains 0, so `{0}` is 0-dimensional).
   - **`FiniteDimensional` — DONE.** `Algebra/finite_dimensional.math`:
     `VectorSpace.FiniteDimensional(V) := ∃ n. ∃ (b : NaturalsBelow(n) →
     carrier). IsBasis(b)` (the propositional finite-basis predicate; the
@@ -449,8 +449,18 @@ library build.
   named context facts), the two congruence transports, and
   `done by independent_le_spanning`. UNBLOCKS Stage F. NOT yet in clean
   manifest (shares the deferred redundant-by read-through with the core).
-- [~] **Prune** (M→L, math) — `FinitelyGenerated ⟹ FiniteDimensional` (choice-free).
-  **Foundation DONE (2026-07-14, `Algebra/basis_pruning.math`, commit ad2491e1):**
+- [x] **Prune — DONE (2026-07-14, `Algebra/basis_pruning.math`).**
+  `VectorSpace.FinitelyGenerated.finite_dimensional` (headline) is proven,
+  choice-free, all gates green. `spanning_finite_dimensional` inducts on the
+  family size: the empty family is a basis (base), each dependent step drops a
+  redundant vector (`independent_or_droppable` finds one via the redundancy
+  contrapositive; `dropIndex_redundant` isolates it by position-bump +
+  `scale_cancel`; `spans_dropIndex` keeps spanning via `skip` surjectivity +
+  transitivity) and recurses; `size_one_finite_dimensional` splits size 1 on
+  triviality (zero vector ⟹ empty basis of `{0}`; nonzero ⟹ itself a basis).
+  Enabled by the Spans-contains-0 fix (so `{0}` is 0-dimensional). NOT yet in the
+  clean manifest (redundant-by read-through deferred, ~20 unused-name hints).
+  **Foundation DONE (2026-07-14, commit ad2491e1):**
   `linearCombination_bump_position` (arbitrary-selection position bump),
   `InSpanOf.of_combination_selected` (used-indices refinement of of_combination),
   and the `NaturalsBelow.skip(jv)` reindexing helper (`skipValue`/`skipInverseValue`
