@@ -3162,6 +3162,20 @@ private:
         ExpressionPointer expectedType,
         bool allowInverses, int line);
 
+    // `module` tactic: prove an `=` goal over a `VectorSpace.carrier(V)` by
+    // normalising both sides to a canonical linear combination `Σ cᵢ • vᵢ`
+    // (distribute `•`, collect like vectors by adding coefficients in the
+    // field — discharged by `ring` — and compare atom-by-atom). Throws for an
+    // explicit `by module` that cannot close; `proveModuleEquality` is the
+    // non-throwing core (also usable by the calc-step auto-prover).
+    ExpressionPointer elaborateModuleNormalise(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column);
+    ExpressionPointer proveModuleEquality(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType, int line);
+
     // Prove `originalProduct = canonical` where `canonical` is the
     // left-associated product of `sortedFactors`. The original is
     // assumed to be some product over the same factor multiset.

@@ -26,7 +26,8 @@ SRCS := \
     src/elaborator/induction.cpp src/elaborator/cases.cpp \
     src/elaborator/inference.cpp src/elaborator/desugar_equality.cpp \
     src/elaborator/levels.cpp \
-    src/elaborator/ring.cpp src/elaborator/group.cpp src/elaborator/calc.cpp \
+    src/elaborator/ring.cpp src/elaborator/group.cpp \
+    src/elaborator/module_normalise.cpp src/elaborator/calc.cpp \
     src/elaborator/prover.cpp src/elaborator/claim.cpp \
     src/elaborator/ground_relations.cpp \
     src/elaborator/coercion.cpp src/elaborator/cast_normal.cpp \

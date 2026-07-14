@@ -3629,6 +3629,10 @@ private:
             Token token = consumeAny();
             return makeSurfaceGroup(false, token.line, token.column);
         }
+        if (current.kind == TokenKind::KeywordModule) {
+            Token token = consumeAny();
+            return makeSurfaceModuleNormalise(token.line, token.column);
+        }
         if (current.kind == TokenKind::KeywordField) {
             Token fieldToken = consumeAny();
             std::vector<SurfaceExpressionPointer> hypotheses;

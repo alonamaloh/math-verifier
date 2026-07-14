@@ -358,6 +358,17 @@ struct SurfaceRing { };
 // hypothesis.
 struct SurfaceGroup { bool allowInverses; };
 
+// `module` — the free-module / vector-space normaliser. Closes an equality
+// goal over a `VectorSpace.carrier(V)` by normalising both sides to a
+// canonical linear combination `Σ cᵢ • vᵢ` (each distinct vector an atom):
+// distribute `•` over `+`/`−`, collapse nested scales, collect like terms by
+// adding coefficients in the field (discharged by `ring`), and compare
+// atom-by-atom. Strictly stronger than the abelian `group` mode over the same
+// carrier (which treats `a • v` as opaque). Named `module`; the token is the
+// module-declaration keyword reused in expression position (no ambiguity — a
+// module declaration only appears at file start).
+struct SurfaceModuleNormalise { };
+
 // `field(h1, h2, ...)` — closes an equality goal in a field by clearing
 // `reciprocal_function(t)` occurrences with the user-supplied nonzero
 // hypotheses `h_i : ¬(t_i = zero)`, then deferring to `ring` on the
@@ -642,7 +653,8 @@ struct SurfaceExpression {
         SurfaceBinaryOperation, SurfaceUnaryOperation, SurfaceFoldBinder,
         SurfaceEllipsisFold, SurfaceSeriesFold,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
-        SurfaceRing, SurfaceGroup, SurfaceField, SurfaceLinearCombination,
+        SurfaceRing, SurfaceGroup, SurfaceModuleNormalise, SurfaceField,
+        SurfaceLinearCombination,
         SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceEventuallyScope,
@@ -831,6 +843,10 @@ inline SurfaceExpressionPointer makeSurfaceGroup(
     bool allowInverses, int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceGroup{allowInverses}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceModuleNormalise(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceModuleNormalise{}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceField(
     std::vector<SurfaceExpressionPointer> nonzeroHypotheses,

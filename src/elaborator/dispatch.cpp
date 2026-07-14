@@ -2214,6 +2214,10 @@ ExpressionPointer Elaborator::elaborateExpression(
                                   expression.line, expression.column,
                                   groupTactic->allowInverses);
         }
+        if (std::get_if<SurfaceModuleNormalise>(&expression.node)) {
+            return elaborateModuleNormalise(localBinders, expectedType,
+                                            expression.line, expression.column);
+        }
         if (auto* fieldTactic =
                 std::get_if<SurfaceField>(&expression.node)) {
             return elaborateField(*fieldTactic, localBinders, expectedType,
