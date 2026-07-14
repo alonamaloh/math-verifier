@@ -18,6 +18,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.division
 import Natural.monus
 import Natural.classical_decidable
 import Natural.least_number
@@ -218,6 +219,123 @@ theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
                        by VectorSpace.standardCombination_add_one
                  = VectorSpace.standardCombination(g, d, 1 + q) + e • g(pos)
                        by substituting posEqQ
+            }
+        }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Two more span-closure facts (the subspace laws not yet recorded): the
+-- zero vector is in every span with an inhabited index, and spans are
+-- closed under subtraction.
+
+theorem VectorSpace.InSpanOf.zero {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) (inhabitant : I)
+        : VectorSpace.InSpanOf(family, VectorSpace.zero(V)) := {
+  VectorSpace.InSpanOf(family, family(inhabitant)) by VectorSpace.InSpanOf.member;
+  VectorSpace.InSpanOf(family, Field.zero(f) • family(inhabitant)) by VectorSpace.InSpanOf.scale;
+  Field.zero(f) • family(inhabitant) = VectorSpace.zero(V)
+      by VectorSpace.zero_scale as zeroIsZero;
+  done by substituting zeroIsZero
+}
+
+theorem VectorSpace.InSpanOf.subtract {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) (u v : VectorSpace.carrier(V))
+        (uMember : VectorSpace.InSpanOf(family, u))
+        (vMember : VectorSpace.InSpanOf(family, v))
+        : VectorSpace.InSpanOf(family, u - v) := {
+  VectorSpace.InSpanOf(family, Field.negate(Field.one(f)) • v) by VectorSpace.InSpanOf.scale;
+  VectorSpace.InSpanOf(family, u + Field.negate(Field.one(f)) • v) by VectorSpace.InSpanOf.add;
+  u + Field.negate(Field.one(f)) • v
+     = u + VectorSpace.negate(v)   by VectorSpace.negate_one_scale
+     = u - v
+     as rewriteSubtract;
+  done by substituting rewriteSubtract
+}
+
+-- ----------------------------------------------------------------------
+-- Normalising an arbitrary combination to canonical coordinates. When the
+-- family vanishes past `n`, every combination of it — whatever selection
+-- and length — is a standard combination Σ_{i<n} d(i) • g(i). This is what
+-- lets the exchange step read off "the coefficient at slot j".
+
+-- The all-zero standard combination is the zero vector.
+theorem VectorSpace.standardCombination_zero_coefficients {f : Field} {V : VectorSpace(f)}
+        (g : Natural → VectorSpace.carrier(V)) (n : Natural)
+        : VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n)
+          = VectorSpace.zero(V) :=
+  by induction on n with IH {
+    case base: done
+    case step(q):
+        VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), 1 + q)
+           = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), q)
+             + Field.zero(f) • g(q)
+                 by VectorSpace.standardCombination_add_one
+           = VectorSpace.zero(V) + Field.zero(f) • g(q)   by IH
+           = VectorSpace.zero(V) + VectorSpace.zero(V)     by VectorSpace.zero_scale
+           = VectorSpace.zero(V)
+  }
+
+theorem VectorSpace.linearCombination_standardize {f : Field} {V : VectorSpace(f)}
+        (g : Natural → VectorSpace.carrier(V)) (n : Natural)
+        (vanishesPast : ∀ (i : Natural). n ≤ i → g(i) = VectorSpace.zero(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → Natural)
+        (count : Natural)
+        : ∃ (d : Natural → Field.carrier(f)).
+              VectorSpace.linearCombination(g, coefficients, selection, count)
+              = VectorSpace.standardCombination(g, d, n) :=
+  by induction on count with IH {
+    case base: {
+        VectorSpace.linearCombination(g, coefficients, selection, 0) = VectorSpace.zero(V);
+        VectorSpace.zero(V) = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n)
+            by VectorSpace.standardCombination_zero_coefficients as emptyIsStandard;
+        VectorSpace.linearCombination(g, coefficients, selection, 0)
+            = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n)
+            as baseGoal;
+        witness ((i : Natural) ↦ Field.zero(f)) with baseGoal
+      }
+    case step(p): {
+        choose d such that
+            VectorSpace.linearCombination(g, coefficients, selection, p)
+            = VectorSpace.standardCombination(g, d, n)
+            from IH;
+        VectorSpace.linearCombination(g, coefficients, selection, p)
+            = VectorSpace.standardCombination(g, d, n) as headStandardEq;
+        VectorSpace.linearCombination(g, coefficients, selection, 1 + p)
+           = VectorSpace.linearCombination(g, coefficients, selection, p)
+             + coefficients(p) • g(selection(p))
+                 by VectorSpace.linearCombination_add_one
+           = VectorSpace.standardCombination(g, d, n) + coefficients(p) • g(selection(p))
+                 by substituting headStandardEq
+           as peeled;
+        selection(p) < n ∨ n ≤ selection(p) by Natural.lt_or_le;
+        done by cases {
+          case selection(p) < n as inRange: {
+              VectorSpace.standardCombination(g,
+                    VectorSpace.bumpCoefficient(d, coefficients(p), selection(p)), n)
+                 = VectorSpace.standardCombination(g, d, n)
+                   + coefficients(p) • g(selection(p))
+                     by VectorSpace.standardCombination_bump as bumpEq;
+              VectorSpace.linearCombination(g, coefficients, selection, 1 + p)
+                 = VectorSpace.standardCombination(g,
+                       VectorSpace.bumpCoefficient(d, coefficients(p), selection(p)), n)
+                 as stepGoal;
+              witness VectorSpace.bumpCoefficient(d, coefficients(p), selection(p)) with stepGoal
+            }
+          case n ≤ selection(p) as outRange: {
+              g(selection(p)) = VectorSpace.zero(V) by vanishesPast as vanishHere;
+              coefficients(p) • g(selection(p))
+                 = coefficients(p) • VectorSpace.zero(V)   by substituting vanishHere
+                 = VectorSpace.zero(V)                     by VectorSpace.scale_zero
+                 as termVanishes;
+              VectorSpace.linearCombination(g, coefficients, selection, 1 + p)
+                 = VectorSpace.standardCombination(g, d, n) + coefficients(p) • g(selection(p))
+                       by peeled
+                 = VectorSpace.standardCombination(g, d, n) + VectorSpace.zero(V)
+                       by substituting termVanishes
+                 = VectorSpace.standardCombination(g, d, n)
+                 as stepGoal;
+              witness d with stepGoal
             }
         }
       }
