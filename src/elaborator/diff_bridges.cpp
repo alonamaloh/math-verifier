@@ -827,6 +827,18 @@ ExpressionPointer Elaborator::tryAcRearrangement(
         } catch (const ElaborateError&) {
         } catch (const TypeError&) {
         }
+        // Free-module rearrangement: a step over a `VectorSpace.carrier(V)`
+        // that collects `a • v + b • v = (a + b) • v` or distributes
+        // `a • (u + v)` is beyond the additive `group` mode (which treats
+        // `a • v` as opaque). `proveModuleEquality` returns null (no throw)
+        // off vector-space carriers, so this is a cheap no-op elsewhere.
+        try {
+            ExpressionPointer moduleProof =
+                proveModuleEquality(localBinders, expectedType, line);
+            if (moduleProof) return moduleProof;
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
         try {
             ExpressionPointer ringProof =
                 elaborateRing(localBinders, expectedType, line, 0);
