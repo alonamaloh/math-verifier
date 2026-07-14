@@ -609,3 +609,129 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
            done by substituting bumped };
   done by VectorSpace.InSpanOf.scale_cancel(nonzero := negNonzero)
 }
+
+-- ----------------------------------------------------------------------
+-- Assembling the pruning induction.
+
+-- The empty family is linearly independent (a selection into the empty index
+-- type is impossible, so the vanishing hypothesis is vacuous).
+theorem VectorSpace.empty_family_independent {f : Field} {V : VectorSpace(f)}
+        (g : NaturalsBelow(0) → VectorSpace.carrier(V))
+        : VectorSpace.LinearlyIndependent(g) := {
+  take count : Natural;
+  take selection : Natural → NaturalsBelow(0);
+  take coefficients : Natural → Field.carrier(f);
+  suppose ∀ (a b : Natural). a < count → b < count → selection(a) = selection(b) → a = b as injective;
+  suppose VectorSpace.linearCombination(g, coefficients, selection, count) = VectorSpace.zero(V) as vanishes;
+  take i : Natural;
+  suppose i < count as iBelow;
+  NaturalsBelow.value(selection(i)) < 0 by NaturalsBelow.below;
+  ¬(NaturalsBelow.value(selection(i)) < 0) by Natural.not_less_than_zero;
+  done
+}
+
+-- Every combination of a family that is identically zero is the zero vector.
+theorem VectorSpace.linearCombination_of_zero_family {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (allZero : ∀ (x : I). family(x) = VectorSpace.zero(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I) (count : Natural)
+        : VectorSpace.linearCombination(family, coefficients, selection, count) = VectorSpace.zero(V) :=
+  by induction on count with IH {
+    case base: done
+    case step(m):
+        VectorSpace.linearCombination(family, coefficients, selection, 1 + m)
+           = VectorSpace.linearCombination(family, coefficients, selection, m)
+             + coefficients(m) • family(selection(m))
+                 by VectorSpace.linearCombination_add_one
+           = VectorSpace.zero(V) + coefficients(m) • family(selection(m))   by IH
+           = VectorSpace.zero(V) + coefficients(m) • VectorSpace.zero(V)     by substituting allZero(selection(m))
+           = VectorSpace.zero(V) + VectorSpace.zero(V)                       by VectorSpace.scale_zero
+           = VectorSpace.zero(V)
+  }
+
+-- Dropping a redundant vector preserves spanning: if `g(j)` lies in the span
+-- of the other vectors, `dropIndex(g, j)` still spans (span(g) ⊆
+-- span(dropIndex(g, j)) by transitivity — every generator is either a member
+-- of the reduced family or the redundant one).
+theorem VectorSpace.spans_dropIndex {f : Field} {V : VectorSpace(f)} {count : Natural}
+        (g : NaturalsBelow(1 + count) → VectorSpace.carrier(V)) (countPos : 0 < count)
+        (j : NaturalsBelow(1 + count))
+        (gSpans : VectorSpace.Spans(g)) (redundant : VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), g(j)))
+        : VectorSpace.Spans(VectorSpace.dropIndex(g, j)) := {
+  NaturalsBelow.value(j) ≤ count
+      by { NaturalsBelow.value(j) < 1 + count by NaturalsBelow.below; done by Natural.le_of_lt_one_plus }
+      as jvBound;
+  ∀ (index : NaturalsBelow(1 + count)). VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), g(index))
+    by {
+      take index : NaturalsBelow(1 + count);
+      NaturalsBelow.value(index) = NaturalsBelow.value(j)
+          ∨ NaturalsBelow.value(index) ≠ NaturalsBelow.value(j) by Logic.excluded_middle;
+      done by cases {
+        case NaturalsBelow.value(index) = NaturalsBelow.value(j) as eq: {
+            index = j by NaturalsBelow.equal_of_value as indexIsJ;
+            VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), g(j)) by redundant;
+            done by substituting indexIsJ
+          }
+        case NaturalsBelow.value(index) ≠ NaturalsBelow.value(j) as ne: {
+            ∃ (i2 : NaturalsBelow(count)). NaturalsBelow.skip(NaturalsBelow.value(j), i2) = index
+                by NaturalsBelow.skip_surjective as preimageExists;
+            choose i2 such that NaturalsBelow.skip(NaturalsBelow.value(j), i2) = index from preimageExists;
+            NaturalsBelow.skip(NaturalsBelow.value(j), i2) = index as skipEq;
+            VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), VectorSpace.dropIndex(g, j)(i2))
+                by VectorSpace.InSpanOf.member;
+            VectorSpace.dropIndex(g, j)(i2)
+               = g(NaturalsBelow.skip(NaturalsBelow.value(j), i2))
+               = g(index)   by substituting skipEq
+               as dropAt;
+            done by substituting dropAt
+          }
+      }
+    } as allInSpan;
+  take v : VectorSpace.carrier(V);
+  VectorSpace.InSpanOf(g, v) by VectorSpace.InSpanOf.of_spans(inhabitant := j);
+  VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), v)
+      by VectorSpace.InSpanOf.transitive(outerInhabitant := NaturalsBelow.make(0, countPos));
+  done
+}
+
+-- The inductive step (for a nonempty tail): a spanning family of `1 + count`
+-- vectors is either independent, or some vector is redundant and can be
+-- dropped to a spanning family of `count` vectors. Proved through the
+-- contrapositive — if NO `count`-family spans, the family is independent
+-- (a nonzero coefficient would exhibit a redundant vector via
+-- `dropIndex_redundant`, and dropping it would span) — so no `¬∀`
+-- witness-extraction is needed.
+theorem VectorSpace.independent_or_droppable {f : Field} {V : VectorSpace(f)} {count : Natural}
+        (g : NaturalsBelow(1 + count) → VectorSpace.carrier(V)) (countPos : 0 < count)
+        (gSpans : VectorSpace.Spans(g))
+        : VectorSpace.LinearlyIndependent(g)
+          ∨ (∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h)) := {
+  (∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h))
+      ∨ ¬(∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h))
+      by Logic.excluded_middle;
+  done by cases {
+    case ∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h) as hExists: { done }
+    case ¬(∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h)) as noH: {
+        VectorSpace.LinearlyIndependent(g) by {
+          take len : Natural;
+          take selection : Natural → NaturalsBelow(1 + count);
+          take coefficients : Natural → Field.carrier(f);
+          suppose ∀ (a b : Natural). a < len → b < len → selection(a) = selection(b) → a = b as injective;
+          suppose VectorSpace.linearCombination(g, coefficients, selection, len) = VectorSpace.zero(V)
+              as vanishes;
+          take i : Natural;
+          suppose i < len as iBelow;
+          suppose coefficients(i) ≠ Field.zero(f) as cNonzero for contradiction {
+            VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i)), g(selection(i)))
+                by VectorSpace.dropIndex_redundant(i0 := i);
+            VectorSpace.Spans(VectorSpace.dropIndex(g, selection(i)))
+                by VectorSpace.spans_dropIndex as dropSpans;
+            ∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h)
+                by { witness VectorSpace.dropIndex(g, selection(i)) with dropSpans };
+            done
+          }
+        };
+        done
+    }
+  }
+}
