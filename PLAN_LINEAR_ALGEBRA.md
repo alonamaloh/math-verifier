@@ -191,13 +191,12 @@ Update this section before ending any session that works on the plan.
   Kept-despite-warning hints: the `by selectionInjective` /
   `below_one_is_zero` / assembling citations in span.math (operative
   reasons, deliberate).
-- **Stage E — MOSTLY DONE (2026-07-14).** Three of the four pieces landed:
-  `FiniteDimensional` + `F[x]` (2026-07-12), and the **Steinitz exchange
-  lemma core** (`Algebra/exchange_lemma.math`, `independent_le_spanning`,
-  2026-07-14 — the abstract crux, where `Field.reciprocal` finally enters).
-  Remaining: the exchange lemma's packaging bridge to index-generic
-  `LinearlyIndependent`/`Spans`, and the pruning piece (FinitelyGenerated ⟹
-  finite basis).
+- **Stage E — NEARLY DONE (2026-07-14).** `FiniteDimensional` + `F[x]`
+  (2026-07-12), the **Steinitz exchange lemma core** (`independent_le_spanning`,
+  2026-07-14 — the abstract crux, where `Field.reciprocal` enters), AND the
+  **official index-generic `exchange`** (packaging bridge, 2026-07-14, commit
+  8e57928b — see the Phase 1 "Bridge" worklist entry). Only the **pruning**
+  piece remains (FinitelyGenerated ⟹ finite basis).
   - **`FiniteDimensional` — DONE.** `Algebra/finite_dimensional.math`:
     `VectorSpace.FiniteDimensional(V) := ∃ n. ∃ (b : NaturalsBelow(n) →
     carrier). IsBasis(b)` (the propositional finite-basis predicate; the
@@ -244,8 +243,10 @@ Update this section before ending any session that works on the plan.
     transport probe feeding Stage F dimension. `Algebra/exchange_lemma.math`
     proves `VectorSpace.independent_le_spanning` (canonical-coordinate form):
     `StandardIndependentBelow(uu, m)` + (`w` vanishes past `n`) + `Spans(w)`
-    ⟹ `m ≤ n`. Only the packaging bridge to the index-generic
-    `LinearlyIndependent`/`Spans` remains. Landed this session:
+    ⟹ `m ≤ n`. The packaging bridge to the index-generic
+    `LinearlyIndependent`/`Spans` (`VectorSpace.exchange`) LANDED 2026-07-14
+    (commit 8e57928b — see the Phase 1 "Bridge" worklist entry). Landed earlier
+    this session:
     - **Reciprocal-solve** — `scale_reciprocal_cancel` (`a⁻¹·(a·v)=v`),
       `InSpanOf.scale_cancel` (a nonzero multiple of `v` in a span puts `v`
       in the span). First genuine use of field-over-ring structure.
@@ -286,12 +287,8 @@ Update this section before ending any session that works on the plan.
       vector_space` initially: builds green under default gates (library+tests
       PASS), but has ~60 `--check-redundant-by` hints that need the careful
       per-site read-through (half are load-bearing keeps), deferred.
-    - **NEXT (packaging bridge):** extend `NaturalsBelow(m)→V` families and
-      `Natural→NaturalsBelow(m)` selections to total `Natural`-indexed maps via
-      a value-level dependent conditional (`Logic.classical_decidable(i<m)`
-      pattern-match, à la `Rational.minimumWithDecision`), with an `m=0`/`len=0`
-      trivial split; add `linearCombination_congruence`; then state the official
-      `exchange : LinearlyIndependent(u:NaturalsBelow(m)) ∧ Spans(w:NaturalsBelow(n)) → m ≤ n`.
+    - **Packaging bridge — DONE (2026-07-14, commit 8e57928b).** See the Phase 1
+      "Bridge" worklist entry for the full recipe. NEXT for Stage E is **Prune**.
     ---
     Foundation landed 2026-07-12 (below), all consumed by the core above:
     - **Combination module-algebra** (`Algebra/linear_combination.math`):
@@ -415,15 +412,31 @@ library build.
   were added after their initial landing.
 
 **Phase 1 — finish Stage E**
-- [ ] **Bridge** (S–M, math) — the official
-  `exchange : LinearlyIndependent(u : NaturalsBelow(m)) ∧ Spans(w : NaturalsBelow(n)) → m ≤ n`
-  over the index-generic predicates, derived from `independent_le_spanning`.
-  Needs: extend `NaturalsBelow(m)→V` families AND `Natural→NaturalsBelow(m)`
-  selections to total `Natural`-indexed maps via a value-level dependent
-  conditional (`Logic.classical_decidable(i<m)` pattern-match binding the proof,
-  à la `Rational.minimumWithDecision`), a `linearCombination_congruence`
-  (arbitrary-selection sibling of `standardCombination_congruence`), and an
-  `m=0`/`len=0` trivial split (empty index type). UNBLOCKS Stage F.
+- [x] **Bridge — DONE (2026-07-14, commit 8e57928b).** The official
+  `VectorSpace.exchange : LinearlyIndependent(u : NaturalsBelow(m)) ∧ Spans(w : NaturalsBelow(n)) → m ≤ n`
+  (`Algebra/exchange_lemma.math`), derived from `independent_le_spanning`.
+  Delivered exactly as planned: `Function.extendBelow` (+`_below`/`_past`)
+  extends a `NaturalsBelow(m)→A` family to a total `Natural→A` map via
+  `Function.extendBelowWithDecision` — the value-level dependent conditional
+  over `Logic.classical_decidable(i<m)`, the `Rational.minimumWithDecision`
+  pattern-match whose `yes(below)` arm forms `NaturalsBelow.make(i, below)`;
+  GENERIC in the codomain `A` (bare type variable, dodges the Sort quirk). The
+  characterizing equations are `by`-less `if i<m then … else …` proofs (the
+  `if_split_test` idiom), NOT `if_positive_dependent` citations. Both families
+  extend with fallback `zero`; the clamped selection `Natural→NaturalsBelow(m)`
+  is `NaturalsBelow.inclusion(fallback) := extendBelow(identity, fallback)` — the
+  reusable "reindex into the finite type" helper (its cousin serves Prune).
+  Independence and spanning transport across the reindexing via the new
+  `VectorSpace.linearCombination_congruence` (`linear_combination.math`,
+  arbitrary-family/selection sibling of `standardCombination_congruence`, same
+  `indexedAggregate_pointwise_below` reduction). `m=0` is immediate (`0≤n` by
+  `Natural.zero_least`); the `m>0` branch (`case m = 1 + predecessor`) supplies
+  `NaturalsBelow.make(0, mPositive)` as the clamped-selection fallback. The
+  risky citations all held first try: `done by independent` (the hypothesis'
+  full ∀-chain instantiated + injectivity/vanishing premises discharged from
+  named context facts), the two congruence transports, and
+  `done by independent_le_spanning`. UNBLOCKS Stage F. NOT yet in clean
+  manifest (shares the deferred redundant-by read-through with the core).
 - [ ] **Prune** (M, math) — `FinitelyGenerated ⟹ ∃ finite basis` (choice-free):
   drop a redundant vector from a spanning family while staying spanning, repeat.
   Needs a "remove one index from a `NaturalsBelow(count)` family" reindexing
