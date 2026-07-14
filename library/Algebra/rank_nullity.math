@@ -267,3 +267,153 @@ theorem LinearMap.image_finite_dimensional {f : Field} (V W : VectorSpace(f))
            with Subspace.spans_of_value_covered(covered := coveredFact) };
   done by VectorSpace.FinitelyGenerated.finite_dimensional
 }
+
+-- ----------------------------------------------------------------------
+-- Finite-family construction: appending a vector, and dropping a
+-- zero-coefficient position from a combination. These are the tools the
+-- basis-extension bricks (3–5) need to GROW an independent family, the
+-- mirror of `basis_pruning`'s shrinking `dropIndex`.
+
+-- The family `family` with one extra vector `x` appended at index `m`: below
+-- `m` it reads `family`, at `m` (the last index) it reads `x`. Built on
+-- `Function.extendBelow` (fallback `x`), so its two characterising equations
+-- are immediate.
+definition VectorSpace.appendVector {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (family : NaturalsBelow(m) → VectorSpace.carrier(V))
+        (x : VectorSpace.carrier(V))
+        : NaturalsBelow(1 + m) → VectorSpace.carrier(V) :=
+  (i : NaturalsBelow(1 + m)) ↦
+    Function.extendBelow(family, x)(NaturalsBelow.value(i))
+
+theorem VectorSpace.appendVector_below {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (family : NaturalsBelow(m) → VectorSpace.carrier(V))
+        (x : VectorSpace.carrier(V)) (i : NaturalsBelow(1 + m))
+        (below : NaturalsBelow.value(i) < m)
+        : VectorSpace.appendVector(family, x)(i)
+          = family(NaturalsBelow.make(NaturalsBelow.value(i), below)) :=
+  VectorSpace.appendVector(family, x)(i)
+     = Function.extendBelow(family, x)(NaturalsBelow.value(i))
+     = family(NaturalsBelow.make(NaturalsBelow.value(i), below))
+           by Function.extendBelow_below
+
+theorem VectorSpace.appendVector_last {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (family : NaturalsBelow(m) → VectorSpace.carrier(V))
+        (x : VectorSpace.carrier(V)) (i : NaturalsBelow(1 + m))
+        (atLast : NaturalsBelow.value(i) = m)
+        : VectorSpace.appendVector(family, x)(i) = x := {
+  m ≤ NaturalsBelow.value(i) by { NaturalsBelow.value(i) = m; done } as past;
+  VectorSpace.appendVector(family, x)(i)
+     = Function.extendBelow(family, x)(NaturalsBelow.value(i))
+     = x by Function.extendBelow_past(past := past);
+  done
+}
+
+-- Dropping a zero-coefficient position: a combination of `1 + n` terms whose
+-- `p`-th coefficient is zero equals the `n`-term combination that reindexes
+-- the coefficients and selection by `NaturalsBelow.skipValue(p, ·)` — the
+-- order-preserving position map that skips `p`. (The dropped term is `0 • …`,
+-- so it contributes nothing.) Induction on `n`, peeling the last position and
+-- splitting on whether `p` is that last position.
+theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        : ∀ (n : Natural). ∀ (p : Natural). p < 1 + n
+              → coefficients(p) = Field.zero(f)
+              → VectorSpace.linearCombination(family, coefficients, selection, 1 + n)
+                = VectorSpace.linearCombination(family,
+                      (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                      (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), n) :=
+  by induction on n with IH {
+    case base: {
+        take p : Natural;
+        suppose p < 1 + 0 as pBelow;
+        suppose coefficients(p) = Field.zero(f) as coeffZero;
+        p = 0 by { p ≤ 0 by Natural.le_of_lt_one_plus; done };
+        VectorSpace.linearCombination(family, coefficients, selection, 1 + 0)
+           = coefficients(0) • family(selection(0)) by VectorSpace.linearCombination_one
+           = coefficients(p) • family(selection(p)) by substituting (p = 0)
+           = Field.zero(f) • family(selection(p)) by substituting coeffZero
+           = VectorSpace.zero(V) by VectorSpace.zero_scale
+           = VectorSpace.linearCombination(family,
+                 (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                 (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 0)
+      }
+    case step(q): {
+        take p : Natural;
+        suppose p < 1 + (1 + q) as pBelow;
+        suppose coefficients(p) = Field.zero(f) as coeffZero;
+        p < 1 + q ∨ p = 1 + q by Natural.le_of_lt_one_plus;
+        done by cases {
+          case p < 1 + q as pNotLast: {
+              -- `p` is not last: peel the last term (unchanged by the skip,
+              -- since `skipValue(p, q) = 1 + q` for `q ≥ p`) and recurse.
+              ¬(q < p) by { suppose q < p as qLtP; p ≤ q by Natural.le_of_lt_one_plus;
+                            q < p ≤ q; done };
+              NaturalsBelow.skipValue(p, q) = 1 + q
+                  by NaturalsBelow.skipValue_above as skipLast;
+              VectorSpace.linearCombination(family,
+                    (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                    (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
+                 = VectorSpace.linearCombination(family,
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
+                   + coefficients(NaturalsBelow.skipValue(p, q))
+                       • family(selection(NaturalsBelow.skipValue(p, q)))
+                       by VectorSpace.linearCombination_add_one
+                 = VectorSpace.linearCombination(family,
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
+                   + coefficients(1 + q) • family(selection(1 + q))
+                       by substituting skipLast
+                 as rhsPeeled;
+              VectorSpace.linearCombination(family, coefficients, selection, 1 + (1 + q))
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                   + coefficients(1 + q) • family(selection(1 + q))
+                       by VectorSpace.linearCombination_add_one
+                 = VectorSpace.linearCombination(family,
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
+                   + coefficients(1 + q) • family(selection(1 + q))
+                       by IH(p, pNotLast, coeffZero)
+                 = VectorSpace.linearCombination(family,
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
+                       by rhsPeeled
+            }
+          case p = 1 + q as pLast: {
+              -- The dropped position is the last one; the skip is the identity
+              -- below `1 + q`, so the reindexed prefix is unchanged.
+              ∀ (i : Natural). i < 1 + q →
+                  coefficients(i) = coefficients(NaturalsBelow.skipValue(p, i))
+                by { take i : Natural; suppose i < 1 + q as iBelow;
+                     i < p by substituting pLast;
+                     NaturalsBelow.skipValue(p, i) = i by NaturalsBelow.skipValue_below;
+                     done by substituting (NaturalsBelow.skipValue(p, i) = i) } as coeffAgree;
+              ∀ (i : Natural). i < 1 + q →
+                  selection(i) = selection(NaturalsBelow.skipValue(p, i))
+                by { take i : Natural; suppose i < 1 + q as iBelow;
+                     i < p by substituting pLast;
+                     NaturalsBelow.skipValue(p, i) = i by NaturalsBelow.skipValue_below;
+                     done by substituting (NaturalsBelow.skipValue(p, i) = i) } as selAgree;
+              coefficients(1 + q) = Field.zero(f)
+                  by { coefficients(1 + q) = coefficients(p) by substituting pLast
+                       = Field.zero(f) by coeffZero; done } as lastZero;
+              VectorSpace.linearCombination(family, coefficients, selection, 1 + (1 + q))
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                   + coefficients(1 + q) • family(selection(1 + q))
+                       by VectorSpace.linearCombination_add_one
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                   + Field.zero(f) • family(selection(1 + q))
+                       by substituting lastZero
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                   + VectorSpace.zero(V) by VectorSpace.zero_scale
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                 = VectorSpace.linearCombination(family,
+                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
+                       by VectorSpace.linearCombination_pointwise_below(
+                              coefficientsAgree := coeffAgree, selectionsAgree := selAgree)
+            }
+        }
+      }
+  }
