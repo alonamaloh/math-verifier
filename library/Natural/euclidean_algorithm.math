@@ -1,0 +1,94 @@
+-- Natural/euclidean_algorithm.math
+--
+-- The Euclidean algorithm: gcd as an honest function, recursing on the
+-- strictly decreasing second argument (`decreasing b` — well-founded
+-- recursion; the `else` branch's `b ≠ 0` discharges the decrease
+-- obligation `a mod b < b`). The characterising equations
+-- `Natural.gcd.at_zero` and `Natural.gcd.recurrence` are generated and
+-- proved with the definition.
+--
+-- `gcd_is_gcd` connects the function to the universal-property predicate
+-- `Natural.is_gcd` (Natural/gcd.math), settling the existence of a gcd for
+-- every pair — the question gcd.math had deferred to the Bezout chapter.
+
+module Natural.euclidean_algorithm
+
+import Logic.basics
+import Logic.exists
+import Logic.functions
+import Logic.well_founded
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divisibility
+import Natural.floor_divide
+import Natural.classical_decidable
+import Natural.well_founded
+import Natural.strong_recursion
+import Natural.gcd
+import Natural.divides_subtract
+
+-- gcd(a, b): repeatedly replace (a, b) by (b, a mod b) until the second
+-- argument vanishes.
+definition Natural.gcd (a b : Natural) : Natural :=
+  if b = 0 then a else Natural.gcd(b, Natural.modulo(a, b))
+  decreasing b
+
+-- Correctness: gcd(a, b) is a greatest common divisor of (a, b). Strong
+-- induction on the second argument, the first generalized (the recursive
+-- call swaps them): at 0 the gcd is `a` itself; otherwise the induction
+-- hypothesis at (b, a mod b) lifts along the division decomposition
+-- a = q·b + (a mod b).
+theorem Natural.gcd_is_gcd (a b : Natural)
+        : Natural.is_gcd(Natural.gcd(a, b), a, b) := {
+  ∀ (second : Natural). ∀ (first : Natural).
+      Natural.is_gcd(Natural.gcd(first, second), first, second) by {
+    take second : Natural;
+    by strong induction on second with hypothesis inductionHypothesis;
+    take first : Natural;
+    done by cases {
+      case second = 0 as secondZero: {
+        Natural.gcd(first, 0) = first by Natural.gcd.at_zero as baseValue;
+        Natural.is_gcd(first, first, 0) by Natural.is_gcd_zero_right;
+        Natural.is_gcd(Natural.gcd(first, 0), first, 0) by substituting baseValue;
+        done by substituting secondZero
+      }
+      otherwise: {
+        Natural.modulo(first, second) < second;
+        Natural.is_gcd(Natural.gcd(second, Natural.modulo(first, second)),
+                       second, Natural.modulo(first, second))
+            by inductionHypothesis(Natural.modulo(first, second), second);
+        first
+           = second * Natural.floor_divide(first, second) + Natural.modulo(first, second)
+               by Natural.floor_divide_modulo_decompose
+           = Natural.floor_divide(first, second) * second + Natural.modulo(first, second);
+        Natural.is_gcd(Natural.gcd(second, Natural.modulo(first, second)), first, second)
+            by Natural.is_gcd_remainder_lift;
+        Natural.gcd(first, second) = Natural.gcd(second, Natural.modulo(first, second))
+            by Natural.gcd.recurrence as recurrenceStep;
+        done by substituting recurrenceStep
+      }
+    }
+  };
+  done
+}
+
+-- The three faces of `gcd_is_gcd`, for consumers that want one leg.
+theorem Natural.gcd_divides_left (a b : Natural) : Natural.gcd(a, b) ∣ a := {
+  Natural.is_gcd(Natural.gcd(a, b), a, b) by Natural.gcd_is_gcd;
+  done
+}
+
+theorem Natural.gcd_divides_right (a b : Natural) : Natural.gcd(a, b) ∣ b := {
+  Natural.is_gcd(Natural.gcd(a, b), a, b) by Natural.gcd_is_gcd;
+  done
+}
+
+theorem Natural.gcd_greatest (a b d : Natural)
+        (dividesLeft : d ∣ a) (dividesRight : d ∣ b) : d ∣ Natural.gcd(a, b) := {
+  Natural.is_gcd(Natural.gcd(a, b), a, b) by Natural.gcd_is_gcd;
+  ∀ (e : Natural). e ∣ a → e ∣ b → e ∣ Natural.gcd(a, b) as universalProperty;
+  universalProperty(d, dividesLeft, dividesRight)
+}
