@@ -1,0 +1,310 @@
+-- Algebra/basis_pruning.math
+--
+-- Every finitely generated vector space has a finite basis: prune a finite
+-- spanning family down to an independent one by dropping a redundant vector
+-- (one that lies in the span of the others) and repeating. Choice-free.
+--
+-- This file builds the reusable reindexing bricks first — an arbitrary-
+-- selection position bump, a span-combination lemma keyed only on the used
+-- indices, and the order-preserving "skip one index" map on `NaturalsBelow`
+-- (the finite-family analogue of `Function.updateAt`, requested by the plan
+-- as a reusable helper) — and then the pruning induction on top of them.
+
+module Algebra.basis_pruning
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.division
+import Natural.monus
+import Natural.classical_decidable
+import Set.subtype
+import Set.finite
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.aggregation
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+import Algebra.linear_combination
+import Algebra.span
+import Algebra.exchange_lemma
+
+-- ----------------------------------------------------------------------
+-- Bumping the coefficient at one POSITION of a combination (arbitrary
+-- selection). Raising `coefficients(pos)` by `e` adds `e • family(selection(pos))`
+-- to the combination — the general-selection sibling of
+-- `standardCombination_bump` (identity selection).
+theorem VectorSpace.linearCombination_bump_position {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f)) (e : Field.carrier(f))
+        (selection : Natural → I) (pos n : Natural) (posBelow : pos < n)
+        : VectorSpace.linearCombination(family,
+              Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, n)
+          = VectorSpace.linearCombination(family, coefficients, selection, n)
+            + e • family(selection(pos)) :=
+  by induction on n with IH {
+    case base: {
+        ¬(pos < 0) by Natural.not_less_than_zero;
+        done
+      }
+    case step(q): {
+        pos < q ∨ pos = q by Natural.le_of_lt_one_plus;
+        done by cases {
+          case pos < q as posLtQ: {
+              q ≠ pos by Natural.not_equal_of_greater_than;
+              Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) = coefficients(q)
+                  by Function.updateAt_off as bumpAtQ;
+              VectorSpace.linearCombination(family,
+                    Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, 1 + q)
+                 = VectorSpace.linearCombination(family,
+                       Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, q)
+                   + Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) • family(selection(q))
+                       by VectorSpace.linearCombination_add_one
+                 = (VectorSpace.linearCombination(family, coefficients, selection, q)
+                    + e • family(selection(pos)))
+                   + Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) • family(selection(q))
+                       by IH
+                 = (VectorSpace.linearCombination(family, coefficients, selection, q)
+                    + e • family(selection(pos)))
+                   + coefficients(q) • family(selection(q))
+                       by substituting bumpAtQ
+                 = VectorSpace.linearCombination(family, coefficients, selection, q)
+                   + (e • family(selection(pos)) + coefficients(q) • family(selection(q)))
+                 = VectorSpace.linearCombination(family, coefficients, selection, q)
+                   + (coefficients(q) • family(selection(q)) + e • family(selection(pos)))
+                       by VectorSpace.add_commutative
+                 = (VectorSpace.linearCombination(family, coefficients, selection, q)
+                    + coefficients(q) • family(selection(q)))
+                   + e • family(selection(pos))
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                   + e • family(selection(pos))
+                       by VectorSpace.linearCombination_add_one
+            }
+          case pos = q as posEqQ: {
+              q = pos by posEqQ as qEqPos;
+              Function.updateAt(coefficients, pos, coefficients(pos) + e)(q)
+                 = Function.updateAt(coefficients, pos, coefficients(pos) + e)(pos)   by substituting qEqPos
+                 = coefficients(pos) + e                                              by Function.updateAt_at
+                 = coefficients(q) + e                                                by substituting posEqQ
+                 as bumpAtQ;
+              ∀ (i : Natural). i < q →
+                  Function.updateAt(coefficients, pos, coefficients(pos) + e)(i) • family(selection(i))
+                  = coefficients(i) • family(selection(i))
+                by {
+                  take i : Natural;
+                  suppose i < q as iLtQ;
+                  i < pos by substituting posEqQ;
+                  i ≠ pos by Natural.not_equal_of_less_than;
+                  Function.updateAt(coefficients, pos, coefficients(pos) + e)(i) = coefficients(i)
+                      by Function.updateAt_off as bumpAtI;
+                  done by substituting bumpAtI
+                };
+              VectorSpace.linearCombination(family,
+                    Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, q)
+                 = VectorSpace.linearCombination(family, coefficients, selection, q)
+                     by VectorSpace.linearCombination_congruence as reduceBelow;
+              VectorSpace.linearCombination(family,
+                    Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, 1 + q)
+                 = VectorSpace.linearCombination(family,
+                       Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, q)
+                   + Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) • family(selection(q))
+                       by VectorSpace.linearCombination_add_one
+                 = VectorSpace.linearCombination(family, coefficients, selection, q)
+                   + Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) • family(selection(q))
+                       by substituting reduceBelow
+                 = VectorSpace.linearCombination(family, coefficients, selection, q)
+                   + (coefficients(q) + e) • family(selection(q))
+                       by substituting bumpAtQ
+                 = VectorSpace.linearCombination(family, coefficients, selection, q)
+                   + (coefficients(q) • family(selection(q)) + e • family(selection(q)))
+                       by VectorSpace.scale_scalar_add
+                 = (VectorSpace.linearCombination(family, coefficients, selection, q)
+                    + coefficients(q) • family(selection(q)))
+                   + e • family(selection(q))
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                   + e • family(selection(q))
+                       by VectorSpace.linearCombination_add_one
+                 = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
+                   + e • family(selection(pos))
+                       by substituting posEqQ
+            }
+        }
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- A combination lies in a span as soon as every SELECTED member does —
+-- the used-indices refinement of `InSpanOf.of_combination` (which asks for
+-- every inner index). The proof only ever touches `inner(selection(i))` for
+-- `i < count`, so that is all it needs.
+theorem VectorSpace.InSpanOf.of_combination_selected {f : Field} {V : VectorSpace(f)}
+        {I J : Type(0)}
+        (inner : I → VectorSpace.carrier(V)) (outer : J → VectorSpace.carrier(V))
+        (outerInhabitant : J)
+        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I) (count : Natural)
+        (selectedInSpan : ∀ (i : Natural). i < count →
+            VectorSpace.InSpanOf(outer, inner(selection(i))))
+        : VectorSpace.InSpanOf(outer,
+              VectorSpace.linearCombination(inner, coefficients, selection, count)) :=
+  by induction on count with IH {
+    case base: {
+        VectorSpace.InSpanOf(outer, outer(outerInhabitant)) by VectorSpace.InSpanOf.member;
+        VectorSpace.InSpanOf(outer, Field.zero(f) • outer(outerInhabitant))
+            by VectorSpace.InSpanOf.scale;
+        VectorSpace.linearCombination(inner, coefficients, selection, 0)
+           = VectorSpace.zero(V)
+           = Field.zero(f) • outer(outerInhabitant)
+               by VectorSpace.zero_scale as emptyIsZero;
+        done by substituting emptyIsZero
+      }
+    case step(m): {
+        ∀ (i : Natural). i < m → VectorSpace.InSpanOf(outer, inner(selection(i)))
+          by { take i : Natural; suppose i < m as iLtM; i < 1 + m; done by selectedInSpan };
+        VectorSpace.InSpanOf(outer, VectorSpace.linearCombination(inner, coefficients, selection, m))
+            by IH;
+        m < 1 + m;
+        VectorSpace.InSpanOf(outer, inner(selection(m))) by selectedInSpan;
+        VectorSpace.InSpanOf(outer, coefficients(m) • inner(selection(m)))
+            by VectorSpace.InSpanOf.scale;
+        VectorSpace.InSpanOf(outer,
+            VectorSpace.linearCombination(inner, coefficients, selection, m)
+              + coefficients(m) • inner(selection(m)))
+            by VectorSpace.InSpanOf.add;
+        VectorSpace.linearCombination(inner, coefficients, selection, 1 + m)
+           = VectorSpace.linearCombination(inner, coefficients, selection, m)
+             + coefficients(m) • inner(selection(m))
+               by VectorSpace.linearCombination_add_one as peelLast;
+        done by substituting peelLast
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- Skipping one index. `NaturalsBelow.skip(jv)` is the order-preserving
+-- injection `NaturalsBelow(count) → NaturalsBelow(1 + count)` that misses
+-- exactly the index with value `jv`: it is the identity below `jv` and
+-- shifts up by one at or above it. `skipInverse` is the partial inverse.
+
+definition NaturalsBelow.skipValue (jv i : Natural) : Natural :=
+  if i < jv then i else 1 + i
+
+theorem NaturalsBelow.skipValue_below (jv i : Natural) (below : i < jv)
+        : NaturalsBelow.skipValue(jv, i) = i :=
+  done by Logic.if_positive
+
+theorem NaturalsBelow.skipValue_above (jv i : Natural) (notBelow : ¬(i < jv))
+        : NaturalsBelow.skipValue(jv, i) = 1 + i :=
+  done by Logic.if_negative
+
+definition NaturalsBelow.skipInverseValue (jv x : Natural) : Natural :=
+  if x < jv then x else Natural.monus(x, 1)
+
+theorem NaturalsBelow.skipInverseValue_below (jv x : Natural) (below : x < jv)
+        : NaturalsBelow.skipInverseValue(jv, x) = x :=
+  done by Logic.if_positive
+
+theorem NaturalsBelow.skipInverseValue_above (jv x : Natural) (notBelow : ¬(x < jv))
+        : NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1) :=
+  done by Logic.if_negative
+
+-- `skipValue(jv, i) < 1 + count` when `i < count`: the value is at most `1 + i`.
+theorem NaturalsBelow.skipValue_bound {count : Natural} (jv : Natural) (i : NaturalsBelow(count))
+        : NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) < 1 + count := {
+  NaturalsBelow.value(i) < count by NaturalsBelow.below as valueBelow;
+  done by cases {
+    case NaturalsBelow.value(i) < jv as below: {
+        NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) = NaturalsBelow.value(i)
+            by NaturalsBelow.skipValue_below as sv;
+        NaturalsBelow.value(i) < count < 1 + count;
+        done by substituting sv
+      }
+    otherwise as notBelow: {
+        NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) = 1 + NaturalsBelow.value(i)
+            by NaturalsBelow.skipValue_above as sv;
+        1 + NaturalsBelow.value(i) ≤ count by Natural.successor_le_of_lt;
+        1 + NaturalsBelow.value(i) < 1 + count;
+        done by substituting sv
+      }
+  }
+}
+
+definition NaturalsBelow.skip {count : Natural} (jv : Natural) (i : NaturalsBelow(count))
+        : NaturalsBelow(1 + count) :=
+  NaturalsBelow.make(NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)),
+                     NaturalsBelow.skipValue_bound(jv, i))
+
+theorem NaturalsBelow.skip_value {count : Natural} (jv : Natural) (i : NaturalsBelow(count))
+        : NaturalsBelow.value(NaturalsBelow.skip(jv, i))
+          = NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) :=
+  done
+
+-- The skipped index never has value `jv` (`skip` misses exactly that slot).
+theorem NaturalsBelow.skip_avoids {count : Natural} (jv : Natural) (i : NaturalsBelow(count))
+        : NaturalsBelow.value(NaturalsBelow.skip(jv, i)) ≠ jv := {
+  NaturalsBelow.value(i) < jv ∨ jv ≤ NaturalsBelow.value(i) by Natural.lt_or_le;
+  done by cases {
+    case NaturalsBelow.value(i) < jv as below: {
+        NaturalsBelow.value(NaturalsBelow.skip(jv, i)) = NaturalsBelow.value(i)
+            by NaturalsBelow.skipValue_below;
+        NaturalsBelow.value(i) ≠ jv by Natural.not_equal_of_less_than;
+        done
+      }
+    case jv ≤ NaturalsBelow.value(i) as ge: {
+        ¬(NaturalsBelow.value(i) < jv)
+            by { suppose NaturalsBelow.value(i) < jv as bad;
+                 NaturalsBelow.value(i) < jv ≤ NaturalsBelow.value(i); done };
+        NaturalsBelow.value(NaturalsBelow.skip(jv, i)) = 1 + NaturalsBelow.value(i)
+            by NaturalsBelow.skipValue_above;
+        jv ≤ NaturalsBelow.value(i) < 1 + NaturalsBelow.value(i)
+             = NaturalsBelow.value(NaturalsBelow.skip(jv, i));
+        jv < NaturalsBelow.value(NaturalsBelow.skip(jv, i));
+        done by Natural.not_equal_of_greater_than
+      }
+  }
+}
+
+-- `monus(1 + i, 1) = i`: peel a 1 off both sides.
+theorem NaturalsBelow.monus_one_plus_one (i : Natural) : Natural.monus(1 + i, 1) = i :=
+  Natural.monus(1 + i, 1)
+     = Natural.monus(1 + i, 1 + 0)
+     = Natural.monus(i, 0)          by Natural.monus_one_plus_one_plus
+     = i                            by Natural.monus_zero
+
+-- `skipInverse` undoes `skip`: the round trip on values.
+theorem NaturalsBelow.skipInverse_skipValue (jv i : Natural)
+        : NaturalsBelow.skipInverseValue(jv, NaturalsBelow.skipValue(jv, i)) = i := {
+  i < jv ∨ jv ≤ i by Natural.lt_or_le;
+  done by cases {
+    case i < jv as below: {
+        NaturalsBelow.skipValue(jv, i) = i by NaturalsBelow.skipValue_below as sv;
+        NaturalsBelow.skipInverseValue(jv, i) = i by NaturalsBelow.skipInverseValue_below as siv;
+        NaturalsBelow.skipInverseValue(jv, NaturalsBelow.skipValue(jv, i))
+           = NaturalsBelow.skipInverseValue(jv, i)   by substituting sv
+           = i                                        by siv
+      }
+    otherwise as notBelow: {
+        ¬(i < jv) by notBelow;
+        NaturalsBelow.skipValue(jv, i) = 1 + i by NaturalsBelow.skipValue_above as sv;
+        ¬(1 + i < jv) by { suppose 1 + i < jv as bad; jv ≤ i < 1 + i < jv; done };
+        NaturalsBelow.skipInverseValue(jv, 1 + i) = Natural.monus(1 + i, 1)
+            by NaturalsBelow.skipInverseValue_above as siv;
+        NaturalsBelow.skipInverseValue(jv, NaturalsBelow.skipValue(jv, i))
+           = NaturalsBelow.skipInverseValue(jv, 1 + i)   by substituting sv
+           = Natural.monus(1 + i, 1)                     by siv
+           = i                                            by NaturalsBelow.monus_one_plus_one
+      }
+  }
+}
