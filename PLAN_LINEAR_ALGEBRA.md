@@ -269,13 +269,18 @@ Update this section before ending any session that works on the plan.
       `cases … { | Ctor(x) => … }` pattern-match is a discouraged CIC form —
       use `if P then a else b` for value-level branching, not `cases` on
       `compare_strict`.
-    - **NEXT = span-transitivity, then the exchange induction.**
-      Span-transitivity (each generator of one family lies in another's span
-      ⟹ the first's span ⊆ the second's) closes from member/scale/add — it
-      is the substitution the exchange lemma's replacement step performs.
-      Then the Steinitz induction itself (where `Field.reciprocal` finally
-      enters: solve for the swapped-out vector by dividing by its nonzero
-      coefficient).
+    - **Span-transitivity — DONE (commit fa73f6db).** `InSpanOf.transitive`:
+      each generator of `inner` lies in span(`outer`) ⟹ span(inner) ⊆
+      span(outer). Via `InSpanOf.of_combination` (a combination of inner
+      members is in span(outer), by induction on the length: peel the last
+      term = scaled generator, add to the shorter combination via the IH,
+      closing from member/scale/add). Base case needs a `J` inhabitant to
+      write `0 = 0·outer(inhabitant)` — the same caveat the other InSpanOf
+      lemmas carry.
+    - **NEXT = the Steinitz exchange induction** (where `Field.reciprocal`
+      finally enters: solve for the swapped-out vector by dividing by its
+      nonzero coefficient). Span-transitivity is the substitution its
+      replacement step performs.
   - **FinitelyGenerated ⟹ finite basis (pruning) — NOT STARTED.** Prune a
     finite spanning family down to an independent one (choice-free); needs
     "remove one index from a `NaturalsBelow(count)` family" reindexing. Shares
