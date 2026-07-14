@@ -882,3 +882,196 @@ theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
     done
   }
 }
+
+-- ----------------------------------------------------------------------
+-- The packaging bridge to the index-generic predicates. The core works
+-- with total `Natural`-indexed families; a `NaturalsBelow(m)`-indexed one
+-- is extended to a total map by filling a fallback past the bound. The
+-- `yes` arm of the classical decision supplies the proof that forms the
+-- bounded index — a value-level dependent conditional, the same shape as
+-- `Rational.minimumWithDecision`. Generic in the codomain `A` (a bare type
+-- variable dodges the "cases motive not a Sort" quirk `Field.carrier` /
+-- `VectorSpace.carrier` as the return type would trip).
+
+definition Function.extendBelowWithDecision {A : Type(0)} {m : Natural}
+        (u : NaturalsBelow(m) → A) (fallback : A) (i : Natural)
+        : Logic.Decidable(i < m) → A
+  | Logic.Decidable.yes(below) => u(NaturalsBelow.make(i, below))
+  | Logic.Decidable.no(_)      => fallback
+
+definition Function.extendBelow {A : Type(0)} {m : Natural}
+        (u : NaturalsBelow(m) → A) (fallback : A) : Natural → A :=
+  (i : Natural) ↦
+    Function.extendBelowWithDecision(u, fallback, i, Logic.classical_decidable(i < m))
+
+-- Below the bound the extension reads the family at the bounded index;
+-- at or past it, the fallback. Proof irrelevance identifies the decision's
+-- internal proof with the caller's `below`.
+theorem Function.extendBelow_below {A : Type(0)} {m : Natural}
+        (u : NaturalsBelow(m) → A) (fallback : A) (i : Natural) (below : i < m)
+        : Function.extendBelow(u, fallback)(i) = u(NaturalsBelow.make(i, below)) :=
+  if i < m
+  then done
+  else { False; done }
+
+theorem Function.extendBelow_past {A : Type(0)} {m : Natural}
+        (u : NaturalsBelow(m) → A) (fallback : A) (i : Natural) (past : m ≤ i)
+        : Function.extendBelow(u, fallback)(i) = fallback :=
+  if i < m
+  then { i < i by { i < m ≤ i; done }; ¬(i < i) by Natural.lt_irreflexive; done }
+  else done
+
+-- The canonical clamped inclusion `Natural → NaturalsBelow(m)`: the value
+-- itself below the bound, a fixed fallback index at or past it. This is the
+-- reusable "reindex into the finite type" helper (`extendBelow` of the
+-- identity family); needs an inhabitant of `NaturalsBelow(m)`, i.e. m > 0.
+definition NaturalsBelow.inclusion {m : Natural} (fallback : NaturalsBelow(m))
+        : Natural → NaturalsBelow(m) :=
+  Function.extendBelow((x : NaturalsBelow(m)) ↦ x, fallback)
+
+theorem NaturalsBelow.inclusion_below {m : Natural} (fallback : NaturalsBelow(m))
+        (i : Natural) (below : i < m)
+        : NaturalsBelow.inclusion(fallback)(i) = NaturalsBelow.make(i, below) :=
+  NaturalsBelow.inclusion(fallback)(i)
+     = ((x : NaturalsBelow(m)) ↦ x)(NaturalsBelow.make(i, below))   by Function.extendBelow_below
+     = NaturalsBelow.make(i, below)
+
+-- ----------------------------------------------------------------------
+-- The official Steinitz exchange lemma over the index-generic predicates:
+-- a linearly independent `NaturalsBelow(m)`-family is no larger than a
+-- spanning `NaturalsBelow(n)`-family. Extend both to total `Natural`-indexed
+-- maps (fallback zero), transport independence and spanning across the
+-- reindexing with `linearCombination_congruence`, and feed the
+-- canonical-coordinate core. The m = 0 case is immediate (0 ≤ n); m > 0
+-- supplies the fallback index the clamped selection needs.
+theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
+        (u : NaturalsBelow(m) → VectorSpace.carrier(V))
+        (w : NaturalsBelow(n) → VectorSpace.carrier(V))
+        (independent : VectorSpace.LinearlyIndependent(u))
+        (spanning : VectorSpace.Spans(w))
+        : m ≤ n :=
+  done by cases {
+    case m = 0: { done by Natural.zero_least }
+    case m = 1 + predecessor for some (predecessor : Natural) as mShape: {
+        1 ≤ m by { 1 ≤ 1 + predecessor; done by substituting mShape };
+        0 < m by Natural.zero_lt_of_one_le as mPositive;
+
+        -- Independence transports: a vanishing standard combination of the
+        -- extended family is a vanishing combination of `u` under the
+        -- clamped selection, whose coefficients `u`'s independence kills.
+        VectorSpace.StandardIndependentBelow(Function.extendBelow(u, VectorSpace.zero(V)), m)
+          by {
+            take len : Natural;
+            take coefficients : Natural → Field.carrier(f);
+            suppose len ≤ m as lenLeM;
+            suppose VectorSpace.standardCombination(
+                        Function.extendBelow(u, VectorSpace.zero(V)), coefficients, len)
+                      = VectorSpace.zero(V) as combVanishes;
+
+            ∀ (a b : Natural). a < len → b < len →
+                NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(a)
+                = NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(b) → a = b
+              by {
+                take a : Natural; take b : Natural;
+                suppose a < len as aLtLen;
+                suppose b < len as bLtLen;
+                suppose NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(a)
+                        = NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(b) as selEq;
+                a < m by { a < len ≤ m; done } as aLtM;
+                b < m by { b < len ≤ m; done } as bLtM;
+                NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(a)
+                    = NaturalsBelow.make(a, aLtM) by NaturalsBelow.inclusion_below as selA;
+                NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(b)
+                    = NaturalsBelow.make(b, bLtM) by NaturalsBelow.inclusion_below as selB;
+                a = NaturalsBelow.value(NaturalsBelow.make(a, aLtM))
+                  = NaturalsBelow.value(NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(a))
+                        by selA
+                  = NaturalsBelow.value(NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(b))
+                        by substituting selEq
+                  = NaturalsBelow.value(NaturalsBelow.make(b, bLtM))   by selB
+                  = b;
+                done
+              } as selInjective;
+
+            ∀ (k : Natural). k < len →
+                coefficients(k) • Function.extendBelow(u, VectorSpace.zero(V))(k)
+                = coefficients(k) • u(NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(k))
+              by {
+                take k : Natural;
+                suppose k < len as kLtLen;
+                k < m by { k < len ≤ m; done } as kLtM;
+                Function.extendBelow(u, VectorSpace.zero(V))(k) = u(NaturalsBelow.make(k, kLtM))
+                    by Function.extendBelow_below as uuAtK;
+                NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(k)
+                    = NaturalsBelow.make(k, kLtM) by NaturalsBelow.inclusion_below as selAtK;
+                coefficients(k) • Function.extendBelow(u, VectorSpace.zero(V))(k)
+                   = coefficients(k) • u(NaturalsBelow.make(k, kLtM))   by substituting uuAtK
+                   = coefficients(k) • u(NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive))(k))
+                         by substituting selAtK
+              } as termsAgreeIndep;
+
+            VectorSpace.standardCombination(Function.extendBelow(u, VectorSpace.zero(V)), coefficients, len)
+               = VectorSpace.linearCombination(Function.extendBelow(u, VectorSpace.zero(V)),
+                     coefficients, (i : Natural) ↦ i, len)
+               = VectorSpace.linearCombination(u, coefficients,
+                     NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive)), len)
+                     by VectorSpace.linearCombination_congruence
+               as combReindex;
+            VectorSpace.linearCombination(u, coefficients,
+                  NaturalsBelow.inclusion(NaturalsBelow.make(0, mPositive)), len)
+               = VectorSpace.standardCombination(Function.extendBelow(u, VectorSpace.zero(V)),
+                     coefficients, len)   by combReindex
+               = VectorSpace.zero(V)      by combVanishes
+               as uCombVanishes;
+
+            done by independent
+          } as uuIndependent;
+
+        -- Spanning transports: reindex the witnessing combination's selection
+        -- from `NaturalsBelow(n)` to `Natural` through the underlying values.
+        VectorSpace.Spans(Function.extendBelow(w, VectorSpace.zero(V)))
+          by {
+            take v : VectorSpace.carrier(V);
+            ∃ (count : Natural). ∃ (selection : Natural → NaturalsBelow(n)).
+                ∃ (coefficients : Natural → Field.carrier(f)).
+                v = VectorSpace.linearCombination(w, coefficients, selection, count)
+                by spanning as vSpanned;
+            choose count, selection, coefficients such that
+                v = VectorSpace.linearCombination(w, coefficients, selection, count) from vSpanned;
+            v = VectorSpace.linearCombination(w, coefficients, selection, count) as vComb;
+
+            ∀ (k : Natural). k < count →
+                coefficients(k) • w(selection(k))
+                = coefficients(k)
+                  • Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
+              by {
+                take k : Natural;
+                suppose k < count as kLtCount;
+                NaturalsBelow.value(selection(k)) < n by NaturalsBelow.below as valueBelow;
+                Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
+                   = w(NaturalsBelow.make(NaturalsBelow.value(selection(k)), valueBelow))
+                         by Function.extendBelow_below
+                   = w(selection(k))   by NaturalsBelow.equal_of_value
+                   as extAtK;
+                done by substituting extAtK
+              } as termsAgreeSpan;
+
+            v = VectorSpace.linearCombination(w, coefficients, selection, count)   by vComb
+              = VectorSpace.linearCombination(Function.extendBelow(w, VectorSpace.zero(V)),
+                    coefficients, (k : Natural) ↦ NaturalsBelow.value(selection(k)), count)
+                    by VectorSpace.linearCombination_congruence
+              as vExtComb;
+            witness count with witness ((k : Natural) ↦ NaturalsBelow.value(selection(k)))
+                 with witness coefficients with vExtComb
+          } as wExtSpans;
+
+        ∀ (i : Natural). n ≤ i → Function.extendBelow(w, VectorSpace.zero(V))(i) = VectorSpace.zero(V)
+          by {
+            take i : Natural;
+            suppose n ≤ i as nLeI;
+            done by Function.extendBelow_past
+          } as wExtVanishesPast;
+
+        done by VectorSpace.independent_le_spanning
+    }
+  }

@@ -256,6 +256,28 @@ theorem VectorSpace.linearCombination_pointwise_below {f : Field} {V : VectorSpa
      = VectorSpace.linearCombination(family, coefficientsRight, selectionRight, count)
 }
 
+-- Two combinations agree when their scaled terms agree below the count —
+-- even across different families and selections (the arbitrary-selection
+-- sibling of standardCombination_congruence). This is the bridge for
+-- reindexing a combination from one family to another.
+theorem VectorSpace.linearCombination_congruence {f : Field} {V : VectorSpace(f)}
+        {I J : Type(0)} (family1 : I → VectorSpace.carrier(V))
+        (family2 : J → VectorSpace.carrier(V))
+        (coefficients1 coefficients2 : Natural → Field.carrier(f))
+        (selection1 : Natural → I) (selection2 : Natural → J) (count : Natural)
+        (termsAgree : ∀ (i : Natural). i < count →
+            coefficients1(i) • family1(selection1(i)) = coefficients2(i) • family2(selection2(i)))
+        : VectorSpace.linearCombination(family1, coefficients1, selection1, count)
+          = VectorSpace.linearCombination(family2, coefficients2, selection2, count) := {
+  VectorSpace.linearCombination(family1, coefficients1, selection1, count)
+     = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
+           (i : Natural) ↦ coefficients1(i) • family1(selection1(i)), count)
+     = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
+           (i : Natural) ↦ coefficients2(i) • family2(selection2(i)), count)
+           by Algebra.indexedAggregate_pointwise_below
+     = VectorSpace.linearCombination(family2, coefficients2, selection2, count)
+}
+
 -- Concatenation: the sum of two combinations over the same family is the
 -- single combination over the merged coefficients and selections.
 theorem VectorSpace.linearCombination_concatenate {f : Field} {V : VectorSpace(f)}
