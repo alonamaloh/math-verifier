@@ -555,9 +555,22 @@ section below)
   record (Stage 0.3) — build when Stage G wants it.
 - [~] **Stage G** (L, math) — **rank–nullity** (headline #1): `dim ker T + dim im T
   = dim V` for `T : V → W` linear, `V` finite-dimensional, choice-free. **BRICKS
-  1–2 DONE (2026-07-14, `Algebra/rank_nullity.math`, library+export green,
-  choice-free); bricks 3–5 BLOCKED on new "finite-family construction"
-  infrastructure — see the STRESS_PROBES Stage-G verdict.** Brick 1
+  1–3 DONE + all bricks 4–5 INFRASTRUCTURE built (2026-07-14,
+  `Algebra/rank_nullity.math`, library+tests+export 2873 green, choice-free); only
+  the brick 4–5 assembly (extension sift + final count) remains.** The "finite-family
+  construction" infra the earlier verdict flagged as missing is now BUILT: the
+  `module` tactic (tier-b, separate deliverable), `appendVector` + its
+  characterising lemmas, `linearCombination_drop_zero_position` (the position-skip),
+  the append lemma `independent_append_outside_span` (a vector outside span(e)
+  extends independent e — the hard one, via `dropIndex_redundant`+`InSpanOf.transitive`
+  and the drop lemma for injectivity), brick 3 `subspace_finite_dimensional` (subspace
+  of f.d. is f.d., maximal-independent via `Natural.least_witness`), and
+  `NaturalsBelow.widen`/`InSpanOf.append_monotone`. REMAINING: brick 4 = sift `e ++
+  basisV` appending out-of-span vectors (exact-prefix tracking through
+  `NaturalsBelow(k+r')`) to a basis of V extending the ker-basis; brick 5 = the
+  appended images are a basis of `im T`, giving `dim V = dim ker T + dim im T`.
+  (Earlier note, now superseded: bricks 3–5 were flagged blocked on this infra —
+  it exists now.) Brick 1
   (`Subspace.linearCombination_value` + independence/spanning value-transport
   corollaries) compiled first try — the `Subtype`/`Subspace` boundary the branch
   was built to measure is FRICTIONLESS (confirms the Stage F thesis: one reusable
