@@ -527,11 +527,15 @@ library build.
 - [ ] **Σ-sugar** (S, elaborator/display) — a `Σ (i < count) …` binder that
   parses to / prints as `VectorSpace.linearCombination(…)`. Pure notation, no
   proof-engine change. Makes everything already built and F/G/H read like maths.
-- [ ] **Norm-a** (M, elaborator/tactic) — additive-group normaliser over
-  `IsAbelianGroup`/`VectorSpace.carrier`: the sound additive fragment of `ring`
-  (assoc/comm/inverse/`0`, push `•` through `+`/`−`). Erases
-  `add_subtract_cancel_left`, `add_pair_interchange`, and the manual assoc/comm
-  chains in `linear_combination.math` + `exchange_lemma.math`.
+- [x] **Norm-a — DONE (2026-07-14).** The `group` tactic gained an abelian mode
+  over `VectorSpace.carrier`: sorts the reduced word (via `add_commutative`) and
+  re-cancels, unfolds `VectorSpace.subtract`. Closes `(a+b)-a=b`, the medial law,
+  and additive rearrangements — by `group` and as bare calc steps
+  (`src/elaborator/group.cpp`, `Test/vector_group_test.math`). Retired
+  `add_subtract_cancel_left` + `add_pair_interchange` (deleted) and collapsed the
+  assoc/comm chains in `exchange_lemma`/`basis_pruning`/`linear_combination`.
+  `a•v` stays opaque (that is tier b = **Norm-b** below). Gates green,
+  export-check 2858, axioms unchanged.
 - [ ] **Norm-b** (L, elaborator/tactic) — free-module `linear_combination`
   normaliser: treat each distinct vector as an atom, normalise both sides to a
   canonical `Σ cᵢ • vᵢ` by collecting like terms (adding coefficients in the
