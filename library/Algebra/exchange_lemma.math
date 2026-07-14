@@ -1,0 +1,72 @@
+-- Algebra/exchange_lemma.math
+--
+-- The Steinitz exchange lemma: an independent family is no larger than a
+-- spanning one. The classical one-swap-at-a-time argument, where
+-- `Field.reciprocal` finally earns its keep — a vector selected with a
+-- nonzero coefficient is solved for by dividing by that coefficient.
+--
+-- This file builds the reusable bricks first (dividing a nonzero scalar
+-- out of a span membership; normalising an arbitrary combination to
+-- canonical coordinates) and then the exchange induction on top of them.
+
+module Algebra.exchange_lemma
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.monus
+import Natural.classical_decidable
+import Natural.least_number
+import Set.subtype
+import Set.finite
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.aggregation
+import Algebra.ring
+import Algebra.ring_lemmas
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.vector_space_lemmas
+import Algebra.linear_combination
+import Algebra.span
+
+-- ----------------------------------------------------------------------
+-- Dividing out a nonzero scalar (where `Field.reciprocal` enters).
+
+-- Scaling by a nonzero scalar is undone by scaling by its reciprocal.
+theorem VectorSpace.scale_reciprocal_cancel {f : Field} (V : VectorSpace(f))
+        (a : Field.carrier(f)) (nonzero : a ≠ Field.zero(f)) (v : VectorSpace.carrier(V))
+        : Field.reciprocal(a, nonzero) • (a • v) = v := {
+  Field.reciprocal(a, nonzero) * a
+     = a * Field.reciprocal(a, nonzero)
+     = Field.one(f)                              by Field.reciprocal_multiplies
+     as reciprocalOnLeft;
+  Field.reciprocal(a, nonzero) • (a • v)
+     = (Field.reciprocal(a, nonzero) * a) • v    by VectorSpace.scale_scalar_multiply
+     = Field.one(f) • v                          by substituting reciprocalOnLeft
+     = v                                         by VectorSpace.one_scale
+}
+
+-- If a nonzero multiple of `v` lies in a span, so does `v` itself: scale
+-- the membership by the reciprocal.
+theorem VectorSpace.InSpanOf.scale_cancel {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V))
+        (a : Field.carrier(f)) (nonzero : a ≠ Field.zero(f))
+        (v : VectorSpace.carrier(V))
+        (member : VectorSpace.InSpanOf(family, a • v))
+        : VectorSpace.InSpanOf(family, v) := {
+  VectorSpace.InSpanOf(family, Field.reciprocal(a, nonzero) • (a • v))
+      by VectorSpace.InSpanOf.scale;
+  Field.reciprocal(a, nonzero) • (a • v) = v
+      by VectorSpace.scale_reciprocal_cancel as cancelReciprocal;
+  done by substituting cancelReciprocal
+}
