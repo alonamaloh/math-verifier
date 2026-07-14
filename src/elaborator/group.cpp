@@ -46,6 +46,14 @@ struct GroupScheme {
     std::string identityRightName;
     std::string inverseLeftName;   // only meaningful when inverse != null
     std::string inverseRightName;
+    // Abelian extension: when the structure additionally carries
+    // commutativity, the normaliser sorts the reduced word to a canonical
+    // order (so `(a+b)-a = b`, the medial law, etc. close). `commutativityName`
+    // is the `op(x,y)=op(y,x)` law and `subtractHead` (if non-empty) is a
+    // definitional subtract to unfold to `op(x, inverse(y))` first.
+    bool abelian = false;
+    std::string commutativityName;
+    std::string subtractHead;
 };
 
 }  // namespace
@@ -90,7 +98,56 @@ ExpressionPointer Elaborator::proveGroupEquality(
     GroupScheme scheme;
     bool found = false;
     bool foundIsGroup = false;
-    for (size_t i = 0; i < binderCount; ++i) {
+
+    // ---- Abelian structure from a bundled carrier. When the goal's carrier
+    // is `VectorSpace.carrier(V)`, cite the flattened `VectorSpace.*` group
+    // laws directly (their leading arguments are `{f}(V)`, so the citation
+    // prefix is {f, V}) and turn on abelian canonicalisation — the additive
+    // group of a vector space is commutative, so the reduced word is sorted
+    // to a canonical order and re-cancelled. This lets `(a + b) - a = b`, the
+    // medial law, and every additive rearrangement close by `group` (and as a
+    // bare calc step).
+    {
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(carrierOpened, head, args);
+        auto* carrierConstant = std::get_if<Constant>(&head->node);
+        const bool lawsInScope =
+            environment_.lookup("VectorSpace.add_associative") != nullptr
+            && environment_.lookup("VectorSpace.add_commutative") != nullptr
+            && environment_.lookup("VectorSpace.zero_add") != nullptr
+            && environment_.lookup("VectorSpace.add_zero") != nullptr
+            && environment_.lookup("VectorSpace.add_negate_left") != nullptr
+            && environment_.lookup("VectorSpace.add_negate_right") != nullptr;
+        if (carrierConstant && carrierConstant->name == "VectorSpace.carrier"
+            && args.size() == 2 && lawsInScope) {
+            ExpressionPointer fieldArg = args[0];
+            ExpressionPointer spaceArg = args[1];
+            auto applyFieldSpace =
+                [&](const std::string& name) -> ExpressionPointer {
+                return makeApplication(
+                    makeApplication(makeConstant(name), fieldArg), spaceArg);
+            };
+            scheme.carrierType = carrierOpened;
+            scheme.carrierLevel = level;
+            scheme.operation = applyFieldSpace("VectorSpace.add");
+            scheme.identity = applyFieldSpace("VectorSpace.zero");
+            scheme.inverse = applyFieldSpace("VectorSpace.negate");
+            scheme.bundlePrefix = {fieldArg, spaceArg};
+            scheme.associativityName = "VectorSpace.add_associative";
+            scheme.identityLeftName = "VectorSpace.zero_add";
+            scheme.identityRightName = "VectorSpace.add_zero";
+            scheme.inverseLeftName = "VectorSpace.add_negate_left";
+            scheme.inverseRightName = "VectorSpace.add_negate_right";
+            scheme.commutativityName = "VectorSpace.add_commutative";
+            scheme.subtractHead = "VectorSpace.subtract";
+            scheme.abelian = true;
+            found = true;
+            foundIsGroup = true;
+        }
+    }
+
+    for (size_t i = 0; !found && i < binderCount; ++i) {
         // Peel the binder's STATED type without normalising: `IsGroup` /
         // `IsMonoid` are transparent definitions, so a whnf would unfold the
         // head to its conjunction body and hide the structure name.
@@ -250,6 +307,21 @@ ExpressionPointer Elaborator::proveGroupEquality(
     auto cancels = [&](const GroupAtom& s, const GroupAtom& h) -> bool {
         return sameTerm(s.term, h.term) && s.inverted != h.inverted;
     };
+    // A definitional subtract `subtractHead {prefix}(x, y)` (= op(x, inverse(y)))
+    // is unfolded to the add∘inverse form before normalising.
+    auto matchSubtract = [&](ExpressionPointer e, ExpressionPointer& x,
+                             ExpressionPointer& y) -> bool {
+        if (scheme.subtractHead.empty() || !effectiveInverse) return false;
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(e, head, args);
+        auto* constant = std::get_if<Constant>(&head->node);
+        if (!constant || constant->name != scheme.subtractHead) return false;
+        if (args.size() != scheme.bundlePrefix.size() + 2) return false;
+        x = args[args.size() - 2];
+        y = args[args.size() - 1];
+        return true;
+    };
 
     // ---- concat: op(termA, termB) = canonical(reduce(wordA ++ wordB)) ---
     // Returns the combined reduced word, its term, and the proof of the
@@ -407,6 +479,17 @@ ExpressionPointer Elaborator::proveGroupEquality(
         if (isIdentity(e)) {
             return {{}, e, refl(e)};
         }
+        ExpressionPointer subX, subY;
+        if (matchSubtract(e, subX, subY)) {
+            // `e ≡ op(subX, inverse(subY))` definitionally, so reflexivity
+            // bridges `e = addForm`; then normalise the add form.
+            ExpressionPointer addForm =
+                buildOp(subX, makeApplication(scheme.inverse, subY));
+            GroupNorm normed = normalize(addForm);
+            ExpressionPointer proof = trans(
+                e, addForm, normed.term, refl(e), normed.proof);
+            return {normed.word, normed.term, proof};
+        }
         ExpressionPointer invArg;
         if (matchInverse(e, invArg)) {
             ExpressionPointer a2, b2, innerInv;
@@ -441,8 +524,163 @@ ExpressionPointer Elaborator::proveGroupEquality(
         return {{GroupAtom{e, false}}, e, refl(e)};
     };
 
+    // ---- abelian canonicalisation: sort the reduced word to a canonical
+    // order (proof via commutative adjacent swaps), then cancel any inverse
+    // pairs the sort brought together. Only runs when commutativity is
+    // available (`scheme.abelian`).
+
+    // Total order on atoms: by structural order of the underlying term, then
+    // positive before inverted (so `x` and `x⁻¹` land adjacent, ready to
+    // cancel).
+    auto atomLess = [&](const GroupAtom& x, const GroupAtom& y) -> bool {
+        int c = compareExpressionStructure(x.term, y.term);
+        if (c != 0) return c < 0;
+        return (!x.inverted) && y.inverted;
+    };
+
+    // Proof that swapping the adjacent atoms at positions (i, i+1) preserves
+    // the word's term: `wordToTerm(w) = wordToTerm(swap(w, i))`.
+    std::function<ExpressionPointer(const std::vector<GroupAtom>&, size_t)>
+        swapAdjacentProof =
+            [&](const std::vector<GroupAtom>& w, size_t i) -> ExpressionPointer {
+        if (i > 0) {
+            ExpressionPointer headTerm = atomTerm(w[0]);
+            std::vector<GroupAtom> tail(w.begin() + 1, w.end());
+            ExpressionPointer tailTerm = wordToTerm(tail);
+            std::vector<GroupAtom> tailSwapped = tail;
+            std::swap(tailSwapped[i - 1], tailSwapped[i]);
+            ExpressionPointer tailSwappedTerm = wordToTerm(tailSwapped);
+            ExpressionPointer inner = swapAdjacentProof(tail, i - 1);
+            return opCongruence(headTerm, headTerm, refl(headTerm),
+                                tailTerm, tailSwappedTerm, inner);
+        }
+        ExpressionPointer a0 = atomTerm(w[0]);
+        ExpressionPointer a1 = atomTerm(w[1]);
+        ExpressionPointer commProof =
+            applyAccessor(scheme.commutativityName, {a0, a1});
+        if (w.size() == 2) return commProof;
+        std::vector<GroupAtom> rest(w.begin() + 2, w.end());
+        ExpressionPointer restTerm = wordToTerm(rest);
+        // op(a0, op(a1, rest)) = op(op(a0,a1), rest)   [reversed assoc]
+        ExpressionPointer assoc1 =
+            applyAccessor(scheme.associativityName, {a0, a1, restTerm});
+        ExpressionPointer step1 = buildEqualitySymmetry(
+            level, carrier, buildOp(buildOp(a0, a1), restTerm),
+            buildOp(a0, buildOp(a1, restTerm)), assoc1);
+        // op(op(a0,a1), rest) = op(op(a1,a0), rest)    [cong-left comm]
+        ExpressionPointer step2 = opCongruence(
+            buildOp(a0, a1), buildOp(a1, a0), commProof,
+            restTerm, restTerm, refl(restTerm));
+        // op(op(a1,a0), rest) = op(a1, op(a0, rest))   [assoc]
+        ExpressionPointer assoc2 =
+            applyAccessor(scheme.associativityName, {a1, a0, restTerm});
+        ExpressionPointer t1 = trans(
+            buildOp(a0, buildOp(a1, restTerm)),
+            buildOp(buildOp(a0, a1), restTerm),
+            buildOp(buildOp(a1, a0), restTerm), step1, step2);
+        return trans(
+            buildOp(a0, buildOp(a1, restTerm)),
+            buildOp(buildOp(a1, a0), restTerm),
+            buildOp(a1, buildOp(a0, restTerm)), t1, assoc2);
+    };
+
+    // Proof that cancelling the inverse pair at positions (i, i+1) preserves
+    // the term: `wordToTerm(w) = wordToTerm(w without i, i+1)`.
+    std::function<ExpressionPointer(const std::vector<GroupAtom>&, size_t)>
+        cancelPairProof =
+            [&](const std::vector<GroupAtom>& w, size_t i) -> ExpressionPointer {
+        if (i > 0) {
+            ExpressionPointer headTerm = atomTerm(w[0]);
+            std::vector<GroupAtom> tail(w.begin() + 1, w.end());
+            ExpressionPointer tailTerm = wordToTerm(tail);
+            std::vector<GroupAtom> tailReduced = tail;
+            tailReduced.erase(tailReduced.begin() + (i - 1),
+                              tailReduced.begin() + (i + 1));
+            ExpressionPointer tailReducedTerm = wordToTerm(tailReduced);
+            ExpressionPointer inner = cancelPairProof(tail, i - 1);
+            return opCongruence(headTerm, headTerm, refl(headTerm),
+                                tailTerm, tailReducedTerm, inner);
+        }
+        const GroupAtom& s = w[0];
+        ExpressionPointer sTerm = atomTerm(s);
+        ExpressionPointer hTerm = atomTerm(w[1]);
+        // op(sTerm, hTerm) = identity, from the correct inverse law.
+        ExpressionPointer cancelProof = s.inverted
+            ? applyAccessor(scheme.inverseLeftName, {s.term})
+            : applyAccessor(scheme.inverseRightName, {s.term});
+        if (w.size() == 2) return cancelProof;
+        std::vector<GroupAtom> rest(w.begin() + 2, w.end());
+        ExpressionPointer restTerm = wordToTerm(rest);
+        // op(sTerm, op(hTerm, rest)) = op(op(sTerm,hTerm), rest)  [rev assoc]
+        ExpressionPointer assocFwd =
+            applyAccessor(scheme.associativityName, {sTerm, hTerm, restTerm});
+        ExpressionPointer revAssoc = buildEqualitySymmetry(
+            level, carrier, buildOp(buildOp(sTerm, hTerm), restTerm),
+            buildOp(sTerm, buildOp(hTerm, restTerm)), assocFwd);
+        // = op(identity, rest)   [cong-left cancelProof]
+        ExpressionPointer cong = opCongruence(
+            buildOp(sTerm, hTerm), scheme.identity, cancelProof,
+            restTerm, restTerm, refl(restTerm));
+        // = rest   [identity_left]
+        ExpressionPointer idl =
+            applyAccessor(scheme.identityLeftName, {restTerm});
+        ExpressionPointer p1 = trans(
+            buildOp(sTerm, buildOp(hTerm, restTerm)),
+            buildOp(buildOp(sTerm, hTerm), restTerm),
+            buildOp(scheme.identity, restTerm), revAssoc, cong);
+        return trans(
+            buildOp(sTerm, buildOp(hTerm, restTerm)),
+            buildOp(scheme.identity, restTerm), restTerm, p1, idl);
+    };
+
+    // Sort + re-cancel a reduced word, threading the proof from the original
+    // expression `origExpr` (nrm.proof : origExpr = wordToTerm(nrm.word)).
+    auto abelianCanonicalize =
+        [&](ExpressionPointer origExpr, GroupNorm nrm) -> GroupNorm {
+        std::vector<GroupAtom> w = nrm.word;
+        ExpressionPointer currentTerm = nrm.term;
+        ExpressionPointer proof = nrm.proof;
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (size_t i = 0; i + 1 < w.size(); ++i) {
+                if (atomLess(w[i + 1], w[i])) {
+                    ExpressionPointer swp = swapAdjacentProof(w, i);
+                    std::swap(w[i], w[i + 1]);
+                    ExpressionPointer newTerm = wordToTerm(w);
+                    proof = trans(origExpr, currentTerm, newTerm, proof, swp);
+                    currentTerm = newTerm;
+                    changed = true;
+                }
+            }
+        }
+        if (cancelInverses) {
+            bool cancelled = true;
+            while (cancelled) {
+                cancelled = false;
+                for (size_t i = 0; i + 1 < w.size(); ++i) {
+                    if (cancels(w[i], w[i + 1])) {
+                        ExpressionPointer cp = cancelPairProof(w, i);
+                        w.erase(w.begin() + i, w.begin() + i + 2);
+                        ExpressionPointer newTerm = wordToTerm(w);
+                        proof =
+                            trans(origExpr, currentTerm, newTerm, proof, cp);
+                        currentTerm = newTerm;
+                        cancelled = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return {w, currentTerm, proof};
+    };
+
     GroupNorm nL = normalize(leftOpened);
     GroupNorm nR = normalize(rightOpened);
+    if (scheme.abelian) {
+        nL = abelianCanonicalize(leftOpened, nL);
+        nR = abelianCanonicalize(rightOpened, nR);
+    }
 
     // Words must match (⇒ canonical terms are structurally identical).
     if (nL.word.size() != nR.word.size()) return nullptr;
