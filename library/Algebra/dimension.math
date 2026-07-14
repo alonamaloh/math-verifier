@@ -1,0 +1,171 @@
+-- Algebra/dimension.math
+--
+-- Dimension of a finite-dimensional vector space, and the invariance that
+-- makes it well-defined. The Steinitz exchange lemma (`VectorSpace.exchange`),
+-- applied in BOTH directions between two finite bases of a fixed space, forces
+-- their index sizes equal — so any `NaturalsBelow`-indexed basis pins a single
+-- natural number, the `dimension`, extracted by definite description
+-- (`Logic.the` over the invariance). This is the choice-free finite half of
+-- Stage F; the general (AC-gated) invariance is separate.
+--
+-- `SameDimension` is the general, index-agnostic relation: two spaces have the
+-- same dimension when a basis of one is equinumerous to a basis of the other
+-- (`Set/equinumerous.math`), needing no `Cardinal` type. For the finite case it
+-- follows from — and, via the counting toolkit, is equivalent to — equality of
+-- the natural-number dimensions.
+
+module Algebra.dimension
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.subtraction
+import Set.subtype
+import Set.finite
+import Set.equinumerous
+import Algebra.field
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.field_bundle
+import Algebra.vector_space
+import Algebra.linear_combination
+import Algebra.span
+import Algebra.exchange_lemma
+import Algebra.finite_dimensional
+
+-- `V has dimension n`: some `NaturalsBelow(n)`-indexed family is a basis. The
+-- witnessing basis need not be unique, but the count `n` is — `dimension_unique`
+-- below. `FiniteDimensional(V)` is definitionally `∃ n. HasDimension(V, n)`.
+definition VectorSpace.HasDimension {f : Field} (V : VectorSpace(f)) (n : Natural)
+        : Proposition :=
+  ∃ (basis : NaturalsBelow(n) → VectorSpace.carrier(V)). VectorSpace.IsBasis(basis)
+
+-- Two finite bases of the same space have the same size. The first is
+-- independent and the second spans, so the exchange lemma gives m ≤ n;
+-- symmetrically n ≤ m; antisymmetry concludes. This is the whole content
+-- of dimension being well-defined.
+theorem VectorSpace.basis_size_unique {f : Field} {V : VectorSpace(f)} (m n : Natural)
+        (firstBasis : NaturalsBelow(m) → VectorSpace.carrier(V))
+        (secondBasis : NaturalsBelow(n) → VectorSpace.carrier(V))
+        (firstIsBasis : VectorSpace.IsBasis(firstBasis))
+        (secondIsBasis : VectorSpace.IsBasis(secondBasis))
+        : m = n := {
+  VectorSpace.LinearlyIndependent(firstBasis)
+      by VectorSpace.IsBasis.linearly_independent as firstIndependent;
+  VectorSpace.Spans(firstBasis) by VectorSpace.IsBasis.spans as firstSpans;
+  VectorSpace.LinearlyIndependent(secondBasis)
+      by VectorSpace.IsBasis.linearly_independent as secondIndependent;
+  VectorSpace.Spans(secondBasis) by VectorSpace.IsBasis.spans as secondSpans;
+  m ≤ n by VectorSpace.exchange(m, n, firstBasis, secondBasis, firstIndependent, secondSpans);
+  n ≤ m by VectorSpace.exchange(n, m, secondBasis, firstBasis, secondIndependent, firstSpans);
+  done by Natural.le_antisymmetric
+}
+
+-- The count is an invariant of the space: any two witnesses of finite
+-- dimension agree. This is the uniqueness that `Logic.the` demands.
+theorem VectorSpace.dimension_unique {f : Field} (V : VectorSpace(f)) (m n : Natural)
+        (hasDimensionM : VectorSpace.HasDimension(V, m))
+        (hasDimensionN : VectorSpace.HasDimension(V, n))
+        : m = n := {
+  choose firstBasis such that VectorSpace.IsBasis(firstBasis) from hasDimensionM;
+  choose secondBasis such that VectorSpace.IsBasis(secondBasis) from hasDimensionN;
+  done by VectorSpace.basis_size_unique
+}
+
+-- Any two `NaturalsBelow`-indexed bases of a fixed space are equinumerous
+-- (their index yardsticks have equal size). This is the finite invariance
+-- expressed through `Equinumerous`, ready for `SameDimension`.
+theorem VectorSpace.bases_equinumerous {f : Field} {V : VectorSpace(f)} (m n : Natural)
+        (firstBasis : NaturalsBelow(m) → VectorSpace.carrier(V))
+        (secondBasis : NaturalsBelow(n) → VectorSpace.carrier(V))
+        (firstIsBasis : VectorSpace.IsBasis(firstBasis))
+        (secondIsBasis : VectorSpace.IsBasis(secondBasis))
+        : Equinumerous(NaturalsBelow(m), NaturalsBelow(n)) := {
+  m = n by VectorSpace.basis_size_unique as sizesEqual;
+  Equinumerous(NaturalsBelow(n), NaturalsBelow(n)) by Equinumerous.reflexive;
+  done by substituting sizesEqual
+}
+
+-- THE dimension: the unique count carried by a finite-dimensional space,
+-- pinned by definite description over the invariance. An honest function of
+-- (V, its finite-dimensionality proof).
+definition VectorSpace.dimension {f : Field} (V : VectorSpace(f))
+        (finiteDimensional : VectorSpace.FiniteDimensional(V)) : Natural :=
+  Logic.the(
+      Natural,
+      (n : Natural) ↦ VectorSpace.HasDimension(V, n),
+      finiteDimensional,
+      VectorSpace.dimension_unique(V))
+
+-- The dimension is realised: `V` has a basis indexed by `NaturalsBelow(dimension)`.
+theorem VectorSpace.dimension_has_basis {f : Field} (V : VectorSpace(f))
+        (finiteDimensional : VectorSpace.FiniteDimensional(V))
+        : VectorSpace.HasDimension(V, VectorSpace.dimension(V, finiteDimensional)) :=
+  Logic.the_satisfies(
+      Natural,
+      (n : Natural) ↦ VectorSpace.HasDimension(V, n),
+      finiteDimensional,
+      VectorSpace.dimension_unique(V))
+
+-- Characterisation: `dimension(V) = n` exactly when `V` has an
+-- `n`-indexed basis. (⟸ is the useful direction — read off a dimension from
+-- any exhibited finite basis.)
+theorem VectorSpace.dimension_equals {f : Field} (V : VectorSpace(f))
+        (finiteDimensional : VectorSpace.FiniteDimensional(V)) (n : Natural)
+        (hasDimension : VectorSpace.HasDimension(V, n))
+        : VectorSpace.dimension(V, finiteDimensional) = n := {
+  VectorSpace.HasDimension(V, VectorSpace.dimension(V, finiteDimensional))
+      by VectorSpace.dimension_has_basis;
+  done by VectorSpace.dimension_unique(V)
+}
+
+-- A field is one-dimensional over itself: {1} is its basis.
+theorem Field.vector_space_dimension (f : Field)
+        : VectorSpace.dimension(Field.vector_space(f), Field.vector_space_finite_dimensional(f))
+          = 1 := {
+  VectorSpace.IsBasis(Field.one_family(f)) by Field.one_family_is_basis as oneFamilyBasis;
+  VectorSpace.HasDimension(Field.vector_space(f), 1)
+      by witness Field.one_family(f) with oneFamilyBasis;
+  done by VectorSpace.dimension_equals(Field.vector_space(f), Field.vector_space_finite_dimensional(f))
+}
+
+-- ----------------------------------------------------------------------
+-- The general "same dimension" relation, stated through equinumerosity of
+-- index types so it applies to bases of any cardinality (no `Cardinal`
+-- object). Two spaces over the same field have the same dimension when some
+-- basis of one is equinumerous to some basis of the other.
+definition VectorSpace.SameDimension {f : Field} (V W : VectorSpace(f)) : Proposition :=
+  ∃ (I : Type(0)). ∃ (basisV : I → VectorSpace.carrier(V)).
+  ∃ (J : Type(0)). ∃ (basisW : J → VectorSpace.carrier(W)).
+      VectorSpace.IsBasis(basisV) ∧ VectorSpace.IsBasis(basisW) ∧ Equinumerous(I, J)
+
+-- Finite-dimensional spaces of equal dimension have the same dimension in the
+-- general sense: their `NaturalsBelow`-indexed bases have equinumerous index
+-- yardsticks.
+theorem VectorSpace.same_dimension_of_equal_dimension {f : Field} (V W : VectorSpace(f))
+        (finiteV : VectorSpace.FiniteDimensional(V))
+        (finiteW : VectorSpace.FiniteDimensional(W))
+        (equalDimension :
+            VectorSpace.dimension(V, finiteV) = VectorSpace.dimension(W, finiteW))
+        : VectorSpace.SameDimension(V, W) := {
+  VectorSpace.HasDimension(V, VectorSpace.dimension(V, finiteV))
+      by VectorSpace.dimension_has_basis as vHasBasis;
+  VectorSpace.HasDimension(W, VectorSpace.dimension(W, finiteW))
+      by VectorSpace.dimension_has_basis as wHasBasis;
+  choose basisV such that VectorSpace.IsBasis(basisV) as basisVIsBasis from vHasBasis;
+  choose basisW such that VectorSpace.IsBasis(basisW) as basisWIsBasis from wHasBasis;
+  Equinumerous(NaturalsBelow(VectorSpace.dimension(W, finiteW)),
+               NaturalsBelow(VectorSpace.dimension(W, finiteW)))
+      by Equinumerous.reflexive;
+  Equinumerous(NaturalsBelow(VectorSpace.dimension(V, finiteV)),
+               NaturalsBelow(VectorSpace.dimension(W, finiteW)))
+      by substituting equalDimension as yardsticksEquinumerous;
+  VectorSpace.IsBasis(basisV) ∧ VectorSpace.IsBasis(basisW)
+      ∧ Equinumerous(NaturalsBelow(VectorSpace.dimension(V, finiteV)),
+                     NaturalsBelow(VectorSpace.dimension(W, finiteW)))
+      by And.introduction(basisVIsBasis, And.introduction(basisWIsBasis, yardsticksEquinumerous))
+      as combined;
+  witness NaturalsBelow(VectorSpace.dimension(V, finiteV)) with witness basisV with
+    witness NaturalsBelow(VectorSpace.dimension(W, finiteW)) with witness basisW with combined
+}
