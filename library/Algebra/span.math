@@ -39,14 +39,19 @@ import Algebra.vector_space
 import Algebra.vector_space_lemmas
 import Algebra.linear_combination
 
--- The family spans: every vector is a finite linear combination of
--- family members.
+-- The family spans: every vector is the zero vector or a finite linear
+-- combination of family members. The explicit `v = 0` disjunct is what
+-- lets the EMPTY family span the trivial space {0}: a combination carries
+-- a selection `Natural → I`, and for the empty index type there is none —
+-- but the empty sum is 0 regardless, so reaching 0 must not require one.
+-- (This mirrors a span being a closure that always contains 0.)
 definition VectorSpace.Spans {f : Field} {V : VectorSpace(f)} {I : Type(0)}
         (family : I → VectorSpace.carrier(V)) : Proposition :=
   ∀ (v : VectorSpace.carrier(V)).
-      ∃ (count : Natural). ∃ (selection : Natural → I).
-      ∃ (coefficients : Natural → Field.carrier(f)).
-          v = VectorSpace.linearCombination(family, coefficients, selection, count)
+      v = VectorSpace.zero(V)
+      ∨ (∃ (count : Natural). ∃ (selection : Natural → I).
+         ∃ (coefficients : Natural → Field.carrier(f)).
+             v = VectorSpace.linearCombination(family, coefficients, selection, count))
 
 -- The family is linearly independent: a vanishing combination of
 -- DISTINCT members (the selection is injective below the count) has
@@ -99,19 +104,6 @@ definition VectorSpace.InSpanOf {f : Field} {V : VectorSpace(f)} {I : Type(0)}
   ∃ (count : Natural). ∃ (selection : Natural → I).
   ∃ (coefficients : Natural → Field.carrier(f)).
       v = VectorSpace.linearCombination(family, coefficients, selection, count)
-
--- Spanning is membership at every vector.
-definition VectorSpace.InSpanOf.of_spans {f : Field} {V : VectorSpace(f)}
-        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
-        (spanning : VectorSpace.Spans(family)) (v : VectorSpace.carrier(V))
-        : VectorSpace.InSpanOf(family, v) :=
-  spanning(v)
-
-definition VectorSpace.Spans.of_in_span {f : Field} {V : VectorSpace(f)}
-        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
-        (member : ∀ (v : VectorSpace.carrier(V)). VectorSpace.InSpanOf(family, v))
-        : VectorSpace.Spans(family) :=
-  member
 
 -- Every family member lies in the span (the length-one combination).
 theorem VectorSpace.InSpanOf.member {f : Field} {V : VectorSpace(f)}
@@ -175,6 +167,44 @@ theorem VectorSpace.InSpanOf.add {f : Field} {V : VectorSpace(f)} {I : Type(0)}
   witness countU + countV with witness VectorSpace.combineFunctions(selectionU, selectionV, countU)
        with witness VectorSpace.combineFunctions(coefficientsU, coefficientsV, countU)
        with sumIsCombination
+}
+
+-- The zero vector lies in every span with an inhabited index (0 · member).
+theorem VectorSpace.InSpanOf.zero {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (family : I → VectorSpace.carrier(V)) (inhabitant : I)
+        : VectorSpace.InSpanOf(family, VectorSpace.zero(V)) := {
+  VectorSpace.InSpanOf(family, family(inhabitant)) by VectorSpace.InSpanOf.member;
+  VectorSpace.InSpanOf(family, Field.zero(f) • family(inhabitant)) by VectorSpace.InSpanOf.scale;
+  Field.zero(f) • family(inhabitant) = VectorSpace.zero(V)
+      by VectorSpace.zero_scale as zeroIsZero;
+  done by substituting zeroIsZero
+}
+
+-- Spanning is membership at every vector. When `v` is the zero vector,
+-- membership comes from the empty combination (`InSpanOf.zero`, hence the
+-- inhabitant); otherwise the `Spans` disjunct already supplies it.
+definition VectorSpace.InSpanOf.of_spans {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
+        (inhabitant : I) (spanning : VectorSpace.Spans(family)) (v : VectorSpace.carrier(V))
+        : VectorSpace.InSpanOf(family, v) := {
+  v = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(family, v) by spanning;
+  done by cases {
+    case v = VectorSpace.zero(V) as vZero: {
+        VectorSpace.InSpanOf(family, VectorSpace.zero(V)) by VectorSpace.InSpanOf.zero;
+        done by substituting vZero
+      }
+    case VectorSpace.InSpanOf(family, v) as inSpan: { done }
+  }
+}
+
+-- A family every vector of which lies in its span is spanning.
+definition VectorSpace.Spans.of_in_span {f : Field} {V : VectorSpace(f)}
+        {I : Type(0)} {family : I → VectorSpace.carrier(V)}
+        (member : ∀ (v : VectorSpace.carrier(V)). VectorSpace.InSpanOf(family, v))
+        : VectorSpace.Spans(family) := {
+  take v : VectorSpace.carrier(V);
+  VectorSpace.InSpanOf(family, v) by member;
+  done
 }
 
 -- ----------------------------------------------------------------------
@@ -263,8 +293,10 @@ theorem Field.one_family_spans (f : Field)
                                     (i : Natural) ↦ NaturalsBelow.one_point, 1)
           by VectorSpace.linearCombination_one
     as targetIsCombination;
-  witness 1 with witness ((i : Natural) ↦ NaturalsBelow.one_point) with
-      witness ((i : Natural) ↦ v) with targetIsCombination
+  VectorSpace.InSpanOf(Field.one_family(f), v)
+    by { witness 1 with witness ((i : Natural) ↦ NaturalsBelow.one_point) with
+             witness ((i : Natural) ↦ v) with targetIsCombination };
+  done
 }
 
 theorem Field.one_family_independent (f : Field)

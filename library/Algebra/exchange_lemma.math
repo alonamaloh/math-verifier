@@ -230,19 +230,8 @@ theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
   }
 
 -- ----------------------------------------------------------------------
--- Two more span-closure facts (the subspace laws not yet recorded): the
--- zero vector is in every span with an inhabited index, and spans are
--- closed under subtraction.
-
-theorem VectorSpace.InSpanOf.zero {f : Field} {V : VectorSpace(f)} {I : Type(0)}
-        (family : I → VectorSpace.carrier(V)) (inhabitant : I)
-        : VectorSpace.InSpanOf(family, VectorSpace.zero(V)) := {
-  VectorSpace.InSpanOf(family, family(inhabitant)) by VectorSpace.InSpanOf.member;
-  VectorSpace.InSpanOf(family, Field.zero(f) • family(inhabitant)) by VectorSpace.InSpanOf.scale;
-  Field.zero(f) • family(inhabitant) = VectorSpace.zero(V)
-      by VectorSpace.zero_scale as zeroIsZero;
-  done by substituting zeroIsZero
-}
+-- One more span-closure fact (a subspace law not yet recorded): spans are
+-- closed under subtraction. (`InSpanOf.zero` now lives in span.math.)
 
 theorem VectorSpace.InSpanOf.subtract {f : Field} {V : VectorSpace(f)} {I : Type(0)}
         (family : I → VectorSpace.carrier(V)) (u v : VectorSpace.carrier(V))
@@ -520,7 +509,7 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
               ∧ (∀ (i : Natural). n ≤ i → gNew(i) = VectorSpace.zero(V))
               ∧ (∀ (i : Natural). i < 1 + k → gNew(i) = uu(i)) := {
   -- Expand uu(k) in canonical coordinates over g.
-  VectorSpace.InSpanOf(g, uu(k)) by VectorSpace.InSpanOf.of_spans as ukInSpan;
+  VectorSpace.InSpanOf(g, uu(k)) by VectorSpace.InSpanOf.of_spans(inhabitant := 0) as ukInSpan;
   choose count, selection, coeffs such that
       uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count) from ukInSpan;
   uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count) as ukLinComb;
@@ -709,8 +698,10 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
   VectorSpace.Spans(VectorSpace.swapIn(g, k, j, uu(k)))
     by {
       take v : VectorSpace.carrier(V);
-      VectorSpace.InSpanOf(g, v) by VectorSpace.InSpanOf.of_spans;
-      done by VectorSpace.InSpanOf.transitive(outerInhabitant := 0)
+      VectorSpace.InSpanOf(g, v) by VectorSpace.InSpanOf.of_spans(inhabitant := 0);
+      VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), v)
+          by VectorSpace.InSpanOf.transitive(outerInhabitant := 0);
+      done
     } as newSpans;
   ∀ (i : Natural). n ≤ i → VectorSpace.swapIn(g, k, j, uu(k))(i) = VectorSpace.zero(V)
     by {
@@ -821,7 +812,7 @@ theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
     ∀ (i : Natural). n ≤ i → gn(i) = VectorSpace.zero(V) as gnVanishesPast;
     ∀ (i : Natural). i < n → gn(i) = uu(i) as gnAgreePrefix;
     -- Expand uu(n) in canonical coordinates over gn, then over uu.
-    VectorSpace.InSpanOf(gn, uu(n)) by VectorSpace.InSpanOf.of_spans as unInSpan;
+    VectorSpace.InSpanOf(gn, uu(n)) by VectorSpace.InSpanOf.of_spans(inhabitant := 0) as unInSpan;
     choose count, selection, coeffs such that
         uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count) from unInSpan;
     uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count) as unLinComb;
@@ -1032,37 +1023,43 @@ theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
         VectorSpace.Spans(Function.extendBelow(w, VectorSpace.zero(V)))
           by {
             take v : VectorSpace.carrier(V);
-            ∃ (count : Natural). ∃ (selection : Natural → NaturalsBelow(n)).
-                ∃ (coefficients : Natural → Field.carrier(f)).
-                v = VectorSpace.linearCombination(w, coefficients, selection, count)
-                by spanning as vSpanned;
-            choose count, selection, coefficients such that
-                v = VectorSpace.linearCombination(w, coefficients, selection, count) from vSpanned;
-            v = VectorSpace.linearCombination(w, coefficients, selection, count) as vComb;
+            v = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(w, v) by spanning;
+            done by cases {
+              case v = VectorSpace.zero(V) as vZero: { done }
+              case VectorSpace.InSpanOf(w, v) as vInSpan: {
+                  choose count, selection, coefficients such that
+                      v = VectorSpace.linearCombination(w, coefficients, selection, count)
+                      from vInSpan;
+                  v = VectorSpace.linearCombination(w, coefficients, selection, count) as vComb;
 
-            ∀ (k : Natural). k < count →
-                coefficients(k) • w(selection(k))
-                = coefficients(k)
-                  • Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
-              by {
-                take k : Natural;
-                suppose k < count as kLtCount;
-                NaturalsBelow.value(selection(k)) < n by NaturalsBelow.below as valueBelow;
-                Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
-                   = w(NaturalsBelow.make(NaturalsBelow.value(selection(k)), valueBelow))
-                         by Function.extendBelow_below
-                   = w(selection(k))   by NaturalsBelow.equal_of_value
-                   as extAtK;
-                done by substituting extAtK
-              } as termsAgreeSpan;
+                  ∀ (k : Natural). k < count →
+                      coefficients(k) • w(selection(k))
+                      = coefficients(k)
+                        • Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
+                    by {
+                      take k : Natural;
+                      suppose k < count as kLtCount;
+                      NaturalsBelow.value(selection(k)) < n by NaturalsBelow.below as valueBelow;
+                      Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
+                         = w(NaturalsBelow.make(NaturalsBelow.value(selection(k)), valueBelow))
+                               by Function.extendBelow_below
+                         = w(selection(k))   by NaturalsBelow.equal_of_value
+                         as extAtK;
+                      done by substituting extAtK
+                    } as termsAgreeSpan;
 
-            v = VectorSpace.linearCombination(w, coefficients, selection, count)   by vComb
-              = VectorSpace.linearCombination(Function.extendBelow(w, VectorSpace.zero(V)),
-                    coefficients, (k : Natural) ↦ NaturalsBelow.value(selection(k)), count)
-                    by VectorSpace.linearCombination_congruence
-              as vExtComb;
-            witness count with witness ((k : Natural) ↦ NaturalsBelow.value(selection(k)))
-                 with witness coefficients with vExtComb
+                  v = VectorSpace.linearCombination(w, coefficients, selection, count)   by vComb
+                    = VectorSpace.linearCombination(Function.extendBelow(w, VectorSpace.zero(V)),
+                          coefficients, (k : Natural) ↦ NaturalsBelow.value(selection(k)), count)
+                          by VectorSpace.linearCombination_congruence
+                    as vExtComb;
+                  VectorSpace.InSpanOf(Function.extendBelow(w, VectorSpace.zero(V)), v)
+                    by { witness count
+                             with witness ((k : Natural) ↦ NaturalsBelow.value(selection(k)))
+                             with witness coefficients with vExtComb };
+                  done
+                }
+            }
           } as wExtSpans;
 
         ∀ (i : Natural). n ≤ i → Function.extendBelow(w, VectorSpace.zero(V))(i) = VectorSpace.zero(V)
