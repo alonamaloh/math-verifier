@@ -191,8 +191,13 @@ Update this section before ending any session that works on the plan.
   Kept-despite-warning hints: the `by selectionInjective` /
   `below_one_is_zero` / assembling citations in span.math (operative
   reasons, deliberate).
-- **Stage E — PARTIALLY DONE (2026-07-12).** Two of the four pieces
-  landed; the two abstract pieces (exchange lemma, pruning) remain.
+- **Stage E — MOSTLY DONE (2026-07-14).** Three of the four pieces landed:
+  `FiniteDimensional` + `F[x]` (2026-07-12), and the **Steinitz exchange
+  lemma core** (`Algebra/exchange_lemma.math`, `independent_le_spanning`,
+  2026-07-14 — the abstract crux, where `Field.reciprocal` finally enters).
+  Remaining: the exchange lemma's packaging bridge to index-generic
+  `LinearlyIndependent`/`Spans`, and the pruning piece (FinitelyGenerated ⟹
+  finite basis).
   - **`FiniteDimensional` — DONE.** `Algebra/finite_dimensional.math`:
     `VectorSpace.FiniteDimensional(V) := ∃ n. ∃ (b : NaturalsBelow(n) →
     carrier). IsBasis(b)` (the propositional finite-basis predicate; the
@@ -233,10 +238,62 @@ Update this section before ending any session that works on the plan.
     `x = y by h; done`, and the resulting unused-name cascade settled by
     dropping the now-dead `as <name>` labels. 17 → 0 leaks; clean-check 174
     files / 232 residual leaks unchanged.
-  - **Exchange lemma (Steinitz) — IN PROGRESS (foundation laid 2026-07-12).**
-    The independent-≤-spanning, one-swap-at-a-time argument (where
-    `Field.reciprocal` enters). This is the abstract crux and the transport
-    probe feeding Stage F dimension. Foundation landed toward it:
+  - **Exchange lemma (Steinitz) — CORE DONE (2026-07-14).** The
+    independent-≤-spanning, one-swap-at-a-time argument (where
+    `Field.reciprocal` FINALLY enters). This is the abstract crux and the
+    transport probe feeding Stage F dimension. `Algebra/exchange_lemma.math`
+    proves `VectorSpace.independent_le_spanning` (canonical-coordinate form):
+    `StandardIndependentBelow(uu, m)` + (`w` vanishes past `n`) + `Spans(w)`
+    ⟹ `m ≤ n`. Only the packaging bridge to the index-generic
+    `LinearlyIndependent`/`Spans` remains. Landed this session:
+    - **Reciprocal-solve** — `scale_reciprocal_cancel` (`a⁻¹·(a·v)=v`),
+      `InSpanOf.scale_cancel` (a nonzero multiple of `v` in a span puts `v`
+      in the span). First genuine use of field-over-ring structure.
+    - **Canonical coordinates** — `standardCombination(g,c,n) = Σ_{i<n}c(i)•g(i)`
+      (identity selection, so "the coefficient at slot j" is well-defined) with
+      `_add_one`/`_congruence`/`_bump` (bump-one-coordinate), a generic
+      `Function.updateAt` (type-variable codomain to dodge the `Field.carrier`
+      motive quirk), and `linearCombination_standardize` (any combination of a
+      family that VANISHES PAST `n` normalises to canonical coordinates —
+      induction on length, bumping the selected slot, dropping out-of-range
+      terms). Normalisation is what made the exchange step read a slot's
+      coefficient without a summation-regrouping/histogram lemma.
+    - **Pivot extraction** (sub-piece 1) — `StandardIndependentBelow` +
+      `exchange_find_pivot`: independence of `uu(0..k)` forces some REMAINING
+      slot (index in `[k,n)`) to carry a nonzero coefficient (else a `-1` at
+      slot k is a nontrivial vanishing combination; `Field.negate_one_nonzero`).
+    - **The swap step** — `swapIn(g,k,j,v)` (transpose-and-overwrite, two
+      `updateAt`s; the `i=j`-first case order handles `j=k` uniformly) and
+      `exchange_step`: `uu(k)` swapped in at slot `k`, old `g(k)` parked at slot
+      `j`, swapped-out `g(j)` recovered by `scale_cancel` after isolating it via
+      a zeroed-coefficient combination through the modified family;
+      `InSpanOf.of_combination` + `.transitive` discharge "still spans".
+    - **Induction + inequality** — `exchange_build` (for each `k ≤ n`, a
+      spanning family whose first `k` entries are `uu(0..k-1)`) then
+      `independent_le_spanning` (if `m>n`, the `k=n` family exhibits `uu(n)` as
+      a combination of `uu(0..n-1)` → contradiction).
+    - **PROBE VERDICT (see STRESS_PROBES.md):** (i) [PROVER] there is NO
+      additive/`ring`-additive normaliser over `VectorSpace.carrier`, so group
+      identities like `(a+b)-a=b` (`add_subtract_cancel_left`) and the medial
+      law are hand-proven — filed a two-tier tactic (additive-group normaliser;
+      free-module `linear_combination` collecting like terms via field-coeff
+      `ring`). Owner concurs this is the right tool. (ii) [SURFACE] the
+      `NaturalsBelow(n)` reindexing pain the plan feared did NOT hit the guts —
+      working over `Natural`-indexed families with bounded predicates turned
+      delete/insert/swap into `Function.updateAt`/`swapIn` point-updates. The
+      transport cost is confined to the not-yet-built bridge.
+    - **NOT YET IN CLEAN MANIFEST** — like `coordinate_space`/`polynomial_
+      vector_space` initially: builds green under default gates (library+tests
+      PASS), but has ~60 `--check-redundant-by` hints that need the careful
+      per-site read-through (half are load-bearing keeps), deferred.
+    - **NEXT (packaging bridge):** extend `NaturalsBelow(m)→V` families and
+      `Natural→NaturalsBelow(m)` selections to total `Natural`-indexed maps via
+      a value-level dependent conditional (`Logic.classical_decidable(i<m)`
+      pattern-match, à la `Rational.minimumWithDecision`), with an `m=0`/`len=0`
+      trivial split; add `linearCombination_congruence`; then state the official
+      `exchange : LinearlyIndependent(u:NaturalsBelow(m)) ∧ Spans(w:NaturalsBelow(n)) → m ≤ n`.
+    ---
+    Foundation landed 2026-07-12 (below), all consumed by the core above:
     - **Combination module-algebra** (`Algebra/linear_combination.math`):
       `linearCombination_scale` (`a·Σcᵢbᵢ = Σ(a·cᵢ)bᵢ`) and
       `linearCombination_add_coefficients` (`Σcᵢbᵢ + Σdᵢbᵢ = Σ(cᵢ+dᵢ)bᵢ`),
@@ -277,10 +334,9 @@ Update this section before ending any session that works on the plan.
       closing from member/scale/add). Base case needs a `J` inhabitant to
       write `0 = 0·outer(inhabitant)` — the same caveat the other InSpanOf
       lemmas carry.
-    - **NEXT = the Steinitz exchange induction** (where `Field.reciprocal`
-      finally enters: solve for the swapped-out vector by dividing by its
-      nonzero coefficient). Span-transitivity is the substitution its
-      replacement step performs.
+    - **Steinitz exchange induction — DONE 2026-07-14** (see the CORE DONE
+      block above). Span-transitivity is the substitution its replacement step
+      performs; `Field.reciprocal` enters via `InSpanOf.scale_cancel`.
   - **FinitelyGenerated ⟹ finite basis (pruning) — NOT STARTED.** Prune a
     finite spanning family down to an independent one (choice-free); needs
     "remove one index from a `NaturalsBelow(count)` family" reindexing. Shares

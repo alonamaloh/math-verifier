@@ -39,7 +39,11 @@ may import from its own layer and below, never above. (Build/layout depth:
   subtype), `linear_map` (kernel/image as subspaces, injective ⟺
   trivial kernel), `linear_combination` (Σ over the vector carrier),
   `span` (index-generic `Spans`/`LinearlyIndependent`/`IsBasis`,
-  `FinitelyGenerated`).
+  `FinitelyGenerated`, `InSpanOf`), `finite_dimensional`,
+  `polynomial_vector_space` (F[x] with the {xⁿ} basis),
+  `exchange_lemma` (the Steinitz inequality `independent_le_spanning`:
+  an independent family is ≤ a spanning one — where `Field.reciprocal`
+  enters).
 - **`Polynomial/`** — the polynomial ring over a coefficient ring:
   `addition`/`multiplication`, `degree` (+ degree-of-product), `division`,
   `bezout`, `irreducible`, `units`, `quotient_field`.

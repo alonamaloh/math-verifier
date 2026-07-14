@@ -257,8 +257,71 @@ took and a judgment on whether new sugar would remove them.
 
 ---
 
+## PROBE — Steinitz exchange lemma · [SURFACE + PROVER] verdict (2026-07-14)
+
+**What was built.** `Algebra/exchange_lemma.math`: the Steinitz inequality
+`independent_le_spanning` (an independent family is ≤ a spanning one, hence
+`m ≤ n`), proven by the classical one-swap-at-a-time argument — the first
+genuine use of `Field.reciprocal` (dividing by the pivot coefficient in
+`InSpanOf.scale_cancel`). Supporting bricks: a canonical-coordinate layer
+(`standardCombination` + peel/congruence/bump), combination normalisation
+(any combination of a family that vanishes past `n` → canonical coordinates),
+pivot extraction from independence, `swapIn` + `exchange_step`, the
+`exchange_build` induction.
+
+**Verdict — two friction sources, both naming a concrete tool.**
+
+1. **No additive/linear-combination normaliser over `VectorSpace.carrier`
+   [PROVER].** `ring`/`field` run only over commutative-ring carriers; over a
+   vector carrier the *only* automation is the fixed `automatic` flattened-law
+   rewrite set, which is not a decision procedure. So group-arithmetic
+   identities that a normaliser would close in one step had to be hand-proven:
+   `add_subtract_cancel_left` ((a+b)−a=b), `add_pair_interchange` (the medial
+   law, already in `linear_combination.math`), and the scattered assoc/comm
+   chains in every `standardCombination_*` proof. **Two-tier fix, in order of
+   power:** (a) an *additive-group normaliser* — the sound additive fragment of
+   `ring` (assoc/comm/inverse/`0`, pushing `•` through `+`/`−`) over any
+   `IsAbelianGroup`/`VectorSpace.carrier`; (b) a *`linear_combination` / free-
+   module normaliser* that treats each distinct vector as an atom, normalises
+   both sides to a canonical `Σ cᵢ • vᵢ` by collecting like terms — where
+   collecting means **adding coefficients in the field, discharged by
+   `ring`/`field`** — then compares atom-by-atom. Tier (b) subsumes (a) and
+   would collapse most of `linear_combination.math` and the coordinate algebra
+   in this file to one-liners (it closes `a•v + b•v = (a+b)•v`,
+   `a•(u+v)=a•u+a•v`, etc.). This is the highest-impact automation the linear-
+   algebra branch has surfaced.
+
+2. **`NaturalsBelow(m)` ⇄ `Natural` transport at the boundary [SURFACE].** The
+   proof runs entirely on `Natural`-indexed families with bounded predicates
+   (`StandardIndependentBelow`, `Spans` + a "vanishes past n" clause), which
+   kept the guts free of `NaturalsBelow.make` gymnastics — the reindexing pain
+   the plan warned about *did not* materialise inside the argument (delete/
+   insert/swap became point-updates via `Function.updateAt`/`swapIn`, no
+   subset representation needed). The friction is confined to the **bridge** to
+   the index-generic `LinearlyIndependent`/`Spans`: extending a
+   `NaturalsBelow(m) → V` family to `Natural → V` needs a value-level
+   *dependent* conditional (`if i<m then u(make(i, proof)) else zero`, i.e. a
+   `Logic.classical_decidable(i<m)` pattern-match binding the proof, à la
+   `Rational.minimumWithDecision`), the *selection* into `NaturalsBelow(m)`
+   needs the same total extension (with an `m=0`/`len=0` trivial split for the
+   empty index type), plus a `linearCombination_congruence`. That bridge is a
+   self-contained transport package — **deferred as the documented next step**;
+   the measurement itself is the finding (the encoding choice moved the cost
+   entirely to the boundary, which is the right place for it).
+
+**Done =** core theorem verified library-green (canonical-coordinate form);
+official-`IsBasis` bridge is the next step; both tactic tiers filed below.
+
+---
+
 ## Side quests / infrastructure (not blocked on any probe)
 
+- [ ] **Vector-space / free-module normaliser (`vector_ring` / `module` /
+  `linear_combination`-for-vectors).** See the Steinitz verdict above. Tier (a):
+  additive-group normaliser over `IsAbelianGroup`. Tier (b): free-module
+  normaliser collecting like terms with field-coefficient arithmetic. Highest-
+  impact automation for the linear-algebra branch; would erase the manual
+  assoc/comm/`add_subtract_cancel_left` chains throughout `Algebra/*`.
 - [ ] **`linarith`.** A linear-arithmetic procedure over ordered fields. The
   analysis probes will keep generating its spec; build it from the captured
   ε-chasing snippets. Highest expected impact on naturalness library-wide.
