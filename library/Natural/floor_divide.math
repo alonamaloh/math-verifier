@@ -457,6 +457,21 @@ theorem Natural.modulo_bound
         : successor(Natural.modulo(dividend, divisor)) ≤ divisor :=
   done by Natural.modulo_step_lt_divisor unfolding Natural.modulo
 
+-- The remainder is strictly below a nonzero divisor. This is the decrease
+-- witness a Euclidean recursion needs (`gcd(a, b) = gcd(b, a mod b)
+-- decreasing b`): the second argument strictly shrinks. The `divisor ≠ 0`
+-- premise is exactly the negation the `else` branch of the guard `b = 0`
+-- supplies, so the obligation closes with no case split. Marked `automatic`
+-- so it discharges unprompted.
+automatic theorem Natural.modulo_lt
+        (dividend divisor : Natural)
+        (divisorNonzero : divisor ≠ 0)
+        : Natural.modulo(dividend, divisor) < divisor := {
+  1 ≤ divisor by Natural.one_le_of_nonzero;
+  Natural.modulo(dividend, divisor) + 1 ≤ divisor by Natural.modulo_bound;
+  done by Natural.lt_of_add_one_le
+}
+
 -- ----------------------------------------------------------------------
 -- Reverse direction: if d | n (i.e., n = d * q), then modulo(d, n) = 0.
 

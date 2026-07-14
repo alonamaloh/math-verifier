@@ -1099,6 +1099,16 @@ private:
                 declaration.body = parseBodyExpressionOrStatement(
                     /*allowClaimTail=*/true);
             }
+            // Optional `decreasing <measure>` clause: the guarded-recursion
+            // body recurses on a decreasing `<measure>` under a well-founded
+            // order, rather than structurally. `decreasing` is a soft keyword
+            // (a plain identifier elsewhere), recognised only in this trailing
+            // position.
+            if (isIdentifierLike(peek().kind)
+                && peek().lexeme == "decreasing") {
+                consumeAny();  // 'decreasing'
+                declaration.decreasingMeasure = parseExpression();
+            }
         } else if (peek().kind == TokenKind::Pipe) {
             // Pattern-match `| Ctor(...) => body` proof rows are a raw
             // recursor spelling; a theorem proof must read like mathematics.

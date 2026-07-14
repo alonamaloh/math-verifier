@@ -1138,6 +1138,12 @@ struct SurfaceDefinitionDeclaration {
     // canonical-constructor registry, which `by_representatives` and the
     // printer use to fold representative terms back to `Name(args)`.
     bool isConstruction = false;
+    // `definition f (…) : R := if <guard> then BASE else STEP decreasing
+    // <measure>` — a guarded-recursion body whose recursion is well-founded
+    // on a decreasing `<measure>` (any expression in the parameters), rather
+    // than structural. Non-null when the clause is present; drives the
+    // WellFounded.recursion desugaring in `tryDesugarWellFoundedRecursion`.
+    SurfaceExpressionPointer decreasingMeasure;
 };
 
 struct SurfaceImportDeclaration  { std::string moduleName; };

@@ -1,12 +1,10 @@
--- Manual target for the `decreasing` surface clause: gcd by well-founded
--- recursion on the second argument. This is the term the `decreasing b`
--- desugaring must synthesise — built by hand first to pin the shape.
---
--- gcd(a, b) = if b = 0 then a else gcd(b, a mod b), measure b. The step
--- case-splits the measure (`subject`); the `successor(k)` arm carries the
--- structural positivity `1 ≤ successor(k)` that `modulo_bound` needs, and the
--- recursive call `gcd(b, a mod b)` becomes `recurse(a mod b, decrease)(b)` —
--- the non-measure argument `a` threaded through the motive `C(b) = (a) → ℕ`.
+-- Feature test: the `decreasing <measure>` surface clause. A guarded
+-- recursion whose measure strictly decreases under a well-founded order,
+-- written the way a mathematician would — `gcd(a, b) = if b = 0 then a else
+-- gcd(b, a mod b)`, decreasing on `b`. The clause compiles to
+-- `WellFounded.recursion` on `b`: the `else` branch carries `b ≠ 0` as an
+-- anonymous fact, so the decrease obligation `a mod b < b` closes on its own
+-- (via `Natural.modulo_lt`), and no case split on the measure is written.
 module Test.well_founded_gcd_test
 
 import Logic.basics
@@ -15,68 +13,17 @@ import Natural.basics
 import Natural.order
 import Natural.arithmetic
 import Natural.floor_divide
+import Natural.classical_decidable
 import Natural.well_founded
 import Equality.basics
 
--- The step: with `recurse` giving gcd for every measure below `subject`,
--- produce gcd for `subject` (as a function of the threaded argument `a`).
-definition Test.gcdStep
-        : (subject : Natural)
-          → ((predecessor : Natural) → predecessor < subject → (a : Natural) → Natural)
-          → (a : Natural) → Natural
-  | zero => (recurse : (predecessor : Natural) → predecessor < 0 → (a : Natural) → Natural)
-            (a : Natural) ↦ a
-  | successor(k) =>
-      (recurse : (predecessor : Natural) → predecessor < successor(k) → (a : Natural) → Natural)
-      (a : Natural) ↦
-          recurse(
-              Natural.modulo(a, successor(k)),
-              Natural.lt_of_successor_le(
-                  Natural.modulo(a, successor(k)), successor(k),
-                  Natural.modulo_bound(a, successor(k), Natural.successor_positive(k))),
-              successor(k))
-
 definition Test.gcd (a b : Natural) : Natural :=
-  WellFounded.recursion(
-      Natural, Natural.LessThan, (_ : Natural) ↦ (a : Natural) → Natural,
-      Natural.lt_wellFounded, Test.gcdStep, b, a)
+  if b = 0 then a else Test.gcd(b, Natural.modulo(a, b))
+  decreasing b
 
--- The base equation holds by computation (the measure `0` reduces the
--- recursion outright).
-theorem Test.gcd_zero (a : Natural) : Test.gcd(a, 0) = a :=
-  done by unfolding Test.gcd, WellFounded.recursion,
-      WellFounded.recursionFromAccessible, Natural.lt_wellFounded, Test.gcdStep
-
--- The step equation does NOT reduce definitionally (the recursion at
--- `a mod successor(k)` carries a different accessibility proof), so it goes
--- through the unfolding lemma; the step then reduces on the `successor(k)`
--- constructor.
-theorem Test.gcd_successor (a k : Natural)
-        : Test.gcd(a, successor(k)) = Test.gcd(successor(k), Natural.modulo(a, successor(k))) := {
-  WellFounded.recursion(
-      Natural, Natural.LessThan, (_ : Natural) ↦ (a : Natural) → Natural,
-      Natural.lt_wellFounded, Test.gcdStep, successor(k))
-    = Test.gcdStep(successor(k),
-          (predecessor : Natural) (rp : predecessor < successor(k)) ↦
-              WellFounded.recursion(
-                  Natural, Natural.LessThan, (_ : Natural) ↦ (a : Natural) → Natural,
-                  Natural.lt_wellFounded, Test.gcdStep, predecessor))
-      by WellFounded.recursion_unfold as unfoldStep;
-  Test.gcd(a, successor(k))
-     = WellFounded.recursion(
-           Natural, Natural.LessThan, (_ : Natural) ↦ (a : Natural) → Natural,
-           Natural.lt_wellFounded, Test.gcdStep, successor(k), a)
-         by unfolding Test.gcd
-     = Test.gcdStep(successor(k),
-           (predecessor : Natural) (rp : predecessor < successor(k)) ↦
-               WellFounded.recursion(
-                   Natural, Natural.LessThan, (_ : Natural) ↦ (a : Natural) → Natural,
-                   Natural.lt_wellFounded, Test.gcdStep, predecessor), a)
-         by substituting unfoldStep
-     = WellFounded.recursion(
-           Natural, Natural.LessThan, (_ : Natural) ↦ (a : Natural) → Natural,
-           Natural.lt_wellFounded, Test.gcdStep, Natural.modulo(a, successor(k)), successor(k))
-         by unfolding Test.gcdStep
-     = Test.gcd(successor(k), Natural.modulo(a, successor(k)))
-         by unfolding Test.gcd
-}
+-- Single-argument case: no threaded arguments, motive `(_) ↦ Natural`. The
+-- measure `n` is the sole parameter; `n mod n < n` for `n ≠ 0` discharges the
+-- decrease.
+definition Test.reduce_to_zero (n : Natural) : Natural :=
+  if n = 0 then 0 else Test.reduce_to_zero(Natural.modulo(n, n))
+  decreasing n

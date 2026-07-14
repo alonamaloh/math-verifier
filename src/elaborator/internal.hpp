@@ -1299,6 +1299,14 @@ private:
     bool tryDesugarGuardedRecursion(
         SurfaceDefinitionDeclaration& decl);
 
+    // A `decreasing <measure>` guarded body compiles to a
+    // `WellFounded.recursion` on the measure instead of the structural
+    // recursor. Rewrites the decl's body in place to the recursion term and
+    // clears `decreasingMeasure`; returns false (leaving the decl untouched)
+    // when the body is not a well-founded-recursion shape it handles.
+    bool tryDesugarWellFoundedRecursion(
+        SurfaceDefinitionDeclaration& decl);
+
     // The step/base data recovered from a general discriminator guard
     // `if <Prefix>.is_<baseCtor>(…, guardVar) then … else …`, for a
     // two-constructor inductive whose base constructor is nullary.
