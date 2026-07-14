@@ -11,8 +11,10 @@
 
 module Algebra.exchange_lemma
 
+import axioms
 import Logic.basics
 import Logic.exists
+import Logic.excluded_middle
 import Equality.basics
 import Natural.basics
 import Natural.peano
@@ -167,7 +169,7 @@ theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
         pos < q ∨ pos = q by Natural.le_of_lt_one_plus;
         done by cases {
           case pos < q as posLtQ: {
-              q ≠ pos by Natural.not_equal_of_greater_than as qNePos;
+              q ≠ pos by Natural.not_equal_of_greater_than;
               VectorSpace.bumpCoefficient(d, e, pos)(q) = d(q)
                   by VectorSpace.bumpCoefficient_off as bumpAtQ;
               VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), 1 + q)
@@ -179,6 +181,9 @@ theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
                        by IH
                  = (VectorSpace.standardCombination(g, d, q) + e • g(pos)) + d(q) • g(q)
                        by substituting bumpAtQ
+                 = VectorSpace.standardCombination(g, d, q) + (e • g(pos) + d(q) • g(q))
+                 = VectorSpace.standardCombination(g, d, q) + (d(q) • g(q) + e • g(pos))
+                       by VectorSpace.add_commutative
                  = (VectorSpace.standardCombination(g, d, q) + d(q) • g(q)) + e • g(pos)
                  = VectorSpace.standardCombination(g, d, 1 + q) + e • g(pos)
                        by VectorSpace.standardCombination_add_one
@@ -196,7 +201,7 @@ theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
                   take i : Natural;
                   suppose i < q as iLtQ;
                   i < pos by substituting posEqQ;
-                  i ≠ pos by Natural.not_equal_of_less_than as iNePos;
+                  i ≠ pos by Natural.not_equal_of_less_than;
                   VectorSpace.bumpCoefficient(d, e, pos)(i) = d(i)
                       by VectorSpace.bumpCoefficient_off as bumpAtI;
                   done by substituting bumpAtI
@@ -288,7 +293,7 @@ theorem VectorSpace.linearCombination_standardize {f : Field} {V : VectorSpace(f
     case base: {
         VectorSpace.linearCombination(g, coefficients, selection, 0) = VectorSpace.zero(V);
         VectorSpace.zero(V) = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n)
-            by VectorSpace.standardCombination_zero_coefficients as emptyIsStandard;
+            by VectorSpace.standardCombination_zero_coefficients;
         VectorSpace.linearCombination(g, coefficients, selection, 0)
             = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n)
             as baseGoal;
@@ -315,7 +320,7 @@ theorem VectorSpace.linearCombination_standardize {f : Field} {V : VectorSpace(f
                     VectorSpace.bumpCoefficient(d, coefficients(p), selection(p)), n)
                  = VectorSpace.standardCombination(g, d, n)
                    + coefficients(p) • g(selection(p))
-                     by VectorSpace.standardCombination_bump as bumpEq;
+                     by VectorSpace.standardCombination_bump;
               VectorSpace.linearCombination(g, coefficients, selection, 1 + p)
                  = VectorSpace.standardCombination(g,
                        VectorSpace.bumpCoefficient(d, coefficients(p), selection(p)), n)
@@ -340,3 +345,118 @@ theorem VectorSpace.linearCombination_standardize {f : Field} {V : VectorSpace(f
         }
       }
   }
+
+-- ----------------------------------------------------------------------
+-- The exchange induction proper. Everything below works with `Natural`-
+-- indexed families and the bounded predicates a swap needs; the bridge to
+-- the index-generic `Spans`/`LinearlyIndependent` is a thin layer above.
+
+-- Independence in canonical coordinates: no nontrivial standard combination
+-- of the first `bound` vectors vanishes. Implied by (and used in place of)
+-- the index-generic `LinearlyIndependent`, since the identity selection is
+-- injective.
+definition VectorSpace.StandardIndependentBelow {f : Field} {V : VectorSpace(f)}
+        (uu : Natural → VectorSpace.carrier(V)) (bound : Natural) : Proposition :=
+  ∀ (len : Natural) (coefficients : Natural → Field.carrier(f)).
+      len ≤ bound
+      → VectorSpace.standardCombination(uu, coefficients, len) = VectorSpace.zero(V)
+      → ∀ (i : Natural). i < len → coefficients(i) = Field.zero(f)
+
+-- Minus one is nonzero — the field is nontrivial.
+theorem Field.negate_one_nonzero (f : Field)
+        : Field.negate(Field.one(f)) ≠ Field.zero(f) := {
+  suppose Field.negate(Field.one(f)) = Field.zero(f) as negOneZero;
+  Field.one(f)
+     = Field.negate(Field.negate(Field.one(f)))
+     = Field.negate(Field.zero(f))              by substituting negOneZero
+     = Field.zero(f)
+     as oneIsZero;
+  Field.zero(f) = Field.one(f) by oneIsZero;
+  Field.zero(f) ≠ Field.one(f) by Field.nontrivial;
+  done
+}
+
+-- Extracting the swap target: when `uu(k)` is expanded in a family whose
+-- first `k` entries are `uu(0..k-1)`, independence of `uu(0..k)` forces some
+-- REMAINING slot (index in [k, n)) to carry a nonzero coefficient. If none
+-- did, the expansion would present `uu(k)` as a combination of the earlier
+-- `uu`'s, and installing a `-1` at slot `k` would be a nontrivial vanishing
+-- combination of `uu(0..k)`.
+theorem VectorSpace.exchange_find_pivot {f : Field} {V : VectorSpace(f)}
+        (uu g : Natural → VectorSpace.carrier(V)) (m k n : Natural)
+        (independent : VectorSpace.StandardIndependentBelow(uu, m))
+        (agreePrefix : ∀ (i : Natural). i < k → g(i) = uu(i))
+        (kBelowN : k < n) (nBelowOrEqM : n ≤ m)
+        (coefficients : Natural → Field.carrier(f))
+        (target : uu(k) = VectorSpace.standardCombination(g, coefficients, n))
+        : ∃ (j : Natural). k ≤ j ∧ j < n ∧ coefficients(j) ≠ Field.zero(f) := {
+  suppose ¬(∃ (j : Natural). k ≤ j ∧ j < n ∧ coefficients(j) ≠ Field.zero(f)) as noPivot
+      for contradiction {
+        ∀ (j : Natural). k ≤ j → j < n → coefficients(j) = Field.zero(f)
+          by {
+            take j : Natural;
+            suppose k ≤ j as kLeJ;
+            suppose j < n as jLtN;
+            suppose coefficients(j) ≠ Field.zero(f) as coefficientNonzero for contradiction {
+              ∃ (jj : Natural). k ≤ jj ∧ jj < n ∧ coefficients(jj) ≠ Field.zero(f)
+                by { witness j with
+                     And.introduction(kLeJ, And.introduction(jLtN, coefficientNonzero)) };
+              done
+            }
+          } as allZeroRemaining;
+        ∀ (i : Natural). i < n → coefficients(i) • g(i) = coefficients(i) • uu(i)
+          by {
+            take i : Natural;
+            suppose i < n as iLtN;
+            i < k ∨ k ≤ i by Natural.lt_or_le;
+            done by cases {
+              case i < k as iLtK: {
+                  g(i) = uu(i) by agreePrefix as gIsUu;
+                  done by substituting gIsUu
+                }
+              case k ≤ i as kLeI: {
+                  coefficients(i) = Field.zero(f) by allZeroRemaining as coeffZero;
+                  coefficients(i) • g(i)
+                     = Field.zero(f) • g(i)     by substituting coeffZero
+                     = VectorSpace.zero(V)      by VectorSpace.zero_scale
+                     = Field.zero(f) • uu(i)    by VectorSpace.zero_scale
+                     = coefficients(i) • uu(i)  by substituting coeffZero
+                }
+            }
+          };
+        VectorSpace.standardCombination(g, coefficients, n)
+           = VectorSpace.standardCombination(uu, coefficients, n)
+             by VectorSpace.standardCombination_congruence as gToUu;
+        VectorSpace.standardCombination(uu, coefficients, n)
+           = VectorSpace.standardCombination(g, coefficients, n)   by gToUu
+           = uu(k)                                                 by target
+           as uuCombIsUk;
+        VectorSpace.standardCombination(uu,
+              VectorSpace.bumpCoefficient(coefficients, Field.negate(Field.one(f)), k), n)
+           = VectorSpace.standardCombination(uu, coefficients, n)
+             + Field.negate(Field.one(f)) • uu(k)
+                 by VectorSpace.standardCombination_bump
+           = uu(k) + Field.negate(Field.one(f)) • uu(k)   by substituting uuCombIsUk
+           = uu(k) + VectorSpace.negate(uu(k))            by VectorSpace.negate_one_scale
+           = uu(k) - uu(k)
+           = VectorSpace.zero(V);
+        ∀ (i : Natural). i < n →
+            VectorSpace.bumpCoefficient(coefficients, Field.negate(Field.one(f)), k)(i)
+            = Field.zero(f)
+          by independent as bumpedAllZero;
+        VectorSpace.bumpCoefficient(coefficients, Field.negate(Field.one(f)), k)(k)
+            = Field.zero(f) by bumpedAllZero as bumpedKZero;
+        coefficients(k) = Field.zero(f) by allZeroRemaining as coeffKZero;
+        VectorSpace.bumpCoefficient(coefficients, Field.negate(Field.one(f)), k)(k)
+           = coefficients(k) + Field.negate(Field.one(f))   by VectorSpace.bumpCoefficient_at
+           = Field.zero(f) + Field.negate(Field.one(f))     by substituting coeffKZero
+           = Field.negate(Field.one(f))
+           as bumpedKValue;
+        Field.negate(Field.one(f))
+           = VectorSpace.bumpCoefficient(coefficients, Field.negate(Field.one(f)), k)(k)
+                 by bumpedKValue
+           = Field.zero(f)                                  by bumpedKZero;
+        Field.negate(Field.one(f)) ≠ Field.zero(f) by Field.negate_one_nonzero;
+        done
+  }
+}
