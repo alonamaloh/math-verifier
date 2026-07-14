@@ -911,3 +911,131 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
     }
   }
 }
+
+-- ----------------------------------------------------------------------
+-- Brick 3 — a subspace of a finite-dimensional space is finite-dimensional.
+--
+-- Independent families inside the subspace are bounded in size by `dim V`
+-- (their value-images are independent in `V`, and the exchange lemma caps an
+-- independent family by a spanning one). So a largest independent size exists;
+-- a family realising it must SPAN the subspace — otherwise a vector outside its
+-- span would, by the append lemma, extend it to a strictly larger independent
+-- family. That maximal independent family is therefore a basis.
+theorem VectorSpace.subspace_finite_dimensional {f : Field} {V : VectorSpace(f)}
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (finiteV : VectorSpace.FiniteDimensional(V))
+        : VectorSpace.FiniteDimensional(Subspace.vector_space(V, subset, subspace)) := {
+  let S : VectorSpace(f) := Subspace.vector_space(V, subset, subspace);
+  let d : Natural := VectorSpace.dimension(V, finiteV);
+  VectorSpace.HasDimension(V, d) by VectorSpace.dimension_has_basis as vHasBasis;
+  choose b such that VectorSpace.IsBasis(b) from vHasBasis;
+  VectorSpace.Spans(b) by VectorSpace.IsBasis.spans as bSpans;
+
+  -- Any independent family in S has size ≤ d.
+  ∀ (k : Natural).
+      (∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+      → k ≤ d
+    by {
+      take k : Natural;
+      suppose ∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)).
+          VectorSpace.LinearlyIndependent(family) as hasK;
+      choose family such that VectorSpace.LinearlyIndependent(family) from hasK;
+      VectorSpace.LinearlyIndependent(
+          (i : NaturalsBelow(k)) ↦ Subspace.inclusion(V, subset, subspace)(family(i)))
+          by Subspace.value_linearlyIndependent(subset, subspace, family) as valueIndependent;
+      done by VectorSpace.exchange(k, d,
+          (i : NaturalsBelow(k)) ↦ Subspace.inclusion(V, subset, subspace)(family(i)),
+          b, valueIndependent, bSpans)
+    } as sizeBound;
+
+  -- No independent family of size 1 + d exists.
+  ¬(∃ (family : NaturalsBelow(1 + d) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+    by {
+      suppose ∃ (family : NaturalsBelow(1 + d) → VectorSpace.carrier(S)).
+          VectorSpace.LinearlyIndependent(family) as has1d;
+      1 + d ≤ d by sizeBound(1 + d, has1d);
+      d < d by { d < 1 + d; d < 1 + d ≤ d; done };
+      ¬(d < d) by Natural.lt_irreflexive;
+      done
+    } as notPlus1d;
+
+  -- A least size with no independent family; the empty family shows it is ≥ 1.
+  ∃ (j0 : Natural).
+      ¬(∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+      ∧ (∀ (k : Natural).
+            ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+            → j0 ≤ k)
+    by Natural.least_witness(
+        (k : Natural) ↦ ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)).
+            VectorSpace.LinearlyIndependent(family)), 1 + d, notPlus1d) as leastExists;
+  choose j0 such that
+      ¬(∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+      ∧ (∀ (k : Natural).
+            ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+            → j0 ≤ k)
+      from leastExists;
+  ¬(∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+      as noneAtJ0;
+  ∀ (k : Natural).
+      ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
+      → j0 ≤ k as j0IsLeast;
+
+  VectorSpace.LinearlyIndependent((i : NaturalsBelow(0)) ↦ VectorSpace.zero(S))
+      by VectorSpace.empty_family_independent as emptyIndependent;
+  j0 ≠ 0
+    by { suppose j0 = 0 as j0Zero;
+         VectorSpace.LinearlyIndependent((i : NaturalsBelow(j0)) ↦ VectorSpace.zero(S))
+             by { VectorSpace.LinearlyIndependent((i : NaturalsBelow(0)) ↦ VectorSpace.zero(S))
+                      by emptyIndependent;
+                  done by substituting j0Zero } as independentAtJ0;
+         ∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family)
+             by { witness ((i : NaturalsBelow(j0)) ↦ VectorSpace.zero(S)) with independentAtJ0 };
+         done } as j0Nonzero;
+  j0 = 0 ∨ ∃ (m0 : Natural). j0 = 1 + m0 by Natural.zero_or_one_plus;
+  done by cases {
+    case j0 = 0 as contradiction0: { j0 ≠ 0 by j0Nonzero; done }
+    case ∃ (m0 : Natural). j0 = 1 + m0 as j0Shape: {
+        choose m0 such that j0 = 1 + m0 from j0Shape;
+        -- The maximal independent family, of size m0.
+        ∃ (family : NaturalsBelow(m0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family)
+          by {
+            suppose ¬(∃ (family : NaturalsBelow(m0) → VectorSpace.carrier(S)).
+                VectorSpace.LinearlyIndependent(family)) as noneAtM0 for contradiction {
+              j0 ≤ m0 by j0IsLeast(m0, noneAtM0);
+              m0 < j0 by { m0 < 1 + m0; done by substituting (j0 = 1 + m0) };
+              m0 < j0 ≤ m0;
+              done
+            }
+          } as maximalExists;
+        choose eMax such that VectorSpace.LinearlyIndependent(eMax) from maximalExists;
+        VectorSpace.LinearlyIndependent(eMax) as eMaxIndependent;
+        -- It spans: a vector outside its span would extend it, contradicting maximality.
+        VectorSpace.Spans(eMax)
+          by {
+            take y : VectorSpace.carrier(S);
+            suppose ¬(y = VectorSpace.zero(S) ∨ VectorSpace.InSpanOf(eMax, y)) as yOutside
+                for contradiction {
+              VectorSpace.LinearlyIndependent(VectorSpace.appendVector(eMax, y))
+                  by VectorSpace.independent_append_outside_span(eMax, y, eMaxIndependent, yOutside)
+                  as appendIndependent;
+              VectorSpace.LinearlyIndependent(VectorSpace.appendVector(eMax, y))
+                  → (∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)).
+                        VectorSpace.LinearlyIndependent(family))
+                by { suppose VectorSpace.LinearlyIndependent(VectorSpace.appendVector(eMax, y)) as ai;
+                     ∃ (family : NaturalsBelow(1 + m0) → VectorSpace.carrier(S)).
+                         VectorSpace.LinearlyIndependent(family)
+                         by { witness VectorSpace.appendVector(eMax, y) with ai };
+                     done by substituting (j0 = 1 + m0) } as bridge;
+              ∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family)
+                  by bridge(appendIndependent);
+              done
+            }
+          } as eMaxSpans;
+        VectorSpace.IsBasis(eMax)
+            by { VectorSpace.LinearlyIndependent(eMax) by eMaxIndependent;
+                 VectorSpace.Spans(eMax) by eMaxSpans; done } as eMaxBasis;
+        VectorSpace.HasDimension(S, m0) by { witness eMax with eMaxBasis } as sHasDimension;
+        done by { witness m0 with sHasDimension }
+    }
+  }
+}
