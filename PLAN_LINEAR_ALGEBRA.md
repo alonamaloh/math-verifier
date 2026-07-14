@@ -553,7 +553,55 @@ section below)
   pre-paid at the exchange bridge (see the Stage F ledger entry + STRESS_PROBES).
   Remaining (deferred, optional): the bundled `FiniteDimensionalVectorSpace`
   record (Stage 0.3) — build when Stage G wants it.
-- [ ] **Stage G** (M, math) — **rank–nullity** (headline #1).
+- [ ] **Stage G** (L, math) — **rank–nullity** (headline #1): `dim ker T + dim im T
+  = dim V` for `T : V → W` linear, `V` finite-dimensional, choice-free. NOT
+  started; scoped 2026-07-14. Route = basis extension (avoids `Quotient`).
+  Available foundation: `LinearMap` + `kernel`/`image` as subspaces
+  (`kernel_is_subspace`/`image_is_subspace`, `linear_map.math`),
+  `Subspace.vector_space` (induced space, carrier = `Subtype(V.carrier, member)`),
+  `dimension` + `dimension_equals` (Stage F), `exchange`/`independent_le_spanning`
+  (Steinitz), `FinitelyGenerated.finite_dimensional` (pruning), the full
+  `InSpanOf`/`Spans`/`LinearlyIndependent` API, and the abelian `group` normaliser.
+  Concrete sub-lemma decomposition (each its own brick, land green + commit):
+  1. **Subspace subtype-transport bridge (THE crux, do first).** Relate a
+     `linearCombination` in `Subspace.vector_space(V, S, sub)` to one in `V`
+     through `Subtype.value`: `Subtype.value(linearCombination_subspace(fam, c,
+     sel, k)) = linearCombination_V((i)↦Subtype.value(fam(i)), c, sel, k)` (induct
+     on `k`, peel `linearCombination_add_one`, reduce `Subspace.add`/`scale` to
+     `V`'s ops via `Subtype.equal_of_value_equal` — the Stage-C reduction). This
+     is the transport the branch was built to MEASURE; record its cost in
+     STRESS_PROBES. Corollaries: independence/spanning transport between a
+     subspace family and its value-image in `V`.
+  2. **`im T` is finite-dimensional.** `T ∘ (basis of V)` lifted into the image
+     subtype (`i ↦ Subtype.make(T(b(i)), ⟨witness b(i)⟩)`) SPANS
+     `Subspace.vector_space(W, image, image_is_subspace)` — every image element is
+     `T(v)`, `v = Σcᵢbᵢ`, so `T(v) = Σcᵢ T(bᵢ)` by additivity+homogeneity (bridge
+     (1) + `LinearMap.additive`/`homogeneous`). ⟹ `FinitelyGenerated` ⟹ f.d. by
+     pruning. Let `r := dim im T`.
+  3. **`ker T` is finite-dimensional.** A subspace of a f.d. space is f.d.: any
+     independent family in `ker T` is independent in `V` (bridge (1)) so ≤ `dim V`
+     by `independent_le_spanning`; maximal-independent = basis. Cleanest concrete
+     form: adapt the pruning argument to grow a basis of `ker T` (or prove the
+     general "subspace of f.d. is f.d." lemma once and reuse for both). Let
+     `k := dim ker T`.
+  4. **Basis extension (Steinitz corollary).** A basis `e_0..e_{k-1}` of `ker T`
+     (as independent vectors in `V`) extends to a basis `e_0..e_{k-1}, a_0..
+     a_{r-1}` of `V` by appending spanning vectors not yet in the span (the
+     `independent_or_droppable`/`InSpanOf` machinery from pruning, run in the
+     growing direction). So `dim V = k + r'` where `r'` = number appended.
+  5. **The appended images are a basis of `im T`.** `T(a_0)..T(a_{r'-1})` are
+     independent (a vanishing combination pulls back into `ker T ∩ span(a)= {0}`)
+     and span `im T` (from step 2's spanning). ⟹ `r' = r = dim im T`
+     (Stage F invariance). Conclude `dim V = dim ker T + dim im T`.
+  FRICTION TO WATCH (record in STRESS_PROBES): the `Subtype`/`Subspace` value
+  boundary — every basis of `ker T`/`im T` lives in a subtype, and steps 4–5 move
+  vectors between the subtype and the ambient `V`/`W`. Bridge (1) is meant to
+  confine that cost to one reusable lemma; whether it stays confined is the
+  finding. Keep bases `Natural`-indexed with bounded predicates where the exchange
+  architecture already paid off, `NaturalsBelow` only at the `dimension` boundary.
+  New file: `Algebra/rank_nullity.math` (+ maybe `Algebra/subspace_dimension.math`
+  for the subtype-transport bridge + "subspace of f.d. is f.d.", if it wants to be
+  reusable for Stage H).
 - [ ] **Stage H0** (M, math) — permutation **sign/parity** — CONFIRMED ABSENT
   from `Lists/permutation.math`, must be built.
 - [ ] **Stage H** (M–L, math) — **det(AB) = det(A)·det(B)** (headline #2).
