@@ -1039,3 +1039,68 @@ theorem VectorSpace.subspace_finite_dimensional {f : Field} {V : VectorSpace(f)}
     }
   }
 }
+
+-- ----------------------------------------------------------------------
+-- Brick 4 — basis extension. An independent family extends to a basis of a
+-- finite-dimensional space by appending spanning vectors not yet in its span.
+
+-- Span is monotone under append: anything in the span of `family` stays in the
+-- span of `appendVector(family, x)` (the extra vector simply goes unused). The
+-- witnessing combination is reindexed by the value-preserving inclusion
+-- `NaturalsBelow(m) ↪ NaturalsBelow(1 + m)`.
+theorem NaturalsBelow.value_below_one_plus {m : Natural} (i : NaturalsBelow(m))
+        : NaturalsBelow.value(i) < 1 + m := {
+  NaturalsBelow.value(i) < m by NaturalsBelow.below;
+  NaturalsBelow.value(i) < m < 1 + m;
+  done
+}
+
+-- The value-preserving inclusion `NaturalsBelow(m) ↪ NaturalsBelow(1 + m)`.
+definition NaturalsBelow.widen {m : Natural} (i : NaturalsBelow(m)) : NaturalsBelow(1 + m) :=
+  NaturalsBelow.make(NaturalsBelow.value(i), NaturalsBelow.value_below_one_plus(i))
+
+theorem NaturalsBelow.widen_value {m : Natural} (i : NaturalsBelow(m))
+        : NaturalsBelow.value(NaturalsBelow.widen(i)) = NaturalsBelow.value(i) :=
+  done
+
+theorem VectorSpace.appendVector_widen {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (family : NaturalsBelow(m) → VectorSpace.carrier(V)) (x : VectorSpace.carrier(V))
+        (i : NaturalsBelow(m))
+        : VectorSpace.appendVector(family, x)(NaturalsBelow.widen(i)) = family(i) := {
+  NaturalsBelow.value(NaturalsBelow.widen(i)) < m
+      by { NaturalsBelow.value(NaturalsBelow.widen(i)) = NaturalsBelow.value(i) by NaturalsBelow.widen_value;
+           NaturalsBelow.value(i) < m by NaturalsBelow.below; done } as widenBelow;
+  NaturalsBelow.make(NaturalsBelow.value(NaturalsBelow.widen(i)), widenBelow) = i
+      by NaturalsBelow.equal_of_value(a := NaturalsBelow.make(NaturalsBelow.value(NaturalsBelow.widen(i)), widenBelow),
+             b := i) as makeEqI;
+  VectorSpace.appendVector(family, x)(NaturalsBelow.widen(i))
+     = family(NaturalsBelow.make(NaturalsBelow.value(NaturalsBelow.widen(i)), widenBelow))
+         by VectorSpace.appendVector_below
+     = family(i) by substituting makeEqI;
+  done
+}
+
+theorem VectorSpace.InSpanOf.append_monotone {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (family : NaturalsBelow(m) → VectorSpace.carrier(V)) (x v : VectorSpace.carrier(V))
+        (member : VectorSpace.InSpanOf(family, v))
+        : VectorSpace.InSpanOf(VectorSpace.appendVector(family, x), v) := {
+  choose count, selection, coefficients such that
+      v = VectorSpace.linearCombination(family, coefficients, selection, count) from member;
+  v = VectorSpace.linearCombination(family, coefficients, selection, count) as vCombo;
+  ∀ (i : Natural). i < count →
+      coefficients(i) • VectorSpace.appendVector(family, x)(NaturalsBelow.widen(selection(i)))
+      = coefficients(i) • family(selection(i))
+    by {
+      take i : Natural; suppose i < count as iBelow;
+      VectorSpace.appendVector(family, x)(NaturalsBelow.widen(selection(i))) = family(selection(i))
+          by VectorSpace.appendVector_widen as appAt;
+      done by substituting appAt
+    };
+  v = VectorSpace.linearCombination(family, coefficients, selection, count) by vCombo
+    = VectorSpace.linearCombination(VectorSpace.appendVector(family, x), coefficients,
+          (i : Natural) ↦ NaturalsBelow.widen(selection(i)), count)
+          by VectorSpace.linearCombination_congruence
+    as vAppendCombo;
+  witness count with witness ((i : Natural) ↦ NaturalsBelow.widen(selection(i)))
+      with witness coefficients with vAppendCombo
+}
