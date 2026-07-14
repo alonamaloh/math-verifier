@@ -75,3 +75,195 @@ theorem Subspace.linearCombination_value {f : Field} {V : VectorSpace(f)} {I : T
                  coefficients, selection, 1 + m)
                  by VectorSpace.linearCombination_add_one
   }
+
+-- Independence and spanning transport across the value boundary, both
+-- corollaries of the bridge above.
+
+-- An independent family inside the subspace maps to an independent family in
+-- `V`: a vanishing combination of the values, pushed through the bridge, is a
+-- vanishing combination inside the subspace, whose coefficients the subspace
+-- independence kills.
+theorem Subspace.value_linearlyIndependent {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (family : I → VectorSpace.carrier(Subspace.vector_space(V, subset, subspace)))
+        (independent : VectorSpace.LinearlyIndependent(family))
+        : VectorSpace.LinearlyIndependent((i : I) ↦ Subtype.value(family(i))) := {
+  take count : Natural;
+  take selection : Natural → I;
+  take coefficients : Natural → Field.carrier(f);
+  suppose ∀ (a b : Natural). a < count → b < count → selection(a) = selection(b) → a = b
+      as selectionInjective;
+  suppose VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
+              coefficients, selection, count) = VectorSpace.zero(V) as valuesVanish;
+  Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, count))
+     = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)), coefficients, selection, count)
+           by Subspace.linearCombination_value
+     = VectorSpace.zero(V) by valuesVanish
+     = Subtype.value(VectorSpace.zero(Subspace.vector_space(V, subset, subspace)));
+  VectorSpace.linearCombination(family, coefficients, selection, count)
+      = VectorSpace.zero(Subspace.vector_space(V, subset, subspace))
+      by Subtype.equal_of_value_equal as combinationZero;
+  done by independent(count, selection, coefficients, selectionInjective, combinationZero)
+}
+
+-- A subspace family spans when every subspace vector's value is either zero or
+-- a `V`-combination of the family values: the bridge turns that combination of
+-- values back into a subspace combination, and equal values mean equal subtype
+-- elements.
+theorem Subspace.spans_of_value_covered {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (family : I → VectorSpace.carrier(Subspace.vector_space(V, subset, subspace)))
+        (covered : ∀ (x : VectorSpace.carrier(Subspace.vector_space(V, subset, subspace))).
+            Subtype.value(x) = VectorSpace.zero(V)
+            ∨ VectorSpace.InSpanOf((i : I) ↦ Subtype.value(family(i)), Subtype.value(x)))
+        : VectorSpace.Spans(family) := {
+  take x : VectorSpace.carrier(Subspace.vector_space(V, subset, subspace));
+  Subtype.value(x) = VectorSpace.zero(V)
+      ∨ VectorSpace.InSpanOf((i : I) ↦ Subtype.value(family(i)), Subtype.value(x)) by covered;
+  done by cases {
+    case Subtype.value(x) = VectorSpace.zero(V) as valueZero: {
+        Subtype.value(x) = VectorSpace.zero(V)
+           = Subtype.value(VectorSpace.zero(Subspace.vector_space(V, subset, subspace)));
+        x = VectorSpace.zero(Subspace.vector_space(V, subset, subspace))
+            by Subtype.equal_of_value_equal;
+        done
+      }
+    case VectorSpace.InSpanOf((i : I) ↦ Subtype.value(family(i)), Subtype.value(x)) as inSpan: {
+        choose count, selection, coefficients such that
+            Subtype.value(x) = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
+                coefficients, selection, count) from inSpan;
+        Subtype.value(x)
+           = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)), coefficients, selection, count)
+           = Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, count))
+                 by Subspace.linearCombination_value;
+        x = VectorSpace.linearCombination(family, coefficients, selection, count)
+            by Subtype.equal_of_value_equal as xIsCombination;
+        VectorSpace.InSpanOf(family, x) by { witness count with witness selection
+            with witness coefficients with xIsCombination };
+        done
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The image of a linear combination under a linear map is the linear
+-- combination of the images: linearity commutes with the finite sum.
+theorem LinearMap.apply_linearCombination {f : Field} {V W : VectorSpace(f)} {I : Type(0)}
+        {T : VectorSpace.carrier(V) → VectorSpace.carrier(W)} (linear : IsLinearMap(V, W, T))
+        (family : I → VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f))
+        (selection : Natural → I) (count : Natural)
+        : T(VectorSpace.linearCombination(family, coefficients, selection, count))
+          = VectorSpace.linearCombination((i : I) ↦ T(family(i)), coefficients, selection, count) :=
+  by induction on count with IH {
+    case base:
+        T(VectorSpace.linearCombination(family, coefficients, selection, 0))
+           = T(VectorSpace.zero(V))
+           = VectorSpace.zero(W) by LinearMap.preserves_zero
+           = VectorSpace.linearCombination((i : I) ↦ T(family(i)), coefficients, selection, 0)
+    case step(m):
+        T(VectorSpace.linearCombination(family, coefficients, selection, 1 + m))
+           = T(VectorSpace.linearCombination(family, coefficients, selection, m)
+                 + coefficients(m) • family(selection(m)))
+                 by VectorSpace.linearCombination_add_one
+           = T(VectorSpace.linearCombination(family, coefficients, selection, m))
+                 + T(coefficients(m) • family(selection(m)))
+                 by LinearMap.additive(linear, VectorSpace.linearCombination(family, coefficients, selection, m),
+                        coefficients(m) • family(selection(m)))
+           = VectorSpace.linearCombination((i : I) ↦ T(family(i)), coefficients, selection, m)
+                 + T(coefficients(m) • family(selection(m)))
+                 by IH
+           = VectorSpace.linearCombination((i : I) ↦ T(family(i)), coefficients, selection, m)
+                 + coefficients(m) • T(family(selection(m)))
+                 by LinearMap.homogeneous(linear, coefficients(m), family(selection(m)))
+           = VectorSpace.linearCombination((i : I) ↦ T(family(i)), coefficients, selection, 1 + m)
+                 by VectorSpace.linearCombination_add_one
+  }
+
+-- ----------------------------------------------------------------------
+-- Brick 2 — the image of a finite-dimensional space is finite-dimensional.
+--
+-- The images `T(b(i))` of a basis `b` of `V`, lifted into the image subtype,
+-- span the image subspace: every element of the image is `T(v)`, and `v` is a
+-- combination of the basis, so `T(v)` is the corresponding combination of the
+-- `T(b(i))` by linearity. Finitely generated, hence finite-dimensional by
+-- pruning.
+theorem LinearMap.image_finite_dimensional {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) (linear : IsLinearMap(V, W, T))
+        (finiteV : VectorSpace.FiniteDimensional(V))
+        : VectorSpace.FiniteDimensional(
+              Subspace.vector_space(W, LinearMap.image(V, W, T),
+                  LinearMap.image_is_subspace(V, W, T, linear))) := {
+  IsSubspace(W, LinearMap.image(V, W, T)) by LinearMap.image_is_subspace as imageSubspace;
+  VectorSpace.HasDimension(V, VectorSpace.dimension(V, finiteV))
+      by VectorSpace.dimension_has_basis as vHasBasis;
+  choose basisV such that VectorSpace.IsBasis(basisV) from vHasBasis;
+  VectorSpace.Spans(basisV) by VectorSpace.IsBasis.spans as basisSpans;
+
+  -- The lifted image family: index i ↦ the image T(basisV(i)) as an element of
+  -- the image subtype.
+  ∀ (i : NaturalsBelow(VectorSpace.dimension(V, finiteV))).
+      T(basisV(i)) ∈ LinearMap.image(V, W, T)
+    by { take i : NaturalsBelow(VectorSpace.dimension(V, finiteV));
+         T(basisV(i)) = T(basisV(i));
+         done by witness basisV(i) with reflexivity(T(basisV(i))) } as imageHits;
+
+  ∀ (x : VectorSpace.carrier(Subspace.vector_space(W, LinearMap.image(V, W, T), imageSubspace))).
+      Subtype.value(x) = VectorSpace.zero(W)
+      ∨ VectorSpace.InSpanOf(
+            (i : NaturalsBelow(VectorSpace.dimension(V, finiteV))) ↦ T(basisV(i)),
+            Subtype.value(x))
+    by {
+          take x : VectorSpace.carrier(Subspace.vector_space(W, LinearMap.image(V, W, T), imageSubspace));
+          Subtype.value(x) ∈ LinearMap.image(V, W, T) by Subtype.property;
+          ∃ (v : VectorSpace.carrier(V)). T(v) = Subtype.value(x);
+          choose v such that T(v) = Subtype.value(x) as vHits;
+          Subtype.value(x) = VectorSpace.zero(W)
+              ∨ VectorSpace.InSpanOf(
+                    (i : NaturalsBelow(VectorSpace.dimension(V, finiteV))) ↦ T(basisV(i)),
+                    Subtype.value(x))
+            by {
+              v = VectorSpace.zero(V)
+                  ∨ (∃ (count : Natural). ∃ (selection : Natural → NaturalsBelow(VectorSpace.dimension(V, finiteV))).
+                     ∃ (coefficients : Natural → Field.carrier(f)).
+                         v = VectorSpace.linearCombination(basisV, coefficients, selection, count))
+                  by basisSpans;
+              done by cases {
+                case v = VectorSpace.zero(V) as vZero: {
+                    Subtype.value(x) = T(v) by vHits
+                       = T(VectorSpace.zero(V)) by substituting vZero
+                       = VectorSpace.zero(W) by LinearMap.preserves_zero;
+                    done
+                  }
+                case ∃ (count : Natural). ∃ (selection : Natural → NaturalsBelow(VectorSpace.dimension(V, finiteV))).
+                     ∃ (coefficients : Natural → Field.carrier(f)).
+                         v = VectorSpace.linearCombination(basisV, coefficients, selection, count) as vCombo: {
+                    choose count, selection, coefficients such that
+                        v = VectorSpace.linearCombination(basisV, coefficients, selection, count) from vCombo;
+                    Subtype.value(x) = T(v) by vHits
+                       = T(VectorSpace.linearCombination(basisV, coefficients, selection, count))
+                             by substituting (v = VectorSpace.linearCombination(basisV, coefficients, selection, count))
+                       = VectorSpace.linearCombination(
+                             (i : NaturalsBelow(VectorSpace.dimension(V, finiteV))) ↦ T(basisV(i)),
+                             coefficients, selection, count)
+                             by LinearMap.apply_linearCombination(linear, basisV, coefficients, selection, count)
+                       as valueIsCombination;
+                    VectorSpace.InSpanOf(
+                        (i : NaturalsBelow(VectorSpace.dimension(V, finiteV))) ↦ T(basisV(i)),
+                        Subtype.value(x))
+                      by { witness count with witness selection with witness coefficients
+                           with valueIsCombination };
+                    done
+                  }
+              }
+            };
+      done
+    } as coveredFact;
+  VectorSpace.FinitelyGenerated(Subspace.vector_space(W, LinearMap.image(V, W, T), imageSubspace))
+      by { witness VectorSpace.dimension(V, finiteV)
+           with witness ((i : NaturalsBelow(VectorSpace.dimension(V, finiteV)))
+                ↦ Subtype.make(VectorSpace.carrier(W), LinearMap.image(V, W, T),
+                      T(basisV(i)), imageHits(i)))
+           with Subspace.spans_of_value_covered(covered := coveredFact) };
+  done by VectorSpace.FinitelyGenerated.finite_dimensional
+}
