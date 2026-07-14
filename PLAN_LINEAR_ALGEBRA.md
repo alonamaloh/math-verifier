@@ -285,6 +285,26 @@ Update this section before ending any session that works on the plan.
     finite spanning family down to an independent one (choice-free); needs
     "remove one index from a `NaturalsBelow(count)` family" reindexing. Shares
     the concatenation/`InSpanOf` machinery above.
+  - **DESIGN NOTE — representation of a linear combination (decide SOON).**
+    Today a combination fixes its index multiset with `selection : Natural → I`
+    + `count`. The exchange and pruning proofs are fundamentally about the
+    index SET shrinking/growing by ONE element, and delete/insert/swap on the
+    `selection/count` encoding is reindexing gymnastics (the flagged pain
+    above). A combination indexed by a **finite subset** `S ⊆ I` —
+    `Σ (i ∈ S) coefficients(i) • family(i)` — makes those moves first-class
+    (`S ∖ {j}`, `S ∪ {j}`, on top of `Set/finite.math`), and is the surface a
+    `Σ_{i∈S}` notation would print. Cost: it is a REPRESENTATION change, so it
+    ripples through everything already built on `linearCombination` (span, the
+    `{1}` basis, `F[x]`, the coefficient module-algebra) — a migration, not an
+    addition. **Plan:** do the exchange proof ONCE on the current encoding
+    first (it exercises reindexing hardest, so it is the honest test); if the
+    delete/insert step is as painful as expected, switch to the subset
+    representation BEFORE pruning + Stage F (which lean on the same
+    combinatorics) rather than paying the reindexing tax twice. Independently
+    and cheaply: a `Σ (i < count) …` binder that parses to / prints as
+    `linearCombination(…)` — pure display sugar over the existing function, no
+    proof-engine change — makes the whole area read like mathematics and can
+    land anytime regardless of the representation call.
   - **Friction found this session, re-triaged (the branch's deliverable):**
     (1) `by substituting eq1, eq2` (comma) is not supported — `substituting`
     rewrites with ONE equation (the search picks a single candidate, it does
