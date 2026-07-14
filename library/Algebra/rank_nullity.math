@@ -417,3 +417,67 @@ theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : Vector
         }
       }
   }
+
+-- When every position of a combination over `appendVector(e, x)` selects an
+-- index below `m` (an `e`-vector, never the appended `x`), the combination IS
+-- a combination over `e` alone, reindexed by the clamp `NaturalsBelow(1+m) →
+-- NaturalsBelow(m)`. (`ei0` is any `e`-index, supplying the clamp fallback.)
+theorem VectorSpace.appendVector_reduces_to_e {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (e : NaturalsBelow(m) → VectorSpace.carrier(V)) (x : VectorSpace.carrier(V))
+        (coefficients : Natural → Field.carrier(f))
+        (selection : Natural → NaturalsBelow(1 + m)) (count : Natural)
+        (ei0 : NaturalsBelow(m))
+        (allBelow : ∀ (j : Natural). j < count → NaturalsBelow.value(selection(j)) < m)
+        : VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, count)
+          = VectorSpace.linearCombination(e, coefficients,
+                (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), count) := {
+  ∀ (j : Natural). j < count →
+      coefficients(j) • VectorSpace.appendVector(e, x)(selection(j))
+      = coefficients(j) • e(NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))))
+    by {
+      take j : Natural;
+      suppose j < count as jBelow;
+      NaturalsBelow.value(selection(j)) < m by allBelow as valBelow;
+      VectorSpace.appendVector(e, x)(selection(j))
+          = e(NaturalsBelow.make(NaturalsBelow.value(selection(j)), valBelow))
+          by VectorSpace.appendVector_below as appAt;
+      NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j)))
+          = NaturalsBelow.make(NaturalsBelow.value(selection(j)), valBelow)
+          by NaturalsBelow.clamp_below as clampAt;
+      coefficients(j) • VectorSpace.appendVector(e, x)(selection(j))
+         = coefficients(j) • e(NaturalsBelow.make(NaturalsBelow.value(selection(j)), valBelow))
+             by substituting appAt
+         = coefficients(j) • e(NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))))
+             by substituting clampAt
+    };
+  done by VectorSpace.linearCombination_congruence
+}
+
+-- The clamp reindex of an injective, below-`m` selection is itself injective:
+-- distinct positions give distinct values give distinct clamped indices.
+theorem VectorSpace.appendVector_clamp_injective {f : Field} {V : VectorSpace(f)} {m : Natural}
+        (selection : Natural → NaturalsBelow(1 + m)) (count : Natural) (ei0 : NaturalsBelow(m))
+        (selInjective : ∀ (a b : Natural). a < count → b < count → selection(a) = selection(b) → a = b)
+        (allBelow : ∀ (j : Natural). j < count → NaturalsBelow.value(selection(j)) < m)
+        : ∀ (a b : Natural). a < count → b < count →
+              NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(a)))
+              = NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(b))) → a = b := {
+  take a : Natural; take b : Natural;
+  suppose a < count as aBelow;
+  suppose b < count as bBelow;
+  suppose NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(a)))
+          = NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(b))) as clampEqual;
+  NaturalsBelow.value(selection(a)) < m by allBelow as aValBelow;
+  NaturalsBelow.value(selection(b)) < m by allBelow as bValBelow;
+  NaturalsBelow.value(selection(a))
+     = NaturalsBelow.value(NaturalsBelow.make(NaturalsBelow.value(selection(a)), aValBelow))
+     = NaturalsBelow.value(NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(a))))
+           by NaturalsBelow.clamp_below
+     = NaturalsBelow.value(NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(b))))
+           by substituting clampEqual
+     = NaturalsBelow.value(NaturalsBelow.make(NaturalsBelow.value(selection(b)), bValBelow))
+           by NaturalsBelow.clamp_below
+     = NaturalsBelow.value(selection(b));
+  selection(a) = selection(b) by NaturalsBelow.equal_of_value(a := selection(a), b := selection(b));
+  done by selInjective
+}
