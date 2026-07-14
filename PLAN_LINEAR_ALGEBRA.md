@@ -553,9 +553,23 @@ section below)
   pre-paid at the exchange bridge (see the Stage F ledger entry + STRESS_PROBES).
   Remaining (deferred, optional): the bundled `FiniteDimensionalVectorSpace`
   record (Stage 0.3) — build when Stage G wants it.
-- [ ] **Stage G** (L, math) — **rank–nullity** (headline #1): `dim ker T + dim im T
-  = dim V` for `T : V → W` linear, `V` finite-dimensional, choice-free. NOT
-  started; scoped 2026-07-14. Route = basis extension (avoids `Quotient`).
+- [~] **Stage G** (L, math) — **rank–nullity** (headline #1): `dim ker T + dim im T
+  = dim V` for `T : V → W` linear, `V` finite-dimensional, choice-free. **BRICKS
+  1–2 DONE (2026-07-14, `Algebra/rank_nullity.math`, library+export green,
+  choice-free); bricks 3–5 BLOCKED on new "finite-family construction"
+  infrastructure — see the STRESS_PROBES Stage-G verdict.** Brick 1
+  (`Subspace.linearCombination_value` + independence/spanning value-transport
+  corollaries) compiled first try — the `Subtype`/`Subspace` boundary the branch
+  was built to measure is FRICTIONLESS (confirms the Stage F thesis: one reusable
+  transport lemma confines the whole subtype cost). Brick 2
+  (`LinearMap.image_finite_dimensional`, on `LinearMap.apply_linearCombination`):
+  `im T` finite-dimensional. **Finding: the real Stage-G cost is NOT the subtype
+  boundary but building a size-`k+r` `NaturalsBelow`-indexed basis (append the
+  ker-basis / concatenate) and re-proving `LinearlyIndependent` — its injective-
+  selection requirement collides under any `NaturalsBelow(1+m)→NaturalsBelow(m)`
+  reindex, needing a *position-skip* fold lemma that doesn't exist yet
+  (scope ≈ one of exchange/pruning). Filed as a side-quest.** Route = basis
+  extension (avoids `Quotient`).
   Available foundation: `LinearMap` + `kernel`/`image` as subspaces
   (`kernel_is_subspace`/`image_is_subspace`, `linear_map.math`),
   `Subspace.vector_space` (induced space, carrier = `Subtype(V.carrier, member)`),

@@ -369,6 +369,86 @@ encoding moved the cost off the invariance entirely.
 
 ---
 
+## PROBE — Rank–nullity (Stage G) · [SURFACE + FOUNDATION] partial verdict (2026-07-14)
+
+**What was built (`Algebra/rank_nullity.math`, bricks 1–2, library + export green,
+choice-free).** The two bricks the plan named as the `Subtype`/`Subspace` boundary
+measurement:
+
+- **Brick 1 — the subtype-transport bridge, `Subspace.linearCombination_value`.**
+  `Subtype.value(linearCombination_S(fam, c, sel, k)) = linearCombination_V((i)↦value(fam(i)), c, sel, k)`.
+  Its two corollaries `Subspace.value_linearlyIndependent` (a subspace family's
+  value-image is independent in `V`) and `Subspace.spans_of_value_covered` (a
+  subspace family spans when every subspace vector's value is `0` or a `V`-combination
+  of the family values).
+- **Brick 2 — `LinearMap.image_finite_dimensional`**, on the linearity/combination
+  interchange `LinearMap.apply_linearCombination` (`T(Σcᵢbᵢ)=ΣcᵢT(bᵢ)`): the images
+  of a basis of `V`, lifted into the image subtype, span the image subspace ⟹
+  finitely generated ⟹ finite-dimensional by pruning.
+
+**Verdict, part 1 — the `Subtype`/`Subspace` value boundary the branch was built to
+measure is FRICTIONLESS [SURFACE, confirming the Stage F thesis].** Brick 1 compiled
+first try. `Subspace.add`/`scale`/`zero` are *defined* so their `Subtype.value` is the
+corresponding `V` operation, so every value-of-a-subspace-operation step is
+definitional; the only non-defeq steps in the whole induction are the two
+`linearCombination_add_one` peels. `Subtype.equal_of_value_equal` then discharges every
+"equal values ⟹ equal subtype elements" obligation in the corollaries with proof
+irrelevance carrying the membership witnesses silently. The design decision that
+`Subspace.carrier` carries the `IsSubspace` proof so `+`/`•` recover it (Stage C) is
+exactly what makes the operators resolve on the subspace side with zero annotation.
+**This confirms the plan's bet: one reusable transport lemma confines the entire
+subtype boundary cost, and it is cheap.**
+
+**Verdict, part 2 — the real Stage-G cost is NOT the subtype boundary but the
+`NaturalsBelow` FAMILY-MANIPULATION for bricks 3–5 (append / concatenate a basis and
+prove the result independent). This infrastructure does not yet exist, and building it
+is a project on the scale of `exchange_lemma.math`/`basis_pruning.math` (~900 lines
+each).** Concretely:
+
+1. **Both remaining routes need a size-`k+r` `NaturalsBelow`-indexed basis of `V`.**
+   `HasDimension(V, n)` is `∃ basis : NaturalsBelow(n) → carrier(V). IsBasis(basis)`,
+   so to conclude `dim V = dim ker + dim im` one must *exhibit* a `NaturalsBelow(k+r)`
+   basis (the ker-basis concatenated with the extension) and prove `IsBasis`. There is
+   no way to read the equality off inequalities alone.
+
+2. **The blocker is `LinearlyIndependent` of an appended/concatenated family.**
+   `LinearlyIndependent(family)` quantifies over an *arbitrary injective* selection
+   `Natural → I`. To prove `appendVector(e, x)` (an `e`-basis with one vector added)
+   independent, a vanishing combination must be reduced to a pure `e`-combination — but
+   the (at most one) position selecting the new index clamps, under any
+   `NaturalsBelow(1+m) → NaturalsBelow(m)` reindex, onto a value already used by another
+   position, so the reduced selection is **not injective** and `LinearlyIndependent(e)`
+   cannot be applied. Escaping this needs a *position-level* skip (drop the zeroed
+   position from the combination range) — the mirror of `basis_pruning`'s
+   `NaturalsBelow.skip` but on the fold's position index rather than the family index.
+   That machinery is what bricks 3 (subspace of f.d. is f.d., via a maximal-independent
+   family — `Natural.least_witness` is available and the exchange bound
+   `k ≤ dim V` transports cleanly through brick 1's corollary) and brick 4 (extend the
+   ker-basis, e.g. by sifting `concat(e, basisV)`) both require, and it is genuinely new.
+
+   **This is the honest measurement: the dependent-index story stays ergonomic for
+   *reading a scalar out of* a `NaturalsBelow`-indexed structure (Stage F) and for
+   *pushing values across a subtype boundary* (Stage G bricks 1–2), but *building a new
+   finite family by append/concatenate and re-establishing independence* reloads the
+   full `NaturalsBelow.make`/position-reindex cost that exchange and pruning each paid
+   once. The cost did not disappear; it reappears wherever a proof constructs, rather
+   than consumes, a finite-indexed basis.** The right fix is an infrastructure module
+   (an `appendVector`/`mergeFamilies` layer with independence + spanning transport, and
+   a position-skip fold lemma), not a proof hack — filed below.
+
+**Elaborator finding (filed).** `by <Lemma>` citation fails when the lemma's conclusion
+is a `definition` that δ-unfolds to `Or`/`∀` — `VectorSpace.Spans(family)` desugars to
+`∀ v. v = 0 ∨ …`, and the dispatch compares the *unfolded* lemma head (`Or`) against the
+*folded* goal head (`Spans`), reporting "conclusion is about `Or` but the goal is about
+`Spans`" even though the fully-applied term has exactly the goal type. Workaround used in
+brick 2: feed the fully-applied lemma term into a `witness … with <term>` position, which
+type-checks against an expected type instead of running the citation heuristic. Root fix:
+the citation head-comparison should unfold both sides (or neither) consistently.
+
+**Done (partial) =** bricks 1–2 green, choice-free, export-check 2861 / axioms
+unchanged; the subtype-boundary measurement (frictionless) recorded; bricks 3–5 scoped
+with the precise blocker identified (append/concat-independence + position-skip infra).
+
 ## Side quests / infrastructure (not blocked on any probe)
 
 - [x] **Tier (a) — additive-group normaliser over `VectorSpace.carrier` — DONE
@@ -388,6 +468,30 @@ encoding moved the cost off the invariance entirely.
   what tier (a) leaves opaque. Subsumes tier (a); would collapse the
   `linearCombination_*` coefficient algebra to one-liners. Owner-requested; the
   highest-remaining automation for the branch.
+- [ ] **Finite-family construction layer (`appendVector` / `mergeFamilies` +
+  independence/spanning transport + a position-skip fold lemma).** Surfaced by
+  Stage G (rank–nullity) bricks 3–5: `basis_pruning`/`exchange` gave the tools to
+  *consume* and *shrink* `NaturalsBelow`-indexed families, but *growing* one
+  (append a vector, concatenate two bases) and re-proving `LinearlyIndependent`
+  reloads the full reindex cost. The specific missing primitive is a
+  **position-skip**: dropping a zero-coefficient position from a
+  `linearCombination`'s `0..len-1` range (mirror of `NaturalsBelow.skip`, which
+  skips a *family* index, on the *fold position* index) — needed because
+  `LinearlyIndependent` demands an injective selection, and the one position that
+  selects an appended vector clamps onto an already-used index under any
+  `NaturalsBelow(1+m)→NaturalsBelow(m)` reindex. With that lemma,
+  `independent_append_outside_span` (append a not-in-span vector keeps
+  independence) and its concatenation cousin fall out, unblocking "subspace of a
+  f.d. space is f.d." (brick 3), basis extension (brick 4), and the final count
+  (brick 5). Estimated scope: comparable to one of `exchange_lemma.math` /
+  `basis_pruning.math`.
+- [ ] **Citation head-comparison unfolds inconsistently (fold-level desync).**
+  `by <Lemma>` fails when the lemma's conclusion is a `definition` that δ-unfolds
+  to `Or`/`∀` (e.g. `VectorSpace.Spans(family)` → `∀ v. v = 0 ∨ …`): dispatch
+  compares the unfolded lemma head (`Or`) to the folded goal head (`Spans`) and
+  rejects a term that in fact has the goal's exact type. Reproduced in
+  `rank_nullity` brick 2; worked around by supplying the term in a `witness … with`
+  position. Fix: unfold both sides (or neither) before the head comparison.
 - [ ] **`linarith`.** A linear-arithmetic procedure over ordered fields. The
   analysis probes will keep generating its spec; build it from the captured
   ε-chasing snippets. Highest expected impact on naturalness library-wide.
