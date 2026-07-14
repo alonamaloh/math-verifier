@@ -460,14 +460,28 @@ with the precise blocker identified (append/concat-independence + position-skip 
   `VectorSpace.add_pair_interchange` and `add_subtract_cancel_left` (deleted) and
   collapsed the assoc/comm chains in `exchange_lemma`/`basis_pruning`/
   `linear_combination` to single `by group` steps. `a•v` stays an opaque atom.
-- [ ] **Tier (b) — free-module normaliser (`module` /
-  `linear_combination`-for-vectors).** Treat each distinct vector as an atom,
-  normalise both sides to a canonical `Σ cᵢ • vᵢ` by collecting like terms
-  (adding coefficients in the field, discharged by `ring`/`field`), compare
-  atom-by-atom. Pushes `•` through `+`/`−` and collects `a•v + b•v = (a+b)•v` —
-  what tier (a) leaves opaque. Subsumes tier (a); would collapse the
-  `linearCombination_*` coefficient algebra to one-liners. Owner-requested; the
-  highest-remaining automation for the branch.
+- [x] **Tier (b) — free-module normaliser (`module`) — DONE (2026-07-14).**
+  New `module` decision tactic (`src/elaborator/module_normalise.cpp`, keyword
+  reuses the module-declaration token in expression position). Closes an `=`
+  goal over `VectorSpace.carrier(V)` by normalising both sides to a canonical
+  `Σ cᵢ • vᵢ`: distribute `•` over `+`/`−` (`scale_vector_add`), collapse nested
+  scales (`scale_scalar_multiply`), negate → `(−1)•` (`negate_one_scale`),
+  subtract → `add∘negate`, bare `v → 1•v` (`one_scale`); then sort by atom
+  (`add_commutative`), merge like atoms by adding field coefficients
+  (`scale_scalar_add`), and drop coefficients the `ring` prover shows are zero
+  (`zero_scale`); compare atom-by-atom with each coefficient equality discharged
+  by `ring` (close goal over binders → `elaborateRing` in try/catch → reopen).
+  Every step emits a kernel-checked certificate (reuses the group.cpp
+  congruence/transitivity pattern). Wired into the calc-step auto-prover
+  (cheap no-op off vector carriers) so it fires as a bare step too. Closes
+  `a•v+b•v=(a+b)•v`, `a•(u+v)=a•u+a•v`, `a•(b•v)=(a*b)•v`, reorderings,
+  `a•v−a•v=0`, and combined rearrangements (`Test/module_tactic_test.math`).
+  Validated on a real proof: `linearCombination_scale`'s inductive step
+  (`scale_vector_add` + `scale_scalar_multiply`) is now one `by module`. Does
+  NOT reach inside an opaque atom (a `linearCombination`/`sum` head stays an
+  atom), so inductions still peel + apply the IH by hand around it. Gates: full
+  tests + export-check 2861 green, axioms unchanged. Docs:
+  `docs/conventions/algebra-tactics.md`.
 - [ ] **Finite-family construction layer (`appendVector` / `mergeFamilies` +
   independence/spanning transport + a position-skip fold lemma).** Surfaced by
   Stage G (rank–nullity) bricks 3–5: `basis_pruning`/`exchange` gave the tools to

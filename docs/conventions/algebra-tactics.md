@@ -1,4 +1,4 @@
-# Algebra tactics: ring, field, linear_combination
+# Algebra tactics: ring, field, linear_combination, group, module
 
 The `ring`/`field` tactics, foundational-vs-derived ring lemmas, and `linear_combination` (ring with equational hypotheses).
 
@@ -216,6 +216,33 @@ layer. This is the vector-space analogue of `ring`'s additive
 fragment; **prefer it to hand-written `add_commutative` /
 `add_associative` chains** over a vector carrier (it is what retired
 `add_pair_interchange` and `add_subtract_cancel_left`). Scope: a scalar
-block `a • v` is an opaque atom — pushing `•` through `+`/`−` and
-collecting like coefficients (`a•v + b•v = (a+b)•v`) is a *free-module*
-normaliser, not yet built (see `STRESS_PROBES.md`, tier b).
+block `a • v` is an opaque atom to `group` — collecting coefficients is
+the `module` tactic below.
+
+## `module` — the free-module normaliser
+
+`module` closes an `=` goal over a `VectorSpace.carrier(V)` by
+normalising both sides to a canonical linear combination `Σ cᵢ • vᵢ`
+(each distinct vector an opaque atom) and comparing atom-by-atom. It is
+strictly stronger than `group`'s abelian mode over the same carrier: it
+**distributes `•` over `+`/`−`** (`a • (u + v) = a • u + a • v`),
+**collapses nested scales** (`a • (b • v) = (a * b) • v`), **collects
+like vectors by adding their field coefficients** (`a • v + b • v =
+(a + b) • v`), reads a bare vector as `1 • v`, negation as `(−1) • v`,
+and **drops any term whose coefficient the `ring` prover shows is zero**
+(so `a • v − a • v = 0`). Each collected/compared coefficient equality
+is discharged by the `ring` prover, and every step emits a
+kernel-checked certificate from the `VectorSpace.scale_*` /
+`add_*` axioms.
+
+No hypothesis is needed — the field and space are read from the carrier
+`VectorSpace.carrier(f, V)`. Like `group`/`ring`, `module` fires as a
+bare relation-chain step too (a cheap no-op off vector-space carriers).
+**Prefer it to hand-written `scale_vector_add` / `scale_scalar_add` /
+`scale_scalar_multiply` chains** — e.g. the inductive step of
+`VectorSpace.linearCombination_scale` collapses `a • (Σ + c • w)` to
+`a • Σ + (a * c) • w` in one `by module`. It does not reach *inside* an
+opaque atom (a `linearCombination`/`sum` head stays an atom), so an
+induction that must rewrite such a subterm still peels with
+`linearCombination_add_one` and applies the IH by hand; `module` closes
+the pure scalar-algebra between those steps.
