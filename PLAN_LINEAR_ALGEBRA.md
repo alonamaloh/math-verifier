@@ -341,26 +341,22 @@ Update this section before ending any session that works on the plan.
     finite spanning family down to an independent one (choice-free); needs
     "remove one index from a `NaturalsBelow(count)` family" reindexing. Shares
     the concatenation/`InSpanOf` machinery above.
-  - **DESIGN NOTE — representation of a linear combination (decide SOON).**
-    Today a combination fixes its index multiset with `selection : Natural → I`
-    + `count`. The exchange and pruning proofs are fundamentally about the
-    index SET shrinking/growing by ONE element, and delete/insert/swap on the
-    `selection/count` encoding is reindexing gymnastics (the flagged pain
-    above). A combination indexed by a **finite subset** `S ⊆ I` —
-    `Σ (i ∈ S) coefficients(i) • family(i)` — makes those moves first-class
-    (`S ∖ {j}`, `S ∪ {j}`, on top of `Set/finite.math`), and is the surface a
-    `Σ_{i∈S}` notation would print. Cost: it is a REPRESENTATION change, so it
-    ripples through everything already built on `linearCombination` (span, the
-    `{1}` basis, `F[x]`, the coefficient module-algebra) — a migration, not an
-    addition. **Plan:** do the exchange proof ONCE on the current encoding
-    first (it exercises reindexing hardest, so it is the honest test); if the
-    delete/insert step is as painful as expected, switch to the subset
-    representation BEFORE pruning + Stage F (which lean on the same
-    combinatorics) rather than paying the reindexing tax twice. Independently
-    and cheaply: a `Σ (i < count) …` binder that parses to / prints as
-    `linearCombination(…)` — pure display sugar over the existing function, no
-    proof-engine change — makes the whole area read like mathematics and can
-    land anytime regardless of the representation call.
+  - **DESIGN NOTE — representation of a linear combination — DECIDED 2026-07-14:
+    KEEP the current `selection : Natural → I` + `count` encoding; the
+    subset-indexed `Σ (i ∈ S)` migration is DROPPED.** The reasoning was: the
+    exchange/pruning proofs are about the index SET changing by one element, and
+    a finite-subset `S ⊆ I` encoding would make `S ∖ {j}`/`S ∪ {j}` first-class
+    — but at the cost of a REPRESENTATION migration rippling through span, the
+    `{1}` basis, `F[x]`, and the coefficient module-algebra. The plan was to run
+    Steinitz ONCE on the current encoding as the honest reindexing test first.
+    **Verdict: the reindexing pain never materialised** — working over
+    `Natural`-indexed families with bounded predicates turned delete/insert/swap
+    into `Function.updateAt`/`swapIn` POINT-UPDATES (see
+    `Algebra/exchange_lemma.math`), so the subset migration is not worth its
+    cost and is dropped. The cheap, orthogonal win survives as a live to-do: a
+    `Σ (i < count) …` display binder that parses to / prints as
+    `linearCombination(…)` — pure notation over the existing function, no
+    proof-engine change (worklist item **Σ-sugar** below).
   - **Friction found this session, re-triaged (the branch's deliverable):**
     (1) `by substituting eq1, eq2` (comma) is not supported — `substituting`
     rewrites with ONE equation (the search picks a single candidate, it does
@@ -398,6 +394,74 @@ Update this section before ending any session that works on the plan.
     applied to `kernel_is_subspace`) were left to consumers — construct
     them where Stage G needs dimensions.
 - **Stages F–H** — not started.
+
+## Remaining worklist (authoritative running order)
+
+Sequenced 2026-07-14 after the Steinitz core landed. Rationale: finish Stage E
+(index-bookkeeping, which the normaliser tactic would not help) with current
+tools; then build the automation interlude (it pays off across the arithmetic-
+heavy F/G/H, not the bookkeeping of the bridge/pruning); then the headlines.
+The one judgment call is where the normaliser sits — after Stage E here; move it
+before **Bridge**/**Prune** only if you want the automation to land first on
+principle. Sizes: S/M/L. Each elaborator item (Σ-sugar, Norm-a, Norm-b) touches
+the parser/elaborator, so it needs a clean `make tests` cycle, not just a warm
+library build.
+
+**Phase 0 — housekeeping**
+- [ ] **Manifest** (S, polish) — redundancy read-through of
+  `Algebra/exchange_lemma.math` (~60 `--check-redundant-by` hints, ~half are
+  load-bearing keeps per `redundant_by_is_half_keeps`); then add to
+  `scripts/clean_manifest.txt`. Like `coordinate_space`/`polynomial_vector_space`
+  were added after their initial landing.
+
+**Phase 1 — finish Stage E**
+- [ ] **Bridge** (S–M, math) — the official
+  `exchange : LinearlyIndependent(u : NaturalsBelow(m)) ∧ Spans(w : NaturalsBelow(n)) → m ≤ n`
+  over the index-generic predicates, derived from `independent_le_spanning`.
+  Needs: extend `NaturalsBelow(m)→V` families AND `Natural→NaturalsBelow(m)`
+  selections to total `Natural`-indexed maps via a value-level dependent
+  conditional (`Logic.classical_decidable(i<m)` pattern-match binding the proof,
+  à la `Rational.minimumWithDecision`), a `linearCombination_congruence`
+  (arbitrary-selection sibling of `standardCombination_congruence`), and an
+  `m=0`/`len=0` trivial split (empty index type). UNBLOCKS Stage F.
+- [ ] **Prune** (M, math) — `FinitelyGenerated ⟹ ∃ finite basis` (choice-free):
+  drop a redundant vector from a spanning family while staying spanning, repeat.
+  Needs a "remove one index from a `NaturalsBelow(count)` family" reindexing
+  helper (reusable; also the exchange bridge's cousin). Keeps the bundled
+  `FiniteDimensional` record and the unbundled existence view in sync.
+
+**Phase 2 — automation interlude (leverage before F/G/H)**
+- [ ] **Σ-sugar** (S, elaborator/display) — a `Σ (i < count) …` binder that
+  parses to / prints as `VectorSpace.linearCombination(…)`. Pure notation, no
+  proof-engine change. Makes everything already built and F/G/H read like maths.
+- [ ] **Norm-a** (M, elaborator/tactic) — additive-group normaliser over
+  `IsAbelianGroup`/`VectorSpace.carrier`: the sound additive fragment of `ring`
+  (assoc/comm/inverse/`0`, push `•` through `+`/`−`). Erases
+  `add_subtract_cancel_left`, `add_pair_interchange`, and the manual assoc/comm
+  chains in `linear_combination.math` + `exchange_lemma.math`.
+- [ ] **Norm-b** (L, elaborator/tactic) — free-module `linear_combination`
+  normaliser: treat each distinct vector as an atom, normalise both sides to a
+  canonical `Σ cᵢ • vᵢ` by collecting like terms (adding coefficients in the
+  field, discharged by `ring`/`field`), compare atom-by-atom. Subsumes Norm-a;
+  collapses the `linearCombination_*` algebra and the coordinate manipulation in
+  `exchange_lemma.math` to one-liners. Highest-impact automation this branch has
+  surfaced (owner-requested). Full design in `STRESS_PROBES.md` (Steinitz
+  verdict + side-quest).
+
+**Phase 3 — dimension + headlines** (Stage F/G/H detail lives in the build-order
+section below)
+- [ ] **Stage F** (M–L, math) — `dimension` (choice-free finite invariance from
+  the exchange lemma). The transport crux the branch was built to measure.
+- [ ] **Stage G** (M, math) — **rank–nullity** (headline #1).
+- [ ] **Stage H0** (M, math) — permutation **sign/parity** — CONFIRMED ABSENT
+  from `Lists/permutation.math`, must be built.
+- [ ] **Stage H** (M–L, math) — **det(AB) = det(A)·det(B)** (headline #2).
+
+**Cross-cutting (deferrable throughout)**
+- [ ] **AC infra** (M, infra) — `Logic/choice.math` (`AxiomOfChoice` Prop +
+  Zorn/well-ordering) + AC-gated *general* (infinite-dimensional) invariance.
+  CONFIRMED ABSENT. Needed ONLY for non-well-orderable-space basis invariance;
+  the finite core (F/G/H), `F[x]`, rank–nullity, determinants never wait on it.
 
 ## What is already in place (so this isn't re-litigated)
 
