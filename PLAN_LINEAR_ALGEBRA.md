@@ -334,10 +334,22 @@ Update this section before ending any session that works on the plan.
     - **Steinitz exchange induction — DONE 2026-07-14** (see the CORE DONE
       block above). Span-transitivity is the substitution its replacement step
       performs; `Field.reciprocal` enters via `InSpanOf.scale_cancel`.
-  - **FinitelyGenerated ⟹ finite basis (pruning) — NOT STARTED.** Prune a
-    finite spanning family down to an independent one (choice-free); needs
-    "remove one index from a `NaturalsBelow(count)` family" reindexing. Shares
-    the concatenation/`InSpanOf` machinery above.
+  - **FinitelyGenerated ⟹ finite basis (pruning) — FOUNDATION + KEY FIX DONE,
+    redundancy/induction remaining.** See the Phase 1 "Prune" worklist entry for
+    the full remaining design. FOUNDATION (commit ad2491e1) + the reindexing
+    helper landed. **DEFINITIONAL FIX (commit c7bad820, `Spans` now contains 0):**
+    the probe surfaced that `Spans`/`InSpanOf` demanded a selection `Natural → I`,
+    which is uninhabited for `I = NaturalsBelow(0)`, so the EMPTY family could not
+    span — making the trivial space `{0}` finitely generated but NOT
+    finite-dimensional (no expressible basis), i.e. `FinitelyGenerated ⟹
+    FiniteDimensional` was FALSE for `{0}`. Owner ruling: `{0}` IS 0-dimensional;
+    learn from Mathlib (span = closure that always contains 0). FIX:
+    `Spans(family) := ∀v. v = 0 ∨ (∃ combination)` — the empty sum reaches 0 with
+    no selection witness. `InSpanOf` unchanged (so exchange's combination
+    extraction is untouched); `InSpanOf.of_spans` gained an index inhabitant (for
+    the `v=0` leg), `InSpanOf.zero` moved to span.math, and the `Spans` producers
+    ({1}-basis, F[x] monomials, exchange's swap/bridge) establish `InSpanOf` then
+    close by auto ∨-intro. All gates green after the change.
   - **DESIGN NOTE — representation of a linear combination — DECIDED 2026-07-14:
     KEEP the current `selection : Natural → I` + `count` encoding; the
     subset-indexed `Σ (i ∈ S)` migration is DROPPED.** The reasoning was: the
@@ -437,11 +449,41 @@ library build.
   named context facts), the two congruence transports, and
   `done by independent_le_spanning`. UNBLOCKS Stage F. NOT yet in clean
   manifest (shares the deferred redundant-by read-through with the core).
-- [ ] **Prune** (M, math) — `FinitelyGenerated ⟹ ∃ finite basis` (choice-free):
-  drop a redundant vector from a spanning family while staying spanning, repeat.
-  Needs a "remove one index from a `NaturalsBelow(count)` family" reindexing
-  helper (reusable; also the exchange bridge's cousin). Keeps the bundled
-  `FiniteDimensional` record and the unbundled existence view in sync.
+- [~] **Prune** (M→L, math) — `FinitelyGenerated ⟹ FiniteDimensional` (choice-free).
+  **Foundation DONE (2026-07-14, `Algebra/basis_pruning.math`, commit ad2491e1):**
+  `linearCombination_bump_position` (arbitrary-selection position bump),
+  `InSpanOf.of_combination_selected` (used-indices refinement of of_combination),
+  and the `NaturalsBelow.skip(jv)` reindexing helper (`skipValue`/`skipInverseValue`
+  + `skip_avoids` + `skipInverse_skipValue` round trip). **UNBLOCKED by the
+  Spans-contains-0 fix (commit c7bad820):** the trivial space `{0}` is now
+  finite-dimensional (empty basis spans via `∀v. v=0`), so the theorem is TRUE.
+  **REMAINING (redundancy + induction, design fully worked out):**
+  1. `NaturalsBelow.skip_surjective` — `value(index)≠jv → ∃i. skip(jv,i)=index`
+     (via `skipInverse`; needs the NaturalsBelow-valued inverse with its bound).
+  2. Redundancy: `g:NaturalsBelow(1+count)→V`, `¬LinearlyIndependent(g)` ⟹
+     `∃j. InSpanOrZero(g∘skip(value j), g(j))` where `InSpanOrZero(fam,v):= v=0 ∨
+     InSpanOf(fam,v)`. Route (avoids the messy `¬∀` extraction): prove the
+     CONTRAPOSITIVE inside "→independent" — take `N,σ,c,inj,comb=0`, suppose
+     `c(i0)≠0`; `j:=σ(i0)`; by `linearCombination_bump_position` at `i0` with
+     `e=-c(i0)`: `(-c(i0))•g(j) = linearCombination(g, updateAt(c,i0,0), σ, N)`,
+     and the RHS reindexes (congruence, `skipInverse`) to a combination of
+     `g∘skip(value j)` (position `i0` has coeff 0 so its selection is free) ⟹
+     `InSpanOf(g∘skip, (-c(i0))•g(j))` ⟹ `InSpanOf(g∘skip, g(j))` by
+     `InSpanOf.scale_cancel`. **count=0 (size 1) is a SEPARATE case**: injectivity
+     into the `NaturalsBelow(1)` singleton forces `N=1`, so `comb=c(0)•g(point)=0`
+     with `c(0)≠0` ⟹ `g(point)=0` (the `v=0` leg of `InSpanOrZero`; `g∘skip`
+     is the empty family).
+  3. Spanning-preservation: `Spans(g)` + `InSpanOrZero(g∘skip(value j), g(j))` ⟹
+     `Spans(g∘skip(value j))`. Every `g(index)` is in `span-or-zero(g∘skip)`:
+     `index≠j` ⟹ member (skip surjectivity); `index=j` ⟹ the hypothesis. Then a
+     zero-aware transitivity (reuse `InSpanOf.transitive`, handle the `=0` leg).
+  4. Induction on `size`: base `size=0` ⟹ `IsBasis(g)` (empty family: independence
+     vacuous, `Spans(g)` given) ⟹ `FiniteDimensional` at `n=0`; step, excluded
+     middle on `∃j. Spans(g∘skip(value j))` — right ⟹ IH at `count`; ¬ ⟹ prove
+     `LinearlyIndependent(g)` (via the redundancy contrapositive) ⟹ `IsBasis(g)`.
+  5. `FinitelyGenerated.finite_dimensional` = choose generators, apply the helper.
+  Keeps the bundled `FiniteDimensional` record and the unbundled existence view in
+  sync (Stage F builds the record).
 
 **Phase 2 — automation interlude (leverage before F/G/H)**
 - [ ] **Σ-sugar** (S, elaborator/display) — a `Σ (i < count) …` binder that
