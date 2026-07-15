@@ -285,3 +285,222 @@ theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(
         }
       })
 }
+
+-- ----------------------------------------------------------------------
+-- The base case: an adjacent transposition inverts exactly one ordered pair.
+
+-- How a transposition moves the value of an index: to the partner's value at
+-- the two swapped indices, unchanged elsewhere. (Stated by value, since a
+-- value pins down the index.)
+theorem Permutation.value_apply_swap_at_left {n : Natural} (a b x : NaturalsBelow(n))
+        (atA : NaturalsBelow.value(x) = NaturalsBelow.value(a))
+        : NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x)) = NaturalsBelow.value(b) := {
+  x = a by NaturalsBelow.equal_of_value(n, x, a, atA) as xIsA;
+  NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x))
+     = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), a)) by substituting xIsA
+     = NaturalsBelow.value(b) by substituting Permutation.apply_swap_left(a, b);
+  done
+}
+
+theorem Permutation.value_apply_swap_at_right {n : Natural} (a b x : NaturalsBelow(n))
+        (atB : NaturalsBelow.value(x) = NaturalsBelow.value(b))
+        : NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x)) = NaturalsBelow.value(a) := {
+  x = b by NaturalsBelow.equal_of_value(n, x, b, atB) as xIsB;
+  NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x))
+     = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), b)) by substituting xIsB
+     = NaturalsBelow.value(a) by substituting Permutation.apply_swap_right(a, b);
+  done
+}
+
+theorem Permutation.value_apply_swap_at_other {n : Natural} (a b x : NaturalsBelow(n))
+        (offA : NaturalsBelow.value(x) ≠ NaturalsBelow.value(a))
+        (offB : NaturalsBelow.value(x) ≠ NaturalsBelow.value(b))
+        : NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x)) = NaturalsBelow.value(x) := {
+  x ≠ a by NaturalsBelow.ne_of_value_ne(x, a, offA) as xNeqA;
+  x ≠ b by NaturalsBelow.ne_of_value_ne(x, b, offB) as xNeqB;
+  NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x))
+     = NaturalsBelow.value(x) by substituting Permutation.apply_swap_other(a, b, x, xNeqA, xNeqB);
+  done
+}
+
+-- From a strict inequality, the two sides differ.
+theorem Natural.ne_of_lt (a b : Natural) (h : a < b) : a ≠ b :=
+  (e : a = b) ↦ {
+    a < a by { a < b by h = a by e; done };
+    False by Natural.lt_irreflexive(a);
+    done
+  }
+
+-- The heart of the base case: on any ordered pair OTHER than {a, b} itself, an
+-- adjacent transposition preserves the value order, so its orientation is +1.
+theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : NaturalsBelow(n))
+        (adjacent : NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a))
+        (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        (notThePair : p ≠ Product.make(a, b))
+        : Permutation.pairOrient(Permutation.swap(a, b), p) = 1 :=
+  by induction on p with pInduct {
+    case Product.make(i, j): {
+      1 + NaturalsBelow.value(a) = NaturalsBelow.value(b) by adjacent as adjacentBack;
+      NaturalsBelow.value(i) < NaturalsBelow.value(j)
+          by Permutation.orderedPairs_property(n, Product.make(i, j), memberP) as ordered;
+      ¬(NaturalsBelow.value(i) = NaturalsBelow.value(a) ∧ NaturalsBelow.value(j) = NaturalsBelow.value(b))
+          by {
+            suppose NaturalsBelow.value(i) = NaturalsBelow.value(a)
+                ∧ NaturalsBelow.value(j) = NaturalsBelow.value(b) for contradiction {
+              NaturalsBelow.value(i) = NaturalsBelow.value(a) as iMatchA;
+              NaturalsBelow.value(j) = NaturalsBelow.value(b) as jMatchB;
+              i = a by NaturalsBelow.equal_of_value(n, i, a, iMatchA) as iIsAeq;
+              j = b by NaturalsBelow.equal_of_value(n, j, b, jMatchB) as jIsBeq;
+              Product.make(i, j) = Product.make(a, b)
+                  by Product.make_equal(NaturalsBelow(n), NaturalsBelow(n), i, a, j, b, iIsAeq, jIsBeq);
+              False by notThePair;
+              done
+            };
+            done
+          } as notBothMatch;
+      NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
+          < NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j))
+          by {
+            NaturalsBelow.value(i) = NaturalsBelow.value(a)
+                ∨ NaturalsBelow.value(i) ≠ NaturalsBelow.value(a);
+            done by cases {
+              case NaturalsBelow.value(i) = NaturalsBelow.value(a) as iIsA: {
+                  NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i)) = NaturalsBelow.value(b)
+                      by Permutation.value_apply_swap_at_left(a, b, i, iIsA) as swapI;
+                  NaturalsBelow.value(a) < NaturalsBelow.value(j)
+                      by { NaturalsBelow.value(a) = NaturalsBelow.value(i) by iIsA
+                               < NaturalsBelow.value(j) by ordered; done } as aLtJ;
+                  NaturalsBelow.value(j) ≠ NaturalsBelow.value(b) by {
+                    suppose NaturalsBelow.value(j) = NaturalsBelow.value(b) for contradiction {
+                      NaturalsBelow.value(i) = NaturalsBelow.value(a)
+                          ∧ NaturalsBelow.value(j) = NaturalsBelow.value(b);
+                      False by notBothMatch;
+                      done
+                    };
+                    done
+                  } as jNotB;
+                  NaturalsBelow.value(j) ≠ NaturalsBelow.value(a)
+                      by Equality.ne_symmetric(Natural, NaturalsBelow.value(a), NaturalsBelow.value(j),
+                             Natural.ne_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(j), aLtJ)) as jNotA;
+                  NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) = NaturalsBelow.value(j)
+                      by Permutation.value_apply_swap_at_other(a, b, j, jNotA, jNotB) as swapJ;
+                  1 + NaturalsBelow.value(a) ≤ NaturalsBelow.value(j)
+                      by Natural.successor_le_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(j), aLtJ)
+                      as oneVaLeJ;
+                  NaturalsBelow.value(j) ≠ 1 + NaturalsBelow.value(a) by substituting adjacentBack as jNotOneVa;
+                  1 + NaturalsBelow.value(a) < NaturalsBelow.value(j)
+                      by Natural.lt_of_le_of_ne(1 + NaturalsBelow.value(a), NaturalsBelow.value(j), oneVaLeJ,
+                             Equality.ne_symmetric(Natural, NaturalsBelow.value(j), 1 + NaturalsBelow.value(a),
+                                 jNotOneVa)) as oneVaLtJ;
+                  NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
+                     = NaturalsBelow.value(b) by swapI
+                     = 1 + NaturalsBelow.value(a) by adjacent
+                     < NaturalsBelow.value(j) by oneVaLtJ
+                     = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) by swapJ;
+                  done
+                }
+              case NaturalsBelow.value(i) ≠ NaturalsBelow.value(a) as iNotA: {
+                  NaturalsBelow.value(i) = NaturalsBelow.value(b)
+                      ∨ NaturalsBelow.value(i) ≠ NaturalsBelow.value(b);
+                  done by cases {
+                    case NaturalsBelow.value(i) = NaturalsBelow.value(b) as iIsB: {
+                        NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i)) = NaturalsBelow.value(a)
+                            by Permutation.value_apply_swap_at_right(a, b, i, iIsB) as swapI;
+                        1 + NaturalsBelow.value(a) < NaturalsBelow.value(j)
+                            by { 1 + NaturalsBelow.value(a) = NaturalsBelow.value(b) by adjacentBack
+                                     = NaturalsBelow.value(i) by iIsB
+                                     < NaturalsBelow.value(j) by ordered; done } as oneVaLtJ;
+                        NaturalsBelow.value(a) < NaturalsBelow.value(j)
+                            by { NaturalsBelow.value(a) < 1 + NaturalsBelow.value(a) by Natural.lt_one_plus
+                                     < NaturalsBelow.value(j) by oneVaLtJ; done } as aLtJ;
+                        NaturalsBelow.value(b) < NaturalsBelow.value(j)
+                            by { NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a) by adjacent
+                                     < NaturalsBelow.value(j) by oneVaLtJ; done } as bLtJ;
+                        NaturalsBelow.value(j) ≠ NaturalsBelow.value(a)
+                            by Equality.ne_symmetric(Natural, NaturalsBelow.value(a), NaturalsBelow.value(j),
+                                   Natural.ne_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(j), aLtJ)) as jNotA;
+                        NaturalsBelow.value(j) ≠ NaturalsBelow.value(b)
+                            by Equality.ne_symmetric(Natural, NaturalsBelow.value(b), NaturalsBelow.value(j),
+                                   Natural.ne_of_lt(NaturalsBelow.value(b), NaturalsBelow.value(j), bLtJ)) as jNotB;
+                        NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) = NaturalsBelow.value(j)
+                            by Permutation.value_apply_swap_at_other(a, b, j, jNotA, jNotB) as swapJ;
+                        NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
+                           = NaturalsBelow.value(a) by swapI
+                           < NaturalsBelow.value(j) by aLtJ
+                           = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) by swapJ;
+                        done
+                      }
+                    case NaturalsBelow.value(i) ≠ NaturalsBelow.value(b) as iNotB: {
+                        NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i)) = NaturalsBelow.value(i)
+                            by Permutation.value_apply_swap_at_other(a, b, i, iNotA, iNotB) as swapI;
+                        NaturalsBelow.value(j) = NaturalsBelow.value(a)
+                            ∨ NaturalsBelow.value(j) ≠ NaturalsBelow.value(a);
+                        done by cases {
+                          case NaturalsBelow.value(j) = NaturalsBelow.value(a) as jIsA: {
+                              NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j))
+                                  = NaturalsBelow.value(b)
+                                  by Permutation.value_apply_swap_at_left(a, b, j, jIsA) as swapJ;
+                              NaturalsBelow.value(i) < NaturalsBelow.value(a)
+                                  by { NaturalsBelow.value(i) < NaturalsBelow.value(j) by ordered
+                                           = NaturalsBelow.value(a) by jIsA; done } as iLtA;
+                              NaturalsBelow.value(a) < NaturalsBelow.value(b)
+                                  by { NaturalsBelow.value(a) < 1 + NaturalsBelow.value(a) by Natural.lt_one_plus
+                                           = NaturalsBelow.value(b) by adjacentBack; done } as aLtB;
+                              NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
+                                 = NaturalsBelow.value(i) by swapI
+                                 < NaturalsBelow.value(a) by iLtA
+                                 < NaturalsBelow.value(b) by aLtB
+                                 = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) by swapJ;
+                              done
+                            }
+                          case NaturalsBelow.value(j) ≠ NaturalsBelow.value(a) as jNotA: {
+                              NaturalsBelow.value(j) = NaturalsBelow.value(b)
+                                  ∨ NaturalsBelow.value(j) ≠ NaturalsBelow.value(b);
+                              done by cases {
+                                case NaturalsBelow.value(j) = NaturalsBelow.value(b) as jIsB: {
+                                    NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j))
+                                        = NaturalsBelow.value(a)
+                                        by Permutation.value_apply_swap_at_right(a, b, j, jIsB) as swapJ;
+                                    NaturalsBelow.value(i) < 1 + NaturalsBelow.value(a)
+                                        by { NaturalsBelow.value(i) < NaturalsBelow.value(j) by ordered
+                                                 = NaturalsBelow.value(b) by jIsB
+                                                 = 1 + NaturalsBelow.value(a) by adjacent; done } as iLtOneVa;
+                                    NaturalsBelow.value(i) ≤ NaturalsBelow.value(a)
+                                        by Natural.le_of_lt_one_plus(NaturalsBelow.value(i), NaturalsBelow.value(a),
+                                               iLtOneVa) as iLeA;
+                                    NaturalsBelow.value(i) < NaturalsBelow.value(a)
+                                        by Natural.lt_of_le_of_ne(NaturalsBelow.value(i), NaturalsBelow.value(a),
+                                               iLeA, iNotA) as iLtA;
+                                    NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
+                                       = NaturalsBelow.value(i) by swapI
+                                       < NaturalsBelow.value(a) by iLtA
+                                       = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) by swapJ;
+                                    done
+                                  }
+                                case NaturalsBelow.value(j) ≠ NaturalsBelow.value(b) as jNotB: {
+                                    NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j))
+                                        = NaturalsBelow.value(j)
+                                        by Permutation.value_apply_swap_at_other(a, b, j, jNotA, jNotB) as swapJ;
+                                    NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
+                                       = NaturalsBelow.value(i) by swapI
+                                       < NaturalsBelow.value(j) by ordered
+                                       = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) by swapJ;
+                                    done
+                                  }
+                              }
+                            }
+                        }
+                      }
+                  }
+                }
+            }
+          } as swapOrdered;
+      Permutation.pairOrient(Permutation.swap(a, b), Product.make(i, j))
+         = Permutation.orient(Permutation.apply(Permutation.swap(a, b), i),
+               Permutation.apply(Permutation.swap(a, b), j))
+         = 1 by Permutation.orient_forward(Permutation.apply(Permutation.swap(a, b), i),
+                    Permutation.apply(Permutation.swap(a, b), j), swapOrdered);
+      done
+    }
+  }
