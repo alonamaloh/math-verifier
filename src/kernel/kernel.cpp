@@ -941,6 +941,17 @@ ExpressionPointer buildIotaReduction(
     // are the parameter binders; skip them, substituting the matching
     // recursor parameter value into the codomain at each step.
     auto walker = constructor.type;
+    // Walked in lockstep with `walker`, but WITHOUT substituting the parameter
+    // values. Recursiveness of a constructor argument must be decided here, on
+    // the ORIGINAL type: a recursive occurrence has the inductive itself as the
+    // head of its (parameter-referencing) domain, e.g. `tail : List A`. The
+    // substituted `walker` cannot tell that apart from a NON-recursive field
+    // whose type is merely the parameter — for `List(List A)` the parameter is
+    // `List A`, so `head : A` becomes `head : List A` after substitution and
+    // would be mis-read as recursive, fabricating a bogus induction hypothesis.
+    // On the original type `head : A` has a bound-variable head, so it is
+    // correctly non-recursive.
+    auto originalWalker = constructor.type;
     int argIndex = 0;
     for (int p = 0; p < numParameters; ++p) {
         auto* pi = std::get_if<Pi>(&walker->node);
@@ -951,6 +962,7 @@ ExpressionPointer buildIotaReduction(
                 " has fewer Pi binders than the inductive has parameters");
         }
         walker = substitute(pi->codomain, 0, constructorArgs[argIndex]);
+        originalWalker = std::get_if<Pi>(&originalWalker->node)->codomain;
         argIndex++;
     }
 
@@ -961,6 +973,7 @@ ExpressionPointer buildIotaReduction(
     // order — Lean's layout, mirrored by buildCaseType).
     std::vector<ExpressionPointer> recursiveCalls;
     while (auto* pi = std::get_if<Pi>(&walker->node)) {
+        auto* originalPi = std::get_if<Pi>(&originalWalker->node);
         auto argValue = constructorArgs[argIndex];
         result = makeApplication(result, argValue);
 
@@ -972,8 +985,6 @@ ExpressionPointer buildIotaReduction(
             telescopeDomains.push_back(telePi->domain);
             argBase = telePi->codomain;
         }
-        bool isRecursive = false;
-        std::vector<ExpressionPointer> recursiveIndices;
         auto typeHead = argBase;
         std::vector<ExpressionPointer> typeArgs;
         while (auto* app = std::get_if<Application>(&typeHead->node)) {
@@ -981,7 +992,19 @@ ExpressionPointer buildIotaReduction(
             typeHead = app->function;
         }
         std::reverse(typeArgs.begin(), typeArgs.end());
-        if (auto* c = std::get_if<Constant>(&typeHead->node);
+        // Recursiveness verdict: read the head off the ORIGINAL (un-substituted)
+        // domain, so a parameter-typed field is not confused for a recursive one.
+        auto originalBase = originalPi->domain;
+        while (auto* telePi = std::get_if<Pi>(&originalBase->node)) {
+            originalBase = telePi->codomain;
+        }
+        auto originalTypeHead = originalBase;
+        while (auto* app = std::get_if<Application>(&originalTypeHead->node)) {
+            originalTypeHead = app->function;
+        }
+        bool isRecursive = false;
+        std::vector<ExpressionPointer> recursiveIndices;
+        if (auto* c = std::get_if<Constant>(&originalTypeHead->node);
             c && c->name == recursor.inductiveName) {
             isRecursive = true;
             // Indices for the recursive call: the typeArgs past the params.
@@ -1024,8 +1047,10 @@ ExpressionPointer buildIotaReduction(
         }
 
         // Advance through the binder; substitute the arg value to keep
-        // de Bruijn indices coherent in the remaining codomain.
+        // de Bruijn indices coherent in the remaining codomain. `originalWalker`
+        // advances without substitution, staying aligned with `walker`.
         walker = substitute(pi->codomain, 0, argValue);
+        originalWalker = originalPi->codomain;
         argIndex++;
     }
     for (const auto& recursiveCall : recursiveCalls) {

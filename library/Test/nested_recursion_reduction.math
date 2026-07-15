@@ -1,0 +1,50 @@
+-- Test/nested_recursion_reduction.math
+--
+-- Regression guard for the ι-reduction of a structural recursion whose
+-- datatype is nested inside ITSELF — recursion over `List(List(A))`.
+--
+-- The bug (fixed in src/kernel/kernel.cpp `buildIotaReduction`): recursiveness
+-- of a constructor argument was decided AFTER substituting the inductive's
+-- parameter values. For `List(List A)` the parameter is `List A`, so the
+-- non-recursive `head : A` field of `prepend` became `head : List A` and its
+-- head constant `List` spuriously matched the inductive name — fabricating a
+-- bogus induction hypothesis, so `flatten(prepend h t)` reduced to a malformed
+-- term instead of `append(h, flatten t)`. The verdict is now read off the
+-- ORIGINAL (un-substituted) constructor type, where `head : A` is a bound
+-- variable and correctly non-recursive.
+--
+-- Each theorem below is proved by `reflexivity`, so it passes ONLY if the
+-- defining equation holds DEFINITIONALLY — exactly what the fix restores.
+
+module Test.nested_recursion_reduction
+
+import Logic.basics
+import Equality.basics
+import Lists.list
+import Lists.append
+
+definition List.flattenTest (A : Type(0)) : List(List(A)) → List(A)
+  | List.empty               => List.empty(A)
+  | List.prepend(head, tail) => List.append(A, head, List.flattenTest(A, tail))
+
+-- The empty clause reduces (this always worked).
+theorem List.flattenTest_empty (A : Type(0))
+        : List.flattenTest(A, List.empty(List(A))) = List.empty(A) :=
+  reflexivity(List.empty(A))
+
+-- The recursive clause reduces — the defining equation holds definitionally.
+-- This is the equation that was NOT provable before the fix.
+theorem List.flattenTest_prepend (A : Type(0)) (head : List(A)) (tail : List(List(A)))
+        : List.flattenTest(A, List.prepend(List(A), head, tail))
+          = List.append(A, head, List.flattenTest(A, tail)) :=
+  reflexivity(List.append(A, head, List.flattenTest(A, tail)))
+
+-- And it computes on a concrete nested list: flatten [[x], [y, z]] = [x, y, z].
+theorem List.flattenTest_concrete (A : Type(0)) (x y z : A)
+        : List.flattenTest(A,
+              List.prepend(List(A), List.prepend(A, x, List.empty(A)),
+                  List.prepend(List(A),
+                      List.prepend(A, y, List.prepend(A, z, List.empty(A))),
+                      List.empty(List(A)))))
+          = List.prepend(A, x, List.prepend(A, y, List.prepend(A, z, List.empty(A)))) :=
+  reflexivity(List.prepend(A, x, List.prepend(A, y, List.prepend(A, z, List.empty(A)))))
