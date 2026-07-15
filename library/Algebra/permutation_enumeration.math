@@ -315,3 +315,245 @@ theorem Permutation.lower_of_row {m : Natural} (sigma : Permutation(m)) (p : Nat
      = sigma by Permutation.restrict_extend(sigma);
   done
 }
+
+-- ----------------------------------------------------------------------
+-- The enumeration list. `allPermutations(1 + m)` concatenates, over every
+-- σ ∈ allPermutations(m), the "row" of the (1 + m) permutations
+-- swap(top, j) ∘ extend(σ), one for each index j.
+
+-- A single entry of a row: the permutation sending the top to j, extending σ.
+definition Permutation.rowElement {m : Natural} (sigma : Permutation(m)) (j : NaturalsBelow(1 + m))
+        : Permutation(1 + m) :=
+  Permutation.compose(Permutation.swap(NaturalsBelow.top(m), j), Permutation.extend(sigma))
+
+-- The row for σ: its entries over all indices j ∈ NaturalsBelow(1 + m).
+definition Permutation.insertRow {m : Natural} (sigma : Permutation(m)) : List(Permutation(1 + m)) :=
+  List.map(NaturalsBelow(1 + m), Permutation(1 + m), Permutation.rowElement(sigma),
+      NaturalsBelow.enumerate(1 + m))
+
+-- Concatenate the rows over a list of permutations of NaturalsBelow(m).
+-- Recursion on the LIST (m fixed), so no index transport arises here.
+definition Permutation.concatRows (m : Natural)
+        : List(Permutation(m)) → List(Permutation(1 + m))
+  | List.empty => List.empty(Permutation(1 + m))
+  | List.prepend(sigma, rest) =>
+      List.append(Permutation(1 + m), Permutation.insertRow(sigma), Permutation.concatRows(m, rest))
+
+-- All permutations of NaturalsBelow(n). The `1 + m` step recurses on the index
+-- (dependent result type), bridged by `unfold Natural.add in` exactly as
+-- `enumerate` above.
+definition Permutation.allPermutations : (n : Natural) → List(Permutation(n))
+  | 0 => List.prepend(Permutation(0), Permutation.identity(0), List.empty(Permutation(0)))
+  | 1 + m => unfold Natural.add in Permutation.concatRows(m, Permutation.allPermutations(m))
+
+theorem Permutation.allPermutations_one_plus (m : Natural)
+        : Permutation.allPermutations(1 + m)
+          = Permutation.concatRows(m, Permutation.allPermutations(m)) :=
+  unfold Natural.add in reflexivity(Permutation.concatRows(m, Permutation.allPermutations(m)))
+
+-- ----------------------------------------------------------------------
+-- Completeness and distinctness of the enumeration.
+
+-- Every permutation of the empty index type is the identity (there is nothing
+-- to move).
+theorem Permutation.perm_zero_is_identity (tau : Permutation(0)) : tau = Permutation.identity(0) :=
+  Permutation.equal_of_apply_equal(tau, Permutation.identity(0),
+      (i : NaturalsBelow(0)) ↦ absurd(NaturalsBelow.zero_is_empty(i)))
+
+-- A row is injective in its index: `swap(top, ·)` is, and post-composing by
+-- extend(σ) cancels.
+theorem Permutation.rowElement_injective {m : Natural} (sigma : Permutation(m))
+        (j1 j2 : NaturalsBelow(1 + m))
+        (equalRows : Permutation.rowElement(sigma, j1) = Permutation.rowElement(sigma, j2))
+        : j1 = j2 := {
+  Permutation.swap(NaturalsBelow.top(m), j1) = Permutation.swap(NaturalsBelow.top(m), j2)
+      by Permutation.compose_right_cancel(Permutation.swap(NaturalsBelow.top(m), j1),
+             Permutation.swap(NaturalsBelow.top(m), j2), Permutation.extend(sigma), equalRows)
+      as swapsEqual;
+  j1 = Permutation.apply(Permutation.swap(NaturalsBelow.top(m), j1), NaturalsBelow.top(m))
+          by Permutation.apply_swap_left(NaturalsBelow.top(m), j1)
+    = Permutation.apply(Permutation.swap(NaturalsBelow.top(m), j2), NaturalsBelow.top(m))
+          by substituting swapsEqual
+    = j2 by Permutation.apply_swap_left(NaturalsBelow.top(m), j2);
+  done
+}
+
+-- Each row is distinct: an injective image of the distinct index enumeration.
+theorem Permutation.insertRow_distinct {m : Natural} (sigma : Permutation(m))
+        : List.Distinct(Permutation(1 + m), Permutation.insertRow(sigma)) :=
+  List.map_distinct(NaturalsBelow(1 + m), Permutation(1 + m), Permutation.rowElement(sigma),
+      (j1 j2 : NaturalsBelow(1 + m))
+          (equalRows : Permutation.rowElement(sigma, j1) = Permutation.rowElement(sigma, j2)) ↦
+          Permutation.rowElement_injective(sigma, j1, j2, equalRows),
+      NaturalsBelow.enumerate(1 + m), NaturalsBelow.enumerate_distinct(1 + m))
+
+-- Every member of a row recovers its σ under `lower` — the key to cross-row
+-- disjointness.
+theorem Permutation.insertRow_member_lower {m : Natural} (sigma : Permutation(m))
+        (tau : Permutation(1 + m))
+        (memTau : List.member(Permutation(1 + m), tau, Permutation.insertRow(sigma)))
+        : Permutation.lower(tau) = sigma := {
+  choose j such that
+      List.member(NaturalsBelow(1 + m), j, NaturalsBelow.enumerate(1 + m))
+          ∧ (Permutation.rowElement(sigma, j) = tau)
+      from List.map_member_invert(NaturalsBelow(1 + m), Permutation(1 + m),
+               Permutation.rowElement(sigma), tau, NaturalsBelow.enumerate(1 + m), memTau);
+  Permutation.rowElement(sigma, j) = tau as rowIsTau;
+  Permutation.lower(tau)
+     = Permutation.lower(Permutation.rowElement(sigma, j)) by substituting rowIsTau
+     = sigma by Permutation.lower_of_row(sigma, j);
+  done
+}
+
+-- Membership into the concatenation: a τ in the row of a σ ∈ l is in
+-- concatRows(l). Induct on where σ sits in l.
+theorem Permutation.concatRows_member (m : Natural) (l : List(Permutation(m)))
+        (sigma : Permutation(m)) (tau : Permutation(1 + m))
+        (memSigma : List.member(Permutation(m), sigma, l))
+        (memTau : List.member(Permutation(1 + m), tau, Permutation.insertRow(sigma)))
+        : List.member(Permutation(1 + m), tau, Permutation.concatRows(m, l)) :=
+  by induction on memSigma with IH {
+    case List.member.here(rest):
+        List.member_append_left(Permutation(1 + m), tau, Permutation.insertRow(sigma),
+            Permutation.concatRows(m, rest), memTau)
+    case List.member.there(head, rest, sub):
+        List.member_append_right(Permutation(1 + m), tau, Permutation.insertRow(head),
+            Permutation.concatRows(m, rest), IH)
+  }
+
+-- Inversion: a member of concatRows(l) sits in the row of some σ ∈ l.
+theorem Permutation.concatRows_member_invert (m : Natural) (tau : Permutation(1 + m))
+        (l : List(Permutation(m)))
+        : List.member(Permutation(1 + m), tau, Permutation.concatRows(m, l))
+          → ∃ (sigma : Permutation(m)). List.member(Permutation(m), sigma, l)
+                ∧ List.member(Permutation(1 + m), tau, Permutation.insertRow(sigma)) :=
+  by induction on l with IH {
+    case List.empty:
+        (memTau : List.member(Permutation(1 + m), tau, Permutation.concatRows(m, List.empty(Permutation(m))))) ↦
+            absurd(List.no_member_empty(Permutation(1 + m), tau, memTau))
+    case List.prepend(sigma0, rest):
+        (memTau : List.member(Permutation(1 + m), tau,
+            Permutation.concatRows(m, List.prepend(Permutation(m), sigma0, rest)))) ↦ {
+          List.member(Permutation(1 + m), tau, Permutation.insertRow(sigma0))
+              ∨ List.member(Permutation(1 + m), tau, Permutation.concatRows(m, rest))
+              by List.member_append_invert(Permutation(1 + m), tau,
+                     Permutation.concatRows(m, rest), Permutation.insertRow(sigma0), memTau);
+          done by cases {
+            case List.member(Permutation(1 + m), tau, Permutation.insertRow(sigma0)) as inBlock:
+                ⟨sigma0, And.introduction(List.member.here(Permutation(m), sigma0, rest), inBlock)⟩
+            case List.member(Permutation(1 + m), tau, Permutation.concatRows(m, rest)) as inRest: {
+                choose sigma such that List.member(Permutation(m), sigma, rest)
+                    ∧ List.member(Permutation(1 + m), tau, Permutation.insertRow(sigma)) from IH(inRest);
+                List.member(Permutation(m), sigma, rest) as sigmaInRest;
+                List.member(Permutation(1 + m), tau, Permutation.insertRow(sigma)) as tauInBlock;
+                ⟨sigma, And.introduction(
+                    List.member.there(Permutation(m), sigma, sigma0, rest, sigmaInRest), tauInBlock)⟩
+            }
+          }
+        }
+  }
+
+-- concatRows preserves distinctness: each row is distinct, and rows for
+-- distinct σ are disjoint (σ is recoverable from any member by `lower`).
+theorem Permutation.concatRows_distinct (m : Natural) (l : List(Permutation(m)))
+        : List.Distinct(Permutation(m), l)
+          → List.Distinct(Permutation(1 + m), Permutation.concatRows(m, l)) :=
+  by induction on l with IH {
+    case List.empty:
+        (distinctL : List.Distinct(Permutation(m), List.empty(Permutation(m)))) ↦
+            List.Distinct.empty(Permutation(1 + m))
+    case List.prepend(sigma, rest):
+        (distinctL : List.Distinct(Permutation(m), List.prepend(Permutation(m), sigma, rest))) ↦ {
+          ¬(List.member(Permutation(m), sigma, rest))
+              by List.Distinct.head_not_member as sigmaNotInRest;
+          List.Distinct(Permutation(m), rest) by List.Distinct.tail_distinct as restDistinct;
+          List.Distinct(Permutation(1 + m), Permutation.concatRows(m, rest))
+              by IH(restDistinct) as concatRestDistinct;
+          (∀ (x : Permutation(1 + m)). List.member(Permutation(1 + m), x, Permutation.insertRow(sigma))
+              → ¬(List.member(Permutation(1 + m), x, Permutation.concatRows(m, rest))))
+              by (x : Permutation(1 + m))
+                 (xInBlock : List.member(Permutation(1 + m), x, Permutation.insertRow(sigma)))
+                 (xInRest : List.member(Permutation(1 + m), x, Permutation.concatRows(m, rest))) ↦ {
+                  Permutation.lower(x) = sigma
+                      by Permutation.insertRow_member_lower(sigma, x, xInBlock) as lowerXisSigma;
+                  choose sigmaPrime such that List.member(Permutation(m), sigmaPrime, rest)
+                      ∧ List.member(Permutation(1 + m), x, Permutation.insertRow(sigmaPrime))
+                      from Permutation.concatRows_member_invert(m, x, rest, xInRest);
+                  List.member(Permutation(1 + m), x, Permutation.insertRow(sigmaPrime)) as xInBlockPrime;
+                  Permutation.lower(x) = sigmaPrime
+                      by Permutation.insertRow_member_lower(sigmaPrime, x, xInBlockPrime) as lowerXisPrime;
+                  sigma = Permutation.lower(x) by lowerXisSigma
+                     = sigmaPrime by lowerXisPrime as sigmaEqualsPrime;
+                  List.member(Permutation(m), sigma, rest) by substituting sigmaEqualsPrime;
+                  False by sigmaNotInRest;
+                  done
+                } as disjoint;
+          List.Distinct(Permutation(1 + m),
+                  List.append(Permutation(1 + m), Permutation.insertRow(sigma),
+                      Permutation.concatRows(m, rest)))
+              by List.distinct_append(Permutation(1 + m), Permutation.concatRows(m, rest),
+                     Permutation.insertRow(sigma), Permutation.insertRow_distinct(sigma),
+                     concatRestDistinct, disjoint);
+          done
+        }
+  }
+
+-- Completeness: every permutation appears. The step writes τ as the row entry
+-- swap(top, τ(top)) ∘ extend(lower τ) — with lower τ in the level-m list (IH)
+-- and τ(top) among the indices — and locates it in the concatenation.
+theorem Permutation.allPermutations_complete (n : Natural)
+        : ∀ (tau : Permutation(n)). List.member(Permutation(n), tau, Permutation.allPermutations(n)) :=
+  by induction on n with IH {
+    case base: {
+        take tau : Permutation(0);
+        tau = Permutation.identity(0) by Permutation.perm_zero_is_identity(tau) as tauIsId;
+        List.member(Permutation(0), Permutation.identity(0),
+                  List.prepend(Permutation(0), Permutation.identity(0), List.empty(Permutation(0))))
+            by List.member.here;
+        List.member(Permutation(0), tau,
+                  List.prepend(Permutation(0), Permutation.identity(0), List.empty(Permutation(0))))
+            by substituting tauIsId;
+        done
+      }
+    case step(m): {
+        take tau : Permutation(1 + m);
+        List.member(Permutation(m), Permutation.lower(tau), Permutation.allPermutations(m))
+            by IH(Permutation.lower(tau)) as lowerInAll;
+        List.member(NaturalsBelow(1 + m), Permutation.apply(tau, NaturalsBelow.top(m)),
+                  NaturalsBelow.enumerate(1 + m))
+            by NaturalsBelow.enumerate_complete(1 + m, Permutation.apply(tau, NaturalsBelow.top(m)))
+            as topInEnum;
+        tau = Permutation.rowElement(Permutation.lower(tau), Permutation.apply(tau, NaturalsBelow.top(m)))
+            by Permutation.decompose_top(tau) as tauIsRow;
+        List.member(Permutation(1 + m),
+                  Permutation.rowElement(Permutation.lower(tau),
+                      Permutation.apply(tau, NaturalsBelow.top(m))),
+                  Permutation.insertRow(Permutation.lower(tau)))
+            by List.map_member(NaturalsBelow(1 + m), Permutation(1 + m),
+                   Permutation.rowElement(Permutation.lower(tau)),
+                   Permutation.apply(tau, NaturalsBelow.top(m)), NaturalsBelow.enumerate(1 + m), topInEnum);
+        List.member(Permutation(1 + m), tau, Permutation.insertRow(Permutation.lower(tau)))
+            by substituting tauIsRow as tauInBlock;
+        List.member(Permutation(1 + m), tau,
+                  Permutation.concatRows(m, Permutation.allPermutations(m)))
+            by Permutation.concatRows_member(m, Permutation.allPermutations(m),
+                   Permutation.lower(tau), tau, lowerInAll, tauInBlock);
+        done by substituting Permutation.allPermutations_one_plus
+      }
+  }
+
+-- Distinctness: the base singleton is distinct; the step is concatRows over the
+-- distinct level-m list.
+theorem Permutation.allPermutations_distinct (n : Natural)
+        : List.Distinct(Permutation(n), Permutation.allPermutations(n)) :=
+  by induction on n with IH {
+    case base:
+        List.Distinct.prepend(Permutation(0), Permutation.identity(0), List.empty(Permutation(0)),
+            List.no_member_empty(Permutation(0), Permutation.identity(0)),
+            List.Distinct.empty(Permutation(0)))
+    case step(m): {
+        List.Distinct(Permutation(1 + m), Permutation.concatRows(m, Permutation.allPermutations(m)))
+            by Permutation.concatRows_distinct(m, Permutation.allPermutations(m), IH);
+        done by substituting Permutation.allPermutations_one_plus
+      }
+  }
