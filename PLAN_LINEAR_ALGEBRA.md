@@ -863,14 +863,31 @@ constructively, and it lets `compose`/`inverse`/`identity` reuse the equinumerou
 engine directly. Group laws are then immediate.
 
 **Brick order (each its own file/section, committed green before the next):**
-1. **`Algebra/finite_permutation.math` — the group `Sₙ`** (THIS brick):
-   `Permutation(n)`, `apply`, `identity`, `compose`, `inverse`; group laws
-   (assoc, id units, inverse cancels); `apply` injective/surjective; extensional
-   equality (`equal_of_apply_equal` via IsInverse + funext). No sign yet.
-2. **Enumeration** — `allPermutations(n)` as a complete, duplicate-free family
-   `NaturalsBelow(factorial n) → Permutation(n)` (Lehmer/insertion recursion).
-   The hard combinatorial brick; the determinant sum is `indexedAggregate` over
-   it. *Design risk lives here* — revisit representation if enumeration fights.
+1. **`Algebra/finite_permutation.math` — the group `Sₙ`** — DONE (ad1a36b3):
+   `Permutation(n)`, `apply`, `identity`, `compose`, `inverse`; group laws;
+   extensional equality (`equal_of_apply_equal` via `make_equal` + funext).
+2a. **Transpositions** — DONE (12f32473): `swap(a,b)` via a classical `if`,
+   involution, self-inverse, `apply_swap_*`.
+2b. **Extend across the boundary** — DONE (f54290ae): `extend(σ) : Permutation(1+m)`
+   fixing the top, via `Function.extendBelow` (no dependent-`if`).
+2c-i. **Restrict** — DONE (6fcb23ec): `restrict(τ, fixesTop) : Permutation(m)`;
+   `extend`⇄`restrict` mutually inverse (`extend_restrict`/`restrict_extend`).
+2c-ii. **Enumeration LIST** (NEXT) — `allPermutations(n) : List(Permutation(n))`.
+   **KERNEL FINDING (do not repeat the flatten dead-end):** recursion over a
+   self-nested `List(List(A))` does NOT ι-reduce on `prepend`
+   (`flatten(prepend(h,t)) = append(h, flatten t)` is not defeq and no tactic
+   closes it), but `List(Permutation m)` / `List(NaturalsBelow k)` reduce fine.
+   So NEVER form a list-of-lists; concatenate directly over `List(Permutation m)`:
+   `concatRows(m) : List(Permutation(m)) → List(Permutation(1+m))`
+   (`empty↦empty`, `prepend(σ,rest)↦append(insertRow(m,σ), concatRows(m,rest))`);
+   `insertRow(m,σ) = map (j ↦ swap(top,j)∘extend σ)` over a positions list
+   (`map make/clampInclusion` over `List.range_down(1+m)`);
+   `allPermutations(0)=[identity(0)]`, `allPermutations(1+m)=concatRows(m, allPermutations(m))`.
+   Then **completeness** (every `τ`: use 2c-i, `τ = swap(top,τ(top))∘extend(restrict …)`;
+   membership via `member_append_left/right` (added, append.math) + `map_member`)
+   and **distinctness** (needs a `member_append` *invert*, proved by inducting on
+   the membership proof — not the list — to avoid dependent-hypothesis
+   generalization). The det sum is `indexedAggregate`/`List.product` over this list.
 3. **Sign** — `sign(σ) : Integer` valued in {−1, +1} + **multiplicativity**
    `sign(compose σ τ) = sign σ · sign τ`. Route chosen AFTER brick 2 stands
    (inversions-count parity vs. adjacent-transposition generation); record the
