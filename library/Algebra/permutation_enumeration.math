@@ -160,3 +160,158 @@ theorem NaturalsBelow.enumerate_distinct (n : Natural)
         done by substituting NaturalsBelow.enumerate_one_plus
       }
   }
+
+-- ----------------------------------------------------------------------
+-- The top-index decomposition. Every permutation τ of NaturalsBelow(1 + m)
+-- factors as `swap(top, τ(top)) ∘ extend(σ)` for a unique σ of NaturalsBelow(m)
+-- — this is what makes the enumeration below complete (every τ is a "row") and
+-- distinct (σ is recoverable, so the rows for distinct σ are disjoint).
+
+-- Right cancellation in the group: post-composing by the same permutation is
+-- injective (undo it with the inverse).
+theorem Permutation.compose_inverse_cancel_right {n : Natural} (p g : Permutation(n))
+        : Permutation.compose(Permutation.compose(p, g), Permutation.inverse(g)) = p :=
+  Permutation.compose(Permutation.compose(p, g), Permutation.inverse(g))
+     = Permutation.compose(p, Permutation.compose(g, Permutation.inverse(g)))
+           by Permutation.compose_associative(p, g, Permutation.inverse(g))
+     = Permutation.compose(p, Permutation.identity(n))
+           by substituting Permutation.inverse_compose_right(g)
+     = p by Permutation.compose_identity_right(p)
+
+theorem Permutation.compose_right_cancel {n : Natural} (a b g : Permutation(n))
+        (equalComposites : Permutation.compose(a, g) = Permutation.compose(b, g))
+        : a = b :=
+  a = Permutation.compose(Permutation.compose(a, g), Permutation.inverse(g))
+          by Permutation.compose_inverse_cancel_right(a, g)
+    = Permutation.compose(Permutation.compose(b, g), Permutation.inverse(g))
+          by substituting equalComposites
+    = b by Permutation.compose_inverse_cancel_right(b, g)
+
+-- A transposition composed with itself is the identity (it is an involution).
+theorem Permutation.swap_compose_self {n : Natural} (a b : NaturalsBelow(n))
+        : Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, b)) = Permutation.identity(n) :=
+  Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, b))
+     = Permutation.compose(Permutation.inverse(Permutation.swap(a, b)), Permutation.swap(a, b))
+           by substituting Permutation.inverse_swap(a, b)
+     = Permutation.identity(n) by Permutation.inverse_compose_left(Permutation.swap(a, b))
+
+-- `restrict` depends only on the underlying permutation, not on the (proof-
+-- irrelevant) top-fixing witness: equal permutations restrict equally.
+theorem Permutation.restrict_congruence {m : Natural} (tau1 tau2 : Permutation(1 + m))
+        (fixes1 : Permutation.apply(tau1, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        (fixes2 : Permutation.apply(tau2, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        (equalPermutations : tau1 = tau2)
+        : Permutation.restrict(tau1, fixes1) = Permutation.restrict(tau2, fixes2) :=
+  Permutation.equal_of_apply_equal(Permutation.restrict(tau1, fixes1), Permutation.restrict(tau2, fixes2),
+      (x : NaturalsBelow(m)) ↦ {
+        NaturalsBelow.value(Permutation.apply(tau1, NaturalsBelow.inclusion(m, x)))
+           = NaturalsBelow.value(Permutation.apply(tau2, NaturalsBelow.inclusion(m, x)))
+                 by substituting equalPermutations
+           as valuesEqual;
+        Permutation.apply(Permutation.restrict(tau1, fixes1), x)
+           = Permutation.restrictMap(tau1, fixes1, x) by Permutation.apply_restrict(tau1, fixes1, x)
+           = Permutation.restrictMap(tau2, fixes2, x)
+                 by NaturalsBelow.equal_of_value(m,
+                        Permutation.restrictMap(tau1, fixes1, x),
+                        Permutation.restrictMap(tau2, fixes2, x), valuesEqual)
+           = Permutation.apply(Permutation.restrict(tau2, fixes2), x)
+                 by Permutation.apply_restrict(tau2, fixes2, x);
+        done
+      })
+
+-- `swap(top, τ(top)) ∘ τ` fixes the top: it sends top ↦ τ(top) ↦ top.
+theorem Permutation.top_swap_fixes {m : Natural} (tau : Permutation(1 + m))
+        : Permutation.apply(
+              Permutation.compose(
+                  Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))), tau),
+              NaturalsBelow.top(m))
+          = NaturalsBelow.top(m) :=
+  Permutation.apply(
+          Permutation.compose(
+              Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))), tau),
+          NaturalsBelow.top(m))
+     = Permutation.apply(
+           Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+           Permutation.apply(tau, NaturalsBelow.top(m)))
+           by Permutation.apply_compose
+     = NaturalsBelow.top(m)
+           by Permutation.apply_swap_right(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m)))
+
+-- The lower part: the restriction of `swap(top, τ(top)) ∘ τ` below the boundary.
+definition Permutation.lower {m : Natural} (tau : Permutation(1 + m)) : Permutation(m) :=
+  Permutation.restrict(
+      Permutation.compose(
+          Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))), tau),
+      Permutation.top_swap_fixes(tau))
+
+-- The decomposition: τ = swap(top, τ(top)) ∘ extend(lower(τ)).
+theorem Permutation.decompose_top {m : Natural} (tau : Permutation(1 + m))
+        : tau = Permutation.compose(
+                    Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+                    Permutation.extend(Permutation.lower(tau))) :=
+  tau
+     = Permutation.compose(Permutation.identity(1 + m), tau) by Permutation.compose_identity_left(tau)
+     = Permutation.compose(
+           Permutation.compose(
+               Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+               Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m)))),
+           tau)
+           by substituting Permutation.swap_compose_self(NaturalsBelow.top(m),
+                  Permutation.apply(tau, NaturalsBelow.top(m)))
+     = Permutation.compose(
+           Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+           Permutation.compose(
+               Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))), tau))
+           by Permutation.compose_associative(
+                  Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+                  Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))), tau)
+     = Permutation.compose(
+           Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+           Permutation.extend(Permutation.lower(tau)))
+           by substituting Permutation.extend_restrict(
+                  Permutation.compose(
+                      Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+                      tau),
+                  Permutation.top_swap_fixes(tau))
+
+-- Recovery: `lower` inverts the row construction. Applied to `swap(top, p) ∘
+-- extend(σ)` it returns σ — the top-image is p, so `swap(top, p)` cancels back
+-- to `extend(σ)`, whose restriction is σ. This is what makes distinct σ give
+-- disjoint rows.
+theorem Permutation.lower_of_row {m : Natural} (sigma : Permutation(m)) (p : NaturalsBelow(1 + m))
+        : Permutation.lower(Permutation.compose(Permutation.swap(NaturalsBelow.top(m), p),
+              Permutation.extend(sigma))) = sigma := {
+  let tau : Permutation(1 + m) :=
+      Permutation.compose(Permutation.swap(NaturalsBelow.top(m), p), Permutation.extend(sigma));
+  Permutation.apply(tau, NaturalsBelow.top(m))
+     = Permutation.apply(Permutation.swap(NaturalsBelow.top(m), p),
+           Permutation.apply(Permutation.extend(sigma), NaturalsBelow.top(m)))
+           by Permutation.apply_compose
+     = Permutation.apply(Permutation.swap(NaturalsBelow.top(m), p), NaturalsBelow.top(m))
+           by substituting Permutation.apply_extend_top(sigma)
+     = p by Permutation.apply_swap_left(NaturalsBelow.top(m), p)
+     as topEq;
+  Permutation.compose(
+          Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))), tau)
+     = Permutation.compose(Permutation.swap(NaturalsBelow.top(m), p), tau) by substituting topEq
+     = Permutation.compose(
+           Permutation.compose(Permutation.swap(NaturalsBelow.top(m), p),
+               Permutation.swap(NaturalsBelow.top(m), p)),
+           Permutation.extend(sigma))
+           by Permutation.compose_associative(Permutation.swap(NaturalsBelow.top(m), p),
+                  Permutation.swap(NaturalsBelow.top(m), p), Permutation.extend(sigma))
+     = Permutation.compose(Permutation.identity(1 + m), Permutation.extend(sigma))
+           by substituting Permutation.swap_compose_self(NaturalsBelow.top(m), p)
+     = Permutation.extend(sigma) by Permutation.compose_identity_left(Permutation.extend(sigma))
+     as innerEq;
+  Permutation.lower(tau)
+     = Permutation.restrict(Permutation.extend(sigma), Permutation.apply_extend_top(sigma))
+           by Permutation.restrict_congruence(
+                  Permutation.compose(
+                      Permutation.swap(NaturalsBelow.top(m), Permutation.apply(tau, NaturalsBelow.top(m))),
+                      tau),
+                  Permutation.extend(sigma),
+                  Permutation.top_swap_fixes(tau), Permutation.apply_extend_top(sigma), innerEq)
+     = sigma by Permutation.restrict_extend(sigma);
+  done
+}
