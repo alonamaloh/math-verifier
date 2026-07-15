@@ -945,8 +945,26 @@ engine directly. Group laws are then immediate.
    function space) need — the outer sums have no `indexedAggregate` "count", they
    are inherently List enumerations, so `Field.sumOver`-over-a-list is the uniform
    Stage-H aggregation primitive. `m`/`n`/`p` kept as literal `Natural` variables.
-5. **`determinant(M) := indexedAggregate`** over `allPermutations(n)` of
-   `sign(σ) · ∏_{i<n} M(i, apply(σ,i))`.
+5. **`determinant(M)`** — DONE (37ba69eb): `Matrix.determinant(matrix) =
+   Field.sumOver((σ) ↦ Field.from_integer(f, sign σ) · Field.productOver((i) ↦
+   matrix(i, apply(σ,i)), enumerate(n)), allPermutations(n))` in
+   `Algebra/determinant.math`, + `Matrix.determinant_expansion` (definitional
+   restatement). All gates green (library + tests + export-check 3030, axioms
+   UNCHANGED — choice-free). **The sign embedding** (the plan glossed "sign(σ)·…"
+   over the field, but sign : Integer): built `Algebra/ring_from_integer.math` —
+   `Ring.from_integer : Integer → Ring.carrier(r)` the initial-ring map (`a−b ↦
+   from_natural(a)−from_natural(b)`, lifted across Integer's difference quotient),
+   with `from_integer_at_difference`/`_one`/`_negate_one`; `Field.from_integer(f,z)
+   = Ring.from_integer` on the field's underlying ring (carrier defeq
+   `Field.carrier`). `Field.productOver` added as the multiplicative companion of
+   brick-4's `Field.sumOver`. GOTCHAS: (a) `linear_combination` does NOT work over
+   an abstract `Ring.carrier` (only `CommutativeRing`/`Field`); the from_integer
+   respect subtract-equality is proved via `substituting` + additive-only `ring`
+   rearrangements (abstract Ring `ring` closes +-assoc/comm only). (b) `IntegerEquivalent(rep1,
+   rep2)` after `let ⟨a,b⟩`/`let ⟨c,d⟩` is defeq `a+d=b+c` but not syntactic —
+   extract it as `a + d = b + c by equivalent as crossNat` before `substituting`.
+   (c) `negate(one)` is not defeq `from_difference(0,1)` in a calc-start — bridge
+   with `negate(one) = from_difference(0,1) by unfolding Integer`.
 6. **`det(AB) = det(A)·det(B)`** — Leibniz expansion, non-injective terms
    collapse (alternating), reindex the surviving sum over `Sₙ`.
 
