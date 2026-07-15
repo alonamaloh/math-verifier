@@ -910,20 +910,24 @@ engine directly. Group laws are then immediate.
      _distinct` (the range_up API completion; range_up ended up unused once the
      index list moved to `enumerate`, kept as legitimate API).
    The det sum is `indexedAggregate`/`List.product` over `allPermutations`.
-3. **Sign** — `sign(σ) : Integer` valued in {−1, +1} + **multiplicativity**
-   `sign(compose σ τ) = sign σ · sign τ`. **ROUTE CHOSEN: the product formula**
-   `sign(σ) = ∏_{i<j} orient(σ(i), σ(j))` over ordered index pairs, where
-   `orient(x,y) = if value(x) < value(y) then 1 else −1` (Integer, ±1). WHY over
-   inversion-parity or transposition-generation: multiplicativity is ONE pair
-   reindexing, not a transposition-flip grind. `sign(σ∘τ) = ∏ orient(σ(τi),σ(τj))`;
-   pointwise `orient(σ(τi),σ(τj)) = orient(τi,τj) · orient(σ; sort{τi,τj})`
-   (orient antisymmetry), so the product splits into `sign(τ)` (same formula) times
-   `∏ orient(σ; sort{τi,τj})`, and `sort ∘ τ` permutes the ordered-pair list — so
-   the second factor `= sign(σ)` by `List.Permutation.product_invariant` +
-   `List.permutation_of_distinct_inclusion` (both already in the library). Needs:
-   ordered-pair enumeration, `orient`, a `∏(f·g) = ∏f·∏g` list lemma, the pointwise
-   factorization, and the reindex permutation. (In progress; record the friction in
-   `STRESS_PROBES.md`.)
+3. **Sign** — DONE (`Algebra/permutation_sign.math`): `sign(σ) : Integer`
+   `sign_is_unit` (∈ {−1,+1}), `sign_identity` (=1), and **multiplicativity**
+   `sign_compose : sign(σ∘τ) = sign σ · sign τ`. All gates green (library + tests +
+   export-check 3016, axiom inventory UNCHANGED — choice-free). **ROUTE: the product
+   formula** `sign(σ) = ∏ orient(σi,σj)` over `orderedPairs(n)` (the value-ordered
+   filter of the index enumeration's Cartesian square), `orient(x,y) = if
+   value(x)<value(y) then 1 else −1`. Multiplicativity was ONE pair reindexing:
+   `pairFactor` gives `pairOrient(σ∘τ,p) = pairOrient(τ,p) · pairOrient(σ,pairImage(τ,p))`
+   pointwise (via orient antisymmetry), `product_pointwise_multiply` splits the map
+   product, the τ-factor reassembles `sign τ` directly, and the σ-factor — reindexed
+   by `pairImage(τ,·) = sort(τ·,τ·)`, which permutes `orderedPairs` (`pairImage_permutes`
+   via `permutation_of_distinct_inclusion`, injectivity from the two-sided
+   `pairImage_cancel`) — reassembles `sign σ` by `product_invariant`. New reusable
+   Lists infra: `cartesianProduct` (+member/distinct), `map_map`, `Permutation.map`,
+   `map_congruence_on`, `product_of_ones`/`product_of_units`, `product_pointwise_multiply`.
+   The route beat inversion-parity/transposition-generation exactly as predicted (no
+   transposition-flip counting). Whether `sign(swap(a,b)) = −1` is needed for brick 6
+   — derive it then (multiplicativity + a direct 2-index computation).
 4. **`Algebra/matrix.math`** — `Matrix(K, m, n) := NaturalsBelow(m) →
    NaturalsBelow(n) → K.carrier`; `multiplyMatrix` via `indexedAggregate`.
    Keep `m`/`n`/`p` literal `Natural` variables (casts at edges only).
