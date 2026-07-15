@@ -1010,7 +1010,14 @@ it explicitly rather than dropping it.
 
 ---
 
-## `calc` leading term defaults a bare numeral to Natural (2026-06-26)
+## `calc` leading term defaults a bare numeral to Natural (2026-06-26) — RESOLVED (stale, verified 2026-07-15)
+
+Re-reproduced against the current build in the bare relation-chain form
+(the `calc` keyword is retired): a leading bare `0` in `0 ≤ Real.absolute_value(x)`
+now elaborates as `Rational.to_real(… 0)` — i.e. it is coerced to the
+carrier (`Real`) seeded from the other operand, NOT defaulted to `Natural`.
+The under-typed-leading-`0` mismatch no longer occurs (the bare-chain
+carrier-seeding + coercion-join fixed it). Left below for history.
 
 `calc 0 ≤ abs(f(x)) < …` fails with:
 
