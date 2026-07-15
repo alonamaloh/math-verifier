@@ -151,11 +151,22 @@ equality goal and calling `elaborateRing` (or the lighter `proveAbstractRingAC`,
 
 **Recommended implementation order.**
 - **Step 1 (self-contained, high-value): strategy (e) in
-  `coerceToExpectedTypeViaDiff`.** This is exactly the brick-6b failure, is
-  testable in isolation (a `library/ErrorTest`- or feature-style regression:
-  `lemma(1, d)` of type `1 ≤ d+1` used where `1 ≤ 1+d` is expected), and reuses
-  `elaborateRing` + the diff-bridge. Land it, add regressions, sweep for
-  wrapper-lemma removals it enables.
+  `coerceToExpectedTypeViaDiff`.** ✅ **DONE 2026-07-15.** This is exactly the
+  brick-6b failure, is testable in isolation (a `library/ErrorTest`- or
+  feature-style regression: `lemma(1, d)` of type `1 ≤ d+1` used where
+  `1 ≤ 1+d` is expected), and reuses `elaborateRing` + the diff-bridge.
+  Landed as strategy (e) "Natural additive rearrangement": prefilter (expected
+  is a Natural relation head `=`/`≤`/`<` with a `+`/`successor`) → diff-walk →
+  `synthesizeNaturalEquality` (builds `diffInferred = diffExpected`, calls
+  `elaborateRing`) → the strategy-(b) transport, now factored into the shared
+  `buildDiffBridgeTransport(resolveEquality)` engine so context-equality and
+  ring-synthesis reuse one motive-masking transport. Handles both directions,
+  associativity, numeral-2 (`ring` folds `2 = 1+1`), and the `<` head. Wrong
+  forms still rejected loudly (`ring` declines → nullptr → kernel reject).
+  Regression: `library/Test/natural_additive_rearrangement_test.math`.
+  library+tests+export-check green, axiom inventory unchanged (3080 decls).
+  Wrapper-lemma-removal sweep deferred: the `1 +`-form wrappers are mostly a
+  *citation* idiom, so they clear with Step 2, not the argument path.
 - **Step 2: additive normal form in `matchAgainstPattern`.** Retires the
   `1 +`-form wrapper-lemma idiom for citations. Broader blast radius — do it
   after step 1 proves the normal form and transport out on the narrower path.
