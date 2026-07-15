@@ -1,0 +1,52 @@
+-- Algebra/matrix.math
+--
+-- Matrices as scalar grids `NaturalsBelow(rows) → NaturalsBelow(columns) →
+-- Field.carrier` over a field, and their multiplication. The inner product
+-- runs over the index enumeration `NaturalsBelow.enumerate(middle)`, so the
+-- summand reads a `NaturalsBelow(middle)` index directly — no clamp of a
+-- plain `Natural` back into the index type, and the empty range (middle = 0)
+-- is the empty list, aggregating to `Field.zero` with nothing to evaluate.
+-- (Stage H brick 4 of PLAN_LINEAR_ALGEBRA.md.)
+
+module Algebra.matrix
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Algebra.field
+import Algebra.field_bundle
+import Algebra.permutation_enumeration
+
+definition Matrix (f : Field) (rows columns : Natural) : Type(0) :=
+  NaturalsBelow(rows) → NaturalsBelow(columns) → Field.carrier(f)
+
+-- Sum a field-valued term over a list of items: the additive fold of the
+-- mapped list. The determinant's Leibniz sum (over the permutation list)
+-- and the matrix inner product (over the index enumeration) are both this
+-- shape.
+definition Field.sumOver {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (items : List(index))
+        : Field.carrier(f) :=
+  List.product(Field.carrier(f), Field.add, Field.zero(f),
+      List.map(index, Field.carrier(f), term, items))
+
+-- The product `left · right` has entry (i, j) the inner product of row i of
+-- `left` with column j of `right`, summed over the shared middle index.
+definition Matrix.multiply {f : Field} {rows middle columns : Natural}
+        (left : Matrix(f, rows, middle)) (right : Matrix(f, middle, columns))
+        : Matrix(f, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦
+      Field.sumOver((k : NaturalsBelow(middle)) ↦ left(i, k) * right(k, j),
+          NaturalsBelow.enumerate(middle))
+
+-- The entry formula, read straight off the definition.
+theorem Matrix.multiply_entry {f : Field} {rows middle columns : Natural}
+        (left : Matrix(f, rows, middle)) (right : Matrix(f, middle, columns))
+        (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns))
+        : Matrix.multiply(left, right)(i, j)
+          = Field.sumOver((k : NaturalsBelow(middle)) ↦ left(i, k) * right(k, j),
+                NaturalsBelow.enumerate(middle)) :=
+  done
