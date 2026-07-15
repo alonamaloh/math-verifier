@@ -173,6 +173,7 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
             [&](ExpressionPointer e) -> bool {
                 if (auto* constant = std::get_if<Constant>(&e->node)) {
                     return constant->name == "Natural.add"
+                        || constant->name == "successor"
                         || constant->name == "Natural.successor";
                 }
                 if (auto* app = std::get_if<Application>(&e->node)) {
@@ -515,7 +516,8 @@ ExpressionPointer Elaborator::buildDiffBridgeTransport(
         ExpressionPointer termTypeClosed,
         ExpressionPointer expectedTypeClosed,
         const std::function<std::optional<DiffBridgeEquality>(
-            ExpressionPointer, ExpressionPointer)>& resolveEquality) {
+            ExpressionPointer, ExpressionPointer)>& resolveEquality,
+        bool useNaturalAdditiveDiff) {
         if (!environment_.lookup("Equality.transport_proposition")) {
             return nullptr;
         }
@@ -556,7 +558,9 @@ ExpressionPointer Elaborator::buildDiffBridgeTransport(
         ExpressionPointer diffInferredOpened, diffExpectedOpened;
         ExpressionPointer expectedFormUsed = expectedOpened;
         for (const Pair& p : tries) {
-            auto pr = findUniqueDiffPair(p.t, p.e);
+            auto pr = useNaturalAdditiveDiff
+                ? findNaturalAdditiveDiffPair(p.t, p.e)
+                : findUniqueDiffPair(p.t, p.e);
             if (pr.first && pr.second) {
                 diffInferredOpened = pr.first;
                 diffExpectedOpened = pr.second;
@@ -825,7 +829,53 @@ ExpressionPointer Elaborator::tryNaturalAdditiveRearrangement(
                     -> std::optional<DiffBridgeEquality> {
                 return synthesizeNaturalEquality(
                     localBinders, diffInferredOpened, diffExpectedOpened);
-            });
+            },
+            /*useNaturalAdditiveDiff=*/true);
+    }
+
+std::pair<ExpressionPointer, ExpressionPointer>
+    Elaborator::findNaturalAdditiveDiffPair(
+        ExpressionPointer left, ExpressionPointer right) {
+        std::function<std::pair<ExpressionPointer, ExpressionPointer>(
+            ExpressionPointer, ExpressionPointer)> walk =
+            [&](ExpressionPointer l, ExpressionPointer r)
+                -> std::pair<ExpressionPointer, ExpressionPointer> {
+                if (structurallyEqual(l, r)) return {nullptr, nullptr};
+                // Peel each side's application spine to its head + arguments.
+                ExpressionPointer headLeft = l, headRight = r;
+                std::vector<ExpressionPointer> argsLeft, argsRight;
+                while (auto* app = std::get_if<Application>(&headLeft->node)) {
+                    argsLeft.push_back(app->argument);
+                    headLeft = app->function;
+                }
+                while (auto* app = std::get_if<Application>(&headRight->node)) {
+                    argsRight.push_back(app->argument);
+                    headRight = app->function;
+                }
+                auto* constantLeft = std::get_if<Constant>(&headLeft->node);
+                auto* constantRight = std::get_if<Constant>(&headRight->node);
+                // Head or arity mismatch (`Natural.add …` vs `successor …`):
+                // the whole subterms are the diff, so a ring-synthesized
+                // equality can relate them.
+                if (!constantLeft || !constantRight
+                    || constantLeft->name != constantRight->name
+                    || argsLeft.size() != argsRight.size()) {
+                    return {l, r};
+                }
+                // Same head + arity: descend into the unique differing
+                // argument; two or more differing arguments make this node
+                // itself the diff.
+                std::pair<ExpressionPointer, ExpressionPointer> found{
+                    nullptr, nullptr};
+                for (size_t i = 0; i < argsLeft.size(); ++i) {
+                    if (structurallyEqual(argsLeft[i], argsRight[i])) continue;
+                    if (found.first) return {l, r};
+                    found = {argsLeft[i], argsRight[i]};
+                }
+                if (!found.first) return {nullptr, nullptr};
+                return walk(found.first, found.second);
+            };
+        return walk(left, right);
     }
 
 bool Elaborator::peelQuotientClass(ExpressionPointer endpoint, QuotientClassParts& out) {

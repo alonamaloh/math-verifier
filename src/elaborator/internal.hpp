@@ -2521,7 +2521,19 @@ private:
         ExpressionPointer expectedTypeClosed,
         const std::function<std::optional<DiffBridgeEquality>(
             ExpressionPointer diffInferredOpened,
-            ExpressionPointer diffExpectedOpened)>& resolveEquality);
+            ExpressionPointer diffExpectedOpened)>& resolveEquality,
+        bool useNaturalAdditiveDiff = false);
+
+    // Like `findUniqueDiffPair`, but STOPS at a head/arity mismatch rather
+    // than descending into misaligned application spines. `1 + n` (binary
+    // `Natural.add`) against `successor n` (unary `successor`) therefore
+    // yields the whole Natural-typed pair `(1 + n, successor n)` — which
+    // `ring` can equate — instead of the function-level `(add 1, successor)`
+    // the generic walker produces. Used by strategy (e) so an additive form
+    // bridges a `successor` form (the leak the Natural sealing must absorb).
+    std::pair<ExpressionPointer, ExpressionPointer>
+    findNaturalAdditiveDiffPair(
+        ExpressionPointer left, ExpressionPointer right);
 
     // Strategy (e) of `coerceToExpectedTypeViaDiff`: when `term`'s type
     // and the expected type are the same Natural relation (`=` / `≤` /
