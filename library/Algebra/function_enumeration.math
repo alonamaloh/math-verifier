@@ -128,3 +128,47 @@ theorem Function.extendByValue_decompose {C : Type(0)} {k : Natural}
             }
         }
       })
+
+-- ----------------------------------------------------------------------
+-- The enumeration list. `functionsBelow(choices, 1 + m)` concatenates, over
+-- every f ∈ functionsBelow(choices, m), the "row" of the extensions
+-- `extendByValue(f, v)` — one for each choice `v ∈ choices`.
+
+-- The unique function out of the empty index type.
+definition Function.emptyBelow {C : Type(0)} : NaturalsBelow(0) → C :=
+  (i : NaturalsBelow(0)) ↦ absurd(NaturalsBelow.zero_is_empty(i))
+
+-- The row for f: extend it by each choice in turn.
+definition Function.functionRow {C : Type(0)} {k : Natural}
+        (choices : List(C)) (f : NaturalsBelow(k) → C) : List(NaturalsBelow(1 + k) → C) :=
+  List.map(C, NaturalsBelow(1 + k) → C, (v : C) ↦ Function.extendByValue(f, v), choices)
+
+-- Concatenate the rows over a list of functions. Recursion on the LIST
+-- (k fixed), so no index transport arises here. The codomain `C` is explicit,
+-- as recursive pattern-match definitions require.
+definition Function.concatFunctionRows (C : Type(0)) (k : Natural) (choices : List(C))
+        : List(NaturalsBelow(k) → C) → List(NaturalsBelow(1 + k) → C)
+  | List.empty => List.empty(NaturalsBelow(1 + k) → C)
+  | List.prepend(f, rest) =>
+      List.append(NaturalsBelow(1 + k) → C, Function.functionRow(choices, f),
+          Function.concatFunctionRows(C, k, choices, rest))
+
+-- All functions `NaturalsBelow(k) → C` whose every value is a choice. The
+-- `1 + m` step recurses on the index (dependent result type), bridged by
+-- `unfold Natural.add in` exactly as `allPermutations`.
+definition Function.functionsBelow (C : Type(0)) (choices : List(C))
+        : (k : Natural) → List(NaturalsBelow(k) → C)
+  | 0 => List.prepend(NaturalsBelow(0) → C, Function.emptyBelow, List.empty(NaturalsBelow(0) → C))
+  | 1 + m => unfold Natural.add in
+      Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m))
+
+theorem Function.functionsBelow_one_plus (C : Type(0)) (choices : List(C)) (m : Natural)
+        : Function.functionsBelow(C, choices, 1 + m)
+          = Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m)) :=
+  unfold Natural.add in
+  reflexivity(Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m)))
+
+-- The determinant's index set: all functions NaturalsBelow(n) → NaturalsBelow(n),
+-- picking one column per row (every column is a valid choice).
+definition Function.allFunctions (n : Natural) : List(NaturalsBelow(n) → NaturalsBelow(n)) :=
+  Function.functionsBelow(NaturalsBelow(n), NaturalsBelow.enumerate(n), n)
