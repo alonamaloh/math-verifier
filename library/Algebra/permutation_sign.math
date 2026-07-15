@@ -14,7 +14,10 @@ import Natural.order
 import Natural.classical_decidable
 import Integer.basics
 import Algebra.integer_domain
+import Lists.list
+import Lists.map
 import Algebra.finite_permutation
+import Algebra.permutation_enumeration
 
 -- Two Natural order facts the antisymmetry proof leans on.
 theorem Natural.lt_or_gt_of_ne (a b : Natural) (distinct : a ≠ b) : a < b ∨ b < a := {
@@ -94,4 +97,124 @@ theorem Permutation.orient_antisymmetric {n : Natural} (x y : NaturalsBelow(n))
         done
       }
   }
+}
+
+-- ----------------------------------------------------------------------
+-- The sign, as the product formula. `signTerm(σ, i, j)` is the orientation
+-- contributed by the ordered pair (i, j) when i precedes j, and the neutral
+-- 1 otherwise; the sign is the double product over all index pairs.
+
+definition Permutation.signTerm {n : Natural} (sigma : Permutation(n)) (i j : NaturalsBelow(n))
+        : Integer :=
+  if NaturalsBelow.value(i) < NaturalsBelow.value(j)
+  then Permutation.orient(Permutation.apply(sigma, i), Permutation.apply(sigma, j))
+  else (1 : Integer)
+
+definition Permutation.signColumn {n : Natural} (sigma : Permutation(n)) (j : NaturalsBelow(n))
+        : Integer :=
+  List.product(Integer, Integer.multiply, Integer.one,
+      List.map(NaturalsBelow(n), Integer,
+          (i : NaturalsBelow(n)) ↦ Permutation.signTerm(sigma, i, j), NaturalsBelow.enumerate(n)))
+
+definition Permutation.sign {n : Natural} (sigma : Permutation(n)) : Integer :=
+  List.product(Integer, Integer.multiply, Integer.one,
+      List.map(NaturalsBelow(n), Integer,
+          (j : NaturalsBelow(n)) ↦ Permutation.signColumn(sigma, j), NaturalsBelow.enumerate(n)))
+
+-- The multiplicative unit of Integer, as the identity the fold-product needs.
+theorem Integer.one_multiply_left (a : Integer) : Integer.multiply(Integer.one, a) = a := ring
+
+-- A fold-product of a list every element of which is `one` is `one`.
+theorem List.product_of_ones (A : Type(0)) (multiply : A → A → A) (one : A)
+        (identityLeft : ∀ (a : A). multiply(one, a) = a)
+        (l : List(A)) (allOne : ∀ (x : A). List.member(A, x, l) → x = one)
+        : List.product(A, multiply, one, l) = one :=
+  by induction on l with IH {
+    case List.empty: reflexivity(one)
+    case List.prepend(head, tail): {
+        head = one by allOne(head, List.member.here(A, head, tail)) as headIsOne;
+        (∀ (x : A). List.member(A, x, tail) → x = one)
+            by (x : A) (xInTail : List.member(A, x, tail)) ↦
+                allOne(x, List.member.there(A, x, head, tail, xInTail)) as tailAllOne;
+        List.product(A, multiply, one, List.prepend(A, head, tail))
+           = multiply(head, List.product(A, multiply, one, tail))
+           = multiply(one, List.product(A, multiply, one, tail)) by substituting headIsOne
+           = List.product(A, multiply, one, tail) by identityLeft(List.product(A, multiply, one, tail))
+           = one by IH(tailAllOne);
+        done
+      }
+  }
+
+-- The identity has sign +1: every ordered pair keeps its orientation, so every
+-- term is 1.
+theorem Permutation.signTerm_identity (n : Natural) (i j : NaturalsBelow(n))
+        : Permutation.signTerm(Permutation.identity(n), i, j) = 1 := {
+  NaturalsBelow.value(i) < NaturalsBelow.value(j)
+      ∨ ¬(NaturalsBelow.value(i) < NaturalsBelow.value(j));
+  done by cases {
+    case NaturalsBelow.value(i) < NaturalsBelow.value(j) as precedes: {
+        Permutation.signTerm(Permutation.identity(n), i, j)
+           = Permutation.orient(Permutation.apply(Permutation.identity(n), i),
+                 Permutation.apply(Permutation.identity(n), j))
+                 by Logic.if_positive
+           = Permutation.orient(i, Permutation.apply(Permutation.identity(n), j))
+                 by substituting Permutation.apply_identity(n, i)
+           = Permutation.orient(i, j) by substituting Permutation.apply_identity(n, j)
+           = 1 by Permutation.orient_forward(i, j, precedes);
+        done
+      }
+    case ¬(NaturalsBelow.value(i) < NaturalsBelow.value(j)) as notPrecedes:
+        done by Logic.if_negative
+  }
+}
+
+theorem Permutation.signColumn_identity (n : Natural) (j : NaturalsBelow(n))
+        : Permutation.signColumn(Permutation.identity(n), j) = 1 := {
+  (∀ (x : Integer). List.member(Integer, x,
+      List.map(NaturalsBelow(n), Integer,
+          (i : NaturalsBelow(n)) ↦ Permutation.signTerm(Permutation.identity(n), i, j),
+          NaturalsBelow.enumerate(n))) → x = 1)
+      by (x : Integer) (memberX : List.member(Integer, x,
+          List.map(NaturalsBelow(n), Integer,
+              (i : NaturalsBelow(n)) ↦ Permutation.signTerm(Permutation.identity(n), i, j),
+              NaturalsBelow.enumerate(n)))) ↦ {
+          choose i such that List.member(NaturalsBelow(n), i, NaturalsBelow.enumerate(n))
+              ∧ (Permutation.signTerm(Permutation.identity(n), i, j) = x)
+              from List.map_member_invert(NaturalsBelow(n), Integer,
+                       (i : NaturalsBelow(n)) ↦ Permutation.signTerm(Permutation.identity(n), i, j),
+                       x, NaturalsBelow.enumerate(n), memberX);
+          Permutation.signTerm(Permutation.identity(n), i, j) = x as termIsX;
+          x = Permutation.signTerm(Permutation.identity(n), i, j) by termIsX
+            = 1 by Permutation.signTerm_identity(n, i, j);
+          done
+        } as allOne;
+  done by List.product_of_ones(Integer, Integer.multiply, Integer.one, Integer.one_multiply_left,
+      List.map(NaturalsBelow(n), Integer,
+          (i : NaturalsBelow(n)) ↦ Permutation.signTerm(Permutation.identity(n), i, j),
+          NaturalsBelow.enumerate(n)), allOne)
+}
+
+theorem Permutation.sign_identity (n : Natural) : Permutation.sign(Permutation.identity(n)) = 1 := {
+  (∀ (x : Integer). List.member(Integer, x,
+      List.map(NaturalsBelow(n), Integer,
+          (j : NaturalsBelow(n)) ↦ Permutation.signColumn(Permutation.identity(n), j),
+          NaturalsBelow.enumerate(n))) → x = 1)
+      by (x : Integer) (memberX : List.member(Integer, x,
+          List.map(NaturalsBelow(n), Integer,
+              (j : NaturalsBelow(n)) ↦ Permutation.signColumn(Permutation.identity(n), j),
+              NaturalsBelow.enumerate(n)))) ↦ {
+          choose j such that List.member(NaturalsBelow(n), j, NaturalsBelow.enumerate(n))
+              ∧ (Permutation.signColumn(Permutation.identity(n), j) = x)
+              from List.map_member_invert(NaturalsBelow(n), Integer,
+                       (j : NaturalsBelow(n)) ↦ Permutation.signColumn(Permutation.identity(n), j),
+                       x, NaturalsBelow.enumerate(n), memberX);
+          Permutation.signColumn(Permutation.identity(n), j) = x as columnIsX;
+          x = Permutation.signColumn(Permutation.identity(n), j) by columnIsX
+            = 1 by Permutation.signColumn_identity(n, j);
+          done
+        } as allOne;
+  done by List.product_of_ones(Integer, Integer.multiply, Integer.one, Integer.one_multiply_left,
+      List.map(NaturalsBelow(n), Integer,
+          (j : NaturalsBelow(n)) ↦ Permutation.signColumn(Permutation.identity(n), j),
+          NaturalsBelow.enumerate(n)), allOne)
 }
