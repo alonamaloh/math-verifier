@@ -928,9 +928,23 @@ engine directly. Group laws are then immediate.
    The route beat inversion-parity/transposition-generation exactly as predicted (no
    transposition-flip counting). Whether `sign(swap(a,b)) = −1` is needed for brick 6
    — derive it then (multiplicativity + a direct 2-index computation).
-4. **`Algebra/matrix.math`** — `Matrix(K, m, n) := NaturalsBelow(m) →
-   NaturalsBelow(n) → K.carrier`; `multiplyMatrix` via `indexedAggregate`.
-   Keep `m`/`n`/`p` literal `Natural` variables (casts at edges only).
+4. **`Algebra/matrix.math`** — DONE (58339472): `Matrix(f, rows, columns) :=
+   NaturalsBelow(rows) → NaturalsBelow(columns) → Field.carrier(f)`;
+   `Matrix.multiply` (entry = inner product over the shared middle index) +
+   `Matrix.multiply_entry`. All gates green (library + tests + export-check
+   3020, axioms UNCHANGED — choice-free). **Design deviation from "via
+   indexedAggregate":** the inner sum runs over the index enumeration list
+   `NaturalsBelow.enumerate(middle)` (through the new reusable `Field.sumOver(term,
+   items) = List.product ∘ List.map` field list-sum), NOT `indexedAggregate` over
+   `Natural`. Reason: `indexedAggregate` reads a `Natural → carrier` summand, so a
+   matrix entry `A(i, k)` would need a total `Natural → NaturalsBelow(middle)`
+   clamp with a fallback — impossible to produce at `middle = 0`. Summing over
+   `enumerate(middle)` lets the summand read `NaturalsBelow(middle)` directly
+   (no clamp) and `middle = 0` is the empty list. This is ALSO the shape brick 5
+   (Leibniz sum over the permutation list) and brick 6 (sum over the enumerated
+   function space) need — the outer sums have no `indexedAggregate` "count", they
+   are inherently List enumerations, so `Field.sumOver`-over-a-list is the uniform
+   Stage-H aggregation primitive. `m`/`n`/`p` kept as literal `Natural` variables.
 5. **`determinant(M) := indexedAggregate`** over `allPermutations(n)` of
    `sign(σ) · ∏_{i<n} M(i, apply(σ,i))`.
 6. **`det(AB) = det(A)·det(B)`** — Leibniz expansion, non-injective terms
