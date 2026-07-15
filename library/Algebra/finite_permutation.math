@@ -18,6 +18,7 @@ import Logic.basics
 import Equality.basics
 import Logic.functions
 import Natural.basics
+import Natural.classical_decidable
 import Set.finite
 import Set.equinumerous
 
@@ -251,3 +252,94 @@ theorem Permutation.inverse_compose_right {n : Natural} (p : Permutation(n))
   Permutation.equal_of_apply_equal(Permutation.compose(p, Permutation.inverse(p)),
       Permutation.identity(n),
       (i : NaturalsBelow(n)) ↦ Permutation.right_inverse(p, i))
+
+-- ----------------------------------------------------------------------
+-- Transpositions: the permutation swapping two indices, fixing the rest.
+-- The building block of both the permutation enumeration and the sign.
+
+definition Permutation.swapMap {n : Natural} (a b : NaturalsBelow(n))
+        : NaturalsBelow(n) → NaturalsBelow(n) :=
+  (i : NaturalsBelow(n)) ↦ if i = a then b else if i = b then a else i
+
+-- The three characterising values: `a ↦ b`, `b ↦ a`, everything else fixed.
+theorem Permutation.swapMap_at_left {n : Natural} (a b : NaturalsBelow(n))
+        : Permutation.swapMap(a, b, a) = b :=
+  done by Logic.if_positive
+
+theorem Permutation.swapMap_at_right {n : Natural} (a b : NaturalsBelow(n))
+        : Permutation.swapMap(a, b, b) = a := {
+  b = a ∨ b ≠ a;
+  done by cases {
+    case b = a as sameEnds:
+        Permutation.swapMap(a, b, b) = b by Logic.if_positive
+           = a by sameEnds
+    case b ≠ a as distinctEnds:
+        Permutation.swapMap(a, b, b)
+           = (if b = b then a else b) by Logic.if_negative
+           = a by Logic.if_positive
+  }
+}
+
+theorem Permutation.swapMap_at_other {n : Natural} (a b i : NaturalsBelow(n))
+        (leftMiss : i ≠ a) (rightMiss : i ≠ b)
+        : Permutation.swapMap(a, b, i) = i :=
+  Permutation.swapMap(a, b, i)
+     = (if i = b then a else i) by Logic.if_negative
+     = i by Logic.if_negative
+
+-- Applying a transposition twice restores the input: it is an involution.
+theorem Permutation.swapMap_involution {n : Natural} (a b i : NaturalsBelow(n))
+        : Permutation.swapMap(a, b, Permutation.swapMap(a, b, i)) = i := {
+  i = a ∨ i ≠ a;
+  done by cases {
+    case i = a as hitsLeft:
+        Permutation.swapMap(a, b, Permutation.swapMap(a, b, i))
+           = Permutation.swapMap(a, b, Permutation.swapMap(a, b, a)) by substituting hitsLeft
+           = Permutation.swapMap(a, b, b) by substituting Permutation.swapMap_at_left(a, b)
+           = a by Permutation.swapMap_at_right(a, b)
+           = i by hitsLeft
+    case i ≠ a as missesLeft: {
+        i = b ∨ i ≠ b;
+        done by cases {
+          case i = b as hitsRight:
+              Permutation.swapMap(a, b, Permutation.swapMap(a, b, i))
+                 = Permutation.swapMap(a, b, Permutation.swapMap(a, b, b)) by substituting hitsRight
+                 = Permutation.swapMap(a, b, a) by substituting Permutation.swapMap_at_right(a, b)
+                 = b by Permutation.swapMap_at_left(a, b)
+                 = i by hitsRight
+          case i ≠ b as missesRight:
+              Permutation.swapMap(a, b, Permutation.swapMap(a, b, i))
+                 = Permutation.swapMap(a, b, i)
+                       by substituting Permutation.swapMap_at_other(a, b, i, missesLeft, missesRight)
+                 = i by Permutation.swapMap_at_other(a, b, i, missesLeft, missesRight)
+        }
+      }
+  }
+}
+
+-- The transposition as a permutation: its own inverse, by the involution.
+definition Permutation.swap {n : Natural} (a b : NaturalsBelow(n)) : Permutation(n) :=
+  Permutation.make(n, Permutation.swapMap(a, b), Permutation.swapMap(a, b),
+      And.introduction(
+          (i : NaturalsBelow(n)) ↦ Permutation.swapMap_involution(a, b, i),
+          (i : NaturalsBelow(n)) ↦ Permutation.swapMap_involution(a, b, i)))
+
+theorem Permutation.apply_swap_left {n : Natural} (a b : NaturalsBelow(n))
+        : Permutation.apply(Permutation.swap(a, b), a) = b :=
+  Permutation.swapMap_at_left(a, b)
+
+theorem Permutation.apply_swap_right {n : Natural} (a b : NaturalsBelow(n))
+        : Permutation.apply(Permutation.swap(a, b), b) = a :=
+  Permutation.swapMap_at_right(a, b)
+
+theorem Permutation.apply_swap_other {n : Natural} (a b i : NaturalsBelow(n))
+        (leftMiss : i ≠ a) (rightMiss : i ≠ b)
+        : Permutation.apply(Permutation.swap(a, b), i) = i :=
+  Permutation.swapMap_at_other(a, b, i, leftMiss, rightMiss)
+
+-- A transposition is its own inverse.
+theorem Permutation.inverse_swap {n : Natural} (a b : NaturalsBelow(n))
+        : Permutation.inverse(Permutation.swap(a, b)) = Permutation.swap(a, b) :=
+  Permutation.equal_of_apply_equal(Permutation.inverse(Permutation.swap(a, b)),
+      Permutation.swap(a, b),
+      (i : NaturalsBelow(n)) ↦ Permutation.apply_inverse(Permutation.swap(a, b), i))
