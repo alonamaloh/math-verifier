@@ -42,24 +42,24 @@ import Integer.basics
 import Rational.basics
 
 theorem Natural.constructor_totality (subject : Natural)
-        : subject = 0 ∨ ∃ (predecessor : Natural). subject = successor(predecessor) :=
+        : subject = 0 ∨ ∃ (predecessor : Natural). subject = 1 + predecessor :=
   done by cases {
     case subject = 0:
         Or.introduceLeft(reflexivity(0))
-    case subject = successor(predecessor) for some predecessor:
-        Or.introduceRight(witness predecessor with reflexivity(successor(predecessor)))
+    case subject = 1 + predecessor for some predecessor:
+        Or.introduceRight(witness predecessor with reflexivity(1 + predecessor))
   }
 
 -- `≤` is now `< ∨ =` (not an inductive), so this "view" is recovered from
 -- the strict-order witness rather than a constructor split: when
 -- `smaller < larger`, the witness `c` with `smaller + (1 + c) = larger`
--- exhibits `larger = successor(smaller + c)` with `smaller ≤ smaller + c`.
+-- exhibits `larger = 1 + (smaller + c)` with `smaller ≤ smaller + c`.
 theorem LessOrEqual.constructor_totality
         (smaller larger : Natural)
         : smaller ≤ larger
           → smaller = larger
             ∨ ∃ (largerPredecessor : Natural).
-                  larger = successor(largerPredecessor)
+                  larger = 1 + largerPredecessor
                   ∧ smaller ≤ largerPredecessor :=
   (proof : smaller ≤ larger) ↦
     done by cases {
@@ -68,8 +68,7 @@ theorem LessOrEqual.constructor_totality
           smaller ≤ smaller + c;
           larger
              = smaller + (1 + c)
-             = smaller + successor(c)
-             = successor(smaller + c)
+             = 1 + (smaller + c)
              as largerIsSuccessor;
           Or.introduceRight(
               witness (smaller + c) with
