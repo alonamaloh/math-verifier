@@ -872,22 +872,44 @@ engine directly. Group laws are then immediate.
    fixing the top, via `Function.extendBelow` (no dependent-`if`).
 2c-i. **Restrict** — DONE (6fcb23ec): `restrict(τ, fixesTop) : Permutation(m)`;
    `extend`⇄`restrict` mutually inverse (`extend_restrict`/`restrict_extend`).
-2c-ii. **Enumeration LIST** (NEXT) — `allPermutations(n) : List(Permutation(n))`.
-   **KERNEL FINDING (do not repeat the flatten dead-end):** recursion over a
-   self-nested `List(List(A))` does NOT ι-reduce on `prepend`
-   (`flatten(prepend(h,t)) = append(h, flatten t)` is not defeq and no tactic
-   closes it), but `List(Permutation m)` / `List(NaturalsBelow k)` reduce fine.
-   So NEVER form a list-of-lists; concatenate directly over `List(Permutation m)`:
-   `concatRows(m) : List(Permutation(m)) → List(Permutation(1+m))`
-   (`empty↦empty`, `prepend(σ,rest)↦append(insertRow(m,σ), concatRows(m,rest))`);
-   `insertRow(m,σ) = map (j ↦ swap(top,j)∘extend σ)` over a positions list
-   (`map make/clampInclusion` over `List.range_down(1+m)`);
-   `allPermutations(0)=[identity(0)]`, `allPermutations(1+m)=concatRows(m, allPermutations(m))`.
-   Then **completeness** (every `τ`: use 2c-i, `τ = swap(top,τ(top))∘extend(restrict …)`;
-   membership via `member_append_left/right` (added, append.math) + `map_member`)
-   and **distinctness** (needs a `member_append` *invert*, proved by inducting on
-   the membership proof — not the list — to avoid dependent-hypothesis
-   generalization). The det sum is `indexedAggregate`/`List.product` over this list.
+2c-ii. **Enumeration LIST** — DONE (`Algebra/permutation_enumeration.math`):
+   `Permutation.allPermutations(n) : List(Permutation(n))` with
+   `allPermutations_complete` (every τ) + `allPermutations_distinct` (each once).
+   All gates green (library+tests+export-check 2974, axiom inventory UNCHANGED —
+   choice-free). Structure:
+   - **`NaturalsBelow.enumerate(n) : List(NaturalsBelow(n))`** (the index list) +
+     `enumerate_complete`/`enumerate_distinct`, then `Permutation.insertRow(σ) =
+     map(rowElement(σ), enumerate(1+m))` where
+     `rowElement(σ,j) = swap(top,j) ∘ extend σ`; `concatRows(m)` recurses on the
+     LIST (m fixed) as `empty↦empty`, `prepend(σ,rest)↦append(insertRow σ,
+     concatRows rest)`; `allPermutations(1+m) = concatRows(m, allPermutations(m))`.
+   - **DEPENDENT-INDEX RECURSION over the sealed Natural — THE key technique.**
+     `enumerate` and `allPermutations` both have result type indexed by the
+     recursion variable (`List(NaturalsBelow(n))` / `List(Permutation(n))`), and
+     the `1+m` step spelling is NOT defeq the `successor` the recursor eliminates
+     on. A manual `Equality_recursor` transport type-checks but REFUSES to
+     ι-reduce (the recursor needs a *syntactic* `refl`, and `one_add(m)` is not),
+     stranding every downstream proof. FIX that works: write the arm as
+     `| 1 + m => unfold Natural.add in <body-at-1+m>` — the unfold makes
+     `1+m ≡ successor m` while checking the arm, so the arm stores an honest
+     `1+m`-typed body with NO transport, and the reduct is clean. The `_one_plus`
+     bridge is then `unfold Natural.add in reflexivity(<body>)`. (A count-recursion
+     with `n` held fixed also dodges it but drags a `count ≤ n` proof whose
+     `successor`/`1+c` spelling re-bites; the unfold-in-arm route is cleaner and
+     reusable for any n-indexed data recursion.)
+   - **completeness** routes each τ through the top-index decomposition
+     `Permutation.decompose_top` (`τ = swap(top,τ(top)) ∘ extend(lower τ)`,
+     built here with `lower`, `restrict_congruence`, `swap_compose_self`);
+     membership via `member_append_left/right` + `map_member` + `concatRows_member`.
+   - **distinctness**: per-row via `rowElement` injectivity (`compose_right_cancel`)
+     + `enumerate_distinct`; cross-row disjointness because `lower` RECOVERS σ from
+     any row member (`lower_of_row` / `insertRow_member_lower`), so distinct σ give
+     disjoint rows; assembled by the new `List.distinct_append` +
+     `member_append_invert` over the distinct level-m list. New Lists lemmas:
+     `member_append_invert`, `distinct_append`, `range_up_complete/_member_lt/
+     _distinct` (the range_up API completion; range_up ended up unused once the
+     index list moved to `enumerate`, kept as legitimate API).
+   The det sum is `indexedAggregate`/`List.product` over `allPermutations`.
 3. **Sign** — `sign(σ) : Integer` valued in {−1, +1} + **multiplicativity**
    `sign(compose σ τ) = sign σ · sign τ`. Route chosen AFTER brick 2 stands
    (inversions-count parity vs. adjacent-transposition generation); record the
