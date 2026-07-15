@@ -140,6 +140,23 @@ theorem List.Permutation.distinct_invariant (A : Type(0)) (l1 l2 : List(A))
           qInvariant(pInvariant(distinct))
   }
 
+-- A permutation maps to a permutation: applying `f` elementwise to both
+-- sides of a rearrangement leaves a rearrangement. (Lives here rather than in
+-- Lists.permutation, which cannot import Lists.map — length imports permutation.)
+theorem List.Permutation.map (A B : Type(0)) (f : A → B) (l1 l2 : List(A))
+        (perm : List.Permutation(A, l1, l2))
+        : List.Permutation(B, List.map(A, B, f, l1), List.map(A, B, f, l2)) :=
+  by induction on perm {
+    case List.Permutation.empty: List.Permutation.empty(B)
+    case List.Permutation.skip(x, a, b, subPerm, mappedTail):
+        List.Permutation.skip(B, f(x), List.map(A, B, f, a), List.map(A, B, f, b), mappedTail)
+    case List.Permutation.swap(x, y, l):
+        List.Permutation.swap(B, f(x), f(y), List.map(A, B, f, l))
+    case List.Permutation.transitive(a, b, c, firstLeg, secondLeg, mappedFirst, mappedSecond):
+        List.Permutation.transitive(B, List.map(A, B, f, a), List.map(A, B, f, b),
+            List.map(A, B, f, c), mappedFirst, mappedSecond)
+  }
+
 -- range_down(n) has no duplicates.
 theorem List.range_down_distinct (n : Natural)
         : List.Distinct(Natural, List.range_down(n)) :=

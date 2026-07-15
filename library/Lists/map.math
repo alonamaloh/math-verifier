@@ -46,6 +46,18 @@ theorem List.map_member (A B : Type(0)) (f : A → B) (element : A) (list : List
         List.member.there(B, f(element), f(head), List.map(A, B, f, rest), IH)
   }
 
+-- Map fusion: mapping `g` then `f` is mapping their composite.
+theorem List.map_map (A B C : Type(0)) (g : A → B) (f : B → C) (l : List(A))
+        : List.map(B, C, f, List.map(A, B, g, l)) = List.map(A, C, (x : A) ↦ f(g(x)), l) :=
+  by induction on l with IH {
+    case List.empty: reflexivity(List.empty(C))
+    case List.prepend(head, tail):
+        List.map(B, C, f, List.map(A, B, g, List.prepend(A, head, tail)))
+           = List.prepend(C, f(g(head)), List.map(B, C, f, List.map(A, B, g, tail)))
+           = List.prepend(C, f(g(head)), List.map(A, C, (x : A) ↦ f(g(x)), tail)) by substituting IH
+           = List.map(A, C, (x : A) ↦ f(g(x)), List.prepend(A, head, tail))
+  }
+
 -- Inversion of map_member: a member of `map(f, l)` comes from a member of `l`.
 theorem List.map_member_invert (A B : Type(0)) (f : A → B) (b : B) (list : List(A))
         : List.member(B, b, List.map(A, B, f, list))
