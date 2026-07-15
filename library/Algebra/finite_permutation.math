@@ -18,9 +18,12 @@ import Logic.basics
 import Equality.basics
 import Logic.functions
 import Natural.basics
+import Natural.order
 import Natural.classical_decidable
 import Set.finite
+import Set.finite_pigeonhole
 import Set.equinumerous
+import Algebra.exchange_lemma
 
 -- ----------------------------------------------------------------------
 -- The permutation object and its projections.
@@ -343,3 +346,112 @@ theorem Permutation.inverse_swap {n : Natural} (a b : NaturalsBelow(n))
   Permutation.equal_of_apply_equal(Permutation.inverse(Permutation.swap(a, b)),
       Permutation.swap(a, b),
       (i : NaturalsBelow(n)) ↦ Permutation.apply_inverse(Permutation.swap(a, b), i))
+
+-- ----------------------------------------------------------------------
+-- Extending across the index boundary. A permutation of NaturalsBelow(m)
+-- becomes one of NaturalsBelow(1 + m) that fixes the top index m: below m it
+-- reads the original permutation (lifted by `inclusion`), at m it stays put.
+-- This is the recursion step the permutation enumeration is built on.
+
+definition Permutation.extendMap {m : Natural} (sigma : Permutation(m))
+        : NaturalsBelow(1 + m) → NaturalsBelow(1 + m) :=
+  (i : NaturalsBelow(1 + m)) ↦
+    Function.extendBelow(
+        (x : NaturalsBelow(m)) ↦ NaturalsBelow.inclusion(m, Permutation.apply(sigma, x)),
+        NaturalsBelow.top(m))(NaturalsBelow.value(i))
+
+-- Below the boundary the extension is the lifted permutation…
+theorem Permutation.extendMap_inclusion {m : Natural} (sigma : Permutation(m)) (y : NaturalsBelow(m))
+        : Permutation.extendMap(sigma, NaturalsBelow.inclusion(m, y))
+          = NaturalsBelow.inclusion(m, Permutation.apply(sigma, y)) := {
+  NaturalsBelow.value(y) < m by NaturalsBelow.below as yBelow;
+  NaturalsBelow.make(NaturalsBelow.value(y), yBelow) = y by NaturalsBelow.equal_of_value as makeIsY;
+  Permutation.extendMap(sigma, NaturalsBelow.inclusion(m, y))
+     = NaturalsBelow.inclusion(m,
+           Permutation.apply(sigma, NaturalsBelow.make(NaturalsBelow.value(y), yBelow)))
+           by Function.extendBelow_below
+     = NaturalsBelow.inclusion(m, Permutation.apply(sigma, y))
+           by substituting makeIsY;
+  done
+}
+
+-- …and at the boundary it fixes the top.
+theorem Permutation.extendMap_top {m : Natural} (sigma : Permutation(m))
+        : Permutation.extendMap(sigma, NaturalsBelow.top(m)) = NaturalsBelow.top(m) := {
+  m ≤ m;
+  done by Function.extendBelow_past
+}
+
+-- Extending `sigma` and then `sigma⁻¹` is the identity: cases on whether the
+-- index is below the boundary (lifted cancellation) or at the top (fixed).
+theorem Permutation.extendMap_cancel {m : Natural} (sigma : Permutation(m)) (i : NaturalsBelow(1 + m))
+        : Permutation.extendMap(Permutation.inverse(sigma), Permutation.extendMap(sigma, i)) = i := {
+  NaturalsBelow.value(i) < m ∨ m ≤ NaturalsBelow.value(i) by Natural.lt_or_le;
+  done by cases {
+    case NaturalsBelow.value(i) < m as iBelow: {
+        i = NaturalsBelow.inclusion(m, NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+            by NaturalsBelow.equal_of_value as iIsInclusion;
+        Permutation.apply(Permutation.inverse(sigma),
+            Permutation.apply(sigma, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+           = Permutation.unapply(sigma,
+                 Permutation.apply(sigma, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+                 by Permutation.apply_inverse(sigma,
+                        Permutation.apply(sigma, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+           = NaturalsBelow.make(NaturalsBelow.value(i), iBelow)
+                 by Permutation.left_inverse(sigma, NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+           as cancelAtIndex;
+        Permutation.extendMap(Permutation.inverse(sigma), Permutation.extendMap(sigma, i))
+           = Permutation.extendMap(Permutation.inverse(sigma),
+                 Permutation.extendMap(sigma,
+                     NaturalsBelow.inclusion(m, NaturalsBelow.make(NaturalsBelow.value(i), iBelow))))
+                 by substituting iIsInclusion
+           = Permutation.extendMap(Permutation.inverse(sigma),
+                 NaturalsBelow.inclusion(m,
+                     Permutation.apply(sigma, NaturalsBelow.make(NaturalsBelow.value(i), iBelow))))
+                 by substituting Permutation.extendMap_inclusion(sigma,
+                        NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+           = NaturalsBelow.inclusion(m,
+                 Permutation.apply(Permutation.inverse(sigma),
+                     Permutation.apply(sigma, NaturalsBelow.make(NaturalsBelow.value(i), iBelow))))
+                 by Permutation.extendMap_inclusion(Permutation.inverse(sigma),
+                        Permutation.apply(sigma, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+           = NaturalsBelow.inclusion(m, NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+                 by substituting cancelAtIndex
+           = i by iIsInclusion;
+        done
+      }
+    case m ≤ NaturalsBelow.value(i) as iAtLeast: {
+        NaturalsBelow.value(i) < 1 + m by NaturalsBelow.below;
+        NaturalsBelow.value(i) ≤ m by Natural.le_cancel_one_plus;
+        NaturalsBelow.value(i) = m by Natural.le_antisymmetric;
+        i = NaturalsBelow.top(m) by NaturalsBelow.equal_of_value as iIsTop;
+        Permutation.extendMap(Permutation.inverse(sigma), Permutation.extendMap(sigma, i))
+           = Permutation.extendMap(Permutation.inverse(sigma),
+                 Permutation.extendMap(sigma, NaturalsBelow.top(m)))
+                 by substituting iIsTop
+           = Permutation.extendMap(Permutation.inverse(sigma), NaturalsBelow.top(m))
+                 by substituting Permutation.extendMap_top(sigma)
+           = NaturalsBelow.top(m) by Permutation.extendMap_top(Permutation.inverse(sigma))
+           = i by iIsTop;
+        done
+      }
+  }
+}
+
+-- The extension as a permutation of NaturalsBelow(1 + m). Its inverse extends
+-- `sigma⁻¹`; the second cancellation reuses `extendMap_cancel` at `sigma⁻¹`
+-- (extending `(sigma⁻¹)⁻¹` reduces to extending `sigma`).
+definition Permutation.extend {m : Natural} (sigma : Permutation(m)) : Permutation(1 + m) :=
+  Permutation.make(1 + m, Permutation.extendMap(sigma), Permutation.extendMap(Permutation.inverse(sigma)),
+      And.introduction(
+          (i : NaturalsBelow(1 + m)) ↦ Permutation.extendMap_cancel(sigma, i),
+          (i : NaturalsBelow(1 + m)) ↦ Permutation.extendMap_cancel(Permutation.inverse(sigma), i)))
+
+theorem Permutation.apply_extend_inclusion {m : Natural} (sigma : Permutation(m)) (y : NaturalsBelow(m))
+        : Permutation.apply(Permutation.extend(sigma), NaturalsBelow.inclusion(m, y))
+          = NaturalsBelow.inclusion(m, Permutation.apply(sigma, y)) :=
+  Permutation.extendMap_inclusion(sigma, y)
+
+theorem Permutation.apply_extend_top {m : Natural} (sigma : Permutation(m))
+        : Permutation.apply(Permutation.extend(sigma), NaturalsBelow.top(m)) = NaturalsBelow.top(m) :=
+  Permutation.extendMap_top(sigma)
