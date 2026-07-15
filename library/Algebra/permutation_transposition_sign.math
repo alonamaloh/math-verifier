@@ -504,3 +504,213 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
       done
     }
   }
+
+-- The base case itself: an adjacent transposition has sign −1. Its unique
+-- inverted pair is {a, b} (orientation −1); every other pair keeps its order
+-- (orientation +1), so the sign-product isolates the single −1.
+theorem Permutation.sign_swap_adjacent {n : Natural} (a b : NaturalsBelow(n))
+        (adjacent : NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a))
+        : Permutation.sign(Permutation.swap(a, b)) = Integer.negate(1) := {
+  1 + NaturalsBelow.value(a) = NaturalsBelow.value(b) by adjacent as adjacentBack;
+  NaturalsBelow.value(a) < NaturalsBelow.value(b)
+      by { NaturalsBelow.value(a) < 1 + NaturalsBelow.value(a) by Natural.lt_one_plus
+               = NaturalsBelow.value(b) by adjacentBack; done } as aLtB;
+  ¬(NaturalsBelow.value(b) < NaturalsBelow.value(a))
+      by Natural.lt_asymmetric(NaturalsBelow.value(a), NaturalsBelow.value(b), aLtB) as notBack;
+  Permutation.sign(Permutation.swap(a, b))
+     = List.product(Integer, Integer.multiply, Integer.one,
+           List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+               Permutation.pairOrient(Permutation.swap(a, b)), Permutation.orderedPairs(n)))
+     = Permutation.pairOrient(Permutation.swap(a, b), Product.make(a, b))
+           by List.product_isolate_single(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                  Permutation.pairOrient(Permutation.swap(a, b)), Product.make(a, b),
+                  Permutation.orderedPairs(n), Permutation.orderedPairs_distinct(n),
+                  Permutation.orderedPairs_member(n, a, b, aLtB),
+                  (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+                      (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p,
+                          Permutation.orderedPairs(n)))
+                      (notThePair : p ≠ Product.make(a, b)) ↦
+                      Permutation.pairOrient_swap_adjacent_other(a, b, adjacent, p, memberP, notThePair))
+     = Permutation.orient(Permutation.apply(Permutation.swap(a, b), a),
+           Permutation.apply(Permutation.swap(a, b), b))
+     = Permutation.orient(b, Permutation.apply(Permutation.swap(a, b), b))
+           by substituting Permutation.apply_swap_left(a, b)
+     = Permutation.orient(b, a) by substituting Permutation.apply_swap_right(a, b)
+     = Integer.negate(1) by Permutation.orient_backward(b, a, notBack);
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The distance induction and the general result.
+
+-- A transposition is symmetric in its two indices.
+theorem Permutation.swap_symmetric {n : Natural} (a b : NaturalsBelow(n))
+        : Permutation.swap(a, b) = Permutation.swap(b, a) :=
+  Permutation.equal_of_apply_equal(Permutation.swap(a, b), Permutation.swap(b, a),
+      (i : NaturalsBelow(n)) ↦ {
+        i = a ∨ i ≠ a;
+        done by cases {
+          case i = a as iIsA:
+              Permutation.apply(Permutation.swap(a, b), i)
+                 = Permutation.apply(Permutation.swap(a, b), a) by substituting iIsA
+                 = b by Permutation.apply_swap_left(a, b)
+                 = Permutation.apply(Permutation.swap(b, a), a) by Permutation.apply_swap_right(b, a)
+                 = Permutation.apply(Permutation.swap(b, a), i) by substituting iIsA
+          case i ≠ a as iNeqA: {
+              i = b ∨ i ≠ b;
+              done by cases {
+                case i = b as iIsB:
+                    Permutation.apply(Permutation.swap(a, b), i)
+                       = Permutation.apply(Permutation.swap(a, b), b) by substituting iIsB
+                       = a by Permutation.apply_swap_right(a, b)
+                       = Permutation.apply(Permutation.swap(b, a), b) by Permutation.apply_swap_left(b, a)
+                       = Permutation.apply(Permutation.swap(b, a), i) by substituting iIsB
+                case i ≠ b as iNeqB:
+                    Permutation.apply(Permutation.swap(a, b), i)
+                       = i by Permutation.apply_swap_other(a, b, i, iNeqA, iNeqB)
+                       = Permutation.apply(Permutation.swap(b, a), i)
+                             by Permutation.apply_swap_other(b, a, i, iNeqB, iNeqA)
+              }
+            }
+        }
+      })
+
+-- Distance induction: a transposition whose indices differ in value by 1 + d
+-- has sign −1. The step conjugates by an adjacent transposition (swap(a, c)
+-- with value(c) = value(a) + 1) to reach one of distance d.
+theorem Permutation.sign_swap_gap (n : Natural) (d : Natural)
+        : ∀ (a b : NaturalsBelow(n)).
+              NaturalsBelow.value(b) = (1 + d) + NaturalsBelow.value(a)
+              → Permutation.sign(Permutation.swap(a, b)) = Integer.negate(1) :=
+  by induction on d with IH {
+    case base:
+        (a b : NaturalsBelow(n))
+        (gapHyp : NaturalsBelow.value(b) = (1 + 0) + NaturalsBelow.value(a)) ↦ {
+          NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a) by gapHyp as adjacentEq;
+          done by Permutation.sign_swap_adjacent(a, b, adjacentEq)
+        }
+    case step(dPred):
+        (a b : NaturalsBelow(n))
+        (gapHyp : NaturalsBelow.value(b) = (1 + (1 + dPred)) + NaturalsBelow.value(a)) ↦ {
+          1 + NaturalsBelow.value(a) < NaturalsBelow.value(b) by {
+            NaturalsBelow.value(b) = (1 + (1 + dPred)) + NaturalsBelow.value(a) by gapHyp
+               = NaturalsBelow.value(a) + (1 + (1 + dPred)) by ring as vbEq;
+            1 + NaturalsBelow.value(a) = NaturalsBelow.value(a) + 1 by ring
+               < NaturalsBelow.value(a) + (1 + (1 + dPred))
+                     by Natural.add_left_strict_monotone(NaturalsBelow.value(a), 1, 1 + (1 + dPred),
+                            Natural.lt_add_of_one_le(1, 1 + dPred,
+                                Natural.add_left_monotone(1, 0, dPred, Natural.zero_least(dPred))))
+               = NaturalsBelow.value(b) by vbEq;
+            done
+          } as cBoundLtB;
+          NaturalsBelow.value(b) < n by NaturalsBelow.below as bBelow;
+          1 + NaturalsBelow.value(a) < n by {
+            1 + NaturalsBelow.value(a) < NaturalsBelow.value(b) by cBoundLtB < n by bBelow; done
+          } as cBound;
+          let c : NaturalsBelow(n) := NaturalsBelow.make(1 + NaturalsBelow.value(a), cBound);
+          NaturalsBelow.value(c) = 1 + NaturalsBelow.value(a) as valueC;
+          NaturalsBelow.value(a) < NaturalsBelow.value(b) by {
+            NaturalsBelow.value(a) < 1 + NaturalsBelow.value(a) by Natural.lt_one_plus
+               < NaturalsBelow.value(b) by cBoundLtB; done
+          } as aLtB;
+          b ≠ a by NaturalsBelow.ne_of_value_ne(b, a,
+              Equality.ne_symmetric(Natural, NaturalsBelow.value(a), NaturalsBelow.value(b),
+                  Natural.ne_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(b), aLtB))) as bNeqA;
+          NaturalsBelow.value(b) ≠ NaturalsBelow.value(c) by {
+            NaturalsBelow.value(c) = 1 + NaturalsBelow.value(a) by valueC;
+            NaturalsBelow.value(b) ≠ 1 + NaturalsBelow.value(a)
+                by Equality.ne_symmetric(Natural, 1 + NaturalsBelow.value(a), NaturalsBelow.value(b),
+                       Natural.ne_of_lt(1 + NaturalsBelow.value(a), NaturalsBelow.value(b), cBoundLtB));
+            done by substituting valueC
+          } as bValueNeqC;
+          b ≠ c by NaturalsBelow.ne_of_value_ne(b, c, bValueNeqC) as bNeqC;
+          NaturalsBelow.value(a) ≠ NaturalsBelow.value(c) by {
+            NaturalsBelow.value(a) ≠ 1 + NaturalsBelow.value(a)
+                by Natural.ne_of_lt(NaturalsBelow.value(a), 1 + NaturalsBelow.value(a), Natural.lt_one_plus);
+            done by substituting valueC
+          } as aValueNeqC;
+          a ≠ c by NaturalsBelow.ne_of_value_ne(a, c, aValueNeqC) as aNeqC;
+          NaturalsBelow.value(b) = (1 + dPred) + NaturalsBelow.value(c) by {
+            NaturalsBelow.value(b) = (1 + (1 + dPred)) + NaturalsBelow.value(a) by gapHyp
+               = (1 + dPred) + (1 + NaturalsBelow.value(a)) by ring
+               = (1 + dPred) + NaturalsBelow.value(c) by substituting valueC;
+            done
+          } as gapCB;
+          Permutation.sign(Permutation.swap(c, b)) = Integer.negate(1) by IH(c, b, gapCB) as signCB;
+          Permutation.swap(c, b)
+              = Permutation.compose(Permutation.swap(a, c),
+                    Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
+              by Equality.symmetry(Permutation(n),
+                     Permutation.compose(Permutation.swap(a, c),
+                         Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))),
+                     Permutation.swap(c, b),
+                     Permutation.swap_conjugate_by_swap(a, b, c, aNeqC, bNeqA, bNeqC)) as identBack;
+          Permutation.sign(Permutation.swap(c, b))
+             = Permutation.sign(Permutation.compose(Permutation.swap(a, c),
+                   Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))))
+                   by substituting identBack
+             = Permutation.sign(Permutation.swap(a, c))
+                   * Permutation.sign(Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
+                   by Permutation.sign_compose(Permutation.swap(a, c),
+                          Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
+             = Permutation.sign(Permutation.swap(a, c))
+                   * (Permutation.sign(Permutation.swap(a, b)) * Permutation.sign(Permutation.swap(a, c)))
+                   by substituting Permutation.sign_compose(Permutation.swap(a, b), Permutation.swap(a, c))
+             = Permutation.sign(Permutation.swap(a, b))
+                   * (Permutation.sign(Permutation.swap(a, c)) * Permutation.sign(Permutation.swap(a, c)))
+                   by ring
+             = Permutation.sign(Permutation.swap(a, b)) * Integer.one
+                   by substituting Permutation.sign_swap_square(a, c)
+             = Permutation.sign(Permutation.swap(a, b)) by ring
+             as signCBeqAB;
+          Permutation.sign(Permutation.swap(a, b))
+             = Permutation.sign(Permutation.swap(c, b)) by signCBeqAB
+             = Integer.negate(1) by signCB;
+          done
+        }
+  }
+
+-- A transposition of distinct indices is odd: its sign is −1.
+theorem Permutation.sign_swap {n : Natural} (a b : NaturalsBelow(n)) (distinct : a ≠ b)
+        : Permutation.sign(Permutation.swap(a, b)) = Integer.negate(1) := {
+  NaturalsBelow.value(a) ≠ NaturalsBelow.value(b) by {
+    suppose NaturalsBelow.value(a) = NaturalsBelow.value(b) for contradiction {
+      NaturalsBelow.value(a) = NaturalsBelow.value(b) as valuesEq;
+      a = b by NaturalsBelow.equal_of_value(n, a, b, valuesEq);
+      False by distinct;
+      done
+    };
+    done
+  } as valuesNe;
+  NaturalsBelow.value(a) < NaturalsBelow.value(b) ∨ NaturalsBelow.value(b) < NaturalsBelow.value(a)
+      by Natural.lt_or_gt_of_ne(NaturalsBelow.value(a), NaturalsBelow.value(b), valuesNe);
+  done by cases {
+    case NaturalsBelow.value(a) < NaturalsBelow.value(b) as aLtB: {
+        choose d such that NaturalsBelow.value(a) + (1 + d) = NaturalsBelow.value(b)
+            from Natural.lt_elim;
+        NaturalsBelow.value(a) + (1 + d) = NaturalsBelow.value(b) as gapEq;
+        NaturalsBelow.value(b) = (1 + d) + NaturalsBelow.value(a) by {
+          NaturalsBelow.value(b) = NaturalsBelow.value(a) + (1 + d) by gapEq
+             = (1 + d) + NaturalsBelow.value(a) by ring;
+          done
+        } as gapHyp;
+        done by Permutation.sign_swap_gap(n, d, a, b, gapHyp)
+      }
+    case NaturalsBelow.value(b) < NaturalsBelow.value(a) as bLtA: {
+        choose d such that NaturalsBelow.value(b) + (1 + d) = NaturalsBelow.value(a)
+            from Natural.lt_elim;
+        NaturalsBelow.value(b) + (1 + d) = NaturalsBelow.value(a) as gapEq;
+        NaturalsBelow.value(a) = (1 + d) + NaturalsBelow.value(b) by {
+          NaturalsBelow.value(a) = NaturalsBelow.value(b) + (1 + d) by gapEq
+             = (1 + d) + NaturalsBelow.value(b) by ring;
+          done
+        } as gapHyp;
+        Permutation.sign(Permutation.swap(b, a)) = Integer.negate(1)
+            by Permutation.sign_swap_gap(n, d, b, a, gapHyp) as signBA;
+        Permutation.sign(Permutation.swap(a, b))
+           = Permutation.sign(Permutation.swap(b, a)) by substituting Permutation.swap_symmetric(a, b)
+           = Integer.negate(1) by signBA;
+        done
+      }
+  }
+}
