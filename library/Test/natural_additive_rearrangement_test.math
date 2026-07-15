@@ -1,0 +1,48 @@
+-- Strategy (e) of `coerceToExpectedTypeViaDiff` (F1, PLAN_ERGONOMICS.md):
+-- a proof of a Natural relation stated in one additive form drops into an
+-- argument slot expecting a mathematically-equal-but-syntactically-different
+-- form. `Natural.add` is opaque and recurses on its first argument, so
+-- `d + 1`, `1 + d`, `(a + b) + c`, `a + (b + c)`, and `a + 2` / `2 + a` are
+-- propositionally but not definitionally equal; the elaborator synthesizes
+-- the rearrangement equality with `ring` and transports the term across it.
+module Test.natural_additive_rearrangement_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.add_order
+
+-- Consumers pin the expected argument form; the callers below supply the
+-- other form and rely on strategy (e) to bridge.
+theorem consume_one_plus (d : Natural) (h : 1 ≤ 1 + d) : 1 ≤ 1 + d := h
+theorem consume_plus_one (d : Natural) (h : 1 ≤ d + 1) : 1 ≤ d + 1 := h
+
+-- Forward (the brick-6b failure): `less_or_equal_add_left(1, d) : 1 ≤ d + 1`
+-- lands in a slot expecting `1 ≤ 1 + d`.
+theorem rearrange_commute_forward (d : Natural) : 1 ≤ 1 + d :=
+  consume_one_plus(d, Natural.less_or_equal_add_left(1, d))
+
+-- Reverse: a `1 + d`-form proof lands in a `d + 1` slot.
+theorem rearrange_commute_reverse (d : Natural) (h : 1 ≤ 1 + d) : 1 ≤ d + 1 :=
+  consume_plus_one(d, h)
+
+-- Associativity: `(a + b) + c` vs `a + (b + c)`.
+theorem consume_assoc_right (a b c : Natural) (h : 1 ≤ a + (b + c))
+        : 1 ≤ a + (b + c) := h
+
+theorem rearrange_associate (a b c : Natural) (h : 1 ≤ (a + b) + c)
+        : 1 ≤ a + (b + c) :=
+  consume_assoc_right(a, b, c, h)
+
+-- Numeral ≥ 2 folding: `a + 2` vs `2 + a`.
+theorem consume_two_plus (a : Natural) (h : 1 ≤ 2 + a) : 1 ≤ 2 + a := h
+
+theorem rearrange_numeral (a : Natural) (h : 1 ≤ a + 2) : 1 ≤ 2 + a :=
+  consume_two_plus(a, h)
+
+-- Strict `<` relation head, commuted.
+theorem consume_less_than (d : Natural) (h : 0 < 1 + d) : 0 < 1 + d := h
+
+theorem rearrange_less_than (d : Natural) (h : 0 < d + 1) : 0 < 1 + d :=
+  consume_less_than(d, h)

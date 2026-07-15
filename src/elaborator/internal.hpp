@@ -22,7 +22,9 @@
 
 #include "timing.hpp"
 #include <cstdlib>
+#include <functional>
 #include <iostream>
+#include <optional>
 #include <sys/resource.h>
 #include <set>
 #include <string>
@@ -2491,6 +2493,57 @@ private:
         ExpressionPointer term,
         ExpressionPointer termTypeClosed,
         ExpressionPointer expectedTypeClosed);
+
+    // The equality that bridges a unique diff pair (diffInferred,
+    // diffExpected) for `buildDiffBridgeTransport`: the carrier type and
+    // its universe level, plus a CLOSED proof of `diffInferred =
+    // diffExpected`. A resolver supplies one either from a local
+    // hypothesis (context-equality strategy) or by synthesis (Natural
+    // additive rearrangement).
+    struct DiffBridgeEquality {
+        ExpressionPointer carrierTypeOpened;
+        LevelPointer carrierLevel;
+        ExpressionPointer proofClosed;
+    };
+
+    // Shared transport engine behind the diff-bridge coercions. Walks
+    // `term`'s inferred type against `expectedTypeClosed`, finds the
+    // unique differing subterm pair (a, b), asks `resolveEquality(a, b)`
+    // for a proof of `a = b`, then wraps `term` with
+    // `Equality.transport_proposition(λz. T_expected[b ↦ z], a, b, proof,
+    // term)` — trying occurrence subsets until the motive reproduces the
+    // inferred type. Returns nullptr when there is no unique diff, the
+    // resolver declines, or no occurrence mask type-checks.
+    ExpressionPointer buildDiffBridgeTransport(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer termTypeClosed,
+        ExpressionPointer expectedTypeClosed,
+        const std::function<std::optional<DiffBridgeEquality>(
+            ExpressionPointer diffInferredOpened,
+            ExpressionPointer diffExpectedOpened)>& resolveEquality);
+
+    // Strategy (e) of `coerceToExpectedTypeViaDiff`: when `term`'s type
+    // and the expected type are the same Natural relation (`=` / `≤` /
+    // `<` over Natural) differing only by an additive rearrangement
+    // (`d + 1` vs `1 + d`, `(a + b) + c` vs `a + (b + c)`, `2` vs `1 + 1`),
+    // synthesize the rearrangement equality with `ring` and transport
+    // `term` across it. `Natural.add` is opaque so these are not defeq;
+    // the synthesized proof is kernel-checked, so trust is preserved.
+    ExpressionPointer tryNaturalAdditiveRearrangement(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer termTypeClosed,
+        ExpressionPointer expectedTypeClosed);
+
+    // Prove `diffInferred = diffExpected` over Natural with `ring` (via
+    // `elaborateRing`), returning it as a `DiffBridgeEquality`. Declines
+    // (nullopt) unless both subterms are Natural-typed and `ring` closes
+    // the identity. The resolver used by `tryNaturalAdditiveRearrangement`.
+    std::optional<DiffBridgeEquality> synthesizeNaturalEquality(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer diffInferredOpened,
+        ExpressionPointer diffExpectedOpened);
 
     // If `type` WHNFs to a class equality `Quotient.class_of(T, R, x) =
     // Quotient.class_of(T, R, y)`, return the underlying equivalence `R(x, y)`;

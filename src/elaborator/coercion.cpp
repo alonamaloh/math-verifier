@@ -144,10 +144,51 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
         // Disjunction-injection prefilter: a proof of one disjunct where
         // `Or(A, B)` is expected wraps with the matching Or.introduce*.
         bool expectedIsOr = headConstantName(expectedTypeClosed) == "Or";
+        // Strategy (e) prefilter (Natural additive rearrangement): the
+        // expected type is a Natural relation (`=` over `Natural`, or
+        // `Natural.LessOrEqual` / `Natural.LessThan`) with a `+`/`successor`
+        // somewhere in it, so the term's type may differ only by an additive
+        // rearrangement (`d + 1` vs `1 + d`) that `Natural.add`'s opacity
+        // makes non-defeq. Purely structural on the closed expected type —
+        // no inferType — so it is as cheap as the other prefilters.
+        auto isNaturalRelationHead = [&](ExpressionPointer e) {
+            std::vector<ExpressionPointer> args;
+            ExpressionPointer head = e;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                args.push_back(app->argument);
+                head = app->function;
+            }
+            auto* constant = std::get_if<Constant>(&head->node);
+            if (!constant) return false;
+            if (constant->name == "Natural.LessOrEqual"
+                || constant->name == "Natural.LessThan") {
+                return true;
+            }
+            // `Equality(T, a, b)` peels to args == [b, a, T]; the carrier T
+            // is the outermost application's argument.
+            return constant->name == "Equality" && args.size() == 3
+                && headConstantName(args.back()) == "Natural";
+        };
+        std::function<bool(ExpressionPointer)> containsNaturalAdditive =
+            [&](ExpressionPointer e) -> bool {
+                if (auto* constant = std::get_if<Constant>(&e->node)) {
+                    return constant->name == "Natural.add"
+                        || constant->name == "Natural.successor";
+                }
+                if (auto* app = std::get_if<Application>(&e->node)) {
+                    return containsNaturalAdditive(app->function)
+                        || containsNaturalAdditive(app->argument);
+                }
+                return false;
+            };
+        bool naturalRearrangeCouldFire =
+            isNaturalRelationHead(expectedTypeClosed)
+            && containsNaturalAdditive(expectedTypeClosed);
         if (!expectedCouldFire
             && !contextCouldFire
             && !barePropositionCouldFire
-            && !expectedIsOr) {
+            && !expectedIsOr
+            && !naturalRearrangeCouldFire) {
             return term;
         }
         ExpressionPointer termTypeOpened;
@@ -254,6 +295,19 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
             localBinders, term, termTypeOpened, expectedTypeClosed);
         if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
                 "bare-proposition-as-proof")) return ok;
+        // Strategy (e): Natural additive rearrangement. The term proves the
+        // same Natural relation modulo an additive identity (`d + 1` vs
+        // `1 + d`, `(a + b) + c` vs `a + (b + c)`, `2` vs `1 + 1`) that is
+        // propositionally but not definitionally true — `Natural.add` is
+        // opaque and recurses on its first argument. Synthesize the
+        // rearrangement equality with `ring` and transport the term across
+        // it, so a lemma stated in one additive form drops into an argument
+        // slot expecting the other. Last resort: only the additive AC that
+        // the earlier strategies cannot express.
+        wrapped = tryNaturalAdditiveRearrangement(
+            localBinders, term, termTypeClosed, expectedTypeClosed);
+        if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
+                "natural-additive-rearrangement")) return ok;
         return term;
     }
 
@@ -455,11 +509,13 @@ std::pair<ExpressionPointer, ExpressionPointer>
         return pairs[0];
     }
 
-ExpressionPointer Elaborator::tryDiffBridgeViaContextEquality(
+ExpressionPointer Elaborator::buildDiffBridgeTransport(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,
         ExpressionPointer termTypeClosed,
-        ExpressionPointer expectedTypeClosed) {
+        ExpressionPointer expectedTypeClosed,
+        const std::function<std::optional<DiffBridgeEquality>(
+            ExpressionPointer, ExpressionPointer)>& resolveEquality) {
         if (!environment_.lookup("Equality.transport_proposition")) {
             return nullptr;
         }
@@ -510,86 +566,8 @@ ExpressionPointer Elaborator::tryDiffBridgeViaContextEquality(
         }
         if (!diffInferredOpened || !diffExpectedOpened) return nullptr;
 
-        // Find an equation in local context whose endpoints match the
-        // diff pair (forward or symmetric). On match, return a closed-
-        // form Equality components record + the bound-variable proof
-        // (or its symmetry wrap), all ready to splice into the
-        // transport_proposition call.
-        struct EqCandidate {
-            ExpressionPointer carrierTypeOpened;
-            LevelPointer carrierLevel;
-            // Built in closed scope (BoundVariable to local binder).
-            ExpressionPointer proofClosed;
-        };
-        auto findEquationInContext = [&]() -> std::optional<EqCandidate> {
-            int N = static_cast<int>(localBinders.size());
-            for (int b = N - 1; b >= 0; --b) {
-                ExpressionPointer binderTypeOpened = openOverLocalBinders(
-                    localBinders[b].type, localBinders, (size_t)b);
-                ExpressionPointer binderTypeWhnf =
-                    weakHeadNormalForm(environment_, binderTypeOpened);
-                EqualityComponents components;
-                try {
-                    components = extractEqualityComponents(
-                        binderTypeWhnf,
-                        "diff-bridge equality candidate", 0);
-                } catch (const ElaborateError&) {
-                    continue;
-                }
-                bool forwardMatch =
-                    structurallyEqual(
-                        components.leftEndpoint, diffInferredOpened)
-                    && structurallyEqual(
-                        components.rightEndpoint, diffExpectedOpened);
-                bool symmetricMatch =
-                    structurallyEqual(
-                        components.leftEndpoint, diffExpectedOpened)
-                    && structurallyEqual(
-                        components.rightEndpoint, diffInferredOpened);
-                if (!forwardMatch && !symmetricMatch) continue;
-                ExpressionPointer hypProofClosed =
-                    makeBoundVariable(N - 1 - b);
-                // Close the diff endpoints for use in the symmetry
-                // wrap (when needed) and for the eventual transport.
-                ExpressionPointer diffInferredClosed =
-                    closeOverLocalBinders(diffInferredOpened,
-                        localBinders, localBinders.size());
-                ExpressionPointer diffExpectedClosed =
-                    closeOverLocalBinders(diffExpectedOpened,
-                        localBinders, localBinders.size());
-                ExpressionPointer carrierTypeClosed =
-                    closeOverLocalBinders(components.carrierType,
-                        localBinders, localBinders.size());
-                ExpressionPointer proofClosed;
-                if (forwardMatch) {
-                    proofClosed = std::move(hypProofClosed);
-                } else {
-                    ExpressionPointer sym = makeConstant(
-                        "Equality.symmetry",
-                        {components.carrierUniverseLevel});
-                    sym = makeApplication(
-                        std::move(sym), carrierTypeClosed);
-                    sym = makeApplication(
-                        std::move(sym), std::move(diffExpectedClosed));
-                    sym = makeApplication(
-                        std::move(sym),
-                        // Re-close (already closed but cheap).
-                        closeOverLocalBinders(diffInferredOpened,
-                            localBinders, localBinders.size()));
-                    sym = makeApplication(
-                        std::move(sym), std::move(hypProofClosed));
-                    proofClosed = std::move(sym);
-                }
-                EqCandidate result;
-                result.carrierTypeOpened = components.carrierType;
-                result.carrierLevel = components.carrierUniverseLevel;
-                result.proofClosed = std::move(proofClosed);
-                return result;
-            }
-            return std::nullopt;
-        };
-
-        auto candidate = findEquationInContext();
+        std::optional<DiffBridgeEquality> candidate =
+            resolveEquality(diffInferredOpened, diffExpectedOpened);
         if (!candidate) return nullptr;
 
         // Close the diff pair and carrier for splicing into the final
@@ -699,6 +677,155 @@ ExpressionPointer Elaborator::tryDiffBridgeViaContextEquality(
             }
         }
         return nullptr;
+    }
+
+ExpressionPointer Elaborator::tryDiffBridgeViaContextEquality(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer termTypeClosed,
+        ExpressionPointer expectedTypeClosed) {
+        // Resolve the bridging equality from a local hypothesis whose
+        // endpoints match the diff pair (forward or symmetric). On a
+        // symmetric match, wrap with `Equality.symmetry` so the proof is
+        // oriented `diffInferred = diffExpected` as the transport expects.
+        return buildDiffBridgeTransport(
+            localBinders, term, termTypeClosed, expectedTypeClosed,
+            [&](ExpressionPointer diffInferredOpened,
+                ExpressionPointer diffExpectedOpened)
+                    -> std::optional<DiffBridgeEquality> {
+                int N = static_cast<int>(localBinders.size());
+                for (int b = N - 1; b >= 0; --b) {
+                    ExpressionPointer binderTypeOpened = openOverLocalBinders(
+                        localBinders[b].type, localBinders, (size_t)b);
+                    ExpressionPointer binderTypeWhnf =
+                        weakHeadNormalForm(environment_, binderTypeOpened);
+                    EqualityComponents components;
+                    try {
+                        components = extractEqualityComponents(
+                            binderTypeWhnf,
+                            "diff-bridge equality candidate", 0);
+                    } catch (const ElaborateError&) {
+                        continue;
+                    }
+                    bool forwardMatch =
+                        structurallyEqual(
+                            components.leftEndpoint, diffInferredOpened)
+                        && structurallyEqual(
+                            components.rightEndpoint, diffExpectedOpened);
+                    bool symmetricMatch =
+                        structurallyEqual(
+                            components.leftEndpoint, diffExpectedOpened)
+                        && structurallyEqual(
+                            components.rightEndpoint, diffInferredOpened);
+                    if (!forwardMatch && !symmetricMatch) continue;
+                    ExpressionPointer hypProofClosed =
+                        makeBoundVariable(N - 1 - b);
+                    // Close the diff endpoints for use in the symmetry
+                    // wrap (when needed) and for the eventual transport.
+                    ExpressionPointer diffInferredClosed =
+                        closeOverLocalBinders(diffInferredOpened,
+                            localBinders, localBinders.size());
+                    ExpressionPointer diffExpectedClosed =
+                        closeOverLocalBinders(diffExpectedOpened,
+                            localBinders, localBinders.size());
+                    ExpressionPointer carrierTypeClosed =
+                        closeOverLocalBinders(components.carrierType,
+                            localBinders, localBinders.size());
+                    ExpressionPointer proofClosed;
+                    if (forwardMatch) {
+                        proofClosed = std::move(hypProofClosed);
+                    } else {
+                        ExpressionPointer sym = makeConstant(
+                            "Equality.symmetry",
+                            {components.carrierUniverseLevel});
+                        sym = makeApplication(
+                            std::move(sym), carrierTypeClosed);
+                        sym = makeApplication(
+                            std::move(sym), std::move(diffExpectedClosed));
+                        sym = makeApplication(
+                            std::move(sym),
+                            // Re-close (already closed but cheap).
+                            closeOverLocalBinders(diffInferredOpened,
+                                localBinders, localBinders.size()));
+                        sym = makeApplication(
+                            std::move(sym), std::move(hypProofClosed));
+                        proofClosed = std::move(sym);
+                    }
+                    DiffBridgeEquality result;
+                    result.carrierTypeOpened = components.carrierType;
+                    result.carrierLevel = components.carrierUniverseLevel;
+                    result.proofClosed = std::move(proofClosed);
+                    return result;
+                }
+                return std::nullopt;
+            });
+    }
+
+std::optional<Elaborator::DiffBridgeEquality>
+    Elaborator::synthesizeNaturalEquality(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer diffInferredOpened,
+        ExpressionPointer diffExpectedOpened) {
+        // The differing subterms must be Natural — `ring` recognizes the
+        // Natural carrier and closes its additive AC (associativity,
+        // commutativity, and numeral `2 = 1 + 1` folding), which is exactly
+        // the class of identities that `Natural.add`'s opacity hides.
+        ExpressionPointer carrierOpened;
+        try {
+            carrierOpened =
+                inferTypeInLocalContext(localBinders, diffInferredOpened);
+        } catch (const TypeError&) {
+            return std::nullopt;
+        } catch (const ElaborateError&) {
+            return std::nullopt;
+        }
+        if (headConstantName(carrierOpened) != "Natural") return std::nullopt;
+        LevelPointer level;
+        try {
+            level = typeUniverseOf(localBinders, diffInferredOpened);
+        } catch (const ElaborateError&) {
+            return std::nullopt;
+        }
+        // Build the goal `diffInferred = diffExpected` closed over the local
+        // binders (`elaborateRing`'s contract) and hand it to `ring`.
+        ExpressionPointer openedGoal = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {level}),
+                                carrierOpened),
+                diffInferredOpened),
+            diffExpectedOpened);
+        ExpressionPointer closedGoal = closeOverLocalBinders(
+            openedGoal, localBinders, localBinders.size());
+        ExpressionPointer proofClosed;
+        try {
+            proofClosed =
+                elaborateRing(localBinders, closedGoal, /*line=*/0, /*column=*/0);
+        } catch (const ElaborateError&) {
+            return std::nullopt;
+        } catch (const TypeError&) {
+            return std::nullopt;
+        }
+        if (!proofClosed) return std::nullopt;
+        DiffBridgeEquality result;
+        result.carrierTypeOpened = carrierOpened;
+        result.carrierLevel = level;
+        result.proofClosed = std::move(proofClosed);
+        return result;
+    }
+
+ExpressionPointer Elaborator::tryNaturalAdditiveRearrangement(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer termTypeClosed,
+        ExpressionPointer expectedTypeClosed) {
+        return buildDiffBridgeTransport(
+            localBinders, term, termTypeClosed, expectedTypeClosed,
+            [&](ExpressionPointer diffInferredOpened,
+                ExpressionPointer diffExpectedOpened)
+                    -> std::optional<DiffBridgeEquality> {
+                return synthesizeNaturalEquality(
+                    localBinders, diffInferredOpened, diffExpectedOpened);
+            });
     }
 
 bool Elaborator::peelQuotientClass(ExpressionPointer endpoint, QuotientClassParts& out) {
