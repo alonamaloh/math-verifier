@@ -1,0 +1,209 @@
+-- Algebra/field_aggregation.math
+--
+-- Finite sums and products of field-valued terms over a list, and their
+-- algebra: how they interact with `append`/`map`, scalar distributivity,
+-- pointwise congruence, and the bilinear expansion of a product of sums.
+-- These are the reusable backbone for the determinant's Leibniz
+-- manipulations (Stage H brick 6 of PLAN_LINEAR_ALGEBRA.md) — permutation-
+-- free field/list algebra.
+
+module Algebra.field_aggregation
+
+import Logic.basics
+import Equality.basics
+import Lists.list
+import Lists.map
+import Lists.append
+import Algebra.field
+import Algebra.field_bundle
+
+-- Sum a field-valued term over a list: the additive fold of the mapped list.
+definition Field.sumOver {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (items : List(index))
+        : Field.carrier(f) :=
+  List.product(Field.carrier(f), Field.add, Field.zero(f),
+      List.map(index, Field.carrier(f), term, items))
+
+-- Multiply a field-valued term over a list: the multiplicative fold.
+definition Field.productOver {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (items : List(index))
+        : Field.carrier(f) :=
+  List.product(Field.carrier(f), Field.multiply, Field.one(f),
+      List.map(index, Field.carrier(f), term, items))
+
+-- The empty and prepend reductions, straight off the folds.
+theorem Field.sumOver_empty {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f))
+        : Field.sumOver(term, List.empty(index)) = Field.zero(f) :=
+  done
+
+theorem Field.sumOver_prepend {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (head : index) (tail : List(index))
+        : Field.sumOver(term, List.prepend(index, head, tail))
+          = term(head) + Field.sumOver(term, tail) :=
+  done
+
+theorem Field.productOver_prepend {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (head : index) (tail : List(index))
+        : Field.productOver(term, List.prepend(index, head, tail))
+          = term(head) * Field.productOver(term, tail) :=
+  done
+
+-- Sums and products split over concatenation.
+theorem Field.sumOver_append {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (first second : List(index))
+        : Field.sumOver(term, List.append(index, first, second))
+          = Field.sumOver(term, first) + Field.sumOver(term, second) :=
+  Field.sumOver(term, List.append(index, first, second))
+     = List.product(Field.carrier(f), Field.add, Field.zero(f),
+           List.append(Field.carrier(f),
+               List.map(index, Field.carrier(f), term, first),
+               List.map(index, Field.carrier(f), term, second)))
+           by substituting List.map_append
+     = Field.sumOver(term, first) + Field.sumOver(term, second)
+           by List.product_append(Field.carrier(f), Field.add, Field.zero(f),
+                  (a b c : Field.carrier(f)) ↦ Field.add_associative(f, a, b, c),
+                  (a : Field.carrier(f)) ↦ Field.zero_add(f, a),
+                  List.map(index, Field.carrier(f), term, first),
+                  List.map(index, Field.carrier(f), term, second))
+
+theorem Field.productOver_append {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (first second : List(index))
+        : Field.productOver(term, List.append(index, first, second))
+          = Field.productOver(term, first) * Field.productOver(term, second) :=
+  Field.productOver(term, List.append(index, first, second))
+     = List.product(Field.carrier(f), Field.multiply, Field.one(f),
+           List.append(Field.carrier(f),
+               List.map(index, Field.carrier(f), term, first),
+               List.map(index, Field.carrier(f), term, second)))
+           by substituting List.map_append
+     = Field.productOver(term, first) * Field.productOver(term, second)
+           by List.product_append(Field.carrier(f), Field.multiply, Field.one(f),
+                  (a b c : Field.carrier(f)) ↦ Field.multiply_associative(f, a, b, c),
+                  (a : Field.carrier(f)) ↦ Field.one_multiply(f, a),
+                  List.map(index, Field.carrier(f), term, first),
+                  List.map(index, Field.carrier(f), term, second))
+
+-- Reindexing a sum/product through a map on the item list.
+theorem Field.sumOver_map {f : Field} {source target : Type(0)}
+        (term : target → Field.carrier(f)) (reindex : source → target)
+        (items : List(source))
+        : Field.sumOver(term, List.map(source, target, reindex, items))
+          = Field.sumOver((x : source) ↦ term(reindex(x)), items) :=
+  Field.sumOver(term, List.map(source, target, reindex, items))
+     = List.product(Field.carrier(f), Field.add, Field.zero(f),
+           List.map(target, Field.carrier(f), term, List.map(source, target, reindex, items)))
+     = List.product(Field.carrier(f), Field.add, Field.zero(f),
+           List.map(source, Field.carrier(f), (x : source) ↦ term(reindex(x)), items))
+           by substituting List.map_map
+     = Field.sumOver((x : source) ↦ term(reindex(x)), items)
+
+theorem Field.productOver_map {f : Field} {source target : Type(0)}
+        (term : target → Field.carrier(f)) (reindex : source → target)
+        (items : List(source))
+        : Field.productOver(term, List.map(source, target, reindex, items))
+          = Field.productOver((x : source) ↦ term(reindex(x)), items) :=
+  Field.productOver(term, List.map(source, target, reindex, items))
+     = List.product(Field.carrier(f), Field.multiply, Field.one(f),
+           List.map(target, Field.carrier(f), term, List.map(source, target, reindex, items)))
+     = List.product(Field.carrier(f), Field.multiply, Field.one(f),
+           List.map(source, Field.carrier(f), (x : source) ↦ term(reindex(x)), items))
+           by substituting List.map_map
+     = Field.productOver((x : source) ↦ term(reindex(x)), items)
+
+-- Pointwise-equal terms give equal sums and products.
+theorem Field.sumOver_congruence {f : Field} {index : Type(0)}
+        (term termPrime : index → Field.carrier(f)) (items : List(index))
+        (pointwise : ∀ (x : index). term(x) = termPrime(x))
+        : Field.sumOver(term, items) = Field.sumOver(termPrime, items) :=
+  by induction on items with IH {
+    case List.empty:
+        Field.sumOver(term, List.empty(index))
+           = Field.zero(f)
+           = Field.sumOver(termPrime, List.empty(index))
+    case List.prepend(head, tail):
+        Field.sumOver(term, List.prepend(index, head, tail))
+           = term(head) + Field.sumOver(term, tail)
+           = termPrime(head) + Field.sumOver(term, tail)         by substituting pointwise(head)
+           = termPrime(head) + Field.sumOver(termPrime, tail)    by IH
+           = Field.sumOver(termPrime, List.prepend(index, head, tail))
+  }
+
+theorem Field.productOver_congruence {f : Field} {index : Type(0)}
+        (term termPrime : index → Field.carrier(f)) (items : List(index))
+        (pointwise : ∀ (x : index). term(x) = termPrime(x))
+        : Field.productOver(term, items) = Field.productOver(termPrime, items) :=
+  by induction on items with IH {
+    case List.empty:
+        Field.productOver(term, List.empty(index))
+           = Field.one(f)
+           = Field.productOver(termPrime, List.empty(index))
+    case List.prepend(head, tail):
+        Field.productOver(term, List.prepend(index, head, tail))
+           = term(head) * Field.productOver(term, tail)
+           = termPrime(head) * Field.productOver(term, tail)         by substituting pointwise(head)
+           = termPrime(head) * Field.productOver(termPrime, tail)    by IH
+           = Field.productOver(termPrime, List.prepend(index, head, tail))
+  }
+
+-- Scalar distributivity: a constant factor pulls in and out of a sum.
+theorem Field.sumOver_scale_left {f : Field} {index : Type(0)}
+        (constant : Field.carrier(f)) (term : index → Field.carrier(f))
+        (items : List(index))
+        : constant * Field.sumOver(term, items)
+          = Field.sumOver((x : index) ↦ constant * term(x), items) :=
+  by induction on items with IH {
+    case List.empty:
+        constant * Field.sumOver(term, List.empty(index))
+           = constant * Field.zero(f)
+           = Field.zero(f)                                          by ring
+           = Field.sumOver((x : index) ↦ constant * term(x), List.empty(index))
+    case List.prepend(head, tail):
+        constant * Field.sumOver(term, List.prepend(index, head, tail))
+           = constant * (term(head) + Field.sumOver(term, tail))
+           = constant * term(head) + constant * Field.sumOver(term, tail)   by ring
+           = constant * term(head) + Field.sumOver((x : index) ↦ constant * term(x), tail)
+                 by substituting IH
+           = Field.sumOver((x : index) ↦ constant * term(x), List.prepend(index, head, tail))
+  }
+
+theorem Field.sumOver_scale_right {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (constant : Field.carrier(f))
+        (items : List(index))
+        : Field.sumOver(term, items) * constant
+          = Field.sumOver((x : index) ↦ term(x) * constant, items) :=
+  by induction on items with IH {
+    case List.empty:
+        Field.sumOver(term, List.empty(index)) * constant
+           = Field.zero(f) * constant
+           = Field.zero(f)                                          by ring
+           = Field.sumOver((x : index) ↦ term(x) * constant, List.empty(index))
+    case List.prepend(head, tail):
+        Field.sumOver(term, List.prepend(index, head, tail)) * constant
+           = (term(head) + Field.sumOver(term, tail)) * constant
+           = term(head) * constant + Field.sumOver(term, tail) * constant   by ring
+           = term(head) * constant + Field.sumOver((x : index) ↦ term(x) * constant, tail)
+                 by substituting IH
+           = Field.sumOver((x : index) ↦ term(x) * constant, List.prepend(index, head, tail))
+  }
+
+-- The bilinear expansion: a product of two sums is the double sum of the
+-- pairwise products.
+theorem Field.sumOver_multiply_sumOver {f : Field} {left right : Type(0)}
+        (leftTerm : left → Field.carrier(f)) (rightTerm : right → Field.carrier(f))
+        (leftItems : List(left)) (rightItems : List(right))
+        : Field.sumOver(leftTerm, leftItems) * Field.sumOver(rightTerm, rightItems)
+          = Field.sumOver(
+                (x : left) ↦ Field.sumOver((y : right) ↦ leftTerm(x) * rightTerm(y), rightItems),
+                leftItems) :=
+  Field.sumOver(leftTerm, leftItems) * Field.sumOver(rightTerm, rightItems)
+     = Field.sumOver((x : left) ↦ leftTerm(x) * Field.sumOver(rightTerm, rightItems), leftItems)
+           by Field.sumOver_scale_right(leftTerm, Field.sumOver(rightTerm, rightItems), leftItems)
+     = Field.sumOver(
+           (x : left) ↦ Field.sumOver((y : right) ↦ leftTerm(x) * rightTerm(y), rightItems),
+           leftItems)
+           by Field.sumOver_congruence(
+                  (x : left) ↦ leftTerm(x) * Field.sumOver(rightTerm, rightItems),
+                  (x : left) ↦ Field.sumOver((y : right) ↦ leftTerm(x) * rightTerm(y), rightItems),
+                  leftItems,
+                  (x : left) ↦ Field.sumOver_scale_left(leftTerm(x), rightTerm, rightItems))
