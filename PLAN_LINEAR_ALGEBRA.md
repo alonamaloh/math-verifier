@@ -965,11 +965,49 @@ engine directly. Group laws are then immediate.
    extract it as `a + d = b + c by equivalent as crossNat` before `substituting`.
    (c) `negate(one)` is not defeq `from_difference(0,1)` in a calc-start — bridge
    with `negate(one) = from_difference(0,1) by unfolding Integer`.
-6. **`det(AB) = det(A)·det(B)`** — Leibniz expansion, non-injective terms
-   collapse (alternating), reindex the surviving sum over `Sₙ`.
+6. **`det(AB) = det(A)·det(B)`** — IN PROGRESS. Leibniz expansion, non-injective
+   terms collapse (alternating), reindex the surviving sum over `Sₙ`.
+   **DONE so far — the reusable field/list aggregation backbone**
+   (`Algebra/field_aggregation.math`, commits d8977c70 + abdd3c1e; owns
+   `Field.sumOver`/`Field.productOver`, moved here from matrix/determinant): the
+   permutation-free algebra every Leibniz step needs —
+   `sumOver`/`productOver` `_empty`/`_prepend`/`_append`/`_map`/`_congruence`;
+   `sumOver_scale_left`/`_right`; `sumOver_multiply_sumOver` (bilinear
+   `(Σa)(Σb)=ΣₓΣ_y aₓb_y`); `sumOver_add`; `sumOver_zero_function`;
+   **`sumOver_interchange`** (Fubini — swap the σ/φ double sum); **`productOver_multiply`**
+   (`∏xᵢyᵢ=(∏xᵢ)(∏yᵢ)` — split `A(i,φi)·B(φi,σi)`). All clean list inductions,
+   `ring` for field rearrangements. Gates green through export-check 3046.
+   **REMAINING (the hard combinatorial core — multi-session):**
+   - **(6a) function-space enumeration + generalized distributivity** — the
+     `Finset.prod_univ_sum` analog `∏_{i<n} Σ_{k<n} g(i,k) = Σ_φ ∏_{i<n} g(i,φi)`.
+     DESIGN DECISION PENDING: represent φ as function objects
+     `NaturalsBelow(n)→NaturalsBelow(n)` (enumerate `allFunctions(n)` via a
+     codomain-fixed `functionsBelow(k,n)` recursion — domain-widening extend-by-value,
+     codomain NB(n) fixed, so NOT the allPermutations restrict-recursion; uniform
+     functional indexing downstream, harder enumeration) vs. value-list selectors
+     (clean induction on the index list, but a positional↔functional bridge at
+     reindex). Leaning function objects for uniform algebra. `allFunctions` needs
+     completeness; distinctness likely only for the reindex step.
+   - **(6b) `sign(swap(a,b)) = −1`** — transposition is odd. Route: reduce to
+     value(a)<value(b) (swap symmetric); conjugation induction on the value-distance
+     d=value(b)−value(a): swap(a,b)=swap(a,c)∘swap(c,b)∘swap(a,c) with value(c)=value(a)+1,
+     so sign_compose + sign(swap(a,c))²=1 ⟹ sign(swap(a,b))=sign(swap(c,b)) (distance
+     d−1); base d=1 (adjacent) = exactly one inverted orderedPair (sortPair(a,c)
+     contributes −1, all others +1 by a 6-way value-casing) via a
+     "product with one −1 factor, rest +1" list-surgery lemma. Substantial (~200 lines).
+   - **(6c) alternating collapse** — for non-injective φ (φa=φb, a≠b), the inner
+     `Σ_σ sign(σ) ∏_i B(φi,σi)=0` by pairing σ↔σ∘swap(a,b): the products are equal
+     (φa=φb) and sign(σ∘swap)=−sign(σ) (needs 6b), so terms cancel; τ=swap(a,b) is a
+     fixed-point-free involution on `allPermutations` via σ↦σ∘τ, so the whole
+     list-sum pairs off to 0. Needs a "sum over a list closed under a
+     sign-reversing fixed-point-free involution = 0" lemma over allPermutations.
+   - **(6d) injective reindex + assembly** — injective φ ⟹ bijection (pigeonhole)
+     ⟹ a Permutation φ̂; C(φ)=sign(φ̂)·det(B) by reindexing σ=ρ∘φ̂ (sign_compose +
+     productOver_map through φ̂); sum over injective φ ↔ `allPermutations` bridge;
+     then `det(AB)=Σ_φ̂ (∏A(i,φ̂i))·sign(φ̂)·det(B)=det(A)·det(B)`.
 
 Realistic size: multi-session. Bricks 2, 3, 6 are the cost; 1, 4, 5 are
-scaffolding.
+scaffolding. Brick 6 backbone (aggregation) DONE; 6a–6d remain.
 
 ## Choice-profile guardrails
 
