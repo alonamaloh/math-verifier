@@ -10,7 +10,7 @@
 -- induction hypothesis at c gives (q', r'), and (q' + 1, r') witnesses
 -- the conclusion at a.
 --
--- One helper (`Natural.trichotomy`) goes here too: the dichotomy
+-- One helper (`Natural.lt_or_le`) goes here too: the dichotomy
 -- "a < b ∨ b ≤ a" is the case-split needed at every induction step.
 
 module Natural.division
@@ -28,76 +28,36 @@ import Natural.multiply_order
 
 -- ----------------------------------------------------------------------
 -- Trichotomy: for every pair of naturals, either the first is strictly
--- less than the second, or the second is ≤ the first.
+-- less than the second, or the second is ≤ the first. Proved directly in
+-- `<` / `+ 1` form by induction on the first argument — no `successor`.
 
-theorem Natural.trichotomy_zero_against (b : Natural)
-        : successor(0) ≤ b ∨ b ≤ 0 :=
-  done by cases {
-    case b = 0: {
-        -- 0 ≤ 0, the right disjunct.
-        (0 : Natural) ≤ 0;
-        done
-      }
-    case b = successor(predB) for some predB: {
-        -- 1 ≤ successor(predB) since 0 ≤ predB, the left disjunct.
-        0 ≤ predB;
-        successor(0) ≤ successor(predB);
-        done
-      }
-  }
-
-theorem Natural.trichotomy_successor_against
-        (predA : Natural)
-        (trichotomyPredA :
-            ∀ (b : Natural). successor(predA) ≤ b ∨ b ≤ predA)
-        (b : Natural)
-        : successor(successor(predA)) ≤ b ∨ b ≤ successor(predA) :=
-  done by cases {
-    case b = 0: {
-        -- 0 ≤ successor(predA), the right disjunct.
-        (0 : Natural) ≤ successor(predA);
-        done
-      }
-    case b = successor(predB) for some predB: {
-        (successor(predA) ≤ predB) ∨ (predB ≤ predA);
+theorem Natural.lt_or_le (a b : Natural) : a < b ∨ b ≤ a :=
+  by induction on a with IH {
+    case 0: {
         done by cases {
-          case successor(predA) ≤ predB as predAStrictlyBelowPredB: {
-              successor(successor(predA)) ≤ successor(predB);
-              done
-            }
-          case predB ≤ predA as predBLessOrEqualPredA: {
-              successor(predB) ≤ successor(predA);
+          case b = 0 as bEq: { b ≤ 0 by substituting bEq; done }
+          case b = 1 + predB for some predB as bEq: {
+              0 ≤ predB < 1 + predB;
+              0 < b by substituting bEq;
               done
             }
         }
       }
-  }
-
-theorem Natural.trichotomy (a : Natural)
-        : ∀ (b : Natural). successor(a) ≤ b ∨ b ≤ a :=
-  by induction on a with IH {
-    case zero: {
-        take b : Natural;
-        done
+    case 1 + predA: {
+        done by cases {
+          case predA < b as predALtB: {
+              1 + predA ≤ b by { predA + 1 ≤ b by Natural.add_one_le_of_lt;
+                                 1 + predA = predA + 1 ≤ b; done };
+              1 + predA < b ∨ 1 + predA = b;
+              done by cases {
+                case 1 + predA < b as lt: { done }
+                case 1 + predA = b as eq: { b ≤ 1 + predA by substituting eq; done }
+              }
+            }
+          case b ≤ predA as bLePredA: { b ≤ predA ≤ 1 + predA; done }
+        }
       }
-    case successor(predA): {
-        take b : Natural;
-        -- IH gives trichotomy at predA; the successor helper lifts it.
-        done
-      }
   }
-
--- The successor-free trichotomy: a < b or b ≤ a.
-theorem Natural.lt_or_le (a b : Natural) : a < b ∨ b ≤ a := {
-  successor(a) ≤ b ∨ b ≤ a;
-  done by cases {
-    case successor(a) ≤ b as successorLessOrEqual: {
-        a < successor(a) ≤ b;
-        done
-      }
-    case b ≤ a as lessOrEqual: done
-  }
-}
 
 -- ----------------------------------------------------------------------
 -- The division-with-remainder predicate. Existence of a quotient/
@@ -116,7 +76,7 @@ definition Natural.has_quotient_remainder
 -- Algebraically:
 --   dividend = divisor + (q' · divisor + r')
 --            = (divisor + q' · divisor) + r'
---            = successor(q') · divisor + r'         (definitional)
+--            = (1 + q') · divisor + r'         (definitional)
 theorem Natural.divide_with_remainder_recurse_step
         (divisor dividend smallerDividend
             recursedQuotient recursedRemainder : Natural)
@@ -125,12 +85,12 @@ theorem Natural.divide_with_remainder_recurse_step
         (smallerDecomposition
             : smallerDividend
               = recursedQuotient * divisor + recursedRemainder)
-        : dividend = successor(recursedQuotient) * divisor + recursedRemainder :=
+        : dividend = (1 + recursedQuotient) * divisor + recursedRemainder :=
   dividend
      = divisor + smallerDividend
      = divisor + (recursedQuotient * divisor + recursedRemainder)
      = (divisor + recursedQuotient * divisor) + recursedRemainder
-     = successor(recursedQuotient) * divisor + recursedRemainder
+     = (1 + recursedQuotient) * divisor + recursedRemainder
 
 -- Given a decomposition `dividend = divisor + smallerDividend` and the
 -- IH at smallerDividend, build the quotient/remainder witness for
@@ -152,10 +112,10 @@ theorem Natural.divide_with_remainder_recurse_case
         smallerDividend = recursedQuotient * divisor + recursedRemainder
         ∧ recursedRemainder < divisor;
     -- Bump the quotient by one to absorb the extra `divisor`.
-    dividend = successor(recursedQuotient) * divisor + recursedRemainder
+    dividend = (1 + recursedQuotient) * divisor + recursedRemainder
         ∧ recursedRemainder < divisor
         as decomposition;
-    witness successor(recursedQuotient) with witness recursedRemainder with decomposition
+    witness (1 + recursedQuotient) with witness recursedRemainder with decomposition
 }
 
 -- Base case: dividend < divisor. Take quotient = 0 and remainder =
