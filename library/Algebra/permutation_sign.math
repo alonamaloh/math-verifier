@@ -1,0 +1,97 @@
+-- Algebra/permutation_sign.math
+--
+-- The sign of a permutation and its multiplicativity, via the product formula
+--   sign(σ) = ∏_{i<j} orient(σ(i), σ(j)),  orient(x, y) = ±1 by value order.
+-- This file builds the orientation ±1 and its algebra; the sign product and
+-- multiplicativity (Stage H brick 3 of PLAN_LINEAR_ALGEBRA.md) build on it.
+
+module Algebra.permutation_sign
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Integer.basics
+import Algebra.integer_domain
+import Algebra.finite_permutation
+
+-- Two Natural order facts the antisymmetry proof leans on.
+theorem Natural.lt_or_gt_of_ne (a b : Natural) (distinct : a ≠ b) : a < b ∨ b < a := {
+  a < b ∨ a = b ∨ b < a by Natural.lt_trichotomy(a, b);
+  done by cases {
+    case a < b as below: below
+    case a = b as equal: absurd(distinct(equal))
+    case b < a as above: above
+  }
+}
+
+theorem Natural.lt_asymmetric (a b : Natural) (below : a < b) : ¬(b < a) :=
+  (above : b < a) ↦ {
+    a < a by Natural.lt_transitive(a, b, a, below, above);
+    False by Natural.lt_irreflexive(a);
+    done
+  }
+
+-- The orientation of an ordered pair: +1 if x precedes y by value, −1 otherwise.
+-- On a pair of DISTINCT indices this is the sign of the value difference.
+definition Permutation.orient {n : Natural} (x y : NaturalsBelow(n)) : Integer :=
+  if NaturalsBelow.value(x) < NaturalsBelow.value(y) then (1 : Integer) else Integer.negate(1)
+
+theorem Permutation.orient_forward {n : Natural} (x y : NaturalsBelow(n))
+        (precedes : NaturalsBelow.value(x) < NaturalsBelow.value(y))
+        : Permutation.orient(x, y) = 1 :=
+  done by Logic.if_positive
+
+theorem Permutation.orient_backward {n : Natural} (x y : NaturalsBelow(n))
+        (notPrecedes : ¬(NaturalsBelow.value(x) < NaturalsBelow.value(y)))
+        : Permutation.orient(x, y) = Integer.negate(1) :=
+  done by Logic.if_negative
+
+-- The orientation is a unit: it is +1 or −1.
+theorem Permutation.orient_is_unit {n : Natural} (x y : NaturalsBelow(n))
+        : Permutation.orient(x, y) = 1 ∨ Permutation.orient(x, y) = Integer.negate(1) := {
+  NaturalsBelow.value(x) < NaturalsBelow.value(y)
+      ∨ ¬(NaturalsBelow.value(x) < NaturalsBelow.value(y));
+  done by cases {
+    case NaturalsBelow.value(x) < NaturalsBelow.value(y) as precedes: {
+        Permutation.orient(x, y) = 1 by Permutation.orient_forward(x, y, precedes);
+        done
+      }
+    case ¬(NaturalsBelow.value(x) < NaturalsBelow.value(y)) as notPrecedes: {
+        Permutation.orient(x, y) = Integer.negate(1) by Permutation.orient_backward(x, y, notPrecedes);
+        done
+      }
+  }
+}
+
+-- Antisymmetry: swapping the pair negates the orientation (for distinct values).
+theorem Permutation.orient_antisymmetric {n : Natural} (x y : NaturalsBelow(n))
+        (distinctValues : NaturalsBelow.value(x) ≠ NaturalsBelow.value(y))
+        : Permutation.orient(x, y) = Integer.negate(Permutation.orient(y, x)) := {
+  NaturalsBelow.value(x) < NaturalsBelow.value(y)
+      ∨ NaturalsBelow.value(y) < NaturalsBelow.value(x)
+      by Natural.lt_or_gt_of_ne(NaturalsBelow.value(x), NaturalsBelow.value(y), distinctValues);
+  done by cases {
+    case NaturalsBelow.value(x) < NaturalsBelow.value(y) as xFirst: {
+        ¬(NaturalsBelow.value(y) < NaturalsBelow.value(x))
+            by Natural.lt_asymmetric(NaturalsBelow.value(x), NaturalsBelow.value(y), xFirst)
+            as notBack;
+        Permutation.orient(x, y)
+           = 1 by Permutation.orient_forward(x, y, xFirst)
+           = Integer.negate(Integer.negate(1)) by ring
+           = Integer.negate(Permutation.orient(y, x))
+                 by substituting Permutation.orient_backward(y, x, notBack);
+        done
+      }
+    case NaturalsBelow.value(y) < NaturalsBelow.value(x) as yFirst: {
+        ¬(NaturalsBelow.value(x) < NaturalsBelow.value(y))
+            by Natural.lt_asymmetric(NaturalsBelow.value(y), NaturalsBelow.value(x), yFirst);
+        Permutation.orient(x, y)
+           = Integer.negate(1) by Permutation.orient_backward(x, y)
+           = Integer.negate(Permutation.orient(y, x))
+                 by substituting Permutation.orient_forward(y, x, yFirst);
+        done
+      }
+  }
+}
