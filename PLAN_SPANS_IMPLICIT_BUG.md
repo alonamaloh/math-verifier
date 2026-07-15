@@ -1,7 +1,63 @@
 # Investigation handoff — the "Spans fold-desync" citation bug
 
-**Status:** root cause pinned, NOT fixed. Kernel/library are at a clean green
-commit; no source changes are staged. This file is the complete handoff.
+**Status: RESOLVED 2026-07-14 (fail-loudly fix landed).** The genuine defect —
+the elaborator silently storing an ill-typed declared type — is fixed; the
+misleading "conclusion is about Or" is gone. Below the original handoff, see
+**"RESOLUTION"** for what actually turned out to be true (the doc's premise was
+partly wrong) and what was deliberately NOT done and why.
+
+## RESOLUTION (2026-07-14)
+
+Three self-contained reproductions settled the picture (they are archived in the
+commit message; the permanent one is `library/ErrorTest/spans_uninferrable_implicit.math`):
+
+- **Repro B** — family codomain `carrier(Subspace.vector_space(…))` (case 2),
+  `covered` matching the lemma verbatim: **compiles clean, already, no fix
+  needed.** The citation works whenever the goal is well-formed and the args
+  line up.
+- **Repro C** — the EXACT acid-test shape (`TaFamily` an abstract parameter,
+  `taValue` a hypothesis): fails with a **correct, clear** "wrong type for the
+  `covered` argument" error. `λj. T(aFamily j)` and `λi. value(TaFamily i)` are
+  **NOT defeq** — `TaFamily` is abstract so `value(TaFamily j)` does not reduce.
+  **The doc's "these are defeq" / "third overlapping issue" claim was wrong for
+  the real theorem** (it was only true for the inline `Subtype.make` version).
+  ⇒ The `take x` block in `appended_images_span` is doing GENUINE mathematical
+  bridging via `taValue`, not working around an elaborator bug. Removing it is a
+  pure `.math` proof refactor (rebuild `coveredFact` in the `value(TaFamily)`
+  spelling), independent of any kernel change — and was deliberately left alone.
+- **Repro A** — inline `Subtype.make`, raw `Subtype` codomain (case 1): the one
+  genuine defect. `{f}`/`{V}` are un-inferrable from a raw-`Subtype` codomain, so
+  leading-implicit inference threw and the generic positional path silently built
+  the malformed `App(Spans, fam)` (family in the `{f:Field}` slot); nothing
+  validated the declared type, so it was stored and the failure surfaced later at
+  the citation as "conclusion is about Or".
+
+**The fix (`src/elaborator/dispatch.cpp`):** when leading-implicit inference for
+an explicit-`{x:T}` constant fails and control falls through to the generic
+positional path, remember it; after the positional application is built, if
+`inferType` rejects it (the explicit args landed in implicit slots), re-raise the
+precise "could not infer all leading arguments of 'VectorSpace.Spans': position N
+is unassigned … Provide the missing argument(s) explicitly" message instead of
+returning the malformed term. Legit positional-into-implicit calls
+(`PAdicEquivalent(p, primality)`) stay well-typed ⇒ no error, no regression.
+
+**Gates:** `make -j 16 tests` green; `make -j 16 export-check` green (2888 decls,
+axiom inventory UNCHANGED); all 55 error-tests pass. Repro A now fails at the
+DECLARED TYPE with the clear message; Repro B still compiles.
+
+**Deliberately NOT done** (out of scope for the chosen fail-loudly fix, kept as
+options): (1) carrier-inversion in the unifier to make case-1 raw-`Subtype`
+families actually inferrable — no current library consumer uses that spelling;
+(2) the `appended_images_span` proof refactor to drop `take x` — genuine math,
+not an elaborator change.
+
+---
+
+## ORIGINAL HANDOFF (below) — partly superseded by RESOLUTION above
+
+**Status (original):** root cause pinned, NOT fixed. Kernel/library are at a
+clean green commit; no source changes are staged. This file is the complete
+handoff.
 
 ## The observable symptom
 

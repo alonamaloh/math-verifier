@@ -1,0 +1,40 @@
+-- `VectorSpace.Spans` carries three leading implicits `{f}{V}{I}`. When the
+-- family's codomain is a raw `Subtype(carrier V, subset)` (an inline
+-- `Subtype.make` lambda) rather than the `carrier(Subspace.vector_space …)`
+-- spelling, `{f}` and `{V}` cannot be inferred from the family alone —
+-- solving `carrier(?V) ≟ Subtype(carrier V, subset)` is a higher-order
+-- inversion the elaborator does not perform. This declared type is therefore
+-- un-inferrable and must fail LOUDLY at the type, naming the un-inferred
+-- leading arguments — NOT silently store a malformed `Spans(fam)` application
+-- (leading implicits omitted, `fam` in the `{f : Field}` slot) that surfaces
+-- later as a baffling "conclusion is about Or" citation error.
+module ErrorTest.spans_uninferrable_implicit
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Set.subtype
+import Set.finite
+import Algebra.field
+import Algebra.vector_space
+import Algebra.subspace
+import Algebra.linear_combination
+import Algebra.span
+import Algebra.rank_nullity
+
+theorem faithful {f : Field} (V : VectorSpace(f))
+        (subset : Set(VectorSpace.carrier(V))) (sub : IsSubspace(V, subset))
+        (covered : ∀ (x : VectorSpace.carrier(Subspace.vector_space(V, subset, sub))).
+            Subtype.value(x) = VectorSpace.zero(V)
+            ∨ VectorSpace.InSpanOf(
+                  (i : NaturalsBelow(1)) ↦ Subtype.value(Subtype.make(VectorSpace.carrier(V), subset,
+                      VectorSpace.zero(V), IsSubspace.contains_zero(sub))),
+                  Subtype.value(x)))
+        : VectorSpace.Spans((i : NaturalsBelow(1)) ↦ Subtype.make(VectorSpace.carrier(V), subset,
+              VectorSpace.zero(V), IsSubspace.contains_zero(sub))) := {
+  done by Subspace.spans_of_value_covered(subset, sub,
+      ((i : NaturalsBelow(1)) ↦ Subtype.make(VectorSpace.carrier(V), subset,
+          VectorSpace.zero(V), IsSubspace.contains_zero(sub))),
+      covered)
+}

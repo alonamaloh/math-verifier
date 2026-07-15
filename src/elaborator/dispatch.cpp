@@ -859,6 +859,20 @@ ExpressionPointer Elaborator::elaborateExpression(
                     return call;
                 }
             }
+            // When a constant carrying leading `{x : T}` implicit binders is
+            // applied WITHOUT an expected type (e.g. building a theorem's
+            // declared type or a claim goal from the surface conclusion) and
+            // the implicit prefix cannot be inferred from the explicit
+            // arguments, inference throws and we fall through to the generic
+            // positional path — which would bind the explicit arguments into
+            // the implicit slots and emit a MALFORMED application (a family
+            // landing in a `{f : Field}` slot). That ill-typed term is then
+            // stored as the goal, and the real diagnosis surfaces later as a
+            // baffling downstream error. Record the failure so the generic
+            // path can re-raise the precise "could not infer implicit …"
+            // message instead of silently emitting the malformed application.
+            bool leadingImplicitInferenceFailed = false;
+            std::string leadingImplicitFailureMessage;
             if (headIdentifier && headIdentifier->universeArgs.empty()) {
                 const std::string& name = headIdentifier->qualifiedName;
                 size_t argumentCount = positionalArguments.size();
@@ -1278,9 +1292,22 @@ ExpressionPointer Elaborator::elaborateExpression(
                             }
                             try {
                                 return runInference();
-                            } catch (const ElaborateError&) {
+                            } catch (const ElaborateError& inferenceError) {
                                 // Inference failed — fall through to
-                                // partial / positional application.
+                                // partial / positional application. When the
+                                // declaration uses explicit `{x : T}` binders
+                                // the fall-through is only legitimate if the
+                                // positional application type-checks (the user
+                                // supplied the implicit prefix positionally,
+                                // e.g. `PAdicEquivalent(p, primality)`).
+                                // Otherwise it would emit a malformed
+                                // application; flag it so the generic path
+                                // re-raises this precise message.
+                                if (explicitImplicitMode) {
+                                    leadingImplicitInferenceFailed = true;
+                                    leadingImplicitFailureMessage =
+                                        inferenceError.what();
+                                }
                             }
                         }
                     }
@@ -1425,6 +1452,26 @@ ExpressionPointer Elaborator::elaborateExpression(
                 }
                 head = makeApplication(std::move(head),
                                         std::move(argumentTerm));
+            }
+            // If we reached the generic positional path because leading
+            // implicit inference for an explicit-`{x : T}` constant FAILED,
+            // the positional application is only acceptable when it is
+            // well-typed (the implicit prefix was supplied positionally).
+            // If inferType rejects it, the explicit arguments landed in the
+            // implicit slots — surface the precise inference failure rather
+            // than storing a malformed goal.
+            if (leadingImplicitInferenceFailed) {
+                bool wellTyped = true;
+                try {
+                    inferTypeInLocalContext(localBinders, head);
+                } catch (const TypeError&) {
+                    wellTyped = false;
+                } catch (const ElaborateError&) {
+                    wellTyped = false;
+                }
+                if (!wellTyped) {
+                    throwElaborate(leadingImplicitFailureMessage);
+                }
             }
             return head;
         }
