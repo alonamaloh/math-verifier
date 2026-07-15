@@ -167,11 +167,40 @@ equality goal and calling `elaborateRing` (or the lighter `proveAbstractRingAC`,
   library+tests+export-check green, axiom inventory unchanged (3080 decls).
   Wrapper-lemma-removal sweep deferred: the `1 +`-form wrappers are mostly a
   *citation* idiom, so they clear with Step 2, not the argument path.
-- **Step 2: additive normal form in `matchAgainstPattern`.** Retires the
-  `1 +`-form wrapper-lemma idiom for citations. Broader blast radius — do it
-  after step 1 proves the normal form and transport out on the narrower path.
+- **Step 2: additive normal form in `matchAgainstPattern`.** ⚠️
+  **INVESTIGATED 2026-07-15 — mostly NOT NEEDED; one narrow residual, deferred.**
+  Empirically, the `matchAgainstPattern` / `by`-citation path **already
+  bridges every constructible F1 additive form**: order goals (`1 ≤ 1 + d`
+  cited against `1 ≤ k + 1`), `=` goals, commute both directions,
+  associativity, numeral-2, and even a metavar occurring *solely* inside the
+  additive node (`1 ≤ n + 1` cited against `1 ≤ 1 + k`) — the auto-prover's
+  goal-driven citation + order/ring bridging carries them. So the planned
+  additive-normal-form change to that hot matcher would be **speculative
+  complexity with no observed benefit** (could not construct a failing
+  matchAgainstPattern case). NOT done.
+  - **The one genuine residual** is a *different* unifier: implicit-argument
+    inference of a bare implicit-leading identifier used as a direct function
+    argument (`impl_bound {n} : 1 ≤ n + 1` passed where `1 ≤ 1 + k` is
+    expected) fails. Root: `unifyConstructorParameters`
+    (`src/elaborator/unification.cpp:81`) misassigns `n := 1` positionally on
+    the `Natural.add` node, AND the dispatch adopt-gate
+    (`dispatch.cpp:561`) demands strict defeq. This is **F2-flavoured**
+    (provable-not-defeq arg coercion across implicit inference), constructed-
+    only (no library instance found).
+  - **A fix was attempted and reverted**: a Natural-additive-normal-form
+    branch in `unifyConstructorParameters` (+ a `coerceToExpectedTypeViaDiff`
+    bridge in the dispatch gate) solved the isolated case but **regressed
+    `library/Integer/embedding.math`'s difference-boundary inference** — the
+    additive branch perturbs metavar bindings in load-bearing citation
+    inference. Flagged as friction: a safe fix needs a surgical approach that
+    only overrides positional binding when it would *demonstrably* misbind
+    (or handles the coercion purely at the dispatch layer without touching the
+    shared unifier), not a blanket additive escape in the hot path.
 - **Step 3: fold numerals ≥ 2** into the same normal form (F4b), and re-check
-  the mixed-type cases against `PLAN_CAST_NORMALIZATION`.
+  the mixed-type cases against `PLAN_CAST_NORMALIZATION`. Argument-slot
+  numerals ≥ 2 are **already covered by Step 1** (`ring` folds `a + 2 ↔ 2 + a`
+  in strategy (e)); citation-path numerals ≥ 2 also already bridge (verified,
+  same as Step 2). Remaining Step-3 scope is thin.
 
 ---
 
