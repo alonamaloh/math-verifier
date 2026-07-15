@@ -25,6 +25,9 @@ import Lists.list
 import Lists.map
 import Lists.append
 import Lists.distinct
+import Algebra.field
+import Algebra.field_bundle
+import Algebra.field_aggregation
 import Algebra.permutation_enumeration
 
 -- ----------------------------------------------------------------------
@@ -258,3 +261,277 @@ theorem Function.allFunctions_complete (n : Natural)
   (g : NaturalsBelow(n) → NaturalsBelow(n)) ↦
     Function.functionsBelow_complete(NaturalsBelow(n), NaturalsBelow.enumerate(n), n, g,
         (i : NaturalsBelow(n)) ↦ NaturalsBelow.enumerate_complete(n, g(i)))
+
+-- ----------------------------------------------------------------------
+-- Generalized distributivity: a product of sums is the sum, over all choice
+-- functions, of the products of the chosen terms — the `Finset.prod_univ_sum`
+-- analog that turns the Leibniz product-of-sums of det(AB) into a sum over the
+-- function space (Stage H brick 6a).
+
+-- Summing a term over the concatenated rows is a double sum: outer over the
+-- functions of the level below, inner over the choices that extend each.
+theorem Field.sumOver_concatFunctionRows {f : Field} (C : Type(0)) (m : Natural) (choices : List(C))
+        (fterm : (NaturalsBelow(1 + m) → C) → Field.carrier(f))
+        (l : List(NaturalsBelow(m) → C))
+        : Field.sumOver(fterm, Function.concatFunctionRows(C, m, choices, l))
+          = Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                Field.sumOver((c : C) ↦ fterm(Function.extendByValue(psi, c)), choices), l) :=
+  by induction on l with IH {
+    case List.empty:
+        Field.sumOver(fterm,
+              Function.concatFunctionRows(C, m, choices, List.empty(NaturalsBelow(m) → C)))
+           = Field.sumOver(fterm, List.empty(NaturalsBelow(1 + m) → C))
+           = Field.zero(f)
+           = Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                 Field.sumOver((c : C) ↦ fterm(Function.extendByValue(psi, c)), choices),
+                 List.empty(NaturalsBelow(m) → C))
+    case List.prepend(psi0, rest):
+        Field.sumOver(fterm,
+              Function.concatFunctionRows(C, m, choices, List.prepend(NaturalsBelow(m) → C, psi0, rest)))
+           = Field.sumOver(fterm,
+                 List.append(NaturalsBelow(1 + m) → C, Function.functionRow(choices, psi0),
+                     Function.concatFunctionRows(C, m, choices, rest)))
+           = Field.sumOver(fterm, Function.functionRow(choices, psi0))
+                 + Field.sumOver(fterm, Function.concatFunctionRows(C, m, choices, rest))
+                 by Field.sumOver_append(fterm, Function.functionRow(choices, psi0),
+                        Function.concatFunctionRows(C, m, choices, rest))
+           = Field.sumOver(fterm,
+                 List.map(C, NaturalsBelow(1 + m) → C, (v : C) ↦ Function.extendByValue(psi0, v), choices))
+                 + Field.sumOver(fterm, Function.concatFunctionRows(C, m, choices, rest))
+           = Field.sumOver((c : C) ↦ fterm(Function.extendByValue(psi0, c)), choices)
+                 + Field.sumOver(fterm, Function.concatFunctionRows(C, m, choices, rest))
+                 by Field.sumOver_map(fterm, (v : C) ↦ Function.extendByValue(psi0, v), choices)
+           = Field.sumOver((c : C) ↦ fterm(Function.extendByValue(psi0, c)), choices)
+                 + Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                       Field.sumOver((c : C) ↦ fterm(Function.extendByValue(psi, c)), choices), rest)
+                 by substituting IH
+           = Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                 Field.sumOver((c : C) ↦ fterm(Function.extendByValue(psi, c)), choices),
+                 List.prepend(NaturalsBelow(m) → C, psi0, rest))
+  }
+
+-- The product over the full index set of a term read through `extendByValue`
+-- splits off the top factor (which reads the extending value `c`) from the
+-- product over the indices below (which reads the underlying `psi`).
+theorem Field.productOver_extendByValue_split {f : Field} (C : Type(0)) (m : Natural)
+        (h : NaturalsBelow(1 + m) → C → Field.carrier(f)) (psi : NaturalsBelow(m) → C) (c : C)
+        : Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
+              NaturalsBelow.enumerate(1 + m))
+          = h(NaturalsBelow.top(m), c)
+                * Field.productOver((x : NaturalsBelow(m)) ↦ h(NaturalsBelow.inclusion(m, x), psi(x)),
+                      NaturalsBelow.enumerate(m)) :=
+  Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
+        NaturalsBelow.enumerate(1 + m))
+     = Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
+           List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+               List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                   NaturalsBelow.enumerate(m))))
+           by substituting NaturalsBelow.enumerate_one_plus
+     = h(NaturalsBelow.top(m), Function.extendByValue(psi, c)(NaturalsBelow.top(m)))
+           * Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
+                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                     NaturalsBelow.enumerate(m)))
+           by Field.productOver_prepend(
+                  (i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
+                  NaturalsBelow.top(m),
+                  List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                      NaturalsBelow.enumerate(m)))
+     = h(NaturalsBelow.top(m), c)
+           * Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
+                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                     NaturalsBelow.enumerate(m)))
+           by substituting Function.apply_extendByValue_top(psi, c)
+     = h(NaturalsBelow.top(m), c)
+           * Field.productOver((x : NaturalsBelow(m)) ↦
+                 h(NaturalsBelow.inclusion(m, x),
+                     Function.extendByValue(psi, c)(NaturalsBelow.inclusion(m, x))),
+                 NaturalsBelow.enumerate(m))
+           by Field.productOver_map(
+                  (i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
+                  NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))
+     = h(NaturalsBelow.top(m), c)
+           * Field.productOver((x : NaturalsBelow(m)) ↦ h(NaturalsBelow.inclusion(m, x), psi(x)),
+                 NaturalsBelow.enumerate(m))
+           by Field.productOver_congruence(
+                  (x : NaturalsBelow(m)) ↦
+                      h(NaturalsBelow.inclusion(m, x),
+                          Function.extendByValue(psi, c)(NaturalsBelow.inclusion(m, x))),
+                  (x : NaturalsBelow(m)) ↦ h(NaturalsBelow.inclusion(m, x), psi(x)),
+                  NaturalsBelow.enumerate(m),
+                  (x : NaturalsBelow(m)) ↦ {
+                    Function.extendByValue(psi, c)(NaturalsBelow.inclusion(m, x)) = psi(x)
+                        by Function.apply_extendByValue_inclusion(psi, c, x) as extAtX;
+                    h(NaturalsBelow.inclusion(m, x),
+                          Function.extendByValue(psi, c)(NaturalsBelow.inclusion(m, x)))
+                       = h(NaturalsBelow.inclusion(m, x), psi(x)) by substituting extAtX;
+                    done
+                  })
+
+-- Generalized distributivity `∏ᵢ Σ_c h(i,c) = Σ_φ ∏ᵢ h(i, φi)`: expanding a
+-- product of sums enumerates one choice per factor, i.e. one function φ from
+-- the index set to the choices. Induction on the number of rows; the step
+-- peels the top row (productOver over `enumerate(1+m)`), applies the inductive
+-- hypothesis to the restricted term below, and matches the resulting double
+-- sum against the concatenated rows of `functionsBelow(1 + m)`.
+theorem Field.productOfSums_distributes {f : Field} (C : Type(0)) (choices : List(C)) (rows : Natural)
+        : ∀ (h : NaturalsBelow(rows) → C → Field.carrier(f)).
+              Field.productOver((i : NaturalsBelow(rows)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
+                  NaturalsBelow.enumerate(rows))
+              = Field.sumOver((phi : NaturalsBelow(rows) → C) ↦
+                    Field.productOver((i : NaturalsBelow(rows)) ↦ h(i, phi(i)),
+                        NaturalsBelow.enumerate(rows)),
+                    Function.functionsBelow(C, choices, rows)) :=
+  by induction on rows with IH {
+    case base: {
+        take h : NaturalsBelow(0) → C → Field.carrier(f);
+        Field.productOver((i : NaturalsBelow(0)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
+              NaturalsBelow.enumerate(0))
+           = Field.one(f)
+           = Field.one(f) + Field.zero(f)                          by ring
+           = Field.productOver((i : NaturalsBelow(0)) ↦ h(i, Function.emptyBelow(i)),
+                 NaturalsBelow.enumerate(0)) + Field.zero(f)
+           = Field.sumOver((phi : NaturalsBelow(0) → C) ↦
+                 Field.productOver((i : NaturalsBelow(0)) ↦ h(i, phi(i)), NaturalsBelow.enumerate(0)),
+                 Function.functionsBelow(C, choices, 0));
+        done
+      }
+    case step(m): {
+        take h : NaturalsBelow(1 + m) → C → Field.carrier(f);
+        Field.productOver((x : NaturalsBelow(m)) ↦
+              Field.sumOver((c : C) ↦ h(NaturalsBelow.inclusion(m, x), c), choices),
+              NaturalsBelow.enumerate(m))
+           = Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                 Field.productOver((x : NaturalsBelow(m)) ↦ h(NaturalsBelow.inclusion(m, x), psi(x)),
+                     NaturalsBelow.enumerate(m)),
+                 Function.functionsBelow(C, choices, m))
+           by IH((x : NaturalsBelow(m)) ↦ (cc : C) ↦ h(NaturalsBelow.inclusion(m, x), cc))
+           as ihEq;
+        Field.sumOver((phi : NaturalsBelow(1 + m) → C) ↦
+              Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, phi(i)),
+                  NaturalsBelow.enumerate(1 + m)),
+              Function.functionsBelow(C, choices, 1 + m))
+           = Field.sumOver((phi : NaturalsBelow(1 + m) → C) ↦
+                 Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, phi(i)),
+                     NaturalsBelow.enumerate(1 + m)),
+                 Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m)))
+                 by substituting Function.functionsBelow_one_plus
+           = Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                 Field.sumOver((c : C) ↦
+                     Field.productOver((i : NaturalsBelow(1 + m)) ↦
+                         h(i, Function.extendByValue(psi, c)(i)), NaturalsBelow.enumerate(1 + m)),
+                     choices),
+                 Function.functionsBelow(C, choices, m))
+                 by Field.sumOver_concatFunctionRows(C, m, choices,
+                        (phi : NaturalsBelow(1 + m) → C) ↦
+                            Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, phi(i)),
+                                NaturalsBelow.enumerate(1 + m)),
+                        Function.functionsBelow(C, choices, m))
+           = Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                 Field.sumOver((c : C) ↦
+                     h(NaturalsBelow.top(m), c)
+                         * Field.productOver((x : NaturalsBelow(m)) ↦
+                               h(NaturalsBelow.inclusion(m, x), psi(x)), NaturalsBelow.enumerate(m)),
+                     choices),
+                 Function.functionsBelow(C, choices, m))
+                 by Field.sumOver_congruence(
+                        (psi : NaturalsBelow(m) → C) ↦
+                            Field.sumOver((c : C) ↦
+                                Field.productOver((i : NaturalsBelow(1 + m)) ↦
+                                    h(i, Function.extendByValue(psi, c)(i)), NaturalsBelow.enumerate(1 + m)),
+                                choices),
+                        (psi : NaturalsBelow(m) → C) ↦
+                            Field.sumOver((c : C) ↦
+                                h(NaturalsBelow.top(m), c)
+                                    * Field.productOver((x : NaturalsBelow(m)) ↦
+                                          h(NaturalsBelow.inclusion(m, x), psi(x)), NaturalsBelow.enumerate(m)),
+                                choices),
+                        Function.functionsBelow(C, choices, m),
+                        (psi : NaturalsBelow(m) → C) ↦
+                            Field.sumOver_congruence(
+                                (c : C) ↦
+                                    Field.productOver((i : NaturalsBelow(1 + m)) ↦
+                                        h(i, Function.extendByValue(psi, c)(i)), NaturalsBelow.enumerate(1 + m)),
+                                (c : C) ↦
+                                    h(NaturalsBelow.top(m), c)
+                                        * Field.productOver((x : NaturalsBelow(m)) ↦
+                                              h(NaturalsBelow.inclusion(m, x), psi(x)),
+                                              NaturalsBelow.enumerate(m)),
+                                choices,
+                                (c : C) ↦ Field.productOver_extendByValue_split(C, m, h, psi, c)))
+           as rhsToMidpoint;
+        Field.productOver((i : NaturalsBelow(1 + m)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
+              NaturalsBelow.enumerate(1 + m))
+           = Field.productOver((i : NaturalsBelow(1 + m)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
+                 List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                     List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                         NaturalsBelow.enumerate(m))))
+                 by substituting NaturalsBelow.enumerate_one_plus
+           = Field.sumOver((c : C) ↦ h(NaturalsBelow.top(m), c), choices)
+                 * Field.productOver((i : NaturalsBelow(1 + m)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
+                       List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                           NaturalsBelow.enumerate(m)))
+                 by Field.productOver_prepend(
+                        (i : NaturalsBelow(1 + m)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
+                        NaturalsBelow.top(m),
+                        List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                            NaturalsBelow.enumerate(m)))
+           = Field.sumOver((c : C) ↦ h(NaturalsBelow.top(m), c), choices)
+                 * Field.productOver((x : NaturalsBelow(m)) ↦
+                       Field.sumOver((c : C) ↦ h(NaturalsBelow.inclusion(m, x), c), choices),
+                       NaturalsBelow.enumerate(m))
+                 by Field.productOver_map(
+                        (i : NaturalsBelow(1 + m)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
+                        NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))
+           = Field.sumOver((c : C) ↦ h(NaturalsBelow.top(m), c), choices)
+                 * Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                       Field.productOver((x : NaturalsBelow(m)) ↦ h(NaturalsBelow.inclusion(m, x), psi(x)),
+                           NaturalsBelow.enumerate(m)),
+                       Function.functionsBelow(C, choices, m))
+                 by substituting ihEq
+           = Field.sumOver((c : C) ↦
+                 Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                     h(NaturalsBelow.top(m), c)
+                         * Field.productOver((x : NaturalsBelow(m)) ↦
+                               h(NaturalsBelow.inclusion(m, x), psi(x)), NaturalsBelow.enumerate(m)),
+                     Function.functionsBelow(C, choices, m)),
+                 choices)
+                 by Field.sumOver_multiply_sumOver(
+                        (c : C) ↦ h(NaturalsBelow.top(m), c),
+                        (psi : NaturalsBelow(m) → C) ↦
+                            Field.productOver((x : NaturalsBelow(m)) ↦
+                                h(NaturalsBelow.inclusion(m, x), psi(x)), NaturalsBelow.enumerate(m)),
+                        choices, Function.functionsBelow(C, choices, m))
+           = Field.sumOver((psi : NaturalsBelow(m) → C) ↦
+                 Field.sumOver((c : C) ↦
+                     h(NaturalsBelow.top(m), c)
+                         * Field.productOver((x : NaturalsBelow(m)) ↦
+                               h(NaturalsBelow.inclusion(m, x), psi(x)), NaturalsBelow.enumerate(m)),
+                     choices),
+                 Function.functionsBelow(C, choices, m))
+                 by Field.sumOver_interchange(
+                        (c : C) ↦ (psi : NaturalsBelow(m) → C) ↦
+                            h(NaturalsBelow.top(m), c)
+                                * Field.productOver((x : NaturalsBelow(m)) ↦
+                                      h(NaturalsBelow.inclusion(m, x), psi(x)), NaturalsBelow.enumerate(m)),
+                        choices, Function.functionsBelow(C, choices, m))
+           = Field.sumOver((phi : NaturalsBelow(1 + m) → C) ↦
+                 Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, phi(i)),
+                     NaturalsBelow.enumerate(1 + m)),
+                 Function.functionsBelow(C, choices, 1 + m))
+                 by rhsToMidpoint;
+        done
+      }
+  }
+
+-- The determinant corollary: the product over rows of the sum over all columns
+-- equals the sum over all choice functions `NaturalsBelow(n) → NaturalsBelow(n)`
+-- of the product of the chosen entries.
+theorem Field.productOfSums_over_allFunctions {f : Field} (n : Natural)
+        (h : NaturalsBelow(n) → NaturalsBelow(n) → Field.carrier(f))
+        : Field.productOver((i : NaturalsBelow(n)) ↦
+              Field.sumOver((c : NaturalsBelow(n)) ↦ h(i, c), NaturalsBelow.enumerate(n)),
+              NaturalsBelow.enumerate(n))
+          = Field.sumOver((phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
+                Field.productOver((i : NaturalsBelow(n)) ↦ h(i, phi(i)), NaturalsBelow.enumerate(n)),
+                Function.allFunctions(n)) :=
+  Field.productOfSums_distributes(NaturalsBelow(n), NaturalsBelow.enumerate(n), n, h)
