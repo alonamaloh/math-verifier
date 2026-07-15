@@ -1,0 +1,253 @@
+-- Algebra/finite_permutation.math
+--
+-- The symmetric group Sₙ: permutations of the finite index type
+-- `NaturalsBelow(n)`. This is the Sₙ scaffolding the determinant is built on
+-- (Stage H0 of PLAN_LINEAR_ALGEBRA.md).
+--
+-- A permutation is carried as an explicit INVERSE PAIR — a `forward` map, its
+-- `backward` map, and a `Function.IsInverse` proof binding them. Storing the
+-- inverse (rather than an existential `IsBijective`) is what let `Equinumerous`
+-- be an equivalence constructively; here it makes `compose`/`inverse`/`identity`
+-- reuse the equinumerosity engine directly and keeps the inverse CANONICAL —
+-- `apply(inverse(p))` reduces to `backward` with no appeal to choice, exactly
+-- what the choice-free determinant reindexing wants.
+
+module Algebra.finite_permutation
+
+import Logic.basics
+import Equality.basics
+import Logic.functions
+import Natural.basics
+import Set.finite
+import Set.equinumerous
+
+-- ----------------------------------------------------------------------
+-- The permutation object and its projections.
+
+inductive Permutation (n : Natural) : Type(0) where
+  | Permutation.make
+      : (forward : NaturalsBelow(n) → NaturalsBelow(n))
+        → (backward : NaturalsBelow(n) → NaturalsBelow(n))
+        → Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), forward, backward)
+        → Permutation(n)
+
+-- Apply the permutation (the forward map).
+definition Permutation.apply {n : Natural}
+        : Permutation(n) → NaturalsBelow(n) → NaturalsBelow(n)
+  | Permutation.make(forward, _, _) => forward
+
+-- Apply the inverse permutation (the backward map).
+definition Permutation.unapply {n : Natural}
+        : Permutation(n) → NaturalsBelow(n) → NaturalsBelow(n)
+  | Permutation.make(_, backward, _) => backward
+
+-- The inverse-pair witness binding `apply` to `unapply`.
+definition Permutation.is_inverse {n : Natural}
+        : (p : Permutation(n))
+          → Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n),
+                Permutation.apply(p), Permutation.unapply(p))
+  | Permutation.make(_, _, proof) => proof
+
+-- The two characterising equations, unpacked.
+theorem Permutation.left_inverse {n : Natural} (p : Permutation(n)) (i : NaturalsBelow(n))
+        : Permutation.unapply(p, Permutation.apply(p, i)) = i := {
+  let ⟨cancelForward, _⟩ := Permutation.is_inverse(p);
+  cancelForward(i)
+}
+
+theorem Permutation.right_inverse {n : Natural} (p : Permutation(n)) (i : NaturalsBelow(n))
+        : Permutation.apply(p, Permutation.unapply(p, i)) = i := {
+  let ⟨_, cancelBackward⟩ := Permutation.is_inverse(p);
+  cancelBackward(i)
+}
+
+-- ----------------------------------------------------------------------
+-- Extensional equality: a permutation is determined by its `apply` map.
+--
+-- The record is glued back together from its fields with proof irrelevance
+-- absorbing the `IsInverse` witness — the same move `Subtype.make_equal` makes,
+-- here for a two-data-field constructor (transport `forward`, then `backward`).
+
+-- Implementation note: transport the inverse proof along the `forward`
+-- change with the `backward` field held fixed; a pure equality-recursor step.
+theorem Permutation.make_equal_forward {n : Natural}
+        (forward forwardPrime backward : NaturalsBelow(n) → NaturalsBelow(n))
+        (inverse : Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), forward, backward))
+        (forwardEqual : forward = forwardPrime)
+        : Permutation.make(n, forward, backward, inverse)
+          = Permutation.make(n, forwardPrime, backward,
+                Equality.transport_proposition(
+                    (g : NaturalsBelow(n) → NaturalsBelow(n))
+                        ↦ Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), g, backward),
+                    forward, forwardPrime, forwardEqual, inverse)) :=
+  Equality_recursor(
+      NaturalsBelow(n) → NaturalsBelow(n), forward,
+      (g : NaturalsBelow(n) → NaturalsBelow(n)) (step : forward = g) ↦
+        Equality(Permutation(n),
+            Permutation.make(n, forward, backward, inverse),
+            Permutation.make(n, g, backward,
+                Equality.transport_proposition(
+                    (h : NaturalsBelow(n) → NaturalsBelow(n))
+                        ↦ Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), h, backward),
+                    forward, g, step, inverse))),
+      reflexivity(Permutation.make(n, forward, backward, inverse)),
+      forwardPrime, forwardEqual)
+
+-- Implementation note: the mirror, transporting along the `backward` change.
+theorem Permutation.make_equal_backward {n : Natural}
+        (forward backward backwardPrime : NaturalsBelow(n) → NaturalsBelow(n))
+        (inverse : Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), forward, backward))
+        (backwardEqual : backward = backwardPrime)
+        : Permutation.make(n, forward, backward, inverse)
+          = Permutation.make(n, forward, backwardPrime,
+                Equality.transport_proposition(
+                    (c : NaturalsBelow(n) → NaturalsBelow(n))
+                        ↦ Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), forward, c),
+                    backward, backwardPrime, backwardEqual, inverse)) :=
+  Equality_recursor(
+      NaturalsBelow(n) → NaturalsBelow(n), backward,
+      (c : NaturalsBelow(n) → NaturalsBelow(n)) (step : backward = c) ↦
+        Equality(Permutation(n),
+            Permutation.make(n, forward, backward, inverse),
+            Permutation.make(n, forward, c,
+                Equality.transport_proposition(
+                    (d : NaturalsBelow(n) → NaturalsBelow(n))
+                        ↦ Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), forward, d),
+                    backward, c, step, inverse))),
+      reflexivity(Permutation.make(n, forward, backward, inverse)),
+      backwardPrime, backwardEqual)
+
+theorem Permutation.make_equal {n : Natural}
+        (forward forwardPrime backward backwardPrime : NaturalsBelow(n) → NaturalsBelow(n))
+        (inverse : Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), forward, backward))
+        (inversePrime : Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), forwardPrime, backwardPrime))
+        (forwardEqual : forward = forwardPrime) (backwardEqual : backward = backwardPrime)
+        : Permutation.make(n, forward, backward, inverse)
+          = Permutation.make(n, forwardPrime, backwardPrime, inversePrime) :=
+  -- Two field-transports, then proof irrelevance closes the witness field.
+  Permutation.make(n, forward, backward, inverse)
+     = Permutation.make(n, forwardPrime, backward,
+           Equality.transport_proposition(
+               (g : NaturalsBelow(n) → NaturalsBelow(n))
+                   ↦ Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), g, backward),
+               forward, forwardPrime, forwardEqual, inverse))
+           by Permutation.make_equal_forward(forward, forwardPrime, backward, inverse, forwardEqual)
+     = Permutation.make(n, forwardPrime, backwardPrime, inversePrime)
+           by Permutation.make_equal_backward(forwardPrime, backward, backwardPrime,
+                  Equality.transport_proposition(
+                      (g : NaturalsBelow(n) → NaturalsBelow(n))
+                          ↦ Function.IsInverse(NaturalsBelow(n), NaturalsBelow(n), g, backward),
+                      forward, forwardPrime, forwardEqual, inverse),
+                  backwardEqual)
+
+-- Every permutation is its own fields reassembled.
+theorem Permutation.eta {n : Natural} (p : Permutation(n))
+        : p = Permutation.make(n, Permutation.apply(p), Permutation.unapply(p),
+                  Permutation.is_inverse(p)) :=
+  by induction on p {
+    case Permutation.make(forward, backward, proof):
+        reflexivity(Permutation.make(n, forward, backward, proof))
+  }
+
+-- The workhorse: permutations with equal `apply` maps are equal. Their
+-- `unapply` maps then agree too (inverses of the same map are unique), and
+-- proof irrelevance handles the witness.
+theorem Permutation.equal_of_apply_equal {n : Natural} (p q : Permutation(n))
+        (applyEqual : ∀ (i : NaturalsBelow(n)). Permutation.apply(p, i) = Permutation.apply(q, i))
+        : p = q := {
+  ∀ (i : NaturalsBelow(n)). Permutation.unapply(p, i) = Permutation.unapply(q, i)
+    by { take i : NaturalsBelow(n);
+         Permutation.unapply(p, i)
+            = Permutation.unapply(q, Permutation.apply(q, Permutation.unapply(p, i)))
+                  by Permutation.left_inverse(q, Permutation.unapply(p, i))
+            = Permutation.unapply(q, Permutation.apply(p, Permutation.unapply(p, i)))
+                  by substituting applyEqual(Permutation.unapply(p, i))
+            = Permutation.unapply(q, i)
+                  by substituting Permutation.right_inverse(p, i);
+         done } as unapplyEqual;
+  Permutation.apply(p) = Permutation.apply(q) by Function.extensionality(applyEqual) as applyFunctionEqual;
+  Permutation.unapply(p) = Permutation.unapply(q) by Function.extensionality(unapplyEqual) as unapplyFunctionEqual;
+  p  = Permutation.make(n, Permutation.apply(p), Permutation.unapply(p), Permutation.is_inverse(p))
+          by Permutation.eta(p)
+     = Permutation.make(n, Permutation.apply(q), Permutation.unapply(q), Permutation.is_inverse(q))
+          by Permutation.make_equal(Permutation.apply(p), Permutation.apply(q),
+                 Permutation.unapply(p), Permutation.unapply(q),
+                 Permutation.is_inverse(p), Permutation.is_inverse(q),
+                 applyFunctionEqual, unapplyFunctionEqual)
+     = q by Permutation.eta(q)
+}
+
+-- ----------------------------------------------------------------------
+-- The group operations.
+
+definition Permutation.identity (n : Natural) : Permutation(n) :=
+  Permutation.make(n, (i : NaturalsBelow(n)) ↦ i, (i : NaturalsBelow(n)) ↦ i,
+      Function.identity_is_inverse(NaturalsBelow(n)))
+
+-- Composition `p ∘ q`: apply q, then p.
+definition Permutation.compose {n : Natural} (p q : Permutation(n)) : Permutation(n) :=
+  Permutation.make(n,
+      (i : NaturalsBelow(n)) ↦ Permutation.apply(p, Permutation.apply(q, i)),
+      (i : NaturalsBelow(n)) ↦ Permutation.unapply(q, Permutation.unapply(p, i)),
+      Function.compose_inverse(NaturalsBelow(n), NaturalsBelow(n), NaturalsBelow(n),
+          Permutation.apply(q), Permutation.unapply(q),
+          Permutation.apply(p), Permutation.unapply(p),
+          Permutation.is_inverse(q), Permutation.is_inverse(p)))
+
+-- The inverse permutation: swap the forward and backward maps.
+definition Permutation.inverse {n : Natural} (p : Permutation(n)) : Permutation(n) :=
+  Permutation.make(n, Permutation.unapply(p), Permutation.apply(p),
+      Function.inverse_swap(NaturalsBelow(n), NaturalsBelow(n),
+          Permutation.apply(p), Permutation.unapply(p), Permutation.is_inverse(p)))
+
+-- The reductions the group laws run on (each holds by construction).
+theorem Permutation.apply_identity {n : Natural} (i : NaturalsBelow(n))
+        : Permutation.apply(Permutation.identity(n), i) = i :=
+  reflexivity(i)
+
+theorem Permutation.apply_compose {n : Natural} (p q : Permutation(n)) (i : NaturalsBelow(n))
+        : Permutation.apply(Permutation.compose(p, q), i)
+          = Permutation.apply(p, Permutation.apply(q, i)) :=
+  reflexivity(Permutation.apply(p, Permutation.apply(q, i)))
+
+theorem Permutation.apply_inverse {n : Natural} (p : Permutation(n)) (i : NaturalsBelow(n))
+        : Permutation.apply(Permutation.inverse(p), i) = Permutation.unapply(p, i) :=
+  reflexivity(Permutation.unapply(p, i))
+
+-- ----------------------------------------------------------------------
+-- The group laws.
+
+-- `apply` of both sides reduces to the same map, so each law is `apply`-wise
+-- immediate — by construction for the identity/associativity laws, and by the
+-- inverse-pair cancellation for the inverse laws.
+
+theorem Permutation.compose_identity_left {n : Natural} (p : Permutation(n))
+        : Permutation.compose(Permutation.identity(n), p) = p :=
+  Permutation.equal_of_apply_equal(Permutation.compose(Permutation.identity(n), p), p,
+      (i : NaturalsBelow(n)) ↦ reflexivity(Permutation.apply(p, i)))
+
+theorem Permutation.compose_identity_right {n : Natural} (p : Permutation(n))
+        : Permutation.compose(p, Permutation.identity(n)) = p :=
+  Permutation.equal_of_apply_equal(Permutation.compose(p, Permutation.identity(n)), p,
+      (i : NaturalsBelow(n)) ↦ reflexivity(Permutation.apply(p, i)))
+
+theorem Permutation.compose_associative {n : Natural} (p q r : Permutation(n))
+        : Permutation.compose(Permutation.compose(p, q), r)
+          = Permutation.compose(p, Permutation.compose(q, r)) :=
+  Permutation.equal_of_apply_equal(
+      Permutation.compose(Permutation.compose(p, q), r),
+      Permutation.compose(p, Permutation.compose(q, r)),
+      (i : NaturalsBelow(n)) ↦
+        reflexivity(Permutation.apply(p, Permutation.apply(q, Permutation.apply(r, i)))))
+
+theorem Permutation.inverse_compose_left {n : Natural} (p : Permutation(n))
+        : Permutation.compose(Permutation.inverse(p), p) = Permutation.identity(n) :=
+  Permutation.equal_of_apply_equal(Permutation.compose(Permutation.inverse(p), p),
+      Permutation.identity(n),
+      (i : NaturalsBelow(n)) ↦ Permutation.left_inverse(p, i))
+
+theorem Permutation.inverse_compose_right {n : Natural} (p : Permutation(n))
+        : Permutation.compose(p, Permutation.inverse(p)) = Permutation.identity(n) :=
+  Permutation.equal_of_apply_equal(Permutation.compose(p, Permutation.inverse(p)),
+      Permutation.identity(n),
+      (i : NaturalsBelow(n)) ↦ Permutation.right_inverse(p, i))

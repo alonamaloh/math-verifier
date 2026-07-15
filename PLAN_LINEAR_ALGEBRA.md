@@ -832,6 +832,60 @@ nothing.
   `det(AB) = det(A)·det(B)`. This is the Sₙ-flavored dependent-index probe,
   complementary to F/G's transport-heavy one.
 
+### Stage H sub-plan (started 2026-07-14)
+
+**H0 scouting findings (confirmed):**
+- `Lists/permutation.math` is the Coq-style **list-rearrangement** relation
+  (`List.Permutation` over `List(A)`), NOT the bijection group. It gives
+  `List.Permutation.product_invariant` (a commutative-associative fold is
+  order-blind) — reusable for reindexing an `indexedAggregate`, but it is not
+  the permutation OBJECT determinants sum over. **Sign/parity: absent. Build it.**
+- No `Algebra/matrix*.math`, no `determinant` anywhere. Clean slate.
+- Aggregation = `Algebra.indexedAggregate(A, op, e, s, n)` over
+  `NaturalsBelow`-style `s : Natural → A`, `n : Natural` count. Rich toolkit:
+  `_pointwise` `_split` `_shift` `_add` `_scale` `_constant`
+  `commutative_monoid_interchange` `_is_fold` `_eq_list_product`. (There is no
+  separate `bigSum`/`bigProduct` symbol — use `indexedAggregate` directly.)
+- Bijection engine = `Set/equinumerous.math`: `Function.IsInverse` (two-sided),
+  `identity_is_inverse`, `compose_inverse`, `inverse_swap`,
+  `IsInjective`/`IsSurjective`/`IsBijective` bridges.
+- Finite pigeonhole = `Set/finite_pigeonhole.math`:
+  `NaturalsBelow.injective_domain_le_codomain`, `no_injection_when_smaller`,
+  `pigeonhole_redirect*` — the tools for "a self-injection of `NaturalsBelow(n)`
+  is bijective".
+
+**Representation decision:** a permutation of `NaturalsBelow(n)` is carried as an
+explicit **inverse pair** — a single-constructor record `Permutation(n)` holding
+`forward`, `backward : NaturalsBelow(n) → NaturalsBelow(n)` and a
+`Function.IsInverse(forward, backward)` proof. Carrying the inverse explicitly
+(not an existential `IsBijective`) is what made `Equinumerous` an equivalence
+constructively, and it lets `compose`/`inverse`/`identity` reuse the equinumerous
+engine directly. Group laws are then immediate.
+
+**Brick order (each its own file/section, committed green before the next):**
+1. **`Algebra/finite_permutation.math` — the group `Sₙ`** (THIS brick):
+   `Permutation(n)`, `apply`, `identity`, `compose`, `inverse`; group laws
+   (assoc, id units, inverse cancels); `apply` injective/surjective; extensional
+   equality (`equal_of_apply_equal` via IsInverse + funext). No sign yet.
+2. **Enumeration** — `allPermutations(n)` as a complete, duplicate-free family
+   `NaturalsBelow(factorial n) → Permutation(n)` (Lehmer/insertion recursion).
+   The hard combinatorial brick; the determinant sum is `indexedAggregate` over
+   it. *Design risk lives here* — revisit representation if enumeration fights.
+3. **Sign** — `sign(σ) : Integer` valued in {−1, +1} + **multiplicativity**
+   `sign(compose σ τ) = sign σ · sign τ`. Route chosen AFTER brick 2 stands
+   (inversions-count parity vs. adjacent-transposition generation); record the
+   choice + why in `STRESS_PROBES.md`.
+4. **`Algebra/matrix.math`** — `Matrix(K, m, n) := NaturalsBelow(m) →
+   NaturalsBelow(n) → K.carrier`; `multiplyMatrix` via `indexedAggregate`.
+   Keep `m`/`n`/`p` literal `Natural` variables (casts at edges only).
+5. **`determinant(M) := indexedAggregate`** over `allPermutations(n)` of
+   `sign(σ) · ∏_{i<n} M(i, apply(σ,i))`.
+6. **`det(AB) = det(A)·det(B)`** — Leibniz expansion, non-injective terms
+   collapse (alternating), reindex the surviving sum over `Sₙ`.
+
+Realistic size: multi-session. Bricks 2, 3, 6 are the cost; 1, 4, 5 are
+scaffolding.
+
 ## Choice-profile guardrails
 
 - **No global axioms.** Everything is provable from the current base
