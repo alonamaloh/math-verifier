@@ -17,6 +17,14 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   Makefile, build logic). Do not paper over it with retries, re-runs, ad-hoc
   reorderings, or proof hacks. A workaround hides the defect and lets it bite
   the next person; a fix removes it for everyone.
+- **Flag friction; don't contort the proof.** The goal is an environment where
+  a mathematician writes proofs the natural way, with kernel-grade rigor. If the
+  system won't accept a mathematically natural phrasing, do NOT bend the argument
+  to force it through — stop and flag the friction clearly (what you tried, what
+  fought, what the natural form should be). Surfacing these frictions is a primary
+  deliverable, not a distraction: each is a chance to fix the language, tactics,
+  or library. Distinguish genuine mathematical subtlety from mere tooling friction
+  and say which.
 - **Build with `make -j 16 library`** from the project root (never bare
   `make`). `make -j 16 tests` also verifies the `Test/` feature files.
   Warm rebuilds are sub-second; a change to `*.cpp`/`*.hpp` (kernel or
