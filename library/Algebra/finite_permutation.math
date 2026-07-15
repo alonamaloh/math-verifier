@@ -455,3 +455,219 @@ theorem Permutation.apply_extend_inclusion {m : Natural} (sigma : Permutation(m)
 theorem Permutation.apply_extend_top {m : Natural} (sigma : Permutation(m))
         : Permutation.apply(Permutation.extend(sigma), NaturalsBelow.top(m)) = NaturalsBelow.top(m) :=
   Permutation.extendMap_top(sigma)
+
+-- ----------------------------------------------------------------------
+-- Restricting across the boundary. A permutation of NaturalsBelow(1 + m) that
+-- FIXES the top index restricts to a permutation of NaturalsBelow(m) — the
+-- inverse of `extend`. This is what lets the enumeration write every top-fixing
+-- permutation as an extension, the heart of the completeness argument.
+
+theorem Permutation.apply_injective {n : Natural} (p : Permutation(n)) (x y : NaturalsBelow(n))
+        (equalImages : Permutation.apply(p, x) = Permutation.apply(p, y)) : x = y :=
+  x = Permutation.unapply(p, Permutation.apply(p, x)) by Permutation.left_inverse(p, x)
+    = Permutation.unapply(p, Permutation.apply(p, y)) by substituting equalImages
+    = y by Permutation.left_inverse(p, y)
+
+-- The boundary inclusion is injective (it preserves the value).
+theorem NaturalsBelow.inclusion_injective (m : Natural) (a b : NaturalsBelow(m))
+        (equalInclusions : NaturalsBelow.inclusion(m, a) = NaturalsBelow.inclusion(m, b)) : a = b := {
+  NaturalsBelow.value(a)
+     = NaturalsBelow.value(NaturalsBelow.inclusion(m, a))
+     = NaturalsBelow.value(NaturalsBelow.inclusion(m, b)) by substituting equalInclusions
+     = NaturalsBelow.value(b) as valuesEqual;
+  done by NaturalsBelow.equal_of_value(m, a, b, valuesEqual)
+}
+
+-- The inverse of a top-fixing permutation fixes the top as well.
+theorem Permutation.inverse_fixes_top {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        : Permutation.apply(Permutation.inverse(tau), NaturalsBelow.top(m)) = NaturalsBelow.top(m) := {
+  Permutation.apply(tau, Permutation.apply(Permutation.inverse(tau), NaturalsBelow.top(m)))
+     = Permutation.apply(tau, Permutation.unapply(tau, NaturalsBelow.top(m)))
+           by substituting Permutation.apply_inverse(tau, NaturalsBelow.top(m))
+     = NaturalsBelow.top(m) by Permutation.right_inverse(tau, NaturalsBelow.top(m))
+     = Permutation.apply(tau, NaturalsBelow.top(m)) by fixesTop
+     as imagesEqual;
+  done by Permutation.apply_injective(tau,
+      Permutation.apply(Permutation.inverse(tau), NaturalsBelow.top(m)), NaturalsBelow.top(m), imagesEqual)
+}
+
+-- A top-fixing permutation keeps the bottom part below the boundary: the image
+-- of an included index stays below m (else it would collide with the fixed top).
+theorem Permutation.top_fixing_image_below {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        (x : NaturalsBelow(m))
+        : NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x))) < m := {
+  NaturalsBelow.value(x) < m by NaturalsBelow.below as valueBelow;
+  NaturalsBelow.inclusion(m, x) ≠ NaturalsBelow.top(m) by {
+    suppose NaturalsBelow.inclusion(m, x) = NaturalsBelow.top(m) as inclusionIsTop for contradiction {
+      NaturalsBelow.value(x)
+         = NaturalsBelow.value(NaturalsBelow.inclusion(m, x))
+         = NaturalsBelow.value(NaturalsBelow.top(m)) by substituting inclusionIsTop
+         = m as valueXisM;
+      False by Natural.not_equal_of_less_than(NaturalsBelow.value(x), m, valueBelow)(valueXisM);
+      done
+    }
+  } as inclusionNotTop;
+  Permutation.apply(tau, NaturalsBelow.inclusion(m, x)) ≠ NaturalsBelow.top(m) by {
+    suppose Permutation.apply(tau, NaturalsBelow.inclusion(m, x)) = NaturalsBelow.top(m) as imageIsTop for contradiction {
+      Permutation.apply(tau, NaturalsBelow.inclusion(m, x))
+         = NaturalsBelow.top(m) by imageIsTop
+         = Permutation.apply(tau, NaturalsBelow.top(m)) by fixesTop as imagesAgree;
+      NaturalsBelow.inclusion(m, x) = NaturalsBelow.top(m)
+          by Permutation.apply_injective(tau, NaturalsBelow.inclusion(m, x), NaturalsBelow.top(m), imagesAgree)
+          as reDerivedEqual;
+      False by inclusionNotTop(reDerivedEqual);
+      done
+    }
+  } as imageNotTop;
+  NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x))) ≠ m by {
+    suppose NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x))) = m as valueIsM for contradiction {
+      Permutation.apply(tau, NaturalsBelow.inclusion(m, x)) = NaturalsBelow.top(m)
+          by NaturalsBelow.equal_of_value(1 + m,
+                 Permutation.apply(tau, NaturalsBelow.inclusion(m, x)), NaturalsBelow.top(m), valueIsM)
+          as imageIsTop;
+      False by imageNotTop(imageIsTop);
+      done
+    }
+  } as valueNotTop;
+  NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x))) < 1 + m by NaturalsBelow.below;
+  NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x))) ≤ m
+      by Natural.le_cancel_one_plus as imageLeM;
+  done by Natural.lt_of_le_of_ne(
+      NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x))), m, imageLeM, valueNotTop)
+}
+
+definition Permutation.restrictMap {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        : NaturalsBelow(m) → NaturalsBelow(m) :=
+  (x : NaturalsBelow(m)) ↦
+    NaturalsBelow.make(NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x))),
+        Permutation.top_fixing_image_below(tau, fixesTop, x))
+
+-- The inclusion of a restricted index is just the original image: the `make`
+-- and the image agree on value, so `equal_of_value` identifies them.
+theorem Permutation.inclusion_restrictMap {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        (x : NaturalsBelow(m))
+        : NaturalsBelow.inclusion(m, Permutation.restrictMap(tau, fixesTop, x))
+          = Permutation.apply(tau, NaturalsBelow.inclusion(m, x)) :=
+  NaturalsBelow.equal_of_value(1 + m,
+      NaturalsBelow.inclusion(m, Permutation.restrictMap(tau, fixesTop, x)),
+      Permutation.apply(tau, NaturalsBelow.inclusion(m, x)),
+      reflexivity(NaturalsBelow.value(Permutation.apply(tau, NaturalsBelow.inclusion(m, x)))))
+
+-- Restricting `tau` then `tau⁻¹` is the identity on the bottom.
+theorem Permutation.restrictMap_cancel {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        (x : NaturalsBelow(m))
+        : Permutation.restrictMap(Permutation.inverse(tau), Permutation.inverse_fixes_top(tau, fixesTop),
+              Permutation.restrictMap(tau, fixesTop, x)) = x := {
+  NaturalsBelow.inclusion(m,
+      Permutation.restrictMap(Permutation.inverse(tau), Permutation.inverse_fixes_top(tau, fixesTop),
+          Permutation.restrictMap(tau, fixesTop, x)))
+     = Permutation.apply(Permutation.inverse(tau),
+           NaturalsBelow.inclusion(m, Permutation.restrictMap(tau, fixesTop, x)))
+           by Permutation.inclusion_restrictMap(Permutation.inverse(tau),
+                  Permutation.inverse_fixes_top(tau, fixesTop), Permutation.restrictMap(tau, fixesTop, x))
+     = Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, NaturalsBelow.inclusion(m, x)))
+           by substituting Permutation.inclusion_restrictMap(tau, fixesTop, x)
+     = Permutation.unapply(tau, Permutation.apply(tau, NaturalsBelow.inclusion(m, x)))
+           by substituting Permutation.apply_inverse(tau, Permutation.apply(tau, NaturalsBelow.inclusion(m, x)))
+     = NaturalsBelow.inclusion(m, x) by Permutation.left_inverse(tau, NaturalsBelow.inclusion(m, x))
+     as inclusionsEqual;
+  done by NaturalsBelow.inclusion_injective(m,
+      Permutation.restrictMap(Permutation.inverse(tau), Permutation.inverse_fixes_top(tau, fixesTop),
+          Permutation.restrictMap(tau, fixesTop, x)),
+      x, inclusionsEqual)
+}
+
+definition Permutation.restrict {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        : Permutation(m) :=
+  Permutation.make(m,
+      Permutation.restrictMap(tau, fixesTop),
+      Permutation.restrictMap(Permutation.inverse(tau), Permutation.inverse_fixes_top(tau, fixesTop)),
+      And.introduction(
+          (x : NaturalsBelow(m)) ↦ Permutation.restrictMap_cancel(tau, fixesTop, x),
+          (x : NaturalsBelow(m)) ↦
+              Permutation.restrictMap_cancel(Permutation.inverse(tau),
+                  Permutation.inverse_fixes_top(tau, fixesTop), x)))
+
+theorem Permutation.apply_restrict {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        (x : NaturalsBelow(m))
+        : Permutation.apply(Permutation.restrict(tau, fixesTop), x) = Permutation.restrictMap(tau, fixesTop, x) :=
+  reflexivity(Permutation.restrictMap(tau, fixesTop, x))
+
+-- extend and restrict are mutually inverse across the boundary.
+theorem Permutation.extend_restrict {m : Natural} (tau : Permutation(1 + m))
+        (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+        : Permutation.extend(Permutation.restrict(tau, fixesTop)) = tau :=
+  Permutation.equal_of_apply_equal(Permutation.extend(Permutation.restrict(tau, fixesTop)), tau,
+      (i : NaturalsBelow(1 + m)) ↦ {
+        NaturalsBelow.value(i) < m ∨ m ≤ NaturalsBelow.value(i) by Natural.lt_or_le;
+        done by cases {
+          case NaturalsBelow.value(i) < m as iBelow: {
+              i = NaturalsBelow.inclusion(m, NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+                  by NaturalsBelow.equal_of_value as iIsInclusion;
+              Permutation.apply(Permutation.extend(Permutation.restrict(tau, fixesTop)), i)
+                 = Permutation.apply(Permutation.extend(Permutation.restrict(tau, fixesTop)),
+                       NaturalsBelow.inclusion(m, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+                       by substituting iIsInclusion
+                 = NaturalsBelow.inclusion(m,
+                       Permutation.apply(Permutation.restrict(tau, fixesTop),
+                           NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+                       by Permutation.apply_extend_inclusion(Permutation.restrict(tau, fixesTop),
+                              NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+                 = NaturalsBelow.inclusion(m,
+                       Permutation.restrictMap(tau, fixesTop, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+                       by substituting Permutation.apply_restrict(tau, fixesTop,
+                              NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+                 = Permutation.apply(tau, NaturalsBelow.inclusion(m, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)))
+                       by Permutation.inclusion_restrictMap(tau, fixesTop,
+                              NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+                 = Permutation.apply(tau, i) by substituting iIsInclusion;
+              done
+            }
+          case m ≤ NaturalsBelow.value(i) as iAtLeast: {
+              NaturalsBelow.value(i) < 1 + m by NaturalsBelow.below;
+              NaturalsBelow.value(i) ≤ m by Natural.le_cancel_one_plus;
+              NaturalsBelow.value(i) = m by Natural.le_antisymmetric;
+              i = NaturalsBelow.top(m) by NaturalsBelow.equal_of_value as iIsTop;
+              Permutation.apply(Permutation.extend(Permutation.restrict(tau, fixesTop)), i)
+                 = Permutation.apply(Permutation.extend(Permutation.restrict(tau, fixesTop)), NaturalsBelow.top(m))
+                       by substituting iIsTop
+                 = NaturalsBelow.top(m)
+                       by Permutation.apply_extend_top(Permutation.restrict(tau, fixesTop))
+                 = Permutation.apply(tau, NaturalsBelow.top(m)) by fixesTop
+                 = Permutation.apply(tau, i) by substituting iIsTop;
+              done
+            }
+        }
+      })
+
+theorem Permutation.restrict_extend {m : Natural} (sigma : Permutation(m))
+        : Permutation.restrict(Permutation.extend(sigma), Permutation.apply_extend_top(sigma)) = sigma :=
+  Permutation.equal_of_apply_equal(
+      Permutation.restrict(Permutation.extend(sigma), Permutation.apply_extend_top(sigma)), sigma,
+      (x : NaturalsBelow(m)) ↦ {
+        NaturalsBelow.inclusion(m,
+            Permutation.apply(Permutation.restrict(Permutation.extend(sigma),
+                Permutation.apply_extend_top(sigma)), x))
+           = NaturalsBelow.inclusion(m,
+                 Permutation.restrictMap(Permutation.extend(sigma),
+                     Permutation.apply_extend_top(sigma), x))
+                 by substituting Permutation.apply_restrict(Permutation.extend(sigma),
+                        Permutation.apply_extend_top(sigma), x)
+           = Permutation.apply(Permutation.extend(sigma), NaturalsBelow.inclusion(m, x))
+                 by Permutation.inclusion_restrictMap(Permutation.extend(sigma),
+                        Permutation.apply_extend_top(sigma), x)
+           = NaturalsBelow.inclusion(m, Permutation.apply(sigma, x))
+                 by Permutation.apply_extend_inclusion(sigma, x)
+           as inclusionsEqual;
+        done by NaturalsBelow.inclusion_injective(m,
+            Permutation.apply(Permutation.restrict(Permutation.extend(sigma),
+                Permutation.apply_extend_top(sigma)), x),
+            Permutation.apply(sigma, x), inclusionsEqual)
+      })
