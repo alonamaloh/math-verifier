@@ -998,13 +998,22 @@ engine directly. Group laws are then immediate.
      The row-type tension dissolved by keeping h on NB(rows) and restricting in
      the IH — no NaturalsBelow embedding. `allFunctions_distinct` NOT yet built
      (needed only for the 6d reindex). Gates: export-check 3067, choice-free.
-   - **(6b) `sign(swap(a,b)) = −1`** — transposition is odd. Route: reduce to
-     value(a)<value(b) (swap symmetric); conjugation induction on the value-distance
-     d=value(b)−value(a): swap(a,b)=swap(a,c)∘swap(c,b)∘swap(a,c) with value(c)=value(a)+1,
-     so sign_compose + sign(swap(a,c))²=1 ⟹ sign(swap(a,b))=sign(swap(c,b)) (distance
-     d−1); base d=1 (adjacent) = exactly one inverted orderedPair (sortPair(a,c)
-     contributes −1, all others +1 by a 6-way value-casing) via a
-     "product with one −1 factor, rest +1" list-surgery lemma. Substantial (~200 lines).
+   - **(6b) `sign(swap(a,b)) = −1`** — DONE (`Algebra/permutation_transposition_sign.math`).
+     `Permutation.sign_swap`: transposition of distinct indices is odd. Route as
+     planned: reduce to value(a)<value(b) (`swap_symmetric`), induct on the
+     value-distance (`sign_swap_gap`, statement `value(b) = (1+d)+value(a)`); the
+     step conjugates by an adjacent transposition swap(a,c), value(c)=value(a)+1,
+     via `swap_conjugate_by_swap` (swap(a,c)∘swap(a,b)∘swap(a,c)=swap(c,b)) +
+     `sign_compose` + `sign_swap_square` (unit) to drop the gap by one. Base
+     `sign_swap_adjacent`: the adjacent swap inverts exactly the single ordered
+     pair {a,b} — `pairOrient_swap_adjacent_other` (a 5-leaf value casing on i,j
+     vs a,b, over `value_apply_swap_at_left/right/other`) gives +1 on every other
+     pair, and reusable `List.product_isolate_single` collapses the sign-product
+     to the one −1 factor. Gates: export-check 3080, choice-free. FRICTION FLAGGED
+     (see [[stage_h_brick6a_decision]] / session notes): `NaturalsBelow.below(x)`
+     mis-infers its implicit `n` under a `value(inclusion …) < k` ascription;
+     `ring` can't see through an opaque `value(b)` that a hypothesis equates to a
+     sum (name+flip the hypothesis instead).
    - **(6c) alternating collapse** — for non-injective φ (φa=φb, a≠b), the inner
      `Σ_σ sign(σ) ∏_i B(φi,σi)=0` by pairing σ↔σ∘swap(a,b): the products are equal
      (φa=φb) and sign(σ∘swap)=−sign(σ) (needs 6b), so terms cancel; τ=swap(a,b) is a
@@ -1017,7 +1026,7 @@ engine directly. Group laws are then immediate.
      then `det(AB)=Σ_φ̂ (∏A(i,φ̂i))·sign(φ̂)·det(B)=det(A)·det(B)`.
 
 Realistic size: multi-session. Bricks 2, 3, 6 are the cost; 1, 4, 5 are
-scaffolding. Brick 6 backbone (aggregation) DONE; 6a DONE; 6b–6d remain.
+scaffolding. Brick 6 backbone (aggregation) DONE; 6a DONE; 6b DONE; 6c–6d remain.
 
 ## Choice-profile guardrails
 
