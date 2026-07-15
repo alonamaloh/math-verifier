@@ -1,0 +1,66 @@
+-- Algebra/determinant.math
+--
+-- The determinant of a square matrix over a field, by the Leibniz formula
+--   det(M) = Σ_{σ ∈ Sₙ} sign(σ) · ∏_{i<n} M(i, σ(i)),
+-- summing over the enumerated permutation list `allPermutations(n)` and
+-- taking the field product over the index enumeration. The integer sign
+-- (always ±1) enters the field through the initial-ring map
+-- `Ring.from_integer`. (Stage H brick 5 of PLAN_LINEAR_ALGEBRA.md.)
+
+module Algebra.determinant
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Algebra.field
+import Algebra.field_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.ring_bundle
+import Algebra.ring_from_integer
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+
+-- The multiplicative companion of `Field.sumOver`: the field product of a
+-- term over a list of items.
+definition Field.productOver {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (items : List(index))
+        : Field.carrier(f) :=
+  List.product(Field.carrier(f), Field.multiply, Field.one(f),
+      List.map(index, Field.carrier(f), term, items))
+
+-- The integer sign (or any integer) as a field element, through the
+-- initial-ring map on the field's underlying ring.
+definition Field.from_integer (f : Field) (z : Integer) : Field.carrier(f) :=
+  Ring.from_integer(CommutativeRing.ring(Field.commutative_ring(f)), z)
+
+-- The Leibniz determinant: sum over Sₙ of the signed product of the entries
+-- picked out by each permutation.
+definition Matrix.determinant {f : Field} {n : Natural} (matrix : Matrix(f, n, n))
+        : Field.carrier(f) :=
+  Field.sumOver(
+      (sigma : Permutation(n)) ↦
+          Field.from_integer(f, Permutation.sign(sigma))
+              * Field.productOver(
+                    (i : NaturalsBelow(n)) ↦ matrix(i, Permutation.apply(sigma, i)),
+                    NaturalsBelow.enumerate(n)),
+      Permutation.allPermutations(n))
+
+-- The defining expansion, read straight off the definition — the form every
+-- determinant identity manipulates.
+theorem Matrix.determinant_expansion {f : Field} {n : Natural}
+        (matrix : Matrix(f, n, n))
+        : Matrix.determinant(matrix)
+          = Field.sumOver(
+                (sigma : Permutation(n)) ↦
+                    Field.from_integer(f, Permutation.sign(sigma))
+                        * Field.productOver(
+                              (i : NaturalsBelow(n)) ↦ matrix(i, Permutation.apply(sigma, i)),
+                              NaturalsBelow.enumerate(n)),
+                Permutation.allPermutations(n)) :=
+  done

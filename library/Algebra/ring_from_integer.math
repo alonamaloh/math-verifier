@@ -1,0 +1,84 @@
+-- Algebra/ring_from_integer.math
+--
+-- The canonical map `Integer → Ring.carrier(r)`, sending the difference
+-- `a − b` to `from_natural(a) − from_natural(b)`. This is the unique ring
+-- homomorphism out of the initial ring ℤ; it is how an integer coefficient
+-- (e.g. a permutation sign, always ±1) enters an abstract ring. Built on
+-- `Ring.from_natural`, lifted across the difference-quotient boundary of
+-- `Integer`.
+
+module Algebra.ring_from_integer
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_from_natural
+
+-- The map on difference representatives: (a, b) ↦ from_natural(a) − from_natural(b).
+definition Ring.from_integer_at_representative (r : Ring)
+        : IntegerRepresentative → Ring.carrier(r)
+  | IntegerRepresentative.make(a, b) =>
+      Ring.from_natural(r, a) - Ring.from_natural(r, b)
+
+-- Well-definedness: equivalent representatives (a + d = b + c) have equal
+-- images, because `from_natural` is additive.
+theorem Ring.from_integer_respect (r : Ring)
+        (rep1 rep2 : IntegerRepresentative)
+        (equivalent : IntegerEquivalent(rep1, rep2))
+        : Ring.from_integer_at_representative(r, rep1)
+          = Ring.from_integer_at_representative(r, rep2) := {
+  let ⟨a, b⟩ := rep1;
+  let ⟨c, d⟩ := rep2;
+  a + d = b + c                                             by equivalent as crossNat;
+  Ring.from_natural(r, a) + Ring.from_natural(r, d)
+     = Ring.from_natural(r, a + d)                          by Ring.from_natural_add
+     = Ring.from_natural(r, b + c)                          by substituting crossNat
+     = Ring.from_natural(r, b) + Ring.from_natural(r, c)    by Ring.from_natural_add
+     as crossFact;
+  Ring.from_integer_at_representative(r, IntegerRepresentative.make(a, b))
+     = Ring.from_natural(r, a) - Ring.from_natural(r, b)
+     = (Ring.from_natural(r, a) + Ring.from_natural(r, d))
+           - Ring.from_natural(r, b) - Ring.from_natural(r, d)                by ring
+     = (Ring.from_natural(r, b) + Ring.from_natural(r, c))
+           - Ring.from_natural(r, b) - Ring.from_natural(r, d)                by substituting crossFact
+     = Ring.from_natural(r, c) - Ring.from_natural(r, d)                      by ring
+     = Ring.from_integer_at_representative(r, IntegerRepresentative.make(c, d))
+}
+
+-- The map on Integer.
+definition Ring.from_integer (r : Ring) : Integer → Ring.carrier(r)
+  by representatives rep ↦ Ring.from_integer_at_representative(r, rep)
+  well_defined by Ring.from_integer_respect(r)
+
+-- The defining reduction on a difference.
+theorem Ring.from_integer_at_difference (r : Ring) (a b : Natural)
+        : Ring.from_integer(r, Integer.from_difference(a, b))
+          = Ring.from_natural(r, a) - Ring.from_natural(r, b) :=
+  Ring.from_integer(r, Integer.from_difference(a, b))
+     = Ring.from_natural(r, a) - Ring.from_natural(r, b)    by unfolding Integer
+
+-- `1 ↦ one`.
+theorem Ring.from_integer_one (r : Ring)
+        : Ring.from_integer(r, Integer.one) = Ring.one(r) :=
+  Ring.from_integer(r, Integer.from_difference(1, 0))
+     = Ring.from_natural(r, 1) - Ring.from_natural(r, 0)    by Ring.from_integer_at_difference
+     = Ring.one(r) - Ring.zero(r)                           by substituting Ring.from_natural_one
+     = Ring.one(r)                                          by ring
+
+-- `−1 ↦ −one`.
+theorem Ring.from_integer_negate_one (r : Ring)
+        : Ring.from_integer(r, Integer.negate(Integer.one)) = Ring.negate(Ring.one(r)) := {
+  Integer.negate(Integer.one) = Integer.from_difference(0, 1)    by unfolding Integer as negOneForm;
+  Ring.from_integer(r, Integer.negate(Integer.one))
+     = Ring.from_integer(r, Integer.from_difference(0, 1))    by substituting negOneForm
+     = Ring.from_natural(r, 0) - Ring.from_natural(r, 1)      by Ring.from_integer_at_difference
+     = Ring.zero(r) - Ring.one(r)                             by substituting Ring.from_natural_one
+     = Ring.negate(Ring.one(r))                               by ring
+}
