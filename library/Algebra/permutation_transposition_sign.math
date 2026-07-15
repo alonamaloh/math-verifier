@@ -115,3 +115,173 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
         }
       }
   }
+
+-- ----------------------------------------------------------------------
+-- Reducing a transposition's sign to that of a closer one by conjugation.
+
+-- Symmetry of disequality (a generic helper).
+theorem Equality.ne_symmetric (A : Type(0)) (x y : A) (ne : x ≠ y) : y ≠ x :=
+  (equal : y = x) ↦ {
+    x = y by equal;
+    done by ne
+  }
+
+-- A transposition's sign squares to one: it is a unit.
+theorem Permutation.sign_swap_square {n : Natural} (a b : NaturalsBelow(n))
+        : Integer.multiply(Permutation.sign(Permutation.swap(a, b)),
+              Permutation.sign(Permutation.swap(a, b))) = Integer.one := {
+  Permutation.sign(Permutation.swap(a, b)) = 1
+      ∨ Permutation.sign(Permutation.swap(a, b)) = Integer.negate(1)
+      by Permutation.sign_is_unit(Permutation.swap(a, b));
+  done by cases {
+    case Permutation.sign(Permutation.swap(a, b)) = 1 as isPositive:
+        Integer.multiply(Permutation.sign(Permutation.swap(a, b)),
+              Permutation.sign(Permutation.swap(a, b)))
+           = Integer.multiply(1, 1) by substituting isPositive
+           = Integer.one by ring
+    case Permutation.sign(Permutation.swap(a, b)) = Integer.negate(1) as isNegative:
+        Integer.multiply(Permutation.sign(Permutation.swap(a, b)),
+              Permutation.sign(Permutation.swap(a, b)))
+           = Integer.multiply(Integer.negate(1), Integer.negate(1)) by substituting isNegative
+           = Integer.one by ring
+  }
+}
+
+-- Conjugating swap(a, b) by the transposition swap(a, c) yields swap(c, b):
+-- swap(a, c) ∘ swap(a, b) ∘ swap(a, c) = swap(c, b), for a, b, c with b outside
+-- {a, c} and a ≠ c. This is the group identity behind the distance reduction.
+theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(n))
+        (aNeqC : a ≠ c) (bNeqA : b ≠ a) (bNeqC : b ≠ c)
+        : Permutation.compose(Permutation.swap(a, c),
+              Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
+          = Permutation.swap(c, b) := {
+  c ≠ a by Equality.ne_symmetric(NaturalsBelow(n), a, c, aNeqC) as cNeqA;
+  a ≠ b by Equality.ne_symmetric(NaturalsBelow(n), b, a, bNeqA) as aNeqB;
+  c ≠ b by Equality.ne_symmetric(NaturalsBelow(n), b, c, bNeqC) as cNeqB;
+  done by Permutation.equal_of_apply_equal(
+      Permutation.compose(Permutation.swap(a, c),
+          Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))),
+      Permutation.swap(c, b),
+      (i : NaturalsBelow(n)) ↦ {
+        i = c ∨ i ≠ c;
+        done by cases {
+          case i = c as iIsC: {
+              Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                    Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                 = Permutation.apply(Permutation.swap(a, c),
+                       Permutation.apply(Permutation.swap(a, b),
+                           Permutation.apply(Permutation.swap(a, c), i)))
+                       by Permutation.apply_compose
+                 = Permutation.apply(Permutation.swap(a, c),
+                       Permutation.apply(Permutation.swap(a, b),
+                           Permutation.apply(Permutation.swap(a, c), c)))
+                       by substituting iIsC
+                 = Permutation.apply(Permutation.swap(a, c),
+                       Permutation.apply(Permutation.swap(a, b), a))
+                       by substituting Permutation.apply_swap_right(a, c)
+                 = Permutation.apply(Permutation.swap(a, c), b)
+                       by substituting Permutation.apply_swap_left(a, b)
+                 = b by Permutation.apply_swap_other(a, c, b, bNeqA, bNeqC)
+                 as lhsEq;
+              Permutation.apply(Permutation.swap(c, b), i)
+                 = Permutation.apply(Permutation.swap(c, b), c) by substituting iIsC
+                 = b by Permutation.apply_swap_left(c, b)
+                 as rhsEq;
+              Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                    Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                 = b by lhsEq
+                 = Permutation.apply(Permutation.swap(c, b), i) by rhsEq;
+              done
+            }
+          case i ≠ c as iNeqC: {
+              i = b ∨ i ≠ b;
+              done by cases {
+                case i = b as iIsB: {
+                    Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                          Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                       = Permutation.apply(Permutation.swap(a, c),
+                             Permutation.apply(Permutation.swap(a, b),
+                                 Permutation.apply(Permutation.swap(a, c), i)))
+                             by Permutation.apply_compose
+                       = Permutation.apply(Permutation.swap(a, c),
+                             Permutation.apply(Permutation.swap(a, b),
+                                 Permutation.apply(Permutation.swap(a, c), b)))
+                             by substituting iIsB
+                       = Permutation.apply(Permutation.swap(a, c),
+                             Permutation.apply(Permutation.swap(a, b), b))
+                             by substituting Permutation.apply_swap_other(a, c, b, bNeqA, bNeqC)
+                       = Permutation.apply(Permutation.swap(a, c), a)
+                             by substituting Permutation.apply_swap_right(a, b)
+                       = c by Permutation.apply_swap_left(a, c)
+                       as lhsEq;
+                    Permutation.apply(Permutation.swap(c, b), i)
+                       = Permutation.apply(Permutation.swap(c, b), b) by substituting iIsB
+                       = c by Permutation.apply_swap_right(c, b)
+                       as rhsEq;
+                    Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                          Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                       = c by lhsEq
+                       = Permutation.apply(Permutation.swap(c, b), i) by rhsEq;
+                    done
+                  }
+                case i ≠ b as iNeqB: {
+                    i = a ∨ i ≠ a;
+                    done by cases {
+                      case i = a as iIsA: {
+                          Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                                Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                             = Permutation.apply(Permutation.swap(a, c),
+                                   Permutation.apply(Permutation.swap(a, b),
+                                       Permutation.apply(Permutation.swap(a, c), i)))
+                                   by Permutation.apply_compose
+                             = Permutation.apply(Permutation.swap(a, c),
+                                   Permutation.apply(Permutation.swap(a, b),
+                                       Permutation.apply(Permutation.swap(a, c), a)))
+                                   by substituting iIsA
+                             = Permutation.apply(Permutation.swap(a, c),
+                                   Permutation.apply(Permutation.swap(a, b), c))
+                                   by substituting Permutation.apply_swap_left(a, c)
+                             = Permutation.apply(Permutation.swap(a, c), c)
+                                   by substituting Permutation.apply_swap_other(a, b, c, cNeqA, cNeqB)
+                             = a by Permutation.apply_swap_right(a, c)
+                             as lhsEq;
+                          Permutation.apply(Permutation.swap(c, b), i)
+                             = Permutation.apply(Permutation.swap(c, b), a) by substituting iIsA
+                             = a by Permutation.apply_swap_other(c, b, a, aNeqC, aNeqB)
+                             as rhsEq;
+                          Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                                Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                             = a by lhsEq
+                             = Permutation.apply(Permutation.swap(c, b), i) by rhsEq;
+                          done
+                        }
+                      case i ≠ a as iNeqA: {
+                          Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                                Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                             = Permutation.apply(Permutation.swap(a, c),
+                                   Permutation.apply(Permutation.swap(a, b),
+                                       Permutation.apply(Permutation.swap(a, c), i)))
+                                   by Permutation.apply_compose
+                             = Permutation.apply(Permutation.swap(a, c),
+                                   Permutation.apply(Permutation.swap(a, b), i))
+                                   by substituting Permutation.apply_swap_other(a, c, i, iNeqA, iNeqC)
+                             = Permutation.apply(Permutation.swap(a, c), i)
+                                   by substituting Permutation.apply_swap_other(a, b, i, iNeqA, iNeqB)
+                             = i by Permutation.apply_swap_other(a, c, i, iNeqA, iNeqC)
+                             as lhsEq;
+                          Permutation.apply(Permutation.swap(c, b), i)
+                             = i by Permutation.apply_swap_other(c, b, i, iNeqC, iNeqB)
+                             as rhsEq;
+                          Permutation.apply(Permutation.compose(Permutation.swap(a, c),
+                                Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
+                             = i by lhsEq
+                             = Permutation.apply(Permutation.swap(c, b), i) by rhsEq;
+                          done
+                        }
+                    }
+                  }
+              }
+            }
+        }
+      })
+}
