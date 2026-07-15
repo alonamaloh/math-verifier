@@ -725,3 +725,98 @@ theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
      = Integer.multiply(Permutation.sign(sigma), Permutation.sign(tau)) by ring;
   done
 }
+
+-- ----------------------------------------------------------------------
+-- The sign is a unit: ±1. (A product of ±1 orientations.)
+
+theorem List.product_of_units (l : List(Integer))
+        (allUnit : ∀ (x : Integer). List.member(Integer, x, l) → (x = 1 ∨ x = Integer.negate(1)))
+        : List.product(Integer, Integer.multiply, Integer.one, l) = 1
+          ∨ List.product(Integer, Integer.multiply, Integer.one, l) = Integer.negate(1) :=
+  by induction on l with IH {
+    case List.empty: {
+        List.product(Integer, Integer.multiply, Integer.one, List.empty(Integer)) = 1;
+        done
+      }
+    case List.prepend(head, tail): {
+        head = 1 ∨ head = Integer.negate(1)
+            by allUnit(head, List.member.here(Integer, head, tail));
+        (∀ (x : Integer). List.member(Integer, x, tail) → (x = 1 ∨ x = Integer.negate(1)))
+            by (x : Integer) (xInTail : List.member(Integer, x, tail)) ↦
+                allUnit(x, List.member.there(Integer, x, head, tail, xInTail)) as tailUnit;
+        List.product(Integer, Integer.multiply, Integer.one, tail) = 1
+            ∨ List.product(Integer, Integer.multiply, Integer.one, tail) = Integer.negate(1)
+            by IH(tailUnit);
+        done by cases {
+          case head = 1 as headOne: {
+              done by cases {
+                case List.product(Integer, Integer.multiply, Integer.one, tail) = 1 as tailOne: {
+                    List.product(Integer, Integer.multiply, Integer.one, List.prepend(Integer, head, tail))
+                       = Integer.multiply(head, List.product(Integer, Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(1, List.product(Integer, Integer.multiply, Integer.one, tail))
+                             by substituting headOne
+                       = Integer.multiply(1, 1) by substituting tailOne
+                       = 1 by ring as productValue;
+                    done by Or.introduceLeft(productValue)
+                  }
+                case List.product(Integer, Integer.multiply, Integer.one, tail) = Integer.negate(1) as tailNegOne: {
+                    List.product(Integer, Integer.multiply, Integer.one, List.prepend(Integer, head, tail))
+                       = Integer.multiply(head, List.product(Integer, Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(1, List.product(Integer, Integer.multiply, Integer.one, tail))
+                             by substituting headOne
+                       = Integer.multiply(1, Integer.negate(1)) by substituting tailNegOne
+                       = Integer.negate(1) by ring as productValue;
+                    done by Or.introduceRight(productValue)
+                  }
+              }
+            }
+          case head = Integer.negate(1) as headNegOne: {
+              done by cases {
+                case List.product(Integer, Integer.multiply, Integer.one, tail) = 1 as tailOne: {
+                    List.product(Integer, Integer.multiply, Integer.one, List.prepend(Integer, head, tail))
+                       = Integer.multiply(head, List.product(Integer, Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(Integer.negate(1), List.product(Integer, Integer.multiply, Integer.one, tail))
+                             by substituting headNegOne
+                       = Integer.multiply(Integer.negate(1), 1) by substituting tailOne
+                       = Integer.negate(1) by ring as productValue;
+                    done by Or.introduceRight(productValue)
+                  }
+                case List.product(Integer, Integer.multiply, Integer.one, tail) = Integer.negate(1) as tailNegOne: {
+                    List.product(Integer, Integer.multiply, Integer.one, List.prepend(Integer, head, tail))
+                       = Integer.multiply(head, List.product(Integer, Integer.multiply, Integer.one, tail))
+                       = Integer.multiply(Integer.negate(1), List.product(Integer, Integer.multiply, Integer.one, tail))
+                             by substituting headNegOne
+                       = Integer.multiply(Integer.negate(1), Integer.negate(1)) by substituting tailNegOne
+                       = 1 by ring as productValue;
+                    done by Or.introduceLeft(productValue)
+                  }
+              }
+            }
+        }
+      }
+  }
+
+theorem Permutation.sign_is_unit {n : Natural} (sigma : Permutation(n))
+        : Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1) := {
+  (∀ (x : Integer). List.member(Integer, x,
+      List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+          Permutation.orderedPairs(n))) → (x = 1 ∨ x = Integer.negate(1)))
+      by (x : Integer) (memberX : List.member(Integer, x,
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+              Permutation.orderedPairs(n)))) ↦ {
+          choose p such that
+              List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))
+                  ∧ (Permutation.pairOrient(sigma, p) = x)
+              from List.map_member_invert(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+                       Permutation.pairOrient(sigma), x, Permutation.orderedPairs(n), memberX);
+          Permutation.pairOrient(sigma, p) = x as orientIsX;
+          Permutation.pairOrient(sigma, p) = 1 ∨ Permutation.pairOrient(sigma, p) = Integer.negate(1)
+              by Permutation.orient_is_unit(Permutation.apply(sigma, Product.first(p)),
+                     Permutation.apply(sigma, Product.second(p)));
+          x = 1 ∨ x = Integer.negate(1) by substituting orientIsX;
+          done
+        } as allUnit;
+  done by List.product_of_units(
+      List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+          Permutation.orderedPairs(n)), allUnit)
+}
