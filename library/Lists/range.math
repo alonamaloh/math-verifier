@@ -169,6 +169,92 @@ theorem List.range_down_member_le (n : Natural)
       }
   }
 
+-- Completeness for the ascending range: every value below n appears in
+-- range_up(n). Induct on n; the step splits j < p (tail, by IH) vs j = p
+-- (the appended top).
+theorem List.range_up_complete (n : Natural)
+        : ∀ (j : Natural). j < n → List.member(Natural, j, List.range_up(n)) :=
+  by induction on n with IH {
+    case base: {
+        take j : Natural;
+        suppose j < 0 as below;
+        False by Natural.not_less_than_zero(j, below);
+        done
+      }
+    case step(predecessor): {
+        take j : Natural;
+        suppose j < 1 + predecessor as below;
+        j ≤ predecessor by Natural.le_of_lt_one_plus;
+        j < predecessor ∨ j = predecessor;
+        done by cases {
+          case j < predecessor as strictlyBelow: {
+              List.member(Natural, j, List.range_up(predecessor)) by IH(j, strictlyBelow);
+              List.member(Natural, j,
+                        List.append(Natural, List.range_up(predecessor),
+                            List.prepend(Natural, predecessor, List.empty(Natural))))
+                  by List.member_append_left;
+              done by substituting List.range_up_add_one
+            }
+          case j = predecessor as atTop: {
+              List.member(Natural, predecessor,
+                        List.prepend(Natural, predecessor, List.empty(Natural)))
+                  by List.member.here;
+              List.member(Natural, j,
+                        List.prepend(Natural, predecessor, List.empty(Natural)))
+                  by substituting atTop;
+              List.member(Natural, j,
+                        List.append(Natural, List.range_up(predecessor),
+                            List.prepend(Natural, predecessor, List.empty(Natural))))
+                  by List.member_append_right;
+              done by substituting List.range_up_add_one
+            }
+        }
+      }
+  }
+
+-- Conversely, every member of range_up(n) is below n.
+theorem List.range_up_member_lt (n : Natural)
+        : ∀ (j : Natural). List.member(Natural, j, List.range_up(n)) → j < n :=
+  by induction on n with IH {
+    case base: {
+        take j : Natural;
+        suppose List.member(Natural, j, List.range_up(0)) as mem;
+        absurd(List.no_member_empty(Natural, j, mem))
+      }
+    case step(predecessor): {
+        take j : Natural;
+        suppose List.member(Natural, j, List.range_up(1 + predecessor)) as mem;
+        List.member(Natural, j,
+                  List.append(Natural, List.range_up(predecessor),
+                      List.prepend(Natural, predecessor, List.empty(Natural))))
+            by substituting List.range_up_add_one;
+        List.member(Natural, j, List.range_up(predecessor))
+              ∨ List.member(Natural, j,
+                    List.prepend(Natural, predecessor, List.empty(Natural)))
+            by List.member_append_invert(Natural, j,
+                   List.prepend(Natural, predecessor, List.empty(Natural)),
+                   List.range_up(predecessor));
+        done by cases {
+          case List.member(Natural, j, List.range_up(predecessor)) as inRange:
+              j < predecessor by IH(j, inRange)
+                ≤ 1 + predecessor
+          case List.member(Natural, j,
+                    List.prepend(Natural, predecessor, List.empty(Natural))) as inSingleton: {
+              j = predecessor ∨ List.member(Natural, j, List.empty(Natural))
+                  by List.member_prepend_invert;
+              done by cases {
+                case j = predecessor as atTop: {
+                    j < 1 + predecessor by substituting atTop;
+                    done
+                  }
+                case List.member(Natural, j, List.empty(Natural)) as inEmpty:
+                    absurd(List.no_member_empty(Natural, j, inEmpty))
+              }
+            }
+        }
+      }
+  }
+
 -- ----------------------------------------------------------------------
 -- The slice of the range above a base point:
 -- `range_down_offset(base, count) = [base+count, …, base+1]`, the `count`

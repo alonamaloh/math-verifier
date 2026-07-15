@@ -97,3 +97,42 @@ theorem List.member_append_right (A : Type(0)) (element : A) (first second : Lis
     case List.prepend(head, tail):
         List.member.there(A, element, head, List.append(A, tail, second), IH)
   }
+
+-- Inversion: a member of a concatenation belongs to one of the two halves.
+-- Induct on `first` (its `prepend` head is the only new candidate at each step);
+-- the membership premise stays in the conclusion so it varies with `first`.
+theorem List.member_append_invert (A : Type(0)) (element : A) (second : List(A)) (first : List(A))
+        : List.member(A, element, List.append(A, first, second))
+          → List.member(A, element, first) ∨ List.member(A, element, second) :=
+  by induction on first with IH {
+    case List.empty:
+        (inAppend : List.member(A, element, List.append(A, List.empty(A), second))) ↦ {
+          -- append(empty, second) is second, so the member is on the right.
+          List.member(A, element, second) by inAppend;
+          done
+        }
+    case List.prepend(head, tail):
+        (inAppend
+            : List.member(A, element, List.append(A, List.prepend(A, head, tail), second))) ↦ {
+          element = head ∨ List.member(A, element, List.append(A, tail, second))
+              by List.member_prepend_invert;
+          done by cases {
+            case element = head as isHead: {
+                List.member(A, element, List.prepend(A, head, tail)) by List.member.here;
+                done
+              }
+            case List.member(A, element, List.append(A, tail, second)) as inTailAppend: {
+                List.member(A, element, tail) ∨ List.member(A, element, second)
+                    by IH(inTailAppend);
+                done by cases {
+                  case List.member(A, element, tail) as inTail: {
+                      List.member(A, element, List.prepend(A, head, tail))
+                          by List.member.there(A, element, head, tail, inTail);
+                      done
+                    }
+                  case List.member(A, element, second) as inSecond: inSecond
+                }
+              }
+          }
+        }
+  }

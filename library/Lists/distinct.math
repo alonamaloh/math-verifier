@@ -15,6 +15,7 @@ import Natural.arithmetic
 import Lists.list
 import Lists.range
 import Lists.map
+import Lists.append
 import Lists.permutation
 
 inductive List.Distinct (A : Type(0)) : List(A) → Proposition where
@@ -224,6 +225,87 @@ theorem List.map_distinct (A B : Type(0)) (f : A → B)
         List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
             List.not_member_map_of_not_member(A, B, f, injective, head, tail, headNotInTail),
             IH)
+  }
+
+-- ----------------------------------------------------------------------
+-- The concatenation of two distinct, disjoint lists is distinct. Induct on
+-- `first`: its head is distinct from the tail (given) and from `second` (by
+-- disjointness), and does not recur in `append(tail, second)`.
+theorem List.distinct_append (A : Type(0)) (second : List(A)) (first : List(A))
+        : List.Distinct(A, first) → List.Distinct(A, second)
+          → (∀ (x : A). List.member(A, x, first) → ¬(List.member(A, x, second)))
+          → List.Distinct(A, List.append(A, first, second)) :=
+  by induction on first with IH {
+    case List.empty:
+        (distinctFirst : List.Distinct(A, List.empty(A)))
+        (distinctSecond : List.Distinct(A, second))
+        (disjoint : ∀ (x : A). List.member(A, x, List.empty(A)) → ¬(List.member(A, x, second))) ↦
+          -- append(empty, second) is second.
+          distinctSecond
+    case List.prepend(head, tail):
+        (distinctFirst : List.Distinct(A, List.prepend(A, head, tail)))
+        (distinctSecond : List.Distinct(A, second))
+        (disjoint : ∀ (x : A). List.member(A, x, List.prepend(A, head, tail))
+            → ¬(List.member(A, x, second))) ↦ {
+          ¬(List.member(A, head, tail)) by List.Distinct.head_not_member as headNotInTail;
+          List.Distinct(A, tail) by List.Distinct.tail_distinct as tailDistinct;
+          ¬(List.member(A, head, List.append(A, tail, second)))
+              by (headInAppend : List.member(A, head, List.append(A, tail, second))) ↦ {
+                  List.member(A, head, tail) ∨ List.member(A, head, second)
+                      by List.member_append_invert(A, head, second, tail, headInAppend);
+                  done by cases {
+                    case List.member(A, head, tail) as inTail: headNotInTail(inTail)
+                    case List.member(A, head, second) as inSecond:
+                        disjoint(head, List.member.here(A, head, tail), inSecond)
+                  }
+                } as headNotInAppend;
+          (∀ (x : A). List.member(A, x, tail) → ¬(List.member(A, x, second)))
+              by (x : A) (xInTail : List.member(A, x, tail)) ↦
+                  disjoint(x, List.member.there(A, x, head, tail, xInTail)) as tailDisjoint;
+          List.Distinct(A, List.append(A, tail, second))
+              by IH(tailDistinct, distinctSecond, tailDisjoint) as appendTailDistinct;
+          List.Distinct.prepend(A, head, List.append(A, tail, second),
+              headNotInAppend, appendTailDistinct)
+        }
+  }
+
+-- range_up(n) has no duplicates: each appended top `p` is new (its predecessors
+-- are all strictly below it).
+theorem List.range_up_distinct (n : Natural)
+        : List.Distinct(Natural, List.range_up(n)) :=
+  by induction on n with IH {
+    case base: List.Distinct.empty(Natural)
+    case step(predecessor): {
+        List.Distinct(Natural, List.prepend(Natural, predecessor, List.empty(Natural)))
+            by List.Distinct.prepend(Natural, predecessor, List.empty(Natural),
+                   List.no_member_empty(Natural, predecessor), List.Distinct.empty(Natural))
+            as singletonDistinct;
+        (∀ (x : Natural). List.member(Natural, x, List.range_up(predecessor))
+            → ¬(List.member(Natural, x, List.prepend(Natural, predecessor, List.empty(Natural)))))
+            by (x : Natural) (xInRange : List.member(Natural, x, List.range_up(predecessor)))
+               (xInSingleton : List.member(Natural, x,
+                   List.prepend(Natural, predecessor, List.empty(Natural)))) ↦ {
+                x < predecessor by List.range_up_member_lt(predecessor, x, xInRange);
+                x = predecessor ∨ List.member(Natural, x, List.empty(Natural))
+                    by List.member_prepend_invert;
+                done by cases {
+                  case x = predecessor as xEqual: {
+                      predecessor < predecessor by substituting xEqual;
+                      False by Natural.lt_irreflexive;
+                      done
+                    }
+                  case List.member(Natural, x, List.empty(Natural)) as xInEmpty:
+                      absurd(List.no_member_empty(Natural, x, xInEmpty))
+                }
+              } as disjoint;
+        List.Distinct(Natural,
+                List.append(Natural, List.range_up(predecessor),
+                    List.prepend(Natural, predecessor, List.empty(Natural))))
+            by List.distinct_append(Natural,
+                   List.prepend(Natural, predecessor, List.empty(Natural)),
+                   List.range_up(predecessor), IH, singletonDistinct, disjoint);
+        done by substituting List.range_up_add_one
+      }
   }
 
 -- ----------------------------------------------------------------------
