@@ -75,6 +75,93 @@ against `PLAN_CAST_NORMALIZATION.md`'s leaf-cast form so they compose.
 **Detail.** `one_plus_vs_plus_one_asymmetry` (root cause + landed fixes),
 `numeral_let_ring_elaborator_gaps` item 3 (numerals ≥ 2), `successor_elimination`.
 
+### F1 — Investigation findings (2026-07-15)
+
+**Architectural constraint (the finding that shapes everything).** The failure
+in the brick-6b case (`less_or_equal_add_left(1, d) : 1 ≤ d+1` rejected where
+`1 ≤ 1+d` is expected) is the KERNEL throwing `Application: argument type does
+not match Pi domain` (`src/elaborator/internal.hpp:624`), i.e.
+`isDefinitionallyEqual` (`src/kernel/kernel.cpp:2106`) returns false because
+`Natural.add` is opaque and `d+1` / `1+d` are not defeq. **The kernel must not
+learn arithmetic** — it is the trusted checker; teaching it `add_commutative`
+would either bloat trust or require an axiom. Therefore **every F1 fix is an
+elaborator-level auto-transport: detect the additive mismatch, SYNTHESIZE a
+proof of the rearrangement equality, and insert a transport so the term the
+kernel sees is genuinely well-typed.** No kernel change; trust is preserved and
+the built proof is still kernel-checked.
+
+**Two separable surfaces, both in the elaborator:**
+
+1. **Argument / expected-type coercion** — `coerceToExpectedTypeViaDiff`
+   (`src/elaborator/coercion.cpp:59`), called on every function argument at
+   `src/elaborator/dispatch.cpp:1423`. It already runs a family of transport
+   strategies ((a) equality-goal diff-wrap, (b) `tryDiffBridgeViaContextEquality`,
+   (c) double-negation, (d) bare-proposition). My case fell through all four
+   (expected head is `LessOrEqual`, no context equality, not structurally
+   equal) and hit the kernel reject. **Add strategy (e): Natural additive
+   rearrangement.** Prefilter: expected and actual are the same Natural
+   relation head (`Equality`/`LessOrEqual`/`LessThan` over Natural) with
+   corresponding sides that share an additive normal form but differ
+   syntactically. Action: for each differing side synthesize the equality
+   (`side_actual = side_expected`) and diff-bridge the term across it — reusing
+   the strategy-(b) transport with a *synthesized* equality instead of a
+   context hypothesis.
+
+2. **Citation matching** — `matchAgainstPattern`
+   (`src/elaborator/diff_bridges.cpp:1036`), whose top already canonicalizes
+   `{0,1}` numerals via `asNumeralLiteral` (`diff_bridges.cpp:918`) and peels
+   `successor`/`NaturalLiteral`. **Generalize that canonicalization to a full
+   Natural additive normal form** so `by <successor- or n+1-stated lemma>`
+   matches a `1+n` goal. This only WIDENS matches; the elaborator then builds
+   the application and surface (1) inserts any needed transport, so the two
+   compose and the kernel still re-checks.
+
+**The normal form.** Canonicalize a Natural expression over `+`, `successor`,
+`0`, `1`, and closed numerals to `(sorted multiset of atoms, constant offset)`.
+Two expressions are "additively equal" iff identical normal forms. Terminating
+(finite atom sort), closed under the automatic bridges (`one_add`, `add_one`,
+`add_commutative`, `add_associative`). Define it compatibly with
+`PLAN_CAST_NORMALIZATION.md`'s leaf-cast form (leaf-cast first, then additive)
+so mixed-type expressions compose.
+
+**Proof synthesis is already callable.** `elaborateRing(localBinders,
+expectedType, line, col)` (`src/elaborator/ring.cpp:702`) returns a proof term
+for a stated equality goal, and its carrier detection already recognizes
+`Natural` (`ring.cpp:173`: Natural literals + `successor`) and closes additive
+AC. So strategy (e) synthesizes `side_actual = side_expected` by building that
+equality goal and calling `elaborateRing` (or the lighter `proveAbstractRingAC`,
+`ring.cpp:2179`). No new prover needed — only the detection + transport wiring.
+
+**Risk assessment.**
+- *Soundness*: none. Elaborator builds a real transport; kernel re-checks. No
+  kernel/defeq change.
+- *Performance*: `coerceToExpectedTypeViaDiff` is ~1 ms/call and already
+  prefiltered; strategy (e) needs an equally cheap prefilter (both types are
+  Natural-relation-headed AND at least one side contains `+`/`successor`)
+  before any inferType/normal-form work. `matchAgainstPattern` runs hot — the
+  normal-form escape must be O(size) and only attempted when the plain
+  structural match has already failed at that node.
+- *Termination*: normal form is a terminating sort/merge; `elaborateRing` is
+  bounded.
+- *Surface fidelity*: the transport is invisible (a wrapper), exactly like the
+  existing registry/diff coercions — the user's source is unchanged.
+- *Interaction*: coordinate the atom ordering with cast-normalization so a
+  mixed `1 + x + n` and `1 + n + x` also unify (that is `PLAN_CAST_NORMALIZATION`
+  territory; the Natural normal form is its homogeneous special case).
+
+**Recommended implementation order.**
+- **Step 1 (self-contained, high-value): strategy (e) in
+  `coerceToExpectedTypeViaDiff`.** This is exactly the brick-6b failure, is
+  testable in isolation (a `library/ErrorTest`- or feature-style regression:
+  `lemma(1, d)` of type `1 ≤ d+1` used where `1 ≤ 1+d` is expected), and reuses
+  `elaborateRing` + the diff-bridge. Land it, add regressions, sweep for
+  wrapper-lemma removals it enables.
+- **Step 2: additive normal form in `matchAgainstPattern`.** Retires the
+  `1 +`-form wrapper-lemma idiom for citations. Broader blast radius — do it
+  after step 1 proves the normal form and transport out on the narrower path.
+- **Step 3: fold numerals ≥ 2** into the same normal form (F4b), and re-check
+  the mixed-type cases against `PLAN_CAST_NORMALIZATION`.
+
 ---
 
 ## F2 · Argument / citation coercion across a provable-not-defeq identity  ·  **P1**
