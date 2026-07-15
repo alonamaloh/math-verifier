@@ -1,0 +1,37 @@
+-- F2: an implicit-leading function applies the argument-coercion transport
+-- (strategy (e), Natural additive rearrangement) to its explicit trailing
+-- arguments — through `inferLeadingArguments`, both for positional and named
+-- arguments — exactly as the plain positional-call path does. The trailing-arg
+-- path used to WHNF the expected domain first, which δ-unfolds a relation like
+-- `≤` (`Natural.LessOrEqual` is `< ∨ =`) into an `Or` and defeated strategy
+-- (e)'s relation-head prefilter, so a `1 + n ≤ d` argument would not bridge a
+-- `successor(n) ≤ d` domain when the function's leading `{n d}` were implicit.
+module Test.implicit_leading_argument_coercion_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+
+-- Implicit leading `{n d}`, a premise stated in `successor` form.
+theorem consume_bound {n d : Natural} (bound : successor(n) ≤ d) : n < d :=
+  n < successor(n) ≤ d
+
+-- Positional: the implicits are solved from the goal, then the `1 + n ≤ d`
+-- argument bridges the `successor(n) ≤ d` domain.
+theorem coerce_positional (n d : Natural) (h : 1 + n ≤ d) : n < d :=
+  consume_bound(h)
+
+-- Named: the same bridge fires for a `bound := …` argument.
+theorem coerce_named (n d : Natural) (h : 1 + n ≤ d) : n < d :=
+  consume_bound(bound := h)
+
+-- The reverse form bridges too (a `successor`-form argument into a `+ 1`
+-- domain), confirming the coercion is not one-directional.
+theorem consume_add_one {n d : Natural} (bound : n + 1 ≤ d) : n < d :=
+  Natural.lt_of_add_one_le(n, d, bound)
+
+theorem coerce_reverse (n d : Natural) (h : successor(n) ≤ d) : n < d :=
+  consume_add_one(bound := h)

@@ -626,9 +626,25 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
             // argument fails to fit the domain, so existing calls are
             // unaffected.
             if (expectedForArgument) {
-                kernelTrailingArgument = coerceToExpectedTypeViaDiff(
-                    localBinders, kernelTrailingArgument,
-                    weakHeadNormalForm(environment_, expectedForArgument));
+                // Try the UN-reduced domain first, then the WHNF'd one. The
+                // WHNF is needed for the redex / equality / bare-proposition
+                // shapes (it exposes the head after substituting earlier
+                // arguments), but it also δ-unfolds a relation like `≤`
+                // (`Natural.LessOrEqual` is `< ∨ =`) into an `Or`, which
+                // defeats the Natural-additive-rearrangement strategy (e) —
+                // that prefilters on the relation head. So a `1 + n ≤ d`
+                // argument bridges a `successor(n) ≤ d` domain here exactly as
+                // it does on the positional path (dispatch.cpp), which passes
+                // the un-reduced type. The second attempt no-ops unless the
+                // first left the term unchanged, so nothing regresses.
+                ExpressionPointer coerced = coerceToExpectedTypeViaDiff(
+                    localBinders, kernelTrailingArgument, expectedForArgument);
+                if (coerced.get() == kernelTrailingArgument.get()) {
+                    coerced = coerceToExpectedTypeViaDiff(
+                        localBinders, kernelTrailingArgument,
+                        weakHeadNormalForm(environment_, expectedForArgument));
+                }
+                kernelTrailingArgument = coerced;
             }
             // Infer the trailing arg's type WITHOUT normalising first, so a
             // Definition head (e.g. `Rational.LessOrEqual` for an `a ≤ b`

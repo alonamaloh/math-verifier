@@ -223,6 +223,20 @@ Natural/ring identity, attempt a cost-gated coercion (reuse the F1 normalizer
 premise-discharge also consult registered `instance`s (`numeral_let_ring`
 item 5) — collapses the derived-ring-law boilerplate.
 
+**Progress.** ✅ **Implicit-leading + named-argument coercion — DONE 2026-07-15.**
+Strategy (e) (F1's Natural additive-rearrangement transport) now fires on the
+explicit trailing arguments of an **implicit-leading** call (through
+`inferLeadingArguments`), for both positional and `name := value` arguments —
+so `consume_bound(h)` / `consume_bound(bound := h)` with `consume_bound {n d}
+(bound : successor(n) ≤ d)` and `h : 1 + n ≤ d` now bridge, matching the plain
+positional path. Root cause was a WHNF of the expected domain in the trailing-arg
+path (`inference.cpp:629`) δ-unfolding `≤` (`< ∨ =`) into an `Or`, defeating
+strategy (e)'s relation-head prefilter; fixed by trying the un-reduced domain
+first, WHNF as fallback. Regression:
+`library/Test/implicit_leading_argument_coercion_test.math`. **Remaining F2:**
+the general provable-not-defeq coercion beyond Natural relations, and (b) the
+`instance`-premise discharge.
+
 **Detail.** `numeral_let_ring_elaborator_gaps` items 4 & 5, `coercion_join_project`.
 
 ---
