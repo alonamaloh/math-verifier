@@ -1528,3 +1528,222 @@ theorem VectorSpace.extend_to_basis {f : Field} {V : VectorSpace(f)} {k : Natura
     by { szEq; extBasis; extPrefix; done } as bundle;
   witness sz with witness r with witness ext with bundle
 }
+
+-- ----------------------------------------------------------------------
+-- Brick 5 — the count. The images of the appended vectors form a basis of the
+-- image, so the number appended equals `dim(im T)`, and `dim V = k + r`
+-- becomes `dim(ker T) + dim(im T)`.
+
+-- A subspace family that spans carries the value transport of that spanning:
+-- every subspace vector's value is zero or a `V`-combination of the family
+-- values. The forward companion of `spans_of_value_covered`.
+theorem Subspace.spanning_value_covered {f : Field} {V : VectorSpace(f)} {I : Type(0)}
+        (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
+        (family : I → VectorSpace.carrier(Subspace.vector_space(V, subset, subspace)))
+        (spanning : VectorSpace.Spans(family))
+        : ∀ (x : VectorSpace.carrier(Subspace.vector_space(V, subset, subspace))).
+              Subtype.value(x) = VectorSpace.zero(V)
+              ∨ VectorSpace.InSpanOf((i : I) ↦ Subtype.value(family(i)), Subtype.value(x)) := {
+  take x : VectorSpace.carrier(Subspace.vector_space(V, subset, subspace));
+  x = VectorSpace.zero(Subspace.vector_space(V, subset, subspace))
+      ∨ (∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+             x = VectorSpace.linearCombination(family, coefficients, selection, count))
+      by spanning;
+  done by cases {
+    case x = VectorSpace.zero(Subspace.vector_space(V, subset, subspace)) as xZero: {
+        Subtype.value(x) = Subtype.value(VectorSpace.zero(Subspace.vector_space(V, subset, subspace)))
+               by substituting xZero
+           = VectorSpace.zero(V);
+        done
+      }
+    case ∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+           x = VectorSpace.linearCombination(family, coefficients, selection, count) as xInSpan: {
+        choose count, selection, coefficients such that
+            x = VectorSpace.linearCombination(family, coefficients, selection, count) as xIsCombo from xInSpan;
+        Subtype.value(x)
+           = Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, count))
+                 by substituting xIsCombo
+           = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)), coefficients, selection, count)
+                 by Subspace.linearCombination_value as valEq;
+        VectorSpace.InSpanOf((i : I) ↦ Subtype.value(family(i)), Subtype.value(x))
+            by { witness count with witness selection with witness coefficients with valEq };
+        done
+      }
+  }
+}
+
+theorem Natural.lt_of_add_left_lt (a x y : Natural) (h : a + x < a + y) : x < y := {
+  successor(a + x) ≤ a + y by Natural.successor_le_of_lt;
+  a + successor(x) = successor(a + x) by Natural.add_successor;
+  a + successor(x) ≤ a + y by substituting (a + successor(x) = successor(a + x));
+  successor(x) ≤ y by Natural.add_left_le_cancel;
+  done by Natural.lt_of_successor_le
+}
+
+-- The images of the appended vectors span the image. Every image element is
+-- `T(v)` with `v` a combination of the basis `ext`; `T` distributes over that
+-- combination, and each `T(ext(i))` is either zero (the `e`-prefix, which lies
+-- in the kernel) or one of the `T(aFamily(j))` (the appended suffix). The
+-- disjunctive `of_combination_covered` carries that over the whole sum.
+theorem LinearMap.appended_images_span {f : Field} {V W : VectorSpace(f)} {k r sz : Natural}
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) (linear : IsLinearMap(V, W, T))
+        (e : NaturalsBelow(k) → VectorSpace.carrier(V))
+        (ext : NaturalsBelow(sz) → VectorSpace.carrier(V))
+        (aFamily : NaturalsBelow(r) → VectorSpace.carrier(V))
+        (imgSub : IsSubspace(W, LinearMap.image(V, W, T)))
+        (TaFamily : NaturalsBelow(r) → VectorSpace.carrier(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub)))
+        (taValue : ∀ (j : NaturalsBelow(r)). Subtype.value(TaFamily(j)) = T(aFamily(j)))
+        (szEq : sz = k + r)
+        (extSpans : VectorSpace.Spans(ext))
+        (eKernel : ∀ (i : NaturalsBelow(k)). T(e(i)) = VectorSpace.zero(W))
+        (extPrefix : ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+        (extSuffix : ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(r)).
+            NaturalsBelow.value(i) = k + NaturalsBelow.value(j) → ext(i) = aFamily(j))
+        : VectorSpace.Spans(TaFamily) := {
+
+  ∀ (i : NaturalsBelow(sz)).
+      T(ext(i)) = VectorSpace.zero(W)
+      ∨ VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)), T(ext(i)))
+    by {
+      take i : NaturalsBelow(sz);
+      NaturalsBelow.value(i) < k ∨ k ≤ NaturalsBelow.value(i) by Natural.lt_or_le;
+      done by cases {
+        case NaturalsBelow.value(i) < k as iBelow: {
+            NaturalsBelow.value(i) = NaturalsBelow.value(NaturalsBelow.make(NaturalsBelow.value(i), iBelow));
+            ext(i) = e(NaturalsBelow.make(NaturalsBelow.value(i), iBelow))
+                by extPrefix(i, NaturalsBelow.make(NaturalsBelow.value(i), iBelow)) as extAtI;
+            T(ext(i)) = T(e(NaturalsBelow.make(NaturalsBelow.value(i), iBelow))) by substituting extAtI
+               = VectorSpace.zero(W) by eKernel(NaturalsBelow.make(NaturalsBelow.value(i), iBelow));
+            done
+          }
+        case k ≤ NaturalsBelow.value(i) as iAtLeast: {
+            NaturalsBelow.value(i) = k + Natural.monus(NaturalsBelow.value(i), k)
+                by NaturalsBelow.decompose_at_least(k, NaturalsBelow.value(i)) as decomp;
+            NaturalsBelow.value(i) < sz by NaturalsBelow.below;
+            k + Natural.monus(NaturalsBelow.value(i), k) < sz by substituting decomp;
+            k + Natural.monus(NaturalsBelow.value(i), k) < k + r by substituting szEq;
+            Natural.monus(NaturalsBelow.value(i), k) < r by Natural.lt_of_add_left_lt as qBelow;
+            NaturalsBelow.value(i)
+                = k + NaturalsBelow.value(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))
+                by decomp as valMatch;
+            ext(i) = aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))
+                by extSuffix(i, NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow), valMatch)
+                as extAtI;
+            VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)),
+                T(aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))))
+                by VectorSpace.InSpanOf.member((j : NaturalsBelow(r)) ↦ T(aFamily(j)),
+                       NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow));
+            T(ext(i)) = T(aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow)))
+                by substituting extAtI;
+            VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)), T(ext(i)))
+                by substituting (T(ext(i)) = T(aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))));
+            done
+          }
+      }
+    } as genCov;
+
+  ∀ (x : VectorSpace.carrier(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub))).
+      Subtype.value(x) = VectorSpace.zero(W)
+      ∨ VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)), Subtype.value(x))
+    by {
+      take x : VectorSpace.carrier(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub));
+      Subtype.value(x) ∈ LinearMap.image(V, W, T) by Subtype.property;
+      ∃ (v : VectorSpace.carrier(V)). T(v) = Subtype.value(x);
+      choose v such that T(v) = Subtype.value(x) as vHits;
+      v = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(ext, v) by extSpans;
+      done by cases {
+        case v = VectorSpace.zero(V) as vZero: {
+            Subtype.value(x) = T(v) by vHits
+               = T(VectorSpace.zero(V)) by substituting vZero
+               = VectorSpace.zero(W) by LinearMap.preserves_zero;
+            done
+          }
+        case VectorSpace.InSpanOf(ext, v) as vInSpan: {
+            choose count, selection, coefficients such that
+                v = VectorSpace.linearCombination(ext, coefficients, selection, count) as vCombo from vInSpan;
+            T(v) = T(VectorSpace.linearCombination(ext, coefficients, selection, count)) by substituting vCombo
+               = VectorSpace.linearCombination((i : NaturalsBelow(sz)) ↦ T(ext(i)), coefficients, selection, count)
+                     by LinearMap.apply_linearCombination(linear, ext, coefficients, selection, count)
+               as tvEq;
+            VectorSpace.linearCombination((i : NaturalsBelow(sz)) ↦ T(ext(i)), coefficients, selection, count)
+                = VectorSpace.zero(W)
+                ∨ VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)),
+                      VectorSpace.linearCombination((i : NaturalsBelow(sz)) ↦ T(ext(i)),
+                          coefficients, selection, count))
+                by VectorSpace.InSpanOf.of_combination_covered as combCov;
+            done by cases {
+              case VectorSpace.linearCombination((i : NaturalsBelow(sz)) ↦ T(ext(i)), coefficients, selection, count)
+                     = VectorSpace.zero(W) as combZero: {
+                  Subtype.value(x) = T(v) by vHits
+                     = VectorSpace.linearCombination((i : NaturalsBelow(sz)) ↦ T(ext(i)), coefficients, selection, count)
+                           by tvEq
+                     = VectorSpace.zero(W) by combZero;
+                  done
+                }
+              case VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)),
+                     VectorSpace.linearCombination((i : NaturalsBelow(sz)) ↦ T(ext(i)),
+                         coefficients, selection, count)) as combInSpan: {
+                  Subtype.value(x) = T(v) by vHits
+                     = VectorSpace.linearCombination((i : NaturalsBelow(sz)) ↦ T(ext(i)), coefficients, selection, count)
+                           by tvEq
+                     as vxEq;
+                  VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)), Subtype.value(x))
+                      by { done by substituting vxEq };
+                  done
+                }
+            }
+          }
+      }
+    } as coveredFact;
+
+  VectorSpace.Spans(TaFamily)
+    by {
+  take x : VectorSpace.carrier(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub));
+  x = VectorSpace.zero(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub))
+      ∨ VectorSpace.InSpanOf(TaFamily, x)
+    by {
+  Subtype.value(x) = VectorSpace.zero(W)
+      ∨ VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)), Subtype.value(x)) by coveredFact;
+  done by cases {
+    case Subtype.value(x) = VectorSpace.zero(W) as valueZero: {
+        Subtype.value(x) = VectorSpace.zero(W)
+           = Subtype.value(VectorSpace.zero(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub)));
+        x = VectorSpace.zero(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub))
+            by Subtype.equal_of_value_equal;
+        done
+      }
+    case VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)), Subtype.value(x)) as valueInSpan: {
+        choose count, selection, coefficients such that
+            Subtype.value(x) = VectorSpace.linearCombination(
+                (j : NaturalsBelow(r)) ↦ T(aFamily(j)), coefficients, selection, count)
+            as vxCombo from valueInSpan;
+        ∀ (i : Natural). i < count →
+            coefficients(i) • Subtype.value(TaFamily(selection(i)))
+            = coefficients(i) • T(aFamily(selection(i)))
+          by { take i : Natural; suppose i < count as iBelow;
+               Subtype.value(TaFamily(selection(i))) = T(aFamily(selection(i))) by taValue as tv;
+               done by substituting tv } as termsMatch;
+        Subtype.value(VectorSpace.linearCombination(TaFamily, coefficients, selection, count))
+           = VectorSpace.linearCombination((j : NaturalsBelow(r)) ↦ Subtype.value(TaFamily(j)),
+                 coefficients, selection, count)
+                 by Subspace.linearCombination_value
+           = VectorSpace.linearCombination((j : NaturalsBelow(r)) ↦ T(aFamily(j)), coefficients, selection, count)
+                 by VectorSpace.linearCombination_congruence
+           as bridgeEq;
+        Subtype.value(x)
+           = VectorSpace.linearCombination((j : NaturalsBelow(r)) ↦ T(aFamily(j)), coefficients, selection, count)
+                 by vxCombo
+           = Subtype.value(VectorSpace.linearCombination(TaFamily, coefficients, selection, count)) by bridgeEq;
+        x = VectorSpace.linearCombination(TaFamily, coefficients, selection, count)
+            by Subtype.equal_of_value_equal as xIsCombination;
+        VectorSpace.InSpanOf(TaFamily, x)
+            by { witness count with witness selection with witness coefficients with xIsCombination };
+        done
+      }
+  }
+    };
+  done
+  } as spanResult;
+  done
+}
