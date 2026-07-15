@@ -1,0 +1,141 @@
+-- Lists/cartesian.math
+--
+-- The Cartesian product of two lists as a list of pairs, with membership
+-- (both directions) and distinctness. Built by concatenating, for each `a` in
+-- the first list, the row `{ (a, b) : b ∈ second }`. Distinctness needs both
+-- lists distinct: each row is distinct (pairing in `b` is injective) and rows
+-- for different `a` are disjoint (they disagree in the first component).
+
+module Lists.cartesian
+
+import Logic.basics
+import Equality.basics
+import Logic.product
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+
+definition List.cartesianProduct (A B : Type(0)) (second : List(B))
+        : List(A) → List(Pair(A, B))
+  | List.empty => List.empty(Pair(A, B))
+  | List.prepend(a, rest) =>
+      List.append(Pair(A, B),
+          List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second),
+          List.cartesianProduct(A, B, second, rest))
+
+-- Membership, forward: a pair of members is a member of the product.
+theorem List.cartesianProduct_member (A B : Type(0)) (a : A) (b : B)
+        (first : List(A)) (second : List(B))
+        (aMember : List.member(A, a, first)) (bMember : List.member(B, b, second))
+        : List.member(Pair(A, B), Product.make(a, b), List.cartesianProduct(A, B, second, first)) :=
+  by induction on aMember with IH {
+    case List.member.here(rest):
+        List.member_append_left(Pair(A, B), Product.make(a, b),
+            List.map(B, Pair(A, B), (c : B) ↦ Product.make(a, c), second),
+            List.cartesianProduct(A, B, second, rest),
+            List.map_member(B, Pair(A, B), (c : B) ↦ Product.make(a, c), b, second, bMember))
+    case List.member.there(head, rest, sub):
+        List.member_append_right(Pair(A, B), Product.make(a, b),
+            List.map(B, Pair(A, B), (c : B) ↦ Product.make(head, c), second),
+            List.cartesianProduct(A, B, second, rest), IH)
+  }
+
+-- Membership, backward: a member of the product projects to members of both.
+theorem List.cartesianProduct_member_invert (A B : Type(0)) (p : Pair(A, B))
+        (second : List(B)) (first : List(A))
+        : List.member(Pair(A, B), p, List.cartesianProduct(A, B, second, first))
+          → List.member(A, Product.first(p), first) ∧ List.member(B, Product.second(p), second) :=
+  by induction on first with IH {
+    case List.empty:
+        (memberP : List.member(Pair(A, B), p, List.cartesianProduct(A, B, second, List.empty(A)))) ↦
+            absurd(List.no_member_empty(Pair(A, B), p, memberP))
+    case List.prepend(a, rest):
+        (memberP : List.member(Pair(A, B), p,
+            List.cartesianProduct(A, B, second, List.prepend(A, a, rest)))) ↦ {
+          List.member(Pair(A, B), p, List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second))
+              ∨ List.member(Pair(A, B), p, List.cartesianProduct(A, B, second, rest))
+              by List.member_append_invert(Pair(A, B), p,
+                     List.cartesianProduct(A, B, second, rest),
+                     List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second), memberP);
+          done by cases {
+            case List.member(Pair(A, B), p,
+                List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second)) as inRow: {
+                choose b such that List.member(B, b, second) ∧ (Product.make(a, b) = p)
+                    from List.map_member_invert(B, Pair(A, B), (c : B) ↦ Product.make(a, c), p, second, inRow);
+                Product.make(a, b) = p as pairIsP;
+                Product.first(p) = Product.first(Product.make(a, b)) by substituting pairIsP
+                   = a as firstIsA;
+                Product.second(p) = Product.second(Product.make(a, b)) by substituting pairIsP
+                   = b as secondIsB;
+                List.member(A, a, List.prepend(A, a, rest)) by List.member.here;
+                List.member(A, Product.first(p), List.prepend(A, a, rest)) by substituting firstIsA;
+                List.member(B, Product.second(p), second) by substituting secondIsB;
+                done
+              }
+            case List.member(Pair(A, B), p, List.cartesianProduct(A, B, second, rest)) as inRest: {
+                List.member(A, Product.first(p), rest) ∧ List.member(B, Product.second(p), second)
+                    by IH(inRest);
+                List.member(A, Product.first(p), rest) as firstInRest;
+                List.member(B, Product.second(p), second);
+                List.member(A, Product.first(p), List.prepend(A, a, rest))
+                    by List.member.there(A, Product.first(p), a, rest, firstInRest);
+                done
+              }
+          }
+        }
+  }
+
+-- Distinctness: the product of two distinct lists is distinct.
+theorem List.cartesianProduct_distinct (A B : Type(0)) (second : List(B))
+        (secondDistinct : List.Distinct(B, second)) (first : List(A))
+        : List.Distinct(A, first)
+          → List.Distinct(Pair(A, B), List.cartesianProduct(A, B, second, first)) :=
+  by induction on first with IH {
+    case List.empty:
+        (firstDistinct : List.Distinct(A, List.empty(A))) ↦ List.Distinct.empty(Pair(A, B))
+    case List.prepend(a, rest):
+        (firstDistinct : List.Distinct(A, List.prepend(A, a, rest))) ↦ {
+          ¬(List.member(A, a, rest)) by List.Distinct.head_not_member as aNotInRest;
+          List.Distinct(A, rest) by List.Distinct.tail_distinct as restDistinct;
+          -- The row for `a` is distinct: pairing in b is injective.
+          List.Distinct(Pair(A, B), List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second))
+              by List.map_distinct(B, Pair(A, B), (b : B) ↦ Product.make(a, b),
+                     (b1 b2 : B) (pairsEqual : Product.make(a, b1) = Product.make(a, b2)) ↦ {
+                         b1 = Product.second(Product.make(a, b1)) by substituting pairsEqual
+                            = Product.second(Product.make(a, b2))
+                            = b2;
+                         done
+                       }, second, secondDistinct)
+              as rowDistinct;
+          -- The row for `a` is disjoint from the product over `rest`: every pair
+          -- in the row has first component `a`, absent from `rest`.
+          (∀ (p : Pair(A, B)). List.member(Pair(A, B), p,
+              List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second))
+              → ¬(List.member(Pair(A, B), p, List.cartesianProduct(A, B, second, rest))))
+              by (p : Pair(A, B))
+                 (inRow : List.member(Pair(A, B), p,
+                     List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second)))
+                 (inRest : List.member(Pair(A, B), p, List.cartesianProduct(A, B, second, rest))) ↦ {
+                  choose b such that List.member(B, b, second) ∧ (Product.make(a, b) = p)
+                      from List.map_member_invert(B, Pair(A, B), (c : B) ↦ Product.make(a, c), p, second, inRow);
+                  Product.make(a, b) = p as pairIsP;
+                  List.member(A, Product.first(p), rest) ∧ List.member(B, Product.second(p), second)
+                      by List.cartesianProduct_member_invert(A, B, p, second, rest, inRest);
+                  List.member(A, Product.first(p), rest);
+                  Product.first(p) = Product.first(Product.make(a, b)) by substituting pairIsP
+                     = a as firstIsA;
+                  List.member(A, a, rest) by substituting firstIsA;
+                  False by aNotInRest;
+                  done
+                } as disjoint;
+          List.Distinct(Pair(A, B),
+                  List.append(Pair(A, B),
+                      List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second),
+                      List.cartesianProduct(A, B, second, rest)))
+              by List.distinct_append(Pair(A, B), List.cartesianProduct(A, B, second, rest),
+                     List.map(B, Pair(A, B), (b : B) ↦ Product.make(a, b), second),
+                     rowDistinct, IH(restDistinct), disjoint);
+          done
+        }
+  }
