@@ -227,3 +227,254 @@ theorem Permutation.sign_identity (n : Natural) : Permutation.sign(Permutation.i
       List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
           Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n)), allOne)
 }
+
+-- ----------------------------------------------------------------------
+-- Multiplicativity: sign(σ ∘ τ) = sign σ · sign τ. The composite's product
+-- factors pairwise into a τ-orientation and a σ-orientation on the τ-image of
+-- the pair; the first product reassembles sign τ and the second, reindexed by
+-- the τ-image (a permutation of the ordered pairs), reassembles sign σ.
+
+-- A pair is its own components reassembled.
+theorem Product.eta (A B : Type(0)) (p : Pair(A, B))
+        : p = Product.make(Product.first(p), Product.second(p)) :=
+  by induction on p {
+    case Product.make(a, b): reflexivity(Product.make(a, b))
+  }
+
+-- Sorting a pair of indices into value order.
+definition Permutation.sortPair {n : Natural} (a b : NaturalsBelow(n))
+        : Pair(NaturalsBelow(n), NaturalsBelow(n)) :=
+  if NaturalsBelow.value(a) < NaturalsBelow.value(b) then Product.make(a, b) else Product.make(b, a)
+
+theorem Permutation.sortPair_forward {n : Natural} (a b : NaturalsBelow(n))
+        (precedes : NaturalsBelow.value(a) < NaturalsBelow.value(b))
+        : Permutation.sortPair(a, b) = Product.make(a, b) :=
+  done by Logic.if_positive
+
+theorem Permutation.sortPair_backward {n : Natural} (a b : NaturalsBelow(n))
+        (notPrecedes : ¬(NaturalsBelow.value(a) < NaturalsBelow.value(b)))
+        : Permutation.sortPair(a, b) = Product.make(b, a) :=
+  done by Logic.if_negative
+
+-- A list-map is unchanged if the two functions agree on the list's members.
+theorem List.map_congruence_on (A B : Type(0)) (f g : A → B) (l : List(A))
+        (agree : ∀ (x : A). List.member(A, x, l) → f(x) = g(x))
+        : List.map(A, B, f, l) = List.map(A, B, g, l) :=
+  by induction on l with IH {
+    case List.empty: reflexivity(List.empty(B))
+    case List.prepend(head, tail): {
+        f(head) = g(head) by agree(head, List.member.here(A, head, tail)) as headAgree;
+        (∀ (x : A). List.member(A, x, tail) → f(x) = g(x))
+            by (x : A) (xInTail : List.member(A, x, tail)) ↦
+                agree(x, List.member.there(A, x, head, tail, xInTail)) as tailAgree;
+        List.map(A, B, f, List.prepend(A, head, tail))
+           = List.prepend(B, f(head), List.map(A, B, f, tail))
+           = List.prepend(B, g(head), List.map(A, B, f, tail)) by substituting headAgree
+           = List.prepend(B, g(head), List.map(A, B, g, tail)) by substituting IH(tailAgree)
+           = List.map(A, B, g, List.prepend(A, head, tail));
+        done
+      }
+  }
+
+-- The fold-product of a pointwise Integer product splits into the product of
+-- the two fold-products.
+theorem List.product_pointwise_multiply (B : Type(0)) (f g : B → Integer) (l : List(B))
+        : List.product(Integer, Integer.multiply, Integer.one,
+              List.map(B, Integer, (x : B) ↦ Integer.multiply(f(x), g(x)), l))
+          = Integer.multiply(
+                List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, l)),
+                List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, g, l))) :=
+  by induction on l with IH {
+    case List.empty:
+        List.product(Integer, Integer.multiply, Integer.one,
+                 List.map(B, Integer, (x : B) ↦ Integer.multiply(f(x), g(x)), List.empty(B)))
+           = Integer.one
+           = Integer.multiply(Integer.one, Integer.one) by ring
+           = Integer.multiply(
+                 List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, List.empty(B))),
+                 List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, g, List.empty(B))))
+    case List.prepend(head, tail):
+        List.product(Integer, Integer.multiply, Integer.one,
+                 List.map(B, Integer, (x : B) ↦ Integer.multiply(f(x), g(x)), List.prepend(B, head, tail)))
+           = Integer.multiply(Integer.multiply(f(head), g(head)),
+                 List.product(Integer, Integer.multiply, Integer.one,
+                     List.map(B, Integer, (x : B) ↦ Integer.multiply(f(x), g(x)), tail)))
+           = Integer.multiply(Integer.multiply(f(head), g(head)),
+                 Integer.multiply(
+                     List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, tail)),
+                     List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, g, tail))))
+                 by substituting IH
+           = Integer.multiply(
+                 Integer.multiply(f(head),
+                     List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, tail))),
+                 Integer.multiply(g(head),
+                     List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, g, tail))))
+                 by ring
+           = Integer.multiply(
+                 List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, List.prepend(B, head, tail))),
+                 List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, g, List.prepend(B, head, tail))))
+  }
+
+-- The reindexing map on ordered pairs: send (i, j) to the value-sorted image
+-- (τ(i), τ(j)). It permutes `orderedPairs(n)` — the heart of the reindexing.
+definition Permutation.pairImage {m : Natural} (tau : Permutation(m))
+        (p : Pair(NaturalsBelow(m), NaturalsBelow(m))) : Pair(NaturalsBelow(m), NaturalsBelow(m)) :=
+  Permutation.sortPair(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)))
+
+-- A value-ordered pair has distinct components.
+theorem Permutation.pair_first_ne_second {n : Natural} (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+        (precedes : NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p)))
+        : Product.first(p) ≠ Product.second(p) :=
+  (equal : Product.first(p) = Product.second(p)) ↦ {
+    NaturalsBelow.value(Product.first(p))
+       < NaturalsBelow.value(Product.second(p)) by precedes
+       = NaturalsBelow.value(Product.first(p)) by substituting equal;
+    False by Natural.lt_irreflexive(NaturalsBelow.value(Product.first(p)));
+    done
+  }
+
+-- A permutation sends distinct indices to indices with distinct values.
+theorem Permutation.apply_values_distinct {n : Natural} (sigma : Permutation(n)) (a b : NaturalsBelow(n))
+        (distinct : a ≠ b)
+        : NaturalsBelow.value(Permutation.apply(sigma, a)) ≠ NaturalsBelow.value(Permutation.apply(sigma, b)) :=
+  (valuesEqual : NaturalsBelow.value(Permutation.apply(sigma, a)) = NaturalsBelow.value(Permutation.apply(sigma, b))) ↦ {
+    Permutation.apply(sigma, a) = Permutation.apply(sigma, b)
+        by NaturalsBelow.equal_of_value(n, Permutation.apply(sigma, a), Permutation.apply(sigma, b), valuesEqual);
+    a = b by Permutation.apply_injective(sigma, a, b);
+    False by distinct;
+    done
+  }
+
+-- The τ-image of an ordered pair is again an ordered pair.
+theorem Permutation.pairImage_in_orderedPairs {n : Natural} (tau : Permutation(n))
+        (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.pairImage(tau, p),
+              Permutation.orderedPairs(n)) := {
+  NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p))
+      by Permutation.orderedPairs_property(n, p, memberP) as precedes;
+  Product.first(p) ≠ Product.second(p) by Permutation.pair_first_ne_second(p, precedes) as componentsDistinct;
+  NaturalsBelow.value(Permutation.apply(tau, Product.first(p)))
+      ≠ NaturalsBelow.value(Permutation.apply(tau, Product.second(p)))
+      by Permutation.apply_values_distinct(tau, Product.first(p), Product.second(p), componentsDistinct)
+      as imageValuesDistinct;
+  NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.second(p)))
+      ∨ NaturalsBelow.value(Permutation.apply(tau, Product.second(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.first(p)))
+      by Natural.lt_or_gt_of_ne(NaturalsBelow.value(Permutation.apply(tau, Product.first(p))),
+             NaturalsBelow.value(Permutation.apply(tau, Product.second(p))), imageValuesDistinct);
+  done by cases {
+    case NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.second(p))) as imageForward: {
+        Permutation.pairImage(tau, p)
+           = Product.make(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)))
+                 by Permutation.sortPair_forward(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)), imageForward);
+        List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+              Product.make(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p))),
+              Permutation.orderedPairs(n))
+            by Permutation.orderedPairs_member(n, Permutation.apply(tau, Product.first(p)),
+                   Permutation.apply(tau, Product.second(p)), imageForward);
+        done
+      }
+    case NaturalsBelow.value(Permutation.apply(tau, Product.second(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) as imageBackward: {
+        ¬(NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.second(p))))
+            by Natural.lt_asymmetric(NaturalsBelow.value(Permutation.apply(tau, Product.second(p))),
+                   NaturalsBelow.value(Permutation.apply(tau, Product.first(p))), imageBackward) as notForward;
+        Permutation.pairImage(tau, p)
+           = Product.make(Permutation.apply(tau, Product.second(p)), Permutation.apply(tau, Product.first(p)))
+                 by Permutation.sortPair_backward(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)), notForward);
+        List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+              Product.make(Permutation.apply(tau, Product.second(p)), Permutation.apply(tau, Product.first(p))),
+              Permutation.orderedPairs(n))
+            by Permutation.orderedPairs_member(n, Permutation.apply(tau, Product.second(p)),
+                   Permutation.apply(tau, Product.first(p)), imageBackward);
+        done
+      }
+  }
+}
+
+-- The τ-image is inverted by the τ⁻¹-image: it has a two-sided inverse on the
+-- ordered pairs, hence is injective there.
+theorem Permutation.pairImage_cancel {n : Natural} (tau : Permutation(n))
+        (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        : Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p)) = p := {
+  let fp : NaturalsBelow(n) := Product.first(p);
+  let sp : NaturalsBelow(n) := Product.second(p);
+  NaturalsBelow.value(fp) < NaturalsBelow.value(sp)
+      by Permutation.orderedPairs_property(n, p, memberP) as precedes;
+  fp ≠ sp by Permutation.pair_first_ne_second(p, precedes) as fpNeSp;
+  NaturalsBelow.value(Permutation.apply(tau, fp)) ≠ NaturalsBelow.value(Permutation.apply(tau, sp))
+      by Permutation.apply_values_distinct(tau, fp, sp, fpNeSp) as imageDistinct;
+  p = Product.make(fp, sp) by Product.eta(NaturalsBelow(n), NaturalsBelow(n), p) as pEta;
+  NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp))
+      ∨ NaturalsBelow.value(Permutation.apply(tau, sp)) < NaturalsBelow.value(Permutation.apply(tau, fp))
+      by Natural.lt_or_gt_of_ne(NaturalsBelow.value(Permutation.apply(tau, fp)),
+             NaturalsBelow.value(Permutation.apply(tau, sp)), imageDistinct);
+  done by cases {
+    case NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp)) as fwd: {
+        Permutation.pairImage(tau, p)
+            = Product.make(Permutation.apply(tau, fp), Permutation.apply(tau, sp))
+                  by Permutation.sortPair_forward(Permutation.apply(tau, fp), Permutation.apply(tau, sp), fwd)
+            as imageForward;
+        Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p))
+           = Permutation.pairImage(Permutation.inverse(tau),
+                 Product.make(Permutation.apply(tau, fp), Permutation.apply(tau, sp)))
+                 by substituting imageForward
+           = Permutation.sortPair(
+                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, fp)),
+                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, sp)))
+           = Permutation.sortPair(Permutation.unapply(tau, Permutation.apply(tau, fp)),
+                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, sp)))
+                 by substituting Permutation.apply_inverse(tau, Permutation.apply(tau, fp))
+           = Permutation.sortPair(fp, Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, sp)))
+                 by substituting Permutation.left_inverse(tau, fp)
+           = Permutation.sortPair(fp, Permutation.unapply(tau, Permutation.apply(tau, sp)))
+                 by substituting Permutation.apply_inverse(tau, Permutation.apply(tau, sp))
+           = Permutation.sortPair(fp, sp) by substituting Permutation.left_inverse(tau, sp)
+           = Product.make(fp, sp) by Permutation.sortPair_forward(fp, sp, precedes)
+           = p by pEta;
+        done
+      }
+    case NaturalsBelow.value(Permutation.apply(tau, sp)) < NaturalsBelow.value(Permutation.apply(tau, fp)) as bwd: {
+        ¬(NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp)))
+            by Natural.lt_asymmetric(NaturalsBelow.value(Permutation.apply(tau, sp)),
+                   NaturalsBelow.value(Permutation.apply(tau, fp)), bwd) as notForward;
+        ¬(NaturalsBelow.value(sp) < NaturalsBelow.value(fp))
+            by Natural.lt_asymmetric(NaturalsBelow.value(fp), NaturalsBelow.value(sp), precedes) as spNotBelowFp;
+        Permutation.pairImage(tau, p)
+            = Product.make(Permutation.apply(tau, sp), Permutation.apply(tau, fp))
+                  by Permutation.sortPair_backward(Permutation.apply(tau, fp), Permutation.apply(tau, sp), notForward)
+            as imageBackward;
+        Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p))
+           = Permutation.pairImage(Permutation.inverse(tau),
+                 Product.make(Permutation.apply(tau, sp), Permutation.apply(tau, fp)))
+                 by substituting imageBackward
+           = Permutation.sortPair(
+                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, sp)),
+                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, fp)))
+           = Permutation.sortPair(Permutation.unapply(tau, Permutation.apply(tau, sp)),
+                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, fp)))
+                 by substituting Permutation.apply_inverse(tau, Permutation.apply(tau, sp))
+           = Permutation.sortPair(sp, Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, fp)))
+                 by substituting Permutation.left_inverse(tau, sp)
+           = Permutation.sortPair(sp, Permutation.unapply(tau, Permutation.apply(tau, fp)))
+                 by substituting Permutation.apply_inverse(tau, Permutation.apply(tau, fp))
+           = Permutation.sortPair(sp, fp) by substituting Permutation.left_inverse(tau, fp)
+           = Product.make(fp, sp) by Permutation.sortPair_backward(sp, fp, spNotBelowFp)
+           = p by pEta;
+        done
+      }
+  }
+}
+
+-- Injectivity of the τ-image on the ordered pairs (from the cancellation).
+theorem Permutation.pairImage_injective_on {n : Natural} (tau : Permutation(n))
+        (p q : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        (memberQ : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), q, Permutation.orderedPairs(n)))
+        (imagesEqual : Permutation.pairImage(tau, p) = Permutation.pairImage(tau, q))
+        : p = q :=
+  p = Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p))
+          by Permutation.pairImage_cancel(tau, p, memberP)
+    = Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, q))
+          by substituting imagesEqual
+    = q by Permutation.pairImage_cancel(tau, q, memberQ)
