@@ -978,16 +978,26 @@ engine directly. Group laws are then immediate.
    (`∏xᵢyᵢ=(∏xᵢ)(∏yᵢ)` — split `A(i,φi)·B(φi,σi)`). All clean list inductions,
    `ring` for field rearrangements. Gates green through export-check 3046.
    **REMAINING (the hard combinatorial core — multi-session):**
-   - **(6a) function-space enumeration + generalized distributivity** — the
-     `Finset.prod_univ_sum` analog `∏_{i<n} Σ_{k<n} g(i,k) = Σ_φ ∏_{i<n} g(i,φi)`.
-     DESIGN DECISION PENDING: represent φ as function objects
-     `NaturalsBelow(n)→NaturalsBelow(n)` (enumerate `allFunctions(n)` via a
-     codomain-fixed `functionsBelow(k,n)` recursion — domain-widening extend-by-value,
-     codomain NB(n) fixed, so NOT the allPermutations restrict-recursion; uniform
-     functional indexing downstream, harder enumeration) vs. value-list selectors
-     (clean induction on the index list, but a positional↔functional bridge at
-     reindex). Leaning function objects for uniform algebra. `allFunctions` needs
-     completeness; distinctness likely only for the reindex step.
+   - **(6a) function-space enumeration + generalized distributivity** — DONE
+     (`Algebra/function_enumeration.math`). DESIGN DECISION RESOLVED: **Option A
+     (function objects)** — φ : NaturalsBelow(n) → NaturalsBelow(n), enumerated by
+     `Function.functionsBelow(C, choices, k)` via a codomain-fixed,
+     domain-widening recursion (extend-by-value on the top index), riding the
+     same `unfold Natural.add in <arm>` dependent-index bridge as allPermutations.
+     Timeboxed allFunctions+completeness attempt came in CLEAN (no fight), so
+     committed to A. Landed: `Function.extendByValue` + apply lemmas
+     (`_below`/`_inclusion`/`_top`) + `extendByValue_decompose` (via
+     Function.extensionality); `functionsBelow`/`allFunctions` +
+     `functionsBelow_complete`/`allFunctions_complete`; and the headline
+     `Field.productOfSums_distributes` `∏_{i<rows} Σ_{c∈choices} h(i,c) =
+     Σ_{φ∈functionsBelow} ∏_{i<rows} h(i,φi)` (induction on rows; step peels the
+     top row, applies IH to the restricted h'(x,c)=h(inclusion(m,x),c), matches
+     the bilinear double sum against concatenated rows via Fubini) with corollary
+     `Field.productOfSums_over_allFunctions` (C=NB(n), choices=enumerate(n)).
+     Helpers `sumOver_concatFunctionRows` + `productOver_extendByValue_split`.
+     The row-type tension dissolved by keeping h on NB(rows) and restricting in
+     the IH — no NaturalsBelow embedding. `allFunctions_distinct` NOT yet built
+     (needed only for the 6d reindex). Gates: export-check 3067, choice-free.
    - **(6b) `sign(swap(a,b)) = −1`** — transposition is odd. Route: reduce to
      value(a)<value(b) (swap symmetric); conjugation induction on the value-distance
      d=value(b)−value(a): swap(a,b)=swap(a,c)∘swap(c,b)∘swap(a,c) with value(c)=value(a)+1,
@@ -1007,7 +1017,7 @@ engine directly. Group laws are then immediate.
      then `det(AB)=Σ_φ̂ (∏A(i,φ̂i))·sign(φ̂)·det(B)=det(A)·det(B)`.
 
 Realistic size: multi-session. Bricks 2, 3, 6 are the cost; 1, 4, 5 are
-scaffolding. Brick 6 backbone (aggregation) DONE; 6a–6d remain.
+scaffolding. Brick 6 backbone (aggregation) DONE; 6a DONE; 6b–6d remain.
 
 ## Choice-profile guardrails
 
