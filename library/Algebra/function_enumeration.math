@@ -1,0 +1,130 @@
+-- Algebra/function_enumeration.math
+--
+-- The enumeration list `Function.allFunctions(n) : List(NaturalsBelow(n) →
+-- NaturalsBelow(n))` — every "choice function" picking a column for each row,
+-- each listed exactly once. This is the index set the generalized-distributivity
+-- step of det(AB) sums over (Stage H brick 6a of PLAN_LINEAR_ALGEBRA.md).
+--
+-- The recursion mirrors `allPermutations`, but the codomain stays fixed while
+-- the DOMAIN widens: a function `NaturalsBelow(1 + k) → C` is determined by
+-- where it sends the top index and by its restriction below, so
+-- `functionsBelow(1 + k)` concatenates, over every `f ∈ functionsBelow(k)`, the
+-- row `[ extendByValue(f, v) : v ∈ choices ]`.
+
+module Algebra.function_enumeration
+
+import Logic.basics
+import Equality.basics
+import Logic.functions
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+import Algebra.permutation_enumeration
+
+-- ----------------------------------------------------------------------
+-- Extending a function by one value. `extendByValue(f, v) : NaturalsBelow(1+k)
+-- → C` sends the top index to `v` and each inclusion of a lower index `x` to
+-- `f(x)`. The value-level dependent conditional (the same shape as
+-- `Function.extendBelow`) reads the input's value and decides whether it is
+-- below the boundary; the codomain is a bare type variable `C`.
+
+definition Function.extendByValueWithDecision {C : Type(0)} {k : Natural}
+        (f : NaturalsBelow(k) → C) (v : C) (j : NaturalsBelow(1 + k))
+        : Logic.Decidable(NaturalsBelow.value(j) < k) → C
+  | Logic.Decidable.yes(below) => f(NaturalsBelow.make(NaturalsBelow.value(j), below))
+  | Logic.Decidable.no(_)      => v
+
+definition Function.extendByValue {C : Type(0)} {k : Natural}
+        (f : NaturalsBelow(k) → C) (v : C) : NaturalsBelow(1 + k) → C :=
+  (j : NaturalsBelow(1 + k)) ↦
+    Function.extendByValueWithDecision(f, v, j,
+        Logic.classical_decidable(NaturalsBelow.value(j) < k))
+
+-- Below the boundary the extension reads the original function at the bounded
+-- index; proof irrelevance identifies the decision's internal proof with the
+-- caller's `below`.
+theorem Function.apply_extendByValue_below {C : Type(0)} {k : Natural}
+        (f : NaturalsBelow(k) → C) (v : C) (j : NaturalsBelow(1 + k))
+        (below : NaturalsBelow.value(j) < k)
+        : Function.extendByValue(f, v)(j) = f(NaturalsBelow.make(NaturalsBelow.value(j), below)) :=
+  if NaturalsBelow.value(j) < k
+  then done
+  else { False; done }
+
+-- At an inclusion the extension reads the original function; at the top it
+-- reads the new value.
+theorem Function.apply_extendByValue_inclusion {C : Type(0)} {k : Natural}
+        (f : NaturalsBelow(k) → C) (v : C) (x : NaturalsBelow(k))
+        : Function.extendByValue(f, v)(NaturalsBelow.inclusion(k, x)) = f(x) := {
+  NaturalsBelow.value(x) < k by NaturalsBelow.below as vLtK;
+  NaturalsBelow.make(NaturalsBelow.value(x), vLtK) = x by NaturalsBelow.equal_of_value as makeIsX;
+  Function.extendByValue(f, v)(NaturalsBelow.inclusion(k, x))
+     = f(NaturalsBelow.make(NaturalsBelow.value(x), vLtK))
+           by Function.apply_extendByValue_below(f, v, NaturalsBelow.inclusion(k, x), vLtK)
+     = f(x) by substituting makeIsX;
+  done
+}
+
+theorem Function.apply_extendByValue_top {C : Type(0)} {k : Natural}
+        (f : NaturalsBelow(k) → C) (v : C)
+        : Function.extendByValue(f, v)(NaturalsBelow.top(k)) = v :=
+  if NaturalsBelow.value(NaturalsBelow.top(k)) < k
+  then {
+    k < k;
+    ¬(k < k) by Natural.lt_irreflexive;
+    False;
+    done
+  }
+  else done
+
+-- The restriction of a function to the indices below the boundary.
+definition Function.lowerBelow {C : Type(0)} {k : Natural}
+        (g : NaturalsBelow(1 + k) → C) : NaturalsBelow(k) → C :=
+  (x : NaturalsBelow(k)) ↦ g(NaturalsBelow.inclusion(k, x))
+
+-- The decomposition: every `g : NaturalsBelow(1+k) → C` is the extension of its
+-- own restriction by its own top value. Cases each index on whether its value
+-- is below the boundary (an inclusion) or equal to it (the top).
+theorem Function.extendByValue_decompose {C : Type(0)} {k : Natural}
+        (g : NaturalsBelow(1 + k) → C)
+        : g = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k))) :=
+  Function.extensionality(NaturalsBelow(1 + k), C, g,
+      Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k))),
+      (j : NaturalsBelow(1 + k)) ↦ {
+        NaturalsBelow.value(j) < 1 + k by NaturalsBelow.below;
+        NaturalsBelow.value(j) ≤ k by Natural.le_of_lt_one_plus;
+        NaturalsBelow.value(j) < k ∨ NaturalsBelow.value(j) = k;
+        done by cases {
+          case NaturalsBelow.value(j) < k as belowBoundary: {
+              let x : NaturalsBelow(k) := NaturalsBelow.make(NaturalsBelow.value(j), belowBoundary);
+              j = NaturalsBelow.inclusion(k, x) by NaturalsBelow.equal_of_value as jIsInclusion;
+              g(j)
+                 = g(NaturalsBelow.inclusion(k, x)) by substituting jIsInclusion
+                 = Function.lowerBelow(g)(x)
+                 = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k)))(
+                       NaturalsBelow.inclusion(k, x))
+                       by Function.apply_extendByValue_inclusion(Function.lowerBelow(g),
+                              g(NaturalsBelow.top(k)), x)
+                 = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k)))(j)
+                       by substituting jIsInclusion;
+              done
+            }
+          case NaturalsBelow.value(j) = k as atBoundary: {
+              j = NaturalsBelow.top(k) by NaturalsBelow.equal_of_value as jIsTop;
+              g(j)
+                 = g(NaturalsBelow.top(k)) by substituting jIsTop
+                 = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k)))(
+                       NaturalsBelow.top(k))
+                       by Function.apply_extendByValue_top(Function.lowerBelow(g), g(NaturalsBelow.top(k)))
+                 = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k)))(j)
+                       by substituting jIsTop;
+              done
+            }
+        }
+      })
