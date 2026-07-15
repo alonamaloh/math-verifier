@@ -367,12 +367,32 @@ The triage pipeline already exists: `scripts/record_error.sh` →
 (5-axis rubric) → `library/ErrorTest/` regression. Work items:
 - Sweep open corpus entries; re-score against the current build (several may
   already be stale-fixed, per the 2026-06-29 sweep pattern).
+  - DONE (2026-07-15): the "`by_induction` 1+n mixed `case zero:`/`case
+    step(k):`" message (inbox) is already fixed — `induction.cpp` now names
+    the offending clause and suggests the `zero`→`base` / `successor`→`step`
+    rename. Stale inbox entry; leave the note as a data point.
 - Specific low-scorers to improve, captured while working:
   - "auto-prover gave up after exhausting its effort budget" — should name the
     likely missing bridge, not just suggest raising the budget.
   - F1's argument-mismatch message is *clear* but could add "these differ by
     `add_commutative` — the forms are not definitionally equal" when both
-    sides are Natural-arithmetic.
+    sides are Natural-arithmetic. **OBVIATED (2026-07-15) — do NOT ship this.**
+    Empirically, strategy (e) additive-rearrangement coercion now rescues
+    EVERY genuinely-equal Natural additive spelling that reaches an argument
+    slot: positional, theorem-body, return position, and named-arg-when-the-
+    other-args-are-pinned all verify (tested `1+k`↔`k+1` in each). The only
+    mismatches that still reach the kernel "wrong type" message on Natural
+    relations are (a) genuine INEQUALITIES (`k+1` vs `k+2`) and (b) an
+    argument mis-inference (`k` bound to `1`, giving `1+1 ≤ n` vs `1+k ≤ n`) —
+    for BOTH, an "these differ by `add_commutative`" note would MISLEAD (it
+    would send the user to bridge two forms that are not in fact equal). A
+    prototype note was written and reverted for exactly this reason. The F1
+    coercion work subsumed this message item.
+  - Head-mismatch citation leaked `<unknown>` for a `∀`/`→` goal —
+    **DONE (2026-07-15, corpus #23):** `inference.cpp` now describes a
+    non-constant goal/conclusion head by shape ("a `∀`/`→` statement")
+    instead of the internal placeholder. Regression
+    `library/ErrorTest/citation_goal_head_pi.math`.
   - F4(c): "ring failed" on `sum = <opaque var>` should suggest the equating
     hypothesis.
 

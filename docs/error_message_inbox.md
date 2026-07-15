@@ -1194,15 +1194,17 @@ the `tLinear` citation does not prove this goal
   `tLinear` has type: IsLinearMap f U V T
 its conclusion is about `IsLinearMap` but the goal is about `<unknown>` — this lemma does not target this goal (check the lemma name)
 ```
-Two problems. (1) The head-mismatch diagnosis prints `<unknown>` for a
-Pi-shaped goal — a goal whose head is a binder should be described as
-"a ∀-statement", not `<unknown>`. (2) The real cause is invisible: the
-conjunction-projection path (`P by h` for `h : A ∧ B`) does not δ-unfold
-`IsLinearMap` to see the ∧, so the citation never gets to try the legs.
-Either unfolding definitions before leg-projection (the auto-prover's
-`done` DOES see the legs after the fact is stated bare — the citation
-path is the odd one out) or saying "the hypothesis's type is a defined
-proposition; state it bare first (`IsLinearMap(U, V, T);`) to expose its
-components" would have saved the debugging round trip. Workaround used:
-cite through proof-data accessor definitions (`by LinearMap.additive(tLinear)`).
+Two problems. (1) RESOLVED (2026-07-15, corpus #23): the head-mismatch
+diagnosis printed `<unknown>` for a Pi-shaped goal; it now describes the
+shape ("a `∀`/`→` statement (its head is not a named relation)").
+Regression `library/ErrorTest/citation_goal_head_pi.math`. (2) STILL OPEN
+(a capability gap, not a message): the conjunction-projection path
+(`P by h` for `h : A ∧ B`) does not δ-unfold `IsLinearMap` to see the ∧, so
+the citation never gets to try the legs. Either unfolding definitions
+before leg-projection (the auto-prover's `done` DOES see the legs after the
+fact is stated bare — the citation path is the odd one out) or saying "the
+hypothesis's type is a defined proposition; state it bare first
+(`IsLinearMap(U, V, T);`) to expose its components" would have saved the
+debugging round trip. Workaround used: cite through proof-data accessor
+definitions (`by LinearMap.additive(tLinear)`).
 rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 0

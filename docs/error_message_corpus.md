@@ -582,3 +582,34 @@ each improvement is measured and protected against regression.
   why this surfaced at the final check with the claim's line lost.
 - **Rubric (0/1):** cause 0 · location 0 · actionable 0 · folded-types 1 ·
   no-jargon 0.
+
+### 23. Head-mismatch citation leaked `<unknown>` for a `∀`/`→` goal — FIXED
+
+- **Trigger:** an argument-free `by <cite>` (or `since`) whose conclusion
+  targets a different head than the goal, WHERE the goal is a `∀`/`→`
+  statement (its head is a binder, not a named relation). Repro:
+  `library/ErrorTest/citation_goal_head_pi.math` (`by h` for `h : a = b`
+  against a `(n : Natural) → P(n)` goal). Found 2026-07-12 citing a
+  conjunction-hypothesis (`IsLinearMap`) against a `∀`-leg (Stage C,
+  linear_map).
+- **Was (symptom):**
+  ```
+  its conclusion is about `Equality` but the goal is about `<unknown>` —
+  this lemma does not target this goal (check the lemma name)
+  ```
+  `headConstantName` returns the internal `<unknown>` placeholder for any
+  non-constant head (a `Pi`), and the head-mismatch line printed it
+  verbatim. Jargon leak; the reader can't tell what shape the goal is.
+- **Now:** the head-mismatch line renders a non-constant head by SHAPE —
+  "a `∀`/`→` statement (its head is not a named relation)" — instead of the
+  placeholder (a `describeHead` helper in `inference.cpp`, applied to both
+  the conclusion and goal sides; named heads keep their backticked name
+  unchanged). Score: cause n/a, location 1, actionable 1, types 1,
+  jargon 1. `.expected` asserts the descriptive phrase present and
+  `` about `<unknown>` `` absent.
+- **Still open (separate capability gap, not this message):** citing a
+  hypothesis whose type is a DEFINITION that unfolds to `A ∧ B` (e.g.
+  `IsLinearMap`) to prove one leg does not δ-unfold the definition to reach
+  the conjunction — the citation path is the odd one out (a bare `claim`
+  of the leg auto-closes). Tracked in the inbox; workaround is a proof-data
+  accessor (`by LinearMap.additive(h)`).

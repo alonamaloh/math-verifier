@@ -1792,14 +1792,35 @@ ExpressionPointer Elaborator::recoverClaimHint(
         }
         if (!conclusionHeadWhnf.empty() && !goalHeadWhnf.empty()
             && conclusionHeadWhnf != goalHeadWhnf) {
-            std::string conclusionShown = conclusionHeadRaw.empty()
-                ? conclusionHeadWhnf : conclusionHeadRaw;
+            // Render a head for display. A term whose head is not a named
+            // constant (a `∀`/`→` statement, most often) yields the
+            // `<unknown>` placeholder from `headConstantName` — leaking that
+            // placeholder into the message is illegible, so describe the
+            // shape instead.
+            auto describeHead = [&](const std::string& rawHead,
+                                    const std::string& whnfHead,
+                                    ExpressionPointer termForShape)
+                    -> std::string {
+                std::string shown =
+                    rawHead.empty() ? whnfHead : rawHead;
+                if (shown != "<unknown>") return "`" + shown + "`";
+                ExpressionPointer reduced = termForShape
+                    ? weakHeadNormalForm(environment_, termForShape)
+                    : nullptr;
+                if (reduced && std::get_if<Pi>(&reduced->node)) {
+                    return "a `∀`/`→` statement (its head is not a named "
+                           "relation)";
+                }
+                return "`<unknown>`";
+            };
+            std::string conclusionShown = describeHead(
+                conclusionHeadRaw, conclusionHeadWhnf, conclusionWhnfForHeads);
             std::string goalShown =
-                goalHeadRaw.empty() ? goalHeadWhnf : goalHeadRaw;
+                describeHead(goalHeadRaw, goalHeadWhnf, goalClosed);
             message +=
-                "\n  its conclusion is about `" + conclusionShown
-                + "` but the goal is about `" + goalShown
-                + "` — this lemma does not target this goal (check the lemma "
+                "\n  its conclusion is about " + conclusionShown
+                + " but the goal is about " + goalShown
+                + " — this lemma does not target this goal (check the lemma "
                 "name)";
         } else {
             message +=
