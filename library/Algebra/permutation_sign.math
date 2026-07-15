@@ -593,3 +593,135 @@ theorem Permutation.pairFactor {n : Natural} (sigma tau : Permutation(n))
       }
   }
 }
+
+-- The τ-image permutes the ordered-pair list: it is an injective self-map with
+-- image inside the list and the same length.
+theorem Permutation.pairImage_permutes {n : Natural} (tau : Permutation(n))
+        : List.Permutation(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+              List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                  Permutation.pairImage(tau), Permutation.orderedPairs(n)),
+              Permutation.orderedPairs(n)) := {
+  List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+              Permutation.pairImage(tau), Permutation.orderedPairs(n)))
+      by List.map_distinct_on(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+             Permutation.pairImage(tau), Permutation.orderedPairs(n),
+             (x y : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+                 (memberX : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x, Permutation.orderedPairs(n)))
+                 (memberY : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), y, Permutation.orderedPairs(n)))
+                 (imagesEqual : Permutation.pairImage(tau, x) = Permutation.pairImage(tau, y)) ↦
+                 Permutation.pairImage_injective_on(tau, x, y, memberX, memberY, imagesEqual),
+             Permutation.orderedPairs_distinct(n))
+      as imageDistinct;
+  (∀ (x : Pair(NaturalsBelow(n), NaturalsBelow(n))).
+      List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x,
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+              Permutation.pairImage(tau), Permutation.orderedPairs(n)))
+      → List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x, Permutation.orderedPairs(n)))
+      by (x : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+         (memberX : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x,
+             List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                 Permutation.pairImage(tau), Permutation.orderedPairs(n)))) ↦ {
+          choose p such that
+              List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))
+                  ∧ (Permutation.pairImage(tau, p) = x)
+              from List.map_member_invert(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                       Permutation.pairImage(tau), x, Permutation.orderedPairs(n), memberX);
+          List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)) as pMember;
+          Permutation.pairImage(tau, p) = x as imageIsX;
+          List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.pairImage(tau, p), Permutation.orderedPairs(n))
+              by Permutation.pairImage_in_orderedPairs(tau, p, pMember);
+          List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x, Permutation.orderedPairs(n))
+              by substituting imageIsX;
+          done
+        } as inclusion;
+  List.length(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+              Permutation.pairImage(tau), Permutation.orderedPairs(n)))
+      = List.length(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.orderedPairs(n))
+      by List.map_length(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+             Permutation.pairImage(tau), Permutation.orderedPairs(n)) as lengthEq;
+  done by List.permutation_of_distinct_inclusion(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+      List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+          Permutation.pairImage(tau), Permutation.orderedPairs(n)),
+      Permutation.orderedPairs(n), imageDistinct, Permutation.orderedPairs_distinct(n), inclusion, lengthEq)
+}
+
+-- Multiplicativity of the sign.
+theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
+        : Permutation.sign(Permutation.compose(sigma, tau))
+          = Integer.multiply(Permutation.sign(sigma), Permutation.sign(tau)) := {
+  -- Rewrite the composite's orientation map by the pointwise factorization.
+  List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+          Permutation.pairOrient(Permutation.compose(sigma, tau)), Permutation.orderedPairs(n))
+      = List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+            (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+                Integer.multiply(Permutation.pairOrient(tau, p),
+                    Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))),
+            Permutation.orderedPairs(n))
+      by List.map_congruence_on(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+             Permutation.pairOrient(Permutation.compose(sigma, tau)),
+             (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+                 Integer.multiply(Permutation.pairOrient(tau, p),
+                     Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))),
+             Permutation.orderedPairs(n),
+             (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+                 (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))) ↦
+                 Permutation.pairFactor(sigma, tau, p, memberP))
+      as mapFactored;
+  -- The reindexed σ-orientations have equal product (the τ-image permutes).
+  List.product(Integer, Integer.multiply, Integer.one,
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+              List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                  Permutation.pairImage(tau), Permutation.orderedPairs(n))))
+      = List.product(Integer, Integer.multiply, Integer.one,
+            List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+                Permutation.orderedPairs(n)))
+      by List.Permutation.product_invariant(Integer, Integer.multiply, Integer.one,
+             (x y z : Integer) ↦ Integer.multiply_associative(x, y, z),
+             (x y : Integer) ↦ Integer.multiply_commutative(x, y),
+             List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+                 List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                     Permutation.pairImage(tau), Permutation.orderedPairs(n))),
+             List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+                 Permutation.orderedPairs(n)),
+             List.Permutation.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+                 List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                     Permutation.pairImage(tau), Permutation.orderedPairs(n)),
+                 Permutation.orderedPairs(n), Permutation.pairImage_permutes(tau)))
+      as reindexedProduct;
+  Permutation.sign(Permutation.compose(sigma, tau))
+     = List.product(Integer, Integer.multiply, Integer.one,
+           List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+               (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+                   Integer.multiply(Permutation.pairOrient(tau, p),
+                       Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))),
+               Permutation.orderedPairs(n)))
+           by substituting mapFactored
+     = Integer.multiply(
+           List.product(Integer, Integer.multiply, Integer.one,
+               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(tau),
+                   Permutation.orderedPairs(n))),
+           List.product(Integer, Integer.multiply, Integer.one,
+               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+                   (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+                       Permutation.pairOrient(sigma, Permutation.pairImage(tau, p)),
+                   Permutation.orderedPairs(n))))
+           by List.product_pointwise_multiply(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                  Permutation.pairOrient(tau),
+                  (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
+                      Permutation.pairOrient(sigma, Permutation.pairImage(tau, p)),
+                  Permutation.orderedPairs(n))
+     = Integer.multiply(Permutation.sign(tau),
+           List.product(Integer, Integer.multiply, Integer.one,
+               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+                   List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                       Permutation.pairImage(tau), Permutation.orderedPairs(n)))))
+           by substituting List.map_map(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                  Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairImage(tau),
+                  Permutation.pairOrient(sigma), Permutation.orderedPairs(n))
+     = Integer.multiply(Permutation.sign(tau), Permutation.sign(sigma))
+           by substituting reindexedProduct
+     = Integer.multiply(Permutation.sign(sigma), Permutation.sign(tau)) by ring;
+  done
+}
