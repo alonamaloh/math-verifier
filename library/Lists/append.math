@@ -73,3 +73,27 @@ theorem List.map_append (A B : Type(0)) (f : A → B) (first second : List(A))
            = List.append(B, List.map(A, B, f, List.prepend(A, head, tail)),
                  List.map(A, B, f, second))
   }
+
+-- ----------------------------------------------------------------------
+-- Membership transports into a concatenation from either side — the facts a
+-- "union over a partition" argument (e.g. enumerating a finite type by cases)
+-- consumes.
+
+theorem List.member_append_left (A : Type(0)) (element : A) (first second : List(A))
+        (inFirst : List.member(A, element, first))
+        : List.member(A, element, List.append(A, first, second)) :=
+  by induction on inFirst {
+    case List.member.here(rest):
+        List.member.here(A, element, List.append(A, rest, second))
+    case List.member.there(head, tail, _, inAppendTail):
+        List.member.there(A, element, head, List.append(A, tail, second), inAppendTail)
+  }
+
+theorem List.member_append_right (A : Type(0)) (element : A) (first second : List(A))
+        (inSecond : List.member(A, element, second))
+        : List.member(A, element, List.append(A, first, second)) :=
+  by induction on first with IH {
+    case List.empty: inSecond
+    case List.prepend(head, tail):
+        List.member.there(A, element, head, List.append(A, tail, second), IH)
+  }
