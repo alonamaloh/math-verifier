@@ -207,3 +207,99 @@ theorem Field.sumOver_multiply_sumOver {f : Field} {left right : Type(0)}
                   (x : left) ↦ Field.sumOver((y : right) ↦ leftTerm(x) * rightTerm(y), rightItems),
                   leftItems,
                   (x : left) ↦ Field.sumOver_scale_left(leftTerm(x), rightTerm, rightItems))
+
+-- A sum of two sums over the same list is the sum of the pointwise sums.
+theorem Field.sumOver_add {f : Field} {index : Type(0)}
+        (term termPrime : index → Field.carrier(f)) (items : List(index))
+        : Field.sumOver(term, items) + Field.sumOver(termPrime, items)
+          = Field.sumOver((x : index) ↦ term(x) + termPrime(x), items) :=
+  by induction on items with IH {
+    case List.empty:
+        Field.sumOver(term, List.empty(index)) + Field.sumOver(termPrime, List.empty(index))
+           = Field.zero(f) + Field.zero(f)
+           = Field.zero(f)                                          by ring
+           = Field.sumOver((x : index) ↦ term(x) + termPrime(x), List.empty(index))
+    case List.prepend(head, tail):
+        Field.sumOver(term, List.prepend(index, head, tail))
+              + Field.sumOver(termPrime, List.prepend(index, head, tail))
+           = (term(head) + Field.sumOver(term, tail))
+                 + (termPrime(head) + Field.sumOver(termPrime, tail))
+           = (term(head) + termPrime(head))
+                 + (Field.sumOver(term, tail) + Field.sumOver(termPrime, tail))    by ring
+           = (term(head) + termPrime(head))
+                 + Field.sumOver((x : index) ↦ term(x) + termPrime(x), tail)        by substituting IH
+           = Field.sumOver((x : index) ↦ term(x) + termPrime(x), List.prepend(index, head, tail))
+  }
+
+-- The sum of a constant-zero term vanishes.
+theorem Field.sumOver_zero_function {f : Field} {index : Type(0)}
+        (items : List(index))
+        : Field.sumOver((x : index) ↦ Field.zero(f), items) = Field.zero(f) :=
+  by induction on items with IH {
+    case List.empty:
+        Field.sumOver((x : index) ↦ Field.zero(f), List.empty(index)) = Field.zero(f)
+    case List.prepend(head, tail):
+        Field.sumOver((x : index) ↦ Field.zero(f), List.prepend(index, head, tail))
+           = Field.zero(f) + Field.sumOver((x : index) ↦ Field.zero(f), tail)
+           = Field.zero(f) + Field.zero(f)                          by substituting IH
+           = Field.zero(f)                                          by ring
+  }
+
+-- Fubini for finite list sums: the order of a double sum is immaterial.
+theorem Field.sumOver_interchange {f : Field} {left right : Type(0)}
+        (term : left → right → Field.carrier(f))
+        (leftItems : List(left)) (rightItems : List(right))
+        : Field.sumOver((a : left) ↦ Field.sumOver((b : right) ↦ term(a, b), rightItems), leftItems)
+          = Field.sumOver((b : right) ↦ Field.sumOver((a : left) ↦ term(a, b), leftItems), rightItems) :=
+  by induction on leftItems with IH {
+    case List.empty:
+        Field.sumOver((a : left) ↦ Field.sumOver((b : right) ↦ term(a, b), rightItems),
+              List.empty(left))
+           = Field.zero(f)
+           = Field.sumOver((b : right) ↦ Field.zero(f), rightItems)
+                 by Field.sumOver_zero_function(rightItems)
+           = Field.sumOver((b : right) ↦ Field.sumOver((a : left) ↦ term(a, b), List.empty(left)),
+                 rightItems)
+    case List.prepend(head, tail):
+        Field.sumOver((a : left) ↦ Field.sumOver((b : right) ↦ term(a, b), rightItems),
+              List.prepend(left, head, tail))
+           = Field.sumOver((b : right) ↦ term(head, b), rightItems)
+                 + Field.sumOver((a : left) ↦ Field.sumOver((b : right) ↦ term(a, b), rightItems), tail)
+           = Field.sumOver((b : right) ↦ term(head, b), rightItems)
+                 + Field.sumOver((b : right) ↦ Field.sumOver((a : left) ↦ term(a, b), tail), rightItems)
+                 by substituting IH
+           = Field.sumOver(
+                 (b : right) ↦ term(head, b) + Field.sumOver((a : left) ↦ term(a, b), tail),
+                 rightItems)
+                 by Field.sumOver_add(
+                        (b : right) ↦ term(head, b),
+                        (b : right) ↦ Field.sumOver((a : left) ↦ term(a, b), tail),
+                        rightItems)
+           = Field.sumOver(
+                 (b : right) ↦ Field.sumOver((a : left) ↦ term(a, b), List.prepend(left, head, tail)),
+                 rightItems)
+  }
+
+-- A product of pointwise products splits into the product of the factors.
+theorem Field.productOver_multiply {f : Field} {index : Type(0)}
+        (term termPrime : index → Field.carrier(f)) (items : List(index))
+        : Field.productOver((x : index) ↦ term(x) * termPrime(x), items)
+          = Field.productOver(term, items) * Field.productOver(termPrime, items) :=
+  by induction on items with IH {
+    case List.empty:
+        Field.productOver((x : index) ↦ term(x) * termPrime(x), List.empty(index))
+           = Field.one(f)
+           = Field.one(f) * Field.one(f)                           by ring
+           = Field.productOver(term, List.empty(index)) * Field.productOver(termPrime, List.empty(index))
+    case List.prepend(head, tail):
+        Field.productOver((x : index) ↦ term(x) * termPrime(x), List.prepend(index, head, tail))
+           = (term(head) * termPrime(head))
+                 * Field.productOver((x : index) ↦ term(x) * termPrime(x), tail)
+           = (term(head) * termPrime(head))
+                 * (Field.productOver(term, tail) * Field.productOver(termPrime, tail))
+                 by substituting IH
+           = (term(head) * Field.productOver(term, tail))
+                 * (termPrime(head) * Field.productOver(termPrime, tail))            by ring
+           = Field.productOver(term, List.prepend(index, head, tail))
+                 * Field.productOver(termPrime, List.prepend(index, head, tail))
+  }
