@@ -241,7 +241,14 @@ the general provable-not-defeq coercion beyond Natural relations, and (b) the
 
 ---
 
-## F3 · `substituting` / calc rewrite direction  ·  **P1**
+## F3 · `substituting` / calc rewrite direction  ·  **P1**  ·  ✅ ALREADY WORKS
+
+**Status (verified 2026-07-15).** The symptoms below no longer reproduce: a
+calc step `A = B by <direct-lemma>` where the lemma proves `B = A` closes, a
+bare-name citation flips (args inferred from the flipped conclusion), and
+`substituting eq` rewrites in the reverse orientation. The symmetry machinery
+now covers direct-lemma calls, not just named hypotheses. Regression:
+`library/Test/calc_symmetry_and_numeral_leaf_test.math`. Kept for history.
 
 **Symptom.** `substituting eq` only rewrites `eq`'s LHS→RHS **in the goal**.
 To use it the other way, or against a hypothesis, you must restate the
@@ -265,6 +272,11 @@ already-forgiving named-hyp behavior.
 ---
 
 ## F4 · `ring` reach: opaque subterms, numerals ≥ 2, diff-leaf  ·  **P2**
+
+**Status (verified 2026-07-15).** (a) ✅ already works — `(2*2)^m = 4^m` closes
+by-less (ground arithmetic decides `2*2 = 4`, then congruence); regression in
+`library/Test/calc_symmetry_and_numeral_leaf_test.math`. (b) numerals ≥ 2 in
+argument slots are covered by F1 Step 1. (c) is an error-message item (→ F9).
 
 **Symptom.** (a) A by-less `=` step whose two sides differ only inside a
 closed-numeral leaf (`power(2*2,m) = power(4,m)`) is not closed — the diff

@@ -1,0 +1,38 @@
+-- Regressions for two PLAN_ERGONOMICS items found already-working:
+--   F3 — calc `by <lemma>` / `substituting` try the symmetric orientation.
+--   F4(a) — a by-less `=` step whose sides differ only inside a closed-numeral
+--           leaf closes (the ground tier decides `2 * 2 = 4`, then congruence).
+module Test.calc_symmetry_and_numeral_leaf_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.power
+
+definition sq (n : Natural) : Natural := n * n
+
+-- F3: the lemma proves `B = A`; the calc step is oriented `A = B`. A direct
+-- lemma call (not a named hypothesis) must be tried in the symmetric direction.
+theorem lemma_b_equals_a (a b : Natural) : sq(a) + b = b + sq(a) :=
+  sq(a) + b = b + sq(a)
+
+theorem calc_uses_symmetric_lemma (a b : Natural) : b + sq(a) = sq(a) + b :=
+  b + sq(a) = sq(a) + b by lemma_b_equals_a
+
+-- F3: a bare-name citation flips too (arguments inferred from the flipped
+-- conclusion).
+theorem calc_uses_symmetric_bare_name (a b : Natural) : b + sq(a) = sq(a) + b :=
+  b + sq(a) = sq(a) + b by lemma_b_equals_a
+
+-- F3: `substituting` rewrites a hypothesis's RHS→LHS as well (reverse
+-- orientation): from `sq(a) = b`, the goal mentioning `b` rewrites back to
+-- `sq(a)`.
+theorem substituting_reverse_orientation (a b : Natural) (eq : sq(a) = b)
+        : b + b = sq(a) + sq(a) :=
+  b + b = sq(a) + sq(a) by substituting eq
+
+-- F4(a): the two sides differ only inside a closed-numeral leaf (`2 * 2` vs
+-- `4`); the by-less step closes via ground arithmetic + congruence.
+theorem numeral_leaf_difference (m : Natural) : (2 * 2) ^ m = 4 ^ m :=
+  (2 * 2) ^ m = 4 ^ m
