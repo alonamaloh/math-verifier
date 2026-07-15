@@ -369,7 +369,45 @@ encoding moved the cost off the invariance entirely.
 
 ---
 
-## PROBE — Rank–nullity (Stage G) · [SURFACE + FOUNDATION] partial verdict (2026-07-14)
+## PROBE — Rank–nullity (Stage G) · [SURFACE + FOUNDATION] FINAL verdict (2026-07-14)
+
+**COMPLETE (2026-07-14): `LinearMap.rank_nullity` proved end-to-end**
+(`Algebra/rank_nullity.math`, library + tests + export-check 2888 green, axiom
+inventory UNCHANGED — choice-free). All five bricks landed. The two-part verdict
+below (recorded when only bricks 1–2 existed) both HELD:
+
+- **Part-1 held to the end.** The `Subtype`/`Subspace` value boundary stayed
+  frictionless the whole way: every subtype↔ambient move in bricks 3–5 went through
+  brick 1's `Subspace.linearCombination_value` (or its two corollaries), and no new
+  subtype-boundary machinery was needed. One reusable transport lemma confined the
+  entire subtype cost, cheaply — as the Stage-F thesis predicted.
+- **Part-2 held: the real cost WAS the `NaturalsBelow` family-manipulation, and it
+  was the finite-family CONCATENATION ALGEBRA that dominated.** But the "size-`k+r`
+  basis" was NOT built by concatenating two `NaturalsBelow` families and re-proving
+  `IsBasis` (the feared ~900-line route). Instead: (a) brick 4 sifts a spanning
+  family growing `ext` with `appendVector`, carrying `sz = k + r` as a running
+  *equation* so the index type stays a plain `NaturalsBelow(sz)` (no `k+r` type
+  transport); (b) brick 5's independence never concatenates two *bases* — it
+  concatenates a single vanishing combination's two halves (`linearCombination_concatenate`
+  over `combineFunctions`) and proves the joint selection injective purely from the
+  disjoint value ranges `[k,sz)` vs `[0,k)`. Two NEW general tools made this cheap:
+  the disjunctive `InSpanOf.of_combination_covered` (empty combination → "=0" leg, so
+  span-transitivity needs NO index-inhabitant — dissolving the zero-vector
+  obstruction that `InSpanOf.zero` carries), and `linearCombination_standardize`
+  (already in `exchange_lemma`) to canonicalize the kernel expansion into an
+  injective identity selection. Net: the concatenation algebra was real and
+  intricate (~250 lines for the independence lemma alone) but bounded — closer to a
+  single `exchange`/`pruning` sub-proof than a new file.
+
+**Surface friction found (fixed at source or worked around, all banked in
+[[linear_algebra_build]]):** the `Spans` by-citation fold-desync (a `done by <lemma>`
+whose conclusion δ-unfolds to `Or` fails the head-dispatch against a folded `Spans`
+goal — prove `Spans` via an explicit `take x` block instead); `NaturalsBelow.clamp`
+applications behind a `let` need explicit `clamp_below` args (or one cited
+value-characterization lemma reused downstream); `decompose_at_least`'s context
+auto-discharge misfires inside reversed calc steps (pass the `atLeast` proof
+explicitly). None are kernel bugs; the first is a citation-dispatch sharp edge worth
+smoothing.
 
 **What was built (`Algebra/rank_nullity.math`, bricks 1–2, library + export green,
 choice-free).** The two bricks the plan named as the `Subtype`/`Subspace` boundary

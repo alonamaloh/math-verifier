@@ -553,12 +553,33 @@ section below)
   pre-paid at the exchange bridge (see the Stage F ledger entry + STRESS_PROBES).
   Remaining (deferred, optional): the bundled `FiniteDimensionalVectorSpace`
   record (Stage 0.3) — build when Stage G wants it.
-- [~] **Stage G** (L, math) — **rank–nullity** (headline #1): `dim ker T + dim im T
-  = dim V` for `T : V → W` linear, `V` finite-dimensional, choice-free. **BRICKS
-  1–3 DONE + all bricks 4–5 INFRASTRUCTURE built (2026-07-14,
-  `Algebra/rank_nullity.math`, library+tests+export 2873 green, choice-free); only
-  the brick 4–5 assembly (extension sift + final count) remains.** The "finite-family
-  construction" infra the earlier verdict flagged as missing is now BUILT: the
+- [x] **Stage G** (L, math) — **rank–nullity** (headline #1): `dim ker T + dim im T
+  = dim V` for `T : V → W` linear, `V` finite-dimensional, choice-free. **DONE
+  2026-07-14 — `LinearMap.rank_nullity` proved in `Algebra/rank_nullity.math`,
+  library+tests+export-check 2888 green, axiom inventory UNCHANGED (choice-free).**
+  All five bricks landed: brick 4 `VectorSpace.extend_to_basis` (sift a basis of V
+  through `sift_extend_aux`, growing the family with `appendVector` only on
+  out-of-span vectors, exact-prefix tracking by value-match — the size stays a
+  running `sz` with a carried `sz = k + r` equation, so no `NaturalsBelow(k+r)`
+  index transport); brick 5 = `LinearMap.appended_images_span`
+  (`spans_of_value_covered` + the new disjunctive `InSpanOf.of_combination_covered`,
+  which routes empty combinations to the "=0" leg and so NEVER needs an
+  index-inhabitant — this killed the zero-vector-inhabitant obstruction) and
+  `LinearMap.appended_images_independent` (standardize the kernel expansion into an
+  identity selection over `[0,k)` via `linearCombination_standardize`, reindex the
+  appended combination into `ext` over `[k,sz)`, CONCATENATE over the disjoint
+  ranges — injective because the ranges never collide — and apply `ext`
+  independence). The n=m/subtype transport thesis HELD end-to-end: the whole
+  subtype cost stayed confined to brick 1's `Subspace.linearCombination_value`; the
+  real Stage-G cost was the finite-family concatenation algebra (selection
+  injectivity across disjoint index blocks), exactly as the earlier verdict
+  predicted. GOTCHAS banked in memory ([[linear_algebra_build]]): the `Spans`
+  by-citation fold-desync (Spans unfolds to `Or`) forced proving `Spans` via an
+  explicit `take x` block, not a `done by <lemma>` citation; `NaturalsBelow.clamp`
+  under a `let` needs explicit `clamp_below` args (or a once-cited value-lemma);
+  `decompose_at_least`'s context auto-discharge misfires in reversed calc steps
+  (pass the `atLeast` proof explicitly). The "finite-family
+  construction" infra the earlier verdict flagged as missing was BUILT first: the
   `module` tactic (tier-b, separate deliverable), `appendVector` + its
   characterising lemmas, `linearCombination_drop_zero_position` (the position-skip),
   the append lemma `independent_append_outside_span` (a vector outside span(e)
