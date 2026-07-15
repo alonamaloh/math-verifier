@@ -1747,3 +1747,376 @@ theorem LinearMap.appended_images_span {f : Field} {V W : VectorSpace(f)} {k r s
   } as spanResult;
   done
 }
+
+-- The images of the appended vectors are linearly independent. A vanishing
+-- combination `Σ cⱼ T(aⱼ) = 0` pulls back through linearity to `Σ cⱼ aⱼ ∈ ker T`,
+-- which lies in the span of the kernel family `e`. Reindexing the appended
+-- combination into `ext` (its selection lands in the suffix `[k, sz)`) and the
+-- kernel expansion into `ext` in canonical form (identity selection over the
+-- prefix `[0, k)` via `linearCombination_standardize`), their difference is a
+-- single vanishing combination of `ext` whose selection is injective — the two
+-- index ranges are disjoint. Independence of `ext` kills every coefficient, the
+-- `cⱼ` among them.
+theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)} {k r sz : Natural}
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) (linear : IsLinearMap(V, W, T))
+        (e : NaturalsBelow(k) → VectorSpace.carrier(V))
+        (ext : NaturalsBelow(sz) → VectorSpace.carrier(V))
+        (aFamily : NaturalsBelow(r) → VectorSpace.carrier(V))
+        (imgSub : IsSubspace(W, LinearMap.image(V, W, T)))
+        (TaFamily : NaturalsBelow(r) → VectorSpace.carrier(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub)))
+        (taValue : ∀ (j : NaturalsBelow(r)). Subtype.value(TaFamily(j)) = T(aFamily(j)))
+        (szEq : sz = k + r)
+        (extIndependent : VectorSpace.LinearlyIndependent(ext))
+        (extPrefix : ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+        (extSuffix : ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(r)).
+            NaturalsBelow.value(i) = k + NaturalsBelow.value(j) → ext(i) = aFamily(j))
+        (kerCoverage : ∀ (w : VectorSpace.carrier(V)).
+            T(w) = VectorSpace.zero(W) → w = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, w))
+        : VectorSpace.LinearlyIndependent(TaFamily) := {
+  take cnt : Natural;
+  take sel : Natural → NaturalsBelow(r);
+  take coeff : Natural → Field.carrier(f);
+  suppose ∀ (a b : Natural). a < cnt → b < cnt → sel(a) = sel(b) → a = b as selInjective;
+  suppose VectorSpace.linearCombination(TaFamily, coeff, sel, cnt)
+          = VectorSpace.zero(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub)) as vanishes;
+
+  -- Pull the vanishing back into `V`: `Σ cⱼ aⱼ` lies in the kernel.
+  ∀ (i : Natural). i < cnt →
+      coeff(i) • Subtype.value(TaFamily(sel(i))) = coeff(i) • T(aFamily(sel(i)))
+    by { take i : Natural; suppose i < cnt as iBelow;
+         Subtype.value(TaFamily(sel(i))) = T(aFamily(sel(i))) by taValue as tv;
+         done by substituting tv } as termsMatch;
+  Subtype.value(VectorSpace.linearCombination(TaFamily, coeff, sel, cnt))
+     = VectorSpace.linearCombination((j : NaturalsBelow(r)) ↦ Subtype.value(TaFamily(j)), coeff, sel, cnt)
+           by Subspace.linearCombination_value
+     = VectorSpace.linearCombination((j : NaturalsBelow(r)) ↦ T(aFamily(j)), coeff, sel, cnt)
+           by VectorSpace.linearCombination_congruence
+     as valueBridge;
+  VectorSpace.linearCombination((j : NaturalsBelow(r)) ↦ T(aFamily(j)), coeff, sel, cnt)
+     = Subtype.value(VectorSpace.linearCombination(TaFamily, coeff, sel, cnt)) by valueBridge
+     = Subtype.value(VectorSpace.zero(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub)))
+           by substituting vanishes
+     = VectorSpace.zero(W) as imagesVanish;
+  T(VectorSpace.linearCombination(aFamily, coeff, sel, cnt))
+     = VectorSpace.linearCombination((j : NaturalsBelow(r)) ↦ T(aFamily(j)), coeff, sel, cnt)
+           by LinearMap.apply_linearCombination(linear, aFamily, coeff, sel, cnt)
+     = VectorSpace.zero(W) by imagesVanish as combinationInKernel;
+  VectorSpace.linearCombination(aFamily, coeff, sel, cnt) = VectorSpace.zero(V)
+      ∨ VectorSpace.InSpanOf(e, VectorSpace.linearCombination(aFamily, coeff, sel, cnt))
+      by kerCoverage(VectorSpace.linearCombination(aFamily, coeff, sel, cnt), combinationInKernel)
+      as kerCase;
+
+  take target : Natural;
+  suppose target < cnt as targetBelow;
+
+  -- Reindex the appended combination into `ext`: the selection lands in the
+  -- suffix `[k, sz)` and is injective there.
+  ∀ (i : Natural). i < cnt → k + NaturalsBelow.value(sel(i)) < sz
+    by { take i : Natural; suppose i < cnt as iBelow;
+         NaturalsBelow.value(sel(i)) < r by NaturalsBelow.below;
+         k + NaturalsBelow.value(sel(i)) < k + r by Natural.add_left_strict_monotone;
+         done by substituting szEq } as selExtBound;
+  let selExtFallback : NaturalsBelow(sz) :=
+      NaturalsBelow.make(k + NaturalsBelow.value(sel(target)), selExtBound(target, targetBelow));
+  let selExt : Natural → NaturalsBelow(sz) :=
+      (i : Natural) ↦ NaturalsBelow.clamp(selExtFallback)(k + NaturalsBelow.value(sel(i)));
+
+  ∀ (i : Natural). i < cnt → NaturalsBelow.value(selExt(i)) = k + NaturalsBelow.value(sel(i))
+    by {
+      take i : Natural; suppose i < cnt as iBelow;
+      k + NaturalsBelow.value(sel(i)) < sz by selExtBound(i, iBelow) as ib;
+      selExt(i) = NaturalsBelow.make(k + NaturalsBelow.value(sel(i)), ib)
+          by NaturalsBelow.clamp_below(sz, selExtFallback, k + NaturalsBelow.value(sel(i)), ib) as selExtAt;
+      NaturalsBelow.value(selExt(i))
+         = NaturalsBelow.value(NaturalsBelow.make(k + NaturalsBelow.value(sel(i)), ib)) by selExtAt
+         = k + NaturalsBelow.value(sel(i));
+      done
+    } as selExtValue;
+
+  ∀ (i : Natural). i < cnt →
+      coeff(i) • aFamily(sel(i)) = coeff(i) • ext(selExt(i))
+    by {
+      take i : Natural; suppose i < cnt as iBelow;
+      NaturalsBelow.value(selExt(i)) = k + NaturalsBelow.value(sel(i)) by selExtValue(i, iBelow) as sv;
+      ext(selExt(i)) = aFamily(sel(i)) by extSuffix(selExt(i), sel(i), sv) as extAt;
+      done by substituting extAt
+    } as aReindexTerms;
+  VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
+     = VectorSpace.linearCombination(ext, coeff, selExt, cnt)
+           by VectorSpace.linearCombination_congruence as aReindex;
+
+  ∀ (a b : Natural). a < cnt → b < cnt → selExt(a) = selExt(b) → a = b
+    by {
+      take a : Natural; take b : Natural;
+      suppose a < cnt as aBelow; suppose b < cnt as bBelow;
+      suppose selExt(a) = selExt(b) as selExtEq;
+      k + NaturalsBelow.value(sel(a))
+         = NaturalsBelow.value(selExt(a)) by selExtValue(a, aBelow)
+         = NaturalsBelow.value(selExt(b)) by substituting selExtEq
+         = k + NaturalsBelow.value(sel(b)) by selExtValue(b, bBelow);
+      NaturalsBelow.value(sel(a)) = NaturalsBelow.value(sel(b)) by Natural.add_cancel_left;
+      sel(a) = sel(b) by NaturalsBelow.equal_of_value(a := sel(a), b := sel(b));
+      done by selInjective(a, b, aBelow, bBelow)
+    } as selExtInjective;
+
+  done by cases {
+    case VectorSpace.linearCombination(aFamily, coeff, sel, cnt) = VectorSpace.zero(V) as combZero: {
+        VectorSpace.linearCombination(ext, coeff, selExt, cnt)
+           = VectorSpace.linearCombination(aFamily, coeff, sel, cnt) by aReindex
+           = VectorSpace.zero(V) by combZero as extCombZero;
+        done by extIndependent(cnt, selExt, coeff, selExtInjective, extCombZero)
+      }
+    case VectorSpace.InSpanOf(e, VectorSpace.linearCombination(aFamily, coeff, sel, cnt)) as combInSpan: {
+        0 < sz by { 0 ≤ k + NaturalsBelow.value(sel(target)) < sz
+                        by selExtBound(target, targetBelow); done } as szPositive;
+        let idEFallback : NaturalsBelow(sz) := NaturalsBelow.make(0, szPositive);
+        let idE : Natural → NaturalsBelow(sz) := NaturalsBelow.clamp(idEFallback);
+        ∀ (i : Natural). i < sz → NaturalsBelow.value(idE(i)) = i
+          by {
+            take i : Natural; suppose i < sz as below;
+            idE(i) = NaturalsBelow.make(i, below) by NaturalsBelow.clamp_below(sz, idEFallback, i, below) as idEAt;
+            NaturalsBelow.value(idE(i)) = NaturalsBelow.value(NaturalsBelow.make(i, below)) by idEAt = i;
+            done
+          } as idEValue;
+
+        -- Expand the kernel membership canonically over the prefix `[0, k)`.
+        choose cntE, selE, cE such that
+            VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
+            = VectorSpace.linearCombination(e, cE, selE, cntE) as wIsECombo from combInSpan;
+        ∀ (i : Natural). k ≤ i → Function.extendBelow(e, VectorSpace.zero(V))(i) = VectorSpace.zero(V)
+          by { take i : Natural; suppose k ≤ i as atLeast;
+               done by Function.extendBelow_past(past := atLeast) } as eeVanishes;
+        ∀ (l : Natural). l < cntE →
+            cE(l) • e(selE(l))
+            = cE(l) • Function.extendBelow(e, VectorSpace.zero(V))(NaturalsBelow.value(selE(l)))
+          by {
+            take l : Natural; suppose l < cntE as lBelow;
+            NaturalsBelow.value(selE(l)) < k by NaturalsBelow.below as valBelow;
+            Function.extendBelow(e, VectorSpace.zero(V))(NaturalsBelow.value(selE(l)))
+                = e(NaturalsBelow.make(NaturalsBelow.value(selE(l)), valBelow)) by Function.extendBelow_below
+                = e(selE(l)) by NaturalsBelow.equal_of_value as eeAt;
+            done by substituting eeAt
+          } as eeReindexTerms;
+        VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
+           = VectorSpace.linearCombination(e, cE, selE, cntE) by wIsECombo
+           = VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
+                 (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE)
+                 by VectorSpace.linearCombination_congruence
+           as wIsEeCombo;
+        ∃ (dPrime : Natural → Field.carrier(f)).
+            VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
+                (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE)
+            = VectorSpace.standardCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime, k)
+            by VectorSpace.linearCombination_standardize(Function.extendBelow(e, VectorSpace.zero(V)), k,
+                   eeVanishes, cE, (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE)
+            as standardizeExists;
+        choose dPrime such that
+            VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
+                (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE)
+            = VectorSpace.standardCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime, k)
+            as wIsStandard from standardizeExists;
+
+        -- Reindex the canonical prefix combination into `ext` (identity into `[0, k)`).
+        ∀ (i : Natural). i < k →
+            dPrime(i) • Function.extendBelow(e, VectorSpace.zero(V))(i)
+            = dPrime(i) • ext(idE(i))
+          by {
+            take i : Natural; suppose i < k as iBelowK;
+            i < sz by { i < k ≤ sz by { k ≤ k + r by Natural.less_or_equal_add_right;
+                                        done by substituting szEq }; done } as iBelowSz;
+            Function.extendBelow(e, VectorSpace.zero(V))(i) = e(NaturalsBelow.make(i, iBelowK))
+                by Function.extendBelow_below as eeAtI;
+            NaturalsBelow.value(idE(i)) = NaturalsBelow.value(NaturalsBelow.make(i, iBelowK))
+                by idEValue(i, iBelowSz) as idEMatch;
+            ext(idE(i)) = e(NaturalsBelow.make(i, iBelowK))
+                by extPrefix(idE(i), NaturalsBelow.make(i, iBelowK), idEMatch) as extAtI;
+            dPrime(i) • Function.extendBelow(e, VectorSpace.zero(V))(i)
+               = dPrime(i) • e(NaturalsBelow.make(i, iBelowK)) by substituting eeAtI
+               = dPrime(i) • ext(idE(i)) by substituting extAtI;
+            done
+          } as eeStdReindexTerms;
+        VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
+           = VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
+                 (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE) by wIsEeCombo
+           = VectorSpace.standardCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime, k) by wIsStandard
+           = VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime,
+                 (i : Natural) ↦ i, k)
+           = VectorSpace.linearCombination(ext, dPrime, idE, k) by VectorSpace.linearCombination_congruence
+           as wIsExtPrefix;
+
+        -- Difference of the two `ext`-combinations vanishes; concatenate.
+        VectorSpace.negate(VectorSpace.linearCombination(ext, dPrime, idE, k))
+           = Field.negate(Field.one(f)) • VectorSpace.linearCombination(ext, dPrime, idE, k)
+                 by VectorSpace.negate_one_scale
+           = VectorSpace.linearCombination(ext, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
+                 by VectorSpace.linearCombination_scale
+           as negatedPrefix;
+        VectorSpace.linearCombination(ext, coeff, selExt, cnt)
+           + VectorSpace.linearCombination(ext, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
+           = VectorSpace.linearCombination(ext, coeff, selExt, cnt)
+             + VectorSpace.negate(VectorSpace.linearCombination(ext, dPrime, idE, k)) by negatedPrefix
+           = VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
+             + VectorSpace.negate(VectorSpace.linearCombination(aFamily, coeff, sel, cnt))
+                 by substituting aReindex
+           = VectorSpace.zero(V) by VectorSpace.add_negate_right
+           as combinedVanishesRaw;
+        VectorSpace.linearCombination(ext, coeff, selExt, cnt)
+           + VectorSpace.linearCombination(ext, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
+           = VectorSpace.linearCombination(ext,
+                 VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt),
+                 VectorSpace.combineFunctions(selExt, idE, cnt), cnt + k)
+                 by VectorSpace.linearCombination_concatenate as concatEq;
+        VectorSpace.linearCombination(ext,
+              VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt),
+              VectorSpace.combineFunctions(selExt, idE, cnt), cnt + k)
+           = VectorSpace.linearCombination(ext, coeff, selExt, cnt)
+             + VectorSpace.linearCombination(ext, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
+                 by concatEq
+           = VectorSpace.zero(V) by combinedVanishesRaw as combinedVanishes;
+
+        -- The concatenated selection lands in `[k, sz)` on the front block
+        -- (the `selExt` values) and in `[0, k)` on the back block (the `idE`
+        -- values), read off through `combineFunctions`.
+        ∀ (x : Natural). x < cnt →
+            NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x))
+            = k + NaturalsBelow.value(sel(x))
+          by {
+            take x : Natural; suppose x < cnt as xFront;
+            NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x))
+               = NaturalsBelow.value(selExt(x)) by VectorSpace.combineFunctions_below
+               = k + NaturalsBelow.value(sel(x)) by selExtValue(x, xFront);
+            done
+          } as frontValue;
+        ∀ (x : Natural). cnt ≤ x → x < cnt + k →
+            NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x)) = Natural.monus(x, cnt)
+          by {
+            take x : Natural; suppose cnt ≤ x as xGe; suppose x < cnt + k as xLt;
+            x = cnt + Natural.monus(x, cnt) by NaturalsBelow.decompose_at_least(cnt, x, xGe) as xDecomp;
+            Natural.monus(x, cnt) < k
+                by { cnt + Natural.monus(x, cnt) < cnt + k by substituting xDecomp;
+                     done by Natural.lt_of_add_left_lt };
+            Natural.monus(x, cnt) < sz
+                by { Natural.monus(x, cnt) < k ≤ sz
+                         by { k ≤ k + r by Natural.less_or_equal_add_right; done by substituting szEq };
+                     done } as monusBelowSz;
+            NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x))
+               = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(cnt + Natural.monus(x, cnt)))
+                     by substituting xDecomp
+               = NaturalsBelow.value(idE(Natural.monus(x, cnt))) by VectorSpace.combineFunctions_shifted
+               = Natural.monus(x, cnt) by idEValue(Natural.monus(x, cnt), monusBelowSz);
+            done
+          } as backValue;
+
+        -- Hence the concatenated selection is injective: front and back values
+        -- never coincide (front `≥ k`, back `< k`), so a shared value forces the
+        -- same block, where `selExt`/`idE` are each injective.
+        ∀ (a b : Natural). a < cnt + k → b < cnt + k →
+            VectorSpace.combineFunctions(selExt, idE, cnt)(a)
+            = VectorSpace.combineFunctions(selExt, idE, cnt)(b) → a = b
+          by {
+            take a : Natural; take b : Natural;
+            suppose a < cnt + k as aBelow; suppose b < cnt + k as bBelow;
+            suppose VectorSpace.combineFunctions(selExt, idE, cnt)(a)
+                    = VectorSpace.combineFunctions(selExt, idE, cnt)(b) as combSelEq;
+            NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a))
+                = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b))
+                by substituting combSelEq as valEq;
+            done by cases {
+              case a < cnt as aFront: {
+                  NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) = k + NaturalsBelow.value(sel(a))
+                      by frontValue(a, aFront) as aVal;
+                  done by cases {
+                    case b < cnt as bFront: {
+                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = k + NaturalsBelow.value(sel(b))
+                            by frontValue(b, bFront) as bVal;
+                        k + NaturalsBelow.value(sel(a))
+                           = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) by aVal
+                           = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) by valEq
+                           = k + NaturalsBelow.value(sel(b)) by bVal;
+                        NaturalsBelow.value(sel(a)) = NaturalsBelow.value(sel(b)) by Natural.add_cancel_left;
+                        sel(a) = sel(b) by NaturalsBelow.equal_of_value(a := sel(a), b := sel(b));
+                        done by selInjective(a, b, aFront, bFront)
+                      }
+                    case ¬(b < cnt) as bBack: {
+                        cnt ≤ b by Natural.less_or_equal_of_not_less_than as bGe;
+                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = Natural.monus(b, cnt)
+                            by backValue(b, bGe, bBelow) as bVal;
+                        Natural.monus(b, cnt) < k
+                            by { b = cnt + Natural.monus(b, cnt) by NaturalsBelow.decompose_at_least(cnt, b, bGe);
+                                 cnt + Natural.monus(b, cnt) < cnt + k by substituting (b = cnt + Natural.monus(b, cnt));
+                                 done by Natural.lt_of_add_left_lt };
+                        k ≤ Natural.monus(b, cnt)
+                            by { k ≤ k + NaturalsBelow.value(sel(a)) by Natural.less_or_equal_add_right;
+                                 k + NaturalsBelow.value(sel(a))
+                                     = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) by aVal
+                                     = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) by valEq
+                                     = Natural.monus(b, cnt) by bVal;
+                                 done };
+                        Natural.monus(b, cnt) < k ≤ Natural.monus(b, cnt);
+                        ¬(Natural.monus(b, cnt) < Natural.monus(b, cnt)) by Natural.lt_irreflexive;
+                        done
+                      }
+                  }
+                }
+              case ¬(a < cnt) as aBack: {
+                  cnt ≤ a by Natural.less_or_equal_of_not_less_than as aGe;
+                  NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) = Natural.monus(a, cnt)
+                      by backValue(a, aGe, aBelow) as aVal;
+                  Natural.monus(a, cnt) < k
+                      by { a = cnt + Natural.monus(a, cnt) by NaturalsBelow.decompose_at_least(cnt, a, aGe);
+                           cnt + Natural.monus(a, cnt) < cnt + k by substituting (a = cnt + Natural.monus(a, cnt));
+                           done by Natural.lt_of_add_left_lt } as aMonusBelowK;
+                  done by cases {
+                    case b < cnt as bFront: {
+                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = k + NaturalsBelow.value(sel(b))
+                            by frontValue(b, bFront) as bVal;
+                        k ≤ Natural.monus(a, cnt)
+                            by { k ≤ k + NaturalsBelow.value(sel(b)) by Natural.less_or_equal_add_right;
+                                 k + NaturalsBelow.value(sel(b))
+                                     = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) by bVal
+                                     = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) by valEq
+                                     = Natural.monus(a, cnt) by aVal;
+                                 done };
+                        Natural.monus(a, cnt) < k ≤ Natural.monus(a, cnt);
+                        ¬(Natural.monus(a, cnt) < Natural.monus(a, cnt)) by Natural.lt_irreflexive;
+                        done
+                      }
+                    case ¬(b < cnt) as bBack: {
+                        cnt ≤ b by Natural.less_or_equal_of_not_less_than as bGe;
+                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = Natural.monus(b, cnt)
+                            by backValue(b, bGe, bBelow) as bVal;
+                        Natural.monus(a, cnt) = Natural.monus(b, cnt)
+                           by { Natural.monus(a, cnt)
+                                  = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) by aVal
+                                  = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) by valEq
+                                  = Natural.monus(b, cnt) by bVal; done } as monusEq;
+                        b = cnt + Natural.monus(b, cnt) by NaturalsBelow.decompose_at_least(cnt, b, bGe) as bDecomp;
+                        a = cnt + Natural.monus(a, cnt) by NaturalsBelow.decompose_at_least(cnt, a, aGe)
+                          = cnt + Natural.monus(b, cnt) by substituting monusEq
+                          = b by bDecomp;
+                        done
+                      }
+                  }
+                }
+            }
+          } as combinedInjective;
+
+        -- Independence of `ext` kills the concatenated coefficients; the first
+        -- `cnt` of them are the `coeff` we care about.
+        ∀ (i : Natural). i < cnt + k →
+            VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt)(i)
+            = Field.zero(f)
+          by extIndependent(cnt + k,
+                 VectorSpace.combineFunctions(selExt, idE, cnt),
+                 VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt),
+                 combinedInjective, combinedVanishes) as concatCoeffsZero;
+        target < cnt + k by { target < cnt ≤ cnt + k by Natural.less_or_equal_add_right; done } as targetBelowSum;
+        coeff(target)
+           = VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt)(target)
+                 by VectorSpace.combineFunctions_below
+           = Field.zero(f) by concatCoeffsZero(target, targetBelowSum);
+        done
+      }
+  }
+}
