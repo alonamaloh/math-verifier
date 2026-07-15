@@ -2120,3 +2120,134 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
       }
   }
 }
+
+-- ----------------------------------------------------------------------
+-- The rank–nullity theorem. Extend a basis of `ker T` to a basis of `V`; the
+-- images of the extension vectors form a basis of `im T`. Counting: `dim V`
+-- (the size of the extended basis) is `dim ker T` (the kernel-basis prefix)
+-- plus the number of extension vectors, which is `dim im T`.
+theorem LinearMap.rank_nullity {f : Field} (V W : VectorSpace(f))
+        (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) (linear : IsLinearMap(V, W, T))
+        (finiteV : VectorSpace.FiniteDimensional(V))
+        (kerFinite : VectorSpace.FiniteDimensional(
+            Subspace.vector_space(V, LinearMap.kernel(V, W, T), LinearMap.kernel_is_subspace(V, W, T, linear))))
+        (imageFinite : VectorSpace.FiniteDimensional(
+            Subspace.vector_space(W, LinearMap.image(V, W, T), LinearMap.image_is_subspace(V, W, T, linear))))
+        : VectorSpace.dimension(V, finiteV)
+          = VectorSpace.dimension(
+                Subspace.vector_space(V, LinearMap.kernel(V, W, T), LinearMap.kernel_is_subspace(V, W, T, linear)),
+                kerFinite)
+            + VectorSpace.dimension(
+                Subspace.vector_space(W, LinearMap.image(V, W, T), LinearMap.image_is_subspace(V, W, T, linear)),
+                imageFinite) := {
+  let kerSet : Set(VectorSpace.carrier(V)) := LinearMap.kernel(V, W, T);
+  let kerSub : IsSubspace(V, kerSet) := LinearMap.kernel_is_subspace(V, W, T, linear);
+  let imgSet : Set(VectorSpace.carrier(W)) := LinearMap.image(V, W, T);
+  let imgSub : IsSubspace(W, imgSet) := LinearMap.image_is_subspace(V, W, T, linear);
+  let kdim : Natural := VectorSpace.dimension(Subspace.vector_space(V, kerSet, kerSub), kerFinite);
+
+  -- A basis of the kernel, transported into `V`.
+  VectorSpace.HasDimension(Subspace.vector_space(V, kerSet, kerSub), kdim)
+      by VectorSpace.dimension_has_basis as kerHasBasis;
+  choose eK such that VectorSpace.IsBasis(eK) from kerHasBasis;
+  VectorSpace.Spans(eK) by VectorSpace.IsBasis.spans as eKSpans;
+  VectorSpace.LinearlyIndependent(eK) by VectorSpace.IsBasis.linearly_independent as eKIndependent;
+  let e : NaturalsBelow(kdim) → VectorSpace.carrier(V) :=
+      (i : NaturalsBelow(kdim)) ↦ Subspace.inclusion(V, kerSet, kerSub)(eK(i));
+  VectorSpace.LinearlyIndependent(e)
+      by Subspace.value_linearlyIndependent(kerSet, kerSub, eK, eKIndependent) as eIndependent;
+  ∀ (i : NaturalsBelow(kdim)). T(e(i)) = VectorSpace.zero(W)
+      by { take i : NaturalsBelow(kdim);
+           Subtype.value(eK(i)) ∈ kerSet by Subtype.property; done } as eKernel;
+
+  -- Extend it to a basis of `V`.
+  ∃ (sz : Natural). ∃ (rr : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+      sz = kdim + rr
+      ∧ VectorSpace.IsBasis(ext)
+      ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(kdim)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+      by VectorSpace.extend_to_basis(e, eIndependent, finiteV) as extendExists;
+  choose sz, rr, ext such that
+      sz = kdim + rr
+      ∧ VectorSpace.IsBasis(ext)
+      ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(kdim)).
+            NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j))
+      from extendExists;
+  sz = kdim + rr as szEq;
+  VectorSpace.IsBasis(ext) as extBasis;
+  ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(kdim)).
+      NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j) as extPrefix;
+  VectorSpace.LinearlyIndependent(ext) by VectorSpace.IsBasis.linearly_independent as extIndependent;
+  VectorSpace.Spans(ext) by VectorSpace.IsBasis.spans as extSpans;
+
+  -- `dim V = sz`.
+  VectorSpace.HasDimension(V, sz) by { witness ext with extBasis } as vHasDimSz;
+  VectorSpace.dimension(V, finiteV) = sz by VectorSpace.dimension_equals(V, finiteV, sz, vHasDimSz) as dimVeq;
+
+  -- The appended vectors `aFamily(j) = ext` at index `kdim + j`, and their images.
+  ∀ (j : NaturalsBelow(rr)). kdim + NaturalsBelow.value(j) < sz
+    by { take j : NaturalsBelow(rr); NaturalsBelow.value(j) < rr by NaturalsBelow.below;
+         kdim + NaturalsBelow.value(j) < kdim + rr by Natural.add_left_strict_monotone;
+         done by substituting szEq } as aBound;
+  let aFamily : NaturalsBelow(rr) → VectorSpace.carrier(V) :=
+      (j : NaturalsBelow(rr)) ↦ ext(NaturalsBelow.make(kdim + NaturalsBelow.value(j), aBound(j)));
+  ∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(rr)).
+      NaturalsBelow.value(i) = kdim + NaturalsBelow.value(j) → ext(i) = aFamily(j)
+    by {
+      take i : NaturalsBelow(sz); take j : NaturalsBelow(rr);
+      suppose NaturalsBelow.value(i) = kdim + NaturalsBelow.value(j) as valEq;
+      NaturalsBelow.value(i) = NaturalsBelow.value(NaturalsBelow.make(kdim + NaturalsBelow.value(j), aBound(j)))
+          by valEq;
+      i = NaturalsBelow.make(kdim + NaturalsBelow.value(j), aBound(j))
+          by NaturalsBelow.equal_of_value(a := i, b := NaturalsBelow.make(kdim + NaturalsBelow.value(j), aBound(j)));
+      ext(i) = ext(NaturalsBelow.make(kdim + NaturalsBelow.value(j), aBound(j)))
+          by substituting (i = NaturalsBelow.make(kdim + NaturalsBelow.value(j), aBound(j)));
+      done
+    } as extSuffix;
+  ∀ (j : NaturalsBelow(rr)). T(aFamily(j)) ∈ LinearMap.image(V, W, T)
+      by { take j : NaturalsBelow(rr); done by witness aFamily(j) with reflexivity(T(aFamily(j))) }
+      as imageMemberA;
+  let TaFamily : NaturalsBelow(rr) → VectorSpace.carrier(Subspace.vector_space(W, imgSet, imgSub)) :=
+      (j : NaturalsBelow(rr)) ↦ Subtype.make(VectorSpace.carrier(W), imgSet, T(aFamily(j)), imageMemberA(j));
+  ∀ (j : NaturalsBelow(rr)). Subtype.value(TaFamily(j)) = T(aFamily(j))
+      by { take j : NaturalsBelow(rr); done } as taValue;
+
+  -- The images span the image and are independent, hence a basis of `im T`.
+  VectorSpace.Spans(TaFamily)
+      by LinearMap.appended_images_span(T, linear, e, ext, aFamily, imgSub, TaFamily, taValue,
+             szEq, extSpans, eKernel, extPrefix, extSuffix) as taSpans;
+  ∀ (w : VectorSpace.carrier(V)).
+      T(w) = VectorSpace.zero(W) → w = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, w)
+    by {
+      take w : VectorSpace.carrier(V);
+      suppose T(w) = VectorSpace.zero(W) as wInKernel;
+      w ∈ kerSet by wInKernel;
+      Subtype.value(Subtype.make(VectorSpace.carrier(V), kerSet, w, wInKernel)) = VectorSpace.zero(V)
+          ∨ VectorSpace.InSpanOf((i : NaturalsBelow(kdim)) ↦ Subtype.value(eK(i)),
+                Subtype.value(Subtype.make(VectorSpace.carrier(V), kerSet, w, wInKernel)))
+          by Subspace.spanning_value_covered(kerSet, kerSub, eK, eKSpans) as covered;
+      done
+    } as kerCoverage;
+  VectorSpace.LinearlyIndependent(TaFamily)
+      by LinearMap.appended_images_independent(T, linear, e, ext, aFamily, imgSub, TaFamily, taValue,
+             szEq, extIndependent, extPrefix, extSuffix, kerCoverage) as taIndependent;
+  VectorSpace.IsBasis(TaFamily)
+      by { VectorSpace.LinearlyIndependent(TaFamily) by taIndependent;
+           VectorSpace.Spans(TaFamily) by taSpans; done } as taBasis;
+
+  -- `dim im T = rr`.
+  VectorSpace.HasDimension(Subspace.vector_space(W, imgSet, imgSub), rr)
+      by { witness TaFamily with taBasis } as imgHasDimRr;
+  VectorSpace.dimension(Subspace.vector_space(W, imgSet, imgSub), imageFinite) = rr
+      by VectorSpace.dimension_equals(Subspace.vector_space(W, imgSet, imgSub), imageFinite, rr, imgHasDimRr)
+      as dimImgeq;
+
+  -- Count: `dim V = sz = kdim + rr = dim ker T + dim im T`.
+  VectorSpace.dimension(V, finiteV)
+     = sz by dimVeq
+     = kdim + rr by szEq
+     = VectorSpace.dimension(Subspace.vector_space(V, kerSet, kerSub), kerFinite)
+       + VectorSpace.dimension(Subspace.vector_space(W, imgSet, imgSub), imageFinite)
+           by substituting dimImgeq;
+  done
+}
