@@ -92,7 +92,7 @@ theorem Natural.lt_or_le (a b : Natural) : a < b ∨ b ≤ a := {
   successor(a) ≤ b ∨ b ≤ a;
   done by cases {
     case successor(a) ≤ b as successorLessOrEqual: {
-        a < b;
+        a < successor(a) ≤ b;
         done
       }
     case b ≤ a as lessOrEqual: done
@@ -179,21 +179,19 @@ theorem Natural.divide_with_remainder_step
             k < dividend
             → Natural.has_quotient_remainder(divisor, k))
         : Natural.has_quotient_remainder(divisor, dividend) := {
-  (successor(dividend) ≤ divisor) ∨ (divisor ≤ dividend);
+  dividend < divisor ∨ divisor ≤ dividend by Natural.lt_or_le;
   done by cases {
-    case successor(dividend) ≤ divisor as dividendBelowDivisor: {
-        dividend < divisor;
+    case dividend < divisor as dividendBelowDivisor: {
         done
       }
     case divisor ≤ dividend as divisorBelowOrEqualDividend: {
         choose smallerDividend such that dividend = divisor + smallerDividend
             from Natural.subtraction_witness;
         -- smallerDividend < dividend (since divisor ≥ 1), so the IH applies.
-        successor(smallerDividend) ≤ smallerDividend + divisor;
+        smallerDividend < smallerDividend + divisor by Natural.lt_add_of_one_le;
         dividend
            = divisor + smallerDividend
            = smallerDividend + divisor;
-        successor(smallerDividend) ≤ dividend;
         smallerDividend < dividend;
         Natural.has_quotient_remainder(divisor, smallerDividend)
             by inductionHypothesis;
