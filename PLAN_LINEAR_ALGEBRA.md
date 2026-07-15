@@ -911,9 +911,19 @@ engine directly. Group laws are then immediate.
      index list moved to `enumerate`, kept as legitimate API).
    The det sum is `indexedAggregate`/`List.product` over `allPermutations`.
 3. **Sign** — `sign(σ) : Integer` valued in {−1, +1} + **multiplicativity**
-   `sign(compose σ τ) = sign σ · sign τ`. Route chosen AFTER brick 2 stands
-   (inversions-count parity vs. adjacent-transposition generation); record the
-   choice + why in `STRESS_PROBES.md`.
+   `sign(compose σ τ) = sign σ · sign τ`. **ROUTE CHOSEN: the product formula**
+   `sign(σ) = ∏_{i<j} orient(σ(i), σ(j))` over ordered index pairs, where
+   `orient(x,y) = if value(x) < value(y) then 1 else −1` (Integer, ±1). WHY over
+   inversion-parity or transposition-generation: multiplicativity is ONE pair
+   reindexing, not a transposition-flip grind. `sign(σ∘τ) = ∏ orient(σ(τi),σ(τj))`;
+   pointwise `orient(σ(τi),σ(τj)) = orient(τi,τj) · orient(σ; sort{τi,τj})`
+   (orient antisymmetry), so the product splits into `sign(τ)` (same formula) times
+   `∏ orient(σ; sort{τi,τj})`, and `sort ∘ τ` permutes the ordered-pair list — so
+   the second factor `= sign(σ)` by `List.Permutation.product_invariant` +
+   `List.permutation_of_distinct_inclusion` (both already in the library). Needs:
+   ordered-pair enumeration, `orient`, a `∏(f·g) = ∏f·∏g` list lemma, the pointwise
+   factorization, and the reindex permutation. (In progress; record the friction in
+   `STRESS_PROBES.md`.)
 4. **`Algebra/matrix.math`** — `Matrix(K, m, n) := NaturalsBelow(m) →
    NaturalsBelow(n) → K.carrier`; `multiplyMatrix` via `indexedAggregate`.
    Keep `m`/`n`/`p` literal `Natural` variables (casts at edges only).
