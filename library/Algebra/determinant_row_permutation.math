@@ -1,0 +1,355 @@
+-- Algebra/determinant_row_permutation.math
+--
+-- Permuting the rows of a matrix multiplies its determinant by the sign of
+-- the permutation (Stage H brick 6d of PLAN_LINEAR_ALGEBRA.md). Stated as the
+-- reindexing identity the det(AB) proof needs: for a permutation p,
+--   Σ_σ sign(σ) ∏_i B(p·i, σ·i) = sign(p) · det(B).
+-- Reindex the σ-sum by σ ↦ σ∘p (a bijection of Sₙ) and the index product by
+-- p; the sign multiplicativity supplies the sign(p) factor.
+
+module Algebra.determinant_row_permutation
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Lists.length
+import Lists.permutation
+import Algebra.field
+import Algebra.field_bundle
+import Algebra.field_aggregation
+import Algebra.commutative_ring_bundle
+import Algebra.ring_bundle
+import Algebra.ring_from_integer
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.determinant
+import Algebra.alternating_collapse
+
+-- The initial-ring map sends a product of two units (±1) to the product of
+-- their images — the restricted multiplicativity that dodges a general
+-- `from_integer_multiply`, by casing on both signs.
+theorem Field.from_integer_multiply_units (f : Field) (z w : Integer)
+        (zUnit : z = 1 ∨ z = Integer.negate(1))
+        (wUnit : w = 1 ∨ w = Integer.negate(1))
+        : Field.from_integer(f, Integer.multiply(z, w))
+          = Field.from_integer(f, z) * Field.from_integer(f, w) := {
+  -- Casing on the unit disjunctions substitutes z, w into the goal, so each
+  -- arm proves a concrete identity; meet the two sides at a concrete ±one.
+  done by cases {
+    case z = 1 as zPositive: {
+        done by cases {
+          case w = 1 as wPositive: {
+              Integer.multiply(1, 1) = 1 by ring as productValue;
+              Field.from_integer(f, 1) * Field.from_integer(f, 1)
+                 = Field.one(f) * Field.one(f)   by substituting Field.from_integer_one
+                 = Field.one(f)                   by ring
+                 as rightSide;
+              Field.from_integer(f, Integer.multiply(1, 1))
+                 = Field.from_integer(f, 1)       by substituting productValue
+                 = Field.one(f)                   by Field.from_integer_one
+                 = Field.from_integer(f, 1) * Field.from_integer(f, 1)   by rightSide
+            }
+          case w = Integer.negate(1) as wNegative: {
+              Integer.multiply(1, Integer.negate(1)) = Integer.negate(1) by ring as productValue;
+              Field.from_integer(f, 1) * Field.from_integer(f, Integer.negate(1))
+                 = Field.one(f) * Field.from_integer(f, Integer.negate(1))   by substituting Field.from_integer_one
+                 = Field.one(f) * Field.negate(f, Field.one(f))              by substituting Field.from_integer_negate_one
+                 = Field.negate(f, Field.one(f))                             by ring
+                 as rightSide;
+              Field.from_integer(f, Integer.multiply(1, Integer.negate(1)))
+                 = Field.from_integer(f, Integer.negate(1))                  by substituting productValue
+                 = Field.negate(f, Field.one(f))                             by Field.from_integer_negate_one
+                 = Field.from_integer(f, 1) * Field.from_integer(f, Integer.negate(1))   by rightSide
+            }
+        }
+      }
+    case z = Integer.negate(1) as zNegative: {
+        done by cases {
+          case w = 1 as wPositive: {
+              Integer.multiply(Integer.negate(1), 1) = Integer.negate(1) by ring as productValue;
+              Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, 1)
+                 = Field.negate(f, Field.one(f)) * Field.from_integer(f, 1)   by substituting Field.from_integer_negate_one
+                 = Field.negate(f, Field.one(f)) * Field.one(f)              by substituting Field.from_integer_one
+                 = Field.negate(f, Field.one(f))                             by ring
+                 as rightSide;
+              Field.from_integer(f, Integer.multiply(Integer.negate(1), 1))
+                 = Field.from_integer(f, Integer.negate(1))                  by substituting productValue
+                 = Field.negate(f, Field.one(f))                             by Field.from_integer_negate_one
+                 = Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, 1)   by rightSide
+            }
+          case w = Integer.negate(1) as wNegative: {
+              Integer.multiply(Integer.negate(1), Integer.negate(1)) = 1 by ring as productValue;
+              Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, Integer.negate(1))
+                 = Field.negate(f, Field.one(f)) * Field.from_integer(f, Integer.negate(1))
+                       by substituting Field.from_integer_negate_one
+                 = Field.negate(f, Field.one(f)) * Field.negate(f, Field.one(f))
+                       by substituting Field.from_integer_negate_one
+                 = Field.one(f)                                              by ring
+                 as rightSide;
+              Field.from_integer(f, Integer.multiply(Integer.negate(1), Integer.negate(1)))
+                 = Field.from_integer(f, 1)                                  by substituting productValue
+                 = Field.one(f)                                              by Field.from_integer_one
+                 = Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, Integer.negate(1))
+                       by rightSide
+            }
+        }
+      }
+  }
+}
+
+-- The image of the index enumeration under a permutation is a rearrangement
+-- of the enumeration itself.
+theorem Permutation.apply_map_permutes_enumerate {n : Natural} (p : Permutation(n))
+        : List.Permutation(NaturalsBelow(n),
+              List.map(NaturalsBelow(n), NaturalsBelow(n),
+                  (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)),
+              NaturalsBelow.enumerate(n)) :=
+  List.permutation_of_distinct_inclusion(NaturalsBelow(n),
+      List.map(NaturalsBelow(n), NaturalsBelow(n),
+          (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)),
+      NaturalsBelow.enumerate(n),
+      List.map_distinct(NaturalsBelow(n), NaturalsBelow(n),
+          (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i),
+          (x y : NaturalsBelow(n))
+              (equalImages : Permutation.apply(p, x) = Permutation.apply(p, y)) ↦
+                Permutation.apply_injective(p, x, y, equalImages),
+          NaturalsBelow.enumerate(n), NaturalsBelow.enumerate_distinct(n)),
+      NaturalsBelow.enumerate_distinct(n),
+      (x : NaturalsBelow(n)) (xInMap : List.member(NaturalsBelow(n), x,
+          List.map(NaturalsBelow(n), NaturalsBelow(n),
+              (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)))) ↦
+            NaturalsBelow.enumerate_complete(n, x),
+      List.map_length(NaturalsBelow(n), NaturalsBelow(n),
+          (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)))
+
+-- Reindexing the row product by p: ∏_i B(p·i, ρ(p·i)) = ∏_j B(j, ρ·j).
+theorem Matrix.product_row_reindex {f : Field} {n : Natural}
+        (B : Matrix(f, n, n)) (p rho : Permutation(n))
+        : Field.productOver(
+              (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                  Permutation.apply(rho, Permutation.apply(p, i))),
+              NaturalsBelow.enumerate(n))
+          = Field.productOver(
+              (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+              NaturalsBelow.enumerate(n)) := {
+  Field.productOver(
+        (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+        List.map(NaturalsBelow(n), NaturalsBelow(n),
+            (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)))
+      = Field.productOver(
+            (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                Permutation.apply(rho, Permutation.apply(p, i))),
+            NaturalsBelow.enumerate(n))
+      by Field.productOver_map(
+             (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+             (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n))
+      as reindexEquation;
+  Field.productOver(
+        (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+            Permutation.apply(rho, Permutation.apply(p, i))),
+        NaturalsBelow.enumerate(n))
+     = Field.productOver(
+           (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+           List.map(NaturalsBelow(n), NaturalsBelow(n),
+               (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)))
+           by reindexEquation
+     = Field.productOver(
+           (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+           NaturalsBelow.enumerate(n))
+           by Field.productOver_permutation(
+                  (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                  List.map(NaturalsBelow(n), NaturalsBelow(n),
+                      (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)),
+                  NaturalsBelow.enumerate(n),
+                  Permutation.apply_map_permutes_enumerate(p))
+}
+
+-- Row permutation scales the determinant by the sign.
+theorem Matrix.determinant_row_permutation {f : Field} {n : Natural}
+        (B : Matrix(f, n, n)) (p : Permutation(n))
+        : Field.sumOver(
+              (sigma : Permutation(n)) ↦
+                  Field.from_integer(f, Permutation.sign(sigma))
+                      * Field.productOver(
+                            (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                                Permutation.apply(sigma, i)),
+                            NaturalsBelow.enumerate(n)),
+              Permutation.allPermutations(n))
+          = Field.from_integer(f, Permutation.sign(p)) * Matrix.determinant(B) := {
+  -- σ ↦ σ∘p permutes the permutation list.
+  List.Permutation(Permutation(n), Permutation.allPermutations(n),
+          List.map(Permutation(n), Permutation(n),
+              (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+              Permutation.allPermutations(n)))
+      by List.Permutation.symmetric(Permutation(n),
+             List.map(Permutation(n), Permutation(n),
+                 (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+                 Permutation.allPermutations(n)),
+             Permutation.allPermutations(n),
+             List.permutation_of_distinct_inclusion(Permutation(n),
+                 List.map(Permutation(n), Permutation(n),
+                     (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+                     Permutation.allPermutations(n)),
+                 Permutation.allPermutations(n),
+                 List.map_distinct(Permutation(n), Permutation(n),
+                     (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+                     (a b : Permutation(n))
+                         (equalComposites : Permutation.compose(a, p) = Permutation.compose(b, p)) ↦
+                           Permutation.compose_right_cancel(a, b, p, equalComposites),
+                     Permutation.allPermutations(n), Permutation.allPermutations_distinct(n)),
+                 Permutation.allPermutations_distinct(n),
+                 (x : Permutation(n)) (xInMap : List.member(Permutation(n), x,
+                     List.map(Permutation(n), Permutation(n),
+                         (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+                         Permutation.allPermutations(n)))) ↦
+                       Permutation.allPermutations_complete(n, x),
+                 List.map_length(Permutation(n), Permutation(n),
+                     (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+                     Permutation.allPermutations(n))))
+      as reindexPermutes;
+
+  -- Each reindexed term: sign and product factor through sign(p) and det(B).
+  ∀ (rho : Permutation(n)).
+      Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+          * Field.productOver(
+                (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                    Permutation.apply(Permutation.compose(rho, p), i)),
+                NaturalsBelow.enumerate(n))
+      = Field.from_integer(f, Permutation.sign(p))
+          * (Field.from_integer(f, Permutation.sign(rho))
+                * Field.productOver(
+                      (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                      NaturalsBelow.enumerate(n)))
+      by (rho : Permutation(n)) ↦ {
+          Field.productOver(
+                (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                    Permutation.apply(Permutation.compose(rho, p), i)),
+                NaturalsBelow.enumerate(n))
+             = Field.productOver(
+                   (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                   NaturalsBelow.enumerate(n))
+                 by Matrix.product_row_reindex(B, p, rho) as productReindexed;
+          Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+             = Field.from_integer(f, Integer.multiply(Permutation.sign(rho), Permutation.sign(p)))
+                   by substituting Permutation.sign_compose
+             = Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p))
+                   by Field.from_integer_multiply_units(f, Permutation.sign(rho), Permutation.sign(p),
+                          Permutation.sign_is_unit(rho), Permutation.sign_is_unit(p))
+                 as signReindexed;
+          Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+                * Field.productOver(
+                      (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                          Permutation.apply(Permutation.compose(rho, p), i)),
+                      NaturalsBelow.enumerate(n))
+             = (Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p)))
+                   * Field.productOver(
+                         (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                             Permutation.apply(Permutation.compose(rho, p), i)),
+                         NaturalsBelow.enumerate(n))
+                   by substituting signReindexed
+             = (Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p)))
+                   * Field.productOver(
+                         (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                         NaturalsBelow.enumerate(n))
+                   by substituting productReindexed
+             = Field.from_integer(f, Permutation.sign(p))
+                   * (Field.from_integer(f, Permutation.sign(rho))
+                         * Field.productOver(
+                               (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                               NaturalsBelow.enumerate(n)))
+                   by ring
+        } as termFactored;
+
+  Field.sumOver(
+        (sigma : Permutation(n)) ↦
+            Field.from_integer(f, Permutation.sign(sigma))
+                * Field.productOver(
+                      (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i), Permutation.apply(sigma, i)),
+                      NaturalsBelow.enumerate(n)),
+        Permutation.allPermutations(n))
+     = Field.sumOver(
+           (sigma : Permutation(n)) ↦
+               Field.from_integer(f, Permutation.sign(sigma))
+                   * Field.productOver(
+                         (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i), Permutation.apply(sigma, i)),
+                         NaturalsBelow.enumerate(n)),
+           List.map(Permutation(n), Permutation(n),
+               (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+               Permutation.allPermutations(n)))
+           by Field.sumOver_permutation(
+                  (sigma : Permutation(n)) ↦
+                      Field.from_integer(f, Permutation.sign(sigma))
+                          * Field.productOver(
+                                (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                                    Permutation.apply(sigma, i)),
+                                NaturalsBelow.enumerate(n)),
+                  Permutation.allPermutations(n),
+                  List.map(Permutation(n), Permutation(n),
+                      (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+                      Permutation.allPermutations(n)),
+                  reindexPermutes)
+     = Field.sumOver(
+           (rho : Permutation(n)) ↦
+               Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+                   * Field.productOver(
+                         (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                             Permutation.apply(Permutation.compose(rho, p), i)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+           by Field.sumOver_map(
+                  (sigma : Permutation(n)) ↦
+                      Field.from_integer(f, Permutation.sign(sigma))
+                          * Field.productOver(
+                                (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                                    Permutation.apply(sigma, i)),
+                                NaturalsBelow.enumerate(n)),
+                  (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
+                  Permutation.allPermutations(n))
+     = Field.sumOver(
+           (rho : Permutation(n)) ↦
+               Field.from_integer(f, Permutation.sign(p))
+                   * (Field.from_integer(f, Permutation.sign(rho))
+                         * Field.productOver(
+                               (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                               NaturalsBelow.enumerate(n))),
+           Permutation.allPermutations(n))
+           by Field.sumOver_congruence(
+                  (rho : Permutation(n)) ↦
+                      Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+                          * Field.productOver(
+                                (i : NaturalsBelow(n)) ↦ B(Permutation.apply(p, i),
+                                    Permutation.apply(Permutation.compose(rho, p), i)),
+                                NaturalsBelow.enumerate(n)),
+                  (rho : Permutation(n)) ↦
+                      Field.from_integer(f, Permutation.sign(p))
+                          * (Field.from_integer(f, Permutation.sign(rho))
+                                * Field.productOver(
+                                      (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                                      NaturalsBelow.enumerate(n))),
+                  Permutation.allPermutations(n), termFactored)
+     = Field.from_integer(f, Permutation.sign(p))
+           * Field.sumOver(
+                 (rho : Permutation(n)) ↦
+                     Field.from_integer(f, Permutation.sign(rho))
+                         * Field.productOver(
+                               (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                               NaturalsBelow.enumerate(n)),
+                 Permutation.allPermutations(n))
+           by Field.sumOver_scale_left(Field.from_integer(f, Permutation.sign(p)),
+                  (rho : Permutation(n)) ↦
+                      Field.from_integer(f, Permutation.sign(rho))
+                          * Field.productOver(
+                                (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
+                                NaturalsBelow.enumerate(n)),
+                  Permutation.allPermutations(n))
+     = Field.from_integer(f, Permutation.sign(p)) * Matrix.determinant(B)
+           by substituting Matrix.determinant_expansion
+}

@@ -501,3 +501,23 @@ theorem Field.sumOver_restrict_support {f : Field} {index : Type(0)}
           }
         }
   }
+
+-- A sum over a list is invariant under permuting the item list (field
+-- addition is commutative and associative) — the additive companion of
+-- `productOver_permutation`.
+theorem Field.sumOver_permutation {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (items1 items2 : List(index))
+        (perm : List.Permutation(index, items1, items2))
+        : Field.sumOver(term, items1) = Field.sumOver(term, items2) :=
+  Field.sumOver(term, items1)
+     = List.product(Field.carrier(f), Field.add, Field.zero(f),
+           List.map(index, Field.carrier(f), term, items1))
+     = List.product(Field.carrier(f), Field.add, Field.zero(f),
+           List.map(index, Field.carrier(f), term, items2))
+           by List.Permutation.product_invariant(Field.carrier(f), Field.add, Field.zero(f),
+                  (x y z : Field.carrier(f)) ↦ Field.add_associative(f, x, y, z),
+                  (x y : Field.carrier(f)) ↦ Field.add_commutative(f, x, y),
+                  List.map(index, Field.carrier(f), term, items1),
+                  List.map(index, Field.carrier(f), term, items2),
+                  List.Permutation.map(index, Field.carrier(f), term, items1, items2, perm))
+     = Field.sumOver(term, items2)
