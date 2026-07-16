@@ -2536,23 +2536,24 @@ private:
         ExpressionPointer left, ExpressionPointer right);
 
     // Strategy (e) of `coerceToExpectedTypeViaDiff`: when `term`'s type
-    // and the expected type are the same Natural relation (`=` / `≤` /
-    // `<` over Natural) differing only by an additive rearrangement
-    // (`d + 1` vs `1 + d`, `(a + b) + c` vs `a + (b + c)`, `2` vs `1 + 1`),
-    // synthesize the rearrangement equality with `ring` and transport
-    // `term` across it. `Natural.add` is opaque so these are not defeq;
-    // the synthesized proof is kernel-checked, so trust is preserved.
-    ExpressionPointer tryNaturalAdditiveRearrangement(
+    // and the expected type are the same relation (`=` / `≤` / `<`) over a
+    // ring carrier differing only by a commutative-ring rearrangement
+    // (`d + 1` vs `1 + d`, `a · b` vs `b · a`, `(a + b) + c` vs `a + (b + c)`,
+    // `2` vs `1 + 1`), synthesize the rearrangement equality with `ring` and
+    // transport `term` across it. The carrier's operations are opaque so
+    // these are not defeq; the synthesized proof is kernel-checked, so trust
+    // is preserved.
+    ExpressionPointer tryRingRearrangement(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,
         ExpressionPointer termTypeClosed,
         ExpressionPointer expectedTypeClosed);
 
-    // Prove `diffInferred = diffExpected` over Natural with `ring` (via
-    // `elaborateRing`), returning it as a `DiffBridgeEquality`. Declines
-    // (nullopt) unless both subterms are Natural-typed and `ring` closes
-    // the identity. The resolver used by `tryNaturalAdditiveRearrangement`.
-    std::optional<DiffBridgeEquality> synthesizeNaturalEquality(
+    // Prove `diffInferred = diffExpected` with `ring` (via `elaborateRing`),
+    // returning it as a `DiffBridgeEquality`. Declines (nullopt) unless the
+    // subterms' carrier is a ring `ring` recognizes and `ring` closes the
+    // identity. The resolver used by `tryRingRearrangement`.
+    std::optional<DiffBridgeEquality> synthesizeRingRearrangementEquality(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer diffInferredOpened,
         ExpressionPointer diffExpectedOpened);

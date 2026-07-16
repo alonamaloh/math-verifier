@@ -144,52 +144,54 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
         // Disjunction-injection prefilter: a proof of one disjunct where
         // `Or(A, B)` is expected wraps with the matching Or.introduce*.
         bool expectedIsOr = headConstantName(expectedTypeClosed) == "Or";
-        // Strategy (e) prefilter (Natural additive rearrangement): the
-        // expected type is a Natural relation (`=` over `Natural`, or
-        // `Natural.LessOrEqual` / `Natural.LessThan`) with a `+`/`successor`
-        // somewhere in it, so the term's type may differ only by an additive
-        // rearrangement (`d + 1` vs `1 + d`) that `Natural.add`'s opacity
-        // makes non-defeq. Purely structural on the closed expected type —
-        // no inferType — so it is as cheap as the other prefilters.
-        auto isNaturalRelationHead = [&](ExpressionPointer e) {
-            std::vector<ExpressionPointer> args;
+        // Strategy (e) prefilter (ring rearrangement): the expected type is an
+        // ORDER relation — `<T>.LessOrEqual` / `<T>.LessThan` for ANY carrier
+        // `T`, not just Natural — whose operands mention a ring operation
+        // (`+`/`·`/`-`), so the term's type may differ only by a rearrangement
+        // (`d + 1` vs `1 + d`, `a · b` vs `b · a`) that the carrier's opaque
+        // operations make non-defeq but `ring` proves. `=` goals reach the same
+        // strategy through `expectedCouldFire`, so they need no clause here.
+        // Purely structural on the closed expected type — a RAW head peel (no
+        // WHNF, since an order relation is a `definition` that would unfold the
+        // name away) — so it stays as cheap as the other prefilters.
+        auto endsWith = [](const std::string& s, const std::string& suffix) {
+            return s.size() >= suffix.size()
+                && s.compare(s.size() - suffix.size(), suffix.size(), suffix)
+                       == 0;
+        };
+        auto relationHeadName = [](ExpressionPointer e) -> std::string {
             ExpressionPointer head = e;
             while (auto* app = std::get_if<Application>(&head->node)) {
-                args.push_back(app->argument);
                 head = app->function;
             }
             auto* constant = std::get_if<Constant>(&head->node);
-            if (!constant) return false;
-            if (constant->name == "Natural.LessOrEqual"
-                || constant->name == "Natural.LessThan") {
-                return true;
-            }
-            // `Equality(T, a, b)` peels to args == [b, a, T]; the carrier T
-            // is the outermost application's argument.
-            return constant->name == "Equality" && args.size() == 3
-                && headConstantName(args.back()) == "Natural";
+            return constant ? constant->name : std::string();
         };
-        std::function<bool(ExpressionPointer)> containsNaturalAdditive =
+        std::function<bool(ExpressionPointer)> containsRingOperation =
             [&](ExpressionPointer e) -> bool {
                 if (auto* constant = std::get_if<Constant>(&e->node)) {
-                    return constant->name == "Natural.add"
-                        || constant->name == "successor"
-                        || constant->name == "Natural.successor";
+                    const std::string& n = constant->name;
+                    return endsWith(n, ".add") || endsWith(n, ".multiply")
+                        || endsWith(n, ".negate") || endsWith(n, ".subtract")
+                        || n == "successor" || n == "Natural.successor";
                 }
                 if (auto* app = std::get_if<Application>(&e->node)) {
-                    return containsNaturalAdditive(app->function)
-                        || containsNaturalAdditive(app->argument);
+                    return containsRingOperation(app->function)
+                        || containsRingOperation(app->argument);
                 }
                 return false;
             };
-        bool naturalRearrangeCouldFire =
-            isNaturalRelationHead(expectedTypeClosed)
-            && containsNaturalAdditive(expectedTypeClosed);
+        std::string expectedRelationName =
+            relationHeadName(expectedTypeClosed);
+        bool rearrangeCouldFire =
+            (endsWith(expectedRelationName, ".LessOrEqual")
+             || endsWith(expectedRelationName, ".LessThan"))
+            && containsRingOperation(expectedTypeClosed);
         if (!expectedCouldFire
             && !contextCouldFire
             && !barePropositionCouldFire
             && !expectedIsOr
-            && !naturalRearrangeCouldFire) {
+            && !rearrangeCouldFire) {
             return term;
         }
         ExpressionPointer termTypeOpened;
@@ -296,19 +298,18 @@ ExpressionPointer Elaborator::coerceToExpectedTypeViaDiff(
             localBinders, term, termTypeOpened, expectedTypeClosed);
         if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
                 "bare-proposition-as-proof")) return ok;
-        // Strategy (e): Natural additive rearrangement. The term proves the
-        // same Natural relation modulo an additive identity (`d + 1` vs
-        // `1 + d`, `(a + b) + c` vs `a + (b + c)`, `2` vs `1 + 1`) that is
-        // propositionally but not definitionally true — `Natural.add` is
-        // opaque and recurses on its first argument. Synthesize the
-        // rearrangement equality with `ring` and transport the term across
-        // it, so a lemma stated in one additive form drops into an argument
-        // slot expecting the other. Last resort: only the additive AC that
-        // the earlier strategies cannot express.
-        wrapped = tryNaturalAdditiveRearrangement(
+        // Strategy (e): ring rearrangement. The term proves the same relation
+        // modulo a ring identity (`d + 1` vs `1 + d`, `a · b` vs `b · a`,
+        // `(a + b) + c` vs `a + (b + c)`, `2` vs `1 + 1`) that is
+        // propositionally but not definitionally true — the carrier's
+        // operations are opaque. Synthesize the rearrangement equality with
+        // `ring` and transport the term across it, so a lemma stated in one
+        // form drops into an argument slot expecting the other. Last resort:
+        // only the commutative-ring AC the earlier strategies cannot express.
+        wrapped = tryRingRearrangement(
             localBinders, term, termTypeClosed, expectedTypeClosed);
         if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
-                "natural-additive-rearrangement")) return ok;
+                "ring-rearrangement")) return ok;
         return term;
     }
 
@@ -766,14 +767,17 @@ ExpressionPointer Elaborator::tryDiffBridgeViaContextEquality(
     }
 
 std::optional<Elaborator::DiffBridgeEquality>
-    Elaborator::synthesizeNaturalEquality(
+    Elaborator::synthesizeRingRearrangementEquality(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer diffInferredOpened,
         ExpressionPointer diffExpectedOpened) {
-        // The differing subterms must be Natural — `ring` recognizes the
-        // Natural carrier and closes its additive AC (associativity,
-        // commutativity, and numeral `2 = 1 + 1` folding), which is exactly
-        // the class of identities that `Natural.add`'s opacity hides.
+        // Whether the differing subterms are rearrangements of one commutative
+        // identity is `elaborateRing`'s call: it recognizes the carrier (any
+        // registered ring — Natural, Integer, Rational, Real, an abstract ring
+        // bundle) and closes the associativity / commutativity / numeral
+        // `2 = 1 + 1` AC that the carrier's opaque operations hide. For a
+        // non-ring carrier `ring` declines and we fall through — so no carrier
+        // gate is needed here beyond inferring the carrier for the goal.
         ExpressionPointer carrierOpened;
         try {
             carrierOpened =
@@ -783,7 +787,6 @@ std::optional<Elaborator::DiffBridgeEquality>
         } catch (const ElaborateError&) {
             return std::nullopt;
         }
-        if (headConstantName(carrierOpened) != "Natural") return std::nullopt;
         LevelPointer level;
         try {
             level = typeUniverseOf(localBinders, diffInferredOpened);
@@ -817,7 +820,7 @@ std::optional<Elaborator::DiffBridgeEquality>
         return result;
     }
 
-ExpressionPointer Elaborator::tryNaturalAdditiveRearrangement(
+ExpressionPointer Elaborator::tryRingRearrangement(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,
         ExpressionPointer termTypeClosed,
@@ -827,7 +830,7 @@ ExpressionPointer Elaborator::tryNaturalAdditiveRearrangement(
             [&](ExpressionPointer diffInferredOpened,
                 ExpressionPointer diffExpectedOpened)
                     -> std::optional<DiffBridgeEquality> {
-                return synthesizeNaturalEquality(
+                return synthesizeRingRearrangementEquality(
                     localBinders, diffInferredOpened, diffExpectedOpened);
             },
             /*useNaturalAdditiveDiff=*/true);

@@ -251,9 +251,26 @@ first, so the change is additive (it only fills premises nothing else could).
 `Real.is_ring`. Regression `library/Test/instance_premise_discharge_test.math`.
 Gates green (tests, error-tests 56/56, export-check 3076, axioms unchanged).
 
-**Remaining F2:** the general provable-not-defeq coercion beyond Natural
-relations (part (a)); and extending (b) to parameterized instances
-(`IsRing(IntegerMod(m), …)`) if it recurs.
+✅ **(a) general provable-not-defeq coercion beyond Natural — DONE 2026-07-15.**
+Strategy (e) of `coerceToExpectedTypeViaDiff` (coercion.cpp) is generalized from
+"Natural additive rearrangement" to "ring rearrangement": the prefilter now
+fires on ANY type's ORDER relation (`<T>.LessOrEqual` / `<T>.LessThan`, raw head
+suffix-match) whose operands mention a ring operation (`+`/`·`/`-`), and the
+synthesis (`synthesizeRingRearrangementEquality`, née `synthesizeNaturalEquality`)
+drops the Natural-only carrier gate — `elaborateRing` recognizes the carrier
+(ℕ/ℤ/ℚ/ℝ/abstract bundle) and decides, declining cleanly for non-rings. So a
+term proving `b · a ≤ c` / `b + a ≤ c` / `(a+b)+c ≤ d` now drops into a slot
+expecting the commuted/re-associated spelling over ℤ/ℚ/ℝ (the `=` case already
+worked via the diff-wrap strategy). Sound: `ring` declines a non-identity, so a
+genuine mismatch still errors (verified). Renamed `tryNaturalAdditiveRearrangement`
+→ `tryRingRearrangement`. Regression
+`library/Test/ring_rearrangement_coercion_test.math` (ℤ/ℚ/ℝ × commute/associate,
+plus the Natural `1+n`↔`n+1` regression). Gates green (tests, error-tests 56/56,
+export-check 3076, axioms unchanged).
+
+**Remaining F2:** extending (b) to parameterized instances
+(`IsRing(IntegerMod(m), …)`, `CommutativeRing.carrier(c)`) if it recurs — would
+also collapse the `commutative_ring_algebra.math` boilerplate.
 
 **Detail.** `numeral_let_ring_elaborator_gaps` items 4 & 5, `coercion_join_project`.
 
