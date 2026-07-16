@@ -29,8 +29,9 @@ definition Function.IsInverse (A B : Type(0)) (f : A → B) (g : B → A) : Prop
 theorem Function.inverse_swap (A B : Type(0)) (f : A → B) (g : B → A)
         (inverse : Function.IsInverse(A, B, f, g))
         : Function.IsInverse(B, A, g, f) := {
-  let ⟨leftInverse, rightInverse⟩ := inverse;
-  And.introduction(rightInverse, leftInverse)
+  (∀ (x : B). f(g(x)) = x);
+  (∀ (y : A). g(f(y)) = y);
+  done
 }
 
 -- The identity is its own inverse.
@@ -47,8 +48,8 @@ theorem Function.compose_inverse (A B C : Type(0))
         (inverseFG : Function.IsInverse(A, B, f, g))
         (inverseHK : Function.IsInverse(B, C, h, k))
         : Function.IsInverse(A, C, (x : A) ↦ h(f(x)), (z : C) ↦ g(k(z))) := {
-  let ⟨leftInverseFG, rightInverseFG⟩ := inverseFG;
-  let ⟨leftInverseHK, rightInverseHK⟩ := inverseHK;
+  (∀ (x : B). k(h(x)) = x) as leftInverseHK;
+  (∀ (y : B). f(g(y)) = y) as rightInverseFG;
   And.introduction(
       (x : A) ↦ g(k(h(f(x))))
                    = g(f(x))      by leftInverseHK(f(x))
@@ -62,22 +63,21 @@ theorem Function.compose_inverse (A B C : Type(0))
 -- you apply g to both sides.
 theorem Function.inverse_is_injective (A B : Type(0)) (f : A → B) (g : B → A)
         (inverse : Function.IsInverse(A, B, f, g))
-        : Function.IsInjective(A, B, f) := {
-  let ⟨leftInverse, _⟩ := inverse;
+        : Function.IsInjective(A, B, f) :=
   (x y : A) (equalImages : f(x) = f(y)) ↦
     x
         = g(f(x))
         = g(f(y))
         = y
-}
 
 -- An inverse pair makes f surjective: g(y) is a preimage of y.
 theorem Function.inverse_is_surjective (A B : Type(0)) (f : A → B) (g : B → A)
         (inverse : Function.IsInverse(A, B, f, g))
-        : Function.IsSurjective(A, B, f) := {
-  let ⟨_, rightInverse⟩ := inverse;
-  (y : B) ↦ witness g(y) with rightInverse(y)
-}
+        : Function.IsSurjective(A, B, f) :=
+  (y : B) ↦ {
+      f(g(y)) = y as preimage;
+      witness g(y) with preimage
+    }
 
 -- The bridge to the established vocabulary: an inverse pair makes f
 -- bijective.
