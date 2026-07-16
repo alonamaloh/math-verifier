@@ -430,7 +430,27 @@ Update this section before ending any session that works on the plan.
     `FiniteDimensionalVectorSpace` record layered over `VectorSpace` carrying
     `dimension`/`basis`/`IsBasis` — build when Stage G needs it (currently the
     unbundled `dimension(V, fd)` view suffices).
-- **Stages G–H** — not started.
+- **Stage G — DONE (2026-07-14).** `LinearMap.rank_nullity` (dim V = dim ker T +
+  dim im T), `Algebra/rank_nullity.math`, choice-free. See the memory tracker
+  [[linear_algebra_build]] for the brick 1–5 detail.
+- **Stage H — IN PROGRESS (det(AB) = det(A)·det(B)).** Bricks 1–5 + 6-backbone +
+  6a + 6b DONE (Sₙ group, enumeration, sign + multiplicativity, matrix,
+  determinant, aggregation, function-space distributivity, sign(swap)=−1). **6c
+  (alternating collapse) + 6d (injective reindex + assembly) REMAIN** — see the
+  Stage-H sub-plan "brick 6" entry for the 6c crux scoping (genuine orbit-pairing,
+  not `Σ=−Σ`; build `List.remove` + `sumOver_remove` first). To be started in a
+  fresh session.
+- **LA POLISH DEBT (owner-requested 2026-07-15, pending).** Most Stage E–H files
+  are NOT in the clean manifest — the tracker repeatedly defers the "redundant-`by`
+  read-through + unused-name cascade + manifest-add" per file (exchange_lemma,
+  basis_pruning, dimension, rank_nullity, and the whole determinant cluster:
+  finite_permutation, permutation_enumeration/sign/transposition_sign,
+  field_aggregation, function_enumeration, matrix, determinant, ring_from_integer).
+  Owner wants all LA modules polished. Do this per the owner rules —
+  [[redundant_by_is_half_keeps]] (read each site; ~half the hints are load-bearing
+  keeps, NOT drive-to-zero), [[readability_is_primary]], [[scope_to_clean_manifest]],
+  the `polish-proofs` skill — file by file, one commit each, re-verify + manifest-add.
+  Large sweep; interleave with or follow the 6c/6d build.
 
 ## Remaining worklist (authoritative running order)
 
@@ -1020,6 +1040,27 @@ engine directly. Group laws are then immediate.
      fixed-point-free involution on `allPermutations` via σ↦σ∘τ, so the whole
      list-sum pairs off to 0. Needs a "sum over a list closed under a
      sign-reversing fixed-point-free involution = 0" lemma over allPermutations.
+     **SCOPING (2026-07-15, before a fresh Stage-H session):**
+     - **CRUX subtlety — must use GENUINE ORBIT-PAIRING, not `Σ = −Σ`.** The
+       tempting shortcut (reindex the sum by the involution ⟹ `Σ g = Σ g∘ι =
+       Σ(−g) = −Σ g` ⟹ `2·Σ = 0` ⟹ `Σ = 0`) is UNSOUND over a general field:
+       `2·S = 0 ⟹ S = 0` needs char ≠ 2. det multiplicativity must hold over any
+       field (incl. char 2), so the lemma has to genuinely pair the list into
+       2-element orbits `{x, ιx}` (each `g(x)+g(ιx)=0`) and sum those. Confirmed
+       the intended route; do NOT take the `Σ=−Σ` bait.
+     - **Missing infra (build FIRST).** No `List.remove`/`List.delete` and no
+       `sumOver`/`productOver` "remove one element" lemma exist yet (checked:
+       Lists/ has membership/distinct/append but no element-removal; the only
+       "isolate" tool is `List.product_isolate_single` in
+       permutation_transposition_sign.math). The lemma wants: `List.remove(x, L)`
+       (drop first occurrence) + `Field.sumOver_remove` (`x∈L ⟹ sumOver(g,L) =
+       g(x) + sumOver(g, remove(x,L))`), then STRONG INDUCTION on length removing
+       the orbit `{head, ι(head)}` — `remove` twice drops length by 2, preserves
+       distinctness + ι-closure. Plan: build `List.remove` + its member/length/
+       distinct lemmas and `sumOver_remove` as a reusable Lists/field-aggregation
+       unit, THEN the involution-pairing sum-zero lemma, THEN instantiate at
+       τ=swap(a,b) on allPermutations for the collapse. Est. the pairing lemma +
+       infra ≈ one exchange-sized file (~200–400 lines).
    - **(6d) injective reindex + assembly** — injective φ ⟹ bijection (pigeonhole)
      ⟹ a Permutation φ̂; C(φ)=sign(φ̂)·det(B) by reindexing σ=ρ∘φ̂ (sign_compose +
      productOver_map through φ̂); sum over injective φ ↔ `allPermutations` bridge;
