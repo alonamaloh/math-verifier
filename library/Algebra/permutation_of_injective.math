@@ -29,33 +29,33 @@ theorem NaturalsBelow.injective_is_surjective (n : Natural)
         (f : NaturalsBelow(n) → NaturalsBelow(n))
         (inj : Function.IsInjective(NaturalsBelow(n), NaturalsBelow(n), f))
         : ∀ (y : NaturalsBelow(n)). ∃ (x : NaturalsBelow(n)). f(x) = y := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  List.Distinct(NaturalsBelow(n),
+          List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))
+      by List.map_distinct;
+  (∀ (x : NaturalsBelow(n)).
+      List.member(NaturalsBelow(n), x,
+          List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))
+      → List.member(NaturalsBelow(n), x, NaturalsBelow.enumerate(n)))
+      by (x : NaturalsBelow(n)) (xInMap : List.member(NaturalsBelow(n), x,
+              List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))) ↦
+            NaturalsBelow.enumerate_complete(n, x);
+  List.length(NaturalsBelow(n), List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))
+      = List.length(NaturalsBelow(n), NaturalsBelow.enumerate(n))
+      by List.map_length;
   List.Permutation(NaturalsBelow(n),
           List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)),
           NaturalsBelow.enumerate(n))
-      by List.permutation_of_distinct_inclusion(NaturalsBelow(n),
-             List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)),
-             NaturalsBelow.enumerate(n),
-             List.map_distinct(NaturalsBelow(n), NaturalsBelow(n), f, inj,
-                 NaturalsBelow.enumerate(n), NaturalsBelow.enumerate_distinct(n)),
-             NaturalsBelow.enumerate_distinct(n),
-             (x : NaturalsBelow(n)) (xInMap : List.member(NaturalsBelow(n), x,
-                 List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))) ↦
-                   NaturalsBelow.enumerate_complete(n, x),
-             List.map_length(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))
-      as imagePermutes;
+      by List.permutation_of_distinct_inclusion;
   List.Permutation(NaturalsBelow(n), NaturalsBelow.enumerate(n),
           List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))
-      by List.Permutation.symmetric(NaturalsBelow(n),
-             List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)),
-             NaturalsBelow.enumerate(n), imagePermutes) as reversed;
+      by List.Permutation.symmetric;
   take y : NaturalsBelow(n);
   List.member(NaturalsBelow(n), y, NaturalsBelow.enumerate(n))
-      by NaturalsBelow.enumerate_complete(n, y) as yEnumerated;
+      by NaturalsBelow.enumerate_complete;
   List.member(NaturalsBelow(n), y,
           List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)))
-      by List.Permutation.member_forward(NaturalsBelow(n), y, NaturalsBelow.enumerate(n),
-             List.map(NaturalsBelow(n), NaturalsBelow(n), f, NaturalsBelow.enumerate(n)),
-             reversed, yEnumerated) as yInImage;
+      by List.Permutation.member_forward as yInImage;
   choose x such that List.member(NaturalsBelow(n), x, NaturalsBelow.enumerate(n)) ∧ (f(x) = y)
       from List.map_member_invert(NaturalsBelow(n), NaturalsBelow(n), f, y,
                NaturalsBelow.enumerate(n), yInImage);
@@ -70,8 +70,8 @@ theorem NaturalsBelow.injective_preimage_unique (n : Natural)
         (y : NaturalsBelow(n))
         : ∀ (x1 x2 : NaturalsBelow(n)). f(x1) = y → f(x2) = y → x1 = x2 :=
   (x1 x2 : NaturalsBelow(n)) (h1 : f(x1) = y) (h2 : f(x2) = y) ↦ {
-    f(x1) = y = f(x2) as imagesEqual;
-    inj(x1, x2, imagesEqual)
+    f(x1) = y = f(x2);
+    done by inj
   }
 
 -- The inverse of an injective self-map, by unique description: the preimage
@@ -90,9 +90,7 @@ theorem NaturalsBelow.injective_inverse_right (n : Natural)
         (inj : Function.IsInjective(NaturalsBelow(n), NaturalsBelow(n), f))
         (y : NaturalsBelow(n))
         : f(NaturalsBelow.injective_inverse(n, f, inj, y)) = y :=
-  Logic.the_satisfies(NaturalsBelow(n), (x : NaturalsBelow(n)) ↦ f(x) = y,
-      NaturalsBelow.injective_is_surjective(n, f, inj, y),
-      NaturalsBelow.injective_preimage_unique(n, f, inj, y))
+  by Logic.the_satisfies(P := (x : NaturalsBelow(n)) ↦ f(x) = y)
 
 -- And on the left: f⁻¹(f(x)) = x, by injectivity applied to the right identity.
 theorem NaturalsBelow.injective_inverse_left (n : Natural)
@@ -101,8 +99,8 @@ theorem NaturalsBelow.injective_inverse_left (n : Natural)
         (x : NaturalsBelow(n))
         : NaturalsBelow.injective_inverse(n, f, inj, f(x)) = x := {
   f(NaturalsBelow.injective_inverse(n, f, inj, f(x))) = f(x)
-      by NaturalsBelow.injective_inverse_right(n, f, inj, f(x)) as rightAtImage;
-  inj(NaturalsBelow.injective_inverse(n, f, inj, f(x)), x, rightAtImage)
+      by NaturalsBelow.injective_inverse_right;
+  done by inj
 }
 
 -- Package an injective self-map as a Permutation whose forward map is `f`.

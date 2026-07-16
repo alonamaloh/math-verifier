@@ -1311,3 +1311,31 @@ relation chain is itself a claim, not a justification — write it directly
 (`A < … = subject as NAME;`), not `A < subject by <chain>`." Tracked under
 PLAN_ERGONOMICS.md F9.
 rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+### stale cache exits 0 with zero findings → a whole file silently reads as "clean" — 2026-07-16 (Stage H polish pass)
+note: **not an error-message wording issue — a false-negative in the polish
+workflow.** Ran the redundancy checks on `determinant_multiplicative.math`
+after editing a file it imports:
+
+```
+stale cache build/library/Algebra/field_aggregation.mathv.iface:
+  its source library/Algebra/field_aggregation.math has changed since the cache was
+  written — the cached declarations are out of date. Run `make -j 16 library` from the
+  project root to rebuild, then retry this verify.
+```
+
+`kernel verify` printed this to stdout, emitted **no warnings, and exited 0**.
+The file had 9 real findings at baseline. Both `.mark_redundant.py` (which
+reported `determinant_multiplicative.math: clean`) and a hand-rolled
+`grep -c 'redundant|unused'` therefore concluded the file was clean. Editing
+*any* dependency silently disarms the checks on every downstream file — exactly
+the situation a polish pass is always in, since it walks a cone bottom-up.
+The message itself is excellent (cause, location, and the exact remedy); the
+defect is that it is advisory. Nothing downstream can distinguish
+"checks ran, found nothing" from "checks never ran".
+diagnosis: a stale cache must fail loudly — exit non-zero (or at minimum emit a
+`warning:` line) when `--check-*` flags are passed and the checks could not run.
+Silent-zero on a skipped check is the same class of defect as a test harness
+reporting green because it collected no tests. `.mark_redundant.py` should treat
+"clean" as trustworthy only on a zero exit *with* a fresh cache.
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
