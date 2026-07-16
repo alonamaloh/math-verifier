@@ -32,6 +32,14 @@ inductive List.member (A : Type(0)) (element : A) : List(A) → Proposition wher
         → List.member(A, element, rest)
         → List.member(A, element, List.prepend(head, rest))
 
+-- Carrier-implicit reader + `∈` operator, so call sites read `x ∈ l`.
+-- Transparent: `x ∈ l` reduces to `List.member(A, x, l)`, so the constructors
+-- (`here`/`there`), induction on a membership proof, and every membership lemma
+-- interoperate across the two spellings without any bridging.
+definition List.memberOf {A : Type(0)} (element : A) (list : List(A)) : Proposition :=
+  List.member(A, element, list)
+operator (∈) on (_, List) := List.memberOf
+
 -- Fold-product: empty ↦ one, prepend(head, tail) ↦ head · product(tail).
 definition List.product (A : Type(0)) (multiply : A → A → A) (one : A)
         : List(A) → A
