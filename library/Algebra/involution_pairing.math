@@ -56,29 +56,24 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
             for some (head : index), (tail : List(index)): {
           ¬(head ∈ tail)
               by List.Distinct.head_not_member as headNotInTail;
-          List.Distinct(index, tail) by List.Distinct.tail_distinct as tailDistinct;
+          List.Distinct(index, tail) by List.Distinct.tail_distinct;
 
           -- The head and its orbit partner ι(head), which lands in the tail.
-          head ∈ List.prepend(index, head, tail)
-              by List.member.here(index, head, tail) as headMember;
-          iota(head) ∈ List.prepend(index, head, tail)
-              by closed(head, headMember) as iotaHeadMember;
-          ¬(iota(head) = head) by noFixedPoint(head, headMember) as iotaHeadNeqHead;
-          iota(head) ∈ tail
-              by List.member_of_prepend_not_head(index, iota(head), head, tail,
-                     iotaHeadMember, iotaHeadNeqHead) as iotaHeadInTail;
+          head ∈ List.prepend(index, head, tail) as headMember;
+          iota(head) ∈ List.prepend(index, head, tail) by closed(head, headMember);
+          ¬(iota(head) = head) by noFixedPoint(head, headMember);
+          iota(head) ∈ tail by List.member_of_prepend_not_head;
 
           -- The removed list and its length, strictly below `subject`.
           let removed : List(index) := tail ∖ iota(head);
           length(tail) = 1 + length(removed)
-              by List.length_remove_member(index, iota(head), tail, iotaHeadInTail)
-              as tailLengthEquation;
+              by List.length_remove_member as tailLengthEquation;
           length(removed)
-             < 1 + length(removed)                       by Natural.lt_one_plus
+             < 1 + length(removed)
              = length(tail)                              by tailLengthEquation
-             < 1 + length(tail)                          by Natural.lt_one_plus
-             = length(List.prepend(index, head, tail))   by List.length_prepend
-             = subject                                               by lengthEquation
+             < 1 + length(tail)
+             = length(List.prepend(index, head, tail))
+             = subject
              as removedLengthBelow;
 
           -- Every member of `removed` came from `items`; restrict the
@@ -86,8 +81,8 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
           ∀ (x : index). x ∈ removed
               → x ∈ List.prepend(index, head, tail)
               by (x : index) (xInRemoved : x ∈ removed) ↦ {
-                  x ∈ tail by List.remove_member_subset as xInTail;
-                  List.member.there(index, x, head, tail, xInTail)
+                  x ∈ tail by List.remove_member_subset;
+                  done
                 } as memberLift;
 
           -- `removed` is still closed under ι.
@@ -97,22 +92,17 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
                   x ∈ tail by List.remove_member_subset;
                   x ∈ List.prepend(index, head, tail)
                       by memberLift(x, xInRemoved) as xInItems;
-                  iota(x) ∈ List.prepend(index, head, tail)
-                      by closed(x, xInItems) as iotaXInItems;
+                  iota(x) ∈ List.prepend(index, head, tail) by closed(x, xInItems);
                   iota(iota(x)) = x by involutive(x, xInItems) as involutiveX;
                   -- ι(x) ≠ head: else x = ι(head), removed from the tail.
                   ¬(iota(x) = head)
                       by (iotaXEqHead : iota(x) = head) ↦ {
                           x = iota(iota(x))                     by involutiveX
                             = iota(head)                        by substituting iotaXEqHead;
-                          ¬(x = iota(head))
-                              by List.remove_member_ne(index, iota(head), x, tail,
-                                     tailDistinct, xInRemoved);
+                          ¬(x = iota(head)) by List.remove_member_ne;
                           done
-                        } as iotaXNeqHead;
-                  iota(x) ∈ tail
-                      by List.member_of_prepend_not_head(index, iota(x), head, tail,
-                             iotaXInItems, iotaXNeqHead) as iotaXInTail;
+                        };
+                  iota(x) ∈ tail by List.member_of_prepend_not_head;
                   -- ι(x) ≠ ι(head): else x = head, but x ∈ tail and head ∉ tail.
                   ¬(iota(x) = iota(head))
                       by (iotaXEqIotaHead : iota(x) = iota(head)) ↦ {
@@ -122,9 +112,8 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
                             as xEqHead;
                           head ∈ tail by substituting xEqHead as headInTail;
                           headNotInTail(headInTail)
-                        } as iotaXNeqIotaHead;
-                  List.remove_member_complete(index, iota(head), iota(x), tail,
-                      iotaXInTail, iotaXNeqIotaHead)
+                        };
+                  done by List.remove_member_complete
                 } as closedRemoved;
 
           ∀ (x : index). x ∈ removed → ¬(iota(x) = x)
@@ -139,25 +128,26 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
                   reversing(x, memberLift(x, xInRemoved)) as reversingRemoved;
 
           -- Recurse on the shorter list, then reassemble the orbit.
+          List.Distinct(index, removed) by List.remove_distinct as removedDistinct;
           Field.sumOver(g, removed) = Field.zero(f)
               by IH(length(removed), removedLengthBelow)(removed,
                      reflexivity(Natural, length(removed)),
-                     List.remove_distinct(index, iota(head), tail, tailDistinct),
+                     removedDistinct,
                      closedRemoved, noFixedPointRemoved, involutiveRemoved, reversingRemoved)
               as removedSumZero;
           Field.sumOver(g, tail)
               = g(iota(head)) + Field.sumOver(g, removed)
-              by Field.sumOver_remove(g, iota(head), tail, iotaHeadInTail) as tailSum;
+              by Field.sumOver_remove as tailSum;
           g(head) + g(iota(head)) = Field.zero(f)
               by reversing(head, headMember) as orbitZero;
 
           Field.sumOver(g, List.prepend(index, head, tail))
-             = g(head) + Field.sumOver(g, tail)                        by Field.sumOver_prepend
+             = g(head) + Field.sumOver(g, tail)
              = g(head) + (g(iota(head)) + Field.sumOver(g, removed))   by substituting tailSum
-             = (g(head) + g(iota(head))) + Field.sumOver(g, removed)   by ring
+             = (g(head) + g(iota(head))) + Field.sumOver(g, removed)
              = Field.zero(f) + Field.sumOver(g, removed)               by substituting orbitZero
              = Field.zero(f) + Field.zero(f)                           by substituting removedSumZero
-             = Field.zero(f)                                           by ring
+             = Field.zero(f)
         }
       }
   }
@@ -175,6 +165,4 @@ theorem Field.sumOver_involution_pairing {f : Field} {index : Type(0)}
         (reversing : ∀ (x : index). x ∈ items
             → g(x) + g(iota(x)) = Field.zero(f))
         : Field.sumOver(g, items) = Field.zero(f) :=
-  Field.sumOver_involution_pairing_aux(g, iota, length(items), items,
-      reflexivity(Natural, length(items)), distinct, closed, noFixedPoint,
-      involutive, reversing)
+  by Field.sumOver_involution_pairing_aux(n := length(items))

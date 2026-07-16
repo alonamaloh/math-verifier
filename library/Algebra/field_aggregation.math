@@ -64,11 +64,7 @@ theorem Field.sumOver_append {f : Field} {index : Type(0)}
                List.map(index, Field.carrier(f), term, second)))
            by substituting List.map_append
      = Field.sumOver(term, first) + Field.sumOver(term, second)
-           by List.product_append(Field.carrier(f), Field.add, Field.zero(f),
-                  (a b c : Field.carrier(f)) ↦ Field.add_associative(f, a, b, c),
-                  (a : Field.carrier(f)) ↦ Field.zero_add(f, a),
-                  List.map(index, Field.carrier(f), term, first),
-                  List.map(index, Field.carrier(f), term, second))
+           by List.product_append
 
 theorem Field.productOver_append {f : Field} {index : Type(0)}
         (term : index → Field.carrier(f)) (first second : List(index))
@@ -81,11 +77,7 @@ theorem Field.productOver_append {f : Field} {index : Type(0)}
                List.map(index, Field.carrier(f), term, second)))
            by substituting List.map_append
      = Field.productOver(term, first) * Field.productOver(term, second)
-           by List.product_append(Field.carrier(f), Field.multiply, Field.one(f),
-                  (a b c : Field.carrier(f)) ↦ Field.multiply_associative(f, a, b, c),
-                  (a : Field.carrier(f)) ↦ Field.one_multiply(f, a),
-                  List.map(index, Field.carrier(f), term, first),
-                  List.map(index, Field.carrier(f), term, second))
+           by List.product_append
 
 -- Reindexing a sum/product through a map on the item list.
 theorem Field.sumOver_map {f : Field} {source target : Type(0)}
@@ -122,7 +114,6 @@ theorem Field.sumOver_congruence {f : Field} {index : Type(0)}
   by induction on items with IH {
     case List.empty:
         Field.sumOver(term, List.empty(index))
-           = Field.zero(f)
            = Field.sumOver(termPrime, List.empty(index))
     case List.prepend(head, tail):
         Field.sumOver(term, List.prepend(index, head, tail))
@@ -139,7 +130,6 @@ theorem Field.productOver_congruence {f : Field} {index : Type(0)}
   by induction on items with IH {
     case List.empty:
         Field.productOver(term, List.empty(index))
-           = Field.one(f)
            = Field.productOver(termPrime, List.empty(index))
     case List.prepend(head, tail):
         Field.productOver(term, List.prepend(index, head, tail))
@@ -158,8 +148,6 @@ theorem Field.sumOver_scale_left {f : Field} {index : Type(0)}
   by induction on items with IH {
     case List.empty:
         constant * Field.sumOver(term, List.empty(index))
-           = constant * Field.zero(f)
-           = Field.zero(f)
            = Field.sumOver((x : index) ↦ constant * term(x), List.empty(index))
     case List.prepend(head, tail):
         constant * Field.sumOver(term, List.prepend(index, head, tail))
@@ -178,8 +166,6 @@ theorem Field.sumOver_scale_right {f : Field} {index : Type(0)}
   by induction on items with IH {
     case List.empty:
         Field.sumOver(term, List.empty(index)) * constant
-           = Field.zero(f) * constant
-           = Field.zero(f)
            = Field.sumOver((x : index) ↦ term(x) * constant, List.empty(index))
     case List.prepend(head, tail):
         Field.sumOver(term, List.prepend(index, head, tail)) * constant
@@ -205,7 +191,11 @@ theorem Field.sumOver_multiply_sumOver {f : Field} {left right : Type(0)}
            (x : left) ↦ Field.sumOver((y : right) ↦ leftTerm(x) * rightTerm(y), rightItems),
            leftItems)
            by Field.sumOver_congruence(
-                  pointwise := (x : left) ↦ Field.sumOver_scale_left(leftTerm(x), rightTerm, rightItems))
+                  pointwise := (x : left) ↦ {
+                      leftTerm(x) * Field.sumOver(rightTerm, rightItems)
+                          = Field.sumOver((y : right) ↦ leftTerm(x) * rightTerm(y), rightItems)
+                          by Field.sumOver_scale_left
+                    })
 
 -- A sum of two sums over the same list is the sum of the pointwise sums.
 theorem Field.sumOver_add {f : Field} {index : Type(0)}
@@ -215,8 +205,6 @@ theorem Field.sumOver_add {f : Field} {index : Type(0)}
   by induction on items with IH {
     case List.empty:
         Field.sumOver(term, List.empty(index)) + Field.sumOver(termPrime, List.empty(index))
-           = Field.zero(f) + Field.zero(f)
-           = Field.zero(f)
            = Field.sumOver((x : index) ↦ term(x) + termPrime(x), List.empty(index))
     case List.prepend(head, tail):
         Field.sumOver(term, List.prepend(index, head, tail))
@@ -297,13 +285,8 @@ theorem Field.sumOver_remove {f : Field} {index : Type(0)}
                    = g(x) + Field.sumOver(g, List.prepend(index, x, tail) ∖ x)
                        by substituting List.remove_prepend_equal
             case ¬(head = x) as headNeqX: {
-                x ∈ tail
-                    by { x = head ∨ x ∈ tail by List.member_prepend_invert;
-                         done by cases {
-                           case x = head as xHead: { head = x by Equality.symmetry; done }
-                           case x ∈ tail as memberTail: memberTail
-                         }
-                       };
+                ¬(x = head) by (xEqualsHead : x = head) ↦ { head = x; done };
+                x ∈ tail by List.member_of_prepend_not_head;
                 Field.sumOver(g, tail) = g(x) + Field.sumOver(g, tail ∖ x)
                     by IH as tailEquation;
                 Field.sumOver(g, List.prepend(index, head, tail))
