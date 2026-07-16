@@ -41,7 +41,7 @@ theorem Field.from_integer_one (f : Field)
   Field.from_integer(f, 1)
      = Ring.from_integer(CommutativeRing.ring(Field.commutative_ring(f)), 1)
      = Ring.one(CommutativeRing.ring(Field.commutative_ring(f)))
-           by Ring.from_integer_one(CommutativeRing.ring(Field.commutative_ring(f)))
+           by Ring.from_integer_one
      = Field.one(f)
 
 theorem Field.from_integer_negate_one (f : Field)
@@ -50,7 +50,7 @@ theorem Field.from_integer_negate_one (f : Field)
      = Ring.from_integer(CommutativeRing.ring(Field.commutative_ring(f)), Integer.negate(1))
      = Ring.negate(CommutativeRing.ring(Field.commutative_ring(f)),
            Ring.one(CommutativeRing.ring(Field.commutative_ring(f))))
-           by Ring.from_integer_negate_one(CommutativeRing.ring(Field.commutative_ring(f)))
+           by Ring.from_integer_negate_one
      = Field.negate(f, Field.one(f))
 
 -- ── φ is invariant under the transposition, because φa = φb ────────────
@@ -80,7 +80,7 @@ theorem Permutation.phi_swap_invariant {n : Natural}
               }
             case ¬(i = b) as iNeqB: {
                 phi(Permutation.apply(Permutation.swap(a, b), i))
-                   = phi(i)   by substituting Permutation.apply_swap_other(a, b, i, iNeqA, iNeqB)
+                   = phi(i)   by substituting Permutation.apply_swap_other
               }
           }
         }
@@ -101,34 +101,33 @@ theorem Matrix.collapse_product_swap_equal {f : Field} {n : Natural}
               (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
               NaturalsBelow.enumerate(n)) := {
   ∀ (i : NaturalsBelow(n)). phi(Permutation.apply(Permutation.swap(a, b), i)) = phi(i)
-      by Permutation.phi_swap_invariant(phi, a, b, phiCollide) as phiSwapInvariant;
+      by Permutation.phi_swap_invariant as phiSwapInvariant;
 
-  -- The transposition permutes the index enumeration.
+  -- The transposition permutes the index enumeration: its image list is
+  -- distinct (swap is injective), complete (it lands in the enumeration),
+  -- and of the same length — so it is a permutation of the enumeration.
+  ∀ (x y : NaturalsBelow(n)).
+      Permutation.apply(Permutation.swap(a, b), x) = Permutation.apply(Permutation.swap(a, b), y) → x = y
+      by Permutation.apply_injective;
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  List.Distinct(NaturalsBelow(n), List.map(NaturalsBelow(n), NaturalsBelow(n),
+          (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i), NaturalsBelow.enumerate(n)))
+      by List.map_distinct;
+  ∀ (x : NaturalsBelow(n)). x ∈ List.map(NaturalsBelow(n), NaturalsBelow(n),
+          (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i), NaturalsBelow.enumerate(n))
+      → x ∈ NaturalsBelow.enumerate(n)
+      by NaturalsBelow.enumerate_complete;
+  length(List.map(NaturalsBelow(n), NaturalsBelow(n),
+          (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i), NaturalsBelow.enumerate(n)))
+      = length(NaturalsBelow.enumerate(n))
+      by List.map_length;
+
   List.Permutation(NaturalsBelow(n),
           List.map(NaturalsBelow(n), NaturalsBelow(n),
               (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i),
               NaturalsBelow.enumerate(n)),
           NaturalsBelow.enumerate(n))
-      by List.permutation_of_distinct_inclusion(NaturalsBelow(n),
-             List.map(NaturalsBelow(n), NaturalsBelow(n),
-                 (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i),
-                 NaturalsBelow.enumerate(n)),
-             NaturalsBelow.enumerate(n),
-             List.map_distinct(NaturalsBelow(n), NaturalsBelow(n),
-                 (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i),
-                 (x y : NaturalsBelow(n))
-                     (equalImages : Permutation.apply(Permutation.swap(a, b), x)
-                         = Permutation.apply(Permutation.swap(a, b), y)) ↦
-                       Permutation.apply_injective(Permutation.swap(a, b), x, y, equalImages),
-                 NaturalsBelow.enumerate(n), NaturalsBelow.enumerate_distinct(n)),
-             NaturalsBelow.enumerate_distinct(n),
-             (x : NaturalsBelow(n)) (xInMap : x ∈ List.map(NaturalsBelow(n), NaturalsBelow(n),
-                     (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i),
-                     NaturalsBelow.enumerate(n))) ↦
-                   NaturalsBelow.enumerate_complete(n, x),
-             List.map_length(NaturalsBelow(n), NaturalsBelow(n),
-                 (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i),
-                 NaturalsBelow.enumerate(n)))
+      by List.permutation_of_distinct_inclusion
       as swapPermutes;
 
   -- Reindexing equation for the map (used flipped in the chain below).
@@ -141,10 +140,7 @@ theorem Matrix.collapse_product_swap_equal {f : Field} {n : Natural}
             (i : NaturalsBelow(n)) ↦ B(phi(Permutation.apply(Permutation.swap(a, b), i)),
                 Permutation.apply(sigma, Permutation.apply(Permutation.swap(a, b), i))),
             NaturalsBelow.enumerate(n))
-      by Field.productOver_map(
-             (j : NaturalsBelow(n)) ↦ B(phi(j), Permutation.apply(sigma, j)),
-             (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i),
-             NaturalsBelow.enumerate(n))
+      by Field.productOver_map
       as reindexEquation;
 
   Field.productOver(
@@ -155,15 +151,9 @@ theorem Matrix.collapse_product_swap_equal {f : Field} {n : Natural}
            (i : NaturalsBelow(n)) ↦ B(phi(Permutation.apply(Permutation.swap(a, b), i)),
                Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), i)),
            NaturalsBelow.enumerate(n))
-           by Field.productOver_congruence(
-                  (i : NaturalsBelow(n)) ↦ B(phi(i),
-                      Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), i)),
-                  (i : NaturalsBelow(n)) ↦ B(phi(Permutation.apply(Permutation.swap(a, b), i)),
-                      Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), i)),
-                  NaturalsBelow.enumerate(n),
+           by Field.productOver_congruence(pointwise :=
                   (i : NaturalsBelow(n)) ↦ {
-                      B(phi(i),
-                            Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), i))
+                      B(phi(i), Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), i))
                         = B(phi(Permutation.apply(Permutation.swap(a, b), i)),
                             Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), i))
                         by substituting phiSwapInvariant(i)
@@ -177,12 +167,7 @@ theorem Matrix.collapse_product_swap_equal {f : Field} {n : Natural}
      = Field.productOver(
            (j : NaturalsBelow(n)) ↦ B(phi(j), Permutation.apply(sigma, j)),
            NaturalsBelow.enumerate(n))
-           by Field.productOver_permutation(
-                  (j : NaturalsBelow(n)) ↦ B(phi(j), Permutation.apply(sigma, j)),
-                  List.map(NaturalsBelow(n), NaturalsBelow(n),
-                      (i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.swap(a, b), i),
-                      NaturalsBelow.enumerate(n)),
-                  NaturalsBelow.enumerate(n), swapPermutes)
+           by Field.productOver_permutation(perm := swapPermutes)
 }
 
 -- ── The orbit of σ under precomposition by swap(a,b) cancels ───────────
@@ -206,17 +191,17 @@ theorem Matrix.collapse_pair_cancels {f : Field} {n : Natural}
           NaturalsBelow.enumerate(n))
       = Field.productOver((i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
             NaturalsBelow.enumerate(n))
-      by Matrix.collapse_product_swap_equal(B, phi, a, b, phiCollide, sigma) as productsEqual;
+      by Matrix.collapse_product_swap_equal as productsEqual;
 
   Permutation.sign(Permutation.compose(sigma, Permutation.swap(a, b)))
      = Integer.multiply(Permutation.sign(sigma), Permutation.sign(Permutation.swap(a, b)))
            by Permutation.sign_compose
      = Integer.multiply(Permutation.sign(sigma), Integer.negate(1))
-           by substituting Permutation.sign_swap(a, b, aNeqB)
+           by substituting Permutation.sign_swap
      as signFlip;
 
   Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1)
-      by Permutation.sign_is_unit(sigma);
+      by Permutation.sign_is_unit;
   done by cases {
     case Permutation.sign(sigma) = 1 as signPositive: {
         -- sign(σ∘τ) = 1·(−1) = −1.
@@ -365,10 +350,10 @@ theorem Matrix.alternating_collapse {f : Field} {n : Natural}
                  as leftValue;
               Permutation.apply(sigma, b)
                  = Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), a)  by leftValue
-                 = Permutation.apply(sigma, a)                       by substituting composeEqualsSigma
-                 as applyEqual;
-              b = a by Permutation.apply_injective(sigma, b, a, applyEqual) as bEqualsA;
-              aNeqB(Equality.symmetry(bEqualsA))
+                 = Permutation.apply(sigma, a)                       by substituting composeEqualsSigma;
+              b = a by Permutation.apply_injective;
+              a = b as aEqualsB;
+              aNeqB(aEqualsB)
             },
       -- involutive: (σ∘swap)∘swap = σ, since swap∘swap = identity.
       (sigma : Permutation(n))

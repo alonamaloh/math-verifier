@@ -111,24 +111,30 @@ theorem Permutation.apply_map_permutes_enumerate {n : Natural} (p : Permutation(
         : List.Permutation(NaturalsBelow(n),
               List.map(NaturalsBelow(n), NaturalsBelow(n),
                   (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)),
-              NaturalsBelow.enumerate(n)) :=
-  List.permutation_of_distinct_inclusion(NaturalsBelow(n),
-      List.map(NaturalsBelow(n), NaturalsBelow(n),
-          (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)),
-      NaturalsBelow.enumerate(n),
-      List.map_distinct(NaturalsBelow(n), NaturalsBelow(n),
-          (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i),
-          (x y : NaturalsBelow(n))
-              (equalImages : Permutation.apply(p, x) = Permutation.apply(p, y)) ↦
-                Permutation.apply_injective(p, x, y, equalImages),
-          NaturalsBelow.enumerate(n), NaturalsBelow.enumerate_distinct(n)),
-      NaturalsBelow.enumerate_distinct(n),
-      (x : NaturalsBelow(n)) (xInMap : x ∈
+              NaturalsBelow.enumerate(n)) := {
+  (∀ (x y : NaturalsBelow(n)). Permutation.apply(p, x) = Permutation.apply(p, y) → x = y)
+      by (x y : NaturalsBelow(n)) (equalImages : Permutation.apply(p, x) = Permutation.apply(p, y)) ↦
+           Permutation.apply_injective;
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n))
+      by NaturalsBelow.enumerate_distinct;
+  List.Distinct(NaturalsBelow(n),
+        List.map(NaturalsBelow(n), NaturalsBelow(n),
+            (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)))
+      by List.map_distinct;
+  (∀ (x : NaturalsBelow(n)). x ∈
+        List.map(NaturalsBelow(n), NaturalsBelow(n),
+            (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n))
+        → x ∈ NaturalsBelow.enumerate(n))
+      by (x : NaturalsBelow(n)) (xInMap : x ∈
           List.map(NaturalsBelow(n), NaturalsBelow(n),
               (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n))) ↦
-            NaturalsBelow.enumerate_complete(n, x),
-      List.map_length(NaturalsBelow(n), NaturalsBelow(n),
-          (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)))
+            NaturalsBelow.enumerate_complete;
+  length(List.map(NaturalsBelow(n), NaturalsBelow(n),
+        (i : NaturalsBelow(n)) ↦ Permutation.apply(p, i), NaturalsBelow.enumerate(n)))
+      = length(NaturalsBelow.enumerate(n))
+      by List.map_length;
+  done by List.permutation_of_distinct_inclusion
+}
 
 -- Reindexing the row product by p: ∏_i B(p·i, ρ(p·i)) = ∏_j B(j, ρ·j).
 theorem Matrix.product_row_reindex {f : Field} {n : Natural}
@@ -167,35 +173,37 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : Natural}
               Permutation.allPermutations(n))
           = Field.from_integer(f, Permutation.sign(p)) * Matrix.determinant(B) := {
   -- σ ↦ σ∘p permutes the permutation list.
+  (∀ (a b : Permutation(n)). Permutation.compose(a, p) = Permutation.compose(b, p) → a = b)
+      by (a b : Permutation(n)) (equalComposites : Permutation.compose(a, p) = Permutation.compose(b, p)) ↦
+           Permutation.compose_right_cancel;
+  List.Distinct(Permutation(n), Permutation.allPermutations(n))
+      by Permutation.allPermutations_distinct;
+  List.Distinct(Permutation(n),
+        List.map(Permutation(n), Permutation(n),
+            (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n)))
+      by List.map_distinct;
+  (∀ (x : Permutation(n)). x ∈
+        List.map(Permutation(n), Permutation(n),
+            (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n))
+        → x ∈ Permutation.allPermutations(n))
+      by (x : Permutation(n)) (xInMap : x ∈
+          List.map(Permutation(n), Permutation(n),
+              (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n))) ↦
+            Permutation.allPermutations_complete;
+  length(List.map(Permutation(n), Permutation(n),
+        (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n)))
+      = length(Permutation.allPermutations(n))
+      by List.map_length;
+  List.Permutation(Permutation(n),
+        List.map(Permutation(n), Permutation(n),
+            (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n)),
+        Permutation.allPermutations(n))
+      by List.permutation_of_distinct_inclusion;
   List.Permutation(Permutation(n), Permutation.allPermutations(n),
           List.map(Permutation(n), Permutation(n),
               (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
               Permutation.allPermutations(n)))
-      by List.Permutation.symmetric(Permutation(n),
-             List.map(Permutation(n), Permutation(n),
-                 (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
-                 Permutation.allPermutations(n)),
-             Permutation.allPermutations(n),
-             List.permutation_of_distinct_inclusion(Permutation(n),
-                 List.map(Permutation(n), Permutation(n),
-                     (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
-                     Permutation.allPermutations(n)),
-                 Permutation.allPermutations(n),
-                 List.map_distinct(Permutation(n), Permutation(n),
-                     (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
-                     (a b : Permutation(n))
-                         (equalComposites : Permutation.compose(a, p) = Permutation.compose(b, p)) ↦
-                           Permutation.compose_right_cancel(a, b, p, equalComposites),
-                     Permutation.allPermutations(n), Permutation.allPermutations_distinct(n)),
-                 Permutation.allPermutations_distinct(n),
-                 (x : Permutation(n)) (xInMap : x ∈
-                     List.map(Permutation(n), Permutation(n),
-                         (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
-                         Permutation.allPermutations(n))) ↦
-                       Permutation.allPermutations_complete(n, x),
-                 List.map_length(Permutation(n), Permutation(n),
-                     (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
-                     Permutation.allPermutations(n))));
+      by List.Permutation.symmetric;
 
   -- Each reindexed term: sign and product factor through sign(p) and det(B).
   ∀ (rho : Permutation(n)).
@@ -218,12 +226,15 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : Natural}
                    (j : NaturalsBelow(n)) ↦ B(j, Permutation.apply(rho, j)),
                    NaturalsBelow.enumerate(n))
                  by Matrix.product_row_reindex(p := p, rho := rho) as productReindexed;
+          Permutation.sign(rho) = 1 ∨ Permutation.sign(rho) = Integer.negate(1)
+              by Permutation.sign_is_unit;
+          Permutation.sign(p) = 1 ∨ Permutation.sign(p) = Integer.negate(1)
+              by Permutation.sign_is_unit;
           Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
              = Field.from_integer(f, Integer.multiply(Permutation.sign(rho), Permutation.sign(p)))
                    by substituting Permutation.sign_compose
              = Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p))
-                   by Field.from_integer_multiply_units(zUnit := Permutation.sign_is_unit(rho),
-                          wUnit := Permutation.sign_is_unit(p))
+                   by Field.from_integer_multiply_units
                  as signReindexed;
           Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
                 * Field.productOver(

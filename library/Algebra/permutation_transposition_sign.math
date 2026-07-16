@@ -39,31 +39,31 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
         (othersAreOne : ∀ (x : B). x ∈ l → x ≠ e0 → f(x) = Integer.one)
         : List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, l)) = f(e0) :=
   by induction on l with IH {
-    case List.empty:
-        absurd(List.no_member_empty(B, e0, memberE0))
+    case List.empty: {
+        ¬(e0 ∈ List.empty(B)) by List.no_member_empty as notMember;
+        absurd(notMember(memberE0))
+      }
     case List.prepend(head, tail): {
-        ¬(head ∈ tail) by List.Distinct.head_not_member(B, head, tail, distinctL)
-            as headNotInTail;
-        List.Distinct(B, tail) by List.Distinct.tail_distinct(B, head, tail, distinctL) as tailDistinct;
+        ¬(head ∈ tail) by List.Distinct.head_not_member;
+        List.Distinct(B, tail) by List.Distinct.tail_distinct as tailDistinct;
         e0 = head ∨ e0 ∈ tail
-            by List.member_prepend_invert(B, e0, head, tail, memberE0);
+            by List.member_prepend_invert;
         done by cases {
           case e0 = head as e0IsHead: {
               (∀ (x : B). x ∈ tail → f(x) = Integer.one)
                   by (x : B) (xInTail : x ∈ tail) ↦ {
-                    x ∈ List.prepend(B, head, tail)
-                        by List.member.there(B, x, head, tail, xInTail) as xInList;
+                    x ∈ List.prepend(B, head, tail);
                     x ≠ e0 by {
                       suppose x = e0 for contradiction {
                         x = e0 as xIsE0;
-                        head = e0 by e0IsHead = x by xIsE0 as headEqX;
+                        head = e0 = x by xIsE0 as headEqX;
                         head ∈ tail by substituting headEqX;
-                        False by headNotInTail;
+                        False;
                         done
                       };
                       done
-                    } as xNeqE0;
-                    f(x) = Integer.one by othersAreOne(x, xInList, xNeqE0);
+                    };
+                    f(x) = Integer.one;
                     done
                   } as tailOnes;
               List.product(Integer, Integer.multiply, Integer.one,
@@ -90,7 +90,7 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
                 suppose head = e0 for contradiction {
                   head = e0 as headIsE0;
                   head ∈ tail by substituting headIsE0;
-                  False by headNotInTail;
+                  False;
                   done
                 };
                 done
@@ -108,7 +108,6 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
                        List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, tail)))
                        by substituting fHeadIsOne
                  = List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, tail))
-                       by ring
                  = f(e0) by IH(tailDistinct, e0InTail, tailOthers);
               done
             }
@@ -132,7 +131,7 @@ theorem Permutation.sign_swap_square {n : Natural} (a b : NaturalsBelow(n))
               Permutation.sign(Permutation.swap(a, b))) = Integer.one := {
   Permutation.sign(Permutation.swap(a, b)) = 1
       ∨ Permutation.sign(Permutation.swap(a, b)) = Integer.negate(1)
-      by Permutation.sign_is_unit(Permutation.swap(a, b));
+      by Permutation.sign_is_unit;
   done by cases {
     case Permutation.sign(Permutation.swap(a, b)) = 1 as isPositive:
         Integer.multiply(Permutation.sign(Permutation.swap(a, b)),
@@ -155,13 +154,10 @@ theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(
         : Permutation.compose(Permutation.swap(a, c),
               Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
           = Permutation.swap(c, b) := {
-  c ≠ a by Equality.ne_symmetric(NaturalsBelow(n), a, c, aNeqC) as cNeqA;
-  a ≠ b by Equality.ne_symmetric(NaturalsBelow(n), b, a, bNeqA) as aNeqB;
-  c ≠ b by Equality.ne_symmetric(NaturalsBelow(n), b, c, bNeqC) as cNeqB;
-  done by Permutation.equal_of_apply_equal(
-      Permutation.compose(Permutation.swap(a, c),
-          Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))),
-      Permutation.swap(c, b),
+  c ≠ a by Equality.ne_symmetric;
+  a ≠ b by Equality.ne_symmetric;
+  c ≠ b by Equality.ne_symmetric;
+  done by Permutation.equal_of_apply_equal(applyEqual :=
       (i : NaturalsBelow(n)) ↦ {
         i = c ∨ i ≠ c;
         done by cases {
@@ -178,14 +174,14 @@ theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(
                        by substituting iIsC
                  = Permutation.apply(Permutation.swap(a, c),
                        Permutation.apply(Permutation.swap(a, b), a))
-                       by substituting Permutation.apply_swap_right(a, c)
+                       by substituting Permutation.apply_swap_right
                  = Permutation.apply(Permutation.swap(a, c), b)
-                       by substituting Permutation.apply_swap_left(a, b)
-                 = b by Permutation.apply_swap_other(a, c, b, bNeqA, bNeqC)
+                       by substituting Permutation.apply_swap_left
+                 = b by Permutation.apply_swap_other
                  as lhsEq;
               Permutation.apply(Permutation.swap(c, b), i)
                  = Permutation.apply(Permutation.swap(c, b), c) by substituting iIsC
-                 = b by Permutation.apply_swap_left(c, b)
+                 = b by Permutation.apply_swap_left
                  as rhsEq;
               Permutation.apply(Permutation.compose(Permutation.swap(a, c),
                     Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
@@ -209,14 +205,14 @@ theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(
                              by substituting iIsB
                        = Permutation.apply(Permutation.swap(a, c),
                              Permutation.apply(Permutation.swap(a, b), b))
-                             by substituting Permutation.apply_swap_other(a, c, b, bNeqA, bNeqC)
+                             by substituting Permutation.apply_swap_other
                        = Permutation.apply(Permutation.swap(a, c), a)
-                             by substituting Permutation.apply_swap_right(a, b)
-                       = c by Permutation.apply_swap_left(a, c)
+                             by substituting Permutation.apply_swap_right
+                       = c by Permutation.apply_swap_left
                        as lhsEq;
                     Permutation.apply(Permutation.swap(c, b), i)
                        = Permutation.apply(Permutation.swap(c, b), b) by substituting iIsB
-                       = c by Permutation.apply_swap_right(c, b)
+                       = c by Permutation.apply_swap_right
                        as rhsEq;
                     Permutation.apply(Permutation.compose(Permutation.swap(a, c),
                           Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
@@ -240,14 +236,14 @@ theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(
                                    by substituting iIsA
                              = Permutation.apply(Permutation.swap(a, c),
                                    Permutation.apply(Permutation.swap(a, b), c))
-                                   by substituting Permutation.apply_swap_left(a, c)
+                                   by substituting Permutation.apply_swap_left
                              = Permutation.apply(Permutation.swap(a, c), c)
-                                   by substituting Permutation.apply_swap_other(a, b, c, cNeqA, cNeqB)
-                             = a by Permutation.apply_swap_right(a, c)
+                                   by substituting Permutation.apply_swap_other
+                             = a by Permutation.apply_swap_right
                              as lhsEq;
                           Permutation.apply(Permutation.swap(c, b), i)
                              = Permutation.apply(Permutation.swap(c, b), a) by substituting iIsA
-                             = a by Permutation.apply_swap_other(c, b, a, aNeqC, aNeqB)
+                             = a by Permutation.apply_swap_other
                              as rhsEq;
                           Permutation.apply(Permutation.compose(Permutation.swap(a, c),
                                 Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
@@ -264,13 +260,13 @@ theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(
                                    by Permutation.apply_compose
                              = Permutation.apply(Permutation.swap(a, c),
                                    Permutation.apply(Permutation.swap(a, b), i))
-                                   by substituting Permutation.apply_swap_other(a, c, i, iNeqA, iNeqC)
+                                   by substituting Permutation.apply_swap_other
                              = Permutation.apply(Permutation.swap(a, c), i)
-                                   by substituting Permutation.apply_swap_other(a, b, i, iNeqA, iNeqB)
-                             = i by Permutation.apply_swap_other(a, c, i, iNeqA, iNeqC)
+                                   by substituting Permutation.apply_swap_other
+                             = i by Permutation.apply_swap_other
                              as lhsEq;
                           Permutation.apply(Permutation.swap(c, b), i)
-                             = i by Permutation.apply_swap_other(c, b, i, iNeqC, iNeqB)
+                             = i by Permutation.apply_swap_other
                              as rhsEq;
                           Permutation.apply(Permutation.compose(Permutation.swap(a, c),
                                 Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))), i)
@@ -295,20 +291,20 @@ theorem Permutation.swap_conjugate_by_swap {n : Natural} (a b c : NaturalsBelow(
 theorem Permutation.value_apply_swap_at_left {n : Natural} (a b x : NaturalsBelow(n))
         (atA : NaturalsBelow.value(x) = NaturalsBelow.value(a))
         : NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x)) = NaturalsBelow.value(b) := {
-  x = a by NaturalsBelow.equal_of_value(n, x, a, atA) as xIsA;
+  x = a by NaturalsBelow.equal_of_value as xIsA;
   NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x))
      = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), a)) by substituting xIsA
-     = NaturalsBelow.value(b) by substituting Permutation.apply_swap_left(a, b);
+     = NaturalsBelow.value(b) by substituting Permutation.apply_swap_left;
   done
 }
 
 theorem Permutation.value_apply_swap_at_right {n : Natural} (a b x : NaturalsBelow(n))
         (atB : NaturalsBelow.value(x) = NaturalsBelow.value(b))
         : NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x)) = NaturalsBelow.value(a) := {
-  x = b by NaturalsBelow.equal_of_value(n, x, b, atB) as xIsB;
+  x = b by NaturalsBelow.equal_of_value as xIsB;
   NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x))
      = NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), b)) by substituting xIsB
-     = NaturalsBelow.value(a) by substituting Permutation.apply_swap_right(a, b);
+     = NaturalsBelow.value(a) by substituting Permutation.apply_swap_right;
   done
 }
 
@@ -316,10 +312,10 @@ theorem Permutation.value_apply_swap_at_other {n : Natural} (a b x : NaturalsBel
         (offA : NaturalsBelow.value(x) ≠ NaturalsBelow.value(a))
         (offB : NaturalsBelow.value(x) ≠ NaturalsBelow.value(b))
         : NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x)) = NaturalsBelow.value(x) := {
-  x ≠ a by NaturalsBelow.ne_of_value_ne(x, a, offA) as xNeqA;
-  x ≠ b by NaturalsBelow.ne_of_value_ne(x, b, offB) as xNeqB;
+  x ≠ a by NaturalsBelow.ne_of_value_ne;
+  x ≠ b by NaturalsBelow.ne_of_value_ne;
   NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), x))
-     = NaturalsBelow.value(x) by substituting Permutation.apply_swap_other(a, b, x, xNeqA, xNeqB);
+     = NaturalsBelow.value(x) by substituting Permutation.apply_swap_other;
   done
 }
 
@@ -327,7 +323,7 @@ theorem Permutation.value_apply_swap_at_other {n : Natural} (a b x : NaturalsBel
 theorem Natural.ne_of_lt (a b : Natural) (h : a < b) : a ≠ b :=
   (e : a = b) ↦ {
     a < a by { a < b by h = a by e; done };
-    False by Natural.lt_irreflexive(a);
+    False by Natural.lt_irreflexive;
     done
   }
 
@@ -343,17 +339,17 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
     case Product.make(i, j): {
       1 + NaturalsBelow.value(a) = NaturalsBelow.value(b) by adjacent as adjacentBack;
       NaturalsBelow.value(i) < NaturalsBelow.value(j)
-          by Permutation.orderedPairs_property(n, Product.make(i, j), memberP) as ordered;
+          by Permutation.orderedPairs_property as ordered;
       ¬(NaturalsBelow.value(i) = NaturalsBelow.value(a) ∧ NaturalsBelow.value(j) = NaturalsBelow.value(b))
           by {
             suppose NaturalsBelow.value(i) = NaturalsBelow.value(a)
                 ∧ NaturalsBelow.value(j) = NaturalsBelow.value(b) for contradiction {
-              NaturalsBelow.value(i) = NaturalsBelow.value(a) as iMatchA;
-              NaturalsBelow.value(j) = NaturalsBelow.value(b) as jMatchB;
-              i = a by NaturalsBelow.equal_of_value(n, i, a, iMatchA) as iIsAeq;
-              j = b by NaturalsBelow.equal_of_value(n, j, b, jMatchB) as jIsBeq;
+              NaturalsBelow.value(i) = NaturalsBelow.value(a);
+              NaturalsBelow.value(j) = NaturalsBelow.value(b);
+              i = a by NaturalsBelow.equal_of_value;
+              j = b by NaturalsBelow.equal_of_value;
               Product.make(i, j) = Product.make(a, b)
-                  by Product.make_equal(NaturalsBelow(n), NaturalsBelow(n), i, a, j, b, iIsAeq, jIsBeq);
+                  by Product.make_equal;
               False by notThePair;
               done
             };
@@ -367,10 +363,10 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
             done by cases {
               case NaturalsBelow.value(i) = NaturalsBelow.value(a) as iIsA: {
                   NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i)) = NaturalsBelow.value(b)
-                      by Permutation.value_apply_swap_at_left(a, b, i, iIsA) as swapI;
+                      by Permutation.value_apply_swap_at_left as swapI;
                   NaturalsBelow.value(a) < NaturalsBelow.value(j)
                       by { NaturalsBelow.value(a) = NaturalsBelow.value(i) by iIsA
-                               < NaturalsBelow.value(j) by ordered; done } as aLtJ;
+                               < NaturalsBelow.value(j) by ordered; done };
                   NaturalsBelow.value(j) ≠ NaturalsBelow.value(b) by {
                     suppose NaturalsBelow.value(j) = NaturalsBelow.value(b) for contradiction {
                       NaturalsBelow.value(i) = NaturalsBelow.value(a)
@@ -379,20 +375,18 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
                       done
                     };
                     done
-                  } as jNotB;
-                  NaturalsBelow.value(j) ≠ NaturalsBelow.value(a)
-                      by Equality.ne_symmetric(Natural, NaturalsBelow.value(a), NaturalsBelow.value(j),
-                             Natural.ne_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(j), aLtJ)) as jNotA;
+                  };
+                  NaturalsBelow.value(a) ≠ NaturalsBelow.value(j) by Natural.ne_of_lt;
+                  NaturalsBelow.value(j) ≠ NaturalsBelow.value(a) by Equality.ne_symmetric;
                   NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) = NaturalsBelow.value(j)
-                      by Permutation.value_apply_swap_at_other(a, b, j, jNotA, jNotB) as swapJ;
+                      by Permutation.value_apply_swap_at_other as swapJ;
                   1 + NaturalsBelow.value(a) ≤ NaturalsBelow.value(j)
-                      by Natural.add_one_le_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(j), aLtJ)
-                      as oneVaLeJ;
-                  NaturalsBelow.value(j) ≠ 1 + NaturalsBelow.value(a) by substituting adjacentBack as jNotOneVa;
+                      by Natural.add_one_le_of_lt;
+                  NaturalsBelow.value(j) ≠ 1 + NaturalsBelow.value(a) by substituting adjacentBack;
+                  1 + NaturalsBelow.value(a) ≠ NaturalsBelow.value(j) by Equality.ne_symmetric;
                   1 + NaturalsBelow.value(a) < NaturalsBelow.value(j)
-                      by Natural.lt_of_le_of_ne(1 + NaturalsBelow.value(a), NaturalsBelow.value(j), oneVaLeJ,
-                             Equality.ne_symmetric(Natural, NaturalsBelow.value(j), 1 + NaturalsBelow.value(a),
-                                 jNotOneVa)) as oneVaLtJ;
+                      by Natural.lt_of_le_of_ne
+                      as oneVaLtJ;
                   NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
                      = NaturalsBelow.value(b) by swapI
                      = 1 + NaturalsBelow.value(a) by adjacent
@@ -406,7 +400,7 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
                   done by cases {
                     case NaturalsBelow.value(i) = NaturalsBelow.value(b) as iIsB: {
                         NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i)) = NaturalsBelow.value(a)
-                            by Permutation.value_apply_swap_at_right(a, b, i, iIsB) as swapI;
+                            by Permutation.value_apply_swap_at_right as swapI;
                         1 + NaturalsBelow.value(a) < NaturalsBelow.value(j)
                             by { 1 + NaturalsBelow.value(a) = NaturalsBelow.value(b) by adjacentBack
                                      = NaturalsBelow.value(i) by iIsB
@@ -416,15 +410,13 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
                                      < NaturalsBelow.value(j) by oneVaLtJ; done } as aLtJ;
                         NaturalsBelow.value(b) < NaturalsBelow.value(j)
                             by { NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a) by adjacent
-                                     < NaturalsBelow.value(j) by oneVaLtJ; done } as bLtJ;
-                        NaturalsBelow.value(j) ≠ NaturalsBelow.value(a)
-                            by Equality.ne_symmetric(Natural, NaturalsBelow.value(a), NaturalsBelow.value(j),
-                                   Natural.ne_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(j), aLtJ)) as jNotA;
-                        NaturalsBelow.value(j) ≠ NaturalsBelow.value(b)
-                            by Equality.ne_symmetric(Natural, NaturalsBelow.value(b), NaturalsBelow.value(j),
-                                   Natural.ne_of_lt(NaturalsBelow.value(b), NaturalsBelow.value(j), bLtJ)) as jNotB;
+                                     < NaturalsBelow.value(j) by oneVaLtJ; done };
+                        NaturalsBelow.value(a) ≠ NaturalsBelow.value(j) by Natural.ne_of_lt;
+                        NaturalsBelow.value(j) ≠ NaturalsBelow.value(a) by Equality.ne_symmetric;
+                        NaturalsBelow.value(b) ≠ NaturalsBelow.value(j) by Natural.ne_of_lt;
+                        NaturalsBelow.value(j) ≠ NaturalsBelow.value(b) by Equality.ne_symmetric;
                         NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j)) = NaturalsBelow.value(j)
-                            by Permutation.value_apply_swap_at_other(a, b, j, jNotA, jNotB) as swapJ;
+                            by Permutation.value_apply_swap_at_other as swapJ;
                         NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
                            = NaturalsBelow.value(a) by swapI
                            < NaturalsBelow.value(j) by aLtJ
@@ -433,14 +425,14 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
                       }
                     case NaturalsBelow.value(i) ≠ NaturalsBelow.value(b) as iNotB: {
                         NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i)) = NaturalsBelow.value(i)
-                            by Permutation.value_apply_swap_at_other(a, b, i, iNotA, iNotB) as swapI;
+                            by Permutation.value_apply_swap_at_other as swapI;
                         NaturalsBelow.value(j) = NaturalsBelow.value(a)
                             ∨ NaturalsBelow.value(j) ≠ NaturalsBelow.value(a);
                         done by cases {
                           case NaturalsBelow.value(j) = NaturalsBelow.value(a) as jIsA: {
                               NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j))
                                   = NaturalsBelow.value(b)
-                                  by Permutation.value_apply_swap_at_left(a, b, j, jIsA) as swapJ;
+                                  by Permutation.value_apply_swap_at_left as swapJ;
                               NaturalsBelow.value(i) < NaturalsBelow.value(a)
                                   by { NaturalsBelow.value(i) < NaturalsBelow.value(j) by ordered
                                            = NaturalsBelow.value(a) by jIsA; done } as iLtA;
@@ -461,17 +453,15 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
                                 case NaturalsBelow.value(j) = NaturalsBelow.value(b) as jIsB: {
                                     NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j))
                                         = NaturalsBelow.value(a)
-                                        by Permutation.value_apply_swap_at_right(a, b, j, jIsB) as swapJ;
+                                        by Permutation.value_apply_swap_at_right as swapJ;
                                     NaturalsBelow.value(i) < 1 + NaturalsBelow.value(a)
                                         by { NaturalsBelow.value(i) < NaturalsBelow.value(j) by ordered
                                                  = NaturalsBelow.value(b) by jIsB
-                                                 = 1 + NaturalsBelow.value(a) by adjacent; done } as iLtOneVa;
+                                                 = 1 + NaturalsBelow.value(a) by adjacent; done };
                                     NaturalsBelow.value(i) ≤ NaturalsBelow.value(a)
-                                        by Natural.le_of_lt_one_plus(NaturalsBelow.value(i), NaturalsBelow.value(a),
-                                               iLtOneVa) as iLeA;
+                                        by Natural.le_of_lt_one_plus;
                                     NaturalsBelow.value(i) < NaturalsBelow.value(a)
-                                        by Natural.lt_of_le_of_ne(NaturalsBelow.value(i), NaturalsBelow.value(a),
-                                               iLeA, iNotA) as iLtA;
+                                        by Natural.lt_of_le_of_ne as iLtA;
                                     NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
                                        = NaturalsBelow.value(i) by swapI
                                        < NaturalsBelow.value(a) by iLtA
@@ -481,7 +471,7 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
                                 case NaturalsBelow.value(j) ≠ NaturalsBelow.value(b) as jNotB: {
                                     NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), j))
                                         = NaturalsBelow.value(j)
-                                        by Permutation.value_apply_swap_at_other(a, b, j, jNotA, jNotB) as swapJ;
+                                        by Permutation.value_apply_swap_at_other as swapJ;
                                     NaturalsBelow.value(Permutation.apply(Permutation.swap(a, b), i))
                                        = NaturalsBelow.value(i) by swapI
                                        < NaturalsBelow.value(j) by ordered
@@ -495,12 +485,11 @@ theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : Naturals
                   }
                 }
             }
-          } as swapOrdered;
+          };
       Permutation.pairOrient(Permutation.swap(a, b), Product.make(i, j))
          = Permutation.orient(Permutation.apply(Permutation.swap(a, b), i),
                Permutation.apply(Permutation.swap(a, b), j))
-         = 1 by Permutation.orient_forward(Permutation.apply(Permutation.swap(a, b), i),
-                    Permutation.apply(Permutation.swap(a, b), j), swapOrdered);
+         = 1 by Permutation.orient_forward;
       done
     }
   }
@@ -516,7 +505,7 @@ theorem Permutation.sign_swap_adjacent {n : Natural} (a b : NaturalsBelow(n))
       by { NaturalsBelow.value(a) < 1 + NaturalsBelow.value(a) by Natural.lt_one_plus
                = NaturalsBelow.value(b) by adjacentBack; done } as aLtB;
   ¬(NaturalsBelow.value(b) < NaturalsBelow.value(a))
-      by Natural.lt_asymmetric(NaturalsBelow.value(a), NaturalsBelow.value(b), aLtB) as notBack;
+      by Natural.lt_asymmetric;
   Permutation.sign(Permutation.swap(a, b))
      = List.product(Integer, Integer.multiply, Integer.one,
            List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
@@ -533,9 +522,9 @@ theorem Permutation.sign_swap_adjacent {n : Natural} (a b : NaturalsBelow(n))
      = Permutation.orient(Permutation.apply(Permutation.swap(a, b), a),
            Permutation.apply(Permutation.swap(a, b), b))
      = Permutation.orient(b, Permutation.apply(Permutation.swap(a, b), b))
-           by substituting Permutation.apply_swap_left(a, b)
-     = Permutation.orient(b, a) by substituting Permutation.apply_swap_right(a, b)
-     = Integer.negate(1) by Permutation.orient_backward(b, a, notBack);
+           by substituting Permutation.apply_swap_left
+     = Permutation.orient(b, a) by substituting Permutation.apply_swap_right
+     = Integer.negate(1) by Permutation.orient_backward;
   done
 }
 
@@ -545,15 +534,15 @@ theorem Permutation.sign_swap_adjacent {n : Natural} (a b : NaturalsBelow(n))
 -- A transposition is symmetric in its two indices.
 theorem Permutation.swap_symmetric {n : Natural} (a b : NaturalsBelow(n))
         : Permutation.swap(a, b) = Permutation.swap(b, a) :=
-  Permutation.equal_of_apply_equal(Permutation.swap(a, b), Permutation.swap(b, a),
+  Permutation.equal_of_apply_equal(applyEqual :=
       (i : NaturalsBelow(n)) ↦ {
         i = a ∨ i ≠ a;
         done by cases {
           case i = a as iIsA:
               Permutation.apply(Permutation.swap(a, b), i)
                  = Permutation.apply(Permutation.swap(a, b), a) by substituting iIsA
-                 = b by Permutation.apply_swap_left(a, b)
-                 = Permutation.apply(Permutation.swap(b, a), a) by Permutation.apply_swap_right(b, a)
+                 = b by Permutation.apply_swap_left
+                 = Permutation.apply(Permutation.swap(b, a), a) by Permutation.apply_swap_right
                  = Permutation.apply(Permutation.swap(b, a), i) by substituting iIsA
           case i ≠ a as iNeqA: {
               i = b ∨ i ≠ b;
@@ -561,14 +550,14 @@ theorem Permutation.swap_symmetric {n : Natural} (a b : NaturalsBelow(n))
                 case i = b as iIsB:
                     Permutation.apply(Permutation.swap(a, b), i)
                        = Permutation.apply(Permutation.swap(a, b), b) by substituting iIsB
-                       = a by Permutation.apply_swap_right(a, b)
-                       = Permutation.apply(Permutation.swap(b, a), b) by Permutation.apply_swap_left(b, a)
+                       = a by Permutation.apply_swap_right
+                       = Permutation.apply(Permutation.swap(b, a), b) by Permutation.apply_swap_left
                        = Permutation.apply(Permutation.swap(b, a), i) by substituting iIsB
                 case i ≠ b as iNeqB:
                     Permutation.apply(Permutation.swap(a, b), i)
-                       = i by Permutation.apply_swap_other(a, b, i, iNeqA, iNeqB)
+                       = i by Permutation.apply_swap_other
                        = Permutation.apply(Permutation.swap(b, a), i)
-                             by Permutation.apply_swap_other(b, a, i, iNeqB, iNeqA)
+                             by Permutation.apply_swap_other
               }
             }
         }
@@ -585,8 +574,8 @@ theorem Permutation.sign_swap_gap (n : Natural) (d : Natural)
     case base:
         (a b : NaturalsBelow(n))
         (gapHyp : NaturalsBelow.value(b) = (1 + 0) + NaturalsBelow.value(a)) ↦ {
-          NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a) by gapHyp as adjacentEq;
-          done by Permutation.sign_swap_adjacent(a, b, adjacentEq)
+          NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a) by gapHyp;
+          done by Permutation.sign_swap_adjacent
         }
     case step(dPred):
         (a b : NaturalsBelow(n))
@@ -594,11 +583,10 @@ theorem Permutation.sign_swap_gap (n : Natural) (d : Natural)
           1 + NaturalsBelow.value(a) < NaturalsBelow.value(b) by {
             NaturalsBelow.value(b) = (1 + (1 + dPred)) + NaturalsBelow.value(a) by gapHyp
                = NaturalsBelow.value(a) + (1 + (1 + dPred)) by ring as vbEq;
+            1 ≤ 1 + dPred by Natural.zero_least;
+            1 < 1 + (1 + dPred) by Natural.lt_add_of_one_le;
             1 + NaturalsBelow.value(a) = NaturalsBelow.value(a) + 1 by ring
-               < NaturalsBelow.value(a) + (1 + (1 + dPred))
-                     by Natural.add_left_strict_monotone(NaturalsBelow.value(a), 1, 1 + (1 + dPred),
-                            Natural.lt_add_of_one_le(1, 1 + dPred,
-                                Natural.add_left_monotone(1, 0, dPred, Natural.zero_least(dPred))))
+               < NaturalsBelow.value(a) + (1 + (1 + dPred)) by Natural.add_left_strict_monotone
                = NaturalsBelow.value(b) by vbEq;
             done
           } as cBoundLtB;
@@ -611,24 +599,21 @@ theorem Permutation.sign_swap_gap (n : Natural) (d : Natural)
           NaturalsBelow.value(a) < NaturalsBelow.value(b) by {
             NaturalsBelow.value(a) < 1 + NaturalsBelow.value(a) by Natural.lt_one_plus
                < NaturalsBelow.value(b) by cBoundLtB; done
-          } as aLtB;
-          b ≠ a by NaturalsBelow.ne_of_value_ne(b, a,
-              Equality.ne_symmetric(Natural, NaturalsBelow.value(a), NaturalsBelow.value(b),
-                  Natural.ne_of_lt(NaturalsBelow.value(a), NaturalsBelow.value(b), aLtB))) as bNeqA;
+          };
+          NaturalsBelow.value(a) ≠ NaturalsBelow.value(b) by Natural.ne_of_lt;
+          NaturalsBelow.value(b) ≠ NaturalsBelow.value(a) by Equality.ne_symmetric;
+          b ≠ a by NaturalsBelow.ne_of_value_ne;
           NaturalsBelow.value(b) ≠ NaturalsBelow.value(c) by {
-            NaturalsBelow.value(c) = 1 + NaturalsBelow.value(a) by valueC;
-            NaturalsBelow.value(b) ≠ 1 + NaturalsBelow.value(a)
-                by Equality.ne_symmetric(Natural, 1 + NaturalsBelow.value(a), NaturalsBelow.value(b),
-                       Natural.ne_of_lt(1 + NaturalsBelow.value(a), NaturalsBelow.value(b), cBoundLtB));
+            1 + NaturalsBelow.value(a) ≠ NaturalsBelow.value(b) by Natural.ne_of_lt;
+            NaturalsBelow.value(b) ≠ 1 + NaturalsBelow.value(a) by Equality.ne_symmetric;
             done by substituting valueC
-          } as bValueNeqC;
-          b ≠ c by NaturalsBelow.ne_of_value_ne(b, c, bValueNeqC) as bNeqC;
+          };
+          b ≠ c by NaturalsBelow.ne_of_value_ne;
           NaturalsBelow.value(a) ≠ NaturalsBelow.value(c) by {
-            NaturalsBelow.value(a) ≠ 1 + NaturalsBelow.value(a)
-                by Natural.ne_of_lt(NaturalsBelow.value(a), 1 + NaturalsBelow.value(a), Natural.lt_one_plus);
+            NaturalsBelow.value(a) ≠ 1 + NaturalsBelow.value(a) by Natural.ne_of_lt;
             done by substituting valueC
-          } as aValueNeqC;
-          a ≠ c by NaturalsBelow.ne_of_value_ne(a, c, aValueNeqC) as aNeqC;
+          };
+          a ≠ c by NaturalsBelow.ne_of_value_ne;
           NaturalsBelow.value(b) = (1 + dPred) + NaturalsBelow.value(c) by {
             NaturalsBelow.value(b) = (1 + (1 + dPred)) + NaturalsBelow.value(a) by gapHyp
                = (1 + dPred) + (1 + NaturalsBelow.value(a)) by ring
@@ -639,27 +624,22 @@ theorem Permutation.sign_swap_gap (n : Natural) (d : Natural)
           Permutation.swap(c, b)
               = Permutation.compose(Permutation.swap(a, c),
                     Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
-              by Equality.symmetry(Permutation(n),
-                     Permutation.compose(Permutation.swap(a, c),
-                         Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))),
-                     Permutation.swap(c, b),
-                     Permutation.swap_conjugate_by_swap(a, b, c, aNeqC, bNeqA, bNeqC)) as identBack;
+              by Permutation.swap_conjugate_by_swap as identBack;
           Permutation.sign(Permutation.swap(c, b))
              = Permutation.sign(Permutation.compose(Permutation.swap(a, c),
                    Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c))))
                    by substituting identBack
              = Permutation.sign(Permutation.swap(a, c))
                    * Permutation.sign(Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
-                   by Permutation.sign_compose(Permutation.swap(a, c),
-                          Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, c)))
+                   by Permutation.sign_compose
              = Permutation.sign(Permutation.swap(a, c))
                    * (Permutation.sign(Permutation.swap(a, b)) * Permutation.sign(Permutation.swap(a, c)))
-                   by substituting Permutation.sign_compose(Permutation.swap(a, b), Permutation.swap(a, c))
+                   by substituting Permutation.sign_compose
              = Permutation.sign(Permutation.swap(a, b))
                    * (Permutation.sign(Permutation.swap(a, c)) * Permutation.sign(Permutation.swap(a, c)))
                    by ring
              = Permutation.sign(Permutation.swap(a, b)) * Integer.one
-                   by substituting Permutation.sign_swap_square(a, c)
+                   by substituting Permutation.sign_swap_square
              = Permutation.sign(Permutation.swap(a, b)) by ring
              as signCBeqAB;
           Permutation.sign(Permutation.swap(a, b))
@@ -674,15 +654,15 @@ theorem Permutation.sign_swap {n : Natural} (a b : NaturalsBelow(n)) (distinct :
         : Permutation.sign(Permutation.swap(a, b)) = Integer.negate(1) := {
   NaturalsBelow.value(a) ≠ NaturalsBelow.value(b) by {
     suppose NaturalsBelow.value(a) = NaturalsBelow.value(b) for contradiction {
-      NaturalsBelow.value(a) = NaturalsBelow.value(b) as valuesEq;
-      a = b by NaturalsBelow.equal_of_value(n, a, b, valuesEq);
+      NaturalsBelow.value(a) = NaturalsBelow.value(b);
+      a = b by NaturalsBelow.equal_of_value;
       False by distinct;
       done
     };
     done
-  } as valuesNe;
+  };
   NaturalsBelow.value(a) < NaturalsBelow.value(b) ∨ NaturalsBelow.value(b) < NaturalsBelow.value(a)
-      by Natural.lt_or_gt_of_ne(NaturalsBelow.value(a), NaturalsBelow.value(b), valuesNe);
+      by Natural.lt_or_gt_of_ne;
   done by cases {
     case NaturalsBelow.value(a) < NaturalsBelow.value(b) as aLtB: {
         choose d such that NaturalsBelow.value(a) + (1 + d) = NaturalsBelow.value(b)
@@ -692,8 +672,8 @@ theorem Permutation.sign_swap {n : Natural} (a b : NaturalsBelow(n)) (distinct :
           NaturalsBelow.value(b) = NaturalsBelow.value(a) + (1 + d) by gapEq
              = (1 + d) + NaturalsBelow.value(a) by ring;
           done
-        } as gapHyp;
-        done by Permutation.sign_swap_gap(n, d, a, b, gapHyp)
+        };
+        done by Permutation.sign_swap_gap
       }
     case NaturalsBelow.value(b) < NaturalsBelow.value(a) as bLtA: {
         choose d such that NaturalsBelow.value(b) + (1 + d) = NaturalsBelow.value(a)
@@ -703,11 +683,11 @@ theorem Permutation.sign_swap {n : Natural} (a b : NaturalsBelow(n)) (distinct :
           NaturalsBelow.value(a) = NaturalsBelow.value(b) + (1 + d) by gapEq
              = (1 + d) + NaturalsBelow.value(b) by ring;
           done
-        } as gapHyp;
+        };
         Permutation.sign(Permutation.swap(b, a)) = Integer.negate(1)
-            by Permutation.sign_swap_gap(n, d, b, a, gapHyp) as signBA;
+            by Permutation.sign_swap_gap as signBA;
         Permutation.sign(Permutation.swap(a, b))
-           = Permutation.sign(Permutation.swap(b, a)) by substituting Permutation.swap_symmetric(a, b)
+           = Permutation.sign(Permutation.swap(b, a)) by substituting Permutation.swap_symmetric
            = Integer.negate(1) by signBA;
         done
       }
