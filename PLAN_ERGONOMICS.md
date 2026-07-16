@@ -451,6 +451,73 @@ The triage pipeline already exists: `scripts/record_error.sh` →
     `library/ErrorTest/citation_goal_head_pi.math`.
   - F4(c): "ring failed" on `sum = <opaque var>` should suggest the equating
     hypothesis.
+  - **Unused-name warning conflates "name unused" with "fact removable"**
+    (2026-07-15, brick-6c `involution_pairing`). The message —
+    "unused name` X` — the auto-prover consumes this fact by type-match, so
+    the name is dead weight: switch to the anonymous form" — reads as "delete
+    the line," but the *fact* is load-bearing (a downstream step matches it by
+    type); only the *name* is redundant. Deleting the whole line broke a proof
+    this session. **Fix:** lead with "keep the statement; just drop `as X`"
+    and add "do NOT delete the line." Higher-value: if the elaborator can tell
+    whether *any* downstream step consumes the fact by type-match, split into
+    two distinct messages — "name unused, fact used" vs "fact unused,
+    removable." Highest priority of this batch (drove a real break; cheap
+    wording fix). Detail: inbox capture 2026-07-15.
+  - **Relation-chain wrapped in `by` position** (2026-07-15) reports the
+    opaque "…but its proof shows: `Natural`" (the chain parsed as a value, not
+    a proof). Should detect a relation-chain expression in `by` position and
+    say "a relation chain is itself a claim, not a justification — write it
+    directly (`A < … = subject as NAME;`), not `A < subject by <chain>`."
+  - **Diagnostic halves of F10/F11** (below) — the `by cases` arm-mismatch
+    should note when an equation was substituted into the goal; the
+    `induction … using` body should say the expected type was dropped by the
+    `↦`-intro form. See those entries.
+
+---
+
+## F10 · `by cases` on a bare equation eagerly rewrites the goal  ·  **P2**
+
+**Symptom.** `by cases { case head = x as h: … }` silently substitutes
+`head → x` throughout the goal, so an arm body written in terms of `head`
+fails to close (the goal now mentions `x`, e.g. "this arm proves … but its
+body proves `… (List.prepend A head tail)`" against a goal reading
+`… (List.prepend A x tail)`). Casing on an *explicit* disjunction
+`head = x ∨ ¬(head = x)` (via `Logic.excluded_middle`) does **not** substitute
+— it hands the equation over as a plain hypothesis. Two spellings of "case on
+whether `head = x`", different behavior (2026-07-15, brick-6c `Lists.remove`).
+
+**Root cause.** `by cases` on a bare equation scrutinee eagerly orients and
+rewrites by it; on an explicit `∨` it does not. The rewrite direction
+(`head → x`, the case-binder variable eliminated in favor of the fixed one)
+is also undocumented.
+
+**Fix direction.** Make the two forms behave consistently, or — cheaper —
+when a `by cases` arm mismatch is caused by the equation-driven rewrite, add a
+note: "the equation `head = x` was substituted into the goal; phrase this arm
+in terms of `x`, or case on an explicit `… ∨ ¬…` disjunction to avoid the
+rewrite." **Detail:** inbox capture 2026-07-15.
+
+---
+
+## F11 · Expected type dropped by `↦`-intro inside `induction … using`  ·  **P2**
+
+**Symptom.** Opening a `by induction on n using Natural.strong_induction with
+subject, IH { … }` body with a term-lambda intro chain
+(`(items : …) (h1 : …) … ↦ …`) loses the goal type: `note goal : T` and
+`done by cases` both fail with "needs an expected type from context (none
+available)". Introducing the same hypotheses with statement-form `take …;` /
+`suppose … as …;` retains the expected type and works (2026-07-15, brick-6c
+`involution_pairing_aux`).
+
+**Root cause.** The motive is not propagated through a `↦` intro in the
+`induction-using` body, whereas `take`/`suppose` preserve it. The error names
+the missing expected type but not the cause (the intro style).
+
+**Fix direction.** Propagate the expected type through the `↦`-intro form (so
+both intro styles behave the same); failing that, when expected type is absent
+specifically inside an `induction-using` body opened by `↦`, suggest "the
+motive isn't propagated through a `↦` intro here — introduce hypotheses with
+`take …;` / `suppose … as …;`." **Detail:** inbox capture 2026-07-15.
 
 ---
 

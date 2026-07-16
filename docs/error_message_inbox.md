@@ -1224,3 +1224,90 @@ hypothesis's type is a defined proposition; state it bare first
 debugging round trip. Workaround used: cite through proof-data accessor
 definitions (`by LinearMap.additive(tLinear)`).
 rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 0
+
+### (warning) unused-name message reads as "delete the line" when the fact is load-bearing — 2026-07-15 (brick-6c `Lists.remove` / `involution_pairing`)
+note: writing the orbit-pairing sum-zero lemma. A bound fact drew:
+
+```
+warning: Algebra.involution_pairing:97:19: unused name `xInTail` — the auto-prover consumes this fact by type-match, so the name is dead weight: switch to the anonymous form (`claim T by V;`), or to `note T;` if it's for the reader
+```
+
+Following "dead weight," I deleted the whole line — which removed a fact a
+downstream step was matching by type, and the proof broke (`by substituting`
+then failed with a direction-search dump). The message is technically accurate
+(the *name* is unused) but conflates that with "the fact is removable." The
+recommended action ("switch to the anonymous form") is correct but easy to
+misread as "remove it."
+diagnosis: split the message by whether any downstream step consumes the fact
+by type-match. If it does: "the bound name is never referenced, but the fact
+IS used (matched by type) — keep the statement, just drop `as X`; do NOT delete
+the line." If nothing consumes it: "fact unused — removable." At minimum, lead
+with "keep the statement" and add "do not delete the line." See F1-adjacent
+note under PLAN_ERGONOMICS.md F9.
+rubric (0/1): cause 1 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+### `by cases` on a bare equation rewrites `head → x` in the goal, arm body mismatches — 2026-07-15 (brick-6c `Lists.remove`)
+note: `List.remove_member_subset`, casing `by cases { case head = x as headEqualsX: … }`
+with the arm body written in terms of `head`:
+
+```
+elaborate error: `by cases` arm at line 49
+  goal: List.member A y (List.remove A x (List.prepend A x tail)) → List.member A y (List.prepend A x tail)
+  …
+  this `by cases` arm must prove the goal
+      List.member A y (List.remove A x (List.prepend A x tail)) → List.member A y (List.prepend A x tail)
+  but its body proves
+      List.member A y (List.remove A x (List.prepend A head tail)) → List.member A y (List.prepend A x tail)
+  — if that is meant to be one side of the disjunction, make sure it matches a disjunct exactly (it is then wrapped automatically); otherwise this case does not close the goal
+```
+
+The goal silently had `head` replaced by `x` (the case equation was oriented
+and substituted). Casing on an explicit `head = x ∨ ¬(head = x)` disjunction
+(from `Logic.excluded_middle`) does NOT substitute — the equation arrives as a
+plain hypothesis. Nothing in the message hints a substitution happened.
+diagnosis: when a `by cases` arm mismatch stems from an equation-driven goal
+rewrite, note it: "the equation `head = x` was substituted into the goal;
+phrase this arm in terms of `x`, or case on an explicit `… ∨ ¬…` disjunction
+to avoid the rewrite." Behavioral surprise tracked as PLAN_ERGONOMICS.md F10.
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+### `induction … using` body opened by a `↦` lambda drops the expected type — 2026-07-15 (brick-6c `involution_pairing_aux`)
+note: `by induction on n using Natural.strong_induction with subject, IH { (items : …) (…) ↦ … }`.
+The multi-binder `↦` intro lost the goal type:
+
+```
+elaborate error: note at line 51
+  `note goal : T` needs an expected type from context (none available at line 51)
+```
+
+(and, before adding `note goal`, `done by cases` reported "needs either a
+proposition or an expected type from context"). Reintroducing the hypotheses
+with statement-form `take items : …;` / `suppose … as …;` retained the expected
+type and the body elaborated. The message correctly says the expected type is
+missing but not *why* — that the `↦`-intro form dropped it where take/suppose
+would not.
+diagnosis: propagate the motive through the `↦`-intro form; or, when expected
+type is absent inside an `induction-using` body opened by `↦`, suggest
+"introduce hypotheses with `take …;` / `suppose … as …;` so the goal type is
+retained." Behavioral surprise tracked as PLAN_ERGONOMICS.md F11.
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+### relation chain used as a `by` justification → opaque "proof shows: Natural" — 2026-07-15 (brick-6c `involution_pairing_aux`)
+note: wrote `List.length(index, removed) < subject by <relation-chain>`, wrapping
+a bare relation chain as a `by` justification instead of letting the chain be
+the claim:
+
+```
+this step's justification proves a different relation than the step claims
+  this step claims:    List.length index removed < subject
+  but its proof shows: Natural
+```
+
+"proof shows: Natural" reflects that the chain was parsed as a value
+expression, not a proof; it does not point at the actual mistake (chain in
+`by` position). The fix is to write the chain directly, ending `as NAME`.
+diagnosis: detect a relation-chain expression in `by` position and say "a
+relation chain is itself a claim, not a justification — write it directly
+(`A < … = subject as NAME;`), not `A < subject by <chain>`." Tracked under
+PLAN_ERGONOMICS.md F9.
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
