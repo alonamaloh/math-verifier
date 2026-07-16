@@ -88,6 +88,7 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::NotElementOf:
         case TokenKind::SubsetOf:
         case TokenKind::NotSubsetOf:
+        case TokenKind::SetMinus:
         case TokenKind::Approx:
         case TokenKind::InverseSuperscript:
         case TokenKind::Bang:
@@ -3268,9 +3269,11 @@ private:
     SurfaceExpressionPointer parseAdditive() {
         auto left = parseMultiplicative();
         while (peek().kind == TokenKind::Plus
-               || peek().kind == TokenKind::Minus) {
+               || peek().kind == TokenKind::Minus
+               || peek().kind == TokenKind::SetMinus) {
             Token op = consumeAny();
-            const char* sym = (op.kind == TokenKind::Plus) ? "+" : "-";
+            const char* sym = (op.kind == TokenKind::Plus) ? "+"
+                            : (op.kind == TokenKind::SetMinus) ? "∖" : "-";
             if (peek().kind == TokenKind::Ellipsis) {
                 // `t₁ op … op ... op g` — ellipsis fold notation.
                 consumeAny();  // '...'

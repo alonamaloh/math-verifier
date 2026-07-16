@@ -8,6 +8,14 @@
 -- through them. No `successor` appears outside the sealed body — this is
 -- the keystone "recursive definition publishes its `f(1 + k) = …` lemma and
 -- goes opaque" pattern that the bulk of the library will follow.
+--
+-- Call sites may read `length(l)`: `List.lengthOf` recovers the carrier from
+-- the list and the `overload` makes `length` a global name (extend it to
+-- other containers with a further `overload length := <T>.length`). The
+-- recursive definition and its characterising lemmas keep the explicit
+-- carrier — the guarded-recursion sugar needs the `is_empty`/`tail`/self-call
+-- scrutinee pattern, and `length(l)` reduces to `List.length(A, l)` so the
+-- two spellings interoperate through the boundary lemmas.
 
 module Lists.length
 
@@ -22,6 +30,13 @@ import Lists.permutation
 opaque definition List.length (A : Type(0)) (l : List(A)) : Natural :=
   if List.is_empty(A, l) then 0
   else 1 + List.length(A, List.tail(A, l))
+
+-- Carrier-implicit reader + global overload, so call sites read `length(l)`.
+-- Transparent: `length(l)` reduces to `List.length(A, l)`, so it matches the
+-- characterising lemmas below without any bridging.
+definition List.lengthOf {A : Type(0)} (l : List(A)) : Natural :=
+  List.length(A, l)
+overload length := List.lengthOf
 
 -- ── Characterising lemmas (the opaque boundary) ───────────────────────
 theorem List.length_empty (A : Type(0)) : List.length(A, List.empty(A)) = 0 :=

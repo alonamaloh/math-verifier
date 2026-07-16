@@ -334,12 +334,34 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
         // arguments — by head-constant name first (fast, exact), then by
         // definitional equality (so a type-alias parameter accepts an
         // argument of the unfolded type, matching what a direct call does).
+        // The user-facing signature: peel the candidate's leading implicit
+        // binders (e.g. a carrier `{A : Type(0)}`) so arguments line up with
+        // the EXPLICIT parameters, exactly as a direct call does. Each peeled
+        // binder is instantiated with a fresh free variable, keeping the term
+        // closed; the remaining domains keep their head constant (`List(A)`
+        // stays `List(_)`), which is what the acceptors match on.
+        auto userFacingSignature = [&](const std::string& candidateName,
+                                       ExpressionPointer signature) {
+            int implicitCount =
+                environment_.implicitArgumentCount(candidateName);
+            for (int k = 0; k < implicitCount; ++k) {
+                signature = weakHeadNormalForm(environment_, signature);
+                auto* pi = std::get_if<Pi>(&signature->node);
+                if (!pi) break;
+                signature = openBinder(
+                    pi->codomain,
+                    "__overload_implicit_" + std::to_string(k));
+            }
+            return signature;
+        };
         std::vector<std::string> matches;
         for (const auto& candidateName : candidateNames) {
             const Declaration* declaration =
                 environment_.lookup(candidateName);
             if (!declaration) continue;
-            ExpressionPointer signature = declarationType(*declaration);
+            ExpressionPointer signature =
+                userFacingSignature(candidateName,
+                                    declarationType(*declaration));
             if (!signatureAcceptsArgumentTypes(signature,
                                                   argumentTypeNames)
                 && !signatureAcceptsArgumentTypesDefeq(
@@ -364,7 +386,9 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
                 const Declaration* declaration =
                     environment_.lookup(candidateName);
                 if (!declaration) continue;
-                ExpressionPointer cursor = declarationType(*declaration);
+                ExpressionPointer cursor =
+                    userFacingSignature(candidateName,
+                                        declarationType(*declaration));
                 bool accepts = true;
                 for (size_t i = 0; i < argumentTypeNames.size(); ++i) {
                     cursor = weakHeadNormalForm(environment_, cursor);
