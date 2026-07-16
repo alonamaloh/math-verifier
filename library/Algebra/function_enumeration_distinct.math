@@ -1,0 +1,185 @@
+-- Algebra/function_enumeration_distinct.math
+--
+-- Distinctness of the function-space enumeration `allFunctions(n)` (Stage H
+-- brick 6d of PLAN_LINEAR_ALGEBRA.md). Mirrors `allPermutations_distinct`:
+-- each row `functionRow(choices, f)` is distinct (extend-by-value is injective
+-- in the value) and rows for distinct base functions are disjoint (the base is
+-- recovered by `lowerBelow`), so the concatenation stays distinct.
+
+module Algebra.function_enumeration_distinct
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+import Algebra.permutation_enumeration
+import Algebra.function_enumeration
+
+-- Extend-by-value is injective in the value: reading the top index recovers it.
+theorem Function.extendByValue_injective_value {C : Type(0)} {k : Natural}
+        (f : NaturalsBelow(k) → C) (v1 v2 : C)
+        (equalExtensions : Function.extendByValue(f, v1) = Function.extendByValue(f, v2))
+        : v1 = v2 := {
+  Function.extendByValue(f, v1)(NaturalsBelow.top(k)) = v1
+      by Function.apply_extendByValue_top(f, v1) as topValue1;
+  Function.extendByValue(f, v2)(NaturalsBelow.top(k)) = v2
+      by Function.apply_extendByValue_top(f, v2) as topValue2;
+  v1 = Function.extendByValue(f, v1)(NaturalsBelow.top(k))   by topValue1
+     = Function.extendByValue(f, v2)(NaturalsBelow.top(k))   by substituting equalExtensions
+     = v2                                                    by topValue2
+}
+
+-- The lower restriction recovers the base function of an extension.
+theorem Function.lowerBelow_extendByValue {C : Type(0)} {k : Natural}
+        (f : NaturalsBelow(k) → C) (v : C)
+        : Function.lowerBelow(Function.extendByValue(f, v)) = f :=
+  Function.extensionality(NaturalsBelow(k), C,
+      Function.lowerBelow(Function.extendByValue(f, v)), f,
+      (x : NaturalsBelow(k)) ↦
+          Function.lowerBelow(Function.extendByValue(f, v))(x)
+             = Function.extendByValue(f, v)(NaturalsBelow.inclusion(k, x))
+             = f(x) by Function.apply_extendByValue_inclusion(f, v, x))
+
+-- Every member of a row has that row's base function as its lower restriction.
+theorem Function.functionRow_member_lower {C : Type(0)} {k : Natural}
+        (choices : List(C)) (f : NaturalsBelow(k) → C) (g : NaturalsBelow(1 + k) → C)
+        (memG : List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, f)))
+        : Function.lowerBelow(g) = f := {
+  choose v such that List.member(C, v, choices)
+      ∧ ((v2 : C) ↦ Function.extendByValue(f, v2))(v) = g
+      from List.map_member_invert(C, NaturalsBelow(1 + k) → C,
+               (v2 : C) ↦ Function.extendByValue(f, v2), g, choices, memG);
+  Function.extendByValue(f, v) = g;
+  Function.lowerBelow(g) = Function.lowerBelow(Function.extendByValue(f, v))
+      by substituting (Function.extendByValue(f, v) = g);
+  Function.lowerBelow(g) = f
+      by Function.lowerBelow_extendByValue(f, v);
+  done
+}
+
+-- A row is distinct: extend-by-value is injective on the (distinct) choices.
+theorem Function.functionRow_distinct {C : Type(0)} {k : Natural}
+        (choices : List(C)) (f : NaturalsBelow(k) → C)
+        (choicesDistinct : List.Distinct(C, choices))
+        : List.Distinct(NaturalsBelow(1 + k) → C, Function.functionRow(choices, f)) :=
+  List.map_distinct(C, NaturalsBelow(1 + k) → C, (v : C) ↦ Function.extendByValue(f, v),
+      (v1 v2 : C) (equalExtensions : Function.extendByValue(f, v1) = Function.extendByValue(f, v2)) ↦
+          Function.extendByValue_injective_value(f, v1, v2, equalExtensions),
+      choices, choicesDistinct)
+
+-- A member of the concatenation has its lower restriction among the base list.
+theorem Function.concatFunctionRows_member_lower (C : Type(0)) (k : Natural) (choices : List(C))
+        (l : List(NaturalsBelow(k) → C))
+        : ∀ (g : NaturalsBelow(1 + k) → C).
+          List.member(NaturalsBelow(1 + k) → C, g, Function.concatFunctionRows(C, k, choices, l))
+          → List.member(NaturalsBelow(k) → C, Function.lowerBelow(g), l) :=
+  by induction on l with IH {
+    case List.empty:
+        (g : NaturalsBelow(1 + k) → C)
+        (memG : List.member(NaturalsBelow(1 + k) → C, g,
+            Function.concatFunctionRows(C, k, choices, List.empty(NaturalsBelow(k) → C)))) ↦ {
+          List.member(NaturalsBelow(1 + k) → C, g, List.empty(NaturalsBelow(1 + k) → C))
+              by memG as memEmpty;
+          done by absurd(List.no_member_empty(NaturalsBelow(1 + k) → C, g, memEmpty))
+        }
+    case List.prepend(head, rest):
+        (g : NaturalsBelow(1 + k) → C)
+        (memG : List.member(NaturalsBelow(1 + k) → C, g,
+            Function.concatFunctionRows(C, k, choices, List.prepend(NaturalsBelow(k) → C, head, rest)))) ↦ {
+          List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, head))
+              ∨ List.member(NaturalsBelow(1 + k) → C, g,
+                    Function.concatFunctionRows(C, k, choices, rest))
+              by List.member_append_invert(NaturalsBelow(1 + k) → C, g,
+                     Function.concatFunctionRows(C, k, choices, rest),
+                     Function.functionRow(choices, head), memG);
+          done by cases {
+            case List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, head)) as inRow: {
+                Function.lowerBelow(g) = head by Function.functionRow_member_lower as lowerIsHead;
+                List.member(NaturalsBelow(k) → C, head, List.prepend(NaturalsBelow(k) → C, head, rest))
+                    by List.member.here(NaturalsBelow(k) → C, head, rest);
+                List.member(NaturalsBelow(k) → C, Function.lowerBelow(g),
+                        List.prepend(NaturalsBelow(k) → C, head, rest))
+                    by substituting lowerIsHead;
+                done
+              }
+            case List.member(NaturalsBelow(1 + k) → C, g,
+                Function.concatFunctionRows(C, k, choices, rest)) as inRest:
+                List.member.there(NaturalsBelow(k) → C, Function.lowerBelow(g), head, rest,
+                    IH(g, inRest))
+          }
+        }
+  }
+
+-- The concatenation of rows over a distinct base list is distinct: rows are
+-- distinct, and rows for distinct base functions are disjoint (they have
+-- different lower restrictions).
+theorem Function.concatFunctionRows_distinct (C : Type(0)) (k : Natural) (choices : List(C))
+        (choicesDistinct : List.Distinct(C, choices)) (l : List(NaturalsBelow(k) → C))
+        : List.Distinct(NaturalsBelow(k) → C, l)
+          → List.Distinct(NaturalsBelow(1 + k) → C, Function.concatFunctionRows(C, k, choices, l)) :=
+  by induction on l with IH {
+    case List.empty:
+        (lDistinct : List.Distinct(NaturalsBelow(k) → C, List.empty(NaturalsBelow(k) → C))) ↦
+          List.Distinct.empty(NaturalsBelow(1 + k) → C)
+    case List.prepend(head, rest):
+        (lDistinct : List.Distinct(NaturalsBelow(k) → C, List.prepend(NaturalsBelow(k) → C, head, rest))) ↦ {
+          ¬(List.member(NaturalsBelow(k) → C, head, rest))
+              by List.Distinct.head_not_member as headNotInRest;
+          List.Distinct(NaturalsBelow(k) → C, rest) by List.Distinct.tail_distinct as restDistinct;
+          -- head's row is disjoint from the concatenation of the rest.
+          (∀ (g : NaturalsBelow(1 + k) → C).
+              List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, head))
+              → ¬(List.member(NaturalsBelow(1 + k) → C, g,
+                    Function.concatFunctionRows(C, k, choices, rest))))
+              by (g : NaturalsBelow(1 + k) → C)
+                 (gInHeadRow : List.member(NaturalsBelow(1 + k) → C, g,
+                     Function.functionRow(choices, head)))
+                 (gInRest : List.member(NaturalsBelow(1 + k) → C, g,
+                     Function.concatFunctionRows(C, k, choices, rest))) ↦ {
+                  Function.lowerBelow(g) = head
+                      by Function.functionRow_member_lower as lowerIsHead;
+                  List.member(NaturalsBelow(k) → C, Function.lowerBelow(g), rest)
+                      by Function.concatFunctionRows_member_lower;
+                  List.member(NaturalsBelow(k) → C, head, rest) by substituting lowerIsHead as headInRest;
+                  headNotInRest(headInRest)
+                } as disjoint;
+          List.Distinct(NaturalsBelow(1 + k) → C,
+                  List.append(NaturalsBelow(1 + k) → C, Function.functionRow(choices, head),
+                      Function.concatFunctionRows(C, k, choices, rest)))
+              by List.distinct_append(NaturalsBelow(1 + k) → C,
+                     Function.concatFunctionRows(C, k, choices, rest),
+                     Function.functionRow(choices, head),
+                     Function.functionRow_distinct(choices, head, choicesDistinct),
+                     IH(restDistinct), disjoint);
+          done
+        }
+  }
+
+-- functionsBelow over distinct choices is distinct.
+theorem Function.functionsBelow_distinct (C : Type(0)) (choices : List(C))
+        (choicesDistinct : List.Distinct(C, choices)) (k : Natural)
+        : List.Distinct(NaturalsBelow(k) → C, Function.functionsBelow(C, choices, k)) :=
+  by induction on k with IH {
+    case base:
+        List.Distinct.prepend(NaturalsBelow(0) → C, Function.emptyBelow,
+            List.empty(NaturalsBelow(0) → C),
+            List.no_member_empty(NaturalsBelow(0) → C, Function.emptyBelow),
+            List.Distinct.empty(NaturalsBelow(0) → C))
+    case step(m): {
+        List.Distinct(NaturalsBelow(1 + m) → C,
+                Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m)))
+            by Function.concatFunctionRows_distinct(C, m, choices, choicesDistinct,
+                   Function.functionsBelow(C, choices, m), IH);
+        done by substituting Function.functionsBelow_one_plus
+      }
+  }
+
+-- The determinant index enumeration is distinct.
+theorem Function.allFunctions_distinct (n : Natural)
+        : List.Distinct(NaturalsBelow(n) → NaturalsBelow(n), Function.allFunctions(n)) :=
+  Function.functionsBelow_distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n),
+      NaturalsBelow.enumerate_distinct(n), n)
