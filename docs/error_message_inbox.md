@@ -898,7 +898,16 @@ hoist to a typed `let respectsR : ∀ … := { … }` — the annotation supplie
 goal, so the block's intros and final `done` typecheck. Ideally the expected
 type of an argument position would flow into a block-bodied lambda there too.
 
-## `absurd(…)` inside a lambda body mis-frames a captured-variable goal → "unbound internal variable" at kernel verify (2026-06-21)
+## `absurd(…)` inside a lambda body mis-frames a captured-variable goal → "unbound internal variable" at kernel verify (2026-06-21) — RESOLVED (stale, verified 2026-07-15)
+
+Re-reproduced the exact standalone repro below against the current build:
+`theorem repro (A C : Proposition) (notA : Not(A)) : A → C := (a : A) ↦
+absurd(notA(a))` now VERIFIES clean (exit 0). The mixed opened/closed
+de-Bruijn frame that put `C` at the wrong index was fixed at the root by the
+dispatch head-type-walk change (corpus #22 — the head-type walk stays opened,
+each peeled domain is closed before hand-out, arguments opened before
+substitution), which also covers the `absurd`-splice path. Left below for
+history.
 
 Repro (minimal): a vacuous-implication proof where `absurd` produces the
 codomain of a lambda whose expected type is an outer parameter.

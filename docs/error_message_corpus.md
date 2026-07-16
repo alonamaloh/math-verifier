@@ -160,6 +160,18 @@ each improvement is measured and protected against regression.
   positions, not tuples) is the real papercut.
 - **Wanted:** either make `?` invoke the auto-prover in proof positions, or
   emit a message saying so and suggesting `claim <component> by …`.
+- **Investigated 2026-07-15 (message-hint attempt, not landed):** the naive
+  fix — at the "could not infer hole(s)" site (`inference.cpp`), flag the
+  message when an unresolved position's domain is a Proposition — does NOT
+  fire on `⟨h, ?⟩ : And (0≤a)(0≤a)`. The position the error actually reports
+  is the **type argument `B`** (`position 1`, domain `Proposition`, i.e. NOT
+  a proof slot), because the `?` in the b-proof slot leaves `B` unpinned and
+  it is `B` that surfaces as unresolved. The genuine proof slot (the b-proof)
+  has domain `B`, which cascades to unresolvable, so `termIsProposition` on it
+  throws→false at the error site. Detecting this correctly needs proof-slot-
+  ness (`isHole[i] && domain inhabits Sort 0`) recorded during the Pi-chain
+  build (line ~1882), where the earlier binders' types are still in context —
+  not reconstructed at the throw site. Deferred as more than a message tweak.
 
 ### 8. Misspelled / unknown cited lemma name — FIXED (fix #4)
 

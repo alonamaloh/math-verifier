@@ -360,7 +360,17 @@ whether it recurs before building.
 
 ---
 
-## F9 · Error-message quality  ·  **P1 (parallel track)**
+## F9 · Error-message quality  ·  **P1 (parallel track)**  ·  ⏸ PAUSED 2026-07-15
+
+**Session close-out (2026-07-15).** One fix landed (the `<unknown>`→"∀/→
+statement" head description, corpus #23); a staleness sweep cleared four
+inbox entries that intervening F1/coercion/dispatch work had already fixed.
+The two remaining named low-scorers below are **blocked on repros we could
+not construct** (auto-prover-budget bridge naming; F4(c) ring-on-opaque-var).
+Track paused here — resume when a fresh confusing message is captured, or to
+take the deferred corpus #7 fix (needs a build-time proof-slot change, not a
+message tweak). This track is inherently open-ended (a continuous sweep), so
+"paused" is its steady state, not "done".
 
 The triage pipeline already exists: `scripts/record_error.sh` →
 `docs/error_message_inbox.md` → promote to `docs/error_message_corpus.md`
@@ -371,6 +381,17 @@ The triage pipeline already exists: `scripts/record_error.sh` →
     step(k):`" message (inbox) is already fixed — `induction.cpp` now names
     the offending clause and suggests the `zero`→`base` / `successor`→`step`
     rename. Stale inbox entry; leave the note as a data point.
+  - DONE (2026-07-15) — three more STALE-FIXED, re-verified + annotated:
+    (1) "calc leading numeral defaults to Natural" — bare relation-chain
+    carrier-seeding now coerces the leading `0` to the RHS carrier;
+    (2) "`absurd(…)` inside a lambda body → unbound internal variable" — the
+    standalone repro now verifies (fixed by the dispatch head-type-walk,
+    corpus #22); (3) the `<unknown>` head leak — FIXED this session (corpus
+    #23, below).
+  - STILL OPEN (re-verified reproduces): corpus #7 `?`-hole in an And-tuple
+    proof slot. A message-hint attempt did not fire (the error reports the
+    unresolved TYPE argument, not the proof slot — see corpus #7's 2026-07-15
+    note); the real fix records proof-slot-ness at Pi-chain build time.
 - Specific low-scorers to improve, captured while working:
   - "auto-prover gave up after exhausting its effort budget" — should name the
     likely missing bridge, not just suggest raising the budget.
