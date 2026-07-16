@@ -433,16 +433,20 @@ Update this section before ending any session that works on the plan.
 - **Stage G — DONE (2026-07-14).** `LinearMap.rank_nullity` (dim V = dim ker T +
   dim im T), `Algebra/rank_nullity.math`, choice-free. See the memory tracker
   [[linear_algebra_build]] for the brick 1–5 detail.
-- **Stage H — IN PROGRESS (det(AB) = det(A)·det(B)).** Bricks 1–5 + 6-backbone +
-  6a + 6b + 6c DONE (Sₙ group, enumeration, sign + multiplicativity, matrix,
-  determinant, aggregation, function-space distributivity, sign(swap)=−1,
-  alternating collapse). **6d (injective reindex + assembly) REMAINS.** 6c landed
-  2026-07-15 (export-check 3094, choice-free): `Lists/remove.math` (List.remove +
-  member/length/distinct lemmas), `Field.sumOver_remove`, the genuine orbit-pairing
-  `Field.sumOver_involution_pairing` (`Algebra/involution_pairing.math`, strong
-  induction on length, removes {head, ι head} each step — char-free, NOT `Σ=−Σ`),
-  and `Matrix.alternating_collapse` (`Algebra/alternating_collapse.math`,
-  instantiated at ι = σ↦σ∘swap(a,b) via `Field.productOver_permutation`). 6d next.
+- **Stage H — DONE (det(AB) = det(A)·det(B), headline #2).** `Matrix.determinant_multiply`
+  (`Algebra/determinant_multiplicative.math`), all gates green (library + tests +
+  export-check 3122, axioms UNCHANGED — choice-free). Bricks 1–6 complete. 6c landed
+  2026-07-15 (`Lists/remove.math`, `Field.sumOver_remove`, `Field.sumOver_involution_pairing`
+  in `Algebra/involution_pairing.math` — genuine orbit-pairing, char-free, NOT `Σ=−Σ`;
+  `Matrix.alternating_collapse` at ι = σ↦σ∘swap(a,b) via `Field.productOver_permutation`).
+  6d landed 2026-07-16: `Permutation.of_injective` (injective self-map ⟹ permutation via
+  pigeonhole surjectivity + `Logic.the` inverse), `Field.sumOver_restrict_support` +
+  `Field.sumOver_permutation`, `Matrix.determinant_row_permutation` (Σ_σ sign σ·∏B(pi,σi)
+  = sign p·det B, via σ↦σ∘p reindex + `Field.from_integer_multiply_units`),
+  `Function.allFunctions_distinct`, and the assembly (Leibniz expand → 6a distribute →
+  productOver_multiply → Fubini → 6c kills non-injective φ → restrict_support to the
+  permutation image → sumOver_map → 6d row-permutation → det A·det B). Remaining LA work
+  is all non-critical: the polish sweep, Σ-sugar/Norm-b automation, AC infra.
 - **LA POLISH DEBT (owner-requested 2026-07-15, pending).** Most Stage E–H files
   are NOT in the clean manifest — the tracker repeatedly defers the "redundant-`by`
   read-through + unused-name cascade + manifest-add" per file (exchange_lemma,
@@ -673,9 +677,10 @@ section below)
   New file: `Algebra/rank_nullity.math` (+ maybe `Algebra/subspace_dimension.math`
   for the subtype-transport bridge + "subspace of f.d. is f.d.", if it wants to be
   reusable for Stage H).
-- [ ] **Stage H0** (M, math) — permutation **sign/parity** — CONFIRMED ABSENT
-  from `Lists/permutation.math`, must be built.
-- [ ] **Stage H** (M–L, math) — **det(AB) = det(A)·det(B)** (headline #2).
+- [x] **Stage H0** (M, math) — permutation **sign/parity** — DONE (built as
+  brick 3, `Algebra/permutation_sign.math`: sign + multiplicativity).
+- [x] **Stage H** (M–L, math) — **det(AB) = det(A)·det(B)** (headline #2) — DONE
+  2026-07-16 (`Matrix.determinant_multiply`, export-check 3122, choice-free).
 
 **Cross-cutting (deferrable throughout)**
 - [ ] **AC infra** (M, infra) — `Logic/choice.math` (`AxiomOfChoice` Prop +
@@ -1088,7 +1093,7 @@ engine directly. Group laws are then immediate.
      then `det(AB)=Σ_φ̂ (∏A(i,φ̂i))·sign(φ̂)·det(B)=det(A)·det(B)`.
 
 Realistic size: multi-session. Bricks 2, 3, 6 are the cost; 1, 4, 5 are
-scaffolding. Brick 6 backbone (aggregation) DONE; 6a DONE; 6b DONE; 6c DONE; 6d remains.
+scaffolding. ALL DONE (2026-07-16): 6-backbone, 6a, 6b, 6c, 6d — Stage H complete.
 
 ## Choice-profile guardrails
 
