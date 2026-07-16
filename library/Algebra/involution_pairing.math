@@ -1,0 +1,180 @@
+-- Algebra/involution_pairing.math
+--
+-- The orbit-pairing sum-zero lemma: a finite sum over a distinct list that
+-- is closed under a fixed-point-free, sign-reversing involution vanishes.
+-- Genuine 2-element-orbit pairing (each `g(x) + g(ι x) = 0`), NOT the
+-- `Σ g = Σ g∘ι = −Σ g ⟹ 2Σ = 0 ⟹ Σ = 0` shortcut — that would need
+-- char ≠ 2, and this must hold over ANY field (Stage H det multiplicativity).
+--
+-- Route: strong induction on the list length. In the step, remove the head's
+-- orbit `{head, ι head}` (its two terms sum to zero), leaving a shorter list
+-- still distinct and ι-closed, and recurse.
+
+module Algebra.involution_pairing
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.strong_recursion
+import Lists.list
+import Lists.distinct
+import Lists.length
+import Lists.remove
+import Algebra.field
+import Algebra.field_bundle
+import Algebra.field_aggregation
+
+-- Strong-induction workhorse: the pairing lemma with the list length pinned
+-- to the induction variable `n`.
+theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
+        (g : index → Field.carrier(f)) (iota : index → index)
+        (n : Natural)
+        : ∀ (items : List(index)).
+          List.length(index, items) = n
+          → List.Distinct(index, items)
+          → (∀ (x : index). List.member(index, x, items) → List.member(index, iota(x), items))
+          → (∀ (x : index). List.member(index, x, items) → ¬(iota(x) = x))
+          → (∀ (x : index). List.member(index, x, items) → iota(iota(x)) = x)
+          → (∀ (x : index). List.member(index, x, items) → g(x) + g(iota(x)) = Field.zero(f))
+          → Field.sumOver(g, items) = Field.zero(f) :=
+  by induction on n using Natural.strong_induction with subject, IH {
+      take items : List(index);
+      suppose List.length(index, items) = subject as lengthEquation;
+      suppose List.Distinct(index, items) as distinct;
+      suppose (∀ (x : index). List.member(index, x, items)
+          → List.member(index, iota(x), items)) as closed;
+      suppose (∀ (x : index). List.member(index, x, items) → ¬(iota(x) = x)) as noFixedPoint;
+      suppose (∀ (x : index). List.member(index, x, items) → iota(iota(x)) = x) as involutive;
+      suppose (∀ (x : index). List.member(index, x, items)
+          → g(x) + g(iota(x)) = Field.zero(f)) as reversing;
+      done by cases {
+        case items = List.empty(index):
+            Field.sumOver(g, List.empty(index)) = Field.zero(f)
+        case items = List.prepend(index, head, tail)
+            for some (head : index), (tail : List(index)): {
+          ¬(List.member(index, head, tail))
+              by List.Distinct.head_not_member as headNotInTail;
+          List.Distinct(index, tail) by List.Distinct.tail_distinct as tailDistinct;
+
+          -- The head and its orbit partner ι(head), which lands in the tail.
+          List.member(index, head, List.prepend(index, head, tail))
+              by List.member.here(index, head, tail) as headMember;
+          List.member(index, iota(head), List.prepend(index, head, tail))
+              by closed(head, headMember) as iotaHeadMember;
+          ¬(iota(head) = head) by noFixedPoint(head, headMember) as iotaHeadNeqHead;
+          List.member(index, iota(head), tail)
+              by List.member_of_prepend_not_head(index, iota(head), head, tail,
+                     iotaHeadMember, iotaHeadNeqHead) as iotaHeadInTail;
+
+          -- The removed list and its length, strictly below `subject`.
+          let removed : List(index) := List.remove(index, iota(head), tail);
+          List.length(index, tail) = 1 + List.length(index, removed)
+              by List.length_remove_member(index, iota(head), tail, iotaHeadInTail)
+              as tailLengthEquation;
+          List.length(index, removed)
+             < 1 + List.length(index, removed)                       by Natural.lt_one_plus
+             = List.length(index, tail)                              by tailLengthEquation
+             < 1 + List.length(index, tail)                          by Natural.lt_one_plus
+             = List.length(index, List.prepend(index, head, tail))   by List.length_prepend
+             = subject                                               by lengthEquation
+             as removedLengthBelow;
+
+          -- Every member of `removed` came from `items`; restrict the
+          -- fixed-point-free / involutive / reversing hypotheses down to it.
+          ∀ (x : index). List.member(index, x, removed)
+              → List.member(index, x, List.prepend(index, head, tail))
+              by (x : index) (xInRemoved : List.member(index, x, removed)) ↦ {
+                  List.member(index, x, tail) by List.remove_member_subset as xInTail;
+                  List.member.there(index, x, head, tail, xInTail)
+                } as memberLift;
+
+          -- `removed` is still closed under ι.
+          ∀ (x : index). List.member(index, x, removed)
+              → List.member(index, iota(x), removed)
+              by (x : index) (xInRemoved : List.member(index, x, removed)) ↦ {
+                  List.member(index, x, tail) by List.remove_member_subset;
+                  List.member(index, x, List.prepend(index, head, tail))
+                      by memberLift(x, xInRemoved) as xInItems;
+                  List.member(index, iota(x), List.prepend(index, head, tail))
+                      by closed(x, xInItems) as iotaXInItems;
+                  iota(iota(x)) = x by involutive(x, xInItems) as involutiveX;
+                  -- ι(x) ≠ head: else x = ι(head), removed from the tail.
+                  ¬(iota(x) = head)
+                      by (iotaXEqHead : iota(x) = head) ↦ {
+                          x = iota(iota(x))                     by involutiveX
+                            = iota(head)                        by substituting iotaXEqHead;
+                          ¬(x = iota(head))
+                              by List.remove_member_ne(index, iota(head), x, tail,
+                                     tailDistinct, xInRemoved);
+                          done
+                        } as iotaXNeqHead;
+                  List.member(index, iota(x), tail)
+                      by List.member_of_prepend_not_head(index, iota(x), head, tail,
+                             iotaXInItems, iotaXNeqHead) as iotaXInTail;
+                  -- ι(x) ≠ ι(head): else x = head, but x ∈ tail and head ∉ tail.
+                  ¬(iota(x) = iota(head))
+                      by (iotaXEqIotaHead : iota(x) = iota(head)) ↦ {
+                          x = iota(iota(x))                     by involutiveX
+                            = iota(iota(head))                  by substituting iotaXEqIotaHead
+                            = head                              by involutive(head, headMember)
+                            as xEqHead;
+                          List.member(index, head, tail) by substituting xEqHead as headInTail;
+                          headNotInTail(headInTail)
+                        } as iotaXNeqIotaHead;
+                  List.remove_member_complete(index, iota(head), iota(x), tail,
+                      iotaXInTail, iotaXNeqIotaHead)
+                } as closedRemoved;
+
+          ∀ (x : index). List.member(index, x, removed) → ¬(iota(x) = x)
+              by (x : index) (xInRemoved : List.member(index, x, removed)) ↦
+                  noFixedPoint(x, memberLift(x, xInRemoved)) as noFixedPointRemoved;
+          ∀ (x : index). List.member(index, x, removed) → iota(iota(x)) = x
+              by (x : index) (xInRemoved : List.member(index, x, removed)) ↦
+                  involutive(x, memberLift(x, xInRemoved)) as involutiveRemoved;
+          ∀ (x : index). List.member(index, x, removed)
+              → g(x) + g(iota(x)) = Field.zero(f)
+              by (x : index) (xInRemoved : List.member(index, x, removed)) ↦
+                  reversing(x, memberLift(x, xInRemoved)) as reversingRemoved;
+
+          -- Recurse on the shorter list, then reassemble the orbit.
+          Field.sumOver(g, removed) = Field.zero(f)
+              by IH(List.length(index, removed), removedLengthBelow)(removed,
+                     reflexivity(Natural, List.length(index, removed)),
+                     List.remove_distinct(index, iota(head), tail, tailDistinct),
+                     closedRemoved, noFixedPointRemoved, involutiveRemoved, reversingRemoved)
+              as removedSumZero;
+          Field.sumOver(g, tail)
+              = g(iota(head)) + Field.sumOver(g, removed)
+              by Field.sumOver_remove(g, iota(head), tail, iotaHeadInTail) as tailSum;
+          g(head) + g(iota(head)) = Field.zero(f)
+              by reversing(head, headMember) as orbitZero;
+
+          Field.sumOver(g, List.prepend(index, head, tail))
+             = g(head) + Field.sumOver(g, tail)                        by Field.sumOver_prepend
+             = g(head) + (g(iota(head)) + Field.sumOver(g, removed))   by substituting tailSum
+             = (g(head) + g(iota(head))) + Field.sumOver(g, removed)   by ring
+             = Field.zero(f) + Field.sumOver(g, removed)               by substituting orbitZero
+             = Field.zero(f) + Field.zero(f)                           by substituting removedSumZero
+             = Field.zero(f)                                           by ring
+        }
+      }
+  }
+
+-- The orbit-pairing sum-zero lemma. `iota` is a fixed-point-free involution
+-- of the distinct list `items` under which `g` is sign-reversing
+-- (`g(x) + g(ι x) = 0`); the sum vanishes.
+theorem Field.sumOver_involution_pairing {f : Field} {index : Type(0)}
+        (g : index → Field.carrier(f)) (iota : index → index)
+        (items : List(index))
+        (distinct : List.Distinct(index, items))
+        (closed : ∀ (x : index). List.member(index, x, items) → List.member(index, iota(x), items))
+        (noFixedPoint : ∀ (x : index). List.member(index, x, items) → ¬(iota(x) = x))
+        (involutive : ∀ (x : index). List.member(index, x, items) → iota(iota(x)) = x)
+        (reversing : ∀ (x : index). List.member(index, x, items)
+            → g(x) + g(iota(x)) = Field.zero(f))
+        : Field.sumOver(g, items) = Field.zero(f) :=
+  Field.sumOver_involution_pairing_aux(g, iota, List.length(index, items), items,
+      reflexivity(Natural, List.length(index, items)), distinct, closed, noFixedPoint,
+      involutive, reversing)
