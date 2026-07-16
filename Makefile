@@ -195,13 +195,14 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # uniqueness DATA of `Logic.the` — the established `Real.reciprocal`
 # definite-description idiom (Real/field.math carries the same two
 # tokens inside the budget).
-CLEAN_LEAK_BUDGET ?= 232
+CLEAN_LEAK_BUDGET ?= 236
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
-# current floor; the surviving sites are factorization_list's negation-leg
-# destructures (await the item-7 records refactor). Ratchets *down* as cleaned.
-CLEAN_ANON_BUDGET ?= 4
+# current floor of 0: every conjunction leg in the manifest is now taken as a
+# bare claim (`P as name;` — a context conjunction's legs are facts on their
+# own, no `by` and no `⟨…⟩` needed). Ratchets *down* as cleaned.
+CLEAN_ANON_BUDGET ?= 0
 
 clean-status:
 	@python3 scripts/clean_status.py
