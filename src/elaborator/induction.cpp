@@ -2144,6 +2144,44 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                         queue.push_back({rightType, rightProof});
                     }
                 }
+                // (a-registry) A structure-CLASS premise (`ringProof :
+                // IsRing(carrier, +, zero, -, ·, one)`) can be discharged by a
+                // registered canonical `instance` — the same proof the
+                // direct-application path uses via
+                // resolveStructureClassLeadingImplicits, which the citation
+                // path never consulted (F2). Matching the instance's closed,
+                // concrete type against the premise pattern pins the premise's
+                // sibling data binders (`+`/`-`/`one`) AND supplies the proof.
+                // Gated on the carrier already being determined so an unpinned
+                // carrier can't ambiguously bind to the wrong ring; restricted
+                // to non-parameterized, monomorphic instances.
+                std::string premiseStructure = headConstantName(domain);
+                if (structureHeadIsClass(premiseStructure)) {
+                    ExpressionPointer carrierArgument;
+                    for (ExpressionPointer spine = domain;;) {
+                        auto* app = std::get_if<Application>(&spine->node);
+                        if (!app) break;
+                        carrierArgument = app->argument;
+                        spine = app->function;
+                    }
+                    if (carrierArgument
+                        && !referencesUnfilled(carrierArgument, 0)) {
+                        for (const auto& registered :
+                                 environment_.canonicalInstanceRegistry) {
+                            if (std::get<0>(registered.first)
+                                != premiseStructure) {
+                                continue;
+                            }
+                            const auto& instance = registered.second;
+                            if (instance.parameterCount != 0
+                                || !instance.universeParameters.empty()) {
+                                continue;
+                            }
+                            tryCandidate(instance.type,
+                                         makeConstant(instance.termName));
+                        }
+                    }
+                }
                 return matches;
             };
             bool progress = true;

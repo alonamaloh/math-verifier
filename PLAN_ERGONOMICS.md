@@ -233,9 +233,27 @@ positional path. Root cause was a WHNF of the expected domain in the trailing-ar
 path (`inference.cpp:629`) δ-unfolding `≤` (`< ∨ =`) into an `Or`, defeating
 strategy (e)'s relation-head prefilter; fixed by trying the un-reduced domain
 first, WHNF as fallback. Regression:
-`library/Test/implicit_leading_argument_coercion_test.math`. **Remaining F2:**
-the general provable-not-defeq coercion beyond Natural relations, and (b) the
-`instance`-premise discharge.
+`library/Test/implicit_leading_argument_coercion_test.math`.
+
+✅ **(b) `instance`-premise discharge — DONE 2026-07-15.** An argument-free
+citation of a generic ring lemma (`done by Ring.zero_multiply`) now discharges
+its `IsRing(carrier, …)` premise from a registered canonical `instance`, the
+same proof the direct-application path already used via
+`resolveStructureClassLeadingImplicits` — matching the instance's closed type
+against the premise pattern pins the sibling data binders (`+`/`-`/`one`) AND
+supplies the proof. Two parts: (1) `completeCitationWithStrategy`'s
+per-premise `scanHypotheses` (induction.cpp) now also tries registered
+canonical instances for a structure-CLASS premise, gated on the carrier being
+determined (no ambiguous cross-ring binding) and restricted to
+non-parameterized monomorphic instances; local hypotheses are still scanned
+first, so the change is additive (it only fills premises nothing else could).
+(2) registered `instance Rational.is_ring` / `Integer.is_ring` /
+`Real.is_ring`. Regression `library/Test/instance_premise_discharge_test.math`.
+Gates green (tests, error-tests 56/56, export-check 3076, axioms unchanged).
+
+**Remaining F2:** the general provable-not-defeq coercion beyond Natural
+relations (part (a)); and extending (b) to parameterized instances
+(`IsRing(IntegerMod(m), …)`) if it recurs.
 
 **Detail.** `numeral_let_ring_elaborator_gaps` items 4 & 5, `coercion_join_project`.
 
