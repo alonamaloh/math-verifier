@@ -114,44 +114,44 @@ theorem List.Permutation.product_invariant (A : Type(0))
 
 theorem List.Permutation.member_forward (A : Type(0)) (element : A)
         (l1 l2 : List(A)) (perm : List.Permutation(A, l1, l2))
-        : List.member(A, element, l1)
-          → List.member(A, element, l2) :=
+        : element ∈ l1
+          → element ∈ l2 :=
   by induction on perm {
     case List.Permutation.empty:
-        (mem : List.member(A, element, List.empty(A))) ↦ mem
+        (mem : element ∈ List.empty(A)) ↦ mem
     case List.Permutation.skip(x, a, b, subPerm, tailForward):
-        (mem : List.member(A, element, List.prepend(A, x, a))) ↦ {
-          element = x ∨ List.member(A, element, a)
+        (mem : element ∈ List.prepend(A, x, a)) ↦ {
+          element = x ∨ element ∈ a
               by List.member_invert_general;
           done by cases {
             case element = x:
                 -- element = x: it is the (shared) head of prepend(x, b).
                 done
-            case List.member(A, element, a) as memberInA:
+            case element ∈ a as memberInA:
                 -- element lies in a; transport it into b (the IH), behind head x.
                 List.member.there(A, element, x, b, tailForward(memberInA))
           }
         }
     case List.Permutation.swap(x, y, l):
-        (mem : List.member(A, element,
-                   List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
-          element = x ∨ List.member(A, element, List.prepend(A, y, l))
+        (mem : element ∈
+                   List.prepend(A, x, List.prepend(A, y, l))) ↦ {
+          element = x ∨ element ∈ List.prepend(A, y, l)
               by List.member_prepend_invert;
           done by cases {
             case element = x: {
                 -- element = x: in prepend(y, prepend(x, l)) it sits one level deep.
-                List.member(A, x, List.prepend(A, y, List.prepend(A, x, l)))
+                x ∈ List.prepend(A, y, List.prepend(A, x, l))
                     by List.member.there;
                 done
               }
-            case List.member(A, element, List.prepend(A, y, l)): {
-                element = y ∨ List.member(A, element, l)
+            case element ∈ List.prepend(A, y, l): {
+                element = y ∨ element ∈ l
                     by List.member_prepend_invert;
                 done by cases {
                   case element = y:
                       -- element = y: the head of prepend(y, prepend(x, l)).
                       done
-                  case List.member(A, element, l) as memberInL:
+                  case element ∈ l as memberInL:
                       List.member.there(A, element, y, List.prepend(A, x, l),
                           List.member.there(A, element, x, l, memberInL))
                 }
@@ -160,7 +160,7 @@ theorem List.Permutation.member_forward (A : Type(0)) (element : A)
         }
     case List.Permutation.transitive(a, b, c, firstLeg, secondLeg,
              firstForward, secondForward):
-        (mem : List.member(A, element, a)) ↦
+        (mem : element ∈ a) ↦
           -- transport through the middle list b (first IH), then on to c (second).
           secondForward(firstForward(mem))
   }
@@ -170,12 +170,12 @@ theorem List.Permutation.member_forward (A : Type(0)) (element : A)
 theorem List.Permutation.not_member_forward (A : Type(0)) (element : A)
         (l1 l2 : List(A))
         (permutation : List.Permutation(A, l1, l2))
-        (notMember : ¬(List.member(A, element, l1)))
-        : ¬(List.member(A, element, l2)) :=
-  (memberTarget : List.member(A, element, l2)) ↦ {
+        (notMember : ¬(element ∈ l1))
+        : ¬(element ∈ l2) :=
+  (memberTarget : element ∈ l2) ↦ {
     -- pull the target membership back across the reversed permutation.
     List.Permutation(A, l2, l1);
-    List.member(A, element, l1) as memberSource;
+    element ∈ l1 as memberSource;
     notMember(memberSource)
   }
 
@@ -185,7 +185,7 @@ theorem List.Permutation.not_member_forward (A : Type(0)) (element : A)
 -- If `element` occurs in `l`, then `l` is a permutation of
 -- `prepend(element, rest)` for some remainder `rest`.
 theorem List.Permutation.extract (A : Type(0)) (element : A) (l : List(A))
-        (memberProof : List.member(A, element, l))
+        (memberProof : element ∈ l)
         : ∃ (rest : List(A)).
               List.Permutation(A, l, List.prepend(A, element, rest)) :=
   by induction on memberProof with IH {

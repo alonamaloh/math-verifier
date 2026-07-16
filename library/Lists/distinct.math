@@ -22,7 +22,7 @@ inductive List.Distinct (A : Type(0)) : List(A) → Proposition where
   | List.Distinct.empty : List.Distinct(A, List.empty(A))
   | List.Distinct.prepend
       : (head : A) → (tail : List(A))
-        → ¬(List.member(A, head, tail))
+        → ¬(head ∈ tail)
         → List.Distinct(A, tail)
         → List.Distinct(A, List.prepend(A, head, tail))
 
@@ -36,7 +36,7 @@ theorem List.Distinct_invert_general (A : Type(0)) (list : List(A))
         (distinctProof : List.Distinct(A, list))
         : ∀ (head : A). ∀ (tail : List(A)).
           list = List.prepend(A, head, tail)
-          → ¬(List.member(A, head, tail)) ∧ List.Distinct(A, tail) :=
+          → ¬(head ∈ tail) ∧ List.Distinct(A, tail) :=
   by induction on distinctProof {
     case List.Distinct.empty:
         (head : A) (tail : List(A))
@@ -53,9 +53,9 @@ theorem List.Distinct_invert_general (A : Type(0)) (list : List(A))
                         = List.prepend(A, head, tail)) ↦ {
           distinctHead = head by List.prepend_injective_head as headEquality;
           distinctTail = tail by List.prepend_injective_tail as tailEquality;
-          ¬(List.member(A, head, distinctTail))
+          ¬(head ∈ distinctTail)
               by substituting headEquality;
-          ¬(List.member(A, head, tail))
+          ¬(head ∈ tail)
               by substituting tailEquality as headNotMember;
           List.Distinct(A, tail)
               by substituting tailEquality as tailIsDistinct;
@@ -66,8 +66,8 @@ theorem List.Distinct_invert_general (A : Type(0)) (list : List(A))
 -- The head of a distinct list does not recur in the tail.
 theorem List.Distinct.head_not_member (A : Type(0)) (head : A) (tail : List(A))
         (distinct : List.Distinct(A, List.prepend(A, head, tail)))
-        : ¬(List.member(A, head, tail)) := {
-  ¬(List.member(A, head, tail)) ∧ List.Distinct(A, tail)
+        : ¬(head ∈ tail) := {
+  ¬(head ∈ tail) ∧ List.Distinct(A, tail)
       by List.Distinct_invert_general(A, List.prepend(A, head, tail), distinct,
              head, tail, reflexivity(List(A), List.prepend(A, head, tail)));
   done
@@ -77,7 +77,7 @@ theorem List.Distinct.head_not_member (A : Type(0)) (head : A) (tail : List(A))
 theorem List.Distinct.tail_distinct (A : Type(0)) (head : A) (tail : List(A))
         (distinct : List.Distinct(A, List.prepend(A, head, tail)))
         : List.Distinct(A, tail) := {
-  ¬(List.member(A, head, tail)) ∧ List.Distinct(A, tail)
+  ¬(head ∈ tail) ∧ List.Distinct(A, tail)
       by List.Distinct_invert_general(A, List.prepend(A, head, tail), distinct,
              head, tail, reflexivity(List(A), List.prepend(A, head, tail)));
   done
@@ -97,39 +97,39 @@ theorem List.Permutation.distinct_invariant (A : Type(0)) (l1 l2 : List(A))
         (distinct : List.Distinct(A, List.prepend(A, x, a))) ↦ {
           -- x does not recur in a, hence (transporting along the
           -- permutation) not in b either; the tails stay distinct.
-          ¬(List.member(A, x, a))
+          ¬(x ∈ a)
               by List.Distinct.head_not_member as xNotInA;
           List.Distinct(A, a) by List.Distinct.tail_distinct as aDistinct;
-          ¬(List.member(A, x, b))
+          ¬(x ∈ b)
               by List.Permutation.not_member_forward as xNotInB;
           List.Distinct.prepend(A, x, b, xNotInB, skipInvariant(aDistinct))
         }
     case List.Permutation.swap(x, y, l):
         (distinct : List.Distinct(A, List.prepend(A, x, List.prepend(A, y, l)))) ↦ {
           -- Unpack: x ∉ y::l, y ∉ l, and l is distinct.
-          ¬(List.member(A, x, List.prepend(A, y, l)))
+          ¬(x ∈ List.prepend(A, y, l))
               by List.Distinct.head_not_member as xNotInYL;
           List.Distinct(A, List.prepend(A, y, l))
               by List.Distinct.tail_distinct as ylDistinct;
-          ¬(List.member(A, y, l)) by List.Distinct.head_not_member as yNotInL;
+          ¬(y ∈ l) by List.Distinct.head_not_member as yNotInL;
           List.Distinct(A, l) by List.Distinct.tail_distinct as lDistinct;
           -- x ∉ l, since it is not even in y::l.
-          ¬(List.member(A, x, l))
-              by (memberXInL : List.member(A, x, l)) ↦
+          ¬(x ∈ l)
+              by (memberXInL : x ∈ l) ↦
                   xNotInYL(List.member.there(A, x, y, l, memberXInL)) as xNotInL;
           -- y ∉ x::l: y is not x (x ∉ y::l rules the head out) and y ∉ l.
-          ¬(List.member(A, y, List.prepend(A, x, l)))
-              by (memberYInXL : List.member(A, y, List.prepend(A, x, l))) ↦ {
-                  y = x ∨ List.member(A, y, l)
+          ¬(y ∈ List.prepend(A, x, l))
+              by (memberYInXL : y ∈ List.prepend(A, x, l)) ↦ {
+                  y = x ∨ y ∈ l
                       by List.member_prepend_invert;
                   done by cases {
                     case y = x as yEqualsX: {
-                        List.member(A, y, List.prepend(A, y, l));
-                        List.member(A, x, List.prepend(A, y, l))
+                        y ∈ List.prepend(A, y, l);
+                        x ∈ List.prepend(A, y, l)
                             by substituting yEqualsX as memberXInYL;
                         xNotInYL(memberXInYL)
                       }
-                    case List.member(A, y, l) as memberYInL: yNotInL(memberYInL)
+                    case y ∈ l as memberYInL: yNotInL(memberYInL)
                   }
                 } as yNotInXL;
           List.Distinct.prepend(A, y, List.prepend(A, x, l), yNotInXL,
@@ -163,10 +163,8 @@ theorem List.range_down_distinct (n : Natural)
   by induction on n with IH {
     case base: List.Distinct.empty(Natural)
     case step(predecessor): {
-        ¬(List.member(Natural, 1 + predecessor,
-                    List.range_down(predecessor)))
-            by (mem : List.member(Natural, 1 + predecessor,
-                    List.range_down(predecessor))) ↦ {
+        ¬((1 + predecessor) ∈ List.range_down(predecessor))
+            by (mem : (1 + predecessor) ∈ List.range_down(predecessor)) ↦ {
                 1 + predecessor ≤ predecessor
                     by List.range_down_member_le;
                 False;
@@ -184,46 +182,46 @@ theorem List.range_down_distinct (n : Natural)
 -- of the list. (k ↦ [k] mod p is not globally injective — [0] = [p] — yet
 -- on the members of range_down(p−1) it is, and that is all this asks.)
 theorem List.map_distinct_on (A B : Type(0)) (f : A → B) (list : List(A))
-        : (∀ (x y : A). List.member(A, x, list) → List.member(A, y, list)
+        : (∀ (x y : A). x ∈ list → y ∈ list
                  → f(x) = f(y) → x = y)
           → List.Distinct(A, list)
           → List.Distinct(B, List.map(A, B, f, list)) :=
   by induction on list with IH {
     case List.empty:
       (injectiveOnList
-          : ∀ (x y : A). List.member(A, x, List.empty(A))
-              → List.member(A, y, List.empty(A)) → f(x) = f(y) → x = y)
+          : ∀ (x y : A). x ∈ List.empty(A)
+              → y ∈ List.empty(A) → f(x) = f(y) → x = y)
       (distinct : List.Distinct(A, List.empty(A))) ↦
         List.Distinct.empty(B)
     case List.prepend(head, tail):
       (injectiveOnList
-          : ∀ (x y : A). List.member(A, x, List.prepend(A, head, tail))
-              → List.member(A, y, List.prepend(A, head, tail))
+          : ∀ (x y : A). x ∈ List.prepend(A, head, tail)
+              → y ∈ List.prepend(A, head, tail)
               → f(x) = f(y) → x = y)
       (distinct : List.Distinct(A, List.prepend(A, head, tail))) ↦ {
         -- Restrict the injectivity hypothesis to the tail's members, and
         -- to comparisons against the head.
-        ∀ (x y : A). List.member(A, x, tail) → List.member(A, y, tail)
+        ∀ (x y : A). x ∈ tail → y ∈ tail
                 → f(x) = f(y) → x = y
             by (x y : A)
-               (xMember : List.member(A, x, tail))
-               (yMember : List.member(A, y, tail))
+               (xMember : x ∈ tail)
+               (yMember : y ∈ tail)
                (imagesEqual : f(x) = f(y)) ↦
                  injectiveOnList(x, y,
                      List.member.there(A, x, head, tail, xMember),
                      List.member.there(A, y, head, tail, yMember),
                      imagesEqual) as injectiveOnTail;
-        (x : A) → List.member(A, x, tail) → f(x) = f(head) → x = head
+        (x : A) → x ∈ tail → f(x) = f(head) → x = head
             by (x : A)
-               (xMember : List.member(A, x, tail))
+               (xMember : x ∈ tail)
                (imagesEqual : f(x) = f(head)) ↦
                  injectiveOnList(x, head,
                      List.member.there(A, x, head, tail, xMember),
                      List.member.here(A, head, tail),
                      imagesEqual);
-        ¬(List.member(A, head, tail));
+        ¬(head ∈ tail);
         List.Distinct(A, tail) as tailDistinct;
-        ¬(List.member(B, f(head), List.map(A, B, f, tail)))
+        ¬(f(head) ∈ List.map(A, B, f, tail))
             by List.not_member_map_of_not_member_on as imageHeadNotInImageTail;
         List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
             imageHeadNotInImageTail,
@@ -250,34 +248,34 @@ theorem List.map_distinct (A B : Type(0)) (f : A → B)
 -- disjointness), and does not recur in `append(tail, second)`.
 theorem List.distinct_append (A : Type(0)) (second : List(A)) (first : List(A))
         : List.Distinct(A, first) → List.Distinct(A, second)
-          → (∀ (x : A). List.member(A, x, first) → ¬(List.member(A, x, second)))
+          → (∀ (x : A). x ∈ first → ¬(x ∈ second))
           → List.Distinct(A, List.append(A, first, second)) :=
   by induction on first with IH {
     case List.empty:
         (distinctFirst : List.Distinct(A, List.empty(A)))
         (distinctSecond : List.Distinct(A, second))
-        (disjoint : ∀ (x : A). List.member(A, x, List.empty(A)) → ¬(List.member(A, x, second))) ↦
+        (disjoint : ∀ (x : A). x ∈ List.empty(A) → ¬(x ∈ second)) ↦
           -- append(empty, second) is second.
           distinctSecond
     case List.prepend(head, tail):
         (distinctFirst : List.Distinct(A, List.prepend(A, head, tail)))
         (distinctSecond : List.Distinct(A, second))
-        (disjoint : ∀ (x : A). List.member(A, x, List.prepend(A, head, tail))
-            → ¬(List.member(A, x, second))) ↦ {
-          ¬(List.member(A, head, tail)) by List.Distinct.head_not_member as headNotInTail;
+        (disjoint : ∀ (x : A). x ∈ List.prepend(A, head, tail)
+            → ¬(x ∈ second)) ↦ {
+          ¬(head ∈ tail) by List.Distinct.head_not_member as headNotInTail;
           List.Distinct(A, tail) by List.Distinct.tail_distinct as tailDistinct;
-          ¬(List.member(A, head, List.append(A, tail, second)))
-              by (headInAppend : List.member(A, head, List.append(A, tail, second))) ↦ {
-                  List.member(A, head, tail) ∨ List.member(A, head, second)
+          ¬(head ∈ List.append(A, tail, second))
+              by (headInAppend : head ∈ List.append(A, tail, second)) ↦ {
+                  head ∈ tail ∨ head ∈ second
                       by List.member_append_invert(A, head, second, tail, headInAppend);
                   done by cases {
-                    case List.member(A, head, tail) as inTail: headNotInTail(inTail)
-                    case List.member(A, head, second) as inSecond:
+                    case head ∈ tail as inTail: headNotInTail(inTail)
+                    case head ∈ second as inSecond:
                         disjoint(head, List.member.here(A, head, tail), inSecond)
                   }
                 } as headNotInAppend;
-          (∀ (x : A). List.member(A, x, tail) → ¬(List.member(A, x, second)))
-              by (x : A) (xInTail : List.member(A, x, tail)) ↦
+          (∀ (x : A). x ∈ tail → ¬(x ∈ second))
+              by (x : A) (xInTail : x ∈ tail) ↦
                   disjoint(x, List.member.there(A, x, head, tail, xInTail)) as tailDisjoint;
           List.Distinct(A, List.append(A, tail, second))
               by IH(tailDistinct, distinctSecond, tailDisjoint) as appendTailDistinct;
@@ -297,13 +295,12 @@ theorem List.range_up_distinct (n : Natural)
             by List.Distinct.prepend(Natural, predecessor, List.empty(Natural),
                    List.no_member_empty(Natural, predecessor), List.Distinct.empty(Natural))
             as singletonDistinct;
-        (∀ (x : Natural). List.member(Natural, x, List.range_up(predecessor))
-            → ¬(List.member(Natural, x, List.prepend(Natural, predecessor, List.empty(Natural)))))
-            by (x : Natural) (xInRange : List.member(Natural, x, List.range_up(predecessor)))
-               (xInSingleton : List.member(Natural, x,
-                   List.prepend(Natural, predecessor, List.empty(Natural)))) ↦ {
+        (∀ (x : Natural). x ∈ List.range_up(predecessor)
+            → ¬(x ∈ List.prepend(Natural, predecessor, List.empty(Natural))))
+            by (x : Natural) (xInRange : x ∈ List.range_up(predecessor))
+               (xInSingleton : x ∈ List.prepend(Natural, predecessor, List.empty(Natural))) ↦ {
                 x < predecessor by List.range_up_member_lt(predecessor, x, xInRange);
-                x = predecessor ∨ List.member(Natural, x, List.empty(Natural))
+                x = predecessor ∨ x ∈ List.empty(Natural)
                     by List.member_prepend_invert;
                 done by cases {
                   case x = predecessor as xEqual: {
@@ -311,7 +308,7 @@ theorem List.range_up_distinct (n : Natural)
                       False by Natural.lt_irreflexive;
                       done
                     }
-                  case List.member(Natural, x, List.empty(Natural)) as xInEmpty:
+                  case x ∈ List.empty(Natural) as xInEmpty:
                       absurd(List.no_member_empty(Natural, x, xInEmpty))
                 }
               } as disjoint;
@@ -334,7 +331,7 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
         : ∀ (l2 : List(A)).
           List.Distinct(A, l1)
           → List.Distinct(A, l2)
-          → (∀ (x : A). List.member(A, x, l1) → List.member(A, x, l2))
+          → (∀ (x : A). x ∈ l1 → x ∈ l2)
           → length(l1) = length(l2)
           → List.Permutation(A, l1, l2) :=
   by induction on l1 with IH {
@@ -342,8 +339,8 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
       (l2 : List(A))
       (distinct1 : List.Distinct(A, List.empty(A)))
       (distinct2 : List.Distinct(A, l2))
-      (inclusion : ∀ (x : A). List.member(A, x, List.empty(A))
-          → List.member(A, x, l2))
+      (inclusion : ∀ (x : A). x ∈ List.empty(A)
+          → x ∈ l2)
       (lengthEquation : length(List.empty(A)) = length(l2)) ↦
         done by cases {
           case l2 = List.empty(A): List.Permutation.empty(A)
@@ -362,32 +359,32 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
       (l2 : List(A))
       (distinct1 : List.Distinct(A, List.prepend(A, head, tail)))
       (distinct2 : List.Distinct(A, l2))
-      (inclusion : ∀ (x : A). List.member(A, x, List.prepend(A, head, tail))
-          → List.member(A, x, l2))
+      (inclusion : ∀ (x : A). x ∈ List.prepend(A, head, tail)
+          → x ∈ l2)
       (lengthEquation
           : length(List.prepend(A, head, tail)) = length(l2)) ↦ {
         -- The head sits somewhere in l2; rotate it to the front.
-        List.member(A, head, List.prepend(A, head, tail));
-        List.member(A, head, l2) as headMember2;
+        head ∈ List.prepend(A, head, tail);
+        head ∈ l2 as headMember2;
         choose rest such that List.Permutation(A, l2, List.prepend(A, head, rest))
             from List.Permutation.extract(A, head, l2, headMember2);
         -- Distinctness on both sides, with the head removed.
-        ¬(List.member(A, head, tail)) as headNotInTail;
+        ¬(head ∈ tail) as headNotInTail;
         List.Distinct(A, tail) as tailDistinct;
         List.Distinct(A, List.prepend(A, head, rest));
-        ¬(List.member(A, head, rest));
+        ¬(head ∈ rest);
         List.Distinct(A, rest) as restDistinct;
         -- The tail is contained in the remainder: an x ∈ tail is in l2,
         -- lands in head :: rest, and is not the head (head ∉ tail).
-        ∀ (x : A). List.member(A, x, tail) → List.member(A, x, rest)
-            by (x : A) (xInTail : List.member(A, x, tail)) ↦ {
-                List.member(A, x, List.prepend(A, head, tail));
-                List.member(A, x, l2);
-                List.member(A, x, List.prepend(A, head, rest))
+        ∀ (x : A). x ∈ tail → x ∈ rest
+            by (x : A) (xInTail : x ∈ tail) ↦ {
+                x ∈ List.prepend(A, head, tail);
+                x ∈ l2;
+                x ∈ List.prepend(A, head, rest)
                     by List.Permutation.member_forward;
                 ¬(x = head)
                     by (xIsHead : x = head) ↦ {
-                        List.member(A, head, tail)
+                        head ∈ tail
                             by substituting xIsHead as headInTail;
                         headNotInTail(headInTail)
                       };

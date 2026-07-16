@@ -133,8 +133,7 @@ definition Permutation.sign {n : Natural} (sigma : Permutation(n)) : Integer :=
 -- value-ordered and distinct.
 theorem Permutation.orderedPairs_member (n : Natural) (i j : NaturalsBelow(n))
         (precedes : NaturalsBelow.value(i) < NaturalsBelow.value(j))
-        : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), Product.make(i, j),
-              Permutation.orderedPairs(n)) :=
+        : Product.make(i, j) ∈ Permutation.orderedPairs(n) :=
   List.filter_member_complete(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.indexPairBelow,
       Product.make(i, j),
       List.cartesianProduct(NaturalsBelow(n), NaturalsBelow(n),
@@ -146,7 +145,7 @@ theorem Permutation.orderedPairs_member (n : Natural) (i j : NaturalsBelow(n))
 
 theorem Permutation.orderedPairs_property (n : Natural)
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        (memberP : p ∈ Permutation.orderedPairs(n))
         : NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p)) :=
   List.filter_member_property(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.indexPairBelow, p,
       List.cartesianProduct(NaturalsBelow(n), NaturalsBelow(n),
@@ -167,14 +166,14 @@ theorem Integer.one_multiply_left (a : Integer) : Integer.multiply(Integer.one, 
 -- A fold-product of a list every element of which is `one` is `one`.
 theorem List.product_of_ones (A : Type(0)) (multiply : A → A → A) (one : A)
         (identityLeft : ∀ (a : A). multiply(one, a) = a)
-        (l : List(A)) (allOne : ∀ (x : A). List.member(A, x, l) → x = one)
+        (l : List(A)) (allOne : ∀ (x : A). x ∈ l → x = one)
         : List.product(A, multiply, one, l) = one :=
   by induction on l with IH {
     case List.empty: reflexivity(one)
     case List.prepend(head, tail): {
         head = one by allOne(head, List.member.here(A, head, tail)) as headIsOne;
-        (∀ (x : A). List.member(A, x, tail) → x = one)
-            by (x : A) (xInTail : List.member(A, x, tail)) ↦
+        (∀ (x : A). x ∈ tail → x = one)
+            by (x : A) (xInTail : x ∈ tail) ↦
                 allOne(x, List.member.there(A, x, head, tail, xInTail)) as tailAllOne;
         List.product(A, multiply, one, List.prepend(A, head, tail))
            = multiply(head, List.product(A, multiply, one, tail))
@@ -188,7 +187,7 @@ theorem List.product_of_ones (A : Type(0)) (multiply : A → A → A) (one : A)
 -- The identity has sign +1: on a value-ordered pair, orient keeps the order.
 theorem Permutation.pairOrient_identity (n : Natural)
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        (memberP : p ∈ Permutation.orderedPairs(n))
         : Permutation.pairOrient(Permutation.identity(n), p) = 1 := {
   NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p))
       by Permutation.orderedPairs_property(n, p, memberP) as precedes;
@@ -204,19 +203,17 @@ theorem Permutation.pairOrient_identity (n : Natural)
 }
 
 theorem Permutation.sign_identity (n : Natural) : Permutation.sign(Permutation.identity(n)) = 1 := {
-  (∀ (x : Integer). List.member(Integer, x,
-      List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
-          Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n))) → x = 1)
-      by (x : Integer) (memberX : List.member(Integer, x,
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
-              Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n)))) ↦ {
+  (∀ (x : Integer). x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+      Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n)) → x = 1)
+      by (x : Integer) (memberX : x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
+          Permutation.pairOrient(Permutation.identity(n)), Permutation.orderedPairs(n))) ↦ {
           choose p such that
-              List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))
+              p ∈ Permutation.orderedPairs(n)
                   ∧ (Permutation.pairOrient(Permutation.identity(n), p) = x)
               from List.map_member_invert(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
                        Permutation.pairOrient(Permutation.identity(n)), x,
                        Permutation.orderedPairs(n), memberX);
-          List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))
+          p ∈ Permutation.orderedPairs(n)
               as pMember;
           Permutation.pairOrient(Permutation.identity(n), p) = x as orientIsX;
           x = Permutation.pairOrient(Permutation.identity(n), p) by orientIsX
@@ -258,14 +255,14 @@ theorem Permutation.sortPair_backward {n : Natural} (a b : NaturalsBelow(n))
 
 -- A list-map is unchanged if the two functions agree on the list's members.
 theorem List.map_congruence_on (A B : Type(0)) (f g : A → B) (l : List(A))
-        (agree : ∀ (x : A). List.member(A, x, l) → f(x) = g(x))
+        (agree : ∀ (x : A). x ∈ l → f(x) = g(x))
         : List.map(A, B, f, l) = List.map(A, B, g, l) :=
   by induction on l with IH {
     case List.empty: reflexivity(List.empty(B))
     case List.prepend(head, tail): {
         f(head) = g(head) by agree(head, List.member.here(A, head, tail)) as headAgree;
-        (∀ (x : A). List.member(A, x, tail) → f(x) = g(x))
-            by (x : A) (xInTail : List.member(A, x, tail)) ↦
+        (∀ (x : A). x ∈ tail → f(x) = g(x))
+            by (x : A) (xInTail : x ∈ tail) ↦
                 agree(x, List.member.there(A, x, head, tail, xInTail)) as tailAgree;
         List.map(A, B, f, List.prepend(A, head, tail))
            = List.prepend(B, f(head), List.map(A, B, f, tail))
@@ -348,9 +345,8 @@ theorem Permutation.apply_values_distinct {n : Natural} (sigma : Permutation(n))
 -- The τ-image of an ordered pair is again an ordered pair.
 theorem Permutation.pairImage_in_orderedPairs {n : Natural} (tau : Permutation(n))
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
-        : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.pairImage(tau, p),
-              Permutation.orderedPairs(n)) := {
+        (memberP : p ∈ Permutation.orderedPairs(n))
+        : Permutation.pairImage(tau, p) ∈ Permutation.orderedPairs(n) := {
   NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p))
       by Permutation.orderedPairs_property(n, p, memberP) as precedes;
   Product.first(p) ≠ Product.second(p) by Permutation.pair_first_ne_second(p, precedes) as componentsDistinct;
@@ -367,9 +363,8 @@ theorem Permutation.pairImage_in_orderedPairs {n : Natural} (tau : Permutation(n
         Permutation.pairImage(tau, p)
            = Product.make(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)))
                  by Permutation.sortPair_forward(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)), imageForward);
-        List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)),
-              Product.make(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p))),
-              Permutation.orderedPairs(n))
+        Product.make(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)))
+            ∈ Permutation.orderedPairs(n)
             by Permutation.orderedPairs_member(n, Permutation.apply(tau, Product.first(p)),
                    Permutation.apply(tau, Product.second(p)), imageForward);
         done
@@ -381,9 +376,8 @@ theorem Permutation.pairImage_in_orderedPairs {n : Natural} (tau : Permutation(n
         Permutation.pairImage(tau, p)
            = Product.make(Permutation.apply(tau, Product.second(p)), Permutation.apply(tau, Product.first(p)))
                  by Permutation.sortPair_backward(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)), notForward);
-        List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)),
-              Product.make(Permutation.apply(tau, Product.second(p)), Permutation.apply(tau, Product.first(p))),
-              Permutation.orderedPairs(n))
+        Product.make(Permutation.apply(tau, Product.second(p)), Permutation.apply(tau, Product.first(p)))
+            ∈ Permutation.orderedPairs(n)
             by Permutation.orderedPairs_member(n, Permutation.apply(tau, Product.second(p)),
                    Permutation.apply(tau, Product.first(p)), imageBackward);
         done
@@ -395,7 +389,7 @@ theorem Permutation.pairImage_in_orderedPairs {n : Natural} (tau : Permutation(n
 -- ordered pairs, hence is injective there.
 theorem Permutation.pairImage_cancel {n : Natural} (tau : Permutation(n))
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        (memberP : p ∈ Permutation.orderedPairs(n))
         : Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p)) = p := {
   let fp : NaturalsBelow(n) := Product.first(p);
   let sp : NaturalsBelow(n) := Product.second(p);
@@ -469,8 +463,8 @@ theorem Permutation.pairImage_cancel {n : Natural} (tau : Permutation(n))
 -- Injectivity of the τ-image on the ordered pairs (from the cancellation).
 theorem Permutation.pairImage_injective_on {n : Natural} (tau : Permutation(n))
         (p q : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
-        (memberQ : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), q, Permutation.orderedPairs(n)))
+        (memberP : p ∈ Permutation.orderedPairs(n))
+        (memberQ : q ∈ Permutation.orderedPairs(n))
         (imagesEqual : Permutation.pairImage(tau, p) = Permutation.pairImage(tau, q))
         : p = q :=
   p = Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p))
@@ -492,7 +486,7 @@ theorem NaturalsBelow.ne_of_value_ne {n : Natural} (a b : NaturalsBelow(n))
 -- is the τ-orientation times the σ-orientation on the sorted τ-image.
 theorem Permutation.pairFactor {n : Natural} (sigma tau : Permutation(n))
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        (memberP : p ∈ Permutation.orderedPairs(n))
         : Permutation.pairOrient(Permutation.compose(sigma, tau), p)
           = Integer.multiply(Permutation.pairOrient(tau, p),
                 Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))) := {
@@ -607,31 +601,29 @@ theorem Permutation.pairImage_permutes {n : Natural} (tau : Permutation(n))
       by List.map_distinct_on(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
              Permutation.pairImage(tau), Permutation.orderedPairs(n),
              (x y : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-                 (memberX : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x, Permutation.orderedPairs(n)))
-                 (memberY : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), y, Permutation.orderedPairs(n)))
+                 (memberX : x ∈ Permutation.orderedPairs(n))
+                 (memberY : y ∈ Permutation.orderedPairs(n))
                  (imagesEqual : Permutation.pairImage(tau, x) = Permutation.pairImage(tau, y)) ↦
                  Permutation.pairImage_injective_on(tau, x, y, memberX, memberY, imagesEqual),
              Permutation.orderedPairs_distinct(n))
       as imageDistinct;
   (∀ (x : Pair(NaturalsBelow(n), NaturalsBelow(n))).
-      List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x,
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-              Permutation.pairImage(tau), Permutation.orderedPairs(n)))
-      → List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x, Permutation.orderedPairs(n)))
+      x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+          Permutation.pairImage(tau), Permutation.orderedPairs(n))
+      → x ∈ Permutation.orderedPairs(n))
       by (x : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-         (memberX : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x,
-             List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                 Permutation.pairImage(tau), Permutation.orderedPairs(n)))) ↦ {
+         (memberX : x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+             Permutation.pairImage(tau), Permutation.orderedPairs(n))) ↦ {
           choose p such that
-              List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))
+              p ∈ Permutation.orderedPairs(n)
                   ∧ (Permutation.pairImage(tau, p) = x)
               from List.map_member_invert(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
                        Permutation.pairImage(tau), x, Permutation.orderedPairs(n), memberX);
-          List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)) as pMember;
+          p ∈ Permutation.orderedPairs(n) as pMember;
           Permutation.pairImage(tau, p) = x as imageIsX;
-          List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.pairImage(tau, p), Permutation.orderedPairs(n))
+          Permutation.pairImage(tau, p) ∈ Permutation.orderedPairs(n)
               by Permutation.pairImage_in_orderedPairs(tau, p, pMember);
-          List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), x, Permutation.orderedPairs(n))
+          x ∈ Permutation.orderedPairs(n)
               by substituting imageIsX;
           done
         } as inclusion;
@@ -665,7 +657,7 @@ theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
                      Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))),
              Permutation.orderedPairs(n),
              (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-                 (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))) ↦
+                 (memberP : p ∈ Permutation.orderedPairs(n)) ↦
                  Permutation.pairFactor(sigma, tau, p, memberP))
       as mapFactored;
   -- The reindexed σ-orientations have equal product (the τ-image permutes).
@@ -729,7 +721,7 @@ theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
 -- The sign is a unit: ±1. (A product of ±1 orientations.)
 
 theorem List.product_of_units (l : List(Integer))
-        (allUnit : ∀ (x : Integer). List.member(Integer, x, l) → (x = 1 ∨ x = Integer.negate(1)))
+        (allUnit : ∀ (x : Integer). x ∈ l → (x = 1 ∨ x = Integer.negate(1)))
         : List.product(Integer, Integer.multiply, Integer.one, l) = 1
           ∨ List.product(Integer, Integer.multiply, Integer.one, l) = Integer.negate(1) :=
   by induction on l with IH {
@@ -740,8 +732,8 @@ theorem List.product_of_units (l : List(Integer))
     case List.prepend(head, tail): {
         head = 1 ∨ head = Integer.negate(1)
             by allUnit(head, List.member.here(Integer, head, tail));
-        (∀ (x : Integer). List.member(Integer, x, tail) → (x = 1 ∨ x = Integer.negate(1)))
-            by (x : Integer) (xInTail : List.member(Integer, x, tail)) ↦
+        (∀ (x : Integer). x ∈ tail → (x = 1 ∨ x = Integer.negate(1)))
+            by (x : Integer) (xInTail : x ∈ tail) ↦
                 allUnit(x, List.member.there(Integer, x, head, tail, xInTail)) as tailUnit;
         List.product(Integer, Integer.multiply, Integer.one, tail) = 1
             ∨ List.product(Integer, Integer.multiply, Integer.one, tail) = Integer.negate(1)
@@ -797,14 +789,12 @@ theorem List.product_of_units (l : List(Integer))
 
 theorem Permutation.sign_is_unit {n : Natural} (sigma : Permutation(n))
         : Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1) := {
-  (∀ (x : Integer). List.member(Integer, x,
-      List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
-          Permutation.orderedPairs(n))) → (x = 1 ∨ x = Integer.negate(1)))
-      by (x : Integer) (memberX : List.member(Integer, x,
-          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
-              Permutation.orderedPairs(n)))) ↦ {
+  (∀ (x : Integer). x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+      Permutation.orderedPairs(n)) → (x = 1 ∨ x = Integer.negate(1)))
+      by (x : Integer) (memberX : x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+          Permutation.orderedPairs(n))) ↦ {
           choose p such that
-              List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n))
+              p ∈ Permutation.orderedPairs(n)
                   ∧ (Permutation.pairOrient(sigma, p) = x)
               from List.map_member_invert(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
                        Permutation.pairOrient(sigma), x, Permutation.orderedPairs(n), memberX);

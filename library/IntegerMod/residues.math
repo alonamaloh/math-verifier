@@ -83,7 +83,7 @@ theorem IntegerMod.residue_negate_of_add_to_modulus (p a b : Natural)
 -- Completeness: every nonzero class is the residue of some 1 ≤ r ≤ n.
 theorem IntegerMod.residues_complete (p n : Natural) (pEquation : p = 1 + n)
         (c : IntegerMod(p)) (cNonzero : ¬(c = IntegerMod.zero(p)))
-        : List.member(IntegerMod(p), c, IntegerMod.residues_up_to(p, n)) := {
+        : c ∈ IntegerMod.residues_up_to(p, n) := {
   -- Reduce c to its canonical representative r < p.
   1 ≤ 1 + n;
   1 ≤ p by substituting pEquation as pPositive;
@@ -107,10 +107,9 @@ theorem IntegerMod.residues_complete (p n : Natural) (pEquation : p = 1 + n)
          = n + 1;
   r ≤ n by Natural.le_of_lt_add_one;
   -- So r appears in the range, and its class in the residue list.
-  List.member(Natural, r, List.range_down(n))
+  r ∈ List.range_down(n)
       by List.range_down_complete;
-  List.member(IntegerMod(p), IntegerMod.residue(p, r),
-            IntegerMod.residues_up_to(p, n))
+  IntegerMod.residue(p, r) ∈ IntegerMod.residues_up_to(p, n)
       by List.map_member;
   done by substituting cEquation
 }
@@ -121,12 +120,12 @@ theorem IntegerMod.residues_complete (p n : Natural) (pEquation : p = 1 + n)
 theorem IntegerMod.residues_distinct (p n : Natural) (pEquation : p = 1 + n)
         : List.Distinct(IntegerMod(p), IntegerMod.residues_up_to(p, n)) := {
   -- The residue map is injective on the members of range_down(n).
-  (x y : Natural) → List.member(Natural, x, List.range_down(n))
-          → List.member(Natural, y, List.range_down(n))
+  (x y : Natural) → x ∈ List.range_down(n)
+          → y ∈ List.range_down(n)
           → IntegerMod.residue(p, x) = IntegerMod.residue(p, y) → x = y
       by (x y : Natural)
-         (xMember : List.member(Natural, x, List.range_down(n)))
-         (yMember : List.member(Natural, y, List.range_down(n)))
+         (xMember : x ∈ List.range_down(n))
+         (yMember : y ∈ List.range_down(n))
          (imagesEqual : IntegerMod.residue(p, x) = IntegerMod.residue(p, y)) ↦ {
            x ≤ n by List.range_down_member_le;
            x ≤ n
@@ -149,11 +148,11 @@ theorem IntegerMod.residues_distinct (p n : Natural) (pEquation : p = 1 + n)
 -- [j] = [0] would force j = 0 by injectivity below the modulus.
 theorem IntegerMod.residues_member_nonzero (p n : Natural) (pEquation : p = 1 + n)
         (c : IntegerMod(p))
-        (cMember : List.member(IntegerMod(p), c, IntegerMod.residues_up_to(p, n)))
+        (cMember : c ∈ IntegerMod.residues_up_to(p, n))
         : ¬(c = IntegerMod.zero(p)) :=
   (cZero : c = IntegerMod.zero(p)) ↦ {
     choose j such that
-        List.member(Natural, j, List.range_down(n)) ∧ IntegerMod.residue(p, j) = c
+        j ∈ List.range_down(n) ∧ IntegerMod.residue(p, j) = c
         from List.map_member_invert(Natural, IntegerMod(p), IntegerMod.residue(p),
                  c, List.range_down(n), cMember);
     IntegerMod.residue(p, j) = c as jClassEquation;
@@ -183,13 +182,11 @@ theorem IntegerMod.residues_member_nonzero (p n : Natural) (pEquation : p = 1 + 
 
 theorem IntegerMod.one_member_residues (p n : Natural) (pEquation : p = 1 + n)
         (nPositive : 1 ≤ n)
-        : List.member(IntegerMod(p), IntegerMod.one(p),
-              IntegerMod.residues_up_to(p, n)) := {
+        : IntegerMod.one(p) ∈ IntegerMod.residues_up_to(p, n) := {
   (1 : Natural) ≤ 1;
-  List.member(Natural, 1, List.range_down(n))
+  1 ∈ List.range_down(n)
       by List.range_down_complete;
-  List.member(IntegerMod(p), IntegerMod.residue(p, 1),
-            IntegerMod.residues_up_to(p, n))
+  IntegerMod.residue(p, 1) ∈ IntegerMod.residues_up_to(p, n)
       by List.map_member;
   -- one(p) is definitionally the residue of 1.
   done by substituting (IntegerMod.one(p) = IntegerMod.residue(p, 1))
@@ -197,8 +194,7 @@ theorem IntegerMod.one_member_residues (p n : Natural) (pEquation : p = 1 + n)
 
 theorem IntegerMod.negate_one_member_residues (p n : Natural)
         (pEquation : p = 1 + n) (nPositive : 1 ≤ n)
-        : List.member(IntegerMod(p), IntegerMod.negate(IntegerMod.one(p)),
-              IntegerMod.residues_up_to(p, n)) := {
+        : IntegerMod.negate(IntegerMod.one(p)) ∈ IntegerMod.residues_up_to(p, n) := {
   -- −1 is the class of n, since n + 1 = p.
   n + 1
       = 1 + n
@@ -206,10 +202,9 @@ theorem IntegerMod.negate_one_member_residues (p n : Natural)
   IntegerMod.residue(p, n) = IntegerMod.negate(IntegerMod.residue(p, 1))
       by IntegerMod.residue_negate_of_add_to_modulus as negateOneEquation;
   n ≤ n;
-  List.member(Natural, n, List.range_down(n))
+  n ∈ List.range_down(n)
       by List.range_down_complete;
-  List.member(IntegerMod(p), IntegerMod.residue(p, n),
-            IntegerMod.residues_up_to(p, n))
+  IntegerMod.residue(p, n) ∈ IntegerMod.residues_up_to(p, n)
       by List.map_member;
   done by substituting negateOneEquation
 }

@@ -279,16 +279,16 @@ theorem Field.sumOver_interchange {f : Field} {left right : Type(0)}
 -- the rest of the sum is the sum over the list with that element removed.
 theorem Field.sumOver_remove {f : Field} {index : Type(0)}
         (g : index → Field.carrier(f)) (x : index) (items : List(index))
-        : List.member(index, x, items)
+        : x ∈ items
           → Field.sumOver(g, items) = g(x) + Field.sumOver(g, items ∖ x) :=
   by induction on items with IH {
     case List.empty:
-        (mem : List.member(index, x, List.empty(index))) ↦ {
+        (mem : x ∈ List.empty(index)) ↦ {
           False by List.no_member_empty;
           done
         }
     case List.prepend(head, tail):
-        (mem : List.member(index, x, List.prepend(index, head, tail))) ↦ {
+        (mem : x ∈ List.prepend(index, head, tail)) ↦ {
           head = x ∨ ¬(head = x) by Logic.excluded_middle;
           done by cases {
             case head = x as headEqualsX:
@@ -297,11 +297,11 @@ theorem Field.sumOver_remove {f : Field} {index : Type(0)}
                    = g(x) + Field.sumOver(g, List.prepend(index, x, tail) ∖ x)
                        by substituting List.remove_prepend_equal
             case ¬(head = x) as headNeqX: {
-                List.member(index, x, tail)
-                    by { x = head ∨ List.member(index, x, tail) by List.member_prepend_invert;
+                x ∈ tail
+                    by { x = head ∨ x ∈ tail by List.member_prepend_invert;
                          done by cases {
                            case x = head as xHead: { head = x by Equality.symmetry; done }
-                           case List.member(index, x, tail) as memberTail: memberTail
+                           case x ∈ tail as memberTail: memberTail
                          }
                        };
                 Field.sumOver(g, tail) = g(x) + Field.sumOver(g, tail ∖ x)
@@ -373,26 +373,26 @@ theorem Field.sumOver_restrict_support {f : Field} {index : Type(0)}
         : ∀ (part : List(index)).
           List.Distinct(index, whole)
           → List.Distinct(index, part)
-          → (∀ (x : index). List.member(index, x, part) → List.member(index, x, whole))
-          → (∀ (x : index). List.member(index, x, whole)
-                → ¬(List.member(index, x, part)) → K(x) = Field.zero(f))
+          → (∀ (x : index). x ∈ part → x ∈ whole)
+          → (∀ (x : index). x ∈ whole
+                → ¬(x ∈ part) → K(x) = Field.zero(f))
           → Field.sumOver(K, whole) = Field.sumOver(K, part) :=
   by induction on whole with IH {
     case List.empty:
         (part : List(index))
         (wholeDistinct : List.Distinct(index, List.empty(index)))
         (partDistinct : List.Distinct(index, part))
-        (subset : ∀ (x : index). List.member(index, x, part) → List.member(index, x, List.empty(index)))
-        (vanishes : ∀ (x : index). List.member(index, x, List.empty(index))
-            → ¬(List.member(index, x, part)) → K(x) = Field.zero(f)) ↦
+        (subset : ∀ (x : index). x ∈ part → x ∈ List.empty(index))
+        (vanishes : ∀ (x : index). x ∈ List.empty(index)
+            → ¬(x ∈ part) → K(x) = Field.zero(f)) ↦
           -- part ⊆ empty forces part = empty, leaving the same sum on both sides.
           done by cases {
             case part = List.empty(index):
                 Field.sumOver(K, List.empty(index)) = Field.sumOver(K, List.empty(index))
             case part = List.prepend(index, head, tail)
                 for some (head : index), (tail : List(index)): {
-                  List.member(index, head, List.prepend(index, head, tail));
-                  List.member(index, head, List.empty(index)) by subset;
+                  head ∈ List.prepend(index, head, tail);
+                  head ∈ List.empty(index) by subset;
                   False by List.no_member_empty;
                   done
                 }
@@ -401,44 +401,44 @@ theorem Field.sumOver_restrict_support {f : Field} {index : Type(0)}
         (part : List(index))
         (wholeDistinct : List.Distinct(index, List.prepend(index, head, tail)))
         (partDistinct : List.Distinct(index, part))
-        (subset : ∀ (x : index). List.member(index, x, part)
-            → List.member(index, x, List.prepend(index, head, tail)))
-        (vanishes : ∀ (x : index). List.member(index, x, List.prepend(index, head, tail))
-            → ¬(List.member(index, x, part)) → K(x) = Field.zero(f)) ↦ {
-          ¬(List.member(index, head, tail)) by List.Distinct.head_not_member;
+        (subset : ∀ (x : index). x ∈ part
+            → x ∈ List.prepend(index, head, tail))
+        (vanishes : ∀ (x : index). x ∈ List.prepend(index, head, tail)
+            → ¬(x ∈ part) → K(x) = Field.zero(f)) ↦ {
+          ¬(head ∈ tail) by List.Distinct.head_not_member;
           List.Distinct(index, tail) by List.Distinct.tail_distinct;
-          List.member(index, head, List.prepend(index, head, tail));
-          List.member(index, head, part) ∨ ¬(List.member(index, head, part))
+          head ∈ List.prepend(index, head, tail);
+          head ∈ part ∨ ¬(head ∈ part)
               by Logic.excluded_middle;
           done by cases {
-            case List.member(index, head, part) as headInPart: {
+            case head ∈ part as headInPart: {
                 -- tail's members not in remove(head, part) vanish; recurse.
-                (∀ (x : index). List.member(index, x, part ∖ head)
-                    → List.member(index, x, tail))
+                (∀ (x : index). x ∈ part ∖ head
+                    → x ∈ tail)
                     by (x : index)
-                       (xInRemove : List.member(index, x, part ∖ head)) ↦ {
-                        List.member(index, x, part) by List.remove_member_subset;
+                       (xInRemove : x ∈ part ∖ head) ↦ {
+                        x ∈ part by List.remove_member_subset;
                         ¬(x = head) by List.remove_member_ne;
-                        List.member(index, x, List.prepend(index, head, tail)) by subset;
+                        x ∈ List.prepend(index, head, tail) by subset;
                         done by List.member_of_prepend_not_head
                       };
-                (∀ (x : index). List.member(index, x, tail)
-                    → ¬(List.member(index, x, part ∖ head))
+                (∀ (x : index). x ∈ tail
+                    → ¬(x ∈ part ∖ head)
                     → K(x) = Field.zero(f))
-                    by (x : index) (xInTail : List.member(index, x, tail))
-                       (xNotInRemove : ¬(List.member(index, x, part ∖ head))) ↦ {
+                    by (x : index) (xInTail : x ∈ tail)
+                       (xNotInRemove : ¬(x ∈ part ∖ head)) ↦ {
                         ¬(x = head)
                             by (xEqualsHead : x = head) ↦ {
-                                List.member(index, head, tail) by substituting xEqualsHead;
+                                head ∈ tail by substituting xEqualsHead;
                                 done
                               };
-                        ¬(List.member(index, x, part))
-                            by (xInPart : List.member(index, x, part)) ↦ {
-                                List.member(index, x, part ∖ head)
+                        ¬(x ∈ part)
+                            by (xInPart : x ∈ part) ↦ {
+                                x ∈ part ∖ head
                                     by List.remove_member_complete;
                                 done
                               };
-                        List.member(index, x, List.prepend(index, head, tail)) by List.member.there;
+                        x ∈ List.prepend(index, head, tail) by List.member.there;
                         done by vanishes
                       };
                 List.Distinct(index, part ∖ head) by List.remove_distinct;
@@ -451,23 +451,23 @@ theorem Field.sumOver_restrict_support {f : Field} {index : Type(0)}
                    = K(head) + Field.sumOver(K, part ∖ head)        by substituting tailEquation
                    = Field.sumOver(K, part)
               }
-            case ¬(List.member(index, head, part)) as headNotInPart: {
+            case ¬(head ∈ part) as headNotInPart: {
                 K(head) = Field.zero(f) by vanishes as headZero;
-                (∀ (x : index). List.member(index, x, part) → List.member(index, x, tail))
-                    by (x : index) (xInPart : List.member(index, x, part)) ↦ {
+                (∀ (x : index). x ∈ part → x ∈ tail)
+                    by (x : index) (xInPart : x ∈ part) ↦ {
                         ¬(x = head)
                             by (xEqualsHead : x = head) ↦ {
-                                List.member(index, head, part) by substituting xEqualsHead;
+                                head ∈ part by substituting xEqualsHead;
                                 done
                               };
-                        List.member(index, x, List.prepend(index, head, tail)) by subset;
+                        x ∈ List.prepend(index, head, tail) by subset;
                         done by List.member_of_prepend_not_head
                       };
-                (∀ (x : index). List.member(index, x, tail)
-                    → ¬(List.member(index, x, part)) → K(x) = Field.zero(f))
-                    by (x : index) (xInTail : List.member(index, x, tail))
-                       (xNotInPart : ¬(List.member(index, x, part))) ↦ {
-                        List.member(index, x, List.prepend(index, head, tail)) by List.member.there;
+                (∀ (x : index). x ∈ tail
+                    → ¬(x ∈ part) → K(x) = Field.zero(f))
+                    by (x : index) (xInTail : x ∈ tail)
+                       (xNotInPart : ¬(x ∈ part)) ↦ {
+                        x ∈ List.prepend(index, head, tail) by List.member.there;
                         done by vanishes
                       };
                 Field.sumOver(K, tail) = Field.sumOver(K, part) by IH as tailEquation;

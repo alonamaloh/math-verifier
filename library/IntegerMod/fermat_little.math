@@ -122,7 +122,7 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p)) (list 
 -- A product of nonzero classes is nonzero.
 theorem IntegerMod.product_nonzero (p : Natural)
         (primality : Natural.is_prime(p)) (list : List(IntegerMod(p)))
-        : (∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, list)
+        : (∀ (z : IntegerMod(p)). z ∈ list
                  → ¬(z = IntegerMod.zero(p)))
           → ¬(List.product(IntegerMod(p), IntegerMod.multiply,
                   IntegerMod.one(p), list)
@@ -130,7 +130,7 @@ theorem IntegerMod.product_nonzero (p : Natural)
   by induction on list with IH {
     case List.empty:
       (membersNonzero
-          : ∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, List.empty(IntegerMod(p)))
+          : ∀ (z : IntegerMod(p)). z ∈ List.empty(IntegerMod(p))
               → ¬(z = IntegerMod.zero(p)))
       (productZero
           : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
@@ -144,7 +144,7 @@ theorem IntegerMod.product_nonzero (p : Natural)
     case List.prepend(head, tail):
       (membersNonzero
           : ∀ (z : IntegerMod(p)).
-              List.member(IntegerMod(p), z, List.prepend(IntegerMod(p), head, tail))
+              z ∈ List.prepend(IntegerMod(p), head, tail)
               → ¬(z = IntegerMod.zero(p)))
       (productZero
           : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
@@ -154,10 +154,10 @@ theorem IntegerMod.product_nonzero (p : Natural)
         -- and a field has no zero divisors.
         ¬(head = IntegerMod.zero(p))
             by membersNonzero(head, List.member.here(IntegerMod(p), head, tail));
-        ∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, tail)
+        ∀ (z : IntegerMod(p)). z ∈ tail
                 → ¬(z = IntegerMod.zero(p))
             by (z : IntegerMod(p))
-               (zMember : List.member(IntegerMod(p), z, tail)) ↦
+               (zMember : z ∈ tail) ↦
                  membersNonzero(z,
                      List.member.there(IntegerMod(p), z, head, tail, zMember))
             as tailMembersNonzero;
@@ -187,13 +187,12 @@ theorem IntegerMod.scaled_residue_member (p n : Natural)
         (pEquation : p = 1 + n)
         (x : IntegerMod(p)) (xNonzero : ¬(x = IntegerMod.zero(p)))
         (z : IntegerMod(p))
-        (zMember : List.member(IntegerMod(p), z,
-            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                IntegerMod.residues_up_to(p, n))))
-        : List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n)) := {
+        (zMember : z ∈ List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                IntegerMod.residues_up_to(p, n)))
+        : z ∈ IntegerMod.residues_up_to(p, n) := {
   -- z = x·u for a nonzero class u, so z is itself nonzero, hence listed.
   choose u such that
-      List.member(IntegerMod(p), u, IntegerMod.residues_up_to(p, n))
+      u ∈ IntegerMod.residues_up_to(p, n)
       ∧ IntegerMod.multiply_by(p, x, u) = z
       from List.map_member_invert(IntegerMod(p), IntegerMod(p),
                IntegerMod.multiply_by(p, x), z, IntegerMod.residues_up_to(p, n),
@@ -215,14 +214,13 @@ theorem IntegerMod.fermat_little (p n : Natural)
   -- The scaled list map(x·_, U) is a permutation of U: it is contained in
   -- U (scaled_residue_member), distinct (x cancels), and of equal length.
   (z : IntegerMod(p))
-        → List.member(IntegerMod(p), z,
-              List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
-                  IntegerMod.residues_up_to(p, n)))
-        → List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n))
+        → z ∈ List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                  IntegerMod.residues_up_to(p, n))
+        → z ∈ IntegerMod.residues_up_to(p, n)
       by IntegerMod.scaled_residue_member;
   (u v : IntegerMod(p))
-        → List.member(IntegerMod(p), u, IntegerMod.residues_up_to(p, n))
-        → List.member(IntegerMod(p), v, IntegerMod.residues_up_to(p, n))
+        → u ∈ IntegerMod.residues_up_to(p, n)
+        → v ∈ IntegerMod.residues_up_to(p, n)
         → IntegerMod.multiply_by(p, x, u) = IntegerMod.multiply_by(p, x, v) → u = v
       by IntegerMod.multiply_cancel_left;
   List.Distinct(IntegerMod(p), IntegerMod.residues_up_to(p, n))
@@ -261,7 +259,7 @@ theorem IntegerMod.fermat_little (p n : Natural)
       as scaledProduct;
   -- Cancel the nonzero product ∏ U.
   ∀ (z : IntegerMod(p)).
-        List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n))
+        z ∈ IntegerMod.residues_up_to(p, n)
         → ¬(z = IntegerMod.zero(p))
       by IntegerMod.residues_member_nonzero as residuesNonzero;
   ¬(IntegerMod.residues_product(p, n) = IntegerMod.zero(p))

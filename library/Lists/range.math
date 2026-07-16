@@ -69,7 +69,7 @@ theorem List.range_down_length (n : Natural)
 -- splits j = 1 + predecessor (head) vs j ≤ predecessor (tail, by IH).)
 theorem List.range_down_complete (n : Natural)
         : ∀ (j : Natural). 1 ≤ j → j ≤ n
-          → List.member(Natural, j, List.range_down(n)) :=
+          → j ∈ List.range_down(n) :=
   by induction on n with IH {
     case base: {
         take j : Natural;
@@ -86,21 +86,19 @@ theorem List.range_down_complete (n : Natural)
         j = 1 + predecessor ∨ ¬(j = 1 + predecessor);
         done by cases {
           case j = 1 + predecessor as jEqual: {
-              List.member(Natural, 1 + predecessor,
-                        List.prepend(Natural, 1 + predecessor, List.range_down(predecessor)))
+              1 + predecessor ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
                   by List.member.here;
-              List.member(Natural, 1 + predecessor, List.range_down(1 + predecessor))
+              1 + predecessor ∈ List.range_down(1 + predecessor)
                   by substituting List.range_down_one_plus;
-              List.member(Natural, j, List.range_down(1 + predecessor))
+              j ∈ List.range_down(1 + predecessor)
                   by substituting jEqual;
               done
             }
           case ¬(j = 1 + predecessor) as jNotEqual: {
               j ≤ predecessor
                   by Natural.le_of_le_one_plus_of_ne;
-              List.member(Natural, j, List.range_down(predecessor)) by IH;
-              List.member(Natural, j,
-                        List.prepend(Natural, 1 + predecessor, List.range_down(predecessor)))
+              j ∈ List.range_down(predecessor) by IH;
+              j ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
                   by List.member.there;
               done by substituting List.range_down_one_plus
             }
@@ -110,21 +108,20 @@ theorem List.range_down_complete (n : Natural)
 
 -- Every member of range_down(n) is positive (the range stops at 1).
 theorem List.range_down_member_positive (n : Natural)
-        : ∀ (j : Natural). List.member(Natural, j, List.range_down(n)) → 1 ≤ j :=
+        : ∀ (j : Natural). j ∈ List.range_down(n) → 1 ≤ j :=
   by induction on n with IH {
     case base: {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_down(0)) as mem;
+        suppose j ∈ List.range_down(0) as mem;
         absurd(List.no_member_empty(Natural, j, mem))
       }
     case step(predecessor): {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_down(1 + predecessor)) as mem;
-        List.member(Natural, j,
-                  List.prepend(Natural, 1 + predecessor, List.range_down(predecessor)))
+        suppose j ∈ List.range_down(1 + predecessor) as mem;
+        j ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
             by substituting List.range_down_one_plus;
         j = 1 + predecessor
-              ∨ List.member(Natural, j, List.range_down(predecessor))
+              ∨ j ∈ List.range_down(predecessor)
             by List.member_prepend_invert;
         done by cases {
           case j = 1 + predecessor as jEqual: {
@@ -132,7 +129,7 @@ theorem List.range_down_member_positive (n : Natural)
               1 ≤ j by substituting jEqual;
               done
             }
-          case List.member(Natural, j, List.range_down(predecessor)) as memberTail: IH(j, memberTail)
+          case j ∈ List.range_down(predecessor) as memberTail: IH(j, memberTail)
         }
       }
   }
@@ -140,28 +137,27 @@ theorem List.range_down_member_positive (n : Natural)
 -- Conversely, every member of range_down(n) is ≤ n. (Needed to show the
 -- head 1 + k doesn't recur in range_down(k), i.e. distinctness.)
 theorem List.range_down_member_le (n : Natural)
-        : ∀ (j : Natural). List.member(Natural, j, List.range_down(n)) → j ≤ n :=
+        : ∀ (j : Natural). j ∈ List.range_down(n) → j ≤ n :=
   by induction on n with IH {
     case base: {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_down(0)) as mem;
+        suppose j ∈ List.range_down(0) as mem;
         absurd(List.no_member_empty(Natural, j, mem))
       }
     case step(predecessor): {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_down(1 + predecessor)) as mem;
-        List.member(Natural, j,
-                  List.prepend(Natural, 1 + predecessor, List.range_down(predecessor)))
+        suppose j ∈ List.range_down(1 + predecessor) as mem;
+        j ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
             by substituting List.range_down_one_plus;
         j = 1 + predecessor
-              ∨ List.member(Natural, j, List.range_down(predecessor))
+              ∨ j ∈ List.range_down(predecessor)
             by List.member_prepend_invert;
         done by cases {
           case j = 1 + predecessor as jEqual: {
               j ≤ 1 + predecessor by substituting jEqual;
               done
             }
-          case List.member(Natural, j, List.range_down(predecessor)) as memberTail:
+          case j ∈ List.range_down(predecessor) as memberTail:
               j
                  ≤ predecessor         by IH(j, memberTail)
                  ≤ 1 + predecessor
@@ -173,7 +169,7 @@ theorem List.range_down_member_le (n : Natural)
 -- range_up(n). Induct on n; the step splits j < p (tail, by IH) vs j = p
 -- (the appended top).
 theorem List.range_up_complete (n : Natural)
-        : ∀ (j : Natural). j < n → List.member(Natural, j, List.range_up(n)) :=
+        : ∀ (j : Natural). j < n → j ∈ List.range_up(n) :=
   by induction on n with IH {
     case base: {
         take j : Natural;
@@ -188,23 +184,17 @@ theorem List.range_up_complete (n : Natural)
         j < predecessor ∨ j = predecessor;
         done by cases {
           case j < predecessor as strictlyBelow: {
-              List.member(Natural, j, List.range_up(predecessor)) by IH(j, strictlyBelow);
-              List.member(Natural, j,
-                        List.append(Natural, List.range_up(predecessor),
-                            List.prepend(Natural, predecessor, List.empty(Natural))))
+              j ∈ List.range_up(predecessor) by IH(j, strictlyBelow);
+              j ∈ List.append(Natural, List.range_up(predecessor), List.prepend(Natural, predecessor, List.empty(Natural)))
                   by List.member_append_left;
               done by substituting List.range_up_add_one
             }
           case j = predecessor as atTop: {
-              List.member(Natural, predecessor,
-                        List.prepend(Natural, predecessor, List.empty(Natural)))
+              predecessor ∈ List.prepend(Natural, predecessor, List.empty(Natural))
                   by List.member.here;
-              List.member(Natural, j,
-                        List.prepend(Natural, predecessor, List.empty(Natural)))
+              j ∈ List.prepend(Natural, predecessor, List.empty(Natural))
                   by substituting atTop;
-              List.member(Natural, j,
-                        List.append(Natural, List.range_up(predecessor),
-                            List.prepend(Natural, predecessor, List.empty(Natural))))
+              j ∈ List.append(Natural, List.range_up(predecessor), List.prepend(Natural, predecessor, List.empty(Natural)))
                   by List.member_append_right;
               done by substituting List.range_up_add_one
             }
@@ -214,40 +204,36 @@ theorem List.range_up_complete (n : Natural)
 
 -- Conversely, every member of range_up(n) is below n.
 theorem List.range_up_member_lt (n : Natural)
-        : ∀ (j : Natural). List.member(Natural, j, List.range_up(n)) → j < n :=
+        : ∀ (j : Natural). j ∈ List.range_up(n) → j < n :=
   by induction on n with IH {
     case base: {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_up(0)) as mem;
+        suppose j ∈ List.range_up(0) as mem;
         absurd(List.no_member_empty(Natural, j, mem))
       }
     case step(predecessor): {
         take j : Natural;
-        suppose List.member(Natural, j, List.range_up(1 + predecessor)) as mem;
-        List.member(Natural, j,
-                  List.append(Natural, List.range_up(predecessor),
-                      List.prepend(Natural, predecessor, List.empty(Natural))))
+        suppose j ∈ List.range_up(1 + predecessor) as mem;
+        j ∈ List.append(Natural, List.range_up(predecessor), List.prepend(Natural, predecessor, List.empty(Natural)))
             by substituting List.range_up_add_one;
-        List.member(Natural, j, List.range_up(predecessor))
-              ∨ List.member(Natural, j,
-                    List.prepend(Natural, predecessor, List.empty(Natural)))
+        j ∈ List.range_up(predecessor)
+              ∨ j ∈ List.prepend(Natural, predecessor, List.empty(Natural))
             by List.member_append_invert(Natural, j,
                    List.prepend(Natural, predecessor, List.empty(Natural)),
                    List.range_up(predecessor));
         done by cases {
-          case List.member(Natural, j, List.range_up(predecessor)) as inRange:
+          case j ∈ List.range_up(predecessor) as inRange:
               j < predecessor by IH(j, inRange)
                 ≤ 1 + predecessor
-          case List.member(Natural, j,
-                    List.prepend(Natural, predecessor, List.empty(Natural))) as inSingleton: {
-              j = predecessor ∨ List.member(Natural, j, List.empty(Natural))
+          case j ∈ List.prepend(Natural, predecessor, List.empty(Natural)) as inSingleton: {
+              j = predecessor ∨ j ∈ List.empty(Natural)
                   by List.member_prepend_invert;
               done by cases {
                 case j = predecessor as atTop: {
                     j < 1 + predecessor by substituting atTop;
                     done
                   }
-                case List.member(Natural, j, List.empty(Natural)) as inEmpty:
+                case j ∈ List.empty(Natural) as inEmpty:
                     absurd(List.no_member_empty(Natural, j, inEmpty))
               }
             }

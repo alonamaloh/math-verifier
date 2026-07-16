@@ -41,9 +41,9 @@ theorem Function.lowerBelow_extendByValue {C : Type(0)} {k : Natural}
 -- Every member of a row has that row's base function as its lower restriction.
 theorem Function.functionRow_member_lower {C : Type(0)} {k : Natural}
         (choices : List(C)) (f : NaturalsBelow(k) → C) (g : NaturalsBelow(1 + k) → C)
-        (memG : List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, f)))
+        (memG : g ∈ Function.functionRow(choices, f))
         : Function.lowerBelow(g) = f := {
-  choose v such that List.member(C, v, choices) ∧ (Function.extendByValue(f, v) = g)
+  choose v such that v ∈ choices ∧ (Function.extendByValue(f, v) = g)
       from List.map_member_invert(C, NaturalsBelow(1 + k) → C,
                (v2 : C) ↦ Function.extendByValue(f, v2), g, choices, memG);
   Function.lowerBelow(g) = Function.lowerBelow(Function.extendByValue(f, v))
@@ -64,34 +64,34 @@ theorem Function.functionRow_distinct {C : Type(0)} {k : Natural}
 theorem Function.concatFunctionRows_member_lower (C : Type(0)) (k : Natural) (choices : List(C))
         (l : List(NaturalsBelow(k) → C))
         : ∀ (g : NaturalsBelow(1 + k) → C).
-          List.member(NaturalsBelow(1 + k) → C, g, Function.concatFunctionRows(C, k, choices, l))
-          → List.member(NaturalsBelow(k) → C, Function.lowerBelow(g), l) :=
+          g ∈ Function.concatFunctionRows(C, k, choices, l)
+          → Function.lowerBelow(g) ∈ l :=
   by induction on l with IH {
     case List.empty:
         (g : NaturalsBelow(1 + k) → C)
-        (memG : List.member(NaturalsBelow(1 + k) → C, g,
-            Function.concatFunctionRows(C, k, choices, List.empty(NaturalsBelow(k) → C)))) ↦ {
-          List.member(NaturalsBelow(1 + k) → C, g, List.empty(NaturalsBelow(1 + k) → C)) by memG;
+        (memG : g ∈
+            Function.concatFunctionRows(C, k, choices, List.empty(NaturalsBelow(k) → C))) ↦ {
+          g ∈ List.empty(NaturalsBelow(1 + k) → C) by memG;
           False by List.no_member_empty;
           done
         }
     case List.prepend(head, rest):
         (g : NaturalsBelow(1 + k) → C)
-        (memG : List.member(NaturalsBelow(1 + k) → C, g,
-            Function.concatFunctionRows(C, k, choices, List.prepend(NaturalsBelow(k) → C, head, rest)))) ↦ {
-          List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, head))
-              ∨ List.member(NaturalsBelow(1 + k) → C, g,
-                    Function.concatFunctionRows(C, k, choices, rest))
+        (memG : g ∈
+            Function.concatFunctionRows(C, k, choices, List.prepend(NaturalsBelow(k) → C, head, rest))) ↦ {
+          g ∈ Function.functionRow(choices, head)
+              ∨ g ∈
+                    Function.concatFunctionRows(C, k, choices, rest)
               by List.member_append_invert;
           done by cases {
-            case List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, head)) as inRow: {
+            case g ∈ Function.functionRow(choices, head) as inRow: {
                 Function.lowerBelow(g) = head by Function.functionRow_member_lower as lowerIsHead;
-                List.member(NaturalsBelow(k) → C, head, List.prepend(NaturalsBelow(k) → C, head, rest));
+                head ∈ List.prepend(NaturalsBelow(k) → C, head, rest);
                 done by substituting lowerIsHead
               }
-            case List.member(NaturalsBelow(1 + k) → C, g,
-                Function.concatFunctionRows(C, k, choices, rest)) as inRest: {
-                List.member(NaturalsBelow(k) → C, Function.lowerBelow(g), rest) by IH;
+            case g ∈
+                Function.concatFunctionRows(C, k, choices, rest) as inRest: {
+                Function.lowerBelow(g) ∈ rest by IH;
                 done
               }
           }
@@ -111,23 +111,23 @@ theorem Function.concatFunctionRows_distinct (C : Type(0)) (k : Natural) (choice
           List.Distinct.empty(NaturalsBelow(1 + k) → C)
     case List.prepend(head, rest):
         (lDistinct : List.Distinct(NaturalsBelow(k) → C, List.prepend(NaturalsBelow(k) → C, head, rest))) ↦ {
-          ¬(List.member(NaturalsBelow(k) → C, head, rest)) by List.Distinct.head_not_member;
+          ¬(head ∈ rest) by List.Distinct.head_not_member;
           List.Distinct(NaturalsBelow(k) → C, rest) by List.Distinct.tail_distinct;
           -- head's row is disjoint from the concatenation of the rest.
           (∀ (g : NaturalsBelow(1 + k) → C).
-              List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, head))
-              → ¬(List.member(NaturalsBelow(1 + k) → C, g,
-                    Function.concatFunctionRows(C, k, choices, rest))))
+              g ∈ Function.functionRow(choices, head)
+              → ¬(g ∈
+                    Function.concatFunctionRows(C, k, choices, rest)))
               by (g : NaturalsBelow(1 + k) → C)
-                 (gInHeadRow : List.member(NaturalsBelow(1 + k) → C, g,
-                     Function.functionRow(choices, head)))
-                 (gInRest : List.member(NaturalsBelow(1 + k) → C, g,
-                     Function.concatFunctionRows(C, k, choices, rest))) ↦ {
+                 (gInHeadRow : g ∈
+                     Function.functionRow(choices, head))
+                 (gInRest : g ∈
+                     Function.concatFunctionRows(C, k, choices, rest)) ↦ {
                   Function.lowerBelow(g) = head
                       by Function.functionRow_member_lower as lowerIsHead;
-                  List.member(NaturalsBelow(k) → C, Function.lowerBelow(g), rest)
+                  Function.lowerBelow(g) ∈ rest
                       by Function.concatFunctionRows_member_lower;
-                  List.member(NaturalsBelow(k) → C, head, rest) by substituting lowerIsHead;
+                  head ∈ rest by substituting lowerIsHead;
                   done
                 };
           List.Distinct(NaturalsBelow(1 + k) → C, Function.functionRow(choices, head))
@@ -148,7 +148,7 @@ theorem Function.functionsBelow_distinct (C : Type(0)) (choices : List(C))
         : List.Distinct(NaturalsBelow(k) → C, Function.functionsBelow(C, choices, k)) :=
   by induction on k with IH {
     case base: {
-        ¬(List.member(NaturalsBelow(0) → C, Function.emptyBelow, List.empty(NaturalsBelow(0) → C)))
+        ¬((Function.emptyBelow : NaturalsBelow(0) → C) ∈ List.empty(NaturalsBelow(0) → C))
             by List.no_member_empty;
         List.Distinct(NaturalsBelow(0) → C, List.empty(NaturalsBelow(0) → C));
         done by List.Distinct.prepend

@@ -60,14 +60,14 @@ definition IntegerMod.unit_residues (n : Natural) : List(IntegerMod(n)) :=
 -- Every member of the list is a unit.
 theorem IntegerMod.unit_residues_member_unit (n : Natural)
         (z : IntegerMod(n))
-        (zMember : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n)))
+        (zMember : z ∈ IntegerMod.unit_residues(n))
         : IntegerMod.is_unit(z) := {
   ∃ (j : Natural).
-        List.member(Natural, j, Natural.coprime_residues(n)) ∧ IntegerMod.residue(n, j) = z
+        j ∈ Natural.coprime_residues(n) ∧ IntegerMod.residue(n, j) = z
       by List.map_member_invert as residueExists;
-  choose j such that List.member(Natural, j, Natural.coprime_residues(n)) ∧ IntegerMod.residue(n, j) = z
+  choose j such that j ∈ Natural.coprime_residues(n) ∧ IntegerMod.residue(n, j) = z
       from residueExists;
-  List.member(Natural, j, Natural.coprime_residues(n));
+  j ∈ Natural.coprime_residues(n);
   Natural.coprime(j, n) by List.filter_member_property;
   IntegerMod.is_unit(IntegerMod.make(n, (j : Integer)))
       by IntegerMod.unit_of_coprime;
@@ -81,7 +81,7 @@ theorem IntegerMod.unit_residues_member_unit (n : Natural)
 theorem IntegerMod.unit_residues_complete (n : Natural)
         (nAtLeastTwo : 2 ≤ n)
         (c : IntegerMod(n)) (cUnit : IntegerMod.is_unit(c))
-        : List.member(IntegerMod(n), c, IntegerMod.unit_residues(n)) := {
+        : c ∈ IntegerMod.unit_residues(n) := {
   (1 : Natural) ≤ 2 ≤ n;
   choose r such that r < n ∧ c = IntegerMod.make(n, (r : Integer))
       from IntegerMod.exists_natural_representative;
@@ -100,12 +100,11 @@ theorem IntegerMod.unit_residues_complete (n : Natural)
     };
   1 ≤ r;
   r ≤ n;
-  List.member(Natural, r, List.range_down(n))
+  r ∈ List.range_down(n)
       by List.range_down_complete;
-  List.member(Natural, r, Natural.coprime_residues(n))
+  r ∈ Natural.coprime_residues(n)
       by List.filter_member_complete;
-  List.member(IntegerMod(n), IntegerMod.residue(n, r),
-            IntegerMod.unit_residues(n))
+  IntegerMod.residue(n, r) ∈ IntegerMod.unit_residues(n)
       by List.map_member;
   done by substituting cEquation
 }
@@ -118,12 +117,12 @@ theorem IntegerMod.unit_residues_distinct (n : Natural)
         (nAtLeastTwo : 2 ≤ n)
         : List.Distinct(IntegerMod(n), IntegerMod.unit_residues(n)) := {
   -- A coprime residue is strictly below the modulus.
-  ∀ (j : Natural). List.member(Natural, j, Natural.coprime_residues(n))
+  ∀ (j : Natural). j ∈ Natural.coprime_residues(n)
           → j < n
       by {
         take j : Natural;
-        suppose List.member(Natural, j, Natural.coprime_residues(n)) as jMember;
-        List.member(Natural, j, List.range_down(n))
+        suppose j ∈ Natural.coprime_residues(n) as jMember;
+        j ∈ List.range_down(n)
             by List.filter_member_subset;
         j ≤ n by List.range_down_member_le;
         Natural.coprime(j, n) by List.filter_member_property;
@@ -136,14 +135,14 @@ theorem IntegerMod.unit_residues_distinct (n : Natural)
           };
         done by Natural.lt_of_le_of_ne
       };
-  (x y : Natural) → List.member(Natural, x, Natural.coprime_residues(n))
-          → List.member(Natural, y, Natural.coprime_residues(n))
+  (x y : Natural) → x ∈ Natural.coprime_residues(n)
+          → y ∈ Natural.coprime_residues(n)
           → IntegerMod.residue(n, x) = IntegerMod.residue(n, y) → x = y
       by {
         take x : Natural;
         take y : Natural;
-        suppose List.member(Natural, x, Natural.coprime_residues(n)) as xMember;
-        suppose List.member(Natural, y, Natural.coprime_residues(n)) as yMember;
+        suppose x ∈ Natural.coprime_residues(n) as xMember;
+        suppose y ∈ Natural.coprime_residues(n) as yMember;
         suppose IntegerMod.residue(n, x) = IntegerMod.residue(n, y) as imagesEqual;
         x < n;
         y < n;
@@ -162,15 +161,15 @@ theorem IntegerMod.scaled_unit_residue_member (n : Natural)
         (nAtLeastTwo : 2 ≤ n)
         (x : IntegerMod(n)) (xUnit : IntegerMod.is_unit(x))
         (z : IntegerMod(n))
-        (zMember : List.member(IntegerMod(n), z,
+        (zMember : z ∈
             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
-                IntegerMod.unit_residues(n))))
-        : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n)) := {
+                IntegerMod.unit_residues(n)))
+        : z ∈ IntegerMod.unit_residues(n) := {
   ∃ (u : IntegerMod(n)).
-        List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
+        u ∈ IntegerMod.unit_residues(n)
         ∧ IntegerMod.multiply_by(n, x, u) = z
       by List.map_member_invert as scaledExists;
-  choose u such that List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
+  choose u such that u ∈ IntegerMod.unit_residues(n)
           ∧ IntegerMod.multiply_by(n, x, u) = z
       from scaledExists;
   IntegerMod.is_unit(u) by IntegerMod.unit_residues_member_unit;
@@ -188,13 +187,13 @@ theorem IntegerMod.euler_fermat (n : Natural)
   -- The scaled list map(x·_, U) is a permutation of U: it is contained
   -- in U, distinct (the unit x cancels), and of equal length.
   (z : IntegerMod(n))
-        → List.member(IntegerMod(n), z,
+        → z ∈
               List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
-                  IntegerMod.unit_residues(n)))
-        → List.member(IntegerMod(n), z, IntegerMod.unit_residues(n));
+                  IntegerMod.unit_residues(n))
+        → z ∈ IntegerMod.unit_residues(n);
   (u v : IntegerMod(n))
-        → List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
-        → List.member(IntegerMod(n), v, IntegerMod.unit_residues(n))
+        → u ∈ IntegerMod.unit_residues(n)
+        → v ∈ IntegerMod.unit_residues(n)
         → IntegerMod.multiply_by(n, x, u) = IntegerMod.multiply_by(n, x, v)
         → u = v
       by IntegerMod.multiply_cancel_left_of_unit;
@@ -232,7 +231,7 @@ theorem IntegerMod.euler_fermat (n : Natural)
               IntegerMod.unit_residues(n))
       as scaledProduct;
   ∀ (z : IntegerMod(n)).
-        List.member(IntegerMod(n), z, IntegerMod.unit_residues(n))
+        z ∈ IntegerMod.unit_residues(n)
         → IntegerMod.is_unit(z)
       by IntegerMod.unit_residues_member_unit;
   IntegerMod.is_unit(

@@ -196,20 +196,18 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                   List.prepend(IntegerMod(p), IntegerMod.one(p),
                       List.prepend(IntegerMod(p),
                           IntegerMod.negate(IntegerMod.one(p)), rest))))
-        (oneNotInRest : ¬(List.member(IntegerMod(p), IntegerMod.one(p), rest)))
+        (oneNotInRest : ¬(IntegerMod.one(p) ∈ rest))
         (negateOneNotInRest
-            : ¬(List.member(IntegerMod(p),
-                   IntegerMod.negate(IntegerMod.one(p)), rest)))
-        : ∀ (z : IntegerMod(p)). List.member(IntegerMod(p), z, rest)
+            : ¬(IntegerMod.negate(IntegerMod.one(p)) ∈ rest))
+        : ∀ (z : IntegerMod(p)). z ∈ rest
           → List.has_distinct_inverse_in(IntegerMod(p), IntegerMod.multiply,
                 IntegerMod.one(p), rest, z) :=
   {
     take z : IntegerMod(p);
-    suppose List.member(IntegerMod(p), z, rest) as zMemberRest;
+    suppose z ∈ rest as zMemberRest;
     let minusOne : IntegerMod(p) := IntegerMod.negate(IntegerMod.one(p));
-    List.member(IntegerMod(p), z,
-              List.prepend(IntegerMod(p), IntegerMod.one(p),
-                  List.prepend(IntegerMod(p), minusOne, rest)))
+    z ∈ List.prepend(IntegerMod(p), IntegerMod.one(p),
+                  List.prepend(IntegerMod(p), minusOne, rest))
         by List.member.there(IntegerMod(p), z, IntegerMod.one(p),
                List.prepend(IntegerMod(p), minusOne, rest),
                List.member.there(IntegerMod(p), z, minusOne, rest, zMemberRest));
@@ -218,7 +216,7 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                   List.prepend(IntegerMod(p), minusOne, rest)),
               IntegerMod.residues_up_to(p, n))
         by List.Permutation.symmetric;
-    List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n))
+    z ∈ IntegerMod.residues_up_to(p, n)
         by List.Permutation.member_forward;
     z ≠ IntegerMod.zero(p)
         by IntegerMod.residues_member_nonzero;
@@ -234,11 +232,10 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                = IntegerMod.one(p);
             done by IntegerMod.zero_not_one
           };
-    List.member(IntegerMod(p), w, IntegerMod.residues_up_to(p, n))
+    w ∈ IntegerMod.residues_up_to(p, n)
         by IntegerMod.residues_complete;
-    List.member(IntegerMod(p), w,
-              List.prepend(IntegerMod(p), IntegerMod.one(p),
-                  List.prepend(IntegerMod(p), minusOne, rest)))
+    w ∈ List.prepend(IntegerMod(p), IntegerMod.one(p),
+                  List.prepend(IntegerMod(p), minusOne, rest))
         by List.Permutation.member_forward;
     w ≠ IntegerMod.one(p)
         by {
@@ -249,7 +246,7 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                = z * IntegerMod.one(p)
                = IntegerMod.one(p)       by zTimesOneIsOne
                as zIsOne;
-            List.member(IntegerMod(p), IntegerMod.one(p), rest)
+            IntegerMod.one(p) ∈ rest
                 by substituting zIsOne;
             done
           };
@@ -266,7 +263,7 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                = IntegerMod.one(p) * minusOne by substituting zTimesMinusOne
                = minusOne
                as zIsMinusOne;
-            List.member(IntegerMod(p), minusOne, rest)
+            minusOne ∈ rest
                 by substituting zIsMinusOne;
             done
           };
@@ -280,21 +277,20 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                 by IntegerMod.square_one_iff;
             done by cases {
               case z = IntegerMod.one(p) as zIsOne: {
-                  List.member(IntegerMod(p), IntegerMod.one(p), rest)
+                  IntegerMod.one(p) ∈ rest
                       by substituting zIsOne;
                   done
                 }
               case z = IntegerMod.negate(IntegerMod.one(p)) as zIsMinusOne: {
-                  List.member(IntegerMod(p), minusOne, rest)
+                  minusOne ∈ rest
                       by substituting zIsMinusOne;
                   done
                 }
             }
           };
-    List.member(IntegerMod(p), w,
-              List.prepend(IntegerMod(p), minusOne, rest))
+    w ∈ List.prepend(IntegerMod(p), minusOne, rest)
         by List.member_of_prepend_not_head;
-    List.member(IntegerMod(p), w, rest)
+    w ∈ rest
         by List.member_of_prepend_not_head;
     witness w with done
   }
@@ -309,8 +305,7 @@ theorem IntegerMod.wilson_product (p n : Natural)
           = IntegerMod.negate(IntegerMod.one(p)) := {
   let minusOne : IntegerMod(p) := IntegerMod.negate(IntegerMod.one(p));
   1 ≤ n by Natural.less_or_equal_predecessor_less_or_equal;
-  List.member(IntegerMod(p), IntegerMod.one(p),
-            IntegerMod.residues_up_to(p, n))
+  IntegerMod.one(p) ∈ IntegerMod.residues_up_to(p, n)
       by IntegerMod.one_member_residues;
   ∃ (afterOne : List(IntegerMod(p))).
             List.Permutation(IntegerMod(p), IntegerMod.residues_up_to(p, n),
@@ -319,10 +314,9 @@ theorem IntegerMod.wilson_product (p n : Natural)
   choose afterOne such that
       List.Permutation(IntegerMod(p), IntegerMod.residues_up_to(p, n),
           List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne));
-  List.member(IntegerMod(p), minusOne, IntegerMod.residues_up_to(p, n))
+  minusOne ∈ IntegerMod.residues_up_to(p, n)
       by IntegerMod.negate_one_member_residues;
-  List.member(IntegerMod(p), minusOne,
-            List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne))
+  minusOne ∈ List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne)
       by List.Permutation.member_forward;
   minusOne ≠ IntegerMod.one(p)
       by {
@@ -331,7 +325,7 @@ theorem IntegerMod.wilson_product (p n : Natural)
              = IntegerMod.negate(IntegerMod.one(p)) by minusOneIsOne;
           done by IntegerMod.one_not_negate_one
         };
-  List.member(IntegerMod(p), minusOne, afterOne)
+  minusOne ∈ afterOne
       by List.member_of_prepend_not_head;
   ∃ (rest : List(IntegerMod(p))).
             List.Permutation(IntegerMod(p), afterOne,
@@ -353,23 +347,21 @@ theorem IntegerMod.wilson_product (p n : Natural)
             List.prepend(IntegerMod(p), IntegerMod.one(p),
                 List.prepend(IntegerMod(p), minusOne, rest)))
       by List.Permutation.distinct_invariant;
-  ¬(List.member(IntegerMod(p), IntegerMod.one(p),
-             List.prepend(IntegerMod(p), minusOne, rest)))
+  ¬(IntegerMod.one(p) ∈ List.prepend(IntegerMod(p), minusOne, rest))
       by List.Distinct.head_not_member;
   List.Distinct(IntegerMod(p), List.prepend(IntegerMod(p), minusOne, rest))
       by List.Distinct.tail_distinct;
-  ¬(List.member(IntegerMod(p), minusOne, rest))
+  ¬(minusOne ∈ rest)
       by List.Distinct.head_not_member;
   List.Distinct(IntegerMod(p), rest)
       by List.Distinct.tail_distinct;
-  ¬(List.member(IntegerMod(p), IntegerMod.one(p), rest))
+  ¬(IntegerMod.one(p) ∈ rest)
       by {
-          suppose List.member(IntegerMod(p), IntegerMod.one(p), rest) as oneInRest;
-          List.member(IntegerMod(p), IntegerMod.one(p),
-                    List.prepend(IntegerMod(p), minusOne, rest));
+          suppose IntegerMod.one(p) ∈ rest as oneInRest;
+          IntegerMod.one(p) ∈ List.prepend(IntegerMod(p), minusOne, rest);
           done
         };
-  (z : IntegerMod(p)) → List.member(IntegerMod(p), z, rest)
+  (z : IntegerMod(p)) → z ∈ rest
         → List.has_distinct_inverse_in(IntegerMod(p), IntegerMod.multiply,
               IntegerMod.one(p), rest, z)
       by IntegerMod.wilson_pairing;

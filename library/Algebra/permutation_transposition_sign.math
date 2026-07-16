@@ -35,29 +35,29 @@ import Algebra.permutation_sign
 -- A product over a distinct list with exactly one non-unit factor equals that
 -- factor: every other element maps to `one`, so it drops out.
 theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
-        (l : List(B)) (distinctL : List.Distinct(B, l)) (memberE0 : List.member(B, e0, l))
-        (othersAreOne : ∀ (x : B). List.member(B, x, l) → x ≠ e0 → f(x) = Integer.one)
+        (l : List(B)) (distinctL : List.Distinct(B, l)) (memberE0 : e0 ∈ l)
+        (othersAreOne : ∀ (x : B). x ∈ l → x ≠ e0 → f(x) = Integer.one)
         : List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, l)) = f(e0) :=
   by induction on l with IH {
     case List.empty:
         absurd(List.no_member_empty(B, e0, memberE0))
     case List.prepend(head, tail): {
-        ¬(List.member(B, head, tail)) by List.Distinct.head_not_member(B, head, tail, distinctL)
+        ¬(head ∈ tail) by List.Distinct.head_not_member(B, head, tail, distinctL)
             as headNotInTail;
         List.Distinct(B, tail) by List.Distinct.tail_distinct(B, head, tail, distinctL) as tailDistinct;
-        e0 = head ∨ List.member(B, e0, tail)
+        e0 = head ∨ e0 ∈ tail
             by List.member_prepend_invert(B, e0, head, tail, memberE0);
         done by cases {
           case e0 = head as e0IsHead: {
-              (∀ (x : B). List.member(B, x, tail) → f(x) = Integer.one)
-                  by (x : B) (xInTail : List.member(B, x, tail)) ↦ {
-                    List.member(B, x, List.prepend(B, head, tail))
+              (∀ (x : B). x ∈ tail → f(x) = Integer.one)
+                  by (x : B) (xInTail : x ∈ tail) ↦ {
+                    x ∈ List.prepend(B, head, tail)
                         by List.member.there(B, x, head, tail, xInTail) as xInList;
                     x ≠ e0 by {
                       suppose x = e0 for contradiction {
                         x = e0 as xIsE0;
                         head = e0 by e0IsHead = x by xIsE0 as headEqX;
-                        List.member(B, head, tail) by substituting headEqX;
+                        head ∈ tail by substituting headEqX;
                         False by headNotInTail;
                         done
                       };
@@ -73,10 +73,10 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
                  = Integer.multiply(f(head), Integer.one)
                        by substituting List.product_of_ones(Integer, Integer.multiply, Integer.one,
                               Integer.one_multiply_left, List.map(B, Integer, f, tail),
-                              (y : Integer) (yInMap : List.member(Integer, y, List.map(B, Integer, f, tail))) ↦ {
-                                choose x such that List.member(B, x, tail) ∧ (f(x) = y)
+                              (y : Integer) (yInMap : y ∈ List.map(B, Integer, f, tail)) ↦ {
+                                choose x such that x ∈ tail ∧ (f(x) = y)
                                     from List.map_member_invert(B, Integer, f, y, tail, yInMap);
-                                List.member(B, x, tail) as xInTail2;
+                                x ∈ tail as xInTail2;
                                 f(x) = y as fxIsY;
                                 y = f(x) by fxIsY = Integer.one by tailOnes(x, xInTail2);
                                 done
@@ -85,11 +85,11 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
                  = f(e0) by substituting e0IsHead;
               done
             }
-          case List.member(B, e0, tail) as e0InTail: {
+          case e0 ∈ tail as e0InTail: {
               head ≠ e0 by {
                 suppose head = e0 for contradiction {
                   head = e0 as headIsE0;
-                  List.member(B, head, tail) by substituting headIsE0;
+                  head ∈ tail by substituting headIsE0;
                   False by headNotInTail;
                   done
                 };
@@ -97,8 +97,8 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
               } as headNeqE0;
               f(head) = Integer.one
                   by othersAreOne(head, List.member.here(B, head, tail), headNeqE0) as fHeadIsOne;
-              (∀ (x : B). List.member(B, x, tail) → x ≠ e0 → f(x) = Integer.one)
-                  by (x : B) (xInTail : List.member(B, x, tail)) ↦
+              (∀ (x : B). x ∈ tail → x ≠ e0 → f(x) = Integer.one)
+                  by (x : B) (xInTail : x ∈ tail) ↦
                       othersAreOne(x, List.member.there(B, x, head, tail, xInTail)) as tailOthers;
               List.product(Integer, Integer.multiply, Integer.one,
                     List.map(B, Integer, f, List.prepend(B, head, tail)))
@@ -336,7 +336,7 @@ theorem Natural.ne_of_lt (a b : Natural) (h : a < b) : a ≠ b :=
 theorem Permutation.pairOrient_swap_adjacent_other {n : Natural} (a b : NaturalsBelow(n))
         (adjacent : NaturalsBelow.value(b) = 1 + NaturalsBelow.value(a))
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-        (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p, Permutation.orderedPairs(n)))
+        (memberP : p ∈ Permutation.orderedPairs(n))
         (notThePair : p ≠ Product.make(a, b))
         : Permutation.pairOrient(Permutation.swap(a, b), p) = 1 :=
   by induction on p with pInduct {
@@ -527,8 +527,7 @@ theorem Permutation.sign_swap_adjacent {n : Natural} (a b : NaturalsBelow(n))
                   Permutation.orderedPairs(n), Permutation.orderedPairs_distinct(n),
                   Permutation.orderedPairs_member(n, a, b, aLtB),
                   (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-                      (memberP : List.member(Pair(NaturalsBelow(n), NaturalsBelow(n)), p,
-                          Permutation.orderedPairs(n)))
+                      (memberP : p ∈ Permutation.orderedPairs(n))
                       (notThePair : p ≠ Product.make(a, b)) ↦
                       Permutation.pairOrient_swap_adjacent_other(a, b, adjacent, p, memberP, notThePair))
      = Permutation.orient(Permutation.apply(Permutation.swap(a, b), a),

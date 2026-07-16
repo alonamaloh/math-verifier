@@ -191,9 +191,9 @@ theorem Function.function_zero_is_empty (C : Type(0)) (g : NaturalsBelow(0) → 
 -- concatFunctionRows(l). Induct on where f sits in l.
 theorem Function.concatFunctionRows_member (C : Type(0)) (k : Natural) (choices : List(C))
         (l : List(NaturalsBelow(k) → C)) (f : NaturalsBelow(k) → C) (g : NaturalsBelow(1 + k) → C)
-        (memF : List.member(NaturalsBelow(k) → C, f, l))
-        (memG : List.member(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, f)))
-        : List.member(NaturalsBelow(1 + k) → C, g, Function.concatFunctionRows(C, k, choices, l)) :=
+        (memF : f ∈ l)
+        (memG : g ∈ Function.functionRow(choices, f))
+        : g ∈ Function.concatFunctionRows(C, k, choices, l) :=
   by induction on memF with IH {
     case List.member.here(rest):
         List.member_append_left(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, f),
@@ -209,43 +209,38 @@ theorem Function.concatFunctionRows_member (C : Type(0)) (k : Natural) (choices 
 -- (IH) and g(top) among the choices — and locates it in the concatenation.
 theorem Function.functionsBelow_complete (C : Type(0)) (choices : List(C)) (k : Natural)
         : ∀ (g : NaturalsBelow(k) → C).
-              (∀ (i : NaturalsBelow(k)). List.member(C, g(i), choices))
-              → List.member(NaturalsBelow(k) → C, g, Function.functionsBelow(C, choices, k)) :=
+              (∀ (i : NaturalsBelow(k)). g(i) ∈ choices)
+              → g ∈ Function.functionsBelow(C, choices, k) :=
   by induction on k with IH {
     case base: {
         take g : NaturalsBelow(0) → C;
-        suppose ∀ (i : NaturalsBelow(0)). List.member(C, g(i), choices);
+        suppose ∀ (i : NaturalsBelow(0)). g(i) ∈ choices;
         g = Function.emptyBelow by Function.function_zero_is_empty(C, g) as gIsEmpty;
-        List.member(NaturalsBelow(0) → C, Function.emptyBelow,
-                  List.prepend(NaturalsBelow(0) → C, Function.emptyBelow, List.empty(NaturalsBelow(0) → C)))
+        (Function.emptyBelow : NaturalsBelow(0) → C) ∈ List.prepend(NaturalsBelow(0) → C, Function.emptyBelow, List.empty(NaturalsBelow(0) → C))
             by List.member.here;
-        List.member(NaturalsBelow(0) → C, g,
-                  List.prepend(NaturalsBelow(0) → C, Function.emptyBelow, List.empty(NaturalsBelow(0) → C)))
+        g ∈ List.prepend(NaturalsBelow(0) → C, Function.emptyBelow, List.empty(NaturalsBelow(0) → C))
             by substituting gIsEmpty;
         done
       }
     case step(m): {
         take g : NaturalsBelow(1 + m) → C;
-        suppose ∀ (i : NaturalsBelow(1 + m)). List.member(C, g(i), choices) as valuesInChoices;
-        (∀ (x : NaturalsBelow(m)). List.member(C, Function.lowerBelow(g)(x), choices))
+        suppose ∀ (i : NaturalsBelow(1 + m)). g(i) ∈ choices as valuesInChoices;
+        (∀ (x : NaturalsBelow(m)). Function.lowerBelow(g)(x) ∈ choices)
             by (x : NaturalsBelow(m)) ↦ valuesInChoices(NaturalsBelow.inclusion(m, x))
             as lowerValuesInChoices;
-        List.member(NaturalsBelow(m) → C, Function.lowerBelow(g), Function.functionsBelow(C, choices, m))
+        Function.lowerBelow(g) ∈ Function.functionsBelow(C, choices, m)
             by IH(Function.lowerBelow(g), lowerValuesInChoices) as lowerInAll;
-        List.member(C, g(NaturalsBelow.top(m)), choices)
+        g(NaturalsBelow.top(m)) ∈ choices
             by valuesInChoices(NaturalsBelow.top(m)) as topInChoices;
         g = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(m)))
             by Function.extendByValue_decompose(g) as gIsRow;
-        List.member(NaturalsBelow(1 + m) → C,
-                  Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(m))),
-                  Function.functionRow(choices, Function.lowerBelow(g)))
+        Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(m))) ∈ Function.functionRow(choices, Function.lowerBelow(g))
             by List.map_member(C, NaturalsBelow(1 + m) → C,
                    (v : C) ↦ Function.extendByValue(Function.lowerBelow(g), v),
                    g(NaturalsBelow.top(m)), choices, topInChoices);
-        List.member(NaturalsBelow(1 + m) → C, g, Function.functionRow(choices, Function.lowerBelow(g)))
+        g ∈ Function.functionRow(choices, Function.lowerBelow(g))
             by substituting gIsRow as gInRow;
-        List.member(NaturalsBelow(1 + m) → C, g,
-                  Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m)))
+        g ∈ Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m))
             by Function.concatFunctionRows_member(C, m, choices, Function.functionsBelow(C, choices, m),
                    Function.lowerBelow(g), g, lowerInAll, gInRow);
         done by substituting Function.functionsBelow_one_plus
@@ -257,7 +252,7 @@ theorem Function.functionsBelow_complete (C : Type(0)) (choices : List(C)) (k : 
 -- hypothesis is automatic).
 theorem Function.allFunctions_complete (n : Natural)
         : ∀ (g : NaturalsBelow(n) → NaturalsBelow(n)).
-              List.member(NaturalsBelow(n) → NaturalsBelow(n), g, Function.allFunctions(n)) :=
+              g ∈ Function.allFunctions(n) :=
   (g : NaturalsBelow(n) → NaturalsBelow(n)) ↦
     Function.functionsBelow_complete(NaturalsBelow(n), NaturalsBelow.enumerate(n), n, g,
         (i : NaturalsBelow(n)) ↦ NaturalsBelow.enumerate_complete(n, g(i)))
