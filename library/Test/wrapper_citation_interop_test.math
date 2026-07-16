@@ -1,0 +1,43 @@
+-- Regression test for the notation-wrapper citation bridge
+-- (matchAgainstPattern, diff_bridges.cpp). A `definition` registered as an
+-- `overload` alias or `operator` dispatch target — `List.lengthOf` (`length`),
+-- `List.removeFrom` (`∖`) — is transparent to citation matching: a lemma or
+-- goal written in wrapper form interoperates with one written in the raw
+-- underlying form (`List.length` / `List.remove`), in BOTH directions, because
+-- the matcher unfolds the wrapper head one δ step when — and only when — that
+-- exposes exactly the other side's head constant. Before the fix, only the
+-- goal side reduced, so a wrapper-form lemma cited against a raw goal failed to
+-- infer the carrier.
+
+module Test.wrapper_citation_interop_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Lists.list
+import Lists.length
+import Lists.remove
+
+-- A lemma STATED in wrapper (`length`) form.
+theorem Test.length_prepend_wrapper_form {A : Type(0)} (head : A) (tail : List(A))
+        : length(List.prepend(A, head, tail)) = 1 + length(tail) :=
+  List.length_prepend(A, head, tail)
+
+-- (1) The case the fix enables: a RAW-form goal cites the WRAPPER-form lemma,
+--     inferring the implicit carrier through the unfolded head.
+theorem Test.raw_goal_cites_wrapper_lemma {A : Type(0)} (head : A) (tail : List(A))
+        : List.length(A, List.prepend(A, head, tail)) = 1 + List.length(A, tail) :=
+  by Test.length_prepend_wrapper_form
+
+-- (2) The reverse: a WRAPPER-form goal cites a RAW-form library lemma.
+theorem Test.wrapper_goal_cites_raw_lemma {A : Type(0)} (head : A) (tail : List(A))
+        : length(List.prepend(A, head, tail)) = 1 + length(tail) :=
+  by List.length_prepend
+
+-- (3) The `∖` operator wrapper bridges to `List.remove` in a mixed calc.
+theorem Test.remove_wrapper_bridges {A : Type(0)} (x head : A) (tail : List(A))
+        (unequal : ¬(head = x))
+        : List.remove(A, x, List.prepend(A, head, tail))
+          = List.prepend(A, head, List.remove(A, x, tail)) :=
+  (List.prepend(A, head, tail)) ∖ x
+     = List.prepend(A, head, tail ∖ x)   by List.remove_prepend_unequal(A, x, head, tail, unequal)

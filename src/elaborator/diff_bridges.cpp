@@ -1364,6 +1364,64 @@ bool Elaborator::matchAgainstPattern(
                     pattern, subjectWhnf,
                     binderCount, bindings, piDepth, deferredOut);
             }
+            // Symmetric to the subject-side unfolds above, but deliberately
+            // NARROW: the PATTERN's head may be a NOTATION WRAPPER — an
+            // `overload` alias or `operator` dispatch target such as
+            // `List.lengthOf` (`length`) / `List.removeFrom` (`∖`) — over the
+            // constant the subject actually uses (`List.length` / `List.remove`
+            // in raw form). Bridge it, but ONLY when all three hold: (a) the
+            // pattern head is a registered dispatch target, so this never
+            // touches an ordinary definition (`selection`, `make`, `Not`, …);
+            // (b) a SINGLE δ step exposes exactly the subject's head constant;
+            // (c) the resulting rematch succeeds. The head-name checks are
+            // cheap and gate the one recursive rematch, so the auto-prover's
+            // search never widens on unrelated mismatches. Metavariable spine
+            // arguments survive the β-apply, and any binding found is δ-valid
+            // and re-checked by the kernel. Runs LAST, so it never disturbs a
+            // match that already succeeded.
+            {
+                std::string subjectHead = headConstantName(subject);
+                std::string patternHead = headConstantName(pattern);
+                bool patternIsWrapper = false;
+                if (!patternHead.empty() && patternHead != subjectHead) {
+                    for (const auto& aliasEntry :
+                             environment_.overloadAliases) {
+                        for (const auto& target : aliasEntry.second) {
+                            if (target == patternHead) {
+                                patternIsWrapper = true;
+                                break;
+                            }
+                        }
+                        if (patternIsWrapper) break;
+                    }
+                    if (!patternIsWrapper) {
+                        for (const auto& operatorEntry :
+                                 environment_.operatorRegistry) {
+                            if (operatorEntry.second == patternHead) {
+                                patternIsWrapper = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (patternIsWrapper) {
+                    ExpressionPointer unfolded =
+                        unfoldHeadConstantOneStep(pattern);
+                    if (unfolded
+                        && headConstantName(unfolded) == subjectHead) {
+                        std::vector<ExpressionPointer> retryBindings =
+                            bindings;
+                        if (matchAgainstPattern(
+                                unfolded, subject,
+                                binderCount, retryBindings, piDepth,
+                                deferredOut)) {
+                            bindings = std::move(retryBindings);
+                            return true;
+                        }
+                        if (deferredOut) deferredOut->resize(deferredMark);
+                    }
+                }
+            }
             return tryProjectionFallback(
                 pattern, subject, binderCount, bindings, piDepth,
                 deferredOut);
