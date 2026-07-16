@@ -335,7 +335,7 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
           List.Distinct(A, l1)
           → List.Distinct(A, l2)
           → (∀ (x : A). List.member(A, x, l1) → List.member(A, x, l2))
-          → List.length(A, l1) = List.length(A, l2)
+          → length(l1) = length(l2)
           → List.Permutation(A, l1, l2) :=
   by induction on l1 with IH {
     case List.empty:
@@ -344,16 +344,16 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
       (distinct2 : List.Distinct(A, l2))
       (inclusion : ∀ (x : A). List.member(A, x, List.empty(A))
           → List.member(A, x, l2))
-      (lengthEquation : List.length(A, List.empty(A)) = List.length(A, l2)) ↦
+      (lengthEquation : length(List.empty(A)) = length(l2)) ↦
         done by cases {
           case l2 = List.empty(A): List.Permutation.empty(A)
           case l2 = List.prepend(A, head, tail) for some (head : A), (tail : List(A)): {
               -- |empty| = 0 but |prepend| = 1 + |tail|, so 0 is one more
               -- than something — absurd.
               (0 : Natural)
-                  = List.length(A, List.empty(A))
-                  = List.length(A, List.prepend(A, head, tail))
-                  = 1 + List.length(A, tail);
+                  = length(List.empty(A))
+                  = length(List.prepend(A, head, tail))
+                  = 1 + length(tail);
               False by Natural.zero_not_one_plus as impossible;
               absurd(impossible)
             }
@@ -365,7 +365,7 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
       (inclusion : ∀ (x : A). List.member(A, x, List.prepend(A, head, tail))
           → List.member(A, x, l2))
       (lengthEquation
-          : List.length(A, List.prepend(A, head, tail)) = List.length(A, l2)) ↦ {
+          : length(List.prepend(A, head, tail)) = length(l2)) ↦ {
         -- The head sits somewhere in l2; rotate it to the front.
         List.member(A, head, List.prepend(A, head, tail));
         List.member(A, head, l2) as headMember2;
@@ -394,13 +394,13 @@ theorem List.permutation_of_distinct_inclusion (A : Type(0)) (l1 : List(A))
                 done by List.member_of_prepend_not_head
               } as tailInclusion;
         -- Equal lengths after dropping the head from both.
-        List.length(A, l2) = List.length(A, List.prepend(A, head, rest));
-        1 + List.length(A, tail)
-            = List.length(A, List.prepend(A, head, tail))
-            = List.length(A, l2)
-            = List.length(A, List.prepend(A, head, rest))
-            = 1 + List.length(A, rest);
-        List.length(A, tail) = List.length(A, rest) as restLengthEquation;
+        length(l2) = length(List.prepend(A, head, rest));
+        1 + length(tail)
+            = length(List.prepend(A, head, tail))
+            = length(l2)
+            = length(List.prepend(A, head, rest))
+            = 1 + length(rest);
+        length(tail) = length(rest) as restLengthEquation;
         -- Recurse on the tails and reassemble.
         List.Permutation(A, tail, rest)
             by IH(rest, tailDistinct, restDistinct, tailInclusion, restLengthEquation);

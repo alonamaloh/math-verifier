@@ -32,7 +32,7 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
         (g : index → Field.carrier(f)) (iota : index → index)
         (n : Natural)
         : ∀ (items : List(index)).
-          List.length(index, items) = n
+          length(items) = n
           → List.Distinct(index, items)
           → (∀ (x : index). List.member(index, x, items) → List.member(index, iota(x), items))
           → (∀ (x : index). List.member(index, x, items) → ¬(iota(x) = x))
@@ -41,7 +41,7 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
           → Field.sumOver(g, items) = Field.zero(f) :=
   by induction on n using Natural.strong_induction with subject, IH {
       take items : List(index);
-      suppose List.length(index, items) = subject as lengthEquation;
+      suppose length(items) = subject as lengthEquation;
       suppose List.Distinct(index, items) as distinct;
       suppose (∀ (x : index). List.member(index, x, items)
           → List.member(index, iota(x), items)) as closed;
@@ -70,14 +70,14 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
 
           -- The removed list and its length, strictly below `subject`.
           let removed : List(index) := List.remove(index, iota(head), tail);
-          List.length(index, tail) = 1 + List.length(index, removed)
+          length(tail) = 1 + length(removed)
               by List.length_remove_member(index, iota(head), tail, iotaHeadInTail)
               as tailLengthEquation;
-          List.length(index, removed)
-             < 1 + List.length(index, removed)                       by Natural.lt_one_plus
-             = List.length(index, tail)                              by tailLengthEquation
-             < 1 + List.length(index, tail)                          by Natural.lt_one_plus
-             = List.length(index, List.prepend(index, head, tail))   by List.length_prepend
+          length(removed)
+             < 1 + length(removed)                       by Natural.lt_one_plus
+             = length(tail)                              by tailLengthEquation
+             < 1 + length(tail)                          by Natural.lt_one_plus
+             = length(List.prepend(index, head, tail))   by List.length_prepend
              = subject                                               by lengthEquation
              as removedLengthBelow;
 
@@ -140,8 +140,8 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
 
           -- Recurse on the shorter list, then reassemble the orbit.
           Field.sumOver(g, removed) = Field.zero(f)
-              by IH(List.length(index, removed), removedLengthBelow)(removed,
-                     reflexivity(Natural, List.length(index, removed)),
+              by IH(length(removed), removedLengthBelow)(removed,
+                     reflexivity(Natural, length(removed)),
                      List.remove_distinct(index, iota(head), tail, tailDistinct),
                      closedRemoved, noFixedPointRemoved, involutiveRemoved, reversingRemoved)
               as removedSumZero;
@@ -175,6 +175,6 @@ theorem Field.sumOver_involution_pairing {f : Field} {index : Type(0)}
         (reversing : ∀ (x : index). List.member(index, x, items)
             → g(x) + g(iota(x)) = Field.zero(f))
         : Field.sumOver(g, items) = Field.zero(f) :=
-  Field.sumOver_involution_pairing_aux(g, iota, List.length(index, items), items,
-      reflexivity(Natural, List.length(index, items)), distinct, closed, noFixedPoint,
+  Field.sumOver_involution_pairing_aux(g, iota, length(items), items,
+      reflexivity(Natural, length(items)), distinct, closed, noFixedPoint,
       involutive, reversing)
