@@ -1925,6 +1925,53 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                                               expectedTypeNormalised,
                                               metavariableNames, assignment);
             }
+            // Equality-endpoint reduction retry: the citation's conclusion
+            // and the goal may spell the same endpoint through different
+            // defeq wrappers (`apply(swap(a,b),a)` vs `swapMap(a,b,a)`);
+            // the WHNF-both retry above only reduces the equality's TOP,
+            // so the endpoint heads stay different and the structural
+            // matcher can't pin the holes. Reduce each side's equality
+            // ENDPOINTS to WHNF and unify again. Sound: the kernel
+            // re-checks the produced term against the ORIGINAL goal.
+            anyUnassigned = false;
+            for (const auto& name : metavariableNames) {
+                if (!assignment.count(name)) { anyUnassigned = true; break; }
+            }
+            if (anyUnassigned) {
+                auto reduceEqualityEndpoints =
+                    [&](ExpressionPointer proposition) -> ExpressionPointer {
+                    if (headConstantName(proposition) != "Equality") {
+                        return nullptr;
+                    }
+                    auto* outer =
+                        std::get_if<Application>(&proposition->node);
+                    if (!outer) return nullptr;
+                    auto* inner =
+                        std::get_if<Application>(&outer->function->node);
+                    if (!inner) return nullptr;
+                    ExpressionPointer leftReduced = weakHeadNormalForm(
+                        environment_, inner->argument);
+                    ExpressionPointer rightReduced = weakHeadNormalForm(
+                        environment_, outer->argument);
+                    return makeApplication(
+                        makeApplication(inner->function, leftReduced),
+                        rightReduced);
+                };
+                try {
+                    ExpressionPointer patternReduced =
+                        reduceEqualityEndpoints(resultTypePattern);
+                    ExpressionPointer expectedReduced =
+                        reduceEqualityEndpoints(expectedType);
+                    if (patternReduced && expectedReduced) {
+                        unifyConstructorParameters(
+                            patternReduced, expectedReduced,
+                            metavariableNames, assignment);
+                    }
+                } catch (const TypeError&) {
+                    // Endpoint reduction is best-effort; fuel exhaustion
+                    // just means this retry doesn't apply.
+                }
+            }
             // Class-equality relaxation (WS3): when the goal is
             // `mk(x) = mk(y)` but this function concludes in the underlying
             // relation `R`, unify the result pattern against `R(x, y)` so

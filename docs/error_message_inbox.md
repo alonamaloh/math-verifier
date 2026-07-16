@@ -1446,3 +1446,34 @@ structures-and-inference.md's named-argument section.
 polishing needed a per-worktree `build → <main>/build` symlink + `git merge
 --ff-only main` (worktrees started ~4 commits behind). Automating worktree setup
 (symlink kernel + build, ff to main) would save each agent minutes.
+
+## 2026-07-16 (evening) — citation-instability root cause found + fixed
+
+**RESOLVED (both entries above).** The "latent perturbation-sensitive
+premise-discharge bug" is root-caused: `completeCitationWithStrategy`'s
+bare-prover premise fallback (block (c), induction.cpp) ran under the
+1000-kernel-step `RedundancyBudgetGuard` and turned a budget TRIP into a hard
+citation failure — with no full-budget fallback (unlike `inferCallWithHoles`,
+whose Step 5b capped probe is backstopped by Step 5d at full budget). Kernel-step
+counts for the same search shift with WHNF-cache warmth, so the outcome flipped
+under benign upstream changes: `by prime_divides_product` at goal `2 ∣ m`
+(sqrt_two_irrational) discharges its `Natural.is_prime 2` premise at **971 of
+1000** steps — any perturbation tipped it over. Fixed by retrying once at the
+full by-citation budget when (and only when) the capped probe trips. With that
+in place, the equality-endpoint reduction retry (the defeq-wrapper citation fix
+flagged above as proven-but-unlanded) is LANDED; library + tests green
+(~+5% CPU on a full re-verify).
+
+**PERF/INDEX gap (new, medium).** The `is_prime 2` premise costs ~971 steps
+because the prover re-proves it by conjunction-splitting instead of citing the
+imported, verbatim `Natural.is_prime_two : Natural.is_prime(2)` —
+contextFactMatch/the lemma index never surface a premise-free library fact for
+a definition-headed goal unless it is marked `automatic`. Indexing premise-free
+theorems by conclusion head (as citation-premise discharge candidates) would
+make this discharge search-free.
+
+**Watch.** `ellipsisTermsMatch` (dispatch.cpp) still uses a capped truth-only
+probe whose trip returns `false` — same cliff class, lower stakes. The
+`choose … from` non-determinism above flows through `inferCallWithHoles`
+(already laddered); if it recurs, audit which cap that path sits under instead
+of assuming this fix covered it.
