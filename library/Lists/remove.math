@@ -57,33 +57,33 @@ theorem List.remove_empty (A : Type(0)) (x : A)
 
 -- A member of `remove(x, l)` is a member of `l`.
 theorem List.remove_member_subset (A : Type(0)) (x y : A) (list : List(A))
-        : List.member(A, y, List.remove(A, x, list))
+        : List.member(A, y, list ∖ x)
           → List.member(A, y, list) :=
   by induction on list with IH {
     case List.empty: {
-        suppose List.member(A, y, List.remove(A, x, List.empty(A))) as mem;
+        suppose List.member(A, y, List.empty(A) ∖ x) as mem;
         done by substituting List.remove_empty
       }
     case List.prepend(head, tail): {
         head = x ∨ ¬(head = x) by Logic.excluded_middle;
         done by cases {
           case head = x as headEqualsX: {
-              suppose List.member(A, y, List.remove(A, x, List.prepend(A, x, tail))) as mem;
+              suppose List.member(A, y, List.prepend(A, x, tail) ∖ x) as mem;
               List.member(A, y, tail) by substituting List.remove_prepend_equal as memTail;
               List.member.there(A, y, x, tail, memTail)
             }
           case ¬(head = x) as headNeqX: {
-              suppose List.member(A, y, List.remove(A, x, List.prepend(A, head, tail))) as mem;
-              List.member(A, y, List.prepend(A, head, List.remove(A, x, tail)))
+              suppose List.member(A, y, List.prepend(A, head, tail) ∖ x) as mem;
+              List.member(A, y, List.prepend(A, head, tail ∖ x))
                   by substituting List.remove_prepend_unequal;
-              y = head ∨ List.member(A, y, List.remove(A, x, tail))
+              y = head ∨ List.member(A, y, tail ∖ x)
                   by List.member_prepend_invert;
               done by cases {
                 case y = head as yHead: {
                     List.member(A, y, List.prepend(A, head, tail));
                     done
                   }
-                case List.member(A, y, List.remove(A, x, tail)) as memRemTail:
+                case List.member(A, y, tail ∖ x) as memRemTail:
                     List.member.there(A, y, head, tail, IH(memRemTail))
               }
             }
@@ -95,7 +95,7 @@ theorem List.remove_member_subset (A : Type(0)) (x y : A) (list : List(A))
 theorem List.remove_member_complete (A : Type(0)) (x y : A) (list : List(A))
         : List.member(A, y, list)
           → ¬(y = x)
-          → List.member(A, y, List.remove(A, x, list)) :=
+          → List.member(A, y, list ∖ x) :=
   by induction on list with IH {
     case List.empty:
         (mem : List.member(A, y, List.empty(A))) (neq : ¬(y = x)) ↦
@@ -118,16 +118,16 @@ theorem List.remove_member_complete (A : Type(0)) (x y : A) (list : List(A))
               }
             case ¬(head = x) as headNeqX: {
                 y = head ∨ List.member(A, y, tail) by List.member_prepend_invert;
-                List.member(A, y, List.prepend(A, head, List.remove(A, x, tail)))
+                List.member(A, y, List.prepend(A, head, tail ∖ x))
                     by cases {
                       case y = head as yHead: {
-                          List.member(A, head, List.prepend(A, head, List.remove(A, x, tail)));
-                          List.member(A, y, List.prepend(A, head, List.remove(A, x, tail)))
+                          List.member(A, head, List.prepend(A, head, tail ∖ x));
+                          List.member(A, y, List.prepend(A, head, tail ∖ x))
                               by substituting yHead;
                           done
                         }
                       case List.member(A, y, tail) as memberTail:
-                          List.member.there(A, y, head, List.remove(A, x, tail),
+                          List.member.there(A, y, head, tail ∖ x,
                               IH(memberTail, neq))
                     };
                 done by substituting List.remove_prepend_unequal
@@ -139,18 +139,18 @@ theorem List.remove_member_complete (A : Type(0)) (x y : A) (list : List(A))
 -- In a distinct list, removing `x` leaves nothing equal to `x`.
 theorem List.remove_member_ne (A : Type(0)) (x y : A) (list : List(A))
         : List.Distinct(A, list)
-          → List.member(A, y, List.remove(A, x, list))
+          → List.member(A, y, list ∖ x)
           → ¬(y = x) :=
   by induction on list with IH {
     case List.empty:
         (distinct : List.Distinct(A, List.empty(A)))
-        (mem : List.member(A, y, List.remove(A, x, List.empty(A)))) ↦ {
+        (mem : List.member(A, y, List.empty(A) ∖ x)) ↦ {
             List.member(A, y, List.empty(A)) by substituting List.remove_empty as memEmpty;
             absurd(List.no_member_empty(A, y, memEmpty))
           }
     case List.prepend(head, tail):
         (distinct : List.Distinct(A, List.prepend(A, head, tail)))
-        (mem : List.member(A, y, List.remove(A, x, List.prepend(A, head, tail)))) ↦ {
+        (mem : List.member(A, y, List.prepend(A, head, tail) ∖ x)) ↦ {
           ¬(List.member(A, head, tail)) by List.Distinct.head_not_member as headNotInTail;
           List.Distinct(A, tail) by List.Distinct.tail_distinct as tailDistinct;
           head = x ∨ ¬(head = x) by Logic.excluded_middle;
@@ -164,9 +164,9 @@ theorem List.remove_member_ne (A : Type(0)) (x y : A) (list : List(A))
                   }
               }
             case ¬(head = x) as headNeqX: {
-                List.member(A, y, List.prepend(A, head, List.remove(A, x, tail)))
+                List.member(A, y, List.prepend(A, head, tail ∖ x))
                     by substituting List.remove_prepend_unequal;
-                y = head ∨ List.member(A, y, List.remove(A, x, tail))
+                y = head ∨ List.member(A, y, tail ∖ x)
                     by List.member_prepend_invert;
                 done by cases {
                   case y = head as yHead: {
@@ -175,7 +175,7 @@ theorem List.remove_member_ne (A : Type(0)) (x y : A) (list : List(A))
                           headNeqX(headEqualsX)
                         }
                     }
-                  case List.member(A, y, List.remove(A, x, tail)) as memRemTail:
+                  case List.member(A, y, tail ∖ x) as memRemTail:
                       IH(tailDistinct, memRemTail)
                 }
               }
@@ -187,7 +187,7 @@ theorem List.remove_member_ne (A : Type(0)) (x y : A) (list : List(A))
 
 -- Removal preserves distinctness.
 theorem List.remove_distinct (A : Type(0)) (x : A) (list : List(A))
-        : List.Distinct(A, list) → List.Distinct(A, List.remove(A, x, list)) :=
+        : List.Distinct(A, list) → List.Distinct(A, list ∖ x) :=
   by induction on list with IH {
     case List.empty: {
         suppose List.Distinct(A, List.empty(A)) as distinct;
@@ -202,14 +202,14 @@ theorem List.remove_distinct (A : Type(0)) (x : A) (list : List(A))
             case head = x as headEqualsX:
                 done by substituting List.remove_prepend_equal
             case ¬(head = x) as headNeqX: {
-                List.Distinct(A, List.remove(A, x, tail)) by IH(tailDistinct) as remTailDistinct;
-                ¬(List.member(A, head, List.remove(A, x, tail)))
-                    by (memHead : List.member(A, head, List.remove(A, x, tail))) ↦ {
+                List.Distinct(A, tail ∖ x) by IH(tailDistinct) as remTailDistinct;
+                ¬(List.member(A, head, tail ∖ x))
+                    by (memHead : List.member(A, head, tail ∖ x)) ↦ {
                         List.member(A, head, tail) by List.remove_member_subset as headInTail;
                         headNotInTail(headInTail)
                       } as headNotInRemTail;
-                List.Distinct(A, List.prepend(A, head, List.remove(A, x, tail)))
-                    by List.Distinct.prepend(A, head, List.remove(A, x, tail),
+                List.Distinct(A, List.prepend(A, head, tail ∖ x))
+                    by List.Distinct.prepend(A, head, tail ∖ x,
                            headNotInRemTail, remTailDistinct);
                 done by substituting List.remove_prepend_unequal
               }
@@ -222,7 +222,7 @@ theorem List.remove_distinct (A : Type(0)) (x : A) (list : List(A))
 -- Removing a member drops the length by one.
 theorem List.length_remove_member (A : Type(0)) (x : A) (list : List(A))
         : List.member(A, x, list)
-          → length(list) = 1 + length(List.remove(A, x, list)) :=
+          → length(list) = 1 + length(list ∖ x) :=
   by induction on list with IH {
     case List.empty:
         (mem : List.member(A, x, List.empty(A))) ↦
@@ -234,7 +234,7 @@ theorem List.length_remove_member (A : Type(0)) (x : A) (list : List(A))
             case head = x as headEqualsX:
                 length(List.prepend(A, head, tail))
                    = 1 + length(tail)                          by List.length_prepend
-                   = 1 + length(List.remove(A, x, List.prepend(A, head, tail)))
+                   = 1 + length(List.prepend(A, head, tail) ∖ x)
                        by substituting List.remove_prepend_equal
             case ¬(head = x) as headNeqX: {
                 List.member(A, x, tail)
@@ -244,14 +244,14 @@ theorem List.length_remove_member (A : Type(0)) (x : A) (list : List(A))
                            case List.member(A, x, tail) as memberTail: memberTail
                          }
                        } as memTail;
-                length(tail) = 1 + length(List.remove(A, x, tail))
+                length(tail) = 1 + length(tail ∖ x)
                     by IH(memTail) as tailEq;
                 length(List.prepend(A, head, tail))
                    = 1 + length(tail)                          by List.length_prepend
-                   = 1 + (1 + length(List.remove(A, x, tail))) by substituting tailEq
-                   = 1 + length(List.prepend(A, head, List.remove(A, x, tail)))
+                   = 1 + (1 + length(tail ∖ x)) by substituting tailEq
+                   = 1 + length(List.prepend(A, head, tail ∖ x))
                        by substituting List.length_prepend
-                   = 1 + length(List.remove(A, x, List.prepend(A, head, tail)))
+                   = 1 + length(List.prepend(A, head, tail) ∖ x)
                        by substituting List.remove_prepend_unequal
               }
           }
