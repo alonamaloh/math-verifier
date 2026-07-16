@@ -10,7 +10,7 @@
 -- `Natural.divides_consecutive_implies_one`, q would equal 1,
 -- contradicting q ≥ 2 (from primality).
 --
--- One helper lemma lives here too: `NaturalList.productOf_at_least_one`
+-- One helper lemma lives here too: `Natural.listProduct_at_least_one`
 -- (positivity of the list product when every element is prime). The
 -- closely-related `Natural.multiply_at_least_one` lives in
 -- `Natural/multiply_order.math` since both Euclid and factorization
@@ -30,31 +30,32 @@ import Natural.strong_recursion
 import Natural.multiply_order
 import Natural.prime
 import Natural.prime_divisor
-import Lists.basics
+import Natural.list_product
+import Lists.list
 
 -- The product of a list of primes is at least 1. Empty case is
 -- reflexivity on 1; prepend case multiplies head (≥ 2 because prime)
 -- with the induction hypothesis on the tail.
-theorem NaturalList.productOf_at_least_one (list : NaturalList)
-        (allPrime : ∀ (p : Natural). NaturalList.member(p, list)
+theorem Natural.listProduct_at_least_one (list : List(Natural))
+        (allPrime : ∀ (p : Natural). p ∈ list
                     → Natural.is_prime(p))
-        : 1 ≤ NaturalList.productOf(list) :=
+        : 1 ≤ Natural.listProduct(list) :=
   by induction on list with IH {
-    case NaturalList.empty:
+    case List.empty:
         done
-    case NaturalList.prepend(head, tail): {
-        -- head is prime, so 2 ≤ head, hence 1 ≤ head; and 1 ≤ productOf(tail)
+    case List.prepend(head, tail): {
+        -- head is prime, so 2 ≤ head, hence 1 ≤ head; and 1 ≤ listProduct(tail)
         -- by the IH on the tail (every tail member is also a list member).
         Natural.is_prime(head)
-            by allPrime(head, NaturalList.member.here(tail));
+            by allPrime(head, List.member.here(Natural, head, tail));
         1 ≤ 2 ≤ head;
-        1 ≤ NaturalList.productOf(tail)
+        1 ≤ Natural.listProduct(tail)
             by IH((p : Natural)
-                       (memberOfTail : NaturalList.member(p, tail)) ↦
+                       (memberOfTail : p ∈ tail) ↦
                      allPrime(p,
-                         NaturalList.member.there(head, tail, memberOfTail)));
-        -- productOf(prepend(head, tail)) ≡ head * productOf(tail).
-        change 1 ≤ head * NaturalList.productOf(tail);
+                         List.member.there(Natural, p, head, tail, memberOfTail)));
+        -- listProduct(prepend(head, tail)) ≡ head * listProduct(tail).
+        change 1 ≤ head * Natural.listProduct(tail);
         done
       }
   }
@@ -96,26 +97,26 @@ theorem Natural.one_is_only_divisor_of_one (d : Natural) (dividesOne : d ∣ 1)
 -- suppose otherwise; then q divides the product, and also divides
 -- n = product + 1, so q divides 1 — but q ≥ 2 from primality.
 theorem Natural.infinitely_many_primes
-        (primes : NaturalList)
+        (primes : List(Natural))
         (allPrime : ∀ (p : Natural).
-                      NaturalList.member(p, primes)
+                      p ∈ primes
                       → Natural.is_prime(p))
         : ∃ (q : Natural).
-            Natural.is_prime(q) ∧ ¬NaturalList.member(q, primes) := {
+            Natural.is_prime(q) ∧ ¬(q ∈ primes) := {
   -- Let n be one more than the product of all the listed primes.
-  set n := 1 + NaturalList.productOf(primes);
-  1 ≤ NaturalList.productOf(primes);
+  set n := 1 + Natural.listProduct(primes);
+  1 ≤ Natural.listProduct(primes);
   -- Then n ≥ 2, so it has a prime divisor q.
   2 ≤ n;
   choose q such that Natural.is_prime(q) ∧ q ∣ n from Natural.has_prime_divisor;
   -- q is our witness: it is prime, and we show it is not in the list.
   witness q with {
-    ¬NaturalList.member(q, primes) by {
+    ¬(q ∈ primes) by {
       -- Suppose, for contradiction, that q is already listed. Then q divides
       -- the product of the list, and also divides n = product + 1, so q
       -- divides 1, forcing q = 1 — but q ≥ 2 since q is prime.
-      suppose NaturalList.member(q, primes) as qInPrimes;
-      q ∣ NaturalList.productOf(primes) by NaturalList.member_divides_product;
+      suppose q ∈ primes as qInPrimes;
+      q ∣ Natural.listProduct(primes) by Natural.member_divides_listProduct;
       q = 1 by Natural.divides_consecutive_implies_one;
       2 ≤ q;
       2 ≤ 1;
