@@ -1403,3 +1403,46 @@ on screen. Zero diagnosis time. Worth keeping as the model for citation errors: 
 the thing that failed, show the signature, no speculation. Only possible improvement:
 suggest the nearest parameter by edit distance ("did you mean `pointwiseEqual`?").
 rubric (1/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+### Stage-H LA polish sweep — batch findings (2026-07-16)
+
+Eight determinant/permutation files swept to argument-free citations (~340→~64
+direct-proof-lemma-call leaks) via parallel worktree subagents. Findings:
+
+**BUG (high) — non-deterministic `choose … from <Lemma>`.** `choose x such that P
+from SomeLemma;` (argument-free) against an implication-typed theorem
+(`Hyp → ∃y. Q(y)`) elaborates NON-DETERMINISTICALLY: identical source, repeated
+runs, intermittent pass/fail with no change. Reproduced ~4/4 fail then ~3/3 pass
+after a no-op revert. The analogous `by <Lemma>` path is deterministic. Workaround:
+hoist to `∃ … by SomeLemma as name; choose … from name;`. Likely the SAME latent
+root as the citation-path instability in [[citation_defeq_matching_and_latent_bug]]
+(a benign upstream perturbation flips a premise-discharge outcome). Deserves an
+ordering/budget audit of the discharge + backward-chaining path.
+
+**BUG (medium) — mixed named + trailing-positional citation scrambles slots.**
+`Lemma(A := …, second := …, …)(trailingPositional)` — some args named, some
+positional — fails "could not infer hole(s) at position N" even when every value
+is well-typed. Fix that worked: name EVERY leading parameter, leaving only the
+final anonymous arrow-argument positional. Bookkeeping loses track once a call
+splits across two applications.
+
+**MESSAGE (accurate, could hint the cause).** "the conclusion shape fits, but an
+argument could not be inferred from the goal or a premise discharged from context"
+fires when a lemma stated at a representation (`swapMap(a,b,a)=b`) is cited on a
+goal reaching it only through defeq wrappers (`apply(swap(a,b),a)=b`). Accurate,
+but when the goal and conclusion are both equalities whose endpoints are defeq but
+differently-headed, the message could add: "the goal's endpoints reduce to the
+lemma's only after unfolding — the citation matcher does not reduce them." See the
+proven-but-unlanded fix in [[citation_defeq_matching_and_latent_bug]].
+
+**DOC gap — `by`/`done by` as a lambda body needs braces.** `pointwise := (x) ↦
+EXPR by V` and `(x) ↦ done by V` parse-error ("expected `)` / expression, got
+`by`"); wrap as `(x) ↦ { EXPR by V }` / `(x) ↦ { done by V }`. Not called out in
+structures-and-inference.md's named-argument section.
+
+**INFRA — worktree cache-root not honored for deps.** `kernel verify --cache-root
+<abs>` resolves a cached file's OWN recorded dependency paths as literal relative
+`build/…` strings against cwd, not against `--cache-root`. Parallel worktree
+polishing needed a per-worktree `build → <main>/build` symlink + `git merge
+--ff-only main` (worktrees started ~4 commits behind). Automating worktree setup
+(symlink kernel + build, ff to main) would save each agent minutes.
