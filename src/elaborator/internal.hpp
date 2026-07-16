@@ -64,6 +64,17 @@ constexpr int kDefeqProbeFuel = 256;
 // arbitrary concrete subterm at the same slot. Discrimination trees
 // solve this by branching at wildcard slots; head-only buckets get
 // most of the speedup at a fraction of the implementation cost.
+// The spineHash a Constant-headed term takes, computed from the head name
+// alone. Kept in lockstep with the Constant branch of spineHash below so the
+// lemma-index bridge can file/probe a lemma under its notation wrapper's
+// δ-unfolded RAW head without materialising the unfolded term.
+inline uint64_t spineHashOfConstantName(const std::string& name) {
+    uint64_t h = subtree_hash::kSeed;
+    h = subtree_hash::mix(h, subtree_hash::kTagConstant);
+    h = subtree_hash::mix(h, subtree_hash::hashString(name));
+    return h;
+}
+
 inline uint64_t spineHash(ExpressionPointer expression) {
     constexpr uint64_t kTagWildcard = 0xfeULL;
     ExpressionPointer head = expression;
@@ -73,10 +84,7 @@ inline uint64_t spineHash(ExpressionPointer expression) {
     }
     uint64_t h = subtree_hash::kSeed;
     if (auto* constant = std::get_if<Constant>(&head->node)) {
-        h = subtree_hash::mix(h, subtree_hash::kTagConstant);
-        h = subtree_hash::mix(h,
-            subtree_hash::hashString(constant->name));
-        return h;
+        return spineHashOfConstantName(constant->name);
     }
     if (std::holds_alternative<Pi>(head->node)) {
         return subtree_hash::mix(h, subtree_hash::kTagPi);
@@ -6392,6 +6400,50 @@ private:
         bool reverseDirection = false;
     };
     std::unordered_multimap<uint64_t, RewriteLemma> lemmaIndex_;
+    // Notation-wrapper → raw-head bridge for the lemma index. A `definition`
+    // registered as an `overload` alias target or an `operator` dispatch
+    // target (`List.lengthOf` for `length`, `List.removeFrom` for `∖`) is a
+    // thin transparent wrapper over a raw constant (`List.length` /
+    // `List.remove`). A lemma STATED in wrapper form hashes into a different
+    // spineHash bucket than a goal written in raw form (and vice versa), so
+    // the auto-prover never retrieves it. We bridge at BOTH ends by keying
+    // each wrapper-headed term ALSO under its raw head's spineHash: index-time
+    // (register the lemma under the raw bucket too) makes a wrapper-form lemma
+    // reachable from a raw goal; lookup-time (probe the raw bucket too) makes
+    // a raw-form lemma reachable from a wrapper goal. The raw bucket is the
+    // common meeting point either way, and matchAgainstPattern already bridges
+    // the residual head mismatch (diff_bridges.cpp). Gated strictly on the two
+    // dispatch-target registries, so ordinary definitions are never re-keyed.
+    //
+    // (wrapper head's spineHash, raw head's spineHash) pairs — consulted per
+    // subterm node during goal scanning, so kept cheap. The decisive cost
+    // control is rawHeadOfWrapperDefinition's PURE-PASS-THROUGH gate: it admits
+    // only genuine thin wrappers (`List.lengthOf`, `List.removeFrom`), keeping
+    // this set to a handful and — critically — excluding heavily-cited ops like
+    // `Real.subtract`/`Integer.add` whose raw bucket a second probe would
+    // rerun the matcher against. A flat vector (not a hash map) linear-scanned
+    // over that handful; keyed by the uint64 spineHash the caller already
+    // computed, never a head-name string. Rebuilt lazily when a registry grows
+    // (they only ever grow during elaboration).
+    std::vector<std::pair<uint64_t, uint64_t>> wrapperHeadRawKeyPairs_;
+    // Inline 64-bit Bloom filter over the wrapper keys (bit `key & 63` set per
+    // key). The near-universal non-wrapper node rejects with a single in-object
+    // bit test — no heap access — before touching the pair vector. With a
+    // handful of wrappers the false-positive rate is a few percent, and a
+    // false positive only costs the (tiny) confirming scan.
+    uint64_t wrapperKeyBloom_ = 0;
+    size_t notationWrapperCacheOverloadCount_ = SIZE_MAX;
+    size_t notationWrapperCacheOperatorCount_ = SIZE_MAX;
+    // Rebuild wrapperHeadRawKeyPairs_ if either dispatch registry has grown.
+    void ensureNotationWrapperCache();
+    // The raw underlying head constant of a transparent notation wrapper
+    // `name` — its definition body's application-spine head after leading
+    // binders are stripped — or "" if `name` is not such a wrapper.
+    std::string rawHeadOfWrapperDefinition(const std::string& name);
+    // Given a term's own spineHash `primaryKey`, the spineHash its RAW-form
+    // counterpart would take when the term is notation-wrapper-headed;
+    // std::nullopt otherwise.
+    std::optional<uint64_t> rawKeyForSpineKey(uint64_t primaryKey);
     // B2 sign-judgment rule index (PLAN_LANGUAGE_IMPROVEMENT.md tier 4).
     // A lemma whose conclusion is a 0-anchored sign judgment — `0 ≤ f(…)`,
     // `0 < f(…)`, or `¬(f(…) = 0)` — over a Constant-headed (or numeral)

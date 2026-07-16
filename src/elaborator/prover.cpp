@@ -1169,7 +1169,20 @@ void Elaborator::collectLibraryEqualitiesAtNode(
         const std::vector<LocalBinder>& localBinders,
         std::vector<ContextEquality>& out) {
         if (!std::holds_alternative<Application>(subexpr->node)) return;
-        uint64_t key = spineHash(subexpr);
+        // Primary bucket, plus the raw-head bucket when `subexpr` is written
+        // in notation-wrapper form — so a wrapper-form subterm reaches a lemma
+        // stated over the raw constant (`length` ↔ `List.length`, `∖` ↔
+        // `List.remove`). Symmetric to registerGenericRewriteLemma's dual-key.
+        // Stack array, not a vector — this runs per subterm node during goal
+        // scanning, so a per-node heap allocation is a measurable tax.
+        uint64_t keyBuffer[2];
+        int keyCount = 0;
+        keyBuffer[keyCount++] = spineHash(subexpr);
+        if (auto rawKey = rawKeyForSpineKey(keyBuffer[0])) {
+            if (*rawKey != keyBuffer[0]) keyBuffer[keyCount++] = *rawKey;
+        }
+        for (int keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
+        uint64_t key = keyBuffer[keyIndex];
         auto range = lemmaIndex_.equal_range(key);
         for (auto iterator = range.first;
              iterator != range.second; ++iterator) {
@@ -1228,6 +1241,7 @@ void Elaborator::collectLibraryEqualitiesAtNode(
             eq.carrierLevel = components.carrierUniverseLevel;
             eq.proofExpr = lemmaApp;
             out.push_back(std::move(eq));
+        }
         }
     }
 

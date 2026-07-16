@@ -6,6 +6,85 @@
 
 #include "elaborator/internal.hpp"
 
+void Elaborator::ensureNotationWrapperCache() {
+    size_t overloadCount = environment_.overloadAliases.size();
+    size_t operatorCount = environment_.operatorRegistry.size();
+    if (overloadCount == notationWrapperCacheOverloadCount_
+        && operatorCount == notationWrapperCacheOperatorCount_) {
+        return;
+    }
+    notationWrapperCacheOverloadCount_ = overloadCount;
+    notationWrapperCacheOperatorCount_ = operatorCount;
+    wrapperHeadRawKeyPairs_.clear();
+    wrapperKeyBloom_ = 0;
+    auto record = [&](const std::string& wrapperName) {
+        std::string raw = rawHeadOfWrapperDefinition(wrapperName);
+        if (raw.empty() || raw == wrapperName) return;
+        uint64_t wrapperKey = spineHashOfConstantName(wrapperName);
+        uint64_t rawKey = spineHashOfConstantName(raw);
+        for (const auto& pair : wrapperHeadRawKeyPairs_) {
+            if (pair.first == wrapperKey) return;
+        }
+        wrapperHeadRawKeyPairs_.emplace_back(wrapperKey, rawKey);
+        wrapperKeyBloom_ |= (uint64_t{1} << (wrapperKey & 63));
+    };
+    for (const auto& aliasEntry : environment_.overloadAliases) {
+        for (const auto& target : aliasEntry.second) record(target);
+    }
+    for (const auto& operatorEntry : environment_.operatorRegistry) {
+        record(operatorEntry.second);
+    }
+}
+
+std::string Elaborator::rawHeadOfWrapperDefinition(const std::string& name) {
+    const Declaration* declaration = environment_.lookup(name);
+    if (!declaration) return "";
+    auto* definition = std::get_if<Definition>(declaration);
+    if (!definition) return "";
+    if (definition->opacity == Opacity::Opaque) return "";
+    ExpressionPointer body = definition->body;
+    if (!body) return "";
+    // Strip the wrapper's own binders, counting them.
+    int binderCount = 0;
+    while (auto* lambda = std::get_if<Lambda>(&body->node)) {
+        body = lambda->body;
+        ++binderCount;
+    }
+    // Require a PURE PASS-THROUGH: the body must be exactly
+    // `RawConstant(a_1, …, a_k)` where every argument is one of the wrapper's
+    // OWN binders (a bare BoundVariable) — a rename/reorder of arguments with
+    // NO computation. This is precisely what separates a notation wrapper
+    // (`List.lengthOf`→`List.length`, `List.removeFrom`→`List.remove`) from an
+    // ordinary definition whose body merely happens to be headed by a constant
+    // (`Real.subtract`→`Real.add`, `Real.divide`→`Real.multiply`,
+    // `Integer.add`→`Quotient.lift`): those pass a `negate`/`reciprocal`/…
+    // subexpression, not a bare argument, so they are excluded. Bridging them
+    // would be meaningless AND expensive — their raw bucket is heavily
+    // populated, so every such term would rerun the matcher against it.
+    ExpressionPointer cursor = body;
+    while (auto* application = std::get_if<Application>(&cursor->node)) {
+        auto* argBound =
+            std::get_if<BoundVariable>(&application->argument->node);
+        if (!argBound || argBound->deBruijnIndex >= binderCount) return "";
+        cursor = application->function;
+    }
+    if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+        return constant->name;
+    }
+    return "";
+}
+
+std::optional<uint64_t> Elaborator::rawKeyForSpineKey(uint64_t primaryKey) {
+    ensureNotationWrapperCache();
+    if (!((wrapperKeyBloom_ >> (primaryKey & 63)) & uint64_t{1})) {
+        return std::nullopt;
+    }
+    for (const auto& pair : wrapperHeadRawKeyPairs_) {
+        if (pair.first == primaryKey) return pair.second;
+    }
+    return std::nullopt;
+}
+
 ExpressionPointer Elaborator::instantiateLemmaBinders(
         ExpressionPointer expression,
         const std::vector<ExpressionPointer>& bindings,
@@ -74,9 +153,15 @@ ExpressionPointer Elaborator::tryLemmaIndexLookup(
         // op-headed LHS, lands in the regular bucket as usual.
         std::vector<uint64_t> keys;
         keys.push_back(spineHash(subLeft));
+        // A wrapper-form goal (`length(l)`, head `List.lengthOf`) also probes
+        // the raw-head bucket (`List.length`), so it retrieves a lemma stated
+        // in raw form. Symmetric to the index-time dual-keying below.
+        if (auto rawKey = rawKeyForSpineKey(keys[0])) {
+            if (*rawKey != keys[0]) keys.push_back(*rawKey);
+        }
         ExpressionPointer wildcardProbe = makeBoundVariable(0);
         uint64_t wildcardKey = spineHash(wildcardProbe);
-        if (wildcardKey != keys[0]) {
+        if (std::find(keys.begin(), keys.end(), wildcardKey) == keys.end()) {
             keys.push_back(wildcardKey);
         }
         for (uint64_t key : keys) {

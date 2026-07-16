@@ -1566,8 +1566,6 @@ void Elaborator::registerGenericRewriteLemma(const std::string& theoremName,
         forwardEntry.rhs = rhs;
         forwardEntry.binderTypes = binderTypes;
         forwardEntry.reverseDirection = false;
-        lemmaIndex_.emplace(spineHash(lhs),
-                              std::move(forwardEntry));
         RewriteLemma reverseEntry;
         reverseEntry.lemmaName = theoremName;
         reverseEntry.binderCount = binderCount;
@@ -1575,8 +1573,19 @@ void Elaborator::registerGenericRewriteLemma(const std::string& theoremName,
         reverseEntry.rhs = rhs;
         reverseEntry.binderTypes = std::move(binderTypes);
         reverseEntry.reverseDirection = true;
-        lemmaIndex_.emplace(spineHash(rhs),
-                              std::move(reverseEntry));
+        // Dual-key each side. When a side's spine head is a notation wrapper
+        // (`length`'s `List.lengthOf`, `∖`'s `List.removeFrom`), also file the
+        // entry under its raw head's bucket (`List.length` / `List.remove`),
+        // so a raw-form goal reaches this wrapper-form lemma. The stored
+        // pattern stays as written — matchAgainstPattern bridges the head.
+        uint64_t lhsKey = spineHash(lhs);
+        uint64_t rhsKey = spineHash(rhs);
+        std::optional<uint64_t> lhsRawKey = rawKeyForSpineKey(lhsKey);
+        std::optional<uint64_t> rhsRawKey = rawKeyForSpineKey(rhsKey);
+        if (lhsRawKey) lemmaIndex_.emplace(*lhsRawKey, forwardEntry);
+        if (rhsRawKey) lemmaIndex_.emplace(*rhsRawKey, reverseEntry);
+        lemmaIndex_.emplace(lhsKey, std::move(forwardEntry));
+        lemmaIndex_.emplace(rhsKey, std::move(reverseEntry));
     }
 
 ExpressionPointer Elaborator::autoProveCalcStep(
