@@ -15,6 +15,8 @@ import Lists.list
 import Lists.map
 import Lists.append
 import Lists.remove
+import Lists.permutation
+import Lists.distinct
 import Algebra.field
 import Algebra.field_bundle
 
@@ -356,3 +358,23 @@ theorem Field.productOver_multiply {f : Field} {index : Type(0)}
            = Field.productOver(term, List.prepend(index, head, tail))
                  * Field.productOver(termPrime, List.prepend(index, head, tail))
   }
+
+-- A product over a list is invariant under permuting the item list (the
+-- field's multiplication is commutative and associative), by lifting
+-- `List.Permutation.product_invariant` across the `map` of the term.
+theorem Field.productOver_permutation {f : Field} {index : Type(0)}
+        (term : index → Field.carrier(f)) (items1 items2 : List(index))
+        (perm : List.Permutation(index, items1, items2))
+        : Field.productOver(term, items1) = Field.productOver(term, items2) :=
+  Field.productOver(term, items1)
+     = List.product(Field.carrier(f), Field.multiply, Field.one(f),
+           List.map(index, Field.carrier(f), term, items1))
+     = List.product(Field.carrier(f), Field.multiply, Field.one(f),
+           List.map(index, Field.carrier(f), term, items2))
+           by List.Permutation.product_invariant(Field.carrier(f), Field.multiply, Field.one(f),
+                  (x y z : Field.carrier(f)) ↦ Field.multiply_associative(f, x, y, z),
+                  (x y : Field.carrier(f)) ↦ Field.multiply_commutative(f, x, y),
+                  List.map(index, Field.carrier(f), term, items1),
+                  List.map(index, Field.carrier(f), term, items2),
+                  List.Permutation.map(index, Field.carrier(f), term, items1, items2, perm))
+     = Field.productOver(term, items2)
