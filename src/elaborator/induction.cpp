@@ -2420,16 +2420,49 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                             }
                         }
                     } else {
-                        RedundancyBudgetGuard budgetGuard(*this);
-                        try {
-                            proved = autoProveClaim(
-                                concretePremise, localBinders, 0);
-                        } catch (const ElaborateError&) {
-                            proved = nullptr;
-                        } catch (const TypeError&) {
-                            proved = nullptr;
-                        } catch (const AutoProverBudgetError&) {
-                            proved = nullptr;
+                        // Probe under the redundancy cap first — the
+                        // common discharge is near-instant and the cap
+                        // keeps a hopeless premise from stalling the
+                        // citation's error report.
+                        bool cappedProbeTripped = false;
+                        {
+                            RedundancyBudgetGuard budgetGuard(*this);
+                            try {
+                                proved = autoProveClaim(
+                                    concretePremise, localBinders, 0);
+                            } catch (const ElaborateError&) {
+                                proved = nullptr;
+                            } catch (const TypeError&) {
+                                proved = nullptr;
+                            } catch (const AutoProverBudgetError&) {
+                                proved = nullptr;
+                                cappedProbeTripped = true;
+                            }
+                        }
+                        // A TRIPPED cap is an effort verdict, not a proof
+                        // verdict — and the kernel-step count of the same
+                        // logical search shifts with unrelated reduction
+                        // history (WHNF-cache warmth), so failing the
+                        // citation on the cap made elaboration outcomes
+                        // flip under benign upstream changes (the
+                        // sqrt_two_irrational `prime_divides_product`
+                        // citation's `is_prime 2` premise sat 29 steps
+                        // under the 1000-step cap). This slot has no later
+                        // discharge stage, so ladder like inferCallWithHoles
+                        // Step 5b → 5d: retry once at the full by-citation
+                        // budget. Real failures (ElaborateError) are final
+                        // and don't retry.
+                        if (!proved && cappedProbeTripped) {
+                            try {
+                                proved = autoProveClaim(
+                                    concretePremise, localBinders, 0);
+                            } catch (const ElaborateError&) {
+                                proved = nullptr;
+                            } catch (const TypeError&) {
+                                proved = nullptr;
+                            } catch (const AutoProverBudgetError&) {
+                                proved = nullptr;
+                            }
                         }
                     }
                     if (proved) bindings[innerIndex] = proved;
