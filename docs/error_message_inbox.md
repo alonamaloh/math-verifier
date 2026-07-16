@@ -1339,3 +1339,67 @@ Silent-zero on a skipped check is the same class of defect as a test harness
 reporting green because it collected no tests. `.mark_redundant.py` should treat
 "clean" as trustworthy only on a zero exit *with* a fresh cache.
 rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+### higher-order conclusion `P (Logic.the …)` → "check the lemma name" on the RIGHT lemma — 2026-07-16 (Stage H polish)
+note: `by Logic.the_satisfies` on the goal `f(the(…)) = y` — the correct and only
+lemma for the job:
+
+```
+  `Logic.the_satisfies` has type: (T : Type _) → (P : T → Proposition) → … → P (Logic.the T P existence uniqueness)
+  its conclusion is about `<unknown>` but the goal is about `Equality` — this lemma
+  does not target this goal (check the lemma name)
+```
+
+The lemma's conclusion head is the *bound metavariable* `P`, so matching would need
+higher-order unification (P := λx. f(x) = y). The message renders that head as
+`<unknown>`, concludes the lemma "does not target this goal", and advises checking
+the name — actively wrong: the name is right, and the fix is
+`by Logic.the_satisfies(P := (x : …) ↦ f(x) = y)`, which the message never hints at.
+Same class, different phrasing, when the conclusion head IS known but the argument
+is trapped under a defeq-but-not-syntactic term (`Matrix.product_row_reindex`, whose
+`apply(rho, apply(p,i))` must match a goal's `apply(compose(rho,p), i)`):
+"the conclusion shape fits, but an argument could not be inferred …" — that one is
+honest and led straight to the fix.
+diagnosis: when the conclusion head is a pattern metavariable, say so — "this
+lemma's conclusion is `P <args>` with `P` a parameter; matching it needs
+higher-order unification. Supply the motive by name: `by Lemma(P := …)`." Never
+emit "check the lemma name" for this case, and never print a binder head as
+`<unknown>`. Tracked under PLAN_ERGONOMICS.md F9.
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+### ex falso is not automatic: `done by <¬P lemma>` with P in context fails — 2026-07-16 (Stage H polish)
+note: with `List.member(…, g, List.empty(…))` in context, `done by List.no_member_empty`
+on an unrelated goal:
+
+```
+  the `List.no_member_empty` citation does not prove this goal
+    goal:        List.member (NaturalsBelow k → C) (Function.lowerBelow C k g) (List.empty …)
+    `List.no_member_empty` has type: (A : Type 0) → (element : A) → Not (List.member A element (List.empty A))
+  its conclusion is about `False` but the goal is about `List.member` — this lemma does not
+  target this goal (check the lemma name)
+```
+
+Diagnosis is right (`False` vs `List.member`) but the reading is backwards: a lemma
+concluding `False` targets EVERY goal, via ex falso. The prover will not take that
+step, and the message frames the mismatch as a naming mistake. Workaround that reads
+well: state the contradiction, then `done` — `False by List.no_member_empty; done`.
+diagnosis: when the citation concludes `False` (or `¬Q` with `Q` derivable from
+context) and the goal is anything else, say "this lemma yields a contradiction; state
+it and discharge the goal: `False by <lemma>; done`" instead of "check the lemma name".
+Better still, let the auto-prover apply ex falso when `False` is reachable from
+context. Tracked under PLAN_ERGONOMICS.md F9.
+rubric (0/1): cause 1 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+### GOOD: named-argument typo names the parameter it could not find — 2026-07-16 (Stage H polish)
+note: guessed `Function.extensionality(pointwise := …)`; the real parameter is
+`pointwiseEqual`:
+
+```
+  named arguments: 'Function.extensionality' has no parameter named 'pointwise'
+```
+
+Exactly right, and it prints the full signature just above, so the correct name is
+on screen. Zero diagnosis time. Worth keeping as the model for citation errors: name
+the thing that failed, show the signature, no speculation. Only possible improvement:
+suggest the nearest parameter by edit distance ("did you mean `pointwiseEqual`?").
+rubric (1/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
