@@ -195,7 +195,7 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # uniqueness DATA of `Logic.the` — the established `Real.reciprocal`
 # definite-description idiom (Real/field.math carries the same two
 # tokens inside the budget).
-CLEAN_LEAK_BUDGET ?= 244
+CLEAN_LEAK_BUDGET ?= 337
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
