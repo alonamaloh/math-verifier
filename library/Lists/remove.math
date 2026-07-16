@@ -20,7 +20,7 @@ import Lists.list
 import Lists.distinct
 import Lists.length
 
-definition List.remove (A : Type(0)) (x : A) : List(A) → List(A)
+opaque definition List.remove (A : Type(0)) (x : A) : List(A) → List(A)
   | List.empty => List.empty(A)
   | List.prepend(head, tail) =>
       if head = x then tail else List.prepend(A, head, List.remove(A, x, tail))
@@ -36,12 +36,22 @@ operator (∖) on (List, _) := List.removeFrom
 -- ── Characterizing equations (the opaque boundary) ────────────────────
 theorem List.remove_prepend_equal (A : Type(0)) (x head : A) (tail : List(A)) (equal : head = x)
         : List.remove(A, x, List.prepend(A, head, tail)) = tail :=
-  by Logic.if_positive
+  List.remove(A, x, List.prepend(A, head, tail))
+     = (if head = x then tail else List.prepend(A, head, List.remove(A, x, tail)))
+           by unfolding List.remove
+     = tail   by Logic.if_positive
 
 theorem List.remove_prepend_unequal (A : Type(0)) (x head : A) (tail : List(A)) (unequal : ¬(head = x))
         : List.remove(A, x, List.prepend(A, head, tail))
           = List.prepend(A, head, List.remove(A, x, tail)) :=
-  by Logic.if_negative
+  List.remove(A, x, List.prepend(A, head, tail))
+     = (if head = x then tail else List.prepend(A, head, List.remove(A, x, tail)))
+           by unfolding List.remove
+     = List.prepend(A, head, List.remove(A, x, tail))   by Logic.if_negative
+
+theorem List.remove_empty (A : Type(0)) (x : A)
+        : List.remove(A, x, List.empty(A)) = List.empty(A) :=
+  done by unfolding List.remove
 
 -- ── Membership ────────────────────────────────────────────────────────
 
@@ -50,8 +60,10 @@ theorem List.remove_member_subset (A : Type(0)) (x y : A) (list : List(A))
         : List.member(A, y, List.remove(A, x, list))
           → List.member(A, y, list) :=
   by induction on list with IH {
-    case List.empty:
-        (mem : List.member(A, y, List.remove(A, x, List.empty(A)))) ↦ mem
+    case List.empty: {
+        suppose List.member(A, y, List.remove(A, x, List.empty(A))) as mem;
+        done by substituting List.remove_empty
+      }
     case List.prepend(head, tail): {
         head = x ∨ ¬(head = x) by Logic.excluded_middle;
         done by cases {
@@ -132,8 +144,10 @@ theorem List.remove_member_ne (A : Type(0)) (x y : A) (list : List(A))
   by induction on list with IH {
     case List.empty:
         (distinct : List.Distinct(A, List.empty(A)))
-        (mem : List.member(A, y, List.remove(A, x, List.empty(A)))) ↦
-            absurd(List.no_member_empty(A, y, mem))
+        (mem : List.member(A, y, List.remove(A, x, List.empty(A)))) ↦ {
+            List.member(A, y, List.empty(A)) by substituting List.remove_empty as memEmpty;
+            absurd(List.no_member_empty(A, y, memEmpty))
+          }
     case List.prepend(head, tail):
         (distinct : List.Distinct(A, List.prepend(A, head, tail)))
         (mem : List.member(A, y, List.remove(A, x, List.prepend(A, head, tail)))) ↦ {
@@ -175,8 +189,10 @@ theorem List.remove_member_ne (A : Type(0)) (x y : A) (list : List(A))
 theorem List.remove_distinct (A : Type(0)) (x : A) (list : List(A))
         : List.Distinct(A, list) → List.Distinct(A, List.remove(A, x, list)) :=
   by induction on list with IH {
-    case List.empty:
-        (distinct : List.Distinct(A, List.empty(A))) ↦ distinct
+    case List.empty: {
+        suppose List.Distinct(A, List.empty(A)) as distinct;
+        done by substituting List.remove_empty
+      }
     case List.prepend(head, tail):
         (distinct : List.Distinct(A, List.prepend(A, head, tail))) ↦ {
           ¬(List.member(A, head, tail)) by List.Distinct.head_not_member as headNotInTail;
