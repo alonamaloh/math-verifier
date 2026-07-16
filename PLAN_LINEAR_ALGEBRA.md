@@ -434,12 +434,15 @@ Update this section before ending any session that works on the plan.
   dim im T), `Algebra/rank_nullity.math`, choice-free. See the memory tracker
   [[linear_algebra_build]] for the brick 1–5 detail.
 - **Stage H — IN PROGRESS (det(AB) = det(A)·det(B)).** Bricks 1–5 + 6-backbone +
-  6a + 6b DONE (Sₙ group, enumeration, sign + multiplicativity, matrix,
-  determinant, aggregation, function-space distributivity, sign(swap)=−1). **6c
-  (alternating collapse) + 6d (injective reindex + assembly) REMAIN** — see the
-  Stage-H sub-plan "brick 6" entry for the 6c crux scoping (genuine orbit-pairing,
-  not `Σ=−Σ`; build `List.remove` + `sumOver_remove` first). To be started in a
-  fresh session.
+  6a + 6b + 6c DONE (Sₙ group, enumeration, sign + multiplicativity, matrix,
+  determinant, aggregation, function-space distributivity, sign(swap)=−1,
+  alternating collapse). **6d (injective reindex + assembly) REMAINS.** 6c landed
+  2026-07-15 (export-check 3094, choice-free): `Lists/remove.math` (List.remove +
+  member/length/distinct lemmas), `Field.sumOver_remove`, the genuine orbit-pairing
+  `Field.sumOver_involution_pairing` (`Algebra/involution_pairing.math`, strong
+  induction on length, removes {head, ι head} each step — char-free, NOT `Σ=−Σ`),
+  and `Matrix.alternating_collapse` (`Algebra/alternating_collapse.math`,
+  instantiated at ι = σ↦σ∘swap(a,b) via `Field.productOver_permutation`). 6d next.
 - **LA POLISH DEBT (owner-requested 2026-07-15, pending).** Most Stage E–H files
   are NOT in the clean manifest — the tracker repeatedly defers the "redundant-`by`
   read-through + unused-name cascade + manifest-add" per file (exchange_lemma,
@@ -1034,12 +1037,30 @@ engine directly. Group laws are then immediate.
      mis-infers its implicit `n` under a `value(inclusion …) < k` ascription;
      `ring` can't see through an opaque `value(b)` that a hypothesis equates to a
      sum (name+flip the hypothesis instead).
-   - **(6c) alternating collapse** — for non-injective φ (φa=φb, a≠b), the inner
-     `Σ_σ sign(σ) ∏_i B(φi,σi)=0` by pairing σ↔σ∘swap(a,b): the products are equal
-     (φa=φb) and sign(σ∘swap)=−sign(σ) (needs 6b), so terms cancel; τ=swap(a,b) is a
-     fixed-point-free involution on `allPermutations` via σ↦σ∘τ, so the whole
-     list-sum pairs off to 0. Needs a "sum over a list closed under a
-     sign-reversing fixed-point-free involution = 0" lemma over allPermutations.
+   - **(6c) alternating collapse — DONE (2026-07-15, export-check 3094, choice-free).**
+     `Matrix.alternating_collapse` (`Algebra/alternating_collapse.math`): for
+     non-injective φ (φa=φb, a≠b), `Σ_σ sign(σ)·∏_i B(φi,σi) = 0`. Landed exactly as
+     scoped — genuine orbit-pairing, no `Σ=−Σ`. Four units, committed separately:
+     (1) `Lists/remove.math` — `List.remove` (drop first occurrence, classical
+     head/x decision) + `remove_member_subset/_complete/_ne`, `remove_distinct`,
+     `length_remove_member`. (2) `Field.sumOver_remove` (in field_aggregation).
+     (3) `Algebra/involution_pairing.math` — `Field.sumOver_involution_pairing`: sum
+     over a distinct list closed under a fixed-point-free sign-reversing involution
+     = 0, by STRONG INDUCTION on length, removing the head's 2-element orbit each
+     step (each orbit's two terms sum to zero). Char-FREE. (4)
+     `Matrix.alternating_collapse` — instantiates the pairing lemma at ι = σ↦σ∘swap(a,b)
+     on `allPermutations(n)`: closure from `allPermutations_complete`, fixed-point-free
+     from `apply_injective`, involutive from `swap_compose_self`, reversing from the
+     paired products being equal (`Field.productOver_permutation` reindexes the index
+     product by the transposition; φ∘swap = φ since φa=φb) and the sign flipping
+     (`sign_swap`=−1 + `sign_compose`, cased on `sign_is_unit` to dodge a general
+     `from_integer_multiply`). Helpers `Field.from_integer_one`/`_negate_one`.
+     GOTCHAS banked: `by cases` on a bare `head=x` eagerly substitutes head→x (use an
+     explicit `head=x ∨ ¬(head=x)` disjunction); a `↦`-lambda body inside
+     `induction … using strong_induction` drops the expected type (use statement-form
+     `take`/`suppose`); a relation chain is the CLAIM not a `by`-justification;
+     `substituting` takes ONE equation (split calc steps); the unused-`memTail` warning
+     flags the NAME not the FACT (drop `as`, keep the line). Original scoping kept below.
      **SCOPING (2026-07-15, before a fresh Stage-H session):**
      - **CRUX subtlety — must use GENUINE ORBIT-PAIRING, not `Σ = −Σ`.** The
        tempting shortcut (reindex the sum by the involution ⟹ `Σ g = Σ g∘ι =
@@ -1067,7 +1088,7 @@ engine directly. Group laws are then immediate.
      then `det(AB)=Σ_φ̂ (∏A(i,φ̂i))·sign(φ̂)·det(B)=det(A)·det(B)`.
 
 Realistic size: multi-session. Bricks 2, 3, 6 are the cost; 1, 4, 5 are
-scaffolding. Brick 6 backbone (aggregation) DONE; 6a DONE; 6b DONE; 6c–6d remain.
+scaffolding. Brick 6 backbone (aggregation) DONE; 6a DONE; 6b DONE; 6c DONE; 6d remains.
 
 ## Choice-profile guardrails
 
