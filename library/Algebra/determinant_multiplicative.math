@@ -47,7 +47,7 @@ theorem Function.non_injective_collision (n : Natural)
   ∃ (b : NaturalsBelow(n)). ¬(phi(a) = phi(b) → a = b)
       by Logic.not_forall_implies_exists_not(NaturalsBelow(n),
              (b : NaturalsBelow(n)) ↦ (phi(a) = phi(b) → a = b), notForallB);
-  choose b such that ¬(phi(a) = phi(b) → a = b) as notImplication;
+  choose b such that ¬(phi(a) = phi(b) → a = b);
   phi(a) = phi(b) ∧ ¬(a = b) by Logic.not_implies_implies_and_not as collision;
   witness a with {
     witness b with { collision }
@@ -316,14 +316,15 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
              (rho1 rho2 : Permutation(n))
                  (equalMaps : ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho1, i))
-                     = ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho2, i))) ↦
-               Permutation.equal_of_apply_equal(rho1, rho2, (i : NaturalsBelow(n)) ↦ {
-                   Permutation.apply(rho1, i)
-                      = ((j : NaturalsBelow(n)) ↦ Permutation.apply(rho1, j))(i)
-                      = ((j : NaturalsBelow(n)) ↦ Permutation.apply(rho2, j))(i)
-                            by substituting equalMaps
-                      = Permutation.apply(rho2, i)
-                 }),
+                     = ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho2, i))) ↦ {
+               ∀ (i : NaturalsBelow(n)). Permutation.apply(rho1, i) = Permutation.apply(rho2, i)
+                   by { take i : NaturalsBelow(n);
+                        done by Function.application_congruence(
+                            f := (j : NaturalsBelow(n)) ↦ Permutation.apply(rho1, j),
+                            g := (j : NaturalsBelow(n)) ↦ Permutation.apply(rho2, j),
+                            x := i) };
+               done by Permutation.equal_of_apply_equal
+             },
              Permutation.allPermutations(n), Permutation.allPermutations_distinct(n))
       as partDistinct;
   (∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
