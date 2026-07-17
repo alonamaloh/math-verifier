@@ -489,16 +489,16 @@ theorem Natural.less_than_one_is_zero (k : Natural) (h : k < 1) : k = 0 := {
 }
 
 theorem Natural.positive_one_plus_monus_one (n : Natural) (pos : 0 < n)
-        : n = 1 + Natural.monus(n, 1) := {
+        : n = 1 + (n ∸ 1) := {
   n = 0 ∨ ∃ (k : Natural). n = 1 + k by Natural.zero_or_one_plus;
   done by cases {
     case n = 0 as nZero: { 0 < 0 by substituting nZero;
                            ¬(0 < 0) by Natural.lt_irreflexive; done }
     case ∃ (k : Natural). n = 1 + k as nPlus: {
         choose k such that n = 1 + k from nPlus;
-        Natural.monus(n, 1) = Natural.monus(1 + k, 1) by substituting (n = 1 + k)
+        (n ∸ 1) = ((1 + k) ∸ 1) by substituting (n = 1 + k)
            = k by NaturalsBelow.monus_one_plus_one as monusK;
-        n = 1 + k = 1 + Natural.monus(n, 1) by substituting monusK;
+        n = 1 + k = 1 + (n ∸ 1) by substituting monusK;
         done
     }
   }
@@ -761,28 +761,28 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
               p0 < len as p0Below;
               NaturalsBelow.value(selection(p0)) = m as p0AtLast;
               coefficients(p0) = Field.zero(f) by xVanish(p0, p0Below, p0AtLast) as cp0Zero;
-              len = 1 + Natural.monus(len, 1)
+              len = 1 + (len ∸ 1)
                   by { 0 < len by { 0 ≤ p0 < len; done };
                        done by Natural.positive_one_plus_monus_one } as lenShape;
-              p0 < 1 + Natural.monus(len, 1) by substituting lenShape as p0BelowShape;
+              p0 < 1 + (len ∸ 1) by substituting lenShape as p0BelowShape;
               -- Drop position p0 (zero coefficient) to keep injectivity.
               VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection,
-                       1 + Natural.monus(len, 1)) by substituting lenShape
+                       1 + (len ∸ 1)) by substituting lenShape
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
                        (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), Natural.monus(len, 1))
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
                        by VectorSpace.linearCombination_drop_zero_position(
                               VectorSpace.appendVector(e, x), coefficients, selection,
-                              Natural.monus(len, 1), p0, p0BelowShape, cp0Zero)
+                              len ∸ 1, p0, p0BelowShape, cp0Zero)
                  as droppedComb;
               -- The dropped selection avoids the x-slot: all below m.
-              ∀ (j : Natural). j < Natural.monus(len, 1) →
+              ∀ (j : Natural). j < (len ∸ 1) →
                   NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j))) < m
                 by {
-                  take j : Natural; suppose j < Natural.monus(len, 1) as jBelow;
+                  take j : Natural; suppose j < (len ∸ 1) as jBelow;
                   NaturalsBelow.skipValue(p0, j) < len
-                    by { NaturalsBelow.skipValue(p0, j) < 1 + Natural.monus(len, 1)
+                    by { NaturalsBelow.skipValue(p0, j) < 1 + (len ∸ 1)
                              by NaturalsBelow.skipValue_bound(jv := p0,
                                     i := NaturalsBelow.make(j, jBelow));
                          done by substituting lenShape } as skipInLen;
@@ -805,46 +805,46 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
                 } as droppedBelow;
               VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
                     (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                    (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), Natural.monus(len, 1))
+                    (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
                  = VectorSpace.linearCombination(e,
                        (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
                        (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
                            NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
-                       Natural.monus(len, 1))
+                       len ∸ 1)
                        by VectorSpace.appendVector_reduces_to_e(ei0 := ei0, allBelow := droppedBelow)
                  as reduceEq;
               VectorSpace.linearCombination(e,
                     (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
                     (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
                         NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
-                    Natural.monus(len, 1))
+                    len ∸ 1)
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
                        (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), Natural.monus(len, 1))
+                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
                        by reduceEq
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
                        by droppedComb
                  = VectorSpace.zero(V) by vanishes as eCombZero;
               -- The dropped selection is injective, so `e`-independence applies.
-              ∀ (a b : Natural). a < Natural.monus(len, 1) → b < Natural.monus(len, 1) →
+              ∀ (a b : Natural). a < (len ∸ 1) → b < (len ∸ 1) →
                   NaturalsBelow.clamp(ei0)(
                       NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))))
                   = NaturalsBelow.clamp(ei0)(
                       NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b)))) → a = b
                 by {
                   take a : Natural; take b : Natural;
-                  suppose a < Natural.monus(len, 1) as aBelow;
-                  suppose b < Natural.monus(len, 1) as bBelow;
+                  suppose a < (len ∸ 1) as aBelow;
+                  suppose b < (len ∸ 1) as bBelow;
                   suppose NaturalsBelow.clamp(ei0)(
                               NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))))
                           = NaturalsBelow.clamp(ei0)(
                               NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b)))) as clampEq;
                   NaturalsBelow.skipValue(p0, a) < len
-                    by { NaturalsBelow.skipValue(p0, a) < 1 + Natural.monus(len, 1)
+                    by { NaturalsBelow.skipValue(p0, a) < 1 + (len ∸ 1)
                              by NaturalsBelow.skipValue_bound(jv := p0, i := NaturalsBelow.make(a, aBelow));
                          done by substituting lenShape } as skipALen;
                   NaturalsBelow.skipValue(p0, b) < len
-                    by { NaturalsBelow.skipValue(p0, b) < 1 + Natural.monus(len, 1)
+                    by { NaturalsBelow.skipValue(p0, b) < 1 + (len ∸ 1)
                              by NaturalsBelow.skipValue_bound(jv := p0, i := NaturalsBelow.make(b, bBelow));
                          done by substituting lenShape } as skipBLen;
                   NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))) < m
@@ -870,9 +870,9 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
                              skipALen, skipBLen);
                   done by NaturalsBelow.skipValue_injective(jv := p0)
                 } as droppedInj;
-              ∀ (i : Natural). i < Natural.monus(len, 1) →
+              ∀ (i : Natural). i < (len ∸ 1) →
                   coefficients(NaturalsBelow.skipValue(p0, i)) = Field.zero(f)
-                  by eIndependent(Natural.monus(len, 1),
+                  by eIndependent(len ∸ 1,
                       (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
                           NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
@@ -889,12 +889,12 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
                     done
                   }
                 case i ≠ p0 as iNeP0: {
-                    i < 1 + Natural.monus(len, 1) by substituting lenShape as iBelowShape;
-                    p0 ≤ Natural.monus(len, 1)
-                        by { p0 < 1 + Natural.monus(len, 1) by p0BelowShape;
+                    i < 1 + (len ∸ 1) by substituting lenShape as iBelowShape;
+                    p0 ≤ (len ∸ 1)
+                        by { p0 < 1 + (len ∸ 1) by p0BelowShape;
                              done by Natural.le_of_lt_one_plus } as p0LeMonus;
-                    NaturalsBelow.skipInverseValue(p0, i) < Natural.monus(len, 1)
-                        by NaturalsBelow.skipInverseValue_bound(count := Natural.monus(len, 1), jv := p0,
+                    NaturalsBelow.skipInverseValue(p0, i) < (len ∸ 1)
+                        by NaturalsBelow.skipInverseValue_bound(count := len ∸ 1, jv := p0,
                                x := i, xBound := iBelowShape, jvBound := p0LeMonus,
                                ne := iNeP0) as skipInvBelow;
                     NaturalsBelow.skipValue(p0, NaturalsBelow.skipInverseValue(p0, i)) = i
@@ -1610,26 +1610,26 @@ theorem LinearMap.appended_images_span {f : Field} {V W : VectorSpace(f)} {k r s
             done
           }
         case k ≤ NaturalsBelow.value(i) as iAtLeast: {
-            NaturalsBelow.value(i) = k + Natural.monus(NaturalsBelow.value(i), k)
+            NaturalsBelow.value(i) = k + (NaturalsBelow.value(i) ∸ k)
                 by NaturalsBelow.decompose_at_least(k, NaturalsBelow.value(i)) as decomp;
             NaturalsBelow.value(i) < sz by NaturalsBelow.below;
-            k + Natural.monus(NaturalsBelow.value(i), k) < sz by substituting decomp;
-            k + Natural.monus(NaturalsBelow.value(i), k) < k + r by substituting szEq;
-            Natural.monus(NaturalsBelow.value(i), k) < r by Natural.lt_of_add_left_lt as qBelow;
+            k + (NaturalsBelow.value(i) ∸ k) < sz by substituting decomp;
+            k + (NaturalsBelow.value(i) ∸ k) < k + r by substituting szEq;
+            (NaturalsBelow.value(i) ∸ k) < r by Natural.lt_of_add_left_lt as qBelow;
             NaturalsBelow.value(i)
-                = k + NaturalsBelow.value(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))
+                = k + NaturalsBelow.value(NaturalsBelow.make(NaturalsBelow.value(i) ∸ k, qBelow))
                 by decomp as valMatch;
-            ext(i) = aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))
-                by extSuffix(i, NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow), valMatch)
+            ext(i) = aFamily(NaturalsBelow.make(NaturalsBelow.value(i) ∸ k, qBelow))
+                by extSuffix(i, NaturalsBelow.make(NaturalsBelow.value(i) ∸ k, qBelow), valMatch)
                 as extAtI;
             VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)),
-                T(aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))))
+                T(aFamily(NaturalsBelow.make(NaturalsBelow.value(i) ∸ k, qBelow))))
                 by VectorSpace.InSpanOf.member((j : NaturalsBelow(r)) ↦ T(aFamily(j)),
-                       NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow));
-            T(ext(i)) = T(aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow)))
+                       NaturalsBelow.make(NaturalsBelow.value(i) ∸ k, qBelow));
+            T(ext(i)) = T(aFamily(NaturalsBelow.make(NaturalsBelow.value(i) ∸ k, qBelow)))
                 by substituting extAtI;
             VectorSpace.InSpanOf((j : NaturalsBelow(r)) ↦ T(aFamily(j)), T(ext(i)))
-                by substituting (T(ext(i)) = T(aFamily(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(i), k), qBelow))));
+                by substituting (T(ext(i)) = T(aFamily(NaturalsBelow.make(NaturalsBelow.value(i) ∸ k, qBelow))));
             done
           }
       }
@@ -1981,22 +1981,22 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
             done
           } as frontValue;
         ∀ (x : Natural). cnt ≤ x → x < cnt + k →
-            NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x)) = Natural.monus(x, cnt)
+            NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x)) = x ∸ cnt
           by {
             take x : Natural; suppose cnt ≤ x as xGe; suppose x < cnt + k as xLt;
-            x = cnt + Natural.monus(x, cnt) by NaturalsBelow.decompose_at_least(cnt, x, xGe) as xDecomp;
-            Natural.monus(x, cnt) < k
-                by { cnt + Natural.monus(x, cnt) < cnt + k by substituting xDecomp;
+            x = cnt + (x ∸ cnt) by NaturalsBelow.decompose_at_least(cnt, x, xGe) as xDecomp;
+            (x ∸ cnt) < k
+                by { cnt + (x ∸ cnt) < cnt + k by substituting xDecomp;
                      done by Natural.lt_of_add_left_lt };
-            Natural.monus(x, cnt) < sz
-                by { Natural.monus(x, cnt) < k ≤ sz
+            (x ∸ cnt) < sz
+                by { (x ∸ cnt) < k ≤ sz
                          by { k ≤ k + r by Natural.less_or_equal_add_right; done by substituting szEq };
                      done } as monusBelowSz;
             NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x))
-               = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(cnt + Natural.monus(x, cnt)))
+               = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(cnt + (x ∸ cnt)))
                      by substituting xDecomp
-               = NaturalsBelow.value(idE(Natural.monus(x, cnt))) by VectorSpace.combineFunctions_shifted
-               = Natural.monus(x, cnt) by idEValue(Natural.monus(x, cnt), monusBelowSz);
+               = NaturalsBelow.value(idE(x ∸ cnt)) by VectorSpace.combineFunctions_shifted
+               = x ∸ cnt by idEValue(x ∸ cnt, monusBelowSz);
             done
           } as backValue;
 
@@ -2032,60 +2032,60 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
                       }
                     case ¬(b < cnt) as bBack: {
                         cnt ≤ b by Natural.less_or_equal_of_not_less_than as bGe;
-                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = Natural.monus(b, cnt)
+                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = b ∸ cnt
                             by backValue(b, bGe, bBelow) as bVal;
-                        Natural.monus(b, cnt) < k
-                            by { b = cnt + Natural.monus(b, cnt) by NaturalsBelow.decompose_at_least(cnt, b, bGe);
-                                 cnt + Natural.monus(b, cnt) < cnt + k by substituting (b = cnt + Natural.monus(b, cnt));
+                        (b ∸ cnt) < k
+                            by { b = cnt + (b ∸ cnt) by NaturalsBelow.decompose_at_least(cnt, b, bGe);
+                                 cnt + (b ∸ cnt) < cnt + k by substituting (b = cnt + (b ∸ cnt));
                                  done by Natural.lt_of_add_left_lt };
-                        k ≤ Natural.monus(b, cnt)
+                        k ≤ (b ∸ cnt)
                             by { k ≤ k + NaturalsBelow.value(sel(a)) by Natural.less_or_equal_add_right;
                                  k + NaturalsBelow.value(sel(a))
                                      = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) by aVal
                                      = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) by valEq
-                                     = Natural.monus(b, cnt) by bVal;
+                                     = b ∸ cnt by bVal;
                                  done };
-                        Natural.monus(b, cnt) < k ≤ Natural.monus(b, cnt);
-                        ¬(Natural.monus(b, cnt) < Natural.monus(b, cnt)) by Natural.lt_irreflexive;
+                        (b ∸ cnt) < k ≤ (b ∸ cnt);
+                        ¬((b ∸ cnt) < (b ∸ cnt)) by Natural.lt_irreflexive;
                         done
                       }
                   }
                 }
               case ¬(a < cnt) as aBack: {
                   cnt ≤ a by Natural.less_or_equal_of_not_less_than as aGe;
-                  NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) = Natural.monus(a, cnt)
+                  NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) = a ∸ cnt
                       by backValue(a, aGe, aBelow) as aVal;
-                  Natural.monus(a, cnt) < k
-                      by { a = cnt + Natural.monus(a, cnt) by NaturalsBelow.decompose_at_least(cnt, a, aGe);
-                           cnt + Natural.monus(a, cnt) < cnt + k by substituting (a = cnt + Natural.monus(a, cnt));
+                  (a ∸ cnt) < k
+                      by { a = cnt + (a ∸ cnt) by NaturalsBelow.decompose_at_least(cnt, a, aGe);
+                           cnt + (a ∸ cnt) < cnt + k by substituting (a = cnt + (a ∸ cnt));
                            done by Natural.lt_of_add_left_lt };
                   done by cases {
                     case b < cnt as bFront: {
                         NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = k + NaturalsBelow.value(sel(b))
                             by frontValue(b, bFront) as bVal;
-                        k ≤ Natural.monus(a, cnt)
+                        k ≤ (a ∸ cnt)
                             by { k ≤ k + NaturalsBelow.value(sel(b)) by Natural.less_or_equal_add_right;
                                  k + NaturalsBelow.value(sel(b))
                                      = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) by bVal
                                      = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) by valEq
-                                     = Natural.monus(a, cnt) by aVal;
+                                     = a ∸ cnt by aVal;
                                  done };
-                        Natural.monus(a, cnt) < k ≤ Natural.monus(a, cnt);
-                        ¬(Natural.monus(a, cnt) < Natural.monus(a, cnt)) by Natural.lt_irreflexive;
+                        (a ∸ cnt) < k ≤ (a ∸ cnt);
+                        ¬((a ∸ cnt) < (a ∸ cnt)) by Natural.lt_irreflexive;
                         done
                       }
                     case ¬(b < cnt) as bBack: {
                         cnt ≤ b by Natural.less_or_equal_of_not_less_than as bGe;
-                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = Natural.monus(b, cnt)
+                        NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) = b ∸ cnt
                             by backValue(b, bGe, bBelow) as bVal;
-                        Natural.monus(a, cnt) = Natural.monus(b, cnt)
-                           by { Natural.monus(a, cnt)
+                        (a ∸ cnt) = (b ∸ cnt)
+                           by { (a ∸ cnt)
                                   = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(a)) by aVal
                                   = NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(b)) by valEq
-                                  = Natural.monus(b, cnt) by bVal; done } as monusEq;
-                        b = cnt + Natural.monus(b, cnt) by NaturalsBelow.decompose_at_least(cnt, b, bGe) as bDecomp;
-                        a = cnt + Natural.monus(a, cnt) by NaturalsBelow.decompose_at_least(cnt, a, aGe)
-                          = cnt + Natural.monus(b, cnt) by substituting monusEq
+                                  = b ∸ cnt by bVal; done } as monusEq;
+                        b = cnt + (b ∸ cnt) by NaturalsBelow.decompose_at_least(cnt, b, bGe) as bDecomp;
+                        a = cnt + (a ∸ cnt) by NaturalsBelow.decompose_at_least(cnt, a, aGe)
+                          = cnt + (b ∸ cnt) by substituting monusEq
                           = b by bDecomp;
                         done
                       }

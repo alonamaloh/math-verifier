@@ -53,90 +53,90 @@ operator (∸) on (Natural, Natural) := Natural.monus
 -- (in this file and downstream) cites these lemmas instead. That's
 -- the discipline the opacity declaration is meant to enforce.
 
--- monus(a, zero) = a. Subtracting nothing (definitional).
-theorem Natural.monus_zero (a : Natural) : Natural.monus(a, 0) = a :=
+-- a ∸ zero = a. Subtracting nothing (definitional).
+theorem Natural.monus_zero (a : Natural) : a ∸ 0 = a :=
   done by unfolding Natural.monus
 
 -- The recursion equation: subtracting successor(b) is one more predecessor.
 theorem Natural.monus_successor (a b : Natural)
-        : Natural.monus(a, successor(b)) = Natural.predecessor(Natural.monus(a, b)) :=
+        : a ∸ successor(b) = Natural.predecessor(a ∸ b) :=
   done by unfolding Natural.monus, Natural.predecessor, Natural.Raw.predecessor, Natural
 
--- monus(zero, b) = zero. Every predecessor of zero is zero.
-theorem Natural.monus_zero_left (b : Natural) : Natural.monus(0, b) = 0 :=
+-- zero ∸ b = zero. Every predecessor of zero is zero.
+theorem Natural.monus_zero_left (b : Natural) : 0 ∸ b = 0 :=
   by induction on b with IH {
     case zero: done by Natural.monus_zero
     case successor(k):
-        Natural.monus(0, successor(k))
-           = Natural.predecessor(Natural.monus(0, k))   by Natural.monus_successor
+        0 ∸ successor(k)
+           = Natural.predecessor(0 ∸ k)   by Natural.monus_successor
            = Natural.predecessor(0)                      by IH
            = 0
   }
 
--- monus(successor(k), zero) = successor(k).
+-- successor(k) ∸ zero = successor(k).
 theorem Natural.monus_succ_zero (k : Natural)
-        : Natural.monus(successor(k), 0) = successor(k) :=
+        : successor(k) ∸ 0 = successor(k) :=
   done by unfolding Natural.monus
 
--- monus(successor(k), successor(j)) = monus(k, j). The recursive
+-- successor(k) ∸ successor(j) = k ∸ j. The recursive
 -- step. Lets downstream proofs "subtract a 1 from both sides." Induct
 -- on j, peeling one predecessor off each side via the recursion equation.
 theorem Natural.monus_succ_succ (k j : Natural)
-        : Natural.monus(successor(k), successor(j)) = Natural.monus(k, j) :=
+        : successor(k) ∸ successor(j) = k ∸ j :=
   by induction on j with IH {
     case zero:
-        Natural.monus(successor(k), successor(0))
-           = Natural.predecessor(Natural.monus(successor(k), 0))   by Natural.monus_successor
+        successor(k) ∸ successor(0)
+           = Natural.predecessor(successor(k) ∸ 0)   by Natural.monus_successor
            = Natural.predecessor(successor(k))                      by Natural.monus_succ_zero
            = k
-           = Natural.monus(k, 0)                                    by Natural.monus_zero
+           = k ∸ 0                                    by Natural.monus_zero
     case successor(m):
-        Natural.monus(successor(k), successor(successor(m)))
-           = Natural.predecessor(Natural.monus(successor(k), successor(m)))   by Natural.monus_successor
-           = Natural.predecessor(Natural.monus(k, m))                          by IH
-           = Natural.monus(k, successor(m))                                    by Natural.monus_successor
+        successor(k) ∸ successor(successor(m))
+           = Natural.predecessor(successor(k) ∸ successor(m))   by Natural.monus_successor
+           = Natural.predecessor(k ∸ m)                          by IH
+           = k ∸ successor(m)                                    by Natural.monus_successor
   }
 
 -- The `1 + n` forms of the two recursive-step characterising lemmas, so
 -- downstream proofs peel a 1 off monus without naming the constructor.
 theorem Natural.monus_one_plus_zero (k : Natural)
-        : Natural.monus(1 + k, 0) = 1 + k :=
-  Natural.monus(1 + k, 0)
-     = Natural.monus(successor(k), 0)
+        : (1 + k) ∸ 0 = 1 + k :=
+  (1 + k) ∸ 0
+     = successor(k) ∸ 0
      = successor(k)                      by Natural.monus_succ_zero
      = 1 + k
 
 theorem Natural.monus_one_plus_one_plus (k j : Natural)
-        : Natural.monus(1 + k, 1 + j) = Natural.monus(k, j) :=
-  Natural.monus(1 + k, 1 + j)
-     = Natural.monus(successor(k), successor(j))
-     = Natural.monus(k, j)                          by Natural.monus_succ_succ
+        : (1 + k) ∸ (1 + j) = k ∸ j :=
+  (1 + k) ∸ (1 + j)
+     = successor(k) ∸ successor(j)
+     = k ∸ j                          by Natural.monus_succ_succ
 
--- monus(a, a) = zero. Induct on a, using monus_one_plus_one_plus to peel
+-- a ∸ a = zero. Induct on a, using monus_one_plus_one_plus to peel
 -- a 1 off both sides.
-theorem Natural.monus_self (a : Natural) : Natural.monus(a, a) = 0 :=
+theorem Natural.monus_self (a : Natural) : a ∸ a = 0 :=
   by induction on a with IH {
     case base: done
     case step(k):
-        Natural.monus(1 + k, 1 + k)
-           = Natural.monus(k, k)
+        (1 + k) ∸ (1 + k)
+           = k ∸ k
            = 0                     by IH
   }
 
 -- Subtracting a summand recovers the other: (b + c) − b = c. Induct on b.
 theorem Natural.monus_add_left (b : Natural)
-        : ∀ (c : Natural). Natural.monus(b + c, b) = c :=
+        : ∀ (c : Natural). (b + c) ∸ b = c :=
   by induction on b with IH {
     case base: {
         take c : Natural;
-        Natural.monus(0 + c, 0)
+        (0 + c) ∸ 0
            = c
       }
     case step(bPredecessor): {
         take c : Natural;
-        Natural.monus((1 + bPredecessor) + c, 1 + bPredecessor)
-           = Natural.monus(1 + (bPredecessor + c), 1 + bPredecessor)
-           = Natural.monus(bPredecessor + c, bPredecessor)
+        ((1 + bPredecessor) + c) ∸ (1 + bPredecessor)
+           = (1 + (bPredecessor + c)) ∸ (1 + bPredecessor)
+           = (bPredecessor + c) ∸ bPredecessor
            = c by IH(c)
       }
   }
@@ -144,44 +144,44 @@ theorem Natural.monus_add_left (b : Natural)
 -- Cancelling a common left summand: (a + c) − (a + d) = c − d. Induct on a,
 -- peeling a 1 off both arguments with monus_one_plus_one_plus each step.
 theorem Natural.monus_add_common_left (a : Natural)
-        : ∀ (c d : Natural). Natural.monus(a + c, a + d) = Natural.monus(c, d) :=
+        : ∀ (c d : Natural). (a + c) ∸ (a + d) = c ∸ d :=
   by induction on a with IH {
     case base: {
         take c : Natural;
         take d : Natural;
-        Natural.monus(0 + c, 0 + d)
-           = Natural.monus(c, d)
+        (0 + c) ∸ (0 + d)
+           = c ∸ d
       }
     case step(k): {
         take c : Natural;
         take d : Natural;
-        Natural.monus((1 + k) + c, (1 + k) + d)
-           = Natural.monus(1 + (k + c), 1 + (k + d))
-           = Natural.monus(k + c, k + d)
-           = Natural.monus(c, d) by IH(c, d)
+        ((1 + k) + c) ∸ ((1 + k) + d)
+           = (1 + (k + c)) ∸ (1 + (k + d))
+           = (k + c) ∸ (k + d)
+           = c ∸ d by IH(c, d)
       }
   }
 
 -- The right-hand companion: (a + c) − (b + c) = a − b. Reorder each side
 -- to a common left summand, then cancel it.
 theorem Natural.monus_add_common_right (a b c : Natural)
-        : Natural.monus(a + c, b + c) = Natural.monus(a, b) :=
-  Natural.monus(a + c, b + c)
-     = Natural.monus(c + a, c + b)
-     = Natural.monus(a, b)
+        : (a + c) ∸ (b + c) = a ∸ b :=
+  (a + c) ∸ (b + c)
+     = (c + a) ∸ (c + b)
+     = a ∸ b
 
--- If a ≤ b, then monus(a, b) = zero. Induct on b, inner case on a.
+-- If a ≤ b, then a ∸ b = zero. Induct on b, inner case on a.
 -- All access to monus is via the characterising lemmas above —
 -- monus_zero_left for the b=0 / a=0 corners, monus_succ_succ to
 -- peel both sides in the recursive case.
 theorem Natural.le_implies_monus_zero (b : Natural)
-        : ∀ (a : Natural). a ≤ b → Natural.monus(a, b) = 0 :=
+        : ∀ (a : Natural). a ≤ b → a ∸ b = 0 :=
   by induction on b with IH {
     case base: {
         take a : Natural;
         suppose a ≤ 0 as aLessOrEqualZero;
-        Natural.monus(a, 0)
-           = Natural.monus(0, 0)
+        a ∸ 0
+           = 0 ∸ 0
            = 0
       }
     case step(predecessorB): {
@@ -194,8 +194,8 @@ theorem Natural.le_implies_monus_zero (b : Natural)
               -- peel a 1 off both sides, then recurse (outer IH at
               -- predecessorB on the descended bound 1 + k ≤ 1 + predecessorB).
               k ≤ predecessorB by Natural.le_cancel_one_plus as descended;
-              Natural.monus(1 + k, 1 + predecessorB)
-                 = Natural.monus(k, predecessorB)
+              (1 + k) ∸ (1 + predecessorB)
+                 = k ∸ predecessorB
                  = 0                                 by IH(k, descended)
             }
         }

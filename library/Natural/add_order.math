@@ -185,11 +185,11 @@ theorem Natural.le_of_le_one_plus_of_ne (j m : Natural)
   done by Natural.le_of_lt_add_one
 }
 
--- Cancel a right addend through monus: (a + b) − b = a.
+-- Cancel a right addend through monus: (a + b) ∸ b = a.
 theorem Natural.monus_add_cancel_right (a b : Natural)
-        : Natural.monus(a + b, b) = a :=
-  Natural.monus(a + b, b)
-     = Natural.monus(b + a, b)
+        : (a + b) ∸ b = a :=
+  (a + b) ∸ b
+     = (b + a) ∸ b
      = a
 
 -- a ≤ b + a (a appears on the right).
@@ -277,11 +277,11 @@ theorem Natural.le_to_add (smaller larger : Natural)
 
 
 -- Subtracting one fewer leaves one more: for j < n,
--- n -̇ j = 1 + (n -̇ (j + 1)).
+-- n ∸ j = 1 + (n ∸ (j + 1)).
 theorem Natural.monus_successor_shift (n : Natural)
         : ∀ (j : Natural). successor(j) ≤ n
-          → Natural.monus(n, j)
-            = successor(Natural.monus(n, successor(j))) :=
+          → n ∸ j
+            = successor(n ∸ successor(j)) :=
   unfold Natural.add in
   by induction on n with IH {
     case zero:
@@ -291,46 +291,43 @@ theorem Natural.monus_successor_shift (n : Natural)
         (j : Natural) (inRange : successor(j) ≤ successor(nPredecessor)) ↦
           done by cases {
             case j = 0:
-                Natural.monus(successor(nPredecessor), 0)
+                successor(nPredecessor) ∸ 0
                    = successor(nPredecessor)
-                   = successor(Natural.monus(nPredecessor, 0))
-                   = successor(
-                         Natural.monus(successor(nPredecessor), successor(0)))
+                   = successor(nPredecessor ∸ 0)
+                   = successor(successor(nPredecessor) ∸ successor(0))
             case j = successor(jPredecessor) for some jPredecessor: {
                 successor(jPredecessor) ≤ nPredecessor as innerRange;
-                Natural.monus(successor(nPredecessor), successor(jPredecessor))
-                   = Natural.monus(nPredecessor, jPredecessor)
-                   = successor(Natural.monus(nPredecessor, successor(jPredecessor)))
+                successor(nPredecessor) ∸ successor(jPredecessor)
+                   = nPredecessor ∸ jPredecessor
+                   = successor(nPredecessor ∸ successor(jPredecessor))
                          by IH(jPredecessor, innerRange)
-                   = successor(
-                         Natural.monus(successor(nPredecessor),
-                                       successor(successor(jPredecessor))))
+                   = successor(successor(nPredecessor) ∸ successor(successor(jPredecessor)))
               }
           }
   }
 
 -- The `1 + j` form of the shift, for consumers that keep `Natural` opaque
--- (no `successor` in expressions): for j < n, n -̇ j = 1 + (n -̇ (1 + j)).
+-- (no `successor` in expressions): for j < n, n ∸ j = 1 + (n ∸ (1 + j)).
 theorem Natural.monus_one_plus_shift (n j : Natural) (inRange : j < n)
-        : Natural.monus(n, j) = 1 + Natural.monus(n, 1 + j) := {
+        : n ∸ j = 1 + (n ∸ (1 + j)) := {
   successor(j) ≤ n;
-  Natural.monus(n, j)
-     = successor(Natural.monus(n, successor(j)))
-     = 1 + Natural.monus(n, 1 + j)
+  n ∸ j
+     = successor(n ∸ successor(j))
+     = 1 + (n ∸ (1 + j))
 }
 
 -- Peeling a successor off the minuend, below the diagonal:
--- (a + 1) − b = (a − b) + 1 when b ≤ a.
+-- (a + 1) ∸ b = (a ∸ b) + 1 when b ≤ a.
 theorem Natural.monus_succ_left (b : Natural)
         : ∀ (a : Natural). b ≤ a
-          → Natural.monus(successor(a), b) = successor(Natural.monus(a, b)) :=
+          → successor(a) ∸ b = successor(a ∸ b) :=
   by induction on b with IH {
     case zero: {
         take a : Natural;
         suppose 0 ≤ a as bound;
-        Natural.monus(successor(a), 0)
+        successor(a) ∸ 0
            = successor(a)
-           = successor(Natural.monus(a, 0))
+           = successor(a ∸ 0)
       }
     case successor(bPredecessor): {
         take a : Natural;
@@ -343,13 +340,11 @@ theorem Natural.monus_succ_left (b : Natural)
           case a = successor(aPredecessor) for some aPredecessor: {
               successor(bPredecessor) ≤ successor(aPredecessor);
               bPredecessor ≤ aPredecessor as innerBound;
-              Natural.monus(successor(successor(aPredecessor)),
-                       successor(bPredecessor))
-                 = Natural.monus(successor(aPredecessor), bPredecessor)
-                 = successor(Natural.monus(aPredecessor, bPredecessor))
+              successor(successor(aPredecessor)) ∸ successor(bPredecessor)
+                 = successor(aPredecessor) ∸ bPredecessor
+                 = successor(aPredecessor ∸ bPredecessor)
                        by IH(aPredecessor, innerBound)
-                 = successor(Natural.monus(successor(aPredecessor),
-                       successor(bPredecessor)))
+                 = successor(successor(aPredecessor) ∸ successor(bPredecessor))
             }
         }
       }

@@ -207,14 +207,14 @@ theorem NaturalsBelow.skipValue_above (jv i : Natural) (notBelow : ¬(i < jv))
   done by Logic.if_negative
 
 definition NaturalsBelow.skipInverseValue (jv x : Natural) : Natural :=
-  if x < jv then x else Natural.monus(x, 1)
+  if x < jv then x else x ∸ 1
 
 theorem NaturalsBelow.skipInverseValue_below (jv x : Natural) (below : x < jv)
         : NaturalsBelow.skipInverseValue(jv, x) = x :=
   done by Logic.if_positive
 
 theorem NaturalsBelow.skipInverseValue_above (jv x : Natural) (notBelow : ¬(x < jv))
-        : NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1) :=
+        : NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1 :=
   done by Logic.if_negative
 
 -- `skipValue(jv, i) < 1 + count` when `i < count`: the value is at most `1 + i`.
@@ -274,10 +274,10 @@ theorem NaturalsBelow.skip_avoids {count : Natural} (jv : Natural) (i : Naturals
 }
 
 -- `monus(1 + i, 1) = i`: peel a 1 off both sides.
-theorem NaturalsBelow.monus_one_plus_one (i : Natural) : Natural.monus(1 + i, 1) = i :=
-  Natural.monus(1 + i, 1)
-     = Natural.monus(1 + i, 1 + 0)
-     = Natural.monus(i, 0)          by Natural.monus_one_plus_one_plus
+theorem NaturalsBelow.monus_one_plus_one (i : Natural) : (1 + i) ∸ 1 = i :=
+  (1 + i) ∸ 1
+     = (1 + i) ∸ (1 + 0)
+     = i ∸ 0          by Natural.monus_one_plus_one_plus
      = i                            by Natural.monus_zero
 
 -- `skipInverse` undoes `skip`: the round trip on values.
@@ -296,11 +296,11 @@ theorem NaturalsBelow.skipInverse_skipValue (jv i : Natural)
         ¬(i < jv) by notBelow;
         NaturalsBelow.skipValue(jv, i) = 1 + i by NaturalsBelow.skipValue_above as sv;
         ¬(1 + i < jv) by { suppose 1 + i < jv as bad; jv ≤ i < 1 + i < jv; done };
-        NaturalsBelow.skipInverseValue(jv, 1 + i) = Natural.monus(1 + i, 1)
+        NaturalsBelow.skipInverseValue(jv, 1 + i) = (1 + i) ∸ 1
             by NaturalsBelow.skipInverseValue_above as siv;
         NaturalsBelow.skipInverseValue(jv, NaturalsBelow.skipValue(jv, i))
            = NaturalsBelow.skipInverseValue(jv, 1 + i)   by substituting sv
-           = Natural.monus(1 + i, 1)                     by siv
+           = (1 + i) ∸ 1                                 by siv
            = i                                            by NaturalsBelow.monus_one_plus_one
       }
   }
@@ -333,9 +333,9 @@ theorem NaturalsBelow.skipInverseValue_bound (count jv x : Natural)
         x = 1 + p as xIsSucc;
         jv ≤ p by { jv < x = 1 + p; done by Natural.le_of_lt_one_plus };
         ¬(x < jv) by { suppose x < jv as bad; jv ≤ x < jv; done };
-        NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1)
+        NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1
             by NaturalsBelow.skipInverseValue_above as siv;
-        Natural.monus(x, 1) = Natural.monus(1 + p, 1)   by substituting xIsSucc
+        x ∸ 1 = (1 + p) ∸ 1   by substituting xIsSucc
                             = p                          by NaturalsBelow.monus_one_plus_one
             as monusIsP;
         1 + p < 1 + count by substituting xIsSucc;
@@ -346,7 +346,7 @@ theorem NaturalsBelow.skipInverseValue_bound (count jv x : Natural)
           p + (1 + c) = count by Natural.add_cancel_left;
           done by Natural.lt_intro
         };
-        NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1)   by siv
+        NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1   by siv
                                               = p                      by monusIsP
                                               < count;
         done
@@ -382,14 +382,14 @@ theorem NaturalsBelow.skipValue_skipInverse (jv x : Natural) (ne : x ≠ jv)
         jv ≤ p by { jv < x = 1 + p; done by Natural.le_of_lt_one_plus };
         ¬(p < jv) by { suppose p < jv as bad; jv ≤ p < jv; done };
         ¬(x < jv) by { suppose x < jv as bad; jv ≤ x < jv; done };
-        NaturalsBelow.skipInverseValue(jv, x) = Natural.monus(x, 1)
+        NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1
             by NaturalsBelow.skipInverseValue_above as siv;
-        Natural.monus(x, 1) = Natural.monus(1 + p, 1)   by substituting xIsSucc
+        x ∸ 1 = (1 + p) ∸ 1   by substituting xIsSucc
                             = p                          by NaturalsBelow.monus_one_plus_one
             as monusIsP;
         NaturalsBelow.skipValue(jv, p) = 1 + p by NaturalsBelow.skipValue_above as svp;
         NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, x))
-           = NaturalsBelow.skipValue(jv, Natural.monus(x, 1))   by substituting siv
+           = NaturalsBelow.skipValue(jv, x ∸ 1)   by substituting siv
            = NaturalsBelow.skipValue(jv, p)                      by substituting monusIsP
            = 1 + p                                                by svp
            = x                                                    by xIsSucc

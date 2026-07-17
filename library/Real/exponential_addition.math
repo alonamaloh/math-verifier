@@ -134,28 +134,28 @@ theorem Real.exponentialTerm_binomial_split (x y : ℝ) (k : ℕ)
           = Real.partialSum(
                 (i : ℕ) ↦
                     Real.exponentialTerm(x, i)
-                    * Real.exponentialTerm(y, Natural.monus(k, i)),
+                    * Real.exponentialTerm(y, k ∸ i),
                 1 + k) := {
   -- Each summand below the cut: fold the coefficient into the two
   -- reciprocal factorials.
   ∀ (i : ℕ). i < 1 + k
         → (1 / (k! : ℝ))
-              * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ Natural.monus(k, i)))
-          = Real.exponentialTerm(x, i) * Real.exponentialTerm(y, Natural.monus(k, i))
+              * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ (k ∸ i)))
+          = Real.exponentialTerm(x, i) * Real.exponentialTerm(y, k ∸ i)
       by (i : ℕ) (iLessThan : i < 1 + k) ↦ {
            i ≤ k by Natural.le_of_lt_one_plus;
            choose d such that k = i + d from Natural.subtraction_witness;
            i + d = k as kJoin;
-           Natural.monus(k, i) = d
+           k ∸ i = d
                by {
-                 Natural.monus(i + d, i) = d;
+                 (i + d) ∸ i = d;
                  done by substituting kJoin
                } as monusCollapse;
            (1 / (k! : ℝ)) * (Natural.binomial(k, i) : ℝ)
                  = (1 / (i! : ℝ)) * (1 / (d! : ℝ))
                by substituting kJoin as coefficientSplit;
            (1 / (k! : ℝ))
-                    * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ Natural.monus(k, i)))
+                    * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ (k ∸ i)))
               = (1 / (k! : ℝ))
                     * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ d))
                     by monusCollapse
@@ -167,7 +167,7 @@ theorem Real.exponentialTerm_binomial_split (x y : ℝ) (k : ℕ)
               = ((1 / (i! : ℝ)) * x ^ i)
                     * ((1 / (d! : ℝ)) * y ^ d)
               = Real.exponentialTerm(x, i) * Real.exponentialTerm(y, d)
-              = Real.exponentialTerm(x, i) * Real.exponentialTerm(y, Natural.monus(k, i))
+              = Real.exponentialTerm(x, i) * Real.exponentialTerm(y, k ∸ i)
                     by monusCollapse
          };
   -- Scale the binomial expansion through the sum and rewrite each term.
@@ -176,17 +176,17 @@ theorem Real.exponentialTerm_binomial_split (x y : ℝ) (k : ℕ)
      = (1 / (k! : ℝ))
            * Real.partialSum(
                  (i : ℕ) ↦
-                     (Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ Natural.monus(k, i)),
+                     (Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ (k ∸ i)),
                  1 + k)
            by Real.binomial_theorem
      = Real.partialSum(
            (i : ℕ) ↦
                (1 / (k! : ℝ))
-               * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ Natural.monus(k, i))),
+               * ((Natural.binomial(k, i) : ℝ) * (x ^ i * y ^ (k ∸ i))),
            1 + k)
            by Real.partialSum_scale
      = Real.partialSum(
-           (i : ℕ) ↦ Real.exponentialTerm(x, i) * Real.exponentialTerm(y, Natural.monus(k, i)),
+           (i : ℕ) ↦ Real.exponentialTerm(x, i) * Real.exponentialTerm(y, k ∸ i),
            1 + k)
            by Real.partialSum_pointwise_below
 }
@@ -200,11 +200,11 @@ theorem Real.cauchy_product_exchange (a b : ℕ → ℝ) (n : ℕ)
         : Real.partialSum(
               (k : ℕ) ↦
                   Real.partialSum(
-                      (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+                      (i : ℕ) ↦ a(i) * b(k ∸ i), 1 + k),
               n)
           = Real.partialSum(
                 (i : ℕ) ↦
-                    a(i) * Real.partialSum(b, Natural.monus(n, i)),
+                    a(i) * Real.partialSum(b, n ∸ i),
                 n) :=
   by induction on n with IH {
     case n = 0: done
@@ -212,94 +212,94 @@ theorem Real.cauchy_product_exchange (a b : ℕ → ℝ) (n : ℕ)
       Real.partialSum(
                 (k : ℕ) ↦
                     Real.partialSum(
-                        (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+                        (i : ℕ) ↦ a(i) * b(k ∸ i), 1 + k),
                 p)
             = Real.partialSum(
                   (i : ℕ) ↦
-                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      a(i) * Real.partialSum(b, p ∸ i),
                   p)
           by IH as exchangeTail;
       -- Padding the weighted row-p sum with its vanishing head:
       -- a(p)·B(p − p) = a(p)·B(0) = 0.
-      Natural.monus(p, p) = 0 as monusDiagonal;
+      p ∸ p = 0 as monusDiagonal;
       Real.partialSum(
                 (i : ℕ) ↦
-                    a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                    a(i) * Real.partialSum(b, p ∸ i),
                 1 + p)
             = Real.partialSum(
                   (i : ℕ) ↦
-                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      a(i) * Real.partialSum(b, p ∸ i),
                   p)
-              + a(p) * Real.partialSum(b, Natural.monus(p, p))
+              + a(p) * Real.partialSum(b, p ∸ p)
             = Real.partialSum(
                   (i : ℕ) ↦
-                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      a(i) * Real.partialSum(b, p ∸ i),
                   p)
               + a(p) * Real.partialSum(b, 0)
                   by monusDiagonal
             = Real.partialSum(
                   (i : ℕ) ↦
-                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      a(i) * Real.partialSum(b, p ∸ i),
                   p)
               + a(p) * Real.zero
             = Real.partialSum(
                   (i : ℕ) ↦
-                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      a(i) * Real.partialSum(b, p ∸ i),
                   p)
                   by ring as headPadding;
       -- Below the cut, peeling one term off n − i absorbs one
       -- diagonal term into each weight.
       ∀ (i : ℕ). i < 1 + p
-            → a(i) * Real.partialSum(b, Natural.monus(p, i))
-                  + a(i) * b(Natural.monus(p, i))
-              = a(i) * Real.partialSum(b, Natural.monus(1 + p, i))
+            → a(i) * Real.partialSum(b, p ∸ i)
+                  + a(i) * b(p ∸ i)
+              = a(i) * Real.partialSum(b, (1 + p) ∸ i)
           by (i : ℕ) (iLessThan : i < 1 + p) ↦ {
                i ≤ p by Natural.le_of_lt_one_plus;
-               Natural.monus(1 + p, i) = 1 + Natural.monus(p, i) as monusStep;
-               a(i) * Real.partialSum(b, Natural.monus(p, i))
-                        + a(i) * b(Natural.monus(p, i))
-                  = a(i) * (Real.partialSum(b, Natural.monus(p, i))
-                                + b(Natural.monus(p, i)))
-                  = a(i) * Real.partialSum(b, 1 + Natural.monus(p, i))
-                  = a(i) * Real.partialSum(b, Natural.monus(1 + p, i))
+               (1 + p) ∸ i = 1 + (p ∸ i) as monusStep;
+               a(i) * Real.partialSum(b, p ∸ i)
+                        + a(i) * b(p ∸ i)
+                  = a(i) * (Real.partialSum(b, p ∸ i)
+                                + b(p ∸ i))
+                  = a(i) * Real.partialSum(b, 1 + (p ∸ i))
+                  = a(i) * Real.partialSum(b, (1 + p) ∸ i)
                         by monusStep
              };
       Real.partialSum(
                (k : ℕ) ↦
                    Real.partialSum(
-                       (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+                       (i : ℕ) ↦ a(i) * b(k ∸ i), 1 + k),
                1 + p)
          = Real.partialSum(
                (k : ℕ) ↦
                    Real.partialSum(
-                       (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+                       (i : ℕ) ↦ a(i) * b(k ∸ i), 1 + k),
                p)
            + Real.partialSum(
-                 (i : ℕ) ↦ a(i) * b(Natural.monus(p, i)), 1 + p)
+                 (i : ℕ) ↦ a(i) * b(p ∸ i), 1 + p)
                by Real.partialSum_add_one
          = Real.partialSum(
                (i : ℕ) ↦
-                   a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                   a(i) * Real.partialSum(b, p ∸ i),
                p)
            + Real.partialSum(
-                 (i : ℕ) ↦ a(i) * b(Natural.monus(p, i)), 1 + p)
+                 (i : ℕ) ↦ a(i) * b(p ∸ i), 1 + p)
                by exchangeTail
          = Real.partialSum(
                (i : ℕ) ↦
-                   a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                   a(i) * Real.partialSum(b, p ∸ i),
                1 + p)
            + Real.partialSum(
-                 (i : ℕ) ↦ a(i) * b(Natural.monus(p, i)), 1 + p)
+                 (i : ℕ) ↦ a(i) * b(p ∸ i), 1 + p)
                by headPadding
          = Real.partialSum(
                (i : ℕ) ↦
-                   a(i) * Real.partialSum(b, Natural.monus(p, i))
-                   + a(i) * b(Natural.monus(p, i)),
+                   a(i) * Real.partialSum(b, p ∸ i)
+                   + a(i) * b(p ∸ i),
                1 + p)
                by Real.partialSum_add
          = Real.partialSum(
                (i : ℕ) ↦
-                   a(i) * Real.partialSum(b, Natural.monus(1 + p, i)),
+                   a(i) * Real.partialSum(b, (1 + p) ∸ i),
                1 + p)
                by Real.partialSum_pointwise_below
     }
@@ -315,7 +315,7 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
                   - Real.partialSum(
                         (k : ℕ) ↦
                             Real.partialSum(
-                                (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                (i : ℕ) ↦ a(i) * b(k ∸ i),
                                 1 + k),
                         n))
           ≤ Real.partialSum((k : ℕ) ↦ abs(a(k)), n)
@@ -323,19 +323,19 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
             - Real.partialSum(
                   (k : ℕ) ↦
                       Real.partialSum(
-                          (i : ℕ) ↦ abs(a(i)) * abs(b(Natural.monus(k, i))),
+                          (i : ℕ) ↦ abs(a(i)) * abs(b(k ∸ i)),
                           1 + k),
                   n) := {
   Real.partialSum(
             (k : ℕ) ↦
                 Real.partialSum(
-                    (i : ℕ) ↦ abs(a(i)) * abs(b(Natural.monus(k, i))),
+                    (i : ℕ) ↦ abs(a(i)) * abs(b(k ∸ i)),
                     1 + k),
             n)
         = Real.partialSum(
               (i : ℕ) ↦
                   abs(a(i))
-                  * Real.partialSum((k : ℕ) ↦ abs(b(k)), Natural.monus(n, i)),
+                  * Real.partialSum((k : ℕ) ↦ abs(b(k)), n ∸ i),
               n)
       by Real.cauchy_product_exchange(
              a := (k : ℕ) ↦ abs(a(k)), b := (k : ℕ) ↦ abs(b(k))) as absExchange;
@@ -352,17 +352,17 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
   -- Each weighted window of B is dominated by the weighted window of Babs.
   ∀ (i : ℕ). i < n
         → abs(a(i) * Real.partialSum(b, n)
-                  - a(i) * Real.partialSum(b, Natural.monus(n, i)))
+                  - a(i) * Real.partialSum(b, n ∸ i))
           ≤ abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
             - abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                  Natural.monus(n, i))
+                  n ∸ i)
       by (i : ℕ) (iLessThan : i < n) ↦ {
            i ≤ n by Natural.LessThan.weaken;
            choose e such that n = i + e from Natural.subtraction_witness;
            i + e = n as nJoin;
-           Natural.monus(n, i) = e
+           n ∸ i = e
                by {
-                 Natural.monus(i + e, i) = e;
+                 (i + e) ∸ i = e;
                  done by substituting nJoin
                } as monusCollapse;
            abs(Real.partialSum(b, n) - Real.partialSum(b, e))
@@ -378,7 +378,7 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
            Real.zero ≤ abs(a(i));
            Real.IsNonneg(abs(a(i)));
            abs(a(i) * Real.partialSum(b, n)
-                    - a(i) * Real.partialSum(b, Natural.monus(n, i)))
+                    - a(i) * Real.partialSum(b, n ∸ i))
               = abs(a(i) * Real.partialSum(b, n)
                     - a(i) * Real.partialSum(b, e))
                     by monusCollapse
@@ -398,39 +398,39 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
                 - abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), e)
               = abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                 - abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                      Natural.monus(n, i))
+                      n ∸ i)
                     by monusCollapse
          };
   abs(Real.partialSum(a, n) * Real.partialSum(b, n)
                - Real.partialSum(
                      (k : ℕ) ↦
                          Real.partialSum(
-                             (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                             (i : ℕ) ↦ a(i) * b(k ∸ i),
                              1 + k),
                      n))
      = abs(Real.partialSum(
                (i : ℕ) ↦ a(i) * Real.partialSum(b, n), n)
            - Real.partialSum(
-                 (i : ℕ) ↦ a(i) * Real.partialSum(b, Natural.monus(n, i)),
+                 (i : ℕ) ↦ a(i) * Real.partialSum(b, n ∸ i),
                  n))
            by signedScale
      = abs(Real.partialSum(
                (i : ℕ) ↦
                    a(i) * Real.partialSum(b, n)
-                   - a(i) * Real.partialSum(b, Natural.monus(n, i)),
+                   - a(i) * Real.partialSum(b, n ∸ i),
                n))
            by Real.partialSum_subtract
      ≤ Real.partialSum(
            (i : ℕ) ↦
                abs(a(i) * Real.partialSum(b, n)
-                   - a(i) * Real.partialSum(b, Natural.monus(n, i))),
+                   - a(i) * Real.partialSum(b, n ∸ i)),
            n)
            by Real.abs_partialSum_le
      ≤ Real.partialSum(
            (i : ℕ) ↦
                abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                - abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                     Natural.monus(n, i)),
+                     n ∸ i),
            n)
            by Real.partialSum_le_pointwise
      = Real.partialSum(
@@ -440,7 +440,7 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
        - Real.partialSum(
              (i : ℕ) ↦
                  abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                     Natural.monus(n, i)),
+                     n ∸ i),
              n)
            by Real.partialSum_subtract
      = Real.partialSum((k : ℕ) ↦ abs(a(k)), n)
@@ -448,7 +448,7 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
        - Real.partialSum(
              (i : ℕ) ↦
                  abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                     Natural.monus(n, i)),
+                     n ∸ i),
              n)
            by absScale
      = Real.partialSum((k : ℕ) ↦ abs(a(k)), n)
@@ -456,7 +456,7 @@ theorem Real.cauchy_product_difference_bound (a b : ℕ → ℝ) (n : ℕ)
        - Real.partialSum(
              (k : ℕ) ↦
                  Real.partialSum(
-                     (i : ℕ) ↦ abs(a(i)) * abs(b(Natural.monus(k, i))),
+                     (i : ℕ) ↦ abs(a(i)) * abs(b(k ∸ i)),
                      1 + k),
              n)
            by absExchange
@@ -483,7 +483,7 @@ theorem Real.cauchy_product_converges
               Real.partialSum(
                   (k : ℕ) ↦
                       Real.partialSum(
-                          (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                          (i : ℕ) ↦ a(i) * b(k ∸ i),
                           1 + k)),
               aLimit * bLimit) := {
   -- The squares converge, signed and absolute.
@@ -505,28 +505,28 @@ theorem Real.cauchy_product_converges
   ∀ (k : ℕ).
           Real.zero
           ≤ Real.partialSum(
-                (i : ℕ) ↦ abs(a(i)) * abs(b(Natural.monus(k, i))),
+                (i : ℕ) ↦ abs(a(i)) * abs(b(k ∸ i)),
                 1 + k)
       by (k : ℕ) ↦
            Real.partialSum_nonneg(termsNonneg := (j : ℕ) ↦ {
                  Real.zero ≤ abs(a(j));
-                 Real.zero ≤ abs(b(Natural.monus(k, j)));
+                 Real.zero ≤ abs(b(k ∸ j));
                  Real.IsNonneg(abs(a(j)));
-                 Real.IsNonneg(abs(b(Natural.monus(k, j))));
-                 Real.IsNonneg(abs(a(j)) * abs(b(Natural.monus(k, j))));
+                 Real.IsNonneg(abs(b(k ∸ j)));
+                 Real.IsNonneg(abs(a(j)) * abs(b(k ∸ j)));
                  done by Real.LessOrEqual_zero_of_IsNonneg
                });
   ∀ (i j : ℕ). i ≤ j
         → Real.partialSum(
               (k : ℕ) ↦
                   Real.partialSum(
-                      (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                      (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                       1 + k),
               i)
           ≤ Real.partialSum(
                 (k : ℕ) ↦
                     Real.partialSum(
-                        (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                        (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                         1 + k),
                 j)
       by (i j : ℕ) (iLeqJ : i ≤ j) ↦ {
@@ -565,7 +565,7 @@ theorem Real.cauchy_product_converges
           Real.partialSum(
               (k : ℕ) ↦
                   Real.partialSum(
-                      (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                      (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                       1 + k),
               n)
           ≤ Real.partialSum((k : ℕ) ↦ abs(a(k)), n)
@@ -574,24 +574,24 @@ theorem Real.cauchy_product_converges
            ∀ (i : ℕ). i < n
                  → abs(a(i))
                        * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                             Natural.monus(n, i))
+                             n ∸ i)
                    ≤ abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                by (i : ℕ) (iLessThan : i < n) ↦ {
                     i ≤ n by Natural.LessThan.weaken;
                     choose e such that n = i + e
                         from Natural.subtraction_witness;
-                    Natural.monus(n, i) ≤ n;
+                    n ∸ i ≤ n;
                     Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                              Natural.monus(n, i))
+                              n ∸ i)
                           ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                         by Real.partialSum_monotone_of_nonneg;
                     Real.zero ≤ abs(a(i));
                     Real.IsNonneg(abs(a(i)));
                     abs(a(i))
                              * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                                   Natural.monus(n, i))
+                                   n ∸ i)
                        = Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                             Natural.monus(n, i)) * abs(a(i))
+                             n ∸ i) * abs(a(i))
                        ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)), n) * abs(a(i))
                              by Real.LessOrEqual.multiply_by_nonneg_right
                        = abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
@@ -599,14 +599,14 @@ theorem Real.cauchy_product_converges
            Real.partialSum(
                     (k : ℕ) ↦
                         Real.partialSum(
-                            (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                            (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                             1 + k),
                     n)
               = Real.partialSum(
                     (i : ℕ) ↦
                         abs(a(i))
                         * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                              Natural.monus(n, i)),
+                              n ∸ i),
                     n)
                     by Real.cauchy_product_exchange(
                            a := (k : ℕ) ↦ abs(a(k)),
@@ -626,7 +626,7 @@ theorem Real.cauchy_product_converges
           Real.partialSum(
               (k : ℕ) ↦
                   Real.partialSum(
-                      (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                      (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                       1 + k),
               n)
           ≤ aAbsoluteLimit * bAbsoluteLimit
@@ -634,7 +634,7 @@ theorem Real.cauchy_product_converges
            Real.partialSum(
                      (k : ℕ) ↦
                          Real.partialSum(
-                             (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                             (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                              1 + k),
                      n)
                  ≤ Real.partialSum((k : ℕ) ↦ abs(a(k)), n)
@@ -645,7 +645,7 @@ theorem Real.cauchy_product_converges
            Real.partialSum(
                      (k : ℕ) ↦
                          Real.partialSum(
-                             (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                             (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                              1 + k),
                      n)
                  ≤ aAbsoluteLimit * bAbsoluteLimit;
@@ -656,7 +656,7 @@ theorem Real.cauchy_product_converges
           Real.partialSum(
               (k : ℕ) ↦
                   Real.partialSum(
-                      (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                      (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                       1 + k)),
           triangleAbsoluteLimit)
       as absoluteTriangleConverges
@@ -667,7 +667,7 @@ theorem Real.cauchy_product_converges
           Real.partialSum(
               (k : ℕ) ↦
                   Real.partialSum(
-                      (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                      (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                       1 + k),
               n)
           ≤ triangleAbsoluteLimit
@@ -676,7 +676,7 @@ theorem Real.cauchy_product_converges
                s := Real.partialSum(
                    (k : ℕ) ↦
                        Real.partialSum(
-                           (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                           (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                            1 + k)),
                converges := absoluteTriangleConverges,
                N := n,
@@ -688,7 +688,7 @@ theorem Real.cauchy_product_converges
           ≤ Real.partialSum(
                 (k : ℕ) ↦
                     Real.partialSum(
-                        (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                        (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                         1 + k),
                 n + n)
       by (n : ℕ) ↦ {
@@ -696,7 +696,7 @@ theorem Real.cauchy_product_converges
                  → abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                    ≤ abs(a(i))
                      * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                           Natural.monus(n + n, i))
+                           (n + n) ∸ i)
                by (i : ℕ) (iLessThan : i < n) ↦ {
                     i ≤ n by Natural.LessThan.weaken;
                     choose e such that n = i + e as nSplit
@@ -704,13 +704,13 @@ theorem Real.cauchy_product_converges
                     n + n
                         = (i + e) + n    by nSplit
                         = i + (e + n);
-                    Natural.monus(n + n, i) = e + n
+                    (n + n) ∸ i = e + n
                         by {
-                          Natural.monus(i + (e + n), i) = e + n;
+                          (i + (e + n)) ∸ i = e + n;
                           i + (e + n) = n + n;
                           done by substituting (i + (e + n) = n + n)
                         } as monusStretch;
-                    n ≤ Natural.monus(n + n, i)
+                    n ≤ (n + n) ∸ i
                         by {
                           n ≤ n + e;
                           n + e = e + n;
@@ -719,38 +719,38 @@ theorem Real.cauchy_product_converges
                         };
                     Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                           ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                                Natural.monus(n + n, i))
+                                (n + n) ∸ i)
                         by Real.partialSum_monotone_of_nonneg;
                     Real.zero ≤ abs(a(i));
                     Real.IsNonneg(abs(a(i)));
                     abs(a(i)) * Real.partialSum((k : ℕ) ↦ abs(b(k)), n)
                        = Real.partialSum((k : ℕ) ↦ abs(b(k)), n) * abs(a(i))
                        ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                             Natural.monus(n + n, i)) * abs(a(i))
+                             (n + n) ∸ i) * abs(a(i))
                              by Real.LessOrEqual.multiply_by_nonneg_right
                        = abs(a(i))
                          * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                               Natural.monus(n + n, i))
+                               (n + n) ∸ i)
                   };
            ∀ (i : ℕ).
                    Real.zero
                    ≤ abs(a(i))
                      * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                           Natural.monus(n + n, i))
+                           (n + n) ∸ i)
                by (i : ℕ) ↦ {
                     Real.zero ≤ abs(a(i));
                     Real.zero
                           ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                                Natural.monus(n + n, i))
+                                (n + n) ∸ i)
                         by Real.partialSum_nonneg;
                     Real.IsNonneg(abs(a(i)));
                     Real.IsNonneg(
                               Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                                  Natural.monus(n + n, i)));
+                                  (n + n) ∸ i));
                     Real.IsNonneg(
                               abs(a(i))
                               * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                                    Natural.monus(n + n, i)));
+                                    (n + n) ∸ i));
                     done by Real.LessOrEqual_zero_of_IsNonneg
                   };
            n ≤ n + n;
@@ -765,20 +765,20 @@ theorem Real.cauchy_product_converges
                     (i : ℕ) ↦
                         abs(a(i))
                         * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                              Natural.monus(n + n, i)),
+                              (n + n) ∸ i),
                     n)
                     by Real.partialSum_le_pointwise
               ≤ Real.partialSum(
                     (i : ℕ) ↦
                         abs(a(i))
                         * Real.partialSum((k : ℕ) ↦ abs(b(k)),
-                              Natural.monus(n + n, i)),
+                              (n + n) ∸ i),
                     n + n)
                     by Real.partialSum_monotone_of_nonneg
               = Real.partialSum(
                     (k : ℕ) ↦
                         Real.partialSum(
-                            (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                            (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                             1 + k),
                     n + n)
                     by Real.cauchy_product_exchange(
@@ -791,7 +791,7 @@ theorem Real.cauchy_product_converges
              s := Real.partialSum(
                  (k : ℕ) ↦
                      Real.partialSum(
-                         (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                         (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                          1 + k)),
              converges := absoluteTriangleConverges,
              N := 0,
@@ -809,13 +809,13 @@ theorem Real.cauchy_product_converges
                      ≤ Real.partialSum(
                            (k : ℕ) ↦
                                Real.partialSum(
-                                   (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                                   (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                                    1 + k),
                            m + m);
                Real.partialSum(
                          (k : ℕ) ↦
                              Real.partialSum(
-                                 (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                                 (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                                  1 + k),
                          m + m)
                      ≤ triangleAbsoluteLimit;
@@ -832,7 +832,7 @@ theorem Real.cauchy_product_converges
                 -Real.partialSum(
                      (k : ℕ) ↦
                          Real.partialSum(
-                             (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                             (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                              1 + k),
                      n),
             -triangleAbsoluteLimit)
@@ -840,7 +840,7 @@ theorem Real.cauchy_product_converges
              s := Real.partialSum(
                  (k : ℕ) ↦
                      Real.partialSum(
-                         (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                         (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                          1 + k)),
              sConverges := absoluteTriangleConverges) as negatedTriangleConverges;
   Real.SequenceConverges(
@@ -850,7 +850,7 @@ theorem Real.cauchy_product_converges
                 + -Real.partialSum(
                        (k : ℕ) ↦
                            Real.partialSum(
-                               (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                               (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                                1 + k),
                        n),
             aAbsoluteLimit * bAbsoluteLimit + -triangleAbsoluteLimit)
@@ -862,7 +862,7 @@ theorem Real.cauchy_product_converges
                  -Real.partialSum(
                       (k : ℕ) ↦
                           Real.partialSum(
-                              (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                              (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                               1 + k),
                       n),
              sConverges := absoluteProductConverges,
@@ -878,7 +878,7 @@ theorem Real.cauchy_product_converges
                 - Real.partialSum(
                       (k : ℕ) ↦
                           Real.partialSum(
-                              (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                              (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                               1 + k),
                       n),
             Real.zero)
@@ -893,7 +893,7 @@ theorem Real.cauchy_product_converges
                   - Real.partialSum(
                         (k : ℕ) ↦
                             Real.partialSum(
-                                (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                (i : ℕ) ↦ a(i) * b(k ∸ i),
                                 1 + k),
                         n))
           ≤ Real.partialSum((k : ℕ) ↦ abs(a(k)), n)
@@ -901,7 +901,7 @@ theorem Real.cauchy_product_converges
             - Real.partialSum(
                   (k : ℕ) ↦
                       Real.partialSum(
-                          (l : ℕ) ↦ abs(a(l)) * abs(b(Natural.monus(k, l))),
+                          (l : ℕ) ↦ abs(a(l)) * abs(b(k ∸ l)),
                           1 + k),
                   n)
       by (n : ℕ) ↦ { done by Real.cauchy_product_difference_bound };
@@ -911,7 +911,7 @@ theorem Real.cauchy_product_converges
                 - Real.partialSum(
                       (k : ℕ) ↦
                           Real.partialSum(
-                              (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                              (i : ℕ) ↦ a(i) * b(k ∸ i),
                               1 + k),
                       n),
             Real.zero)
@@ -923,7 +923,7 @@ theorem Real.cauchy_product_converges
                   - Real.partialSum(
                         (k : ℕ) ↦
                             Real.partialSum(
-                                (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                (i : ℕ) ↦ a(i) * b(k ∸ i),
                                 1 + k),
                         n)),
             -Real.zero)
@@ -933,7 +933,7 @@ theorem Real.cauchy_product_converges
                  - Real.partialSum(
                        (k : ℕ) ↦
                            Real.partialSum(
-                               (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                               (i : ℕ) ↦ a(i) * b(k ∸ i),
                                1 + k),
                        n),
              sConverges := signedGapVanishes) as negatedSignedGapConverges;
@@ -944,7 +944,7 @@ theorem Real.cauchy_product_converges
                     - Real.partialSum(
                           (k : ℕ) ↦
                               Real.partialSum(
-                                  (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                  (i : ℕ) ↦ a(i) * b(k ∸ i),
                                   1 + k),
                           n)),
             aLimit * bLimit + -Real.zero)
@@ -955,7 +955,7 @@ theorem Real.cauchy_product_converges
                    - Real.partialSum(
                          (k : ℕ) ↦
                              Real.partialSum(
-                                 (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                 (i : ℕ) ↦ a(i) * b(k ∸ i),
                                  1 + k),
                          n)),
              sConverges := productConverges,
@@ -969,7 +969,7 @@ theorem Real.cauchy_product_converges
                     - Real.partialSum(
                           (k : ℕ) ↦
                               Real.partialSum(
-                                  (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                  (i : ℕ) ↦ a(i) * b(k ∸ i),
                                   1 + k),
                           n)),
             aLimit * bLimit)
@@ -980,13 +980,13 @@ theorem Real.cauchy_product_converges
                   - Real.partialSum(
                         (k : ℕ) ↦
                             Real.partialSum(
-                                (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                (i : ℕ) ↦ a(i) * b(k ∸ i),
                                 1 + k),
                         n))
           = Real.partialSum(
                 (k : ℕ) ↦
                     Real.partialSum(
-                        (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                        (i : ℕ) ↦ a(i) * b(k ∸ i),
                         1 + k),
                 n)
       by (n : ℕ) ↦ {
@@ -995,13 +995,13 @@ theorem Real.cauchy_product_converges
                          - Real.partialSum(
                                (k : ℕ) ↦
                                    Real.partialSum(
-                                       (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                                       (i : ℕ) ↦ a(i) * b(k ∸ i),
                                        1 + k),
                                n))
                  = Real.partialSum(
                        (k : ℕ) ↦
                            Real.partialSum(
-                               (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                               (i : ℕ) ↦ a(i) * b(k ∸ i),
                                1 + k),
                        n)
                by ring;
@@ -1011,7 +1011,7 @@ theorem Real.cauchy_product_converges
               t := Real.partialSum(
                   (k : ℕ) ↦
                       Real.partialSum(
-                          (i : ℕ) ↦ a(i) * b(Natural.monus(k, i)),
+                          (i : ℕ) ↦ a(i) * b(k ∸ i),
                           1 + k)),
               sConverges := assembledAtProduct)
 }
@@ -1047,7 +1047,7 @@ theorem Real.exponential_add (x y : ℝ)
                     Real.partialSum(
                         (i : ℕ) ↦
                             Real.exponentialTerm(x, i)
-                            * Real.exponentialTerm(y, Natural.monus(k, i)),
+                            * Real.exponentialTerm(y, k ∸ i),
                         1 + k)),
             exp(x) * exp(y))
       by Real.cauchy_product_converges(
@@ -1059,7 +1059,7 @@ theorem Real.exponential_add (x y : ℝ)
                   Real.partialSum(
                       (i : ℕ) ↦
                           Real.exponentialTerm(x, i)
-                          * Real.exponentialTerm(y, Natural.monus(k, i)),
+                          * Real.exponentialTerm(y, k ∸ i),
                       1 + k),
               n)
           = Real.partialSum(Real.exponentialTerm(x + y), n)
@@ -1069,7 +1069,7 @@ theorem Real.exponential_add (x y : ℝ)
                        = Real.partialSum(
                              (i : ℕ) ↦
                                  Real.exponentialTerm(x, i)
-                                 * Real.exponentialTerm(y, Natural.monus(k, i)),
+                                 * Real.exponentialTerm(y, k ∸ i),
                              1 + k)
                      by Real.exponentialTerm_binomial_split;
                  done
@@ -1083,7 +1083,7 @@ theorem Real.exponential_add (x y : ℝ)
                      Real.partialSum(
                          (i : ℕ) ↦
                              Real.exponentialTerm(x, i)
-                             * Real.exponentialTerm(y, Natural.monus(k, i)),
+                             * Real.exponentialTerm(y, k ∸ i),
                          1 + k)),
              t := Real.partialSum(Real.exponentialTerm(x + y)),
              sConverges := triangleConverges);

@@ -1170,10 +1170,20 @@ SurfaceDefinitionDeclaration Elaborator::augmentDeclarationWithConventions(
 
 namespace {
 
-// Is `expr` syntactically `Natural.monus(guardVar, 1)`?
+// Is `expr` syntactically `Natural.monus(guardVar, 1)` — in either
+// spelling, the named call or the `guardVar ∸ 1` operator form (both
+// elaborate to the same term)?
 bool isMonusGuardMinusOne(const SurfaceExpressionPointer& expr,
                           const std::string& guardVar) {
     if (!expr) return false;
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&expr->node)) {
+        if (binary->opSymbol != "∸") return false;
+        auto* base = std::get_if<SurfaceIdentifier>(&binary->left->node);
+        auto* one = std::get_if<SurfaceNumericLiteral>(&binary->right->node);
+        return base && base->universeArgs.empty()
+            && base->qualifiedName == guardVar
+            && one && one->digits == "1";
+    }
     auto* application = std::get_if<SurfaceApplication>(&expr->node);
     if (!application || application->arguments.size() != 2) return false;
     auto* function =

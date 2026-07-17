@@ -41,19 +41,19 @@ import Algebra.ring_summation
 definition Ring.binomialTerm (r : Ring) (a b : Ring.carrier(r)) (n k : Natural)
         : Ring.carrier(r) :=
   Ring.from_natural(r, Natural.binomial(n, k))
-  * (Ring.power(r, a, k) * Ring.power(r, b, Natural.monus(n, k)))
+  * (Ring.power(r, a, k) * Ring.power(r, b, n ∸ k))
 
 -- The left edge (k = 0): the coefficient and aᵏ are both 1, so the term
 -- is bⁿ.
 theorem Ring.binomialTerm_zero_index (r : Ring) (a b : Ring.carrier(r)) (n : Natural)
         : Ring.binomialTerm(r, a, b, n, 0) = Ring.power(r, b, n) := {
   Natural.binomial(n, 0) = 1 as coefficient;
-  Natural.monus(n, 0) = n as deficit;
+  n ∸ 0 = n as deficit;
   Ring.binomialTerm(r, a, b, n, 0)
      = Ring.from_natural(r, Natural.binomial(n, 0))
-       * (Ring.one(r) * Ring.power(r, b, Natural.monus(n, 0)))
+       * (Ring.one(r) * Ring.power(r, b, n ∸ 0))
      = Ring.from_natural(r, 1)
-       * (Ring.one(r) * Ring.power(r, b, Natural.monus(n, 0)))   by substituting coefficient
+       * (Ring.one(r) * Ring.power(r, b, n ∸ 0))   by substituting coefficient
      = Ring.from_natural(r, 1) * (Ring.one(r) * Ring.power(r, b, n))   by substituting deficit
      = Ring.one(r) * (Ring.one(r) * Ring.power(r, b, n))   by Ring.from_natural_one
      = Ring.power(r, b, n)   by ring
@@ -65,10 +65,10 @@ theorem Ring.binomialTerm_overflow (r : Ring) (a b : Ring.carrier(r)) (p : Natur
   Natural.binomial(p, 1 + p) = 0 by Natural.binomial_overflow as coefficientZero;
   Ring.binomialTerm(r, a, b, p, 1 + p)
      = Ring.from_natural(r, Natural.binomial(p, 1 + p))
-       * (Ring.power(r, a, 1 + p) * Ring.power(r, b, Natural.monus(p, 1 + p)))
+       * (Ring.power(r, a, 1 + p) * Ring.power(r, b, p ∸ (1 + p)))
      = Ring.from_natural(r, 0)
-       * (Ring.power(r, a, 1 + p) * Ring.power(r, b, Natural.monus(p, 1 + p)))   by substituting coefficientZero
-     = Ring.zero(r) * (Ring.power(r, a, 1 + p) * Ring.power(r, b, Natural.monus(p, 1 + p)))
+       * (Ring.power(r, a, 1 + p) * Ring.power(r, b, p ∸ (1 + p)))   by substituting coefficientZero
+     = Ring.zero(r) * (Ring.power(r, a, 1 + p) * Ring.power(r, b, p ∸ (1 + p)))
      = Ring.zero(r)
 }
 
@@ -95,56 +95,56 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
   Natural.binomial(1 + p, 1 + j)
         = Natural.binomial(p, j) + Natural.binomial(p, 1 + j)
       by Natural.binomial_pascal as pascalCoefficient;
-  Natural.monus(1 + p, 1 + j) = Natural.monus(p, j) as deficitDiagonal;
+  (1 + p) ∸ (1 + j) = p ∸ j as deficitDiagonal;
   j < p ∨ p ≤ j by Natural.lt_or_le;
   done by cases {
     case j < p as jBelow: {
-        Natural.monus(p, j) = 1 + Natural.monus(p, 1 + j) as deficitShift;
+        p ∸ j = 1 + (p ∸ (1 + j)) as deficitShift;
         a * Ring.binomialTerm(R, a, b, p, j)
              + b * Ring.binomialTerm(R, a, b, p, 1 + j)
            = a * (Ring.from_natural(R, Natural.binomial(p, j))
-                  * (Ring.power(R, a, j) * Ring.power(R, b, Natural.monus(p, j))))
+                  * (Ring.power(R, a, j) * Ring.power(R, b, p ∸ j)))
              + b * (Ring.from_natural(R, Natural.binomial(p, 1 + j))
-                    * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                    * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ (1 + j))))
            = a * (Ring.from_natural(R, Natural.binomial(p, j))
-                  * (Ring.power(R, a, j) * Ring.power(R, b, 1 + Natural.monus(p, 1 + j))))
+                  * (Ring.power(R, a, j) * Ring.power(R, b, 1 + (p ∸ (1 + j)))))
              + b * (Ring.from_natural(R, Natural.binomial(p, 1 + j))
-                    * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                    * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ (1 + j))))
                  by substituting deficitShift
            = a * (Ring.from_natural(R, Natural.binomial(p, j))
                   * (Ring.power(R, a, j)
-                     * (b * Ring.power(R, b, Natural.monus(p, 1 + j)))))
+                     * (b * Ring.power(R, b, p ∸ (1 + j)))))
              + b * (Ring.from_natural(R, Natural.binomial(p, 1 + j))
                     * ((a * Ring.power(R, a, j))
-                       * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                       * Ring.power(R, b, p ∸ (1 + j))))
                  by substituting Ring.power_add_one
            = (Ring.from_natural(R, Natural.binomial(p, j))
               + Ring.from_natural(R, Natural.binomial(p, 1 + j)))
              * ((a * Ring.power(R, a, j))
-                * (b * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                * (b * Ring.power(R, b, p ∸ (1 + j))))
                  by ring
            as rightExpanded;
         Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
            = Ring.from_natural(R, Natural.binomial(1 + p, 1 + j))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(1 + p, 1 + j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, (1 + p) ∸ (1 + j)))
            = Ring.from_natural(R, Natural.binomial(p, j) + Natural.binomial(p, 1 + j))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(1 + p, 1 + j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, (1 + p) ∸ (1 + j)))
                by substituting pascalCoefficient
            = Ring.from_natural(R, Natural.binomial(p, j) + Natural.binomial(p, 1 + j))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ j))
                by substituting deficitDiagonal
            = (Ring.from_natural(R, Natural.binomial(p, j))
               + Ring.from_natural(R, Natural.binomial(p, 1 + j)))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ j))
                by Ring.from_natural_add
            = (Ring.from_natural(R, Natural.binomial(p, j))
               + Ring.from_natural(R, Natural.binomial(p, 1 + j)))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, 1 + Natural.monus(p, 1 + j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, 1 + (p ∸ (1 + j))))
                by substituting deficitShift
            = (Ring.from_natural(R, Natural.binomial(p, j))
               + Ring.from_natural(R, Natural.binomial(p, 1 + j)))
              * ((a * Ring.power(R, a, j))
-                * (b * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                * (b * Ring.power(R, b, p ∸ (1 + j))))
                by substituting Ring.power_add_one
            = a * Ring.binomialTerm(R, a, b, p, j)
              + b * Ring.binomialTerm(R, a, b, p, 1 + j)
@@ -159,28 +159,28 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
            as boundaryCoefficient;
         b * Ring.binomialTerm(R, a, b, p, 1 + j)
            = b * (Ring.from_natural(R, Natural.binomial(p, 1 + j))
-                  * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                  * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ (1 + j))))
            = b * (Ring.from_natural(R, 0)
-                  * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                  * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ (1 + j))))
                by substituting coefficientZero
            = b * (Ring.zero(R)
-                  * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, 1 + j))))
+                  * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ (1 + j))))
            = Ring.zero(R)   by ring
            as secondVanishes;
         Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
            = Ring.from_natural(R, Natural.binomial(1 + p, 1 + j))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(1 + p, 1 + j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, (1 + p) ∸ (1 + j)))
            = Ring.from_natural(R, Natural.binomial(p, j))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(1 + p, 1 + j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, (1 + p) ∸ (1 + j)))
                by substituting boundaryCoefficient
            = Ring.from_natural(R, Natural.binomial(p, j))
-             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, Natural.monus(p, j)))
+             * (Ring.power(R, a, 1 + j) * Ring.power(R, b, p ∸ j))
                by substituting deficitDiagonal
            = Ring.from_natural(R, Natural.binomial(p, j))
-             * ((a * Ring.power(R, a, j)) * Ring.power(R, b, Natural.monus(p, j)))
+             * ((a * Ring.power(R, a, j)) * Ring.power(R, b, p ∸ j))
                by substituting Ring.power_add_one
            = a * (Ring.from_natural(R, Natural.binomial(p, j))
-                  * (Ring.power(R, a, j) * Ring.power(R, b, Natural.monus(p, j))))
+                  * (Ring.power(R, a, j) * Ring.power(R, b, p ∸ j)))
                by ring
            as firstAligns;
         Ring.binomialTerm(R, a, b, 1 + p, 1 + j)

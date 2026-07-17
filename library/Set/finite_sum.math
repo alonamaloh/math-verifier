@@ -29,7 +29,7 @@ import Natural.classical_decidable
 
 -- If m ≤ k, then k splits as m plus its excess over m.
 theorem NaturalsBelow.decompose_at_least (m k : Natural) (atLeast : m ≤ k)
-        : k = m + Natural.monus(k, m) :=
+        : k = m + (k ∸ m) :=
   { done by Natural.monus_zero_implies_decompose }
 
 -- ----------------------------------------------------------------------
@@ -56,11 +56,11 @@ theorem NaturalsBelow.below_shifts (m n value : Natural) (belowN : value < n)
 -- `value = m + (value − m)`, then cancel m on the left.
 theorem NaturalsBelow.below_unshifts (m n value : Natural)
         (atLeast : m ≤ value) (belowSum : value < m + n)
-        : Natural.monus(value, m) < n := {
+        : (value ∸ m) < n := {
   value + 1 ≤ m + n;
-  Natural.monus(value, m) + 1 ≤ n by {
-    m + (Natural.monus(value, m) + 1)
-              = (m + Natural.monus(value, m)) + 1
+  (value ∸ m) + 1 ≤ n by {
+    m + ((value ∸ m) + 1)
+              = (m + (value ∸ m)) + 1
               = value + 1
               ≤ m + n;
     done
@@ -89,7 +89,7 @@ definition NaturalsBelow.sum_out_of (m n : Natural)
         Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), valueBelow))
     } else {
         m ≤ NaturalsBelow.value(element) by Natural.less_or_equal_of_not_less_than;
-        Sum.right(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(element), m),
+        Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m,
             NaturalsBelow.below_unshifts))
     }
 
@@ -110,9 +110,9 @@ theorem NaturalsBelow.sum_out_of_below (m n : Natural)
 
 theorem NaturalsBelow.sum_out_of_at_least (m n : Natural)
         (element : NaturalsBelow(m + n)) (notBelow : ¬(NaturalsBelow.value(element) < m))
-        (shiftedBelow : Natural.monus(NaturalsBelow.value(element), m) < n)
+        (shiftedBelow : (NaturalsBelow.value(element) ∸ m) < n)
         : NaturalsBelow.sum_out_of(m, n, element)
-          = Sum.right(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(element), m), shiftedBelow)) :=
+          = Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m, shiftedBelow)) :=
   if NaturalsBelow.value(element) < m
   then {
       NaturalsBelow.value(element) < m;
@@ -149,14 +149,14 @@ theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
                 done
             }
         };
-        Natural.monus(m + NaturalsBelow.value(element), m) < n by {
-            Natural.monus(m + NaturalsBelow.value(element), m)
+        ((m + NaturalsBelow.value(element)) ∸ m) < n by {
+            (m + NaturalsBelow.value(element)) ∸ m
                 = NaturalsBelow.value(element)
                 < n
         } as shiftBound;
-        Natural.monus(m + NaturalsBelow.value(element), m) = NaturalsBelow.value(element);
+        ((m + NaturalsBelow.value(element)) ∸ m) = NaturalsBelow.value(element);
         NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, Sum.right(element)))
-           = Sum.right(NaturalsBelow.make(Natural.monus(m + NaturalsBelow.value(element), m), shiftBound))
+           = Sum.right(NaturalsBelow.make((m + NaturalsBelow.value(element)) ∸ m, shiftBound))
                  by NaturalsBelow.sum_out_of_at_least
            = Sum.right(element)   by NaturalsBelow.equal_of_value
       }
@@ -179,15 +179,15 @@ theorem NaturalsBelow.sum_round_trip_right (m n : Natural)
       }
     otherwise as notBelow: {
         m ≤ NaturalsBelow.value(element) by Natural.less_or_equal_of_not_less_than;
-        Natural.monus(NaturalsBelow.value(element), m) < n
+        (NaturalsBelow.value(element) ∸ m) < n
             by NaturalsBelow.below_unshifts as shiftBound;
-        m + Natural.monus(NaturalsBelow.value(element), m) = NaturalsBelow.value(element);
+        m + (NaturalsBelow.value(element) ∸ m) = NaturalsBelow.value(element);
         NaturalsBelow.sum_out_of(m, n, element)
-            = Sum.right(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(element), m), shiftBound))
+            = Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m, shiftBound))
             by NaturalsBelow.sum_out_of_at_least;
         NaturalsBelow.sum_into(m, n, NaturalsBelow.sum_out_of(m, n, element))
            = NaturalsBelow.sum_into(m, n,
-                 Sum.right(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(element), m), shiftBound)))
+                 Sum.right(NaturalsBelow.make(NaturalsBelow.value(element) ∸ m, shiftBound)))
            = element   by NaturalsBelow.equal_of_value
       }
   }
