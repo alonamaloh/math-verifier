@@ -1,0 +1,329 @@
+-- Algebra/cayley_hamilton.math
+--
+-- The Cayley–Hamilton theorem over any commutative ring: a square matrix
+-- satisfies its own characteristic polynomial. The proof works at the
+-- level of coefficient FAMILIES — the k-th entrywise coefficient matrix
+-- Nₖ of adj(xI − A) — never packaging (Matrix R)[x] as a polynomial
+-- ring. Extracting coefficients from the adjugate identity
+--   (xI − A)·adj(xI − A) = charPoly(A)·I
+-- gives charPoly(A)[1+k]·I = Nₖ − A·N₁₊ₖ (and −A·N₀ at k = 0); summing
+-- Aᵏ times each equation telescopes to −A^{1+n}·Nₙ, which vanishes
+-- because the adjugate's entries have degree < n.
+
+module Algebra.cayley_hamilton
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.monus
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.remove
+import Lists.distinct
+import Lists.length
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_power
+import Algebra.ring_summation
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.determinant
+import Algebra.alternating_collapse
+import Algebra.characteristic_polynomial
+import Algebra.adjugate
+import Algebra.matrix_polynomial_evaluation
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.commutative
+import Polynomial.monomial
+import Polynomial.degree
+import Polynomial.degree_product
+import Polynomial.multiply_coefficient
+
+-- The k-th coefficient of a polynomial matrix, entry by entry.
+definition Matrix.coefficientMatrix {c : CommutativeRing} {n : ℕ}
+        (Q : Matrix(CommutativeRing.polynomial_ring(c), n, n)) (k : ℕ) : Matrix(c, n, n) :=
+  (i : NaturalsBelow(n)) ↦ (j : NaturalsBelow(n)) ↦ Polynomial.coefficientOf(Q(i, j), k)
+
+-- A base-ring matrix, embedded entrywise as constant polynomials.
+definition Matrix.constantEntries {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) : Matrix(CommutativeRing.polynomial_ring(c), n, n) :=
+  Matrix.mapEntries(
+      (a : CommutativeRing.carrier(c)) ↦ Polynomial.constant(CommutativeRing.ring(c), a), A)
+
+-- Coefficient extraction is additive.
+theorem Matrix.coefficientMatrix_subtract {c : CommutativeRing} {n : ℕ}
+        (X Y : Matrix(CommutativeRing.polynomial_ring(c), n, n)) (k : ℕ)
+        : Matrix.coefficientMatrix((X - Y), k)
+          = Matrix.coefficientMatrix(X, k) - Matrix.coefficientMatrix(Y, k) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.coefficientMatrix((X - Y), k)(i, j)
+      = (Matrix.coefficientMatrix(X, k) - Matrix.coefficientMatrix(Y, k))(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦
+          Matrix.coefficientMatrix((X - Y), k)(i, j)
+             = Polynomial.coefficientOf(X(i, j), k) - Polynomial.coefficientOf(Y(i, j), k)
+                   by Polynomial.coefficientOf_subtract
+             = (Matrix.coefficientMatrix(X, k) - Matrix.coefficientMatrix(Y, k))(i, j);
+  done by Matrix.equal_of_entries
+}
+
+-- Scaling by the indeterminate shifts the coefficient families down…
+theorem Matrix.coefficientMatrix_scale_indeterminate_one_plus {c : CommutativeRing} {n : ℕ}
+        (Q : Matrix(CommutativeRing.polynomial_ring(c), n, n)) (k : ℕ)
+        : Matrix.coefficientMatrix(
+              Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)), Q), 1 + k)
+          = Matrix.coefficientMatrix(Q, k) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.coefficientMatrix(
+          Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)), Q), 1 + k)(i, j)
+      = Matrix.coefficientMatrix(Q, k)(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          1 ≤ 1 + k;
+          (1 + k) ∸ 1 = k as indexShift;
+          Matrix.coefficientMatrix(
+              Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)), Q), 1 + k)(i, j)
+             = Ring.one(CommutativeRing.ring(c))
+               * Polynomial.coefficientOf(Q(i, j), (1 + k) ∸ 1)
+                   by Polynomial.coefficientOf_monomial_multiply
+             = Ring.one(CommutativeRing.ring(c)) * Polynomial.coefficientOf(Q(i, j), k)
+                   by substituting indexShift
+             = Polynomial.coefficientOf(Q(i, j), k)
+                   by Ring.one_multiply;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- …and its bottom family is zero.
+theorem Matrix.coefficientMatrix_scale_indeterminate_zero {c : CommutativeRing} {n : ℕ}
+        (Q : Matrix(CommutativeRing.polynomial_ring(c), n, n))
+        : Matrix.coefficientMatrix(
+              Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)), Q), 0)
+          = Matrix.zero(c, n, n) := {
+  ¬(0 = 1);
+  Polynomial.coefficientOf(Polynomial.indeterminate(CommutativeRing.ring(c)), 0)
+     = Ring.zero(CommutativeRing.ring(c))
+      by Polynomial.coefficientOf_monomial_off as indeterminateAtZero;
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.coefficientMatrix(
+          Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)), Q), 0)(i, j)
+      = Matrix.zero(c, n, n)(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          Matrix.coefficientMatrix(
+              Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)), Q), 0)(i, j)
+             = Polynomial.coefficientOf(Polynomial.indeterminate(CommutativeRing.ring(c)), 0)
+               * Polynomial.coefficientOf(Q(i, j), 0)
+                   by Polynomial.coefficientOf_multiply_zero
+             = Ring.zero(CommutativeRing.ring(c)) * Polynomial.coefficientOf(Q(i, j), 0)
+                   by substituting indeterminateAtZero
+             = Matrix.zero(c, n, n)(i, j)
+                   by Ring.zero_multiply_left;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- Multiplying by constant-embedded A acts as A on each coefficient family.
+theorem Matrix.coefficientMatrix_constant_multiply {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (Q : Matrix(CommutativeRing.polynomial_ring(c), n, n)) (k : ℕ)
+        : Matrix.coefficientMatrix(
+              (Matrix.constantEntries(A) * Q), k)
+          = A * Matrix.coefficientMatrix(Q, k) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.coefficientMatrix(
+          (Matrix.constantEntries(A) * Q), k)(i, j)
+      = (A * Matrix.coefficientMatrix(Q, k))(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          ∀ (t : NaturalsBelow(n)).
+              Polynomial.coefficientOf(
+                  (Polynomial.constant(CommutativeRing.ring(c), A(i, t)) * Q(t, j)), k)
+              = A(i, t) * Polynomial.coefficientOf(Q(t, j), k)
+              by (t : NaturalsBelow(n)) ↦ {
+                  0 ≤ k;
+                  k ∸ 0 = k as indexShift;
+                  Polynomial.coefficientOf(
+                      (Polynomial.constant(CommutativeRing.ring(c), A(i, t)) * Q(t, j)), k)
+                     = A(i, t) * Polynomial.coefficientOf(Q(t, j), k ∸ 0)
+                           by Polynomial.coefficientOf_monomial_multiply
+                     = A(i, t) * Polynomial.coefficientOf(Q(t, j), k)
+                           by substituting indexShift;
+                  done
+                } as entryCoefficients;
+          Matrix.coefficientMatrix(
+              (Matrix.constantEntries(A) * Q), k)(i, j)
+             = (CommutativeRing.sumOver(
+                   (t : NaturalsBelow(n)) ↦
+                       Polynomial.coefficientOf(
+                           (Polynomial.constant(CommutativeRing.ring(c), A(i, t)) * Q(t, j)), k),
+                   NaturalsBelow.enumerate(n)) : CommutativeRing.carrier(c))
+                   by Polynomial.coefficientOf_sumOver
+             = (CommutativeRing.sumOver(
+                   (t : NaturalsBelow(n)) ↦ A(i, t) * Polynomial.coefficientOf(Q(t, j), k),
+                   NaturalsBelow.enumerate(n)) : CommutativeRing.carrier(c))
+                   by CommutativeRing.sumOver_congruence(pointwise := entryCoefficients)
+             = (A * Matrix.coefficientMatrix(Q, k))(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- The scalar matrix p·I, coefficient by coefficient: p[k]·I.
+theorem Matrix.coefficientMatrix_scale_identity {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (k : ℕ)
+        : Matrix.coefficientMatrix(
+              Matrix.scale(p, Matrix.identity(CommutativeRing.polynomial_ring(c), n)), k)
+          = Matrix.scale(p[k], Matrix.identity(c, n)) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.coefficientMatrix(
+          Matrix.scale(p, Matrix.identity(CommutativeRing.polynomial_ring(c), n)), k)(i, j)
+      = Matrix.scale(p[k], Matrix.identity(c, n))(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          i = j ∨ ¬(i = j);
+          done by cases {
+            case i = j as diagonal: {
+                Matrix.identity(CommutativeRing.polynomial_ring(c), n)(j, j)
+                   = CommutativeRing.one(CommutativeRing.polynomial_ring(c))
+                    by Matrix.identity_entry_diagonal as identityEntryTop;
+                Matrix.identity(c, n)(j, j) = CommutativeRing.one(c)
+                    by Matrix.identity_entry_diagonal as identityEntryBase;
+                (p * Polynomial.one(CommutativeRing.ring(c))) = p
+                    by Polynomial.multiply_one_right as absorbOne;
+                Matrix.coefficientMatrix(
+                    Matrix.scale(p, Matrix.identity(CommutativeRing.polynomial_ring(c), n)), k)(j, j)
+                   = Polynomial.coefficientOf(
+                         (p * Polynomial.one(CommutativeRing.ring(c))), k)
+                         by substituting identityEntryTop
+                   = Polynomial.coefficientOf(p, k)
+                         by substituting absorbOne
+                   = p[k] * CommutativeRing.one(c)
+                         by Ring.multiply_one
+                   = p[k] * Matrix.identity(c, n)(j, j)
+                         by substituting identityEntryBase
+                   = Matrix.scale(p[k], Matrix.identity(c, n))(j, j);
+                done
+              }
+            case ¬(i = j) as offDiagonal: {
+                Matrix.identity(CommutativeRing.polynomial_ring(c), n)(i, j)
+                   = CommutativeRing.zero(CommutativeRing.polynomial_ring(c))
+                    by Matrix.identity_entry_off as identityEntryTop;
+                Matrix.identity(c, n)(i, j) = CommutativeRing.zero(c)
+                    by Matrix.identity_entry_off as identityEntryBase;
+                (p * Polynomial.zero(CommutativeRing.ring(c)))
+                   = Polynomial.zero(CommutativeRing.ring(c))
+                    by Ring.multiply_zero_right(Polynomial.ring(CommutativeRing.ring(c)), p) as absorbZero;
+                Matrix.coefficientMatrix(
+                    Matrix.scale(p, Matrix.identity(CommutativeRing.polynomial_ring(c), n)), k)(i, j)
+                   = Polynomial.coefficientOf(
+                         (p * Polynomial.zero(CommutativeRing.ring(c))), k)
+                         by substituting identityEntryTop
+                   = Polynomial.coefficientOf(Polynomial.zero(CommutativeRing.ring(c)), k)
+                         by substituting absorbZero
+                   = Ring.zero(CommutativeRing.ring(c))
+                         by Polynomial.coefficientOf_zero
+                   = p[k] * CommutativeRing.zero(c)
+                         by Ring.multiply_zero_right
+                   = p[k] * Matrix.identity(c, n)(i, j)
+                         by substituting identityEntryBase
+                   = Matrix.scale(p[k], Matrix.identity(c, n))(i, j);
+                done
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- xI − A, compositionally: the characteristic matrix is the scalar
+-- matrix x·I minus the constant embedding of A.
+theorem Matrix.characteristic_compositional {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Matrix.characteristic(A)
+          = Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+                Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+            - Matrix.constantEntries(A) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.characteristic(A)(i, j)
+      = (Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+             Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+         - Matrix.constantEntries(A))(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          i = j ∨ ¬(i = j);
+          done by cases {
+            case i = j as diagonal: {
+                Matrix.identity(CommutativeRing.polynomial_ring(c), n)(j, j)
+                   = CommutativeRing.one(CommutativeRing.polynomial_ring(c))
+                    by Matrix.identity_entry_diagonal as identityEntry;
+                Matrix.characteristic(A)(j, j)
+                   = Polynomial.indeterminate(CommutativeRing.ring(c))
+                     - Polynomial.constant(CommutativeRing.ring(c), A(j, j))
+                         by Matrix.characteristic_entry_diagonal
+                   = ((Polynomial.indeterminate(CommutativeRing.ring(c))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                      * CommutativeRing.one(CommutativeRing.polynomial_ring(c)))
+                     - (Polynomial.constant(CommutativeRing.ring(c), A(j, j))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                         by Ring.multiply_one(Polynomial.ring(CommutativeRing.ring(c)),
+                                Polynomial.indeterminate(CommutativeRing.ring(c)))
+                   = ((Polynomial.indeterminate(CommutativeRing.ring(c))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                      * Matrix.identity(CommutativeRing.polynomial_ring(c), n)(j, j))
+                     - (Polynomial.constant(CommutativeRing.ring(c), A(j, j))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                         by substituting identityEntry
+                   = (Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+                          Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+                      - Matrix.constantEntries(A))(j, j);
+                done
+              }
+            case ¬(i = j) as offDiagonal: {
+                Matrix.identity(CommutativeRing.polynomial_ring(c), n)(i, j)
+                   = CommutativeRing.zero(CommutativeRing.polynomial_ring(c))
+                    by Matrix.identity_entry_off as identityEntry;
+                Matrix.characteristic(A)(i, j)
+                   = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j)))
+                         by Matrix.characteristic_entry_off
+                   = CommutativeRing.zero(CommutativeRing.polynomial_ring(c))
+                     - (Polynomial.constant(CommutativeRing.ring(c), A(i, j))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                         by Ring.zero_add(Polynomial.ring(CommutativeRing.ring(c)),
+                                Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j))))
+                   = ((Polynomial.indeterminate(CommutativeRing.ring(c))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                      * CommutativeRing.zero(CommutativeRing.polynomial_ring(c)))
+                     - (Polynomial.constant(CommutativeRing.ring(c), A(i, j))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                         by Ring.multiply_zero_right(Polynomial.ring(CommutativeRing.ring(c)),
+                                Polynomial.indeterminate(CommutativeRing.ring(c)))
+                   = ((Polynomial.indeterminate(CommutativeRing.ring(c))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                      * Matrix.identity(CommutativeRing.polynomial_ring(c), n)(i, j))
+                     - (Polynomial.constant(CommutativeRing.ring(c), A(i, j))
+                           : CommutativeRing.carrier(CommutativeRing.polynomial_ring(c)))
+                         by substituting identityEntry
+                   = (Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+                          Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+                      - Matrix.constantEntries(A))(i, j);
+                done
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
