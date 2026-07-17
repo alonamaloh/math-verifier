@@ -67,14 +67,12 @@ theorem VectorSpace.linearCombination_bump_position {f : Field} {V : VectorSpace
         done by cases {
           case pos < q as posLtQ: {
               q ≠ pos by Natural.not_equal_of_greater_than;
-              Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) = coefficients(q)
-                  by Function.updateAt_off as bumpAtQ;
+              Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) = coefficients(q) as bumpAtQ;
               VectorSpace.linearCombination(family,
                     Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, 1 + q)
                  = VectorSpace.linearCombination(family,
                        Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, q)
                    + Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) • family(selection(q))
-                       by VectorSpace.linearCombination_add_one
                  = (VectorSpace.linearCombination(family, coefficients, selection, q)
                     + e • family(selection(pos)))
                    + Function.updateAt(coefficients, pos, coefficients(pos) + e)(q) • family(selection(q))
@@ -92,10 +90,10 @@ theorem VectorSpace.linearCombination_bump_position {f : Field} {V : VectorSpace
                        by VectorSpace.linearCombination_add_one
             }
           case pos = q as posEqQ: {
-              q = pos by posEqQ as qEqPos;
+              q = pos;
               Function.updateAt(coefficients, pos, coefficients(pos) + e)(q)
-                 = Function.updateAt(coefficients, pos, coefficients(pos) + e)(pos)   by substituting qEqPos
-                 = coefficients(pos) + e                                              by Function.updateAt_at
+                 = Function.updateAt(coefficients, pos, coefficients(pos) + e)(pos)
+                 = coefficients(pos) + e
                  = coefficients(q) + e                                                by substituting posEqQ
                  as bumpAtQ;
               ∀ (i : Natural). i < q →
@@ -104,16 +102,14 @@ theorem VectorSpace.linearCombination_bump_position {f : Field} {V : VectorSpace
                 by {
                   take i : Natural;
                   suppose i < q as iLtQ;
-                  i < pos by substituting posEqQ;
+                  i < pos;
                   i ≠ pos by Natural.not_equal_of_less_than;
-                  Function.updateAt(coefficients, pos, coefficients(pos) + e)(i) = coefficients(i)
-                      by Function.updateAt_off as bumpAtI;
+                  Function.updateAt(coefficients, pos, coefficients(pos) + e)(i) = coefficients(i) as bumpAtI;
                   done by substituting bumpAtI
                 };
               VectorSpace.linearCombination(family,
                     Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, q)
-                 = VectorSpace.linearCombination(family, coefficients, selection, q)
-                     by VectorSpace.linearCombination_congruence as reduceBelow;
+                 = VectorSpace.linearCombination(family, coefficients, selection, q) as reduceBelow;
               VectorSpace.linearCombination(family,
                     Function.updateAt(coefficients, pos, coefficients(pos) + e), selection, 1 + q)
                  = VectorSpace.linearCombination(family,
@@ -165,7 +161,7 @@ theorem VectorSpace.InSpanOf.of_combination_selected {f : Field} {V : VectorSpac
         VectorSpace.linearCombination(inner, coefficients, selection, 0)
            = VectorSpace.zero(V)
            = Field.zero(f) • outer(outerInhabitant)
-               by VectorSpace.zero_scale as emptyIsZero;
+           as emptyIsZero;
         done by substituting emptyIsZero
       }
     case step(m): {
@@ -184,7 +180,7 @@ theorem VectorSpace.InSpanOf.of_combination_selected {f : Field} {V : VectorSpac
         VectorSpace.linearCombination(inner, coefficients, selection, 1 + m)
            = VectorSpace.linearCombination(inner, coefficients, selection, m)
              + coefficients(m) • inner(selection(m))
-               by VectorSpace.linearCombination_add_one as peelLast;
+               as peelLast;
         done by substituting peelLast
       }
   }
@@ -220,17 +216,15 @@ theorem NaturalsBelow.skipInverseValue_above (jv x : Natural) (notBelow : ¬(x <
 -- `skipValue(jv, i) < 1 + count` when `i < count`: the value is at most `1 + i`.
 theorem NaturalsBelow.skipValue_bound {count : Natural} (jv : Natural) (i : NaturalsBelow(count))
         : NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) < 1 + count := {
-  NaturalsBelow.value(i) < count by NaturalsBelow.below as valueBelow;
+  NaturalsBelow.value(i) < count;
   done by cases {
     case NaturalsBelow.value(i) < jv as below: {
-        NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) = NaturalsBelow.value(i)
-            by NaturalsBelow.skipValue_below as sv;
+        NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) = NaturalsBelow.value(i) as sv;
         NaturalsBelow.value(i) < count < 1 + count;
         done by substituting sv
       }
     otherwise as notBelow: {
-        NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) = 1 + NaturalsBelow.value(i)
-            by NaturalsBelow.skipValue_above as sv;
+        NaturalsBelow.skipValue(jv, NaturalsBelow.value(i)) = 1 + NaturalsBelow.value(i) as sv;
         1 + NaturalsBelow.value(i) ≤ count by Natural.add_one_le_of_lt;
         1 + NaturalsBelow.value(i) < 1 + count;
         done by substituting sv
@@ -277,8 +271,8 @@ theorem NaturalsBelow.skip_avoids {count : Natural} (jv : Natural) (i : Naturals
 theorem NaturalsBelow.monus_one_plus_one (i : Natural) : (1 + i) ∸ 1 = i :=
   (1 + i) ∸ 1
      = (1 + i) ∸ (1 + 0)
-     = i ∸ 0          by Natural.monus_one_plus_one_plus
-     = i                            by Natural.monus_zero
+     = i ∸ 0
+     = i
 
 -- `skipInverse` undoes `skip`: the round trip on values.
 theorem NaturalsBelow.skipInverse_skipValue (jv i : Natural)
@@ -286,22 +280,21 @@ theorem NaturalsBelow.skipInverse_skipValue (jv i : Natural)
   i < jv ∨ jv ≤ i by Natural.lt_or_le;
   done by cases {
     case i < jv as below: {
-        NaturalsBelow.skipValue(jv, i) = i by NaturalsBelow.skipValue_below as sv;
-        NaturalsBelow.skipInverseValue(jv, i) = i by NaturalsBelow.skipInverseValue_below as siv;
+        NaturalsBelow.skipValue(jv, i) = i as sv;
+        NaturalsBelow.skipInverseValue(jv, i) = i as siv;
         NaturalsBelow.skipInverseValue(jv, NaturalsBelow.skipValue(jv, i))
            = NaturalsBelow.skipInverseValue(jv, i)   by substituting sv
            = i                                        by siv
       }
     otherwise as notBelow: {
-        ¬(i < jv) by notBelow;
-        NaturalsBelow.skipValue(jv, i) = 1 + i by NaturalsBelow.skipValue_above as sv;
+        ¬(i < jv);
+        NaturalsBelow.skipValue(jv, i) = 1 + i as sv;
         ¬(1 + i < jv) by { suppose 1 + i < jv as bad; jv ≤ i < 1 + i < jv; done };
-        NaturalsBelow.skipInverseValue(jv, 1 + i) = (1 + i) ∸ 1
-            by NaturalsBelow.skipInverseValue_above as siv;
+        NaturalsBelow.skipInverseValue(jv, 1 + i) = (1 + i) ∸ 1 as siv;
         NaturalsBelow.skipInverseValue(jv, NaturalsBelow.skipValue(jv, i))
            = NaturalsBelow.skipInverseValue(jv, 1 + i)   by substituting sv
            = (1 + i) ∸ 1                                 by siv
-           = i                                            by NaturalsBelow.monus_one_plus_one
+           = i
       }
   }
 }
@@ -314,7 +307,7 @@ theorem NaturalsBelow.skipInverseValue_bound (count jv x : Natural)
   x < jv ∨ jv ≤ x by Natural.lt_or_le;
   done by cases {
     case x < jv as below: {
-        NaturalsBelow.skipInverseValue(jv, x) = x by NaturalsBelow.skipInverseValue_below as siv;
+        NaturalsBelow.skipInverseValue(jv, x) = x as siv;
         x < jv ≤ count;
         done by substituting siv
       }
@@ -322,28 +315,26 @@ theorem NaturalsBelow.skipInverseValue_bound (count jv x : Natural)
         ¬(jv = x) by { suppose jv = x as e; x = jv by e; done };
         jv < x by Natural.lt_of_le_of_ne;
         0 < x by { 0 ≤ jv < x; done };
-        ¬(x = 0) by Natural.not_equal_of_greater_than;
-        x = 0 ∨ ∃ (p : Natural). x = 1 + p by Natural.zero_or_one_plus;
+        ¬(x = 0);
+        x = 0 ∨ ∃ (p : Natural). x = 1 + p;
         ∃ (p : Natural). x = 1 + p
             by cases {
                  case x = 0 as xZero: { False; done }
                  case ∃ (p : Natural). x = 1 + p as hasPred: { done }
                } as predExists;
         choose p such that x = 1 + p from predExists;
-        x = 1 + p as xIsSucc;
+        x = 1 + p;
         jv ≤ p by { jv < x = 1 + p; done by Natural.le_of_lt_one_plus };
         ¬(x < jv) by { suppose x < jv as bad; jv ≤ x < jv; done };
-        NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1
-            by NaturalsBelow.skipInverseValue_above as siv;
-        x ∸ 1 = (1 + p) ∸ 1   by substituting xIsSucc
-                            = p                          by NaturalsBelow.monus_one_plus_one
+        NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1 as siv;
+        x ∸ 1 = (1 + p) ∸ 1
+              = p
             as monusIsP;
-        1 + p < 1 + count by substituting xIsSucc;
+        1 + p < 1 + count;
         p < count by {
           choose c such that (1 + p) + (1 + c) = 1 + count from Natural.lt_elim;
-          1 + (p + (1 + c)) = 1 + count
-              by { 1 + (p + (1 + c)) = (1 + p) + (1 + c) = 1 + count; done };
-          p + (1 + c) = count by Natural.add_cancel_left;
+          1 + (p + (1 + c)) = 1 + count;
+          p + (1 + c) = count;
           done by Natural.lt_intro
         };
         NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1   by siv
@@ -360,8 +351,8 @@ theorem NaturalsBelow.skipValue_skipInverse (jv x : Natural) (ne : x ≠ jv)
   x < jv ∨ jv ≤ x by Natural.lt_or_le;
   done by cases {
     case x < jv as below: {
-        NaturalsBelow.skipInverseValue(jv, x) = x by NaturalsBelow.skipInverseValue_below as siv;
-        NaturalsBelow.skipValue(jv, x) = x by NaturalsBelow.skipValue_below as sv;
+        NaturalsBelow.skipInverseValue(jv, x) = x as siv;
+        NaturalsBelow.skipValue(jv, x) = x as sv;
         NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, x))
            = NaturalsBelow.skipValue(jv, x)   by substituting siv
            = x                                 by sv
@@ -370,8 +361,8 @@ theorem NaturalsBelow.skipValue_skipInverse (jv x : Natural) (ne : x ≠ jv)
         ¬(jv = x) by { suppose jv = x as e; x = jv by e; done };
         jv < x by Natural.lt_of_le_of_ne;
         0 < x by { 0 ≤ jv < x; done };
-        ¬(x = 0) by Natural.not_equal_of_greater_than;
-        x = 0 ∨ ∃ (p : Natural). x = 1 + p by Natural.zero_or_one_plus;
+        ¬(x = 0);
+        x = 0 ∨ ∃ (p : Natural). x = 1 + p;
         ∃ (p : Natural). x = 1 + p
             by cases {
                  case x = 0 as xZero: { False; done }
@@ -382,12 +373,11 @@ theorem NaturalsBelow.skipValue_skipInverse (jv x : Natural) (ne : x ≠ jv)
         jv ≤ p by { jv < x = 1 + p; done by Natural.le_of_lt_one_plus };
         ¬(p < jv) by { suppose p < jv as bad; jv ≤ p < jv; done };
         ¬(x < jv) by { suppose x < jv as bad; jv ≤ x < jv; done };
-        NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1
-            by NaturalsBelow.skipInverseValue_above as siv;
-        x ∸ 1 = (1 + p) ∸ 1   by substituting xIsSucc
-                            = p                          by NaturalsBelow.monus_one_plus_one
+        NaturalsBelow.skipInverseValue(jv, x) = x ∸ 1 as siv;
+        x ∸ 1 = (1 + p) ∸ 1
+              = p
             as monusIsP;
-        NaturalsBelow.skipValue(jv, p) = 1 + p by NaturalsBelow.skipValue_above as svp;
+        NaturalsBelow.skipValue(jv, p) = 1 + p as svp;
         NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, x))
            = NaturalsBelow.skipValue(jv, x ∸ 1)   by substituting siv
            = NaturalsBelow.skipValue(jv, p)                      by substituting monusIsP
@@ -402,11 +392,10 @@ theorem NaturalsBelow.skipValue_skipInverse (jv x : Natural) (ne : x ≠ jv)
 theorem NaturalsBelow.skip_surjective {count : Natural} (jv : Natural) (jvBound : jv ≤ count)
         (index : NaturalsBelow(1 + count)) (ne : NaturalsBelow.value(index) ≠ jv)
         : ∃ (i : NaturalsBelow(count)). NaturalsBelow.skip(jv, i) = index := {
-  NaturalsBelow.value(index) < 1 + count by NaturalsBelow.below as vBound;
-  NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)) < count
-      by NaturalsBelow.skipInverseValue_bound as ivBound;
+  NaturalsBelow.value(index) < 1 + count;
+  NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)) < count as ivBound;
   NaturalsBelow.skipValue(jv, NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)))
-      = NaturalsBelow.value(index) by NaturalsBelow.skipValue_skipInverse as round;
+      = NaturalsBelow.value(index) as round;
   NaturalsBelow.value(NaturalsBelow.skip(jv,
         NaturalsBelow.make(NaturalsBelow.skipInverseValue(jv, NaturalsBelow.value(index)), ivBound)))
       = NaturalsBelow.value(index) by round;
@@ -426,8 +415,8 @@ theorem Field.negate_nonzero (f : Field) (a : Field.carrier(f)) (nonzero : a ≠
   suppose Field.negate(a) = Field.zero(f) as negZero;
   a = a + Field.zero(f)
     = a + Field.negate(a)   by substituting negZero
-    = Field.zero(f)          by Field.add_negate_right;
-  a ≠ Field.zero(f) by nonzero;
+    = Field.zero(f);
+  a ≠ Field.zero(f);
   done
 }
 
@@ -450,17 +439,14 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
         (i0 : Natural) (i0Below : i0 < len) (nonzero : coefficients(i0) ≠ Field.zero(f))
         : VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)), g(selection(i0))) := {
   NaturalsBelow.value(selection(i0)) ≤ count
-      by { NaturalsBelow.value(selection(i0)) < 1 + count by NaturalsBelow.below;
-           done by Natural.le_of_lt_one_plus } as jvBound;
+      by { NaturalsBelow.value(selection(i0)) < 1 + count;
+           done by Natural.le_of_lt_one_plus };
   NaturalsBelow.value(NaturalsBelow.skip(NaturalsBelow.value(selection(i0)),
-        NaturalsBelow.make(0, countPos))) ≠ NaturalsBelow.value(selection(i0))
-      by NaturalsBelow.skip_avoids as redirectAvoids;
+        NaturalsBelow.make(0, countPos))) ≠ NaturalsBelow.value(selection(i0));
 
   -- The coefficients with slot i0 zeroed, and the selection redirected there
   -- to an index that is not selection(i0).
-  Field.negate(coefficients(i0)) ≠ Field.zero(f) by Field.negate_nonzero as negNonzero;
-  coefficients(i0) + Field.negate(coefficients(i0)) = Field.zero(f)
-      by Field.add_negate_right as sumZero;
+  Field.negate(coefficients(i0)) ≠ Field.zero(f);
 
   -- Position bump: raising slot i0 by -c(i0) zeroes it and adds -c(i0)·g(j).
   VectorSpace.linearCombination(g,
@@ -487,7 +473,7 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
             NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
           ≠ NaturalsBelow.value(selection(i0))
         by {
-          i = i0 ∨ i ≠ i0 by Logic.excluded_middle;
+          i = i0 ∨ i ≠ i0;
           done by cases {
             case i = i0 as atI0: {
                 Function.updateAt(selection, i0,
@@ -495,36 +481,29 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
                    = Function.updateAt(selection, i0,
                          NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i0)
                          by substituting atI0
-                   = NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos))
-                         by Function.updateAt_at
-                   as redirectHere;
-                NaturalsBelow.value(Function.updateAt(selection, i0,
-                      NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
-                   = NaturalsBelow.value(
-                         NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))
-                         by substituting redirectHere as valEq;
+                   = NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos));
                 NaturalsBelow.value(
                       NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))
-                   ≠ NaturalsBelow.value(selection(i0)) by redirectAvoids;
+                   ≠ NaturalsBelow.value(selection(i0));
                 done
               }
             case i ≠ i0 as offI0: {
                 Function.updateAt(selection, i0,
                       NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
-                   = selection(i) by Function.updateAt_off as selHere;
+                   = selection(i);
                 selection(i) ≠ selection(i0)
                     by { suppose selection(i) = selection(i0) as e; i = i0 by injective; done };
                 NaturalsBelow.value(selection(i)) ≠ NaturalsBelow.value(selection(i0))
                     by { suppose NaturalsBelow.value(selection(i)) = NaturalsBelow.value(selection(i0)) as ve;
                          selection(i) = selection(i0) by NaturalsBelow.equal_of_value; done };
-                done by substituting selHere
+                done
               }
           }
-        } as valueNeJ;
+        };
       ∃ (i2 : NaturalsBelow(count)). NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), i2)
           = Function.updateAt(selection, i0,
                 NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
-          by NaturalsBelow.skip_surjective as preimageExists;
+          as preimageExists;
       choose i2 such that NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), i2)
           = Function.updateAt(selection, i0,
                 NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
@@ -541,7 +520,7 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
                 NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
               by substituting skipEqSel as dropAtI2;
       done by substituting dropAtI2
-    } as selectedInSpan;
+    };
 
   VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i0)),
         VectorSpace.linearCombination(g,
@@ -549,14 +528,13 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
             Function.updateAt(selection, i0,
                 NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos))),
             len))
-      by VectorSpace.InSpanOf.of_combination_selected(outerInhabitant := NaturalsBelow.make(0, countPos))
-      as combInSpan;
+      by VectorSpace.InSpanOf.of_combination_selected(outerInhabitant := NaturalsBelow.make(0, countPos));
 
   -- That combination equals the bumped one (they agree below len: at i0 the
   -- zeroed coefficient kills the redirected term).
   Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i0)
-      = coefficients(i0) + Field.negate(coefficients(i0))   by Function.updateAt_at
-      = Field.zero(f)                                        by sumZero
+      = coefficients(i0) + Field.negate(coefficients(i0))
+      = Field.zero(f)
       as zeroedAtI0;
   ∀ (i : Natural). i < len →
       Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
@@ -567,7 +545,7 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
     by {
       take i : Natural;
       suppose i < len as iBelow;
-      i = i0 ∨ i ≠ i0 by Logic.excluded_middle;
+      i = i0 ∨ i ≠ i0;
       done by cases {
         case i = i0 as atI0: {
             Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
@@ -581,19 +559,19 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
                = Field.zero(f) • g(Function.updateAt(selection, i0,
                      NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i))
                      by substituting czeroHere
-               = VectorSpace.zero(V)                by VectorSpace.zero_scale
-               = Field.zero(f) • g(selection(i))    by VectorSpace.zero_scale
+               = VectorSpace.zero(V)
+               = Field.zero(f) • g(selection(i))
                = Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0)))(i)
                  • g(selection(i))                  by substituting czeroHere
           }
         case i ≠ i0 as offI0: {
             Function.updateAt(selection, i0,
                   NaturalsBelow.skip(NaturalsBelow.value(selection(i0)), NaturalsBelow.make(0, countPos)))(i)
-                = selection(i) by Function.updateAt_off as selHere;
+                = selection(i) as selHere;
             done by substituting selHere
           }
       }
-    } as termsMatch;
+    };
   VectorSpace.linearCombination(g,
         Function.updateAt(coefficients, i0, coefficients(i0) + Field.negate(coefficients(i0))),
         Function.updateAt(selection, i0,
@@ -612,7 +590,7 @@ theorem VectorSpace.dropIndex_redundant {f : Field} {V : VectorSpace(f)} {count 
                    selection, len))
                by substituting redirectSame;
            done by substituting bumped };
-  done by VectorSpace.InSpanOf.scale_cancel(nonzero := negNonzero)
+  done by VectorSpace.InSpanOf.scale_cancel
 }
 
 -- ----------------------------------------------------------------------
@@ -630,7 +608,7 @@ theorem VectorSpace.empty_family_independent {f : Field} {V : VectorSpace(f)}
   suppose VectorSpace.linearCombination(g, coefficients, selection, count) = VectorSpace.zero(V) as vanishes;
   take i : Natural;
   suppose i < count as iBelow;
-  NaturalsBelow.value(selection(i)) < 0 by NaturalsBelow.below;
+  NaturalsBelow.value(selection(i)) < 0;
   ¬(NaturalsBelow.value(selection(i)) < 0) by Natural.not_less_than_zero;
   done
 }
@@ -647,7 +625,6 @@ theorem VectorSpace.linearCombination_of_zero_family {f : Field} {V : VectorSpac
         VectorSpace.linearCombination(family, coefficients, selection, 1 + m)
            = VectorSpace.linearCombination(family, coefficients, selection, m)
              + coefficients(m) • family(selection(m))
-                 by VectorSpace.linearCombination_add_one
            = VectorSpace.zero(V) + coefficients(m) • family(selection(m))   by IH
            = VectorSpace.zero(V) + coefficients(m) • VectorSpace.zero(V)     by substituting allZero(selection(m))
            = VectorSpace.zero(V) + VectorSpace.zero(V)                       by VectorSpace.scale_zero
@@ -664,34 +641,32 @@ theorem VectorSpace.spans_dropIndex {f : Field} {V : VectorSpace(f)} {count : Na
         (gSpans : VectorSpace.Spans(g)) (redundant : VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), g(j)))
         : VectorSpace.Spans(VectorSpace.dropIndex(g, j)) := {
   NaturalsBelow.value(j) ≤ count
-      by { NaturalsBelow.value(j) < 1 + count by NaturalsBelow.below; done by Natural.le_of_lt_one_plus }
-      as jvBound;
+      by { NaturalsBelow.value(j) < 1 + count; done by Natural.le_of_lt_one_plus };
   ∀ (index : NaturalsBelow(1 + count)). VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), g(index))
     by {
       take index : NaturalsBelow(1 + count);
       NaturalsBelow.value(index) = NaturalsBelow.value(j)
-          ∨ NaturalsBelow.value(index) ≠ NaturalsBelow.value(j) by Logic.excluded_middle;
+          ∨ NaturalsBelow.value(index) ≠ NaturalsBelow.value(j);
       done by cases {
         case NaturalsBelow.value(index) = NaturalsBelow.value(j) as eq: {
-            index = j by NaturalsBelow.equal_of_value as indexIsJ;
-            VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), g(j)) by redundant;
+            index = j as indexIsJ;
+            VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), g(j));
             done by substituting indexIsJ
           }
         case NaturalsBelow.value(index) ≠ NaturalsBelow.value(j) as ne: {
             ∃ (i2 : NaturalsBelow(count)). NaturalsBelow.skip(NaturalsBelow.value(j), i2) = index
-                by NaturalsBelow.skip_surjective as preimageExists;
+                as preimageExists;
             choose i2 such that NaturalsBelow.skip(NaturalsBelow.value(j), i2) = index from preimageExists;
             NaturalsBelow.skip(NaturalsBelow.value(j), i2) = index as skipEq;
             VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), VectorSpace.dropIndex(g, j)(i2))
                 by VectorSpace.InSpanOf.member;
             VectorSpace.dropIndex(g, j)(i2)
                = g(NaturalsBelow.skip(NaturalsBelow.value(j), i2))
-               = g(index)   by substituting skipEq
-               as dropAt;
-            done by substituting dropAt
+               = g(index)   by substituting skipEq;
+            done
           }
       }
-    } as allInSpan;
+    };
   take v : VectorSpace.carrier(V);
   VectorSpace.InSpanOf(g, v) by VectorSpace.InSpanOf.of_spans(inhabitant := j);
   VectorSpace.InSpanOf(VectorSpace.dropIndex(g, j), v)
@@ -712,8 +687,7 @@ theorem VectorSpace.independent_or_droppable {f : Field} {V : VectorSpace(f)} {c
         : VectorSpace.LinearlyIndependent(g)
           ∨ (∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h)) := {
   (∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h))
-      ∨ ¬(∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h))
-      by Logic.excluded_middle;
+      ∨ ¬(∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h));
   done by cases {
     case ∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h) as hExists: { done }
     case ¬(∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h)) as noH: {
@@ -727,10 +701,8 @@ theorem VectorSpace.independent_or_droppable {f : Field} {V : VectorSpace(f)} {c
           take i : Natural;
           suppose i < len as iBelow;
           suppose coefficients(i) ≠ Field.zero(f) as cNonzero for contradiction {
-            VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i)), g(selection(i)))
-                by VectorSpace.dropIndex_redundant(i0 := i);
-            VectorSpace.Spans(VectorSpace.dropIndex(g, selection(i)))
-                by VectorSpace.spans_dropIndex as dropSpans;
+            VectorSpace.InSpanOf(VectorSpace.dropIndex(g, selection(i)), g(selection(i)));
+            VectorSpace.Spans(VectorSpace.dropIndex(g, selection(i))) as dropSpans;
             ∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h)
                 by { witness VectorSpace.dropIndex(g, selection(i)) with dropSpans };
             done
@@ -749,32 +721,28 @@ theorem VectorSpace.size_one_finite_dimensional {f : Field} {V : VectorSpace(f)}
         (g : NaturalsBelow(1 + count) → VectorSpace.carrier(V)) (countZero : count = 0)
         (gSpans : VectorSpace.Spans(g))
         : VectorSpace.FiniteDimensional(V) := {
-  0 < 1 + count by { 0 < 1 ≤ 1 + count; done } as zeroLtOnePlus;
+  0 < 1 + count as zeroLtOnePlus;
   ∀ (x : NaturalsBelow(1 + count)). NaturalsBelow.value(x) = 0
     by { take x : NaturalsBelow(1 + count);
-         NaturalsBelow.value(x) < 1 + count by NaturalsBelow.below;
+         NaturalsBelow.value(x) < 1 + count;
          1 + count = 1 by substituting countZero;
          NaturalsBelow.value(x) < 1;
-         done by NaturalsBelow.below_one_is_zero } as allValueZero;
+         done } as allValueZero;
   ∀ (x y : NaturalsBelow(1 + count)). g(x) = g(y)
     by { take x : NaturalsBelow(1 + count); take y : NaturalsBelow(1 + count);
          NaturalsBelow.value(x) = 0 by allValueZero;
          NaturalsBelow.value(y) = 0 by allValueZero;
          NaturalsBelow.value(x) = NaturalsBelow.value(y);
-         x = y by NaturalsBelow.equal_of_value;
+         x = y;
          done } as gConstant;
   (∀ (v : VectorSpace.carrier(V)). v = VectorSpace.zero(V))
-      ∨ ¬(∀ (v : VectorSpace.carrier(V)). v = VectorSpace.zero(V)) by Logic.excluded_middle;
+      ∨ ¬(∀ (v : VectorSpace.carrier(V)). v = VectorSpace.zero(V));
   done by cases {
     case ∀ (v : VectorSpace.carrier(V)). v = VectorSpace.zero(V) as trivial: {
-        VectorSpace.LinearlyIndependent((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V))
-            by VectorSpace.empty_family_independent as emptyIndep;
+        VectorSpace.LinearlyIndependent((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V));
         VectorSpace.Spans((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V))
-            by { take v : VectorSpace.carrier(V); v = VectorSpace.zero(V) by trivial; done } as emptySpans;
-        VectorSpace.IsBasis((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V))
-            by { VectorSpace.LinearlyIndependent((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V)) by emptyIndep;
-                 VectorSpace.Spans((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V)) by emptySpans;
-                 done } as emptyBasis;
+            by { take v : VectorSpace.carrier(V); v = VectorSpace.zero(V) by trivial; done };
+        VectorSpace.IsBasis((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V)) as emptyBasis;
         witness 0 with witness ((x : NaturalsBelow(0)) ↦ VectorSpace.zero(V)) with emptyBasis
       }
     case ¬(∀ (v : VectorSpace.carrier(V)). v = VectorSpace.zero(V)) as nontrivial: {
@@ -782,7 +750,7 @@ theorem VectorSpace.size_one_finite_dimensional {f : Field} {V : VectorSpace(f)}
             by Logic.not_forall_implies_exists_not(VectorSpace.carrier(V),
                    (v : VectorSpace.carrier(V)) ↦ v = VectorSpace.zero(V), nontrivial) as nonzeroExists;
         choose v0 such that ¬(v0 = VectorSpace.zero(V)) from nonzeroExists;
-        ¬(v0 = VectorSpace.zero(V)) as v0Nonzero;
+        ¬(v0 = VectorSpace.zero(V));
         -- The single vector is nonzero: otherwise the whole family is zero and
         -- every combination — including v0's — is zero.
         g(NaturalsBelow.make(0, zeroLtOnePlus)) ≠ VectorSpace.zero(V)
@@ -791,16 +759,15 @@ theorem VectorSpace.size_one_finite_dimensional {f : Field} {V : VectorSpace(f)}
             ∀ (x : NaturalsBelow(1 + count)). g(x) = VectorSpace.zero(V)
               by { take x : NaturalsBelow(1 + count);
                    g(x) = g(NaturalsBelow.make(0, zeroLtOnePlus))
-                            by gConstant(x, NaturalsBelow.make(0, zeroLtOnePlus))
-                        = VectorSpace.zero(V) by pointZero;
-                   done } as allZero;
+                        = VectorSpace.zero(V);
+                   done };
             VectorSpace.InSpanOf(g, v0)
                 by VectorSpace.InSpanOf.of_spans(inhabitant := NaturalsBelow.make(0, zeroLtOnePlus))
                 as v0InSpan;
             choose count2, selection2, coefficients2 such that
                 v0 = VectorSpace.linearCombination(g, coefficients2, selection2, count2) from v0InSpan;
             v0 = VectorSpace.linearCombination(g, coefficients2, selection2, count2)
-               = VectorSpace.zero(V) by VectorSpace.linearCombination_of_zero_family;
+               = VectorSpace.zero(V);
             done
           } as pointNonzero;
         VectorSpace.LinearlyIndependent(g)
@@ -821,25 +788,24 @@ theorem VectorSpace.size_one_finite_dimensional {f : Field} {V : VectorSpace(f)}
                             NaturalsBelow.value(selection(0)) = NaturalsBelow.value(selection(1));
                             done by NaturalsBelow.equal_of_value };
                    (0 : Natural) = 1 by injective;
-                   done } as notOneLtLen;
-            len ≤ 1 by { 1 < len ∨ len ≤ 1 by Natural.lt_or_le; done } as lenLeOne;
-            i < 1 by { i < len ≤ 1; done };
-            i = 0 by NaturalsBelow.below_one_is_zero as iZero;
-            0 < len by { i < len; done };
-            1 ≤ len by Natural.add_one_le_of_lt;
+                   done };
+            len ≤ 1 by { 1 < len ∨ len ≤ 1 by Natural.lt_or_le; done };
+            i < 1;
+            i = 0 as iZero;
+            0 < len;
+            1 ≤ len;
             len = 1 by Natural.le_antisymmetric as lenOne;
             VectorSpace.linearCombination(g, coefficients, selection, 1)
                 = VectorSpace.linearCombination(g, coefficients, selection, len)   by substituting lenOne
-                = VectorSpace.zero(V) by vanishes
+                = VectorSpace.zero(V)
                 as vanishesOne;
             coefficients(0) • g(selection(0)) = VectorSpace.zero(V)
                 by { coefficients(0) • g(selection(0))
                         = VectorSpace.linearCombination(g, coefficients, selection, 1)
-                              by VectorSpace.linearCombination_one
                         = VectorSpace.zero(V) by vanishesOne; done } as termZero;
             g(selection(0)) ≠ VectorSpace.zero(V)
                 by { g(selection(0)) = g(NaturalsBelow.make(0, zeroLtOnePlus)) by gConstant;
-                     done by pointNonzero } as gSelNonzero;
+                     done by pointNonzero };
             coefficients(0) = Field.zero(f)
               by {
                 coefficients(0) = Field.zero(f) ∨ coefficients(0) ≠ Field.zero(f) by Logic.excluded_middle;
@@ -851,8 +817,8 @@ theorem VectorSpace.size_one_finite_dimensional {f : Field} {V : VectorSpace(f)}
                                by VectorSpace.scale_reciprocal_cancel
                          = Field.reciprocal(coefficients(0), isNonzero) • VectorSpace.zero(V)
                                by substituting termZero
-                         = VectorSpace.zero(V) by VectorSpace.scale_zero;
-                      g(selection(0)) ≠ VectorSpace.zero(V) by gSelNonzero;
+                         = VectorSpace.zero(V);
+                      g(selection(0)) ≠ VectorSpace.zero(V);
                       done
                     }
                 }
@@ -860,10 +826,8 @@ theorem VectorSpace.size_one_finite_dimensional {f : Field} {V : VectorSpace(f)}
             coefficients(i) = coefficients(0) by substituting iZero
                             = Field.zero(f) by coeffZero;
             done
-          } as gIndependent;
-        VectorSpace.IsBasis(g)
-            by { VectorSpace.LinearlyIndependent(g) by gIndependent;
-                 VectorSpace.Spans(g) by gSpans; done } as gBasis;
+          };
+        VectorSpace.IsBasis(g) as gBasis;
         witness 1 + count with witness g with gBasis
       }
   }
@@ -879,10 +843,8 @@ theorem VectorSpace.spanning_finite_dimensional {f : Field} {V : VectorSpace(f)}
     case base: {
         take g : NaturalsBelow(0) → VectorSpace.carrier(V);
         suppose VectorSpace.Spans(g) as gSpans;
-        VectorSpace.LinearlyIndependent(g) by VectorSpace.empty_family_independent as gIndep;
-        VectorSpace.IsBasis(g)
-            by { VectorSpace.LinearlyIndependent(g) by gIndep;
-                 VectorSpace.Spans(g) by gSpans; done } as gBasis;
+        VectorSpace.LinearlyIndependent(g);
+        VectorSpace.IsBasis(g) as gBasis;
         witness 0 with witness g with gBasis
       }
     case step(count): {
@@ -892,24 +854,21 @@ theorem VectorSpace.spanning_finite_dimensional {f : Field} {V : VectorSpace(f)}
         done by cases {
           case 0 < count as countPos: {
               VectorSpace.LinearlyIndependent(g)
-                  ∨ (∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h))
-                  by VectorSpace.independent_or_droppable;
+                  ∨ (∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h));
               done by cases {
                 case VectorSpace.LinearlyIndependent(g) as gIndep: {
-                    VectorSpace.IsBasis(g)
-                        by { VectorSpace.LinearlyIndependent(g) by gIndep;
-                             VectorSpace.Spans(g) by gSpans; done } as gBasis;
+                    VectorSpace.IsBasis(g) as gBasis;
                     witness 1 + count with witness g with gBasis
                   }
                 case ∃ (h : NaturalsBelow(count) → VectorSpace.carrier(V)). VectorSpace.Spans(h) as hExists: {
                     choose h such that VectorSpace.Spans(h) from hExists;
-                    VectorSpace.Spans(h) as hSpans;
+                    VectorSpace.Spans(h);
                     done by IH
                   }
               }
             }
           case count ≤ 0 as countLe: {
-              count = 0 by Natural.less_or_equal_zero_implies_equals_zero as countZero;
+              count = 0;
               done by VectorSpace.size_one_finite_dimensional
             }
         }
@@ -922,6 +881,6 @@ theorem VectorSpace.FinitelyGenerated.finite_dimensional {f : Field} {V : Vector
         (finitelyGenerated : VectorSpace.FinitelyGenerated(V))
         : VectorSpace.FiniteDimensional(V) := {
   choose count, generators such that VectorSpace.Spans(generators) from finitelyGenerated;
-  VectorSpace.Spans(generators) as generatorsSpan;
-  done by VectorSpace.spanning_finite_dimensional
+  VectorSpace.Spans(generators);
+  done
 }

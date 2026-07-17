@@ -201,7 +201,10 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # 2026-07-17: 271 → 272. LA wave 3: exchange_lemma polished to the bar
 # (135 findings settled, ~90 hints/names dropped, 18 documented keeps)
 # and MANIFEST-ADDED at a single counted leak.
-CLEAN_LEAK_BUDGET ?= 272
+# 2026-07-17: 272 → 274. LA wave 3: basis_pruning polished (154 findings,
+# 4 documented false-positive reverts) and MANIFEST-ADDED at two counted
+# leaks (both structural: the injective-appeal symmetrization blocks).
+CLEAN_LEAK_BUDGET ?= 274
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
