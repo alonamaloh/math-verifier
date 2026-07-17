@@ -2185,6 +2185,21 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         found = true;
                     }
                 }
+                // Fallback 1b: a library theorem STATING the premise
+                // verbatim (premise-free, matched by spine hash + defeq).
+                // Search-free and prompted — the user cited this lemma —
+                // so the pool is not `automatic`-gated. Skipped in the
+                // speculative context scan, whose unprompted discipline
+                // keeps the automatic-only pool.
+                if (!found && !inSpeculativeContextScan_) {
+                    ExpressionPointer stated = findPremiseFreeLibraryFact(
+                        slotNormalised, slotOpened,
+                        /*requireAutomatic=*/false);
+                    if (stated) {
+                        elaboratedArgs[i] = std::move(stated);
+                        found = true;
+                    }
+                }
                 // Fallback 2: not a stated hypothesis and no forgetful
                 // instance — but the bare prover may close it
                 // near-instantly from `automatic` lemmas / the tier stack

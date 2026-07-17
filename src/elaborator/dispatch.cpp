@@ -3086,21 +3086,46 @@ bool Elaborator::ellipsisTermsMatch(
     // budget-capped bare-prover probe on the equality (§3: what lets
     // `x ≡ x^1` verify against opaque `power` via the automatic
     // power_one). Truth-only: the proof term is discarded.
+    ExpressionPointer equality;
     try {
-        RedundancyBudgetGuard budgetGuard(*this);
         LevelPointer universe = typeUniverseOf(localBinders, writtenKernel);
-        ExpressionPointer equality = makeApplication(
+        equality = makeApplication(
             makeApplication(
                 makeApplication(
                     makeConstant("Equality", {universe}), carrierType),
                 writtenKernel),
             expectedKernel);
+    } catch (const ElaborateError&) {
+        return false;
+    } catch (const TypeError&) {
+        return false;
+    }
+    bool cappedProbeTripped = false;
+    try {
+        RedundancyBudgetGuard budgetGuard(*this);
         ExpressionPointer proof =
             autoProveClaim(equality, localBinders, written->line);
         return proof != nullptr;
     } catch (const ElaborateError&) {
     } catch (const TypeError&) {
     } catch (const AutoProverBudgetError&) {
+        cappedProbeTripped = true;
+    }
+    // A TRIPPED cap is an effort verdict, not a truth verdict — and step
+    // counts shift with unrelated reduction history, so rejecting the
+    // written ellipsis term on the cap would make `…`-matching flip under
+    // benign upstream changes (the same cliff as the citation premise
+    // discharge). Retry once at the full budget; a real prover failure
+    // stays a mismatch.
+    if (cappedProbeTripped) {
+        try {
+            ExpressionPointer proof =
+                autoProveClaim(equality, localBinders, written->line);
+            return proof != nullptr;
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        } catch (const AutoProverBudgetError&) {
+        }
     }
     return false;
 }

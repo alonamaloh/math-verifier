@@ -4898,6 +4898,22 @@ private:
         const std::set<std::string>& outerMetavars,
         std::map<std::string, ExpressionPointer>& outerAssignment);
 
+    // Search-free premise discharge from a VERBATIM library fact: scan the
+    // environment for a premise-free (Pi-free, monomorphic) Definition/Axiom
+    // whose statement is definitionally the premise, prefiltered by spine
+    // hash on both the premise's spellings (as stated and WHNF'd). Returns
+    // the fact as a constant, or null. With `requireAutomatic` the pool is
+    // the unprompted `automatic` one (the speculative-scan discipline);
+    // without it, ANY stated theorem qualifies — the caller must be on a
+    // PROMPTED path (discharging a premise of a lemma the user cited), where
+    // "the library states this verbatim" is exactly the citation contract.
+    // `Internal.sorry*` is excluded unconditionally (the automatic gate used
+    // to exclude it implicitly; see the sorry-search soundness fix).
+    ExpressionPointer findPremiseFreeLibraryFact(
+        const ExpressionPointer& premiseOpened,
+        const ExpressionPointer& premiseOpenedUnreduced,
+        bool requireAutomatic);
+
     // True when `openedType` (already opened over `localBinders`) is a
     // Proposition — i.e. its own type weak-head-reduces to `Sort 0`. Used
     // to restrict context-discharge to proof obligations, never values.
@@ -6106,6 +6122,17 @@ private:
     uint64_t autoProveStepSnapshot_ = 0;
     bool autoProveBudgetActive_ = false;
     bool autoProveBudgetTripped_ = false;
+
+    // Premises whose FULL-budget discharge retry (the capped-probe-tripped
+    // ladder in citation premise discharge) already failed during the
+    // current top-level declaration, keyed by the opened premise's spine
+    // hash. A failing citation is re-attempted at several peel/flattening
+    // depths, each probing the SAME undischargeable premise; without the
+    // memo every attempt re-burns the full budget (~seconds per premise).
+    // Cleared per declaration (elaborateTopStatement). Conservative: only
+    // repeat FAILURES are skipped, and only for the retry tier — the capped
+    // probe still runs fresh at every site.
+    std::unordered_set<uint64_t> failedFullBudgetDischarges_;
 
     // Default budget, in kernel reduction steps. Read once from
     // MATH_AUTOPROVE_BUDGET (if set and parseable as a non-negative

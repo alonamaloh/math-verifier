@@ -9,6 +9,10 @@
 #include <functional>
 
 void Elaborator::elaborateTopStatement(const SurfaceTopStatement& statement) {
+        // Fresh declaration, fresh discharge memo: the failed-full-budget
+        // premise set is only meaningful against this statement's binder
+        // names and imports-so-far.
+        failedFullBudgetDischarges_.clear();
         try {
             elaborateTopStatementDispatch(statement);
         } catch (const TypeError& kernelError) {

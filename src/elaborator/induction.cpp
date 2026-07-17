@@ -1960,6 +1960,63 @@ ExpressionPointer Elaborator::autoFillHintForClaimCore(
             + "`)");
     }
 
+ExpressionPointer Elaborator::findPremiseFreeLibraryFact(
+        const ExpressionPointer& premiseOpened,
+        const ExpressionPointer& premiseOpenedUnreduced,
+        bool requireAutomatic) {
+        // Hash prefilter admits BOTH spellings: the premise as stated and
+        // its WHNF (a transparent `≤` premise unfolds to its Exists body
+        // while the fact is stored in `≤` form).
+        uint64_t premiseHash = spineHash(premiseOpened);
+        uint64_t premiseHashUnreduced = spineHash(premiseOpenedUnreduced);
+        Context emptyContext;
+        for (const auto& [factName, factDeclaration]
+                 : environment_.declarations) {
+            // The `sorry` axioms inhabit every proposition and must never
+            // be reachable by search (they are Pi-typed, so the premise-free
+            // filter already skips them — this guard is belt and braces).
+            if (factName.rfind("Internal.sorry", 0) == 0) continue;
+            ExpressionPointer factType;
+            bool automaticFlag = false;
+            size_t universeParameterCount = 0;
+            if (auto* definition = std::get_if<Definition>(
+                    &factDeclaration)) {
+                factType = definition->type;
+                automaticFlag = definition->automatic;
+                universeParameterCount =
+                    definition->universeParameters.size();
+            } else if (auto* axiom = std::get_if<Axiom>(
+                           &factDeclaration)) {
+                factType = axiom->type;
+                automaticFlag = axiom->automatic;
+                universeParameterCount =
+                    axiom->universeParameters.size();
+            } else {
+                continue;
+            }
+            if ((requireAutomatic && !automaticFlag)
+                || universeParameterCount != 0) {
+                continue;
+            }
+            if (std::get_if<Pi>(&factType->node)) continue;
+            uint64_t factHash = spineHash(factType);
+            if (factHash != premiseHash
+                && factHash != premiseHashUnreduced) {
+                continue;
+            }
+            bool equal = false;
+            try {
+                equal = isDefinitionallyEqual(
+                    environment_, emptyContext,
+                    factType, premiseOpened);
+            } catch (...) { equal = false; }
+            if (equal) {
+                return makeConstant(factName, {});
+            }
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::completeCitationFromBindings(
         ExpressionPointer hintTerm,
         const ExpressionPointer& goalClosed,
@@ -2368,58 +2425,30 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                         }
                         // Fallback: a premise-free `automatic` fact
                         // whose statement is definitionally the premise
-                        // (non-numeral ground facts). The hash
-                        // prefilter admits BOTH spellings: the premise
-                        // as stated and its WHNF (a transparent `≤`
-                        // premise unfolds to its Exists body while the
-                        // fact is stored in `≤` form).
-                        uint64_t premiseHash = spineHash(concreteOpened);
-                        uint64_t premiseHashUnreduced = spineHash(
+                        // (non-numeral ground facts).
+                        proved = findPremiseFreeLibraryFact(
+                            concreteOpened,
                             openOverLocalBinders(
-                                concretePremise, localBinders, N));
-                        Context emptyContext;
-                        for (const auto& [factName, factDeclaration]
-                                 : environment_.declarations) {
-                            ExpressionPointer factType;
-                            bool automaticFlag = false;
-                            size_t universeParameterCount = 0;
-                            if (auto* definition = std::get_if<Definition>(
-                                    &factDeclaration)) {
-                                factType = definition->type;
-                                automaticFlag = definition->automatic;
-                                universeParameterCount =
-                                    definition->universeParameters.size();
-                            } else if (auto* axiom = std::get_if<Axiom>(
-                                           &factDeclaration)) {
-                                factType = axiom->type;
-                                automaticFlag = axiom->automatic;
-                                universeParameterCount =
-                                    axiom->universeParameters.size();
-                            } else {
-                                continue;
-                            }
-                            if (!automaticFlag
-                                || universeParameterCount != 0) {
-                                continue;
-                            }
-                            if (std::get_if<Pi>(&factType->node)) continue;
-                            uint64_t factHash = spineHash(factType);
-                            if (factHash != premiseHash
-                                && factHash != premiseHashUnreduced) {
-                                continue;
-                            }
-                            bool equal = false;
-                            try {
-                                equal = isDefinitionallyEqual(
-                                    environment_, emptyContext,
-                                    factType, concreteOpened);
-                            } catch (...) { equal = false; }
-                            if (equal) {
-                                proved = makeConstant(factName, {});
-                                break;
-                            }
-                        }
+                                concretePremise, localBinders, N),
+                            /*requireAutomatic=*/true);
                     } else {
+                        // Prompted path: the user cited this lemma, so a
+                        // library theorem STATING the premise verbatim
+                        // discharges it search-free — before any prover
+                        // run (the `is_prime 2` premise of
+                        // `by prime_divides_product` cites the imported
+                        // `Natural.is_prime_two` instead of re-proving
+                        // primality by conjunction-splitting at the edge
+                        // of the effort cap).
+                        proved = findPremiseFreeLibraryFact(
+                            concreteOpened,
+                            openOverLocalBinders(
+                                concretePremise, localBinders, N),
+                            /*requireAutomatic=*/false);
+                        if (proved) {
+                            bindings[innerIndex] = proved;
+                            continue;
+                        }
                         // Probe under the redundancy cap first — the
                         // common discharge is near-instant and the cap
                         // keeps a hopeless premise from stalling the
@@ -2452,16 +2481,35 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                         // Step 5b → 5d: retry once at the full by-citation
                         // budget. Real failures (ElaborateError) are final
                         // and don't retry.
-                        if (!proved && cappedProbeTripped) {
-                            try {
-                                proved = autoProveClaim(
-                                    concretePremise, localBinders, 0);
-                            } catch (const ElaborateError&) {
-                                proved = nullptr;
-                            } catch (const TypeError&) {
-                                proved = nullptr;
-                            } catch (const AutoProverBudgetError&) {
-                                proved = nullptr;
+                        //
+                        // The retry is bounded against failure-path waste
+                        // (a FAILING citation is re-attempted at several
+                        // peel/flattening depths, each probing the same
+                        // hopeless premise; unbounded, each attempt burned
+                        // the full budget — ~7 s on sqrt_two_irrational's
+                        // `¬∃` citation alone): it runs only in the
+                        // unique-match pass (the greedy pass's failures
+                        // fall through to that pass anyway), and a premise
+                        // whose full-budget retry already failed in this
+                        // declaration is skipped via the discharge memo.
+                        if (!proved && cappedProbeTripped
+                            && uniqueMatchFirst) {
+                            uint64_t memoKey = spineHash(concreteOpened);
+                            if (!failedFullBudgetDischarges_.count(memoKey)) {
+                                try {
+                                    proved = autoProveClaim(
+                                        concretePremise, localBinders, 0);
+                                } catch (const ElaborateError&) {
+                                    proved = nullptr;
+                                } catch (const TypeError&) {
+                                    proved = nullptr;
+                                } catch (const AutoProverBudgetError&) {
+                                    proved = nullptr;
+                                }
+                                if (!proved) {
+                                    failedFullBudgetDischarges_.insert(
+                                        memoKey);
+                                }
                             }
                         }
                     }
