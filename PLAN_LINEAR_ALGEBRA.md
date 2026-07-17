@@ -447,17 +447,15 @@ Update this section before ending any session that works on the plan.
   productOver_multiply → Fubini → 6c kills non-injective φ → restrict_support to the
   permutation image → sumOver_map → 6d row-permutation → det A·det B). Remaining LA work
   is all non-critical: the polish sweep, Σ-sugar/Norm-b automation, AC infra.
-- **LA POLISH DEBT (owner-requested 2026-07-15, pending).** Most Stage E–H files
-  are NOT in the clean manifest — the tracker repeatedly defers the "redundant-`by`
-  read-through + unused-name cascade + manifest-add" per file (exchange_lemma,
-  basis_pruning, dimension, rank_nullity, and the whole determinant cluster:
-  finite_permutation, permutation_enumeration/sign/transposition_sign,
-  field_aggregation, function_enumeration, matrix, determinant, ring_from_integer).
-  Owner wants all LA modules polished. Do this per the owner rules —
-  [[redundant_by_is_half_keeps]] (read each site; ~half the hints are load-bearing
-  keeps, NOT drive-to-zero), [[readability_is_primary]], [[scope_to_clean_manifest]],
-  the `polish-proofs` skill — file by file, one commit each, re-verify + manifest-add.
-  Large sweep; interleave with or follow the 6c/6d build.
+- **LA POLISH DEBT — CLOSED 2026-07-17.** Waves 1–2 (dimension + the
+  determinant cluster) landed 2026-07-16 (see the polish-session entry);
+  wave 3 landed 2026-07-17 in the overnight loop: exchange_lemma
+  (5579b02d, 135 findings, manifest-added at +1 leak), basis_pruning
+  (a62bc6b9, 154 findings, 4 documented checker false-positive reverts,
+  +2 leaks), rank_nullity (6de1b274, 290 findings, zero reverts, +23
+  leaks — all structural hypothesis-application data args). Budget
+  272 → 297 with dated Makefile notes. Every Stage A–H file is now at
+  the clean-manifest bar; nothing remains open in this plan.
 
 ## Remaining worklist (authoritative running order)
 
