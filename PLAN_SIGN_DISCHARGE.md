@@ -171,6 +171,23 @@ regressions).
   machinery.
 - Run `MATH_CLASSIFY_HINTS` (B5, tier-4 counts) before deciding;
   owner sign-off required.
+- **B5 measurement (2026-07-17, post-S1/S2/S4):** 6853 hinted sites;
+  closes-today 2032 (29.7%); **tier4-sign 177 (2.6%)**, thinly spread
+  (≤8 per file; top files are the order foundations themselves plus
+  exponential_addition, trigonometric_bounds, and the LA cone) —
+  mostly ℕ/ℤ zero-equality shapes (`0 * x = 0`, `¬(0 ∣ x)`,
+  `length(empty) = 0`), not the ℝ inventory pattern S4 already
+  killed; tier3+4-sign-cast 22; **tier3-cast 408 (6.0%) — 2.3× the
+  sign bucket and the largest absorbable class**; B4-order-step 50;
+  tier2-ground 196. AM-GM itself is down to ~10 hinted sites, and
+  the classifier says they are cast bridges and order-logic bridges,
+  not sign — three of them (lines 74, 75, 164) now close WITHOUT
+  their hint (closes=1). Conclusion drafted for owner: a full S3
+  sign tier is NOT warranted by residue volume; the S3-shaped items
+  worth doing are the three structural holes (−0 absorption,
+  δ-unfold dispatch, rewrite-precondition sharing) plus sign-fact
+  memoization for the perf note. The next big readability lever —
+  including for AM-GM — is tier3-cast, not sign.
 
 ## AM-GM closure (2026-07-17, third pass — 2f07372e)
 
