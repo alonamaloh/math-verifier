@@ -25,6 +25,7 @@ import Lists.list
 import Lists.map
 import Lists.append
 import Lists.distinct
+import Lists.length
 import Algebra.finite_permutation
 
 -- ----------------------------------------------------------------------
@@ -54,6 +55,24 @@ theorem NaturalsBelow.enumerate_one_plus (m : ℕ)
   reflexivity(List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
       List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
           NaturalsBelow.enumerate(m))))
+
+-- The enumeration lists exactly n indices.
+theorem NaturalsBelow.enumerate_length (n : ℕ)
+        : length(NaturalsBelow.enumerate(n)) = n :=
+  by induction on n with IH {
+    case base:
+        length(NaturalsBelow.enumerate(0)) = 0
+    case step(m):
+        length(NaturalsBelow.enumerate(1 + m))
+           = length(List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                     NaturalsBelow.enumerate(m))))
+                 by substituting NaturalsBelow.enumerate_one_plus
+           = 1 + length(List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
+                 NaturalsBelow.enumerate(m)))
+           = 1 + length(NaturalsBelow.enumerate(m))   by List.map_length
+           = 1 + m                                    by substituting IH
+  }
 
 -- Every index of `NaturalsBelow(n)` appears in `enumerate(n)`. The step
 -- splits an index by whether its value is below the boundary (an inclusion

@@ -135,6 +135,24 @@ theorem Polynomial.coefficientOf_monomial_off (r : Ring) (c : Ring.carrier(r))
         : Polynomial.monomial(r, c, j)[i] = Ring.zero(r) :=
   Polynomial.coefficient_monomial_off(r, c, j, i, notEqual)
 
+-- The monomial's degree bound: c·x^j has no coefficient above index j.
+theorem Polynomial.monomial_DegreeLessThan (r : Ring) (c : Ring.carrier(r)) (j : ℕ)
+        : Polynomial.DegreeLessThan(r, Polynomial.monomial(r, c, j), 1 + j) :=
+  (i : ℕ) (onePlusJLessOrEqualI : 1 + j ≤ i) ↦ {
+    j < i by Natural.lt_of_add_one_le;
+    ¬(i = j) by Natural.not_equal_of_greater_than;
+    done by Polynomial.coefficientOf_monomial_off
+  }
+
+-- One is the constant monomial, so it is bounded below degree 1.
+theorem Polynomial.one_DegreeLessThan (r : Ring)
+        : Polynomial.DegreeLessThan(r, Polynomial.one(r), 1) := {
+  Polynomial.one(r) = Polynomial.monomial(r, Ring.one(r), 0) as oneAsMonomial;
+  Polynomial.DegreeLessThan(r, Polynomial.monomial(r, Ring.one(r), 0), 1)
+      by Polynomial.monomial_DegreeLessThan;
+  done by substituting oneAsMonomial
+}
+
 -- The coefficient of (c·x^j)·p: the convolution collapses to a single
 -- term because the monomial vanishes off index j.
 theorem Polynomial.coefficientOf_monomial_multiply (r : Ring) (c : Ring.carrier(r))

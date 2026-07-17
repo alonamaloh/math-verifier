@@ -473,6 +473,71 @@ theorem CommutativeRing.sumOver_restrict_support {r : CommutativeRing} {index : 
         }
   }
 
+-- Isolating a factor: a member of the item list contributes its term, and
+-- the rest of the product is the product over the list with that element
+-- removed — the multiplicative companion of `sumOver_remove`.
+theorem CommutativeRing.productOver_remove {r : CommutativeRing} {index : Type(0)}
+        (g : index → CommutativeRing.carrier(r)) (x : index) (items : List(index))
+        : x ∈ items
+          → CommutativeRing.productOver(g, items) = g(x) * CommutativeRing.productOver(g, items ∖ x) :=
+  by induction on items with IH {
+    case List.empty:
+        (mem : x ∈ List.empty(index)) ↦ {
+          False by List.no_member_empty;
+          done
+        }
+    case List.prepend(head, tail):
+        (mem : x ∈ List.prepend(index, head, tail)) ↦ {
+          head = x ∨ ¬(head = x) by Logic.excluded_middle;
+          done by cases {
+            case head = x as headEqualsX:
+                CommutativeRing.productOver(g, List.prepend(index, x, tail))
+                   = g(x) * CommutativeRing.productOver(g, tail)
+                   = g(x) * CommutativeRing.productOver(g, List.prepend(index, x, tail) ∖ x)
+                       by substituting List.remove_prepend_equal
+            case ¬(head = x) as headNeqX: {
+                ¬(x = head) by (xEqualsHead : x = head) ↦ { head = x; done };
+                x ∈ tail by List.member_of_prepend_not_head;
+                CommutativeRing.productOver(g, tail) = g(x) * CommutativeRing.productOver(g, tail ∖ x)
+                    by IH as tailEquation;
+                CommutativeRing.productOver(g, List.prepend(index, head, tail))
+                   = g(head) * CommutativeRing.productOver(g, tail)
+                   = g(head) * (g(x) * CommutativeRing.productOver(g, tail ∖ x))
+                         by substituting tailEquation
+                   = g(x) * (g(head) * CommutativeRing.productOver(g, tail ∖ x))   by ring
+                   = g(x) * CommutativeRing.productOver(g, List.prepend(index, head, tail ∖ x))
+                   = g(x) * CommutativeRing.productOver(g, List.prepend(index, head, tail) ∖ x)
+                         by substituting List.remove_prepend_unequal
+              }
+          }
+        }
+  }
+
+-- A sum whose term vanishes on every member of the list vanishes.
+theorem CommutativeRing.sumOver_zero_on_members {r : CommutativeRing} {index : Type(0)}
+        (term : index → CommutativeRing.carrier(r)) (items : List(index))
+        (vanishes : ∀ (x : index). x ∈ items → term(x) = CommutativeRing.zero(r))
+        : CommutativeRing.sumOver(term, items) = CommutativeRing.zero(r) :=
+  by induction on items with IH {
+    case List.empty:
+        CommutativeRing.sumOver(term, List.empty(index)) = CommutativeRing.zero(r)
+    case List.prepend(head, tail): {
+        head ∈ List.prepend(index, head, tail);
+        term(head) = CommutativeRing.zero(r) by vanishes as headVanishes;
+        ∀ (x : index). x ∈ tail → term(x) = CommutativeRing.zero(r)
+            by (x : index) (xInTail : x ∈ tail) ↦ {
+                x ∈ List.prepend(index, head, tail) by List.member.there;
+                done by vanishes
+              };
+        CommutativeRing.sumOver(term, tail) = CommutativeRing.zero(r) by IH as tailVanishes;
+        CommutativeRing.sumOver(term, List.prepend(index, head, tail))
+           = term(head) + CommutativeRing.sumOver(term, tail)
+           = CommutativeRing.zero(r) + CommutativeRing.sumOver(term, tail)   by substituting headVanishes
+           = CommutativeRing.zero(r) + CommutativeRing.zero(r)               by substituting tailVanishes
+           = CommutativeRing.zero(r)
+      }
+  }
+
 -- A sum over a list is invariant under permuting the item list (ring
 -- addition is commutative and associative) — the additive companion of
 -- `productOver_permutation`.
