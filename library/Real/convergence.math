@@ -48,20 +48,20 @@ import Real.absolute_value
 import Real.division
 
 -- ----------------------------------------------------------------------
--- ε–N convergence: `s : Natural → Real` converges to `limit : Real`
+-- ε–N convergence: `s : ℕ → ℝ` converges to `limit : ℝ`
 -- iff for every positive Real ε, eventually every term of `s` is within
 -- ε of the limit. (ε is a real number, as in continuity and the
 -- derivative; the bridges below mediate the rational tolerances the
 -- Cauchy-rep machinery still speaks.)
 
 definition Real.SequenceConverges
-        (s : Natural → Real) (limit : Real) : Proposition :=
-  ∀ (ε : Real). ε > 0 →
+        (s : ℕ → ℝ) (limit : ℝ) : Proposition :=
+  ∀ (ε : ℝ). ε > 0 →
     eventually (m). abs(s(m) - limit) < ε
 
 -- A sequence is convergent iff some Real is its limit.
-definition Real.SequenceConvergent (s : Natural → Real) : Proposition :=
-  ∃ (limit : Real). Real.SequenceConverges(s, limit)
+definition Real.SequenceConvergent (s : ℕ → ℝ) : Proposition :=
+  ∃ (limit : ℝ). Real.SequenceConverges(s, limit)
 
 -- ----------------------------------------------------------------------
 -- Bridge from a rational-ε bound to Real-ε convergence: `of_rational` builds
@@ -73,23 +73,23 @@ definition Real.SequenceConvergent (s : Natural → Real) : Proposition :=
 -- supplies a rational q with 0 < q < ε, and the rational bound at q lands
 -- every tail term below q, hence below ε.
 theorem Real.SequenceConverges.of_rational
-        (s : Natural → Real) (limit : Real)
-        (rationalBound : ∀ (ε : Rational). Rational.zero < ε →
-            ∃ (N : Natural).
-              ∀ (m : Natural). N ≤ m →
-                abs(s(m) - limit) < (ε : Real))
+        (s : ℕ → ℝ) (limit : ℝ)
+        (rationalBound : ∀ (ε : ℚ). Rational.zero < ε →
+            ∃ (N : ℕ).
+              ∀ (m : ℕ). N ≤ m →
+                abs(s(m) - limit) < (ε : ℝ))
         : Real.SequenceConverges(s, limit) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
-    choose q such that Rational.zero < q ∧ (q : Real) < ε
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
+    choose q such that Rational.zero < q ∧ (q : ℝ) < ε
         from Real.exists_positive_rational_below;
     Rational.zero < q as qPositive;
-    (q : Real) < ε;
+    (q : ℝ) < ε;
     choose N from rationalBound(q, qPositive);
     witness N with {
-      take m : Natural;
+      take m : ℕ;
       take N_leq_m : N ≤ m;
       abs(s(m) - limit)
-         < (q : Real)
+         < (q : ℝ)
          < ε
     }
   }
@@ -109,7 +109,7 @@ theorem Real.SequenceConverges.of_rational
 -- `∀δ > 0. ∃ N. ∀ m ≥ N. |s_rep(m)| < ε + δ`. Pick ε = δ = halve(δ_outer)
 -- and the bound becomes `|s_rep(m)| < δ_outer`.
 
--- Rep-level helper: from `|x| < (ε : Real)` (a Real-level less-than),
+-- Rep-level helper: from `|x| < (ε : ℝ)` (a Real-level less-than),
 -- extract the Rational-level pointwise bound `∃ N. ∀m ≥ N. |s(m)| < ε`.
 --
 -- The Real-side unfolding gives the two-quantifier IsEventuallyNonneg
@@ -120,16 +120,16 @@ theorem Real.SequenceConverges.of_rational
 -- the clean one-quantifier shape.
 theorem Real.cauchy_almost_zero_from_absolute_bound
         (s_rep : CauchyRationalSequence)
-        (almostZeroAtAllPositives : ∀ (ε : Rational). Rational.zero < ε
-              → abs((Quotient.class_of(s_rep) : Real))
+        (almostZeroAtAllPositives : ∀ (ε : ℚ). Rational.zero < ε
+              → abs((Quotient.class_of(s_rep) : ℝ))
                   < ε)
-        (ε : Rational) (εPositive : Rational.zero < ε)
-        : ∃ (N : Natural).
-            ∀ (m : Natural). N ≤ m →
+        (ε : ℚ) (εPositive : Rational.zero < ε)
+        : ∃ (N : ℕ).
+            ∀ (m : ℕ). N ≤ m →
               abs(s_rep(m)) < ε := {
       let ⟨s, sCauchy⟩ := s_rep;
       -- Apply the Real-side hypothesis at halve(ε), giving
-      -- |x| < (halve(ε) : Real). After pattern-matching on s_rep, the
+      -- |x| < (halve(ε) : ℝ). After pattern-matching on s_rep, the
       -- Quotient.lift β-chain reduces this to IsEventuallyNonneg
       -- (halve(ε) - |s(·)|) — i.e., ∀δ > 0, eventually
       -- -δ < halve(ε) - |s(m)|. We instantiate at δ := halve(ε) too.
@@ -138,16 +138,16 @@ theorem Real.cauchy_almost_zero_from_absolute_bound
           from (unfold Real.IsNonneg in
                    Real.LessThan.weaken(
                        abs((Quotient.class_of(
-                           CauchyRationalSequence.make(s, sCauchy)) : Real)),
-                       (Rational.halve(ε) : Real),
+                           CauchyRationalSequence.make(s, sCauchy)) : ℝ)),
+                       (Rational.halve(ε) : ℝ),
                        almostZeroAtAllPositives(
                            Rational.halve(ε), halvedPositive)))(
                    Rational.halve(ε), halvedPositive);
       witness N with {
-          take m : Natural;
+          take m : ℕ;
           take N_leq_m : N ≤ m;
           note goal : abs(s(m)) < ε;
-          let absSM : Rational := abs(s(m));
+          let absSM : ℚ := abs(s(m));
           -- boundAtN gives -halve(ε) < halve(ε) - absSM. Add
           -- (absSM + halve(ε)) to both sides; the LHS becomes absSM
           -- and the RHS becomes halve(ε) + halve(ε), so absSM < ε via
@@ -168,18 +168,18 @@ theorem Real.cauchy_almost_zero_from_absolute_bound
 -- definition of CauchyEquivalent-to-zero modulo `s(m) - 0 = s(m)`.
 theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
         (s_rep : CauchyRationalSequence)
-        (absoluteAlmostZero : ∀ (ε : Rational). Rational.zero < ε →
-                ∃ (N : Natural).
-                  ∀ (m : Natural). N ≤ m →
+        (absoluteAlmostZero : ∀ (ε : ℚ). Rational.zero < ε →
+                ∃ (N : ℕ).
+                  ∀ (m : ℕ). N ≤ m →
                     abs(s_rep(m)) < ε)
         : CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero)) := {
         let ⟨s, _⟩ := s_rep;
-        take ε : Rational;
+        take ε : ℚ;
         take εPositive : Rational.zero < ε;
         choose N as absBoundAtN
             from absoluteAlmostZero(ε, εPositive);
         witness N with {
-            take m : Natural;
+            take m : ℕ;
             take N_leq_m : N ≤ m;
             -- CauchyEquivalent unfolds the goal at index m to
             --   |s(m) - 0| < ε.
@@ -191,17 +191,17 @@ theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
         }
     }
 
--- The headline lemma at the Real level: from `∀ε > 0. |x| < (ε : Real)`,
+-- The headline lemma at the Real level: from `∀ε > 0. |x| < (ε : ℝ)`,
 -- conclude `x = Real.zero`. Lift via Quotient.induct.
 theorem Real.eq_of_absolute_value_less_than_all_positive
-        (x : Real)
-        (hypothesis : ∀ (ε : Rational). Rational.zero < ε →
+        (x : ℝ)
+        (hypothesis : ∀ (ε : ℚ). Rational.zero < ε →
                           abs(x) < ε)
         : x = Real.zero :=
   by_representatives x as s_rep => {
-    ∀ (ε : Rational). Rational.zero < ε →
-            ∃ (N : Natural).
-              ∀ (m : Natural). N ≤ m →
+    ∀ (ε : ℚ). Rational.zero < ε →
+            ∃ (N : ℕ).
+              ∀ (m : ℕ). N ≤ m →
                 abs(s_rep(m)) < ε;
     CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero));
     done
@@ -209,14 +209,14 @@ theorem Real.eq_of_absolute_value_less_than_all_positive
 
 -- The same conclusion from a real-ε hypothesis: slip a rational under any
 -- positive real ε and fall back on the rational-ε version.
-theorem Real.eq_of_absolute_value_less_than_all_positive_real (x : Real)
-        (hypothesis : ∀ (ε : Real). ε > 0 → abs(x) < ε)
+theorem Real.eq_of_absolute_value_less_than_all_positive_real (x : ℝ)
+        (hypothesis : ∀ (ε : ℝ). ε > 0 → abs(x) < ε)
         : x = Real.zero := {
-  ∀ (ε : Rational). Rational.zero < ε → abs(x) < (ε : Real)
+  ∀ (ε : ℚ). Rational.zero < ε → abs(x) < (ε : ℝ)
       by {
-        take ε : Rational;
+        take ε : ℚ;
         take εPositive : Rational.zero < ε;
-        (ε : Real) > 0;
+        (ε : ℝ) > 0;
         done
       };
   done
@@ -226,7 +226,7 @@ theorem Real.eq_of_absolute_value_less_than_all_positive_real (x : Real)
 -- `x - y = 0 → x = y` on Real. A small ring corollary: add y to both
 -- sides.
 theorem Real.eq_of_sub_eq_zero
-        (x y : Real) (hypothesis : x - y = Real.zero)
+        (x y : ℝ) (hypothesis : x - y = Real.zero)
         : x = y :=
   x
      = (x - y) + y
@@ -257,22 +257,22 @@ theorem Real.eq_of_sub_eq_zero
 -- we get L1 - L2 = 0, and eq_of_sub_eq_zero finishes.
 
 theorem Real.SequenceConverges.unique
-        (s : Natural → Real)
-        (L1 L2 : Real)
+        (s : ℕ → ℝ)
+        (L1 L2 : ℝ)
         (convergesToL1 : Real.SequenceConverges(s, L1))
         (convergesToL2 : Real.SequenceConverges(s, L2))
         : L1 = L2 := {
   -- For every ε > 0, the triangle inequality on (L1 - s(m)) + (s(m) - L2)
   -- and the two ε/2 bounds give |L1 - L2| < ε.
-  ∀ (ε : Real). ε > 0 → abs(L1 - L2) < ε
+  ∀ (ε : ℝ). ε > 0 → abs(L1 - L2) < ε
     by {
-      take ε : Real;
+      take ε : ℝ;
       take εPositive : ε > 0;
-      (2 : Real) > 0;
+      (2 : ℝ) > 0;
       ε / 2 > 0 as halfPositive;
       choose N1 as boundFromL1 from convergesToL1(ε / 2, halfPositive);
       choose N2 as boundFromL2 from convergesToL2(ε / 2, halfPositive);
-      let m : Natural := Natural.maximum(N1, N2);
+      let m : ℕ := Natural.maximum(N1, N2);
       N1 ≤ m;
       N2 ≤ m;
       -- Pointwise bounds at m. The L1 side has |s - L| swapped to
@@ -296,25 +296,25 @@ theorem Real.SequenceConverges.unique
 -- description: convergence supplies existence, and uniqueness of
 -- limits supplies the rest. This is the bridge from "converges to
 -- something" to an actual value the rest of analysis can compute with.
-definition Real.limit (s : Natural → Real)
-        (convergent : Real.SequenceConvergent(s)) : Real :=
+definition Real.limit (s : ℕ → ℝ)
+        (convergent : Real.SequenceConvergent(s)) : ℝ :=
   Logic.the(
-      Real,
-      (candidate : Real) ↦ Real.SequenceConverges(s, candidate),
+      ℝ,
+      (candidate : ℝ) ↦ Real.SequenceConverges(s, candidate),
       convergent,
-      (a b : Real)
+      (a b : ℝ)
       (aIsLimit : Real.SequenceConverges(s, a))
       (bIsLimit : Real.SequenceConverges(s, b)) ↦
         done)
 
-theorem Real.limit_converges (s : Natural → Real)
+theorem Real.limit_converges (s : ℕ → ℝ)
         (convergent : Real.SequenceConvergent(s))
         : Real.SequenceConverges(s, Real.limit(s, convergent)) :=
   Logic.the_satisfies(
-      Real,
-      (candidate : Real) ↦ Real.SequenceConverges(s, candidate),
+      ℝ,
+      (candidate : ℝ) ↦ Real.SequenceConverges(s, candidate),
       convergent,
-      (a b : Real)
+      (a b : ℝ)
       (aIsLimit : Real.SequenceConverges(s, a))
       (bIsLimit : Real.SequenceConverges(s, b)) ↦
         done)

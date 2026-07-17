@@ -36,37 +36,37 @@ import Algebra.integer_euclidean
 
 -- The Natural embedding is monotone: a ≤ b ⟹ (a : ℤ) ≤ (b : ℤ).
 -- t + t ≤ m forces 4t² ≤ m² (square the bound in ℕ, then transport to ℤ).
-theorem Integer.four_square_le_from_natural (t m : Natural) (bound : t + t ≤ m)
-        : (4 : Integer) * (t : Integer)² ≤ (m : Integer)² := {
+theorem Integer.four_square_le_from_natural (t m : ℕ) (bound : t + t ≤ m)
+        : (4 : ℤ) * (t : ℤ)² ≤ (m : ℤ)² := {
   (t + t)² ≤ (t + t) * m = m * (t + t) ≤ m²;
-  ((t + t)² : Integer) ≤ (m² : Integer)
+  ((t + t)² : ℤ) ≤ (m² : ℤ)
       by Natural.to_integer.LessOrEqual_preserves as castSquared;
   (t + t)² = 4 * t² as naturalSquare;
-  (4 : Integer) * (t : Integer)²
-     = ((4 * t² : Natural) : Integer)   by substituting Natural.to_integer.multiply_preserves
-     = ((t + t)² : Integer)             by substituting naturalSquare
-     ≤ (m² : Integer)                   by castSquared
-     = (m : Integer)²
+  (4 : ℤ) * (t : ℤ)²
+     = ((4 * t² : ℕ) : ℤ)   by substituting Natural.to_integer.multiply_preserves
+     = ((t + t)² : ℤ)             by substituting naturalSquare
+     ≤ (m² : ℤ)                   by castSquared
+     = (m : ℤ)²
 }
 
 -- Balanced division: dividing by a positive integer leaves a remainder
 -- of absolute value at most half the divisor (stated multiplication-
 -- only: 4·remainder² ≤ m²).
-theorem Integer.divide_balanced (a m : Integer) (mPositive : m > (0 : Integer))
-        : ∃ (quotient : Integer). ∃ (remainder : Integer).
+theorem Integer.divide_balanced (a m : ℤ) (mPositive : m > (0 : ℤ))
+        : ∃ (quotient : ℤ). ∃ (remainder : ℤ).
             a = m * quotient + remainder
             ∧ 4 * remainder² ≤ m² := {
   -- Positivity exhibits m as the image of a positive Natural, which the
   -- Natural division machinery consumes.
-  choose k such that m = ((0 : Integer) + Integer.one) + (k : Integer)
+  choose k such that m = ((0 : ℤ) + Integer.one) + (k : ℤ)
       as mDecomposition from mPositive;
-  m = ((0 : Integer) + Integer.one) + (k : Integer)   by mDecomposition
-    = ((1 + k : Natural) : Integer)                   by substituting Natural.to_integer.add_preserves
+  m = ((0 : ℤ) + Integer.one) + (k : ℤ)   by mDecomposition
+    = ((1 + k : ℕ) : ℤ)                   by substituting Natural.to_integer.add_preserves
     as mCast;
   choose quotient0, naturalRemainder such that
-      a = ((1 + k : Natural) : Integer) * quotient0 + (naturalRemainder : Integer) ∧ naturalRemainder < 1 + k
+      a = ((1 + k : ℕ) : ℤ) * quotient0 + (naturalRemainder : ℤ) ∧ naturalRemainder < 1 + k
       from Integer.divide_by_positive(a, 1 + k, (1 ≤ 1 + k));
-  a = m * quotient0 + (naturalRemainder : Integer)
+  a = m * quotient0 + (naturalRemainder : ℤ)
       by substituting mCast as aEquationM;
   naturalRemainder + naturalRemainder ≤ 1 + k
       ∨ 1 + k ≤ naturalRemainder + naturalRemainder
@@ -75,10 +75,10 @@ theorem Integer.divide_balanced (a m : Integer) (mPositive : m > (0 : Integer))
     case naturalRemainder + naturalRemainder ≤ 1 + k as smallRemainder: {
         -- r + r ≤ 1 + k: keep r. remainder = (r : ℤ), quotient = quotient0.
         witness quotient0 with
-        witness (naturalRemainder : Integer) with
-            { 4 * (naturalRemainder : Integer)² ≤ ((1 + k : Natural) : Integer)²
+        witness (naturalRemainder : ℤ) with
+            { 4 * (naturalRemainder : ℤ)² ≤ ((1 + k : ℕ) : ℤ)²
                   by Integer.four_square_le_from_natural;
-              4 * (naturalRemainder : Integer)² ≤ m²
+              4 * (naturalRemainder : ℤ)² ≤ m²
                   by substituting mCast as keepBound;
               And.introduction(aEquationM, keepBound) }
       }
@@ -86,7 +86,7 @@ theorem Integer.divide_balanced (a m : Integer) (mPositive : m > (0 : Integer))
         -- 1 + k ≤ r + r: bump. With 1 + k = r + d, remainder = −(d : ℤ),
         -- quotient = quotient0 + 1.
         naturalRemainder ≤ 1 + k by Natural.LessThan.weaken;
-        ∃ (d : Natural). 1 + k = naturalRemainder + d by Natural.subtraction_witness as dExists;
+        ∃ (d : ℕ). 1 + k = naturalRemainder + d by Natural.subtraction_witness as dExists;
         choose d such that 1 + k = naturalRemainder + d as mEquation from dExists;
         -- d ≤ r: from 1 + k ≤ r + r and 1 + k = r + d, cancel r.
         naturalRemainder + d = 1 + k ≤ naturalRemainder + naturalRemainder   by largeRemainder;
@@ -94,25 +94,25 @@ theorem Integer.divide_balanced (a m : Integer) (mPositive : m > (0 : Integer))
         -- d + d ≤ r + d = 1 + k.
         d + d ≤ naturalRemainder + d   by Natural.le_add_preserves_left
               = 1 + k;
-        4 * (d : Integer)² ≤ ((1 + k : Natural) : Integer)²
+        4 * (d : ℤ)² ≤ ((1 + k : ℕ) : ℤ)²
             by Integer.four_square_le_from_natural;
-        4 * (d : Integer)² ≤ m² by substituting mCast;
-        m = ((1 + k : Natural) : Integer)                  by mCast
-          = ((naturalRemainder + d : Natural) : Integer)   by substituting mEquation
-          = (naturalRemainder : Integer) + (d : Integer)
+        4 * (d : ℤ)² ≤ m² by substituting mCast;
+        m = ((1 + k : ℕ) : ℤ)                  by mCast
+          = ((naturalRemainder + d : ℕ) : ℤ)   by substituting mEquation
+          = (naturalRemainder : ℤ) + (d : ℤ)
           as remainderSplit;
-        (naturalRemainder : Integer) = m - (d : Integer)
+        (naturalRemainder : ℤ) = m - (d : ℤ)
             by substituting remainderSplit as remainderCast;
-        a = m * quotient0 + (naturalRemainder : Integer)   by aEquationM
-          = m * quotient0 + (m - (d : Integer))            by substituting remainderCast
-          = m * (quotient0 + (1 : Integer)) + (-(d : Integer))
+        a = m * quotient0 + (naturalRemainder : ℤ)   by aEquationM
+          = m * quotient0 + (m - (d : ℤ))            by substituting remainderCast
+          = m * (quotient0 + (1 : ℤ)) + (-(d : ℤ))
                 by ring
           as aBalanced;
-        (-(d : Integer))² = (d : Integer)² by ring as squareNegate;
-        4 * (-(d : Integer))² ≤ m²
+        (-(d : ℤ))² = (d : ℤ)² by ring as squareNegate;
+        4 * (-(d : ℤ))² ≤ m²
             by substituting squareNegate as remainderBound;
-        witness quotient0 + (1 : Integer) with
-        witness -(d : Integer) with
+        witness quotient0 + (1 : ℤ) with
+        witness -(d : ℤ) with
             And.introduction(aBalanced, remainderBound)
       }
   }

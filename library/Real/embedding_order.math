@@ -41,14 +41,14 @@ import Real.order
 -- ----------------------------------------------------------------------
 -- Weak order: a ≤ b transfers pointwise (the difference of the constant
 -- sequences is the constant b − a, which is nonnegative).
-theorem Rational.to_real.LessOrEqual_preserves (a b : Rational)
+theorem Rational.to_real.LessOrEqual_preserves (a b : ℚ)
         (aLessOrEqualB : a ≤ b)
-        : (a : Real) ≤ (b : Real) :=
+        : (a : ℝ) ≤ (b : ℝ) :=
   unfold Real.IsNonneg in
-  ((ε : Rational)
+  ((ε : ℚ)
   (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦
+        (m : ℕ) (_ : 0 ≤ m) ↦
           -ε
              < Rational.zero
              ≤ b + -a)
@@ -58,17 +58,17 @@ theorem Rational.to_real.LessOrEqual_preserves (a b : Rational)
 -- injectivity at distinct points: were (a : ℝ) = (b : ℝ), the constant
 -- sequences would be Cauchy-equivalent, putting |a − b| below the
 -- positive gap b − a itself — yet b − a ≤ |a − b|.
-theorem Rational.to_real.LessThan_preserves (a b : Rational)
+theorem Rational.to_real.LessThan_preserves (a b : ℚ)
         (aLessThanB : a < b)
-        : (a : Real) < (b : Real) := {
+        : (a : ℝ) < (b : ℝ) := {
   a ≤ b;
-  (a : Real) ≤ (b : Real) as lessOrEqualPart;
+  (a : ℝ) ≤ (b : ℝ) as lessOrEqualPart;
   Rational.zero
      = a + -a
      < b + -a
     as gapPositive;
-  ¬((a : Real) = (b : Real)) by {
-          suppose (a : Real) = (b : Real) as coercedEqual;
+  ¬((a : ℝ) = (b : ℝ)) by {
+          suppose (a : ℝ) = (b : ℝ) as coercedEqual;
           let equivalent
               : CauchyEquivalent(Rational.to_cauchy_constant(a),
                     Rational.to_cauchy_constant(b))
@@ -77,7 +77,7 @@ theorem Rational.to_real.LessThan_preserves (a b : Rational)
                      Rational.to_cauchy_constant(a), Rational.to_cauchy_constant(b), coercedEqual);
           -- Evaluate the equivalence at ε = b − a.
           choose N such that
-              ∀ (m : Natural). N ≤ m →
+              ∀ (m : ℕ). N ≤ m →
                 abs(Rational.to_cauchy_constant(a)(m) - Rational.to_cauchy_constant(b)(m)) < b - a
               as eventuallyClose
               from equivalent(b - a, gapPositive);
@@ -96,9 +96,9 @@ theorem Rational.to_real.LessThan_preserves (a b : Rational)
 
 -- The workhorse special case: a positive rational tolerance is a
 -- positive real.
-automatic theorem Rational.to_real.positive_preserves (ε : Rational)
+automatic theorem Rational.to_real.positive_preserves (ε : ℚ)
         (εPositive : Rational.zero < ε)
-        : Real.zero < (ε : Real) := {
+        : Real.zero < (ε : ℝ) := {
   done
 }
 
@@ -106,21 +106,21 @@ automatic theorem Rational.to_real.positive_preserves (ε : Rational)
 -- The embedding also REFLECTS the strict order: a strict inequality
 -- between the casts forces the rational one (classically — were b ≤ a,
 -- the cast of that would contradict the strictness).
-theorem Rational.to_real.LessThan_reflects (a b : Rational)
-        (strictAtReal : (a : Real) < (b : Real))
+theorem Rational.to_real.LessThan_reflects (a b : ℚ)
+        (strictAtReal : (a : ℝ) < (b : ℝ))
         : a < b :=
   {
     suppose ¬(a < b) for contradiction;
     b ≤ a by Rational.not_LessThan_implies_LessOrEqual;
-    (b : Real) ≤ (a : Real);
-    (a : Real) < (a : Real) by Real.LessThan.transitive_right;
+    (b : ℝ) ≤ (a : ℝ);
+    (a : ℝ) < (a : ℝ) by Real.LessThan.transitive_right;
     done
   }
 
 -- … and the weak order (classically — were the rationals not so ordered, the
 -- strict reverse inequality would preserve to the reals, against the hypothesis).
-theorem Rational.to_real.LessOrEqual_reflects (a b : Rational)
-        (weakAtReal : (a : Real) ≤ (b : Real))
+theorem Rational.to_real.LessOrEqual_reflects (a b : ℚ)
+        (weakAtReal : (a : ℝ) ≤ (b : ℝ))
         : a ≤ b :=
   {
     suppose ¬(a ≤ b) for contradiction;
@@ -133,18 +133,18 @@ theorem Rational.to_real.LessOrEqual_reflects (a b : Rational)
       }
     };
     b < a;
-    (b : Real) < (a : Real);
-    (b : Real) < (b : Real) by Real.LessThan.transitive_right;
+    (b : ℝ) < (a : ℝ);
+    (b : ℝ) < (b : ℝ) by Real.LessThan.transitive_right;
     done
   }
 
 -- ℚ→ℝ is injective, by antisymmetry: the cast equality weakens to ≤ both
 -- ways, and each weak inequality reflects to the rationals.
-theorem Rational.to_real.injective (a b : Rational)
-        (castEqual : (a : Real) = (b : Real))
+theorem Rational.to_real.injective (a b : ℚ)
+        (castEqual : (a : ℝ) = (b : ℝ))
         : a = b := {
-  (a : Real) ≤ (b : Real);
-  (b : Real) ≤ (a : Real);
+  (a : ℝ) ≤ (b : ℝ);
+  (b : ℝ) ≤ (a : ℝ);
   a ≤ b;
   b ≤ a;
   done by Rational.LessOrEqual.antisymmetric
@@ -152,55 +152,55 @@ theorem Rational.to_real.injective (a b : Rational)
 
 -- ----------------------------------------------------------------------
 -- The composite ℕ → ℝ cast is additive, leg by leg.
-theorem Real.from_natural.add_preserves (m1 m2 : Natural)
-        : (m1 + m2 : Real) = (m1 : Real) + (m2 : Real) :=
-  (m1 + m2 : Real)
-     = (((m1 : Rational) + (m2 : Rational)) : Real)
-     = (m1 : Real) + (m2 : Real)
+theorem Real.from_natural.add_preserves (m1 m2 : ℕ)
+        : (m1 + m2 : ℝ) = (m1 : ℝ) + (m2 : ℝ) :=
+  (m1 + m2 : ℝ)
+     = (((m1 : ℚ) + (m2 : ℚ)) : ℝ)
+     = (m1 : ℝ) + (m2 : ℝ)
 
 -- The cast of the natural 0 is the real 0 (definitionally, hop by hop).
 theorem Real.from_natural.zero_preserves
-        : ((0 : Natural) : Real) = Real.zero :=
-  reflexivity(Real, Real.zero)
+        : ((0 : ℕ) : ℝ) = Real.zero :=
+  reflexivity(ℝ, Real.zero)
 
 -- The cast of the natural 1 is the real 1.
 theorem Real.from_natural.one_preserves
-        : ((1 : Rational) : Real) = Real.one := {
-  ((1 : Rational) : Real)
+        : ((1 : ℚ) : ℝ) = Real.one := {
+  ((1 : ℚ) : ℝ)
      = Real.one
 }
 
 
 -- … and multiplicative.
-theorem Real.from_natural.multiply_preserves (m1 m2 : Natural)
-        : (m1 * m2 : Real) = (m1 : Real) * (m2 : Real) :=
-  (m1 * m2 : Real)
-     = (((m1 : Rational) * (m2 : Rational)) : Real)
-     = (m1 : Real) * (m2 : Real)
+theorem Real.from_natural.multiply_preserves (m1 m2 : ℕ)
+        : (m1 * m2 : ℝ) = (m1 : ℝ) * (m2 : ℝ) :=
+  (m1 * m2 : ℝ)
+     = (((m1 : ℚ) * (m2 : ℚ)) : ℝ)
+     = (m1 : ℝ) * (m2 : ℝ)
 
 -- ----------------------------------------------------------------------
 -- The composite ℕ → ℝ cast preserves the order: the weak form, positivity,
 -- and the hypothesis-free `1 + n` special case.
-theorem Real.from_natural.LessOrEqual_preserves (m1 m2 : Natural) (le : m1 ≤ m2)
-        : (m1 : Real) ≤ (m2 : Real) := {
-  (m1 : Rational) ≤ (m2 : Rational);
+theorem Real.from_natural.LessOrEqual_preserves (m1 m2 : ℕ) (le : m1 ≤ m2)
+        : (m1 : ℝ) ≤ (m2 : ℝ) := {
+  (m1 : ℚ) ≤ (m2 : ℚ);
   done
 }
 
-theorem Real.from_natural_positive (n : Natural) (nPositive : n > 0)
-        : (n : Real) > 0 := {
-  (n : Integer) > Integer.zero;
-  (n : Rational) > Rational.zero;
+theorem Real.from_natural_positive (n : ℕ) (nPositive : n > 0)
+        : (n : ℝ) > 0 := {
+  (n : ℤ) > Integer.zero;
+  (n : ℚ) > Rational.zero;
   done
 }
 
-theorem Real.one_plus_cast_positive (n : Natural)
-        : (1 + n : Real) > 0 := {
-  (1 + n : Rational) > 0;
+theorem Real.one_plus_cast_positive (n : ℕ)
+        : (1 + n : ℝ) > 0 := {
+  (1 + n : ℚ) > 0;
   done
 }
 
--- Consume a `mk(b) ≤ (q : Real)` bound at the sequence level: beyond
+-- Consume a `mk(b) ≤ (q : ℝ)` bound at the sequence level: beyond
 -- some index, every term of b sits within any ε below q. This is the
 -- boundary lemma pointwise-bound arguments consume — the ≤ unfolds
 -- (through the opaque `Real.IsNonneg`) to eventual nonnegativity of
@@ -209,8 +209,8 @@ theorem Real.one_plus_cast_positive (n : Natural)
 theorem Real.eventually_below_cast_of_LessOrEqual
         (b : Rational.sequence.Sequence)
         (bIsCauchy : Rational.sequence.IsCauchy(b))
-        (q : Rational)
-        (belowCast : Real.from_cauchy_sequence(b, bIsCauchy) ≤ (q : Real))
-        (ε : Rational) (εPositive : ε > (0 : Rational))
+        (q : ℚ)
+        (belowCast : Real.from_cauchy_sequence(b, bIsCauchy) ≤ (q : ℝ))
+        (ε : ℚ) (εPositive : ε > (0 : ℚ))
         : eventually (m). -ε < q - b(m) :=
   (unfold Real.IsNonneg in belowCast)(ε, εPositive)

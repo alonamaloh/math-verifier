@@ -40,85 +40,85 @@ import Rational.basics
 -- numCanonical / (k + 1) equal to a target rational, the listing
 -- `(i, k) ↦ integerListing(i) / (k + 1)` hits it.
 theorem Rational.enumeration_witness
-        (integerListing : Natural → Integer)
-        (integerSurjective : Function.IsSurjective(Natural, Integer, integerListing))
-        (pairListing : Natural → Product(Natural, Natural))
-        (pairSurjective : Function.IsSurjective(Natural, Product(Natural, Natural), pairListing))
-        (target : Rational) (numCanonical : Integer) (k : Natural)
-        (targetEquation : target = numCanonical / ((k + 1) : Integer))
-        : ∃ (listIndex : Natural).
+        (integerListing : ℕ → ℤ)
+        (integerSurjective : Function.IsSurjective(ℕ, ℤ, integerListing))
+        (pairListing : ℕ → Product(ℕ, ℕ))
+        (pairSurjective : Function.IsSurjective(ℕ, Product(ℕ, ℕ), pairListing))
+        (target : ℚ) (numCanonical : ℤ) (k : ℕ)
+        (targetEquation : target = numCanonical / ((k + 1) : ℤ))
+        : ∃ (listIndex : ℕ).
             integerListing(Product.first(pairListing(listIndex)))
-            / ((Product.second(pairListing(listIndex)) + 1) : Integer)
+            / ((Product.second(pairListing(listIndex)) + 1) : ℤ)
             = target := {
   choose i such that integerListing(i) = numCanonical from integerSurjective(numCanonical);
   choose listIndex such that pairListing(listIndex) = Product.make(i, k)
       from pairSurjective(Product.make(i, k));
   witness listIndex with
       integerListing(Product.first(pairListing(listIndex)))
-           / ((Product.second(pairListing(listIndex)) + 1) : Integer)
+           / ((Product.second(pairListing(listIndex)) + 1) : ℤ)
          = integerListing(Product.first(Product.make(i, k)))
-           / ((Product.second(Product.make(i, k)) + 1) : Integer)
-         = numCanonical / ((k + 1) : Integer)
+           / ((Product.second(Product.make(i, k)) + 1) : ℤ)
+         = numCanonical / ((k + 1) : ℤ)
          = target
 }
 
 -- Freek #3: ℚ is denumerable. Enumerate via (i, k) ↦ integerListing(i) /
 -- (k + 1); every rational has a positive-denominator form, found by
 -- sign-splitting the denominator.
-theorem Rational.is_enumerable : IsEnumerable(Rational) := {
-  choose integerListing such that Function.IsSurjective(Natural, Integer, integerListing)
+theorem Rational.is_enumerable : IsEnumerable(ℚ) := {
+  choose integerListing such that Function.IsSurjective(ℕ, ℤ, integerListing)
       from Integer.is_enumerable;
-  choose pairListing such that Function.IsSurjective(Natural, Pair(Natural, Natural), pairListing)
+  choose pairListing such that Function.IsSurjective(ℕ, Pair(ℕ, ℕ), pairListing)
       from Natural.pairs_enumerable;
-  witness ((listIndex : Natural) ↦
+  witness ((listIndex : ℕ) ↦
       integerListing(Product.first(pairListing(listIndex)))
-      / ((Product.second(pairListing(listIndex)) + 1) : Integer))
+      / ((Product.second(pairListing(listIndex)) + 1) : ℤ))
   with {
-    take target as RationalRepresentative.make(numerator, denominator, denominatorNonzero) : Rational;
-    Integer.IsNonneg(denominator) ∨ ∃ (k : Natural). denominator = -(k : Integer)
+    take target as RationalRepresentative.make(numerator, denominator, denominatorNonzero) : ℚ;
+    Integer.IsNonneg(denominator) ∨ ∃ (k : ℕ). denominator = -(k : ℤ)
         by Integer.sign_split;
     done by cases {
       case Integer.IsNonneg(denominator) as denominatorNonneg: {
-          choose m such that denominator = (m : Integer) from denominatorNonneg;
-          m = 0 ∨ ∃ (k : Natural). m = k + 1;
+          choose m such that denominator = (m : ℤ) from denominatorNonneg;
+          m = 0 ∨ ∃ (k : ℕ). m = k + 1;
           done by cases {
             case m = 0 as mIsZero: {
                 denominator
-                   = (m : Integer)
-                   = ((0 : Natural) : Integer)
+                   = (m : ℤ)
+                   = ((0 : ℕ) : ℤ)
                    = Integer.zero;
                 absurd(denominatorNonzero(denominator = Integer.zero))
               }
-            case ∃ (k : Natural). m = k + 1 as mIsSuccessor: {
+            case ∃ (k : ℕ). m = k + 1 as mIsSuccessor: {
                 choose k such that m = k + 1 from mIsSuccessor;
-                numerator * ((k + 1) : Integer)
-                   = numerator * (m : Integer)
+                numerator * ((k + 1) : ℤ)
+                   = numerator * (m : ℤ)
                    = numerator * denominator;
                 Rational.fraction(numerator, denominator, denominatorNonzero)
-                      = numerator / ((k + 1) : Integer);
+                      = numerator / ((k + 1) : ℤ);
                 done
               }
           }
         }
-      case ∃ (k : Natural). denominator = -(k : Integer) as denominatorNegated: {
-          choose m such that denominator = -(m : Integer) from denominatorNegated;
-          m = 0 ∨ ∃ (k : Natural). m = k + 1;
+      case ∃ (k : ℕ). denominator = -(k : ℤ) as denominatorNegated: {
+          choose m such that denominator = -(m : ℤ) from denominatorNegated;
+          m = 0 ∨ ∃ (k : ℕ). m = k + 1;
           done by cases {
             case m = 0 as mIsZero: {
                 denominator
-                   = -(m : Integer)
-                   = -((0 : Natural) : Integer)
+                   = -(m : ℤ)
+                   = -((0 : ℕ) : ℤ)
                    = Integer.zero;
                 absurd(denominatorNonzero(denominator = Integer.zero))
               }
-            case ∃ (k : Natural). m = k + 1 as mIsSuccessor: {
+            case ∃ (k : ℕ). m = k + 1 as mIsSuccessor: {
                 choose k such that m = k + 1 from mIsSuccessor;
-                numerator * ((k + 1) : Integer)
-                   = numerator * (m : Integer)
-                   = -numerator * -(m : Integer)
+                numerator * ((k + 1) : ℤ)
+                   = numerator * (m : ℤ)
+                   = -numerator * -(m : ℤ)
                    = -numerator * denominator;
                 Rational.fraction(numerator, denominator, denominatorNonzero)
-                      = -numerator / ((k + 1) : Integer);
+                      = -numerator / ((k + 1) : ℤ);
                 done
               }
           }

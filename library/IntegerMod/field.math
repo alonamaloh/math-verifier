@@ -46,7 +46,7 @@ import IntegerMod.instances
 -- ----------------------------------------------------------------------
 -- Two classes are equal iff their representatives are congruent. The
 -- forward direction (exact) needs the equivalence proofs.
-theorem IntegerMod.congruent_of_make_equal (modulus : Natural) (x y : Integer)
+theorem IntegerMod.congruent_of_make_equal (modulus : ℕ) (x y : ℤ)
         (makeEquality : IntegerMod.make(modulus, x) = IntegerMod.make(modulus, y))
         : Integer.CongruentModulo(modulus, x, y) := {
   -- Equal classes (makeEquality) ⇒ congruent representatives — the
@@ -57,9 +57,9 @@ theorem IntegerMod.congruent_of_make_equal (modulus : Natural) (x y : Integer)
 
 -- From a divisibility witness `p | (a·w − 1)` the class of w inverts
 -- the class of a: `[a] · [w] = [1]`.
-theorem IntegerMod.inverse_from_witness (modulus : Natural) (a w : Integer)
+theorem IntegerMod.inverse_from_witness (modulus : ℕ) (a w : ℤ)
         (witnessDivides
-            : Integer.divides((modulus : Integer), a * w - Integer.one))
+            : Integer.divides((modulus : ℤ), a * w - Integer.one))
         : IntegerMod.make(modulus, a) * IntegerMod.make(modulus, w)
           = IntegerMod.one(modulus) :=
   Quotient.equivalent_implies_equal(a * w, Integer.one, witnessDivides)
@@ -67,16 +67,16 @@ theorem IntegerMod.inverse_from_witness (modulus : Natural) (a w : Integer)
 -- ----------------------------------------------------------------------
 -- 0 ≠ 1 in F_p. If [0] = [1] then p | 1, forcing p = 1, contradicting
 -- p ≥ 2.
-theorem IntegerMod.zero_not_one (p : Natural)
+theorem IntegerMod.zero_not_one (p : ℕ)
         (primality : Natural.is_prime(p))
         : ¬(IntegerMod.zero(p) = IntegerMod.one(p)) :=
   (zeroEqualsOne : IntegerMod.zero(p) = IntegerMod.one(p)) ↦ {
     Integer.CongruentModulo(p, Integer.zero, Integer.one);
     -- p | (0 − 1); negate to get p | 1.
-    Integer.divides((p : Integer), -(Integer.zero - Integer.one))
+    Integer.divides((p : ℤ), -(Integer.zero - Integer.one))
         by Integer.divides_negate;
     -(Integer.zero - Integer.one) = Integer.one;
-    Integer.divides((p : Integer), Integer.one);
+    Integer.divides((p : ℤ), Integer.one);
     Natural.divides(p, 1);
     p = 1;
     2 ≤ p;
@@ -89,61 +89,61 @@ theorem IntegerMod.zero_not_one (p : Natural)
 -- class [a] has a multiplicative inverse. Splits a by sign into ± a
 -- Natural k, transfers p ∤ a to p ∤ k, and reads the inverse off
 -- Bezout's identity for (p, k).
-theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
+theorem IntegerMod.invertible_at_representative (p : ℕ) (a : ℤ)
         (primality : Natural.is_prime(p))
-        (notDivides : ¬ Integer.divides((p : Integer), a))
+        (notDivides : ¬ Integer.divides((p : ℤ), a))
         : ∃ (y : IntegerMod(p)).
             IntegerMod.make(p, a) * y = IntegerMod.one(p) := {
-  Integer.IsNonneg(a) ∨ (∃ (k : Natural). a = -(k : Integer))
+  Integer.IsNonneg(a) ∨ (∃ (k : ℕ). a = -(k : ℤ))
       by Integer.sign_split;
   done by cases {
     case Integer.IsNonneg(a) as nonnegative: {
-        choose k such that a = (k : Integer) from nonnegative;
-        -- p ∤ a transfers to p ∤ k: p | k would give p | (k : Integer) = a.
+        choose k such that a = (k : ℤ) from nonnegative;
+        -- p ∤ a transfers to p ∤ k: p | k would give p | (k : ℤ) = a.
         ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦ {
-                 Integer.divides((p : Integer), (k : Integer));
-                 Integer.divides((p : Integer), a);
+                 Integer.divides((p : ℤ), (k : ℤ));
+                 Integer.divides((p : ℤ), a);
                  done
                }
             as notDividesK;
         -- Bezout: p·bezoutX + k·bezoutY = 1, used below to rewrite Integer.one.
         choose bezoutX, bezoutY such that
-            (p : Integer) * bezoutX + (k : Integer) * bezoutY = Integer.one
+            (p : ℤ) * bezoutX + (k : ℤ) * bezoutY = Integer.one
             from Natural.bezout_one_when_prime_coprime(p, k, primality, notDividesK);
         witness IntegerMod.make(p, bezoutY) with
             IntegerMod.inverse_from_witness(witnessDivides :=
                 ⟨-bezoutX,
                  { a * bezoutY - Integer.one
-                    = (k : Integer) * bezoutY
-                          - ((p : Integer) * bezoutX + (k : Integer) * bezoutY)
-                    = (p : Integer) * -bezoutX }⟩)
+                    = (k : ℤ) * bezoutY
+                          - ((p : ℤ) * bezoutX + (k : ℤ) * bezoutY)
+                    = (p : ℤ) * -bezoutX }⟩)
     }
-    case ∃ (k : Natural). a = -(k : Integer) as negative: {
-        choose k such that a = -(k : Integer) from negative;
-        -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : Integer) = a.
+    case ∃ (k : ℕ). a = -(k : ℤ) as negative: {
+        choose k such that a = -(k : ℤ) from negative;
+        -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : ℤ) = a.
         ¬ Natural.divides(p, k)
             by (pDividesK : Natural.divides(p, k)) ↦ {
-                 Integer.divides((p : Integer), (k : Integer));
-                 Integer.divides((p : Integer), -(k : Integer))
+                 Integer.divides((p : ℤ), (k : ℤ));
+                 Integer.divides((p : ℤ), -(k : ℤ))
                      by Integer.divides_negate;
-                 Integer.divides((p : Integer), a);
+                 Integer.divides((p : ℤ), a);
                  done
                }
             as notDividesK;
         -- Bezout: p·bezoutX + k·bezoutY = 1, used below to rewrite Integer.one.
         choose bezoutX, bezoutY such that
-            (p : Integer) * bezoutX + (k : Integer) * bezoutY = Integer.one
+            (p : ℤ) * bezoutX + (k : ℤ) * bezoutY = Integer.one
             from Natural.bezout_one_when_prime_coprime(p, k, primality, notDividesK);
         witness IntegerMod.make(p, -bezoutY) with
             IntegerMod.inverse_from_witness(witnessDivides :=
                 ⟨-bezoutX,
                  { a * -bezoutY - Integer.one
-                    = (-(k : Integer)) * -bezoutY - Integer.one
-                    = (k : Integer) * bezoutY - Integer.one
-                    = (k : Integer) * bezoutY
-                          - ((p : Integer) * bezoutX + (k : Integer) * bezoutY)
-                    = (p : Integer) * -bezoutX }⟩)
+                    = (-(k : ℤ)) * -bezoutY - Integer.one
+                    = (k : ℤ) * bezoutY - Integer.one
+                    = (k : ℤ) * bezoutY
+                          - ((p : ℤ) * bezoutX + (k : ℤ) * bezoutY)
+                    = (p : ℤ) * -bezoutX }⟩)
     }
   }
 }
@@ -151,15 +151,15 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
 -- ----------------------------------------------------------------------
 -- Every nonzero class is invertible. Induct on the class; a class is
 -- nonzero exactly when its representative is not divisible by p.
-theorem IntegerMod.nonzero_invertible (p : Natural)
+theorem IntegerMod.nonzero_invertible (p : ℕ)
         (primality : Natural.is_prime(p))
         (x : IntegerMod(p))
         : ¬(x = IntegerMod.zero(p))
           → ∃ (y : IntegerMod(p)). x * y = IntegerMod.one(p) :=
   by_representatives x as a =>
       (notZero : ¬(IntegerMod.make(p, a) = IntegerMod.zero(p))) ↦ {
-        ¬ Integer.divides((p : Integer), a)
-            by (pDividesA : Integer.divides((p : Integer), a)) ↦ {
+        ¬ Integer.divides((p : ℤ), a)
+            by (pDividesA : Integer.divides((p : ℤ), a)) ↦ {
                  Integer.CongruentModulo(p, a, Integer.zero)
                      by substituting (ring : a - Integer.zero = a);
                  IntegerMod.make(p, a) = IntegerMod.zero(p);
@@ -170,7 +170,7 @@ theorem IntegerMod.nonzero_invertible (p : Natural)
 
 -- ----------------------------------------------------------------------
 -- F_p is a field.
-theorem IntegerMod.is_field (p : Natural) (primality : Natural.is_prime(p))
+theorem IntegerMod.is_field (p : ℕ) (primality : Natural.is_prime(p))
         : IsField(IntegerMod(p),
                   IntegerMod.add,
                   IntegerMod.zero(p), IntegerMod.negate,

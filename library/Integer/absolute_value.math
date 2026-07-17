@@ -28,20 +28,20 @@ import Integer.order
 
 -- The function on representatives: |make(a, b)| := (distance(a, b) : Integer).
 definition Integer.absolute_value_at_representative
-        : IntegerRepresentative → Integer
+        : IntegerRepresentative → ℤ
   | IntegerRepresentative.make(a, b) =>
-      (Natural.distance(a, b) : Integer)
+      (Natural.distance(a, b) : ℤ)
 
 -- Respect kernel: given `a + d = b + c`, the two representatives'
 -- absolute-value-at-representative agree as Integers. Direct from
 -- `Natural.distance_respects_integer_equivalent`.
 theorem Integer.absolute_value_respect_natural
-        (a b c d : Natural)
+        (a b c d : ℕ)
         (aPlusDEqualsBPlusC : a + d = b + c)
-        : (Natural.distance(a, b) : Integer)
-          = (Natural.distance(c, d) : Integer) :=
-  (Natural.distance(a, b) : Integer)
-     = (Natural.distance(c, d) : Integer)
+        : (Natural.distance(a, b) : ℤ)
+          = (Natural.distance(c, d) : ℤ) :=
+  (Natural.distance(a, b) : ℤ)
+     = (Natural.distance(c, d) : ℤ)
 
 theorem Integer.absolute_value_respect
         (rep1 rep1Prime : IntegerRepresentative)
@@ -54,12 +54,12 @@ theorem Integer.absolute_value_respect
 }
 
 -- Absolute value as a function on Integer.
-definition Integer.absolute_value : Integer → Integer
+definition Integer.absolute_value : ℤ → ℤ
   by representatives rep ↦ Integer.absolute_value_at_representative(rep)
   well_defined by Integer.absolute_value_respect
 
 -- Register `abs` as a per-type alias. Downstream code that imports
--- this file can write `abs(x)` where `x : Integer` and the elaborator
+-- this file can write `abs(x)` where `x : ℤ` and the elaborator
 -- resolves to `Integer.absolute_value(x)`. Each carrier's
 -- absolute_value file adds its own `overload abs := …` entry so the
 -- alias dispatches on argument type at the call site.
@@ -71,11 +71,11 @@ theorem Integer.absolute_value_zero
         : abs(Integer.zero) = Integer.zero :=
   okay
 
--- |(n : Integer)| = (n : Integer) for n : Natural. Via lift β:
--- (n : Integer) = mk(make(n, zero)), |.| = (distance(n, zero) :
--- Integer) = (n : Integer) by distance_zero_right.
-automatic theorem Integer.absolute_value_of_natural (n : Natural)
-        : abs((n : Integer)) = (n : Integer) := {
+-- |(n : ℤ)| = (n : ℤ) for n : ℕ. Via lift β:
+-- (n : ℤ) = mk(make(n, zero)), |.| = (distance(n, zero) :
+-- ℤ) = (n : ℤ) by distance_zero_right.
+automatic theorem Integer.absolute_value_of_natural (n : ℕ)
+        : abs((n : ℤ)) = (n : ℤ) := {
     Natural.distance(n, 0) + 0
        = Natural.distance(n, 0)
        = n
@@ -91,16 +91,16 @@ theorem Integer.absolute_value_negate_at_representative
                 Integer.negate_representatives(rep))
           = Integer.absolute_value_at_representative(rep) := {
   let ⟨a, b⟩ := rep;
-  (Natural.distance(b, a) : Integer)
-     = (Natural.distance(a, b) : Integer)
+  (Natural.distance(b, a) : ℤ)
+     = (Natural.distance(a, b) : ℤ)
 }
 
--- |-x| = |x| on Integer.
-theorem Integer.absolute_value_negate (x : Integer)
+-- |-x| = |x| on ℤ.
+theorem Integer.absolute_value_negate (x : ℤ)
         : abs(-x) = abs(x) :=
   by_representatives x as ⟨a, b⟩ =>
-      { (Natural.distance(b, a) : Integer)
-         = (Natural.distance(a, b) : Integer) }
+      { (Natural.distance(b, a) : ℤ)
+         = (Natural.distance(a, b) : ℤ) }
 
 -- -(-x) = x at the representative level: double-negation cancels.
 theorem Integer.negate_negate_at_representative
@@ -111,9 +111,9 @@ theorem Integer.negate_negate_at_representative
   okay
 }
 
--- -(-x) = x on Integer. At a representative (a, b) both sides reduce
+-- -(-x) = x on ℤ. At a representative (a, b) both sides reduce
 -- to make(a, b).
-theorem Integer.negate_negate (x : Integer) : -(-x) = x :=
+theorem Integer.negate_negate (x : ℤ) : -(-x) = x :=
   by_representatives x as ⟨a, b⟩ => okay
 
 -- -(p + q) = -p + -q at the representative level. Both sides reduce
@@ -130,55 +130,55 @@ theorem Integer.negate_add_at_representatives
   okay
 }
 
--- -(p + q) = -p + -q on Integer. Take representatives for both p and q.
-theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=
+-- -(p + q) = -p + -q on ℤ. Take representatives for both p and q.
+theorem Integer.negate_add (p q : ℤ) : -(p + q) = -p + -q :=
   by_representatives p as ⟨alpha, beta⟩, q as ⟨gamma, δ⟩ => okay
 
 -- ----------------------------------------------------------------------
 -- Triangle inequality.
 
--- Monotonicity of the Natural ↪ Integer embedding: n ≤ m on Naturals
+-- Monotonicity of the ℕ ↪ ℤ embedding: n ≤ m on ℕ
 -- implies (n : I) ≤ (m : I). Witness via Natural.subtraction_witness.
 -- |x + y| at representatives reduces directly: mk(a, b) + mk(c, d)
 -- = mk(a + c, b + d), |·| = (distance(a + c, b + d) : I). Stated as
 -- a sanity check / convenience.
 theorem Integer.absolute_value_add_at_representatives
-        (a b c d : Natural)
+        (a b c d : ℕ)
         : abs(((Integer.from_difference(a, b)
-                + Integer.from_difference(c, d)) : Integer))
-          = (Natural.distance(a + c, b + d) : Integer) :=
+                + Integer.from_difference(c, d)) : ℤ))
+          = (Natural.distance(a + c, b + d) : ℤ) :=
   okay
 
--- Triangle inequality on representatives. Establishes the Integer ≤
+-- Triangle inequality on representatives. Establishes the ℤ ≤
 -- between the embedded distances. The actual Integer.triangle_inequality
 -- then takes representatives for both arguments.
 theorem Integer.triangle_inequality_at_representatives
-        (a b c d : Natural)
-        : (Natural.distance(a + c, b + d) : Integer)
-          ≤ (Natural.distance(a, b) : Integer)
-            + (Natural.distance(c, d) : Integer) := {
+        (a b c d : ℕ)
+        : (Natural.distance(a + c, b + d) : ℤ)
+          ≤ (Natural.distance(a, b) : ℤ)
+            + (Natural.distance(c, d) : ℤ) := {
     Natural.distance(a + c, b + d)
       ≤ Natural.distance(a, b) + Natural.distance(c, d)
       by Natural.distance_add_triangle;
-    (Natural.distance(a + c, b + d) : Integer)
-       ≤ ((Natural.distance(a, b) + Natural.distance(c, d)) : Integer)
-       = (Natural.distance(a, b) : Integer)
-           + (Natural.distance(c, d) : Integer)
+    (Natural.distance(a + c, b + d) : ℤ)
+       ≤ ((Natural.distance(a, b) + Natural.distance(c, d)) : ℤ)
+       = (Natural.distance(a, b) : ℤ)
+           + (Natural.distance(c, d) : ℤ)
 }
 
--- |x + y| ≤ |x| + |y| on Integer. Take representatives x = [(a, b)],
+-- |x + y| ≤ |x| + |y| on ℤ. Take representatives x = [(a, b)],
 -- y = [(c, d)]; the result follows from the at-representatives lemma.
-theorem Integer.triangle_inequality (x y : Integer)
+theorem Integer.triangle_inequality (x y : ℤ)
         : abs(x + y)
           ≤ abs(x) + abs(y) :=
   by_representatives x as ⟨a, b⟩, y as ⟨c, d⟩ =>
-      { (Natural.distance(a + c, b + d) : Integer)
-         ≤ (Natural.distance(a, b) : Integer)
-             + (Natural.distance(c, d) : Integer) }
+      { (Natural.distance(a + c, b + d) : ℤ)
+         ≤ (Natural.distance(a, b) : ℤ)
+             + (Natural.distance(c, d) : ℤ) }
 
 
 -- x - y = -(y - x). Single ring identity; the auto-prover closes
 -- the whole chain via the lemma index + negate_add + comm.
-theorem Integer.subtract_swap (x y : Integer) : x - y = -(y - x) :=
+theorem Integer.subtract_swap (x y : ℤ) : x - y = -(y - x) :=
   x - y
      = -(y - x)

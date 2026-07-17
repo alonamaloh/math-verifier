@@ -72,7 +72,7 @@ theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) := {
                zeroSequence, oneSequence, zeroEqualsOne)
         as cauchyEquivalence;
     choose witnessIndex such that
-        ∀ (m : Natural). witnessIndex ≤ m →
+        ∀ (m : ℕ). witnessIndex ≤ m →
           abs(zeroSequence(m) - oneSequence(m)) < Rational.one
         as atWitnessIndex
         from cauchyEquivalence(Rational.one, Rational.zero_less_one);
@@ -101,11 +101,11 @@ theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) := {
 -- onward — trivially CauchyEquivalent to the constant-one sequence.
 theorem Real.reciprocal_cauchy_sequence_multiplies
         (originalSequencePacked : CauchyRationalSequence)
-        (lowerBound : Rational)
+        (lowerBound : ℚ)
         (lowerBoundPositive : Rational.zero < lowerBound)
-        (apartnessIndex : Natural)
+        (apartnessIndex : ℕ)
         (apartness
-            : ∀ (m : Natural). apartnessIndex ≤ m →
+            : ∀ (m : ℕ). apartnessIndex ≤ m →
                 lowerBound ≤ abs(originalSequencePacked(m)))
         : CauchyEquivalent(
               CauchyRationalSequence.multiply(
@@ -116,10 +116,10 @@ theorem Real.reciprocal_cauchy_sequence_multiplies
                       lowerBound, lowerBoundPositive,
                       apartnessIndex, apartness)),
               Rational.to_cauchy_constant(Rational.one)) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦
     witness apartnessIndex with
-        (m : Natural) (apartnessIndexLeqM : apartnessIndex ≤ m) ↦ {
+        (m : ℕ) (apartnessIndexLeqM : apartnessIndex ≤ m) ↦ {
           let underlyingSequence : Rational.sequence.Sequence :=
               CauchyRationalSequence.sequenceFunction(originalSequencePacked);
           -- `?` for the redundant positional args: lowerBound and
@@ -158,8 +158,8 @@ theorem Real.reciprocal_cauchy_sequence_multiplies
 -- apartness to get a lower bound, build the reciprocal CauchyRational
 -- sequence, and use the multiplication-converges-to-one lemma.
 theorem Real.reciprocal_exists_for_nonzero
-        (x : Real) (xNonzero : ¬(x = Real.zero))
-        : ∃ (y : Real). x * y = Real.one :=
+        (x : ℝ) (xNonzero : ¬(x = Real.zero))
+        : ∃ (y : ℝ). x * y = Real.one :=
   by_representatives x as rep => {
         -- Project the underlying sequence and its Cauchy witness once;
         -- both feed multiple downstream constructions.
@@ -176,17 +176,17 @@ theorem Real.reciprocal_exists_for_nonzero
                               CauchyRationalSequence, CauchyEquivalent,
                               rep, zeroSequence, representativesEquivalent));
         choose lowerBound such that
-            ∃ (apartnessIndex : Natural).
-              Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
+            ∃ (apartnessIndex : ℕ).
+              Rational.zero < lowerBound ∧ ∀ (m : ℕ). apartnessIndex ≤ m →
                     lowerBound ≤ abs(rep(m))
             as apartnessTail
             from Real.cauchy_apartness_from_zero;
         choose apartnessIndex such that
-              Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
+              Rational.zero < lowerBound ∧ ∀ (m : ℕ). apartnessIndex ≤ m →
                     lowerBound ≤ abs(rep(m))
             from apartnessTail;
         Rational.zero < lowerBound as lowerBoundPositive;
-        ∀ (m : Natural). apartnessIndex ≤ m →
+        ∀ (m : ℕ). apartnessIndex ≤ m →
                     lowerBound ≤ abs(rep(m))
             as apartness;
         -- Package the reciprocal as its own Cauchy sequence, then
@@ -197,7 +197,7 @@ theorem Real.reciprocal_exists_for_nonzero
             Real.reciprocal_cauchy_sequence(
                 underlyingSequence, underlyingIsCauchy,
                 ?, lowerBoundPositive, ?, apartness);
-        witness (Quotient.class_of(recipPacked) : Real) with
+        witness (Quotient.class_of(recipPacked) : ℝ) with
             Quotient.equivalent_implies_equal(
                 CauchyRationalSequence.multiply(rep, recipPacked),
                 Rational.to_cauchy_constant(Rational.one),
@@ -208,7 +208,7 @@ theorem Real.reciprocal_exists_for_nonzero
 -- ----------------------------------------------------------------------
 -- Real is a Field.
 theorem Real.is_field
-        : IsField(Real, Real.add, Real.zero, Real.negate,
+        : IsField(ℝ, Real.add, Real.zero, Real.negate,
                    Real.multiply, Real.one) := {
     Real.is_commutative_ring;
     Real.zero_not_equal_one;
@@ -219,7 +219,7 @@ theorem Real.is_field
 -- ----------------------------------------------------------------------
 -- A multiplicative inverse is unique: two right-inverses of the same x
 -- agree (associate b across x · a = 1).
-theorem Real.inverse_unique (x a b : Real)
+theorem Real.inverse_unique (x a b : ℝ)
         (aInverse : x * a = Real.one) (bInverse : x * b = Real.one)
         : a = b :=
   a
@@ -232,11 +232,11 @@ theorem Real.inverse_unique (x a b : Real)
 -- THE reciprocal, by definite description: existence from
 -- reciprocal_exists_for_nonzero, uniqueness from the lemma above. The
 -- reciprocal is now an honest function of (x, proof that x ≠ 0).
-definition Real.reciprocal (x : Real) (xNonzero : ¬(x = Real.zero)) : Real := {
-  ∃ (y : Real). x * y = Real.one as reciprocalExists;
+definition Real.reciprocal (x : ℝ) (xNonzero : ¬(x = Real.zero)) : ℝ := {
+  ∃ (y : ℝ). x * y = Real.one as reciprocalExists;
   Logic.the(
-      Real,
-      (y : Real) ↦ x * y = Real.one,
+      ℝ,
+      (y : ℝ) ↦ x * y = Real.one,
       reciprocalExists,
       Real.inverse_unique(x))
 }
@@ -247,12 +247,12 @@ definition Real.reciprocal (x : Real) (xNonzero : ¬(x = Real.zero)) : Real := {
 -- plainly while staying honest.
 operator (⁻¹) on (Real) := Real.reciprocal
 
-theorem Real.reciprocal_multiplies (x : Real) (xNonzero : ¬(x = Real.zero))
+theorem Real.reciprocal_multiplies (x : ℝ) (xNonzero : ¬(x = Real.zero))
         : x * Real.reciprocal(x, xNonzero) = Real.one := {
-  ∃ (y : Real). x * y = Real.one as reciprocalExists;
+  ∃ (y : ℝ). x * y = Real.one as reciprocalExists;
   Logic.the_satisfies(
-      Real,
-      (y : Real) ↦ x * y = Real.one,
+      ℝ,
+      (y : ℝ) ↦ x * y = Real.one,
       reciprocalExists,
       Real.inverse_unique(x))
 }

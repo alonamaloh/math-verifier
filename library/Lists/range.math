@@ -20,38 +20,38 @@ import Lists.list
 import Lists.length
 import Lists.append
 
-definition List.range_down : Natural → List(Natural)
-  | 0 => List.empty(Natural)
+definition List.range_down : ℕ → List(ℕ)
+  | 0 => List.empty(ℕ)
   | 1 + predecessor =>
-      List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
+      List.prepend(ℕ, 1 + predecessor, List.range_down(predecessor))
 
 -- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
 -- not definitionally the constructor; bridge via `one_add`).
-theorem List.range_down_one_plus (n : Natural)
+theorem List.range_down_one_plus (n : ℕ)
         : List.range_down(1 + n)
-          = List.prepend(Natural, 1 + n, List.range_down(n)) :=
+          = List.prepend(ℕ, 1 + n, List.range_down(n)) :=
   done by substituting Natural.one_add
 
 -- The ascending counterpart `range_up(n) = [0, 1, …, n−1]`, grown at the
 -- tail so the fold-product reads the largest index last. That matches the
 -- left-fold recursion of `Algebra.indexedAggregate`, letting the
 -- list-product bridge there reassociate without commutativity.
-definition List.range_up : Natural → List(Natural)
-  | 0 => List.empty(Natural)
+definition List.range_up : ℕ → List(ℕ)
+  | 0 => List.empty(ℕ)
   | 1 + predecessor =>
-      List.append(Natural, List.range_up(predecessor),
-          List.prepend(Natural, predecessor, List.empty(Natural)))
+      List.append(ℕ, List.range_up(predecessor),
+          List.prepend(ℕ, predecessor, List.empty(ℕ)))
 
 -- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
 -- not definitionally the constructor; bridge via `one_add`).
-theorem List.range_up_add_one (n : Natural)
+theorem List.range_up_add_one (n : ℕ)
         : List.range_up(1 + n)
-          = List.append(Natural, List.range_up(n),
-                List.prepend(Natural, n, List.empty(Natural))) :=
+          = List.append(ℕ, List.range_up(n),
+                List.prepend(ℕ, n, List.empty(ℕ))) :=
   done by substituting Natural.one_add
 
 -- `range_down(n)` has exactly n elements.
-theorem List.range_down_length (n : Natural)
+theorem List.range_down_length (n : ℕ)
         : length(List.range_down(n)) = n :=
   by induction on n with IH {
     case base:
@@ -67,12 +67,12 @@ theorem List.range_down_length (n : Natural)
 -- Completeness: every positive integer ≤ n appears in range_down(n).
 -- (Induct on n with j generalised so the bound varies; the step case
 -- splits j = 1 + predecessor (head) vs j ≤ predecessor (tail, by IH).)
-theorem List.range_down_complete (n : Natural)
-        : ∀ (j : Natural). 1 ≤ j → j ≤ n
+theorem List.range_down_complete (n : ℕ)
+        : ∀ (j : ℕ). 1 ≤ j → j ≤ n
           → j ∈ List.range_down(n) :=
   by induction on n with IH {
     case base: {
-        take j : Natural;
+        take j : ℕ;
         suppose 1 ≤ j as lower;
         suppose j ≤ 0 as upper;
         1 ≤ 0;
@@ -80,13 +80,13 @@ theorem List.range_down_complete (n : Natural)
         done
       }
     case step(predecessor): {
-        take j : Natural;
+        take j : ℕ;
         suppose 1 ≤ j as lower;
         suppose j ≤ 1 + predecessor as upper;
         j = 1 + predecessor ∨ ¬(j = 1 + predecessor);
         done by cases {
           case j = 1 + predecessor as jEqual: {
-              1 + predecessor ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
+              1 + predecessor ∈ List.prepend(ℕ, 1 + predecessor, List.range_down(predecessor))
                   by List.member.here;
               1 + predecessor ∈ List.range_down(1 + predecessor)
                   by substituting List.range_down_one_plus;
@@ -98,7 +98,7 @@ theorem List.range_down_complete (n : Natural)
               j ≤ predecessor
                   by Natural.le_of_le_one_plus_of_ne;
               j ∈ List.range_down(predecessor) by IH;
-              j ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
+              j ∈ List.prepend(ℕ, 1 + predecessor, List.range_down(predecessor))
                   by List.member.there;
               done by substituting List.range_down_one_plus
             }
@@ -107,18 +107,18 @@ theorem List.range_down_complete (n : Natural)
   }
 
 -- Every member of range_down(n) is positive (the range stops at 1).
-theorem List.range_down_member_positive (n : Natural)
-        : ∀ (j : Natural). j ∈ List.range_down(n) → 1 ≤ j :=
+theorem List.range_down_member_positive (n : ℕ)
+        : ∀ (j : ℕ). j ∈ List.range_down(n) → 1 ≤ j :=
   by induction on n with IH {
     case base: {
-        take j : Natural;
+        take j : ℕ;
         suppose j ∈ List.range_down(0) as mem;
-        absurd(List.no_member_empty(Natural, j, mem))
+        absurd(List.no_member_empty(ℕ, j, mem))
       }
     case step(predecessor): {
-        take j : Natural;
+        take j : ℕ;
         suppose j ∈ List.range_down(1 + predecessor) as mem;
-        j ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
+        j ∈ List.prepend(ℕ, 1 + predecessor, List.range_down(predecessor))
             by substituting List.range_down_one_plus;
         j = 1 + predecessor
               ∨ j ∈ List.range_down(predecessor)
@@ -136,18 +136,18 @@ theorem List.range_down_member_positive (n : Natural)
 
 -- Conversely, every member of range_down(n) is ≤ n. (Needed to show the
 -- head 1 + k doesn't recur in range_down(k), i.e. distinctness.)
-theorem List.range_down_member_le (n : Natural)
-        : ∀ (j : Natural). j ∈ List.range_down(n) → j ≤ n :=
+theorem List.range_down_member_le (n : ℕ)
+        : ∀ (j : ℕ). j ∈ List.range_down(n) → j ≤ n :=
   by induction on n with IH {
     case base: {
-        take j : Natural;
+        take j : ℕ;
         suppose j ∈ List.range_down(0) as mem;
-        absurd(List.no_member_empty(Natural, j, mem))
+        absurd(List.no_member_empty(ℕ, j, mem))
       }
     case step(predecessor): {
-        take j : Natural;
+        take j : ℕ;
         suppose j ∈ List.range_down(1 + predecessor) as mem;
-        j ∈ List.prepend(Natural, 1 + predecessor, List.range_down(predecessor))
+        j ∈ List.prepend(ℕ, 1 + predecessor, List.range_down(predecessor))
             by substituting List.range_down_one_plus;
         j = 1 + predecessor
               ∨ j ∈ List.range_down(predecessor)
@@ -168,33 +168,33 @@ theorem List.range_down_member_le (n : Natural)
 -- Completeness for the ascending range: every value below n appears in
 -- range_up(n). Induct on n; the step splits j < p (tail, by IH) vs j = p
 -- (the appended top).
-theorem List.range_up_complete (n : Natural)
-        : ∀ (j : Natural). j < n → j ∈ List.range_up(n) :=
+theorem List.range_up_complete (n : ℕ)
+        : ∀ (j : ℕ). j < n → j ∈ List.range_up(n) :=
   by induction on n with IH {
     case base: {
-        take j : Natural;
+        take j : ℕ;
         suppose j < 0 as below;
         False by Natural.not_less_than_zero(j, below);
         done
       }
     case step(predecessor): {
-        take j : Natural;
+        take j : ℕ;
         suppose j < 1 + predecessor as below;
         j ≤ predecessor by Natural.le_of_lt_one_plus;
         j < predecessor ∨ j = predecessor;
         done by cases {
           case j < predecessor as strictlyBelow: {
               j ∈ List.range_up(predecessor) by IH(j, strictlyBelow);
-              j ∈ List.append(Natural, List.range_up(predecessor), List.prepend(Natural, predecessor, List.empty(Natural)))
+              j ∈ List.append(ℕ, List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
                   by List.member_append_left;
               done by substituting List.range_up_add_one
             }
           case j = predecessor as atTop: {
-              predecessor ∈ List.prepend(Natural, predecessor, List.empty(Natural))
+              predecessor ∈ List.prepend(ℕ, predecessor, List.empty(ℕ))
                   by List.member.here;
-              j ∈ List.prepend(Natural, predecessor, List.empty(Natural))
+              j ∈ List.prepend(ℕ, predecessor, List.empty(ℕ))
                   by substituting atTop;
-              j ∈ List.append(Natural, List.range_up(predecessor), List.prepend(Natural, predecessor, List.empty(Natural)))
+              j ∈ List.append(ℕ, List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
                   by List.member_append_right;
               done by substituting List.range_up_add_one
             }
@@ -203,38 +203,38 @@ theorem List.range_up_complete (n : Natural)
   }
 
 -- Conversely, every member of range_up(n) is below n.
-theorem List.range_up_member_lt (n : Natural)
-        : ∀ (j : Natural). j ∈ List.range_up(n) → j < n :=
+theorem List.range_up_member_lt (n : ℕ)
+        : ∀ (j : ℕ). j ∈ List.range_up(n) → j < n :=
   by induction on n with IH {
     case base: {
-        take j : Natural;
+        take j : ℕ;
         suppose j ∈ List.range_up(0) as mem;
-        absurd(List.no_member_empty(Natural, j, mem))
+        absurd(List.no_member_empty(ℕ, j, mem))
       }
     case step(predecessor): {
-        take j : Natural;
+        take j : ℕ;
         suppose j ∈ List.range_up(1 + predecessor) as mem;
-        j ∈ List.append(Natural, List.range_up(predecessor), List.prepend(Natural, predecessor, List.empty(Natural)))
+        j ∈ List.append(ℕ, List.range_up(predecessor), List.prepend(ℕ, predecessor, List.empty(ℕ)))
             by substituting List.range_up_add_one;
         j ∈ List.range_up(predecessor)
-              ∨ j ∈ List.prepend(Natural, predecessor, List.empty(Natural))
-            by List.member_append_invert(Natural, j,
-                   List.prepend(Natural, predecessor, List.empty(Natural)),
+              ∨ j ∈ List.prepend(ℕ, predecessor, List.empty(ℕ))
+            by List.member_append_invert(ℕ, j,
+                   List.prepend(ℕ, predecessor, List.empty(ℕ)),
                    List.range_up(predecessor));
         done by cases {
           case j ∈ List.range_up(predecessor) as inRange:
               j < predecessor by IH(j, inRange)
                 ≤ 1 + predecessor
-          case j ∈ List.prepend(Natural, predecessor, List.empty(Natural)) as inSingleton: {
-              j = predecessor ∨ j ∈ List.empty(Natural)
+          case j ∈ List.prepend(ℕ, predecessor, List.empty(ℕ)) as inSingleton: {
+              j = predecessor ∨ j ∈ List.empty(ℕ)
                   by List.member_prepend_invert;
               done by cases {
                 case j = predecessor as atTop: {
                     j < 1 + predecessor by substituting atTop;
                     done
                   }
-                case j ∈ List.empty(Natural) as inEmpty:
-                    absurd(List.no_member_empty(Natural, j, inEmpty))
+                case j ∈ List.empty(ℕ) as inEmpty:
+                    absurd(List.no_member_empty(ℕ, j, inEmpty))
               }
             }
         }
@@ -248,30 +248,30 @@ theorem List.range_up_member_lt (n : Natural)
 -- `range_down(base)` recovers the full range — the splitting fact behind
 -- "break the product over 1..p−1 into its two halves".
 
-definition List.range_down_offset (base : Natural) : Natural → List(Natural)
-  | 0 => List.empty(Natural)
+definition List.range_down_offset (base : ℕ) : ℕ → List(ℕ)
+  | 0 => List.empty(ℕ)
   | 1 + predecessorCount =>
-      List.prepend(Natural, base + (1 + predecessorCount),
+      List.prepend(ℕ, base + (1 + predecessorCount),
           List.range_down_offset(base, predecessorCount))
 
 -- The recursion in `1 + n` form, as for `range_down`.
-theorem List.range_down_offset_one_plus (base count : Natural)
+theorem List.range_down_offset_one_plus (base count : ℕ)
         : List.range_down_offset(base, 1 + count)
-          = List.prepend(Natural, base + (1 + count),
+          = List.prepend(ℕ, base + (1 + count),
                 List.range_down_offset(base, count)) :=
   done by substituting Natural.one_add
 
 -- [base+count .. 1] = [base+count .. base+1] ++ [base .. 1].
-theorem List.range_down_split (base count : Natural)
+theorem List.range_down_split (base count : ℕ)
         : List.range_down(base + count)
-          = List.append(Natural, List.range_down_offset(base, count),
+          = List.append(ℕ, List.range_down_offset(base, count),
                 List.range_down(base)) :=
   by induction on count with IH {
     case base:
         -- The offset slice is empty and base + 0 = base.
         List.range_down(base + 0)
            = List.range_down(base)   by (base + 0 = base)
-           = List.append(Natural, List.range_down_offset(base, 0),
+           = List.append(ℕ, List.range_down_offset(base, 0),
                  List.range_down(base))
     case step(predecessorCount):
         -- Peel the top element base + (1 + count′) off both sides.
@@ -279,21 +279,21 @@ theorem List.range_down_split (base count : Natural)
            = List.range_down(1 + (base + predecessorCount))
                  by (base + (1 + predecessorCount)
                      = 1 + (base + predecessorCount))
-           = List.prepend(Natural, 1 + (base + predecessorCount),
+           = List.prepend(ℕ, 1 + (base + predecessorCount),
                  List.range_down(base + predecessorCount))
                  by List.range_down_one_plus
-           = List.prepend(Natural, 1 + (base + predecessorCount),
-                 List.append(Natural,
+           = List.prepend(ℕ, 1 + (base + predecessorCount),
+                 List.append(ℕ,
                      List.range_down_offset(base, predecessorCount),
                      List.range_down(base)))
                  by substituting IH
-           = List.prepend(Natural, base + (1 + predecessorCount),
-                 List.append(Natural,
+           = List.prepend(ℕ, base + (1 + predecessorCount),
+                 List.append(ℕ,
                      List.range_down_offset(base, predecessorCount),
                      List.range_down(base)))
                  by (1 + (base + predecessorCount)
                      = base + (1 + predecessorCount))
-           = List.append(Natural,
+           = List.append(ℕ,
                  List.range_down_offset(base, 1 + predecessorCount),
                  List.range_down(base))
                  by List.range_down_offset_one_plus

@@ -38,38 +38,38 @@ import IntegerMod.basics
 -- Respect of congruence by the Integer operations.
 
 -- (a + b) − (a' + b') = (a − a') + (b − b'); closed under addition.
-theorem Integer.CongruentModulo.add_respects (modulus : Natural)
-        (a a' b b' : Integer)
+theorem Integer.CongruentModulo.add_respects (modulus : ℕ)
+        (a a' b b' : ℤ)
         (congruentA : Integer.CongruentModulo(modulus, a, a'))
         (congruentB : Integer.CongruentModulo(modulus, b, b'))
         : Integer.CongruentModulo(modulus, a + b, a' + b') := {
-  Integer.divides((modulus : Integer), (a - a') + (b - b')) by Integer.divides_add;
+  Integer.divides((modulus : ℤ), (a - a') + (b - b')) by Integer.divides_add;
   (a - a') + (b - b') = (a + b) - (a' + b');
-  Integer.divides((modulus : Integer), (a + b) - (a' + b'))
+  Integer.divides((modulus : ℤ), (a + b) - (a' + b'))
 }
 
 -- (−a) − (−a') = −(a − a'); closed under negation.
-theorem Integer.CongruentModulo.negate_respects (modulus : Natural)
-        (a a' : Integer)
+theorem Integer.CongruentModulo.negate_respects (modulus : ℕ)
+        (a a' : ℤ)
         (congruentA : Integer.CongruentModulo(modulus, a, a'))
         : Integer.CongruentModulo(modulus, -a, -a') := {
-  Integer.divides((modulus : Integer), -(a - a')) by Integer.divides_negate;
+  Integer.divides((modulus : ℤ), -(a - a')) by Integer.divides_negate;
   -(a - a') = (-a) - (-a');
-  Integer.divides((modulus : Integer), (-a) - (-a'))
+  Integer.divides((modulus : ℤ), (-a) - (-a'))
 }
 
 -- a·b − a'·b' = (a − a')·b + (b − b')·a'; closed under addition of the
 -- two multiplied-through differences.
-theorem Integer.CongruentModulo.multiply_respects (modulus : Natural)
-        (a a' b b' : Integer)
+theorem Integer.CongruentModulo.multiply_respects (modulus : ℕ)
+        (a a' b b' : ℤ)
         (congruentA : Integer.CongruentModulo(modulus, a, a'))
         (congruentB : Integer.CongruentModulo(modulus, b, b'))
         : Integer.CongruentModulo(modulus, a * b, a' * b') := {
-  Integer.divides((modulus : Integer), (a - a') * b) by Integer.divides_multiply_right;
-  Integer.divides((modulus : Integer), (b - b') * a') by Integer.divides_multiply_right;
-  Integer.divides((modulus : Integer), (a - a') * b + (b - b') * a') by Integer.divides_add;
+  Integer.divides((modulus : ℤ), (a - a') * b) by Integer.divides_multiply_right;
+  Integer.divides((modulus : ℤ), (b - b') * a') by Integer.divides_multiply_right;
+  Integer.divides((modulus : ℤ), (a - a') * b + (b - b') * a') by Integer.divides_add;
   (a - a') * b + (b - b') * a' = a * b - a' * b';
-  Integer.divides((modulus : Integer), a * b - a' * b')
+  Integer.divides((modulus : ℤ), a * b - a' * b')
 }
 
 -- ----------------------------------------------------------------------
@@ -79,7 +79,7 @@ theorem Integer.CongruentModulo.multiply_respects (modulus : Natural)
 -- as the named constructor and is the preferred intro over the raw
 -- `Quotient.class_of`.
 
-construction IntegerMod.make (modulus : Natural) (a : Integer)
+construction IntegerMod.make (modulus : ℕ) (a : ℤ)
         : IntegerMod(modulus) :=
   Quotient.class_of(a)
 
@@ -92,15 +92,15 @@ construction IntegerMod.make (modulus : Natural) (a : Integer)
 -- Add the Integer representatives modulo `modulus`; well-defined in each
 -- argument because addition respects congruence (with reflexivity on the
 -- held-fixed side).
-definition IntegerMod.add {modulus : Natural}
+definition IntegerMod.add {modulus : ℕ}
         : IntegerMod(modulus) → IntegerMod(modulus) → IntegerMod(modulus)
   by representatives a, b ↦ IntegerMod.make(modulus, a + b)
   well_defined by
-    (a a' b : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
+    (a a' b : ℤ) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
         ({ Integer.CongruentModulo(modulus, b, b) by Integer.CongruentModulo.reflexive;
            done by Integer.CongruentModulo.add_respects
          } : Integer.CongruentModulo(modulus, a + b, a' + b)),
-    (a b b' : Integer) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
+    (a b b' : ℤ) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
         ({ Integer.CongruentModulo(modulus, a, a) by Integer.CongruentModulo.reflexive;
            done by Integer.CongruentModulo.add_respects
          } : Integer.CongruentModulo(modulus, a + b, a + b'))
@@ -112,26 +112,26 @@ definition IntegerMod.add {modulus : Natural}
 -- type — the elaborator's leading-implicit inference solves it from the
 -- argument's type.
 
-definition IntegerMod.negate {modulus : Natural}
+definition IntegerMod.negate {modulus : ℕ}
         : IntegerMod(modulus) → IntegerMod(modulus)
   by representatives a ↦ IntegerMod.make(modulus, -a)
   well_defined by
-    (a a' : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
+    (a a' : ℤ) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
         ({ done by Integer.CongruentModulo.negate_respects
          } : Integer.CongruentModulo(modulus, -a, -a'))
 
 -- ----------------------------------------------------------------------
 -- Multiplication. Same two-lift shape as addition.
 
-definition IntegerMod.multiply {modulus : Natural}
+definition IntegerMod.multiply {modulus : ℕ}
         : IntegerMod(modulus) → IntegerMod(modulus) → IntegerMod(modulus)
   by representatives a, b ↦ IntegerMod.make(modulus, a * b)
   well_defined by
-    (a a' b : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
+    (a a' b : ℤ) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
         ({ Integer.CongruentModulo(modulus, b, b) by Integer.CongruentModulo.reflexive;
            done by Integer.CongruentModulo.multiply_respects
          } : Integer.CongruentModulo(modulus, a * b, a' * b)),
-    (a b b' : Integer) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
+    (a b b' : ℤ) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
         ({ Integer.CongruentModulo(modulus, a, a) by Integer.CongruentModulo.reflexive;
            done by Integer.CongruentModulo.multiply_respects
          } : Integer.CongruentModulo(modulus, a * b, a * b'))
@@ -142,14 +142,14 @@ definition IntegerMod.multiply {modulus : Natural}
 -- `modulus` is explicit on the constants: as bare arguments they
 -- have no operand to drive implicit inference, and an unfilled
 -- implicit here is mis-bound to the modulus slot by the elaborator.
-definition IntegerMod.zero (modulus : Natural) : IntegerMod(modulus) :=
+definition IntegerMod.zero (modulus : ℕ) : IntegerMod(modulus) :=
   IntegerMod.make(modulus, Integer.zero)
 
-definition IntegerMod.one (modulus : Natural) : IntegerMod(modulus) :=
+definition IntegerMod.one (modulus : ℕ) : IntegerMod(modulus) :=
   IntegerMod.make(modulus, Integer.one)
 
 -- Subtraction: x − y = x + (−y).
-definition IntegerMod.subtract {modulus : Natural}
+definition IntegerMod.subtract {modulus : ℕ}
         (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
   IntegerMod.add(x, IntegerMod.negate(y))
 

@@ -31,15 +31,15 @@ import Polynomial.multiply_laws
 import Polynomial.instances
 
 -- ----------------------------------------------------------------------
--- Natural arithmetic helpers for the reflection.
+-- ℕ arithmetic helpers for the reflection.
 
-theorem Natural.monus_add_cancel_left (a : Natural)
-        : ∀ (b : Natural). (a + b) ∸ a = b :=
+theorem Natural.monus_add_cancel_left (a : ℕ)
+        : ∀ (b : ℕ). (a + b) ∸ a = b :=
   by induction on a with IH {
     case 0:
-        (b : Natural) ↦ { done by Natural.monus_zero }
+        (b : ℕ) ↦ { done by Natural.monus_zero }
     case 1 + predecessor:
-        (b : Natural) ↦
+        (b : ℕ) ↦
           ((1 + predecessor) + b) ∸ (1 + predecessor)
              = (1 + (predecessor + b)) ∸ (1 + predecessor)
                  by Natural.add_associative
@@ -49,14 +49,14 @@ theorem Natural.monus_add_cancel_left (a : Natural)
                  by IH(b)
   }
 
-theorem Natural.monus_add_involution (i d : Natural)
+theorem Natural.monus_add_involution (i d : ℕ)
         : (i + d) ∸ ((i + d) ∸ i) = i :=
   (i + d) ∸ ((i + d) ∸ i)
      = (i + d) ∸ d
      = (d + i) ∸ d
      = i
 
-theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
+theorem Natural.monus_monus_self (k i : ℕ) (h : i ≤ k)
         : k ∸ (k ∸ i) = i := {
   choose d such that k = i + d as decomposition from Natural.subtraction_witness;
   -- rewrite k throughout, then it's the monus/add involution.
@@ -67,8 +67,8 @@ theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
 
 -- Sum respects pointwise equality on the summation range 0..n.
 theorem Ring.Sum.extensional_range (r : Ring)
-        (f g : Natural → Ring.carrier(r)) (n : Natural)
-        (h : ∀ (i : Natural). i ≤ n → f(i) = g(i))
+        (f g : ℕ → Ring.carrier(r)) (n : ℕ)
+        (h : ∀ (i : ℕ). i ≤ n → f(i) = g(i))
         : Ring.Sum(r, f, n) = Ring.Sum(r, g, n) :=
   by induction on n with IH {
     case base:
@@ -77,8 +77,8 @@ theorem Ring.Sum.extensional_range (r : Ring)
            = g(0)               by h(0, Natural.LessOrEqual.reflexive)
            = Ring.Sum(r, g, 0)
     case step(k): {
-        ∀ (i : Natural). i ≤ k → f(i) = g(i) by {
-            take i : Natural;
+        ∀ (i : ℕ). i ≤ k → f(i) = g(i) by {
+            take i : ℕ;
             suppose i ≤ k as smaller;
             i ≤ 1 + k;
             done
@@ -101,36 +101,36 @@ congruence_under_binder Ring.Sum := Ring.Sum.extensional_range
 -- ----------------------------------------------------------------------
 -- Sum reflection: Σ_{i=0}^{n} f(i) = Σ_{i=0}^{n} f(n−i).
 
-theorem Ring.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
-        (n : Natural)
+theorem Ring.Sum.reverse (r : Ring) (f : ℕ → Ring.carrier(r))
+        (n : ℕ)
         : Ring.Sum(r, f, n)
-          = Ring.Sum(r, (i : Natural) ↦ f(n ∸ i), n) :=
+          = Ring.Sum(r, (i : ℕ) ↦ f(n ∸ i), n) :=
   by induction on n with IH {
     case base:
         Ring.Sum(r, f, 0)
            = f(0)
            = f(0 ∸ 0)
-           = Ring.Sum(r, (i : Natural) ↦ f(0 ∸ i), 0)   by substituting Ring.Sum.base
+           = Ring.Sum(r, (i : ℕ) ↦ f(0 ∸ i), 0)   by substituting Ring.Sum.base
     case step(k): {
-        Ring.Sum(r, (i : Natural) ↦ f(k ∸ i), k)
-              = Ring.Sum(r, (i : Natural) ↦ f((1 + k) ∸ (1 + i)), k)
+        Ring.Sum(r, (i : ℕ) ↦ f(k ∸ i), k)
+              = Ring.Sum(r, (i : ℕ) ↦ f((1 + k) ∸ (1 + i)), k)
           by Ring.Sum.extensional_range(r,
-                 (i : Natural) ↦ f(k ∸ i),
-                 (i : Natural) ↦ f((1 + k) ∸ (1 + i)),
+                 (i : ℕ) ↦ f(k ∸ i),
+                 (i : ℕ) ↦ f((1 + k) ∸ (1 + i)),
                  k,
-                 (i : Natural) (_ : i ≤ k) ↦
+                 (i : ℕ) (_ : i ≤ k) ↦
                      { f(k ∸ i)
                         = f((1 + k) ∸ (1 + i))
                             by substituting Natural.monus_one_plus_one_plus }) as tailReindex;
         Ring.Sum(r, f, 1 + k)
            = (Ring.Sum(r, f, k) + f(1 + k))
            = (f(1 + k) + Ring.Sum(r, f, k))
-           = (f(1 + k) + Ring.Sum(r, (i : Natural) ↦ f(k ∸ i), k))
-           = (f((1 + k) ∸ 0) + Ring.Sum(r, (i : Natural) ↦ f(k ∸ i), k))
+           = (f(1 + k) + Ring.Sum(r, (i : ℕ) ↦ f(k ∸ i), k))
+           = (f((1 + k) ∸ 0) + Ring.Sum(r, (i : ℕ) ↦ f(k ∸ i), k))
                by substituting Natural.monus_one_plus_zero
-           = (f((1 + k) ∸ 0) + Ring.Sum(r, (i : Natural) ↦ f((1 + k) ∸ (1 + i)), k))
+           = (f((1 + k) ∸ 0) + Ring.Sum(r, (i : ℕ) ↦ f((1 + k) ∸ (1 + i)), k))
                by substituting tailReindex
-           = Ring.Sum(r, (i : Natural) ↦ f((1 + k) ∸ i), 1 + k)
+           = Ring.Sum(r, (i : ℕ) ↦ f((1 + k) ∸ i), 1 + k)
                by Ring.Sum.shift_one_plus
   }
   }
@@ -142,14 +142,14 @@ theorem Polynomial.Coefficients.multiply_commutative (r : Ring)
         (ringCommutative : ∀ (x y : Ring.carrier(r)). (x * y) = (y * x))
         (p q : Polynomial.Coefficients(Ring.carrier(r)))
         : (p * q) ≈ (q * p) :=
-  (k : Natural) ↦
+  (k : ℕ) ↦
       (p * q)[k]
-         = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[k ∸ i]), k)
+         = Ring.Sum(r, (i : ℕ) ↦ (p[i] * q[k ∸ i]), k)
                by Polynomial.nth_multiply
-         = Ring.Sum(r, (i : Natural) ↦ (p[k ∸ i] * q[k ∸ (k ∸ i)]), k)
+         = Ring.Sum(r, (i : ℕ) ↦ (p[k ∸ i] * q[k ∸ (k ∸ i)]), k)
                by Ring.Sum.reverse
-         = Ring.Sum(r, (i : Natural) ↦ (q[i] * p[k ∸ i]), k)
-               by ((i : Natural) (smaller : i ≤ k) ↦
+         = Ring.Sum(r, (i : ℕ) ↦ (q[i] * p[k ∸ i]), k)
+               by ((i : ℕ) (smaller : i ≤ k) ↦
                       (p[k ∸ i] * q[k ∸ (k ∸ i)])
                          = (p[k ∸ i] * q[i])
                          = (q[i] * p[k ∸ i])

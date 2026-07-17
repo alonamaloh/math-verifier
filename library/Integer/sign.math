@@ -28,45 +28,45 @@ import Integer.absolute_value
 
 -- Helper: subtracting at the representative level (when b ≤ a) gives
 -- a representative equivalent to the natural difference.
--- Specifically: mk(make(a, b)) = (k : Integer) where a = b + k.
+-- Specifically: mk(make(a, b)) = (k : ℤ) where a = b + k.
 theorem Integer.from_subtraction_witness
-        (a b k : Natural)
+        (a b k : ℕ)
         (witnessEquation : a = b + k)
         : Integer.from_difference(a, b)
-          = (k : Integer) := {
-  -- `(k : Integer)` is `from_difference(k, 0)`; the boundary needs the
+          = (k : ℤ) := {
+  -- `(k : ℤ)` is `from_difference(k, 0)`; the boundary needs the
   -- cross-equation `a + 0 = b + k`.
   a + 0 = b + k;
   done
 }
 
 -- Helper: when a ≤ b, mk(make(a, b)) is the negation of a Natural image.
--- Specifically: mk(make(a, b)) = -(k : Integer) where b = a + k.
+-- Specifically: mk(make(a, b)) = -(k : ℤ) where b = a + k.
 theorem Integer.from_reverse_subtraction_witness
-        (a b k : Natural)
+        (a b k : ℕ)
         (witnessEquation : b = a + k)
         : Integer.from_difference(a, b)
-          = -(k : Integer) := {
-  -- `-(k : Integer)` is `from_difference(0, k)`; the boundary needs the
+          = -(k : ℤ) := {
+  -- `-(k : ℤ)` is `from_difference(0, k)`; the boundary needs the
   -- cross-equation `a + k = b + 0`.
   a + k = b + 0;
   done
 }
 
 -- The two disjuncts as named propositions (avoid huge inline forms).
-definition Integer.MkIsNonneg (a b : Natural) : Proposition :=
-  ∃ (k : Natural).
+definition Integer.MkIsNonneg (a b : ℕ) : Proposition :=
+  ∃ (k : ℕ).
     Integer.from_difference(a, b)
-    = (k : Integer)
+    = (k : ℤ)
 
-definition Integer.MkIsNegated (a b : Natural) : Proposition :=
-  ∃ (k : Natural).
+definition Integer.MkIsNegated (a b : ℕ) : Proposition :=
+  ∃ (k : ℕ).
     Integer.from_difference(a, b)
-    = -(k : Integer)
+    = -(k : ℤ)
 
 -- Sign trichotomy at the representative level.
 theorem Integer.sign_split_at_representative
-        (a b : Natural)
+        (a b : ℕ)
         : Integer.MkIsNonneg(a, b) ∨ Integer.MkIsNegated(a, b) :=
   { a ≤ b ∨ b ≤ a;
   done by cases {
@@ -87,11 +87,11 @@ theorem Integer.sign_split_at_representative
   } }
 
 -- The sign-split motive on Integers.
-definition Integer.SignSplitProp (y : Integer) : Proposition :=
-  Integer.IsNonneg(y) ∨ ∃ (k : Natural). y = -(k : Integer)
+definition Integer.SignSplitProp (y : ℤ) : Proposition :=
+  Integer.IsNonneg(y) ∨ ∃ (k : ℕ). y = -(k : ℤ)
 
 -- Top-level sign split via Quotient.induct.
-theorem Integer.sign_split (x : Integer) : Integer.SignSplitProp(x) :=
+theorem Integer.sign_split (x : ℤ) : Integer.SignSplitProp(x) :=
   by_representatives x as ⟨a, b⟩ => {
     Integer.MkIsNonneg(a, b) ∨ Integer.MkIsNegated(a, b);
     done
@@ -99,10 +99,10 @@ theorem Integer.sign_split (x : Integer) : Integer.SignSplitProp(x) :=
 
 -- ----------------------------------------------------------------------
 -- The Natural-to-Integer embedding is injective.
-theorem Natural.to_integer.injective (n m : Natural)
-        (embeddingEquality : (n : Integer) = (m : Integer))
+theorem Natural.to_integer.injective (n m : ℕ)
+        (embeddingEquality : (n : ℤ) = (m : ℤ))
         : n = m :=
-  -- `(n : Integer) = (m : Integer)` is `from_difference(n, 0) =
+  -- `(n : ℤ) = (m : ℤ)` is `from_difference(n, 0) =
   -- from_difference(m, 0)`; the boundary reads it back as `n + 0 = 0 + m`.
   n
      = n + 0
@@ -111,28 +111,28 @@ theorem Natural.to_integer.injective (n m : Natural)
 
 -- ----------------------------------------------------------------------
 -- The key cancellation/sign lemma for Rational.IsNonneg_respect:
--- if `(a : Integer) * (d2 + 1 : Integer) = -(k : Integer) *
--- (d1 + 1 : Integer)`, then k = zero.
+-- if `(a : ℤ) * (d2 + 1 : ℤ) = -(k : ℤ) *
+-- (d1 + 1 : ℤ)`, then k = zero.
 theorem Integer.natural_eq_negate_natural_implies_both_zero
-        (a k d1 d2 : Natural)
+        (a k d1 d2 : ℕ)
         (mixedEquality
-            : (a : Integer) * (d2 + 1 : Integer)
-              = -(k : Integer) * (d1 + 1 : Integer))
+            : (a : ℤ) * (d2 + 1 : ℤ)
+              = -(k : ℤ) * (d1 + 1 : ℤ))
         : k = 0 := {
-    -(k : Integer) * (d1 + 1 : Integer)
-       = -((k : Integer) * (d1 + 1 : Integer))
-       = -(k * (d1 + 1) : Integer);
+    -(k : ℤ) * (d1 + 1 : ℤ)
+       = -((k : ℤ) * (d1 + 1 : ℤ))
+       = -(k * (d1 + 1) : ℤ);
     -- Combine with the hypothesis: (a·(d2+1) : ℤ) = -(k·(d1+1) : ℤ).
-    (a * (d2 + 1) : Integer)
-              = (a : Integer) * (d2 + 1 : Integer)
-              = -(k : Integer) * (d1 + 1 : Integer)
-              = -(k * (d1 + 1) : Integer);
+    (a * (d2 + 1) : ℤ)
+              = (a : ℤ) * (d2 + 1 : ℤ)
+              = -(k : ℤ) * (d1 + 1 : ℤ)
+              = -(k * (d1 + 1) : ℤ);
     -- Move the negated term across: the sum of the two naturals vanishes.
-    (a * (d2 + 1) + k * (d1 + 1) : Integer)
-       = (a * (d2 + 1) : Integer)
-         + (k * (d1 + 1) : Integer)
-       = -(k * (d1 + 1) : Integer)
-         + (k * (d1 + 1) : Integer)
+    (a * (d2 + 1) + k * (d1 + 1) : ℤ)
+       = (a * (d2 + 1) : ℤ)
+         + (k * (d1 + 1) : ℤ)
+       = -(k * (d1 + 1) : ℤ)
+         + (k * (d1 + 1) : ℤ)
        = Integer.zero;
     a * (d2 + 1) + k * (d1 + 1) = 0;
     k * (d1 + 1) = 0;
@@ -145,49 +145,49 @@ theorem Integer.natural_eq_negate_natural_implies_both_zero
 -- fully general |x*y| = |x|*|y| can wait.
 
 theorem Integer.absolute_value_multiply_by_positive_natural
-        (x : Integer) (d : Natural)
-        : abs(x * (d + 1 : Integer))
-          = abs(x) * (d + 1 : Integer) :=
-  { Integer.IsNonneg(x) ∨ (∃ (k : Natural). x = -(k : Integer))
+        (x : ℤ) (d : ℕ)
+        : abs(x * (d + 1 : ℤ))
+          = abs(x) * (d + 1 : ℤ) :=
+  { Integer.IsNonneg(x) ∨ (∃ (k : ℕ). x = -(k : ℤ))
       by Integer.sign_split;
   done by cases {
     case Integer.IsNonneg(x) as xIsNonneg: {
-        choose a such that x = (a : Integer) from xIsNonneg;
+        choose a such that x = (a : ℤ) from xIsNonneg;
         -- |x * (d+1)| = |(a : I) * ((d+1) : I)|
         -- = |(a * (d+1) : I)| = (a * (d+1) : I)
         -- = (a : I) * ((d+1) : I) = |x| * ((d+1) : I).
         abs(
-                 x * (d + 1 : Integer))
+                 x * (d + 1 : ℤ))
            = abs(
-                 (a : Integer) * (d + 1 : Integer))
+                 (a : ℤ) * (d + 1 : ℤ))
            = abs(
-                 (a * (d + 1) : Integer))
-           = (a * (d + 1) : Integer)
-           = (a : Integer) * (d + 1 : Integer)
-           = abs((a : Integer))
-             * (d + 1 : Integer)
-           = abs(x) * (d + 1 : Integer)
+                 (a * (d + 1) : ℤ))
+           = (a * (d + 1) : ℤ)
+           = (a : ℤ) * (d + 1 : ℤ)
+           = abs((a : ℤ))
+             * (d + 1 : ℤ)
+           = abs(x) * (d + 1 : ℤ)
     }
-    case ∃ (k : Natural). x = -(k : Integer) as xNegEvidence: {
-        choose k such that x = -(k : Integer) from xNegEvidence;
+    case ∃ (k : ℕ). x = -(k : ℤ) as xNegEvidence: {
+        choose k such that x = -(k : ℤ) from xNegEvidence;
         -- |x * (d+1)| = |-(k : I) * ((d+1) : I)|
         -- = |-((k : I) * ((d+1) : I))| = |(k * (d+1) : I)|
         -- = (k * (d+1) : I) = (k : I) * ((d+1) : I)
         -- = |(k : I)| * ((d+1) : I) = |-(k : I)| * ((d+1) : I)
         -- = |x| * ((d+1) : I).
         abs(
-                 x * (d + 1 : Integer))
+                 x * (d + 1 : ℤ))
            = abs(
-                 -(k : Integer) * (d + 1 : Integer))
+                 -(k : ℤ) * (d + 1 : ℤ))
            = abs(
-                 -((k : Integer) * (d + 1 : Integer)))
+                 -((k : ℤ) * (d + 1 : ℤ)))
            = abs(
-                 (k : Integer) * (d + 1 : Integer))
-           = abs((k * (d + 1) : Integer))
-           = (k * (d + 1) : Integer)
-           = (k : Integer) * (d + 1 : Integer)
-           = abs(-(k : Integer))
-             * (d + 1 : Integer)
-           = abs(x) * (d + 1 : Integer)
+                 (k : ℤ) * (d + 1 : ℤ))
+           = abs((k * (d + 1) : ℤ))
+           = (k * (d + 1) : ℤ)
+           = (k : ℤ) * (d + 1 : ℤ)
+           = abs(-(k : ℤ))
+             * (d + 1 : ℤ)
+           = abs(x) * (d + 1 : ℤ)
     }
   } }

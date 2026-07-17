@@ -71,15 +71,15 @@ import ComplexNumber.completeness
 -- coordinates, and it is bounded by the modulus).
 
 theorem ComplexNumber.SequenceConverges.realPart
-        (s : Natural → ComplexNumber) (limit : ComplexNumber)
+        (s : ℕ → ℂ) (limit : ℂ)
         (converges : ComplexNumber.SequenceConverges(s, limit))
         : Real.SequenceConverges(
-              (n : Natural) ↦ ComplexNumber.realPart(s(n)),
+              (n : ℕ) ↦ ComplexNumber.realPart(s(n)),
               ComplexNumber.realPart(limit)) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
     choose threshold as close from converges(ε, εPositive);
     witness threshold with
-        (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
+        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦ {
           ComplexNumber.realPart(s(m) - limit)
               = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit) as differencePart;
           abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(limit))
@@ -93,15 +93,15 @@ theorem ComplexNumber.SequenceConverges.realPart
   }
 
 theorem ComplexNumber.SequenceConverges.imaginaryPart
-        (s : Natural → ComplexNumber) (limit : ComplexNumber)
+        (s : ℕ → ℂ) (limit : ℂ)
         (converges : ComplexNumber.SequenceConverges(s, limit))
         : Real.SequenceConverges(
-              (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
+              (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)),
               ComplexNumber.imaginaryPart(limit)) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
     choose threshold as close from converges(ε, εPositive);
     witness threshold with
-        (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
+        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦ {
           ComplexNumber.imaginaryPart(s(m) - limit)
               = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit) as differencePart;
           abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(limit))
@@ -119,26 +119,26 @@ theorem ComplexNumber.SequenceConverges.imaginaryPart
 -- a limit reassembles, with an ε/2 budget per coordinate.
 
 theorem ComplexNumber.SequenceConverges.of_coordinates
-        (s : Natural → ComplexNumber) (limit : ComplexNumber)
+        (s : ℕ → ℂ) (limit : ℂ)
         (realConverges
             : Real.SequenceConverges(
-                  (n : Natural) ↦ ComplexNumber.realPart(s(n)),
+                  (n : ℕ) ↦ ComplexNumber.realPart(s(n)),
                   ComplexNumber.realPart(limit)))
         (imaginaryConverges
             : Real.SequenceConverges(
-                  (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
+                  (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)),
                   ComplexNumber.imaginaryPart(limit)))
         : ComplexNumber.SequenceConverges(s, limit) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
-    (2 : Real) > 0;
-    (2 : Real) ≠ 0;
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
+    (2 : ℝ) > 0;
+    (2 : ℝ) ≠ 0;
     ε / 2 > 0 as halfPositive;
     choose realThreshold as realClose
         from realConverges(ε / 2, halfPositive);
     choose imaginaryThreshold as imaginaryClose
         from imaginaryConverges(ε / 2, halfPositive);
     witness Natural.maximum(realThreshold, imaginaryThreshold) with
-        (m : Natural)
+        (m : ℕ)
         (aboveMaximum : Natural.maximum(realThreshold, imaginaryThreshold) ≤ m) ↦ {
           realThreshold ≤ m by Natural.le_through_max_left as realAbove;
           imaginaryThreshold ≤ m by Natural.le_through_max_right as imaginaryAbove;
@@ -171,14 +171,14 @@ theorem ComplexNumber.SequenceConverges.of_coordinates
 -- ----------------------------------------------------------------------
 -- Convergence only reads the terms.
 theorem ComplexNumber.SequenceConverges.of_pointwise
-        (s t : Natural → ComplexNumber) (limit : ComplexNumber)
-        (pointwiseEqual : ∀ (n : Natural). s(n) = t(n))
+        (s t : ℕ → ℂ) (limit : ℂ)
+        (pointwiseEqual : ∀ (n : ℕ). s(n) = t(n))
         (sConverges : ComplexNumber.SequenceConverges(s, limit))
         : ComplexNumber.SequenceConverges(t, limit) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
     choose threshold as close from sConverges(ε, εPositive);
     witness threshold with
-        (m : Natural) (aboveThreshold : threshold ≤ m) ↦
+        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦
           abs(t(m) - limit)
              = abs(s(m) - limit)    by pointwiseEqual(m)
              < ε              by close(m, aboveThreshold)
@@ -187,21 +187,21 @@ theorem ComplexNumber.SequenceConverges.of_pointwise
 -- ----------------------------------------------------------------------
 -- Sum of limits: each summand within ε/2 puts the sum within ε.
 theorem ComplexNumber.SequenceConverges.add
-        (s t : Natural → ComplexNumber) (sLimit tLimit : ComplexNumber)
+        (s t : ℕ → ℂ) (sLimit tLimit : ℂ)
         (sConverges : ComplexNumber.SequenceConverges(s, sLimit))
         (tConverges : ComplexNumber.SequenceConverges(t, tLimit))
         : ComplexNumber.SequenceConverges(
-              (n : Natural) ↦ s(n) + t(n), sLimit + tLimit) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
-    (2 : Real) > 0;
-    (2 : Real) ≠ 0;
+              (n : ℕ) ↦ s(n) + t(n), sLimit + tLimit) :=
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
+    (2 : ℝ) > 0;
+    (2 : ℝ) ≠ 0;
     ε / 2 > 0 as halfPositive;
     choose sThreshold as sClose
         from sConverges(ε / 2, halfPositive);
     choose tThreshold as tClose
         from tConverges(ε / 2, halfPositive);
     witness Natural.maximum(sThreshold, tThreshold) with
-        (m : Natural)
+        (m : ℕ)
         (aboveMaximum : Natural.maximum(sThreshold, tThreshold) ≤ m) ↦ {
           sThreshold ≤ m by Natural.le_through_max_left as sAbove;
           tThreshold ≤ m by Natural.le_through_max_right as tAbove;
@@ -227,55 +227,55 @@ theorem ComplexNumber.SequenceConverges.add
 -- Negating a sequence negates its limit: the coordinates negate, and
 -- the real algebra carries them.
 theorem ComplexNumber.SequenceConverges.negate
-        (s : Natural → ComplexNumber) (sLimit : ComplexNumber)
+        (s : ℕ → ℂ) (sLimit : ℂ)
         (sConverges : ComplexNumber.SequenceConverges(s, sLimit))
-        : ComplexNumber.SequenceConverges((n : Natural) ↦ -s(n), -sLimit) := {
+        : ComplexNumber.SequenceConverges((n : ℕ) ↦ -s(n), -sLimit) := {
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.realPart(s(n)),
+      (n : ℕ) ↦ ComplexNumber.realPart(s(n)),
       ComplexNumber.realPart(sLimit))
       by ComplexNumber.SequenceConverges.realPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
+      (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)),
       ComplexNumber.imaginaryPart(sLimit))
       by ComplexNumber.SequenceConverges.imaginaryPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ -ComplexNumber.realPart(s(n)),
+      (n : ℕ) ↦ -ComplexNumber.realPart(s(n)),
       -ComplexNumber.realPart(sLimit))
-      by Real.SequenceConverges.negate(s := (n : Natural) ↦ ComplexNumber.realPart(s(n)));
+      by Real.SequenceConverges.negate(s := (n : ℕ) ↦ ComplexNumber.realPart(s(n)));
   Real.SequenceConverges(
-      (n : Natural) ↦ -ComplexNumber.imaginaryPart(s(n)),
+      (n : ℕ) ↦ -ComplexNumber.imaginaryPart(s(n)),
       -ComplexNumber.imaginaryPart(sLimit))
-      by Real.SequenceConverges.negate(s := (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)));
-  ∀ (n : Natural).
+      by Real.SequenceConverges.negate(s := (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)));
+  ∀ (n : ℕ).
       -ComplexNumber.realPart(s(n)) = ComplexNumber.realPart(-s(n))
-      by (n : Natural) ↦ {
+      by (n : ℕ) ↦ {
            ComplexNumber.realPart(-s(n)) = -ComplexNumber.realPart(s(n));
            done
          } as realPointwise;
-  ∀ (n : Natural).
+  ∀ (n : ℕ).
       -ComplexNumber.imaginaryPart(s(n)) = ComplexNumber.imaginaryPart(-s(n))
-      by (n : Natural) ↦ {
+      by (n : ℕ) ↦ {
            ComplexNumber.imaginaryPart(-s(n)) = -ComplexNumber.imaginaryPart(s(n));
            done
          } as imaginaryPointwise;
   -ComplexNumber.realPart(sLimit) = ComplexNumber.realPart(-sLimit) as limitRealPart;
   -ComplexNumber.imaginaryPart(sLimit) = ComplexNumber.imaginaryPart(-sLimit) as limitImaginaryPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.realPart(-s(n)),
+      (n : ℕ) ↦ ComplexNumber.realPart(-s(n)),
       ComplexNumber.realPart(-sLimit))
       by {
         Real.SequenceConverges(
-            (n : Natural) ↦ ComplexNumber.realPart(-s(n)),
+            (n : ℕ) ↦ ComplexNumber.realPart(-s(n)),
             -ComplexNumber.realPart(sLimit))
             by Real.SequenceConverges.of_pointwise(pointwiseEqual := realPointwise);
         done by substituting limitRealPart
       };
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.imaginaryPart(-s(n)),
+      (n : ℕ) ↦ ComplexNumber.imaginaryPart(-s(n)),
       ComplexNumber.imaginaryPart(-sLimit))
       by {
         Real.SequenceConverges(
-            (n : Natural) ↦ ComplexNumber.imaginaryPart(-s(n)),
+            (n : ℕ) ↦ ComplexNumber.imaginaryPart(-s(n)),
             -ComplexNumber.imaginaryPart(sLimit))
             by Real.SequenceConverges.of_pointwise(pointwiseEqual := imaginaryPointwise);
         done by substituting limitImaginaryPart
@@ -289,64 +289,64 @@ theorem ComplexNumber.SequenceConverges.negate
 -- of the coordinates, and each combination converges by the real
 -- algebra of limits.
 theorem ComplexNumber.SequenceConverges.multiply
-        (s t : Natural → ComplexNumber) (sLimit tLimit : ComplexNumber)
+        (s t : ℕ → ℂ) (sLimit tLimit : ℂ)
         (sConverges : ComplexNumber.SequenceConverges(s, sLimit))
         (tConverges : ComplexNumber.SequenceConverges(t, tLimit))
         : ComplexNumber.SequenceConverges(
-              (n : Natural) ↦ s(n) * t(n), sLimit * tLimit) := {
+              (n : ℕ) ↦ s(n) * t(n), sLimit * tLimit) := {
   -- The four coordinate sequences converge.
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.realPart(s(n)),
+      (n : ℕ) ↦ ComplexNumber.realPart(s(n)),
       ComplexNumber.realPart(sLimit))
       by ComplexNumber.SequenceConverges.realPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
+      (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)),
       ComplexNumber.imaginaryPart(sLimit))
       by ComplexNumber.SequenceConverges.imaginaryPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.realPart(t(n)),
+      (n : ℕ) ↦ ComplexNumber.realPart(t(n)),
       ComplexNumber.realPart(tLimit))
       by ComplexNumber.SequenceConverges.realPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.imaginaryPart(t(n)),
+      (n : ℕ) ↦ ComplexNumber.imaginaryPart(t(n)),
       ComplexNumber.imaginaryPart(tLimit))
       by ComplexNumber.SequenceConverges.imaginaryPart;
   -- The real coordinate of the product: re·re′ − im·im′.
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.realPart(s(n)) * ComplexNumber.realPart(t(n)),
+      (n : ℕ) ↦ ComplexNumber.realPart(s(n)) * ComplexNumber.realPart(t(n)),
       ComplexNumber.realPart(sLimit) * ComplexNumber.realPart(tLimit))
       by Real.SequenceConverges.multiply(
-             s := (n : Natural) ↦ ComplexNumber.realPart(s(n)),
-             t := (n : Natural) ↦ ComplexNumber.realPart(t(n)));
+             s := (n : ℕ) ↦ ComplexNumber.realPart(s(n)),
+             t := (n : ℕ) ↦ ComplexNumber.realPart(t(n)));
   Real.SequenceConverges(
-      (n : Natural) ↦
+      (n : ℕ) ↦
           ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.imaginaryPart(t(n)),
       ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.imaginaryPart(tLimit))
       by Real.SequenceConverges.multiply(
-             s := (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
-             t := (n : Natural) ↦ ComplexNumber.imaginaryPart(t(n)));
+             s := (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)),
+             t := (n : ℕ) ↦ ComplexNumber.imaginaryPart(t(n)));
   Real.SequenceConverges(
-      (n : Natural) ↦
+      (n : ℕ) ↦
           -(ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.imaginaryPart(t(n))),
       -(ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.imaginaryPart(tLimit)))
       by Real.SequenceConverges.negate(
-             s := (n : Natural) ↦
+             s := (n : ℕ) ↦
                  ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.imaginaryPart(t(n)));
   Real.SequenceConverges(
-      (n : Natural) ↦
+      (n : ℕ) ↦
           ComplexNumber.realPart(s(n)) * ComplexNumber.realPart(t(n))
           + -(ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.imaginaryPart(t(n))),
       ComplexNumber.realPart(sLimit) * ComplexNumber.realPart(tLimit)
       + -(ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.imaginaryPart(tLimit)))
       by Real.SequenceConverges.add(
-             s := (n : Natural) ↦ ComplexNumber.realPart(s(n)) * ComplexNumber.realPart(t(n)),
-             t := (n : Natural) ↦
+             s := (n : ℕ) ↦ ComplexNumber.realPart(s(n)) * ComplexNumber.realPart(t(n)),
+             t := (n : ℕ) ↦
                  -(ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.imaginaryPart(t(n))));
-  ∀ (n : Natural).
+  ∀ (n : ℕ).
       ComplexNumber.realPart(s(n)) * ComplexNumber.realPart(t(n))
             + -(ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.imaginaryPart(t(n)))
         = ComplexNumber.realPart(s(n) * t(n))
-      by (n : Natural) ↦ {
+      by (n : ℕ) ↦ {
            ComplexNumber.realPart(s(n) * t(n))
                  = ComplexNumber.realPart(s(n)) * ComplexNumber.realPart(t(n))
                    - ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.imaginaryPart(t(n));
@@ -362,11 +362,11 @@ theorem ComplexNumber.SequenceConverges.multiply
         done
       } as limitRealPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.realPart(s(n) * t(n)),
+      (n : ℕ) ↦ ComplexNumber.realPart(s(n) * t(n)),
       ComplexNumber.realPart(sLimit * tLimit))
       by {
         Real.SequenceConverges(
-            (n : Natural) ↦ ComplexNumber.realPart(s(n) * t(n)),
+            (n : ℕ) ↦ ComplexNumber.realPart(s(n) * t(n)),
             ComplexNumber.realPart(sLimit) * ComplexNumber.realPart(tLimit)
             + -(ComplexNumber.imaginaryPart(sLimit)
                     * ComplexNumber.imaginaryPart(tLimit)))
@@ -375,35 +375,35 @@ theorem ComplexNumber.SequenceConverges.multiply
       };
   -- The imaginary coordinate of the product: re·im′ + im·re′.
   Real.SequenceConverges(
-      (n : Natural) ↦
+      (n : ℕ) ↦
           ComplexNumber.realPart(s(n)) * ComplexNumber.imaginaryPart(t(n)),
       ComplexNumber.realPart(sLimit) * ComplexNumber.imaginaryPart(tLimit))
       by Real.SequenceConverges.multiply(
-             s := (n : Natural) ↦ ComplexNumber.realPart(s(n)),
-             t := (n : Natural) ↦ ComplexNumber.imaginaryPart(t(n)));
+             s := (n : ℕ) ↦ ComplexNumber.realPart(s(n)),
+             t := (n : ℕ) ↦ ComplexNumber.imaginaryPart(t(n)));
   Real.SequenceConverges(
-      (n : Natural) ↦
+      (n : ℕ) ↦
           ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.realPart(t(n)),
       ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.realPart(tLimit))
       by Real.SequenceConverges.multiply(
-             s := (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)),
-             t := (n : Natural) ↦ ComplexNumber.realPart(t(n)));
+             s := (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)),
+             t := (n : ℕ) ↦ ComplexNumber.realPart(t(n)));
   Real.SequenceConverges(
-      (n : Natural) ↦
+      (n : ℕ) ↦
           ComplexNumber.realPart(s(n)) * ComplexNumber.imaginaryPart(t(n))
           + ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.realPart(t(n)),
       ComplexNumber.realPart(sLimit) * ComplexNumber.imaginaryPart(tLimit)
       + ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.realPart(tLimit))
       by Real.SequenceConverges.add(
-             s := (n : Natural) ↦
+             s := (n : ℕ) ↦
                  ComplexNumber.realPart(s(n)) * ComplexNumber.imaginaryPart(t(n)),
-             t := (n : Natural) ↦
+             t := (n : ℕ) ↦
                  ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.realPart(t(n)));
-  ∀ (n : Natural).
+  ∀ (n : ℕ).
       ComplexNumber.realPart(s(n)) * ComplexNumber.imaginaryPart(t(n))
             + ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.realPart(t(n))
         = ComplexNumber.imaginaryPart(s(n) * t(n))
-      by (n : Natural) ↦ {
+      by (n : ℕ) ↦ {
            ComplexNumber.imaginaryPart(s(n) * t(n))
                  = ComplexNumber.realPart(s(n)) * ComplexNumber.imaginaryPart(t(n))
                    + ComplexNumber.imaginaryPart(s(n)) * ComplexNumber.realPart(t(n));
@@ -413,11 +413,11 @@ theorem ComplexNumber.SequenceConverges.multiply
         + ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.realPart(tLimit)
     = ComplexNumber.imaginaryPart(sLimit * tLimit) as limitImaginaryPart;
   Real.SequenceConverges(
-      (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n) * t(n)),
+      (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n) * t(n)),
       ComplexNumber.imaginaryPart(sLimit * tLimit))
       by {
         Real.SequenceConverges(
-            (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n) * t(n)),
+            (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n) * t(n)),
             ComplexNumber.realPart(sLimit) * ComplexNumber.imaginaryPart(tLimit)
             + ComplexNumber.imaginaryPart(sLimit) * ComplexNumber.realPart(tLimit))
             by Real.SequenceConverges.of_pointwise(pointwiseEqual := imaginaryPointwise);
@@ -430,20 +430,20 @@ theorem ComplexNumber.SequenceConverges.multiply
 -- The squeeze at zero: a ℂ-sequence dominated in modulus by a real
 -- sequence that vanishes also vanishes.
 theorem ComplexNumber.SequenceConverges.squeeze_zero
-        (v : Natural → ComplexNumber) (u : Natural → Real)
-        (dominated : ∀ (n : Natural). abs(v(n)) ≤ u(n))
+        (v : ℕ → ℂ) (u : ℕ → ℝ)
+        (dominated : ∀ (n : ℕ). abs(v(n)) ≤ u(n))
         (uVanishes : Real.SequenceConverges(u, Real.zero))
         : ComplexNumber.SequenceConverges(
               v,
               RingModulo.zero(Real.polynomial_commutative_ring,
                   Complex.definingPolynomial)) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
-    let zero : ComplexNumber :=
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
+    let zero : ℂ :=
         RingModulo.zero(Real.polynomial_commutative_ring,
             Complex.definingPolynomial);
     choose threshold as close from uVanishes(ε, εPositive);
     witness threshold with
-        (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
+        (m : ℕ) (aboveThreshold : threshold ≤ m) ↦ {
           u(m) ≤ abs(u(m)) by Real.LessOrEqual_absolute_value;
           abs(v(m) - zero)
              = abs(v(m))

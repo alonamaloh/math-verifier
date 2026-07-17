@@ -24,16 +24,16 @@ import Natural.strong_recursion
 
 -- A minimal witness: a point where the predicate holds with nothing
 -- below it doing so.
-theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
-        : ∀ (n : Natural). predicate(n)
-          → ∃ (minimum : Natural).
+theorem Natural.least_witness_minimal (predicate : ℕ → Proposition)
+        : ∀ (n : ℕ). predicate(n)
+          → ∃ (minimum : ℕ).
               predicate(minimum)
-              ∧ (∀ (k : Natural). k < minimum → ¬predicate(k)) := {
-  take n : Natural;
+              ∧ (∀ (k : ℕ). k < minimum → ¬predicate(k)) := {
+  take n : ℕ;
   by strong induction on n with subject, inductionHypothesis {
     suppose predicate(subject) as predicateAtSubject;
     done by cases {
-      case ∃ (smaller : Natural). smaller < subject ∧ predicate(smaller) as someSmaller: {
+      case ∃ (smaller : ℕ). smaller < subject ∧ predicate(smaller) as someSmaller: {
           choose smaller such that smaller < subject ∧ predicate(smaller)
               from someSmaller;
           smaller < subject as smallerBelowSubject;
@@ -41,10 +41,10 @@ theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
           inductionHypothesis(smaller, smallerBelowSubject, predicateAtSmaller)
         }
       otherwise as noneSmaller: {
-          ∀ (k : Natural). k < subject → ¬predicate(k)
-              by (k : Natural) (kLessSubject : k < subject)
+          ∀ (k : ℕ). k < subject → ¬predicate(k)
+              by (k : ℕ) (kLessSubject : k < subject)
                      (predicateAtK : predicate(k)) ↦ {
-                   ∃ (smaller : Natural). smaller < subject ∧ predicate(smaller)
+                   ∃ (smaller : ℕ). smaller < subject ∧ predicate(smaller)
                        by { witness k with And.introduction(kLessSubject, predicateAtK) }
                        as existsSmaller;
                    noneSmaller(existsSmaller)
@@ -58,20 +58,20 @@ theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
 -- The least-number principle proper: a least point in the `≤` sense.
 -- Anything strictly below the minimal witness would contradict
 -- minimality, so by trichotomy the minimum is ≤ every other witness.
-theorem Natural.least_witness (predicate : Natural → Proposition)
-        (n : Natural) (witnessAtN : predicate(n))
-        : ∃ (minimum : Natural).
-            predicate(minimum) ∧ (∀ (k : Natural). predicate(k) → minimum ≤ k) := {
-  ∃ (minimum : Natural).
-      predicate(minimum) ∧ (∀ (k : Natural). k < minimum → ¬predicate(k))
+theorem Natural.least_witness (predicate : ℕ → Proposition)
+        (n : ℕ) (witnessAtN : predicate(n))
+        : ∃ (minimum : ℕ).
+            predicate(minimum) ∧ (∀ (k : ℕ). predicate(k) → minimum ≤ k) := {
+  ∃ (minimum : ℕ).
+      predicate(minimum) ∧ (∀ (k : ℕ). k < minimum → ¬predicate(k))
       by Natural.least_witness_minimal as minimalWitness;
   choose minimum such that
-      predicate(minimum) ∧ (∀ (k : Natural). k < minimum → ¬predicate(k))
+      predicate(minimum) ∧ (∀ (k : ℕ). k < minimum → ¬predicate(k))
       from minimalWitness;
   predicate(minimum) as predicateAtMinimum;
-  ∀ (k : Natural). k < minimum → ¬predicate(k);
-  ∀ (k : Natural). predicate(k) → minimum ≤ k
-      by (k : Natural) (predicateAtK : predicate(k)) ↦ {
+  ∀ (k : ℕ). k < minimum → ¬predicate(k);
+  ∀ (k : ℕ). predicate(k) → minimum ≤ k
+      by (k : ℕ) (predicateAtK : predicate(k)) ↦ {
            k < minimum ∨ k = minimum ∨ minimum < k
                by Natural.lt_trichotomy;
            done by cases {

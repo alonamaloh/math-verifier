@@ -22,11 +22,11 @@ import Natural.monus
 import Natural.add_order
 import Equality.basics
 
-definition Natural.distance (a b : Natural) : Natural :=
+definition Natural.distance (a b : ℕ) : ℕ :=
   (a ∸ b) + (b ∸ a)
 
 -- distance(0, b) = b. The forward difference vanishes; the backward one is b.
-theorem Natural.distance_zero_left (b : Natural)
+theorem Natural.distance_zero_left (b : ℕ)
         : Natural.distance(0, b) = b :=
   Natural.distance(0, b)
      = (0 ∸ b) + (b ∸ 0)
@@ -34,7 +34,7 @@ theorem Natural.distance_zero_left (b : Natural)
      = b
 
 -- distance(a, 0) = a. Symmetric to distance_zero_left.
-theorem Natural.distance_zero_right (a : Natural) : Natural.distance(a, 0) = a :=
+theorem Natural.distance_zero_right (a : ℕ) : Natural.distance(a, 0) = a :=
   Natural.distance(a, 0)
      = (a ∸ 0) + (0 ∸ a)
      = a + 0
@@ -42,7 +42,7 @@ theorem Natural.distance_zero_right (a : Natural) : Natural.distance(a, 0) = a :
 
 -- The recursive step, now a characterising lemma: distance drops by one
 -- on each side. Both monus terms peel a leading successor.
-theorem Natural.distance_succ_succ (a b : Natural)
+theorem Natural.distance_succ_succ (a b : ℕ)
         : Natural.distance(successor(a), successor(b)) = Natural.distance(a, b) :=
   Natural.distance(successor(a), successor(b))
      = (successor(a) ∸ successor(b)) + (successor(b) ∸ successor(a))
@@ -52,7 +52,7 @@ theorem Natural.distance_succ_succ (a b : Natural)
 -- The `1 +` spelling of the recursive step, so proofs peel a 1 off both
 -- arguments without naming the constructor (the form `by induction`
 -- produces at its step case).
-theorem Natural.distance_one_plus_one_plus (a b : Natural)
+theorem Natural.distance_one_plus_one_plus (a b : ℕ)
         : Natural.distance(1 + a, 1 + b) = Natural.distance(a, b) :=
   Natural.distance(1 + a, 1 + b)
      = ((1 + a) ∸ (1 + b)) + ((1 + b) ∸ (1 + a))
@@ -60,14 +60,14 @@ theorem Natural.distance_one_plus_one_plus (a b : Natural)
      = Natural.distance(a, b)
 
 -- distance(a, a) = 0. Both truncated differences vanish.
-theorem Natural.distance_self (a : Natural) : Natural.distance(a, a) = 0 :=
+theorem Natural.distance_self (a : ℕ) : Natural.distance(a, a) = 0 :=
   Natural.distance(a, a)
      = (a ∸ a) + (a ∸ a)
      = 0 + 0
      = 0
 
 -- distance is symmetric: the two truncated differences just swap.
-theorem Natural.distance_symmetric (a b : Natural)
+theorem Natural.distance_symmetric (a b : ℕ)
         : Natural.distance(a, b) = Natural.distance(b, a) :=
   Natural.distance(a, b)
      = (a ∸ b) + (b ∸ a)
@@ -77,16 +77,16 @@ theorem Natural.distance_symmetric (a b : Natural)
 -- distance(a, b) ≤ a + b. Triangle inequality at Natural level.
 -- Induction on a; b stays polymorphic in the IH by binding it
 -- inside the inductive body.
-theorem Natural.distance_le_add (a : Natural)
-        : ∀ (b : Natural). Natural.distance(a, b) ≤ a + b :=
+theorem Natural.distance_le_add (a : ℕ)
+        : ∀ (b : ℕ). Natural.distance(a, b) ≤ a + b :=
   by induction on a with IH {
     case base:
-        (b : Natural) ↦
+        (b : ℕ) ↦
           Natural.distance(0, b)
              = b
              ≤ 0 + b
     case step(k):
-        (b : Natural) ↦
+        (b : ℕ) ↦
           done by cases {
             case b = 0:
                 Natural.distance(1 + k, 0)
@@ -104,7 +104,7 @@ theorem Natural.distance_le_add (a : Natural)
 
 -- Cancellation on the left: distance(b + c, b + d) = distance(c, d).
 -- Cancel the common summand b inside each truncated difference.
-theorem Natural.distance_add_left_cancel (b c d : Natural)
+theorem Natural.distance_add_left_cancel (b c d : ℕ)
         : Natural.distance(b + c, b + d) = Natural.distance(c, d) :=
   Natural.distance(b + c, b + d)
      = ((b + c) ∸ (b + d)) + ((b + d) ∸ (b + c))
@@ -113,7 +113,7 @@ theorem Natural.distance_add_left_cancel (b c d : Natural)
 
 -- Cancellation on the right: distance(a + b, c + b) = distance(a, c).
 -- Reduce to the left form via add_commutative.
-theorem Natural.distance_add_right_cancel (a b c : Natural)
+theorem Natural.distance_add_right_cancel (a b c : ℕ)
         : Natural.distance(a + b, c + b) = Natural.distance(a, c) :=
   Natural.distance(a + b, c + b)
      = Natural.distance(b + a, b + c)
@@ -121,7 +121,7 @@ theorem Natural.distance_add_right_cancel (a b c : Natural)
 
 -- Helper: distance(a + b, b) = a. Reorder to a common left summand
 -- `b`, then cancel it: distance(b + a, b + 0) = distance(a, 0) = a.
-theorem Natural.distance_add_self_right (a b : Natural)
+theorem Natural.distance_add_self_right (a b : ℕ)
         : Natural.distance(a + b, b) = a :=
   Natural.distance(a + b, b)
      = Natural.distance(b + a, b + 0)
@@ -130,7 +130,7 @@ theorem Natural.distance_add_self_right (a b : Natural)
 
 -- The symmetric companion: distance(b, a + b) = a. Symmetry of
 -- distance reduces it to the previous lemma.
-theorem Natural.distance_self_add_right (a b : Natural)
+theorem Natural.distance_self_add_right (a b : ℕ)
         : Natural.distance(b, a + b) = a :=
   Natural.distance(b, a + b)
      = Natural.distance(a + b, b)
@@ -140,16 +140,16 @@ theorem Natural.distance_self_add_right (a b : Natural)
 -- "distance ≤ z iff a ≤ c + z and c ≤ a + z" characterisation;
 -- proved standalone. Induction on a with b bound inside so the IH
 -- is polymorphic in b.
-theorem Natural.le_add_distance (a : Natural)
-        : ∀ (b : Natural). a ≤ b + Natural.distance(a, b) :=
-  unfold Natural.add, Natural in
+theorem Natural.le_add_distance (a : ℕ)
+        : ∀ (b : ℕ). a ≤ b + Natural.distance(a, b) :=
+  unfold Natural.add, ℕ in
   by induction on a with IH {
     case zero:
-        (b : Natural) ↦
+        (b : ℕ) ↦
           -- 0 ≤ b + distance(0, b) = b + b.
           done by Natural.zero_least
     case successor(k):
-        (b : Natural) ↦
+        (b : ℕ) ↦
           done by cases {
             case b = 0:
                 -- 1+k ≤ 0 + distance(1+k, 0) = 1+k. Reflexive.
@@ -167,15 +167,15 @@ theorem Natural.le_add_distance (a : Natural)
 -- distance(b, c). Induct on a; inner case-splits on c and b. Base
 -- cases use `le_add_distance` and `distance_le_add`; the recursive
 -- case (1+k, 1+b', 1+c') reduces all three distances by 1.
-theorem Natural.distance_triangle (a : Natural)
-        : ∀ (b c : Natural).
+theorem Natural.distance_triangle (a : ℕ)
+        : ∀ (b c : ℕ).
           Natural.distance(a, c)
             ≤ Natural.distance(a, b) + Natural.distance(b, c) :=
   unfold Natural.add in
   by induction on a with IH {
     case zero: {
-        take b : Natural;
-        take c : Natural;
+        take b : ℕ;
+        take c : ℕ;
         Natural.distance(0, c)
            = c
            ≤ b + Natural.distance(c, b)
@@ -183,7 +183,7 @@ theorem Natural.distance_triangle (a : Natural)
            = Natural.distance(0, b) + Natural.distance(b, c)
       }
     case successor(k):
-        (b c : Natural) ↦
+        (b c : ℕ) ↦
           done by cases {
             case c = 0:
                 Natural.distance(1 + k, 0)
@@ -213,7 +213,7 @@ theorem Natural.distance_triangle (a : Natural)
 -- distance(a + c, b + d) ≤ distance(a, b) + distance(c, d). Triangle
 -- through b + c, then cancellation on each summand. Bridges Natural-
 -- level metric structure to the Integer triangle inequality.
-theorem Natural.distance_add_triangle (a b c d : Natural)
+theorem Natural.distance_add_triangle (a b c d : ℕ)
         : Natural.distance(a + c, b + d)
           ≤ Natural.distance(a, b) + Natural.distance(c, d) :=
   Natural.distance(a + c, b + d)
@@ -227,7 +227,7 @@ theorem Natural.distance_add_triangle (a b c d : Natural)
 -- adding the common summand lets the hypothesis rewrite one argument,
 -- and cancelling it again lands on the other pair.
 theorem Natural.distance_respects_integer_equivalent
-        (a b c d : Natural) (hypothesis : a + d = b + c)
+        (a b c d : ℕ) (hypothesis : a + d = b + c)
         : Natural.distance(a, b) = Natural.distance(c, d) := {
   a ∸ b
      = (a + d) ∸ (b + d)

@@ -34,15 +34,15 @@ import Natural.arithmetic
 -- integer; the quotient below identifies them.
 inductive IntegerRepresentative : Type(0) where
   | IntegerRepresentative.make
-      : Natural → Natural → IntegerRepresentative
+      : ℕ → ℕ → IntegerRepresentative
 
 -- Projections — the positive and negative parts. These are the *only*
 -- pattern-matches on a representative; the equivalence and its proofs go
 -- through them, so they read as "the positive part of x", never
 -- "destructure x".
-definition IntegerRepresentative.positivePart : IntegerRepresentative → Natural
+definition IntegerRepresentative.positivePart : IntegerRepresentative → ℕ
   | IntegerRepresentative.make(positive, negative) => positive
-definition IntegerRepresentative.negativePart : IntegerRepresentative → Natural
+definition IntegerRepresentative.negativePart : IntegerRepresentative → ℕ
   | IntegerRepresentative.make(positive, negative) => negative
 
 -- (a, b) ~ (c, d) iff a + d = b + c — their differences `a - b`, `c - d`
@@ -70,8 +70,8 @@ theorem IntegerEquivalent.reflexive (x : IntegerRepresentative)
         : IntegerEquivalent(x, x) :=
   done
 
--- Symmetry kernel at the Natural level: a + d = b + c gives c + b = d + a.
-theorem IntegerEquivalent.symmetric_natural (a b c d : Natural)
+-- Symmetry kernel at the ℕ level: a + d = b + c gives c + b = d + a.
+theorem IntegerEquivalent.symmetric_natural (a b c d : ℕ)
         (crossEquation : a + d = b + c) : c + b = d + a :=
   c + b
      = b + c
@@ -83,11 +83,11 @@ theorem IntegerEquivalent.symmetric (x y : IntegerRepresentative)
         : IntegerEquivalent(y, x) :=
   done
 
--- Transitivity kernel at the Natural level. From `a + d = b + c` and
+-- Transitivity kernel at the ℕ level. From `a + d = b + c` and
 -- `c + f = d + e`, derive `a + f = b + e`: sum the hypotheses, rearrange
 -- both sides into `_ + (c + d)`, then cancel the common addend.
 theorem IntegerEquivalent.transitive_natural
-        (a b c d e f : Natural)
+        (a b c d e f : ℕ)
         (firstCrossEquation : a + d = b + c)
         (secondCrossEquation : c + f = d + e)
         : a + f = b + e := {
@@ -127,30 +127,30 @@ instance Integer.equivalence
 
 -- The canonical introduction form: the class of the difference `a - b`.
 -- Registered as a `construction` so proofs read `Integer.from_difference(a, b)`.
--- The `unfold Integer` pierces the opaque type once, here at the boundary.
-construction Integer.from_difference (a b : Natural) : Integer :=
-  unfold Integer in Quotient.class_of(IntegerRepresentative.make(a, b))
+-- The `unfold ℤ` pierces the opaque type once, here at the boundary.
+construction Integer.from_difference (a b : ℕ) : ℤ :=
+  unfold ℤ in Quotient.class_of(IntegerRepresentative.make(a, b))
 
 -- ----------------------------------------------------------------------
 -- The boundary API. Every consumer compares Integers through these two
 -- lemmas: `from_difference(a, b) = from_difference(c, d)` is exactly the
--- Natural cross-equation `a + d = b + c`, in both directions. The opaque
+-- ℕ cross-equation `a + d = b + c`, in both directions. The opaque
 -- `Integer` is pierced only here (the equivalence is already transparent).
 
 -- Cross-equation ⇒ equal classes (via Quotient.equivalent_implies_equal).
-automatic theorem Integer.difference_equal (a b c d : Natural)
+automatic theorem Integer.difference_equal (a b c d : ℕ)
         (crossEquation : a + d = b + c)
         : Integer.from_difference(a, b) = Integer.from_difference(c, d) :=
-  unfold Integer in
+  unfold ℤ in
     Quotient.equivalent_implies_equal(IntegerRepresentative.make(a, b),
                    IntegerRepresentative.make(c, d),
                    crossEquation)
 
 -- Equal classes ⇒ cross-equation (via Quotient.equal_implies_equivalent).
-theorem Integer.difference_equal_implies (a b c d : Natural)
+theorem Integer.difference_equal_implies (a b c d : ℕ)
         (differenceEquality
             : Integer.from_difference(a, b) = Integer.from_difference(c, d))
         : a + d = b + c :=
   Quotient.equal_implies_equivalent(IntegerRepresentative.make(a, b),
                  IntegerRepresentative.make(c, d),
-                 unfold Integer in differenceEquality)
+                 unfold ℤ in differenceEquality)

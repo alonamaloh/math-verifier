@@ -47,14 +47,14 @@ theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) := {
 
 -- 0 ≤ q ↔ IsNonneg(q) was already in `Rational.positive`. We mirror
 -- as Rational.LessOrEqual.reflexive: x ≤ x.
-automatic theorem Rational.LessOrEqual.reflexive (x : Rational) : x ≤ x :=
+automatic theorem Rational.LessOrEqual.reflexive (x : ℚ) : x ≤ x :=
   Rational.IsNonneg(x - x)
     by substituting (ring : x - x = Rational.zero)
 
 -- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p + q). At Integer level the
 -- sum of two non-negatives is non-negative; lift through reps.
 theorem Integer.IsNonneg.add
-        (x y : Integer)
+        (x y : ℤ)
         (xIsNonneg : Integer.IsNonneg(x))
         (yIsNonneg : Integer.IsNonneg(y))
         : Integer.IsNonneg(x + y) := {
@@ -62,13 +62,13 @@ theorem Integer.IsNonneg.add
     choose b from yIsNonneg;
     witness a + b with
         { x + y
-            = (a : Integer) + (b : Integer)
-            = (a + b : Integer) }
+            = (a : ℤ) + (b : ℤ)
+            = (a + b : ℤ) }
 }
 
 -- Rational IsNonneg.add: take representatives, the Integer-level
 -- IsNonneg.add closes the leaf.
-theorem Rational.IsNonneg.add (p q : Rational)
+theorem Rational.IsNonneg.add (p q : ℚ)
         (pIsNonneg : Rational.IsNonneg(p))
         (qIsNonneg : Rational.IsNonneg(q))
         : Rational.IsNonneg(p + q) :=
@@ -77,7 +77,7 @@ theorem Rational.IsNonneg.add (p q : Rational)
     Integer.IsNonneg((n1 * d1) * (d2 * d2));
     Integer.IsNonneg((n2 * d2) * (d1 * d1));
     Integer.IsNonneg((n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1));
-    (0 : Integer) ≤ (n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1);
+    (0 : ℤ) ≤ (n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1);
     done by substituting
         (ring : (n1 * d2 + n2 * d1) * (d1 * d2)
                 = (n1 * d1) * (d2 * d2) + (n2 * d2) * (d1 * d1))
@@ -88,7 +88,7 @@ theorem Rational.IsNonneg.add (p q : Rational)
 -- (-n)-nonneg, so n = 0 (Integer antisymmetry), and mk(make(0, d)) =
 -- Rational.zero via Quotient.equivalent_implies_equal.
 theorem Rational.IsNonneg_and_negate_IsNonneg_implies_zero
-        (q : Rational)
+        (q : ℚ)
         (qIsNonneg : Rational.IsNonneg(q))
         (negQIsNonneg : Rational.IsNonneg(-q))
         : q = Rational.zero :=
@@ -112,7 +112,7 @@ theorem Rational.IsNonneg_and_negate_IsNonneg_implies_zero
 -- IsNonneg(y - x) ∧ IsNonneg(x - y) = IsNonneg(y - x) ∧ IsNonneg(-(y - x)),
 -- giving y - x = 0, so y = x.
 theorem Rational.LessOrEqual.antisymmetric
-        (x y : Rational)
+        (x y : ℚ)
         (xLeqY : x ≤ y) (yLeqX : y ≤ x)
         : x = y := {
   Rational.IsNonneg(-(y - x));
@@ -126,7 +126,7 @@ theorem Rational.LessOrEqual.antisymmetric
 -- Transitivity: x ≤ y ∧ y ≤ z → x ≤ z. Algebra: (z - y) + (y - x)
 -- = z - x; IsNonneg of both summands gives IsNonneg of the sum.
 theorem Rational.LessOrEqual.transitive
-        (x y z : Rational)
+        (x y z : ℚ)
         (xLeqY : x ≤ y) (yLeqZ : y ≤ z)
         : x ≤ z :=
   -- (z - y) + (y - x) = z - x; IsNonneg.add closes the rewritten goal.
@@ -140,21 +140,21 @@ theorem Rational.LessOrEqual.transitive
 -- members at every use site (`And.left(LessOrEqual(x, y), x ≠ y,
 -- xLessThanY)` collapses to `Rational.LessThan.weaken(xLessThanY)`).
 theorem Rational.LessThan.weaken
-        {x y : Rational} (xLessThanY : x < y) : x ≤ y :=
+        {x y : ℚ} (xLessThanY : x < y) : x ≤ y :=
   And.left(Rational.LessOrEqual(x, y), x ≠ y, xLessThanY)
 
 -- Extract the distinctness part: x < y → x ≠ y.
 theorem Rational.LessThan.distinct
-        {x y : Rational} (xLessThanY : x < y) : x ≠ y :=
+        {x y : ℚ} (xLessThanY : x < y) : x ≠ y :=
   And.right(Rational.LessOrEqual(x, y), x ≠ y, xLessThanY)
 
 -- Strict order is irreflexive: a < a is impossible. Marked `automatic`
 -- so the auto-prover closes a `False` goal from an in-scope `a < a`
 -- (the textbook "but a < a, contradiction") without a citation.
-automatic theorem Rational.LessThan.irreflexive (a : Rational) : ¬(a < a) := {
+automatic theorem Rational.LessThan.irreflexive (a : ℚ) : ¬(a < a) := {
   suppose a < a as selfLess;
   a ≠ a as aDistinct;
-  aDistinct(reflexivity(Rational, a))
+  aDistinct(reflexivity(ℚ, a))
 }
 
 -- Lift a strict inequality across a function that preserves ≤ and
@@ -163,10 +163,10 @@ automatic theorem Rational.LessThan.irreflexive (a : Rational) : ¬(a < a) := {
 -- `<`-as-`≤ ∧ ¬=` encoding at every strict-monotonicity site.
 --
 -- Reads as: "given `weak`/`injection` for `f`, and `x < y`, you get
--- `f x < f y`." Caller writes `(fx, fy : Rational)` explicitly so the
+-- `f x < f y`." Caller writes `(fx, fy : ℚ)` explicitly so the
 -- helper doesn't depend on `f` being apparent in the call.
 theorem Rational.LessThan.lift
-        (x y fx fy : Rational)
+        (x y fx fy : ℚ)
         (weak : x ≤ y → fx ≤ fy)
         (injection : fx = fy → x = y)
         (xLessThanY : x < y)
@@ -180,7 +180,7 @@ theorem Rational.LessThan.lift
 
 -- Weak-then-strict: x ≤ y ∧ y < z → x < z.
 theorem Rational.LessThan.transitive_left
-        (x y z : Rational)
+        (x y z : ℚ)
         (xLeqY : x ≤ y) (yLessThanZ : y < z)
         : x < z := {
   y ≤ z;
@@ -201,7 +201,7 @@ theorem Rational.LessThan.transitive_left
 
 -- Strict-then-weak: x < y ∧ y ≤ z → x < z. Symmetric to the above.
 theorem Rational.LessThan.transitive_right
-        (x y z : Rational)
+        (x y z : ℚ)
         (xLessThanY : x < y) (yLeqZ : y ≤ z)
         : x < z := {
   x ≤ y;
@@ -221,13 +221,13 @@ theorem Rational.LessThan.transitive_right
 -- Additive monotonicity (weak): x ≤ y → x + z ≤ y + z. Since
 -- (y + z) - (x + z) = y - x, the IsNonneg evidence carries over.
 automatic theorem Rational.add_preserves_LessOrEqual
-        (x y z : Rational) (xLeqY : x ≤ y)
+        (x y z : ℚ) (xLeqY : x ≤ y)
         : x + z ≤ y + z :=
   x + z ≤ y + z
     by substituting ((y + z) - (x + z) = y - x)
 
 -- Add cancel right: x + z = y + z → x = y. Add -z to both sides.
-theorem Rational.add_cancel_right (x y z : Rational)
+theorem Rational.add_cancel_right (x y z : ℚ)
         (sumEquality : x + z = y + z)
         : x = y :=
   x
@@ -237,13 +237,13 @@ theorem Rational.add_cancel_right (x y z : Rational)
 
 -- Additive monotonicity (strict): x < y → x + z < y + z.
 automatic theorem Rational.add_preserves_LessThan
-        (x y z : Rational) (xLessY : x < y)
+        (x y z : ℚ) (xLessY : x < y)
         : x + z < y + z :=
   { done by Rational.LessThan.lift }
 
 -- Left-additive strict: x < y → z + x < z + y. Via commutativity.
 theorem Rational.add_left_preserves_LessThan
-        (x y z : Rational) (xLessY : x < y)
+        (x y z : ℚ) (xLessY : x < y)
         : z + x < z + y :=
   z + x
      = x + z
@@ -253,7 +253,7 @@ theorem Rational.add_left_preserves_LessThan
 -- Left additive monotonicity (weak): b ≤ h → h + b ≤ h + h. Via the
 -- right form and two applications of commutativity.
 theorem Rational.add_preserves_LessOrEqual_left
-        (b h : Rational) (bLeqH : b ≤ h)
+        (b h : ℚ) (bLeqH : b ≤ h)
         : h + b ≤ h + h :=
   h + b
      = b + h
@@ -261,7 +261,7 @@ theorem Rational.add_preserves_LessOrEqual_left
 
 -- Combined strict sum: A < H ∧ B < H → A + B < H + H.
 automatic theorem Rational.LessThan.add_strict_strict
-        (a b h : Rational)
+        (a b h : ℚ)
         (aLessH : a < h) (bLessH : b < h)
         : a + b < h + h := {
   b ≤ h;
@@ -273,10 +273,10 @@ automatic theorem Rational.LessThan.add_strict_strict
 -- 0 < x → -x < 0. Used wherever an ε-argument needs the symmetric
 -- "-ε < 0" form (e.g. to bound something from below by -ε via 0).
 automatic theorem Rational.negate_LessThan_zero_of_positive
-        (x : Rational) (xPositive : Rational.zero < x)
+        (x : ℚ) (xPositive : Rational.zero < x)
         : -x < Rational.zero :=
   -- Add -x to both sides of 0 < x: 0 + -x < x + -x, i.e., -x < 0.
-  (-x : Rational)
+  (-x : ℚ)
      = Rational.zero + -x
      < x + -x
      = Rational.zero
@@ -285,12 +285,12 @@ automatic theorem Rational.negate_LessThan_zero_of_positive
 -- definitions of both sides reduce to the same `IsNonneg(y - x)`
 -- modulo `y - x = -x - -y`, which is pure ring.
 automatic theorem Rational.LessOrEqual.negate
-        (x y : Rational) (xLeqY : x ≤ y) : -y ≤ -x :=
+        (x y : ℚ) (xLeqY : x ≤ y) : -y ≤ -x :=
   -y ≤ -x by substituting (ring : y - x = -x - -y)
 
 -- Strict order reverses under negation: x < y → -y < -x.
 automatic theorem Rational.LessThan.negate
-        (x y : Rational) (xLessY : x < y) : -y < -x := {
+        (x y : ℚ) (xLessY : x < y) : -y < -x := {
   x ≤ y;
   -y ≤ -x;
   x ≠ y as xDistinct;
@@ -300,7 +300,7 @@ automatic theorem Rational.LessThan.negate
 
 -- IsNonneg(-x) → x ≤ 0. Dual to LessOrEqual_zero_of_IsNonneg.
 automatic theorem Rational.LessOrEqual_zero_of_negate_IsNonneg
-        (x : Rational) (negXIsNonneg : Rational.IsNonneg(-x))
+        (x : ℚ) (negXIsNonneg : Rational.IsNonneg(-x))
         : x ≤ Rational.zero :=
   -- x ≤ 0 = IsNonneg(0 - x) = IsNonneg(-x).
   x ≤ Rational.zero by substituting (ring : -x = Rational.zero - x)
@@ -308,7 +308,7 @@ automatic theorem Rational.LessOrEqual_zero_of_negate_IsNonneg
 -- A rational with positive absolute value is nonzero: if q = 0 then
 -- |q| = 0, contradicting 0 < |q|.
 theorem Rational.nonzero_of_absolute_value_positive
-        (q : Rational)
+        (q : ℚ)
         (absolutePositive : Rational.zero < abs(q))
         : q ≠ Rational.zero :=
   (qIsZero : q = Rational.zero) ↦ {

@@ -28,25 +28,25 @@ import Equality.basics
 definition Natural.Raw.power (base : Natural.Raw) : Natural.Raw → Natural.Raw
   | zero         => Natural.Raw.successor(Natural.Raw.zero)
   | successor(k) =>
-      unfold Natural in Natural.multiply(base, Natural.Raw.power(base, k))
+      unfold ℕ in Natural.multiply(base, Natural.Raw.power(base, k))
 
-opaque definition Natural.power (base : Natural) : Natural → Natural :=
-  unfold Natural in Natural.Raw.power(base)
+opaque definition Natural.power (base : ℕ) : ℕ → ℕ :=
+  unfold ℕ in Natural.Raw.power(base)
 
 operator (^) on (Natural, Natural) := Natural.power
 
 -- base^0 = 1.
-theorem Natural.power_zero (base : Natural) : base ^ 0 = successor(0) :=
+theorem Natural.power_zero (base : ℕ) : base ^ 0 = successor(0) :=
   done by unfolding Natural.power
 
 -- base^(k+1) = base * base^k. The successor-equation lemma.
-theorem Natural.power_succ (base k : Natural)
+theorem Natural.power_succ (base k : ℕ)
         : base ^ successor(k) = base * base ^ k :=
   done by unfolding Natural.power
 
 -- The same recurrence at `1 + k`, for consumers that keep `successor`
 -- out of their spellings.
-theorem Natural.power_one_plus (base k : Natural)
+theorem Natural.power_one_plus (base k : ℕ)
         : base ^ (1 + k) = base * base ^ k :=
   base ^ (1 + k)
      = base ^ successor(k)    by substituting Natural.one_add
@@ -54,21 +54,21 @@ theorem Natural.power_one_plus (base k : Natural)
 
 -- base^1 = base. Stepping through power_succ + power_zero + multiply_one;
 -- the auto-prover finds each lemma by library scan.
-theorem Natural.power_one (base : Natural) : base ^ successor(0) = base :=
+theorem Natural.power_one (base : ℕ) : base ^ successor(0) = base :=
   base ^ successor(0)
      = base * 1
      = base
 
 -- 2^(1+k) splits at its midpoint — the shape a block-grouping
 -- induction consumes (the harmonic-series ladder, the AGM descent).
-theorem Natural.two_power_one_plus (k : Natural)
+theorem Natural.two_power_one_plus (k : ℕ)
         : 2 ^ (1 + k) = 2 ^ k + 2 ^ k :=
   2 ^ (1 + k)
      = 2 * 2 ^ k       by Natural.power_one_plus
      = 2 ^ k + 2 ^ k
 
 -- Every 2^K is positive.
-theorem Natural.one_le_two_power (K : Natural) : 1 ≤ 2 ^ K :=
+theorem Natural.one_le_two_power (K : ℕ) : 1 ≤ 2 ^ K :=
   by induction on K with IH {
     case base:
         1
@@ -84,9 +84,9 @@ theorem Natural.one_le_two_power (K : Natural) : 1 ≤ 2 ^ K :=
 -- base^(a + b) = base^a * base^b. Induct on a; opaqueness means the
 -- recursive step uses power_succ to peel a successor instead of
 -- riding the kernel's ι.
-theorem Natural.power_add (base a b : Natural)
+theorem Natural.power_add (base a b : ℕ)
         : base ^ (a + b) = base ^ a * base ^ b :=
-  unfold Natural.add, Natural in
+  unfold Natural.add, ℕ in
   by induction on a with IH {
     case zero:
         -- 0 + b reduces to b; one_multiply restores the leading 1 and
@@ -107,8 +107,8 @@ theorem Natural.power_add (base a b : Natural)
 
 -- Subtraction-witness extractor for `1 ≤ base^k`: provides a Natural m
 -- with base^k = succ(m). Useful for showing strict positivity.
-theorem Natural.power_succ_form (base k : Natural) (basePositive : 1 ≤ base)
-        : ∃ (m : Natural). base ^ k = successor(m) :=
+theorem Natural.power_succ_form (base k : ℕ) (basePositive : 1 ≤ base)
+        : ∃ (m : ℕ). base ^ k = successor(m) :=
   unfold Natural.add in
   by induction on k with IH {
     case zero:
@@ -131,9 +131,9 @@ theorem Natural.power_succ_form (base k : Natural) (basePositive : 1 ≤ base)
 
 -- base^k ≥ 1 for base ≥ 1. From the succ form.
 theorem Natural.power_positive
-        (base k : Natural) (basePositive : 1 ≤ base)
+        (base k : ℕ) (basePositive : 1 ≤ base)
         : 1 ≤ base ^ k := {
-  ∃ (m : Natural). base ^ k = successor(m) as succForm;
+  ∃ (m : ℕ). base ^ k = successor(m) as succForm;
   choose m such that base ^ k = successor(m) from succForm;
   -- 1 ≤ successor(m) = base^k.
   1

@@ -3,7 +3,7 @@
 -- Arithmetic and summation lemmas needed by the polynomial division
 -- algorithm (Polynomial/division.math). Two groups:
 --
---   * Small Natural facts the standard library happens not to carry yet
+--   * Small ℕ facts the standard library happens not to carry yet
 --     (`1 + n ≤ m` inversion, the monus/add cancel law, the
 --     at-the-bound-or-below ≤ split).
 --   * `Ring.Sum.single_point`: a sum whose summand vanishes off a
@@ -31,12 +31,12 @@ import Algebra.ring_summation
 import Polynomial.commutative
 
 -- ----------------------------------------------------------------------
--- Degree-specific Natural fact.
+-- Degree-specific ℕ fact.
 
 -- The high-index degree bound: 1 + (d + j) ≤ i forces
 -- 1 + d ≤ i − j. Writing i = (1 + (d + j)) + c and
 -- regrouping, i − j = 1 + (d + c) ≥ 1 + d.
-theorem Natural.degree_bound_helper (d j i : Natural)
+theorem Natural.degree_bound_helper (d j i : ℕ)
         (bound : 1 + (d + j) ≤ i)
         : 1 + d ≤ i ∸ j := {
   choose c such that i = (1 + (d + j)) + c
@@ -58,24 +58,24 @@ theorem Natural.degree_bound_helper (d j i : Natural)
 
 -- A sum whose summand vanishes everywhere on 0..n is zero.
 theorem Ring.Sum.vanishes_below (r : Ring)
-        (h : Natural → Ring.carrier(r)) (n : Natural)
-        (vanish : ∀ (i : Natural). i ≤ n → h(i) = Ring.zero(r))
+        (h : ℕ → Ring.carrier(r)) (n : ℕ)
+        (vanish : ∀ (i : ℕ). i ≤ n → h(i) = Ring.zero(r))
         : Ring.Sum(r, h, n) = Ring.zero(r) :=
   Ring.Sum(r, h, n)
-     = Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), n)
+     = Ring.Sum(r, (i : ℕ) ↦ Ring.zero(r), n)
      = Ring.zero(r)
            by Ring.Sum.zero
 
 -- A sum whose summand vanishes off a single index j ≤ n equals h(j).
 theorem Ring.Sum.single_point (r : Ring)
-        (h : Natural → Ring.carrier(r)) (j : Natural) (n : Natural)
+        (h : ℕ → Ring.carrier(r)) (j : ℕ) (n : ℕ)
         : j ≤ n
-          → (∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r))
+          → (∀ (i : ℕ). ¬(i = j) → h(i) = Ring.zero(r))
           → Ring.Sum(r, h, n) = h(j) :=
   by induction on n with IH {
     case base:
       (jLessOrEqualZero : j ≤ 0)
-               (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦ {
+               (vanish : ∀ (i : ℕ). ¬(i = j) → h(i) = Ring.zero(r)) ↦ {
         j = 0;
         Ring.Sum(r, h, 0)
            = h(0)
@@ -83,12 +83,12 @@ theorem Ring.Sum.single_point (r : Ring)
       }
     case step(m):
       (jLessOrEqualOnePlus : j ≤ 1 + m)
-               (vanish : ∀ (i : Natural). ¬(i = j) → h(i) = Ring.zero(r)) ↦
+               (vanish : ∀ (i : ℕ). ¬(i = j) → h(i) = Ring.zero(r)) ↦
           done by cases {
             case j = 1 + m as jEqualsOnePlus: {
                 Ring.Sum(r, h, m) = Ring.zero(r)
                     by Ring.Sum.vanishes_below(r, h, m,
-                           (i : Natural) (iLessOrEqualM : i ≤ m) ↦
+                           (i : ℕ) (iLessOrEqualM : i ≤ m) ↦
                                vanish(i,
                                    (iEqualsJ : i = j) ↦
                                        Natural.not_one_plus_le_self(m,

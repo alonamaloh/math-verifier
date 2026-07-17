@@ -30,22 +30,22 @@ import Equality.basics
 
 -- `a < b` iff b exceeds a by at least one. Successor-free (only `+`/`1`),
 -- and opaque — its body is seen ONLY by the two boundary lemmas below.
-opaque definition Natural.LessThan (a b : Natural) : Proposition :=
-  ∃ (c : Natural). a + (1 + c) = b
+opaque definition Natural.LessThan (a b : ℕ) : Proposition :=
+  ∃ (c : ℕ). a + (1 + c) = b
 
 operator (<) on (Natural, Natural) := Natural.LessThan
 
 -- ── Boundary: the general `<` intro / elim (sees the `∃` body) ────────
 -- A gap `c` with `a + (1 + c) = b` witnesses `a < b`, and conversely.
-theorem Natural.lt_intro (a b c : Natural) (h : a + (1 + c) = b) : a < b :=
+theorem Natural.lt_intro (a b c : ℕ) (h : a + (1 + c) = b) : a < b :=
   unfold Natural.LessThan in witness c with h
 
-theorem Natural.lt_elim (a b : Natural) (h : a < b)
-        : ∃ (c : Natural). a + (1 + c) = b :=
+theorem Natural.lt_elim (a b : ℕ) (h : a < b)
+        : ∃ (c : ℕ). a + (1 + c) = b :=
   unfold Natural.LessThan in h
 
 -- ── `≤` as transparent notation on top of `<` ─────────────────────────
-definition Natural.LessOrEqual (a b : Natural) : Proposition :=
+definition Natural.LessOrEqual (a b : ℕ) : Proposition :=
   a < b ∨ a = b
 
 operator (≤) on (Natural, Natural) := Natural.LessOrEqual
@@ -53,11 +53,11 @@ operator (≤) on (Natural, Natural) := Natural.LessOrEqual
 -- ── The two atomic strict facts (supply the witness `0` directly) ─────
 
 -- a < 1 + a — the gap is 0.
-theorem Natural.lt_one_plus (a : Natural) : a < 1 + a :=
+theorem Natural.lt_one_plus (a : ℕ) : a < 1 + a :=
   unfold Natural.LessThan in witness 0 with ring
 
 -- a < successor(a) — the same fact in successor form.
-automatic theorem Natural.lt_successor (a : Natural) : a < successor(a) :=
+automatic theorem Natural.lt_successor (a : ℕ) : a < successor(a) :=
   unfold Natural.LessThan in witness 0 with { a + (1 + 0) = successor(a) }
 
 -- Nothing lies strictly below zero. A gap `c` with `k + (1 + c) = 0` makes
@@ -65,7 +65,7 @@ automatic theorem Natural.lt_successor (a : Natural) : a < successor(a) :=
 -- Implementation note: opaque `<` has no Decidable instance, so `absurd`
 -- cannot refute `k < 0` on its own; consumers cite this lemma instead —
 -- e.g. `NaturalsBelow(0)` is empty.
-theorem Natural.not_less_than_zero (k : Natural) : ¬(k < 0) := {
+theorem Natural.not_less_than_zero (k : ℕ) : ¬(k < 0) := {
   suppose k < 0 as _;
   choose gap such that k + (1 + gap) = 0 from Natural.lt_elim;
   successor(k + gap)
@@ -78,7 +78,7 @@ theorem Natural.not_less_than_zero (k : Natural) : ¬(k < 0) := {
 -- `a + (1 + c) = a` cancels `a` to force `1 + c = 0`, i.e. `successor(c) = 0`.
 -- Marked `automatic` so a reductio ending in `x < x` closes with a bare
 -- `done`, matching Real.LessThan.irreflexive.
-automatic theorem Natural.lt_irreflexive (a : Natural) : ¬ (a < a) := {
+automatic theorem Natural.lt_irreflexive (a : ℕ) : ¬ (a < a) := {
   suppose a < a as _;
   choose gap such that a + (1 + gap) = a from Natural.lt_elim;
   a + (1 + gap)
@@ -94,7 +94,7 @@ automatic theorem Natural.lt_irreflexive (a : Natural) : ¬ (a < a) := {
 -- Transitivity of `<`: stacking the two gaps gives a gap for a < c. This is
 -- the one composition proven directly from the witnesses; the `calc`
 -- interface below is then built on it.
-theorem Natural.lt_transitive (a b c : Natural)
+theorem Natural.lt_transitive (a b c : ℕ)
         (aLessThanB : a < b) (bLessThanC : b < c) : a < c := {
   choose gapAB such that a + (1 + gapAB) = b from Natural.lt_elim;
   choose gapBC such that b + (1 + gapBC) = c from Natural.lt_elim;
@@ -109,24 +109,24 @@ theorem Natural.lt_transitive (a b c : Natural)
 -- registered operator). With these, mixed `<`/`≤`/`=` chains compose. ──
 
 -- A strict inequality is in particular a weak one (disjunction injection).
-theorem Natural.LessThan.weaken (a b : Natural) (h : a < b) : a ≤ b := {
+theorem Natural.LessThan.weaken (a b : ℕ) (h : a < b) : a ≤ b := {
   done
 }
 
 -- a ≤ b with a ≠ b strengthens to a < b.
-theorem Natural.lt_of_le_of_ne (a b : Natural) (lessOrEqual : a ≤ b) (notEqual : ¬(a = b)) : a < b :=
+theorem Natural.lt_of_le_of_ne (a b : ℕ) (lessOrEqual : a ≤ b) (notEqual : ¬(a = b)) : a < b :=
   done
 
 -- Strictly comparable values are unequal, in both orientations. These are
 -- the disequality witnesses the ground-relation decision procedure emits
 -- for numeral goals like `4 ≠ 5` (PLAN_FAST_NUMERALS §D).
-theorem Natural.not_equal_of_less_than (a b : Natural) (h : a < b) : ¬(a = b) := {
+theorem Natural.not_equal_of_less_than (a b : ℕ) (h : a < b) : ¬(a = b) := {
   suppose a = b as aEqualsB;
   a < a;
   done
 }
 
-theorem Natural.not_equal_of_greater_than (a b : Natural) (h : b < a) : ¬(a = b) := {
+theorem Natural.not_equal_of_greater_than (a b : ℕ) (h : b < a) : ¬(a = b) := {
   suppose a = b as aEqualsB;
   b < b;
   done
@@ -134,11 +134,11 @@ theorem Natural.not_equal_of_greater_than (a b : Natural) (h : b < a) : ¬(a = b
 
 -- A positive natural is nonzero — the ℕ face of the `/` side-condition
 -- family (the ℚ/ℝ twins live beside their division operators).
-automatic theorem Natural.nonzero_of_positive (n : Natural) (positive : n > 0) : ¬(n = 0) :=
+automatic theorem Natural.nonzero_of_positive (n : ℕ) (positive : n > 0) : ¬(n = 0) :=
   done
 
 -- a ≤ b and b < c give a < c.
-theorem Natural.LessThan.transitive_left (a b c : Natural)
+theorem Natural.LessThan.transitive_left (a b c : ℕ)
         (aLessOrEqualB : a ≤ b) (bLessThanC : b < c) : a < c :=
   done by cases {
     case a < b: done
@@ -146,7 +146,7 @@ theorem Natural.LessThan.transitive_left (a b c : Natural)
   }
 
 -- a < b and b ≤ c give a < c.
-theorem Natural.LessThan.transitive_right (a b c : Natural)
+theorem Natural.LessThan.transitive_right (a b c : ℕ)
         (aLessThanB : a < b) (bLessOrEqualC : b ≤ c) : a < c :=
   done by cases {
     case b < c: done
@@ -155,12 +155,12 @@ theorem Natural.LessThan.transitive_right (a b c : Natural)
 
 -- ── The `calc` interface for `≤` ──────────────────────────────────────
 
-automatic theorem Natural.LessOrEqual.reflexive (a : Natural) : a ≤ a := {
+automatic theorem Natural.LessOrEqual.reflexive (a : ℕ) : a ≤ a := {
   a = a;
   done
 }
 
-theorem Natural.LessOrEqual.transitive (a b c : Natural)
+theorem Natural.LessOrEqual.transitive (a b c : ℕ)
         (aLessOrEqualB : a ≤ b) (bLessOrEqualC : b ≤ c) : a ≤ c :=
   done by cases {
     case b < c: {
@@ -173,21 +173,21 @@ theorem Natural.LessOrEqual.transitive (a b c : Natural)
 -- ── Order facts, now as `calc` chains ─────────────────────────────────
 
 -- n ≤ successor(n).
-automatic theorem Natural.le_successor (n : Natural) : n ≤ successor(n) := {
+automatic theorem Natural.le_successor (n : ℕ) : n ≤ successor(n) := {
   n < successor(n);
   done
 }
 
 -- Right-extension by one (the role the old `LessOrEqual.step` constructor
 -- played): smaller ≤ larger ≤ successor(larger).
-automatic theorem Natural.le_step (smaller larger : Natural) (proof : smaller ≤ larger)
+automatic theorem Natural.le_step (smaller larger : ℕ) (proof : smaller ≤ larger)
         : smaller ≤ successor(larger) :=
   smaller
      ≤ larger
      ≤ successor(larger)
 
 -- a ≤ a + b.
-automatic theorem Natural.less_or_equal_add_right (a b : Natural) : a ≤ a + b :=
+automatic theorem Natural.less_or_equal_add_right (a b : ℕ) : a ≤ a + b :=
   done by cases {
     case b = 0: {
         a = a + 0;
@@ -202,12 +202,12 @@ automatic theorem Natural.less_or_equal_add_right (a b : Natural) : a ≤ a + b 
   }
 
 -- Zero is at most every natural number: 0 ≤ 0 + upperBound = upperBound.
-automatic theorem Natural.zero_least (upperBound : Natural) : 0 ≤ upperBound :=
+automatic theorem Natural.zero_least (upperBound : ℕ) : 0 ≤ upperBound :=
   0
      ≤ 0 + upperBound
      = upperBound
 
-theorem Natural.lt_trichotomy_successor_step (predecessor b : Natural)
+theorem Natural.lt_trichotomy_successor_step (predecessor b : ℕ)
         (predecessorComparison : predecessor < b ∨ predecessor = b ∨ b < predecessor)
         : 1 + predecessor < b ∨ 1 + predecessor = b ∨ b < 1 + predecessor :=
   done by cases {
@@ -251,10 +251,10 @@ theorem Natural.lt_trichotomy_successor_step (predecessor b : Natural)
 
 -- Trichotomy: the strict-order elimination principle (any two naturals
 -- compare as `<`, `=`, or `>`). Induction on a, b universal.
-theorem Natural.lt_trichotomy (a : Natural)
-        : ∀ (b : Natural). a < b ∨ a = b ∨ b < a :=
+theorem Natural.lt_trichotomy (a : ℕ)
+        : ∀ (b : ℕ). a < b ∨ a = b ∨ b < a :=
   by induction on a with IH {
-    case base: (b : Natural) ↦
+    case base: (b : ℕ) ↦
       done by cases {
         case b = 0: {
             0 = 0;
@@ -265,7 +265,7 @@ theorem Natural.lt_trichotomy (a : Natural)
                ≤ predecessor
                < 1 + predecessor
       }
-    case step(predecessor): (b : Natural) ↦ {
+    case step(predecessor): (b : ℕ) ↦ {
       predecessor < b ∨ predecessor = b ∨ b < predecessor;
       done by Natural.lt_trichotomy_successor_step
     }
@@ -273,7 +273,7 @@ theorem Natural.lt_trichotomy (a : Natural)
 
 -- The trichotomy bridge the reductio idiom leans on: a failed ≤ flips
 -- to a strict < the other way.
-theorem Natural.lt_of_not_le (a b : Natural)
+theorem Natural.lt_of_not_le (a b : ℕ)
         (notLessOrEqual : ¬(a ≤ b)) : b < a := {
   a < b ∨ a = b ∨ b < a by Natural.lt_trichotomy;
   done by cases {
@@ -298,7 +298,7 @@ theorem Natural.lt_of_not_le (a b : Natural)
 -- `cases Natural.compare_strict …` avoidable, proving an order by refuting
 -- its opposite (`¬(a < b) by { … }; b ≤ a`) instead of case-splitting the
 -- comparison.
-theorem Natural.less_or_equal_of_not_less_than (a b : Natural)
+theorem Natural.less_or_equal_of_not_less_than (a b : ℕ)
         (notLessThan : ¬(a < b)) : b ≤ a := {
   a < b ∨ a = b ∨ b < a by Natural.lt_trichotomy;
   done by cases {
@@ -312,7 +312,7 @@ theorem Natural.less_or_equal_of_not_less_than (a b : Natural)
 }
 
 -- Successor preserves ≤.
-automatic theorem Natural.successor_less_or_equal_successor (a b : Natural)
+automatic theorem Natural.successor_less_or_equal_successor (a b : ℕ)
         (proof : a ≤ b) : successor(a) ≤ successor(b) :=
   done by cases {
     case a < b: {
@@ -327,20 +327,20 @@ automatic theorem Natural.successor_less_or_equal_successor (a b : Natural)
   }
 
 -- 1 ≤ successor(k): `successor` monotonicity applied at 0 (`1` is `successor(0)`).
-automatic theorem Natural.successor_positive (k : Natural) : 1 ≤ successor(k) := {
+automatic theorem Natural.successor_positive (k : ℕ) : 1 ≤ successor(k) := {
   0 ≤ k;
   done
 }
 
 -- 1 ≤ k + 1: the `n + 1` form of successor_positive.
-theorem Natural.one_le_add_one (k : Natural) : 1 ≤ k + 1 :=
-  (1 : Natural)
+theorem Natural.one_le_add_one (k : ℕ) : 1 ≤ k + 1 :=
+  (1 : ℕ)
      ≤ successor(k)
      = k + 1
 
 -- 1 ≤ 1 + k: the `1 + n` face of the same fact.
-theorem Natural.one_le_one_plus (k : Natural) : 1 ≤ 1 + k :=
-  (1 : Natural)
+theorem Natural.one_le_one_plus (k : ℕ) : 1 ≤ 1 + k :=
+  (1 : ℕ)
      ≤ k + 1
      = 1 + k
 
@@ -351,7 +351,7 @@ automatic theorem Natural.one_less_or_equal_two : 1 ≤ 2 :=
 -- A nonzero natural is at least one. Lets consumers turn "≠ 0" straight into
 -- the positive-multiplier hypothesis `1 ≤ n` without a structural successor
 -- case-split of their own.
-theorem Natural.one_le_of_nonzero (n : Natural) (nonzero : n ≠ 0) : 1 ≤ n :=
+theorem Natural.one_le_of_nonzero (n : ℕ) (nonzero : n ≠ 0) : 1 ≤ n :=
   done by cases {
     case n = 0 as isZero: { False; done }
     case n = successor(k) for some k: done
@@ -359,7 +359,7 @@ theorem Natural.one_le_of_nonzero (n : Natural) (nonzero : n ≠ 0) : 1 ≤ n :=
 
 -- successor(p) ≤ upperBound implies p ≤ upperBound.
 automatic theorem Natural.less_or_equal_predecessor_less_or_equal
-        (p upperBound : Natural) (successorLessOrEqual : successor(p) ≤ upperBound)
+        (p upperBound : ℕ) (successorLessOrEqual : successor(p) ≤ upperBound)
         : p ≤ upperBound := {
   p
      < successor(p)
@@ -380,13 +380,13 @@ automatic theorem Natural.less_or_equal_predecessor_less_or_equal
 -- recursion-level modules in `Natural/`.
 
 -- a < a + 1 — the atomic strict fact, in `+ 1` form (gap 0).
-theorem Natural.lt_add_one (a : Natural) : a < a + 1 := {
+theorem Natural.lt_add_one (a : ℕ) : a < a + 1 := {
   a < 1 + a;
   done
 }
 
 -- k < n  ⟹  k + 1 ≤ n.
-automatic theorem Natural.add_one_le_of_lt (k n : Natural) (h : k < n) : k + 1 ≤ n := {
+automatic theorem Natural.add_one_le_of_lt (k n : ℕ) (h : k < n) : k + 1 ≤ n := {
   choose gap such that k + (1 + gap) = n from Natural.lt_elim;
   (k + 1) + gap
      = k + (1 + gap)
@@ -397,13 +397,13 @@ automatic theorem Natural.add_one_le_of_lt (k n : Natural) (h : k < n) : k + 1 �
 }
 
 -- k + 1 ≤ n  ⟹  k < n: k < k + 1 ≤ n.
-automatic theorem Natural.lt_of_add_one_le (k n : Natural) (h : k + 1 ≤ n) : k < n :=
+automatic theorem Natural.lt_of_add_one_le (k n : ℕ) (h : k + 1 ≤ n) : k < n :=
   k
      < k + 1
      ≤ n
 
 -- k < n + 1  ⟹  k ≤ n: the gap collapses once the `+ 1` is cancelled.
-theorem Natural.le_of_lt_add_one (k n : Natural) (h : k < n + 1) : k ≤ n := {
+theorem Natural.le_of_lt_add_one (k n : ℕ) (h : k < n + 1) : k ≤ n := {
   choose gap such that k + (1 + gap) = n + 1 from Natural.lt_elim;
   (k + gap) + 1 = n + 1;
   k + gap = n by Natural.add_cancel_right;
@@ -413,25 +413,25 @@ theorem Natural.le_of_lt_add_one (k n : Natural) (h : k < n + 1) : k ≤ n := {
 }
 
 -- k < 1 + n  ⟹  k ≤ n: the `1 + n` face of the same collapse.
-theorem Natural.le_of_lt_one_plus (k n : Natural) (h : k < 1 + n) : k ≤ n := {
+theorem Natural.le_of_lt_one_plus (k n : ℕ) (h : k < 1 + n) : k ≤ n := {
   k < n + 1;
   done
 }
 
 -- 1 ≤ m  ⟹  0 < m: positivity in `<` form.
-theorem Natural.zero_lt_of_one_le (m : Natural) (h : 1 ≤ m) : 0 < m := {
+theorem Natural.zero_lt_of_one_le (m : ℕ) (h : 1 ≤ m) : 0 < m := {
   0 + 1 ≤ m;
   done
 }
 
 -- a < n  ⟹  a < n + 1 (the strict-order step, `+ 1` form).
-theorem Natural.lt_add_one_of_lt (a n : Natural) (h : a < n) : a < n + 1 :=
+theorem Natural.lt_add_one_of_lt (a n : ℕ) (h : a < n) : a < n + 1 :=
   a
      < n
      < n + 1
 
 -- a ≤ n  ⟹  a ≤ n + 1 (the weak-order step, `+ 1` form).
-theorem Natural.le_add_one_of_le (a n : Natural) (h : a ≤ n) : a ≤ n + 1 :=
+theorem Natural.le_add_one_of_le (a n : ℕ) (h : a ≤ n) : a ≤ n + 1 :=
   a
      ≤ n
      ≤ n + 1

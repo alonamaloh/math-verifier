@@ -34,8 +34,8 @@ import ComplexNumber.exponential
 import ComplexNumber.series
 
 -- The binomial coefficient C(n, k) as a complex number, embedded ℚ → ℝ → ℂ.
-definition ComplexNumber.binomialCoefficient (n k : Natural) : ComplexNumber :=
-  ComplexNumber.from_real(((Natural.binomial(n, k) : Rational) : Real))
+definition ComplexNumber.binomialCoefficient (n k : ℕ) : ℂ :=
+  ComplexNumber.from_real(((Natural.binomial(n, k) : ℚ) : ℝ))
 
 -- ℂ as a bundled commutative ring (commutativity from the quotient base).
 definition ComplexNumber.commutative_ring : CommutativeRing :=
@@ -44,12 +44,12 @@ definition ComplexNumber.commutative_ring : CommutativeRing :=
           Complex.definingPolynomial))
 
 -- The `1 + n` recursion unfold for ℂ's power.
-theorem ComplexNumber.power_add_one (x : ComplexNumber) (n : Natural)
+theorem ComplexNumber.power_add_one (x : ℂ) (n : ℕ)
         : x ^ (1 + n) = x * x ^ n :=
   done by substituting Natural.one_add
 
 -- Bridge 1: the bundled-ring power at `ComplexNumber.ring_bundle` is ℂ's.
-theorem ComplexNumber.power_eq_ring_power (x : ComplexNumber) (n : Natural)
+theorem ComplexNumber.power_eq_ring_power (x : ℂ) (n : ℕ)
         : Ring.power(ComplexNumber.ring_bundle, x, n) = x ^ n :=
   by induction on n with IH {
     case base: done
@@ -61,7 +61,7 @@ theorem ComplexNumber.power_eq_ring_power (x : ComplexNumber) (n : Natural)
   }
 
 -- Bridge 2: the bundled-ring sum is ℂ's partial sum over 1+n terms.
-theorem ComplexNumber.partialSum_eq_ring_sum (f : Natural → ComplexNumber) (n : Natural)
+theorem ComplexNumber.partialSum_eq_ring_sum (f : ℕ → ℂ) (n : ℕ)
         : Ring.Sum(ComplexNumber.ring_bundle, f, n) = ComplexNumber.partialSum(f, 1 + n) :=
   by induction on n with IH {
     case base:
@@ -78,29 +78,29 @@ theorem ComplexNumber.partialSum_eq_ring_sum (f : Natural → ComplexNumber) (n 
   }
 
 -- Bridge 3: the ring's Natural map is the ℕ → ℚ → ℝ → ℂ coefficient cast.
-theorem ComplexNumber.from_natural_eq_ring_from_natural (m : Natural)
+theorem ComplexNumber.from_natural_eq_ring_from_natural (m : ℕ)
         : Ring.from_natural(ComplexNumber.ring_bundle, m)
-          = ComplexNumber.from_real(((m : Rational) : Real)) :=
+          = ComplexNumber.from_real(((m : ℚ) : ℝ)) :=
   by induction on m with IH {
     case base:
         Ring.from_natural(ComplexNumber.ring_bundle, 0)
            = ComplexNumber.from_real(Real.zero)               by ComplexNumber.from_real.zero_preserves
-           = ComplexNumber.from_real(((0 : Rational) : Real))
+           = ComplexNumber.from_real(((0 : ℚ) : ℝ))
     case step(k):
         Ring.from_natural(ComplexNumber.ring_bundle, 1 + k)
            = Ring.from_natural(ComplexNumber.ring_bundle, 1) + Ring.from_natural(ComplexNumber.ring_bundle, k)
            = Ring.one(ComplexNumber.ring_bundle) + Ring.from_natural(ComplexNumber.ring_bundle, k)
            = ComplexNumber.from_real(Real.one) + Ring.from_natural(ComplexNumber.ring_bundle, k)
            = ComplexNumber.from_real(Real.one)
-             + ComplexNumber.from_real(((k : Rational) : Real))  by IH
-           = ComplexNumber.from_real(Real.one + ((k : Rational) : Real))
-           = ComplexNumber.from_real(((1 : Rational) : Real) + ((k : Rational) : Real))
-           = ComplexNumber.from_real((((1 + k : Natural) : Rational) : Real))
+             + ComplexNumber.from_real(((k : ℚ) : ℝ))  by IH
+           = ComplexNumber.from_real(Real.one + ((k : ℚ) : ℝ))
+           = ComplexNumber.from_real(((1 : ℚ) : ℝ) + ((k : ℚ) : ℝ))
+           = ComplexNumber.from_real((((1 + k : ℕ) : ℚ) : ℝ))
                  by Real.from_natural.add_preserves
   }
 
 -- The bundled-ring general term at ℂ is ℂ's binomial summand.
-theorem ComplexNumber.binomialTerm_cast (a b : ComplexNumber) (n k : Natural)
+theorem ComplexNumber.binomialTerm_cast (a b : ℂ) (n k : ℕ)
         : Ring.binomialTerm(ComplexNumber.ring_bundle, a, b, n, k)
           = ComplexNumber.binomialCoefficient(n, k)
             * (a ^ k * b ^ (n ∸ k)) :=
@@ -118,10 +118,10 @@ theorem ComplexNumber.binomialTerm_cast (a b : ComplexNumber) (n k : Natural)
 
 -- ----------------------------------------------------------------------
 -- Freek #44 on ℂ.
-theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
+theorem ComplexNumber.binomial_theorem (a b : ℂ) (n : ℕ)
         : (a + b) ^ n
           = ComplexNumber.partialSum(
-                (k : Natural) ↦
+                (k : ℕ) ↦
                     ComplexNumber.binomialCoefficient(n, k)
                     * (a ^ k
                        * b ^ (n ∸ k)),
@@ -130,15 +130,15 @@ theorem ComplexNumber.binomial_theorem (a b : ComplexNumber) (n : Natural)
      = Ring.power(ComplexNumber.ring_bundle, a + b, n)
            by ComplexNumber.power_eq_ring_power
      = Ring.Sum(ComplexNumber.ring_bundle,
-           (k : Natural) ↦ Ring.binomialTerm(ComplexNumber.ring_bundle, a, b, n, k), n)
+           (k : ℕ) ↦ Ring.binomialTerm(ComplexNumber.ring_bundle, a, b, n, k), n)
            by CommutativeRing.binomial_theorem(c := ComplexNumber.commutative_ring)
      = ComplexNumber.partialSum(
-           (k : Natural) ↦ Ring.binomialTerm(ComplexNumber.ring_bundle, a, b, n, k), 1 + n)
+           (k : ℕ) ↦ Ring.binomialTerm(ComplexNumber.ring_bundle, a, b, n, k), 1 + n)
            by ComplexNumber.partialSum_eq_ring_sum
      = ComplexNumber.partialSum(
-           (k : Natural) ↦
+           (k : ℕ) ↦
                ComplexNumber.binomialCoefficient(n, k)
                * (a ^ k * b ^ (n ∸ k)),
            1 + n)
            by ComplexNumber.partialSum_pointwise(
-                  pointwiseEqual := (k : Natural) ↦ ComplexNumber.binomialTerm_cast(a, b, n, k))
+                  pointwiseEqual := (k : ℕ) ↦ ComplexNumber.binomialTerm_cast(a, b, n, k))

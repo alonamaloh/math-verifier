@@ -44,7 +44,7 @@ import Integer.integral_domain
 
 inductive RationalRepresentative : Type(0) where
   | RationalRepresentative.make
-      : Integer → (denominator : Integer) → denominator ≠ Integer.zero
+      : ℤ → (denominator : ℤ) → denominator ≠ Integer.zero
         → RationalRepresentative
 
 -- (n1, d1) ~ (n2, d2) iff n1 · d2 = n2 · d1 in Integer. The nonzero proofs
@@ -124,11 +124,11 @@ instance Rational.equivalence
 -- The canonical introduction form: the class of the fraction n / d, given a
 -- proof that d is nonzero. Registered as a `construction` so proofs read
 -- `Rational.fraction(n, d, proof)` instead of the raw `Quotient.class_of`. The
--- `unfold Rational` pierces the opaque type once, here at the boundary.
+-- `unfold ℚ` pierces the opaque type once, here at the boundary.
 construction Rational.fraction
-        (n : Integer) (d : Integer) (denominatorNonzero : d ≠ Integer.zero)
-        : Rational :=
-  unfold Rational in Quotient.class_of(RationalRepresentative.make(n, d, denominatorNonzero))
+        (n : ℤ) (d : ℤ) (denominatorNonzero : d ≠ Integer.zero)
+        : ℚ :=
+  unfold ℚ in Quotient.class_of(RationalRepresentative.make(n, d, denominatorNonzero))
 
 -- ----------------------------------------------------------------------
 -- The boundary API. Every consumer compares rationals through these two
@@ -138,39 +138,39 @@ construction Rational.fraction
 
 -- Cross-equation ⇒ equal fractions (via Quotient.equivalent_implies_equal).
 automatic theorem Rational.fraction_equal
-        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
-        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (n1 d1 : ℤ) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : ℤ) (d2Nonzero : d2 ≠ Integer.zero)
         (crossEquation : n1 * d2 = n2 * d1)
         : Rational.fraction(n1, d1, d1Nonzero) = Rational.fraction(n2, d2, d2Nonzero) :=
-  unfold Rational in
+  unfold ℚ in
     Quotient.equivalent_implies_equal(RationalRepresentative.make(n1, d1, d1Nonzero),
                    RationalRepresentative.make(n2, d2, d2Nonzero),
                    crossEquation)
 
 -- Equal fractions ⇒ cross-equation (via Quotient.equal_implies_equivalent).
 theorem Rational.fraction_equal_implies
-        (n1 d1 : Integer) (d1Nonzero : d1 ≠ Integer.zero)
-        (n2 d2 : Integer) (d2Nonzero : d2 ≠ Integer.zero)
+        (n1 d1 : ℤ) (d1Nonzero : d1 ≠ Integer.zero)
+        (n2 d2 : ℤ) (d2Nonzero : d2 ≠ Integer.zero)
         (fractionEquality
             : Rational.fraction(n1, d1, d1Nonzero) = Rational.fraction(n2, d2, d2Nonzero))
         : n1 * d2 = n2 * d1 :=
   Quotient.equal_implies_equivalent(RationalRepresentative.make(n1, d1, d1Nonzero),
                  RationalRepresentative.make(n2, d2, d2Nonzero),
-                 unfold Rational in fractionEquality)
+                 unfold ℚ in fractionEquality)
 
 -- Division of two integers as a rational. The denominator's nonzeroness is
 -- a genuine side condition; the `/` operator leaves it for the auto-prover
 -- to discharge at the use site (a decidable `2 ≠ 0`, or a hypothesis in
 -- scope), so `a / b` reads plainly while staying mathematically honest.
 definition Integer.divide
-        (a : Integer) (b : Integer) (denominatorNonzero : b ≠ Integer.zero)
-        : Rational :=
+        (a : ℤ) (b : ℤ) (denominatorNonzero : b ≠ Integer.zero)
+        : ℚ :=
   Rational.fraction(a, b, denominatorNonzero)
 
 operator (/) on (Integer, Integer) := Integer.divide
 
-definition Rational.zero : Rational :=
+definition Rational.zero : ℚ :=
   Rational.fraction(Integer.zero, Integer.one, Integer.one_is_nonzero)
 
-definition Rational.one : Rational :=
+definition Rational.one : ℚ :=
   Rational.fraction(Integer.one, Integer.one, Integer.one_is_nonzero)

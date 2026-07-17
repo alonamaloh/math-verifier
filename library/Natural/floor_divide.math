@@ -1,6 +1,6 @@
 -- Natural/floor_divide.math
 --
--- Floor `Natural → Natural → Natural` division and modulo functions
+-- Floor `ℕ → ℕ → ℕ` division and modulo functions
 -- via fuel-based recursion. (`Natural.divide` is the honest ℚ-valued
 -- division, defined above ℚ in Rational/natural_division.math.) Pattern-matches on `p ∸ n`
 -- (a Natural) to decide "does p fit in n?" — Type-safe case analysis
@@ -52,7 +52,7 @@ definition Natural.Raw.floor_divide_step
         : (fuel divisor dividend : Natural.Raw) → Natural.Raw
   | zero,            _,       _        => Natural.Raw.zero
   | successor(fuel), divisor, dividend =>
-      unfold Natural in
+      unfold ℕ in
       Natural.Raw.select_on_zero(
           divisor ∸ dividend,
           -- divisor ≤ dividend: recurse with dividend - divisor, count one more.
@@ -64,13 +64,13 @@ definition Natural.Raw.floor_divide_step
 
 opaque definition Natural.floor_divide_step
         : (fuel divisor dividend : ℕ) → ℕ :=
-  unfold Natural in Natural.Raw.floor_divide_step
+  unfold ℕ in Natural.Raw.floor_divide_step
 
 definition Natural.Raw.modulo_step
         : (fuel divisor dividend : Natural.Raw) → Natural.Raw
   | zero,            _,       dividend => dividend
   | successor(fuel), divisor, dividend =>
-      unfold Natural in
+      unfold ℕ in
       Natural.Raw.select_on_zero(
           divisor ∸ dividend,
           -- divisor ≤ dividend: carry on with dividend - divisor.
@@ -81,7 +81,7 @@ definition Natural.Raw.modulo_step
 
 opaque definition Natural.modulo_step
         : (fuel divisor dividend : ℕ) → ℕ :=
-  unfold Natural in Natural.Raw.modulo_step
+  unfold ℕ in Natural.Raw.modulo_step
 
 -- Top-level functions in Lean's argument order (dividend, divisor),
 -- with fuel = dividend (always enough since each iteration reduces the
@@ -132,14 +132,14 @@ theorem Natural.floor_divide_step_succ_fits
         (pFits : p ∸ n = 0)
         : Natural.floor_divide_step(successor(fuel), p, n)
           = successor(Natural.floor_divide_step(fuel, p, n ∸ p)) :=
-  done by substituting pFits unfolding Natural.floor_divide_step, Natural
+  done by substituting pFits unfolding Natural.floor_divide_step, ℕ
 
 theorem Natural.modulo_step_succ_fits
         (fuel p n : ℕ)
         (pFits : p ∸ n = 0)
         : Natural.modulo_step(successor(fuel), p, n)
           = Natural.modulo_step(fuel, p, n ∸ p) :=
-  done by substituting pFits unfolding Natural.modulo_step, Natural
+  done by substituting pFits unfolding Natural.modulo_step, ℕ
 
 -- Successor fuel, p > n (p ∸ n = successor(predM)): no
 -- recursion; divide returns 0, modulo carries n. Substituting along
@@ -148,13 +148,13 @@ theorem Natural.floor_divide_step_succ_too_big
         (fuel p n predM : ℕ)
         (pTooBig : p ∸ n = successor(predM))
         : Natural.floor_divide_step(successor(fuel), p, n) = 0 :=
-  done by substituting pTooBig unfolding Natural.floor_divide_step, Natural
+  done by substituting pTooBig unfolding Natural.floor_divide_step, ℕ
 
 theorem Natural.modulo_step_succ_too_big
         (fuel p n predM : ℕ)
         (pTooBig : p ∸ n = successor(predM))
         : Natural.modulo_step(successor(fuel), p, n) = n :=
-  done by substituting pTooBig unfolding Natural.modulo_step, Natural
+  done by substituting pTooBig unfolding Natural.modulo_step, ℕ
 
 -- ----------------------------------------------------------------------
 -- The division-by-zero conventions, aligned with Lean's `Nat.div`/`Nat.mod`:
@@ -200,7 +200,7 @@ theorem Natural.monus_zero_implies_decompose (divisor : ℕ)
         : ∀ (dividend : ℕ).
           divisor ∸ dividend = 0
           → dividend = divisor + (dividend ∸ divisor) :=
-  unfold Natural.add, Natural in
+  unfold Natural.add, ℕ in
   by induction on divisor with IH {
     case zero: {
         take dividend : ℕ;
@@ -323,7 +323,7 @@ theorem Natural.floor_divide_modulo_decompose (dividend divisor : ℕ)
 -- the kernel goal type with the in-hand proof.
 automatic theorem Natural.monus_le_self (n : ℕ)
         : ∀ (d : ℕ). n ∸ d ≤ n :=
-  unfold Natural.add, Natural in
+  unfold Natural.add, ℕ in
   by induction on n with IH {
     case zero: {
         take d : ℕ;
@@ -352,7 +352,7 @@ theorem Natural.monus_succ_implies_gt (d : ℕ)
         : ∀ (n predM : ℕ).
           d ∸ n = successor(predM)
           → successor(n) ≤ d :=
-  unfold Natural.add, Natural in
+  unfold Natural.add, ℕ in
   by induction on d with IH {
     case zero: {
         take n : ℕ;
@@ -483,7 +483,7 @@ automatic theorem Natural.modulo_lt
 -- Helper: (a + b) ∸ a = b. Subtracting `a` from `a + b` gives `b`.
 theorem Natural.monus_add_cancel (a : ℕ)
         : ∀ (b : ℕ). (a + b) ∸ a = b :=
-  unfold Natural.add, Natural in
+  unfold Natural.add, ℕ in
   by induction on a with IH {
     case zero: {
         take b : ℕ;
@@ -499,7 +499,7 @@ theorem Natural.monus_add_cancel (a : ℕ)
 -- Helper: d ∸ (d + m) = 0 (d ≤ d + m, so subtraction is zero).
 theorem Natural.monus_self_plus (d : ℕ)
         : ∀ (m : ℕ). d ∸ (d + m) = 0 :=
-  unfold Natural.add, Natural in
+  unfold Natural.add, ℕ in
   by induction on d with IH {
     case zero: {
         take m : ℕ;

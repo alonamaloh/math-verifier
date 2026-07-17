@@ -39,12 +39,12 @@ import Real.negation
 -- whose absolute value is Rational.zero < ε. So N = 0 witnesses.
 theorem CauchyRationalSequence.equivalent_when_sequenceFunction_equal
         (rep1 rep2 : CauchyRationalSequence)
-        (pointwiseEq : ∀ (n : Natural). rep1(n) = rep2(n))
+        (pointwiseEq : ∀ (n : ℕ). rep1(n) = rep2(n))
         : CauchyEquivalent(rep1, rep2) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦
+        (m : ℕ) (_ : 0 ≤ m) ↦
           abs(rep1(m) - rep2(m))
              = abs(rep2(m) - rep2(m))
                   by pointwiseEq(m)
@@ -59,8 +59,8 @@ theorem CauchyRationalSequence.equivalent_when_sequenceFunction_equal
 -- the quotient machinery directly.
 theorem Real.equal_of_pointwise_sequence
         (rep1 rep2 : CauchyRationalSequence)
-        (pointwiseEqual : ∀ (n : Natural). rep1(n) = rep2(n))
-        : (Quotient.class_of(rep1) : Real) = Quotient.class_of(rep2) :=
+        (pointwiseEqual : ∀ (n : ℕ). rep1(n) = rep2(n))
+        : (Quotient.class_of(rep1) : ℝ) = Quotient.class_of(rep2) :=
   -- A proof of the equivalence where the class-equality is expected
   -- auto-wraps Quotient.equivalent_implies_equal (WS3 equality-of-classes
   -- coercion) — the one designated quotient-boundary point for the ring laws.
@@ -70,40 +70,40 @@ theorem Real.equal_of_pointwise_sequence
 -- ----------------------------------------------------------------------
 -- Add is commutative on Real. Pick representatives; the pointwise
 -- equality is exactly Rational.add_commutative.
-automatic theorem Real.add_commutative (x y : Real) : Real.add(x, y) = Real.add(y, x) :=
+automatic theorem Real.add_commutative (x y : ℝ) : Real.add(x, y) = Real.add(y, x) :=
   by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩ => {
-    ∀ (n : Natural). sx(n) + sy(n) = sy(n) + sx(n) by Rational.add_commutative;
+    ∀ (n : ℕ). sx(n) + sy(n) = sy(n) + sx(n) by Rational.add_commutative;
     done
   }
 
 -- Add is associative on Real. Pick representatives; the pointwise
 -- equality is Rational.add_associative.
-automatic theorem Real.add_associative (x y z : Real)
+automatic theorem Real.add_associative (x y z : ℝ)
         : Real.add(Real.add(x, y), z) = Real.add(x, Real.add(y, z)) :=
   by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩,
                      z as ⟨sz, szCauchy⟩ => {
-    ∀ (n : Natural).
+    ∀ (n : ℕ).
         (sx(n) + sy(n)) + sz(n) = sx(n) + (sy(n) + sz(n)) by Rational.add_associative;
     done
   }
 
 -- 0 + x = x on Real. Use the constant-zero sequence for the zero.
 theorem Real.zero_add
-        (x : Real)
+        (x : ℝ)
         : Real.add(Real.zero, x) = x :=
   by_representatives x as rep_x =>
     Real.equal_of_pointwise_sequence(
         CauchyRationalSequence.add(
             Rational.to_cauchy_constant(Rational.zero), rep_x),
         rep_x,
-        (n : Natural) ↦
+        (n : ℕ) ↦
           (Rational.to_cauchy_constant(Rational.zero) + rep_x)(n)
              = Rational.zero + rep_x(n)
              = rep_x(n))
 
 -- x + 0 = x via add_commutative + zero_add.
 theorem Real.add_zero
-        (x : Real)
+        (x : ℝ)
         : Real.add(x, Real.zero) = x :=
   Real.add(x, Real.zero)
      = Real.add(Real.zero, x)
@@ -111,21 +111,21 @@ theorem Real.add_zero
 
 -- x + (-x) = 0 on Real.
 theorem Real.add_negate_right
-        (x : Real)
+        (x : ℝ)
         : Real.add(x, Real.negate(x)) = Real.zero :=
   by_representatives x as rep_x =>
     Real.equal_of_pointwise_sequence(
         CauchyRationalSequence.add(
             rep_x, CauchyRationalSequence.negate(rep_x)),
         Rational.to_cauchy_constant(Rational.zero),
-        (n : Natural) ↦
+        (n : ℕ) ↦
           (rep_x + CauchyRationalSequence.negate(rep_x))(n)
              = rep_x(n) + -rep_x(n)
              = Rational.zero)
 
 -- (-x) + x = 0 via add_commutative + add_negate_right.
 automatic theorem Real.add_negate_left
-        (x : Real)
+        (x : ℝ)
         : Real.add(Real.negate(x), x) = Real.zero :=
   Real.add(Real.negate(x), x)
      = Real.add(x, Real.negate(x))
@@ -133,34 +133,34 @@ automatic theorem Real.add_negate_left
 
 
 -- -(-x) = x on Real. Lift the pointwise Rational.negate_negate.
-theorem Real.negate_negate (x : Real) : Real.negate(Real.negate(x)) = x :=
+theorem Real.negate_negate (x : ℝ) : Real.negate(Real.negate(x)) = x :=
   by_representatives x as rep_x =>
     Real.equal_of_pointwise_sequence(
         CauchyRationalSequence.negate(CauchyRationalSequence.negate(rep_x)),
         rep_x,
-        (n : Natural) ↦
+        (n : ℕ) ↦
           CauchyRationalSequence.negate(CauchyRationalSequence.negate(rep_x))(n)
              = -(-rep_x(n))
              = rep_x(n))
 
 -- -(x + y) = -x + -y on Real. Pick representatives; pointwise it is
 -- Rational.negate_add.
-theorem Real.negate_add (x y : Real) : -(x + y) = -x + -y :=
+theorem Real.negate_add (x y : ℝ) : -(x + y) = -x + -y :=
   by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩ => {
-    ∀ (n : Natural). -(sx(n) + sy(n)) = -sx(n) + -sy(n) by Rational.negate_add;
+    ∀ (n : ℕ). -(sx(n) + sy(n)) = -sx(n) + -sy(n) by Rational.negate_add;
     done
   }
 
 -- The Rational → Real embedding is a homomorphism of addition:
--- (a + b : Real) = (a : Real) + (b : Real). At rep level the LHS is
+-- (a + b : ℝ) = (a : ℝ) + (b : ℝ). At rep level the LHS is
 -- mk(const_(a+b)) and the RHS is mk(add(const_a, const_b));
 -- pointwise both sides give a + b at every index.
-theorem Rational.to_real_add (a b : Rational)
-        : ((a + b) : Real) = a + b := {
-  ∀ (n : Natural).
+theorem Rational.to_real_add (a b : ℚ)
+        : ((a + b) : ℝ) = a + b := {
+  ∀ (n : ℕ).
       Rational.to_cauchy_constant(a + b)(n)
       = (Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b))(n)
-    by (n : Natural) ↦
+    by (n : ℕ) ↦
       Rational.to_cauchy_constant(a + b)(n)
          = a + b
          = (Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b))(n);

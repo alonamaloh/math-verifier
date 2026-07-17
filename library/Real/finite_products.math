@@ -54,23 +54,23 @@ import Real.power
 
 -- Finite products Π_{k<n} s(k) — the multiplicative instance of the
 -- generic aggregation, over Real's multiplicative commutative monoid.
-definition Real.partialProduct (s : Natural → Real) (n : Natural) : Real :=
-  Algebra.indexedAggregate(Real, Real.multiply, Real.one, s, n)
+definition Real.partialProduct (s : ℕ → ℝ) (n : ℕ) : ℝ :=
+  Algebra.indexedAggregate(ℝ, Real.multiply, Real.one, s, n)
 
 -- The recursion unfold: one more factor is the (n)-th term.
-theorem Real.partialProduct_add_one (s : Natural → Real) (n : Natural)
+theorem Real.partialProduct_add_one (s : ℕ → ℝ) (n : ℕ)
         : Real.partialProduct(s, 1 + n) = Real.partialProduct(s, n) * s(n) :=
   done by Algebra.indexedAggregate_add_one
 
 -- Products of nonnegative terms are nonnegative.
-theorem Real.partialProduct_nonneg (s : Natural → Real) (n : Natural)
-        (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
+theorem Real.partialProduct_nonneg (s : ℕ → ℝ) (n : ℕ)
+        (termsNonneg : ∀ (j : ℕ). Real.zero ≤ s(j))
         : Real.zero ≤ Real.partialProduct(s, n) :=
   by induction on n with IH {
     case zero: {
         Rational.zero < Rational.one;
         Real.zero < Rational.one;
-        Real.zero ≤ (Rational.one : Real);
+        Real.zero ≤ (Rational.one : ℝ);
         done
       }
     case n = 1 + predecessor for some predecessor: {
@@ -86,24 +86,24 @@ theorem Real.partialProduct_nonneg (s : Natural → Real) (n : Natural)
   }
 
 -- Splitting a product at a cut.
-theorem Real.partialProduct_split (s : Natural → Real) (n k : Natural)
+theorem Real.partialProduct_split (s : ℕ → ℝ) (n k : ℕ)
         : Real.partialProduct(s, k + n)
           = Real.partialProduct(s, n)
-            * Real.partialProduct((j : Natural) ↦ s(n + j), k) :=
+            * Real.partialProduct((j : ℕ) ↦ s(n + j), k) :=
   Algebra.indexedAggregate_split(associativity := Real.multiply_associative,
       identityRight := Real.multiply_one)
 
 -- A constant factor exits as its n-th power.
-theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural)
-        : Real.partialProduct((k : Natural) ↦ c * s(k), n)
+theorem Real.partialProduct_scale (c : ℝ) (s : ℕ → ℝ) (n : ℕ)
+        : Real.partialProduct((k : ℕ) ↦ c * s(k), n)
           = c ^ n * Real.partialProduct(s, n) :=
   by induction on n with IH {
     case zero:
-        Real.partialProduct((k : Natural) ↦ c * s(k), 0)
+        Real.partialProduct((k : ℕ) ↦ c * s(k), 0)
            = c ^ 0 * Real.partialProduct(s, 0)
     case n = 1 + predecessor for some predecessor:
-        Real.partialProduct((k : Natural) ↦ c * s(k), 1 + predecessor)
-           = Real.partialProduct((k : Natural) ↦ c * s(k), predecessor)
+        Real.partialProduct((k : ℕ) ↦ c * s(k), 1 + predecessor)
+           = Real.partialProduct((k : ℕ) ↦ c * s(k), predecessor)
              * (c * s(predecessor))
            = (c ^ predecessor * Real.partialProduct(s, predecessor))
              * (c * s(predecessor))
@@ -115,8 +115,8 @@ theorem Real.partialProduct_scale (c : Real) (s : Natural → Real) (n : Natural
 
 -- Products only see the terms' values.
 theorem Real.partialProduct_pointwise
-        (s sequencePrime : Natural → Real)
-        (pointwiseEqual : ∀ (k : Natural). s(k) = sequencePrime(k))
-        (n : Natural)
+        (s sequencePrime : ℕ → ℝ)
+        (pointwiseEqual : ∀ (k : ℕ). s(k) = sequencePrime(k))
+        (n : ℕ)
         : Real.partialProduct(s, n) = Real.partialProduct(sequencePrime, n) :=
   Algebra.indexedAggregate_pointwise(pointwiseEqual := pointwiseEqual)

@@ -3,7 +3,7 @@
 -- The Fundamental Theorem of Arithmetic (Freek #80): every n ≥ 1 is a
 -- product of primes, uniquely up to order.
 --
--- Factorizations are `List(Natural)`; `listProduct` folds multiplication.
+-- Factorizations are `List(ℕ)`; `listProduct` folds multiplication.
 -- Existence is strong induction on n (peel off a prime divisor and
 -- recurse on the quotient). Uniqueness reuses the polymorphic permutation
 -- machinery (`Lists/permutation.math`): two prime lists with equal
@@ -37,14 +37,14 @@ import Lists.permutation
 -- ----------------------------------------------------------------------
 -- Two primes, one dividing the other, are equal.
 
-theorem Natural.prime_equals_of_prime_divides (p q : Natural)
+theorem Natural.prime_equals_of_prime_divides (p q : ℕ)
         (pPrime : Natural.is_prime(p)) (qPrime : Natural.is_prime(q))
         (pDividesQ : p ∣ q)
         : p = q := {
   p = 1 ∨ p = q;
   done by cases {
     case p = 1 as pEqualsOne: {
-      (2 : Natural) ≤ 1;
+      (2 : ℕ) ≤ 1;
       False;
       done
     }
@@ -56,38 +56,38 @@ theorem Natural.prime_equals_of_prime_divides (p q : Natural)
 -- ----------------------------------------------------------------------
 -- Euclid over a list: a prime dividing a prime list's product is a member.
 
-theorem Natural.prime_member_of_divides_product (p : Natural)
-        (pPrime : Natural.is_prime(p)) (list : List(Natural))
-        : (∀ (k : Natural). k ∈ list → Natural.is_prime(k))
+theorem Natural.prime_member_of_divides_product (p : ℕ)
+        (pPrime : Natural.is_prime(p)) (list : List(ℕ))
+        : (∀ (k : ℕ). k ∈ list → Natural.is_prime(k))
           → p ∣ Natural.listProduct(list)
           → p ∈ list :=
   by induction on list with inductionHypothesis {
     case List.empty: {
-      suppose (∀ (k : Natural). k ∈ List.empty(Natural) → Natural.is_prime(k)) as _;
-      suppose p ∣ Natural.listProduct(List.empty(Natural)) as _;
+      suppose (∀ (k : ℕ). k ∈ List.empty(ℕ) → Natural.is_prime(k)) as _;
+      suppose p ∣ Natural.listProduct(List.empty(ℕ)) as _;
       p ∣ 1;
       p = 1;
-      (2 : Natural) ≤ 1;
+      (2 : ℕ) ≤ 1;
       False;
       done
     }
     case List.prepend(head, tail): {
-      suppose (∀ (k : Natural). k ∈ List.prepend(Natural, head, tail) → Natural.is_prime(k)) as allPrime;
-      suppose p ∣ Natural.listProduct(List.prepend(Natural, head, tail)) as _;
+      suppose (∀ (k : ℕ). k ∈ List.prepend(ℕ, head, tail) → Natural.is_prime(k)) as allPrime;
+      suppose p ∣ Natural.listProduct(List.prepend(ℕ, head, tail)) as _;
       p ∣ head * Natural.listProduct(tail);
       (p ∣ head) ∨ (p ∣ Natural.listProduct(tail)) by Natural.prime_divides_product;
       done by cases {
         case p ∣ head as pDividesHead: {
-          head ∈ List.prepend(Natural, head, tail);
+          head ∈ List.prepend(ℕ, head, tail);
           Natural.is_prime(head);
           p = head;
           done
         }
         case p ∣ Natural.listProduct(tail) as pDividesTail: {
-          ∀ (k : Natural). k ∈ tail → Natural.is_prime(k) by {
-            take k : Natural;
+          ∀ (k : ℕ). k ∈ tail → Natural.is_prime(k) by {
+            take k : ℕ;
             suppose k ∈ tail as _;
-            k ∈ List.prepend(Natural, head, tail);
+            k ∈ List.prepend(ℕ, head, tail);
             done
           };
           p ∈ tail by inductionHypothesis;
@@ -100,24 +100,24 @@ theorem Natural.prime_member_of_divides_product (p : Natural)
 -- ----------------------------------------------------------------------
 -- A prime list with product 1 is empty.
 
-theorem Natural.prime_list_product_one_implies_empty (list : List(Natural))
-        : (∀ (k : Natural). k ∈ list → Natural.is_prime(k))
+theorem Natural.prime_list_product_one_implies_empty (list : List(ℕ))
+        : (∀ (k : ℕ). k ∈ list → Natural.is_prime(k))
           → Natural.listProduct(list) = 1
-          → list = List.empty(Natural) :=
+          → list = List.empty(ℕ) :=
   done by cases {
-    case list = List.empty(Natural): {
-        suppose (∀ (k : Natural). k ∈ List.empty(Natural) → Natural.is_prime(k)) as _;
-        suppose Natural.listProduct(List.empty(Natural)) = 1 as _;
+    case list = List.empty(ℕ): {
+        suppose (∀ (k : ℕ). k ∈ List.empty(ℕ) → Natural.is_prime(k)) as _;
+        suppose Natural.listProduct(List.empty(ℕ)) = 1 as _;
         done
       }
-    case list = List.prepend(Natural, head, tail) for some (head : Natural), (tail : List(Natural)): {
-        suppose (∀ (k : Natural). k ∈ List.prepend(Natural, head, tail) → Natural.is_prime(k)) as allPrime;
-        suppose Natural.listProduct(List.prepend(Natural, head, tail)) = 1 as _;
-        head ∈ List.prepend(Natural, head, tail);
+    case list = List.prepend(ℕ, head, tail) for some (head : ℕ), (tail : List(ℕ)): {
+        suppose (∀ (k : ℕ). k ∈ List.prepend(ℕ, head, tail) → Natural.is_prime(k)) as allPrime;
+        suppose Natural.listProduct(List.prepend(ℕ, head, tail)) = 1 as _;
+        head ∈ List.prepend(ℕ, head, tail);
         Natural.is_prime(head);
-        head ∣ 1 by witness Natural.listProduct(tail) with { (1 : Natural) = head * Natural.listProduct(tail) };
+        head ∣ 1 by witness Natural.listProduct(tail) with { (1 : ℕ) = head * Natural.listProduct(tail) };
         head = 1;
-        (2 : Natural) ≤ 1;
+        (2 : ℕ) ≤ 1;
         False;
         done
       }
@@ -126,22 +126,22 @@ theorem Natural.prime_list_product_one_implies_empty (list : List(Natural))
 -- ----------------------------------------------------------------------
 -- Existence: every n ≥ 1 is a product of primes.
 
-theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 ≤ n)
-        : ∃ (list : List(Natural)).
-            (∀ (k : Natural). k ∈ list → Natural.is_prime(k))
+theorem Natural.prime_factorization_exists_list (n : ℕ) (atLeastOne : 1 ≤ n)
+        : ∃ (list : List(ℕ)).
+            (∀ (k : ℕ). k ∈ list → Natural.is_prime(k))
             ∧ Natural.listProduct(list) = n :=
   (by induction on n using Natural.strong_induction with subject, inductionHypothesis {
      suppose 1 ≤ subject as _;
      done by cases {
        case subject = 1 as subjectEqualsOne:
-           witness List.empty(Natural) with {
-             (∀ (k : Natural). k ∈ List.empty(Natural) → Natural.is_prime(k)) by {
-               take k : Natural;
-               suppose k ∈ List.empty(Natural) as _;
+           witness List.empty(ℕ) with {
+             (∀ (k : ℕ). k ∈ List.empty(ℕ) → Natural.is_prime(k)) by {
+               take k : ℕ;
+               suppose k ∈ List.empty(ℕ) as _;
                False by List.no_member_empty;
                done
              };
-             Natural.listProduct(List.empty(Natural)) = subject;
+             Natural.listProduct(List.empty(ℕ)) = subject;
              done
            }
        case 2 ≤ subject as subjectAtLeastTwo: {
@@ -154,13 +154,13 @@ theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 �
            quotient < prime * quotient;
            quotient < subject;
            choose tail such that
-               (∀ (k : Natural). k ∈ tail → Natural.is_prime(k))
+               (∀ (k : ℕ). k ∈ tail → Natural.is_prime(k))
                ∧ Natural.listProduct(tail) = quotient
                from inductionHypothesis(quotient, (quotient < subject))(quotientAtLeastOne);
-           witness List.prepend(Natural, prime, tail) with {
-             (∀ (k : Natural). k ∈ List.prepend(Natural, prime, tail) → Natural.is_prime(k)) by {
-               take k : Natural;
-               suppose k ∈ List.prepend(Natural, prime, tail) as _;
+           witness List.prepend(ℕ, prime, tail) with {
+             (∀ (k : ℕ). k ∈ List.prepend(ℕ, prime, tail) → Natural.is_prime(k)) by {
+               take k : ℕ;
+               suppose k ∈ List.prepend(ℕ, prime, tail) as _;
                k = prime ∨ k ∈ tail by List.member_prepend_invert;
                done by cases {
                  case k = prime as kEqualsPrime:
@@ -169,7 +169,7 @@ theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 �
                      done
                }
              };
-             Natural.listProduct(List.prepend(Natural, prime, tail))
+             Natural.listProduct(List.prepend(ℕ, prime, tail))
                 = prime * Natural.listProduct(tail)
                 = prime * quotient
                 = subject;
@@ -179,70 +179,70 @@ theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 �
      }
    }
    : 1 ≤ n
-     → ∃ (list : List(Natural)).
-         (∀ (k : Natural). k ∈ list → Natural.is_prime(k))
+     → ∃ (list : List(ℕ)).
+         (∀ (k : ℕ). k ∈ list → Natural.is_prime(k))
          ∧ Natural.listProduct(list) = n
    )(atLeastOne)
 
 -- ----------------------------------------------------------------------
 -- Uniqueness: prime lists with equal product are permutations.
 
-theorem Natural.prime_factorization_unique (l1 : List(Natural))
-        : ∀ (l2 : List(Natural)).
-          (∀ (k : Natural). k ∈ l1 → Natural.is_prime(k))
-          → (∀ (k : Natural). k ∈ l2 → Natural.is_prime(k))
+theorem Natural.prime_factorization_unique (l1 : List(ℕ))
+        : ∀ (l2 : List(ℕ)).
+          (∀ (k : ℕ). k ∈ l1 → Natural.is_prime(k))
+          → (∀ (k : ℕ). k ∈ l2 → Natural.is_prime(k))
           → Natural.listProduct(l1) = Natural.listProduct(l2)
-          → List.Permutation(Natural, l1, l2) :=
+          → List.Permutation(ℕ, l1, l2) :=
   by induction on l1 with inductionHypothesis {
     case List.empty: {
-      take l2 : List(Natural);
-      suppose (∀ (k : Natural). k ∈ List.empty(Natural) → Natural.is_prime(k)) as _;
-      suppose (∀ (k : Natural). k ∈ l2 → Natural.is_prime(k)) as _;
-      suppose Natural.listProduct(List.empty(Natural)) = Natural.listProduct(l2) as _;
-      l2 = List.empty(Natural) by Natural.prime_list_product_one_implies_empty;
+      take l2 : List(ℕ);
+      suppose (∀ (k : ℕ). k ∈ List.empty(ℕ) → Natural.is_prime(k)) as _;
+      suppose (∀ (k : ℕ). k ∈ l2 → Natural.is_prime(k)) as _;
+      suppose Natural.listProduct(List.empty(ℕ)) = Natural.listProduct(l2) as _;
+      l2 = List.empty(ℕ) by Natural.prime_list_product_one_implies_empty;
       done
     }
     case List.prepend(p, rest1): {
-      take l2 : List(Natural);
-      suppose (∀ (k : Natural). k ∈ List.prepend(Natural, p, rest1) → Natural.is_prime(k)) as allPrime1;
-      suppose (∀ (k : Natural). k ∈ l2 → Natural.is_prime(k)) as allPrime2;
-      suppose Natural.listProduct(List.prepend(Natural, p, rest1)) = Natural.listProduct(l2) as _;
-      p ∈ List.prepend(Natural, p, rest1);
+      take l2 : List(ℕ);
+      suppose (∀ (k : ℕ). k ∈ List.prepend(ℕ, p, rest1) → Natural.is_prime(k)) as allPrime1;
+      suppose (∀ (k : ℕ). k ∈ l2 → Natural.is_prime(k)) as allPrime2;
+      suppose Natural.listProduct(List.prepend(ℕ, p, rest1)) = Natural.listProduct(l2) as _;
+      p ∈ List.prepend(ℕ, p, rest1);
       Natural.is_prime(p);
       p ∣ Natural.listProduct(l2)
           by witness Natural.listProduct(rest1) with
               { Natural.listProduct(l2) = p * Natural.listProduct(rest1) };
       p ∈ l2;
       -- Rotate p to the front of l2, then cancel it.
-      ∃ (rest : List(Natural)). List.Permutation(Natural, l2, List.prepend(Natural, p, rest))
+      ∃ (rest : List(ℕ)). List.Permutation(ℕ, l2, List.prepend(ℕ, p, rest))
           by List.Permutation.extract;
-      choose l2rest such that List.Permutation(Natural, l2, List.prepend(Natural, p, l2rest));
+      choose l2rest such that List.Permutation(ℕ, l2, List.prepend(ℕ, p, l2rest));
       Natural.listProduct(l2)
-                = Natural.listProduct(List.prepend(Natural, p, l2rest))
+                = Natural.listProduct(List.prepend(ℕ, p, l2rest))
                 = p * Natural.listProduct(l2rest);
       p * Natural.listProduct(rest1)
          = Natural.listProduct(l2)
          = p * Natural.listProduct(l2rest);
       1 ≤ p;
       Natural.listProduct(rest1) = Natural.listProduct(l2rest);
-      ∀ (k : Natural). k ∈ rest1 → Natural.is_prime(k) by {
-        take k : Natural;
+      ∀ (k : ℕ). k ∈ rest1 → Natural.is_prime(k) by {
+        take k : ℕ;
         suppose k ∈ rest1 as _;
-        k ∈ List.prepend(Natural, p, rest1);
+        k ∈ List.prepend(ℕ, p, rest1);
         done
       };
-      ∀ (k : Natural). k ∈ l2rest → Natural.is_prime(k) by {
-        take k : Natural;
+      ∀ (k : ℕ). k ∈ l2rest → Natural.is_prime(k) by {
+        take k : ℕ;
         suppose k ∈ l2rest as memberL2rest;
-        List.Permutation(Natural, List.prepend(Natural, p, l2rest), l2) by List.Permutation.symmetric;
-        k ∈ List.prepend(Natural, p, l2rest);
+        List.Permutation(ℕ, List.prepend(ℕ, p, l2rest), l2) by List.Permutation.symmetric;
+        k ∈ List.prepend(ℕ, p, l2rest);
         k ∈ l2 by List.Permutation.member_forward;
         done
       };
-      List.Permutation(Natural, rest1, l2rest) by inductionHypothesis;
-      List.Permutation(Natural, List.prepend(Natural, p, l2rest), l2)
+      List.Permutation(ℕ, rest1, l2rest) by inductionHypothesis;
+      List.Permutation(ℕ, List.prepend(ℕ, p, l2rest), l2)
           by List.Permutation.symmetric;
-      List.Permutation(Natural, List.prepend(Natural, p, rest1), List.prepend(Natural, p, l2rest));
+      List.Permutation(ℕ, List.prepend(ℕ, p, rest1), List.prepend(ℕ, p, l2rest));
       done
     }
   }
@@ -250,29 +250,29 @@ theorem Natural.prime_factorization_unique (l1 : List(Natural))
 -- ----------------------------------------------------------------------
 -- The Fundamental Theorem of Arithmetic: existence + uniqueness.
 
-theorem Natural.fundamental_theorem_of_arithmetic (n : Natural) (atLeastOne : 1 ≤ n)
-        : (∃ (list : List(Natural)).
-              (∀ (k : Natural). k ∈ list → Natural.is_prime(k))
+theorem Natural.fundamental_theorem_of_arithmetic (n : ℕ) (atLeastOne : 1 ≤ n)
+        : (∃ (list : List(ℕ)).
+              (∀ (k : ℕ). k ∈ list → Natural.is_prime(k))
               ∧ Natural.listProduct(list) = n)
-          ∧ (∀ (l1 l2 : List(Natural)).
-                (∀ (k : Natural). k ∈ l1 → Natural.is_prime(k))
-                → (∀ (k : Natural). k ∈ l2 → Natural.is_prime(k))
+          ∧ (∀ (l1 l2 : List(ℕ)).
+                (∀ (k : ℕ). k ∈ l1 → Natural.is_prime(k))
+                → (∀ (k : ℕ). k ∈ l2 → Natural.is_prime(k))
                 → Natural.listProduct(l1) = n
                 → Natural.listProduct(l2) = n
-                → List.Permutation(Natural, l1, l2)) := {
-  (∃ (list : List(Natural)).
-            (∀ (k : Natural). k ∈ list → Natural.is_prime(k))
+                → List.Permutation(ℕ, l1, l2)) := {
+  (∃ (list : List(ℕ)).
+            (∀ (k : ℕ). k ∈ list → Natural.is_prime(k))
             ∧ Natural.listProduct(list) = n);
-  (∀ (l1 l2 : List(Natural)).
-            (∀ (k : Natural). k ∈ l1 → Natural.is_prime(k))
-            → (∀ (k : Natural). k ∈ l2 → Natural.is_prime(k))
+  (∀ (l1 l2 : List(ℕ)).
+            (∀ (k : ℕ). k ∈ l1 → Natural.is_prime(k))
+            → (∀ (k : ℕ). k ∈ l2 → Natural.is_prime(k))
             → Natural.listProduct(l1) = n
             → Natural.listProduct(l2) = n
-            → List.Permutation(Natural, l1, l2)) by {
-    take l1 : List(Natural);
-    take l2 : List(Natural);
-    suppose (∀ (k : Natural). k ∈ l1 → Natural.is_prime(k)) as _;
-    suppose (∀ (k : Natural). k ∈ l2 → Natural.is_prime(k)) as _;
+            → List.Permutation(ℕ, l1, l2)) by {
+    take l1 : List(ℕ);
+    take l2 : List(ℕ);
+    suppose (∀ (k : ℕ). k ∈ l1 → Natural.is_prime(k)) as _;
+    suppose (∀ (k : ℕ). k ∈ l2 → Natural.is_prime(k)) as _;
     suppose Natural.listProduct(l1) = n as _;
     suppose Natural.listProduct(l2) = n as _;
     Natural.listProduct(l1) = n = Natural.listProduct(l2);

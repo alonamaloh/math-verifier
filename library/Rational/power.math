@@ -51,7 +51,7 @@ import Rational.archimedean
 
 -- ----------------------------------------------------------------------
 -- cⁿ, by recursion on the exponent.
-definition Rational.power (base : Rational) : Natural → Rational
+definition Rational.power (base : ℚ) : ℕ → ℚ
   | 0 => Rational.one
   | 1 + n => base * Rational.power(base, n)
 
@@ -59,13 +59,13 @@ operator (^) on (Rational, Natural) := Rational.power
 
 -- The recursion characterised in `1 + n` form, so consumers step the
 -- exponent without naming `successor`.
-theorem Rational.power_add_one (base : Rational) (n : Natural)
+theorem Rational.power_add_one (base : ℚ) (n : ℕ)
         : base ^ (1 + n) = base * base ^ n :=
   done
 
 -- Powers of a nonnegative base are nonnegative.
 theorem Rational.power_nonneg
-        (base : Rational) (baseNonneg : Rational.zero ≤ base) (n : Natural)
+        (base : ℚ) (baseNonneg : Rational.zero ≤ base) (n : ℕ)
         : Rational.zero ≤ base ^ n :=
   by induction on n with IH {
     case base: {
@@ -83,18 +83,18 @@ theorem Rational.power_nonneg
 
 -- ----------------------------------------------------------------------
 -- 1 + n·step, by recursion — the Bernoulli linear factor.
-definition Rational.linearGrowth (step : Rational) : Natural → Rational
+definition Rational.linearGrowth (step : ℚ) : ℕ → ℚ
   | 0 => Rational.one
   | 1 + n => Rational.linearGrowth(step, n) + step
 
 -- The recursion characterised in `1 + n` form (successor-free stepping).
-theorem Rational.linearGrowth_add_one (step : Rational) (n : Natural)
+theorem Rational.linearGrowth_add_one (step : ℚ) (n : ℕ)
         : Rational.linearGrowth(step, 1 + n) = Rational.linearGrowth(step, n) + step :=
   done
 
 -- The linear factor never drops below 1 (nonnegative step).
 theorem Rational.linearGrowth_at_least_one
-        (step : Rational) (stepNonneg : Rational.zero ≤ step) (n : Natural)
+        (step : ℚ) (stepNonneg : Rational.zero ≤ step) (n : ℕ)
         : Rational.one ≤ Rational.linearGrowth(step, n) :=
   by induction on n with IH {
     case base: {
@@ -111,21 +111,21 @@ theorem Rational.linearGrowth_at_least_one
 
 -- The closed form.
 theorem Rational.linearGrowth_closed_form
-        (step : Rational) (n : Natural)
+        (step : ℚ) (n : ℕ)
         : Rational.linearGrowth(step, n)
           = Rational.one + n * step :=
   by induction on n with IH {
     case base:
         Rational.linearGrowth(step, 0)
            = Rational.one
-           = Rational.one + (0 : Rational) * step
+           = Rational.one + (0 : ℚ) * step
     case step(predecessor): {
-        (1 + predecessor : Rational) = (1 : Rational) + (predecessor : Rational) as oneCast;
+        (1 + predecessor : ℚ) = (1 : ℚ) + (predecessor : ℚ) as oneCast;
         Rational.linearGrowth(step, 1 + predecessor)
            = Rational.linearGrowth(step, predecessor) + step
-           = (Rational.one + (predecessor : Rational) * step) + step
+           = (Rational.one + (predecessor : ℚ) * step) + step
                  by IH
-           = Rational.one + (1 + predecessor : Rational) * step
+           = Rational.one + (1 + predecessor : ℚ) * step
                  by linear_combination(step - step * oneCast)
       }
   }
@@ -135,10 +135,10 @@ theorem Rational.linearGrowth_closed_form
 -- both parts nonnegative. Per step, c·(L + h) ≤ L for any L ≥ 1 —
 -- the difference is h·(L − c) ≥ 0 — and the power factor carries it.
 theorem Rational.power_bernoulli
-        (c h : Rational)
+        (c h : ℚ)
         (cNonneg : Rational.zero ≤ c) (hNonneg : Rational.zero ≤ h)
         (partition : c + h = Rational.one)
-        (n : Natural)
+        (n : ℕ)
         : c ^ n * Rational.linearGrowth(h, n)
           ≤ Rational.one :=
   by induction on n with IH {
@@ -191,10 +191,10 @@ theorem Rational.power_bernoulli
 -- ----------------------------------------------------------------------
 -- Geometric decay: some power of c drops below any positive ε.
 theorem Rational.power_decay_witness
-        (c ε : Rational)
+        (c ε : ℚ)
         (cNonneg : Rational.zero ≤ c) (cBelowOne : c < Rational.one)
         (εPositive : Rational.zero < ε)
-        : ∃ (N : Natural). c ^ N < ε := {
+        : ∃ (N : ℕ). c ^ N < ε := {
   -- The gap h := 1 − c is positive.
   Rational.zero
      = c - c
@@ -206,17 +206,17 @@ theorem Rational.power_decay_witness
   Rational.zero < Rational.one;
   Rational.zero ≤ Rational.one;
   Rational.IsNonneg(Rational.one);
-  choose K such that Rational.one ≤ (1 + K : Rational) * (ε * (Rational.one - c))
+  choose K such that Rational.one ≤ (1 + K : ℚ) * (ε * (Rational.one - c))
       from Rational.archimedean_for_positives;
   -- … so at N = K+1 the scaled linear factor exceeds 1 strictly.
   Rational.linearGrowth(Rational.one - c, 1 + K)
-          = Rational.one + (1 + K : Rational) * (Rational.one - c)
+          = Rational.one + (1 + K : ℚ) * (Rational.one - c)
       by Rational.linearGrowth_closed_form
       as lgClosed;
   Rational.one
      = Rational.one + Rational.zero
      < Rational.one + ε
-     ≤ (1 + K : Rational) * (ε * (Rational.one - c)) + ε
+     ≤ (1 + K : ℚ) * (ε * (Rational.one - c)) + ε
      = ε * Rational.linearGrowth(Rational.one - c, 1 + K)
            by linear_combination(ε - ε * lgClosed);
   -- Bernoulli at N, then cancel the (positive) linear factor.
@@ -240,9 +240,9 @@ theorem Rational.power_decay_witness
 -- ----------------------------------------------------------------------
 -- Powers of a base at most 1 only shrink as the exponent grows.
 theorem Rational.power_le_subsequent
-        (c : Rational)
+        (c : ℚ)
         (cNonneg : Rational.zero ≤ c) (cLeqOne : c ≤ Rational.one)
-        (N k : Natural)
+        (N k : ℕ)
         : c ^ (k + N) ≤ c ^ N :=
   by induction on k with IH {
     case base: {
@@ -261,9 +261,9 @@ theorem Rational.power_le_subsequent
   }
 
 theorem Rational.power_le_at_le
-        (c : Rational)
+        (c : ℚ)
         (cNonneg : Rational.zero ≤ c) (cLeqOne : c ≤ Rational.one)
-        (N m : Natural) (NLeqM : N ≤ m)
+        (N m : ℕ) (NLeqM : N ≤ m)
         : c ^ m ≤ c ^ N := {
   choose k such that m = k + N from Natural.le_to_add;
   c ^ (k + N) ≤ c ^ N;

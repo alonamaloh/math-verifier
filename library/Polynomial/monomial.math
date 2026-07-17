@@ -30,7 +30,7 @@ import Polynomial.division_support
 
 -- The coefficient list of c·x^j: j zeros followed by c.
 definition Polynomial.Coefficients.monomial (r : Ring) (c : Ring.carrier(r))
-        : Natural → Polynomial.Coefficients(Ring.carrier(r))
+        : ℕ → Polynomial.Coefficients(Ring.carrier(r))
   | 0 =>
       Polynomial.Coefficients.cons(Ring.carrier(r), c,
           Polynomial.Coefficients.nil(Ring.carrier(r)))
@@ -39,7 +39,7 @@ definition Polynomial.Coefficients.monomial (r : Ring) (c : Ring.carrier(r))
           Polynomial.Coefficients.monomial(r, c, k))
 
 -- The recursion in `1 + n` form: one more zero coefficient prepended.
-theorem Polynomial.Coefficients.monomial_one_plus (r : Ring) (c : Ring.carrier(r)) (k : Natural)
+theorem Polynomial.Coefficients.monomial_one_plus (r : Ring) (c : Ring.carrier(r)) (k : ℕ)
         : Polynomial.Coefficients.monomial(r, c, 1 + k)
           = Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r),
                 Polynomial.Coefficients.monomial(r, c, k)) :=
@@ -47,7 +47,7 @@ theorem Polynomial.Coefficients.monomial_one_plus (r : Ring) (c : Ring.carrier(r
 
 -- Coefficient of the monomial list at its own degree is c.
 theorem Polynomial.coefficient_monomial_at (r : Ring) (c : Ring.carrier(r))
-        (j : Natural)
+        (j : ℕ)
         : Polynomial.Coefficients.monomial(r, c, j)[j] = c :=
   by induction on j with IH {
     case base: reflexivity(Ring.carrier(r), c)
@@ -63,15 +63,15 @@ theorem Polynomial.coefficient_monomial_at (r : Ring) (c : Ring.carrier(r))
 
 -- Coefficient of the monomial list off its degree is zero.
 theorem Polynomial.coefficient_monomial_off (r : Ring) (c : Ring.carrier(r))
-        (j : Natural)
-        : ∀ (i : Natural). ¬(i = j)
+        (j : ℕ)
+        : ∀ (i : ℕ). ¬(i = j)
           → Polynomial.Coefficients.monomial(r, c, j)[i] = Ring.zero(r) :=
   by induction on j with IH {
     case base:
-      (i : Natural) (notEqual : ¬(i = 0)) ↦
+      (i : ℕ) (notEqual : ¬(i = 0)) ↦
           done by cases {
             case i = 0 as iEqualsZero: absurd(notEqual(iEqualsZero))
-            case i = 1 + iPredecessor for some (iPredecessor : Natural) as iEqualsOnePlus:
+            case i = 1 + iPredecessor for some (iPredecessor : ℕ) as iEqualsOnePlus:
                 Polynomial.Coefficients.monomial(r, c, 0)[i]
                    = Polynomial.Coefficients.monomial(r, c, 0)[1 + iPredecessor]
                          by substituting iEqualsOnePlus
@@ -80,7 +80,7 @@ theorem Polynomial.coefficient_monomial_off (r : Ring) (c : Ring.carrier(r))
                    = Ring.zero(r)
           }
     case step(k):
-      (i : Natural) (notEqual : ¬(i = 1 + k)) ↦
+      (i : ℕ) (notEqual : ¬(i = 1 + k)) ↦
           done by cases {
             case i = 0 as iEqualsZero:
                 Polynomial.Coefficients.monomial(r, c, 1 + k)[i]
@@ -89,7 +89,7 @@ theorem Polynomial.coefficient_monomial_off (r : Ring) (c : Ring.carrier(r))
                    = Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r), Polynomial.Coefficients.monomial(r, c, k))[0]
                          by Polynomial.Coefficients.monomial_one_plus
                    = Ring.zero(r)
-            case i = 1 + iPredecessor for some (iPredecessor : Natural) as iEqualsOnePlus:
+            case i = 1 + iPredecessor for some (iPredecessor : ℕ) as iEqualsOnePlus:
                 Polynomial.Coefficients.monomial(r, c, 1 + k)[i]
                    = Polynomial.Coefficients.monomial(r, c, 1 + k)[1 + iPredecessor]
                          by substituting iEqualsOnePlus
@@ -109,36 +109,36 @@ theorem Polynomial.coefficient_monomial_off (r : Ring) (c : Ring.carrier(r))
   }
 
 -- The monomial c·x^j, as a polynomial.
-definition Polynomial.monomial (r : Ring) (c : Ring.carrier(r)) (j : Natural)
+definition Polynomial.monomial (r : Ring) (c : Ring.carrier(r)) (j : ℕ)
         : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
   Polynomial.make(Ring.carrier(r), Ring.zero(r),
       Polynomial.Coefficients.monomial(r, c, j))
 
 -- Its coefficients, at the quotient level (definitional through the lift).
 theorem Polynomial.coefficientOf_monomial_at (r : Ring) (c : Ring.carrier(r))
-        (j : Natural)
+        (j : ℕ)
         : Polynomial.monomial(r, c, j)[j] = c :=
   Polynomial.coefficient_monomial_at(r, c, j)
 
 theorem Polynomial.coefficientOf_monomial_off (r : Ring) (c : Ring.carrier(r))
-        (j i : Natural) (notEqual : ¬(i = j))
+        (j i : ℕ) (notEqual : ¬(i = j))
         : Polynomial.monomial(r, c, j)[i] = Ring.zero(r) :=
   Polynomial.coefficient_monomial_off(r, c, j, i, notEqual)
 
 -- The coefficient of (c·x^j)·p: the convolution collapses to a single
 -- term because the monomial vanishes off index j.
 theorem Polynomial.coefficientOf_monomial_multiply (r : Ring) (c : Ring.carrier(r))
-        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (j k : Natural)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (j k : ℕ)
         (jLessOrEqualK : j ≤ k)
         : (Polynomial.monomial(r, c, j) * p)[k] = (c * p[k ∸ j]) :=
   (Polynomial.monomial(r, c, j) * p)[k]
-     = Ring.Sum(r, (i : Natural) ↦ (Polynomial.monomial(r, c, j)[i] * p[k ∸ i]), k)
+     = Ring.Sum(r, (i : ℕ) ↦ (Polynomial.monomial(r, c, j)[i] * p[k ∸ i]), k)
            by Polynomial.coefficientOf_multiply
      = (Polynomial.monomial(r, c, j)[j] * p[k ∸ j])
            by Ring.Sum.single_point(r,
-                  (i : Natural) ↦ (Polynomial.monomial(r, c, j)[i] * p[k ∸ i]),
+                  (i : ℕ) ↦ (Polynomial.monomial(r, c, j)[i] * p[k ∸ i]),
                   j, k, jLessOrEqualK,
-                  (i : Natural) (indexNotJ : ¬(i = j)) ↦
+                  (i : ℕ) (indexNotJ : ¬(i = j)) ↦
                       (Polynomial.monomial(r, c, j)[i] * p[k ∸ i])
                          = (Ring.zero(r) * p[k ∸ i])
                                by Polynomial.coefficientOf_monomial_off(r, c, j, i, indexNotJ)

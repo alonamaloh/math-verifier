@@ -41,16 +41,16 @@ import Real.series
 -- ----------------------------------------------------------------------
 -- A Cauchy sequence of reals: past some index, any two terms are
 -- within ε of each other — for every positive real ε.
-definition Real.SequenceIsCauchy (s : Natural → Real) : Proposition :=
-  ∀ (ε : Real). ε > 0 →
-    ∃ (N : Natural).
-      ∀ (m n : Natural). N ≤ m → N ≤ n →
+definition Real.SequenceIsCauchy (s : ℕ → ℝ) : Proposition :=
+  ∀ (ε : ℝ). ε > 0 →
+    ∃ (N : ℕ).
+      ∀ (m n : ℕ). N ≤ m → N ≤ n →
         abs(s(m) - s(n)) < ε
 
 -- The eventual lower bounds of a sequence: the reals that some tail
 -- of the sequence stays at or above.
-definition Real.eventual_lower_bounds (s : Natural → Real) : Set(Real) :=
-  (t : Real) ↦ ∃ (N : Natural). ∀ (m : Natural). N ≤ m → t ≤ s(m)
+definition Real.eventual_lower_bounds (s : ℕ → ℝ) : Set(ℝ) :=
+  (t : ℝ) ↦ ∃ (N : ℕ). ∀ (m : ℕ). N ≤ m → t ≤ s(m)
 
 -- ----------------------------------------------------------------------
 -- A Cauchy tail at tolerance q pins the eventual lower bounds around
@@ -58,12 +58,12 @@ definition Real.eventual_lower_bounds (s : Natural → Real) : Set(Real) :=
 -- of them.
 
 theorem Real.cauchy_tail_gives_lower_bound
-        (s : Natural → Real) (N : Natural) (q : Real)
-        (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
+        (s : ℕ → ℝ) (N : ℕ) (q : ℝ)
+        (tailClose : ∀ (m n : ℕ). N ≤ m → N ≤ n
                      → abs(s(m) - s(n)) < q)
         : (s(N) - q) ∈ Real.eventual_lower_bounds(s) :=
   witness N with
-      (m : Natural) (mInTail : N ≤ m) ↦ {
+      (m : ℕ) (mInTail : N ≤ m) ↦ {
         abs(s(m) - s(N)) < q
             by tailClose(m, N, mInTail, (N ≤ N));
         -q < s(m) - s(N)
@@ -76,13 +76,13 @@ theorem Real.cauchy_tail_gives_lower_bound
       }
 
 theorem Real.cauchy_tail_gives_upper_bound
-        (s : Natural → Real) (N : Natural) (q : Real)
-        (tailClose : ∀ (m n : Natural). N ≤ m → N ≤ n
+        (s : ℕ → ℝ) (N : ℕ) (q : ℝ)
+        (tailClose : ∀ (m n : ℕ). N ≤ m → N ≤ n
                      → abs(s(m) - s(n)) < q)
         : Real.IsUpperBound(Real.eventual_lower_bounds(s),
                             s(N) + q) :=
-  (t : Real) (tEventual : t ∈ Real.eventual_lower_bounds(s)) ↦ {
-    choose tailStart such that ∀ (m : Natural). tailStart ≤ m → t ≤ s(m)
+  (t : ℝ) (tEventual : t ∈ Real.eventual_lower_bounds(s)) ↦ {
+    choose tailStart such that ∀ (m : ℕ). tailStart ≤ m → t ≤ s(m)
         from tEventual;
     -- Probe past both tails at once.
     tailStart ≤ Natural.maximum(tailStart, N);
@@ -106,35 +106,35 @@ theorem Real.cauchy_tail_gives_upper_bound
 
 -- ----------------------------------------------------------------------
 -- The headline: Cauchy sequences of reals converge.
-theorem Real.cauchy_sequence_converges (s : Natural → Real)
+theorem Real.cauchy_sequence_converges (s : ℕ → ℝ)
         (cauchy : Real.SequenceIsCauchy(s))
         : Real.SequenceConvergent(s) := {
   -- The eventual lower bounds are nonempty (one unit below any Cauchy
   -- tail) and bounded above (one unit above it), so they have a
   -- supremum.
-  (1 : Real) > 0;
-  ∃ (unitIndex : Natural). ∀ (m n : Natural). unitIndex ≤ m → unitIndex ≤ n
+  (1 : ℝ) > 0;
+  ∃ (unitIndex : ℕ). ∀ (m n : ℕ). unitIndex ≤ m → unitIndex ≤ n
       → abs(s(m) - s(n)) < 1
       by cauchy as unitCauchy;
   choose unitIndex from unitCauchy;
   (s(unitIndex) - 1) ∈ Real.eventual_lower_bounds(s)
       by Real.cauchy_tail_gives_lower_bound as unitTailBelow;
-  Set.IsNonempty(Real, Real.eventual_lower_bounds(s))
+  Set.IsNonempty(ℝ, Real.eventual_lower_bounds(s))
       by witness s(unitIndex) - 1 with unitTailBelow;
   Real.IsUpperBound(Real.eventual_lower_bounds(s), s(unitIndex) + 1)
       by Real.cauchy_tail_gives_upper_bound as unitTailAbove;
   Real.IsBoundedAbove(Real.eventual_lower_bounds(s))
       by witness s(unitIndex) + 1 with unitTailAbove;
-  ∃ (candidate : Real). Real.IsSupremum(Real.eventual_lower_bounds(s), candidate)
+  ∃ (candidate : ℝ). Real.IsSupremum(Real.eventual_lower_bounds(s), candidate)
       by Real.supremum_exists as supremumExists;
   choose limit such that Real.IsSupremum(Real.eventual_lower_bounds(s), limit)
       as isSupremum from supremumExists;
   let ⟨isUpper, isLeast⟩ := isSupremum;
   witness limit with
-      (ε : Real)
+      (ε : ℝ)
       (εPositive : ε > 0) ↦ {
         ε / 4 > 0 by Real.divide_positive;
-        ∃ (N : Natural). ∀ (m n : Natural). N ≤ m → N ≤ n
+        ∃ (N : ℕ). ∀ (m n : ℕ). N ≤ m → N ≤ n
             → abs(s(m) - s(n)) < ε / 4
             by cauchy as quarterCauchy;
         choose N as tailClose from quarterCauchy;
@@ -150,7 +150,7 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
         ε / 2 < ε
             by Real.divide_two_less_than_self as halveBelowε;
         witness N with
-            (m : Natural) (mInTail : N ≤ m) ↦ {
+            (m : ℕ) (mInTail : N ≤ m) ↦ {
               abs(s(m) - s(N)) < ε / 4
                   by tailClose(m, N, mInTail, (N ≤ N));
               -(ε / 4) < s(m) - s(N) ∧ s(m) - s(N) < ε / 4
@@ -198,19 +198,19 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
 -- ----------------------------------------------------------------------
 -- Convergent sequences are Cauchy: both tails sit within ε/2 of the
 -- limit, so within ε of each other.
-theorem Real.converges_implies_cauchy (s : Natural → Real)
+theorem Real.converges_implies_cauchy (s : ℕ → ℝ)
         (convergent : Real.SequenceConvergent(s))
         : Real.SequenceIsCauchy(s) := {
   choose limit such that Real.SequenceConverges(s, limit) as converges
       from convergent;
-  take ε : Real;
+  take ε : ℝ;
   take εPositive : ε > 0;
-  (2 : Real) > 0;
-  (2 : Real) ≠ 0;
+  (2 : ℝ) > 0;
+  (2 : ℝ) ≠ 0;
   ε / 2 > 0 as halfPositive;
   choose N as tailClose from converges(ε / 2, halfPositive);
   witness N with
-      (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
+      (m n : ℕ) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
         abs(s(m) - limit) < ε / 2 by tailClose(m, mInTail);
         abs(s(n) - limit) < ε / 2 by tailClose(n, nInTail);
         abs(s(m) - s(n))
@@ -230,19 +230,19 @@ theorem Real.converges_implies_cauchy (s : Natural → Real)
 -- The comparison test, Cauchy form: if |t(k)| ≤ b(k) termwise and the
 -- partial sums of b are Cauchy, so are the partial sums of t — any
 -- window of t-terms is absolutely below the matching window of b.
-theorem Real.series_dominated_cauchy (t b : Natural → Real)
-        (domination : ∀ (k : Natural). abs(t(k)) ≤ b(k))
+theorem Real.series_dominated_cauchy (t b : ℕ → ℝ)
+        (domination : ∀ (k : ℕ). abs(t(k)) ≤ b(k))
         (boundCauchy : Real.SequenceIsCauchy(Real.partialSum(b)))
         : Real.SequenceIsCauchy(Real.partialSum(t)) :=
-  (ε : Real)
+  (ε : ℝ)
   (εPositive : ε > 0) ↦ {
     choose N as tailClose from boundCauchy(ε, εPositive);
     -- The ordered case: the gap from index i up to index j ≥ i.
-    ∀ (i j : Natural). N ≤ i → N ≤ j → i ≤ j
+    ∀ (i j : ℕ). N ≤ i → N ≤ j → i ≤ j
         → abs(Real.partialSum(t, j) - Real.partialSum(t, i))
           < ε
         by {
-          take i : Natural; take j : Natural;
+          take i : ℕ; take j : ℕ;
           take iInTail : N ≤ i; take jInTail : N ≤ j;
           take iLeqJ : i ≤ j;
           choose c such that j = i + c as splitEquation
@@ -254,37 +254,37 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
           Real.partialSum(t, j)
                       = Real.partialSum(t, c + i)    by jAsSum
                       = Real.partialSum(t, i)
-                        + Real.partialSum((k : Natural) ↦ t(i + k), c)
+                        + Real.partialSum((k : ℕ) ↦ t(i + k), c)
                             by Real.partialSum_split
               as splitT;
           Real.partialSum(b, j)
                       = Real.partialSum(b, c + i)    by jAsSum
                       = Real.partialSum(b, i)
-                        + Real.partialSum((k : Natural) ↦ b(i + k), c)
+                        + Real.partialSum((k : ℕ) ↦ b(i + k), c)
                             by Real.partialSum_split
               as splitB;
           Real.partialSum(t, j) - Real.partialSum(t, i)
                       = (Real.partialSum(t, i)
-                         + Real.partialSum((k : Natural) ↦ t(i + k), c))
+                         + Real.partialSum((k : ℕ) ↦ t(i + k), c))
                         - Real.partialSum(t, i)
                             by splitT
-                      = Real.partialSum((k : Natural) ↦ t(i + k), c)
+                      = Real.partialSum((k : ℕ) ↦ t(i + k), c)
                             by ring
               as tWindowValue;
-          Real.partialSum((k : Natural) ↦ b(i + k), c)
+          Real.partialSum((k : ℕ) ↦ b(i + k), c)
                       = (Real.partialSum(b, i)
-                         + Real.partialSum((k : Natural) ↦ b(i + k), c))
+                         + Real.partialSum((k : ℕ) ↦ b(i + k), c))
                         - Real.partialSum(b, i)
                             by ring
                       = Real.partialSum(b, j) - Real.partialSum(b, i)
                             by splitB
               as bWindowValue;
-          ∀ (k : Natural). k < c → abs(t(i + k)) ≤ b(i + k)
-              by (k : Natural) (_ : k < c) ↦ domination(i + k);
-          abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
-                      ≤ Real.partialSum((k : Natural) ↦ abs(t(i + k)), c)
+          ∀ (k : ℕ). k < c → abs(t(i + k)) ≤ b(i + k)
+              by (k : ℕ) (_ : k < c) ↦ domination(i + k);
+          abs(Real.partialSum((k : ℕ) ↦ t(i + k), c))
+                      ≤ Real.partialSum((k : ℕ) ↦ abs(t(i + k)), c)
                             by Real.abs_partialSum_le
-                      ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+                      ≤ Real.partialSum((k : ℕ) ↦ b(i + k), c)
                             by Real.partialSum_le_pointwise
               as tWindowBound;
           Real.partialSum(b, j) - Real.partialSum(b, i)
@@ -294,9 +294,9 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                             by tailClose(j, i, jInTail, iInTail)
               as bWindowBelow;
           abs(Real.partialSum(t, j) - Real.partialSum(t, i))
-             = abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
+             = abs(Real.partialSum((k : ℕ) ↦ t(i + k), c))
                    by tWindowValue
-             ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+             ≤ Real.partialSum((k : ℕ) ↦ b(i + k), c)
                    by tWindowBound
              = Real.partialSum(b, j) - Real.partialSum(b, i)
                    by bWindowValue
@@ -304,7 +304,7 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
                    by bWindowBelow
         } as oneSided;
     witness N with
-        (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
+        (m n : ℕ) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
           m ≤ n ∨ n ≤ m by Natural.totality_of_less_or_equal;
           done by cases {
             case m ≤ n as mLeqN: {
@@ -325,8 +325,8 @@ theorem Real.series_dominated_cauchy (t b : Natural → Real)
 
 -- The comparison test: a series termwise dominated by a convergent
 -- series converges.
-theorem Real.series_dominated_converges (t b : Natural → Real)
-        (domination : ∀ (k : Natural). abs(t(k)) ≤ b(k))
+theorem Real.series_dominated_converges (t b : ℕ → ℝ)
+        (domination : ∀ (k : ℕ). abs(t(k)) ≤ b(k))
         (boundConvergent : Real.SequenceConvergent(Real.partialSum(b)))
         : Real.SequenceConvergent(Real.partialSum(t)) := {
   Real.SequenceIsCauchy(Real.partialSum(b))

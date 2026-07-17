@@ -38,14 +38,14 @@ import Algebra.ring_lemmas
 import Algebra.ring_summation
 
 -- The general term C(n,k)·aᵏ·bⁿ⁻ᵏ of the binomial expansion over a ring.
-definition Ring.binomialTerm (r : Ring) (a b : Ring.carrier(r)) (n k : Natural)
+definition Ring.binomialTerm (r : Ring) (a b : Ring.carrier(r)) (n k : ℕ)
         : Ring.carrier(r) :=
   Ring.from_natural(r, Natural.binomial(n, k))
   * (Ring.power(r, a, k) * Ring.power(r, b, n ∸ k))
 
 -- The left edge (k = 0): the coefficient and aᵏ are both 1, so the term
 -- is bⁿ.
-theorem Ring.binomialTerm_zero_index (r : Ring) (a b : Ring.carrier(r)) (n : Natural)
+theorem Ring.binomialTerm_zero_index (r : Ring) (a b : Ring.carrier(r)) (n : ℕ)
         : Ring.binomialTerm(r, a, b, n, 0) = Ring.power(r, b, n) := {
   Natural.binomial(n, 0) = 1 as coefficient;
   n ∸ 0 = n as deficit;
@@ -60,7 +60,7 @@ theorem Ring.binomialTerm_zero_index (r : Ring) (a b : Ring.carrier(r)) (n : Nat
 }
 
 -- Above the diagonal the coefficient vanishes, so the term is zero.
-theorem Ring.binomialTerm_overflow (r : Ring) (a b : Ring.carrier(r)) (p : Natural)
+theorem Ring.binomialTerm_overflow (r : Ring) (a b : Ring.carrier(r)) (p : ℕ)
         : Ring.binomialTerm(r, a, b, p, 1 + p) = Ring.zero(r) := {
   Natural.binomial(p, 1 + p) = 0 by Natural.binomial_overflow as coefficientZero;
   Ring.binomialTerm(r, a, b, p, 1 + p)
@@ -73,7 +73,7 @@ theorem Ring.binomialTerm_overflow (r : Ring) (a b : Ring.carrier(r)) (p : Natur
 }
 
 -- The (n+1)-row's left edge is b times the n-row's left edge.
-theorem Ring.binomialTerm_edge_zero (r : Ring) (a b : Ring.carrier(r)) (p : Natural)
+theorem Ring.binomialTerm_edge_zero (r : Ring) (a b : Ring.carrier(r)) (p : ℕ)
         : Ring.binomialTerm(r, a, b, 1 + p, 0)
           = b * Ring.binomialTerm(r, a, b, p, 0) :=
   Ring.binomialTerm(r, a, b, 1 + p, 0)
@@ -87,7 +87,7 @@ theorem Ring.binomialTerm_edge_zero (r : Ring) (a b : Ring.carrier(r)) (p : Natu
 -- genuine; at or above it the second coefficient C(n, k+1) is zero, and
 -- the deficit-exponent bookkeeping differs — hence the split on j < p.
 theorem Ring.binomialTerm_pascal (c : CommutativeRing)
-        (a b : CommutativeRing.carrier(c)) (p j : Natural)
+        (a b : CommutativeRing.carrier(c)) (p j : ℕ)
         : Ring.binomialTerm(CommutativeRing.ring(c), a, b, 1 + p, 1 + j)
           = a * Ring.binomialTerm(CommutativeRing.ring(c), a, b, p, j)
             + b * Ring.binomialTerm(CommutativeRing.ring(c), a, b, p, 1 + j) := {
@@ -195,10 +195,10 @@ theorem Ring.binomialTerm_pascal (c : CommutativeRing)
 -- ----------------------------------------------------------------------
 -- Freek #44, generic form.
 theorem CommutativeRing.binomial_theorem (c : CommutativeRing)
-        (a b : CommutativeRing.carrier(c)) (n : Natural)
+        (a b : CommutativeRing.carrier(c)) (n : ℕ)
         : Ring.power(CommutativeRing.ring(c), a + b, n)
           = Ring.Sum(CommutativeRing.ring(c),
-                (k : Natural) ↦ Ring.binomialTerm(CommutativeRing.ring(c), a, b, n, k), n) := {
+                (k : ℕ) ↦ Ring.binomialTerm(CommutativeRing.ring(c), a, b, n, k), n) := {
   let R : Ring := CommutativeRing.ring(c);
   by induction on n with IH {
     case base:
@@ -206,18 +206,18 @@ theorem CommutativeRing.binomial_theorem (c : CommutativeRing)
            = Ring.one(R)
            = Ring.power(R, b, 0)
            = Ring.binomialTerm(R, a, b, 0, 0)
-           = Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, 0, k), 0)
+           = Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, 0, k), 0)
     case step(p): {
         b * Ring.binomialTerm(R, a, b, p, 1 + p)
            = b * Ring.zero(R)   by Ring.binomialTerm_overflow
            = Ring.zero(R)
            as secondVanishes;
         Ring.Sum(R,
-                 (j : Natural) ↦ a * Ring.binomialTerm(R, a, b, p, j)
+                 (j : ℕ) ↦ a * Ring.binomialTerm(R, a, b, p, j)
                                  + b * Ring.binomialTerm(R, a, b, p, 1 + j), p)
            = Ring.Sum(R,
-                 (j : Natural) ↦ Ring.binomialTerm(R, a, b, 1 + p, 1 + j), p)
-               by (j : Natural) ↦
+                 (j : ℕ) ↦ Ring.binomialTerm(R, a, b, 1 + p, 1 + j), p)
+               by (j : ℕ) ↦
                    { a * Ring.binomialTerm(R, a, b, p, j)
                         + b * Ring.binomialTerm(R, a, b, p, 1 + j)
                       = Ring.binomialTerm(R, a, b, 1 + p, 1 + j)
@@ -225,47 +225,47 @@ theorem CommutativeRing.binomial_theorem (c : CommutativeRing)
            as pascalRows;
         Ring.power(R, a + b, 1 + p)
            = (a + b) * Ring.power(R, a + b, p)
-           = (a + b) * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)   by IH
-           = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
-             + b * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
-           = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
-             + (b * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+           = (a + b) * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)   by IH
+           = a * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+             + b * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+           = a * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+             + (b * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
                 + Ring.zero(R))   by ring
-           = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
-             + (b * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+           = a * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+             + (b * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
                 + b * Ring.binomialTerm(R, a, b, p, 1 + p))   by secondVanishes
-           = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
-             + (Ring.Sum(R, (k : Natural) ↦ b * Ring.binomialTerm(R, a, b, p, k), p)
+           = a * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+             + (Ring.Sum(R, (k : ℕ) ↦ b * Ring.binomialTerm(R, a, b, p, k), p)
                 + b * Ring.binomialTerm(R, a, b, p, 1 + p))   by Ring.Sum.scale_left
-           = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
-             + Ring.Sum(R, (k : Natural) ↦ b * Ring.binomialTerm(R, a, b, p, k), 1 + p)
+           = a * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+             + Ring.Sum(R, (k : ℕ) ↦ b * Ring.binomialTerm(R, a, b, p, k), 1 + p)
                by Ring.Sum.add_one
-           = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+           = a * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
              + (b * Ring.binomialTerm(R, a, b, p, 0)
-                + Ring.Sum(R, (j : Natural) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
+                + Ring.Sum(R, (j : ℕ) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
                by Ring.Sum.shift_one_plus
-           = a * Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, p, k), p)
+           = a * Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, p, k), p)
              + (Ring.binomialTerm(R, a, b, 1 + p, 0)
-                + Ring.Sum(R, (j : Natural) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
+                + Ring.Sum(R, (j : ℕ) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
                by Ring.binomialTerm_edge_zero
-           = Ring.Sum(R, (j : Natural) ↦ a * Ring.binomialTerm(R, a, b, p, j), p)
+           = Ring.Sum(R, (j : ℕ) ↦ a * Ring.binomialTerm(R, a, b, p, j), p)
              + (Ring.binomialTerm(R, a, b, 1 + p, 0)
-                + Ring.Sum(R, (j : Natural) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
+                + Ring.Sum(R, (j : ℕ) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
                by Ring.Sum.scale_left
            = Ring.binomialTerm(R, a, b, 1 + p, 0)
-             + (Ring.Sum(R, (j : Natural) ↦ a * Ring.binomialTerm(R, a, b, p, j), p)
-                + Ring.Sum(R, (j : Natural) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
+             + (Ring.Sum(R, (j : ℕ) ↦ a * Ring.binomialTerm(R, a, b, p, j), p)
+                + Ring.Sum(R, (j : ℕ) ↦ b * Ring.binomialTerm(R, a, b, p, 1 + j), p))
                by ring
            = Ring.binomialTerm(R, a, b, 1 + p, 0)
              + Ring.Sum(R,
-                   (j : Natural) ↦ a * Ring.binomialTerm(R, a, b, p, j)
+                   (j : ℕ) ↦ a * Ring.binomialTerm(R, a, b, p, j)
                                    + b * Ring.binomialTerm(R, a, b, p, 1 + j), p)
                by Ring.Sum.add
            = Ring.binomialTerm(R, a, b, 1 + p, 0)
              + Ring.Sum(R,
-                   (j : Natural) ↦ Ring.binomialTerm(R, a, b, 1 + p, 1 + j), p)
+                   (j : ℕ) ↦ Ring.binomialTerm(R, a, b, 1 + p, 1 + j), p)
                by substituting pascalRows
-           = Ring.Sum(R, (k : Natural) ↦ Ring.binomialTerm(R, a, b, 1 + p, k), 1 + p)
+           = Ring.Sum(R, (k : ℕ) ↦ Ring.binomialTerm(R, a, b, 1 + p, k), 1 + p)
                by Ring.Sum.shift_one_plus
       }
   }

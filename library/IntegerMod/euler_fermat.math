@@ -52,24 +52,24 @@ import IntegerMod.wilson
 import IntegerMod.fermat_little
 
 -- The units of ℤ/n, as the classes of the coprime residues 1..n.
-definition IntegerMod.unit_residues (n : Natural) : List(IntegerMod(n)) :=
-  List.map(Natural, IntegerMod(n), IntegerMod.residue(n),
+definition IntegerMod.unit_residues (n : ℕ) : List(IntegerMod(n)) :=
+  List.map(ℕ, IntegerMod(n), IntegerMod.residue(n),
       Natural.coprime_residues(n))
 
 -- ----------------------------------------------------------------------
 -- Every member of the list is a unit.
-theorem IntegerMod.unit_residues_member_unit (n : Natural)
+theorem IntegerMod.unit_residues_member_unit (n : ℕ)
         (z : IntegerMod(n))
         (zMember : z ∈ IntegerMod.unit_residues(n))
         : IntegerMod.is_unit(z) := {
-  ∃ (j : Natural).
+  ∃ (j : ℕ).
         j ∈ Natural.coprime_residues(n) ∧ IntegerMod.residue(n, j) = z
       by List.map_member_invert as residueExists;
   choose j such that j ∈ Natural.coprime_residues(n) ∧ IntegerMod.residue(n, j) = z
       from residueExists;
   j ∈ Natural.coprime_residues(n);
   Natural.coprime(j, n) by List.filter_member_property;
-  IntegerMod.is_unit(IntegerMod.make(n, (j : Integer)))
+  IntegerMod.is_unit(IntegerMod.make(n, (j : ℤ)))
       by IntegerMod.unit_of_coprime;
   done by substituting (IntegerMod.residue(n, j) = z)
 }
@@ -78,16 +78,16 @@ theorem IntegerMod.unit_residues_member_unit (n : Natural)
 -- Completeness: every unit appears on the list (n ≥ 2). The canonical
 -- representative r of a unit class is coprime to n, and r ≠ 0 since
 -- gcd(0, n) = n ≠ 1.
-theorem IntegerMod.unit_residues_complete (n : Natural)
+theorem IntegerMod.unit_residues_complete (n : ℕ)
         (nAtLeastTwo : 2 ≤ n)
         (c : IntegerMod(n)) (cUnit : IntegerMod.is_unit(c))
         : c ∈ IntegerMod.unit_residues(n) := {
-  (1 : Natural) ≤ 2 ≤ n;
-  choose r such that r < n ∧ c = IntegerMod.make(n, (r : Integer))
+  (1 : ℕ) ≤ 2 ≤ n;
+  choose r such that r < n ∧ c = IntegerMod.make(n, (r : ℤ))
       from IntegerMod.exists_natural_representative;
   r < n;
-  c = IntegerMod.make(n, (r : Integer)) as cEquation;
-  IntegerMod.is_unit(IntegerMod.make(n, (r : Integer)))
+  c = IntegerMod.make(n, (r : ℤ)) as cEquation;
+  IntegerMod.is_unit(IntegerMod.make(n, (r : ℤ)))
       by substituting cEquation;
   Natural.coprime(r, n)
       by IntegerMod.coprime_of_unit_representative;
@@ -113,14 +113,14 @@ theorem IntegerMod.unit_residues_complete (n : Natural)
 -- Distinctness: distinct coprime residues give distinct classes — the
 -- residues sit in [1, n−1] (n itself is not coprime to n for n ≥ 2),
 -- where `make` is injective.
-theorem IntegerMod.unit_residues_distinct (n : Natural)
+theorem IntegerMod.unit_residues_distinct (n : ℕ)
         (nAtLeastTwo : 2 ≤ n)
         : List.Distinct(IntegerMod(n), IntegerMod.unit_residues(n)) := {
   -- A coprime residue is strictly below the modulus.
-  ∀ (j : Natural). j ∈ Natural.coprime_residues(n)
+  ∀ (j : ℕ). j ∈ Natural.coprime_residues(n)
           → j < n
       by {
-        take j : Natural;
+        take j : ℕ;
         suppose j ∈ Natural.coprime_residues(n) as jMember;
         j ∈ List.range_down(n)
             by List.filter_member_subset;
@@ -135,12 +135,12 @@ theorem IntegerMod.unit_residues_distinct (n : Natural)
           };
         done by Natural.lt_of_le_of_ne
       };
-  (x y : Natural) → x ∈ Natural.coprime_residues(n)
+  (x y : ℕ) → x ∈ Natural.coprime_residues(n)
           → y ∈ Natural.coprime_residues(n)
           → IntegerMod.residue(n, x) = IntegerMod.residue(n, y) → x = y
       by {
-        take x : Natural;
-        take y : Natural;
+        take x : ℕ;
+        take y : ℕ;
         suppose x ∈ Natural.coprime_residues(n) as xMember;
         suppose y ∈ Natural.coprime_residues(n) as yMember;
         suppose IntegerMod.residue(n, x) = IntegerMod.residue(n, y) as imagesEqual;
@@ -148,16 +148,16 @@ theorem IntegerMod.unit_residues_distinct (n : Natural)
         y < n;
         done by IntegerMod.make_injective_below_modulus
       };
-  List.Distinct(Natural, List.range_down(n))
+  List.Distinct(ℕ, List.range_down(n))
       by List.range_down_distinct;
-  List.Distinct(Natural, Natural.coprime_residues(n))
+  List.Distinct(ℕ, Natural.coprime_residues(n))
       by List.filter_distinct;
   done by List.map_distinct_on
 }
 
 -- ----------------------------------------------------------------------
 -- Multiplication by a unit maps the unit list into itself.
-theorem IntegerMod.scaled_unit_residue_member (n : Natural)
+theorem IntegerMod.scaled_unit_residue_member (n : ℕ)
         (nAtLeastTwo : 2 ≤ n)
         (x : IntegerMod(n)) (xUnit : IntegerMod.is_unit(x))
         (z : IntegerMod(n))
@@ -180,7 +180,7 @@ theorem IntegerMod.scaled_unit_residue_member (n : Natural)
 
 -- ----------------------------------------------------------------------
 -- Euler's theorem in ℤ/n: a unit raised to φ(n) is 1.
-theorem IntegerMod.euler_fermat (n : Natural)
+theorem IntegerMod.euler_fermat (n : ℕ)
         (nAtLeastTwo : 2 ≤ n)
         (x : IntegerMod(n)) (xUnit : IntegerMod.is_unit(x))
         : IntegerMod.power(n, x, Natural.totient(n)) = IntegerMod.one(n) := {
@@ -262,11 +262,11 @@ theorem IntegerMod.euler_fermat (n : Natural)
 -- a^φ(n) ≡ 1 (mod n). The degenerate moduli hold on their own — φ(0) = 0
 -- makes a^φ(0) = 1 on the nose, and everything is congruent mod 1 — while
 -- for n ≥ 2 the class of a is a unit and the modular form applies.
-theorem Natural.euler_fermat (n a : Natural)
+theorem Natural.euler_fermat (n a : ℕ)
         (coprime : Natural.coprime(a, n))
         : Integer.CongruentModulo(n,
-              (a ^ Natural.totient(n) : Integer), Integer.one) := {
-  n = 0 ∨ ∃ (m : Natural). n = m + 1 by Natural.zero_or_add_one;
+              (a ^ Natural.totient(n) : ℤ), Integer.one) := {
+  n = 0 ∨ ∃ (m : ℕ). n = m + 1 by Natural.zero_or_add_one;
   done by cases {
     case n = 0: {
         Natural.totient(0)
@@ -276,7 +276,7 @@ theorem Natural.euler_fermat (n a : Natural)
             = a ^ 0
             = 1
           as powerIsOne;
-        (a ^ Natural.totient(0) : Integer)
+        (a ^ Natural.totient(0) : ℤ)
            = 1                     by substituting powerIsOne
            = Integer.one
           as residueIsOne;
@@ -284,35 +284,35 @@ theorem Natural.euler_fermat (n a : Natural)
             by Integer.CongruentModulo.reflexive;
         done by substituting residueIsOne
       }
-    case ∃ (m : Natural). n = m + 1 as nPositive: {
+    case ∃ (m : ℕ). n = m + 1 as nPositive: {
         choose m such that n = m + 1 from nPositive;
-        m = 0 ∨ ∃ (k : Natural). m = k + 1 by Natural.zero_or_add_one;
+        m = 0 ∨ ∃ (k : ℕ). m = k + 1 by Natural.zero_or_add_one;
         done by cases {
           case m = 0 as mIsZero: {
               n = m + 1
                    = 1   by substituting mIsZero
                 as nIsOne;
-              witness (a ^ Natural.totient(n) : Integer) - Integer.one with
-                  (a ^ Natural.totient(n) : Integer) - Integer.one
-                     = 1 * ((a ^ Natural.totient(n) : Integer) - Integer.one)
+              witness (a ^ Natural.totient(n) : ℤ) - Integer.one with
+                  (a ^ Natural.totient(n) : ℤ) - Integer.one
+                     = 1 * ((a ^ Natural.totient(n) : ℤ) - Integer.one)
                            by ring
-                     = (n : Integer)
-                           * ((a ^ Natural.totient(n) : Integer) - Integer.one)
+                     = (n : ℤ)
+                           * ((a ^ Natural.totient(n) : ℤ) - Integer.one)
                            by substituting nIsOne
             }
-          case ∃ (k : Natural). m = k + 1 as mPositive: {
+          case ∃ (k : ℕ). m = k + 1 as mPositive: {
               choose k such that m = k + 1 as mEquation from mPositive;
               1 ≤ m by substituting mEquation;
-              (2 : Natural)
+              (2 : ℕ)
                  = 1 + 1
                  ≤ m + 1   by Natural.add_one_le_add_one_of_le
                  = n;
-              IntegerMod.is_unit(IntegerMod.make(n, (a : Integer)))
+              IntegerMod.is_unit(IntegerMod.make(n, (a : ℤ)))
                   by IntegerMod.unit_of_coprime;
-              IntegerMod.power(n, IntegerMod.make(n, (a : Integer)), Natural.totient(n)) = IntegerMod.one(n)
+              IntegerMod.power(n, IntegerMod.make(n, (a : ℤ)), Natural.totient(n)) = IntegerMod.one(n)
                   by IntegerMod.euler_fermat;
-              IntegerMod.make(n, (a ^ Natural.totient(n) : Integer))
-                  = IntegerMod.power(n, IntegerMod.make(n, (a : Integer)), Natural.totient(n))
+              IntegerMod.make(n, (a ^ Natural.totient(n) : ℤ))
+                  = IntegerMod.power(n, IntegerMod.make(n, (a : ℤ)), Natural.totient(n))
                   = IntegerMod.one(n);
               done by IntegerMod.congruent_of_make_equal
             }

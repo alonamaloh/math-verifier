@@ -34,7 +34,7 @@ import Logic.exists
 -- argument, so d·q ≡ q + predD·q, and q ≤ q + (anything) by
 -- le_add_right.
 theorem Natural.le_q_d_mult_q
-        (d q : Natural) (oneLessOrEqualD : 1 ≤ d)
+        (d q : ℕ) (oneLessOrEqualD : 1 ≤ d)
         : q ≤ d * q :=
   done by cases {
     case d = 0 as dIsZero: {
@@ -50,8 +50,8 @@ theorem Natural.le_q_d_mult_q
 -- Bounded quotient search. Returns either a witness q ≤ bound with
 -- n = d·q, or a function rejecting every such q.
 theorem Natural.search_quotient_witness_up_to
-        (d n quotientBound : Natural)
-        : (∃ (q : Natural). q ≤ quotientBound ∧ n = d * q) ∨ (∀ (q : Natural).
+        (d n quotientBound : ℕ)
+        : (∃ (q : ℕ). q ≤ quotientBound ∧ n = d * q) ∨ (∀ (q : ℕ).
               q ≤ quotientBound
               → n ≠ d * q) :=
   by induction on quotientBound with IH {
@@ -59,14 +59,14 @@ theorem Natural.search_quotient_witness_up_to
         (n = d * 0) ∨ (n ≠ d * 0);
         done by cases {
           case n = d * 0 as nEqualsDTimesZero: {
-              ∃ (q : Natural). q ≤ 0 ∧ n = d * q by {
+              ∃ (q : ℕ). q ≤ 0 ∧ n = d * q by {
                 witness 0 with (0 ≤ 0 ∧ n = d * 0)
               };
               done
           }
           case n ≠ d * 0 as nNotDTimesZero: {
-              ∀ (q : Natural). q ≤ 0 → n ≠ d * q by {
-                take q : Natural;
+              ∀ (q : ℕ). q ≤ 0 → n ≠ d * q by {
+                take q : ℕ;
                 suppose q ≤ 0 as quotientLessOrEqualZero;
                 suppose n = d * q as nEqualsDTimesQuotient;
                 q = 0;
@@ -79,40 +79,40 @@ theorem Natural.search_quotient_witness_up_to
       }
     case successor(prevBound): {
         done by cases {
-          case ∃ (q : Natural). q ≤ prevBound ∧ n = d * q as foundEarlier: {
+          case ∃ (q : ℕ). q ≤ prevBound ∧ n = d * q as foundEarlier: {
               choose q such that q ≤ prevBound ∧ n = d * q from foundEarlier;
-              ∃ (qNext : Natural). qNext ≤ successor(prevBound) ∧ n = d * qNext by {
+              ∃ (qNext : ℕ). qNext ≤ successor(prevBound) ∧ n = d * qNext by {
                 q ≤ successor(prevBound);
                 witness q with (q ≤ successor(prevBound) ∧ n = d * q)
               };
               done
           }
-          case ∀ (q : Natural). q ≤ prevBound → n ≠ d * q as noneEarlier: {
+          case ∀ (q : ℕ). q ≤ prevBound → n ≠ d * q as noneEarlier: {
               (n = d * successor(prevBound)) ∨ (n ≠ d * successor(prevBound));
               done by cases {
                 case n = d * successor(prevBound) as nEqualsDTimesSuccessorPrevious: {
-                    ∃ (q : Natural). q ≤ successor(prevBound) ∧ n = d * q by {
+                    ∃ (q : ℕ). q ≤ successor(prevBound) ∧ n = d * q by {
                       witness successor(prevBound)
                           with (successor(prevBound) ≤ successor(prevBound) ∧ n = d * successor(prevBound))
                     };
                     done
                 }
                 case n ≠ d * successor(prevBound) as nNotDTimesSuccessorPrevious: {
-                    ∀ (q : Natural). q ≤ successor(prevBound) → n ≠ d * q by {
-                      take q : Natural;
+                    ∀ (q : ℕ). q ≤ successor(prevBound) → n ≠ d * q by {
+                      take q : ℕ;
                       suppose q ≤ successor(prevBound) as quotientLessOrEqualSuccessorPrevious;
                       suppose n = d * q as nEqualsDTimesQuotient;
                       -- q ≤ successor(prevBound) means q = successor(prevBound) (contradicts
                       -- this branch's hypothesis) or q ≤ prevBound (contradicts noneEarlier).
                       (q = successor(prevBound))
-                            ∨ (∃ (bPredecessor : Natural).
+                            ∨ (∃ (bPredecessor : ℕ).
                                   successor(prevBound) = successor(bPredecessor) ∧ q ≤ bPredecessor);
                       done by cases {
                         case q = successor(prevBound) as quotientEqualsSuccessorPrevious: {
                             n = d * successor(prevBound);
                             done
                         }
-                        case ∃ (bPredecessor : Natural).
+                        case ∃ (bPredecessor : ℕ).
                               successor(prevBound) = successor(bPredecessor) ∧ q ≤ bPredecessor
                             as smallerBound: {
                             choose bPredecessor such that
@@ -138,7 +138,7 @@ theorem Natural.search_quotient_witness_up_to
 -- the cap lemma to rule out any q (because q > n would force
 -- d·q > n).
 automatic theorem Natural.decides_divides
-        (d n : Natural) : d ∣ n ∨ d ∤ n :=
+        (d n : ℕ) : d ∣ n ∨ d ∤ n :=
   done by cases {
     case d = 0: {
         (n = 0) ∨ (n ≠ 0);
@@ -162,16 +162,16 @@ automatic theorem Natural.decides_divides
         }
       }
     case d = successor(predD) for some predD: {
-        (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
-              ∨ (∀ (q : Natural). q ≤ n → n ≠ successor(predD) * q);
+        (∃ (q : ℕ). q ≤ n ∧ n = successor(predD) * q)
+              ∨ (∀ (q : ℕ). q ≤ n → n ≠ successor(predD) * q);
         done by cases {
-          case ∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q as foundWitness: {
+          case ∃ (q : ℕ). q ≤ n ∧ n = successor(predD) * q as foundWitness: {
               -- Witness found; that's the divisor.
               choose q such that q ≤ n ∧ n = successor(predD) * q from foundWitness;
               successor(predD) ∣ n;
               done
           }
-          case ∀ (q : Natural). q ≤ n → n ≠ successor(predD) * q as noQuotientInRange: {
+          case ∀ (q : ℕ). q ≤ n → n ≠ successor(predD) * q as noQuotientInRange: {
               -- A divisibility witness gives some q with n = d · q; the cap
               -- lemma forces q ≤ d · q = n, which noQuotientInRange forbids.
               successor(predD) ∤ n by {

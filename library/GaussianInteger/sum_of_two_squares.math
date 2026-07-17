@@ -59,12 +59,12 @@ import GaussianInteger.euclidean
 
 -- ----------------------------------------------------------------------
 -- Helper: a prime, embedded in ℤ, does not divide 1.
-theorem Integer.prime_natural_not_divides_one (p : Natural)
+theorem Integer.prime_natural_not_divides_one (p : ℕ)
         (primality : Natural.is_prime(p))
-        (dividesOne : Integer.divides((p : Integer), Integer.one))
+        (dividesOne : Integer.divides((p : ℤ), Integer.one))
         : False := {
   Integer.one = (Natural.to_integer(1)) as oneCast;
-  Integer.divides((p : Integer), (Natural.to_integer(1)))
+  Integer.divides((p : ℤ), (Natural.to_integer(1)))
       by substituting oneCast;
   Natural.divides(p, 1) by Natural.to_integer.divides_reflects;
   p = 1 as pEqualOne;
@@ -75,7 +75,7 @@ theorem Integer.prime_natural_not_divides_one (p : Natural)
 
 -- ----------------------------------------------------------------------
 -- Helper: 1 ≤ x and x ≠ 1 force 2 ≤ x.
-theorem Natural.at_least_two_of_at_least_one_and_not_one (x : Natural)
+theorem Natural.at_least_two_of_at_least_one_and_not_one (x : ℕ)
         (atLeastOne : 1 ≤ x) (notOne : ¬(x = 1))
         : 2 ≤ x := {
   done by Natural.less_or_equal_not_equal_successor
@@ -84,12 +84,12 @@ theorem Natural.at_least_two_of_at_least_one_and_not_one (x : Natural)
 -- ----------------------------------------------------------------------
 -- The descent step of the two-squares theorem.
 theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
-        (p : Natural) (primality : Natural.is_prime(p))
-        (m : Integer)
-        (dividesSquarePlusOne : Integer.divides((p : Integer), m * m + Integer.one))
-        : ∃ (a : Integer). ∃ (b : Integer). (p : Integer) = a * a + b * b := {
+        (p : ℕ) (primality : Natural.is_prime(p))
+        (m : ℤ)
+        (dividesSquarePlusOne : Integer.divides((p : ℤ), m * m + Integer.one))
+        : ∃ (a : ℤ). ∃ (b : ℤ). (p : ℤ) = a * a + b * b := {
   let s : Ring := GaussianInteger.ring_bundle;
-  let bigP : GaussianInteger := GaussianInteger.embedInteger((p : Integer));
+  let bigP : GaussianInteger := GaussianInteger.embedInteger((p : ℤ));
   let α : GaussianInteger := GaussianInteger.ofCoordinates(m, Integer.one);
   let β : GaussianInteger := GaussianInteger.ofCoordinates(m, -(Integer.one));
 
@@ -120,46 +120,46 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
       by GaussianInteger.coordinates_injective as αβEqual;
 
   -- bigP divides α·β.
-  choose q such that m * m + Integer.one = (p : Integer) * q as qEqual from dividesSquarePlusOne;
+  choose q such that m * m + Integer.one = (p : ℤ) * q as qEqual from dividesSquarePlusOne;
   Ring.divides(s, bigP, α * β)
       by witness GaussianInteger.embedInteger(q) with
           α * β
              = GaussianInteger.embedInteger(m * m + Integer.one)   by αβEqual
-             = GaussianInteger.embedInteger((p : Integer) * q)     by substituting qEqual
+             = GaussianInteger.embedInteger((p : ℤ) * q)     by substituting qEqual
              = bigP * GaussianInteger.embedInteger(q);
 
   -- bigP divides neither α nor β.
   ¬(Ring.divides(s, bigP, α))
       by {
         suppose Ring.divides(s, bigP, α) as dividesα;
-        Integer.divides((p : Integer), im(α))
+        Integer.divides((p : ℤ), im(α))
             by GaussianInteger.embedInteger_divides_imaginary;
         im(α)
                   = Product.second(coords(α))
                   = Product.second(Product.make(m, Integer.one))   by substituting αCoordinates
                   = Integer.one
             as imaginaryOne;
-        Integer.divides((p : Integer), Integer.one) by substituting imaginaryOne;
+        Integer.divides((p : ℤ), Integer.one) by substituting imaginaryOne;
         done by Integer.prime_natural_not_divides_one
       };
   ¬(Ring.divides(s, bigP, β))
       by {
         suppose Ring.divides(s, bigP, β) as dividesβ;
-        Integer.divides((p : Integer), im(β))
+        Integer.divides((p : ℤ), im(β))
             by GaussianInteger.embedInteger_divides_imaginary;
         im(β)
                   = Product.second(coords(β))
                   = Product.second(Product.make(m, -(Integer.one)))   by substituting βCoordinates
                   = -(Integer.one)
             as imaginaryNegOne;
-        Integer.divides((p : Integer), -(Integer.one)) by substituting imaginaryNegOne;
-        choose quotientNeg such that -(Integer.one) = (p : Integer) * quotientNeg as negEqual;
-        Integer.divides((p : Integer), Integer.one)
+        Integer.divides((p : ℤ), -(Integer.one)) by substituting imaginaryNegOne;
+        choose quotientNeg such that -(Integer.one) = (p : ℤ) * quotientNeg as negEqual;
+        Integer.divides((p : ℤ), Integer.one)
             by witness -(quotientNeg) with
                 Integer.one
                    = -(-(Integer.one))
-                   = -((p : Integer) * quotientNeg)        by substituting negEqual
-                   = (p : Integer) * (-(quotientNeg));
+                   = -((p : ℤ) * quotientNeg)        by substituting negEqual
+                   = (p : ℤ) * (-(quotientNeg));
         done by Integer.prime_natural_not_divides_one
       };
 
@@ -167,7 +167,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
   ¬(bigP = Ring.zero(s))
       by {
         suppose bigP = Ring.zero(s) as bigPZero;
-        GaussianInteger.normNatural(GaussianInteger.embedInteger((p : Integer))) = p * p;
+        GaussianInteger.normNatural(GaussianInteger.embedInteger((p : ℤ))) = p * p;
         p * p
                   = GaussianInteger.normNatural(bigP)
                   = GaussianInteger.normNatural(Ring.zero(s))   by substituting bigPZero
@@ -176,7 +176,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
         p ≤ p * p
             by Natural.le_multiply_when_factor_at_least_one;
         p ≤ 0 by substituting normEqual;
-        (2 : Natural) ≤ p ≤ 0;
+        (2 : ℕ) ≤ p ≤ 0;
         done
       };
 
@@ -186,7 +186,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
         suppose Ring.IsUnit(s, bigP) as bigPUnit;
         choose w such that Ring.one(s) = bigP * w as oneEqual from bigPUnit;
         let factor : GaussianInteger := w;
-        (1 : Natural)
+        (1 : ℕ)
                   = GaussianInteger.normNatural(Ring.one(s))   by GaussianInteger.normNatural_one
                   = GaussianInteger.normNatural(bigP * factor)   by substituting oneEqual
                   = GaussianInteger.normNatural(bigP) * GaussianInteger.normNatural(factor)
@@ -198,7 +198,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
         p ≤ p * p
             by Natural.le_multiply_when_factor_at_least_one;
         p ≤ 1 by substituting squareEqualOne;
-        (2 : Natural) ≤ p ≤ 1;
+        (2 : ℕ) ≤ p ≤ 1;
         done
       };
 
@@ -255,7 +255,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
       by {
         suppose GaussianInteger.normNatural(aG) = 1 as aGNormOne;
         GaussianInteger.normInteger(aG)
-                  = (GaussianInteger.normNatural(aG) : Integer)
+                  = (GaussianInteger.normNatural(aG) : ℤ)
                   = (Natural.to_integer(1))   by substituting aGNormOne
                   = Integer.one;
         Ring.IsUnit(s, aG) by GaussianInteger.unit_of_normInteger_one;
@@ -265,7 +265,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
       by {
         suppose GaussianInteger.normNatural(bG) = 1 as bGNormOne;
         GaussianInteger.normInteger(bG)
-                  = (GaussianInteger.normNatural(bG) : Integer)
+                  = (GaussianInteger.normNatural(bG) : ℤ)
                   = (Natural.to_integer(1))   by substituting bGNormOne
                   = Integer.one;
         Ring.IsUnit(s, bG) by GaussianInteger.unit_of_normInteger_one;
@@ -283,8 +283,8 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
       by Natural.prime_square_factor as aGNormEqualP;
 
   -- p = re(aG)² + im(aG)².
-  (p : Integer)
-            = (GaussianInteger.normNatural(aG) : Integer)   by substituting aGNormEqualP
+  (p : ℤ)
+            = (GaussianInteger.normNatural(aG) : ℤ)   by substituting aGNormEqualP
             = GaussianInteger.normInteger(aGauss)
             = re(aGauss) * re(aGauss)
               + im(aGauss) * im(aGauss)

@@ -47,25 +47,25 @@ import Real.power
 -- ----------------------------------------------------------------------
 -- Partial sums: Σ_{k < n} s(k) — the additive instance of the generic
 -- aggregation, over Real's additive commutative monoid.
-definition Real.partialSum (s : Natural → Real) (n : Natural) : Real :=
-  Algebra.indexedAggregate(Real, Real.add, Real.zero, s, n)
+definition Real.partialSum (s : ℕ → ℝ) (n : ℕ) : ℝ :=
+  Algebra.indexedAggregate(ℝ, Real.add, Real.zero, s, n)
 
 -- The recursion characterised in `1 + n` form, so consumers step the
 -- index without naming the raw constructor (`Natural.add` is opaque, so
 -- `1 + n` is not definitionally the constructor form; bridge via `one_add`).
-theorem Real.partialSum_add_one (s : Natural → Real) (n : Natural)
+theorem Real.partialSum_add_one (s : ℕ → ℝ) (n : ℕ)
         : Real.partialSum(s, 1 + n) = Real.partialSum(s, n) + s(n) :=
   done by substituting Natural.one_add
 
 -- A series converges to a total when its partial sums do.
 definition Real.SeriesConverges
-        (s : Natural → Real) (total : Real) : Proposition :=
+        (s : ℕ → ℝ) (total : ℝ) : Proposition :=
   Real.SequenceConverges(Real.partialSum(s), total)
 
 -- ----------------------------------------------------------------------
 -- The geometric closed form: (1 − r)·Σ_{k<n} rᵏ = 1 − rⁿ. The sum
 -- telescopes one factor at a time.
-theorem Real.geometric_partialSum (r : Real) (n : Natural)
+theorem Real.geometric_partialSum (r : ℝ) (n : ℕ)
         : (1 - r) * (r^0 + r^1 + ... + r^(n - 1)) = 1 - r^n :=
   by induction on n with IH {
     case base:
@@ -85,71 +85,71 @@ theorem Real.geometric_partialSum (r : Real) (n : Natural)
 -- ----------------------------------------------------------------------
 -- Convergence of the geometric series to a given inverse L of 1 − r.
 theorem Real.geometric_series_converges
-        (r L : Real)
+        (r L : ℝ)
         (rSmall : abs(r) < 1)
         (inverseProperty : (1 - r) * L = 1)
         : r^0 + r^1 + ... + r^k + ... = L := {
   -- rⁿ → 0, since |rⁿ| = |r|ⁿ and |r| < 1.
   abs(r) ≥ 0;
-  Real.SequenceConverges((n : Natural) ↦ abs(r) ^ n, 0)
+  Real.SequenceConverges((n : ℕ) ↦ abs(r) ^ n, 0)
       by Real.power_converges_zero;
-  Real.SequenceConverges((n : Natural) ↦ r^n, 0)
+  Real.SequenceConverges((n : ℕ) ↦ r^n, 0)
       by Real.SequenceConverges.squeeze_zero(
-             v := (n : Natural) ↦ r^n,
-             u := (n : Natural) ↦ abs(r) ^ n,
-             dominated := (n : Natural) ↦ {
+             v := (n : ℕ) ↦ r^n,
+             u := (n : ℕ) ↦ abs(r) ^ n,
+             dominated := (n : ℕ) ↦ {
                abs(r^n)
                   = abs(r) ^ n   by Real.absolute_value_power
                   ≤ abs(r) ^ n
              })
       as rConverges;
   -- 1 − rⁿ → 1.
-  Real.SequenceConverges((n : Natural) ↦ -r^n, -(0 : Real))
+  Real.SequenceConverges((n : ℕ) ↦ -r^n, -(0 : ℝ))
       by Real.SequenceConverges.negate(
-             s := (n : Natural) ↦ r^n, sLimit := 0, sConverges := rConverges)
+             s := (n : ℕ) ↦ r^n, sLimit := 0, sConverges := rConverges)
       as negatedConverges;
-  Real.SequenceConverges((n : Natural) ↦ (1 : Real), 1)
+  Real.SequenceConverges((n : ℕ) ↦ (1 : ℝ), 1)
       by Real.constant_sequence_converges
       as oneConverges;
-  Real.SequenceConverges((n : Natural) ↦ (1 : Real) + -r^n, 1 + -(0 : Real))
+  Real.SequenceConverges((n : ℕ) ↦ (1 : ℝ) + -r^n, 1 + -(0 : ℝ))
       by Real.SequenceConverges.add(
-             s := (n : Natural) ↦ (1 : Real), t := (n : Natural) ↦ -r^n,
-             sLimit := 1, tLimit := -(0 : Real),
+             s := (n : ℕ) ↦ (1 : ℝ), t := (n : ℕ) ↦ -r^n,
+             sLimit := 1, tLimit := -(0 : ℝ),
              sConverges := oneConverges, tConverges := negatedConverges);
-  Real.SequenceConverges((n : Natural) ↦ 1 - r^n, 1 + -(0 : Real));
-  Real.SequenceConverges((n : Natural) ↦ 1 - r^n, 1)
+  Real.SequenceConverges((n : ℕ) ↦ 1 - r^n, 1 + -(0 : ℝ));
+  Real.SequenceConverges((n : ℕ) ↦ 1 - r^n, 1)
       as oneMinusConverges;
   -- Sₙ = (1 − rⁿ)·L, so Sₙ → 1·L = L.
-  Real.SequenceConverges((n : Natural) ↦ L, L)
+  Real.SequenceConverges((n : ℕ) ↦ L, L)
       by Real.constant_sequence_converges
       as limitConverges;
-  Real.SequenceConverges((n : Natural) ↦ (1 - r^n) * L, 1 * L)
+  Real.SequenceConverges((n : ℕ) ↦ (1 - r^n) * L, 1 * L)
       by Real.SequenceConverges.multiply(
-             s := (n : Natural) ↦ 1 - r^n, t := (n : Natural) ↦ L,
+             s := (n : ℕ) ↦ 1 - r^n, t := (n : ℕ) ↦ L,
              sLimit := 1, tLimit := L,
              sConverges := oneMinusConverges, tConverges := limitConverges);
   Real.SequenceConverges(
-        (n : Natural) ↦ Real.partialSum((k : Natural) ↦ r^k, n), 1 * L)
+        (n : ℕ) ↦ Real.partialSum((k : ℕ) ↦ r^k, n), 1 * L)
       by Real.SequenceConverges.of_pointwise(
-             s := (n : Natural) ↦ (1 - r^n) * L,
-             pointwiseEqual := (n : Natural) ↦ {
-               Real.partialSum((k : Natural) ↦ r^k, n)
-                  = Real.partialSum((k : Natural) ↦ r^k, n) * 1
-                  = Real.partialSum((k : Natural) ↦ r^k, n) * ((1 - r) * L)
-                  = ((1 - r) * Real.partialSum((k : Natural) ↦ r^k, n)) * L
+             s := (n : ℕ) ↦ (1 - r^n) * L,
+             pointwiseEqual := (n : ℕ) ↦ {
+               Real.partialSum((k : ℕ) ↦ r^k, n)
+                  = Real.partialSum((k : ℕ) ↦ r^k, n) * 1
+                  = Real.partialSum((k : ℕ) ↦ r^k, n) * ((1 - r) * L)
+                  = ((1 - r) * Real.partialSum((k : ℕ) ↦ r^k, n)) * L
                   = (1 - r^n) * L
                         by Real.geometric_partialSum
              });
   Real.SequenceConverges(
-        (n : Natural) ↦ Real.partialSum((k : Natural) ↦ r^k, n), L);
+        (n : ℕ) ↦ Real.partialSum((k : ℕ) ↦ r^k, n), L);
   done
 }
 
 -- ----------------------------------------------------------------------
 -- Freek #66: the geometric series. For |r| < 1 there is an inverse L
 -- of 1 − r — the sum of the series — and Σ rᵏ converges to it.
-theorem Real.geometric_series (r : Real) (rSmall : abs(r) < 1)
-        : ∃ (L : Real).
+theorem Real.geometric_series (r : ℝ) (rSmall : abs(r) < 1)
+        : ∃ (L : ℝ).
             (1 - r) * L = 1 ∧ (r^0 + r^1 + ... + r^k + ... = L) := {
   r ≤ abs(r);
   r < 1 by Real.LessThan.transitive_left;
@@ -165,9 +165,9 @@ theorem Real.geometric_series (r : Real) (rSmall : abs(r) < 1)
 -- ----------------------------------------------------------------------
 -- Partial sums only see the terms' values.
 theorem Real.partialSum_pointwise
-        (s sequencePrime : Natural → Real)
-        (pointwiseEqual : ∀ (k : Natural). s(k) = sequencePrime(k))
-        (n : Natural)
+        (s sequencePrime : ℕ → ℝ)
+        (pointwiseEqual : ∀ (k : ℕ). s(k) = sequencePrime(k))
+        (n : ℕ)
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
   Algebra.indexedAggregate_pointwise(pointwiseEqual := pointwiseEqual)
 
@@ -176,25 +176,25 @@ theorem Real.partialSum_pointwise
 -- when the identity genuinely fails past the cut — e.g. binomial
 -- coefficients that overflow to zero.
 theorem Real.partialSum_pointwise_below
-        (s sequencePrime : Natural → Real) (n : Natural)
-        (pointwiseEqual : ∀ (k : Natural). k < n → s(k) = sequencePrime(k))
+        (s sequencePrime : ℕ → ℝ) (n : ℕ)
+        (pointwiseEqual : ∀ (k : ℕ). k < n → s(k) = sequencePrime(k))
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
   Algebra.indexedAggregate_pointwise_below(pointwiseEqual := pointwiseEqual)
 
 -- A telescoping sum collapses to its boundary terms.
 theorem Real.telescoping_partialSum
-        (t : Natural → Real) (n : Natural)
-        : Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), n)
+        (t : ℕ → ℝ) (n : ℕ)
+        : Real.partialSum((k : ℕ) ↦ t(k) - t(1 + k), n)
           = t(0) - t(n) :=
   by induction on n with IH {
     case base:
-        Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), 0)
+        Real.partialSum((k : ℕ) ↦ t(k) - t(1 + k), 0)
            = Real.zero
            = t(0) - t(0)
     case step(predecessor):
         Real.partialSum(
-                 (k : Natural) ↦ t(k) - t(1 + k), 1 + predecessor)
-           = Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), predecessor)
+                 (k : ℕ) ↦ t(k) - t(1 + k), 1 + predecessor)
+           = Real.partialSum((k : ℕ) ↦ t(k) - t(1 + k), predecessor)
              + (t(predecessor) - t(1 + predecessor))
            = (t(0) - t(predecessor)) + (t(predecessor) - t(1 + predecessor))
                  by IH
@@ -204,23 +204,23 @@ theorem Real.telescoping_partialSum
 -- ----------------------------------------------------------------------
 -- Splitting a partial sum at a cut: the part below n, plus the block
 -- of k terms shifted past n.
-theorem Real.partialSum_split (s : Natural → Real) (n k : Natural)
+theorem Real.partialSum_split (s : ℕ → ℝ) (n k : ℕ)
         : Real.partialSum(s, k + n)
           = Real.partialSum(s, n)
-            + Real.partialSum((j : Natural) ↦ s(n + j), k) :=
+            + Real.partialSum((j : ℕ) ↦ s(n + j), k) :=
   Algebra.indexedAggregate_split(associativity := Real.add_associative,
       identityRight := Real.add_zero)
 
 -- Termwise comparison below the cut compares the partial sums.
-theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
-        (termsBounded : ∀ (j : Natural). j < n → s(j) ≤ t(j))
+theorem Real.partialSum_le_pointwise (s t : ℕ → ℝ) (n : ℕ)
+        (termsBounded : ∀ (j : ℕ). j < n → s(j) ≤ t(j))
         : Real.partialSum(s, n) ≤ Real.partialSum(t, n) :=
   by induction on n with IH {
     case base: { Real.zero ≤ Real.zero; done }
     case step(predecessor): {
         predecessor < 1 + predecessor;
-        ∀ (j : Natural). j < predecessor → s(j) ≤ t(j)
-            by (j : Natural) (jBelow : j < predecessor) ↦ {
+        ∀ (j : ℕ). j < predecessor → s(j) ≤ t(j)
+            by (j : ℕ) (jBelow : j < predecessor) ↦ {
                  j < 1 + predecessor;
                  done
                } as prefixBounded;
@@ -236,8 +236,8 @@ theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
   }
 
 -- Sums of nonnegative terms are nonnegative.
-theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
-        (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
+theorem Real.partialSum_nonneg (s : ℕ → ℝ) (n : ℕ)
+        (termsNonneg : ∀ (j : ℕ). Real.zero ≤ s(j))
         : Real.zero ≤ Real.partialSum(s, n) :=
   by induction on n with IH {
     case base: { Real.zero ≤ Real.zero; done }
@@ -252,71 +252,71 @@ theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
   }
 
 -- … so partial sums of nonnegative terms only grow.
-theorem Real.partialSum_monotone_of_nonneg (s : Natural → Real)
-        (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
-        (N m : Natural) (NLeqM : N ≤ m)
+theorem Real.partialSum_monotone_of_nonneg (s : ℕ → ℝ)
+        (termsNonneg : ∀ (j : ℕ). Real.zero ≤ s(j))
+        (N m : ℕ) (NLeqM : N ≤ m)
         : Real.partialSum(s, N) ≤ Real.partialSum(s, m) := {
   choose k such that m = k + N from Natural.le_to_add;
-  ∀ (j : Natural). Real.zero ≤ s(N + j) by (j : Natural) ↦ termsNonneg(N + j);
-  Real.zero ≤ Real.partialSum((j : Natural) ↦ s(N + j), k);
+  ∀ (j : ℕ). Real.zero ≤ s(N + j) by (j : ℕ) ↦ termsNonneg(N + j);
+  Real.zero ≤ Real.partialSum((j : ℕ) ↦ s(N + j), k);
   Real.partialSum(s, N)
      = Real.partialSum(s, N) + Real.zero
-     ≤ Real.partialSum(s, N) + Real.partialSum((j : Natural) ↦ s(N + j), k)
+     ≤ Real.partialSum(s, N) + Real.partialSum((j : ℕ) ↦ s(N + j), k)
      = Real.partialSum(s, k + N)
      = Real.partialSum(s, m)
 }
 
 -- A constant block sums to (its length)·(the constant), at the Real level.
-theorem Real.partialSum_constant (c : Real) (n : Natural)
-        : Real.partialSum((j : Natural) ↦ c, n) = (n : Real) * c :=
+theorem Real.partialSum_constant (c : ℝ) (n : ℕ)
+        : Real.partialSum((j : ℕ) ↦ c, n) = (n : ℝ) * c :=
   by induction on n with IH {
     case base: {
-        ((0 : Natural) : Real) = Real.zero;
-        Real.partialSum((j : Natural) ↦ c, 0)
+        ((0 : ℕ) : ℝ) = Real.zero;
+        Real.partialSum((j : ℕ) ↦ c, 0)
            = Real.zero
            = 0 * c
-           = ((0 : Natural) : Real) * c
+           = ((0 : ℕ) : ℝ) * c
       }
     case step(predecessor): {
         -- The cast of 1 is Real.one definitionally, so the split is the
         -- additive leg alone.
-        (1 + predecessor : Real) = Real.one + (predecessor : Real);
-        Real.partialSum((j : Natural) ↦ c, 1 + predecessor)
-           = Real.partialSum((j : Natural) ↦ c, predecessor) + c
-           = (predecessor : Real) * c + c
+        (1 + predecessor : ℝ) = Real.one + (predecessor : ℝ);
+        Real.partialSum((j : ℕ) ↦ c, 1 + predecessor)
+           = Real.partialSum((j : ℕ) ↦ c, predecessor) + c
+           = (predecessor : ℝ) * c + c
                  by IH
-           = (Real.one + (predecessor : Real)) * c
-           = (1 + predecessor : Real) * c
+           = (Real.one + (predecessor : ℝ)) * c
+           = (1 + predecessor : ℝ) * c
       }
   }
 
 -- ----------------------------------------------------------------------
 -- Linearity of partial sums: they split over termwise sums and pull
 -- out constant factors.
-theorem Real.partialSum_add (s t : Natural → Real) (n : Natural)
-        : Real.partialSum((k : Natural) ↦ s(k) + t(k), n)
+theorem Real.partialSum_add (s t : ℕ → ℝ) (n : ℕ)
+        : Real.partialSum((k : ℕ) ↦ s(k) + t(k), n)
           = Real.partialSum(s, n) + Real.partialSum(t, n) :=
   Algebra.indexedAggregate_add(associativity := Real.add_associative,
       commutativity := Real.add_commutative, identityLeft := Real.zero_add)
 
-theorem Real.partialSum_scale (c : Real) (s : Natural → Real) (n : Natural)
-        : Real.partialSum((k : Natural) ↦ c * s(k), n)
+theorem Real.partialSum_scale (c : ℝ) (s : ℕ → ℝ) (n : ℕ)
+        : Real.partialSum((k : ℕ) ↦ c * s(k), n)
           = c * Real.partialSum(s, n) :=
   Algebra.indexedAggregate_scale(
-      distributes := (x : Real) (y : Real) ↦ (ring : c * (x + y) = c * x + c * y),
+      distributes := (x : ℝ) (y : ℝ) ↦ (ring : c * (x + y) = c * x + c * y),
       scaleIdentity := (ring : c * Real.zero = Real.zero))
 
 -- Negating every term negates the sum.
-theorem Real.partialSum_negate (s : Natural → Real) (n : Natural)
-        : Real.partialSum((k : Natural) ↦ -s(k), n)
+theorem Real.partialSum_negate (s : ℕ → ℝ) (n : ℕ)
+        : Real.partialSum((k : ℕ) ↦ -s(k), n)
           = -Real.partialSum(s, n) :=
   by induction on n with IH {
     case base:
-        Real.partialSum((k : Natural) ↦ -s(k), 0)
+        Real.partialSum((k : ℕ) ↦ -s(k), 0)
            = -Real.zero
     case step(predecessor):
-        Real.partialSum((k : Natural) ↦ -s(k), 1 + predecessor)
-           = Real.partialSum((k : Natural) ↦ -s(k), predecessor)
+        Real.partialSum((k : ℕ) ↦ -s(k), 1 + predecessor)
+           = Real.partialSum((k : ℕ) ↦ -s(k), predecessor)
              + -s(predecessor)
            = -Real.partialSum(s, predecessor) + -s(predecessor)
                  by IH
@@ -325,16 +325,16 @@ theorem Real.partialSum_negate (s : Natural → Real) (n : Natural)
   }
 
 -- Sums subtract termwise.
-theorem Real.partialSum_subtract (s t : Natural → Real) (n : Natural)
-        : Real.partialSum((k : Natural) ↦ s(k) - t(k), n)
+theorem Real.partialSum_subtract (s t : ℕ → ℝ) (n : ℕ)
+        : Real.partialSum((k : ℕ) ↦ s(k) - t(k), n)
           = Real.partialSum(s, n) - Real.partialSum(t, n) :=
   by induction on n with IH {
     case base:
-        Real.partialSum((k : Natural) ↦ s(k) - t(k), 0)
+        Real.partialSum((k : ℕ) ↦ s(k) - t(k), 0)
            = Real.zero - Real.zero
     case step(predecessor):
-        Real.partialSum((k : Natural) ↦ s(k) - t(k), 1 + predecessor)
-           = Real.partialSum((k : Natural) ↦ s(k) - t(k), predecessor)
+        Real.partialSum((k : ℕ) ↦ s(k) - t(k), 1 + predecessor)
+           = Real.partialSum((k : ℕ) ↦ s(k) - t(k), predecessor)
              + (s(predecessor) - t(predecessor))
            = (Real.partialSum(s, predecessor) - Real.partialSum(t, predecessor))
              + (s(predecessor) - t(predecessor))
@@ -345,17 +345,17 @@ theorem Real.partialSum_subtract (s t : Natural → Real) (n : Natural)
   }
 
 -- Scaling on the right (a common factor behind every term).
-theorem Real.partialSum_scale_right (s : Natural → Real) (c : Real) (n : Natural)
-        : Real.partialSum((k : Natural) ↦ s(k) * c, n)
+theorem Real.partialSum_scale_right (s : ℕ → ℝ) (c : ℝ) (n : ℕ)
+        : Real.partialSum((k : ℕ) ↦ s(k) * c, n)
           = Real.partialSum(s, n) * c :=
   by induction on n with IH {
     case base:
-        Real.partialSum((k : Natural) ↦ s(k) * c, 0)
+        Real.partialSum((k : ℕ) ↦ s(k) * c, 0)
            = Real.zero
            = Real.zero * c
     case step(predecessor):
-        Real.partialSum((k : Natural) ↦ s(k) * c, 1 + predecessor)
-           = Real.partialSum((k : Natural) ↦ s(k) * c, predecessor)
+        Real.partialSum((k : ℕ) ↦ s(k) * c, 1 + predecessor)
+           = Real.partialSum((k : ℕ) ↦ s(k) * c, predecessor)
              + s(predecessor) * c
            = Real.partialSum(s, predecessor) * c + s(predecessor) * c
                  by IH
@@ -365,10 +365,10 @@ theorem Real.partialSum_scale_right (s : Natural → Real) (c : Real) (n : Natur
 
 -- A sum of nonnegative terms vanishes only if every term below the cut
 -- does: each term is squeezed between zero and the whole sum.
-theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
-        (termsNonneg : ∀ (j : Natural). Real.zero ≤ s(j))
+theorem Real.partialSum_zero_term (s : ℕ → ℝ) (n : ℕ)
+        (termsNonneg : ∀ (j : ℕ). Real.zero ≤ s(j))
         (sumZero : Real.partialSum(s, n) = Real.zero)
-        (j : Natural) (jBelow : j < n)
+        (j : ℕ) (jBelow : j < n)
         : s(j) = Real.zero := {
   -- s(j) ≤ Σ_{i < j+1} s(i) ≤ Σ_{i < n} s(i) = 0.
   Real.zero ≤ Real.partialSum(s, j);
@@ -387,30 +387,30 @@ theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
 }
 
 -- The zero series sums to zero.
-theorem Real.partialSum_zero (n : Natural)
-        : Real.partialSum((k : Natural) ↦ Real.zero, n) = Real.zero :=
+theorem Real.partialSum_zero (n : ℕ)
+        : Real.partialSum((k : ℕ) ↦ Real.zero, n) = Real.zero :=
   by induction on n with IH {
     case base: done
     case step(predecessor):
-        Real.partialSum((k : Natural) ↦ Real.zero, 1 + predecessor)
-           = Real.partialSum((k : Natural) ↦ Real.zero, predecessor) + Real.zero
+        Real.partialSum((k : ℕ) ↦ Real.zero, 1 + predecessor)
+           = Real.partialSum((k : ℕ) ↦ Real.zero, predecessor) + Real.zero
            = Real.zero + Real.zero    by IH
            = Real.zero
   }
 
 -- Termwise equality below the cut gives equal partial sums.
 theorem Real.partialSum_pointwise_bounded
-        (s sequencePrime : Natural → Real) (n : Natural)
-        (termsEqual : ∀ (j : Natural). j < n
+        (s sequencePrime : ℕ → ℝ) (n : ℕ)
+        (termsEqual : ∀ (j : ℕ). j < n
                       → s(j) = sequencePrime(j))
         : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
   Algebra.indexedAggregate_pointwise_below(pointwiseEqual := termsEqual)
 
 -- ----------------------------------------------------------------------
 -- The triangle inequality for partial sums: |Σ s(k)| ≤ Σ |s(k)|.
-theorem Real.abs_partialSum_le (s : Natural → Real) (n : Natural)
+theorem Real.abs_partialSum_le (s : ℕ → ℝ) (n : ℕ)
         : abs(Real.partialSum(s, n))
-          ≤ Real.partialSum((k : Natural) ↦ abs(s(k)), n) :=
+          ≤ Real.partialSum((k : ℕ) ↦ abs(s(k)), n) :=
   by induction on n with IH {
     case base: {
         Real.IsNonneg(Real.zero);
@@ -418,47 +418,47 @@ theorem Real.abs_partialSum_le (s : Natural → Real) (n : Natural)
         abs(Real.partialSum(s, 0))
            = Real.zero
            ≤ Real.zero
-           = Real.partialSum((k : Natural) ↦ abs(s(k)), 0)
+           = Real.partialSum((k : ℕ) ↦ abs(s(k)), 0)
       }
     case step(predecessor):
         abs(Real.partialSum(s, 1 + predecessor))
            = abs(Real.partialSum(s, predecessor) + s(predecessor))
            ≤ abs(Real.partialSum(s, predecessor)) + abs(s(predecessor))
-           ≤ Real.partialSum((k : Natural) ↦ abs(s(k)), predecessor)
+           ≤ Real.partialSum((k : ℕ) ↦ abs(s(k)), predecessor)
              + abs(s(predecessor))
-           = Real.partialSum((k : Natural) ↦ abs(s(k)), 1 + predecessor)
+           = Real.partialSum((k : ℕ) ↦ abs(s(k)), 1 + predecessor)
                  by substituting Real.partialSum_add_one
   }
 
 -- A window of a sum is bounded by the same window of the absolute
 -- series: |B(w+m) − B(m)| ≤ Babs(w+m) − Babs(m).
-theorem Real.partialSum_window_bound (b : Natural → Real) (m w : Natural)
+theorem Real.partialSum_window_bound (b : ℕ → ℝ) (m w : ℕ)
         : abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
-          ≤ Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
-            - Real.partialSum((k : Natural) ↦ abs(b(k)), m) := {
+          ≤ Real.partialSum((k : ℕ) ↦ abs(b(k)), w + m)
+            - Real.partialSum((k : ℕ) ↦ abs(b(k)), m) := {
   Real.partialSum(b, w + m)
         = Real.partialSum(b, m)
-          + Real.partialSum((j : Natural) ↦ b(m + j), w)
+          + Real.partialSum((j : ℕ) ↦ b(m + j), w)
       by Real.partialSum_split;
-  Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
-        = Real.partialSum((k : Natural) ↦ abs(b(k)), m)
-          + Real.partialSum((j : Natural) ↦ abs(b(m + j)), w)
+  Real.partialSum((k : ℕ) ↦ abs(b(k)), w + m)
+        = Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
+          + Real.partialSum((j : ℕ) ↦ abs(b(m + j)), w)
       by Real.partialSum_split;
   abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
      = abs((Real.partialSum(b, m)
-                + Real.partialSum((j : Natural) ↦ b(m + j), w))
+                + Real.partialSum((j : ℕ) ↦ b(m + j), w))
            - Real.partialSum(b, m))
-     = abs(Real.partialSum((j : Natural) ↦ b(m + j), w))
+     = abs(Real.partialSum((j : ℕ) ↦ b(m + j), w))
            by substituting
-               (ring : Real.partialSum((j : Natural) ↦ b(m + j), w)
+               (ring : Real.partialSum((j : ℕ) ↦ b(m + j), w)
                    = (Real.partialSum(b, m)
-                          + Real.partialSum((j : Natural) ↦ b(m + j), w))
+                          + Real.partialSum((j : ℕ) ↦ b(m + j), w))
                      - Real.partialSum(b, m))
-     ≤ Real.partialSum((j : Natural) ↦ abs(b(m + j)), w)
+     ≤ Real.partialSum((j : ℕ) ↦ abs(b(m + j)), w)
            by Real.abs_partialSum_le
-     = (Real.partialSum((k : Natural) ↦ abs(b(k)), m)
-            + Real.partialSum((j : Natural) ↦ abs(b(m + j)), w))
-       - Real.partialSum((k : Natural) ↦ abs(b(k)), m)
-     = Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
-       - Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+     = (Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
+            + Real.partialSum((j : ℕ) ↦ abs(b(m + j)), w))
+       - Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
+     = Real.partialSum((k : ℕ) ↦ abs(b(k)), w + m)
+       - Real.partialSum((k : ℕ) ↦ abs(b(k)), m)
 }

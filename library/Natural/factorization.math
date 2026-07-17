@@ -30,7 +30,7 @@ import Lists.list
 -- Helpers (arithmetic + order facts not yet in the upstream modules).
 
 -- Every natural is either zero or ≥ 1.
-theorem Natural.is_zero_or_at_least_one (k : Natural) : k = 0 ∨ 1 ≤ k :=
+theorem Natural.is_zero_or_at_least_one (k : ℕ) : k = 0 ∨ 1 ≤ k :=
   done by cases {
     case k = 0: okay
     case k = successor(kPredecessor) for some kPredecessor: {
@@ -43,7 +43,7 @@ theorem Natural.is_zero_or_at_least_one (k : Natural) : k = 0 ∨ 1 ≤ k :=
 -- contradicts the hypothesis, successor(nPredecessor) re-splits via
 -- is_zero_or_at_least_one on nPredecessor.
 automatic theorem Natural.equals_one_or_at_least_two
-        (n : Natural) (positivity : 1 ≤ n) : n = 1 ∨ 2 ≤ n :=
+        (n : ℕ) (positivity : 1 ≤ n) : n = 1 ∨ 2 ≤ n :=
   done by cases {
     case n = 0: {
         1 ≤ 0;
@@ -62,7 +62,7 @@ automatic theorem Natural.equals_one_or_at_least_two
 -- If 1 ≤ n and n = p * q, then 1 ≤ q. By cases on q: q = 0 forces
 -- n = p * 0 = 0, contradicting 1 ≤ n.
 automatic theorem Natural.right_factor_at_least_one
-        (p n : Natural) (q : Natural) (oneLessOrEqualN : 1 ≤ n) (nEqualsPTimesQ : n = p * q)
+        (p n : ℕ) (q : ℕ) (oneLessOrEqualN : 1 ≤ n) (nEqualsPTimesQ : n = p * q)
         : 1 ≤ q :=
   done by cases {
     case q = 0: 1 ≤ n = p * 0 = 0
@@ -78,19 +78,19 @@ automatic theorem Natural.right_factor_at_least_one
 -- and apply prepend-injectivity inside each branch.
 
 theorem Natural.list_all_prime_under_prepend_equality
-        (head : Natural) (tail : List(Natural))
+        (head : ℕ) (tail : List(ℕ))
         (headIsPrime : Natural.is_prime(head))
-        (allPrimeTail : ∀ (k : Natural).
+        (allPrimeTail : ∀ (k : ℕ).
                         k ∈ tail
                         → Natural.is_prime(k))
-        (candidate : Natural) (list : List(Natural))
+        (candidate : ℕ) (list : List(ℕ))
         (memberProof : candidate ∈ list)
-        : list = List.prepend(Natural, head, tail)
+        : list = List.prepend(ℕ, head, tail)
           → Natural.is_prime(candidate) :=
   by induction on memberProof {
     case List.member.here(rest):
-        (listEquality : List.prepend(Natural, candidate, rest)
-                        = List.prepend(Natural, head, tail)) ↦ {
+        (listEquality : List.prepend(ℕ, candidate, rest)
+                        = List.prepend(ℕ, head, tail)) ↦ {
           -- From `here`, list = prepend(candidate, rest); combined with
           -- listEquality, prepend(candidate, rest) = prepend(head, tail),
           -- so candidate = head and is_prime(candidate) = is_prime(head).
@@ -98,8 +98,8 @@ theorem Natural.list_all_prime_under_prepend_equality
           Natural.is_prime(candidate)
         }
     case List.member.there(headInList, restInList, subMembership):
-        (listEquality : List.prepend(Natural, headInList, restInList)
-                        = List.prepend(Natural, head, tail)) ↦ {
+        (listEquality : List.prepend(ℕ, headInList, restInList)
+                        = List.prepend(ℕ, head, tail)) ↦ {
           -- From `there`, list = prepend(headInList, restInList); combined
           -- with listEquality, restInList = tail, so subMembership lifts to
           -- member(candidate, tail) via Equality.transport.
@@ -114,14 +114,14 @@ theorem Natural.list_all_prime_under_prepend_equality
 -- `member(candidate, list)` premise against `membership` pins `list`, and
 -- `headIsPrime` / `allPrimeTail` pin `head` / `tail`.
 theorem Natural.list_all_prime_prepend
-        (head : Natural) (tail : List(Natural))
+        (head : ℕ) (tail : List(ℕ))
         (headIsPrime : Natural.is_prime(head))
-        (allPrimeTail : ∀ (k : Natural).
+        (allPrimeTail : ∀ (k : ℕ).
                         k ∈ tail
                         → Natural.is_prime(k))
-        (candidate : Natural)
+        (candidate : ℕ)
         (membership :
-            candidate ∈ List.prepend(Natural, head, tail))
+            candidate ∈ List.prepend(ℕ, head, tail))
         : Natural.is_prime(candidate) :=
   done
 
@@ -131,10 +131,10 @@ theorem Natural.list_all_prime_prepend
 -- Strong induction needs the motive to carry the `1 ≤ subject` premise, so
 -- the recursion lives in this helper; the public theorem below just feeds it
 -- the hypothesis.
-theorem Natural.prime_factorization_exists_helper (n : Natural)
+theorem Natural.prime_factorization_exists_helper (n : ℕ)
         : 1 ≤ n
-          → ∃ (list : List(Natural)).
-              (∀ (k : Natural).
+          → ∃ (list : List(ℕ)).
+              (∀ (k : ℕ).
                k ∈ list
                → Natural.is_prime(k))
               ∧ Natural.listProduct(list) = n :=
@@ -144,37 +144,37 @@ theorem Natural.prime_factorization_exists_helper (n : Natural)
        done by cases {
          -- subject = 1: the empty list works (its product is 1 = subject).
          case subject = 1 as subjectEqualsOne:
-             witness List.empty(Natural) with {
-                 ∀ (k : Natural).
-                         k ∈ List.empty(Natural) → Natural.is_prime(k)
-                     by (k : Natural)
-                            (memberOfEmpty : k ∈ List.empty(Natural)) ↦ {
+             witness List.empty(ℕ) with {
+                 ∀ (k : ℕ).
+                         k ∈ List.empty(ℕ) → Natural.is_prime(k)
+                     by (k : ℕ)
+                            (memberOfEmpty : k ∈ List.empty(ℕ)) ↦ {
                          False by List.no_member_empty as noMember;
                          absurd(noMember)
                        };
-                 Natural.listProduct(List.empty(Natural)) = subject;
+                 Natural.listProduct(List.empty(ℕ)) = subject;
                  done
                }
          -- subject ≥ 2: peel off a prime divisor and recurse on the quotient.
          case 2 ≤ subject as subjectAtLeastTwo: {
              choose prime such that Natural.is_prime(prime) ∧ prime ∣ subject
                from Natural.has_prime_divisor;
-             ∃ (factor : Natural). subject = prime * factor;
+             ∃ (factor : ℕ). subject = prime * factor;
              choose quotient such that subject = prime * quotient;
              2 ≤ prime;
              1 ≤ quotient;
              quotient < prime * quotient;
              quotient < subject;
              choose tail such that
-                 (∀ (k : Natural).
+                 (∀ (k : ℕ).
                   k ∈ tail → Natural.is_prime(k))
                  ∧ Natural.listProduct(tail) = quotient
                from inductionHypothesis(quotient, (quotient < subject))(1 ≤ quotient);
-             witness List.prepend(Natural, prime, tail) with {
-                 ∀ (k : Natural).
-                         k ∈ List.prepend(Natural, prime, tail)
+             witness List.prepend(ℕ, prime, tail) with {
+                 ∀ (k : ℕ).
+                         k ∈ List.prepend(ℕ, prime, tail)
                          → Natural.is_prime(k);
-                 Natural.listProduct(List.prepend(Natural, prime, tail))
+                 Natural.listProduct(List.prepend(ℕ, prime, tail))
                     = prime * Natural.listProduct(tail)
                     = prime * quotient
                     = subject;
@@ -185,9 +185,9 @@ theorem Natural.prime_factorization_exists_helper (n : Natural)
    }
 
 theorem Natural.prime_factorization_exists
-        (n : Natural) (atLeastOne : 1 ≤ n)
-        : ∃ (list : List(Natural)).
-            (∀ (k : Natural).
+        (n : ℕ) (atLeastOne : 1 ≤ n)
+        : ∃ (list : List(ℕ)).
+            (∀ (k : ℕ).
              k ∈ list
              → Natural.is_prime(k))
             ∧ Natural.listProduct(list) = n :=

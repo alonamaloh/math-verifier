@@ -45,21 +45,21 @@ import Rational.reciprocal
 -- The rational image of a natural number is nonnegative. A boundary
 -- lemma for the opaque IsNonneg (the cast form): the `unfold` collapses
 -- the lift, so call sites cite this name and never pierce the opacity.
-automatic theorem Rational.from_natural_is_nonneg (n : Natural)
-        : Rational.IsNonneg((n : Rational)) := {
-  Integer.IsNonneg((n : Integer));
-  (0 : Integer) ≤ (n : Integer);
-  done by substituting (ring : n * Integer.one = (n : Integer))
+automatic theorem Rational.from_natural_is_nonneg (n : ℕ)
+        : Rational.IsNonneg((n : ℚ)) := {
+  Integer.IsNonneg((n : ℤ));
+  (0 : ℤ) ≤ (n : ℤ);
+  done by substituting (ring : n * Integer.one = (n : ℤ))
       unfolding Rational.IsNonneg
 }
 
--- The same fact in `≤` form, so a call site needing `0 ≤ (n : Rational)`
+-- The same fact in `≤` form, so a call site needing `0 ≤ (n : ℚ)`
 -- — the non-negativity premise of `multiply_by_nonneg_left/right` — cites
 -- it in one step instead of chaining through `IsNonneg`. Mirrors
 -- `zero_le_absolute_value`, the directly-citable nonnegativity of `abs`.
-automatic theorem Rational.from_natural_LessOrEqual_zero (n : Natural)
-        : Rational.zero ≤ (n : Rational) := {
-  Rational.IsNonneg((n : Rational));
+automatic theorem Rational.from_natural_LessOrEqual_zero (n : ℕ)
+        : Rational.zero ≤ (n : ℚ) := {
+  Rational.IsNonneg((n : ℚ));
   done
 }
 
@@ -68,14 +68,14 @@ automatic theorem Rational.from_natural_LessOrEqual_zero (n : Natural)
 
 -- (-x) * y = -(x * y). At reps, both sides have the same denominator
 -- and the numerator equality reduces to Integer.multiply_negate_left.
-theorem Rational.multiply_negate_left (x y : Rational)
+theorem Rational.multiply_negate_left (x y : ℚ)
         : (-x) * y = -(x * y) :=
   by_representatives x as ⟨n_x, d_x, _⟩, y as ⟨n_y, d_y, _⟩ =>
       { ((-n_x) * n_y) * (d_x * d_y)
          = (-(n_x * n_y)) * (d_x * d_y) }
 
 -- Distribute multiplication over subtraction: (b - a) * c = b*c - a*c.
-theorem Rational.subtract_multiply_distribute (a b c : Rational)
+theorem Rational.subtract_multiply_distribute (a b c : ℚ)
         : (b - a) * c = b * c - a * c :=
   (b - a) * c
      = b * c - a * c
@@ -85,7 +85,7 @@ theorem Rational.subtract_multiply_distribute (a b c : Rational)
 
 -- a ≤ b ∧ 0 ≤ c → a * c ≤ b * c.
 automatic theorem Rational.LessOrEqual.multiply_by_nonneg_right
-        (a b c : Rational) (aLeqB : a ≤ b)
+        (a b c : ℚ) (aLeqB : a ≤ b)
         (cNonneg : Rational.LessOrEqual(Rational.zero, c))
         : a * c ≤ b * c := {
   Rational.IsNonneg(c);
@@ -97,7 +97,7 @@ automatic theorem Rational.LessOrEqual.multiply_by_nonneg_right
 
 -- a ≤ b ∧ 0 ≤ c → c * a ≤ c * b. By commutativity.
 automatic theorem Rational.LessOrEqual.multiply_by_nonneg_left
-        (a b c : Rational) (aLeqB : a ≤ b)
+        (a b c : ℚ) (aLeqB : a ≤ b)
         (cNonneg : Rational.LessOrEqual(Rational.zero, c))
         : c * a ≤ c * b :=
   c * a
@@ -118,10 +118,10 @@ automatic theorem Rational.zero_not_equal_one : Rational.zero ≠ Rational.one :
     -- Equal fractions ⇒ Integer.zero · 1 = Integer.one · 1, i.e. 0 = 1 in ℤ.
     Integer.zero * Integer.one = Integer.one * Integer.one
         by Rational.fraction_equal_implies;
-    (1 : Integer)
+    (1 : ℤ)
        = Integer.one * Integer.one
        = Integer.zero * Integer.one
-       = (0 : Integer);
+       = (0 : ℤ);
     1 = 0;
     absurd(1 = 0)
   }
@@ -129,7 +129,7 @@ automatic theorem Rational.zero_not_equal_one : Rational.zero ≠ Rational.one :
 -- 0 < 1 at Rational. And of (0 ≤ 1) and (0 ≠ 1).
 automatic theorem Rational.zero_less_one : Rational.zero < Rational.one := {
   -- Rational.one is 1/1, sign-witness 1·1 = 1 ≥ 0.
-  Integer.IsNonneg(((1 : Natural) : Integer));
+  Integer.IsNonneg(((1 : ℕ) : ℤ));
   Integer.IsNonneg(Integer.one);
   Integer.IsNonneg(Integer.one * Integer.one);
   Rational.IsNonneg(Rational.one);
@@ -140,7 +140,7 @@ automatic theorem Rational.zero_less_one : Rational.zero < Rational.one := {
 
 -- halve(ε) < ε when 0 < ε.
 automatic theorem Rational.halve_less_than_self
-        (ε : Rational) (εPos : Rational.zero < ε)
+        (ε : ℚ) (εPos : Rational.zero < ε)
         : Rational.halve(ε) < ε := {
   -- ε − halve(ε) = halve(ε), since ε = halve(ε) + halve(ε).
   ε - Rational.halve(ε)
@@ -169,7 +169,7 @@ automatic theorem Rational.halve_less_than_self
 
 -- |q|_at_rep = mk(make(|n|_int, d)) — its numerator is |n|, which is
 -- IsNonneg (image of a Natural). So |q| is IsNonneg.
-automatic theorem Rational.absolute_value_IsNonneg (q : Rational)
+automatic theorem Rational.absolute_value_IsNonneg (q : ℚ)
         : Rational.IsNonneg(abs(q)) :=
   -- At a representative make(n, d), |q| has numerator
   -- Integer.absolute_value(n) — the image of a Natural (= distance(a, b)
@@ -183,7 +183,7 @@ automatic theorem Rational.absolute_value_IsNonneg (q : Rational)
       }
 
 -- 0 ≤ |q|.
-automatic theorem Rational.zero_le_absolute_value (q : Rational)
+automatic theorem Rational.zero_le_absolute_value (q : ℚ)
         : Rational.LessOrEqual(Rational.zero, abs(q)) := {
   Rational.IsNonneg(abs(q));
   done
@@ -197,15 +197,15 @@ automatic theorem Rational.zero_le_absolute_value (q : Rational)
 --   ((succ(K):I)·|d| + (-|n|)·1) · (1·|d|),
 -- which equals ((K:I)·(|d|−1) + |d|) · |d| ≥ 0.
 theorem Rational.absolute_value_le_add_one_natural_at_representative
-        (n d : Integer) (dNonzero : d ≠ Integer.zero)
+        (n d : ℤ) (dNonzero : d ≠ Integer.zero)
         : Rational.LessOrEqual(
               abs(Rational.fraction(n, d, dNonzero)),
-              ((Integer.absolute_value_natural(n) + 1) : Rational)) :=
+              ((Integer.absolute_value_natural(n) + 1) : ℚ)) :=
   unfold Rational.IsNonneg in {
-    abs(n) = (Integer.absolute_value_natural(n) : Integer) as absoluteImage;
+    abs(n) = (Integer.absolute_value_natural(n) : ℤ) as absoluteImage;
     Integer.IsNonneg(abs(d) + -Integer.one);
     Integer.IsNonneg(abs(d));
-    Integer.IsNonneg((Integer.absolute_value_natural(n) : Integer));
+    Integer.IsNonneg((Integer.absolute_value_natural(n) : ℤ));
     Integer.IsNonneg(
                 Integer.absolute_value_natural(n) * (abs(d) + -Integer.one));
     Integer.IsNonneg(
@@ -214,16 +214,16 @@ theorem Rational.absolute_value_le_add_one_natural_at_representative
     Integer.IsNonneg(
                 (Integer.absolute_value_natural(n) * (abs(d) + -Integer.one) + abs(d))
                 * abs(d));
-    (0 : Integer) ≤
-                ((Integer.absolute_value_natural(n) : Integer) * (abs(d) + -Integer.one) + abs(d))
+    (0 : ℤ) ≤
+                ((Integer.absolute_value_natural(n) : ℤ) * (abs(d) + -Integer.one) + abs(d))
                 * abs(d);
-    (((Integer.absolute_value_natural(n) + 1) : Integer) * abs(d)
+    (((Integer.absolute_value_natural(n) + 1) : ℤ) * abs(d)
           + (-abs(n)) * Integer.one) * (Integer.one * abs(d))
-       = (((Integer.absolute_value_natural(n) : Integer) + Integer.one) * abs(d)
+       = (((Integer.absolute_value_natural(n) : ℤ) + Integer.one) * abs(d)
           + (-abs(n)) * Integer.one)
          * (Integer.one * abs(d))
-       = (((Integer.absolute_value_natural(n) : Integer) + Integer.one) * abs(d)
-          + (-(Integer.absolute_value_natural(n) : Integer)) * Integer.one)
+       = (((Integer.absolute_value_natural(n) : ℤ) + Integer.one) * abs(d)
+          + (-(Integer.absolute_value_natural(n) : ℤ)) * Integer.one)
          * (Integer.one * abs(d))
              by absoluteImage
        = (Integer.absolute_value_natural(n) * (abs(d) + -Integer.one) + abs(d))
@@ -231,22 +231,22 @@ theorem Rational.absolute_value_le_add_one_natural_at_representative
     done by substituting witnessEquation
   }
 
--- ((n + 1) : Rational) = (n : Rational) + 1. The `n + 1` cast bridge, so
+-- ((n + 1) : ℚ) = (n : ℚ) + 1. The `n + 1` cast bridge, so
 -- consumers add one to a natural-image bound without naming the constructor.
-theorem Rational.add_one_cast (n : Natural)
-        : ((n + 1) : Rational) = n + Rational.one :=
-  ((n + 1) : Rational)
-     = (n : Rational) + ((1 : Natural) : Rational)
-     = (n : Rational) + Rational.one
+theorem Rational.add_one_cast (n : ℕ)
+        : ((n + 1) : ℚ) = n + Rational.one :=
+  ((n + 1) : ℚ)
+     = (n : ℚ) + ((1 : ℕ) : ℚ)
+     = (n : ℚ) + Rational.one
 
 -- The headline Archimedean property: for any Rational q, there is a
--- Natural K with |q| ≤ ((K + 1) : Rational).
-theorem Rational.absolute_value_le_add_one_natural (q : Rational)
-        : ∃ (K : Natural).
-            abs(q) ≤ ((K + 1) : Rational) :=
+-- Natural K with |q| ≤ ((K + 1) : ℚ).
+theorem Rational.absolute_value_le_add_one_natural (q : ℚ)
+        : ∃ (K : ℕ).
+            abs(q) ≤ ((K + 1) : ℚ) :=
   by_representatives q as ⟨n, d, dNonzero⟩ => {
     abs(Rational.fraction(n, d, dNonzero))
-            ≤ ((Integer.absolute_value_natural(n) + 1) : Rational);
+            ≤ ((Integer.absolute_value_natural(n) + 1) : ℚ);
     witness Integer.absolute_value_natural(n) with done
   }
 
@@ -256,7 +256,7 @@ theorem Rational.absolute_value_le_add_one_natural (q : Rational)
 
 -- c ≤ d → b + c ≤ b + d. General left-add.
 automatic theorem Rational.add_general_LessOrEqual_left
-        (b c d : Rational) (cLeqD : c ≤ d)
+        (b c d : ℚ) (cLeqD : c ≤ d)
         : b + c ≤ b + d :=
   b + c
      = c + b
@@ -265,7 +265,7 @@ automatic theorem Rational.add_general_LessOrEqual_left
 
 -- a ≤ b ∧ c ≤ d → a + c ≤ b + d.
 automatic theorem Rational.LessOrEqual.sum
-        {a b c d : Rational} (aLeqB : a ≤ b) (cLeqD : c ≤ d)
+        {a b c d : ℚ} (aLeqB : a ≤ b) (cLeqD : c ≤ d)
         : a + c ≤ b + d :=
   a + c
      ≤ b + c
@@ -275,22 +275,22 @@ automatic theorem Rational.LessOrEqual.sum
 -- ε / (K + 1) construction.
 
 -- The reciprocal of (succ(K) : R) packaged as StrictPositiveRational.
--- 1/(succ(K)) = mk(make(succ(zero) : Integer, K)) per the definition.
--- IsNonneg follows from numerator = (1 : Integer) being IsNonneg.
-theorem Rational.reciprocal_of_succ_IsNonneg (K : Natural)
+-- 1/(succ(K)) = mk(make(succ(zero) : ℤ, K)) per the definition.
+-- IsNonneg follows from numerator = (1 : ℤ) being IsNonneg.
+theorem Rational.reciprocal_of_succ_IsNonneg (K : ℕ)
         : Rational.IsNonneg(
               StrictPositiveRational.reciprocal(
                   StrictPositiveRational.make(K, 0))) :=
   -- The reciprocal is (0+1)/(K+1); sign-witness (0+1)·(K+1) ≥ 0.
   unfold Rational.IsNonneg in {
-    Integer.IsNonneg(((0 + 1) : Integer));
-    Integer.IsNonneg(((K + 1) : Integer));
-    Integer.IsNonneg(((0 + 1) : Integer) * ((K + 1) : Integer));
+    Integer.IsNonneg(((0 + 1) : ℤ));
+    Integer.IsNonneg(((K + 1) : ℤ));
+    Integer.IsNonneg(((0 + 1) : ℤ) * ((K + 1) : ℤ));
     done by Integer.zero_less_or_equal_of_nonneg
   }
 
 -- 1/(succ(K)) is non-zero.
-theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
+theorem Rational.reciprocal_of_succ_nonzero (K : ℕ)
         : Rational.zero
               ≠ StrictPositiveRational.reciprocal(
                     StrictPositiveRational.make(K, 0)) :=
@@ -298,27 +298,27 @@ theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
               : Rational.zero
                 = StrictPositiveRational.reciprocal(
                       StrictPositiveRational.make(K, 0))) ↦ {
-    let denominatorNonzero : ((K + 1) : Integer) ≠ Integer.zero := done;
+    let denominatorNonzero : ((K + 1) : ℤ) ≠ Integer.zero := done;
     -- Equal classes ⇒ 0·(K+1) = (0+1)·1, i.e. 0 = 1 in ℤ.
     RationalEquivalent(
                 RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
                 RationalRepresentative.make(
-                    ((0 + 1) : Integer), ((K + 1) : Integer), denominatorNonzero))
+                    ((0 + 1) : ℤ), ((K + 1) : ℤ), denominatorNonzero))
         by Quotient.equal_implies_equivalent(
                RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
                RationalRepresentative.make(
-                   ((0 + 1) : Integer), ((K + 1) : Integer), denominatorNonzero),
-               unfold Rational in zeroEqRecip);
-    ((0 + 1) : Integer)
-       = ((0 + 1) : Integer) * Integer.one
-       = Integer.zero * ((K + 1) : Integer)
+                   ((0 + 1) : ℤ), ((K + 1) : ℤ), denominatorNonzero),
+               unfold ℚ in zeroEqRecip);
+    ((0 + 1) : ℤ)
+       = ((0 + 1) : ℤ) * Integer.one
+       = Integer.zero * ((K + 1) : ℤ)
        = Integer.zero                          as addOneZero;
-    ((0 + 1) : Integer) ≠ Integer.zero as addOneNonzero;
+    ((0 + 1) : ℤ) ≠ Integer.zero as addOneNonzero;
     absurd(addOneNonzero(addOneZero))
   }
 
 -- 1/(succ(K)) > 0.
-theorem Rational.reciprocal_of_succ_positive (K : Natural)
+theorem Rational.reciprocal_of_succ_positive (K : ℕ)
         : Rational.zero
             < StrictPositiveRational.reciprocal(
                   StrictPositiveRational.make(K, 0)) := {
@@ -335,7 +335,7 @@ theorem Rational.reciprocal_of_succ_positive (K : Natural)
 -- A zero numerator makes a fraction zero, so a nonzero fraction has a
 -- nonzero numerator.
 theorem Rational.numerator_nonzero
-        (n d : Integer) (denominatorNonzero : d ≠ Integer.zero)
+        (n d : ℤ) (denominatorNonzero : d ≠ Integer.zero)
         (fractionNonzero : Rational.fraction(n, d, denominatorNonzero) ≠ Rational.zero)
         : n ≠ Integer.zero := {
   suppose n = Integer.zero as numeratorZero;
@@ -354,7 +354,7 @@ theorem Rational.numerator_nonzero
 -- reps the cross with 0/1 forces n_x·n_y = 0, impossible for nonzero
 -- numerators (ℤ is an integral domain).
 automatic theorem Rational.multiply_nonzero
-        (x y : Rational)
+        (x y : ℚ)
         (xNonzero : x ≠ Rational.zero) (yNonzero : y ≠ Rational.zero)
         : x * y ≠ Rational.zero :=
   by_representatives x as ⟨n_x, d_x, dxNonzero⟩, y as ⟨n_y, d_y, dyNonzero⟩ => {
@@ -384,7 +384,7 @@ automatic theorem Rational.multiply_nonzero
 
 -- Multiplication preserves strict positivity: 0 < x, 0 < y → 0 < x·y.
 automatic theorem Rational.multiply_positive_positive
-        (x y : Rational) (xPos : Rational.zero < x) (yPos : Rational.zero < y)
+        (x y : ℚ) (xPos : Rational.zero < x) (yPos : Rational.zero < y)
         : Rational.zero < x * y := {
   -- 0 ≤ x·y since both factors are nonnegative.
   Rational.LessOrEqual(Rational.zero, x);
@@ -406,30 +406,30 @@ automatic theorem Rational.multiply_positive_positive
 -- The packaged value of make(K, 0) is the integer image (K + 1): denominator
 -- (0 + 1) is one. `fraction_equal` after unfolding the value / cast, with the
 -- cross-equation closed by `(0 + 1 : I) = one`.
-theorem Rational.value_at_zero_is_add_one (K : Natural)
+theorem Rational.value_at_zero_is_add_one (K : ℕ)
         : StrictPositiveRational.value(StrictPositiveRational.make(K, 0))
-          = ((K + 1) : Rational) :=
+          = ((K + 1) : ℚ) :=
   unfold StrictPositiveRational.value, Integer.to_rational in {
-    ((K + 1) : Integer) * Integer.one = ((K + 1) : Integer) * ((0 + 1) : Integer);
+    ((K + 1) : ℤ) * Integer.one = ((K + 1) : ℤ) * ((0 + 1) : ℤ);
     done by Rational.fraction_equal
   }
 
 -- δ with ((K + 1) : R) · δ ≤ ε. Witness: δ := ε · (1/(K + 1)).
 theorem Rational.divide_by_succ_positive
-        (ε : Rational) (K : Natural)
+        (ε : ℚ) (K : ℕ)
         (εPos : Rational.zero < ε)
-        : ∃ (δ : Rational).
+        : ∃ (δ : ℚ).
             Rational.zero < δ ∧ Rational.LessOrEqual(
-                    ((K + 1) : Rational) * δ,
+                    ((K + 1) : ℚ) * δ,
                     ε) :=
   {
-    let δ : Rational :=
+    let δ : ℚ :=
         ε * StrictPositiveRational.reciprocal(StrictPositiveRational.make(K, 0));
     Rational.zero < StrictPositiveRational.reciprocal(StrictPositiveRational.make(K, 0));
     Rational.zero < δ by Rational.multiply_positive_positive;
-    StrictPositiveRational.value(StrictPositiveRational.make(K, 0)) = ((K + 1) : Rational);
+    StrictPositiveRational.value(StrictPositiveRational.make(K, 0)) = ((K + 1) : ℚ);
     -- ((K+1) : R) · (ε · (1/(K+1))) = ε · (((K+1) : R) · (1/(K+1))) = ε · 1 = ε.
-    ((K + 1) : Rational) * δ
+    ((K + 1) : ℚ) * δ
        = StrictPositiveRational.value(StrictPositiveRational.make(K, 0)) * δ
        = ε
              * (StrictPositiveRational.value(StrictPositiveRational.make(K, 0))
@@ -451,16 +451,16 @@ theorem Rational.zero_not_equal_one_half
     RationalEquivalent(
                 RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
                 RationalRepresentative.make(
-                    Integer.one, (2 : Integer), Rational.two_nonzero))
+                    Integer.one, (2 : ℤ), Rational.two_nonzero))
         by Quotient.equal_implies_equivalent(
                RationalRepresentative.make(Integer.zero, Integer.one, Integer.one_is_nonzero),
                RationalRepresentative.make(
-                   Integer.one, (2 : Integer), Rational.two_nonzero),
-               unfold Rational in zeroEqualsOneHalf);
-    (1 : Integer)
+                   Integer.one, (2 : ℤ), Rational.two_nonzero),
+               unfold ℚ in zeroEqualsOneHalf);
+    (1 : ℤ)
        = Integer.one * Integer.one
-       = Integer.zero * (2 : Integer)
-       = (0 : Integer);
+       = Integer.zero * (2 : ℤ)
+       = (0 : ℤ);
     1 = 0;
     absurd(1 = 0)
   }

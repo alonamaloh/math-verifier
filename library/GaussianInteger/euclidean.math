@@ -54,20 +54,20 @@ import GaussianInteger.integral_domain
 -- Doubling as the integer numeral 2. With `Natural.add` opaque the cast
 -- `(2 : ℤ) = ((2 : ℕ) : ℤ)` is an atom `ring` can no longer split into 1+1,
 -- so spell the split out once through the additive cast lemma.
-theorem Integer.two_as_one_plus_one : (2 : Integer) = (1 : Integer) + (1 : Integer) :=
-  (2 : Integer)
+theorem Integer.two_as_one_plus_one : (2 : ℤ) = (1 : ℤ) + (1 : ℤ) :=
+  (2 : ℤ)
      = Natural.to_integer(1 + 1)
      = Natural.to_integer(1) + Natural.to_integer(1)
 
-theorem Integer.two_times (x : Integer) : (2 : Integer) * x = x + x :=
-  (2 : Integer) * x
-     = ((1 : Integer) + (1 : Integer)) * x                           by substituting Integer.two_as_one_plus_one
+theorem Integer.two_times (x : ℤ) : (2 : ℤ) * x = x + x :=
+  (2 : ℤ) * x
+     = ((1 : ℤ) + (1 : ℤ)) * x                           by substituting Integer.two_as_one_plus_one
      = x + x                                                          by ring
 
 -- Scaling distributes over a sum of squares: (k·r₁)² + (k·r₂)² = k²·(r₁²+r₂²).
 -- Kept symbolic in k so the crux's last step is degree 4 in {k, r₁, r₂} rather
 -- than degree 6 once k = b₁²+b₂² is substituted in.
-theorem Integer.scaled_sum_of_squares (k r1 r2 : Integer)
+theorem Integer.scaled_sum_of_squares (k r1 r2 : ℤ)
         : (k * r1) * (k * r1) + (k * r2) * (k * r2) = (k * k) * (r1 * r1 + r2 * r2) := ring
 
 -- The two linear relations: the conj-product times the divisor coordinates
@@ -75,7 +75,7 @@ theorem Integer.scaled_sum_of_squares (k r1 r2 : Integer)
 -- separate theorems (not inline `claim`s) so the crux references them as
 -- opaque constants: a `substituting <local proof>` re-traverses the inlined
 -- proof term on every use, turning these 66ms steps into a 7.9s blowup.
-theorem Integer.gaussian_linear_relation_one (a1 a2 b1 b2 q1 q2 s1 s2 r1 : Integer)
+theorem Integer.gaussian_linear_relation_one (a1 a2 b1 b2 q1 q2 s1 s2 r1 : ℤ)
         (s1Def : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
         (s2Def : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
         (r1Def : r1 = a1 - (b1 * q1 - b2 * q2))
@@ -89,7 +89,7 @@ theorem Integer.gaussian_linear_relation_one (a1 a2 b1 b2 q1 q2 s1 s2 r1 : Integ
      = (b1 * b1 + b2 * b2) * r1
            by substituting r1Def
 
-theorem Integer.gaussian_linear_relation_two (a1 a2 b1 b2 q1 q2 s1 s2 r2 : Integer)
+theorem Integer.gaussian_linear_relation_two (a1 a2 b1 b2 q1 q2 s1 s2 r2 : ℤ)
         (s1Def : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
         (s2Def : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
         (r2Def : r2 = a2 - (b2 * q1 + b1 * q2))
@@ -105,7 +105,7 @@ theorem Integer.gaussian_linear_relation_two (a1 a2 b1 b2 q1 q2 s1 s2 r2 : Integ
 
 -- The norm crux: D·(s₁²+s₂²) = D²·(r₁²+r₂²), D = b₁²+b₂². Brahmagupta on the
 -- two linear relations.
-theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : Integer)
+theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : ℤ)
         (s1Def : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
         (s2Def : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
         (r1Def : r1 = a1 - (b1 * q1 - b2 * q2))
@@ -131,7 +131,7 @@ theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : Integer)
 
 -- 4a ≤ 2b with b ≥ 1 forces a < b: otherwise b ≤ a gives 4a ≤ 2a, while
 -- 1 ≤ 2a gives 2a < 2a — impossible.
-theorem Natural.less_of_four_times_le_double (a b : Natural)
+theorem Natural.less_of_four_times_le_double (a b : ℕ)
         (bound : 4 * a ≤ 2 * b) (bPositive : 1 ≤ b) : a < b := {
   suppose b ≤ a for contradiction {
     1 ≤ a;
@@ -151,37 +151,37 @@ theorem Natural.less_of_four_times_le_double (a b : Natural)
 
 -- Cancelling the bound: from D·sSquares = D²·norm and 4·sSquares ≤ 2·D²,
 -- multiply the bound by D and cancel D² to get 4·norm ≤ 2·D.
-theorem Integer.cancel_norm_bound (dNat : Natural) (dPositive : 1 ≤ dNat)
-        (sSquares norm : Integer)
-        (crux : (dNat : Integer) * sSquares = ((dNat : Integer) * (dNat : Integer)) * norm)
-        (bound : (4 : Integer) * sSquares ≤ (2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
-        : (4 : Integer) * norm ≤ (2 : Integer) * (dNat : Integer) := {
-  (dNat : Integer) * ((4 : Integer) * sSquares)
-        ≤ (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+theorem Integer.cancel_norm_bound (dNat : ℕ) (dPositive : 1 ≤ dNat)
+        (sSquares norm : ℤ)
+        (crux : (dNat : ℤ) * sSquares = ((dNat : ℤ) * (dNat : ℤ)) * norm)
+        (bound : (4 : ℤ) * sSquares ≤ (2 : ℤ) * ((dNat : ℤ) * (dNat : ℤ)))
+        : (4 : ℤ) * norm ≤ (2 : ℤ) * (dNat : ℤ) := {
+  (dNat : ℤ) * ((4 : ℤ) * sSquares)
+        ≤ (dNat : ℤ) * ((2 : ℤ) * ((dNat : ℤ) * (dNat : ℤ)))
       by Integer.multiply_le_by_natural as scaled;
-  ((dNat * dNat : Natural) : Integer) = (dNat : Integer) * (dNat : Integer) as dSquareCast;
-  (dNat : Integer) * ((4 : Integer) * sSquares)
-            = (4 : Integer) * ((dNat : Integer) * sSquares)
+  ((dNat * dNat : ℕ) : ℤ) = (dNat : ℤ) * (dNat : ℤ) as dSquareCast;
+  (dNat : ℤ) * ((4 : ℤ) * sSquares)
+            = (4 : ℤ) * ((dNat : ℤ) * sSquares)
                   by ring
-            = (4 : Integer) * (((dNat : Integer) * (dNat : Integer)) * norm)
+            = (4 : ℤ) * (((dNat : ℤ) * (dNat : ℤ)) * norm)
                   by substituting crux
-            = ((dNat : Integer) * (dNat : Integer)) * ((4 : Integer) * norm)
+            = ((dNat : ℤ) * (dNat : ℤ)) * ((4 : ℤ) * norm)
                   by ring
-            = ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
+            = ((dNat * dNat : ℕ) : ℤ) * ((4 : ℤ) * norm)
                   by substituting dSquareCast
       as lhsForm;
-  (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
-            = ((dNat : Integer) * (dNat : Integer)) * ((2 : Integer) * (dNat : Integer))
+  (dNat : ℤ) * ((2 : ℤ) * ((dNat : ℤ) * (dNat : ℤ)))
+            = ((dNat : ℤ) * (dNat : ℤ)) * ((2 : ℤ) * (dNat : ℤ))
                   by ring
-            = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
+            = ((dNat * dNat : ℕ) : ℤ) * ((2 : ℤ) * (dNat : ℤ))
                   by substituting dSquareCast
       as rhsForm;
-      ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
-            = (dNat : Integer) * ((4 : Integer) * sSquares)
+      ((dNat * dNat : ℕ) : ℤ) * ((4 : ℤ) * norm)
+            = (dNat : ℤ) * ((4 : ℤ) * sSquares)
                   by lhsForm
-            ≤ (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+            ≤ (dNat : ℤ) * ((2 : ℤ) * ((dNat : ℤ) * (dNat : ℤ)))
                   by scaled
-            = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
+            = ((dNat * dNat : ℕ) : ℤ) * ((2 : ℤ) * (dNat : ℤ))
                   by rhsForm;
   1 ≤ dNat * dNat;
   done by Integer.cancel_le_by_natural_positive
@@ -193,41 +193,41 @@ theorem GaussianInteger.has_euclidean_division
         : Ring.HasEuclideanDivision(GaussianInteger.ring_bundle, GaussianInteger.normNatural) :=
   (a b : GaussianInteger)
       (bNonzero : ¬(b = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.definingPolynomial))) ↦ {
-    let a1 : Integer := Product.first(coords(a));
-    let a2 : Integer := Product.second(coords(a));
-    let b1 : Integer := Product.first(coords(b));
-    let b2 : Integer := Product.second(coords(b));
-    let dNat : Natural := GaussianInteger.normNatural(b);
+    let a1 : ℤ := Product.first(coords(a));
+    let a2 : ℤ := Product.second(coords(a));
+    let b1 : ℤ := Product.first(coords(b));
+    let b2 : ℤ := Product.second(coords(b));
+    let dNat : ℕ := GaussianInteger.normNatural(b);
     1 ≤ dNat by GaussianInteger.normNatural_positive;
-    (dNat : Integer)
+    (dNat : ℤ)
               = GaussianInteger.normInteger(b)
               = b1 * b1 + b2 * b2
         as dCast;
     -- Balanced-divide the two coordinates of a·conj(b) by D.
-    (dNat : Integer) > Integer.zero by Natural.to_integer.positive_preserves as dIntPositive;
+    (dNat : ℤ) > Integer.zero by Natural.to_integer.positive_preserves as dIntPositive;
     choose q1, s1 such that
-        a1 * b1 + a2 * b2 = (dNat : Integer) * q1 + s1 ∧ 4 * s1² ≤ (dNat : Integer)²
-        from Integer.divide_balanced(a1 * b1 + a2 * b2, (dNat : Integer), dIntPositive);
-    a1 * b1 + a2 * b2 = (dNat : Integer) * q1 + s1 as s1Equation;
+        a1 * b1 + a2 * b2 = (dNat : ℤ) * q1 + s1 ∧ 4 * s1² ≤ (dNat : ℤ)²
+        from Integer.divide_balanced(a1 * b1 + a2 * b2, (dNat : ℤ), dIntPositive);
+    a1 * b1 + a2 * b2 = (dNat : ℤ) * q1 + s1 as s1Equation;
     choose q2, s2 such that
-        a2 * b1 - a1 * b2 = (dNat : Integer) * q2 + s2 ∧ 4 * s2² ≤ (dNat : Integer)²
-        from Integer.divide_balanced(a2 * b1 - a1 * b2, (dNat : Integer), dIntPositive);
-    a2 * b1 - a1 * b2 = (dNat : Integer) * q2 + s2 as s2Equation;
+        a2 * b1 - a1 * b2 = (dNat : ℤ) * q2 + s2 ∧ 4 * s2² ≤ (dNat : ℤ)²
+        from Integer.divide_balanced(a2 * b1 - a1 * b2, (dNat : ℤ), dIntPositive);
+    a2 * b1 - a1 * b2 = (dNat : ℤ) * q2 + s2 as s2Equation;
     -- s_i = n_i − D·q_i, with D = b₁²+b₂².
     s1
-              = ((dNat : Integer) * q1 + s1) - (dNat : Integer) * q1   by ring
-              = (a1 * b1 + a2 * b2) - (dNat : Integer) * q1            by substituting s1Equation
+              = ((dNat : ℤ) * q1 + s1) - (dNat : ℤ) * q1   by ring
+              = (a1 * b1 + a2 * b2) - (dNat : ℤ) * q1            by substituting s1Equation
               = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1         by substituting dCast;
     s2
-              = ((dNat : Integer) * q2 + s2) - (dNat : Integer) * q2   by ring
-              = (a2 * b1 - a1 * b2) - (dNat : Integer) * q2            by substituting s2Equation
+              = ((dNat : ℤ) * q2 + s2) - (dNat : ℤ) * q2   by ring
+              = (a2 * b1 - a1 * b2) - (dNat : ℤ) * q2            by substituting s2Equation
               = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2         by substituting dCast;
     -- The quotient and remainder in ℤ[i].
     let q : GaussianInteger := GaussianInteger.ofCoordinates(q1, q2);
     let r : GaussianInteger :=
         RingModulo.add(a, RingModulo.negate(RingModulo.multiply(b, q)));
-    let r1 : Integer := Product.first(coords(r));
-    let r2 : Integer := Product.second(coords(r));
+    let r1 : ℤ := Product.first(coords(r));
+    let r2 : ℤ := Product.second(coords(r));
     -- a = b·q + r, an additive-group rearrangement.
     a
               = RingModulo.add(RingModulo.multiply(b, q),
@@ -268,33 +268,33 @@ theorem GaussianInteger.has_euclidean_division
                     by substituting coordsAEquation
               = a2 - (b2 * q1 + b1 * q2);
     -- The crux, in terms of D = (dNat : ℤ).
-    (dNat : Integer) * (s1 * s1 + s2 * s2)
+    (dNat : ℤ) * (s1 * s1 + s2 * s2)
               = (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
                     by substituting dCast
               = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2)
                     by Integer.gaussian_norm_crux
-              = ((dNat : Integer) * (dNat : Integer)) * (r1 * r1 + r2 * r2)
+              = ((dNat : ℤ) * (dNat : ℤ)) * (r1 * r1 + r2 * r2)
                     by substituting dCast;
     -- Combine the two coordinate bounds: 4·(s₁²+s₂²) ≤ 2·D².
-    (4 : Integer) * (s1 * s1 + s2 * s2)
-              = (4 : Integer) * (s1 * s1) + (4 : Integer) * (s2 * s2)
-              ≤ (dNat : Integer) * (dNat : Integer) + (4 : Integer) * (s2 * s2)
+    (4 : ℤ) * (s1 * s1 + s2 * s2)
+              = (4 : ℤ) * (s1 * s1) + (4 : ℤ) * (s2 * s2)
+              ≤ (dNat : ℤ) * (dNat : ℤ) + (4 : ℤ) * (s2 * s2)
                     by Integer.add_preserves_less_or_equal
-              = (4 : Integer) * (s2 * s2) + (dNat : Integer) * (dNat : Integer)
-              ≤ (dNat : Integer) * (dNat : Integer) + (dNat : Integer) * (dNat : Integer)
+              = (4 : ℤ) * (s2 * s2) + (dNat : ℤ) * (dNat : ℤ)
+              ≤ (dNat : ℤ) * (dNat : ℤ) + (dNat : ℤ) * (dNat : ℤ)
                     by Integer.add_preserves_less_or_equal
-              = (2 : Integer) * ((dNat : Integer) * (dNat : Integer));
+              = (2 : ℤ) * ((dNat : ℤ) * (dNat : ℤ));
     -- 4·N(r) ≤ 2·D, then transfer to ℕ.
-    (4 : Integer) * (r1 * r1 + r2 * r2) ≤ (2 : Integer) * (dNat : Integer)
+    (4 : ℤ) * (r1 * r1 + r2 * r2) ≤ (2 : ℤ) * (dNat : ℤ)
         by Integer.cancel_norm_bound as normBound;
-    ((4 * GaussianInteger.normNatural(r) : Natural) : Integer)
-              = (4 : Integer) * (GaussianInteger.normNatural(r) : Integer)
-              = (4 : Integer) * GaussianInteger.normInteger(r)
+    ((4 * GaussianInteger.normNatural(r) : ℕ) : ℤ)
+              = (4 : ℤ) * (GaussianInteger.normNatural(r) : ℤ)
+              = (4 : ℤ) * GaussianInteger.normInteger(r)
                     by substituting GaussianInteger.normNatural_is_normInteger(r)
-              = (4 : Integer) * (r1 * r1 + r2 * r2)
-              ≤ (2 : Integer) * (dNat : Integer)               by normBound
-              = (2 : Integer) * (GaussianInteger.normNatural(b) : Integer)
-              = ((2 * GaussianInteger.normNatural(b) : Natural) : Integer);
+              = (4 : ℤ) * (r1 * r1 + r2 * r2)
+              ≤ (2 : ℤ) * (dNat : ℤ)               by normBound
+              = (2 : ℤ) * (GaussianInteger.normNatural(b) : ℤ)
+              = ((2 * GaussianInteger.normNatural(b) : ℕ) : ℤ);
     4 * GaussianInteger.normNatural(r) ≤ 2 * GaussianInteger.normNatural(b)
         by Natural.to_integer.LessOrEqual_reflects;
     GaussianInteger.normNatural(r) < GaussianInteger.normNatural(b)

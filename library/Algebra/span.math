@@ -49,8 +49,8 @@ definition VectorSpace.Spans {f : Field} {V : VectorSpace(f)} {I : Type(0)}
         (family : I → VectorSpace.carrier(V)) : Proposition :=
   ∀ (v : VectorSpace.carrier(V)).
       v = VectorSpace.zero(V)
-      ∨ (∃ (count : Natural). ∃ (selection : Natural → I).
-         ∃ (coefficients : Natural → Field.carrier(f)).
+      ∨ (∃ (count : ℕ). ∃ (selection : ℕ → I).
+         ∃ (coefficients : ℕ → Field.carrier(f)).
              v = VectorSpace.linearCombination(family, coefficients, selection, count))
 
 -- The family is linearly independent: a vanishing combination of
@@ -58,11 +58,11 @@ definition VectorSpace.Spans {f : Field} {V : VectorSpace(f)} {I : Type(0)}
 -- all its coefficients zero.
 definition VectorSpace.LinearlyIndependent {f : Field} {V : VectorSpace(f)} {I : Type(0)}
         (family : I → VectorSpace.carrier(V)) : Proposition :=
-  ∀ (count : Natural). ∀ (selection : Natural → I).
-  ∀ (coefficients : Natural → Field.carrier(f)).
-      (∀ (i j : Natural). i < count → j < count → selection(i) = selection(j) → i = j)
+  ∀ (count : ℕ). ∀ (selection : ℕ → I).
+  ∀ (coefficients : ℕ → Field.carrier(f)).
+      (∀ (i j : ℕ). i < count → j < count → selection(i) = selection(j) → i = j)
       → VectorSpace.linearCombination(family, coefficients, selection, count) = VectorSpace.zero(V)
-      → ∀ (i : Natural). i < count → coefficients(i) = Field.zero(f)
+      → ∀ (i : ℕ). i < count → coefficients(i) = Field.zero(f)
 
 -- A basis is an independent spanning family.
 definition VectorSpace.IsBasis {f : Field} {V : VectorSpace(f)} {I : Type(0)}
@@ -88,7 +88,7 @@ definition VectorSpace.IsBasis.spans {f : Field} {V : VectorSpace(f)}
 -- Finitely generated: some finite family spans.
 definition VectorSpace.FinitelyGenerated {f : Field} (V : VectorSpace(f))
         : Proposition :=
-  ∃ (count : Natural). ∃ (generators : NaturalsBelow(count) → VectorSpace.carrier(V)).
+  ∃ (count : ℕ). ∃ (generators : NaturalsBelow(count) → VectorSpace.carrier(V)).
       VectorSpace.Spans(generators)
 
 -- ----------------------------------------------------------------------
@@ -101,8 +101,8 @@ definition VectorSpace.FinitelyGenerated {f : Field} (V : VectorSpace(f))
 definition VectorSpace.InSpanOf {f : Field} {V : VectorSpace(f)} {I : Type(0)}
         (family : I → VectorSpace.carrier(V)) (v : VectorSpace.carrier(V))
         : Proposition :=
-  ∃ (count : Natural). ∃ (selection : Natural → I).
-  ∃ (coefficients : Natural → Field.carrier(f)).
+  ∃ (count : ℕ). ∃ (selection : ℕ → I).
+  ∃ (coefficients : ℕ → Field.carrier(f)).
       v = VectorSpace.linearCombination(family, coefficients, selection, count)
 
 -- Every family member lies in the span (the length-one combination).
@@ -112,11 +112,11 @@ theorem VectorSpace.InSpanOf.member {f : Field} {V : VectorSpace(f)}
   family(i)
      = Field.one(f) • family(i)
      = VectorSpace.linearCombination(family,
-           (k : Natural) ↦ Field.one(f), (k : Natural) ↦ i, 1)
+           (k : ℕ) ↦ Field.one(f), (k : ℕ) ↦ i, 1)
            by VectorSpace.linearCombination_one
      as memberIsCombination;
-  witness 1 with witness ((k : Natural) ↦ i)
-       with witness ((k : Natural) ↦ Field.one(f)) with memberIsCombination
+  witness 1 with witness ((k : ℕ) ↦ i)
+       with witness ((k : ℕ) ↦ Field.one(f)) with memberIsCombination
 }
 
 -- The span is closed under scaling: a scalar multiple of a member is a
@@ -133,11 +133,11 @@ theorem VectorSpace.InSpanOf.scale {f : Field} {V : VectorSpace(f)}
   a • v
      = a • VectorSpace.linearCombination(family, coefficients, selection, count)
      = VectorSpace.linearCombination(family,
-           (i : Natural) ↦ a * coefficients(i), selection, count)
+           (i : ℕ) ↦ a * coefficients(i), selection, count)
            by VectorSpace.linearCombination_scale
      as scaledIsCombination;
   witness count with witness selection
-       with witness ((i : Natural) ↦ a * coefficients(i)) with scaledIsCombination
+       with witness ((i : ℕ) ↦ a * coefficients(i)) with scaledIsCombination
 }
 
 -- The span is closed under addition: concatenate the two witnessing
@@ -224,8 +224,8 @@ theorem VectorSpace.InSpanOf.of_combination {f : Field} {V : VectorSpace(f)}
         (inner : I → VectorSpace.carrier(V)) (outer : J → VectorSpace.carrier(V))
         (outerInhabitant : J)
         (generatorsInSpan : ∀ (i : I). VectorSpace.InSpanOf(outer, inner(i)))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
-        (count : Natural)
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → I)
+        (count : ℕ)
         : VectorSpace.InSpanOf(outer,
               VectorSpace.linearCombination(inner, coefficients, selection, count)) :=
   by induction on count with IH {
@@ -289,27 +289,27 @@ theorem Field.one_family_spans (f : Field)
         : VectorSpace.Spans(Field.one_family(f)) := {
   take v : Field.carrier(f);
   v = v * Field.one(f)
-    = VectorSpace.linearCombination(Field.one_family(f), (i : Natural) ↦ v,
-                                    (i : Natural) ↦ NaturalsBelow.one_point, 1)
+    = VectorSpace.linearCombination(Field.one_family(f), (i : ℕ) ↦ v,
+                                    (i : ℕ) ↦ NaturalsBelow.one_point, 1)
           by VectorSpace.linearCombination_one
     as targetIsCombination;
   VectorSpace.InSpanOf(Field.one_family(f), v)
-    by { witness 1 with witness ((i : Natural) ↦ NaturalsBelow.one_point) with
-             witness ((i : Natural) ↦ v) with targetIsCombination };
+    by { witness 1 with witness ((i : ℕ) ↦ NaturalsBelow.one_point) with
+             witness ((i : ℕ) ↦ v) with targetIsCombination };
   done
 }
 
 theorem Field.one_family_independent (f : Field)
         : VectorSpace.LinearlyIndependent(Field.one_family(f)) := {
-  take count : Natural;
-  take selection : Natural → NaturalsBelow(1);
-  take coefficients : Natural → Field.carrier(f);
-  suppose ∀ (i j : Natural). i < count → j < count → selection(i) = selection(j) → i = j
+  take count : ℕ;
+  take selection : ℕ → NaturalsBelow(1);
+  take coefficients : ℕ → Field.carrier(f);
+  suppose ∀ (i j : ℕ). i < count → j < count → selection(i) = selection(j) → i = j
       as selectionInjective;
   suppose VectorSpace.linearCombination(Field.one_family(f), coefficients, selection, count)
               = VectorSpace.zero(Field.vector_space(f))
       as combinationVanishes;
-  take i : Natural;
+  take i : ℕ;
   suppose i < count as indexBelowCount;
   -- Injectivity caps the count at one — a selection of two indices into
   -- the one-element index type repeats — so the combination is the
@@ -320,7 +320,7 @@ theorem Field.one_family_independent (f : Field)
         ¬(i < 0) by Natural.not_less_than_zero;
         done
       }
-    case count = 1 + predecessor for some (predecessor : Natural) as countShape:
+    case count = 1 + predecessor for some (predecessor : ℕ) as countShape:
         done by cases {
           case predecessor = 0: {
               count = 1 + predecessor = 1 + 0 = 1 as countIsOne;
@@ -338,7 +338,7 @@ theorem Field.one_family_independent (f : Field)
                        by combinationVanishes;
               done by substituting indexIsZero
             }
-          case predecessor = 1 + deeper for some (deeper : Natural) as predecessorShape: {
+          case predecessor = 1 + deeper for some (deeper : ℕ) as predecessorShape: {
               count = 1 + predecessor = 1 + (1 + deeper);
               0 < 1 ≤ 1 + (1 + deeper);
               0 < count;

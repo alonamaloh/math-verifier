@@ -47,15 +47,15 @@ import Natural.power
 
 -- Any nonnegative square root of x·y is at most the arithmetic mean.
 theorem Real.geometric_mean_le_arithmetic_mean
-        (x y g : Real)
+        (x y g : ℝ)
         (xNonneg : 0 ≤ x) (yNonneg : 0 ≤ y)
         (gNonneg : 0 ≤ g)
         (gSquare : g * g = x * y)
         : g ≤ (x + y) / 2 := {
-  let mean : Real := (x + y) / 2;
-  let halfDiff : Real := (x - y) / 2;
+  let mean : ℝ := (x + y) / 2;
+  let halfDiff : ℝ := (x - y) / 2;
   -- The mean is nonnegative.
-  (0 : Real)
+  (0 : ℝ)
    = 0 + 0
    ≤ x + 0
    ≤ x + y;
@@ -92,9 +92,9 @@ theorem Real.geometric_mean_le_arithmetic_mean
 -- The geometric mean exists, and the inequality holds for it: the
 -- two-variable arithmetic/geometric mean inequality.
 theorem Real.arithmetic_geometric_mean_two
-        (x y : Real)
+        (x y : ℝ)
         (xNonneg : 0 ≤ x) (yNonneg : 0 ≤ y)
-        : ∃ (g : Real).
+        : ∃ (g : ℝ).
             0 ≤ g ∧ g * g = x * y ∧ g ≤ (x + y) / 2 := {
   Real.IsNonneg(x);
   Real.IsNonneg(y);
@@ -113,17 +113,17 @@ theorem Real.arithmetic_geometric_mean_two
 -- proven by Cauchy's forward–backward induction: it holds at 1 and 2,
 -- doubling preserves it, and stepping down preserves it.
 
-definition Real.MeansInequalityAt (n : Natural) : Proposition :=
-  (s : Natural → Real) → (∀ (j : Natural). 0 ≤ s(j))
-  → (n : Real) ^ n * Real.partialProduct(s, n)
+definition Real.MeansInequalityAt (n : ℕ) : Proposition :=
+  (s : ℕ → ℝ) → (∀ (j : ℕ). 0 ≤ s(j))
+  → (n : ℝ) ^ n * Real.partialProduct(s, n)
     ≤ Real.partialSum(s, n) ^ n
 
 theorem Real.means_inequality_one : Real.MeansInequalityAt(1) :=
-  (s : Natural → Real) (termsNonneg : ∀ (j : Natural). 0 ≤ s(j)) ↦ {
+  (s : ℕ → ℝ) (termsNonneg : ∀ (j : ℕ). 0 ≤ s(j)) ↦ {
     0 ≤ s(0);
-    ((1 : Natural) : Real) ^ 1
+    ((1 : ℕ) : ℝ) ^ 1
        * Real.partialProduct(s, 1)
-     = (((1 : Natural) : Real) * 1)
+     = (((1 : ℕ) : ℝ) * 1)
        * (1 * s(0))
      = (1 * 1) * (1 * s(0))
      = (0 + s(0)) * 1;
@@ -136,39 +136,39 @@ theorem Real.means_inequality_one : Real.MeansInequalityAt(1) :=
 -- Doubling preserves the inequality: split the 2m variables into two
 -- halves, bound each half by its own inequality, and close with the
 -- two-variable square gap on the half-sums.
-theorem Real.means_inequality_double (m : Natural)
+theorem Real.means_inequality_double (m : ℕ)
         (atHalf : Real.MeansInequalityAt(m))
         : Real.MeansInequalityAt(m + m) :=
-  (s : Natural → Real) (termsNonneg : ∀ (j : Natural). 0 ≤ s(j)) ↦ {
-    let firstSum : Real := Real.partialSum(s, m);
-    let secondSum : Real := Real.partialSum((j : Natural) ↦ s(m + j), m);
-    let firstProduct : Real := Real.partialProduct(s, m);
-    let secondProduct : Real := Real.partialProduct((j : Natural) ↦ s(m + j), m);
-    ∀ (j : Natural). 0 ≤ s(m + j)
-        by (j : Natural) ↦ termsNonneg(m + j);
-    (m : Real) ^ m * firstProduct ≤ firstSum ^ m;
-    (m : Real) ^ m * secondProduct ≤ secondSum ^ m;
+  (s : ℕ → ℝ) (termsNonneg : ∀ (j : ℕ). 0 ≤ s(j)) ↦ {
+    let firstSum : ℝ := Real.partialSum(s, m);
+    let secondSum : ℝ := Real.partialSum((j : ℕ) ↦ s(m + j), m);
+    let firstProduct : ℝ := Real.partialProduct(s, m);
+    let secondProduct : ℝ := Real.partialProduct((j : ℕ) ↦ s(m + j), m);
+    ∀ (j : ℕ). 0 ≤ s(m + j)
+        by (j : ℕ) ↦ termsNonneg(m + j);
+    (m : ℝ) ^ m * firstProduct ≤ firstSum ^ m;
+    (m : ℝ) ^ m * secondProduct ≤ secondSum ^ m;
     -- Nonnegativity inventory.
     firstSum ≥ 0;
     secondSum ≥ 0;
     secondProduct ≥ 0;
-    Rational.IsNonneg((m : Rational));
-    Rational.zero ≤ (m : Rational);
-    (Rational.zero : Real) ≤ (m : Real);
-    0 ≤ (m : Real);
-    0 ≤ (m : Real) ^ m;
-    0 ≤ (2 : Real);
-    0 ≤ (2 : Real) ^ m;
+    Rational.IsNonneg((m : ℚ));
+    Rational.zero ≤ (m : ℚ);
+    (Rational.zero : ℝ) ≤ (m : ℝ);
+    0 ≤ (m : ℝ);
+    0 ≤ (m : ℝ) ^ m;
+    0 ≤ (2 : ℝ);
+    0 ≤ (2 : ℝ) ^ m;
     0 ≤ firstSum ^ m;
     -- IsNonneg forms for the multiplications.
-    Real.IsNonneg((2 : Real) ^ m);
-    Real.IsNonneg((m : Real) ^ m);
+    Real.IsNonneg((2 : ℝ) ^ m);
+    Real.IsNonneg((m : ℝ) ^ m);
     Real.IsNonneg(secondProduct);
     Real.IsNonneg(firstSum ^ m);
-    Real.IsNonneg((2 : Real) ^ m * (2 : Real) ^ m);
-    Real.IsNonneg((m : Real) ^ m * secondProduct);
-    Real.IsNonneg(((2 : Real) ^ m * (2 : Real) ^ m) * ((m : Real) ^ m * secondProduct));
-    Real.IsNonneg(((2 : Real) ^ m * (2 : Real) ^ m) * firstSum ^ m);
+    Real.IsNonneg((2 : ℝ) ^ m * (2 : ℝ) ^ m);
+    Real.IsNonneg((m : ℝ) ^ m * secondProduct);
+    Real.IsNonneg(((2 : ℝ) ^ m * (2 : ℝ) ^ m) * ((m : ℝ) ^ m * secondProduct));
+    Real.IsNonneg(((2 : ℝ) ^ m * (2 : ℝ) ^ m) * firstSum ^ m);
     -- The two-variable square gap on the half-sums.
     Real.IsNonneg((firstSum - secondSum) * (firstSum - secondSum));
     0 ≤ (firstSum - secondSum) * (firstSum - secondSum);
@@ -177,36 +177,36 @@ theorem Real.means_inequality_double (m : Natural)
      ≤ (firstSum - secondSum) * (firstSum - secondSum)
        - (firstSum - secondSum) * (firstSum - secondSum)
      = 0;
-    ((2 : Real) * (2 : Real)) * (firstSum * secondSum)
+    ((2 : ℝ) * (2 : ℝ)) * (firstSum * secondSum)
      = (firstSum + secondSum) * (firstSum + secondSum)
        + -((firstSum - secondSum) * (firstSum - secondSum))
      ≤ (firstSum + secondSum) * (firstSum + secondSum) + 0
      = (firstSum + secondSum) * (firstSum + secondSum);
-    0 ≤ ((2 : Real) * (2 : Real)) * (firstSum * secondSum);
+    0 ≤ ((2 : ℝ) * (2 : ℝ)) * (firstSum * secondSum);
     -- The chain.
-    (m + m : Real) ^ (m + m) * Real.partialProduct(s, m + m)
-     = ((m : Real) + (m : Real)) ^ (m + m) * Real.partialProduct(s, m + m)
-     = ((m : Real) + (m : Real)) ^ (m + m) * (firstProduct * secondProduct)
-     = (2 * (m : Real)) ^ (m + m) * (firstProduct * secondProduct)
-           by ((m : Real) + (m : Real) = 2 * (m : Real))
-     = ((2 : Real) ^ (m + m) * (m : Real) ^ (m + m)) * (firstProduct * secondProduct)
-     = (((2 : Real) ^ m * (2 : Real) ^ m) * (m : Real) ^ (m + m)) * (firstProduct * secondProduct)
-     = (((2 : Real) ^ m * (2 : Real) ^ m) * ((m : Real) ^ m * (m : Real) ^ m))
+    (m + m : ℝ) ^ (m + m) * Real.partialProduct(s, m + m)
+     = ((m : ℝ) + (m : ℝ)) ^ (m + m) * Real.partialProduct(s, m + m)
+     = ((m : ℝ) + (m : ℝ)) ^ (m + m) * (firstProduct * secondProduct)
+     = (2 * (m : ℝ)) ^ (m + m) * (firstProduct * secondProduct)
+           by ((m : ℝ) + (m : ℝ) = 2 * (m : ℝ))
+     = ((2 : ℝ) ^ (m + m) * (m : ℝ) ^ (m + m)) * (firstProduct * secondProduct)
+     = (((2 : ℝ) ^ m * (2 : ℝ) ^ m) * (m : ℝ) ^ (m + m)) * (firstProduct * secondProduct)
+     = (((2 : ℝ) ^ m * (2 : ℝ) ^ m) * ((m : ℝ) ^ m * (m : ℝ) ^ m))
        * (firstProduct * secondProduct)
-     = ((m : Real) ^ m * firstProduct)
-       * (((2 : Real) ^ m * (2 : Real) ^ m) * ((m : Real) ^ m * secondProduct))
+     = ((m : ℝ) ^ m * firstProduct)
+       * (((2 : ℝ) ^ m * (2 : ℝ) ^ m) * ((m : ℝ) ^ m * secondProduct))
      ≤ firstSum ^ m
-       * (((2 : Real) ^ m * (2 : Real) ^ m) * ((m : Real) ^ m * secondProduct))
-     = ((m : Real) ^ m * secondProduct)
-       * (((2 : Real) ^ m * (2 : Real) ^ m) * firstSum ^ m)
+       * (((2 : ℝ) ^ m * (2 : ℝ) ^ m) * ((m : ℝ) ^ m * secondProduct))
+     = ((m : ℝ) ^ m * secondProduct)
+       * (((2 : ℝ) ^ m * (2 : ℝ) ^ m) * firstSum ^ m)
      ≤ secondSum ^ m
-       * (((2 : Real) ^ m * (2 : Real) ^ m) * firstSum ^ m)
-     = ((2 : Real) ^ m * (2 : Real) ^ m)
+       * (((2 : ℝ) ^ m * (2 : ℝ) ^ m) * firstSum ^ m)
+     = ((2 : ℝ) ^ m * (2 : ℝ) ^ m)
        * (firstSum ^ m * secondSum ^ m)
-     = ((2 : Real) * (2 : Real)) ^ m
+     = ((2 : ℝ) * (2 : ℝ)) ^ m
        * (firstSum ^ m * secondSum ^ m)
-     = ((2 : Real) * (2 : Real)) ^ m * (firstSum * secondSum) ^ m
-     = (((2 : Real) * (2 : Real)) * (firstSum * secondSum)) ^ m
+     = ((2 : ℝ) * (2 : ℝ)) ^ m * (firstSum * secondSum) ^ m
+     = (((2 : ℝ) * (2 : ℝ)) * (firstSum * secondSum)) ^ m
      ≤ ((firstSum + secondSum) * (firstSum + secondSum)) ^ m
            by Real.power_monotone
      = (firstSum + secondSum) ^ m * (firstSum + secondSum) ^ m
@@ -222,41 +222,41 @@ theorem Real.means_inequality_double (m : Natural)
 -- m-term one: slot 0 carries the whole sum A = Σ_{<m} s, and slot j+1
 -- carries m·s(j). Over m+1 slots its sum telescopes to (m+1)·A and its
 -- product is A·mᵐ·Π, so the (m+1)-case applied to it yields the m-case.
-definition Real.augmentedScaledRow (s : Natural → Real) (m : Natural)
-        : Natural → Real :=
-  (k : Natural) ↦
-    if k = 0 then Real.partialSum(s, m) else (m : Real) * s(k ∸ 1)
+definition Real.augmentedScaledRow (s : ℕ → ℝ) (m : ℕ)
+        : ℕ → ℝ :=
+  (k : ℕ) ↦
+    if k = 0 then Real.partialSum(s, m) else (m : ℝ) * s(k ∸ 1)
 
 -- Slot 0 carries the whole sum A = Σ_{<m} s.
-theorem Real.augmentedScaledRow_zero (s : Natural → Real) (m : Natural)
+theorem Real.augmentedScaledRow_zero (s : ℕ → ℝ) (m : ℕ)
         : Real.augmentedScaledRow(s, m, 0) = Real.partialSum(s, m) :=
-  if (0 : Natural) = 0
-  then reflexivity(Real, Real.partialSum(s, m))
-  else { (0 : Natural) = 0; done }
+  if (0 : ℕ) = 0
+  then reflexivity(ℝ, Real.partialSum(s, m))
+  else { (0 : ℕ) = 0; done }
 
 -- Every later slot 1 + j carries the scaled value m·s(j).
-theorem Real.augmentedScaledRow_one_plus (s : Natural → Real) (m j : Natural)
-        : Real.augmentedScaledRow(s, m, 1 + j) = (m : Real) * s(j) :=
-  if (1 + j : Natural) = 0
-  then { (1 + j : Natural) ≠ 0; done }
+theorem Real.augmentedScaledRow_one_plus (s : ℕ → ℝ) (m j : ℕ)
+        : Real.augmentedScaledRow(s, m, 1 + j) = (m : ℝ) * s(j) :=
+  if (1 + j : ℕ) = 0
+  then { (1 + j : ℕ) ≠ 0; done }
   else {
-    (m : Real) * s((1 + j) ∸ 1) = (m : Real) * s(j);
+    (m : ℝ) * s((1 + j) ∸ 1) = (m : ℝ) * s(j);
     done
   }
 
-theorem Real.means_inequality_predecessor (m : Natural)
+theorem Real.means_inequality_predecessor (m : ℕ)
         (atSuccessor : Real.MeansInequalityAt(1 + m))
         : Real.MeansInequalityAt(m) :=
-  (s : Natural → Real) (termsNonneg : ∀ (j : Natural). 0 ≤ s(j)) ↦ {
-    let augmentedRow : Natural → Real := Real.augmentedScaledRow(s, m);
+  (s : ℕ → ℝ) (termsNonneg : ∀ (j : ℕ). 0 ≤ s(j)) ↦ {
+    let augmentedRow : ℕ → ℝ := Real.augmentedScaledRow(s, m);
     0 ≤ Real.partialSum(s, m);
-    Rational.IsNonneg((m : Rational));
-    Rational.zero ≤ (m : Rational);
-    (Rational.zero : Real) ≤ (m : Real);
-    0 ≤ (m : Real);
-    Real.IsNonneg((m : Real));
-    ∀ (k : Natural). 0 ≤ Real.augmentedScaledRow(s, m, k) by {
-        take k : Natural;
+    Rational.IsNonneg((m : ℚ));
+    Rational.zero ≤ (m : ℚ);
+    (Rational.zero : ℝ) ≤ (m : ℝ);
+    0 ≤ (m : ℝ);
+    Real.IsNonneg((m : ℝ));
+    ∀ (k : ℕ). 0 ≤ Real.augmentedScaledRow(s, m, k) by {
+        take k : ℕ;
         if k = 0
         then {
           0 ≤ Real.partialSum(s, m);
@@ -265,58 +265,58 @@ theorem Real.means_inequality_predecessor (m : Natural)
         else {
           0 ≤ s(k ∸ 1);
           Real.IsNonneg(s(k ∸ 1));
-          Real.IsNonneg((m : Real) * s(k ∸ 1));
-          0 ≤ (m : Real) * s(k ∸ 1);
+          Real.IsNonneg((m : ℝ) * s(k ∸ 1));
+          0 ≤ (m : ℝ) * s(k ∸ 1);
           done
         }
     };
-    (1 + m : Real) ^ (1 + m) * Real.partialProduct(augmentedRow, 1 + m)
+    (1 + m : ℝ) ^ (1 + m) * Real.partialProduct(augmentedRow, 1 + m)
       ≤ Real.partialSum(augmentedRow, 1 + m) ^ (1 + m);
     -- The augmented sum telescopes to (m+1)·A.
     1 + m = m + 1;
-    let onePlusMReal : Real := (1 + m : Real);
+    let onePlusMReal : ℝ := (1 + m : ℝ);
     onePlusMReal
-     = (((1 : Rational) + (m : Rational)) : Real)
-     = 1 + (m : Real);
-    ∀ (j : Natural). Real.augmentedScaledRow(s, m, 1 + j) = (m : Real) * s(j) by {
-        take j : Natural;
+     = (((1 : ℚ) + (m : ℚ)) : ℝ)
+     = 1 + (m : ℝ);
+    ∀ (j : ℕ). Real.augmentedScaledRow(s, m, 1 + j) = (m : ℝ) * s(j) by {
+        take j : ℕ;
         done
     };
     Real.partialSum(augmentedRow, 1 + m)
          = Real.partialSum(augmentedRow, m + 1)
          = Real.partialSum(augmentedRow, 1)
-           + Real.partialSum((j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j), m)
-         = Real.partialSum(augmentedRow, 1) + Real.partialSum((j : Natural) ↦ (m : Real) * s(j), m)
-         = Real.partialSum(augmentedRow, 1) + (m : Real) * Real.partialSum(s, m)
-         = (0 + Real.augmentedScaledRow(s, m, 0 + 0)) + (m : Real) * Real.partialSum(s, m)
-         = (0 + Real.augmentedScaledRow(s, m, 0)) + (m : Real) * Real.partialSum(s, m)
-         = (0 + Real.partialSum(s, m)) + (m : Real) * Real.partialSum(s, m)
-         = (1 + (m : Real)) * Real.partialSum(s, m)
+           + Real.partialSum((j : ℕ) ↦ Real.augmentedScaledRow(s, m, 1 + j), m)
+         = Real.partialSum(augmentedRow, 1) + Real.partialSum((j : ℕ) ↦ (m : ℝ) * s(j), m)
+         = Real.partialSum(augmentedRow, 1) + (m : ℝ) * Real.partialSum(s, m)
+         = (0 + Real.augmentedScaledRow(s, m, 0 + 0)) + (m : ℝ) * Real.partialSum(s, m)
+         = (0 + Real.augmentedScaledRow(s, m, 0)) + (m : ℝ) * Real.partialSum(s, m)
+         = (0 + Real.partialSum(s, m)) + (m : ℝ) * Real.partialSum(s, m)
+         = (1 + (m : ℝ)) * Real.partialSum(s, m)
          = onePlusMReal * Real.partialSum(s, m);
     -- The augmented product telescopes to A·mᵐ·Π.
     Real.partialProduct(augmentedRow, 1 + m)
          = Real.partialProduct(augmentedRow, m + 1)
          = Real.partialProduct(augmentedRow, 1)
-           * Real.partialProduct((j : Natural) ↦ Real.augmentedScaledRow(s, m, 1 + j), m)
+           * Real.partialProduct((j : ℕ) ↦ Real.augmentedScaledRow(s, m, 1 + j), m)
          = Real.partialProduct(augmentedRow, 1)
-           * Real.partialProduct((j : Natural) ↦ (m : Real) * s(j), m)
-         = Real.partialProduct(augmentedRow, 1) * ((m : Real) ^ m * Real.partialProduct(s, m))
-         = (1 * Real.augmentedScaledRow(s, m, 0 + 0)) * ((m : Real) ^ m * Real.partialProduct(s, m))
-         = (1 * Real.augmentedScaledRow(s, m, 0)) * ((m : Real) ^ m * Real.partialProduct(s, m))
-         = (1 * Real.partialSum(s, m)) * ((m : Real) ^ m * Real.partialProduct(s, m))
-         = Real.partialSum(s, m) * ((m : Real) ^ m * Real.partialProduct(s, m));
+           * Real.partialProduct((j : ℕ) ↦ (m : ℝ) * s(j), m)
+         = Real.partialProduct(augmentedRow, 1) * ((m : ℝ) ^ m * Real.partialProduct(s, m))
+         = (1 * Real.augmentedScaledRow(s, m, 0 + 0)) * ((m : ℝ) ^ m * Real.partialProduct(s, m))
+         = (1 * Real.augmentedScaledRow(s, m, 0)) * ((m : ℝ) ^ m * Real.partialProduct(s, m))
+         = (1 * Real.partialSum(s, m)) * ((m : ℝ) ^ m * Real.partialProduct(s, m))
+         = Real.partialSum(s, m) * ((m : ℝ) ^ m * Real.partialProduct(s, m));
     -- Cancel the positive (m+1)ᵐ⁺¹.
-    Rational.zero < (1 + m : Rational);
-    (Rational.zero : Real) < (1 + m : Real);
-    0 < (1 + m : Real);
-    0 < (1 + m : Real) ^ (1 + m);
-    (1 + m : Real) ^ (1 + m)
-    * (Real.partialSum(s, m) * ((m : Real) ^ m * Real.partialProduct(s, m)))
-         = (1 + m : Real) ^ (1 + m) * Real.partialProduct(augmentedRow, 1 + m)
+    Rational.zero < (1 + m : ℚ);
+    (Rational.zero : ℝ) < (1 + m : ℝ);
+    0 < (1 + m : ℝ);
+    0 < (1 + m : ℝ) ^ (1 + m);
+    (1 + m : ℝ) ^ (1 + m)
+    * (Real.partialSum(s, m) * ((m : ℝ) ^ m * Real.partialProduct(s, m)))
+         = (1 + m : ℝ) ^ (1 + m) * Real.partialProduct(augmentedRow, 1 + m)
          ≤ Real.partialSum(augmentedRow, 1 + m) ^ (1 + m)
          = (onePlusMReal * Real.partialSum(s, m)) ^ (1 + m)
-         = (1 + m : Real) ^ (1 + m) * Real.partialSum(s, m) ^ (1 + m);
-    Real.partialSum(s, m) * ((m : Real) ^ m * Real.partialProduct(s, m))
+         = (1 + m : ℝ) ^ (1 + m) * Real.partialSum(s, m) ^ (1 + m);
+    Real.partialSum(s, m) * ((m : ℝ) ^ m * Real.partialProduct(s, m))
       ≤ Real.partialSum(s, m) ^ (1 + m)
         by Real.LessOrEqual.multiply_cancel_left_positive;
     -- Cancel A — or collapse when A vanishes.
@@ -326,8 +326,8 @@ theorem Real.means_inequality_predecessor (m : Natural)
           then
               -- With m = 0 every exponent is 0, so each power is 1 and the
               -- empty product is 1, collapsing both sides to 1.
-              (m : Real) ^ m * Real.partialProduct(s, m)
-                 = (0 : Real) ^ 0 * Real.partialProduct(s, 0)
+              (m : ℝ) ^ m * Real.partialProduct(s, m)
+                 = (0 : ℝ) ^ 0 * Real.partialProduct(s, 0)
                  = 1
                  = Real.partialSum(s, 0) ^ 0
                  ≤ Real.partialSum(s, m) ^ m
@@ -347,8 +347,8 @@ theorem Real.means_inequality_predecessor (m : Natural)
                = 0;
               0 ≤ Real.partialSum(s, m);
               0 ≤ Real.partialSum(s, m) ^ m;
-              (m : Real) ^ m * Real.partialProduct(s, m)
-               = (m : Real) ^ m * 0
+              (m : ℝ) ^ m * Real.partialProduct(s, m)
+               = (m : ℝ) ^ m * 0
                = 0
                ≤ Real.partialSum(s, m) ^ m
           }
@@ -359,7 +359,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
               done
           };
           0 < Real.partialSum(s, m);
-          Real.partialSum(s, m) * ((m : Real) ^ m * Real.partialProduct(s, m))
+          Real.partialSum(s, m) * ((m : ℝ) ^ m * Real.partialProduct(s, m))
            ≤ Real.partialSum(s, m) ^ (1 + m)
            = Real.partialSum(s, m) * Real.partialSum(s, m) ^ m;
           done by Real.LessOrEqual.multiply_cancel_left_positive
@@ -368,7 +368,7 @@ theorem Real.means_inequality_predecessor (m : Natural)
   }
 
 -- The inequality holds at every power of two …
-theorem Real.means_inequality_doubling (k : Natural)
+theorem Real.means_inequality_doubling (k : ℕ)
         : Real.MeansInequalityAt(2 ^ k) :=
   by induction on k with IH {
     case base: {
@@ -383,7 +383,7 @@ theorem Real.means_inequality_doubling (k : Natural)
   }
 
 -- … every index sits below some power of two …
-theorem Natural.le_two_power (n : Natural) : n ≤ 2 ^ n :=
+theorem Natural.le_two_power (n : ℕ) : n ≤ 2 ^ n :=
   by induction on n with IH {
     case base: {
         1 ≤ 2 ^ 0   by Natural.one_le_two_power;
@@ -401,17 +401,17 @@ theorem Natural.le_two_power (n : Natural) : n ≤ 2 ^ n :=
   }
 
 -- … and the inequality descends one index at a time.
-theorem Real.means_inequality_downward (difference : Natural)
-        : ∀ (n : Natural).
+theorem Real.means_inequality_downward (difference : ℕ)
+        : ∀ (n : ℕ).
             Real.MeansInequalityAt(difference + n)
           → Real.MeansInequalityAt(n) :=
   by induction on difference with IH {
     case base:
-        (n : Natural) (atIndex : Real.MeansInequalityAt(0 + n)) ↦ {
+        (n : ℕ) (atIndex : Real.MeansInequalityAt(0 + n)) ↦ {
           done by substituting (0 + n = n)
         }
     case step(predecessor):
-        (n : Natural)
+        (n : ℕ)
         (atTop : Real.MeansInequalityAt((1 + predecessor) + n)) ↦ {
           Real.MeansInequalityAt(1 + (predecessor + n));
           Real.MeansInequalityAt(predecessor + n)
@@ -423,10 +423,10 @@ theorem Real.means_inequality_downward (difference : Natural)
 -- ----------------------------------------------------------------------
 -- Freek #38: the inequality of arithmetic and geometric means, in the
 -- division-free form nⁿ·Πs ≤ (Σs)ⁿ.
-theorem Real.arithmetic_mean_geometric_mean (n : Natural)
-        (s : Natural → Real)
-        (termsNonneg : ∀ (j : Natural). 0 ≤ s(j))
-        : (n : Real) ^ n * Real.partialProduct(s, n)
+theorem Real.arithmetic_mean_geometric_mean (n : ℕ)
+        (s : ℕ → ℝ)
+        (termsNonneg : ∀ (j : ℕ). 0 ≤ s(j))
+        : (n : ℝ) ^ n * Real.partialProduct(s, n)
           ≤ Real.partialSum(s, n) ^ n := {
   n ≤ 2 ^ n;
   choose difference such that 2 ^ n = difference + n

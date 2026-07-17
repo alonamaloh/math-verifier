@@ -49,11 +49,11 @@ import Integer.algebra
 -- ----------------------------------------------------------------------
 -- The Bezout existential predicate.
 definition Natural.has_bezout
-        (firstOperand secondOperand : Natural) : Proposition :=
-    ∃ (gcdValue : Natural).
-      ∃ (firstCoefficient : Integer).
-        ∃ (secondCoefficient : Integer).
-          (firstOperand : Integer) * firstCoefficient + (secondOperand : Integer) * secondCoefficient = (gcdValue : Integer)
+        (firstOperand secondOperand : ℕ) : Proposition :=
+    ∃ (gcdValue : ℕ).
+      ∃ (firstCoefficient : ℤ).
+        ∃ (secondCoefficient : ℤ).
+          (firstOperand : ℤ) * firstCoefficient + (secondOperand : ℤ) * secondCoefficient = (gcdValue : ℤ)
           ∧ Natural.is_gcd(gcdValue, firstOperand, secondOperand)
 
 -- ----------------------------------------------------------------------
@@ -64,9 +64,9 @@ definition Natural.has_bezout
 -- `Integer.zero · Integer.zero` to `Integer.zero`, and
 -- `add_identity_right`.
 
-theorem Natural.has_bezout_zero_right (a : Natural)
+theorem Natural.has_bezout_zero_right (a : ℕ)
         : Natural.has_bezout(a, 0) := {
-    (a : Integer) * Integer.one + (0 : Integer) * Integer.zero = (a : Integer);
+    (a : ℤ) * Integer.one + (0 : ℤ) * Integer.zero = (a : ℤ);
     Natural.is_gcd(a, a, 0) by Natural.is_gcd_zero_right;
     witness a with witness Integer.one with witness Integer.zero with done
 }
@@ -75,13 +75,13 @@ theorem Natural.has_bezout_zero_right (a : Natural)
 -- Integer-level lifting of the Natural decomposition a = q·b + r.
 
 theorem Integer.lift_decomposition
-        (a q b r : Natural)
+        (a q b r : ℕ)
         (naturalDecomposition : a = q * b + r)
-        : (a : Integer) = (q : Integer) * (b : Integer) + (r : Integer) :=
-  (a : Integer)
-     = (q * b + r : Integer)
-     = (q * b : Integer) + (r : Integer)
-     = (q : Integer) * (b : Integer) + (r : Integer)
+        : (a : ℤ) = (q : ℤ) * (b : ℤ) + (r : ℤ) :=
+  (a : ℤ)
+     = (q * b + r : ℤ)
+     = (q * b : ℤ) + (r : ℤ)
+     = (q : ℤ) * (b : ℤ) + (r : ℤ)
 
 -- ----------------------------------------------------------------------
 -- The Integer-level substitution at the heart of the Euclidean step.
@@ -94,7 +94,7 @@ theorem Integer.lift_decomposition
 -- `subtract_left_add` to replace `aInt − qInt · bInt` by `rInt`.
 
 theorem Integer.bezout_substitute
-        (aInt bInt qInt rInt xPrime yPrime gcdInt : Integer)
+        (aInt bInt qInt rInt xPrime yPrime gcdInt : ℤ)
         (decomposition
             : aInt = qInt * bInt + rInt)
         (recursedEquation
@@ -140,10 +140,10 @@ theorem Integer.bezout_substitute
 -- coefficients.
 
 theorem Natural.has_bezout_successor_step
-        (predB : Natural) (a : Natural)
+        (predB : ℕ) (a : ℕ)
         (inductionHypothesis :
-            ∀ (k : Natural). k < successor(predB)
-            → ∀ (aPrime : Natural). Natural.has_bezout(aPrime, k))
+            ∀ (k : ℕ). k < successor(predB)
+            → ∀ (aPrime : ℕ). Natural.has_bezout(aPrime, k))
         : Natural.has_bezout(a, successor(predB)) := {
     1 ≤ successor(predB);
     Natural.has_quotient_remainder(successor(predB), a)
@@ -157,48 +157,48 @@ theorem Natural.has_bezout_successor_step
     Natural.has_bezout(successor(predB), r) by inductionHypothesis as hasBezoutForBR;
     choose gcdValue from hasBezoutForBR;
     choose xPrime such that
-        ∃ (secondCoefficient : Integer).
-            (successor(predB) : Integer) * xPrime + (r : Integer) * secondCoefficient = (gcdValue : Integer)
+        ∃ (secondCoefficient : ℤ).
+            (successor(predB) : ℤ) * xPrime + (r : ℤ) * secondCoefficient = (gcdValue : ℤ)
             ∧ Natural.is_gcd(gcdValue, successor(predB), r);
     choose yPrime such that
-        (successor(predB) : Integer) * xPrime + (r : Integer) * yPrime = (gcdValue : Integer)
+        (successor(predB) : ℤ) * xPrime + (r : ℤ) * yPrime = (gcdValue : ℤ)
         ∧ Natural.is_gcd(gcdValue, successor(predB), r);
-    (successor(predB) : Integer) * xPrime + (r : Integer) * yPrime = (gcdValue : Integer);
+    (successor(predB) : ℤ) * xPrime + (r : ℤ) * yPrime = (gcdValue : ℤ);
     Natural.is_gcd(gcdValue, successor(predB), r);
     -- Lift the decomposition to ℤ and substitute r = a − q·successor(predB).
-    (a : Integer) = (q : Integer) * (successor(predB) : Integer) + (r : Integer);
-    (a : Integer) * yPrime + (successor(predB) : Integer) * (xPrime - (q : Integer) * yPrime) = (gcdValue : Integer);
+    (a : ℤ) = (q : ℤ) * (successor(predB) : ℤ) + (r : ℤ);
+    (a : ℤ) * yPrime + (successor(predB) : ℤ) * (xPrime - (q : ℤ) * yPrime) = (gcdValue : ℤ);
     Natural.is_gcd(gcdValue, a, successor(predB)) by Natural.is_gcd_remainder_lift;
     witness gcdValue with
         witness yPrime with
-        witness (xPrime - (q : Integer) * yPrime) with done
+        witness (xPrime - (q : ℤ) * yPrime) with done
 }
 
 -- ----------------------------------------------------------------------
 -- Step function for the strong induction: dispatch between the base
 -- case and the successor case.
 
-theorem Natural.has_bezout_step (b : Natural)
+theorem Natural.has_bezout_step (b : ℕ)
         (inductionHypothesis :
-            ∀ (k : Natural). k < b
-            → ∀ (aPrime : Natural). Natural.has_bezout(aPrime, k))
-        : ∀ (a : Natural). Natural.has_bezout(a, b) :=
+            ∀ (k : ℕ). k < b
+            → ∀ (aPrime : ℕ). Natural.has_bezout(aPrime, k))
+        : ∀ (a : ℕ). Natural.has_bezout(a, b) :=
   done by cases {
-    case b = 0: { take a : Natural; done by Natural.has_bezout_zero_right }
-    case b = successor(predB) for some predB: { take a : Natural; done by Natural.has_bezout_successor_step }
+    case b = 0: { take a : ℕ; done by Natural.has_bezout_zero_right }
+    case b = successor(predB) for some predB: { take a : ℕ; done by Natural.has_bezout_successor_step }
   }
 
 -- ----------------------------------------------------------------------
 -- Main theorem: Bezout's identity.
-theorem Natural.bezout (a b : Natural)
+theorem Natural.bezout (a b : ℕ)
         : Natural.has_bezout(a, b) :=
   -- Strong induction on the second operand, generalised over the first so
   -- the recursive call may switch operands. (`k < bArgument` is definitionally
   -- `successor(k) ≤ bArgument`, so the step's hypothesis matches directly.)
   (by induction on b using Natural.strong_induction
        with bArgument, inductionHypothesis {
-     take aPrime : Natural;
+     take aPrime : ℕ;
      done by Natural.has_bezout_step
    }
-   : ∀ (aPrime : Natural). Natural.has_bezout(aPrime, b)
+   : ∀ (aPrime : ℕ). Natural.has_bezout(aPrime, b)
    )(a)

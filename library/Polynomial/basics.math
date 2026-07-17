@@ -9,7 +9,7 @@
 -- zeros are quotiented away — `[a0]` and `[a0, 0]` are the same
 -- polynomial. This makes `Polynomial(R, zero)` a genuine quotient type
 -- on which equality is the kernel's `=`, the same pattern used for
--- Integer / Rational / Real / IntegerMod.
+-- ℤ / ℚ / ℝ / IntegerMod.
 --
 -- Only R's zero is needed to form the type and its equivalence; the
 -- ring operations (add, multiply, …) enter later, where the
@@ -48,18 +48,18 @@ definition Polynomial.Coefficients.tail (R : Type(0))
 -- the recursion, `nth(cons(c, rest), 0)` reduces to `c` (head of a cons)
 -- definitionally — the reduction low-degree coefficient proofs rely on.
 definition Polynomial.nthFromIndex (R : Type(0)) (zeroCoefficient : R)
-        : Natural → Polynomial.Coefficients(R) → R
+        : ℕ → Polynomial.Coefficients(R) → R
   | 0,     coeffs => Polynomial.Coefficients.head(R, zeroCoefficient, coeffs)
   | 1 + p, coeffs =>
       Polynomial.nthFromIndex(R, zeroCoefficient, p, Polynomial.Coefficients.tail(R, coeffs))
 
 definition Polynomial.nth (R : Type(0)) (zeroCoefficient : R)
-        (coeffs : Polynomial.Coefficients(R)) (index : Natural) : R :=
+        (coeffs : Polynomial.Coefficients(R)) (index : ℕ) : R :=
   Polynomial.nthFromIndex(R, zeroCoefficient, index, coeffs)
 
 -- Past the end: every entry of the empty list is the zero coefficient.
 -- (Recursing on the index, the tail of nil stays nil at each step.)
-theorem Polynomial.nth_nil (R : Type(0)) (zeroCoefficient : R) (index : Natural)
+theorem Polynomial.nth_nil (R : Type(0)) (zeroCoefficient : R) (index : ℕ)
         : Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.nil(R), index)
             = zeroCoefficient :=
   by induction on index with IH {
@@ -80,7 +80,7 @@ theorem Polynomial.nth_cons_zero (R : Type(0)) (zeroCoefficient : R)
 -- (`Natural.add` is opaque, so `1 + j` is not definitionally the
 -- constructor; bridge via `one_add`).
 theorem Polynomial.nth_one_plus (R : Type(0)) (zeroCoefficient : R)
-        (coeffs : Polynomial.Coefficients(R)) (j : Natural)
+        (coeffs : Polynomial.Coefficients(R)) (j : ℕ)
         : Polynomial.nth(R, zeroCoefficient, coeffs, 1 + j)
           = Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.tail(R, coeffs), j) :=
   done
@@ -88,7 +88,7 @@ theorem Polynomial.nth_one_plus (R : Type(0)) (zeroCoefficient : R)
 -- Reading past the head: the (1 + j)-th entry of cons(c, rest) is the
 -- j-th entry of rest — the tail of a cons.
 theorem Polynomial.nth_cons_one_plus (R : Type(0)) (zeroCoefficient : R)
-        (c : R) (rest : Polynomial.Coefficients(R)) (j : Natural)
+        (c : R) (rest : Polynomial.Coefficients(R)) (j : ℕ)
         : Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.cons(R, c, rest), 1 + j)
           = Polynomial.nth(R, zeroCoefficient, rest, j) :=
   Polynomial.nth(R, zeroCoefficient, Polynomial.Coefficients.cons(R, c, rest), 1 + j)
@@ -99,7 +99,7 @@ theorem Polynomial.nth_cons_one_plus (R : Type(0)) (zeroCoefficient : R)
 -- at every index (trailing zeros become invisible).
 definition Polynomial.ExtensionallyEqual (R : Type(0)) (zeroCoefficient : R)
         (p q : Polynomial.Coefficients(R)) : Proposition :=
-  (index : Natural) →
+  (index : ℕ) →
       Polynomial.nth(R, zeroCoefficient, p, index)
       = Polynomial.nth(R, zeroCoefficient, q, index)
 
@@ -108,7 +108,7 @@ definition Polynomial.ExtensionallyEqual (R : Type(0)) (zeroCoefficient : R)
 theorem Polynomial.ExtensionallyEqual.reflexive (R : Type(0))
         (zeroCoefficient : R) (p : Polynomial.Coefficients(R))
         : Polynomial.ExtensionallyEqual(R, zeroCoefficient, p, p) :=
-  (index : Natural) ↦
+  (index : ℕ) ↦
       reflexivity(R, Polynomial.nth(R, zeroCoefficient, p, index))
 
 theorem Polynomial.ExtensionallyEqual.symmetric (R : Type(0))
@@ -116,7 +116,7 @@ theorem Polynomial.ExtensionallyEqual.symmetric (R : Type(0))
         (extensionallyEqual
             : Polynomial.ExtensionallyEqual(R, zeroCoefficient, p, q))
         : Polynomial.ExtensionallyEqual(R, zeroCoefficient, q, p) :=
-  (index : Natural) ↦
+  (index : ℕ) ↦
       Equality.symmetry(?, ?, extensionallyEqual(index))
 
 theorem Polynomial.ExtensionallyEqual.transitive (R : Type(0))
@@ -126,7 +126,7 @@ theorem Polynomial.ExtensionallyEqual.transitive (R : Type(0))
         (secondEqual
             : Polynomial.ExtensionallyEqual(R, zeroCoefficient, q, r))
         : Polynomial.ExtensionallyEqual(R, zeroCoefficient, p, r) :=
-  (index : Natural) ↦
+  (index : ℕ) ↦
       Equality.transitivity(?, ?, ?, firstEqual(index), secondEqual(index))
 
 -- Polynomials over R: coefficient lists modulo the equivalence.

@@ -65,21 +65,21 @@ import ComplexNumber.modulus_bounds
 -- (mirrors Real.SequenceConverges / Real.SequenceIsCauchy).
 
 definition ComplexNumber.SequenceConverges
-        (s : Natural → ComplexNumber) (limit : ComplexNumber) : Proposition :=
-  ∀ (ε : Real). ε > 0 →
-    ∃ (N : Natural).
-      ∀ (m : Natural). N ≤ m →
+        (s : ℕ → ℂ) (limit : ℂ) : Proposition :=
+  ∀ (ε : ℝ). ε > 0 →
+    ∃ (N : ℕ).
+      ∀ (m : ℕ). N ≤ m →
         ComplexNumber.modulus(s(m) - limit) < ε
 
 definition ComplexNumber.SequenceConvergent
-        (s : Natural → ComplexNumber) : Proposition :=
-  ∃ (limit : ComplexNumber). ComplexNumber.SequenceConverges(s, limit)
+        (s : ℕ → ℂ) : Proposition :=
+  ∃ (limit : ℂ). ComplexNumber.SequenceConverges(s, limit)
 
 definition ComplexNumber.SequenceIsCauchy
-        (s : Natural → ComplexNumber) : Proposition :=
-  ∀ (ε : Real). ε > 0 →
-    ∃ (N : Natural).
-      ∀ (m n : Natural). N ≤ m → N ≤ n →
+        (s : ℕ → ℂ) : Proposition :=
+  ∀ (ε : ℝ). ε > 0 →
+    ∃ (N : ℕ).
+      ∀ (m n : ℕ). N ≤ m → N ≤ n →
         ComplexNumber.modulus(s(m) - s(n)) < ε
 
 -- ----------------------------------------------------------------------
@@ -88,13 +88,13 @@ definition ComplexNumber.SequenceIsCauchy
 -- modulus.
 
 theorem ComplexNumber.SequenceIsCauchy.realPart
-        (s : Natural → ComplexNumber)
+        (s : ℕ → ℂ)
         (cauchy : ComplexNumber.SequenceIsCauchy(s))
-        : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.realPart(s(n))) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
+        : Real.SequenceIsCauchy((n : ℕ) ↦ ComplexNumber.realPart(s(n))) :=
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
     choose threshold as close from cauchy(ε, εPositive);
     witness threshold with
-        (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
+        (m n : ℕ) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
           ComplexNumber.realPart(s(m) - s(n))
               = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n)) as differencePart;
           abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n)))
@@ -108,13 +108,13 @@ theorem ComplexNumber.SequenceIsCauchy.realPart
   }
 
 theorem ComplexNumber.SequenceIsCauchy.imaginaryPart
-        (s : Natural → ComplexNumber)
+        (s : ℕ → ℂ)
         (cauchy : ComplexNumber.SequenceIsCauchy(s))
-        : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n))) :=
-  (ε : Real) (εPositive : ε > 0) ↦ {
+        : Real.SequenceIsCauchy((n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n))) :=
+  (ε : ℝ) (εPositive : ε > 0) ↦ {
     choose threshold as close from cauchy(ε, εPositive);
     witness threshold with
-        (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
+        (m n : ℕ) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
           ComplexNumber.imaginaryPart(s(m) - s(n))
               = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n)) as differencePart;
           abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n)))
@@ -132,30 +132,30 @@ theorem ComplexNumber.SequenceIsCauchy.imaginaryPart
 -- whose coordinates are the limits of its coordinate sequences.
 
 theorem ComplexNumber.cauchy_sequence_converges
-        (s : Natural → ComplexNumber)
+        (s : ℕ → ℂ)
         (cauchy : ComplexNumber.SequenceIsCauchy(s))
         : ComplexNumber.SequenceConvergent(s) := {
   -- Each coordinate sequence is real-Cauchy, hence converges.
-  Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.realPart(s(n)))
+  Real.SequenceIsCauchy((n : ℕ) ↦ ComplexNumber.realPart(s(n)))
       by ComplexNumber.SequenceIsCauchy.realPart as realCauchy;
-  Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)))
+  Real.SequenceIsCauchy((n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)))
       by ComplexNumber.SequenceIsCauchy.imaginaryPart as imaginaryCauchy;
   choose realLimit as realConverges
       from Real.cauchy_sequence_converges(
-               (n : Natural) ↦ ComplexNumber.realPart(s(n)), realCauchy);
+               (n : ℕ) ↦ ComplexNumber.realPart(s(n)), realCauchy);
   choose imaginaryLimit as imaginaryConverges
       from Real.cauchy_sequence_converges(
-               (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)), imaginaryCauchy);
+               (n : ℕ) ↦ ComplexNumber.imaginaryPart(s(n)), imaginaryCauchy);
   -- The candidate limit reassembles the coordinate limits.
   witness ComplexNumber.ofCoordinates(realLimit, imaginaryLimit) with
-      (ε : Real) (εPositive : ε > 0) ↦ {
+      (ε : ℝ) (εPositive : ε > 0) ↦ {
         ε / 2 > 0 as halfPositive;
         choose realThreshold as realClose
             from realConverges(ε / 2, halfPositive);
         choose imaginaryThreshold as imaginaryClose
             from imaginaryConverges(ε / 2, halfPositive);
         witness Natural.maximum(realThreshold, imaginaryThreshold) with
-            (m : Natural)
+            (m : ℕ)
             (aboveMaximum : Natural.maximum(realThreshold, imaginaryThreshold) ≤ m) ↦ {
               realThreshold ≤ m by Natural.le_through_max_left as realAbove;
               imaginaryThreshold ≤ m by Natural.le_through_max_right as imaginaryAbove;

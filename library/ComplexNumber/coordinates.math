@@ -34,7 +34,7 @@ import ComplexNumber.basics
 
 -- (re, im) of the class of a coefficient list, reading c + x·(rest).
 definition ComplexNumber.coordinatesOfCoefficients
-        : Polynomial.Coefficients(Real) → Pair(Real, Real)
+        : Polynomial.Coefficients(ℝ) → Pair(ℝ, ℝ)
   | Polynomial.Coefficients.nil => Product.make(Real.zero, Real.zero)
   | Polynomial.Coefficients.cons(c, rest) =>
       Product.make(
@@ -49,25 +49,25 @@ overload coords := ComplexNumber.coordinatesOfCoefficients
 -- ----------------------------------------------------------------------
 -- An all-zero coefficient list has coordinates (0, 0).
 theorem ComplexNumber.coordinatesOfCoefficients_all_zero
-        (a : Polynomial.Coefficients(Real))
-        : (∀ (i : Natural). Polynomial.nth(Real, Real.zero, a, i) = Real.zero)
+        (a : Polynomial.Coefficients(ℝ))
+        : (∀ (i : ℕ). Polynomial.nth(ℝ, Real.zero, a, i) = Real.zero)
           → ComplexNumber.coordinatesOfCoefficients(a)
             = Product.make(Real.zero, Real.zero) :=
   by induction on a with IH {
     case Polynomial.Coefficients.nil:
         (allZero
-            : ∀ (i : Natural). Polynomial.nth(Real, Real.zero,
-                  Polynomial.Coefficients.nil(Real), i) = Real.zero) ↦
-          reflexivity(Pair(Real, Real), Product.make(Real.zero, Real.zero))
+            : ∀ (i : ℕ). Polynomial.nth(ℝ, Real.zero,
+                  Polynomial.Coefficients.nil(ℝ), i) = Real.zero) ↦
+          reflexivity(Pair(ℝ, ℝ), Product.make(Real.zero, Real.zero))
     case Polynomial.Coefficients.cons(c, rest):
         (allZero
-            : ∀ (i : Natural). Polynomial.nth(Real, Real.zero,
-                  Polynomial.Coefficients.cons(Real, c, rest), i) = Real.zero) ↦ {
+            : ∀ (i : ℕ). Polynomial.nth(ℝ, Real.zero,
+                  Polynomial.Coefficients.cons(ℝ, c, rest), i) = Real.zero) ↦ {
         c = Real.zero by allZero(0);
         coords(rest) = Product.make(Real.zero, Real.zero)
-            by IH((i : Natural) ↦ {
-                     Polynomial.nth(Real, Real.zero,
-                             Polynomial.Coefficients.cons(Real, c, rest), 1 + i) = Real.zero
+            by IH((i : ℕ) ↦ {
+                     Polynomial.nth(ℝ, Real.zero,
+                             Polynomial.Coefficients.cons(ℝ, c, rest), 1 + i) = Real.zero
                          by allZero;
                      done by substituting Polynomial.nth_cons_one_plus
                    }) as restCoordinates;
@@ -102,56 +102,56 @@ theorem ComplexNumber.coordinatesOfCoefficients_all_zero
 -- Each branch returns an explicit term checked against the goal by
 -- definitional unfolding of `coordinatesOfCoefficients` on a `cons`/`nil`.
 theorem ComplexNumber.coordinatesOfCoefficients_respects
-        (a : Polynomial.Coefficients(Real))
-        : ∀ (b : Polynomial.Coefficients(Real)).
-          Polynomial.ExtensionallyEqual(Real, Real.zero, a, b)
+        (a : Polynomial.Coefficients(ℝ))
+        : ∀ (b : Polynomial.Coefficients(ℝ)).
+          Polynomial.ExtensionallyEqual(ℝ, Real.zero, a, b)
           → ComplexNumber.coordinatesOfCoefficients(a)
             = ComplexNumber.coordinatesOfCoefficients(b) :=
   by induction on a with IH {
     case Polynomial.Coefficients.nil:
-        (b : Polynomial.Coefficients(Real))
-        (extensionallyEqual : Polynomial.ExtensionallyEqual(Real, Real.zero,
-            Polynomial.Coefficients.nil(Real), b)) ↦ {
+        (b : Polynomial.Coefficients(ℝ))
+        (extensionallyEqual : Polynomial.ExtensionallyEqual(ℝ, Real.zero,
+            Polynomial.Coefficients.nil(ℝ), b)) ↦ {
           -- b agrees with the empty list at every index, so b is all-zero too.
-          ∀ (i : Natural). Polynomial.nth(Real, Real.zero, b, i) = Real.zero
-              by (i : Natural) ↦
-                   { Polynomial.nth(Real, Real.zero, b, i)
+          ∀ (i : ℕ). Polynomial.nth(ℝ, Real.zero, b, i) = Real.zero
+              by (i : ℕ) ↦
+                   { Polynomial.nth(ℝ, Real.zero, b, i)
                       = Real.zero   by extensionallyEqual(i) };
-          coords(Polynomial.Coefficients.nil(Real))
+          coords(Polynomial.Coefficients.nil(ℝ))
              = Product.make(Real.zero, Real.zero)
              = coords(b)
         }
     case Polynomial.Coefficients.cons(c, rest):
-        (b : Polynomial.Coefficients(Real))
-        (extensionallyEqual : Polynomial.ExtensionallyEqual(Real, Real.zero,
-            Polynomial.Coefficients.cons(Real, c, rest), b)) ↦
+        (b : Polynomial.Coefficients(ℝ))
+        (extensionallyEqual : Polynomial.ExtensionallyEqual(ℝ, Real.zero,
+            Polynomial.Coefficients.cons(ℝ, c, rest), b)) ↦
           done by cases {
-            case b = Polynomial.Coefficients.nil(Real) as bNil: {
-                Polynomial.ExtensionallyEqual(Real, Real.zero,
-                    Polynomial.Coefficients.cons(Real, c, rest),
-                    Polynomial.Coefficients.nil(Real))
+            case b = Polynomial.Coefficients.nil(ℝ) as bNil: {
+                Polynomial.ExtensionallyEqual(ℝ, Real.zero,
+                    Polynomial.Coefficients.cons(ℝ, c, rest),
+                    Polynomial.Coefficients.nil(ℝ))
                     as extEqNil;
-                coords(Polynomial.Coefficients.cons(Real, c, rest))
+                coords(Polynomial.Coefficients.cons(ℝ, c, rest))
                    = Product.make(Real.zero, Real.zero)
                          by ComplexNumber.coordinatesOfCoefficients_all_zero(
-                                Polynomial.Coefficients.cons(Real, c, rest),
-                                (i : Natural) ↦ extEqNil(i))
-                   = coords(Polynomial.Coefficients.nil(Real))
+                                Polynomial.Coefficients.cons(ℝ, c, rest),
+                                (i : ℕ) ↦ extEqNil(i))
+                   = coords(Polynomial.Coefficients.nil(ℝ))
                    = coords(b)
               }
-            case b = Polynomial.Coefficients.cons(Real, d, restB) for some (d : Real), (restB : Polynomial.Coefficients(Real)) as bCons: {
-                Polynomial.ExtensionallyEqual(Real, Real.zero,
-                    Polynomial.Coefficients.cons(Real, c, rest),
-                    Polynomial.Coefficients.cons(Real, d, restB))
+            case b = Polynomial.Coefficients.cons(ℝ, d, restB) for some (d : ℝ), (restB : Polynomial.Coefficients(ℝ)) as bCons: {
+                Polynomial.ExtensionallyEqual(ℝ, Real.zero,
+                    Polynomial.Coefficients.cons(ℝ, c, rest),
+                    Polynomial.Coefficients.cons(ℝ, d, restB))
                     as extEq;
                 c = d by extEq(0);
                 coords(rest) = coords(restB)
                     by IH(restB,
-                           (i : Natural) ↦ {
-                             Polynomial.nth(Real, Real.zero,
-                                     Polynomial.Coefficients.cons(Real, c, rest), 1 + i)
-                                = Polynomial.nth(Real, Real.zero,
-                                      Polynomial.Coefficients.cons(Real, d, restB), 1 + i)
+                           (i : ℕ) ↦ {
+                             Polynomial.nth(ℝ, Real.zero,
+                                     Polynomial.Coefficients.cons(ℝ, c, rest), 1 + i)
+                                = Polynomial.nth(ℝ, Real.zero,
+                                      Polynomial.Coefficients.cons(ℝ, d, restB), 1 + i)
                                 by extEq(1 + i);
                              done by substituting Polynomial.nth_cons_one_plus
                            }) as tailCoordinates;
@@ -165,12 +165,12 @@ theorem ComplexNumber.coordinatesOfCoefficients_respects
                     by tailCoordinates;
                 -- assemble through the explicit pair forms (keeps both endpoints
                 -- cheap make(…) so the prover never unfolds the recursive coords)
-                coords(Polynomial.Coefficients.cons(Real, c, rest))
+                coords(Polynomial.Coefficients.cons(ℝ, c, rest))
                    = Product.make(
                          c - Product.second(coords(rest)), Product.first(coords(rest)))
                    = Product.make(
                          d - Product.second(coords(restB)), Product.first(coords(restB)))
-                   = coords(Polynomial.Coefficients.cons(Real, d, restB))
+                   = coords(Polynomial.Coefficients.cons(ℝ, d, restB))
                    = coords(b)
               }
           }
@@ -179,8 +179,8 @@ theorem ComplexNumber.coordinatesOfCoefficients_respects
 -- ----------------------------------------------------------------------
 -- The coordinate map on ℝ[x] (lifting over the polynomial quotient).
 definition ComplexNumber.coordinatesOfPolynomial
-        : Polynomial(Real, Real.zero)
-          → Pair(Real, Real)
+        : Polynomial(ℝ, Real.zero)
+          → Pair(ℝ, ℝ)
   by representatives a ↦ ComplexNumber.coordinatesOfCoefficients(a)
   well_defined by ComplexNumber.coordinatesOfCoefficients_respects
 

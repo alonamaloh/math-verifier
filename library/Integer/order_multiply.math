@@ -31,76 +31,76 @@ import Integer.sign
 import Integer.sum_of_squares
 
 -- The product of two non-negative integers is non-negative.
-automatic theorem Integer.multiply_nonneg (a b : Integer)
+automatic theorem Integer.multiply_nonneg (a b : ℤ)
         (aNonneg : Integer.IsNonneg(a)) (bNonneg : Integer.IsNonneg(b))
         : Integer.IsNonneg(a * b) := {
-  choose j such that a = (j : Integer) from aNonneg;
-  choose k such that b = (k : Integer) from bNonneg;
+  choose j such that a = (j : ℤ) from aNonneg;
+  choose k such that b = (k : ℤ) from bNonneg;
   witness j * k with
       a * b
-         = (j : Integer) * (k : Integer)
-         = ((j * k : Natural) : Integer)
+         = (j : ℤ) * (k : ℤ)
+         = ((j * k : ℕ) : ℤ)
 }
 
 -- x ≤ y ⟹ y − x is non-negative.
-theorem Integer.nonneg_difference_of_le (x y : Integer) (xLeY : x ≤ y)
+theorem Integer.nonneg_difference_of_le (x y : ℤ) (xLeY : x ≤ y)
         : Integer.IsNonneg(y - x) := {
-  choose n such that y = x + (n : Integer) from xLeY;
+  choose n such that y = x + (n : ℤ) from xLeY;
   witness n with
       y - x
-         = (x + (n : Integer)) - x
-         = (n : Integer)
+         = (x + (n : ℤ)) - x
+         = (n : ℤ)
 }
 
 -- y − x non-negative ⟹ x ≤ y.
-theorem Integer.le_of_nonneg_difference (x y : Integer) (differenceNonneg : Integer.IsNonneg(y - x))
+theorem Integer.le_of_nonneg_difference (x y : ℤ) (differenceNonneg : Integer.IsNonneg(y - x))
         : x ≤ y := {
-  choose n such that y - x = (n : Integer) from differenceNonneg;
+  choose n such that y - x = (n : ℤ) from differenceNonneg;
   witness n with
       y
          = (y - x) + x
-         = (n : Integer) + x
-         = x + (n : Integer)
+         = (n : ℤ) + x
+         = x + (n : ℤ)
 }
 
 -- Multiplying both sides by a Natural image preserves ≤.
-theorem Integer.multiply_le_by_natural (m : Natural) (x y : Integer) (xLeY : x ≤ y)
-        : (m : Integer) * x ≤ (m : Integer) * y := {
-  Integer.IsNonneg((m : Integer));
+theorem Integer.multiply_le_by_natural (m : ℕ) (x y : ℤ) (xLeY : x ≤ y)
+        : (m : ℤ) * x ≤ (m : ℤ) * y := {
+  Integer.IsNonneg((m : ℤ));
   Integer.IsNonneg(y - x);
-  Integer.IsNonneg((m : Integer) * (y - x));
-  Integer.IsNonneg((m : Integer) * y - (m : Integer) * x);
+  Integer.IsNonneg((m : ℤ) * (y - x));
+  Integer.IsNonneg((m : ℤ) * y - (m : ℤ) * x);
   done
 }
 
 -- Cancelling a positive Natural multiplier reflects ≤.
-theorem Integer.cancel_le_by_natural_positive (m : Natural) (mPositive : 1 ≤ m)
-        (x y : Integer) (productLe : (m : Integer) * x ≤ (m : Integer) * y) : x ≤ y := {
-  Integer.IsNonneg((m : Integer) * y - (m : Integer) * x);
-  Integer.IsNonneg((m : Integer) * (y - x));
-  Integer.IsNonneg(y - x) ∨ ∃ (k : Natural). (y - x) = -(k : Integer)
+theorem Integer.cancel_le_by_natural_positive (m : ℕ) (mPositive : 1 ≤ m)
+        (x y : ℤ) (productLe : (m : ℤ) * x ≤ (m : ℤ) * y) : x ≤ y := {
+  Integer.IsNonneg((m : ℤ) * y - (m : ℤ) * x);
+  Integer.IsNonneg((m : ℤ) * (y - x));
+  Integer.IsNonneg(y - x) ∨ ∃ (k : ℕ). (y - x) = -(k : ℤ)
       by Integer.sign_split;
   done by cases {
     case Integer.IsNonneg(y - x) as nonnegative: done
-    case ∃ (k : Natural). (y - x) = -(k : Integer) as negative: {
-        choose k such that y - x = -(k : Integer) from negative;
-        (m : Integer) * (y - x)
-                  = (m : Integer) * (-(k : Integer))
-                  = -((m : Integer) * (k : Integer))
-                  = -((m * k : Natural) : Integer);
-        Integer.IsNonneg(-((m * k : Natural) : Integer));
-        choose j such that -((m * k : Natural) : Integer) = (j : Integer);
-        ((m * k + j : Natural) : Integer)
-                  = ((m * k : Natural) : Integer) + (j : Integer)
-                  = ((m * k : Natural) : Integer) + (-((m * k : Natural) : Integer))
+    case ∃ (k : ℕ). (y - x) = -(k : ℤ) as negative: {
+        choose k such that y - x = -(k : ℤ) from negative;
+        (m : ℤ) * (y - x)
+                  = (m : ℤ) * (-(k : ℤ))
+                  = -((m : ℤ) * (k : ℤ))
+                  = -((m * k : ℕ) : ℤ);
+        Integer.IsNonneg(-((m * k : ℕ) : ℤ));
+        choose j such that -((m * k : ℕ) : ℤ) = (j : ℤ);
+        ((m * k + j : ℕ) : ℤ)
+                  = ((m * k : ℕ) : ℤ) + (j : ℤ)
+                  = ((m * k : ℕ) : ℤ) + (-((m * k : ℕ) : ℤ))
                   = Integer.zero;
         m * k + j = 0;
         m * k = 0;
         k * m = m * k = 0;
         k = 0 by Natural.multiply_equals_zero_with_positive_right;
         y - x
-                  = -(k : Integer)
-                  = -((0 : Natural) : Integer)
+                  = -(k : ℤ)
+                  = -((0 : ℕ) : ℤ)
                   = Integer.zero;
         Integer.IsNonneg(y - x);
         done
@@ -109,17 +109,17 @@ theorem Integer.cancel_le_by_natural_positive (m : Natural) (mPositive : 1 ≤ m
 }
 
 -- An Integer square is nonnegative.
-automatic theorem Integer.square_IsNonneg (x : Integer)
+automatic theorem Integer.square_IsNonneg (x : ℤ)
         : Integer.IsNonneg(Integer.multiply(x, x)) := {
-  Integer.IsNonneg(x) ∨ ∃ (k : Natural). x = -(k : Integer)
+  Integer.IsNonneg(x) ∨ ∃ (k : ℕ). x = -(k : ℤ)
       by Integer.sign_split;
   done by cases {
     case Integer.IsNonneg(x):
         done
-    case ∃ (k : Natural). x = -(k : Integer) as negativeEvidence: {
-        choose k such that x = -(k : Integer) from negativeEvidence;
-        Integer.IsNonneg((k : Integer));
-        Integer.IsNonneg(Integer.multiply((k : Integer), (k : Integer)));
+    case ∃ (k : ℕ). x = -(k : ℤ) as negativeEvidence: {
+        choose k such that x = -(k : ℤ) from negativeEvidence;
+        Integer.IsNonneg((k : ℤ));
+        Integer.IsNonneg(Integer.multiply((k : ℤ), (k : ℤ)));
         done
       }
   }

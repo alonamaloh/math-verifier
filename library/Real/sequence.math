@@ -34,39 +34,39 @@ import Rational.absolute_value
 
 -- A sequence of Rationals: a function ℕ → ℚ.
 definition Rational.sequence.Sequence : Type(0) :=
-  Natural → Rational
+  ℕ → ℚ
 
 -- `s` converges to `limit`: for every positive ε there is an N such
 -- that beyond N, every term is within ε of the limit.
 definition Rational.sequence.ConvergesTo
-        (s : Rational.sequence.Sequence) (limit : Rational)
+        (s : Rational.sequence.Sequence) (limit : ℚ)
         : Proposition :=
-  ∀ (ε : Rational). Rational.zero < ε →
-    ∃ (N : Natural).
-      ∀ (m : Natural). N ≤ m →
+  ∀ (ε : ℚ). Rational.zero < ε →
+    ∃ (N : ℕ).
+      ∀ (m : ℕ). N ≤ m →
         abs(s(m) - limit) < ε
 
 -- `s` is Cauchy: terms get arbitrarily close to each other beyond
 -- some index.
 definition Rational.sequence.IsCauchy
         (s : Rational.sequence.Sequence) : Proposition :=
-  ∀ (ε : Rational). Rational.zero < ε →
-    ∃ (N : Natural).
-      ∀ (m : Natural). N ≤ m →
-        ∀ (n : Natural). N ≤ n →
+  ∀ (ε : ℚ). Rational.zero < ε →
+    ∃ (N : ℕ).
+      ∀ (m : ℕ). N ≤ m →
+        ∀ (n : ℕ). N ≤ n →
           abs(s(m) - s(n)) < ε
 
 -- `s` is bounded: there is a single M (Rational) bounding every
 -- |s(n)|. Required to prove products of Cauchy sequences are Cauchy.
 definition Rational.sequence.Bounded
         (s : Rational.sequence.Sequence) : Proposition :=
-  ∃ (boundValue : Rational).
-    ∀ (n : Natural).
+  ∃ (boundValue : ℚ).
+    ∀ (n : ℕ).
       abs(s(n)) ≤ boundValue
 
 -- Helper: |q - q| = 0 for any Rational q. By `q - q = q + -q =
 -- Rational.zero` and `|Rational.zero| = Rational.zero`.
-theorem Rational.absolute_value_subtract_self (q : Rational)
+theorem Rational.absolute_value_subtract_self (q : ℚ)
         : abs(q - q) = Rational.zero :=
   abs(q - q)
      = abs(q + -q)
@@ -79,43 +79,43 @@ theorem Rational.sequence.negate_is_cauchy
         (s : Rational.sequence.Sequence)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         : Rational.sequence.IsCauchy(
-              (n : Natural) ↦ -s(n)) :=
-  (ε : Rational)
+              (n : ℕ) ↦ -s(n)) :=
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     -- `choose N such that … from sIsCauchy(ε, …)` cannot infer the
     -- existential's type through the opaque Rational (the inferType-
     -- application bridge is blocked), so name it explicitly first.
-    ∃ (N : Natural).
-        ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < ε;
+    ∃ (N : ℕ).
+        ∀ (m : ℕ). N ≤ m → ∀ (n : ℕ). N ≤ n → abs(s(m) - s(n)) < ε;
     choose N such that
-        ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < ε
+        ∀ (m : ℕ). N ≤ m → ∀ (n : ℕ). N ≤ n → abs(s(m) - s(n)) < ε
         as sCauchy_at_N;
     witness N with
-        (m : Natural) (N_leq_m : N ≤ m)
-                 (n : Natural) (N_leq_n : N ≤ n) ↦
+        (m : ℕ) (N_leq_m : N ≤ m)
+                 (n : ℕ) (N_leq_n : N ≤ n) ↦
           abs(-s(m) - -s(n))
              = abs(s(m) - s(n))
              < ε            by sCauchy_at_N(m, N_leq_m, n, N_leq_n)
   }
 
 -- Constant sequence is Cauchy: |q - q| = 0 < ε.
-theorem Rational.sequence.constant_is_cauchy (q : Rational)
-        : Rational.sequence.IsCauchy((n : Natural) ↦ q) :=
-  (ε : Rational) (εPositive : Rational.zero < ε) ↦
+theorem Rational.sequence.constant_is_cauchy (q : ℚ)
+        : Rational.sequence.IsCauchy((n : ℕ) ↦ q) :=
+  (ε : ℚ) (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m)
-                 (n : Natural) (_ : 0 ≤ n) ↦
+        (m : ℕ) (_ : 0 ≤ m)
+                 (n : ℕ) (_ : 0 ≤ n) ↦
           abs(q - q)
              = Rational.zero
              < ε
 
 -- Constant sequence converges to its constant value. Same shape.
-theorem Rational.sequence.constant_converges_to_itself (q : Rational)
+theorem Rational.sequence.constant_converges_to_itself (q : ℚ)
         : Rational.sequence.ConvergesTo(
-              (n : Natural) ↦ q, q) :=
-  (ε : Rational) (εPositive : Rational.zero < ε) ↦
+              (n : ℕ) ↦ q, q) :=
+  (ε : ℚ) (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦
+        (m : ℕ) (_ : 0 ≤ m) ↦
           abs(q - q)
              = Rational.zero
              < ε
@@ -128,12 +128,12 @@ theorem Rational.sequence.constant_converges_to_itself (q : Rational)
 theorem Rational.sequence.IsCauchy.eventually_near_anchor
         (s : Rational.sequence.Sequence)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
-        (ε : Rational) (εPositive : ε > (0 : Rational))
-        : ∃ (N : Natural). eventually (m). abs(s(m) - s(N)) < ε := {
+        (ε : ℚ) (εPositive : ε > (0 : ℚ))
+        : ∃ (N : ℕ). eventually (m). abs(s(m) - s(N)) < ε := {
   choose N from sIsCauchy(ε, εPositive);
   witness N with
       witness N with
-          (m : Natural) (mPastAnchor : N ≤ m) ↦ {
+          (m : ℕ) (mPastAnchor : N ≤ m) ↦ {
             N ≤ N;
             done
           }

@@ -3,7 +3,7 @@
 -- Euclid's lemma: for any prime `p` and naturals `a`, `b`, if `p` divides
 -- `a * b` then `p` divides `a` or `p` divides `b`. The proof goes through
 -- Bezout's identity: from `p` prime and `p ∤ a` we extract integer
--- coefficients `x`, `y` with `(p : Integer) * x + (a : Integer) * y = 1`.
+-- coefficients `x`, `y` with `(p : ℤ) * x + (a : ℤ) * y = 1`.
 -- Multiplying the equation by `b` and using `p | a * b` decomposes `b`
 -- into a multiple of `p` (in Integer); the sign-split on the resulting
 -- coefficient projects back to a Natural witness.
@@ -50,12 +50,12 @@ theorem Natural.divides_one_implies_equals_one
         : d = 1 := {
   -- A divisor of 1 is bounded by 1, and a zero divisor would force 1 = 0;
   -- so d = 1.
-  (1 : Natural) = 0 ∨ d ≤ 1;
+  (1 : ℕ) = 0 ∨ d ≤ 1;
   d ≤ 1;
   done by cases {
     case d = 0: {
-        choose quotient such that (1 : Natural) = 0 * quotient from dividesOne;
-        (1 : Natural) = 0 * quotient = 0;
+        choose quotient such that (1 : ℕ) = 0 * quotient from dividesOne;
+        (1 : ℕ) = 0 * quotient = 0;
         done
       }
     case d = successor(dPredecessor) for some dPredecessor as dEquation: {
@@ -74,28 +74,28 @@ theorem Natural.divides_one_implies_equals_one
 -- either 1 or p; g = p contradicts `p ∤ a`, leaving g = 1.
 
 theorem Natural.bezout_one_when_prime_coprime
-        (p a : Natural)
+        (p a : ℕ)
         (primality : Natural.is_prime(p))
         (notDividesA : ¬ Natural.divides(p, a))
-        : ∃ (x : Integer). ∃ (y : Integer).
-            (p : Integer) * x + (a : Integer) * y = (1 : Integer) := {
+        : ∃ (x : ℤ). ∃ (y : ℤ).
+            (p : ℤ) * x + (a : ℤ) * y = (1 : ℤ) := {
     Natural.has_bezout(p, a) by Natural.bezout as bezoutWitness;
     choose g from bezoutWitness;
     choose x such that
-        ∃ (secondCoefficient : Integer).
-            (p : Integer) * x + (a : Integer) * secondCoefficient = (g : Integer)
+        ∃ (secondCoefficient : ℤ).
+            (p : ℤ) * x + (a : ℤ) * secondCoefficient = (g : ℤ)
             ∧ Natural.is_gcd(g, p, a);
     choose y such that
-        (p : Integer) * x + (a : Integer) * y = (g : Integer)
+        (p : ℤ) * x + (a : ℤ) * y = (g : ℤ)
         ∧ Natural.is_gcd(g, p, a);
     g ∣ p;
     g = 1 ∨ g = p;
     done by cases {
       case g = 1 as gEqOne:
           witness x with witness y with
-              (p : Integer) * x + (a : Integer) * y
-                 = (g : Integer)
-                 = ((1 : Natural) : Integer)
+              (p : ℤ) * x + (a : ℤ) * y
+                 = (g : ℤ)
+                 = ((1 : ℕ) : ℤ)
       case g = p as gEqP: {
           Natural.divides(p, a);
           False;
@@ -105,7 +105,7 @@ theorem Natural.bezout_one_when_prime_coprime
 }
 
 -- ----------------------------------------------------------------------
--- Sign-side helper: if `(b : Integer) = -(m : Integer)` for naturals
+-- Sign-side helper: if `(b : ℤ) = -(m : ℤ)` for naturals
 -- `b` and `m`, then `b = 0`. Used when the Bezout coefficient comes
 -- out negative — combined with `b ≥ 0` (which a Natural cast always
 -- gives), the only resolution is both sides zero.
@@ -114,10 +114,10 @@ theorem Natural.bezout_one_when_prime_coprime
 -- make(0, m))`, which is `b + m = 0`. Hence b = 0.
 
 theorem Natural.natural_eq_negate_natural_implies_first_zero
-        (b m : Natural)
-        (equality : (b : Integer) = -(m : Integer))
+        (b m : ℕ)
+        (equality : (b : ℤ) = -(m : ℤ))
         : b = 0 := {
-    -- `(b : Integer) = -(m : Integer)` is `from_difference(b, 0) =
+    -- `(b : ℤ) = -(m : ℤ)` is `from_difference(b, 0) =
     -- from_difference(0, m)`; the boundary reads it back as `b + m = 0 + 0`.
     b + m
        = 0 + 0
@@ -128,7 +128,7 @@ theorem Natural.natural_eq_negate_natural_implies_first_zero
 -- ----------------------------------------------------------------------
 -- Euclid's lemma — coprime case. Given prime p with p ∤ a and p | a*b,
 -- conclude p | b. The proof multiplies the Bezout identity by b and
--- reorganises so that b sits as a (p : Integer) multiple. The
+-- reorganises so that b sits as a (p : ℤ) multiple. The
 -- Integer-level coefficient is then sign-split: a non-negative
 -- coefficient projects back to a Natural witness for p | b; a negative
 -- coefficient forces b = 0 (and 0 is trivially a p-multiple).
@@ -140,77 +140,77 @@ theorem Natural.prime_divides_product_when_coprime
         (productDivides : p ∣ a * b)
         : p ∣ b := {
     choose x such that
-        ∃ (y : Integer). (p : Integer) * x + (a : Integer) * y = (1 : Integer)
+        ∃ (y : ℤ). (p : ℤ) * x + (a : ℤ) * y = (1 : ℤ)
         from Natural.bezout_one_when_prime_coprime;
-    choose y such that (p : Integer) * x + (a : Integer) * y = (1 : Integer);
+    choose y such that (p : ℤ) * x + (a : ℤ) * y = (1 : ℤ);
     choose productQuotient such that a * b = p * productQuotient from productDivides;
 
-    -- Step 1: multiply the Bezout combination by (b : Integer).
+    -- Step 1: multiply the Bezout combination by (b : ℤ).
     -- (p*x + a*y) * b = 1 * b = b, distributed gives p*x*b + a*y*b = b.
-    (p : Integer) * x * (b : Integer)
-            + (a : Integer) * y * (b : Integer)
-       = ((p : Integer) * x + (a : Integer) * y) * (b : Integer)
-       = Integer.one * (b : Integer)
-       = (b : Integer);
+    (p : ℤ) * x * (b : ℤ)
+            + (a : ℤ) * y * (b : ℤ)
+       = ((p : ℤ) * x + (a : ℤ) * y) * (b : ℤ)
+       = Integer.one * (b : ℤ)
+       = (b : ℤ);
 
     -- Step 2: rewrite (a*y)*b into p*((k:Integer)*y) using
     -- a*b = p * productQuotient at Integer level.
-    (a : Integer) * y * (b : Integer)
-       = (a : Integer) * (b : Integer) * y
-       = (a * b : Integer) * y
-       = (p * productQuotient : Integer) * y
-       = (p : Integer) * (productQuotient : Integer) * y
-       = (p : Integer) * ((productQuotient : Integer) * y);
+    (a : ℤ) * y * (b : ℤ)
+       = (a : ℤ) * (b : ℤ) * y
+       = (a * b : ℤ) * y
+       = (p * productQuotient : ℤ) * y
+       = (p : ℤ) * (productQuotient : ℤ) * y
+       = (p : ℤ) * ((productQuotient : ℤ) * y);
 
-    -- Step 3: assemble (b : Integer) = (p : Integer) * (x*b + k*y).
-    (b : Integer)
-       = (p : Integer) * x * (b : Integer)
-           + (a : Integer) * y * (b : Integer)
-       = (p : Integer) * x * (b : Integer)
-           + (p : Integer) * ((productQuotient : Integer) * y)
-       = (p : Integer)
-           * (x * (b : Integer)
-              + (productQuotient : Integer) * y);
+    -- Step 3: assemble (b : ℤ) = (p : ℤ) * (x*b + k*y).
+    (b : ℤ)
+       = (p : ℤ) * x * (b : ℤ)
+           + (a : ℤ) * y * (b : ℤ)
+       = (p : ℤ) * x * (b : ℤ)
+           + (p : ℤ) * ((productQuotient : ℤ) * y)
+       = (p : ℤ)
+           * (x * (b : ℤ)
+              + (productQuotient : ℤ) * y);
 
     -- Step 4: sign-split the coefficient.
     Integer.IsNonneg(
-              x * (b : Integer) + (productQuotient : Integer) * y)
-          ∨ (∃ (negativePart : Natural).
-                x * (b : Integer) + (productQuotient : Integer) * y
-                  = -(negativePart : Integer))
+              x * (b : ℤ) + (productQuotient : ℤ) * y)
+          ∨ (∃ (negativePart : ℕ).
+                x * (b : ℤ) + (productQuotient : ℤ) * y
+                  = -(negativePart : ℤ))
         by Integer.sign_split
     done by cases {
       case Integer.IsNonneg(
-              x * (b : Integer) + (productQuotient : Integer) * y) as zIsNonneg: {
+              x * (b : ℤ) + (productQuotient : ℤ) * y) as zIsNonneg: {
         choose coefficient such that
-            x * (b : Integer) + (productQuotient : Integer) * y = (coefficient : Integer)
+            x * (b : ℤ) + (productQuotient : ℤ) * y = (coefficient : ℤ)
             from zIsNonneg;
         -- (b : Int) = (p : Int) * (coefficient : Int) = (p*coefficient : Int).
         -- Inject to Natural: b = p * coefficient.
-        (b : Integer)
-           = (p : Integer)
-               * (x * (b : Integer)
-                  + (productQuotient : Integer) * y)
-           = (p : Integer) * (coefficient : Integer)
-           = (p * coefficient : Integer);
+        (b : ℤ)
+           = (p : ℤ)
+               * (x * (b : ℤ)
+                  + (productQuotient : ℤ) * y)
+           = (p : ℤ) * (coefficient : ℤ)
+           = (p * coefficient : ℤ);
         b = p * coefficient
             by Natural.to_integer.injective as bEqualsProduct;
         witness coefficient with bEqualsProduct
       }
-      case ∃ (negativePart : Natural).
-              x * (b : Integer) + (productQuotient : Integer) * y
-                = -(negativePart : Integer) as zIsNegated: {
+      case ∃ (negativePart : ℕ).
+              x * (b : ℤ) + (productQuotient : ℤ) * y
+                = -(negativePart : ℤ) as zIsNegated: {
         choose negativePart such that
-            x * (b : Integer) + (productQuotient : Integer) * y = -(negativePart : Integer)
+            x * (b : ℤ) + (productQuotient : ℤ) * y = -(negativePart : ℤ)
             from zIsNegated;
         -- (b : Int) = (p : Int) * -(negativePart : Int) = -((p * negativePart) : Int).
-        (b : Integer)
-           = (p : Integer)
-               * (x * (b : Integer)
-                  + (productQuotient : Integer) * y)
-           = (p : Integer) * -(negativePart : Integer)
-           = -((p : Integer) * (negativePart : Integer))
-           = -((p * negativePart) : Integer);
+        (b : ℤ)
+           = (p : ℤ)
+               * (x * (b : ℤ)
+                  + (productQuotient : ℤ) * y)
+           = (p : ℤ) * -(negativePart : ℤ)
+           = -((p : ℤ) * (negativePart : ℤ))
+           = -((p * negativePart) : ℤ);
         note b = 0
           by Natural.natural_eq_negate_natural_implies_first_zero;
         p

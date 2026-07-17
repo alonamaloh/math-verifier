@@ -50,92 +50,92 @@ import Real.interface
 -- ----------------------------------------------------------------------
 -- The harmonic terms 1/(n+1), and the doubling index ladder 2ᴷ.
 
-definition Real.harmonic_term (n : Natural) : Real :=
-  1 / (1 + n : Real)
+definition Real.harmonic_term (n : ℕ) : ℝ :=
+  1 / (1 + n : ℝ)
 
 -- Every harmonic term is nonnegative.
-theorem Real.harmonic_term_nonneg (j : Natural)
+theorem Real.harmonic_term_nonneg (j : ℕ)
         : Real.zero ≤ Real.harmonic_term(j) := {
-  (1 + j : Real) > 0;
+  (1 + j : ℝ) > 0;
   Real.harmonic_term(j) > 0 by Real.divide_positive;
   done
 }
 
 -- ----------------------------------------------------------------------
 -- Each of the p terms past index p is at least 1/(2p).
-theorem Real.harmonic_term_block_bound (p j : Natural)
-        (doubledNonzero : (p + p : Real) ≠ 0)
+theorem Real.harmonic_term_block_bound (p j : ℕ)
+        (doubledNonzero : (p + p : ℝ) ≠ 0)
         (jBelow : j < p)
-        : 1 / (p + p : Real) ≤ Real.harmonic_term(p + j) := {
+        : 1 / (p + p : ℝ) ≤ Real.harmonic_term(p + j) := {
   -- index bound at the Natural layer: 1 + (p + j) = p + (j + 1) ≤ 2p
   j + 1 ≤ p;
   1 + (p + j)
      = p + (j + 1)
      ≤ p + p;
   -- cast it and flip through the reciprocal
-  (1 + (p + j) : Real) ≤ (p + p : Real);
-  (1 + (p + j) : Real) > 0;
+  (1 + (p + j) : ℝ) ≤ (p + p : ℝ);
+  (1 + (p + j) : ℝ) > 0;
   done by Real.one_divide_antitone
 }
 
 -- ----------------------------------------------------------------------
 -- Doubling the index adds at least one half: the p new terms each beat
 -- 1/(2p), and p·(1/(2p)) = ½.
-theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
-        : Real.partialSum(Real.harmonic_term, p) + 1 / (2 : Real)
+theorem Real.harmonic_doubling_bound (p : ℕ) (pPositive : 1 ≤ p)
+        : Real.partialSum(Real.harmonic_term, p) + 1 / (2 : ℝ)
           ≤ Real.partialSum(Real.harmonic_term, p + p) := {
   -- 2p is a positive, hence nonzero, denominator.
   1
      ≤ p
      ≤ p + p;
   p + p > 0;
-  (p + p : Real) > 0;
-  (p + p : Real) ≠ 0;
+  (p + p : ℝ) > 0;
+  (p + p : ℝ) ≠ 0;
   -- Each of the p shifted terms beats the constant 1/(2p).
-  ∀ (j : Natural). j < p
-        → 1 / (p + p : Real) ≤ Real.harmonic_term(p + j)
+  ∀ (j : ℕ). j < p
+        → 1 / (p + p : ℝ) ≤ Real.harmonic_term(p + j)
       by {
-        take j : Natural;
+        take j : ℕ;
         suppose j < p as jBelow;
         done by Real.harmonic_term_block_bound
       };
   -- Summing that comparison over the block.
-  Real.partialSum((j : Natural) ↦ 1 / (p + p : Real), p) ≤ Real.partialSum((j : Natural) ↦ Real.harmonic_term(p + j), p);
+  Real.partialSum((j : ℕ) ↦ 1 / (p + p : ℝ), p) ≤ Real.partialSum((j : ℕ) ↦ Real.harmonic_term(p + j), p);
   -- The constant block is worth exactly ½: p copies of 1/(2p).
-  Real.partialSum((j : Natural) ↦ 1 / (p + p : Real), p) = (p : Real) * (1 / (p + p : Real));
-  (p + p : Real) = (p : Real) + (p : Real);
-  (p + p : Real) * (1 / (p + p : Real)) = 1;
-  (1 / (2 : Real)) * (p + p : Real)
-     = (1 / (2 : Real)) * ((p : Real) + (p : Real))
-     = (p : Real) * (1 / (2 : Real) + 1 / (2 : Real))
-     = (p : Real);
-  (p : Real) * (1 / (p + p : Real))
-     = ((1 / (2 : Real)) * (p + p : Real)) * (1 / (p + p : Real))
-     = (1 / (2 : Real))
-       * ((p + p : Real) * (1 / (p + p : Real)))
-     = (1 / (2 : Real)) * 1
-     = 1 / (2 : Real);
+  Real.partialSum((j : ℕ) ↦ 1 / (p + p : ℝ), p) = (p : ℝ) * (1 / (p + p : ℝ));
+  (p + p : ℝ) = (p : ℝ) + (p : ℝ);
+  (p + p : ℝ) * (1 / (p + p : ℝ)) = 1;
+  (1 / (2 : ℝ)) * (p + p : ℝ)
+     = (1 / (2 : ℝ)) * ((p : ℝ) + (p : ℝ))
+     = (p : ℝ) * (1 / (2 : ℝ) + 1 / (2 : ℝ))
+     = (p : ℝ);
+  (p : ℝ) * (1 / (p + p : ℝ))
+     = ((1 / (2 : ℝ)) * (p + p : ℝ)) * (1 / (p + p : ℝ))
+     = (1 / (2 : ℝ))
+       * ((p + p : ℝ) * (1 / (p + p : ℝ)))
+     = (1 / (2 : ℝ)) * 1
+     = 1 / (2 : ℝ);
   -- Assemble: trade ½ for the constant block, compare, and merge.
-  Real.partialSum(Real.harmonic_term, p) + 1 / (2 : Real)
-     = Real.partialSum(Real.harmonic_term, p) + (p : Real) * (1 / (p + p : Real))
-     = Real.partialSum(Real.harmonic_term, p) + Real.partialSum((j : Natural) ↦ 1 / (p + p : Real), p)
+  Real.partialSum(Real.harmonic_term, p) + 1 / (2 : ℝ)
+     = Real.partialSum(Real.harmonic_term, p) + (p : ℝ) * (1 / (p + p : ℝ))
+     = Real.partialSum(Real.harmonic_term, p) + Real.partialSum((j : ℕ) ↦ 1 / (p + p : ℝ), p)
      ≤ Real.partialSum(Real.harmonic_term, p)
-       + Real.partialSum((j : Natural) ↦ Real.harmonic_term(p + j), p)
+       + Real.partialSum((j : ℕ) ↦ Real.harmonic_term(p + j), p)
      = Real.partialSum(Real.harmonic_term, p + p)
 }
 
 -- ----------------------------------------------------------------------
 -- Iterating the doubling: S(2ᴷ) ≥ 1 + K/2, the linearGrowth ladder.
-theorem Real.harmonic_doubling_growth (K : Natural)
+theorem Real.harmonic_doubling_growth (K : ℕ)
         : (Rational.linearGrowth(Rational.one_half, K))
           ≤ Real.partialSum(Real.harmonic_term, 2 ^ K) :=
   by induction on K with IH {
     case base: {
         -- S(1) = 1/1 = 1, and the ladder starts at 1.
-        (1 + 0 : Real) = 1;
-        (1 + 0 : Real) * (1 / (1 + 0 : Real)) = 1;
-        1 / (1 + 0 : Real)
-           = (1 + 0 : Real) * (1 / (1 + 0 : Real))
+        (1 + 0 : ℝ) = 1;
+        (1 + 0 : ℝ) * (1 / (1 + 0 : ℝ)) = 1;
+        1 / (1 + 0 : ℝ)
+           = (1 + 0 : ℝ) * (1 / (1 + 0 : ℝ))
            = 1;
         2 ^ 0 = 1   by Natural.power_zero;
         Real.partialSum(Real.harmonic_term, 2 ^ 0)
@@ -143,26 +143,26 @@ theorem Real.harmonic_doubling_growth (K : Natural)
            = Real.zero + Real.harmonic_term(0)
            = Real.harmonic_term(0)
            = 1;
-        Rational.one ≤ (Rational.one : Real);
+        Rational.one ≤ (Rational.one : ℝ);
         done
       }
     case step(predecessor): {
         1 ≤ 2 ^ predecessor;
-        Real.partialSum(Real.harmonic_term, 2 ^ predecessor) + 1 / (2 : Real)
+        Real.partialSum(Real.harmonic_term, 2 ^ predecessor) + 1 / (2 : ℝ)
             ≤ Real.partialSum(Real.harmonic_term, 2 ^ predecessor + 2 ^ predecessor);
         ((Rational.linearGrowth(Rational.one_half, 1 + predecessor))
-              : Real)
+              : ℝ)
            = ((Rational.linearGrowth(Rational.one_half, predecessor)
-               + Rational.one_half : Rational) : Real)
+               + Rational.one_half : ℚ) : ℝ)
            = ((Rational.linearGrowth(Rational.one_half, predecessor))
-              : Real)
-             + (Rational.one_half : Real)
+              : ℝ)
+             + (Rational.one_half : ℝ)
            = ((Rational.linearGrowth(Rational.one_half, predecessor))
-              : Real)
-             + 1 / (2 : Real)
+              : ℝ)
+             + 1 / (2 : ℝ)
                  by Real.one_half_cast
            ≤ Real.partialSum(Real.harmonic_term, 2 ^ predecessor)
-             + 1 / (2 : Real)
+             + 1 / (2 : ℝ)
            ≤ Real.partialSum(Real.harmonic_term, 2 ^ predecessor + 2 ^ predecessor)
            = Real.partialSum(Real.harmonic_term, 2 ^ (1 + predecessor))
       }
@@ -173,39 +173,39 @@ theorem Real.harmonic_doubling_growth (K : Natural)
 -- every bound, eventually and forever.
 theorem Real.harmonic_series_diverges
         : Real.TendsToInfinity(Real.partialSum(Real.harmonic_term)) :=
-  (bound : Real) ↦ {
+  (bound : ℝ) ↦ {
     -- A rational roof above the real bound, then climb the ladder past it:
     -- bound ≤ |bound| ≤ roof ≤ (K+1)·½ < lg(½, K+1).
-    choose roof such that roof > Rational.zero ∧ abs(bound) ≤ (roof : Real)
+    choose roof such that roof > Rational.zero ∧ abs(bound) ≤ (roof : ℝ)
         from Real.exists_positive_rational_roof;
     bound
        ≤ abs(bound)
-       ≤ (roof : Real);
+       ≤ (roof : ℝ);
     Rational.IsNonneg(abs(roof));
-    choose K such that abs(roof) ≤ (1 + K : Rational) * Rational.one_half
+    choose K such that abs(roof) ≤ (1 + K : ℚ) * Rational.one_half
         from Rational.archimedean_for_positives;
     roof ≤ abs(roof);
-    Rational.linearGrowth(Rational.one_half, 1 + K) = Rational.one + (1 + K : Rational) * Rational.one_half;
+    Rational.linearGrowth(Rational.one_half, 1 + K) = Rational.one + (1 + K : ℚ) * Rational.one_half;
     roof
        ≤ abs(roof)
-       ≤ (1 + K : Rational) * Rational.one_half
-       = Rational.zero + (1 + K : Rational) * Rational.one_half
-       < Rational.one + (1 + K : Rational) * Rational.one_half
+       ≤ (1 + K : ℚ) * Rational.one_half
+       = Rational.zero + (1 + K : ℚ) * Rational.one_half
+       < Rational.one + (1 + K : ℚ) * Rational.one_half
        = Rational.linearGrowth(Rational.one_half, 1 + K);
     witness 2 ^ (1 + K) with
-        (m : Natural)
+        (m : ℕ)
         (aboveThreshold : 2 ^ (1 + K) ≤ m) ↦ {
-          ((Rational.linearGrowth(Rational.one_half, 1 + K)) : Real)
+          ((Rational.linearGrowth(Rational.one_half, 1 + K)) : ℝ)
               ≤ Real.partialSum(Real.harmonic_term, 2 ^ (1 + K));
           Real.harmonic_term_nonneg;
           Real.partialSum(Real.harmonic_term, 2 ^ (1 + K))
               ≤ Real.partialSum(Real.harmonic_term, m)
               by Real.partialSum_monotone_of_nonneg;
-          (roof : Real) < ((Rational.linearGrowth(Rational.one_half, 1 + K)) : Real);
+          (roof : ℝ) < ((Rational.linearGrowth(Rational.one_half, 1 + K)) : ℝ);
           bound
-             ≤ (roof : Real)
+             ≤ (roof : ℝ)
              < ((Rational.linearGrowth(Rational.one_half, 1 + K))
-                : Real)
+                : ℝ)
              ≤ Real.partialSum(Real.harmonic_term, 2 ^ (1 + K))
              ≤ Real.partialSum(Real.harmonic_term, m)
         }

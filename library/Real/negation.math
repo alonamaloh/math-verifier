@@ -29,16 +29,16 @@ definition CauchyRationalSequence.negate
         : CauchyRationalSequence → CauchyRationalSequence
   | CauchyRationalSequence.make(s, sCauchy) =>
       CauchyRationalSequence.make(
-          (n : Natural) ↦ -s(n),
+          (n : ℕ) ↦ -s(n),
           Rational.sequence.negate_is_cauchy(s, sCauchy))
 
 -- negate(rep)(m) = -rep(m): bridges abstract usage of the negated
 -- sequence through the pattern-match definition.
 theorem CauchyRationalSequence.sequenceFunction_negate
-        (rep : CauchyRationalSequence) (m : Natural)
+        (rep : CauchyRationalSequence) (m : ℕ)
         : CauchyRationalSequence.negate(rep)(m) = -rep(m) := {
   let ⟨s, _⟩ := rep;
-  reflexivity(Rational, -s(m))
+  reflexivity(ℚ, -s(m))
 }
 
 -- After bridging the sequenceFunction projector through negate,
@@ -49,17 +49,17 @@ theorem CauchyRationalSequence.sequenceFunction_negate
 theorem Real.negate_respects
         (rep1 rep1Prime : CauchyRationalSequence)
         (equivalenceHypothesis : CauchyEquivalent(rep1, rep1Prime))
-        : (Quotient.class_of(CauchyRationalSequence.negate(rep1)) : Real)
+        : (Quotient.class_of(CauchyRationalSequence.negate(rep1)) : ℝ)
           = Quotient.class_of(CauchyRationalSequence.negate(rep1Prime)) :=
   Quotient.equivalent_implies_equal(
       CauchyRationalSequence.negate(rep1),
       CauchyRationalSequence.negate(rep1Prime),
-      (ε : Rational)
+      (ε : ℚ)
                (εPositive : Rational.zero < ε) ↦ {
           choose N as origAtN
               from equivalenceHypothesis(ε, εPositive);
           witness N with
-              (m : Natural) (N_leq_m : N ≤ m) ↦
+              (m : ℕ) (N_leq_m : N ≤ m) ↦
                 -- |-a - -b| = |a - b|, so the original ε-bound on rep1 vs.
                 -- rep1Prime carries over unchanged to their negations.
                 abs(CauchyRationalSequence.negate(rep1)(m) - CauchyRationalSequence.negate(rep1Prime)(m))
@@ -69,13 +69,13 @@ theorem Real.negate_respects
                        by origAtN(m, N_leq_m)
         })
 
-definition Real.negate : Real → Real
+definition Real.negate : ℝ → ℝ
   by representatives rep ↦
-       (Quotient.class_of(CauchyRationalSequence.negate(rep)) : Real)
+       (Quotient.class_of(CauchyRationalSequence.negate(rep)) : ℝ)
   well_defined by Real.negate_respects
 
 -- Subtraction.
-definition Real.subtract (x y : Real) : Real :=
+definition Real.subtract (x y : ℝ) : ℝ :=
   x + Real.negate(y)
 
 operator (-) on (Real, Real) := Real.subtract
@@ -83,21 +83,21 @@ operator (-) on (Real, Real) := Real.subtract
 -- ----------------------------------------------------------------------
 -- The embedding preserves negation (mirror of to_real.add_preserves):
 -- both sides are the constant sequence λn. −q.
-theorem Rational.to_real.negate_preserves_equiv (q : Rational)
+theorem Rational.to_real.negate_preserves_equiv (q : ℚ)
         : CauchyEquivalent(
               Rational.to_cauchy_constant(-q),
               CauchyRationalSequence.negate(Rational.to_cauchy_constant(q))) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦
+        (m : ℕ) (_ : 0 ≤ m) ↦
           abs(Rational.to_cauchy_constant(-q)(m)
                    - CauchyRationalSequence.negate(Rational.to_cauchy_constant(q))(m))
              = abs(-q - -q)
              = Rational.zero
              < ε
 
-theorem Rational.to_real.negate_preserves (q : Rational)
+theorem Rational.to_real.negate_preserves (q : ℚ)
         : Rational.to_real(-q) = -Rational.to_real(q) := {
   CauchyEquivalent(
             Rational.to_cauchy_constant(-q),
@@ -107,8 +107,8 @@ theorem Rational.to_real.negate_preserves (q : Rational)
 
 -- Subtraction through the embedding, assembled from the additive and
 -- negation halves.
-theorem Rational.to_real.subtract_preserves (a b : Rational)
-        : ((a - b : Rational) : Real) = a - b :=
-  ((a - b : Rational) : Real)
-     = (a : Real) + ((-b : Rational) : Real)
-     = (a : Real) + -(b : Real)
+theorem Rational.to_real.subtract_preserves (a b : ℚ)
+        : ((a - b : ℚ) : ℝ) = a - b :=
+  ((a - b : ℚ) : ℝ)
+     = (a : ℝ) + ((-b : ℚ) : ℝ)
+     = (a : ℝ) + -(b : ℝ)

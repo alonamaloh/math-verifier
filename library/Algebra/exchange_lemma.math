@@ -81,20 +81,20 @@ theorem VectorSpace.InSpanOf.scale_cancel {f : Field} {V : VectorSpace(f)} {I : 
 -- meaningful quantity for the exchange step.
 
 definition VectorSpace.standardCombination {f : Field} {V : VectorSpace(f)}
-        (g : Natural → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f)) (count : Natural)
+        (g : ℕ → VectorSpace.carrier(V))
+        (coefficients : ℕ → Field.carrier(f)) (count : ℕ)
         : VectorSpace.carrier(V) :=
-  VectorSpace.linearCombination(g, coefficients, (i : Natural) ↦ i, count)
+  VectorSpace.linearCombination(g, coefficients, (i : ℕ) ↦ i, count)
 
 -- Peel the last term.
 theorem VectorSpace.standardCombination_add_one {f : Field} {V : VectorSpace(f)}
-        (g : Natural → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f)) (count : Natural)
+        (g : ℕ → VectorSpace.carrier(V))
+        (coefficients : ℕ → Field.carrier(f)) (count : ℕ)
         : VectorSpace.standardCombination(g, coefficients, 1 + count)
           = VectorSpace.standardCombination(g, coefficients, count)
             + coefficients(count) • g(count) :=
   VectorSpace.standardCombination(g, coefficients, 1 + count)
-     = VectorSpace.linearCombination(g, coefficients, (i : Natural) ↦ i, count)
+     = VectorSpace.linearCombination(g, coefficients, (i : ℕ) ↦ i, count)
        + coefficients(count) • g(count)
            by VectorSpace.linearCombination_add_one
      = VectorSpace.standardCombination(g, coefficients, count)
@@ -104,16 +104,16 @@ theorem VectorSpace.standardCombination_add_one {f : Field} {V : VectorSpace(f)}
 -- even when both the family and the coefficients differ, provided the
 -- scaled vectors coincide index by index.
 theorem VectorSpace.standardCombination_congruence {f : Field} {V : VectorSpace(f)}
-        (g1 g2 : Natural → VectorSpace.carrier(V))
-        (c1 c2 : Natural → Field.carrier(f)) (n : Natural)
-        (termsAgree : ∀ (i : Natural). i < n → c1(i) • g1(i) = c2(i) • g2(i))
+        (g1 g2 : ℕ → VectorSpace.carrier(V))
+        (c1 c2 : ℕ → Field.carrier(f)) (n : ℕ)
+        (termsAgree : ∀ (i : ℕ). i < n → c1(i) • g1(i) = c2(i) • g2(i))
         : VectorSpace.standardCombination(g1, c1, n)
           = VectorSpace.standardCombination(g2, c2, n) := {
   VectorSpace.standardCombination(g1, c1, n)
      = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
-           (i : Natural) ↦ c1(i) • g1(i), n)
+           (i : ℕ) ↦ c1(i) • g1(i), n)
      = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
-           (i : Natural) ↦ c2(i) • g2(i), n)
+           (i : ℕ) ↦ c2(i) • g2(i), n)
      = VectorSpace.standardCombination(g2, c2, n)
 }
 
@@ -121,31 +121,31 @@ theorem VectorSpace.standardCombination_congruence {f : Field} {V : VectorSpace(
 -- type variable — `Field.carrier(f)` or `VectorSpace.carrier(V)` as the
 -- conditional's return type trips "cases motive not a Sort", the same
 -- generalisation `combineFunctions` makes).
-definition Function.updateAt {A : Type(0)} (h : Natural → A) (pos : Natural) (newValue : A)
-        : Natural → A :=
-  (i : Natural) ↦ if i = pos then newValue else h(i)
+definition Function.updateAt {A : Type(0)} (h : ℕ → A) (pos : ℕ) (newValue : A)
+        : ℕ → A :=
+  (i : ℕ) ↦ if i = pos then newValue else h(i)
 
-theorem Function.updateAt_at {A : Type(0)} (h : Natural → A) (pos : Natural) (newValue : A)
+theorem Function.updateAt_at {A : Type(0)} (h : ℕ → A) (pos : ℕ) (newValue : A)
         : Function.updateAt(h, pos, newValue)(pos) = newValue :=
   done by Logic.if_positive
 
-theorem Function.updateAt_off {A : Type(0)} (h : Natural → A) (pos i : Natural)
+theorem Function.updateAt_off {A : Type(0)} (h : ℕ → A) (pos i : ℕ)
         (newValue : A) (distinct : i ≠ pos)
         : Function.updateAt(h, pos, newValue)(i) = h(i) :=
   done by Logic.if_negative
 
 -- The coefficients `d` with position `pos` raised by `e`.
-definition VectorSpace.bumpCoefficient {f : Field} (d : Natural → Field.carrier(f))
-        (e : Field.carrier(f)) (pos : Natural) : Natural → Field.carrier(f) :=
+definition VectorSpace.bumpCoefficient {f : Field} (d : ℕ → Field.carrier(f))
+        (e : Field.carrier(f)) (pos : ℕ) : ℕ → Field.carrier(f) :=
   Function.updateAt(d, pos, d(pos) + e)
 
-theorem VectorSpace.bumpCoefficient_at {f : Field} (d : Natural → Field.carrier(f))
-        (e : Field.carrier(f)) (pos : Natural)
+theorem VectorSpace.bumpCoefficient_at {f : Field} (d : ℕ → Field.carrier(f))
+        (e : Field.carrier(f)) (pos : ℕ)
         : VectorSpace.bumpCoefficient(d, e, pos)(pos) = d(pos) + e :=
   done by Function.updateAt_at
 
-theorem VectorSpace.bumpCoefficient_off {f : Field} (d : Natural → Field.carrier(f))
-        (e : Field.carrier(f)) (pos i : Natural) (distinct : i ≠ pos)
+theorem VectorSpace.bumpCoefficient_off {f : Field} (d : ℕ → Field.carrier(f))
+        (e : Field.carrier(f)) (pos i : ℕ) (distinct : i ≠ pos)
         : VectorSpace.bumpCoefficient(d, e, pos)(i) = d(i) :=
   done by Function.updateAt_off
 
@@ -154,8 +154,8 @@ theorem VectorSpace.bumpCoefficient_off {f : Field} (d : Natural → Field.carri
 -- canonical coordinates one term at a time, and what installs the `-1`
 -- coefficient the independence contradiction needs.
 theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
-        (g : Natural → VectorSpace.carrier(V)) (d : Natural → Field.carrier(f))
-        (e : Field.carrier(f)) (pos n : Natural) (posBelow : pos < n)
+        (g : ℕ → VectorSpace.carrier(V)) (d : ℕ → Field.carrier(f))
+        (e : Field.carrier(f)) (pos n : ℕ) (posBelow : pos < n)
         : VectorSpace.standardCombination(g, VectorSpace.bumpCoefficient(d, e, pos), n)
           = VectorSpace.standardCombination(g, d, n) + e • g(pos) :=
   by induction on n with IH {
@@ -189,10 +189,10 @@ theorem VectorSpace.standardCombination_bump {f : Field} {V : VectorSpace(f)}
                  = d(pos) + e
                  = d(q) + e                                      by substituting posEqQ
                  as bumpAtQ;
-              ∀ (i : Natural). i < q →
+              ∀ (i : ℕ). i < q →
                   VectorSpace.bumpCoefficient(d, e, pos)(i) • g(i) = d(i) • g(i)
                 by {
-                  take i : Natural;
+                  take i : ℕ;
                   suppose i < q as iLtQ;
                   i < pos;
                   i ≠ pos by Natural.not_equal_of_less_than;
@@ -246,14 +246,14 @@ theorem VectorSpace.InSpanOf.subtract {f : Field} {V : VectorSpace(f)} {I : Type
 
 -- The all-zero standard combination is the zero vector.
 theorem VectorSpace.standardCombination_zero_coefficients {f : Field} {V : VectorSpace(f)}
-        (g : Natural → VectorSpace.carrier(V)) (n : Natural)
-        : VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n)
+        (g : ℕ → VectorSpace.carrier(V)) (n : ℕ)
+        : VectorSpace.standardCombination(g, (i : ℕ) ↦ Field.zero(f), n)
           = VectorSpace.zero(V) :=
   by induction on n with IH {
     case base: done
     case step(q):
-        VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), 1 + q)
-           = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), q)
+        VectorSpace.standardCombination(g, (i : ℕ) ↦ Field.zero(f), 1 + q)
+           = VectorSpace.standardCombination(g, (i : ℕ) ↦ Field.zero(f), q)
              + Field.zero(f) • g(q)
                  by VectorSpace.standardCombination_add_one
            = VectorSpace.zero(V) + Field.zero(f) • g(q)   by IH
@@ -262,21 +262,21 @@ theorem VectorSpace.standardCombination_zero_coefficients {f : Field} {V : Vecto
   }
 
 theorem VectorSpace.linearCombination_standardize {f : Field} {V : VectorSpace(f)}
-        (g : Natural → VectorSpace.carrier(V)) (n : Natural)
-        (vanishesPast : ∀ (i : Natural). n ≤ i → g(i) = VectorSpace.zero(V))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → Natural)
-        (count : Natural)
-        : ∃ (d : Natural → Field.carrier(f)).
+        (g : ℕ → VectorSpace.carrier(V)) (n : ℕ)
+        (vanishesPast : ∀ (i : ℕ). n ≤ i → g(i) = VectorSpace.zero(V))
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → ℕ)
+        (count : ℕ)
+        : ∃ (d : ℕ → Field.carrier(f)).
               VectorSpace.linearCombination(g, coefficients, selection, count)
               = VectorSpace.standardCombination(g, d, n) :=
   by induction on count with IH {
     case base: {
         VectorSpace.linearCombination(g, coefficients, selection, 0) = VectorSpace.zero(V);
-        VectorSpace.zero(V) = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n);
+        VectorSpace.zero(V) = VectorSpace.standardCombination(g, (i : ℕ) ↦ Field.zero(f), n);
         VectorSpace.linearCombination(g, coefficients, selection, 0)
-            = VectorSpace.standardCombination(g, (i : Natural) ↦ Field.zero(f), n)
+            = VectorSpace.standardCombination(g, (i : ℕ) ↦ Field.zero(f), n)
             as baseGoal;
-        witness ((i : Natural) ↦ Field.zero(f)) with baseGoal
+        witness ((i : ℕ) ↦ Field.zero(f)) with baseGoal
       }
     case step(p): {
         choose d such that
@@ -334,11 +334,11 @@ theorem VectorSpace.linearCombination_standardize {f : Field} {V : VectorSpace(f
 -- the index-generic `LinearlyIndependent`, since the identity selection is
 -- injective.
 definition VectorSpace.StandardIndependentBelow {f : Field} {V : VectorSpace(f)}
-        (uu : Natural → VectorSpace.carrier(V)) (bound : Natural) : Proposition :=
-  ∀ (len : Natural) (coefficients : Natural → Field.carrier(f)).
+        (uu : ℕ → VectorSpace.carrier(V)) (bound : ℕ) : Proposition :=
+  ∀ (len : ℕ) (coefficients : ℕ → Field.carrier(f)).
       len ≤ bound
       → VectorSpace.standardCombination(uu, coefficients, len) = VectorSpace.zero(V)
-      → ∀ (i : Natural). i < len → coefficients(i) = Field.zero(f)
+      → ∀ (i : ℕ). i < len → coefficients(i) = Field.zero(f)
 
 -- Minus one is nonzero — the field is nontrivial.
 theorem Field.negate_one_nonzero (f : Field)
@@ -361,30 +361,30 @@ theorem Field.negate_one_nonzero (f : Field)
 -- `uu`'s, and installing a `-1` at slot `k` would be a nontrivial vanishing
 -- combination of `uu(0..k)`.
 theorem VectorSpace.exchange_find_pivot {f : Field} {V : VectorSpace(f)}
-        (uu g : Natural → VectorSpace.carrier(V)) (m k n : Natural)
+        (uu g : ℕ → VectorSpace.carrier(V)) (m k n : ℕ)
         (independent : VectorSpace.StandardIndependentBelow(uu, m))
-        (agreePrefix : ∀ (i : Natural). i < k → g(i) = uu(i))
+        (agreePrefix : ∀ (i : ℕ). i < k → g(i) = uu(i))
         (kBelowN : k < n) (nBelowOrEqM : n ≤ m)
-        (coefficients : Natural → Field.carrier(f))
+        (coefficients : ℕ → Field.carrier(f))
         (target : uu(k) = VectorSpace.standardCombination(g, coefficients, n))
-        : ∃ (j : Natural). k ≤ j ∧ j < n ∧ coefficients(j) ≠ Field.zero(f) := {
-  suppose ¬(∃ (j : Natural). k ≤ j ∧ j < n ∧ coefficients(j) ≠ Field.zero(f)) as noPivot
+        : ∃ (j : ℕ). k ≤ j ∧ j < n ∧ coefficients(j) ≠ Field.zero(f) := {
+  suppose ¬(∃ (j : ℕ). k ≤ j ∧ j < n ∧ coefficients(j) ≠ Field.zero(f)) as noPivot
       for contradiction {
-        ∀ (j : Natural). k ≤ j → j < n → coefficients(j) = Field.zero(f)
+        ∀ (j : ℕ). k ≤ j → j < n → coefficients(j) = Field.zero(f)
           by {
-            take j : Natural;
+            take j : ℕ;
             suppose k ≤ j as kLeJ;
             suppose j < n as jLtN;
             suppose coefficients(j) ≠ Field.zero(f) as coefficientNonzero for contradiction {
-              ∃ (jj : Natural). k ≤ jj ∧ jj < n ∧ coefficients(jj) ≠ Field.zero(f)
+              ∃ (jj : ℕ). k ≤ jj ∧ jj < n ∧ coefficients(jj) ≠ Field.zero(f)
                 by { witness j with
                      And.introduction(kLeJ, And.introduction(jLtN, coefficientNonzero)) };
               done
             }
           } as allZeroRemaining;
-        ∀ (i : Natural). i < n → coefficients(i) • g(i) = coefficients(i) • uu(i)
+        ∀ (i : ℕ). i < n → coefficients(i) • g(i) = coefficients(i) • uu(i)
           by {
-            take i : Natural;
+            take i : ℕ;
             suppose i < n as iLtN;
             i < k ∨ k ≤ i by Natural.lt_or_le;
             done by cases {
@@ -416,7 +416,7 @@ theorem VectorSpace.exchange_find_pivot {f : Field} {V : VectorSpace(f)}
            = uu(k) + Field.negate(Field.one(f)) • uu(k)   by substituting uuCombIsUk
            = uu(k) + VectorSpace.negate(uu(k))            by VectorSpace.negate_one_scale
            = VectorSpace.zero(V);
-        ∀ (i : Natural). i < n →
+        ∀ (i : ℕ). i < n →
             VectorSpace.bumpCoefficient(coefficients, Field.negate(Field.one(f)), k)(i)
             = Field.zero(f)
           by independent as bumpedAllZero;
@@ -442,15 +442,15 @@ theorem VectorSpace.exchange_find_pivot {f : Field} {V : VectorSpace(f)}
 -- into slot `j` and installs `v` at slot `k`. (When `j = k` the inner move
 -- is overwritten — the net effect is just `v` at slot `k`.) Two nested
 -- point-updates.
-definition VectorSpace.swapIn {A : Type(0)} (g : Natural → A) (k j : Natural)
-        (newValue : A) : Natural → A :=
+definition VectorSpace.swapIn {A : Type(0)} (g : ℕ → A) (k j : ℕ)
+        (newValue : A) : ℕ → A :=
   Function.updateAt(Function.updateAt(g, j, g(k)), k, newValue)
 
-theorem VectorSpace.swapIn_at_k {A : Type(0)} (g : Natural → A) (k j : Natural) (v : A)
+theorem VectorSpace.swapIn_at_k {A : Type(0)} (g : ℕ → A) (k j : ℕ) (v : A)
         : VectorSpace.swapIn(g, k, j, v)(k) = v :=
   done
 
-theorem VectorSpace.swapIn_at_j {A : Type(0)} (g : Natural → A) (k j : Natural) (v : A)
+theorem VectorSpace.swapIn_at_j {A : Type(0)} (g : ℕ → A) (k j : ℕ) (v : A)
         (distinct : j ≠ k)
         : VectorSpace.swapIn(g, k, j, v)(j) = g(k) :=
   VectorSpace.swapIn(g, k, j, v)(j)
@@ -458,7 +458,7 @@ theorem VectorSpace.swapIn_at_j {A : Type(0)} (g : Natural → A) (k j : Natural
      = Function.updateAt(g, j, g(k))(j)
      = g(k)
 
-theorem VectorSpace.swapIn_off {A : Type(0)} (g : Natural → A) (k j i : Natural) (v : A)
+theorem VectorSpace.swapIn_off {A : Type(0)} (g : ℕ → A) (k j i : ℕ) (v : A)
         (offK : i ≠ k) (offJ : i ≠ j)
         : VectorSpace.swapIn(g, k, j, v)(i) = g(i) :=
   VectorSpace.swapIn(g, k, j, v)(i)
@@ -474,22 +474,22 @@ theorem VectorSpace.swapIn_off {A : Type(0)} (g : Natural → A) (k j i : Natura
 -- "the swapped family still spans"; `InSpanOf.scale_cancel` (dividing by
 -- that nonzero coefficient) is what recovers the swapped-out vector.
 theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
-        (uu g : Natural → VectorSpace.carrier(V)) (m k n : Natural)
+        (uu g : ℕ → VectorSpace.carrier(V)) (m k n : ℕ)
         (independent : VectorSpace.StandardIndependentBelow(uu, m))
-        (gVanishesPast : ∀ (i : Natural). n ≤ i → g(i) = VectorSpace.zero(V))
-        (gAgreePrefix : ∀ (i : Natural). i < k → g(i) = uu(i))
+        (gVanishesPast : ∀ (i : ℕ). n ≤ i → g(i) = VectorSpace.zero(V))
+        (gAgreePrefix : ∀ (i : ℕ). i < k → g(i) = uu(i))
         (gSpans : VectorSpace.Spans(g))
         (kBelowN : k < n) (nBelowOrEqM : n ≤ m)
-        : ∃ (gNew : Natural → VectorSpace.carrier(V)).
+        : ∃ (gNew : ℕ → VectorSpace.carrier(V)).
               VectorSpace.Spans(gNew)
-              ∧ (∀ (i : Natural). n ≤ i → gNew(i) = VectorSpace.zero(V))
-              ∧ (∀ (i : Natural). i < 1 + k → gNew(i) = uu(i)) := {
+              ∧ (∀ (i : ℕ). n ≤ i → gNew(i) = VectorSpace.zero(V))
+              ∧ (∀ (i : ℕ). i < 1 + k → gNew(i) = uu(i)) := {
   -- Expand uu(k) in canonical coordinates over g.
   VectorSpace.InSpanOf(g, uu(k)) by VectorSpace.InSpanOf.of_spans(inhabitant := 0) as ukInSpan;
   choose count, selection, coeffs such that
       uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count) from ukInSpan;
   uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count);
-  ∃ (d : Natural → Field.carrier(f)).
+  ∃ (d : ℕ → Field.carrier(f)).
       VectorSpace.linearCombination(g, coeffs, selection, count)
       = VectorSpace.standardCombination(g, d, n)
       by VectorSpace.linearCombination_standardize as standardized;
@@ -501,7 +501,7 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
   uu(k) = VectorSpace.linearCombination(g, coeffs, selection, count)
         = VectorSpace.standardCombination(g, d, n)                     by linCombStandard;
   -- Independence forces a nonzero coefficient on a remaining slot.
-  ∃ (j : Natural). k ≤ j ∧ j < n ∧ d(j) ≠ Field.zero(f)
+  ∃ (j : ℕ). k ≤ j ∧ j < n ∧ d(j) ≠ Field.zero(f)
       by VectorSpace.exchange_find_pivot as pivotExists;
   choose j such that k ≤ j ∧ j < n ∧ d(j) ≠ Field.zero(f) from pivotExists;
   k ≤ j;
@@ -515,9 +515,9 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
                by VectorSpace.InSpanOf.member;
            done by substituting swapAtK };
   -- Every OTHER old generator is trivially in the swapped family's span.
-  ∀ (i : Natural). i ≠ j → VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(i))
+  ∀ (i : ℕ). i ≠ j → VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(i))
     by {
-      take i : Natural;
+      take i : ℕ;
       suppose i ≠ j as offJ;
       i = k ∨ i ≠ k;
       done by cases {
@@ -540,10 +540,10 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
       }
     } as offJInSpan;
   -- g with slot j replaced by uu(k): every generator is in the swapped span.
-  ∀ (i : Natural). VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
+  ∀ (i : ℕ). VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
                                         Function.updateAt(g, j, uu(k))(i))
     by {
-      take i : Natural;
+      take i : ℕ;
       i = j ∨ i ≠ j;
       done by cases {
         case i = j as atJ: {
@@ -563,17 +563,17 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
   -- lands in the swapped span, and equals the same combination of g.
   VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
         VectorSpace.linearCombination(Function.updateAt(g, j, uu(k)),
-            Function.updateAt(d, j, Field.zero(f)), (i : Natural) ↦ i, n))
+            Function.updateAt(d, j, Field.zero(f)), (i : ℕ) ↦ i, n))
       by VectorSpace.InSpanOf.of_combination(outerInhabitant := 0);
   VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)),
         VectorSpace.standardCombination(Function.updateAt(g, j, uu(k)),
             Function.updateAt(d, j, Field.zero(f)), n));
   Function.updateAt(d, j, Field.zero(f))(j) = Field.zero(f) as czeroAtJ;
-  ∀ (i : Natural). i < n →
+  ∀ (i : ℕ). i < n →
       Function.updateAt(d, j, Field.zero(f))(i) • Function.updateAt(g, j, uu(k))(i)
       = Function.updateAt(d, j, Field.zero(f))(i) • g(i)
     by {
-      take i : Natural;
+      take i : ℕ;
       suppose i < n as iLtN;
       i = j ∨ i ≠ j;
       done by cases {
@@ -601,10 +601,10 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
       by substituting primeToG;
   -- d is the zeroed coefficients bumped by d(j) at slot j, so the full
   -- combination splits as [j-zeroed combination] + d(j) • g(j).
-  ∀ (i : Natural). VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i)
+  ∀ (i : ℕ). VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i)
       = d(i)
     by {
-      take i : Natural;
+      take i : ℕ;
       i = j ∨ i ≠ j;
       done by cases {
         case i = j as atJ: {
@@ -622,10 +622,10 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
           }
       }
     } as bumpIsD;
-  ∀ (i : Natural). i < n →
+  ∀ (i : ℕ). i < n →
       VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i) • g(i)
       = d(i) • g(i)
-    by { take i : Natural; suppose i < n as iLtN;
+    by { take i : ℕ; suppose i < n as iLtN;
          VectorSpace.bumpCoefficient(Function.updateAt(d, j, Field.zero(f)), d(j), j)(i) = d(i)
              by bumpIsD as here;
          done by substituting here };
@@ -657,9 +657,9 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
   VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(j))
       by VectorSpace.InSpanOf.scale_cancel;
   -- Every old generator is now in the swapped span (slot j via the solve).
-  ∀ (i : Natural). VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(i))
+  ∀ (i : ℕ). VectorSpace.InSpanOf(VectorSpace.swapIn(g, k, j, uu(k)), g(i))
     by {
-      take i : Natural;
+      take i : ℕ;
       i = j ∨ i ≠ j;
       done by cases {
         case i = j as atJ: { done }
@@ -675,9 +675,9 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
           by VectorSpace.InSpanOf.transitive(outerInhabitant := 0);
       done
     } as newSpans;
-  ∀ (i : Natural). n ≤ i → VectorSpace.swapIn(g, k, j, uu(k))(i) = VectorSpace.zero(V)
+  ∀ (i : ℕ). n ≤ i → VectorSpace.swapIn(g, k, j, uu(k))(i) = VectorSpace.zero(V)
     by {
-      take i : Natural;
+      take i : ℕ;
       suppose n ≤ i as nLeI;
       k < i;
       i ≠ k by Natural.not_equal_of_greater_than;
@@ -686,9 +686,9 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
       VectorSpace.swapIn(g, k, j, uu(k))(i) = g(i);
       done by gVanishesPast
     } as newVanishesPast;
-  ∀ (i : Natural). i < 1 + k → VectorSpace.swapIn(g, k, j, uu(k))(i) = uu(i)
+  ∀ (i : ℕ). i < 1 + k → VectorSpace.swapIn(g, k, j, uu(k))(i) = uu(i)
     by {
-      take i : Natural;
+      take i : ℕ;
       suppose i < 1 + k as iBelow;
       i < k ∨ i = k by Natural.le_of_lt_one_plus;
       done by cases {
@@ -715,20 +715,20 @@ theorem VectorSpace.exchange_step {f : Field} {V : VectorSpace(f)}
 -- Iterating the swap: for every k ≤ n, a spanning family whose first k
 -- entries are uu(0..k-1). Induction on k, one exchange step per increment.
 theorem VectorSpace.exchange_build {f : Field} {V : VectorSpace(f)}
-        (uu w : Natural → VectorSpace.carrier(V)) (m n : Natural)
+        (uu w : ℕ → VectorSpace.carrier(V)) (m n : ℕ)
         (independent : VectorSpace.StandardIndependentBelow(uu, m))
-        (wVanishesPast : ∀ (i : Natural). n ≤ i → w(i) = VectorSpace.zero(V))
+        (wVanishesPast : ∀ (i : ℕ). n ≤ i → w(i) = VectorSpace.zero(V))
         (wSpans : VectorSpace.Spans(w)) (nBelowOrEqM : n ≤ m)
-        : ∀ (k : Natural). k ≤ n →
-              ∃ (gk : Natural → VectorSpace.carrier(V)).
+        : ∀ (k : ℕ). k ≤ n →
+              ∃ (gk : ℕ → VectorSpace.carrier(V)).
                   VectorSpace.Spans(gk)
-                  ∧ (∀ (i : Natural). n ≤ i → gk(i) = VectorSpace.zero(V))
-                  ∧ (∀ (i : Natural). i < k → gk(i) = uu(i)) :=
+                  ∧ (∀ (i : ℕ). n ≤ i → gk(i) = VectorSpace.zero(V))
+                  ∧ (∀ (i : ℕ). i < k → gk(i) = uu(i)) :=
   by induction on k with IH {
     case base: {
         suppose 0 ≤ n as zeroLeN;
-        ∀ (i : Natural). i < 0 → w(i) = uu(i)
-            by { take i : Natural; suppose i < 0 as below;
+        ∀ (i : ℕ). i < 0 → w(i) = uu(i)
+            by { take i : ℕ; suppose i < 0 as below;
                  ¬(i < 0) by Natural.not_less_than_zero; done } as vacuousPrefix;
         witness w with And.introduction(wSpans, And.introduction(wVanishesPast, vacuousPrefix))
       }
@@ -736,19 +736,19 @@ theorem VectorSpace.exchange_build {f : Field} {V : VectorSpace(f)}
         suppose 1 + q ≤ n as succLeN;
         q < n by Natural.lt_of_add_one_le;
         q ≤ n;
-        ∃ (gq : Natural → VectorSpace.carrier(V)).
+        ∃ (gq : ℕ → VectorSpace.carrier(V)).
             VectorSpace.Spans(gq)
-            ∧ (∀ (i : Natural). n ≤ i → gq(i) = VectorSpace.zero(V))
-            ∧ (∀ (i : Natural). i < q → gq(i) = uu(i))
+            ∧ (∀ (i : ℕ). n ≤ i → gq(i) = VectorSpace.zero(V))
+            ∧ (∀ (i : ℕ). i < q → gq(i) = uu(i))
             by IH as fromIH;
         choose gq such that
             VectorSpace.Spans(gq)
-            ∧ (∀ (i : Natural). n ≤ i → gq(i) = VectorSpace.zero(V))
-            ∧ (∀ (i : Natural). i < q → gq(i) = uu(i))
+            ∧ (∀ (i : ℕ). n ≤ i → gq(i) = VectorSpace.zero(V))
+            ∧ (∀ (i : ℕ). i < q → gq(i) = uu(i))
             from fromIH;
         VectorSpace.Spans(gq);
-        ∀ (i : Natural). n ≤ i → gq(i) = VectorSpace.zero(V);
-        ∀ (i : Natural). i < q → gq(i) = uu(i);
+        ∀ (i : ℕ). n ≤ i → gq(i) = VectorSpace.zero(V);
+        ∀ (i : ℕ). i < q → gq(i) = uu(i);
         done by VectorSpace.exchange_step
       }
   }
@@ -761,9 +761,9 @@ theorem VectorSpace.exchange_build {f : Field} {V : VectorSpace(f)}
 -- combination of uu(0..n) once a `-1` is installed — contradicting
 -- independence.
 theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
-        (uu w : Natural → VectorSpace.carrier(V)) (m n : Natural)
+        (uu w : ℕ → VectorSpace.carrier(V)) (m n : ℕ)
         (independent : VectorSpace.StandardIndependentBelow(uu, m))
-        (wVanishesPast : ∀ (i : Natural). n ≤ i → w(i) = VectorSpace.zero(V))
+        (wVanishesPast : ∀ (i : ℕ). n ≤ i → w(i) = VectorSpace.zero(V))
         (wSpans : VectorSpace.Spans(w))
         : m ≤ n := {
   suppose ¬(m ≤ n) as notLe for contradiction {
@@ -771,24 +771,24 @@ theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
     n ≤ m;
     1 + n ≤ m by Natural.add_one_le_of_lt;
     -- The fully swapped family: first n slots are uu(0..n-1), still spans.
-    ∃ (gn : Natural → VectorSpace.carrier(V)).
+    ∃ (gn : ℕ → VectorSpace.carrier(V)).
         VectorSpace.Spans(gn)
-        ∧ (∀ (i : Natural). n ≤ i → gn(i) = VectorSpace.zero(V))
-        ∧ (∀ (i : Natural). i < n → gn(i) = uu(i))
+        ∧ (∀ (i : ℕ). n ≤ i → gn(i) = VectorSpace.zero(V))
+        ∧ (∀ (i : ℕ). i < n → gn(i) = uu(i))
         by VectorSpace.exchange_build as built;
     choose gn such that
         VectorSpace.Spans(gn)
-        ∧ (∀ (i : Natural). n ≤ i → gn(i) = VectorSpace.zero(V))
-        ∧ (∀ (i : Natural). i < n → gn(i) = uu(i)) from built;
+        ∧ (∀ (i : ℕ). n ≤ i → gn(i) = VectorSpace.zero(V))
+        ∧ (∀ (i : ℕ). i < n → gn(i) = uu(i)) from built;
     VectorSpace.Spans(gn);
-    ∀ (i : Natural). n ≤ i → gn(i) = VectorSpace.zero(V);
-    ∀ (i : Natural). i < n → gn(i) = uu(i) as gnAgreePrefix;
+    ∀ (i : ℕ). n ≤ i → gn(i) = VectorSpace.zero(V);
+    ∀ (i : ℕ). i < n → gn(i) = uu(i) as gnAgreePrefix;
     -- Expand uu(n) in canonical coordinates over gn, then over uu.
     VectorSpace.InSpanOf(gn, uu(n)) by VectorSpace.InSpanOf.of_spans(inhabitant := 0) as unInSpan;
     choose count, selection, coeffs such that
         uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count) from unInSpan;
     uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count);
-    ∃ (d : Natural → Field.carrier(f)).
+    ∃ (d : ℕ → Field.carrier(f)).
         VectorSpace.linearCombination(gn, coeffs, selection, count)
         = VectorSpace.standardCombination(gn, d, n)
         by VectorSpace.linearCombination_standardize as standardized;
@@ -800,8 +800,8 @@ theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
     uu(n) = VectorSpace.linearCombination(gn, coeffs, selection, count)
           = VectorSpace.standardCombination(gn, d, n)                     by linCombStd
           as unStandardGn;
-    ∀ (i : Natural). i < n → d(i) • gn(i) = d(i) • uu(i)
-      by { take i : Natural; suppose i < n as iLtN;
+    ∀ (i : ℕ). i < n → d(i) • gn(i) = d(i) • uu(i)
+      by { take i : ℕ; suppose i < n as iLtN;
            gn(i) = uu(i) by gnAgreePrefix as gnAtI; done by substituting gnAtI };
     VectorSpace.standardCombination(gn, d, n) = VectorSpace.standardCombination(uu, d, n);
     uu(n) = VectorSpace.standardCombination(gn, d, n)   by unStandardGn
@@ -809,9 +809,9 @@ theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
           as unStandardUu;
     -- Install -1 at slot n: a vanishing combination of uu(0..n).
     Function.updateAt(d, n, Field.negate(Field.one(f)))(n) = Field.negate(Field.one(f)) as eAtN;
-    ∀ (i : Natural). i < n →
+    ∀ (i : ℕ). i < n →
         Function.updateAt(d, n, Field.negate(Field.one(f)))(i) • uu(i) = d(i) • uu(i)
-      by { take i : Natural; suppose i < n as iLtN;
+      by { take i : ℕ; suppose i < n as iLtN;
            i ≠ n by Natural.not_equal_of_less_than;
            Function.updateAt(d, n, Field.negate(Field.one(f)))(i) = d(i) as eAtI;
            done by substituting eAtI };
@@ -829,7 +829,7 @@ theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
        = uu(n) + Field.negate(Field.one(f)) • uu(n)   by unStandardUu
        = uu(n) + VectorSpace.negate(uu(n))            by VectorSpace.negate_one_scale
        = VectorSpace.zero(V);
-    ∀ (i : Natural). i < 1 + n → Function.updateAt(d, n, Field.negate(Field.one(f)))(i) = Field.zero(f)
+    ∀ (i : ℕ). i < 1 + n → Function.updateAt(d, n, Field.negate(Field.one(f)))(i) = Field.zero(f)
         by independent as eAllZero;
     Function.updateAt(d, n, Field.negate(Field.one(f)))(n) = Field.zero(f)
         by eAllZero as eNzero;
@@ -851,44 +851,44 @@ theorem VectorSpace.independent_le_spanning {f : Field} {V : VectorSpace(f)}
 -- variable dodges the "cases motive not a Sort" quirk `Field.carrier` /
 -- `VectorSpace.carrier` as the return type would trip).
 
-definition Function.extendBelowWithDecision {A : Type(0)} {m : Natural}
-        (u : NaturalsBelow(m) → A) (fallback : A) (i : Natural)
+definition Function.extendBelowWithDecision {A : Type(0)} {m : ℕ}
+        (u : NaturalsBelow(m) → A) (fallback : A) (i : ℕ)
         : Logic.Decidable(i < m) → A
   | Logic.Decidable.yes(below) => u(NaturalsBelow.make(i, below))
   | Logic.Decidable.no(_)      => fallback
 
-definition Function.extendBelow {A : Type(0)} {m : Natural}
-        (u : NaturalsBelow(m) → A) (fallback : A) : Natural → A :=
-  (i : Natural) ↦
+definition Function.extendBelow {A : Type(0)} {m : ℕ}
+        (u : NaturalsBelow(m) → A) (fallback : A) : ℕ → A :=
+  (i : ℕ) ↦
     Function.extendBelowWithDecision(u, fallback, i, Logic.classical_decidable(i < m))
 
 -- Below the bound the extension reads the family at the bounded index;
 -- at or past it, the fallback. Proof irrelevance identifies the decision's
 -- internal proof with the caller's `below`.
-theorem Function.extendBelow_below {A : Type(0)} {m : Natural}
-        (u : NaturalsBelow(m) → A) (fallback : A) (i : Natural) (below : i < m)
+theorem Function.extendBelow_below {A : Type(0)} {m : ℕ}
+        (u : NaturalsBelow(m) → A) (fallback : A) (i : ℕ) (below : i < m)
         : Function.extendBelow(u, fallback)(i) = u(NaturalsBelow.make(i, below)) :=
   if i < m
   then done
   else { False; done }
 
-theorem Function.extendBelow_past {A : Type(0)} {m : Natural}
-        (u : NaturalsBelow(m) → A) (fallback : A) (i : Natural) (past : m ≤ i)
+theorem Function.extendBelow_past {A : Type(0)} {m : ℕ}
+        (u : NaturalsBelow(m) → A) (fallback : A) (i : ℕ) (past : m ≤ i)
         : Function.extendBelow(u, fallback)(i) = fallback :=
   if i < m
   then { i < i; ¬(i < i) by Natural.lt_irreflexive; done }
   else done
 
--- The canonical clamped inclusion `Natural → NaturalsBelow(m)`: the value
+-- The canonical clamped inclusion `ℕ → NaturalsBelow(m)`: the value
 -- itself below the bound, a fixed fallback index at or past it. This is the
 -- reusable "reindex into the finite type" helper (`extendBelow` of the
 -- identity family); needs an inhabitant of `NaturalsBelow(m)`, i.e. m > 0.
-definition NaturalsBelow.clamp {m : Natural} (fallback : NaturalsBelow(m))
-        : Natural → NaturalsBelow(m) :=
+definition NaturalsBelow.clamp {m : ℕ} (fallback : NaturalsBelow(m))
+        : ℕ → NaturalsBelow(m) :=
   Function.extendBelow((x : NaturalsBelow(m)) ↦ x, fallback)
 
-theorem NaturalsBelow.clamp_below {m : Natural} (fallback : NaturalsBelow(m))
-        (i : Natural) (below : i < m)
+theorem NaturalsBelow.clamp_below {m : ℕ} (fallback : NaturalsBelow(m))
+        (i : ℕ) (below : i < m)
         : NaturalsBelow.clamp(fallback)(i) = NaturalsBelow.make(i, below) :=
   NaturalsBelow.clamp(fallback)(i)
      = ((x : NaturalsBelow(m)) ↦ x)(NaturalsBelow.make(i, below))
@@ -902,7 +902,7 @@ theorem NaturalsBelow.clamp_below {m : Natural} (fallback : NaturalsBelow(m))
 -- reindexing with `linearCombination_congruence`, and feed the
 -- canonical-coordinate core. The m = 0 case is immediate (0 ≤ n); m > 0
 -- supplies the fallback index the clamped selection needs.
-theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
+theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : ℕ)
         (u : NaturalsBelow(m) → VectorSpace.carrier(V))
         (w : NaturalsBelow(n) → VectorSpace.carrier(V))
         (independent : VectorSpace.LinearlyIndependent(u))
@@ -910,7 +910,7 @@ theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
         : m ≤ n :=
   done by cases {
     case m = 0: { done }
-    case m = 1 + predecessor for some (predecessor : Natural) as mShape: {
+    case m = 1 + predecessor for some (predecessor : ℕ) as mShape: {
         1 ≤ m;
         0 < m as mPositive;
 
@@ -919,18 +919,18 @@ theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
         -- clamped selection, whose coefficients `u`'s independence kills.
         VectorSpace.StandardIndependentBelow(Function.extendBelow(u, VectorSpace.zero(V)), m)
           by {
-            take len : Natural;
-            take coefficients : Natural → Field.carrier(f);
+            take len : ℕ;
+            take coefficients : ℕ → Field.carrier(f);
             suppose len ≤ m as lenLeM;
             suppose VectorSpace.standardCombination(
                         Function.extendBelow(u, VectorSpace.zero(V)), coefficients, len)
                       = VectorSpace.zero(V) as combVanishes;
 
-            ∀ (a b : Natural). a < len → b < len →
+            ∀ (a b : ℕ). a < len → b < len →
                 NaturalsBelow.clamp(NaturalsBelow.make(0, mPositive))(a)
                 = NaturalsBelow.clamp(NaturalsBelow.make(0, mPositive))(b) → a = b
               by {
-                take a : Natural; take b : Natural;
+                take a : ℕ; take b : ℕ;
                 suppose a < len as aLtLen;
                 suppose b < len as bLtLen;
                 suppose NaturalsBelow.clamp(NaturalsBelow.make(0, mPositive))(a)
@@ -951,11 +951,11 @@ theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
                 done
               };
 
-            ∀ (k : Natural). k < len →
+            ∀ (k : ℕ). k < len →
                 coefficients(k) • Function.extendBelow(u, VectorSpace.zero(V))(k)
                 = coefficients(k) • u(NaturalsBelow.clamp(NaturalsBelow.make(0, mPositive))(k))
               by {
-                take k : Natural;
+                take k : ℕ;
                 suppose k < len as kLtLen;
                 k < m as kLtM;
                 Function.extendBelow(u, VectorSpace.zero(V))(k) = u(NaturalsBelow.make(k, kLtM)) as uuAtK;
@@ -969,7 +969,7 @@ theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
 
             VectorSpace.standardCombination(Function.extendBelow(u, VectorSpace.zero(V)), coefficients, len)
                = VectorSpace.linearCombination(Function.extendBelow(u, VectorSpace.zero(V)),
-                     coefficients, (i : Natural) ↦ i, len)
+                     coefficients, (i : ℕ) ↦ i, len)
                = VectorSpace.linearCombination(u, coefficients,
                      NaturalsBelow.clamp(NaturalsBelow.make(0, mPositive)), len)
                as combReindex;
@@ -996,12 +996,12 @@ theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
                       from vInSpan;
                   v = VectorSpace.linearCombination(w, coefficients, selection, count);
 
-                  ∀ (k : Natural). k < count →
+                  ∀ (k : ℕ). k < count →
                       coefficients(k) • w(selection(k))
                       = coefficients(k)
                         • Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
                     by {
-                      take k : Natural;
+                      take k : ℕ;
                       suppose k < count as kLtCount;
                       NaturalsBelow.value(selection(k)) < n as valueBelow;
                       Function.extendBelow(w, VectorSpace.zero(V))(NaturalsBelow.value(selection(k)))
@@ -1013,20 +1013,20 @@ theorem VectorSpace.exchange {f : Field} {V : VectorSpace(f)} (m n : Natural)
 
                   v = VectorSpace.linearCombination(w, coefficients, selection, count)
                     = VectorSpace.linearCombination(Function.extendBelow(w, VectorSpace.zero(V)),
-                          coefficients, (k : Natural) ↦ NaturalsBelow.value(selection(k)), count)
+                          coefficients, (k : ℕ) ↦ NaturalsBelow.value(selection(k)), count)
                     as vExtComb;
                   VectorSpace.InSpanOf(Function.extendBelow(w, VectorSpace.zero(V)), v)
                     by { witness count
-                             with witness ((k : Natural) ↦ NaturalsBelow.value(selection(k)))
+                             with witness ((k : ℕ) ↦ NaturalsBelow.value(selection(k)))
                              with witness coefficients with vExtComb };
                   done
                 }
             }
           };
 
-        ∀ (i : Natural). n ≤ i → Function.extendBelow(w, VectorSpace.zero(V))(i) = VectorSpace.zero(V)
+        ∀ (i : ℕ). n ≤ i → Function.extendBelow(w, VectorSpace.zero(V))(i) = VectorSpace.zero(V)
           by {
-            take i : Natural;
+            take i : ℕ;
             suppose n ≤ i as nLeI;
             done
           };

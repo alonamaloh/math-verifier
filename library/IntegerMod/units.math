@@ -41,25 +41,25 @@ import IntegerMod.instances
 import IntegerMod.field
 
 -- A class is a unit when it has a multiplicative inverse.
-definition IntegerMod.is_unit {modulus : Natural} (x : IntegerMod(modulus))
+definition IntegerMod.is_unit {modulus : ℕ} (x : IntegerMod(modulus))
         : Proposition :=
   ∃ (w : IntegerMod(modulus)). x * w = IntegerMod.one(modulus)
 
 -- ----------------------------------------------------------------------
 -- Coprime representative ⟹ unit: Bezout gives a·x + n·y = 1, so the
 -- class of x inverts the class of a.
-theorem IntegerMod.unit_of_coprime (n a : Natural)
+theorem IntegerMod.unit_of_coprime (n a : ℕ)
         (coprime : Natural.coprime(a, n))
-        : IntegerMod.is_unit(IntegerMod.make(n, (a : Integer))) := {
-  choose x, y such that (a : Integer) * x + (n : Integer) * y = Integer.one as bezoutEquation
+        : IntegerMod.is_unit(IntegerMod.make(n, (a : ℤ))) := {
+  choose x, y such that (a : ℤ) * x + (n : ℤ) * y = Integer.one as bezoutEquation
       from Natural.coprime_bezout(a, n, coprime);
-  Integer.divides((n : Integer), (a : Integer) * x - Integer.one)
-      by ⟨-y, { (a : Integer) * x - Integer.one
-                 = (a : Integer) * x - ((a : Integer) * x + (n : Integer) * y)
+  Integer.divides((n : ℤ), (a : ℤ) * x - Integer.one)
+      by ⟨-y, { (a : ℤ) * x - Integer.one
+                 = (a : ℤ) * x - ((a : ℤ) * x + (n : ℤ) * y)
                        by substituting bezoutEquation
-                 = (n : Integer) * -y
+                 = (n : ℤ) * -y
                        by ring }⟩;
-  IntegerMod.make(n, (a : Integer)) * IntegerMod.make(n, x)
+  IntegerMod.make(n, (a : ℤ)) * IntegerMod.make(n, x)
         = IntegerMod.one(n)
       by IntegerMod.inverse_from_witness as inverse;
   witness IntegerMod.make(n, x) with inverse
@@ -68,45 +68,45 @@ theorem IntegerMod.unit_of_coprime (n a : Natural)
 -- ----------------------------------------------------------------------
 -- Unit ⟹ coprime representative. The arithmetic core: if d divides both
 -- n and a product that is ≡ 1 mod n, then d divides 1.
-theorem Natural.divides_one_of_divides_congruent_one (d n : Natural)
-        (product : Integer)
+theorem Natural.divides_one_of_divides_congruent_one (d n : ℕ)
+        (product : ℤ)
         (dDividesN : d ∣ n)
         (productCongruentOne
-            : Integer.divides((n : Integer), product - Integer.one))
-        (dDividesProduct : Integer.divides((d : Integer), product))
+            : Integer.divides((n : ℤ), product - Integer.one))
+        (dDividesProduct : Integer.divides((d : ℤ), product))
         : d ∣ 1 := {
-  Integer.divides((d : Integer), (n : Integer))
+  Integer.divides((d : ℤ), (n : ℤ))
       by Natural.to_integer.divides_preserves;
-  Integer.divides((d : Integer), product - Integer.one)
+  Integer.divides((d : ℤ), product - Integer.one)
       by Integer.divides_transitive;
   -- d divides the product and the product minus one, hence their
   -- difference: product − (product − 1) = 1.
-  Integer.divides((d : Integer), -(product - Integer.one))
+  Integer.divides((d : ℤ), -(product - Integer.one))
       by Integer.divides_negate;
-  Integer.divides((d : Integer), product + -(product - Integer.one))
+  Integer.divides((d : ℤ), product + -(product - Integer.one))
       by Integer.divides_add;
   product + -(product - Integer.one) = Integer.one
       by ring as oneEquation;
-  Integer.divides((d : Integer), ((1 : Natural) : Integer))
+  Integer.divides((d : ℤ), ((1 : ℕ) : ℤ))
       by substituting oneEquation;
   done by Natural.to_integer.divides_reflects
 }
 
-theorem IntegerMod.coprime_of_unit_representative (n r : Natural)
-        (rUnit : IntegerMod.is_unit(IntegerMod.make(n, (r : Integer))))
+theorem IntegerMod.coprime_of_unit_representative (n r : ℕ)
+        (rUnit : IntegerMod.is_unit(IntegerMod.make(n, (r : ℤ))))
         : Natural.coprime(r, n) := {
-  choose w such that IntegerMod.make(n, (r : Integer)) * w = IntegerMod.one(n)
+  choose w such that IntegerMod.make(n, (r : ℤ)) * w = IntegerMod.one(n)
       from rUnit;
   -- Read the inverse at a representative: r·b ≡ 1 (mod n) for some
   -- integer b.
   by_representatives w as b => {
-      Integer.CongruentModulo(n, (r : Integer) * b, Integer.one);
+      Integer.CongruentModulo(n, (r : ℤ) * b, Integer.one);
       -- Any common divisor of r and n divides r·b ≡ 1, hence is 1.
-      ∀ (d : Natural). d ∣ r → d ∣ n → d ∣ 1
-          by (d : Natural) (dDividesR : d ∣ r) (dDividesN : d ∣ n) ↦ {
-              Integer.divides((d : Integer), (r : Integer))
+      ∀ (d : ℕ). d ∣ r → d ∣ n → d ∣ 1
+          by (d : ℕ) (dDividesR : d ∣ r) (dDividesN : d ∣ n) ↦ {
+              Integer.divides((d : ℤ), (r : ℤ))
                   by Natural.to_integer.divides_preserves;
-              Integer.divides((d : Integer), (r : Integer) * b)
+              Integer.divides((d : ℤ), (r : ℤ) * b)
                   by Integer.divides_multiply_right;
               done by Natural.divides_one_of_divides_congruent_one
             }
@@ -121,12 +121,12 @@ theorem IntegerMod.coprime_of_unit_representative (n r : Natural)
 -- ----------------------------------------------------------------------
 -- Closure facts.
 
-theorem IntegerMod.one_is_unit (modulus : Natural)
+theorem IntegerMod.one_is_unit (modulus : ℕ)
         : IntegerMod.is_unit(IntegerMod.one(modulus)) :=
   witness IntegerMod.one(modulus) with done
 
 -- The product of two units is a unit: the inverses multiply.
-theorem IntegerMod.multiply_unit (modulus : Natural)
+theorem IntegerMod.multiply_unit (modulus : ℕ)
         (x y : IntegerMod(modulus))
         (xUnit : IntegerMod.is_unit(x)) (yUnit : IntegerMod.is_unit(y))
         : IntegerMod.is_unit(x * y) := {
@@ -143,7 +143,7 @@ theorem IntegerMod.multiply_unit (modulus : Natural)
 }
 
 -- A product of units is a unit.
-theorem IntegerMod.product_unit (modulus : Natural) (list : List(IntegerMod(modulus)))
+theorem IntegerMod.product_unit (modulus : ℕ) (list : List(IntegerMod(modulus)))
         : (∀ (z : IntegerMod(modulus)). z ∈ list
                  → IntegerMod.is_unit(z))
           → IntegerMod.is_unit(
@@ -185,7 +185,7 @@ theorem IntegerMod.product_unit (modulus : Natural) (list : List(IntegerMod(modu
   }
 
 -- A unit cancels from both sides: c·u = c·v implies u = v.
-theorem IntegerMod.multiply_cancel_left_of_unit (modulus : Natural)
+theorem IntegerMod.multiply_cancel_left_of_unit (modulus : ℕ)
         (c u v : IntegerMod(modulus))
         (cUnit : IntegerMod.is_unit(c))
         (equation : c * u = c * v)
@@ -207,7 +207,7 @@ theorem IntegerMod.multiply_cancel_left_of_unit (modulus : Natural)
 
 -- The same on the right: u·c = v·c implies u = v, by commuting into the
 -- left-cancellation law.
-theorem IntegerMod.multiply_cancel_right_of_unit (modulus : Natural)
+theorem IntegerMod.multiply_cancel_right_of_unit (modulus : ℕ)
         (c u v : IntegerMod(modulus))
         (cUnit : IntegerMod.is_unit(c))
         (equation : u * c = v * c)

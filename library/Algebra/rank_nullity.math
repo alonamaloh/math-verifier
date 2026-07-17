@@ -48,8 +48,8 @@ import Algebra.dimension
 theorem Subspace.linearCombination_value {f : Field} {V : VectorSpace(f)} {I : Type(0)}
         (subset : Set(VectorSpace.carrier(V))) (subspace : IsSubspace(V, subset))
         (family : I → VectorSpace.carrier(Subspace.vector_space(V, subset, subspace)))
-        (coefficients : Natural → Field.carrier(f))
-        (selection : Natural → I) (count : Natural)
+        (coefficients : ℕ → Field.carrier(f))
+        (selection : ℕ → I) (count : ℕ)
         : Subtype.value(VectorSpace.linearCombination(family, coefficients, selection, count))
           = VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
                 coefficients, selection, count) :=
@@ -86,10 +86,10 @@ theorem Subspace.value_linearlyIndependent {f : Field} {V : VectorSpace(f)} {I :
         (family : I → VectorSpace.carrier(Subspace.vector_space(V, subset, subspace)))
         (independent : VectorSpace.LinearlyIndependent(family))
         : VectorSpace.LinearlyIndependent((i : I) ↦ Subtype.value(family(i))) := {
-  take count : Natural;
-  take selection : Natural → I;
-  take coefficients : Natural → Field.carrier(f);
-  suppose ∀ (a b : Natural). a < count → b < count → selection(a) = selection(b) → a = b
+  take count : ℕ;
+  take selection : ℕ → I;
+  take coefficients : ℕ → Field.carrier(f);
+  suppose ∀ (a b : ℕ). a < count → b < count → selection(a) = selection(b) → a = b
       as selectionInjective;
   suppose VectorSpace.linearCombination((i : I) ↦ Subtype.value(family(i)),
               coefficients, selection, count) = VectorSpace.zero(V) as valuesVanish;
@@ -149,8 +149,8 @@ theorem Subspace.spans_of_value_covered {f : Field} {V : VectorSpace(f)} {I : Ty
 theorem LinearMap.apply_linearCombination {f : Field} {V W : VectorSpace(f)} {I : Type(0)}
         {T : VectorSpace.carrier(V) → VectorSpace.carrier(W)} (linear : IsLinearMap(V, W, T))
         (family : I → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f))
-        (selection : Natural → I) (count : Natural)
+        (coefficients : ℕ → Field.carrier(f))
+        (selection : ℕ → I) (count : ℕ)
         : T(VectorSpace.linearCombination(family, coefficients, selection, count))
           = VectorSpace.linearCombination((i : I) ↦ T(family(i)), coefficients, selection, count) :=
   by induction on count with IH {
@@ -219,8 +219,8 @@ theorem LinearMap.image_finite_dimensional {f : Field} (V W : VectorSpace(f))
                     Subtype.value(x))
             by {
               v = VectorSpace.zero(V)
-                  ∨ (∃ (count : Natural). ∃ (selection : Natural → NaturalsBelow(VectorSpace.dimension(V, finiteV))).
-                     ∃ (coefficients : Natural → Field.carrier(f)).
+                  ∨ (∃ (count : ℕ). ∃ (selection : ℕ → NaturalsBelow(VectorSpace.dimension(V, finiteV))).
+                     ∃ (coefficients : ℕ → Field.carrier(f)).
                          v = VectorSpace.linearCombination(basisV, coefficients, selection, count))
                   by basisSpans;
               done by cases {
@@ -230,8 +230,8 @@ theorem LinearMap.image_finite_dimensional {f : Field} (V W : VectorSpace(f))
                        = VectorSpace.zero(W);
                     done
                   }
-                case ∃ (count : Natural). ∃ (selection : Natural → NaturalsBelow(VectorSpace.dimension(V, finiteV))).
-                     ∃ (coefficients : Natural → Field.carrier(f)).
+                case ∃ (count : ℕ). ∃ (selection : ℕ → NaturalsBelow(VectorSpace.dimension(V, finiteV))).
+                     ∃ (coefficients : ℕ → Field.carrier(f)).
                          v = VectorSpace.linearCombination(basisV, coefficients, selection, count) as vCombo: {
                     choose count, selection, coefficients such that
                         v = VectorSpace.linearCombination(basisV, coefficients, selection, count) from vCombo;
@@ -271,14 +271,14 @@ theorem LinearMap.image_finite_dimensional {f : Field} (V W : VectorSpace(f))
 -- `m` it reads `family`, at `m` (the last index) it reads `x`. Built on
 -- `Function.extendBelow` (fallback `x`), so its two characterising equations
 -- are immediate.
-definition VectorSpace.appendVector {f : Field} {V : VectorSpace(f)} {m : Natural}
+definition VectorSpace.appendVector {f : Field} {V : VectorSpace(f)} {m : ℕ}
         (family : NaturalsBelow(m) → VectorSpace.carrier(V))
         (x : VectorSpace.carrier(V))
         : NaturalsBelow(1 + m) → VectorSpace.carrier(V) :=
   (i : NaturalsBelow(1 + m)) ↦
     Function.extendBelow(family, x)(NaturalsBelow.value(i))
 
-theorem VectorSpace.appendVector_below {f : Field} {V : VectorSpace(f)} {m : Natural}
+theorem VectorSpace.appendVector_below {f : Field} {V : VectorSpace(f)} {m : ℕ}
         (family : NaturalsBelow(m) → VectorSpace.carrier(V))
         (x : VectorSpace.carrier(V)) (i : NaturalsBelow(1 + m))
         (below : NaturalsBelow.value(i) < m)
@@ -288,7 +288,7 @@ theorem VectorSpace.appendVector_below {f : Field} {V : VectorSpace(f)} {m : Nat
      = Function.extendBelow(family, x)(NaturalsBelow.value(i))
      = family(NaturalsBelow.make(NaturalsBelow.value(i), below))
 
-theorem VectorSpace.appendVector_last {f : Field} {V : VectorSpace(f)} {m : Natural}
+theorem VectorSpace.appendVector_last {f : Field} {V : VectorSpace(f)} {m : ℕ}
         (family : NaturalsBelow(m) → VectorSpace.carrier(V))
         (x : VectorSpace.carrier(V)) (i : NaturalsBelow(1 + m))
         (atLast : NaturalsBelow.value(i) = m)
@@ -308,16 +308,16 @@ theorem VectorSpace.appendVector_last {f : Field} {V : VectorSpace(f)} {m : Natu
 -- splitting on whether `p` is that last position.
 theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
-        : ∀ (n : Natural). ∀ (p : Natural). p < 1 + n
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → I)
+        : ∀ (n : ℕ). ∀ (p : ℕ). p < 1 + n
               → coefficients(p) = Field.zero(f)
               → VectorSpace.linearCombination(family, coefficients, selection, 1 + n)
                 = VectorSpace.linearCombination(family,
-                      (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                      (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), n) :=
+                      (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                      (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), n) :=
   by induction on n with IH {
     case base: {
-        take p : Natural;
+        take p : ℕ;
         suppose p < 1 + 0 as pBelow;
         suppose coefficients(p) = Field.zero(f) as coeffZero;
         p = 0;
@@ -327,11 +327,11 @@ theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : Vector
            = Field.zero(f) • family(selection(p)) by substituting coeffZero
            = VectorSpace.zero(V)
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                 (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 0)
+                 (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                 (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), 0)
       }
     case step(q): {
-        take p : Natural;
+        take p : ℕ;
         suppose p < 1 + (1 + q) as pBelow;
         suppose coefficients(p) = Field.zero(f) as coeffZero;
         p < 1 + q ∨ p = 1 + q by Natural.le_of_lt_one_plus;
@@ -343,17 +343,17 @@ theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : Vector
                             q < p ≤ q; done };
               NaturalsBelow.skipValue(p, q) = 1 + q as skipLast;
               VectorSpace.linearCombination(family,
-                    (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                    (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
+                    (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                    (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
                  = VectorSpace.linearCombination(family,
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
                    + coefficients(NaturalsBelow.skipValue(p, q))
                        • family(selection(NaturalsBelow.skipValue(p, q)))
                        by VectorSpace.linearCombination_add_one
                  = VectorSpace.linearCombination(family,
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
                    + coefficients(1 + q) • family(selection(1 + q))
                        by substituting skipLast
                  as rhsPeeled;
@@ -361,27 +361,27 @@ theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : Vector
                  = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
                    + coefficients(1 + q) • family(selection(1 + q))
                  = VectorSpace.linearCombination(family,
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), q)
                    + coefficients(1 + q) • family(selection(1 + q))
                        by IH(p, pNotLast, coeffZero)
                  = VectorSpace.linearCombination(family,
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
                        by rhsPeeled
             }
           case p = 1 + q as pLast: {
               -- The dropped position is the last one; the skip is the identity
               -- below `1 + q`, so the reindexed prefix is unchanged.
-              ∀ (i : Natural). i < 1 + q →
+              ∀ (i : ℕ). i < 1 + q →
                   coefficients(i) = coefficients(NaturalsBelow.skipValue(p, i))
-                by { take i : Natural; suppose i < 1 + q as iBelow;
+                by { take i : ℕ; suppose i < 1 + q as iBelow;
                      i < p;
                      NaturalsBelow.skipValue(p, i) = i;
                      done by substituting (NaturalsBelow.skipValue(p, i) = i) };
-              ∀ (i : Natural). i < 1 + q →
+              ∀ (i : ℕ). i < 1 + q →
                   selection(i) = selection(NaturalsBelow.skipValue(p, i))
-                by { take i : Natural; suppose i < 1 + q as iBelow;
+                by { take i : ℕ; suppose i < 1 + q as iBelow;
                      i < p;
                      NaturalsBelow.skipValue(p, i) = i;
                      done by substituting (NaturalsBelow.skipValue(p, i) = i) };
@@ -398,8 +398,8 @@ theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : Vector
                    + VectorSpace.zero(V) by VectorSpace.zero_scale
                  = VectorSpace.linearCombination(family, coefficients, selection, 1 + q)
                  = VectorSpace.linearCombination(family,
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p, i)),
+                       (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p, i)), 1 + q)
             }
         }
       }
@@ -409,20 +409,20 @@ theorem VectorSpace.linearCombination_drop_zero_position {f : Field} {V : Vector
 -- index below `m` (an `e`-vector, never the appended `x`), the combination IS
 -- a combination over `e` alone, reindexed by the clamp `NaturalsBelow(1+m) →
 -- NaturalsBelow(m)`. (`ei0` is any `e`-index, supplying the clamp fallback.)
-theorem VectorSpace.appendVector_reduces_to_e {f : Field} {V : VectorSpace(f)} {m : Natural}
+theorem VectorSpace.appendVector_reduces_to_e {f : Field} {V : VectorSpace(f)} {m : ℕ}
         (e : NaturalsBelow(m) → VectorSpace.carrier(V)) (x : VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f))
-        (selection : Natural → NaturalsBelow(1 + m)) (count : Natural)
+        (coefficients : ℕ → Field.carrier(f))
+        (selection : ℕ → NaturalsBelow(1 + m)) (count : ℕ)
         (ei0 : NaturalsBelow(m))
-        (allBelow : ∀ (j : Natural). j < count → NaturalsBelow.value(selection(j)) < m)
+        (allBelow : ∀ (j : ℕ). j < count → NaturalsBelow.value(selection(j)) < m)
         : VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, count)
           = VectorSpace.linearCombination(e, coefficients,
-                (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), count) := {
-  ∀ (j : Natural). j < count →
+                (j : ℕ) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), count) := {
+  ∀ (j : ℕ). j < count →
       coefficients(j) • VectorSpace.appendVector(e, x)(selection(j))
       = coefficients(j) • e(NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))))
     by {
-      take j : Natural;
+      take j : ℕ;
       suppose j < count as jBelow;
       NaturalsBelow.value(selection(j)) < m by allBelow as valBelow;
       VectorSpace.appendVector(e, x)(selection(j))
@@ -437,14 +437,14 @@ theorem VectorSpace.appendVector_reduces_to_e {f : Field} {V : VectorSpace(f)} {
 
 -- The clamp reindex of an injective, below-`m` selection is itself injective:
 -- distinct positions give distinct values give distinct clamped indices.
-theorem VectorSpace.appendVector_clamp_injective {f : Field} {V : VectorSpace(f)} {m : Natural}
-        (selection : Natural → NaturalsBelow(1 + m)) (count : Natural) (ei0 : NaturalsBelow(m))
-        (selInjective : ∀ (a b : Natural). a < count → b < count → selection(a) = selection(b) → a = b)
-        (allBelow : ∀ (j : Natural). j < count → NaturalsBelow.value(selection(j)) < m)
-        : ∀ (a b : Natural). a < count → b < count →
+theorem VectorSpace.appendVector_clamp_injective {f : Field} {V : VectorSpace(f)} {m : ℕ}
+        (selection : ℕ → NaturalsBelow(1 + m)) (count : ℕ) (ei0 : NaturalsBelow(m))
+        (selInjective : ∀ (a b : ℕ). a < count → b < count → selection(a) = selection(b) → a = b)
+        (allBelow : ∀ (j : ℕ). j < count → NaturalsBelow.value(selection(j)) < m)
+        : ∀ (a b : ℕ). a < count → b < count →
               NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(a)))
               = NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(b))) → a = b := {
-  take a : Natural; take b : Natural;
+  take a : ℕ; take b : ℕ;
   suppose a < count as aBelow;
   suppose b < count as bBelow;
   suppose NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(a)))
@@ -465,18 +465,18 @@ theorem VectorSpace.appendVector_clamp_injective {f : Field} {V : VectorSpace(f)
 }
 
 -- Small arithmetic / position facts the append lemma leans on.
-theorem Natural.less_than_one_is_zero (k : Natural) (h : k < 1) : k = 0 := {
+theorem Natural.less_than_one_is_zero (k : ℕ) (h : k < 1) : k = 0 := {
   k ≤ 0 by Natural.le_of_lt_one_plus;
   done
 }
 
-theorem Natural.positive_one_plus_monus_one (n : Natural) (pos : 0 < n)
+theorem Natural.positive_one_plus_monus_one (n : ℕ) (pos : 0 < n)
         : n = 1 + (n ∸ 1) := {
-  n = 0 ∨ ∃ (k : Natural). n = 1 + k;
+  n = 0 ∨ ∃ (k : ℕ). n = 1 + k;
   done by cases {
     case n = 0 as nZero: { 0 < 0;
                            ¬(0 < 0); done }
-    case ∃ (k : Natural). n = 1 + k as nPlus: {
+    case ∃ (k : ℕ). n = 1 + k as nPlus: {
         choose k such that n = 1 + k from nPlus;
         (n ∸ 1) = ((1 + k) ∸ 1)
            = k;
@@ -486,7 +486,7 @@ theorem Natural.positive_one_plus_monus_one (n : Natural) (pos : 0 < n)
   }
 }
 
-theorem NaturalsBelow.skipValue_ne (jv j : Natural) : NaturalsBelow.skipValue(jv, j) ≠ jv := {
+theorem NaturalsBelow.skipValue_ne (jv j : ℕ) : NaturalsBelow.skipValue(jv, j) ≠ jv := {
   j < jv ∨ jv ≤ j by Natural.lt_or_le;
   done by cases {
     case j < jv as below: {
@@ -504,7 +504,7 @@ theorem NaturalsBelow.skipValue_ne (jv j : Natural) : NaturalsBelow.skipValue(jv
   }
 }
 
-theorem NaturalsBelow.skipValue_injective (jv a b : Natural)
+theorem NaturalsBelow.skipValue_injective (jv a b : ℕ)
         (h : NaturalsBelow.skipValue(jv, a) = NaturalsBelow.skipValue(jv, b)) : a = b := {
   a < jv ∨ jv ≤ a by Natural.lt_or_le;
   done by cases {
@@ -563,7 +563,7 @@ theorem NaturalsBelow.skipValue_injective (jv a b : Natural)
 -- (at most one) position selecting `x` carries a zero coefficient and is
 -- dropped by `linearCombination_drop_zero_position` to keep the reduced
 -- selection injective.
-theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace(f)} {m : Natural}
+theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace(f)} {m : ℕ}
         (e : NaturalsBelow(m) → VectorSpace.carrier(V)) (x : VectorSpace.carrier(V))
         (eIndependent : VectorSpace.LinearlyIndependent(e))
         (notInSpan : ¬(x = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, x)))
@@ -574,21 +574,21 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
   x ≠ VectorSpace.zero(V)
       by { suppose x = VectorSpace.zero(V) as isZero;
            x = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, x); done };
-  take len : Natural;
-  take selection : Natural → NaturalsBelow(1 + m);
-  take coefficients : Natural → Field.carrier(f);
-  suppose ∀ (a b : Natural). a < len → b < len → selection(a) = selection(b) → a = b
+  take len : ℕ;
+  take selection : ℕ → NaturalsBelow(1 + m);
+  take coefficients : ℕ → Field.carrier(f);
+  suppose ∀ (a b : ℕ). a < len → b < len → selection(a) = selection(b) → a = b
       as selectionInjective;
   suppose VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
           = VectorSpace.zero(V) as vanishes;
-  m = 0 ∨ ∃ (mp : Natural). m = 1 + mp;
+  m = 0 ∨ ∃ (mp : ℕ). m = 1 + mp;
   done by cases {
     case m = 0 as mZero: {
         -- The empty family: `appendVector` is the singleton `{x}`; any two
         -- positions select the sole index, so an injective selection has at
         -- most one position, and its coefficient kills `x`.
-        ∀ (i : Natural). i < len → NaturalsBelow.value(selection(i)) = m
-          by { take i : Natural; suppose i < len as iBelow;
+        ∀ (i : ℕ). i < len → NaturalsBelow.value(selection(i)) = m
+          by { take i : ℕ; suppose i < len as iBelow;
                NaturalsBelow.value(selection(i)) < 1 + m;
                1 + m = 1 by substituting mZero;
                NaturalsBelow.value(selection(i)) < 1;
@@ -604,7 +604,7 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
                    by NaturalsBelow.equal_of_value;
                0 = 1 by selectionInjective(0, 1);
                done };
-        take i : Natural;
+        take i : ℕ;
         suppose i < len as iBelow;
         0 < len by { 0 ≤ i < len; done };
         len ≤ 1 by { 1 < len ∨ len ≤ 1 by Natural.lt_or_le;
@@ -636,7 +636,7 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
           done
         }
       }
-    case ∃ (mp : Natural). m = 1 + mp as mPosExists: {
+    case ∃ (mp : ℕ). m = 1 + mp as mPosExists: {
         choose mp such that m = 1 + mp from mPosExists;
         0 < m as mPos;
         let ei0 : NaturalsBelow(m) := NaturalsBelow.make(0, mPos);
@@ -644,9 +644,9 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
         -- Step 1: a position selecting the appended slot `x` carries a zero
         -- coefficient — else `x` would lie in the span of the other vectors,
         -- all of which are `e`-vectors, so in `span(e)`.
-        ∀ (p : Natural). p < len → NaturalsBelow.value(selection(p)) = m → coefficients(p) = Field.zero(f)
+        ∀ (p : ℕ). p < len → NaturalsBelow.value(selection(p)) = m → coefficients(p) = Field.zero(f)
           by {
-            take p : Natural;
+            take p : ℕ;
             suppose p < len as pBelow;
             suppose NaturalsBelow.value(selection(p)) = m as pAtLast;
             suppose coefficients(p) ≠ Field.zero(f) as cpNonzero for contradiction {
@@ -689,45 +689,45 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
 
         -- Step 2: reduce the whole vanishing combination to one over `e` and
         -- invoke `e`'s independence.
-        ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m)
-            ∨ (∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m)
-          by { (∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m)
-                   ∨ ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m);
+        ¬(∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m)
+            ∨ (∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m)
+          by { (∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m)
+                   ∨ ¬(∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m);
                done by cases {
-                 case ∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m as ex: { done }
-                 case ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m) as nex: { done }
+                 case ∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m as ex: { done }
+                 case ¬(∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m) as nex: { done }
                } };
         done by cases {
-          case ¬(∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m) as noLast: {
-              ∀ (j : Natural). j < len → NaturalsBelow.value(selection(j)) < m
-                by { take j : Natural; suppose j < len as jBelow;
+          case ¬(∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m) as noLast: {
+              ∀ (j : ℕ). j < len → NaturalsBelow.value(selection(j)) < m
+                by { take j : ℕ; suppose j < len as jBelow;
                      NaturalsBelow.value(selection(j)) < 1 + m;
                      NaturalsBelow.value(selection(j)) ≤ m by Natural.le_of_lt_one_plus;
                      NaturalsBelow.value(selection(j)) ≠ m
                          by { suppose NaturalsBelow.value(selection(j)) = m as jAtLast;
-                              ∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m
+                              ∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m
                                   by { witness j with And.introduction(jBelow, jAtLast) };
                               done };
                      done by Natural.lt_of_le_of_ne } as allBelow;
               VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
                  = VectorSpace.linearCombination(e, coefficients,
-                       (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), len)
+                       (j : ℕ) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), len)
                        by VectorSpace.appendVector_reduces_to_e(ei0 := ei0, allBelow := allBelow) as reduceEq;
               VectorSpace.linearCombination(e, coefficients,
-                    (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), len)
+                    (j : ℕ) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))), len)
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
                        by reduceEq
                  = VectorSpace.zero(V) as eCombZero;
-              ∀ (a b : Natural). a < len → b < len →
+              ∀ (a b : ℕ). a < len → b < len →
                   NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(a)))
                   = NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(b))) → a = b
                   by VectorSpace.appendVector_clamp_injective(ei0 := ei0,
                          selInjective := selectionInjective, allBelow := allBelow) as clampInj;
               done by eIndependent(len,
-                  (j : Natural) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))),
+                  (j : ℕ) ↦ NaturalsBelow.clamp(ei0)(NaturalsBelow.value(selection(j))),
                   coefficients, clampInj, eCombZero)
             }
-          case ∃ (p : Natural). p < len ∧ NaturalsBelow.value(selection(p)) = m as lastExists: {
+          case ∃ (p : ℕ). p < len ∧ NaturalsBelow.value(selection(p)) = m as lastExists: {
               choose p0 such that p0 < len ∧ NaturalsBelow.value(selection(p0)) = m from lastExists;
               p0 < len as p0Below;
               NaturalsBelow.value(selection(p0)) = m as p0AtLast;
@@ -741,14 +741,14 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection,
                        1 + (len ∸ 1)) by substituting lenShape
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                       (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
                  as droppedComb;
               -- The dropped selection avoids the x-slot: all below m.
-              ∀ (j : Natural). j < (len ∸ 1) →
+              ∀ (j : ℕ). j < (len ∸ 1) →
                   NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, j))) < m
                 by {
-                  take j : Natural; suppose j < (len ∸ 1) as jBelow;
+                  take j : ℕ; suppose j < (len ∸ 1) as jBelow;
                   NaturalsBelow.skipValue(p0, j) < len
                     by { NaturalsBelow.skipValue(p0, j) < 1 + (len ∸ 1)
                              by NaturalsBelow.skipValue_bound(jv := p0,
@@ -770,35 +770,35 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
                   done by Natural.lt_of_le_of_ne
                 };
               VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
-                    (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                    (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
+                    (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                    (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
                  = VectorSpace.linearCombination(e,
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                       (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                       (i : ℕ) ↦ NaturalsBelow.clamp(ei0)(
                            NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
                        len ∸ 1)
                        by VectorSpace.appendVector_reduces_to_e
                  as reduceEq;
               VectorSpace.linearCombination(e,
-                    (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                    (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
+                    (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                    (i : ℕ) ↦ NaturalsBelow.clamp(ei0)(
                         NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
                     len ∸ 1)
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x),
-                       (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
-                       (i : Natural) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
+                       (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                       (i : ℕ) ↦ selection(NaturalsBelow.skipValue(p0, i)), len ∸ 1)
                        by reduceEq
                  = VectorSpace.linearCombination(VectorSpace.appendVector(e, x), coefficients, selection, len)
                        by droppedComb
                  = VectorSpace.zero(V) as eCombZero;
               -- The dropped selection is injective, so `e`-independence applies.
-              ∀ (a b : Natural). a < (len ∸ 1) → b < (len ∸ 1) →
+              ∀ (a b : ℕ). a < (len ∸ 1) → b < (len ∸ 1) →
                   NaturalsBelow.clamp(ei0)(
                       NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, a))))
                   = NaturalsBelow.clamp(ei0)(
                       NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, b)))) → a = b
                 by {
-                  take a : Natural; take b : Natural;
+                  take a : ℕ; take b : ℕ;
                   suppose a < (len ∸ 1) as aBelow;
                   suppose b < (len ∸ 1) as bBelow;
                   suppose NaturalsBelow.clamp(ei0)(
@@ -835,16 +835,16 @@ theorem VectorSpace.independent_append_outside_span {f : Field} {V : VectorSpace
                              skipALen, skipBLen);
                   done by NaturalsBelow.skipValue_injective
                 } as droppedInj;
-              ∀ (i : Natural). i < (len ∸ 1) →
+              ∀ (i : ℕ). i < (len ∸ 1) →
                   coefficients(NaturalsBelow.skipValue(p0, i)) = Field.zero(f)
                   by eIndependent(len ∸ 1,
-                      (i : Natural) ↦ NaturalsBelow.clamp(ei0)(
+                      (i : ℕ) ↦ NaturalsBelow.clamp(ei0)(
                           NaturalsBelow.value(selection(NaturalsBelow.skipValue(p0, i)))),
-                      (i : Natural) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
+                      (i : ℕ) ↦ coefficients(NaturalsBelow.skipValue(p0, i)),
                       droppedInj, eCombZero) as skippedCoeffsZero;
               -- Recover every original coefficient: p0 is zero directly, and
               -- j ≠ p0 is `skipValue(p0, skipInverse(p0, j))`.
-              take i : Natural;
+              take i : ℕ;
               suppose i < len as iBelow;
               i = p0 ∨ i ≠ p0;
               done by cases {
@@ -886,17 +886,17 @@ theorem VectorSpace.subspace_finite_dimensional {f : Field} {V : VectorSpace(f)}
         (finiteV : VectorSpace.FiniteDimensional(V))
         : VectorSpace.FiniteDimensional(Subspace.vector_space(V, subset, subspace)) := {
   let S : VectorSpace(f) := Subspace.vector_space(V, subset, subspace);
-  let d : Natural := VectorSpace.dimension(V, finiteV);
+  let d : ℕ := VectorSpace.dimension(V, finiteV);
   VectorSpace.HasDimension(V, d) by VectorSpace.dimension_has_basis as vHasBasis;
   choose b such that VectorSpace.IsBasis(b) from vHasBasis;
   VectorSpace.Spans(b);
 
   -- Any independent family in S has size ≤ d.
-  ∀ (k : Natural).
+  ∀ (k : ℕ).
       (∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
       → k ≤ d
     by {
-      take k : Natural;
+      take k : ℕ;
       suppose ∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)).
           VectorSpace.LinearlyIndependent(family) as hasK;
       choose family such that VectorSpace.LinearlyIndependent(family) from hasK;
@@ -918,23 +918,23 @@ theorem VectorSpace.subspace_finite_dimensional {f : Field} {V : VectorSpace(f)}
     } as notPlus1d;
 
   -- A least size with no independent family; the empty family shows it is ≥ 1.
-  ∃ (j0 : Natural).
+  ∃ (j0 : ℕ).
       ¬(∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
-      ∧ (∀ (k : Natural).
+      ∧ (∀ (k : ℕ).
             ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
             → j0 ≤ k)
     by Natural.least_witness(
-        (k : Natural) ↦ ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)).
+        (k : ℕ) ↦ ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)).
             VectorSpace.LinearlyIndependent(family)), 1 + d, notPlus1d) as leastExists;
   choose j0 such that
       ¬(∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
-      ∧ (∀ (k : Natural).
+      ∧ (∀ (k : ℕ).
             ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
             → j0 ≤ k)
       from leastExists;
   ¬(∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
      ;
-  ∀ (k : Natural).
+  ∀ (k : ℕ).
       ¬(∃ (family : NaturalsBelow(k) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family))
       → j0 ≤ k;
 
@@ -948,10 +948,10 @@ theorem VectorSpace.subspace_finite_dimensional {f : Field} {V : VectorSpace(f)}
          ∃ (family : NaturalsBelow(j0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family)
              by { witness ((i : NaturalsBelow(j0)) ↦ VectorSpace.zero(S)) with independentAtJ0 };
          done };
-  j0 = 0 ∨ ∃ (m0 : Natural). j0 = 1 + m0 by Natural.zero_or_one_plus;
+  j0 = 0 ∨ ∃ (m0 : ℕ). j0 = 1 + m0 by Natural.zero_or_one_plus;
   done by cases {
     case j0 = 0 as contradiction0: { j0 ≠ 0; done }
-    case ∃ (m0 : Natural). j0 = 1 + m0 as j0Shape: {
+    case ∃ (m0 : ℕ). j0 = 1 + m0 as j0Shape: {
         choose m0 such that j0 = 1 + m0 from j0Shape;
         -- The maximal independent family, of size m0.
         ∃ (family : NaturalsBelow(m0) → VectorSpace.carrier(S)). VectorSpace.LinearlyIndependent(family)
@@ -1003,7 +1003,7 @@ theorem VectorSpace.subspace_finite_dimensional {f : Field} {V : VectorSpace(f)}
 -- span of `appendVector(family, x)` (the extra vector simply goes unused). The
 -- witnessing combination is reindexed by the value-preserving inclusion
 -- `NaturalsBelow(m) ↪ NaturalsBelow(1 + m)`.
-theorem NaturalsBelow.value_below_one_plus {m : Natural} (i : NaturalsBelow(m))
+theorem NaturalsBelow.value_below_one_plus {m : ℕ} (i : NaturalsBelow(m))
         : NaturalsBelow.value(i) < 1 + m := {
   NaturalsBelow.value(i) < m;
   NaturalsBelow.value(i) < m < 1 + m;
@@ -1011,14 +1011,14 @@ theorem NaturalsBelow.value_below_one_plus {m : Natural} (i : NaturalsBelow(m))
 }
 
 -- The value-preserving inclusion `NaturalsBelow(m) ↪ NaturalsBelow(1 + m)`.
-definition NaturalsBelow.widen {m : Natural} (i : NaturalsBelow(m)) : NaturalsBelow(1 + m) :=
+definition NaturalsBelow.widen {m : ℕ} (i : NaturalsBelow(m)) : NaturalsBelow(1 + m) :=
   NaturalsBelow.make(NaturalsBelow.value(i), NaturalsBelow.value_below_one_plus(i))
 
-theorem NaturalsBelow.widen_value {m : Natural} (i : NaturalsBelow(m))
+theorem NaturalsBelow.widen_value {m : ℕ} (i : NaturalsBelow(m))
         : NaturalsBelow.value(NaturalsBelow.widen(i)) = NaturalsBelow.value(i) :=
   done
 
-theorem VectorSpace.appendVector_widen {f : Field} {V : VectorSpace(f)} {m : Natural}
+theorem VectorSpace.appendVector_widen {f : Field} {V : VectorSpace(f)} {m : ℕ}
         (family : NaturalsBelow(m) → VectorSpace.carrier(V)) (x : VectorSpace.carrier(V))
         (i : NaturalsBelow(m))
         : VectorSpace.appendVector(family, x)(NaturalsBelow.widen(i)) = family(i) := {
@@ -1031,27 +1031,27 @@ theorem VectorSpace.appendVector_widen {f : Field} {V : VectorSpace(f)} {m : Nat
   done
 }
 
-theorem VectorSpace.InSpanOf.append_monotone {f : Field} {V : VectorSpace(f)} {m : Natural}
+theorem VectorSpace.InSpanOf.append_monotone {f : Field} {V : VectorSpace(f)} {m : ℕ}
         (family : NaturalsBelow(m) → VectorSpace.carrier(V)) (x v : VectorSpace.carrier(V))
         (member : VectorSpace.InSpanOf(family, v))
         : VectorSpace.InSpanOf(VectorSpace.appendVector(family, x), v) := {
   choose count, selection, coefficients such that
       v = VectorSpace.linearCombination(family, coefficients, selection, count) from member;
   v = VectorSpace.linearCombination(family, coefficients, selection, count);
-  ∀ (i : Natural). i < count →
+  ∀ (i : ℕ). i < count →
       coefficients(i) • VectorSpace.appendVector(family, x)(NaturalsBelow.widen(selection(i)))
       = coefficients(i) • family(selection(i))
     by {
-      take i : Natural; suppose i < count as iBelow;
+      take i : ℕ; suppose i < count as iBelow;
       VectorSpace.appendVector(family, x)(NaturalsBelow.widen(selection(i))) = family(selection(i))
           by VectorSpace.appendVector_widen as appAt;
       done by substituting appAt
     };
   v = VectorSpace.linearCombination(family, coefficients, selection, count)
     = VectorSpace.linearCombination(VectorSpace.appendVector(family, x), coefficients,
-          (i : Natural) ↦ NaturalsBelow.widen(selection(i)), count)
+          (i : ℕ) ↦ NaturalsBelow.widen(selection(i)), count)
     as vAppendCombo;
-  witness count with witness ((i : Natural) ↦ NaturalsBelow.widen(selection(i)))
+  witness count with witness ((i : ℕ) ↦ NaturalsBelow.widen(selection(i)))
       with witness coefficients with vAppendCombo
 }
 
@@ -1068,8 +1068,8 @@ theorem VectorSpace.InSpanOf.of_combination_covered {f : Field} {V : VectorSpace
         (inner : I → VectorSpace.carrier(V)) (outer : J → VectorSpace.carrier(V))
         (generatorsCovered :
             ∀ (i : I). inner(i) = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(outer, inner(i)))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
-        : ∀ (count : Natural).
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → I)
+        : ∀ (count : ℕ).
               VectorSpace.linearCombination(inner, coefficients, selection, count) = VectorSpace.zero(V)
               ∨ VectorSpace.InSpanOf(outer,
                     VectorSpace.linearCombination(inner, coefficients, selection, count)) :=
@@ -1189,12 +1189,12 @@ theorem VectorSpace.Spans.transitive_covered {f : Field} {V : VectorSpace(f)} {I
         : VectorSpace.Spans(outer) := {
   take v : VectorSpace.carrier(V);
   v = VectorSpace.zero(V)
-      ∨ (∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+      ∨ (∃ (count : ℕ). ∃ (selection : ℕ → I). ∃ (coefficients : ℕ → Field.carrier(f)).
              v = VectorSpace.linearCombination(inner, coefficients, selection, count))
       by innerSpans;
   done by cases {
     case v = VectorSpace.zero(V) as vZero: { done }
-    case ∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+    case ∃ (count : ℕ). ∃ (selection : ℕ → I). ∃ (coefficients : ℕ → Field.carrier(f)).
            v = VectorSpace.linearCombination(inner, coefficients, selection, count) as vCombo: {
         choose count, selection, coefficients such that
             v = VectorSpace.linearCombination(inner, coefficients, selection, count) from vCombo;
@@ -1230,14 +1230,14 @@ theorem VectorSpace.Spans.transitive_covered {f : Field} {V : VectorSpace(f)} {I
 -- wherever indices match values, and covers every `s`-vector processed so far.
 -- After all of `s` is processed, `ext` covers a spanning family, so it spans.
 
-theorem Natural.one_plus_add (a b : Natural) : 1 + (a + b) = a + (1 + b) := ring
+theorem Natural.one_plus_add (a b : ℕ) : 1 + (a + b) = a + (1 + b) := ring
 
-theorem VectorSpace.sift_extend_aux {f : Field} {V : VectorSpace(f)} {k d : Natural}
+theorem VectorSpace.sift_extend_aux {f : Field} {V : VectorSpace(f)} {k d : ℕ}
         (e : NaturalsBelow(k) → VectorSpace.carrier(V))
         (eIndependent : VectorSpace.LinearlyIndependent(e))
         (s : NaturalsBelow(d) → VectorSpace.carrier(V))
-        : ∀ (n : Natural). n ≤ d →
-              ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+        : ∀ (n : ℕ). n ≤ d →
+              ∃ (sz : ℕ). ∃ (r : ℕ). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
                   sz = k + r
                   ∧ VectorSpace.LinearlyIndependent(ext)
                   ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
@@ -1274,7 +1274,7 @@ theorem VectorSpace.sift_extend_aux {f : Field} {V : VectorSpace(f)} {k d : Natu
         n0 < d by Natural.lt_of_add_one_le as n0LtD;
         let sn0 : VectorSpace.carrier(V) := s(NaturalsBelow.make(n0, n0LtD));
 
-        ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+        ∃ (sz : ℕ). ∃ (r : ℕ). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
             sz = k + r
             ∧ VectorSpace.LinearlyIndependent(ext)
             ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
@@ -1415,21 +1415,21 @@ theorem VectorSpace.sift_extend_aux {f : Field} {V : VectorSpace(f)} {k d : Natu
 -- makes it span. It is already independent, hence a basis, and the sift never
 -- disturbs the `e`-prefix. The size is `k + r` — `e`'s `k` vectors followed by
 -- the `r` appended ones — which the count in brick 5 reads off.
-theorem VectorSpace.extend_to_basis {f : Field} {V : VectorSpace(f)} {k : Natural}
+theorem VectorSpace.extend_to_basis {f : Field} {V : VectorSpace(f)} {k : ℕ}
         (e : NaturalsBelow(k) → VectorSpace.carrier(V))
         (eIndependent : VectorSpace.LinearlyIndependent(e))
         (finiteV : VectorSpace.FiniteDimensional(V))
-        : ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+        : ∃ (sz : ℕ). ∃ (r : ℕ). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
               sz = k + r
               ∧ VectorSpace.IsBasis(ext)
               ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
                     NaturalsBelow.value(i) = NaturalsBelow.value(j) → ext(i) = e(j)) := {
-  let d : Natural := VectorSpace.dimension(V, finiteV);
+  let d : ℕ := VectorSpace.dimension(V, finiteV);
   VectorSpace.HasDimension(V, d) by VectorSpace.dimension_has_basis as vHasBasis;
   choose basisV such that VectorSpace.IsBasis(basisV) from vHasBasis;
   VectorSpace.Spans(basisV) as basisSpans;
   d ≤ d by Natural.LessOrEqual.reflexive;
-  ∃ (sz : Natural). ∃ (r : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+  ∃ (sz : ℕ). ∃ (r : ℕ). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
       sz = k + r
       ∧ VectorSpace.LinearlyIndependent(ext)
       ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(k)).
@@ -1482,7 +1482,7 @@ theorem Subspace.spanning_value_covered {f : Field} {V : VectorSpace(f)} {I : Ty
               ∨ VectorSpace.InSpanOf((i : I) ↦ Subtype.value(family(i)), Subtype.value(x)) := {
   take x : VectorSpace.carrier(Subspace.vector_space(V, subset, subspace));
   x = VectorSpace.zero(Subspace.vector_space(V, subset, subspace))
-      ∨ (∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+      ∨ (∃ (count : ℕ). ∃ (selection : ℕ → I). ∃ (coefficients : ℕ → Field.carrier(f)).
              x = VectorSpace.linearCombination(family, coefficients, selection, count))
       by spanning;
   done by cases {
@@ -1491,7 +1491,7 @@ theorem Subspace.spanning_value_covered {f : Field} {V : VectorSpace(f)} {I : Ty
            = VectorSpace.zero(V);
         done
       }
-    case ∃ (count : Natural). ∃ (selection : Natural → I). ∃ (coefficients : Natural → Field.carrier(f)).
+    case ∃ (count : ℕ). ∃ (selection : ℕ → I). ∃ (coefficients : ℕ → Field.carrier(f)).
            x = VectorSpace.linearCombination(family, coefficients, selection, count) as xInSpan: {
         choose count, selection, coefficients such that
             x = VectorSpace.linearCombination(family, coefficients, selection, count) as xIsCombo from xInSpan;
@@ -1507,7 +1507,7 @@ theorem Subspace.spanning_value_covered {f : Field} {V : VectorSpace(f)} {I : Ty
   }
 }
 
-theorem Natural.lt_of_add_left_lt (a x y : Natural) (h : a + x < a + y) : x < y := {
+theorem Natural.lt_of_add_left_lt (a x y : ℕ) (h : a + x < a + y) : x < y := {
   a + (x + 1) = (a + x) + 1
      ≤ a + y;
   x + 1 ≤ y;
@@ -1519,7 +1519,7 @@ theorem Natural.lt_of_add_left_lt (a x y : Natural) (h : a + x < a + y) : x < y 
 -- combination, and each `T(ext(i))` is either zero (the `e`-prefix, which lies
 -- in the kernel) or one of the `T(aFamily(j))` (the appended suffix). The
 -- disjunctive `of_combination_covered` carries that over the whole sum.
-theorem LinearMap.appended_images_span {f : Field} {V W : VectorSpace(f)} {k r sz : Natural}
+theorem LinearMap.appended_images_span {f : Field} {V W : VectorSpace(f)} {k r sz : ℕ}
         (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) (linear : IsLinearMap(V, W, T))
         (e : NaturalsBelow(k) → VectorSpace.carrier(V))
         (ext : NaturalsBelow(sz) → VectorSpace.carrier(V))
@@ -1645,10 +1645,10 @@ theorem LinearMap.appended_images_span {f : Field} {V W : VectorSpace(f)} {k r s
             Subtype.value(x) = VectorSpace.linearCombination(
                 (j : NaturalsBelow(r)) ↦ T(aFamily(j)), coefficients, selection, count)
             as vxCombo from valueInSpan;
-        ∀ (i : Natural). i < count →
+        ∀ (i : ℕ). i < count →
             coefficients(i) • Subtype.value(TaFamily(selection(i)))
             = coefficients(i) • T(aFamily(selection(i)))
-          by { take i : Natural; suppose i < count as iBelow;
+          by { take i : ℕ; suppose i < count as iBelow;
                Subtype.value(TaFamily(selection(i))) = T(aFamily(selection(i))) by taValue as tv;
                done by substituting tv };
         Subtype.value(VectorSpace.linearCombination(TaFamily, coefficients, selection, count))
@@ -1682,7 +1682,7 @@ theorem LinearMap.appended_images_span {f : Field} {V W : VectorSpace(f)} {k r s
 -- single vanishing combination of `ext` whose selection is injective — the two
 -- index ranges are disjoint. Independence of `ext` kills every coefficient, the
 -- `cⱼ` among them.
-theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)} {k r sz : Natural}
+theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)} {k r sz : ℕ}
         (T : VectorSpace.carrier(V) → VectorSpace.carrier(W)) (linear : IsLinearMap(V, W, T))
         (e : NaturalsBelow(k) → VectorSpace.carrier(V))
         (ext : NaturalsBelow(sz) → VectorSpace.carrier(V))
@@ -1699,17 +1699,17 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
         (kerCoverage : ∀ (w : VectorSpace.carrier(V)).
             T(w) = VectorSpace.zero(W) → w = VectorSpace.zero(V) ∨ VectorSpace.InSpanOf(e, w))
         : VectorSpace.LinearlyIndependent(TaFamily) := {
-  take cnt : Natural;
-  take sel : Natural → NaturalsBelow(r);
-  take coeff : Natural → Field.carrier(f);
-  suppose ∀ (a b : Natural). a < cnt → b < cnt → sel(a) = sel(b) → a = b as selInjective;
+  take cnt : ℕ;
+  take sel : ℕ → NaturalsBelow(r);
+  take coeff : ℕ → Field.carrier(f);
+  suppose ∀ (a b : ℕ). a < cnt → b < cnt → sel(a) = sel(b) → a = b as selInjective;
   suppose VectorSpace.linearCombination(TaFamily, coeff, sel, cnt)
           = VectorSpace.zero(Subspace.vector_space(W, LinearMap.image(V, W, T), imgSub)) as vanishes;
 
   -- Pull the vanishing back into `V`: `Σ cⱼ aⱼ` lies in the kernel.
-  ∀ (i : Natural). i < cnt →
+  ∀ (i : ℕ). i < cnt →
       coeff(i) • Subtype.value(TaFamily(sel(i))) = coeff(i) • T(aFamily(sel(i)))
-    by { take i : Natural; suppose i < cnt as iBelow;
+    by { take i : ℕ; suppose i < cnt as iBelow;
          Subtype.value(TaFamily(sel(i))) = T(aFamily(sel(i))) by taValue as tv;
          done by substituting tv };
   Subtype.value(VectorSpace.linearCombination(TaFamily, coeff, sel, cnt))
@@ -1730,24 +1730,24 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
       by kerCoverage(VectorSpace.linearCombination(aFamily, coeff, sel, cnt), combinationInKernel)
      ;
 
-  take target : Natural;
+  take target : ℕ;
   suppose target < cnt as targetBelow;
 
   -- Reindex the appended combination into `ext`: the selection lands in the
   -- suffix `[k, sz)` and is injective there.
-  ∀ (i : Natural). i < cnt → k + NaturalsBelow.value(sel(i)) < sz
-    by { take i : Natural; suppose i < cnt as iBelow;
+  ∀ (i : ℕ). i < cnt → k + NaturalsBelow.value(sel(i)) < sz
+    by { take i : ℕ; suppose i < cnt as iBelow;
          NaturalsBelow.value(sel(i)) < r;
          k + NaturalsBelow.value(sel(i)) < k + r;
          done by substituting szEq } as selExtBound;
   let selExtFallback : NaturalsBelow(sz) :=
       NaturalsBelow.make(k + NaturalsBelow.value(sel(target)), selExtBound(target, targetBelow));
-  let selExt : Natural → NaturalsBelow(sz) :=
-      (i : Natural) ↦ NaturalsBelow.clamp(selExtFallback)(k + NaturalsBelow.value(sel(i)));
+  let selExt : ℕ → NaturalsBelow(sz) :=
+      (i : ℕ) ↦ NaturalsBelow.clamp(selExtFallback)(k + NaturalsBelow.value(sel(i)));
 
-  ∀ (i : Natural). i < cnt → NaturalsBelow.value(selExt(i)) = k + NaturalsBelow.value(sel(i))
+  ∀ (i : ℕ). i < cnt → NaturalsBelow.value(selExt(i)) = k + NaturalsBelow.value(sel(i))
     by {
-      take i : Natural; suppose i < cnt as iBelow;
+      take i : ℕ; suppose i < cnt as iBelow;
       k + NaturalsBelow.value(sel(i)) < sz as ib;
       selExt(i) = NaturalsBelow.make(k + NaturalsBelow.value(sel(i)), ib)
           by NaturalsBelow.clamp_below(sz, selExtFallback, k + NaturalsBelow.value(sel(i)), ib) as selExtAt;
@@ -1757,10 +1757,10 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
       done
     } as selExtValue;
 
-  ∀ (i : Natural). i < cnt →
+  ∀ (i : ℕ). i < cnt →
       coeff(i) • aFamily(sel(i)) = coeff(i) • ext(selExt(i))
     by {
-      take i : Natural; suppose i < cnt as iBelow;
+      take i : ℕ; suppose i < cnt as iBelow;
       NaturalsBelow.value(selExt(i)) = k + NaturalsBelow.value(sel(i)) by selExtValue(i, iBelow) as sv;
       ext(selExt(i)) = aFamily(sel(i)) by extSuffix(selExt(i), sel(i), sv) as extAt;
       done by substituting extAt
@@ -1769,9 +1769,9 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
      = VectorSpace.linearCombination(ext, coeff, selExt, cnt)
            by VectorSpace.linearCombination_congruence as aReindex;
 
-  ∀ (a b : Natural). a < cnt → b < cnt → selExt(a) = selExt(b) → a = b
+  ∀ (a b : ℕ). a < cnt → b < cnt → selExt(a) = selExt(b) → a = b
     by {
-      take a : Natural; take b : Natural;
+      take a : ℕ; take b : ℕ;
       suppose a < cnt as aBelow; suppose b < cnt as bBelow;
       suppose selExt(a) = selExt(b) as selExtEq;
       k + NaturalsBelow.value(sel(a))
@@ -1795,10 +1795,10 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
         0 < sz by { 0 ≤ k + NaturalsBelow.value(sel(target)) < sz;
                         done } as szPositive;
         let idEFallback : NaturalsBelow(sz) := NaturalsBelow.make(0, szPositive);
-        let idE : Natural → NaturalsBelow(sz) := NaturalsBelow.clamp(idEFallback);
-        ∀ (i : Natural). i < sz → NaturalsBelow.value(idE(i)) = i
+        let idE : ℕ → NaturalsBelow(sz) := NaturalsBelow.clamp(idEFallback);
+        ∀ (i : ℕ). i < sz → NaturalsBelow.value(idE(i)) = i
           by {
-            take i : Natural; suppose i < sz as below;
+            take i : ℕ; suppose i < sz as below;
             idE(i) = NaturalsBelow.make(i, below) as idEAt;
             NaturalsBelow.value(idE(i)) = NaturalsBelow.value(NaturalsBelow.make(i, below)) by idEAt = i;
             done
@@ -1808,14 +1808,14 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
         choose cntE, selE, cE such that
             VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
             = VectorSpace.linearCombination(e, cE, selE, cntE) as wIsECombo from combInSpan;
-        ∀ (i : Natural). k ≤ i → Function.extendBelow(e, VectorSpace.zero(V))(i) = VectorSpace.zero(V)
-          by { take i : Natural; suppose k ≤ i as atLeast;
+        ∀ (i : ℕ). k ≤ i → Function.extendBelow(e, VectorSpace.zero(V))(i) = VectorSpace.zero(V)
+          by { take i : ℕ; suppose k ≤ i as atLeast;
                done };
-        ∀ (l : Natural). l < cntE →
+        ∀ (l : ℕ). l < cntE →
             cE(l) • e(selE(l))
             = cE(l) • Function.extendBelow(e, VectorSpace.zero(V))(NaturalsBelow.value(selE(l)))
           by {
-            take l : Natural; suppose l < cntE as lBelow;
+            take l : ℕ; suppose l < cntE as lBelow;
             NaturalsBelow.value(selE(l)) < k as valBelow;
             Function.extendBelow(e, VectorSpace.zero(V))(NaturalsBelow.value(selE(l)))
                 = e(NaturalsBelow.make(NaturalsBelow.value(selE(l)), valBelow))
@@ -1825,26 +1825,26 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
         VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
            = VectorSpace.linearCombination(e, cE, selE, cntE) by wIsECombo
            = VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
-                 (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE)
+                 (l : ℕ) ↦ NaturalsBelow.value(selE(l)), cntE)
            as wIsEeCombo;
-        ∃ (dPrime : Natural → Field.carrier(f)).
+        ∃ (dPrime : ℕ → Field.carrier(f)).
             VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
-                (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE)
+                (l : ℕ) ↦ NaturalsBelow.value(selE(l)), cntE)
             = VectorSpace.standardCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime, k)
             by VectorSpace.linearCombination_standardize
             as standardizeExists;
         choose dPrime such that
             VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
-                (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE)
+                (l : ℕ) ↦ NaturalsBelow.value(selE(l)), cntE)
             = VectorSpace.standardCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime, k)
             as wIsStandard from standardizeExists;
 
         -- Reindex the canonical prefix combination into `ext` (identity into `[0, k)`).
-        ∀ (i : Natural). i < k →
+        ∀ (i : ℕ). i < k →
             dPrime(i) • Function.extendBelow(e, VectorSpace.zero(V))(i)
             = dPrime(i) • ext(idE(i))
           by {
-            take i : Natural; suppose i < k as iBelowK;
+            take i : ℕ; suppose i < k as iBelowK;
             i < sz by { i < k ≤ sz by { k ≤ k + r;
                                         done by substituting szEq }; done } as iBelowSz;
             Function.extendBelow(e, VectorSpace.zero(V))(i) = e(NaturalsBelow.make(i, iBelowK))
@@ -1860,21 +1860,21 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
           };
         VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
            = VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), cE,
-                 (l : Natural) ↦ NaturalsBelow.value(selE(l)), cntE) by wIsEeCombo
+                 (l : ℕ) ↦ NaturalsBelow.value(selE(l)), cntE) by wIsEeCombo
            = VectorSpace.standardCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime, k) by wIsStandard
            = VectorSpace.linearCombination(Function.extendBelow(e, VectorSpace.zero(V)), dPrime,
-                 (i : Natural) ↦ i, k)
+                 (i : ℕ) ↦ i, k)
            = VectorSpace.linearCombination(ext, dPrime, idE, k)
           ;
 
         -- Difference of the two `ext`-combinations vanishes; concatenate.
         VectorSpace.negate(VectorSpace.linearCombination(ext, dPrime, idE, k))
            = Field.negate(Field.one(f)) • VectorSpace.linearCombination(ext, dPrime, idE, k)
-           = VectorSpace.linearCombination(ext, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
+           = VectorSpace.linearCombination(ext, (i : ℕ) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
                  by VectorSpace.linearCombination_scale
            as negatedPrefix;
         VectorSpace.linearCombination(ext, coeff, selExt, cnt)
-           + VectorSpace.linearCombination(ext, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
+           + VectorSpace.linearCombination(ext, (i : ℕ) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
            = VectorSpace.linearCombination(ext, coeff, selExt, cnt)
              + VectorSpace.negate(VectorSpace.linearCombination(ext, dPrime, idE, k)) by negatedPrefix
            = VectorSpace.linearCombination(aFamily, coeff, sel, cnt)
@@ -1883,29 +1883,29 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
            = VectorSpace.zero(V) by VectorSpace.add_negate_right
            as combinedVanishesRaw;
         VectorSpace.linearCombination(ext,
-              VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt),
+              VectorSpace.combineFunctions(coeff, (i : ℕ) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt),
               VectorSpace.combineFunctions(selExt, idE, cnt), cnt + k)
            = VectorSpace.linearCombination(ext, coeff, selExt, cnt)
-             + VectorSpace.linearCombination(ext, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
+             + VectorSpace.linearCombination(ext, (i : ℕ) ↦ Field.negate(Field.one(f)) * dPrime(i), idE, k)
            = VectorSpace.zero(V) by combinedVanishesRaw as combinedVanishes;
 
         -- The concatenated selection lands in `[k, sz)` on the front block
         -- (the `selExt` values) and in `[0, k)` on the back block (the `idE`
         -- values), read off through `combineFunctions`.
-        ∀ (x : Natural). x < cnt →
+        ∀ (x : ℕ). x < cnt →
             NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x))
             = k + NaturalsBelow.value(sel(x))
           by {
-            take x : Natural; suppose x < cnt as xFront;
+            take x : ℕ; suppose x < cnt as xFront;
             NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x))
                = NaturalsBelow.value(selExt(x)) by VectorSpace.combineFunctions_below
                = k + NaturalsBelow.value(sel(x)) by selExtValue(x, xFront);
             done
           } as frontValue;
-        ∀ (x : Natural). cnt ≤ x → x < cnt + k →
+        ∀ (x : ℕ). cnt ≤ x → x < cnt + k →
             NaturalsBelow.value(VectorSpace.combineFunctions(selExt, idE, cnt)(x)) = x ∸ cnt
           by {
-            take x : Natural; suppose cnt ≤ x as xGe; suppose x < cnt + k as xLt;
+            take x : ℕ; suppose cnt ≤ x as xGe; suppose x < cnt + k as xLt;
             x = cnt + (x ∸ cnt) by NaturalsBelow.decompose_at_least(cnt, x, xGe) as xDecomp;
             (x ∸ cnt) < k
                 by { cnt + (x ∸ cnt) < cnt + k by substituting xDecomp;
@@ -1925,11 +1925,11 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
         -- Hence the concatenated selection is injective: front and back values
         -- never coincide (front `≥ k`, back `< k`), so a shared value forces the
         -- same block, where `selExt`/`idE` are each injective.
-        ∀ (a b : Natural). a < cnt + k → b < cnt + k →
+        ∀ (a b : ℕ). a < cnt + k → b < cnt + k →
             VectorSpace.combineFunctions(selExt, idE, cnt)(a)
             = VectorSpace.combineFunctions(selExt, idE, cnt)(b) → a = b
           by {
-            take a : Natural; take b : Natural;
+            take a : ℕ; take b : ℕ;
             suppose a < cnt + k as aBelow; suppose b < cnt + k as bBelow;
             suppose VectorSpace.combineFunctions(selExt, idE, cnt)(a)
                     = VectorSpace.combineFunctions(selExt, idE, cnt)(b) as combSelEq;
@@ -2019,16 +2019,16 @@ theorem LinearMap.appended_images_independent {f : Field} {V W : VectorSpace(f)}
 
         -- Independence of `ext` kills the concatenated coefficients; the first
         -- `cnt` of them are the `coeff` we care about.
-        ∀ (i : Natural). i < cnt + k →
-            VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt)(i)
+        ∀ (i : ℕ). i < cnt + k →
+            VectorSpace.combineFunctions(coeff, (i : ℕ) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt)(i)
             = Field.zero(f)
           by extIndependent(cnt + k,
                  VectorSpace.combineFunctions(selExt, idE, cnt),
-                 VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt),
+                 VectorSpace.combineFunctions(coeff, (i : ℕ) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt),
                  combinedInjective, combinedVanishes) as concatCoeffsZero;
         target < cnt + k as targetBelowSum;
         coeff(target)
-           = VectorSpace.combineFunctions(coeff, (i : Natural) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt)(target)
+           = VectorSpace.combineFunctions(coeff, (i : ℕ) ↦ Field.negate(Field.one(f)) * dPrime(i), cnt)(target)
            = Field.zero(f) by concatCoeffsZero(target, targetBelowSum);
         done
       }
@@ -2058,7 +2058,7 @@ theorem LinearMap.rank_nullity {f : Field} (V W : VectorSpace(f))
   let kerSub : IsSubspace(V, kerSet) := LinearMap.kernel_is_subspace(V, W, T, linear);
   let imgSet : Set(VectorSpace.carrier(W)) := LinearMap.image(V, W, T);
   let imgSub : IsSubspace(W, imgSet) := LinearMap.image_is_subspace(V, W, T, linear);
-  let kdim : Natural := VectorSpace.dimension(Subspace.vector_space(V, kerSet, kerSub), kerFinite);
+  let kdim : ℕ := VectorSpace.dimension(Subspace.vector_space(V, kerSet, kerSub), kerFinite);
 
   -- A basis of the kernel, transported into `V`.
   VectorSpace.HasDimension(Subspace.vector_space(V, kerSet, kerSub), kdim)
@@ -2075,7 +2075,7 @@ theorem LinearMap.rank_nullity {f : Field} (V W : VectorSpace(f))
            Subtype.value(eK(i)) ∈ kerSet by Subtype.property; done } as eKernel;
 
   -- Extend it to a basis of `V`.
-  ∃ (sz : Natural). ∃ (rr : Natural). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
+  ∃ (sz : ℕ). ∃ (rr : ℕ). ∃ (ext : NaturalsBelow(sz) → VectorSpace.carrier(V)).
       sz = kdim + rr
       ∧ VectorSpace.IsBasis(ext)
       ∧ (∀ (i : NaturalsBelow(sz)). ∀ (j : NaturalsBelow(kdim)).

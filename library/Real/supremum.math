@@ -71,7 +71,7 @@ import Set.basics
 
 -- halve(a + a) = a. Unfold halve, distribute (ring), refold, apply
 -- halve_doubled.
-theorem Rational.halve_of_doubled (a : Rational)
+theorem Rational.halve_of_doubled (a : ℚ)
         : Rational.halve(a + a) = a :=
   Rational.halve(a + a)
      = (a + a) * Rational.one_half
@@ -80,7 +80,7 @@ theorem Rational.halve_of_doubled (a : Rational)
 
 -- halve(x) - halve(y) = halve(x - y). Distributivity over `(1/2)` is
 -- pure ring once `multiply_negate_left` is in scope.
-theorem Rational.halve_subtract_distributive (x y : Rational)
+theorem Rational.halve_subtract_distributive (x y : ℚ)
         : Rational.halve(x) - Rational.halve(y) = Rational.halve(x - y) :=
   Rational.halve(x) - Rational.halve(y)
      = x * Rational.one_half - y * Rational.one_half
@@ -92,7 +92,7 @@ theorem Rational.halve_subtract_distributive (x y : Rational)
 -- halve(right - left) = halve(old_width). The auto-prover finds each
 -- step via the lemma index (halve_of_doubled, halve_subtract_distributive,
 -- add_subtract_cancel_left).
-theorem Rational.halve_endpoint_left (a b : Rational)
+theorem Rational.halve_endpoint_left (a b : ℚ)
         : Rational.halve(a + b) - a = Rational.halve(b - a) :=
   Rational.halve(a + b) - a
      = Rational.halve(a + b) - Rational.halve(a + a)
@@ -102,7 +102,7 @@ theorem Rational.halve_endpoint_left (a b : Rational)
 -- b - halve(a + b) = halve(b - a). No-branch width identity:
 -- new_width = right - midpoint = right - halve(left + right) =
 -- halve(right - left) = halve(old_width).
-theorem Rational.halve_endpoint_right (a b : Rational)
+theorem Rational.halve_endpoint_right (a b : ℚ)
         : b - Rational.halve(a + b) = Rational.halve(b - a) :=
   b - Rational.halve(a + b)
      = Rational.halve(b + b) - Rational.halve(a + b)
@@ -115,9 +115,9 @@ theorem Rational.halve_endpoint_right (a b : Rational)
 -- and monotone-step invariants.
 
 theorem Rational.halve_preserves_LessOrEqual
-        (x y : Rational) (xLeqY : x ≤ y)
+        (x y : ℚ) (xLeqY : x ≤ y)
         : Rational.halve(x) ≤ Rational.halve(y) := {
-  (0 : Rational) ≤ Rational.one_half;
+  (0 : ℚ) ≤ Rational.one_half;
   Rational.halve(x)
      = x * Rational.one_half
      ≤ y * Rational.one_half
@@ -126,7 +126,7 @@ theorem Rational.halve_preserves_LessOrEqual
 
 -- a ≤ b → a ≤ halve(a + b). From a + a ≤ a + b (left-add b), halve
 -- both sides, then `halve(a + a) = a`.
-theorem Rational.halve_left_le_sum (a b : Rational) (aLeqB : a ≤ b)
+theorem Rational.halve_left_le_sum (a b : ℚ) (aLeqB : a ≤ b)
         : a ≤ Rational.halve(a + b) := {
   a + a ≤ a + b;
   a
@@ -136,7 +136,7 @@ theorem Rational.halve_left_le_sum (a b : Rational) (aLeqB : a ≤ b)
 
 -- a ≤ b → halve(a + b) ≤ b. Symmetric: a + b ≤ b + b, then halve and
 -- `halve(b + b) = b`.
-theorem Rational.halve_sum_le_right (a b : Rational) (aLeqB : a ≤ b)
+theorem Rational.halve_sum_le_right (a b : ℚ) (aLeqB : a ≤ b)
         : Rational.halve(a + b) ≤ b := {
   a + b ≤ b + b;
   Rational.halve(a + b)
@@ -148,145 +148,145 @@ theorem Rational.halve_sum_le_right (a b : Rational) (aLeqB : a ≤ b)
 -- Bound vocabulary on Real.
 
 -- `b` is an upper bound for `S` when every element of `S` is ≤ `b`.
-definition Real.IsUpperBound (subset : Set(Real)) (bound : Real)
+definition Real.IsUpperBound (subset : Set(ℝ)) (bound : ℝ)
         : Proposition :=
-  ∀ (subject : Real). subject ∈ subset → subject ≤ bound
+  ∀ (subject : ℝ). subject ∈ subset → subject ≤ bound
 
 -- `S` is bounded above when some Real is an upper bound for it.
-definition Real.IsBoundedAbove (subset : Set(Real)) : Proposition :=
-  ∃ (bound : Real). Real.IsUpperBound(subset, bound)
+definition Real.IsBoundedAbove (subset : Set(ℝ)) : Proposition :=
+  ∃ (bound : ℝ). Real.IsUpperBound(subset, bound)
 
 -- `s` is the supremum (least upper bound) of `S` when:
 --   - `s` is an upper bound for `S`, and
 --   - every other upper bound `b` satisfies `s ≤ b`.
-definition Real.IsSupremum (subset : Set(Real)) (s : Real)
+definition Real.IsSupremum (subset : Set(ℝ)) (s : ℝ)
         : Proposition :=
-  Real.IsUpperBound(subset, s) ∧ ∀ (otherBound : Real).
+  Real.IsUpperBound(subset, s) ∧ ∀ (otherBound : ℝ).
             Real.IsUpperBound(subset, otherBound)
           → s ≤ otherBound
 
 -- ----------------------------------------------------------------------
 -- Building block #1: every Real has a Rational lower bound.
 --
--- Given x : Real with Cauchy representative `make(seq, seqCauchy)`,
+-- Given x : ℝ with Cauchy representative `make(seq, seqCauchy)`,
 -- pick N from the Cauchy witness at ε = 1, then `q := seq(N) - 1` is
 -- below x. Reason: for m ≥ N, `|seq(m) - seq(N)| < 1`, so
 -- `seq(m) > seq(N) - 1 = q`, so the difference sequence
 -- `λn. seq(n) - q` is eventually > 0, hence eventually > -ε for any
--- positive ε — that's exactly Real.IsNonneg(x - (q : Real)).
+-- positive ε — that's exactly Real.IsNonneg(x - (q : ℝ)).
 
 theorem Real.exists_rational_below_at_make
         (rep : CauchyRationalSequence)
-        : ∃ (q : Rational).
-            (q : Real) ≤ Quotient.class_of(rep) := {
+        : ∃ (q : ℚ).
+            (q : ℝ) ≤ Quotient.class_of(rep) := {
       let ⟨seq, seqIsCauchy⟩ := rep;
       -- Pick N from the Cauchy witness at ε = 1; for m, n ≥ N,
       -- |seq(m) - seq(n)| < 1. The witness rational is q := seq(N) - 1
       -- — every later term `seq(m)` lies in (seq(N) - 1, seq(N) + 1),
       -- hence strictly above q.
       choose N as cauchyAt1
-          from seqIsCauchy((1 : Rational), (0 : Rational) < (1 : Rational));
-      witness seq(N) - (1 : Rational) with (unfold Real.IsNonneg in {
-        -- (q : Real) ≤ mk(make(seq, _)) unfolds (via Quotient.lift
+          from seqIsCauchy((1 : ℚ), (0 : ℚ) < (1 : ℚ));
+      witness seq(N) - (1 : ℚ) with (unfold Real.IsNonneg in {
+        -- (q : ℝ) ≤ mk(make(seq, _)) unfolds (via Quotient.lift
         -- through `LessOrEqual` → `IsNonneg` of the difference) to:
         -- `∀ ε > 0. ∃ M. ∀ m ≥ M. seq(m) - (seq(N) - 1) > -ε`. Take
         -- M = N and chain -ε < 0 < seq(m) - (seq(N) - 1).
-        let ε ∈ Rational with (0 : Rational) < ε;
+        let ε ∈ ℚ with (0 : ℚ) < ε;
         witness N with {
-          let m ∈ Natural with N ≤ m;
-          abs(seq(m) - seq(N)) < (1: Rational)
+          let m ∈ ℕ with N ≤ m;
+          abs(seq(m) - seq(N)) < (1: ℚ)
             by cauchyAt1(m, N ≤ m, N, N ≤ N);
-          -(1 : Rational) < seq(m) - seq(N)
+          -(1 : ℚ) < seq(m) - seq(N)
             by Rational.absolute_value_LessThan_bounds;
           -- 0 = -1 + 1 < (seq(m) - seq(N)) + 1, adding 1 on the right;
           -- ring rearranges the RHS to `seq(m) - (seq(N) - 1)`.
-          (0 : Rational)
-                  = -(1 : Rational) + (1 : Rational)
-                  < (seq(m) - seq(N)) + (1 : Rational)
-                  = seq(m) - (seq(N) - (1 : Rational));
+          (0 : ℚ)
+                  = -(1 : ℚ) + (1 : ℚ)
+                  < (seq(m) - seq(N)) + (1 : ℚ)
+                  = seq(m) - (seq(N) - (1 : ℚ));
           -- Close -ε < seq(m) - (seq(N) - 1) by chaining through 0:
           -- -ε < 0 (since ε > 0) and 0 < ... by the calc above.
           -ε
-             < (0 : Rational)
-             < seq(m) - (seq(N) - (1 : Rational))
+             < (0 : ℚ)
+             < seq(m) - (seq(N) - (1 : ℚ))
         }
       })
    }
 
 -- Lift the at-make form via Quotient.induct.
-theorem Real.exists_rational_below (x : Real)
-        : ∃ (q : Rational). (q : Real) ≤ x :=
+theorem Real.exists_rational_below (x : ℝ)
+        : ∃ (q : ℚ). (q : ℝ) ≤ x :=
   by_representatives x as rep => done
 
 -- ----------------------------------------------------------------------
 -- Building block #2: every Real has a Rational upper bound. Symmetric
 -- to #1 with q := seq(N) + 1; for m ≥ N, |seq(m) - seq(N)| < 1 gives
--- seq(m) < seq(N) + 1 = q, so q - seq(m) > 0, hence x ≤ (q : Real).
+-- seq(m) < seq(N) + 1 = q, so q - seq(m) > 0, hence x ≤ (q : ℝ).
 
 theorem Real.exists_rational_above_at_make
         (rep : CauchyRationalSequence)
-        : ∃ (q : Rational).
-            (Quotient.class_of(rep) : Real) ≤ (q : Real) := {
+        : ∃ (q : ℚ).
+            (Quotient.class_of(rep) : ℝ) ≤ (q : ℝ) := {
       let ⟨seq, seqIsCauchy⟩ := rep;
       choose N as cauchyAt1
-          from seqIsCauchy((1 : Rational), Rational.zero_less_one);
-      witness seq(N) + (1 : Rational) with
+          from seqIsCauchy((1 : ℚ), Rational.zero_less_one);
+      witness seq(N) + (1 : ℚ) with
           unfold Real.IsNonneg in
-          ((ε : Rational)
-                   (εPositive : (0 : Rational) < ε) ↦
+          ((ε : ℚ)
+                   (εPositive : (0 : ℚ) < ε) ↦
             witness N with
-                (m : Natural) (mGeN : N ≤ m) ↦ {
-                  abs(seq(m) - seq(N)) < (1 : Rational)
+                (m : ℕ) (mGeN : N ≤ m) ↦ {
+                  abs(seq(m) - seq(N)) < (1 : ℚ)
                     by cauchyAt1(m, mGeN, N, N ≤ N);
-                  seq(m) - seq(N) < (1 : Rational)
+                  seq(m) - seq(N) < (1 : ℚ)
                     by Rational.absolute_value_LessThan_bounds;
                   -- Negate both sides: from `seq(m) - seq(N) < 1` we
                   -- get `-1 < -(seq(m) - seq(N)) = seq(N) - seq(m)`.
                   -- Then add 1 to both sides:
                   -- `0 < (seq(N) - seq(m)) + 1 = (seq(N) + 1) - seq(m)`.
-                  -(1 : Rational)
+                  -(1 : ℚ)
                           < -(seq(m) - seq(N))
                           = seq(N) - seq(m);
-                  (0 : Rational)
-                          = -(1 : Rational) + (1 : Rational)
-                          < (seq(N) - seq(m)) + (1 : Rational)
-                          = (seq(N) + (1 : Rational)) - seq(m);
+                  (0 : ℚ)
+                          = -(1 : ℚ) + (1 : ℚ)
+                          < (seq(N) - seq(m)) + (1 : ℚ)
+                          = (seq(N) + (1 : ℚ)) - seq(m);
                   -- Chain: -ε < 0 < (seq(N) + 1) - seq(m).
                   -ε
-                     < (0 : Rational)
-                     < (seq(N) + (1 : Rational)) - seq(m)
+                     < (0 : ℚ)
+                     < (seq(N) + (1 : ℚ)) - seq(m)
                 })
    }
 
 -- Lift exists_rational_above_at_make via Quotient.induct.
-theorem Real.exists_rational_above (x : Real)
-        : ∃ (q : Rational). x ≤ (q : Real) :=
+theorem Real.exists_rational_above (x : ℝ)
+        : ∃ (q : ℚ). x ≤ (q : ℝ) :=
   by_representatives x as rep => done
 
 -- A positive rational roof over |x|: the form every ε-argument wants,
 -- with positivity bundled in so the roof can be fed to reciprocals.
-theorem Real.exists_positive_rational_roof (x : Real)
-        : ∃ (q : Rational). Rational.zero < q ∧ abs(x) ≤ (q : Real) := {
-  ∃ (q : Rational). abs(x) ≤ (q : Real);
-  choose bound such that abs(x) ≤ (bound : Real);
+theorem Real.exists_positive_rational_roof (x : ℝ)
+        : ∃ (q : ℚ). Rational.zero < q ∧ abs(x) ≤ (q : ℝ) := {
+  ∃ (q : ℚ). abs(x) ≤ (q : ℝ);
+  choose bound such that abs(x) ≤ (bound : ℝ);
   Real.zero ≤ abs(x);
   Rational.zero < Rational.one;
-  Real.zero < (Rational.one : Real);
-  ((bound + Rational.one) : Real)
-          = (bound : Real) + (Rational.one : Real);
+  Real.zero < (Rational.one : ℝ);
+  ((bound + Rational.one) : ℝ)
+          = (bound : ℝ) + (Rational.one : ℝ);
   Real.zero
      ≤ abs(x)
-     ≤ (bound : Real);
-  (Rational.zero : Real)
-     ≤ (bound : Real)
-     = (bound : Real) + Real.zero
-     < (bound : Real) + (Rational.one : Real)
-     = ((bound + Rational.one) : Real);
+     ≤ (bound : ℝ);
+  (Rational.zero : ℝ)
+     ≤ (bound : ℝ)
+     = (bound : ℝ) + Real.zero
+     < (bound : ℝ) + (Rational.one : ℝ)
+     = ((bound + Rational.one) : ℝ);
   abs(x)
-     ≤ (bound : Real)
-     = (bound : Real) + Real.zero
-     ≤ (bound : Real) + (Rational.one : Real)
-     = ((bound + Rational.one) : Real);
+     ≤ (bound : ℝ)
+     = (bound : ℝ) + Real.zero
+     ≤ (bound : ℝ) + (Rational.one : ℝ)
+     = ((bound + Rational.one) : ℝ);
   witness bound + Rational.one with {
     Rational.zero < bound + Rational.one;
     done
@@ -299,25 +299,25 @@ theorem Real.exists_positive_rational_roof (x : Real)
 -- Each step of the bisection holds a Rational interval [a, b]. We
 -- maintain two invariants on this interval (formalised in the
 -- Cauchy + sup proofs below):
---   * b is an upper bound for S (`(b : Real) ≥ everything in S`).
---   * a is below some element of S (∃ y ∈ S. (a : Real) ≤ y).
+--   * b is an upper bound for S (`(b : ℝ) ≥ everything in S`).
+--   * a is below some element of S (∃ y ∈ S. (a : ℝ) ≤ y).
 --
 -- The step's midpoint `m = halve(a + b)` is decided classically:
--- either `(m : Real)` is itself an upper bound for S — in which case
+-- either `(m : ℝ)` is itself an upper bound for S — in which case
 -- the new interval is [a, m] — or not, in which case we know some
 -- y ∈ S satisfies `m < y` so the new interval [m, b] still meets
 -- both invariants.
 
 inductive Real.BisectionInterval : Type(0) where
   | Real.BisectionInterval.make
-      : Rational → Rational → Real.BisectionInterval
+      : ℚ → ℚ → Real.BisectionInterval
 
 definition Real.BisectionInterval.left
-        : Real.BisectionInterval → Rational
+        : Real.BisectionInterval → ℚ
   | Real.BisectionInterval.make(a, _) => a
 
 definition Real.BisectionInterval.right
-        : Real.BisectionInterval → Rational
+        : Real.BisectionInterval → ℚ
   | Real.BisectionInterval.make(_, b) => b
 
 -- One bisection step PARAMETRIZED by the decidability. Splitting
@@ -329,14 +329,14 @@ definition Real.BisectionInterval.right
 -- unify the proof's case-analysis with the one buried inside
 -- `bisectionStep`'s body (both on the opaque axiom result).
 definition Real.bisectionStepWithDec
-        (subset : Set(Real)) (state : Real.BisectionInterval)
+        (subset : Set(ℝ)) (state : Real.BisectionInterval)
         : Logic.Decidable(
                   Real.IsUpperBound(
                       subset,
                       (Rational.halve(
                            Real.BisectionInterval.left(state)
                            + Real.BisectionInterval.right(state))
-                       : Real)))
+                       : ℝ)))
           → Real.BisectionInterval
   | Logic.Decidable.yes(_) =>
       Real.BisectionInterval.make(
@@ -354,7 +354,7 @@ definition Real.bisectionStepWithDec
 -- One bisection step. Classical: split at the midpoint and pick the
 -- half consistent with the running invariants.
 definition Real.bisectionStep
-        (subset : Set(Real)) (state : Real.BisectionInterval)
+        (subset : Set(ℝ)) (state : Real.BisectionInterval)
         : Real.BisectionInterval :=
   Real.bisectionStepWithDec(
       subset, state,
@@ -363,7 +363,7 @@ definition Real.bisectionStep
               subset,
               (Rational.halve(
                    Real.BisectionInterval.left(state)
-                   + Real.BisectionInterval.right(state)) : Real))))
+                   + Real.BisectionInterval.right(state)) : ℝ))))
 
 -- The characterizing equations of the step: when the midpoint is an
 -- upper bound the step keeps the left half, otherwise the right half.
@@ -371,13 +371,13 @@ definition Real.bisectionStep
 -- if_negative); proofs below reason propositionally through them
 -- instead of case-analyzing the classical decision.
 theorem Real.bisectionStep_eq_of_upper_bound
-        (subset : Set(Real)) (state : Real.BisectionInterval)
+        (subset : Set(ℝ)) (state : Real.BisectionInterval)
         (midpointIsUpperBound
             : Real.IsUpperBound(
                   subset,
                   (Rational.halve(
                        Real.BisectionInterval.left(state)
-                       + Real.BisectionInterval.right(state)) : Real)))
+                       + Real.BisectionInterval.right(state)) : ℝ)))
         : Real.bisectionStep(subset, state)
           = Real.BisectionInterval.make(
                 Real.BisectionInterval.left(state),
@@ -387,13 +387,13 @@ theorem Real.bisectionStep_eq_of_upper_bound
   by Logic.if_positive
 
 theorem Real.bisectionStep_eq_of_not_upper_bound
-        (subset : Set(Real)) (state : Real.BisectionInterval)
+        (subset : Set(ℝ)) (state : Real.BisectionInterval)
         (midpointNotUpperBound
             : ¬Real.IsUpperBound(
                   subset,
                   (Rational.halve(
                        Real.BisectionInterval.left(state)
-                       + Real.BisectionInterval.right(state)) : Real)))
+                       + Real.BisectionInterval.right(state)) : ℝ)))
         : Real.bisectionStep(subset, state)
           = Real.BisectionInterval.make(
                 Rational.halve(
@@ -406,8 +406,8 @@ theorem Real.bisectionStep_eq_of_not_upper_bound
 -- [a0, b0] enclosing the bisection setup, generate the nth refined
 -- interval by iterating `bisectionStep`.
 definition Real.bisectionIntervals
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
-        : Natural → Real.BisectionInterval
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
+        : ℕ → Real.BisectionInterval
   | 0 =>
       initial
   | 1 + predecessor =>
@@ -418,7 +418,7 @@ definition Real.bisectionIntervals
 -- The recursion in `1 + n` form (`Natural.add` is opaque, so `1 + n` is
 -- not definitionally the constructor; bridge via `one_add`).
 theorem Real.bisectionIntervals_one_plus
-        (subset : Set(Real)) (initial : Real.BisectionInterval) (n : Natural)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval) (n : ℕ)
         : Real.bisectionIntervals(subset, initial, 1 + n)
           = Real.bisectionStep(
                 subset, Real.bisectionIntervals(subset, initial, n)) :=
@@ -427,14 +427,14 @@ theorem Real.bisectionIntervals_one_plus
 -- The lower-bound sequence and upper-bound sequence: projections of
 -- the bisection intervals.
 definition Real.bisectionLeft
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
-        (n : Natural) : Rational :=
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
+        (n : ℕ) : ℚ :=
   Real.BisectionInterval.left(
       Real.bisectionIntervals(subset, initial, n))
 
 definition Real.bisectionRight
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
-        (n : Natural) : Rational :=
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
+        (n : ℕ) : ℚ :=
   Real.BisectionInterval.right(
       Real.bisectionIntervals(subset, initial, n))
 
@@ -442,13 +442,13 @@ definition Real.bisectionRight
 -- Every invariant proof below case-splits on whether the midpoint is
 -- an upper bound and reasons through these four equations.
 theorem Real.bisectionLeft_one_plus_of_upper_bound
-        (subset : Set(Real)) (initial : Real.BisectionInterval) (n : Natural)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval) (n : ℕ)
         (midpointIsUpperBound
             : Real.IsUpperBound(
                   subset,
                   (Rational.halve(
                        Real.bisectionLeft(subset, initial, n)
-                       + Real.bisectionRight(subset, initial, n)) : Real)))
+                       + Real.bisectionRight(subset, initial, n)) : ℝ)))
         : Real.bisectionLeft(subset, initial, 1 + n)
           = Real.bisectionLeft(subset, initial, n) :=
   Real.bisectionLeft(subset, initial, 1 + n)
@@ -464,13 +464,13 @@ theorem Real.bisectionLeft_one_plus_of_upper_bound
      = Real.bisectionLeft(subset, initial, n)
 
 theorem Real.bisectionRight_one_plus_of_upper_bound
-        (subset : Set(Real)) (initial : Real.BisectionInterval) (n : Natural)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval) (n : ℕ)
         (midpointIsUpperBound
             : Real.IsUpperBound(
                   subset,
                   (Rational.halve(
                        Real.bisectionLeft(subset, initial, n)
-                       + Real.bisectionRight(subset, initial, n)) : Real)))
+                       + Real.bisectionRight(subset, initial, n)) : ℝ)))
         : Real.bisectionRight(subset, initial, 1 + n)
           = Rational.halve(
                 Real.bisectionLeft(subset, initial, n)
@@ -490,13 +490,13 @@ theorem Real.bisectionRight_one_plus_of_upper_bound
            + Real.bisectionRight(subset, initial, n))
 
 theorem Real.bisectionLeft_one_plus_of_not_upper_bound
-        (subset : Set(Real)) (initial : Real.BisectionInterval) (n : Natural)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval) (n : ℕ)
         (midpointNotUpperBound
             : ¬Real.IsUpperBound(
                   subset,
                   (Rational.halve(
                        Real.bisectionLeft(subset, initial, n)
-                       + Real.bisectionRight(subset, initial, n)) : Real)))
+                       + Real.bisectionRight(subset, initial, n)) : ℝ)))
         : Real.bisectionLeft(subset, initial, 1 + n)
           = Rational.halve(
                 Real.bisectionLeft(subset, initial, n)
@@ -516,13 +516,13 @@ theorem Real.bisectionLeft_one_plus_of_not_upper_bound
            + Real.bisectionRight(subset, initial, n))
 
 theorem Real.bisectionRight_one_plus_of_not_upper_bound
-        (subset : Set(Real)) (initial : Real.BisectionInterval) (n : Natural)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval) (n : ℕ)
         (midpointNotUpperBound
             : ¬Real.IsUpperBound(
                   subset,
                   (Rational.halve(
                        Real.bisectionLeft(subset, initial, n)
-                       + Real.bisectionRight(subset, initial, n)) : Real)))
+                       + Real.bisectionRight(subset, initial, n)) : ℝ)))
         : Real.bisectionRight(subset, initial, 1 + n)
           = Real.bisectionRight(subset, initial, n) :=
   Real.bisectionRight(subset, initial, 1 + n)
@@ -558,21 +558,21 @@ theorem Real.bisectionRight_one_plus_of_not_upper_bound
 -- classical "not an upper bound" fact (some y ∈ S satisfies
 -- midpoint ≤ y, otherwise midpoint WOULD have been an upper bound).
 theorem Real.bisectionLeft_below_witness
-        (subset : Set(Real))
+        (subset : Set(ℝ))
         (initial : Real.BisectionInterval)
         (initialLeftBelowSome
-            : ∃ (y : Real).
-                  y ∈ subset ∧ (Real.BisectionInterval.left(initial) : Real) ≤ y)
-        (n : Natural)
-        : ∃ (y : Real).
-              y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ y :=
+            : ∃ (y : ℝ).
+                  y ∈ subset ∧ (Real.BisectionInterval.left(initial) : ℝ) ≤ y)
+        (n : ℕ)
+        : ∃ (y : ℝ).
+              y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : ℝ) ≤ y :=
   by induction on n with IH {
     case base: initialLeftBelowSome
     case step(predecessor): {
-        let midReal : Real :=
+        let midReal : ℝ :=
             (Rational.halve(
                  Real.bisectionLeft(subset, initial, predecessor)
-                 + Real.bisectionRight(subset, initial, predecessor)) : Real);
+                 + Real.bisectionRight(subset, initial, predecessor)) : ℝ);
         -- Split on whether the midpoint is an upper bound. Yes: the new
         -- left endpoint is unchanged, below some element by the IH.
         -- No: the new left endpoint is the midpoint — not an upper
@@ -583,20 +583,20 @@ theorem Real.bisectionLeft_below_witness
                   = Real.bisectionLeft(subset, initial, predecessor)
                   by Real.bisectionLeft_one_plus_of_upper_bound;
               choose y such that
-                  y ∈ subset ∧ (Real.bisectionLeft(subset, initial, predecessor) : Real) ≤ y
+                  y ∈ subset ∧ (Real.bisectionLeft(subset, initial, predecessor) : ℝ) ≤ y
                   from IH;
-              (Real.bisectionLeft(subset, initial, 1 + predecessor) : Real) ≤ y;
+              (Real.bisectionLeft(subset, initial, 1 + predecessor) : ℝ) ≤ y;
               witness y with done
             }
           otherwise as midNotUpper: {
-              -- IsUpperBound unfolds to `∀ (y : Real). y ∈ S → y ≤ midReal`;
+              -- IsUpperBound unfolds to `∀ (y : ℝ). y ∈ S → y ≤ midReal`;
               -- not_forall_implies_exists_not + not_implies_implies_and_not
               -- give some y with y ∈ S and ¬(y ≤ midReal);
               -- not_LessOrEqual_implies flips to midReal ≤ y.
               choose witnessReal
                   from Logic.not_forall_implies_exists_not(
-                           Real,
-                           (y : Real) ↦
+                           ℝ,
+                           (y : ℝ) ↦
                                y ∈ subset → y ≤ midReal,
                            midNotUpper);
               (witnessReal ∈ subset) ∧ ¬(witnessReal ≤ midReal);
@@ -608,7 +608,7 @@ theorem Real.bisectionLeft_below_witness
                         Real.bisectionLeft(subset, initial, predecessor)
                         + Real.bisectionRight(subset, initial, predecessor))
                   by Real.bisectionLeft_one_plus_of_not_upper_bound;
-              (Real.bisectionLeft(subset, initial, 1 + predecessor) : Real) ≤ witnessReal;
+              (Real.bisectionLeft(subset, initial, 1 + predecessor) : ℝ) ≤ witnessReal;
               witness witnessReal with done
             }
         }
@@ -622,15 +622,15 @@ theorem Real.bisectionLeft_below_witness
 -- no: right = right(predecessor), which the IH covers. Both arms
 -- reason through the endpoint recurrences.
 theorem Real.bisectionRight_is_upper_bound
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialRightAbove
             : Real.IsUpperBound(
                   subset,
-                  (Real.BisectionInterval.right(initial) : Real)))
-        (n : Natural)
+                  (Real.BisectionInterval.right(initial) : ℝ)))
+        (n : ℕ)
         : Real.IsUpperBound(
               subset,
-              (Real.bisectionRight(subset, initial, n) : Real)) :=
+              (Real.bisectionRight(subset, initial, n) : ℝ)) :=
   by induction on n with IH {
     case base: initialRightAbove
     case step(predecessor): {
@@ -642,7 +642,7 @@ theorem Real.bisectionRight_is_upper_bound
                    subset,
                    (Rational.halve(
                         Real.bisectionLeft(subset, initial, predecessor)
-                        + Real.bisectionRight(subset, initial, predecessor)) : Real)): {
+                        + Real.bisectionRight(subset, initial, predecessor)) : ℝ)): {
               Real.bisectionRight(subset, initial, 1 + predecessor)
                   = Rational.halve(
                         Real.bisectionLeft(subset, initial, predecessor)
@@ -663,7 +663,7 @@ theorem Real.bisectionRight_is_upper_bound
 -- I3 (width): bₙ - aₙ = halve^n(b0 - a0). The width sequence is
 -- defined recursively as repeated halving of the initial width.
 definition Real.bisectionWidth
-        (initial : Real.BisectionInterval) : Natural → Rational
+        (initial : Real.BisectionInterval) : ℕ → ℚ
   | 0 =>
       Real.BisectionInterval.right(initial)
       - Real.BisectionInterval.left(initial)
@@ -672,7 +672,7 @@ definition Real.bisectionWidth
 
 -- The recursion in `1 + n` form.
 theorem Real.bisectionWidth_one_plus
-        (initial : Real.BisectionInterval) (n : Natural)
+        (initial : Real.BisectionInterval) (n : ℕ)
         : Real.bisectionWidth(initial, 1 + n)
           = Rational.halve(Real.bisectionWidth(initial, n)) :=
   done
@@ -680,8 +680,8 @@ theorem Real.bisectionWidth_one_plus
 -- The width invariant: at every step, the difference between right and
 -- left endpoints equals the recursive halving of (b0 - a0).
 theorem Real.bisection_width_invariant
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
-        (n : Natural)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
+        (n : ℕ)
         : Real.bisectionRight(subset, initial, n)
             - Real.bisectionLeft(subset, initial, n)
           = Real.bisectionWidth(initial, n) :=
@@ -697,7 +697,7 @@ theorem Real.bisection_width_invariant
                    subset,
                    (Rational.halve(
                         Real.bisectionLeft(subset, initial, predecessor)
-                        + Real.bisectionRight(subset, initial, predecessor)) : Real)): {
+                        + Real.bisectionRight(subset, initial, predecessor)) : ℝ)): {
               Real.bisectionLeft(subset, initial, 1 + predecessor)
                   = Real.bisectionLeft(subset, initial, predecessor)
                   by Real.bisectionLeft_one_plus_of_upper_bound;
@@ -777,26 +777,26 @@ theorem Real.bisection_width_invariant
 --     LHS reduces (by Rational.add_subtract_cancel_left applied
 --     symmetrically) to b(j) - s(j). Done.
 theorem Real.LessOrEqual_of_pointwise_at_make
-        (s : Natural → Rational)
+        (s : ℕ → ℚ)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
-        (b : Natural → Rational)
+        (b : ℕ → ℚ)
         (bIsCauchy : Rational.sequence.IsCauchy(b))
         (pointwiseLeq
-            : ∀ (n : Natural).
-                (s(n) : Real)
+            : ∀ (n : ℕ).
+                (s(n) : ℝ)
                   ≤ Real.from_cauchy_sequence(b, bIsCauchy))
         : Real.from_cauchy_sequence(s, sIsCauchy)
             ≤ Real.from_cauchy_sequence(b, bIsCauchy) :=
   unfold Real.IsNonneg in
-  ((ε : Rational)
-           (εPositive : (0 : Rational) < ε) ↦ {
-    (0 : Rational) < Rational.halve(ε) as halvedPositive;
+  ((ε : ℚ)
+           (εPositive : (0 : ℚ) < ε) ↦ {
+    (0 : ℚ) < Rational.halve(ε) as halvedPositive;
     choose N_s as sCauchyAt
         from sIsCauchy(Rational.halve(ε), halvedPositive);
     choose N_b as bMinusSAt
         from pointwiseLeq(N_s)(Rational.halve(ε), halvedPositive);
     witness Natural.maximum(N_s, N_b) with
-        (m : Natural)
+        (m : ℕ)
                  (mGeMax : Natural.maximum(N_s, N_b) ≤ m) ↦ {
           N_s ≤ m as m_geq_N_s;
           N_b ≤ m as m_geq_N_b;
@@ -831,10 +831,10 @@ theorem Real.LessOrEqual_of_pointwise_at_make
 -- Lift to arbitrary Real B via Quotient.induct: case on B = mk(b_rep),
 -- Take a representative B = [(b, bIsCauchy)]; the at-make form proves it.
 theorem Real.LessOrEqual_of_pointwise
-        (s : Natural → Rational)
+        (s : ℕ → ℚ)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
-        (B : Real)
-        (pointwiseLeq : ∀ (n : Natural). (s(n) : Real) ≤ B)
+        (B : ℝ)
+        (pointwiseLeq : ∀ (n : ℕ). (s(n) : ℝ) ≤ B)
         : Real.from_cauchy_sequence(s, sIsCauchy)
             ≤ B :=
   by_representatives B as ⟨b, bIsCauchy⟩ => {
@@ -855,15 +855,15 @@ theorem Real.LessOrEqual_of_pointwise
 -- ε/2 bounds inside one eventually scope — thresholds never on the
 -- page.
 theorem Real.LessOrEqual_of_pointwise_lower
-        (s : Natural → Rational)
+        (s : ℕ → ℚ)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
-        (B : Real)
-        (pointwiseLower : ∀ (n : Natural). B ≤ (s(n) : Real))
+        (B : ℝ)
+        (pointwiseLower : ∀ (n : ℕ). B ≤ (s(n) : ℝ))
         : B ≤ Real.from_cauchy_sequence(s, sIsCauchy) := {
   take B as representative(b, bIsCauchy);
-  suffices ∀ (ε : Rational). ε > 0 → eventually (m). -ε < s(m) - b(m)
+  suffices ∀ (ε : ℚ). ε > 0 → eventually (m). -ε < s(m) - b(m)
       by definition of Real.LessOrEqual, Real.IsNonneg;
-  take ε : Rational;
+  take ε : ℚ;
   suppose ε > 0 as εPositive;
 
   choose N such that eventually (m). abs(s(m) - s(N)) < Rational.halve(ε)
@@ -889,11 +889,11 @@ theorem Real.LessOrEqual_of_pointwise_lower
 -- the previous, and the midpoint lies inside.
 
 theorem Real.bisectionLeq_invariant
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (n : Natural)
+        (n : ℕ)
         : Real.bisectionLeft(subset, initial, n)
           ≤ Real.bisectionRight(subset, initial, n) :=
   by induction on n with IH {
@@ -908,7 +908,7 @@ theorem Real.bisectionLeq_invariant
                    subset,
                    (Rational.halve(
                         Real.bisectionLeft(subset, initial, predecessor)
-                        + Real.bisectionRight(subset, initial, predecessor)) : Real)): {
+                        + Real.bisectionRight(subset, initial, predecessor)) : ℝ)): {
               Real.bisectionRight(subset, initial, 1 + predecessor)
                   = Rational.halve(
                         Real.bisectionLeft(subset, initial, predecessor)
@@ -947,11 +947,11 @@ theorem Real.bisectionLeq_invariant
 -- Both depend on the within-interval invariant at the previous step.
 
 theorem Real.bisectionLeft_step_monotone
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (n : Natural)
+        (n : ℕ)
         : Real.bisectionLeft(subset, initial, n)
           ≤ Real.bisectionLeft(subset, initial, 1 + n) := {
     -- The within-interval invariant: left(n) ≤ right(n), used by the
@@ -966,7 +966,7 @@ theorem Real.bisectionLeft_step_monotone
                     subset,
                     (Rational.halve(
                          Real.bisectionLeft(subset, initial, n)
-                         + Real.bisectionRight(subset, initial, n)) : Real)): {
+                         + Real.bisectionRight(subset, initial, n)) : ℝ)): {
                Real.bisectionLeft(subset, initial, 1 + n)
                    = Real.bisectionLeft(subset, initial, n)
                    by Real.bisectionLeft_one_plus_of_upper_bound;
@@ -988,11 +988,11 @@ theorem Real.bisectionLeft_step_monotone
   }
 
 theorem Real.bisectionRight_step_monotone
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (n : Natural)
+        (n : ℕ)
         : Real.bisectionRight(subset, initial, 1 + n)
           ≤ Real.bisectionRight(subset, initial, n) := {
     -- The within-interval invariant: left(n) ≤ right(n), used by the
@@ -1007,7 +1007,7 @@ theorem Real.bisectionRight_step_monotone
                     subset,
                     (Rational.halve(
                          Real.bisectionLeft(subset, initial, n)
-                         + Real.bisectionRight(subset, initial, n)) : Real)): {
+                         + Real.bisectionRight(subset, initial, n)) : ℝ)): {
                Real.bisectionRight(subset, initial, 1 + n)
                    = Rational.halve(
                          Real.bisectionLeft(subset, initial, n)
@@ -1032,20 +1032,20 @@ theorem Real.bisectionRight_step_monotone
 -- Multi-step monotone: iterate the step-monotone lemmas.
 
 theorem Real.bisectionLeft_le_subsequent
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (k : Natural)
-        : ∀ (n : Natural).
+        (k : ℕ)
+        : ∀ (n : ℕ).
             Real.bisectionLeft(subset, initial, n)
             ≤ Real.bisectionLeft(subset, initial, k + n) :=
   by induction on k with IH {
-    case base: (n : Natural) ↦ {
+    case base: (n : ℕ) ↦ {
         Real.bisectionLeft(subset, initial, n)
            ≤ Real.bisectionLeft(subset, initial, 0 + n)
       }
-    case step(predecessor): (n : Natural) ↦ {
+    case step(predecessor): (n : ℕ) ↦ {
         Real.bisectionLeft(subset, initial, n)
                 ≤ Real.bisectionLeft(subset, initial, predecessor + n)
                 by IH;
@@ -1059,20 +1059,20 @@ theorem Real.bisectionLeft_le_subsequent
   }
 
 theorem Real.bisectionRight_le_predecessor
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (k : Natural)
-        : ∀ (n : Natural).
+        (k : ℕ)
+        : ∀ (n : ℕ).
             Real.bisectionRight(subset, initial, k + n)
             ≤ Real.bisectionRight(subset, initial, n) :=
   by induction on k with IH {
-    case base: (n : Natural) ↦ {
+    case base: (n : ℕ) ↦ {
         Real.bisectionRight(subset, initial, 0 + n)
            ≤ Real.bisectionRight(subset, initial, n)
       }
-    case step(predecessor): (n : Natural) ↦ {
+    case step(predecessor): (n : ℕ) ↦ {
         Real.bisectionRight(subset, initial, predecessor + n)
                 ≤ Real.bisectionRight(subset, initial, n)
                 by IH;
@@ -1088,11 +1088,11 @@ theorem Real.bisectionRight_le_predecessor
 -- Cross-bound: left(k + n) ≤ right(n). Combine left ≤ right at k+n
 -- with right(k + n) ≤ right(n).
 theorem Real.bisectionLeft_le_bisectionRight_predecessor
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (k n : Natural)
+        (k n : ℕ)
         : Real.bisectionLeft(subset, initial, k + n)
           ≤ Real.bisectionRight(subset, initial, n) :=
   Real.bisectionLeft(subset, initial, k + n)
@@ -1104,34 +1104,34 @@ theorem Real.bisectionLeft_le_bisectionRight_predecessor
 
 -- halve(x) * y = x * halve(y). One-half is symmetric across the
 -- multiplication: ring after unfolding halve to `* one_half`.
-theorem Rational.halve_multiply_swap (x y : Rational)
+theorem Rational.halve_multiply_swap (x y : ℚ)
         : Rational.halve(x) * y = x * Rational.halve(y) :=
   Rational.halve(x) * y
      = (x * Rational.one_half) * y
      = x * (y * Rational.one_half)
      = x * Rational.halve(y)
 
--- halve((1 + 1) + (n : Rational)) ≤ (1 + (n : Rational)). Used to
+-- halve((1 + 1) + (n : ℚ)) ≤ (1 + (n : ℚ)). Used to
 -- step the multiplicative bound.
-theorem Rational.halve_two_plus_le_one_plus (n : Natural)
-        : Rational.halve((1 : Rational) + (1 : Rational) + (n : Rational))
-          ≤ (1 : Rational) + (n : Rational) := {
+theorem Rational.halve_two_plus_le_one_plus (n : ℕ)
+        : Rational.halve((1 : ℚ) + (1 : ℚ) + (n : ℚ))
+          ≤ (1 : ℚ) + (n : ℚ) := {
   -- 1 ≤ 1 + n because n ≥ 0:  1 = 1 + 0 ≤ 1 + n.
-  Rational.IsNonneg((n : Rational));
-  (0 : Rational) ≤ (n : Rational);
+  Rational.IsNonneg((n : ℚ));
+  (0 : ℚ) ≤ (n : ℚ);
   -- 1 = 1 + 0 ≤ 1 + n, adding 1 on the left to 0 ≤ n.
-  (1 : Rational) = (1 : Rational) + (0 : Rational)
-                 ≤ (1 : Rational) + (n : Rational);
+  (1 : ℚ) = (1 : ℚ) + (0 : ℚ)
+                 ≤ (1 : ℚ) + (n : ℚ);
   -- 1 + 1 + n = 1 + (1 + n) ≤ (1 + n) + (1 + n), since 1 ≤ 1 + n.
-  (1 : Rational) + (1 : Rational) + (n : Rational)
-          = (1 : Rational) + ((1 : Rational) + (n : Rational))
-          ≤ ((1 : Rational) + (n : Rational))
-            + ((1 : Rational) + (n : Rational));
+  (1 : ℚ) + (1 : ℚ) + (n : ℚ)
+          = (1 : ℚ) + ((1 : ℚ) + (n : ℚ))
+          ≤ ((1 : ℚ) + (n : ℚ))
+            + ((1 : ℚ) + (n : ℚ));
   -- halve is monotone, and halve of a doubled value folds back.
-  Rational.halve((1 : Rational) + (1 : Rational) + (n : Rational))
-     ≤ Rational.halve(((1 : Rational) + (n : Rational))
-                       + ((1 : Rational) + (n : Rational)))
-     = (1 : Rational) + (n : Rational)
+  Rational.halve((1 : ℚ) + (1 : ℚ) + (n : ℚ))
+     ≤ Rational.halve(((1 : ℚ) + (n : ℚ))
+                       + ((1 : ℚ) + (n : ℚ)))
+     = (1 : ℚ) + (n : ℚ)
 }
 
 -- width(n) ≥ 0 inductively from initial width ≥ 0 + halve preserves nonneg.
@@ -1141,7 +1141,7 @@ theorem Real.bisectionWidth_nonneg
             : Rational.IsNonneg(
                   Real.BisectionInterval.right(initial)
                   - Real.BisectionInterval.left(initial)))
-        (n : Natural)
+        (n : ℕ)
         : Rational.IsNonneg(Real.bisectionWidth(initial, n)) :=
   by induction on n with IH {
     case base: initialWidthNonneg
@@ -1153,7 +1153,7 @@ theorem Real.bisectionWidth_nonneg
       }
   }
 
--- For c ≥ 0, halve^n(c) * (1 + n : Rational) ≤ c. Multiplicative bound
+-- For c ≥ 0, halve^n(c) * (1 + n : ℚ) ≤ c. Multiplicative bound
 -- that turns into the Cauchy modulus via Archimedean.
 theorem Real.bisectionWidth_times_one_plus_le_initial
         (initial : Real.BisectionInterval)
@@ -1161,9 +1161,9 @@ theorem Real.bisectionWidth_times_one_plus_le_initial
             : Rational.IsNonneg(
                   Real.BisectionInterval.right(initial)
                   - Real.BisectionInterval.left(initial)))
-        (n : Natural)
+        (n : ℕ)
         : Real.bisectionWidth(initial, n)
-            * (1 + n : Rational)
+            * (1 + n : ℚ)
           ≤ Real.BisectionInterval.right(initial)
             - Real.BisectionInterval.left(initial) :=
   by induction on n with IH {
@@ -1171,14 +1171,14 @@ theorem Real.bisectionWidth_times_one_plus_le_initial
         -- width(0) reduces to (right - left); (1 + 0 : R) reduces to 1.
         -- The product · 1 collapses to (right - left), then reflexive.
         Real.bisectionWidth(initial, 0)
-                * (1 : Rational)
+                * (1 : ℚ)
            = Real.BisectionInterval.right(initial)
                 - Real.BisectionInterval.left(initial)
            ≤ Real.BisectionInterval.right(initial)
                 - Real.BisectionInterval.left(initial)
     case step(predecessor): {
         Real.bisectionWidth(initial, predecessor)
-                  * (1 + predecessor : Rational)
+                  * (1 + predecessor : ℚ)
                 ≤ Real.BisectionInterval.right(initial)
                   - Real.BisectionInterval.left(initial)
                 by IH;
@@ -1190,29 +1190,29 @@ theorem Real.bisectionWidth_times_one_plus_le_initial
         -- so width(predecessor) * halve(1+(1+predecessor)) ≤ width(predecessor) * (1+predecessor) ≤ initial
         Rational.IsNonneg(Real.bisectionWidth(initial, predecessor));
         Rational.halve(Real.bisectionWidth(initial, predecessor))
-                  * (1 + (1 + predecessor) : Rational)
+                  * (1 + (1 + predecessor) : ℚ)
                 = Real.bisectionWidth(initial, predecessor)
-                  * Rational.halve((1 + (1 + predecessor) : Rational));
+                  * Rational.halve((1 + (1 + predecessor) : ℚ));
         -- Bridge through the cast: halve((1+(1+n) : R)) ≤ (1+n : R)
         -- using halve_two_plus_le_one_plus on the expanded Rational form.
-        (1 + (1 + predecessor) : Rational)
-                = (1 : Rational) + (1 : Rational) + (predecessor : Rational);
-        Rational.halve((1 + (1 + predecessor) : Rational))
-                ≤ (1 : Rational) + (predecessor : Rational)
+        (1 + (1 + predecessor) : ℚ)
+                = (1 : ℚ) + (1 : ℚ) + (predecessor : ℚ);
+        Rational.halve((1 + (1 + predecessor) : ℚ))
+                ≤ (1 : ℚ) + (predecessor : ℚ)
                 by Rational.halve_two_plus_le_one_plus;
-        (0 : Rational) ≤ Real.bisectionWidth(initial, predecessor);
+        (0 : ℚ) ≤ Real.bisectionWidth(initial, predecessor);
         Real.bisectionWidth(initial, predecessor)
-                  * Rational.halve((1 + (1 + predecessor) : Rational))
+                  * Rational.halve((1 + (1 + predecessor) : ℚ))
                 ≤ Real.bisectionWidth(initial, predecessor)
-                  * (1 + predecessor : Rational);
+                  * (1 + predecessor : ℚ);
         Real.bisectionWidth(initial, 1 + predecessor)
-                  * (1 + (1 + predecessor) : Rational)
+                  * (1 + (1 + predecessor) : ℚ)
              = Rational.halve(Real.bisectionWidth(initial, predecessor))
-                  * (1 + (1 + predecessor) : Rational)
+                  * (1 + (1 + predecessor) : ℚ)
              = Real.bisectionWidth(initial, predecessor)
-                  * Rational.halve((1 + (1 + predecessor) : Rational))
+                  * Rational.halve((1 + (1 + predecessor) : ℚ))
              ≤ Real.bisectionWidth(initial, predecessor)
-                  * (1 + predecessor : Rational)
+                  * (1 + predecessor : ℚ)
              ≤ Real.BisectionInterval.right(initial)
                   - Real.BisectionInterval.left(initial)
       }
@@ -1223,11 +1223,11 @@ theorem Real.bisectionWidth_times_one_plus_le_initial
 -- right/cross variants from "k + N" to "any m ≥ N" via le_to_add.
 
 theorem Real.bisectionLeft_le_at_le
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (N m : Natural) (NLeqM : N ≤ m)
+        (N m : ℕ) (NLeqM : N ≤ m)
         : Real.bisectionLeft(subset, initial, N)
           ≤ Real.bisectionLeft(subset, initial, m) := {
   -- Write m as k + N (justified by N ≤ m), then the step-monotone
@@ -1239,11 +1239,11 @@ theorem Real.bisectionLeft_le_at_le
 }
 
 theorem Real.bisectionRight_le_at_le
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (N m : Natural) (NLeqM : N ≤ m)
+        (N m : ℕ) (NLeqM : N ≤ m)
         : Real.bisectionRight(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
   choose k such that m = k + N from Natural.le_to_add;
@@ -1253,11 +1253,11 @@ theorem Real.bisectionRight_le_at_le
 }
 
 theorem Real.bisectionLeft_le_bisectionRight_at_le
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (N m : Natural) (NLeqM : N ≤ m)
+        (N m : ℕ) (NLeqM : N ≤ m)
         : Real.bisectionLeft(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
   choose k such that m = k + N from Natural.le_to_add;
@@ -1275,45 +1275,45 @@ theorem Real.exists_bisectionWidth_below
             : Rational.IsNonneg(
                   Real.BisectionInterval.right(initial)
                   - Real.BisectionInterval.left(initial)))
-        (ε : Rational)
-        (εPositive : (0 : Rational) < ε)
-        : ∃ (N : Natural).
+        (ε : ℚ)
+        (εPositive : (0 : ℚ) < ε)
+        : ∃ (N : ℕ).
               Real.bisectionWidth(initial, N) < ε := {
   choose K such that
             (Real.BisectionInterval.right(initial)
              - Real.BisectionInterval.left(initial))
-            ≤ (1 + K : Rational) * ε
+            ≤ (1 + K : ℚ) * ε
       from Rational.archimedean_for_positives;
   Real.bisectionWidth(initial, 1 + K)
-            * (1 + (1 + K) : Rational)
+            * (1 + (1 + K) : ℚ)
           ≤ Real.BisectionInterval.right(initial)
             - Real.BisectionInterval.left(initial)
     by Real.bisectionWidth_times_one_plus_le_initial;
-  (0 : Rational) < (1 + (1 + K) : Rational);
+  (0 : ℚ) < (1 + (1 + K) : ℚ);
   -- (1+K) < 1+(1+K) lifts (× positive ε) to a strict product bound:
   -- 0 < ((1+(1+K)) - (1+K))·ε, add (1+K)·ε to both sides.
-  (0 : Rational) < (1 : Rational);
-  (1 + K : Rational)
-     = (0 : Rational) + (1 + K : Rational)
-     < (1 : Rational) + (1 + K : Rational)
-     = (1 + (1 + K) : Rational);
-  (0 : Rational)
-     = (1 + K : Rational) - (1 + K : Rational)
-     < (1 + (1 + K) : Rational) - (1 + K : Rational);
-  (0 : Rational)
-          < ((1 + (1 + K) : Rational)
-             - (1 + K : Rational)) * ε;
-  (1 + K : Rational) * ε
-     = (0 : Rational) + (1 + K : Rational) * ε
-     < ((1 + (1 + K) : Rational)
-        - (1 + K : Rational)) * ε
-       + (1 + K : Rational) * ε
-     = (1 + (1 + K) : Rational) * ε;
+  (0 : ℚ) < (1 : ℚ);
+  (1 + K : ℚ)
+     = (0 : ℚ) + (1 + K : ℚ)
+     < (1 : ℚ) + (1 + K : ℚ)
+     = (1 + (1 + K) : ℚ);
+  (0 : ℚ)
+     = (1 + K : ℚ) - (1 + K : ℚ)
+     < (1 + (1 + K) : ℚ) - (1 + K : ℚ);
+  (0 : ℚ)
+          < ((1 + (1 + K) : ℚ)
+             - (1 + K : ℚ)) * ε;
+  (1 + K : ℚ) * ε
+     = (0 : ℚ) + (1 + K : ℚ) * ε
+     < ((1 + (1 + K) : ℚ)
+        - (1 + K : ℚ)) * ε
+       + (1 + K : ℚ) * ε
+     = (1 + (1 + K) : ℚ) * ε;
   Real.bisectionWidth(initial, 1 + K)
-            * (1 + (1 + K) : Rational)
-          ≤ (1 + K : Rational) * ε
-          < (1 + (1 + K) : Rational) * ε
-          = ε * (1 + (1 + K) : Rational);
+            * (1 + (1 + K) : ℚ)
+          ≤ (1 + K : ℚ) * ε
+          < (1 + (1 + K) : ℚ) * ε
+          = ε * (1 + (1 + K) : ℚ);
   witness 1 + K with
       done by Rational.LessThan.multiply_cancel_right_positive
 }
@@ -1322,7 +1322,7 @@ theorem Real.exists_bisectionWidth_below
 -- Absolute-value bound from interval bounds: -c ≤ x ≤ c → |x| ≤ c.
 
 theorem Rational.absolute_value_LessOrEqual_of_bounds
-        (x c : Rational)
+        (x c : ℚ)
         (lowerBound : -c ≤ x) (upperBound : x ≤ c)
         : abs(x) ≤ c :=
   done by cases {
@@ -1343,11 +1343,11 @@ theorem Rational.absolute_value_LessOrEqual_of_bounds
 -- [-(b_N - a_N), b_N - a_N] = [-width(N), width(N)].
 
 theorem Real.bisectionLeft_diff_bound
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (N m n : Natural) (NLeqM : N ≤ m) (NLeqN : N ≤ n)
+        (N m n : ℕ) (NLeqM : N ≤ m) (NLeqN : N ≤ n)
         : abs(
               Real.bisectionLeft(subset, initial, m)
               - Real.bisectionLeft(subset, initial, n))
@@ -1394,19 +1394,19 @@ theorem Real.bisectionLeft_diff_bound
 -- I4: the lower-bound sequence is Cauchy at the rational level.
 -- Combine the |a_m - a_n| ≤ width(N) bound + the Cauchy modulus.
 theorem Real.bisectionLeft_is_cauchy
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
         : Rational.sequence.IsCauchy(
               Real.bisectionLeft(subset, initial)) :=
-  (ε : Rational)
-           (εPositive : (0 : Rational) < ε) ↦ {
+  (ε : ℚ)
+           (εPositive : (0 : ℚ) < ε) ↦ {
     choose N such that Real.bisectionWidth(initial, N) < ε
         from Real.exists_bisectionWidth_below;
     witness N with
-        (m : Natural) (NLeqM : N ≤ m)
-                 (n : Natural) (NLeqN : N ≤ n) ↦
+        (m : ℕ) (NLeqM : N ≤ m)
+                 (n : ℕ) (NLeqN : N ≤ n) ↦
           abs(Real.bisectionLeft(subset, initial, m)
                     - Real.bisectionLeft(subset, initial, n))
              ≤ Real.bisectionWidth(initial, N)
@@ -1415,7 +1415,7 @@ theorem Real.bisectionLeft_is_cauchy
 
 -- ----------------------------------------------------------------------
 -- The Real-level ≤ on rational embeddings reflects to the Rational
--- level. (a : Real) ≤ (b : Real) reduces (by the standard Quotient.lift
+-- level. (a : ℝ) ≤ (b : ℝ) reduces (by the standard Quotient.lift
 -- β chain on Real.subtract/Real.IsNonneg/sequenceFunction at the constant
 -- representatives) to the eventually-nonneg statement on the constant
 -- sequence λn. b - a — i.e., ∀ε > 0. -ε < b - a. From this we conclude
@@ -1424,8 +1424,8 @@ theorem Real.bisectionLeft_is_cauchy
 -- is `b - a < b - a`, contradicting irreflexivity.
 
 theorem Rational.LessOrEqual_of_real_LessOrEqual
-        (a b : Rational)
-        (realLeq : (a : Real) ≤ (b : Real))
+        (a b : ℚ)
+        (realLeq : (a : ℝ) ≤ (b : ℝ))
         : a ≤ b :=
   done by cases {
     case a ≤ b as aLeqB: done
@@ -1436,15 +1436,15 @@ theorem Rational.LessOrEqual_of_real_LessOrEqual
                    = b
         otherwise as aNotEqB: {
             -- b ≤ a AND a ≠ b: derive 0 < a - b for the contradiction.
-            Rational.LessOrEqual((0 : Rational), a - b);
-            ¬((0 : Rational) = a - b)
-              by (zeroEqDiff : (0 : Rational) = a - b) ↦
+            Rational.LessOrEqual((0 : ℚ), a - b);
+            ¬((0 : ℚ) = a - b)
+              by (zeroEqDiff : (0 : ℚ) = a - b) ↦
                    aNotEqB({
                        a
                           = b + (a - b)
-                          = b + (0 : Rational)
+                          = b + (0 : ℚ)
                           = b});
-            (0 : Rational) < a - b as diffPositive;
+            (0 : ℚ) < a - b as diffPositive;
             -- realLeq at ε = a - b yields the contradiction.
             choose N as bound
                 from (unfold Real.IsNonneg in realLeq)(a - b, diffPositive);
@@ -1460,11 +1460,11 @@ theorem Rational.LessOrEqual_of_real_LessOrEqual
 -- Real-level limit is well-defined: package the Cauchy proof and
 -- take the Quotient.class_of.
 definition Real.bisectionLimit
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        : Real :=
+        : ℝ :=
   Real.from_cauchy_sequence(Real.bisectionLeft(subset, initial),
           Real.bisectionLeft_is_cauchy(
               subset, initial, initialLeftLeqRight))
@@ -1484,34 +1484,34 @@ definition Real.bisectionLimit
 -- > bisectionRight(K) - ε/2 to get bisectionLeft(j) - yseq(j) > -ε.
 -- At-rep form: pattern-match y_rep to expose (yseq, yIsCauchy).
 theorem Real.bisectionLimit_is_upper_bound_at_rep
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
         (initialRightAbove
             : Real.IsUpperBound(
                   subset,
-                  (Real.BisectionInterval.right(initial) : Real)))
+                  (Real.BisectionInterval.right(initial) : ℝ)))
         (y_rep : CauchyRationalSequence)
-        (yInSubset : (Quotient.class_of(y_rep) : Real) ∈ subset)
-        : (Quotient.class_of(y_rep) : Real)
+        (yInSubset : (Quotient.class_of(y_rep) : ℝ) ∈ subset)
+        : (Quotient.class_of(y_rep) : ℝ)
             ≤ Real.bisectionLimit(
                   subset, initial, initialLeftLeqRight) := {
   let ⟨yseq, yIsCauchy⟩ := y_rep;
   unfold Real.IsNonneg in
-  ((ε : Rational)
-           (εPositive : (0 : Rational) < ε) ↦ {
-    (0 : Rational) < Rational.halve(ε) as halvedPositive;
+  ((ε : ℚ)
+           (εPositive : (0 : ℚ) < ε) ↦ {
+    (0 : ℚ) < Rational.halve(ε) as halvedPositive;
     choose K such that Real.bisectionWidth(initial, K) < Rational.halve(ε)
         from Real.exists_bisectionWidth_below;
     Real.IsUpperBound(
-              subset, (Real.bisectionRight(subset, initial, K) : Real));
+              subset, (Real.bisectionRight(subset, initial, K) : ℝ));
     Real.from_cauchy_sequence(yseq, yIsCauchy)
-            ≤ (Real.bisectionRight(subset, initial, K) : Real) as yLeqRightK;
+            ≤ (Real.bisectionRight(subset, initial, K) : ℝ) as yLeqRightK;
     choose M as pointwiseAt
         from yLeqRightK(Rational.halve(ε), halvedPositive);
     witness Natural.maximum(K, M) with
-        (j : Natural)
+        (j : ℕ)
                  (jGeMax : Natural.maximum(K, M) ≤ j) ↦ {
           K ≤ j;
           M ≤ j as j_geq_M;
@@ -1553,18 +1553,18 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
 
 -- Take a representative y = [(rep, _)]; the at-rep lemma proves it.
 theorem Real.bisectionLimit_is_upper_bound
-        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (subset : Set(ℝ)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
         (initialRightAbove
             : Real.IsUpperBound(
                   subset,
-                  (Real.BisectionInterval.right(initial) : Real)))
+                  (Real.BisectionInterval.right(initial) : ℝ)))
         : Real.IsUpperBound(
               subset,
               Real.bisectionLimit(subset, initial, initialLeftLeqRight)) :=
-  (y : Real) (yInSubset : y ∈ subset) ↦
+  (y : ℝ) (yInSubset : y ∈ subset) ↦
     by_representatives y as rep =>
       done by Real.bisectionLimit_is_upper_bound_at_rep
 
@@ -1573,33 +1573,33 @@ theorem Real.bisectionLimit_is_upper_bound
 -- via bisectionLeft_below_witness + otherIsUpper applied at the witness.
 -- Then LessOrEqual_of_pointwise lifts the pointwise bound to the limit.
 theorem Real.bisectionLimit_is_least
-        (subset : Set(Real))
+        (subset : Set(ℝ))
         (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
         (initialLeftBelowSome
-            : ∃ (y : Real).
-                  y ∈ subset ∧ (Real.BisectionInterval.left(initial) : Real) ≤ y)
-        (otherBound : Real)
+            : ∃ (y : ℝ).
+                  y ∈ subset ∧ (Real.BisectionInterval.left(initial) : ℝ) ≤ y)
+        (otherBound : ℝ)
         (otherIsUpper : Real.IsUpperBound(subset, otherBound))
         : Real.bisectionLimit(subset, initial, initialLeftLeqRight)
           ≤ otherBound := {
   -- Every lower endpoint is below some element of S, which otherBound
   -- caps: bisectionLeft(n) ≤ y ≤ otherBound. So the limit of the lower
   -- endpoints is ≤ otherBound.
-  ∀ (n : Natural).
-            (Real.bisectionLeft(subset, initial, n) : Real) ≤ otherBound
-      by (n : Natural) ↦ {
-        ∃ (y : Real).
-                  y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ y;
+  ∀ (n : ℕ).
+            (Real.bisectionLeft(subset, initial, n) : ℝ) ≤ otherBound
+      by (n : ℕ) ↦ {
+        ∃ (y : ℝ).
+                  y ∈ subset ∧ (Real.bisectionLeft(subset, initial, n) : ℝ) ≤ y;
         choose witnessY such that
                  witnessY ∈ subset
-                 ∧ (Real.bisectionLeft(subset, initial, n) : Real) ≤ witnessY;
+                 ∧ (Real.bisectionLeft(subset, initial, n) : ℝ) ≤ witnessY;
         witnessY ∈ subset;
-        (Real.bisectionLeft(subset, initial, n) : Real) ≤ witnessY;
+        (Real.bisectionLeft(subset, initial, n) : ℝ) ≤ witnessY;
         witnessY ≤ otherBound;
-        (Real.bisectionLeft(subset, initial, n) : Real)
+        (Real.bisectionLeft(subset, initial, n) : ℝ)
            ≤ witnessY
            ≤ otherBound
       };
@@ -1610,44 +1610,44 @@ theorem Real.bisectionLimit_is_least
 -- Headline theorem.
 
 theorem Real.supremum_exists
-        (subset : Set(Real))
-        (nonempty : Set.IsNonempty(Real, subset))
+        (subset : Set(ℝ))
+        (nonempty : Set.IsNonempty(ℝ, subset))
         (bounded : Real.IsBoundedAbove(subset))
-        : ∃ (s : Real). Real.IsSupremum(subset, s) := {
+        : ∃ (s : ℝ). Real.IsSupremum(subset, s) := {
   choose x0 from nonempty;
   choose B0real from bounded;
-  choose a0 such that (a0 : Real) ≤ x0 from Real.exists_rational_below;
-  choose b0 such that B0real ≤ (b0 : Real) from Real.exists_rational_above;
+  choose a0 such that (a0 : ℝ) ≤ x0 from Real.exists_rational_below;
+  choose b0 such that B0real ≤ (b0 : ℝ) from Real.exists_rational_above;
   let initial : Real.BisectionInterval :=
       Real.BisectionInterval.make(a0, b0);
-  -- b0 is an upper bound for S: for any y ∈ S, y ≤ B0real ≤ (b0 : Real).
-  Real.IsUpperBound(subset, (b0 : Real))
-    by (y : Real) (yInS : y ∈ subset) ↦
+  -- b0 is an upper bound for S: for any y ∈ S, y ≤ B0real ≤ (b0 : ℝ).
+  Real.IsUpperBound(subset, (b0 : ℝ))
+    by (y : ℝ) (yInS : y ∈ subset) ↦
          y
             ≤ B0real
-            ≤ (b0 : Real);
+            ≤ (b0 : ℝ);
   -- Package x0 with its membership and lower-bound facts as the witness
   -- needed by bisectionLeft_below_witness / bisectionLimit_is_least.
-  ∃ (y : Real).
-            y ∈ subset ∧ (Real.BisectionInterval.left(initial) : Real) ≤ y
+  ∃ (y : ℝ).
+            y ∈ subset ∧ (Real.BisectionInterval.left(initial) : ℝ) ≤ y
     by {
       witness x0 with done
     };
-  -- a0 ≤ b0 as Rationals follows from (a0 : Real) ≤ x0 ≤ B0 ≤ (b0 : Real).
+  -- a0 ≤ b0 as Rationals follows from (a0 : ℝ) ≤ x0 ≤ B0 ≤ (b0 : ℝ).
   -- This is needed for bisectionLeft_is_cauchy and friends.
-  (a0 : Real)
+  (a0 : ℝ)
           ≤ x0
           ≤ B0real
-          ≤ (b0 : Real);
+          ≤ (b0 : ℝ);
   Real.BisectionInterval.left(initial)
           ≤ Real.BisectionInterval.right(initial) as initialLeftLeqRight;
-  let supValue : Real :=
+  let supValue : ℝ :=
       Real.bisectionLimit(subset, initial, initialLeftLeqRight);
   witness supValue with {
     Real.IsUpperBound(subset, supValue);
-    ∀ (otherBound : Real).
+    ∀ (otherBound : ℝ).
               Real.IsUpperBound(subset, otherBound) → supValue ≤ otherBound
-        by (otherBound : Real)
+        by (otherBound : ℝ)
                  (otherIsUpper : Real.IsUpperBound(subset, otherBound)) ↦
              done by Real.bisectionLimit_is_least;
     done
@@ -1661,24 +1661,24 @@ theorem Real.supremum_exists
 -- the lemma every "the supremum is attained up to ε" argument — IVT,
 -- monotone convergence on sets — actually consumes.
 theorem Real.IsSupremum.exists_above
-        (subset : Set(Real)) (s u : Real)
+        (subset : Set(ℝ)) (s u : ℝ)
         (isSupremum : Real.IsSupremum(subset, s))
         (uBelowSupremum : u < s)
-        : ∃ (x : Real). x ∈ subset ∧ u < x := {
-  suppose ¬(∃ (x : Real). x ∈ subset ∧ u < x) as noneAbove for contradiction;
+        : ∃ (x : ℝ). x ∈ subset ∧ u < x := {
+  suppose ¬(∃ (x : ℝ). x ∈ subset ∧ u < x) as noneAbove for contradiction;
   -- Every element fails to exceed u, so u is an upper bound …
   Real.IsUpperBound(subset, u)
-      by (y : Real) (yInSubset : y ∈ subset) ↦ {
+      by (y : ℝ) (yInSubset : y ∈ subset) ↦ {
         ¬(u < y)
             by (uBelowY : u < y) ↦ {
-                 ∃ (x : Real). x ∈ subset ∧ u < x
+                 ∃ (x : ℝ). x ∈ subset ∧ u < x
                      by { witness y with done };
-                 noneAbove(∃ (x : Real). x ∈ subset ∧ u < x)
+                 noneAbove(∃ (x : ℝ). x ∈ subset ∧ u < x)
                };
         done by Real.LessOrEqual_of_not_LessThan
       };
   -- … so leastness pins s ≤ u, against u < s.
-  ∀ (otherBound : Real).
+  ∀ (otherBound : ℝ).
             Real.IsUpperBound(subset, otherBound) → s ≤ otherBound;
   s ≤ u;
   u < u by Real.LessThan.transitive_right;

@@ -44,21 +44,21 @@ import IntegerMod.representative
 -- ----------------------------------------------------------------------
 -- The class of a natural number, and the residue list [n], …, [1].
 
-definition IntegerMod.residue (p : Natural) (k : Natural) : IntegerMod(p) :=
-  IntegerMod.make(p, (k : Integer))
+definition IntegerMod.residue (p : ℕ) (k : ℕ) : IntegerMod(p) :=
+  IntegerMod.make(p, (k : ℤ))
 
-definition IntegerMod.residues_up_to (p : Natural) (top : Natural)
+definition IntegerMod.residues_up_to (p : ℕ) (top : ℕ)
         : List(IntegerMod(p)) :=
-  List.map(Natural, IntegerMod(p), IntegerMod.residue(p), List.range_down(top))
+  List.map(ℕ, IntegerMod(p), IntegerMod.residue(p), List.range_down(top))
 
 -- The recursion in `1 + n` form: one more residue on the front.
-theorem IntegerMod.residues_up_to_one_plus (p n : Natural)
+theorem IntegerMod.residues_up_to_one_plus (p n : ℕ)
         : IntegerMod.residues_up_to(p, 1 + n)
           = List.prepend(IntegerMod(p), IntegerMod.residue(p, 1 + n),
                 IntegerMod.residues_up_to(p, n)) :=
   IntegerMod.residues_up_to(p, 1 + n)
-     = List.map(Natural, IntegerMod(p), IntegerMod.residue(p),
-           List.prepend(Natural, 1 + n, List.range_down(n)))
+     = List.map(ℕ, IntegerMod(p), IntegerMod.residue(p),
+           List.prepend(ℕ, 1 + n, List.range_down(n)))
            by substituting List.range_down_one_plus
      = List.prepend(IntegerMod(p), IntegerMod.residue(p, 1 + n),
            IntegerMod.residues_up_to(p, n))
@@ -66,31 +66,31 @@ theorem IntegerMod.residues_up_to_one_plus (p n : Natural)
 -- ----------------------------------------------------------------------
 -- Negation pairs residues that sum to the modulus: a + b = p gives
 -- [a] = −[b] (their difference a − (−b) is exactly p).
-theorem IntegerMod.residue_negate_of_add_to_modulus (p a b : Natural)
+theorem IntegerMod.residue_negate_of_add_to_modulus (p a b : ℕ)
         (sumEquation : a + b = p)
         : IntegerMod.residue(p, a) = IntegerMod.negate(IntegerMod.residue(p, b)) := {
-  Integer.CongruentModulo(p, (a : Integer), -(b : Integer))
+  Integer.CongruentModulo(p, (a : ℤ), -(b : ℤ))
       by ⟨Integer.one,
-          { (a : Integer) - (-(b : Integer))
-               = (a : Integer) + (b : Integer)
-               = ((a + b : Natural) : Integer)
-               = (p : Integer)
-               = (p : Integer) * Integer.one }⟩ as congruent;
-  Quotient.equivalent_implies_equal((a : Integer), -(b : Integer), congruent)
+          { (a : ℤ) - (-(b : ℤ))
+               = (a : ℤ) + (b : ℤ)
+               = ((a + b : ℕ) : ℤ)
+               = (p : ℤ)
+               = (p : ℤ) * Integer.one }⟩ as congruent;
+  Quotient.equivalent_implies_equal((a : ℤ), -(b : ℤ), congruent)
 }
 
 -- ----------------------------------------------------------------------
 -- Completeness: every nonzero class is the residue of some 1 ≤ r ≤ n.
-theorem IntegerMod.residues_complete (p n : Natural) (pEquation : p = 1 + n)
+theorem IntegerMod.residues_complete (p n : ℕ) (pEquation : p = 1 + n)
         (c : IntegerMod(p)) (cNonzero : ¬(c = IntegerMod.zero(p)))
         : c ∈ IntegerMod.residues_up_to(p, n) := {
   -- Reduce c to its canonical representative r < p.
   1 ≤ 1 + n;
   1 ≤ p by substituting pEquation as pPositive;
-  choose r such that r < p ∧ c = IntegerMod.make(p, (r : Integer))
+  choose r such that r < p ∧ c = IntegerMod.make(p, (r : ℤ))
       from IntegerMod.exists_natural_representative(p, pPositive, c);
   r < p as rBound;
-  c = IntegerMod.make(p, (r : Integer)) as cEquation;
+  c = IntegerMod.make(p, (r : ℤ)) as cEquation;
   -- r is not 0 (the class is nonzero), so 1 ≤ r.
   r ≠ 0
       by (rZero : r = 0) ↦ {
@@ -117,13 +117,13 @@ theorem IntegerMod.residues_complete (p n : Natural) (pEquation : p = 1 + n)
 -- ----------------------------------------------------------------------
 -- Distinctness: the residues 1, …, n are pairwise distinct classes,
 -- because `make` is injective below the modulus.
-theorem IntegerMod.residues_distinct (p n : Natural) (pEquation : p = 1 + n)
+theorem IntegerMod.residues_distinct (p n : ℕ) (pEquation : p = 1 + n)
         : List.Distinct(IntegerMod(p), IntegerMod.residues_up_to(p, n)) := {
   -- The residue map is injective on the members of range_down(n).
-  (x y : Natural) → x ∈ List.range_down(n)
+  (x y : ℕ) → x ∈ List.range_down(n)
           → y ∈ List.range_down(n)
           → IntegerMod.residue(p, x) = IntegerMod.residue(p, y) → x = y
-      by (x y : Natural)
+      by (x y : ℕ)
          (xMember : x ∈ List.range_down(n))
          (yMember : y ∈ List.range_down(n))
          (imagesEqual : IntegerMod.residue(p, x) = IntegerMod.residue(p, y)) ↦ {
@@ -139,21 +139,21 @@ theorem IntegerMod.residues_distinct (p n : Natural) (pEquation : p = 1 + n)
            y < p by substituting pEquation;
            done by IntegerMod.make_injective_below_modulus
          };
-  List.Distinct(Natural, List.range_down(n)) by List.range_down_distinct;
+  List.Distinct(ℕ, List.range_down(n)) by List.range_down_distinct;
   done by List.map_distinct_on
 }
 
 -- ----------------------------------------------------------------------
 -- Zero is not on the list: a member is the class of some 1 ≤ j ≤ n, and
 -- [j] = [0] would force j = 0 by injectivity below the modulus.
-theorem IntegerMod.residues_member_nonzero (p n : Natural) (pEquation : p = 1 + n)
+theorem IntegerMod.residues_member_nonzero (p n : ℕ) (pEquation : p = 1 + n)
         (c : IntegerMod(p))
         (cMember : c ∈ IntegerMod.residues_up_to(p, n))
         : ¬(c = IntegerMod.zero(p)) :=
   (cZero : c = IntegerMod.zero(p)) ↦ {
     choose j such that
         j ∈ List.range_down(n) ∧ IntegerMod.residue(p, j) = c
-        from List.map_member_invert(Natural, IntegerMod(p), IntegerMod.residue(p),
+        from List.map_member_invert(ℕ, IntegerMod(p), IntegerMod.residue(p),
                  c, List.range_down(n), cMember);
     IntegerMod.residue(p, j) = c as jClassEquation;
     1 ≤ j by List.range_down_member_positive;
@@ -180,10 +180,10 @@ theorem IntegerMod.residues_member_nonzero (p n : Natural) (pEquation : p = 1 + 
 -- The classes 1 and −1 = [n] are on the list (n ≥ 1), and they are
 -- different classes as soon as 2 ≤ n (that is, p ≥ 3).
 
-theorem IntegerMod.one_member_residues (p n : Natural) (pEquation : p = 1 + n)
+theorem IntegerMod.one_member_residues (p n : ℕ) (pEquation : p = 1 + n)
         (nPositive : 1 ≤ n)
         : IntegerMod.one(p) ∈ IntegerMod.residues_up_to(p, n) := {
-  (1 : Natural) ≤ 1;
+  (1 : ℕ) ≤ 1;
   1 ∈ List.range_down(n)
       by List.range_down_complete;
   IntegerMod.residue(p, 1) ∈ IntegerMod.residues_up_to(p, n)
@@ -192,7 +192,7 @@ theorem IntegerMod.one_member_residues (p n : Natural) (pEquation : p = 1 + n)
   done by substituting (IntegerMod.one(p) = IntegerMod.residue(p, 1))
 }
 
-theorem IntegerMod.negate_one_member_residues (p n : Natural)
+theorem IntegerMod.negate_one_member_residues (p n : ℕ)
         (pEquation : p = 1 + n) (nPositive : 1 ≤ n)
         : IntegerMod.negate(IntegerMod.one(p)) ∈ IntegerMod.residues_up_to(p, n) := {
   -- −1 is the class of n, since n + 1 = p.
@@ -209,7 +209,7 @@ theorem IntegerMod.negate_one_member_residues (p n : Natural)
   done by substituting negateOneEquation
 }
 
-theorem IntegerMod.one_not_negate_one (p n : Natural)
+theorem IntegerMod.one_not_negate_one (p n : ℕ)
         (pEquation : p = 1 + n) (nAtLeastTwo : 2 ≤ n)
         (oneEqualsNegateOne
             : IntegerMod.one(p) = IntegerMod.negate(IntegerMod.one(p)))

@@ -19,7 +19,7 @@ import Logic.exists
 -- by ι-reduction `Natural.is_zero(successor(n))` *is* `False`. This
 -- is the bridge that lets us turn the hypothetical equality
 -- `zero = successor(n)` into a proof of `False`.
-definition Natural.is_zero : Natural → Proposition
+definition Natural.is_zero : ℕ → Proposition
   | zero         => True
   | successor(_) => False
 
@@ -28,7 +28,7 @@ definition Natural.is_zero : Natural → Proposition
 -- free. Substituting along the assumed equality slides it to
 -- `Natural.is_zero(successor(n))`, which by definition is `False` —
 -- and that is exactly what we needed.
-automatic theorem Natural.successor_not_zero (n : Natural) : successor(n) ≠ zero := {
+automatic theorem Natural.successor_not_zero (n : ℕ) : successor(n) ≠ zero := {
   suppose successor(n) = zero;
   Natural.is_zero(successor(n))
 }
@@ -36,7 +36,7 @@ automatic theorem Natural.successor_not_zero (n : Natural) : successor(n) ≠ ze
 -- Symmetric direction. Same reductio; the substituting tactic tries
 -- both directions of the equality, so it doesn't matter that the
 -- hypothesis here is `zero = successor(n)` rather than its mirror.
-automatic theorem Natural.zero_not_successor (n : Natural) : zero ≠ successor(n) := {
+automatic theorem Natural.zero_not_successor (n : ℕ) : zero ≠ successor(n) := {
   suppose zero = successor(n);
   Natural.is_zero(successor(n))
 }
@@ -44,12 +44,12 @@ automatic theorem Natural.zero_not_successor (n : Natural) : zero ≠ successor(
 -- Predecessor: returns zero for zero (an arbitrary choice — predecessor
 -- isn't really defined there), and the inner argument for successor.
 -- Used by `successor_injective` below.
-definition Natural.predecessor : Natural → Natural
+definition Natural.predecessor : ℕ → ℕ
   | zero         => zero
   | successor(k) => k
 
 -- successor is injective: if successor(a) = successor(b) then a = b.
-automatic theorem Natural.successor_injective (a b : Natural)
+automatic theorem Natural.successor_injective (a b : ℕ)
         (equalityProof : successor(a) = successor(b)) : a = b :=
   a
      = Natural.predecessor(successor(a))
@@ -60,7 +60,7 @@ automatic theorem Natural.successor_injective (a b : Natural)
 -- Peel two successors via injectivity to reach `0 = successor(n)`, then
 -- the bare `zero_not_successor`. Reads as "2 is never of the form 3 + n";
 -- used to rule out the d ≥ 3 case when classifying divisors of 2.
-theorem Natural.two_not_three_plus (n : Natural)
+theorem Natural.two_not_three_plus (n : ℕ)
         : 2 ≠ successor(successor(successor(n))) := {
   suppose 2 = successor(successor(successor(n))) as twoEqualsThreePlus;
   1 = successor(successor(n));
@@ -72,13 +72,13 @@ theorem Natural.two_not_three_plus (n : Natural)
 -- The expected disjunction for splitting a Natural propositionally:
 -- `claim goal by cases { case n = 0: …  case ∃ k. n = successor(k): … }`
 -- — finds this lemma via the unified hammer.
-automatic theorem Natural.zero_or_successor (n : Natural)
-        : n = 0 ∨ ∃ (k : Natural). n = successor(k) :=
-  unfold Natural in
+automatic theorem Natural.zero_or_successor (n : ℕ)
+        : n = 0 ∨ ∃ (k : ℕ). n = successor(k) :=
+  unfold ℕ in
   by induction on n with IH {
     case zero: done
     case successor(k): {
-        ∃ (predecessor : Natural). successor(k) = successor(predecessor)
+        ∃ (predecessor : ℕ). successor(k) = successor(predecessor)
             by witness k with done;
         done
       }

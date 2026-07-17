@@ -47,7 +47,7 @@ import Real.algebra
 
 definition Rational.sequence.IsEventuallyNonneg
         (s : Rational.sequence.Sequence) : Proposition :=
-  ∀ (ε : Rational). ε > 0 →
+  ∀ (ε : ℚ). ε > 0 →
     eventually (m). -ε < s(m)
 
 -- IsEventuallyNonneg on a packaged CauchyRationalSequence: lifted
@@ -70,13 +70,13 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
         (aEventuallyNonneg
             : CauchyRationalSequence.IsEventuallyNonneg(a))
         : CauchyRationalSequence.IsEventuallyNonneg(b) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     Rational.zero < Rational.halve(ε) as halvedPositive;
     choose N_a from aEventuallyNonneg(Rational.halve(ε), halvedPositive);
     choose N_eq as eqBound from aEquivB(Rational.halve(ε), halvedPositive);
     witness Natural.maximum(N_a, N_eq) with
-        (m : Natural)
+        (m : ℕ)
                  (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) ↦ {
           N_a ≤ m;
           N_eq ≤ m;
@@ -130,7 +130,7 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect
 -- ----------------------------------------------------------------------
 -- Real.IsNonneg, LessOrEqual, LessThan.
 
-opaque definition Real.IsNonneg (x : Real) : Proposition :=
+opaque definition Real.IsNonneg (x : ℝ) : Proposition :=
   Quotient.lift(
       CauchyRationalSequence.IsEventuallyNonneg,
       CauchyRationalSequence.IsEventuallyNonneg.respect,
@@ -153,10 +153,10 @@ theorem Real.IsNonneg.eventually_nonneg
         : CauchyRationalSequence.IsEventuallyNonneg(c) :=
   done by unfolding Real.IsNonneg
 
-definition Real.LessOrEqual (x y : Real) : Proposition :=
+definition Real.LessOrEqual (x y : ℝ) : Proposition :=
   Real.IsNonneg(y - x)
 
-definition Real.LessThan (x y : Real) : Proposition :=
+definition Real.LessThan (x y : ℝ) : Proposition :=
   Real.LessOrEqual(x, y) ∧ Not(x = y)
 
 operator (≤) on (Real, Real) := Real.LessOrEqual
@@ -171,16 +171,16 @@ operator (<) on (Real, Real) := Real.LessThan
 -- N = 0 works; -ε < 0.
 automatic theorem Real.IsNonneg_zero : Real.IsNonneg(Real.zero) :=
   unfold Real.IsNonneg in
-  ((ε : Rational)
+  ((ε : ℚ)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦ {
+        (m : ℕ) (_ : 0 ≤ m) ↦ {
           -- Goal: -ε < Rational.to_cauchy_constant(0)(m) ≡β Rational.zero.
           -ε < Rational.zero
         })
 
 -- Real.LessOrEqual.reflexive : x ≤ x.
-automatic theorem Real.LessOrEqual.reflexive (x : Real) : x ≤ x :=
+automatic theorem Real.LessOrEqual.reflexive (x : ℝ) : x ≤ x :=
   -- x ≤ x is Real.IsNonneg(x - x); rewrite x - x to 0 and use IsNonneg_zero.
   Real.IsNonneg(x - x)
     by substituting (ring : x - x = Real.zero)
@@ -196,18 +196,18 @@ theorem Rational.sequence.IsEventuallyNonneg.add
         (sNonneg : Rational.sequence.IsEventuallyNonneg(s))
         (tNonneg : Rational.sequence.IsEventuallyNonneg(t))
         : Rational.sequence.IsEventuallyNonneg(
-              (n : Natural) ↦ s(n) + t(n)) :=
-  (ε : Rational)
+              (n : ℕ) ↦ s(n) + t(n)) :=
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     Rational.zero < Rational.halve(ε);
     eventually (m). -Rational.halve(ε) < s(m) as sBounded;
-    choose N_s such that ∀ (m : Natural). N_s ≤ m → -Rational.halve(ε) < s(m)
+    choose N_s such that ∀ (m : ℕ). N_s ≤ m → -Rational.halve(ε) < s(m)
         from sBounded;
     eventually (m). -Rational.halve(ε) < t(m) as tBounded;
-    choose N_t such that ∀ (m : Natural). N_t ≤ m → -Rational.halve(ε) < t(m)
+    choose N_t such that ∀ (m : ℕ). N_t ≤ m → -Rational.halve(ε) < t(m)
         from tBounded;
     witness Natural.maximum(N_s, N_t) with
-        (m : Natural)
+        (m : ℕ)
                  (mGeMax : Natural.maximum(N_s, N_t) ≤ m) ↦ {
           N_s ≤ m;
           N_t ≤ m;
@@ -234,14 +234,14 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.add
               CauchyRationalSequence.add(a, b)) :=
   -- IsEventuallyNonneg of add(a, b) means IsEventuallyNonneg of
   -- (a + b)(·). Bridge to a(n) + b(n) via sequenceFunction_add.
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
-    Rational.sequence.IsEventuallyNonneg((n : Natural) ↦ a(n) + b(n))
+    Rational.sequence.IsEventuallyNonneg((n : ℕ) ↦ a(n) + b(n))
         as sumNonneg;
-    choose N such that ∀ (m : Natural). N ≤ m → -ε < a(m) + b(m)
+    choose N such that ∀ (m : ℕ). N ≤ m → -ε < a(m) + b(m)
         from sumNonneg(ε, εPositive);
     witness N with
-        (m : Natural) (_ : N ≤ m) ↦
+        (m : ℕ) (_ : N ≤ m) ↦
           -ε
              < a(m) + b(m)
              = (a + b)(m)
@@ -249,7 +249,7 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.add
 
 -- Real.IsNonneg.add: Real-level statement. Lift via Quotient.induct_two.
 theorem Real.IsNonneg.add
-        (x y : Real)
+        (x y : ℝ)
         (xNonneg : Real.IsNonneg(x))
         (yNonneg : Real.IsNonneg(y))
         : Real.IsNonneg(x + y) :=
@@ -266,7 +266,7 @@ theorem Real.IsNonneg.add
 -- Real.IsNonneg.add to get Real.IsNonneg((y - x) + (z - y)) =
 -- Real.IsNonneg(z - x).
 theorem Real.LessOrEqual.transitive
-        (x y z : Real)
+        (x y z : ℝ)
         (xLeqY : x ≤ y) (yLeqZ : y ≤ z)
         : x ≤ z :=
   Real.IsNonneg(z - x)
@@ -285,17 +285,17 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
         (sNonneg : Rational.sequence.IsEventuallyNonneg(s))
         (negSNonneg
             : Rational.sequence.IsEventuallyNonneg(
-                  (n : Natural) ↦ -s(n)))
-        : ∀ (ε : Rational). Rational.zero < ε →
-            ∃ (N : Natural).
-              ∀ (m : Natural). N ≤ m →
+                  (n : ℕ) ↦ -s(n)))
+        : ∀ (ε : ℚ). Rational.zero < ε →
+            ∃ (N : ℕ).
+              ∀ (m : ℕ). N ≤ m →
                 abs(s(m) - Rational.zero) < ε :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     choose N_s from sNonneg(ε, εPositive);
     choose N_negS as negSLowerBound from negSNonneg(ε, εPositive);
     witness Natural.maximum(N_s, N_negS) with
-        (m : Natural)
+        (m : ℕ)
                  (mGeMax : Natural.maximum(N_s, N_negS) ≤ m) ↦ {
           -- Lower bound on s(m): -ε < s(m), from sNonneg.
           N_s ≤ m;
@@ -337,28 +337,28 @@ theorem CauchyRationalSequence.equivalent_zero_of_IsEventuallyNonneg_both
 
 -- Drop the strict part of a Real.LessThan: x < y → x ≤ y.
 theorem Real.LessThan.weaken
-        (x y : Real) (xLessThanY : x < y) : x ≤ y :=
+        (x y : ℝ) (xLessThanY : x < y) : x ≤ y :=
   And.left(Real.LessOrEqual(x, y), Not(x = y), xLessThanY)
 
 -- Extract the distinctness part: x < y → ¬(x = y).
 theorem Real.LessThan.distinct
-        (x y : Real) (xLessThanY : x < y) : Not(x = y) :=
+        (x y : ℝ) (xLessThanY : x < y) : Not(x = y) :=
   And.right(Real.LessOrEqual(x, y), Not(x = y), xLessThanY)
 
 -- Strict order is irreflexive: a < a is impossible. Marked `automatic`
 -- so the auto-prover closes a `False` goal from an in-scope `a < a`
 -- (the textbook "but a < a, contradiction") without a citation.
-automatic theorem Real.LessThan.irreflexive (a : Real) : ¬(a < a) := {
+automatic theorem Real.LessThan.irreflexive (a : ℝ) : ¬(a < a) := {
   suppose a < a as selfLess;
   a ≠ a as aDistinct;
-  aDistinct(reflexivity(Real, a))
+  aDistinct(reflexivity(ℝ, a))
 }
 
 -- Real-level: x ≥ 0 and -x ≥ 0 implies x = Real.zero. Take a
 -- representative; sequence-level antisymmetry gives the equivalence
 -- to the constant-zero sequence, which lifts via Quotient.equivalent_implies_equal.
 theorem Real.IsNonneg_and_negate_IsNonneg_implies_zero
-        (x : Real)
+        (x : ℝ)
         (xNonneg : Real.IsNonneg(x))
         (negXNonneg : Real.IsNonneg(-x))
         : x = Real.zero :=
@@ -374,7 +374,7 @@ theorem Real.IsNonneg_and_negate_IsNonneg_implies_zero
 -- y - x = Real.zero by the antisymmetric lemma above; then x = y by
 -- the (x - y) + y = x identity.
 theorem Real.LessOrEqual.antisymmetric
-        (x y : Real)
+        (x y : ℝ)
         (xLeqY : x ≤ y) (yLeqX : y ≤ x)
         : x = y := {
   -- IsNonneg(-(y - x)): convert IsNonneg(x - y) by showing
@@ -394,7 +394,7 @@ theorem Real.LessOrEqual.antisymmetric
 
 -- Real.LessThan.transitive_left: x ≤ y, y < z → x < z.
 theorem Real.LessThan.transitive_left
-        (x y z : Real)
+        (x y z : ℝ)
         (xLeqY : x ≤ y) (yLessThanZ : y < z)
         : x < z := {
   y ≤ z;
@@ -413,7 +413,7 @@ theorem Real.LessThan.transitive_left
 
 -- Real.LessThan.transitive_right: x < y, y ≤ z → x < z.
 theorem Real.LessThan.transitive_right
-        (x y z : Real)
+        (x y z : ℝ)
         (xLessThanY : x < y) (yLeqZ : y ≤ z)
         : x < z := {
   x ≤ y;
@@ -434,13 +434,13 @@ theorem Real.LessThan.transitive_right
 
 -- (y + z) - (x + z) = y - x, so IsNonneg evidence transfers.
 automatic theorem Real.add_preserves_LessOrEqual
-        (x y z : Real) (xLeqY : x ≤ y)
+        (x y z : ℝ) (xLeqY : x ≤ y)
         : x + z ≤ y + z :=
   x + z ≤ y + z by substituting (ring : y - x = (y + z) - (x + z))
 
 -- x + z = y + z → x = y. By ring + Equality.symmetry.
 theorem Real.add_cancel_right
-        (x y z : Real) (sumEquality : x + z = y + z)
+        (x y z : ℝ) (sumEquality : x + z = y + z)
         : x = y :=
   x
      = (x + z) - z
@@ -449,7 +449,7 @@ theorem Real.add_cancel_right
 
 -- Strict additive monotonicity: x < y → x + z < y + z.
 theorem Real.add_preserves_LessThan
-        (x y z : Real) (xLessY : x < y)
+        (x y z : ℝ) (xLessY : x < y)
         : x + z < y + z := {
   x ≤ y;
   x + z ≤ y + z as sumLeq;
@@ -464,7 +464,7 @@ theorem Real.add_preserves_LessThan
 
 -- Left additive strict: x < y → z + x < z + y. Via commutativity.
 theorem Real.add_left_preserves_LessThan
-        (x y z : Real) (xLessY : x < y)
+        (x y z : ℝ) (xLessY : x < y)
         : z + x < z + y :=
   z + x
      = x + z
@@ -473,7 +473,7 @@ theorem Real.add_left_preserves_LessThan
 
 -- Weak left additive: a ≤ b → z + a ≤ z + b. Same shape.
 theorem Real.add_preserves_LessOrEqual_left
-        (x y z : Real) (xLeqY : x ≤ y)
+        (x y z : ℝ) (xLeqY : x ≤ y)
         : z + x ≤ z + y :=
   z + x
      = x + z
@@ -482,26 +482,26 @@ theorem Real.add_preserves_LessOrEqual_left
 
 -- Adding a positive amount strictly increases; adding a nonnegative amount
 -- weakly increases. The everyday `x < x + 1` / `x ≤ x + c` facts.
-theorem Real.less_than_add_of_positive (x c : Real) (cPositive : c > 0)
+theorem Real.less_than_add_of_positive (x c : ℝ) (cPositive : c > 0)
         : x < x + c :=
   x
      = x + 0
      < x + c
 
-theorem Real.less_or_equal_add_of_nonneg (x c : Real) (cNonneg : c ≥ 0)
+theorem Real.less_or_equal_add_of_nonneg (x c : ℝ) (cNonneg : c ≥ 0)
         : x ≤ x + c :=
   x
      = x + 0
      ≤ x + c
 
 -- Negation reverses ≤: (−x) − (−y) is the same difference as y − x.
-theorem Real.LessOrEqual.negate (x y : Real) (xLeqY : x ≤ y)
+theorem Real.LessOrEqual.negate (x y : ℝ) (xLeqY : x ≤ y)
         : -y ≤ -x :=
   -y ≤ -x by substituting (ring : y - x = -x - -y)
 
 -- Strict counterpart: x < y → -y < -x. Negation reverses strict order.
 automatic theorem Real.LessThan.negate
-        (x y : Real) (xLessY : x < y) : -y < -x := {
+        (x y : ℝ) (xLessY : x < y) : -y < -x := {
   x ≤ y;
   -y ≤ -x;
   x ≠ y as xDistinct;
@@ -512,7 +512,7 @@ automatic theorem Real.LessThan.negate
 -- Combined strict-strict sum: a < c ∧ b < d → a + b < c + d.
 -- Chain through (a + b) < (c + b) < (c + d) using transitivity.
 theorem Real.LessThan.add_strict_strict
-        (a b c d : Real)
+        (a b c d : ℝ)
         (aLessC : a < c) (bLessD : b < d)
         : a + b < c + d :=
   a + b
@@ -522,13 +522,13 @@ theorem Real.LessThan.add_strict_strict
 -- The IsNonneg ↔ (0 ≤ ·) bridge, in both directions (mirrors the
 -- Rational pair). 0 ≤ x is definitionally IsNonneg(x − 0); the ring
 -- identity x − 0 = x crosses the gap.
-theorem Real.LessOrEqual_zero_of_IsNonneg (x : Real)
+theorem Real.LessOrEqual_zero_of_IsNonneg (x : ℝ)
         (xNonneg : Real.IsNonneg(x))
         : Real.zero ≤ x :=
   Real.IsNonneg(x - Real.zero)
       by substituting (ring : x - Real.zero = x)
 
-automatic theorem Real.IsNonneg_of_LessOrEqual_zero (x : Real)
+automatic theorem Real.IsNonneg_of_LessOrEqual_zero (x : ℝ)
         (zeroLeqX : Real.zero ≤ x)
         : Real.IsNonneg(x) :=
   Real.IsNonneg(x) by substituting (ring : x = x - Real.zero)

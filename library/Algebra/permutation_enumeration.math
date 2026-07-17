@@ -38,14 +38,14 @@ import Algebra.finite_permutation
 -- index transport (a transport would refuse to ι-reduce, stranding the
 -- recursion); the `_one_plus` equation replays the same bridge.
 
-definition NaturalsBelow.enumerate : (n : Natural) → List(NaturalsBelow(n))
+definition NaturalsBelow.enumerate : (n : ℕ) → List(NaturalsBelow(n))
   | 0 => List.empty(NaturalsBelow(0))
   | 1 + m => unfold Natural.add in
       List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
           List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
               NaturalsBelow.enumerate(m)))
 
-theorem NaturalsBelow.enumerate_one_plus (m : Natural)
+theorem NaturalsBelow.enumerate_one_plus (m : ℕ)
         : NaturalsBelow.enumerate(1 + m)
           = List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m), NaturalsBelow.inclusion(m),
@@ -58,7 +58,7 @@ theorem NaturalsBelow.enumerate_one_plus (m : Natural)
 -- Every index of `NaturalsBelow(n)` appears in `enumerate(n)`. The step
 -- splits an index by whether its value is below the boundary (an inclusion
 -- from one level down, in the mapped tail) or equal to it (the top head).
-theorem NaturalsBelow.enumerate_complete (n : Natural)
+theorem NaturalsBelow.enumerate_complete (n : ℕ)
         : ∀ (x : NaturalsBelow(n)). x ∈ NaturalsBelow.enumerate(n) :=
   by induction on n with IH {
     case base:
@@ -108,7 +108,7 @@ theorem NaturalsBelow.enumerate_complete (n : Natural)
 
 -- The top index is not among the inclusions (they all have value below the
 -- boundary; the top has value equal to it).
-theorem NaturalsBelow.top_not_in_inclusions (m : Natural)
+theorem NaturalsBelow.top_not_in_inclusions (m : ℕ)
         : ¬(NaturalsBelow.top(m) ∈
                 List.map(NaturalsBelow(m), NaturalsBelow(1 + m),
                     NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))) :=
@@ -135,7 +135,7 @@ theorem NaturalsBelow.top_not_in_inclusions (m : Natural)
 
 -- `enumerate(n)` has no duplicates: the mapped inclusions are distinct
 -- (inclusion is injective) and the top head is new.
-theorem NaturalsBelow.enumerate_distinct (n : Natural)
+theorem NaturalsBelow.enumerate_distinct (n : ℕ)
         : List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) :=
   by induction on n with IH {
     case base: List.Distinct.empty(NaturalsBelow(0))
@@ -283,7 +283,7 @@ definition Permutation.insertRow {m : Natural} (sigma : Permutation(m)) : List(P
 
 -- Concatenate the rows over a list of permutations of NaturalsBelow(m).
 -- Recursion on the LIST (m fixed), so no index transport arises here.
-definition Permutation.concatRows (m : Natural)
+definition Permutation.concatRows (m : ℕ)
         : List(Permutation(m)) → List(Permutation(1 + m))
   | List.empty => List.empty(Permutation(1 + m))
   | List.prepend(sigma, rest) =>
@@ -292,11 +292,11 @@ definition Permutation.concatRows (m : Natural)
 -- All permutations of NaturalsBelow(n). The `1 + m` step recurses on the index
 -- (dependent result type), bridged by `unfold Natural.add in` exactly as
 -- `enumerate` above.
-definition Permutation.allPermutations : (n : Natural) → List(Permutation(n))
+definition Permutation.allPermutations : (n : ℕ) → List(Permutation(n))
   | 0 => List.prepend(Permutation(0), Permutation.identity(0), List.empty(Permutation(0)))
   | 1 + m => unfold Natural.add in Permutation.concatRows(m, Permutation.allPermutations(m))
 
-theorem Permutation.allPermutations_one_plus (m : Natural)
+theorem Permutation.allPermutations_one_plus (m : ℕ)
         : Permutation.allPermutations(1 + m)
           = Permutation.concatRows(m, Permutation.allPermutations(m)) :=
   unfold Natural.add in reflexivity(Permutation.concatRows(m, Permutation.allPermutations(m)))
@@ -359,7 +359,7 @@ theorem Permutation.insertRow_member_lower {m : Natural} (sigma : Permutation(m)
 
 -- Membership into the concatenation: a τ in the row of a σ ∈ l is in
 -- concatRows(l). Induct on where σ sits in l.
-theorem Permutation.concatRows_member (m : Natural) (l : List(Permutation(m)))
+theorem Permutation.concatRows_member (m : ℕ) (l : List(Permutation(m)))
         (sigma : Permutation(m)) (tau : Permutation(1 + m))
         (memSigma : sigma ∈ l)
         (memTau : tau ∈ Permutation.insertRow(sigma))
@@ -379,7 +379,7 @@ theorem Permutation.concatRows_member (m : Natural) (l : List(Permutation(m)))
   }
 
 -- Inversion: a member of concatRows(l) sits in the row of some σ ∈ l.
-theorem Permutation.concatRows_member_invert (m : Natural) (tau : Permutation(1 + m))
+theorem Permutation.concatRows_member_invert (m : ℕ) (tau : Permutation(1 + m))
         (l : List(Permutation(m)))
         : tau ∈ Permutation.concatRows(m, l)
           → ∃ (sigma : Permutation(m)). sigma ∈ l
@@ -415,7 +415,7 @@ theorem Permutation.concatRows_member_invert (m : Natural) (tau : Permutation(1 
 
 -- concatRows preserves distinctness: each row is distinct, and rows for
 -- distinct σ are disjoint (σ is recoverable from any member by `lower`).
-theorem Permutation.concatRows_distinct (m : Natural) (l : List(Permutation(m)))
+theorem Permutation.concatRows_distinct (m : ℕ) (l : List(Permutation(m)))
         : List.Distinct(Permutation(m), l)
           → List.Distinct(Permutation(1 + m), Permutation.concatRows(m, l)) :=
   by induction on l with IH {
@@ -462,7 +462,7 @@ theorem Permutation.concatRows_distinct (m : Natural) (l : List(Permutation(m)))
 -- Completeness: every permutation appears. The step writes τ as the row entry
 -- swap(top, τ(top)) ∘ extend(lower τ) — with lower τ in the level-m list (IH)
 -- and τ(top) among the indices — and locates it in the concatenation.
-theorem Permutation.allPermutations_complete (n : Natural)
+theorem Permutation.allPermutations_complete (n : ℕ)
         : ∀ (tau : Permutation(n)). tau ∈ Permutation.allPermutations(n) :=
   by induction on n with IH {
     case base: {
@@ -497,7 +497,7 @@ theorem Permutation.allPermutations_complete (n : Natural)
 
 -- Distinctness: the base singleton is distinct; the step is concatRows over the
 -- distinct level-m list.
-theorem Permutation.allPermutations_distinct (n : Natural)
+theorem Permutation.allPermutations_distinct (n : ℕ)
         : List.Distinct(Permutation(n), Permutation.allPermutations(n)) :=
   by induction on n with IH {
     case base: {

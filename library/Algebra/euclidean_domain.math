@@ -45,7 +45,7 @@ theorem Ring.add_subtract_self_left (s : Ring) (a r : Ring.carrier(s))
 -- `norm` admits division with remainder: for any `a` and nonzero `b`
 -- there are `q`, `r` with `a = b·q + r` and either `r = 0` or
 -- `norm(r) < norm(b)`.
-definition Ring.HasEuclideanDivision (s : Ring) (norm : Ring.carrier(s) → Natural)
+definition Ring.HasEuclideanDivision (s : Ring) (norm : Ring.carrier(s) → ℕ)
         : Proposition :=
   (a b : Ring.carrier(s))
     → ¬(b = Ring.zero(s))
@@ -56,7 +56,7 @@ definition Ring.HasEuclideanDivision (s : Ring) (norm : Ring.carrier(s) → Natu
 inductive EuclideanDomain : Type(1) where
   | EuclideanDomain.make
       : (domain : IntegralDomain)
-        → (norm : Ring.carrier(IntegralDomain.ring(domain)) → Natural)
+        → (norm : Ring.carrier(IntegralDomain.ring(domain)) → ℕ)
         → Ring.HasEuclideanDivision(IntegralDomain.ring(domain), norm)
         → EuclideanDomain
 
@@ -67,7 +67,7 @@ definition EuclideanDomain.ring (euclidean : EuclideanDomain) : Ring :=
   IntegralDomain.ring(EuclideanDomain.domain(euclidean))
 
 definition EuclideanDomain.norm (euclidean : EuclideanDomain)
-        : Ring.carrier(EuclideanDomain.ring(euclidean)) → Natural :=
+        : Ring.carrier(EuclideanDomain.ring(euclidean)) → ℕ :=
   let ⟨domain, norm, division⟩ := euclidean in norm
 
 definition EuclideanDomain.division (euclidean : EuclideanDomain)
@@ -85,7 +85,7 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
             Ring.GeneratesIdeal(EuclideanDomain.ring(euclidean), member,
                 generator) := {
   let s : Ring := EuclideanDomain.ring(euclidean);
-  let norm : Ring.carrier(s) → Natural := EuclideanDomain.norm(euclidean);
+  let norm : Ring.carrier(s) → ℕ := EuclideanDomain.norm(euclidean);
   -- Re-type the ideal at `s` so its projections are spelled with `s`
   -- (matching the ring operations below; avoids ζ-mismatches in rewrite).
   Ring.IsIdeal(s, member) as isIdealAtRing;
@@ -101,16 +101,16 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
         -- A least-norm nonzero member generates the ideal.
         choose leastNorm such that
             (∃ (x : Ring.carrier(s)). member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = leastNorm)
-            ∧ (∀ (k : Natural). k < leastNorm
+            ∧ (∀ (k : ℕ). k < leastNorm
                    → ¬(∃ (x : Ring.carrier(s)). member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = k))
             from Natural.least_witness_minimal(
-                     (k : Natural) ↦
+                     (k : ℕ) ↦
                          ∃ (x : Ring.carrier(s)).
                              member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = k,
                      norm(nonzero),
                      ⟨nonzero, ⟨memberNonzero,
-                         ⟨nonzeroDistinct, reflexivity(Natural, norm(nonzero))⟩⟩⟩);
-        ∀ (k : Natural). k < leastNorm
+                         ⟨nonzeroDistinct, reflexivity(ℕ, norm(nonzero))⟩⟩⟩);
+        ∀ (k : ℕ). k < leastNorm
                 → ¬(∃ (x : Ring.carrier(s)). member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = k)
             as nothingSmaller;
         ∃ (x : Ring.carrier(s)).
@@ -158,7 +158,7 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
                       ∧ norm(x) = norm(remainder)
                   by ⟨remainder, ⟨memberRemainder,
                       ⟨remainderNonzero,
-                       reflexivity(Natural, norm(remainder))⟩⟩⟩
+                       reflexivity(ℕ, norm(remainder))⟩⟩⟩
                   as remainderIsNonzeroNorm;
               absurd(
                   nothingSmaller(norm(remainder), remainderNormBelowLeast,

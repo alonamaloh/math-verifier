@@ -54,15 +54,15 @@ fold_operation (+) on VectorSpace.carrier := VectorSpace.add_is_monoid
 -- is the vector at selection(i), scaled by coefficients(i).
 definition VectorSpace.linearCombination {f : Field} {V : VectorSpace(f)} {I : Type(0)}
         (family : I → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f))
-        (selection : Natural → I)
-        (count : Natural) : VectorSpace.carrier(V) :=
+        (coefficients : ℕ → Field.carrier(f))
+        (selection : ℕ → I)
+        (count : ℕ) : VectorSpace.carrier(V) :=
   sum i from 0 to count - 1 of coefficients(i) • family(selection(i))
 
 -- The empty combination is the zero vector.
 automatic theorem VectorSpace.linearCombination_zero {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → I)
         : VectorSpace.linearCombination(family, coefficients, selection, 0)
           = VectorSpace.zero(V) :=
   done
@@ -70,7 +70,7 @@ automatic theorem VectorSpace.linearCombination_zero {f : Field} {V : VectorSpac
 -- A single term: the combination collapses to its one scaled vector.
 theorem VectorSpace.linearCombination_one {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → I)
         : VectorSpace.linearCombination(family, coefficients, selection, 1)
           = coefficients(0) • family(selection(0)) := {
   ∀ (v : VectorSpace.carrier(V)). VectorSpace.zero(V) + v = v by VectorSpace.zero_add;
@@ -80,8 +80,8 @@ theorem VectorSpace.linearCombination_one {f : Field} {V : VectorSpace(f)}
 -- Peel the last term.
 theorem VectorSpace.linearCombination_add_one {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
-        (count : Natural)
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → I)
+        (count : ℕ)
         : VectorSpace.linearCombination(family, coefficients, selection, 1 + count)
           = VectorSpace.linearCombination(family, coefficients, selection, count)
             + coefficients(count) • family(selection(count)) :=
@@ -101,18 +101,18 @@ theorem VectorSpace.linearCombination_add_one {f : Field} {V : VectorSpace(f)}
 -- Scaling a combination scales every coefficient.
 theorem VectorSpace.linearCombination_scale {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficients : Natural → Field.carrier(f)) (selection : Natural → I)
-        (a : Field.carrier(f)) (count : Natural)
+        (coefficients : ℕ → Field.carrier(f)) (selection : ℕ → I)
+        (a : Field.carrier(f)) (count : ℕ)
         : a • VectorSpace.linearCombination(family, coefficients, selection, count)
           = VectorSpace.linearCombination(family,
-                (i : Natural) ↦ a * coefficients(i), selection, count) :=
+                (i : ℕ) ↦ a * coefficients(i), selection, count) :=
   by induction on count with IH {
     case base:
         a • VectorSpace.linearCombination(family, coefficients, selection, 0)
            = a • VectorSpace.zero(V)
            = VectorSpace.zero(V)
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ a * coefficients(i), selection, 0)
+                 (i : ℕ) ↦ a * coefficients(i), selection, 0)
     case step(m):
         a • VectorSpace.linearCombination(family, coefficients, selection, 1 + m)
            = a • (VectorSpace.linearCombination(family, coefficients, selection, m)
@@ -122,11 +122,11 @@ theorem VectorSpace.linearCombination_scale {f : Field} {V : VectorSpace(f)}
                   + (a * coefficients(m)) • family(selection(m))
                  by module
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ a * coefficients(i), selection, m)
+                 (i : ℕ) ↦ a * coefficients(i), selection, m)
                   + (a * coefficients(m)) • family(selection(m))
                  by IH
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ a * coefficients(i), selection, 1 + m)
+                 (i : ℕ) ↦ a * coefficients(i), selection, 1 + m)
                  by VectorSpace.linearCombination_add_one
   }
 
@@ -134,12 +134,12 @@ theorem VectorSpace.linearCombination_scale {f : Field} {V : VectorSpace(f)}
 -- coefficients index by index.
 theorem VectorSpace.linearCombination_add_coefficients {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficientsLeft coefficientsRight : Natural → Field.carrier(f))
-        (selection : Natural → I) (count : Natural)
+        (coefficientsLeft coefficientsRight : ℕ → Field.carrier(f))
+        (selection : ℕ → I) (count : ℕ)
         : VectorSpace.linearCombination(family, coefficientsLeft, selection, count)
               + VectorSpace.linearCombination(family, coefficientsRight, selection, count)
           = VectorSpace.linearCombination(family,
-                (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, count) :=
+                (i : ℕ) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, count) :=
   by induction on count with IH {
     case base:
         VectorSpace.linearCombination(family, coefficientsLeft, selection, 0)
@@ -147,7 +147,7 @@ theorem VectorSpace.linearCombination_add_coefficients {f : Field} {V : VectorSp
            = VectorSpace.zero(V) + VectorSpace.zero(V)
            = VectorSpace.zero(V)
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, 0)
+                 (i : ℕ) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, 0)
     case step(m):
         VectorSpace.linearCombination(family, coefficientsLeft, selection, 1 + m)
               + VectorSpace.linearCombination(family, coefficientsRight, selection, 1 + m)
@@ -166,16 +166,16 @@ theorem VectorSpace.linearCombination_add_coefficients {f : Field} {V : VectorSp
                   + coefficientsRight(m) • family(selection(m)))
                  by group
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, m)
+                 (i : ℕ) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, m)
              + (coefficientsLeft(m) • family(selection(m))
                   + coefficientsRight(m) • family(selection(m)))
                  by IH
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, m)
+                 (i : ℕ) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, m)
              + (coefficientsLeft(m) + coefficientsRight(m)) • family(selection(m))
                  by VectorSpace.scale_scalar_add
            = VectorSpace.linearCombination(family,
-                 (i : Natural) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, 1 + m)
+                 (i : ℕ) ↦ coefficientsLeft(i) + coefficientsRight(i), selection, 1 + m)
                  by VectorSpace.linearCombination_add_one
   }
 
@@ -185,19 +185,19 @@ theorem VectorSpace.linearCombination_add_coefficients {f : Field} {V : VectorSp
 -- definition serves both the selections (into the index type) and the
 -- coefficients (into the field).
 definition VectorSpace.combineFunctions {A : Type(0)}
-        (left right : Natural → A) (count : Natural) : Natural → A :=
-  (i : Natural) ↦
+        (left right : ℕ → A) (count : ℕ) : ℕ → A :=
+  (i : ℕ) ↦
     if i < count then left(i) else right(i ∸ count)
 
 -- Branch reductions: below the cut the merged family is the left family;
 -- the shifted index above the cut is the right family.
 theorem VectorSpace.combineFunctions_below {A : Type(0)}
-        (left right : Natural → A) (count i : Natural) (below : i < count)
+        (left right : ℕ → A) (count i : ℕ) (below : i < count)
         : VectorSpace.combineFunctions(left, right, count)(i) = left(i) :=
   done by Logic.if_positive
 
 theorem VectorSpace.combineFunctions_shifted {A : Type(0)}
-        (left right : Natural → A) (count j : Natural)
+        (left right : ℕ → A) (count j : ℕ)
         : VectorSpace.combineFunctions(left, right, count)(count + j) = right(j) := {
   ¬(count + j < count) by {
     suppose count + j < count as shifted;
@@ -213,17 +213,17 @@ theorem VectorSpace.combineFunctions_shifted {A : Type(0)}
 -- the count (the terms past the count are never read).
 theorem VectorSpace.linearCombination_pointwise_below {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficientsLeft coefficientsRight : Natural → Field.carrier(f))
-        (selectionLeft selectionRight : Natural → I) (count : Natural)
-        (coefficientsAgree : ∀ (i : Natural). i < count → coefficientsLeft(i) = coefficientsRight(i))
-        (selectionsAgree : ∀ (i : Natural). i < count → selectionLeft(i) = selectionRight(i))
+        (coefficientsLeft coefficientsRight : ℕ → Field.carrier(f))
+        (selectionLeft selectionRight : ℕ → I) (count : ℕ)
+        (coefficientsAgree : ∀ (i : ℕ). i < count → coefficientsLeft(i) = coefficientsRight(i))
+        (selectionsAgree : ∀ (i : ℕ). i < count → selectionLeft(i) = selectionRight(i))
         : VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, count)
           = VectorSpace.linearCombination(family, coefficientsRight, selectionRight, count) := {
-  ∀ (i : Natural). i < count →
+  ∀ (i : ℕ). i < count →
       coefficientsLeft(i) • family(selectionLeft(i))
       = coefficientsRight(i) • family(selectionRight(i))
     by {
-      take i : Natural;
+      take i : ℕ;
       suppose i < count as iBelow;
       coefficientsLeft(i) = coefficientsRight(i);
       selectionLeft(i) = selectionRight(i);
@@ -233,9 +233,9 @@ theorem VectorSpace.linearCombination_pointwise_below {f : Field} {V : VectorSpa
     };
   VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, count)
      = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
-           (i : Natural) ↦ coefficientsLeft(i) • family(selectionLeft(i)), count)
+           (i : ℕ) ↦ coefficientsLeft(i) • family(selectionLeft(i)), count)
      = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
-           (i : Natural) ↦ coefficientsRight(i) • family(selectionRight(i)), count)
+           (i : ℕ) ↦ coefficientsRight(i) • family(selectionRight(i)), count)
            by Algebra.indexedAggregate_pointwise_below
      = VectorSpace.linearCombination(family, coefficientsRight, selectionRight, count)
 }
@@ -247,17 +247,17 @@ theorem VectorSpace.linearCombination_pointwise_below {f : Field} {V : VectorSpa
 theorem VectorSpace.linearCombination_congruence {f : Field} {V : VectorSpace(f)}
         {I J : Type(0)} (family1 : I → VectorSpace.carrier(V))
         (family2 : J → VectorSpace.carrier(V))
-        (coefficients1 coefficients2 : Natural → Field.carrier(f))
-        (selection1 : Natural → I) (selection2 : Natural → J) (count : Natural)
-        (termsAgree : ∀ (i : Natural). i < count →
+        (coefficients1 coefficients2 : ℕ → Field.carrier(f))
+        (selection1 : ℕ → I) (selection2 : ℕ → J) (count : ℕ)
+        (termsAgree : ∀ (i : ℕ). i < count →
             coefficients1(i) • family1(selection1(i)) = coefficients2(i) • family2(selection2(i)))
         : VectorSpace.linearCombination(family1, coefficients1, selection1, count)
           = VectorSpace.linearCombination(family2, coefficients2, selection2, count) := {
   VectorSpace.linearCombination(family1, coefficients1, selection1, count)
      = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
-           (i : Natural) ↦ coefficients1(i) • family1(selection1(i)), count)
+           (i : ℕ) ↦ coefficients1(i) • family1(selection1(i)), count)
      = Algebra.indexedAggregate(VectorSpace.carrier(V), VectorSpace.add, VectorSpace.zero(V),
-           (i : Natural) ↦ coefficients2(i) • family2(selection2(i)), count)
+           (i : ℕ) ↦ coefficients2(i) • family2(selection2(i)), count)
            by Algebra.indexedAggregate_pointwise_below
      = VectorSpace.linearCombination(family2, coefficients2, selection2, count)
 }
@@ -266,9 +266,9 @@ theorem VectorSpace.linearCombination_congruence {f : Field} {V : VectorSpace(f)
 -- single combination over the merged coefficients and selections.
 theorem VectorSpace.linearCombination_concatenate {f : Field} {V : VectorSpace(f)}
         {I : Type(0)} (family : I → VectorSpace.carrier(V))
-        (coefficientsLeft coefficientsRight : Natural → Field.carrier(f))
-        (selectionLeft selectionRight : Natural → I)
-        (countLeft countRight : Natural)
+        (coefficientsLeft coefficientsRight : ℕ → Field.carrier(f))
+        (selectionLeft selectionRight : ℕ → I)
+        (countLeft countRight : ℕ)
         : VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
               + VectorSpace.linearCombination(family, coefficientsRight, selectionRight, countRight)
           = VectorSpace.linearCombination(family,
@@ -277,15 +277,15 @@ theorem VectorSpace.linearCombination_concatenate {f : Field} {V : VectorSpace(f
                 countLeft + countRight) :=
   by induction on countRight with IH {
     case base: {
-        ∀ (i : Natural). i < countLeft →
+        ∀ (i : ℕ). i < countLeft →
             coefficientsLeft(i)
             = VectorSpace.combineFunctions(coefficientsLeft, coefficientsRight, countLeft)(i)
-          by { take i : Natural; suppose i < countLeft as iBelow;
+          by { take i : ℕ; suppose i < countLeft as iBelow;
                done by VectorSpace.combineFunctions_below };
-        ∀ (i : Natural). i < countLeft →
+        ∀ (i : ℕ). i < countLeft →
             selectionLeft(i)
             = VectorSpace.combineFunctions(selectionLeft, selectionRight, countLeft)(i)
-          by { take i : Natural; suppose i < countLeft as iBelow;
+          by { take i : ℕ; suppose i < countLeft as iBelow;
                done by VectorSpace.combineFunctions_below };
         VectorSpace.linearCombination(family, coefficientsLeft, selectionLeft, countLeft)
               + VectorSpace.linearCombination(family, coefficientsRight, selectionRight, 0)

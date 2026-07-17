@@ -28,7 +28,7 @@ import Natural.compare
 import Natural.classical_decidable
 
 -- If m ≤ k, then k splits as m plus its excess over m.
-theorem NaturalsBelow.decompose_at_least (m k : Natural) (atLeast : m ≤ k)
+theorem NaturalsBelow.decompose_at_least (m k : ℕ) (atLeast : m ≤ k)
         : k = m + (k ∸ m) :=
   { done by Natural.monus_zero_implies_decompose }
 
@@ -38,14 +38,14 @@ theorem NaturalsBelow.decompose_at_least (m k : Natural) (atLeast : m ≤ k)
 -- free of inequality bookkeeping.
 
 -- A value already below m is below m + n: the left block stays put.
-theorem NaturalsBelow.below_extends (m n value : Natural) (belowM : value < m)
+theorem NaturalsBelow.below_extends (m n value : ℕ) (belowM : value < m)
         : value < m + n :=
   value
      < m
      ≤ m + n
 
 -- A value below n, shifted up by m, is below m + n: the right block.
-theorem NaturalsBelow.below_shifts (m n value : Natural) (belowN : value < n)
+theorem NaturalsBelow.below_shifts (m n value : ℕ) (belowN : value < n)
         : m + value < m + n := {
   value + 1 ≤ n;
   done
@@ -54,7 +54,7 @@ theorem NaturalsBelow.below_shifts (m n value : Natural) (belowN : value < n)
 -- Conversely, a value at least m and below m + n drops below n once shifted
 -- down by m. Rewrite the bound as `m + ((value − m) + 1) ≤ m + n` using
 -- `value = m + (value − m)`, then cancel m on the left.
-theorem NaturalsBelow.below_unshifts (m n value : Natural)
+theorem NaturalsBelow.below_unshifts (m n value : ℕ)
         (atLeast : m ≤ value) (belowSum : value < m + n)
         : (value ∸ m) < n := {
   value + 1 ≤ m + n;
@@ -72,7 +72,7 @@ theorem NaturalsBelow.below_unshifts (m n value : Natural)
 -- The bijection.
 
 -- Lay the two blocks end to end.
-definition NaturalsBelow.sum_into (m n : Natural)
+definition NaturalsBelow.sum_into (m n : ℕ)
         : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m + n)
   | Sum.left(element) =>
       NaturalsBelow.make(NaturalsBelow.value(element), NaturalsBelow.below_extends)
@@ -81,7 +81,7 @@ definition NaturalsBelow.sum_into (m n : Natural)
 
 -- The inverse: compare the value against m. Below m → the left block,
 -- keeping the value. At least m → the right block, value shifted down by m.
-definition NaturalsBelow.sum_out_of (m n : Natural)
+definition NaturalsBelow.sum_out_of (m n : ℕ)
         : NaturalsBelow(m + n) → DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)) :=
   (element : NaturalsBelow(m + n)) ↦
     if NaturalsBelow.value(element) < m then {
@@ -97,7 +97,7 @@ definition NaturalsBelow.sum_out_of (m n : Natural)
 -- the left block; at least m it drops the value by m into the right block.
 -- (Proof-level `if` refines the classical decision so `sum_out_of` ι-reduces;
 -- the make's proof field is irrelevant, so the two sides agree definitionally.)
-theorem NaturalsBelow.sum_out_of_below (m n : Natural)
+theorem NaturalsBelow.sum_out_of_below (m n : ℕ)
         (element : NaturalsBelow(m + n)) (valueBelow : NaturalsBelow.value(element) < m)
         : NaturalsBelow.sum_out_of(m, n, element)
           = Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), valueBelow)) :=
@@ -108,7 +108,7 @@ theorem NaturalsBelow.sum_out_of_below (m n : Natural)
       done
     }
 
-theorem NaturalsBelow.sum_out_of_at_least (m n : Natural)
+theorem NaturalsBelow.sum_out_of_at_least (m n : ℕ)
         (element : NaturalsBelow(m + n)) (notBelow : ¬(NaturalsBelow.value(element) < m))
         (shiftedBelow : (NaturalsBelow.value(element) ∸ m) < n)
         : NaturalsBelow.sum_out_of(m, n, element)
@@ -125,7 +125,7 @@ theorem NaturalsBelow.sum_out_of_at_least (m n : Natural)
 -- in each, the impossible branch is a value strictly below itself.
 
 -- out_of recovers the summand into placed.
-theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
+theorem NaturalsBelow.sum_round_trip_left (m n : ℕ)
         (s : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)))
         : NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, s)) = s :=
   by induction on s with IH {
@@ -164,7 +164,7 @@ theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
 
 -- into reassembles whatever out_of split. The below branch holds because the
 -- value is unchanged; the atLeast branch because m + (value − m) = value.
-theorem NaturalsBelow.sum_round_trip_right (m n : Natural)
+theorem NaturalsBelow.sum_round_trip_right (m n : ℕ)
         (element : NaturalsBelow(m + n))
         : NaturalsBelow.sum_into(m, n, NaturalsBelow.sum_out_of(m, n, element)) = element :=
   done by cases {
@@ -193,7 +193,7 @@ theorem NaturalsBelow.sum_round_trip_right (m n : Natural)
   }
 
 -- The two yardsticks laid end to end form one.
-theorem NaturalsBelow.sum_equinumerous (m n : Natural)
+theorem NaturalsBelow.sum_equinumerous (m n : ℕ)
         : Equinumerous(DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n)) := {
   ∀ (s : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n))).
         NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, s)) = s as leftInverse;
@@ -250,7 +250,7 @@ theorem Equinumerous.sum_congruence (A A' B B' : Type(0))
 
 -- The sum rule: a size-m type and a size-n type have a size-(m+n) union.
 -- Compose the componentwise bijection with the end-to-end one.
-theorem HasSize.sum (X Y : Type(0)) (m n : Natural)
+theorem HasSize.sum (X Y : Type(0)) (m n : ℕ)
         (sizeX : HasSize(X, m)) (sizeY : HasSize(Y, n))
         : HasSize(DisjointUnion(X, Y), m + n) := {
   Equinumerous(DisjointUnion(X, Y), DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)));

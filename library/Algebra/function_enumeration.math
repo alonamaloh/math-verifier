@@ -37,13 +37,13 @@ import Algebra.permutation_enumeration
 -- `Function.extendBelow`) reads the input's value and decides whether it is
 -- below the boundary; the codomain is a bare type variable `C`.
 
-definition Function.extendByValueWithDecision {C : Type(0)} {k : Natural}
+definition Function.extendByValueWithDecision {C : Type(0)} {k : ℕ}
         (f : NaturalsBelow(k) → C) (v : C) (j : NaturalsBelow(1 + k))
         : Logic.Decidable(NaturalsBelow.value(j) < k) → C
   | Logic.Decidable.yes(below) => f(NaturalsBelow.make(NaturalsBelow.value(j), below))
   | Logic.Decidable.no(_)      => v
 
-definition Function.extendByValue {C : Type(0)} {k : Natural}
+definition Function.extendByValue {C : Type(0)} {k : ℕ}
         (f : NaturalsBelow(k) → C) (v : C) : NaturalsBelow(1 + k) → C :=
   (j : NaturalsBelow(1 + k)) ↦
     Function.extendByValueWithDecision(f, v, j,
@@ -52,7 +52,7 @@ definition Function.extendByValue {C : Type(0)} {k : Natural}
 -- Below the boundary the extension reads the original function at the bounded
 -- index; proof irrelevance identifies the decision's internal proof with the
 -- caller's `below`.
-theorem Function.apply_extendByValue_below {C : Type(0)} {k : Natural}
+theorem Function.apply_extendByValue_below {C : Type(0)} {k : ℕ}
         (f : NaturalsBelow(k) → C) (v : C) (j : NaturalsBelow(1 + k))
         (below : NaturalsBelow.value(j) < k)
         : Function.extendByValue(f, v)(j) = f(NaturalsBelow.make(NaturalsBelow.value(j), below)) :=
@@ -62,7 +62,7 @@ theorem Function.apply_extendByValue_below {C : Type(0)} {k : Natural}
 
 -- At an inclusion the extension reads the original function; at the top it
 -- reads the new value.
-theorem Function.apply_extendByValue_inclusion {C : Type(0)} {k : Natural}
+theorem Function.apply_extendByValue_inclusion {C : Type(0)} {k : ℕ}
         (f : NaturalsBelow(k) → C) (v : C) (x : NaturalsBelow(k))
         : Function.extendByValue(f, v)(NaturalsBelow.inclusion(k, x)) = f(x) := {
   NaturalsBelow.value(x) < k by NaturalsBelow.below as vLtK;
@@ -74,7 +74,7 @@ theorem Function.apply_extendByValue_inclusion {C : Type(0)} {k : Natural}
   done
 }
 
-theorem Function.apply_extendByValue_top {C : Type(0)} {k : Natural}
+theorem Function.apply_extendByValue_top {C : Type(0)} {k : ℕ}
         (f : NaturalsBelow(k) → C) (v : C)
         : Function.extendByValue(f, v)(NaturalsBelow.top(k)) = v :=
   if NaturalsBelow.value(NaturalsBelow.top(k)) < k
@@ -87,14 +87,14 @@ theorem Function.apply_extendByValue_top {C : Type(0)} {k : Natural}
   else done
 
 -- The restriction of a function to the indices below the boundary.
-definition Function.lowerBelow {C : Type(0)} {k : Natural}
+definition Function.lowerBelow {C : Type(0)} {k : ℕ}
         (g : NaturalsBelow(1 + k) → C) : NaturalsBelow(k) → C :=
   (x : NaturalsBelow(k)) ↦ g(NaturalsBelow.inclusion(k, x))
 
 -- The decomposition: every `g : NaturalsBelow(1+k) → C` is the extension of its
 -- own restriction by its own top value. Cases each index on whether its value
 -- is below the boundary (an inclusion) or equal to it (the top).
-theorem Function.extendByValue_decompose {C : Type(0)} {k : Natural}
+theorem Function.extendByValue_decompose {C : Type(0)} {k : ℕ}
         (g : NaturalsBelow(1 + k) → C)
         : g = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k))) := {
   (∀ (j : NaturalsBelow(1 + k)). g(j) = Function.extendByValue(Function.lowerBelow(g), g(NaturalsBelow.top(k)))(j))
@@ -142,14 +142,14 @@ definition Function.emptyBelow {C : Type(0)} : NaturalsBelow(0) → C :=
   (i : NaturalsBelow(0)) ↦ absurd(NaturalsBelow.zero_is_empty(i))
 
 -- The row for f: extend it by each choice in turn.
-definition Function.functionRow {C : Type(0)} {k : Natural}
+definition Function.functionRow {C : Type(0)} {k : ℕ}
         (choices : List(C)) (f : NaturalsBelow(k) → C) : List(NaturalsBelow(1 + k) → C) :=
   List.map(C, NaturalsBelow(1 + k) → C, (v : C) ↦ Function.extendByValue(f, v), choices)
 
 -- Concatenate the rows over a list of functions. Recursion on the LIST
 -- (k fixed), so no index transport arises here. The codomain `C` is explicit,
 -- as recursive pattern-match definitions require.
-definition Function.concatFunctionRows (C : Type(0)) (k : Natural) (choices : List(C))
+definition Function.concatFunctionRows (C : Type(0)) (k : ℕ) (choices : List(C))
         : List(NaturalsBelow(k) → C) → List(NaturalsBelow(1 + k) → C)
   | List.empty => List.empty(NaturalsBelow(1 + k) → C)
   | List.prepend(f, rest) =>
@@ -160,12 +160,12 @@ definition Function.concatFunctionRows (C : Type(0)) (k : Natural) (choices : Li
 -- `1 + m` step recurses on the index (dependent result type), bridged by
 -- `unfold Natural.add in` exactly as `allPermutations`.
 definition Function.functionsBelow (C : Type(0)) (choices : List(C))
-        : (k : Natural) → List(NaturalsBelow(k) → C)
+        : (k : ℕ) → List(NaturalsBelow(k) → C)
   | 0 => List.prepend(NaturalsBelow(0) → C, Function.emptyBelow, List.empty(NaturalsBelow(0) → C))
   | 1 + m => unfold Natural.add in
       Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m))
 
-theorem Function.functionsBelow_one_plus (C : Type(0)) (choices : List(C)) (m : Natural)
+theorem Function.functionsBelow_one_plus (C : Type(0)) (choices : List(C)) (m : ℕ)
         : Function.functionsBelow(C, choices, 1 + m)
           = Function.concatFunctionRows(C, m, choices, Function.functionsBelow(C, choices, m)) :=
   unfold Natural.add in
@@ -173,7 +173,7 @@ theorem Function.functionsBelow_one_plus (C : Type(0)) (choices : List(C)) (m : 
 
 -- The determinant's index set: all functions NaturalsBelow(n) → NaturalsBelow(n),
 -- picking one column per row (every column is a valid choice).
-definition Function.allFunctions (n : Natural) : List(NaturalsBelow(n) → NaturalsBelow(n)) :=
+definition Function.allFunctions (n : ℕ) : List(NaturalsBelow(n) → NaturalsBelow(n)) :=
   Function.functionsBelow(NaturalsBelow(n), NaturalsBelow.enumerate(n), n)
 
 -- ----------------------------------------------------------------------
@@ -191,7 +191,7 @@ theorem Function.function_zero_is_empty (C : Type(0)) (g : NaturalsBelow(0) → 
 
 -- Membership into the concatenation: a g in the row of an f ∈ l is in
 -- concatFunctionRows(l). Induct on where f sits in l.
-theorem Function.concatFunctionRows_member (C : Type(0)) (k : Natural) (choices : List(C))
+theorem Function.concatFunctionRows_member (C : Type(0)) (k : ℕ) (choices : List(C))
         (l : List(NaturalsBelow(k) → C)) (f : NaturalsBelow(k) → C) (g : NaturalsBelow(1 + k) → C)
         (memF : f ∈ l)
         (memG : g ∈ Function.functionRow(choices, f))
@@ -215,7 +215,7 @@ theorem Function.concatFunctionRows_member (C : Type(0)) (k : Natural) (choices 
 -- `functionsBelow(choices, k)`. The step writes g as the row entry
 -- extendByValue(lowerBelow(g), g(top)) — with lowerBelow(g) in the level-m list
 -- (IH) and g(top) among the choices — and locates it in the concatenation.
-theorem Function.functionsBelow_complete (C : Type(0)) (choices : List(C)) (k : Natural)
+theorem Function.functionsBelow_complete (C : Type(0)) (choices : List(C)) (k : ℕ)
         : ∀ (g : NaturalsBelow(k) → C).
               (∀ (i : NaturalsBelow(k)). g(i) ∈ choices)
               → g ∈ Function.functionsBelow(C, choices, k) :=
@@ -251,7 +251,7 @@ theorem Function.functionsBelow_complete (C : Type(0)) (choices : List(C)) (k : 
 -- The determinant corollary: every function NaturalsBelow(n) → NaturalsBelow(n)
 -- appears in `allFunctions(n)` (every value is a column, so the choices
 -- hypothesis is automatic).
-theorem Function.allFunctions_complete (n : Natural)
+theorem Function.allFunctions_complete (n : ℕ)
         : ∀ (g : NaturalsBelow(n) → NaturalsBelow(n)).
               g ∈ Function.allFunctions(n) :=
   (g : NaturalsBelow(n) → NaturalsBelow(n)) ↦ {
@@ -268,7 +268,7 @@ theorem Function.allFunctions_complete (n : Natural)
 
 -- Summing a term over the concatenated rows is a double sum: outer over the
 -- functions of the level below, inner over the choices that extend each.
-theorem Field.sumOver_concatFunctionRows {f : Field} (C : Type(0)) (m : Natural) (choices : List(C))
+theorem Field.sumOver_concatFunctionRows {f : Field} (C : Type(0)) (m : ℕ) (choices : List(C))
         (fterm : (NaturalsBelow(1 + m) → C) → Field.carrier(f))
         (l : List(NaturalsBelow(m) → C))
         : Field.sumOver(fterm, Function.concatFunctionRows(C, m, choices, l))
@@ -310,7 +310,7 @@ theorem Field.sumOver_concatFunctionRows {f : Field} (C : Type(0)) (m : Natural)
 -- The product over the full index set of a term read through `extendByValue`
 -- splits off the top factor (which reads the extending value `c`) from the
 -- product over the indices below (which reads the underlying `psi`).
-theorem Field.productOver_extendByValue_split {f : Field} (C : Type(0)) (m : Natural)
+theorem Field.productOver_extendByValue_split {f : Field} (C : Type(0)) (m : ℕ)
         (h : NaturalsBelow(1 + m) → C → Field.carrier(f)) (psi : NaturalsBelow(m) → C) (c : C)
         : Field.productOver((i : NaturalsBelow(1 + m)) ↦ h(i, Function.extendByValue(psi, c)(i)),
               NaturalsBelow.enumerate(1 + m))
@@ -363,7 +363,7 @@ theorem Field.productOver_extendByValue_split {f : Field} (C : Type(0)) (m : Nat
 -- peels the top row (productOver over `enumerate(1+m)`), applies the inductive
 -- hypothesis to the restricted term below, and matches the resulting double
 -- sum against the concatenated rows of `functionsBelow(1 + m)`.
-theorem Field.productOfSums_distributes {f : Field} (C : Type(0)) (choices : List(C)) (rows : Natural)
+theorem Field.productOfSums_distributes {f : Field} (C : Type(0)) (choices : List(C)) (rows : ℕ)
         : ∀ (h : NaturalsBelow(rows) → C → Field.carrier(f)).
               Field.productOver((i : NaturalsBelow(rows)) ↦ Field.sumOver((c : C) ↦ h(i, c), choices),
                   NaturalsBelow.enumerate(rows))
@@ -496,7 +496,7 @@ theorem Field.productOfSums_distributes {f : Field} (C : Type(0)) (choices : Lis
 -- The determinant corollary: the product over rows of the sum over all columns
 -- equals the sum over all choice functions `NaturalsBelow(n) → NaturalsBelow(n)`
 -- of the product of the chosen entries.
-theorem Field.productOfSums_over_allFunctions {f : Field} (n : Natural)
+theorem Field.productOfSums_over_allFunctions {f : Field} (n : ℕ)
         (h : NaturalsBelow(n) → NaturalsBelow(n) → Field.carrier(f))
         : Field.productOver((i : NaturalsBelow(n)) ↦
               Field.sumOver((c : NaturalsBelow(n)) ↦ h(i, c), NaturalsBelow.enumerate(n)),

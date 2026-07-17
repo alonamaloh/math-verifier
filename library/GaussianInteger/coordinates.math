@@ -37,7 +37,7 @@ import GaussianInteger.basics
 
 -- (re, im) of the class of a coefficient list, reading c + x·(rest).
 definition GaussianInteger.coordinatesOfCoefficients
-        : Polynomial.Coefficients(Integer) → Pair(Integer, Integer)
+        : Polynomial.Coefficients(ℤ) → Pair(ℤ, ℤ)
   | Polynomial.Coefficients.nil => Product.make(Integer.zero, Integer.zero)
   | Polynomial.Coefficients.cons(c, rest) =>
       Product.make(
@@ -52,9 +52,9 @@ overload coords := GaussianInteger.coordinatesOfCoefficients
 -- ----------------------------------------------------------------------
 -- An all-zero coefficient list has coordinates (0, 0).
 theorem GaussianInteger.coordinatesOfCoefficients_all_zero
-        (a : Polynomial.Coefficients(Integer))
-        (allZero : ∀ (i : Natural).
-            Polynomial.nth(Integer, Integer.zero, a, i) = Integer.zero)
+        (a : Polynomial.Coefficients(ℤ))
+        (allZero : ∀ (i : ℕ).
+            Polynomial.nth(ℤ, Integer.zero, a, i) = Integer.zero)
         : GaussianInteger.coordinatesOfCoefficients(a)
           = Product.make(Integer.zero, Integer.zero) :=
   by induction on a with IH {
@@ -63,9 +63,9 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
     case Polynomial.Coefficients.cons(c, rest): {
         c = Integer.zero by allZero(0) as cIsZero;
         coords(rest) = Product.make(Integer.zero, Integer.zero)
-            by IH((i : Natural) ↦ {
-                     Polynomial.nth(Integer, Integer.zero,
-                             Polynomial.Coefficients.cons(Integer, c, rest), 1 + i) = Integer.zero
+            by IH((i : ℕ) ↦ {
+                     Polynomial.nth(ℤ, Integer.zero,
+                             Polynomial.Coefficients.cons(ℤ, c, rest), 1 + i) = Integer.zero
                          by allZero;
                      done by substituting Polynomial.nth_cons_one_plus
                    }) as restCoordinates;
@@ -87,56 +87,56 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
 -- Each branch returns an explicit term checked against the goal by
 -- definitional unfolding of `coordinatesOfCoefficients` on a `cons`/`nil`.
 theorem GaussianInteger.coords_extensional
-        (a : Polynomial.Coefficients(Integer))
-        : ∀ (b : Polynomial.Coefficients(Integer)).
-          Polynomial.ExtensionallyEqual(Integer, Integer.zero, a, b)
+        (a : Polynomial.Coefficients(ℤ))
+        : ∀ (b : Polynomial.Coefficients(ℤ)).
+          Polynomial.ExtensionallyEqual(ℤ, Integer.zero, a, b)
           → GaussianInteger.coordinatesOfCoefficients(a)
             = GaussianInteger.coordinatesOfCoefficients(b) :=
   by induction on a with IH {
     case Polynomial.Coefficients.nil: {
-        take b : Polynomial.Coefficients(Integer);
-        suppose Polynomial.ExtensionallyEqual(Integer, Integer.zero,
-            Polynomial.Coefficients.nil(Integer), b) as extensionallyEqual;
+        take b : Polynomial.Coefficients(ℤ);
+        suppose Polynomial.ExtensionallyEqual(ℤ, Integer.zero,
+            Polynomial.Coefficients.nil(ℤ), b) as extensionallyEqual;
         -- b agrees with the empty list at every index, so b is all-zero too.
-        ∀ (i : Natural). Polynomial.nth(Integer, Integer.zero, b, i) = Integer.zero by {
-            take i : Natural;
-            Polynomial.nth(Integer, Integer.zero, b, i)
-               = Polynomial.nth(Integer, Integer.zero, Polynomial.Coefficients.nil(Integer), i)   by extensionallyEqual(i)
+        ∀ (i : ℕ). Polynomial.nth(ℤ, Integer.zero, b, i) = Integer.zero by {
+            take i : ℕ;
+            Polynomial.nth(ℤ, Integer.zero, b, i)
+               = Polynomial.nth(ℤ, Integer.zero, Polynomial.Coefficients.nil(ℤ), i)   by extensionallyEqual(i)
                = Integer.zero                                                                      by Polynomial.nth_nil
           };
-        coords(Polynomial.Coefficients.nil(Integer))
+        coords(Polynomial.Coefficients.nil(ℤ))
            = Product.make(Integer.zero, Integer.zero)
            = coords(b)
     }
     case Polynomial.Coefficients.cons(c, rest): {
-        take b : Polynomial.Coefficients(Integer);
-        suppose Polynomial.ExtensionallyEqual(Integer, Integer.zero,
-            Polynomial.Coefficients.cons(Integer, c, rest), b) as extensionallyEqual;
+        take b : Polynomial.Coefficients(ℤ);
+        suppose Polynomial.ExtensionallyEqual(ℤ, Integer.zero,
+            Polynomial.Coefficients.cons(ℤ, c, rest), b) as extensionallyEqual;
         done by cases {
-          case b = Polynomial.Coefficients.nil(Integer): {
-              ∀ (i : Natural).
-                  Polynomial.nth(Integer, Integer.zero,
-                      Polynomial.Coefficients.cons(Integer, c, rest), i) = Integer.zero by {
-                take i : Natural;
-                Polynomial.nth(Integer, Integer.zero, Polynomial.Coefficients.cons(Integer, c, rest), i)
-                   = Polynomial.nth(Integer, Integer.zero, Polynomial.Coefficients.nil(Integer), i)   by extensionallyEqual(i)
+          case b = Polynomial.Coefficients.nil(ℤ): {
+              ∀ (i : ℕ).
+                  Polynomial.nth(ℤ, Integer.zero,
+                      Polynomial.Coefficients.cons(ℤ, c, rest), i) = Integer.zero by {
+                take i : ℕ;
+                Polynomial.nth(ℤ, Integer.zero, Polynomial.Coefficients.cons(ℤ, c, rest), i)
+                   = Polynomial.nth(ℤ, Integer.zero, Polynomial.Coefficients.nil(ℤ), i)   by extensionallyEqual(i)
                    = Integer.zero                                                                      by Polynomial.nth_nil
               };
               done
             }
-          case b = Polynomial.Coefficients.cons(Integer, d, restB)
-              for some (d : Integer), (restB : Polynomial.Coefficients(Integer)) as bIsCons: {
-              Polynomial.ExtensionallyEqual(Integer, Integer.zero,
-                  Polynomial.Coefficients.cons(Integer, c, rest),
-                  Polynomial.Coefficients.cons(Integer, d, restB))
+          case b = Polynomial.Coefficients.cons(ℤ, d, restB)
+              for some (d : ℤ), (restB : Polynomial.Coefficients(ℤ)) as bIsCons: {
+              Polynomial.ExtensionallyEqual(ℤ, Integer.zero,
+                  Polynomial.Coefficients.cons(ℤ, c, rest),
+                  Polynomial.Coefficients.cons(ℤ, d, restB))
                   by substituting bIsCons as extensionallyEqualCons;
               c = d by extensionallyEqualCons(0) as headsEqual;
               coords(rest) = coords(restB)
-                  by IH(restB, (i : Natural) ↦ {
-                           Polynomial.nth(Integer, Integer.zero,
-                                   Polynomial.Coefficients.cons(Integer, c, rest), 1 + i)
-                              = Polynomial.nth(Integer, Integer.zero,
-                                    Polynomial.Coefficients.cons(Integer, d, restB), 1 + i)
+                  by IH(restB, (i : ℕ) ↦ {
+                           Polynomial.nth(ℤ, Integer.zero,
+                                   Polynomial.Coefficients.cons(ℤ, c, rest), 1 + i)
+                              = Polynomial.nth(ℤ, Integer.zero,
+                                    Polynomial.Coefficients.cons(ℤ, d, restB), 1 + i)
                               by extensionallyEqualCons(1 + i);
                            done by substituting Polynomial.nth_cons_one_plus
                          })
@@ -148,12 +148,12 @@ theorem GaussianInteger.coords_extensional
               Product.first(coords(rest)) = Product.first(coords(restB));
               -- Assemble through the explicit make(…) forms so the prover never
               -- unfolds the recursive coords.
-              coords(Polynomial.Coefficients.cons(Integer, c, rest))
+              coords(Polynomial.Coefficients.cons(ℤ, c, rest))
                  = Product.make(
                        c - Product.second(coords(rest)), Product.first(coords(rest)))
                  = Product.make(
                        d - Product.second(coords(restB)), Product.first(coords(restB)))
-                 = coords(Polynomial.Coefficients.cons(Integer, d, restB))
+                 = coords(Polynomial.Coefficients.cons(ℤ, d, restB))
             }
         }
     }
@@ -162,7 +162,7 @@ theorem GaussianInteger.coords_extensional
 -- ----------------------------------------------------------------------
 -- The coordinate map on ℤ[x] (lifting over the polynomial quotient).
 definition GaussianInteger.coordinatesOfPolynomial
-        : Polynomial(Integer, Integer.zero) → Pair(Integer, Integer)
+        : Polynomial(ℤ, Integer.zero) → Pair(ℤ, ℤ)
   by representatives a ↦ GaussianInteger.coordinatesOfCoefficients(a)
   well_defined by GaussianInteger.coords_extensional
 

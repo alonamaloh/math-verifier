@@ -49,8 +49,8 @@ import IntegerMod.wilson
 -- ----------------------------------------------------------------------
 -- Powers in IntegerMod, by recursion on the exponent: x^0 = 1,
 -- x^(1+k) = x · x^k.
-definition IntegerMod.power (modulus : Natural)
-        (x : IntegerMod(modulus)) : Natural → IntegerMod(modulus)
+definition IntegerMod.power (modulus : ℕ)
+        (x : IntegerMod(modulus)) : ℕ → IntegerMod(modulus)
   | 0 => IntegerMod.one(modulus)
   | 1 + k => IntegerMod.multiply(x, IntegerMod.power(modulus, x, k))
 
@@ -58,14 +58,14 @@ definition IntegerMod.power (modulus : Natural)
 -- application `multiply_by(p, x)` is a clean one-argument function to map
 -- over a list (the implicit-modulus `multiply` cannot be partially
 -- applied: a lone argument would land in the modulus slot).
-definition IntegerMod.multiply_by (modulus : Natural)
+definition IntegerMod.multiply_by (modulus : ℕ)
         (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
   IntegerMod.multiply(x, y)
 
 -- ----------------------------------------------------------------------
 -- Scaling every element of a list by x multiplies its product by
 -- x^length: ∏ map(x·_, l) = x^|l| · ∏ l.
-theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p)) (list : List(IntegerMod(p)))
+theorem IntegerMod.product_map_multiply (p : ℕ) (x : IntegerMod(p)) (list : List(IntegerMod(p)))
         : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
                 List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x), list))
             = IntegerMod.power(p, x, length(list))
@@ -120,7 +120,7 @@ theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p)) (list 
 
 -- ----------------------------------------------------------------------
 -- A product of nonzero classes is nonzero.
-theorem IntegerMod.product_nonzero (p : Natural)
+theorem IntegerMod.product_nonzero (p : ℕ)
         (primality : Natural.is_prime(p)) (list : List(IntegerMod(p)))
         : (∀ (z : IntegerMod(p)). z ∈ list
                  → ¬(z = IntegerMod.zero(p)))
@@ -182,7 +182,7 @@ theorem IntegerMod.product_nonzero (p : Natural)
 -- ----------------------------------------------------------------------
 -- Multiplication by a nonzero class x permutes the nonzero classes: the
 -- scaled list map(x·_, U) is contained in U.
-theorem IntegerMod.scaled_residue_member (p n : Natural)
+theorem IntegerMod.scaled_residue_member (p n : ℕ)
         (primality : Natural.is_prime(p))
         (pEquation : p = 1 + n)
         (x : IntegerMod(p)) (xNonzero : ¬(x = IntegerMod.zero(p)))
@@ -206,7 +206,7 @@ theorem IntegerMod.scaled_residue_member (p n : Natural)
 
 -- ----------------------------------------------------------------------
 -- Fermat's little theorem in F_p: x ≠ 0 implies x^(p−1) = 1.
-theorem IntegerMod.fermat_little (p n : Natural)
+theorem IntegerMod.fermat_little (p n : ℕ)
         (primality : Natural.is_prime(p))
         (pEquation : p = 1 + n)
         (x : IntegerMod(p)) (xNonzero : ¬(x = IntegerMod.zero(p)))
@@ -290,44 +290,44 @@ theorem IntegerMod.fermat_little (p n : Natural)
 -- ----------------------------------------------------------------------
 -- Bridging to the integers: the class of a^k is the k-th power of the
 -- class of a.
-theorem IntegerMod.power_of_class (p a : Natural)
-        : ∀ (k : Natural).
-          IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), k)
-            = IntegerMod.make(p, (a ^ k : Integer)) :=
+theorem IntegerMod.power_of_class (p a : ℕ)
+        : ∀ (k : ℕ).
+          IntegerMod.power(p, IntegerMod.make(p, (a : ℤ)), k)
+            = IntegerMod.make(p, (a ^ k : ℤ)) :=
   by induction on k with IH {
     case base:
         -- Both sides are the class of 1 (a⁰ = 1 by power_zero).
-        IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), 0)
-           = IntegerMod.make(p, ((1 : Natural) : Integer))
-           = IntegerMod.make(p, (a ^ 0 : Integer))
+        IntegerMod.power(p, IntegerMod.make(p, (a : ℤ)), 0)
+           = IntegerMod.make(p, ((1 : ℕ) : ℤ))
+           = IntegerMod.make(p, (a ^ 0 : ℤ))
                  by Natural.power_zero(a)
     case step(j):
-        IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), 1 + j)
-           = IntegerMod.make(p, (a : Integer))
-                 * IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), j)
-           = IntegerMod.make(p, (a : Integer))
-                 * IntegerMod.make(p, (a ^ j : Integer))
+        IntegerMod.power(p, IntegerMod.make(p, (a : ℤ)), 1 + j)
+           = IntegerMod.make(p, (a : ℤ))
+                 * IntegerMod.power(p, IntegerMod.make(p, (a : ℤ)), j)
+           = IntegerMod.make(p, (a : ℤ))
+                 * IntegerMod.make(p, (a ^ j : ℤ))
                  by substituting IH
-           = IntegerMod.make(p, (a : Integer) * (a ^ j : Integer))
-           = IntegerMod.make(p, ((a * a ^ j : Natural) : Integer))
+           = IntegerMod.make(p, (a : ℤ) * (a ^ j : ℤ))
+           = IntegerMod.make(p, ((a * a ^ j : ℕ) : ℤ))
                  by Natural.to_integer.multiply_preserves(a, a ^ j)
-           = IntegerMod.make(p, (a ^ (1 + j) : Integer))
+           = IntegerMod.make(p, (a ^ (1 + j) : ℤ))
                  by Natural.power_one_plus
   }
 
 -- A natural number not divisible by p has a nonzero class.
-theorem IntegerMod.class_nonzero_of_not_divides (p a : Natural)
+theorem IntegerMod.class_nonzero_of_not_divides (p a : ℕ)
         (notDivides : ¬(Natural.divides(p, a)))
-        : ¬(IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p)) :=
-  (classZero : IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p)) ↦ {
+        : ¬(IntegerMod.make(p, (a : ℤ)) = IntegerMod.zero(p)) :=
+  (classZero : IntegerMod.make(p, (a : ℤ)) = IntegerMod.zero(p)) ↦ {
     -- p ∣ a − 0 = a, over the integers and then over the naturals.
-    choose quotient such that (a : Integer) - Integer.zero = (p : Integer) * quotient
+    choose quotient such that (a : ℤ) - Integer.zero = (p : ℤ) * quotient
         as differenceEquation from IntegerMod.congruent_of_make_equal;
-    Integer.divides((p : Integer), (a : Integer))
+    Integer.divides((p : ℤ), (a : ℤ))
         by ⟨quotient,
-            { (a : Integer)
-               = (a : Integer) - Integer.zero   by ring
-               = (p : Integer) * quotient       by differenceEquation }⟩;
+            { (a : ℤ)
+               = (a : ℤ) - Integer.zero   by ring
+               = (p : ℤ) * quotient       by differenceEquation }⟩;
     Natural.divides(p, a)
         by Natural.to_integer.divides_reflects as naturalDivides;
     notDivides(naturalDivides)
@@ -336,26 +336,26 @@ theorem IntegerMod.class_nonzero_of_not_divides (p a : Natural)
 -- ----------------------------------------------------------------------
 -- Fermat's little theorem over the integers (Freek #10): for p prime,
 -- p = 1 + n, and p ∤ a, we have p ∣ a^n − 1.
-theorem Natural.fermat_little (p n a : Natural)
+theorem Natural.fermat_little (p n a : ℕ)
         (primality : Natural.is_prime(p))
         (pEquation : p = 1 + n)
         (notDivides : ¬(Natural.divides(p, a)))
-        : Integer.divides((p : Integer),
-              (a ^ n : Integer) - Integer.one) := {
-  ¬(IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p))
+        : Integer.divides((p : ℤ),
+              (a ^ n : ℤ) - Integer.one) := {
+  ¬(IntegerMod.make(p, (a : ℤ)) = IntegerMod.zero(p))
       by IntegerMod.class_nonzero_of_not_divides;
-  IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), n) = IntegerMod.one(p)
+  IntegerMod.power(p, IntegerMod.make(p, (a : ℤ)), n) = IntegerMod.one(p)
       by IntegerMod.fermat_little;
-  IntegerMod.make(p, (a ^ n : Integer))
+  IntegerMod.make(p, (a ^ n : ℤ))
       = IntegerMod.make(p, Integer.one)
       by {
-        IntegerMod.make(p, (a ^ n : Integer))
-            = IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), n)
+        IntegerMod.make(p, (a ^ n : ℤ))
+            = IntegerMod.power(p, IntegerMod.make(p, (a : ℤ)), n)
                   by IntegerMod.power_of_class(p, a, n)
             = IntegerMod.one(p)
       };
   -- Equal classes mean congruent representatives: p ∣ a^n − 1.
-  Integer.CongruentModulo(p, (a ^ n : Integer), Integer.one)
+  Integer.CongruentModulo(p, (a ^ n : ℤ), Integer.one)
       by IntegerMod.congruent_of_make_equal as congruent;
   congruent
 }

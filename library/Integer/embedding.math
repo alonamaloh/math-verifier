@@ -20,35 +20,35 @@ import Integer.basics
 import Integer.addition
 import Integer.multiplication
 
--- Embed a natural as the equivalence class of (n, 0).
-definition Natural.to_integer (n : Natural) : Integer :=
+-- Embed a ℕ as the equivalence class of (n, 0).
+definition Natural.to_integer (n : ℕ) : ℤ :=
   Integer.from_difference(n, 0)
 
--- Register the embedding as the canonical coercion from Natural to
--- Integer. After this, `(n : Integer)` for a Natural `n` expands to
+-- Register the embedding as the canonical coercion from ℕ to
+-- ℤ. After this, `(n : ℤ)` for a ℕ `n` expands to
 -- `Natural.to_integer(n)`.
 coercion (Natural, Integer) := Natural.to_integer
 
 -- Embedding preserves zero (definitionally).
 theorem Natural.to_integer.zero_preserves
         : Natural.to_integer(0) = Integer.zero :=
-  reflexivity(Integer, Integer.zero)
+  reflexivity(ℤ, Integer.zero)
 
 -- Embedding preserves one (definitionally).
 theorem Natural.to_integer.one_preserves
         : Natural.to_integer(1) = Integer.one :=
-  reflexivity(Integer, Integer.one)
+  reflexivity(ℤ, Integer.one)
 
 -- Embedding preserves addition. LHS reduces to mk(make(a + b, 0));
 -- RHS reduces (via two Quotient.lift kernel rules + add_representatives,
 -- with the ground `0 + 0` computed by the kernel) to mk(make(a + b, 0)).
-theorem Natural.to_integer.add_preserves (a b : Natural)
+theorem Natural.to_integer.add_preserves (a b : ℕ)
         : Natural.to_integer(a + b) = Natural.to_integer(a) + Natural.to_integer(b) :=
-  done by unfolding Integer
+  done by unfolding ℤ
 
 -- Embedding preserves `+ 1`: to_integer(n + 1) = to_integer(n) + 1, so
 -- consumers that step a numeral up by one never spell the constructor.
-theorem Natural.to_integer.add_one_preserves (n : Natural)
+theorem Natural.to_integer.add_one_preserves (n : ℕ)
         : Natural.to_integer(n + 1) = Natural.to_integer(n) + Integer.one :=
   Natural.to_integer(n + 1)
      = Natural.to_integer(n) + Integer.one
@@ -57,8 +57,8 @@ theorem Natural.to_integer.add_one_preserves (n : Natural)
 -- mk(make(a·b + 0, a·0 + 0)), which is *not* definitionally equal to
 -- mk(make(a·b, 0)) — the asymmetric `a · 0` term doesn't simplify by
 -- kernel reduction alone. `Integer.difference_equal` bridges the gap with a
--- Natural-level cross-equation.
-theorem Natural.to_integer.multiply_preserves (a b : Natural)
+-- ℕ-level cross-equation.
+theorem Natural.to_integer.multiply_preserves (a b : ℕ)
         : Natural.to_integer(a * b) = Natural.to_integer(a) * Natural.to_integer(b) := {
   -- The product class is `mk(make(a·b + 0, a·0 + 0))`; it equals
   -- `mk(make(a·b, 0))` because the cross-equation below holds (`ring`).
@@ -67,15 +67,15 @@ theorem Natural.to_integer.multiply_preserves (a b : Natural)
   done
 }
 
--- Multiplying a difference class by an embedded natural scales both parts:
+-- Multiplying a difference class by an embedded ℕ scales both parts:
 -- `(p − q)·c = (p·c − q·c)`. The representative-computation form of the
--- multiplication lift — consumers scale a difference by a natural through
+-- multiplication lift — consumers scale a difference by a ℕ through
 -- this lemma instead of unfolding the product at representatives. Proved at
 -- the boundary: the product class reduces to
 -- `class_of(make(p·c + q·0, p·0 + q·c))`, which equals
 -- `class_of(make(p·c, q·c))` by the cross-equation (`ring`).
-theorem Integer.from_difference_times_natural (p q c : Natural)
-        : Integer.from_difference(p, q) * (c : Integer)
+theorem Integer.from_difference_times_natural (p q c : ℕ)
+        : Integer.from_difference(p, q) * (c : ℤ)
           = Integer.from_difference(p * c, q * c) := {
   (p * c + q * 0) + q * c = (p * 0 + q * c) + p * c;
   done

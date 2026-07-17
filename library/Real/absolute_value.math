@@ -49,18 +49,18 @@ theorem Rational.sequence.absolute_value_is_cauchy
         (s : Rational.sequence.Sequence)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         : Rational.sequence.IsCauchy(
-              (n : Natural) ↦ abs(s(n))) :=
-  (ε : Rational)
+              (n : ℕ) ↦ abs(s(n))) :=
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     -- `obtain` cannot infer the existential through the opaque Rational, so
     -- state it top-down first.
-    ∃ (N : Natural).
-        ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < ε
+    ∃ (N : ℕ).
+        ∀ (m : ℕ). N ≤ m → ∀ (n : ℕ). N ≤ n → abs(s(m) - s(n)) < ε
         as sBounded;
     choose N from sBounded;
     witness N with
-        (m : Natural) (N_leq_m : N ≤ m)
-                 (n : Natural) (N_leq_n : N ≤ n) ↦
+        (m : ℕ) (N_leq_m : N ≤ m)
+                 (n : ℕ) (N_leq_n : N ≤ n) ↦
           abs(
                    abs(s(m))
                    - abs(s(n)))
@@ -75,15 +75,15 @@ definition CauchyRationalSequence.absolute_value
         : CauchyRationalSequence → CauchyRationalSequence
   | CauchyRationalSequence.make(s, sCauchy) =>
       CauchyRationalSequence.make(
-          (n : Natural) ↦ abs(s(n)),
+          (n : ℕ) ↦ abs(s(n)),
           Rational.sequence.absolute_value_is_cauchy(s, sCauchy))
 
 -- Bridge: absolute_value(rep)(m) = |rep(m)|.
 theorem CauchyRationalSequence.sequenceFunction_absolute_value
-        (rep : CauchyRationalSequence) (m : Natural)
+        (rep : CauchyRationalSequence) (m : ℕ)
         : CauchyRationalSequence.absolute_value(rep)(m) = abs(rep(m)) := {
   let ⟨s, _⟩ := rep;
-  reflexivity(Rational, abs(s(m)))
+  reflexivity(ℚ, abs(s(m)))
 }
 
 -- ----------------------------------------------------------------------
@@ -97,11 +97,11 @@ theorem Real.absolute_value_respects
         : CauchyEquivalent(
               CauchyRationalSequence.absolute_value(rep),
               CauchyRationalSequence.absolute_value(rep')) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
       choose N from equivalenceHypothesis(ε, εPositive);
       witness N with
-              (m : Natural) (N_leq_m : N ≤ m) ↦
+              (m : ℕ) (N_leq_m : N ≤ m) ↦
                 abs(CauchyRationalSequence.absolute_value(rep)(m)
                        - CauchyRationalSequence.absolute_value(rep')(m))
                    = abs(abs(rep(m)) - abs(rep'(m)))
@@ -112,9 +112,9 @@ theorem Real.absolute_value_respects
 -- ----------------------------------------------------------------------
 -- Real.absolute_value: take the pointwise absolute value of the
 -- representative; well-defined by the reverse-triangle respect above.
-definition Real.absolute_value : Real → Real
+definition Real.absolute_value : ℝ → ℝ
   by representatives rep ↦
-       (Quotient.class_of(CauchyRationalSequence.absolute_value(rep)) : Real)
+       (Quotient.class_of(CauchyRationalSequence.absolute_value(rep)) : ℝ)
   well_defined by Real.absolute_value_respects
 
 overload abs := Real.absolute_value
@@ -135,16 +135,16 @@ overload abs := Real.absolute_value
 theorem Real.triangle_inequality_at_make
         (rep_x rep_y : CauchyRationalSequence)
         : abs(
-              (Quotient.class_of(rep_x) : Real) + Quotient.class_of(rep_y))
-          ≤ abs((Quotient.class_of(rep_x) : Real))
-            + abs((Quotient.class_of(rep_y) : Real)) := {
+              (Quotient.class_of(rep_x) : ℝ) + Quotient.class_of(rep_y))
+          ≤ abs((Quotient.class_of(rep_x) : ℝ))
+            + abs((Quotient.class_of(rep_y) : ℝ)) := {
   let ⟨sx, _⟩ := rep_x;
   let ⟨sy, _⟩ := rep_y;
   unfold Real.IsNonneg in
-  ((ε : Rational)
+  ((ε : ℚ)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦ {
+        (m : ℕ) (_ : 0 ≤ m) ↦ {
           -- 0 ≤ (|sx(m)| + |sy(m)|) − |sx(m) + sy(m)| is the triangle
           -- inequality; −ε < 0 by positivity of ε.
           abs(sx(m) + sy(m)) ≤ abs(sx(m)) + abs(sy(m));
@@ -157,7 +157,7 @@ theorem Real.triangle_inequality_at_make
 }
 
 -- Triangle on Real. Lift via Quotient.induct_two to the at-make form.
-automatic theorem Real.triangle_inequality (x y : Real)
+automatic theorem Real.triangle_inequality (x y : ℝ)
         : abs(x + y)
           ≤ abs(x) + abs(y) :=
   by_representatives x as repX, y as repY =>
@@ -165,13 +165,13 @@ automatic theorem Real.triangle_inequality (x y : Real)
 
 -- ----------------------------------------------------------------------
 -- |-x| = |x| on Real. Lift the pointwise Rational.absolute_value_negate.
-theorem Real.absolute_value_negate (x : Real)
+theorem Real.absolute_value_negate (x : ℝ)
         : abs(-x) = abs(x) :=
   by_representatives x as rep_x => {
-    ∀ (n : Natural).
+    ∀ (n : ℕ).
             CauchyRationalSequence.absolute_value(CauchyRationalSequence.negate(rep_x))(n)
             = CauchyRationalSequence.absolute_value(rep_x)(n)
-        by (n : Natural) ↦
+        by (n : ℕ) ↦
           CauchyRationalSequence.absolute_value(CauchyRationalSequence.negate(rep_x))(n)
              = abs(CauchyRationalSequence.negate(rep_x)(n))
              = abs(-rep_x(n))
@@ -182,7 +182,7 @@ theorem Real.absolute_value_negate (x : Real)
 
 -- |x - y| = |y - x| on Real. From x - y = -(y - x) plus
 -- Real.absolute_value_negate.
-theorem Real.absolute_value_subtract_swap (x y : Real)
+theorem Real.absolute_value_subtract_swap (x y : ℝ)
         : abs(x - y) = abs(y - x) :=
   abs(x - y)
      = abs(-(y - x))

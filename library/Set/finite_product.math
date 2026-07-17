@@ -61,7 +61,7 @@ theorem Equinumerous.product_congruence (A A' B B' : Type(0))
 -- chain: (n·i + j) + 1 = n·i + (j + 1) ≤ n·i + n = n·(i + 1)
 -- ≤ n·m = m·n, using j + 1 ≤ n (the second component's bound) and
 -- i + 1 ≤ m (the first component's bound).
-theorem NaturalsBelow.product_index_bound (m n i j : Natural)
+theorem NaturalsBelow.product_index_bound (m n i j : ℕ)
         (belowM : i < m) (belowN : j < n)
         : n * i + j < m * n := {
   i + 1 ≤ m by Natural.add_one_le_of_lt;
@@ -80,7 +80,7 @@ theorem NaturalsBelow.product_index_bound (m n i j : Natural)
 -- the row of the cell. From the decomposition n·q + r = k we read q ≤ k, so
 -- n·q < n·m; were m ≤ q we would get n·m ≤ n·q, putting n·q below
 -- itself. (n is the divisor, so it must be positive.)
-theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
+theorem NaturalsBelow.product_quotient_bound (m n k : ℕ)
         (oneLeN : 1 ≤ n) (belowProduct : k < m * n)
         : Natural.floor_divide(k, n) < m := {
   k + 1 ≤ m * n by Natural.add_one_le_of_lt;
@@ -108,7 +108,7 @@ theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
 -- The two directions, for a positive divisor n.
 
 -- Row-major: the cell (i, j) of an m-by-n grid maps to index n·i + j.
-definition NaturalsBelow.product_into (m n : Natural) (oneLeN : 1 ≤ n)
+definition NaturalsBelow.product_into (m n : ℕ) (oneLeN : 1 ≤ n)
         : Pair(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m * n) :=
   (p : Pair(NaturalsBelow(m), NaturalsBelow(n))) ↦
     NaturalsBelow.make(
@@ -118,7 +118,7 @@ definition NaturalsBelow.product_into (m n : Natural) (oneLeN : 1 ≤ n)
             NaturalsBelow.below(Product.first(p)), NaturalsBelow.below(Product.second(p))))
 
 -- The inverse: divide by n. The quotient is the row, the remainder the column.
-definition NaturalsBelow.product_out_of (m n : Natural) (oneLeN : 1 ≤ n)
+definition NaturalsBelow.product_out_of (m n : ℕ) (oneLeN : 1 ≤ n)
         : NaturalsBelow(m * n) → Pair(NaturalsBelow(m), NaturalsBelow(n)) :=
   (k : NaturalsBelow(m * n)) ↦
     Product.make(NaturalsBelow.make(Natural.floor_divide(NaturalsBelow.value(k), n),
@@ -134,11 +134,11 @@ definition NaturalsBelow.product_out_of (m n : Natural) (oneLeN : 1 ≤ n)
 -- n·i + j with i = value(first), j = value(second); dividing it by n returns
 -- the quotient i and remainder j (uniqueness of quotient/remainder), so the
 -- recovered pair has the same components.
-theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : 1 ≤ n)
+theorem NaturalsBelow.product_round_trip_left (m n : ℕ) (oneLeN : 1 ≤ n)
         (p : Pair(NaturalsBelow(m), NaturalsBelow(n)))
         : NaturalsBelow.product_out_of(m, n, oneLeN, NaturalsBelow.product_into(m, n, oneLeN, p)) = p :=
   let ⟨first, second⟩ := p in {
-        let index : Natural := n * NaturalsBelow.value(first) + NaturalsBelow.value(second);
+        let index : ℕ := n * NaturalsBelow.value(first) + NaturalsBelow.value(second);
         let indexBound : index < m * n :=
             NaturalsBelow.product_index_bound(m, n,
                 NaturalsBelow.value(first), NaturalsBelow.value(second),
@@ -170,7 +170,7 @@ theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : 1 ≤ n)
 -- and column modulo(value k, n); into sends them back to the single index
 -- n·divide(value k, n) + modulo(value k, n), which is value k exactly — that
 -- is the division identity.
-theorem NaturalsBelow.product_round_trip_right (m n : Natural) (oneLeN : 1 ≤ n)
+theorem NaturalsBelow.product_round_trip_right (m n : ℕ) (oneLeN : 1 ≤ n)
         (k : NaturalsBelow(m * n))
         : NaturalsBelow.product_into(m, n, oneLeN, NaturalsBelow.product_out_of(m, n, oneLeN, k)) = k := {
   n * Natural.floor_divide(NaturalsBelow.value(k), n) + Natural.modulo(NaturalsBelow.value(k), n)
@@ -184,7 +184,7 @@ theorem NaturalsBelow.product_round_trip_right (m n : Natural) (oneLeN : 1 ≤ n
 -- The product of two yardsticks is one yardstick. Split on n: with n = 0 the
 -- product is empty (no second component) and so is the target NaturalsBelow(m·0);
 -- with n positive the row-major map and Euclidean division are inverse.
-theorem NaturalsBelow.product_equinumerous (m n : Natural)
+theorem NaturalsBelow.product_equinumerous (m n : ℕ)
         : Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n)) :=
   done by cases {
     case n = 0: {
@@ -220,7 +220,7 @@ theorem NaturalsBelow.product_equinumerous (m n : Natural)
 
 -- The product rule: a size-m type and a size-n type have a size-(m·n) product.
 -- Compose the componentwise bijection with the grid bijection.
-theorem HasSize.product (X Y : Type(0)) (m n : Natural)
+theorem HasSize.product (X Y : Type(0)) (m n : ℕ)
         (sizeX : HasSize(X, m)) (sizeY : HasSize(Y, n))
         : HasSize(Pair(X, Y), m * n) := {
   Equinumerous(Pair(X, Y), Pair(NaturalsBelow(m), NaturalsBelow(n)));

@@ -19,14 +19,14 @@ import Natural.order
 -- The outcome of comparing k against m: either k is strictly below m, or
 -- m is at most k. The type lives in `Type(0)`, so a function may branch on
 -- it; each constructor carries the deciding inequality.
-inductive Natural.StrictComparison (k m : Natural) : Type(0) where
+inductive Natural.StrictComparison (k m : ℕ) : Type(0) where
   | Natural.StrictComparison.below   : successor(k) ≤ m → Natural.StrictComparison(k, m)
   | Natural.StrictComparison.atLeast : m ≤ k → Natural.StrictComparison(k, m)
 
 -- Base row: compare 0 against m. `1 ≤ m` when m is a successor, `m ≤ 0`
 -- when m is zero.
 definition Natural.compare_strict_zero_against
-        : (m : Natural) → Natural.StrictComparison(0, m)
+        : (m : ℕ) → Natural.StrictComparison(0, m)
   | zero =>
       Natural.StrictComparison.atLeast(0, 0, done)
   | successor(predecessorM) =>
@@ -37,7 +37,7 @@ definition Natural.compare_strict_zero_against
 -- side. Pattern-matching the comparison ARGUMENT (a real binder) keeps the
 -- inductive row free of a `cases` on the recursive sub-comparison.
 definition Natural.compare_strict_shift
-        (predecessorK predecessorM : Natural)
+        (predecessorK predecessorM : ℕ)
         : Natural.StrictComparison(predecessorK, predecessorM)
           → Natural.StrictComparison(successor(predecessorK), successor(predecessorM))
   | Natural.StrictComparison.below(strictlyBelow) =>
@@ -49,10 +49,10 @@ definition Natural.compare_strict_shift
 -- comparison of predecessorK against every m. Zero is below every
 -- successor; otherwise shift the recursive sub-comparison up one row.
 definition Natural.compare_strict_successor_against
-        (predecessorK : Natural)
+        (predecessorK : ℕ)
         (comparePredecessor
-            : (m : Natural) → Natural.StrictComparison(predecessorK, m))
-        : (m : Natural) → Natural.StrictComparison(successor(predecessorK), m)
+            : (m : ℕ) → Natural.StrictComparison(predecessorK, m))
+        : (m : ℕ) → Natural.StrictComparison(successor(predecessorK), m)
   | zero =>
       Natural.StrictComparison.atLeast(successor(predecessorK), 0, ?)
   | successor(predecessorM) =>
@@ -62,7 +62,7 @@ definition Natural.compare_strict_successor_against
 -- `compare_strict(k, m)` : either `k < m` (as `successor(k) ≤ m`) or
 -- `m ≤ k`, delivered as data a function can branch on.
 definition Natural.compare_strict
-        : (k m : Natural) → Natural.StrictComparison(k, m)
+        : (k m : ℕ) → Natural.StrictComparison(k, m)
   | zero, m =>
       Natural.compare_strict_zero_against(m)
   | successor(predecessorK), m =>

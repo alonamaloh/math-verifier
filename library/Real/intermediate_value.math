@@ -45,34 +45,34 @@ import Real.continuity
 -- ----------------------------------------------------------------------
 -- The candidate set: points of [a, b] where f has not yet crossed zero.
 definition Real.intermediate_value_candidates
-        (f : Real → Real) (a b : Real) : Set(Real) :=
-  (x : Real) ↦ a ≤ x ∧ x ≤ b ∧ f(x) ≤ 0
+        (f : ℝ → ℝ) (a b : ℝ) : Set(ℝ) :=
+  (x : ℝ) ↦ a ≤ x ∧ x ≤ b ∧ f(x) ≤ 0
 
 -- ----------------------------------------------------------------------
 -- The intermediate value theorem (zero-crossing form).
 theorem Real.intermediate_value
-        (f : Real → Real) (a b : Real)
+        (f : ℝ → ℝ) (a b : ℝ)
         (aLeqB : a ≤ b)
         (fContinuous : Real.ContinuousOn(f, a, b))
         (fStartsNonpositive : f(a) ≤ 0)
         (fEndsNonnegative : 0 ≤ f(b))
-        : ∃ (c : Real). a ≤ c ∧ c ≤ b ∧ f(c) = 0 := {
+        : ∃ (c : ℝ). a ≤ c ∧ c ≤ b ∧ f(c) = 0 := {
   set candidates := Real.intermediate_value_candidates(f, a, b);
   -- a is a candidate, and b bounds all of them, so the supremum exists.
   a ≤ a;
   a ∈ candidates as aInCandidates;
   Real.IsUpperBound(candidates, b)
-      by (y : Real) (yInCandidates : y ∈ candidates) ↦ {
+      by (y : ℝ) (yInCandidates : y ∈ candidates) ↦ {
            a ≤ y ∧ y ≤ b ∧ f(y) ≤ 0;
            done
          } as bIsUpper;
-  Set.IsNonempty(Real, candidates)
+  Set.IsNonempty(ℝ, candidates)
       by witness a with aInCandidates;
   Real.IsBoundedAbove(candidates)
       by witness b with bIsUpper;
   choose c such that Real.IsSupremum(candidates, c) from Real.supremum_exists;
   Real.IsUpperBound(candidates, c);
-  ∀ (otherBound : Real). Real.IsUpperBound(candidates, otherBound) → c ≤ otherBound;
+  ∀ (otherBound : ℝ). Real.IsUpperBound(candidates, otherBound) → c ≤ otherBound;
   a ≤ c;
   c ≤ b;
   Real.ContinuousAt(f, c) as fContinuousAtC;
@@ -82,19 +82,19 @@ theorem Real.intermediate_value
   -- c − δ already bounds the candidate set — beating the least bound c.
   suppose f(c) > 0 for contradiction {
       -- A tolerance inside the gap (0, f(c)): half of f(c).
-      let ε : Real := f(c) / 2;
+      let ε : ℝ := f(c) / 2;
       ε > 0 as εPositive;
       ε < f(c) by Real.divide_two_less_than_self;
       choose δ such that
-          0 < δ ∧ ∀ (y : Real). abs(y - c) < δ
+          0 < δ ∧ ∀ (y : ℝ). abs(y - c) < δ
             → abs(f(y) - f(c)) < ε
           from fContinuousAtC(ε, εPositive);
-      ∀ (y : Real). abs(y - c) < δ → abs(f(y) - f(c)) < ε as fClose;
+      ∀ (y : ℝ). abs(y - c) < δ → abs(f(y) - f(c)) < ε as fClose;
       -- Any candidate above c − δ would sit δ-close to c
       -- (candidates never exceed c), forcing f > 0 there —
       -- impossible for a candidate. So c − δ is an upper bound.
       Real.IsUpperBound(candidates, c - δ)
-          by (y : Real) (yInCandidates : y ∈ candidates) ↦ {
+          by (y : ℝ) (yInCandidates : y ∈ candidates) ↦ {
                suppose c - δ < y for contradiction {
                  f(y) ≤ 0;
                  y ≤ c;
@@ -135,19 +135,19 @@ theorem Real.intermediate_value
         < 0 + -f(c)
         = -f(c);
       -- A tolerance inside the gap (0, −f(c)): half of −f(c).
-      let ε : Real := -f(c) / 2;
+      let ε : ℝ := -f(c) / 2;
       ε > 0 as εPositive;
       ε < -f(c) by Real.divide_two_less_than_self;
       choose δ such that
-          0 < δ ∧ ∀ (y : Real). abs(y - c) < δ
+          0 < δ ∧ ∀ (y : ℝ). abs(y - c) < δ
             → abs(f(y) - f(c)) < ε
           from fContinuousAtC(ε, εPositive);
       0 < δ;
-      ∀ (y : Real). abs(y - c) < δ → abs(f(y) - f(c)) < ε as fClose;
+      ∀ (y : ℝ). abs(y - c) < δ → abs(f(y) - f(c)) < ε as fClose;
       -- Everything δ-close to c keeps f negative.
-      ∀ (y : Real). abs(y - c) < δ
+      ∀ (y : ℝ). abs(y - c) < δ
         → f(y) < 0
-          by (y : Real)
+          by (y : ℝ)
              (yClose : abs(y - c) < δ) ↦ {
                abs(f(y) - f(c)) < ε
                    by fClose(y, yClose);

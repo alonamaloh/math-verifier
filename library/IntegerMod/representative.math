@@ -29,27 +29,27 @@ import IntegerMod.operations
 import IntegerMod.field
 
 -- Every class is `make(p, r)` for some natural `r` with `r < p`.
-theorem IntegerMod.exists_natural_representative (p : Natural) (pPositive : 1 ≤ p)
+theorem IntegerMod.exists_natural_representative (p : ℕ) (pPositive : 1 ≤ p)
         (c : IntegerMod(p))
-        : ∃ (r : Natural). r < p
-            ∧ c = IntegerMod.make(p, (r : Integer)) :=
+        : ∃ (r : ℕ). r < p
+            ∧ c = IntegerMod.make(p, (r : ℤ)) :=
   by_representatives c as x =>
     {
       choose quotient, remainder such that
-          x = (p : Integer) * quotient + (remainder : Integer) ∧ remainder < p
+          x = (p : ℤ) * quotient + (remainder : ℤ) ∧ remainder < p
           from Integer.divide_by_positive(x, p, pPositive);
-      x = (p : Integer) * quotient + (remainder : Integer) as xEquation;
+      x = (p : ℤ) * quotient + (remainder : ℤ) as xEquation;
       remainder < p as remainderBound;
-      x - (remainder : Integer)
-          = ((p : Integer) * quotient + (remainder : Integer))
-              - (remainder : Integer)
+      x - (remainder : ℤ)
+          = ((p : ℤ) * quotient + (remainder : ℤ))
+              - (remainder : ℤ)
                 by substituting xEquation
-          = (p : Integer) * quotient   by ring
+          = (p : ℤ) * quotient   by ring
           as differenceEquation;
-      Integer.CongruentModulo(p, x, (remainder : Integer))
+      Integer.CongruentModulo(p, x, (remainder : ℤ))
           by ⟨quotient, differenceEquation⟩ as congruent;
       ⟨remainder, And.introduction(remainderBound,
-          Quotient.equivalent_implies_equal(x, (remainder : Integer), congruent))⟩
+          Quotient.equivalent_implies_equal(x, (remainder : ℤ), congruent))⟩
     }
 
 -- ----------------------------------------------------------------------
@@ -58,23 +58,23 @@ theorem IntegerMod.exists_natural_representative (p : Natural) (pPositive : 1 �
 
 -- The ordered half: with j ≤ i < p and p ∣ (i − j), the difference i − j
 -- is a natural multiple of p smaller than p, hence zero.
-theorem Integer.CongruentModulo.equal_of_ordered_below (p i j : Natural)
+theorem Integer.CongruentModulo.equal_of_ordered_below (p i j : ℕ)
         (jLessOrEqual : j ≤ i)
         (iBelow : i < p)
-        (congruent : Integer.CongruentModulo(p, (i : Integer), (j : Integer)))
+        (congruent : Integer.CongruentModulo(p, (i : ℤ), (j : ℤ)))
         : i = j := {
   -- Write i = j + difference.
   choose difference such that i = j + difference as iEquation
       from Natural.subtraction_witness(j, i, jLessOrEqual);
   -- The integer difference i − j is that natural difference.
-  (i : Integer) - (j : Integer)
-      = (((j + difference) : Natural) : Integer) - (j : Integer)
+  (i : ℤ) - (j : ℤ)
+      = (((j + difference) : ℕ) : ℤ) - (j : ℤ)
             by substituting iEquation
-      = ((j : Integer) + (difference : Integer)) - (j : Integer)
-      = (difference : Integer)
+      = ((j : ℤ) + (difference : ℤ)) - (j : ℤ)
+      = (difference : ℤ)
       as differenceEquation;
   -- So p divides the natural difference.
-  Integer.divides((p : Integer), (difference : Integer))
+  Integer.divides((p : ℤ), (difference : ℤ))
       by substituting differenceEquation;
   Natural.divides(p, difference)
       by Natural.to_integer.divides_reflects;
@@ -99,19 +99,19 @@ theorem Integer.CongruentModulo.equal_of_ordered_below (p i j : Natural)
 
 -- `make` is injective on the residues 0..p−1: distinct naturals below the
 -- modulus represent distinct classes.
-theorem IntegerMod.make_injective_below_modulus (p i j : Natural)
+theorem IntegerMod.make_injective_below_modulus (p i j : ℕ)
         (iBelow : i < p) (jBelow : j < p)
         (makeEquality
-            : IntegerMod.make(p, (i : Integer)) = IntegerMod.make(p, (j : Integer)))
+            : IntegerMod.make(p, (i : ℤ)) = IntegerMod.make(p, (j : ℤ)))
         : i = j := {
-  Integer.CongruentModulo(p, (i : Integer), (j : Integer));
+  Integer.CongruentModulo(p, (i : ℤ), (j : ℤ));
   -- Order i against j; each order goes through the ordered lemma.
   i < j ∨ j ≤ i by Natural.lt_or_le;
   done by cases {
     case i < j as iStrictlyBelowJ: {
         -- i < j: swap the roles.
         i ≤ j by Natural.LessThan.weaken;
-        Integer.CongruentModulo(p, (j : Integer), (i : Integer))
+        Integer.CongruentModulo(p, (j : ℤ), (i : ℤ))
             by Integer.CongruentModulo.symmetric;
         j = i by Integer.CongruentModulo.equal_of_ordered_below;
         i = j

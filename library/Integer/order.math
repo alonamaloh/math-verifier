@@ -1,7 +1,7 @@
 -- Integer/order.math
 --
 -- The ≤ relation on Integer. Defined directly: `x ≤ y` iff there is
--- a natural `n` such that `y = x + (n : Integer)`. This shape makes
+-- a natural `n` such that `y = x + (n : ℤ)`. This shape makes
 -- reflexivity and transitivity straightforward, and integrates cleanly
 -- with the additive ring laws (no need to drop down to representatives).
 
@@ -22,16 +22,16 @@ import Integer.negation
 import Integer.ring
 import Integer.algebra
 
--- `x` is non-negative iff it equals some Natural's image.
-definition Integer.IsNonneg (x : Integer) : Proposition :=
-  ∃ (n : Natural). x = (n : Integer)
+-- `x` is non-negative iff it equals some ℕ's image.
+definition Integer.IsNonneg (x : ℤ) : Proposition :=
+  ∃ (n : ℕ). x = (n : ℤ)
 
--- ≤ on Integer: `x ≤ y` iff there's a Natural `n` with y = x + n.
-definition Integer.LessOrEqual (x y : Integer) : Proposition :=
-  ∃ (n : Natural). y = x + (n : Integer)
+-- ≤ on ℤ: `x ≤ y` iff there's a ℕ `n` with y = x + n.
+definition Integer.LessOrEqual (x y : ℤ) : Proposition :=
+  ∃ (n : ℕ). y = x + (n : ℤ)
 
 -- Strict <: `x + 1 ≤ y`.
-definition Integer.LessThan (x y : Integer) : Proposition :=
+definition Integer.LessThan (x y : ℤ) : Proposition :=
   Integer.LessOrEqual(x + Integer.one, y)
 
 operator (≤) on (Integer, Integer) := Integer.LessOrEqual
@@ -44,79 +44,79 @@ operator (<) on (Integer, Integer) := Integer.LessThan
 automatic theorem Integer.zero_is_nonneg : Integer.IsNonneg(Integer.zero) :=
   witness 0 with done
 
--- Every embedded Natural is non-negative.
-automatic theorem Integer.from_natural_is_nonneg (n : Natural)
-        : Integer.IsNonneg((n : Integer)) :=
+-- Every embedded ℕ is non-negative.
+automatic theorem Integer.from_natural_is_nonneg (n : ℕ)
+        : Integer.IsNonneg((n : ℤ)) :=
   witness n with done
 
 -- `IsNonneg(x)` and `0 ≤ x` say the same thing: `IsNonneg` is `∃n. x = (n:ℤ)`
 -- and `0 ≤ x` is `∃n. x = 0 + (n:ℤ)`, identical once `0 + (n:ℤ)` collapses.
 -- These let order-level code speak `≤` while reusing the non-negativity
 -- machinery (closure under +, ·, squares) stated with `IsNonneg`.
-theorem Integer.zero_less_or_equal_of_nonneg (x : Integer)
+theorem Integer.zero_less_or_equal_of_nonneg (x : ℤ)
         (xNonneg : Integer.IsNonneg(x))
-        : (0 : Integer) ≤ x := {
-  choose n such that x = (n : Integer) from xNonneg;
-  witness n with x = (n : Integer) = (0 : Integer) + (n : Integer)
+        : (0 : ℤ) ≤ x := {
+  choose n such that x = (n : ℤ) from xNonneg;
+  witness n with x = (n : ℤ) = (0 : ℤ) + (n : ℤ)
 }
 
-theorem Integer.nonneg_of_zero_less_or_equal (x : Integer)
-        (xNonneg : (0 : Integer) ≤ x)
+theorem Integer.nonneg_of_zero_less_or_equal (x : ℤ)
+        (xNonneg : (0 : ℤ) ≤ x)
         : Integer.IsNonneg(x) := {
-  choose n such that x = (0 : Integer) + (n : Integer) from xNonneg;
-  witness n with x = (0 : Integer) + (n : Integer) = (n : Integer)
+  choose n such that x = (0 : ℤ) + (n : ℤ) from xNonneg;
+  witness n with x = (0 : ℤ) + (n : ℤ) = (n : ℤ)
 }
 
 -- ----------------------------------------------------------------------
 -- ≤ basic properties.
 
 -- Reflexivity: x ≤ x. Witness: 0, since x = x + 0.
-theorem Integer.LessOrEqual.reflexive (x : Integer) : x ≤ x :=
+theorem Integer.LessOrEqual.reflexive (x : ℤ) : x ≤ x :=
   witness 0 with done
 
 -- Transitivity: x ≤ y and y ≤ z give x ≤ z.
 -- With y = x + a and z = y + b:  z = (x + a) + b = x + (a + b).
-theorem Integer.LessOrEqual.transitive (x y z : Integer)
+theorem Integer.LessOrEqual.transitive (x y z : ℤ)
         (xLessOrEqualY : x ≤ y) (yLessOrEqualZ : y ≤ z)
         : x ≤ z := {
-  choose a such that y = x + (a : Integer) from xLessOrEqualY;
-  choose b such that z = y + (b : Integer) from yLessOrEqualZ;
+  choose a such that y = x + (a : ℤ) from xLessOrEqualY;
+  choose b such that z = y + (b : ℤ) from yLessOrEqualZ;
   witness a + b with
       z
-         = y + (b : Integer)
-         = (x + (a : Integer)) + (b : Integer)
-         = x + ((a : Integer) + (b : Integer))
-         = x + (a + b : Integer)
+         = y + (b : ℤ)
+         = (x + (a : ℤ)) + (b : ℤ)
+         = x + ((a : ℤ) + (b : ℤ))
+         = x + (a + b : ℤ)
 }
 
--- a < b weakens to a ≤ b: a ≤ a + 1 (witness the natural 1) and a + 1 ≤ b (the
+-- a < b weakens to a ≤ b: a ≤ a + 1 (witness the ℕ 1) and a + 1 ≤ b (the
 -- definition of `<`), by transitivity.
-theorem Integer.LessThan.weaken (a b : Integer) (aLessThanB : a < b) : a ≤ b := {
+theorem Integer.LessThan.weaken (a b : ℤ) (aLessThanB : a < b) : a ≤ b := {
   a + Integer.one ≤ b;
   a ≤ a + Integer.one
-      by witness (1 : Natural) with (a + Integer.one = a + ((1 : Natural) : Integer));
+      by witness (1 : ℕ) with (a + Integer.one = a + ((1 : ℕ) : ℤ));
   done
 }
 
 -- Weak-then-strict: x ≤ y ∧ y < z → x < z. With y = x + a and
 -- z = (y + 1) + b, the difference between z and x + 1 is a + b.
-theorem Integer.LessThan.transitive_left (x y z : Integer)
+theorem Integer.LessThan.transitive_left (x y z : ℤ)
         (xLessOrEqualY : x ≤ y) (yLessThanZ : y < z)
         : x < z := {
   y + Integer.one ≤ z as yPlusOneBelowZ;
-  choose a such that y = x + (a : Integer) from xLessOrEqualY;
-  choose b such that z = (y + Integer.one) + (b : Integer) from yPlusOneBelowZ;
+  choose a such that y = x + (a : ℤ) from xLessOrEqualY;
+  choose b such that z = (y + Integer.one) + (b : ℤ) from yPlusOneBelowZ;
   witness a + b with
       z
-         = (y + Integer.one) + (b : Integer)
-         = ((x + (a : Integer)) + Integer.one) + (b : Integer)
-         = (x + Integer.one) + ((a : Integer) + (b : Integer))
-         = (x + Integer.one) + (a + b : Integer)
+         = (y + Integer.one) + (b : ℤ)
+         = ((x + (a : ℤ)) + Integer.one) + (b : ℤ)
+         = (x + Integer.one) + ((a : ℤ) + (b : ℤ))
+         = (x + Integer.one) + (a + b : ℤ)
 }
 
 -- Strict-then-weak: x < y ∧ y ≤ z → x < z. Both sides speak x + 1 ≤ ·,
 -- so ≤-transitivity carries the strict bound through.
-theorem Integer.LessThan.transitive_right (x y z : Integer)
+theorem Integer.LessThan.transitive_right (x y z : ℤ)
         (xLessThanY : x < y) (yLessOrEqualZ : y ≤ z)
         : x < z := {
   x + Integer.one ≤ y;
@@ -128,29 +128,29 @@ theorem Integer.LessThan.transitive_right (x y z : Integer)
 -- The Natural→Integer embedding preserves order (the ℕ→ℤ rung of the tower).
 
 -- a ≤ b ⟹ (a:ℤ) ≤ (b:ℤ): with b = a + k, the difference is the image of k.
-theorem Natural.to_integer.LessOrEqual_preserves (n m : Natural) (nLeqM : n ≤ m)
-        : (n : Integer) ≤ (m : Integer) := {
+theorem Natural.to_integer.LessOrEqual_preserves (n m : ℕ) (nLeqM : n ≤ m)
+        : (n : ℤ) ≤ (m : ℤ) := {
   choose k such that m = n + k from Natural.subtraction_witness;
   witness k with
-      (m : Integer)
-         = (n + k : Integer)
-         = (n : Integer) + (k : Integer)
+      (m : ℤ)
+         = (n + k : ℤ)
+         = (n : ℤ) + (k : ℤ)
 }
 
 -- a < b ⟹ (a:ℤ) < (b:ℤ): a + 1 ≤ b preserves to (a:ℤ) + 1 ≤ (b:ℤ), which is `<`.
-theorem Natural.to_integer.LessThan_preserves (a b : Natural) (aLessThanB : a < b)
-        : (a : Integer) < (b : Integer) := {
+theorem Natural.to_integer.LessThan_preserves (a b : ℕ) (aLessThanB : a < b)
+        : (a : ℤ) < (b : ℤ) := {
   a + 1 ≤ b;
-  ((a + 1 : Natural) : Integer) ≤ (b : Integer);
-  (a : Integer) + Integer.one ≤ (b : Integer);
+  ((a + 1 : ℕ) : ℤ) ≤ (b : ℤ);
+  (a : ℤ) + Integer.one ≤ (b : ℤ);
   done
 }
 
 -- 0 < n ⟹ 0 < (n:ℤ). Automatic: the ℕ→ℤ rung of the positivity tower the
 -- division/nonzero discharge walks.
-automatic theorem Natural.to_integer.positive_preserves (n : Natural) (nPositive : 0 < n)
-        : Integer.zero < (n : Integer) := {
-  ((0 : Natural) : Integer) < (n : Integer);
+automatic theorem Natural.to_integer.positive_preserves (n : ℕ) (nPositive : 0 < n)
+        : Integer.zero < (n : ℤ) := {
+  ((0 : ℕ) : ℤ) < (n : ℤ);
   done
 }
 
@@ -159,12 +159,12 @@ automatic theorem Natural.to_integer.positive_preserves (n : Natural) (nPositive
 
 -- (a:ℤ) ≤ (b:ℤ) ⟹ a ≤ b: the gap witness reads back through the difference
 -- boundary as b = a + gap.
-theorem Natural.to_integer.LessOrEqual_reflects (a b : Natural)
-        (imageLessOrEqual : (a : Integer) ≤ (b : Integer)) : a ≤ b := {
-  choose gap such that (b : Integer) = (a : Integer) + (gap : Integer) from imageLessOrEqual;
-  (b : Integer)
-     = (a : Integer) + (gap : Integer)
-     = ((a + gap : Natural) : Integer);
+theorem Natural.to_integer.LessOrEqual_reflects (a b : ℕ)
+        (imageLessOrEqual : (a : ℤ) ≤ (b : ℤ)) : a ≤ b := {
+  choose gap such that (b : ℤ) = (a : ℤ) + (gap : ℤ) from imageLessOrEqual;
+  (b : ℤ)
+     = (a : ℤ) + (gap : ℤ)
+     = ((a + gap : ℕ) : ℤ);
   b + 0 = 0 + (a + gap);
   b
      = b + 0
@@ -176,10 +176,10 @@ theorem Natural.to_integer.LessOrEqual_reflects (a b : Natural)
 
 -- (a:ℤ) < (b:ℤ) ⟹ a < b: strictness lowers through the `+ 1` shift —
 -- (a:ℤ) + 1 is the image of a + 1, so a + 1 ≤ b.
-theorem Natural.to_integer.LessThan_reflects (a b : Natural)
-        (imageLessThan : (a : Integer) < (b : Integer)) : a < b := {
-  (a : Integer) + Integer.one ≤ (b : Integer);
-  ((a + 1 : Natural) : Integer) ≤ (b : Integer);
+theorem Natural.to_integer.LessThan_reflects (a b : ℕ)
+        (imageLessThan : (a : ℤ) < (b : ℤ)) : a < b := {
+  (a : ℤ) + Integer.one ≤ (b : ℤ);
+  ((a + 1 : ℕ) : ℤ) ≤ (b : ℤ);
   a + 1 ≤ b by Natural.to_integer.LessOrEqual_reflects;
   done by Natural.lt_of_add_one_le
 }
@@ -190,17 +190,17 @@ theorem Natural.to_integer.LessThan_reflects (a b : Natural)
 -- ≤ is preserved by adding the same value: x ≤ y implies x + z ≤ y + z.
 -- With y = x + n, we have y + z = (x + z) + n by associativity +
 -- commutativity. Witness: same n.
-theorem Integer.add_preserves_less_or_equal (x y z : Integer)
+theorem Integer.add_preserves_less_or_equal (x y z : ℤ)
         (xLessOrEqualY : x ≤ y)
         : x + z ≤ y + z := {
-  choose n such that y = x + (n : Integer) from xLessOrEqualY;
+  choose n such that y = x + (n : ℤ) from xLessOrEqualY;
   witness n with
       y + z
-         = (x + (n : Integer)) + z
-         = (x + z) + (n : Integer)
+         = (x + (n : ℤ)) + z
+         = (x + z) + (n : ℤ)
 }
 
 -- Every Natural's image is ≥ 0.
-theorem Integer.zero_less_or_equal_from_natural (n : Natural)
-        : Integer.zero ≤ (n : Integer) :=
+theorem Integer.zero_less_or_equal_from_natural (n : ℕ)
+        : Integer.zero ≤ (n : ℤ) :=
   witness n with done

@@ -36,7 +36,7 @@ import Real.embedding
 -- (s(m) + t(m)) - (s(n) + t(n)) = (s(m) - s(n)) + (t(m) - t(n)).
 -- Pure Rational algebra.
 theorem Rational.sequence.add_subtract_regroup
-        (a b c d : Rational)
+        (a b c d : ℚ)
         : (a + b) - (c + d) = (a - c) + (b - d) := ring
 
 -- The pointwise sum of two sequences is Cauchy when both are.
@@ -46,26 +46,26 @@ theorem Rational.sequence.sum_is_cauchy
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         (tIsCauchy : Rational.sequence.IsCauchy(t))
         : Rational.sequence.IsCauchy(
-              (n : Natural) ↦ s(n) + t(n)) :=
-  (ε : Rational)
+              (n : ℕ) ↦ s(n) + t(n)) :=
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
     -- `choose` can't infer the existential through the opaque Rational (the
     -- inferType-application bridge is blocked), so state it top-down first.
     Rational.zero < Rational.halve(ε);
-    ∃ (N : Natural).
-        ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(s(m) - s(n)) < Rational.halve(ε);
+    ∃ (N : ℕ).
+        ∀ (m : ℕ). N ≤ m → ∀ (n : ℕ). N ≤ n → abs(s(m) - s(n)) < Rational.halve(ε);
     choose N_s such that
-        ∀ (m : Natural). N_s ≤ m → ∀ (n : Natural). N_s ≤ n → abs(s(m) - s(n)) < Rational.halve(ε)
+        ∀ (m : ℕ). N_s ≤ m → ∀ (n : ℕ). N_s ≤ n → abs(s(m) - s(n)) < Rational.halve(ε)
         as sBound;
-    ∃ (N : Natural).
-        ∀ (m : Natural). N ≤ m → ∀ (n : Natural). N ≤ n → abs(t(m) - t(n)) < Rational.halve(ε);
+    ∃ (N : ℕ).
+        ∀ (m : ℕ). N ≤ m → ∀ (n : ℕ). N ≤ n → abs(t(m) - t(n)) < Rational.halve(ε);
     choose N_t such that
-        ∀ (m : Natural). N_t ≤ m → ∀ (n : Natural). N_t ≤ n → abs(t(m) - t(n)) < Rational.halve(ε)
+        ∀ (m : ℕ). N_t ≤ m → ∀ (n : ℕ). N_t ≤ n → abs(t(m) - t(n)) < Rational.halve(ε)
         as tBound;
     witness Natural.maximum(N_s, N_t) with
-        (m : Natural)
+        (m : ℕ)
                  (m_ge_max : Natural.maximum(N_s, N_t) ≤ m)
-                 (n : Natural)
+                 (n : ℕ)
                  (n_ge_max : Natural.maximum(N_s, N_t) ≤ n) ↦ {
           N_s ≤ m as mGeNs;
           N_s ≤ n as nGeNs;
@@ -92,7 +92,7 @@ definition CauchyRationalSequence.add
   | CauchyRationalSequence.make(s, sCauchy),
     CauchyRationalSequence.make(t, tCauchy) =>
       CauchyRationalSequence.make(
-          (n : Natural) ↦ s(n) + t(n),
+          (n : ℕ) ↦ s(n) + t(n),
           Rational.sequence.sum_is_cauchy(s, t, sCauchy, tCauchy))
 
 -- Pointwise sum of representatives, so rep-level proofs read `a + b`
@@ -103,11 +103,11 @@ operator (+) on (CauchyRationalSequence, CauchyRationalSequence) := CauchyRation
 -- Bridges the abstract sequenceFunction projector through the
 -- pattern-match definition of add.
 automatic theorem CauchyRationalSequence.sequenceFunction_add
-        (rep_x rep_y : CauchyRationalSequence) (m : Natural)
+        (rep_x rep_y : CauchyRationalSequence) (m : ℕ)
         : (rep_x + rep_y)(m) = rep_x(m) + rep_y(m) := {
   let ⟨sa, _⟩ := rep_x;
   let ⟨sb, _⟩ := rep_y;
-  reflexivity(Rational, sa(m) + sb(m))
+  reflexivity(ℚ, sa(m) + sb(m))
 }
 
 -- Respect of addition in the second argument: with rep_x fixed, varying
@@ -118,11 +118,11 @@ theorem Real.add_respects_second
         (rep_x rep_y rep_yPrime : CauchyRationalSequence)
         (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
         : CauchyEquivalent(rep_x + rep_y, rep_x + rep_yPrime) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
       choose N as yEquiv_at_N from yEquiv(ε, εPositive);
       witness N with
-          (m : Natural) (N_leq_m : N ≤ m) ↦
+          (m : ℕ) (N_leq_m : N ≤ m) ↦
             abs((rep_x + rep_y)(m) - (rep_x + rep_yPrime)(m))
                = abs((rep_x(m) + rep_y(m)) - (rep_x(m) + rep_yPrime(m)))
                = abs(rep_y(m) - rep_yPrime(m))
@@ -136,11 +136,11 @@ theorem Real.add_respects_first
         (rep_x rep_xPrime rep_y : CauchyRationalSequence)
         (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
         : CauchyEquivalent(rep_x + rep_y, rep_xPrime + rep_y) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦ {
       choose N as xEquiv_at_N from xEquiv(ε, εPositive);
       witness N with
-          (m : Natural) (N_leq_m : N ≤ m) ↦
+          (m : ℕ) (N_leq_m : N ≤ m) ↦
             abs((rep_x + rep_y)(m) - (rep_xPrime + rep_y)(m))
                = abs((rep_x(m) + rep_y(m)) - (rep_xPrime(m) + rep_y(m)))
                = abs(rep_x(m) - rep_xPrime(m))
@@ -150,8 +150,8 @@ theorem Real.add_respects_first
 
 -- Real.add: add the representative sequences pointwise; well-defined in
 -- each argument by the respect lemmas above.
-definition Real.add : Real → Real → Real
-  by representatives a, c ↦ (Quotient.class_of(a + c) : Real)
+definition Real.add : ℝ → ℝ → ℝ
+  by representatives a, c ↦ (Quotient.class_of(a + c) : ℝ)
   well_defined by Real.add_respects_first, Real.add_respects_second
 
 operator (+) on (Real, Real) := Real.add
@@ -164,12 +164,12 @@ operator (+) on (Real, Real) := Real.add
 -- Reflexivity: Real.zero is definitionally Rational.to_real(Rational.zero).
 theorem Rational.to_real.zero_preserves
         : Rational.to_real(Rational.zero) = Real.zero :=
-  reflexivity(Real, Real.zero)
+  reflexivity(ℝ, Real.zero)
 
 -- Reflexivity: Real.one is definitionally Rational.to_real(Rational.one).
 theorem Rational.to_real.one_preserves
         : Rational.to_real(Rational.one) = Real.one :=
-  reflexivity(Real, Real.one)
+  reflexivity(ℝ, Real.one)
 
 -- Embedding preserves addition. Both sides represent the constant
 -- sequence λn. a + b; the LHS via Rational.to_cauchy_constant(a + b),
@@ -177,14 +177,14 @@ theorem Rational.to_real.one_preserves
 -- The Cauchy-witness proofs differ, so we use Quotient.equivalent_implies_equal with a
 -- pointwise-zero equivalence proof — pre-built as a named helper so
 -- the lambda body has an unambiguous expected type.
-theorem Rational.to_real.add_preserves_equiv (a b : Rational)
+theorem Rational.to_real.add_preserves_equiv (a b : ℚ)
         : CauchyEquivalent(
               Rational.to_cauchy_constant(a + b),
               Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b)) :=
-  (ε : Rational)
+  (ε : ℚ)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
-        (m : Natural) (_ : 0 ≤ m) ↦
+        (m : ℕ) (_ : 0 ≤ m) ↦
           -- Both sequence projections reduce to `a + b`. The LHS via
           -- δ-unfold of Rational.to_cauchy_constant plus ι/β on the
           -- abstract projector. The RHS additionally walks through
@@ -194,7 +194,7 @@ theorem Rational.to_real.add_preserves_equiv (a b : Rational)
              = Rational.zero
              < ε
 
-theorem Rational.to_real.add_preserves (a b : Rational)
+theorem Rational.to_real.add_preserves (a b : ℚ)
         : Rational.to_real(a + b)
           = Rational.to_real(a) + Rational.to_real(b) :=
   Quotient.equivalent_implies_equal(
