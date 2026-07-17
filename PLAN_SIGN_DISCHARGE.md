@@ -121,6 +121,53 @@ regressions).
 ## Status
 
 - 2026-07-17: case study + quick wins LANDED (3 lemmas, AM-GM swept
-  ~50 → 4 waypoint lines, tests green). S1–S4 not started. Inbox
+  ~50 → 4 waypoint lines, tests green). Inbox
   entries filed: misleading decide-shaped error for failed take/if
   claims; ∀-instantiation gap.
+- 2026-07-17 (second pass): **S1, S2, S4 ALL DONE.** S3 remains
+  decision-gated (see evidence below).
+  - **S1 (a4bc868d + follow-ups):** probe-driven audit — every
+    judgment × operation cell as a bare claim in a scratch module —
+    then 20 one-hop fills: ℝ add-positivity trio,
+    negate_nonpositive_ge_zero, positive_of_nonneg_nonzero,
+    nonneg_of_positive (the 0-anchored weaken BRIDGE the sign index
+    needs — LessThan.weaken itself is not 0-anchored so never
+    registers), power_nonzero, negate_nonzero, reciprocal_nonzero,
+    divide_nonzero, absolute_value_positive; the
+    LessOrEqual_zero_of_IsNonneg bridge flipped automatic (ℚ parity);
+    ℚ twins of all of the above plus less_or_equal_add_of_nonneg,
+    power_positive, reciprocal_function_nonzero, divide_nonneg. The
+    full 46-cell probe discharges silently at both carriers.
+  - **S2 (ca15c22f):** ∀-fact instantiation
+    (`tryInstantiateUniversalContextFact` + `factIsUniversalOverData`
+    gate) wired into the THREE premise passes that only did
+    direct/conjunction-leg matching: the sign-judgment recursion, the
+    monotonicity recursion, and citation context-discharge Step 5b.
+    Match pins every binder — no search. AM-GM's residual line is gone.
+  - **S4 (7 commits):** exponential −73, derivative −67, continuity
+    −29 (zero restorations), division −9, harmonic_series −5,
+    square_root −5, ℂ modulus −17. Restored-on-break residuals, each
+    recorded in its commit: (a) no one-hop `k! > 0` at ℕ; (b) the
+    REWRITE-INDEX precondition pass (abs(x)=x needs IsNonneg(x)) only
+    scans binders — two IsNonneg lines restored; (c) `Real.one +
+    Real.one` roofs are outside the numeral battery ((2:ℝ) ≢ 1+1);
+    (d) done-goals that flowed through a motive arrive WHNF'd as
+    `IsNonneg(x − Real.zero)`, invisible to the sign index (sealed
+    negate ⇒ not defeq) — cauchy_schwarz's `done by
+    LessOrEqual_zero_of_IsNonneg` closers are load-bearing for exactly
+    this reason.
+
+## S3 decision-gate evidence (collected by the sweep)
+
+- **Perf:** derivative.math re-verify 8.1 s → 12.9 s (+59%); the
+  auto-prover spends 4.3 s across 404 claims re-deriving sign facts
+  per premise slot that one context line used to feed. Other files
+  unchanged. A search-free structural tier (or per-context sign-fact
+  memoization) would recover this.
+- **Reach:** three structural holes a tier could own: the WHNF'd
+  `IsNonneg(x − 0)` form (needs transport-carrying −0 absorption);
+  δ-unfolding of defined subjects (exponentialTerm, modulus) before
+  head dispatch; the rewrite-index precondition pass sharing the sign
+  machinery.
+- Run `MATH_CLASSIFY_HINTS` (B5, tier-4 counts) before deciding;
+  owner sign-off required.
