@@ -12,9 +12,13 @@ elaborates through a canonical section of the ℕ ↪ ℤ embedding. The
 mathematician writes `p[a - b]` under a hypothesis `b ≤ a` and the
 system fills the rest.
 
-Explicitly REJECTED alternative: promoting monus to notation (`∸` was
-prototyped and backed out same-day). `Natural.monus` remains the
-machine-level truncated operation, spelled by name.
+Relationship to `∸` (owner call, same day, after a trial read): the two
+notations are COMPLEMENTARY, not competing. `operator (∸) on (Natural,
+Natural) := Natural.monus` is registered and used at total-lambda sites
+(convolution summands `p[i] * q[k ∸ i]`), where truncation is the honest
+semantics and no bound is in scope. This plan's obligation-narrowing
+covers the OTHER sites — where the paper-math hypothesis `b ≤ a` exists
+and `a - b` (honest, ℤ-valued) should narrow back to ℕ.
 
 ## Design
 

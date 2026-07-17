@@ -93,6 +93,7 @@ enum class TokenKind {
     CenterDot,       // "·" (binary operation symbol, multiplicative precedence)
     Bullet,          // "•" (scalar action, multiplicative precedence)
     Compose,         // "∘" (composition, multiplicative precedence)
+    Monus,           // "∸" (truncated subtraction, additive precedence)
     InverseSuperscript,  // "⁻¹" (postfix operator symbol, e.g. group inverse)
     SquareSuperscript,   // "²" (postfix squaring; parse-time sugar for E * E)
     Bang,            // "!" (postfix operator symbol, e.g. factorial). There is

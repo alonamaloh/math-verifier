@@ -16,6 +16,8 @@ A catalogue of surface constructs. For depth see `docs/conventions/`.
 | `operator (sym) on (T1, T2) := F` | infix/postfix operator dispatch |
 | `operator (()) on (T) := F` | application dispatch: a value of wrapper type T applies like the function it wraps (`rep(n)`, `sigma(i)`); `F : T → (A → B)` unwraps |
 | `operator ([]) on (T, Index) := F` | indexing dispatch: `p[k]` reads the k-th entry (`p[k]` = coefficient of x^k in a Polynomial); an ordinary binary operator with bracket spelling |
+| `a ∸ b` | truncated subtraction on Natural (`Natural.monus`; 0 when b > a) — for TOTAL positions like convolution summands `q[k ∸ i]`; honest `a - b` is ℤ-valued (see PLAN_NATURAL_NARROWING.md for the narrowing design) |
+| `p ∘ q` | composition (registry operator, multiplicative precedence, left-assoc); registered on Permutation |
 | `E²` | parse-time sugar for `E * E` at any carrier (binds tighter than every binary operator: `2 * n²` is `2 * (n * n)`) |
 | `base ^ exp` | infix power (registry operator `^`), right-associative (`a ^ b ^ c` is `a ^ (b ^ c)`), binds tighter than unary `-`/`¬` (so `-x ^ 2` is `-(x ^ 2)`) and `*`/`/`, and looser than application/postfix. Registered base-first on Natural/Rational/Real/ComplexNumber (`base : T`, `exp : Natural`), so `x ^ 2` is `T.power(x, 2)`. Distinct from `x²` (which is `x * x`, defeq-transparent): `x ^ 2` goes through the opaque `power` and its characterising lemmas |
 | `instance N` | register the canonical structure instance/bundle for N's carrier |

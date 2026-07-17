@@ -123,7 +123,7 @@ theorem Polynomial.nth_multiply (r : Ring)
         (p q : Polynomial.Coefficients(Ring.carrier(r)))
         : ∀ (k : Natural).
           (p * q)[k]
-            = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[Natural.monus(k, i)]), k) :=
+            = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[k ∸ i]), k) :=
   by induction on p with IH {
     case Polynomial.Coefficients.nil:
       (k : Natural) ↦
@@ -131,11 +131,11 @@ theorem Polynomial.nth_multiply (r : Ring)
          = Ring.zero(r)
          = Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), k)
              by Ring.Sum.zero
-         = Ring.Sum(r, (i : Natural) ↦ (Polynomial.Coefficients.nil(Ring.carrier(r))[i] * q[Natural.monus(k, i)]), k)
+         = Ring.Sum(r, (i : Natural) ↦ (Polynomial.Coefficients.nil(Ring.carrier(r))[i] * q[k ∸ i]), k)
              by (i : Natural) ↦
                  Ring.zero(r)
-                    = (Ring.zero(r) * q[Natural.monus(k, i)])
-                    = (Polynomial.Coefficients.nil(Ring.carrier(r))[i] * q[Natural.monus(k, i)])
+                    = (Ring.zero(r) * q[k ∸ i])
+                    = (Polynomial.Coefficients.nil(Ring.carrier(r))[i] * q[k ∸ i])
     case Polynomial.Coefficients.cons(a, restA):
       (k : Natural) ↦
       done by cases {
@@ -146,30 +146,27 @@ theorem Polynomial.nth_multiply (r : Ring)
                  = ((a * q[0]) + Polynomial.Coefficients.shift(r, restA * q)[0])
                  = ((a * q[0]) + Ring.zero(r))
                  = (a * q[0])
-                 = Ring.Sum(r,
-                       (i : Natural) ↦
-                           (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[i] * q[Natural.monus(0, i)]),
-                       0)
+                 = Ring.Sum(r, (i : Natural) ↦ (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[i] * q[0 ∸ i]), 0)
                      by Ring.Sum.convolution_zero(
                             A := (i : Natural) ↦ Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[i],
                             B := (m : Natural) ↦ q[m])
         case k = 1 + predecessor for some predecessor: {
             (restA * q)[predecessor]
-                  = Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[Natural.monus(predecessor, j)]), predecessor)
+                  = Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[predecessor ∸ j]), predecessor)
                 by IH;
 
-            Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[Natural.monus(predecessor, j)]), predecessor)
+            Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[predecessor ∸ j]), predecessor)
                 = Ring.Sum(r,
                       (j : Natural) ↦
-                          (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[Natural.monus(predecessor, j)]),
+                          (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[predecessor ∸ j]),
                       predecessor)
               by Ring.Sum.extensional(r,
-                     (j : Natural) ↦ (restA[j] * q[Natural.monus(predecessor, j)]),
+                     (j : Natural) ↦ (restA[j] * q[predecessor ∸ j]),
                      (j : Natural) ↦
-                         (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[Natural.monus(predecessor, j)]),
+                         (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[predecessor ∸ j]),
                      (j : Natural) ↦
-                         { (restA[j] * q[Natural.monus(predecessor, j)])
-                               = (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[Natural.monus(predecessor, j)])
+                         { (restA[j] * q[predecessor ∸ j])
+                               = (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[predecessor ∸ j])
                                by substituting Polynomial.coefficient_cons_one_plus },
                      predecessor) as tailReindex;
 
@@ -180,16 +177,16 @@ theorem Polynomial.nth_multiply (r : Ring)
                  = ((a * q[1 + predecessor]) + (restA * q)[predecessor])
                      by Polynomial.nth_shift_one_plus
                  = ((a * q[1 + predecessor])
-                       + Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[Natural.monus(predecessor, j)]), predecessor))
+                       + Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[predecessor ∸ j]), predecessor))
                  = ((a * q[1 + predecessor])
                        + Ring.Sum(r,
                              (j : Natural) ↦
-                                 (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[Natural.monus(predecessor, j)]),
+                                 (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[1 + j] * q[predecessor ∸ j]),
                              predecessor))
                      by substituting tailReindex
                  = Ring.Sum(r,
                        (i : Natural) ↦
-                           (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[i] * q[Natural.monus(1 + predecessor, i)]),
+                           (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[i] * q[(1 + predecessor) ∸ i]),
                        1 + predecessor)
                      by Ring.Sum.convolution_shift(
                             A := (i : Natural) ↦ Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[i],
@@ -213,15 +210,15 @@ theorem Polynomial.Coefficients.multiply_respects (r : Ring)
         : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p * q, pPrime * qPrime) :=
   (k : Natural) ↦
       (p * q)[k]
-         = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[Natural.monus(k, i)]), k)
+         = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[k ∸ i]), k)
                by Polynomial.nth_multiply
-         = Ring.Sum(r, (i : Natural) ↦ (pPrime[i] * qPrime[Natural.monus(k, i)]), k)
+         = Ring.Sum(r, (i : Natural) ↦ (pPrime[i] * qPrime[k ∸ i]), k)
                by ((i : Natural) ↦
-                          (p[i] * q[Natural.monus(k, i)])
-                             = (pPrime[i] * q[Natural.monus(k, i)])
+                          (p[i] * q[k ∸ i])
+                             = (pPrime[i] * q[k ∸ i])
                                    by firstEqual(i)
-                             = (pPrime[i] * qPrime[Natural.monus(k, i)])
-                                   by secondEqual(Natural.monus(k, i)))
+                             = (pPrime[i] * qPrime[k ∸ i])
+                                   by secondEqual(k ∸ i))
          = (pPrime * qPrime)[k]
                by Polynomial.nth_multiply
 

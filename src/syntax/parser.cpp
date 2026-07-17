@@ -3317,10 +3317,12 @@ private:
         auto left = parseMultiplicative();
         while (peek().kind == TokenKind::Plus
                || peek().kind == TokenKind::Minus
-               || peek().kind == TokenKind::SetMinus) {
+               || peek().kind == TokenKind::SetMinus
+               || peek().kind == TokenKind::Monus) {
             Token op = consumeAny();
             const char* sym = (op.kind == TokenKind::Plus) ? "+"
-                            : (op.kind == TokenKind::SetMinus) ? "∖" : "-";
+                            : (op.kind == TokenKind::SetMinus) ? "∖"
+                            : (op.kind == TokenKind::Monus) ? "∸" : "-";
             if (peek().kind == TokenKind::Ellipsis) {
                 // `t₁ op … op ... op g` — ellipsis fold notation.
                 consumeAny();  // '...'

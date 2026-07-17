@@ -3,7 +3,7 @@
 -- Commutativity of polynomial multiplication when the coefficient ring
 -- is commutative, and the resulting IsCommutativeRing instance. The
 -- convolution Σ_{i=0}^{k} p_i·q_{k-i} is symmetric in p and q: reflect
--- the sum (Sum.reverse), use the involution monus(k, monus(k,i)) = i on
+-- the sum (Sum.reverse), use the involution k ∸ (k ∸ i) = i on
 -- the summation range, and commute the ring product.
 
 module Polynomial.commutative
@@ -34,35 +34,35 @@ import Polynomial.instances
 -- Natural arithmetic helpers for the reflection.
 
 theorem Natural.monus_add_cancel_left (a : Natural)
-        : ∀ (b : Natural). Natural.monus(a + b, a) = b :=
+        : ∀ (b : Natural). (a + b) ∸ a = b :=
   by induction on a with IH {
     case 0:
         (b : Natural) ↦ { done by Natural.monus_zero }
     case 1 + predecessor:
         (b : Natural) ↦
-          Natural.monus((1 + predecessor) + b, 1 + predecessor)
-             = Natural.monus(1 + (predecessor + b), 1 + predecessor)
+          ((1 + predecessor) + b) ∸ (1 + predecessor)
+             = (1 + (predecessor + b)) ∸ (1 + predecessor)
                  by Natural.add_associative
-             = Natural.monus(predecessor + b, predecessor)
+             = (predecessor + b) ∸ predecessor
                  by Natural.monus_one_plus_one_plus
              = b
                  by IH(b)
   }
 
 theorem Natural.monus_add_involution (i d : Natural)
-        : Natural.monus(i + d, Natural.monus(i + d, i)) = i :=
-  Natural.monus(i + d, Natural.monus(i + d, i))
-     = Natural.monus(i + d, d)
-     = Natural.monus(d + i, d)
+        : (i + d) ∸ ((i + d) ∸ i) = i :=
+  (i + d) ∸ ((i + d) ∸ i)
+     = (i + d) ∸ d
+     = (d + i) ∸ d
      = i
 
 theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
-        : Natural.monus(k, Natural.monus(k, i)) = i := {
+        : k ∸ (k ∸ i) = i := {
   choose d such that k = i + d as decomposition from Natural.subtraction_witness;
   -- rewrite k throughout, then it's the monus/add involution.
-  Natural.monus(k, Natural.monus(k, i))
-     = Natural.monus(i + d, Natural.monus(i + d, i))   by substituting decomposition
-     = i                                                by Natural.monus_add_involution
+  k ∸ (k ∸ i)
+     = (i + d) ∸ ((i + d) ∸ i)   by substituting decomposition
+     = i                          by Natural.monus_add_involution
 }
 
 -- Sum respects pointwise equality on the summation range 0..n.
@@ -104,38 +104,33 @@ congruence_under_binder Ring.Sum := Ring.Sum.extensional_range
 theorem Ring.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
         (n : Natural)
         : Ring.Sum(r, f, n)
-          = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(n, i)), n) :=
+          = Ring.Sum(r, (i : Natural) ↦ f(n ∸ i), n) :=
   by induction on n with IH {
     case base:
         Ring.Sum(r, f, 0)
            = f(0)
-           = f(Natural.monus(0, 0))
-           = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(0, i)), 0)   by substituting Ring.Sum.base
+           = f(0 ∸ 0)
+           = Ring.Sum(r, (i : Natural) ↦ f(0 ∸ i), 0)   by substituting Ring.Sum.base
     case step(k): {
-        Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k)
-              = Ring.Sum(r,
-                    (i : Natural) ↦ f(Natural.monus(1 + k, 1 + i)), k)
+        Ring.Sum(r, (i : Natural) ↦ f(k ∸ i), k)
+              = Ring.Sum(r, (i : Natural) ↦ f((1 + k) ∸ (1 + i)), k)
           by Ring.Sum.extensional_range(r,
-                 (i : Natural) ↦ f(Natural.monus(k, i)),
-                 (i : Natural) ↦ f(Natural.monus(1 + k, 1 + i)),
+                 (i : Natural) ↦ f(k ∸ i),
+                 (i : Natural) ↦ f((1 + k) ∸ (1 + i)),
                  k,
                  (i : Natural) (_ : i ≤ k) ↦
-                     { f(Natural.monus(k, i))
-                        = f(Natural.monus(1 + k, 1 + i))
+                     { f(k ∸ i)
+                        = f((1 + k) ∸ (1 + i))
                             by substituting Natural.monus_one_plus_one_plus }) as tailReindex;
         Ring.Sum(r, f, 1 + k)
            = (Ring.Sum(r, f, k) + f(1 + k))
            = (f(1 + k) + Ring.Sum(r, f, k))
-           = (f(1 + k)
-              + Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
-           = (f(Natural.monus(1 + k, 0))
-              + Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
+           = (f(1 + k) + Ring.Sum(r, (i : Natural) ↦ f(k ∸ i), k))
+           = (f((1 + k) ∸ 0) + Ring.Sum(r, (i : Natural) ↦ f(k ∸ i), k))
                by substituting Natural.monus_one_plus_zero
-           = (f(Natural.monus(1 + k, 0))
-              + Ring.Sum(r,
-                    (i : Natural) ↦ f(Natural.monus(1 + k, 1 + i)), k))
+           = (f((1 + k) ∸ 0) + Ring.Sum(r, (i : Natural) ↦ f((1 + k) ∸ (1 + i)), k))
                by substituting tailReindex
-           = Ring.Sum(r, (i : Natural) ↦ f(Natural.monus(1 + k, i)), 1 + k)
+           = Ring.Sum(r, (i : Natural) ↦ f((1 + k) ∸ i), 1 + k)
                by Ring.Sum.shift_one_plus
   }
   }
@@ -149,16 +144,16 @@ theorem Polynomial.Coefficients.multiply_commutative (r : Ring)
         : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (p * q), (q * p)) :=
   (k : Natural) ↦
       (p * q)[k]
-         = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[Natural.monus(k, i)]), k)
+         = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[k ∸ i]), k)
                by Polynomial.nth_multiply
-         = Ring.Sum(r, (i : Natural) ↦ (p[Natural.monus(k, i)] * q[Natural.monus(k, Natural.monus(k, i))]), k)
+         = Ring.Sum(r, (i : Natural) ↦ (p[k ∸ i] * q[k ∸ (k ∸ i)]), k)
                by Ring.Sum.reverse
-         = Ring.Sum(r, (i : Natural) ↦ (q[i] * p[Natural.monus(k, i)]), k)
+         = Ring.Sum(r, (i : Natural) ↦ (q[i] * p[k ∸ i]), k)
                by ((i : Natural) (smaller : i ≤ k) ↦
-                      (p[Natural.monus(k, i)] * q[Natural.monus(k, Natural.monus(k, i))])
-                         = (p[Natural.monus(k, i)] * q[i])
-                         = (q[i] * p[Natural.monus(k, i)])
-                               by ringCommutative(p[Natural.monus(k, i)], q[i]))
+                      (p[k ∸ i] * q[k ∸ (k ∸ i)])
+                         = (p[k ∸ i] * q[i])
+                         = (q[i] * p[k ∸ i])
+                               by ringCommutative(p[k ∸ i], q[i]))
          = (q * p)[k]
                by Polynomial.nth_multiply
 
