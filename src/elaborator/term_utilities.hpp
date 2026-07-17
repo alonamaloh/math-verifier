@@ -49,6 +49,12 @@ struct LocalBinder {
     // a measured 120× blowup on proof-heavy calc blocks. The auto-prover's
     // closed-term matchers still see `value` via the LocalBinder itself.
     bool valueIsProof = false;
+    // Transparent alias (the quotient descent's scrutinee re-binding, R1):
+    // elaborateIdentifier INLINES `value` at every use instead of emitting
+    // a BoundVariable, so the binder is never referenced and downstream
+    // matchers see the canonical spelling. The binder still occupies its
+    // slot (de Bruijn arithmetic) and is realised as a dead `let`.
+    bool inlineAlias = false;
 };
 
 // Returns the FreeVariable name used when opening / closing the binder

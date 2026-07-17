@@ -494,16 +494,32 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         if (targetFunction.empty()) {
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' is not supported for "
-                "operand type '" + operandTypeName + "' (line "
-                + std::to_string(line)
-                + "); supported: +, *, ≤, <, ∣ on Natural; +, *, - on "
-                "Integer; ∧, ∨ on Proposition");
+                "operand type '" + operandTypeName
+                + "'; supported: +, *, ≤, <, ∣ on Natural; +, *, - on "
+                "Integer; ∧, ∨ on Proposition",
+                line, 0);
         }
         if (environment_.lookup(targetFunction) == nullptr) {
-            throw ElaborateError(
-                "operator '" + operatorSymbol + "' resolves to '"
-                + targetFunction + "' but that function is not in scope "
-                "(line " + std::to_string(line) + ")");
+            std::string message =
+                "operator '" + operatorSymbol + "' at operand type '"
+                + operandTypeName + "' resolves to '" + targetFunction
+                + "' but that function is not in scope";
+            if (wrapLeftInSuccessor) {
+                // The baffling special case: `<` at Natural is
+                // implemented as `successor(a) ≤ b`, so the missing
+                // function is the ≤ it desugars to. Say so — and flag
+                // the usual real cause, a numeral left operand typed
+                // bottom-up as Natural beside a wider right operand.
+                message +=
+                    "\n  (`a < b` at Natural desugars to `successor(a) ≤ b`,"
+                    " so `<` needs Natural's `≤` — import Natural.order)."
+                    "\n  If the other operand is a wider type (Integer/"
+                    "Rational/Real), the mismatch usually means a bare"
+                    " numeral on the LEFT was typed as Natural: ascribe it"
+                    " (`(0 : Real) < x`) or flip the comparison"
+                    " (`x > 0`).";
+            }
+            throw ElaborateError(message, line, 0);
         }
         if (wrapLeftInSuccessor) {
             if (environment_.lookup("successor") == nullptr) {

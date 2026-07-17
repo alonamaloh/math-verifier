@@ -21,6 +21,19 @@ ExpressionPointer Elaborator::elaborateIdentifier(
                         + "' cannot take universe arguments (line "
                         + std::to_string(line) + ")");
                 }
+                // A transparent alias binder (the quotient descent's
+                // scrutinee re-binding, R1) INLINES its value at every
+                // use: the elaborated term is byte-identical to writing
+                // the value's spelling by hand, so every downstream
+                // matcher — auto-prover context scans, lemma index,
+                // citation unification — sees the canonical form with no
+                // ζ-bridging required. The value is expressed over the
+                // binders below the alias; lift it into the use scope.
+                if (localBinders[i].inlineAlias && localBinders[i].value) {
+                    return liftBoundVariables(
+                        localBinders[i].value,
+                        static_cast<int>(localBinders.size()) - i, 0);
+                }
                 return makeBoundVariable(deBruijnIndex);
             }
         }

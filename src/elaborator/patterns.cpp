@@ -1183,6 +1183,61 @@ ExpressionPointer Elaborator::buildCaseLambda(
             bodyStack.push_back({binder.name, binder.type});
         }
 
+        // R1 (PLAN_READABILITY_ERGONOMICS): the quotient descent's
+        // scrutinee alias for the DESTRUCTURE form. elaborateQuotientCases
+        // parked the class_of prefix; the arm goal here is spelled at the
+        // constructor-applied representative, so the alias value is that
+        // same application wrapped in class_of — built now that the
+        // pattern binders exist. Injected as a transparent inline alias
+        // (never referenced as a BoundVariable) plus a dead `let` for the
+        // binder slot. One-shot: consumed on entry regardless of shape.
+        bool scrutineeAliasInjected = false;
+        ExpressionPointer scrutineeAliasValue;
+        ExpressionPointer scrutineeAliasType;
+        std::string scrutineeAliasName;
+        if (pendingScrutineeAlias_.active) {
+            pendingScrutineeAlias_.active = false;
+            if (matchedCase->patterns.size() == 1) {
+                int totalBinderDepth =
+                    static_cast<int>(lambdaBinders.size());
+                ExpressionPointer constructorApplication =
+                    makeConstant(spellPublicly
+                                     ? publicConstructorSpelling(
+                                           constructorName)
+                                     : constructorName,
+                                 inductiveUniverseArguments);
+                for (const auto& parameterValue : parameterValues) {
+                    constructorApplication = makeApplication(
+                        constructorApplication,
+                        shift(parameterValue, totalBinderDepth));
+                }
+                for (size_t i = 0;
+                     i < destructuredArgumentPositions.size(); ++i) {
+                    int deBruijnIndex = totalBinderDepth - 1
+                        - static_cast<int>(
+                            destructuredArgumentPositions[i]);
+                    constructorApplication = makeApplication(
+                        constructorApplication,
+                        makeBoundVariable(deBruijnIndex));
+                }
+                scrutineeAliasName = pendingScrutineeAlias_.name;
+                scrutineeAliasValue = makeApplication(
+                    shift(pendingScrutineeAlias_.classOfPrefix,
+                          totalBinderDepth),
+                    std::move(constructorApplication));
+                scrutineeAliasType = shift(
+                    pendingScrutineeAlias_.quotientType, totalBinderDepth);
+                LocalBinder aliasBinder{scrutineeAliasName,
+                                        scrutineeAliasType,
+                                        scrutineeAliasValue,
+                                        /*valueIsProof=*/false};
+                aliasBinder.inlineAlias = true;
+                bodyStack.push_back(std::move(aliasBinder));
+                expectedBodyType = shift(expectedBodyType, 1);
+                scrutineeAliasInjected = true;
+            }
+        }
+
         // If any non-scrutinee position has a constructor pattern,
         // `buildBodyForCase` emits a chain of inner recursor calls
         // whose motives properly abstract later-bound dependent args.
@@ -1234,6 +1289,13 @@ ExpressionPointer Elaborator::buildCaseLambda(
             }
             TypeError reraised = kernelError;
             rethrowKernelError(reraised);
+        }
+
+        // Realise the R1 scrutinee alias as a (dead — every use was
+        // inlined) `let` so the binder slot stays well-scoped.
+        if (scrutineeAliasInjected) {
+            bodyKernel = makeLet(scrutineeAliasName, scrutineeAliasType,
+                                 scrutineeAliasValue, bodyKernel);
         }
 
         // Wrap in lambdas in reverse order.

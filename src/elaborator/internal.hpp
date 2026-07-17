@@ -6123,6 +6123,25 @@ private:
     bool autoProveBudgetActive_ = false;
     bool autoProveBudgetTripped_ = false;
 
+    // R1 (PLAN_READABILITY_ERGONOMICS): the quotient descent's scrutinee
+    // re-binding, for the DESTRUCTURE form (`by_representatives x as
+    // ⟨seq, c⟩`). The synthesized inner cases instantiates the arm goal at
+    // the constructor-applied representative (`make(seq, c)`), so the
+    // alias value must be spelled there too — elaborateQuotientCases can't
+    // build it (the destructured binders don't exist yet), so it parks the
+    // pieces here and buildCaseLambda injects the alias after the pattern
+    // binders are in scope. One-shot: consumed (deactivated) at the first
+    // buildCaseLambda entry; cleared by RAII in elaborateQuotientCases if
+    // elaboration throws before consumption.
+    struct PendingScrutineeAlias {
+        std::string name;                 // the scrutinee's own name
+        ExpressionPointer classOfPrefix;  // Quotient.class_of(T, R), scoped
+                                          // to the inner cases' outer stack
+        ExpressionPointer quotientType;   // same scope
+        bool active = false;
+    };
+    PendingScrutineeAlias pendingScrutineeAlias_;
+
     // Premises whose FULL-budget discharge retry (the capped-probe-tripped
     // ladder in citation premise discharge) already failed during the
     // current top-level declaration, keyed by the opened premise's spine

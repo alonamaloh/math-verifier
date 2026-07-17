@@ -1526,3 +1526,36 @@ under binders — HOU territory). Readable fallback: a two-step chain exposing
 the defeq-intermediate (`apply(extend(sigma), top) = extendMap(sigma, top) =
 top by extendMap_top`). A bounded one-δ/ι-step-at-a-time retry (unfold, match,
 repeat ≤4) would likely catch these without the overshoot.
+
+## 2026-07-16 (night) — R1 descent-alias session findings
+
+**LANDED — `by_representatives` keeps the scrutinee's name (R1).** Inside a
+descent arm, `x` now denotes the descended class: a transparent alias that
+INLINES to the arm's canonical spelling (`class_of(rep)` for bare patterns,
+`class_of(make(seq, c))` under a destructure — threaded to the inner arm via
+pendingScrutineeAlias_). Elaborated terms are byte-identical to the
+hand-spelled form, so no matcher changes were needed. density.math's six
+class respellings are now `x`.
+
+**GAP (medium) — statement-level `≠ 0` elaborates its numeral as the cast
+tower.** `Real.nonzero_of_positive : … : x ≠ 0` stores
+`Not (x = to_real(to_rational(to_integer 0)))` — structurally unequal to a
+claim's `Real.zero`, so the automatic lemma is invisible to the shape scan
+and citation matcher alike (`x ≠ 0` claims fail where `¬(0 = x)` closes).
+Fix direction: extend the numeral canon / carrier-identity shortcut to
+operator operand positions so statement `0`s elaborate at the carrier
+identity. Same root as the `(1 : Real)` positional caveat.
+
+**MESSAGE (small) — citation head report says `False` for a `Not` lemma.**
+Citing `nonzero_of_positive` at a `Not(...)` goal reports "its conclusion is
+about `False` but the goal is about `Not`" — the lemma side was WHNF'd
+(Not → …→False) but the goal side kept `Not`. Compare like with like.
+
+**FIXED — `<`-at-Natural resolution error.** "operator '<' resolves to
+'LessOrEqual' but that function is not in scope" now (a) carries line info
+structurally (header no longer 1:1), (b) explains the `successor(a) ≤ b`
+desugaring, and (c) points at the usual real cause: a bare numeral LEFT
+operand typed bottom-up as Natural beside a wider right operand (fix: flip
+to `x > 0` or ascribe). The remaining structural gap — the coercion-join
+should lift the numeral to the other operand's carrier — is F1-family
+(left operands are typed bottom-up).

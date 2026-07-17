@@ -419,6 +419,43 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
         ExpressionPointer bodyExpectedType =
             makeApplication(motiveInner, mkAppliedToRep);
 
+        // R1 (PLAN_READABILITY_ERGONOMICS): keep the scrutinee's own name
+        // addressable inside the arm. The descent proves the goal at
+        // `Quotient.class_of(rep)` for an ARBITRARY representative, so the
+        // outer binder named `x` can no longer contribute — but the
+        // mathematician keeps writing "x" for the class just descended
+        // into ("write x = [s]"). Shadow the scrutinee's name with a
+        // transparent alias for the class: elaborateIdentifier INLINES the
+        // alias at every use, so the elaborated term is byte-identical to
+        // writing the class spelling by hand and every downstream matcher
+        // sees the canonical form. Gated on the body actually mentioning
+        // the name, so arms that never say `x` elaborate exactly as before.
+        //
+        // Two shapes: with a BARE pattern the goal is spelled at
+        // `class_of(rep)`, so the alias binds here; with a DESTRUCTURE
+        // pattern the synthesized inner cases re-spells the goal at the
+        // constructor-applied representative (`class_of(make(seq, c))`),
+        // so the alias value must be built INSIDE that arm — park the
+        // pieces for buildCaseLambda to inject (pendingScrutineeAlias_).
+        const std::string& scrutineeName =
+            localBinders[localBinders.size() - 1 - scrutineeDeBruijn].name;
+        bool aliasScrutinee =
+            !scrutineeName.empty() && scrutineeName[0] != '_'
+            && scrutineeName != representativeName
+            && surfaceMentionsName(*clause.body, scrutineeName);
+        ExpressionPointer quotientTypeInner;
+        bool aliasBoundHere = false;
+        if (aliasScrutinee && !innerDestructurePattern) {
+            quotientTypeInner = shift(scrutineeType, 1);
+            LocalBinder aliasBinder{scrutineeName, quotientTypeInner,
+                                    mkAppliedToRep,
+                                    /*valueIsProof=*/false};
+            aliasBinder.inlineAlias = true;
+            innerBinders.push_back(std::move(aliasBinder));
+            bodyExpectedType = shift(bodyExpectedType, 1);
+            aliasBoundHere = true;
+        }
+
         // If the user supplied a destructure pattern on the rep,
         // synthesize a `cases <fresh_rep> { | <inner_pattern> => <body> }`
         // wrap before elaborating; otherwise elaborate the body directly.
@@ -440,6 +477,29 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
                 clause.line, clause.column);
         }
 
+        // For the destructure form, park the alias pieces for
+        // buildCaseLambda (scoped to the inner cases' outer stack, which
+        // is exactly `innerBinders` = [..., rep]). RAII-cleared so a
+        // throw before consumption can't leak into an unrelated cases.
+        struct PendingAliasGuard {
+            Elaborator& elaborator;
+            ~PendingAliasGuard() {
+                elaborator.pendingScrutineeAlias_.active = false;
+            }
+        } pendingAliasGuard{*this};
+        if (aliasScrutinee && innerDestructurePattern) {
+            pendingScrutineeAlias_.name = scrutineeName;
+            pendingScrutineeAlias_.classOfPrefix =
+                makeApplication(
+                    makeApplication(
+                        makeConstant("Quotient.class_of",
+                                     {quotientUniverse}),
+                        carrierTypeInner),
+                    relationInner);
+            pendingScrutineeAlias_.quotientType = shift(scrutineeType, 1);
+            pendingScrutineeAlias_.active = true;
+        }
+
         // Elaborate the body in the extended local context.
         ExpressionPointer bodyKernel =
             elaborateExpression(*bodySurface, innerBinders,
@@ -458,6 +518,14 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
         bodyKernel = coerceToExpectedTypeViaDiff(
             innerBinders, bodyKernel,
             weakHeadNormalForm(environment_, bodyExpectedType));
+
+        // Realise the R1 alias binder as a (dead — every use was inlined)
+        // kernel `let` so the binder slot stays well-scoped under the
+        // case lambda.
+        if (aliasBoundHere) {
+            bodyKernel = makeLet(scrutineeName, quotientTypeInner,
+                                 mkAppliedToRep, bodyKernel);
+        }
 
         // Wrap the body in the representative-case lambda.
         ExpressionPointer representativeCaseLambda = makeLambda(
