@@ -204,7 +204,13 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # 2026-07-17: 272 → 274. LA wave 3: basis_pruning polished (154 findings,
 # 4 documented false-positive reverts) and MANIFEST-ADDED at two counted
 # leaks (both structural: the injective-appeal symmetrization blocks).
-CLEAN_LEAK_BUDGET ?= 274
+# 2026-07-17: 274 → 297. LA wave 3 complete: rank_nullity (2159 lines,
+# the library's largest file) polished (290 findings, zero reverts) and
+# MANIFEST-ADDED at 23 counted leaks — all hypothesis applications whose
+# arguments are the content (independent/eIndependent/selectionInjective
+# data instantiations) plus named-arg skipValue_bound sites at
+# un-inferable slots; the det/perm-documented structural class.
+CLEAN_LEAK_BUDGET ?= 297
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
