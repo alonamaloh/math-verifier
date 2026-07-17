@@ -458,6 +458,21 @@ void Elaborator::elaborateOperatorDeclaration(
                              : "' first parameter type does not have '")
                 + declaration.leftTypeName + "' as its head");
         }
+        // An application registration — `operator (()) on (T) := F` —
+        // additionally requires F to yield a function once the wrapped
+        // value is supplied: `T → (A → B)`. That codomain is what a call
+        // `value(argument)` unwraps to.
+        if (declaration.operatorSymbol == "()") {
+            ExpressionPointer afterLeft = weakHeadNormalForm(
+                environment_, leftPi->codomain);
+            if (!std::holds_alternative<Pi>(afterLeft->node)) {
+                throwElaborate(
+                    "application dispatch function '"
+                    + declaration.functionName
+                    + "' must return a function (its type should be "
+                    + declaration.leftTypeName + " → (A → B))");
+            }
+        }
         if (!isPostfix) {
             ExpressionPointer afterLeft = weakHeadNormalForm(
                 environment_, leftPi->codomain);

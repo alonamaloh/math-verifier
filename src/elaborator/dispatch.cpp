@@ -1400,6 +1400,43 @@ ExpressionPointer Elaborator::elaborateExpression(
             } catch (...) {
                 headType = nullptr;
             }
+            // Application convention: the function position holds a VALUE
+            // whose (non-function) type has a registered application
+            // operator (`operator (()) on (T) := <unwrapper>`) — `rep(n)`
+            // with `rep : CauchyRationalSequence`, `sigma(i)` with
+            // `sigma : Permutation(m)`. Rewrite to the registered unwrapper
+            // call and re-elaborate the surface form, so the unwrapper's
+            // own implicit inference and argument coercions apply exactly
+            // as if the user had spelled it out.
+            if (headType && !std::holds_alternative<Pi>(headType->node)) {
+                ExpressionPointer typeHead = headType;
+                while (auto* typeApplication =
+                           std::get_if<Application>(&typeHead->node)) {
+                    typeHead = typeApplication->function;
+                }
+                if (auto* typeConstant =
+                        std::get_if<Constant>(&typeHead->node)) {
+                    std::string unwrapperName = environment_.lookupOperator(
+                        "()", typeConstant->name, "");
+                    if (!unwrapperName.empty()) {
+                        std::vector<SurfaceExpressionPointer>
+                            unwrapperArguments;
+                        unwrapperArguments.push_back(application->function);
+                        for (const auto& argument : positionalArguments) {
+                            unwrapperArguments.push_back(argument);
+                        }
+                        SurfaceExpressionPointer unwrapperCall =
+                            makeSurfaceApplication(
+                                makeSurfaceIdentifier(
+                                    unwrapperName, {},
+                                    expression.line, expression.column),
+                                std::move(unwrapperArguments),
+                                expression.line, expression.column);
+                        return elaborateExpression(
+                            *unwrapperCall, localBinders, expectedType);
+                    }
+                }
+            }
             for (const auto& argument : positionalArguments) {
                 ExpressionPointer argumentExpectedType;
                 if (headType) {

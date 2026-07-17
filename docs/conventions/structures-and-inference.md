@@ -134,6 +134,20 @@ type — the implicit-recovery mechanism pinned by
   the dispatch function `F` (`{p}` not `(p)`), so `F` is callable as
   `F(a, b)`; the `convention`-prepended `{p}`/`{primality}` satisfy this.
 
+### Application: `operator (()) on (T) := F`
+
+A value that *wraps* a function can be registered to apply directly:
+`operator (()) on (CauchyRationalSequence) := CauchyRationalSequence.sequenceFunction`
+lets a proof write `rep(n)` for the n-th term of the packaged sequence,
+and `operator (()) on (Permutation) := Permutation.apply` lets it write
+`sigma(i)` (and `(rep_x * rep_y)(n)`, `sigma(sigma(i))`, …). Elaborating
+`f(a)` where `f`'s type is a non-function whose head has a registered
+`()` dispatches to `F(f, a)` — the emitted term is byte-identical to the
+spelled-out call, so citations, matchers, and defeq are unaffected. `F`
+must take the wrapped value as its first explicit argument and return a
+function (`T → (A → B)`); implicit indices (`Permutation.apply`'s `{n}`)
+are recovered from the value's type as with any operator.
+
 ## Citing a lemma by name — let the arguments be inferred
 
 A lemma cited as `by <Lemma>` (no argument list) has its arguments filled

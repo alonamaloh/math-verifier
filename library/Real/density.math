@@ -64,24 +64,15 @@ theorem Real.exists_positive_rational_below
               };
         ∃ (lowerBound : Rational).
             Rational.zero < lowerBound ∧ ∃ (signIndex : Natural).
-                (∀ (m : Natural). signIndex ≤ m
-                    → lowerBound
-                      ≤ CauchyRationalSequence.sequenceFunction(
-                            CauchyRationalSequence.make(seq, seqCauchy), m))
-                ∨ ∀ (m : Natural). signIndex ≤ m
-                    → CauchyRationalSequence.sequenceFunction(
-                          CauchyRationalSequence.make(seq, seqCauchy), m)
-                        ≤ -lowerBound
+                (∀ (m : Natural). signIndex ≤ m → lowerBound ≤ seq(m))
+                ∨ ∀ (m : Natural). signIndex ≤ m → seq(m) ≤ -lowerBound
           by Real.cauchy_sign_eventually as signEventually;
         choose lowerBound, signIndex from signEventually;
         Rational.zero < lowerBound;
         done by cases {
           -- seq(m) ≥ lowerBound past signIndex: then (lowerBound : ℝ)
           -- ≤ x, and halve(lowerBound) is the rational we want.
-          case (∀ (m : Natural). signIndex ≤ m
-                → lowerBound
-                  ≤ CauchyRationalSequence.sequenceFunction(
-                        CauchyRationalSequence.make(seq, seqCauchy), m))
+          case (∀ (m : Natural). signIndex ≤ m → lowerBound ≤ seq(m))
               as positiveTail: {
               (lowerBound : Real) ≤ x
                   by unfold Real.IsNonneg in
@@ -90,8 +81,7 @@ theorem Real.exists_positive_rational_below
                        witness signIndex with
                            (m : Natural)
                            (mPastSignIndex : signIndex ≤ m) ↦ {
-                             lowerBound ≤ seq(m)
-                                 by positiveTail(m, mPastSignIndex);
+                             lowerBound ≤ seq(m);
                              -ε
                                 < Rational.zero
                                 ≤ seq(m) - lowerBound
@@ -107,10 +97,7 @@ theorem Real.exists_positive_rational_below
             }
           -- seq(m) ≤ -lowerBound past signIndex: then x ≤ (−lowerBound
           -- : ℝ) < 0, contradicting 0 < x.
-          case (∀ (m : Natural). signIndex ≤ m
-                → CauchyRationalSequence.sequenceFunction(
-                      CauchyRationalSequence.make(seq, seqCauchy), m)
-                    ≤ -lowerBound)
+          case (∀ (m : Natural). signIndex ≤ m → seq(m) ≤ -lowerBound)
               as negativeTail: {
               x ≤ (-lowerBound : Real)
                   by unfold Real.IsNonneg in
@@ -119,8 +106,7 @@ theorem Real.exists_positive_rational_below
                        witness signIndex with
                            (m : Natural)
                            (mPastSignIndex : signIndex ≤ m) ↦ {
-                             seq(m) ≤ -lowerBound
-                                 by negativeTail(m, mPastSignIndex);
+                             seq(m) ≤ -lowerBound;
                              -ε
                                 < Rational.zero
                                 ≤ -lowerBound - seq(m)

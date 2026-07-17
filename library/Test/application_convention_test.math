@@ -1,0 +1,61 @@
+-- Application convention: a value wrapping a function can be applied
+-- directly — `rep(n)` elaborates as
+-- `CauchyRationalSequence.sequenceFunction(rep, n)` and `sigma(i)` as
+-- `Permutation.apply(sigma, i)`. The rewrite fires when the function
+-- position holds a value whose (non-function) type head has a
+-- registered unwrapper; the emitted term is byte-identical to the
+-- spelled-out call, so citations and matchers are unaffected.
+
+module Test.application_convention_test
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Rational.basics
+import Rational.multiplication
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Set.finite
+import Algebra.finite_permutation
+
+-- A bare parameter of wrapper type applies directly.
+theorem parameter_applies (rep : CauchyRationalSequence) (n : Natural)
+        : rep(n) = CauchyRationalSequence.sequenceFunction(rep, n) :=
+  reflexivity(Rational, rep(n))
+
+-- The unwrapped spelling is definitionally the underlying function.
+theorem compound_head_applies
+        (s : Rational.sequence.Sequence)
+        (sCauchy : Rational.sequence.IsCauchy(s))
+        (n : Natural)
+        : CauchyRationalSequence.make(s, sCauchy)(n) = s(n) :=
+  reflexivity(Rational, s(n))
+
+-- An unwrapper with an implicit argument (`Permutation.apply {n}`)
+-- still infers it from the applied value's type.
+theorem permutation_applies {n : Natural} (sigma : Permutation(n)) (i : NaturalsBelow(n))
+        : sigma(i) = Permutation.apply(sigma, i) :=
+  reflexivity(NaturalsBelow(n), sigma(i))
+
+-- Nested: the result of one convention application feeds another.
+theorem nested_application {n : Natural} (sigma : Permutation(n)) (i : NaturalsBelow(n))
+        : sigma(sigma(i)) = Permutation.apply(sigma, Permutation.apply(sigma, i)) :=
+  reflexivity(NaturalsBelow(n), sigma(sigma(i)))
+
+-- A parenthesized operator result applies directly: the pointwise
+-- product of representatives evaluated at an index.
+theorem operator_result_applies (a b : CauchyRationalSequence) (n : Natural)
+        : (a * b)(n) = a(n) * b(n) :=
+  reflexivity(Rational, (a * b)(n))
+
+-- The convention form works inside a cited statement: the identity
+-- permutation fixes every index.
+theorem convention_in_statement {n : Natural} (i : NaturalsBelow(n))
+        : Permutation.identity(n)(i) = i :=
+  Permutation.apply_identity(n, i)

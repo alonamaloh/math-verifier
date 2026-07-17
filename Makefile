@@ -195,7 +195,10 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # uniqueness DATA of `Logic.the` — the established `Real.reciprocal`
 # definite-description idiom (Real/field.math carries the same two
 # tokens inside the budget).
-CLEAN_LEAK_BUDGET ?= 276
+# 2026-07-16: 276 → 271. R3 application convention (`rep(n)` for wrapped
+# functions) removed the `sequenceFunction` walls from Real/algebra.math,
+# and Real/density.math's ∃-statement now speaks `seq(m)` directly.
+CLEAN_LEAK_BUDGET ?= 271
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the

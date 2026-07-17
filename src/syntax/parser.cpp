@@ -774,7 +774,17 @@ private:
             throwHere("expected an operator symbol like '+', '*', "
                       "'-', '≤', '<', '∣' inside the parentheses");
         }
-        declaration.operatorSymbol = consumeAny().lexeme;
+        // `operator (()) on (T) := F` registers APPLICATION on T: a value
+        // of type T used in function position dispatches to F (the
+        // unwrapper), so `rep(n)` reads as F(rep, n). Lexes as two tokens.
+        if (peek().kind == TokenKind::LeftParen
+            && peekAt(1).kind == TokenKind::RightParen) {
+            consumeAny();
+            consumeAny();
+            declaration.operatorSymbol = "()";
+        } else {
+            declaration.operatorSymbol = consumeAny().lexeme;
+        }
         expect(TokenKind::RightParen,
                "expected ')' after operator symbol");
         expect(TokenKind::KeywordOn,
