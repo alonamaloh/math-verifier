@@ -197,7 +197,41 @@ to one pipeline:
 3. ✅ **Re-green** — trivial, as predicted; nothing depended on the shadowed
    scalar path.
 4. **Library cast sweep** — delete the now-redundant explicit casts across
-   the analysis cone (the payoff). NOT STARTED.
+   the analysis cone (the payoff). IN PROGRESS — reframed by the B5
+   tier3-cast measurement (2026-07-17), see "Tier3-cast absorption
+   phase" below.
+
+## Tier3-cast absorption phase (2026-07-17, owner-approved)
+
+B5 classified 408 hinted sites as tier3-cast (largest absorbable
+bucket). Clustering: ~110 sites are the analysis cone's
+division/reciprocal dances (Real.exponential 32, ℂ exponential/trig
+~64); the number-theory cone (GaussianInteger/IntegerMod, `divides`
+congruences, `Integer.sign_split`) is a different mechanism family,
+deferred.
+
+**Root cause found (6f46f407):** rewriting under `/` is structurally
+impossible by transport — the divide proof argument's TYPE mentions
+the denominator, so any motive abstracting the denominator is
+ill-typed. Every analysis file worked around it with
+multiply-through-and-cancel dances. Fix was library-level:
+`Real.reciprocal_proof_irrelevant`, `Real.divide_proof_irrelevant`,
+`Real.reciprocal_congruence`, `Real.divide_denominator_congruence`
+(+ ℚ twin), all automatic. A by-less calc step now rewrites a
+denominator (congruence cited goal-driven, `b = c` premise from the
+context equation), and the field seat finishes reciprocal-of-product
+splits with in-term nonzero proofs. Validated: the four reciprocal
+dances in Real/exponential.math collapsed to two-line natural
+spellings (−58 lines).
+
+Remaining in this phase:
+- sweep the same dance pattern through the ℂ exponential/trig cone
+  and the remaining Real files;
+- the power-congruence budget blowup (AM-GM :144 shape:
+  `(x+x)^n·P = (2·x)^n·P` exhausts the prover budget instead of
+  trying the cheap diff-congruence + ring route first) — the
+  cost-gated-ring backlog item, elaborator-side;
+- reassess the number-theory `divides` family separately.
 
 The pipeline is now unified: **join inserts → elaboration normalizes to
 leaf-cast form → ring reads coerced literals as coefficients.** The four
