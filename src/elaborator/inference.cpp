@@ -867,6 +867,37 @@ bool Elaborator::typeIsProposition(const Context& context,
         }
     }
 
+bool Elaborator::factIsUniversalOverData(
+        const Context& openedContext,
+        const ExpressionPointer& factTypeOpened) {
+        ExpressionPointer cursor;
+        try {
+            cursor = weakHeadNormalForm(environment_, factTypeOpened);
+        } catch (...) {
+            return false;
+        }
+        Context extended = openedContext;
+        int dataBinderCount = 0;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            if (typeIsProposition(extended, pi->domain)) break;
+            std::string fresh =
+                "_forall_fact_" + std::to_string(dataBinderCount);
+            extended.push_back({fresh, pi->domain,
+                                FreeVariableOrigin::Internal, nullptr});
+            try {
+                cursor = weakHeadNormalForm(
+                    environment_,
+                    openBinder(pi->codomain, fresh,
+                               FreeVariableOrigin::Internal));
+            } catch (...) {
+                return false;
+            }
+            ++dataBinderCount;
+        }
+        if (dataBinderCount == 0) return false;
+        return typeIsProposition(extended, cursor);
+    }
+
 bool Elaborator::termIsProposition(
         const std::vector<LocalBinder>& localBinders,
         const ExpressionPointer& term) {
@@ -2184,6 +2215,43 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                             {leafIndex, N, fact.source});
                         found = true;
                         break;
+                    }
+                }
+                // ∀-fact instantiation: a hypothesis `∀ (x : T). P(x)`
+                // (data binders, Proposition body) discharges the slot
+                // `P(t)` when matching the body pins every binder — the
+                // instantiation is forced by the match, so no search is
+                // involved (the `termsNonneg : ∀ j. 0 ≤ s(j)` premise
+                // gap). Runs after the direct scan so an exact
+                // hypothesis still wins.
+                if (!found) {
+                    for (const ContextFact& fact : localFacts) {
+                        ExpressionPointer candidateOpened;
+                        try {
+                            candidateOpened = openOverLocalBinders(
+                                fact.type, localBinders, N);
+                        } catch (const TypeError&) {
+                            continue;
+                        }
+                        if (!factIsUniversalOverData(
+                                openedContext, candidateOpened)) {
+                            continue;
+                        }
+                        ExpressionPointer filled = nullptr;
+                        try {
+                            filled = autoFillHintForClaim(
+                                fact.proofTerm, fact.type, slotType,
+                                localBinders, line);
+                        } catch (const ElaborateError&) {
+                        } catch (const TypeError&) {
+                        }
+                        if (filled) {
+                            elaboratedArgs[i] = std::move(filled);
+                            lastDischarges_.push_back(
+                                {N - 1, N, fact.source + " (∀-instantiated)"});
+                            found = true;
+                            break;
+                        }
                     }
                 }
                 // Fallback: no direct hypothesis of this structure class, but

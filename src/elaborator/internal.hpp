@@ -4965,6 +4965,29 @@ private:
     bool typeIsProposition(const Context& context,
                             const ExpressionPointer& openedType);
 
+    // True when `factTypeOpened` (already opened over the binders that
+    // produced `openedContext`) is a universally-quantified fact — one or
+    // more leading Pi binders over DATA (non-Proposition) domains, ending
+    // in a Proposition body. This is the shape context-discharge may
+    // instantiate against a determined premise slot: the slot pins every
+    // binder by structural match, so no proof search is involved. The walk
+    // stops at the first Proposition-typed domain (an implication premise,
+    // including the hidden one inside `¬P`), which stays part of the body.
+    bool factIsUniversalOverData(const Context& openedContext,
+                                 const ExpressionPointer& factTypeOpened);
+
+    // ∀-fact instantiation for premise discharge: scan `facts` for a
+    // hypothesis `∀ (x : T). P(x)` (data binders, Proposition body —
+    // see factIsUniversalOverData) whose body matches `slotType` with
+    // every binder pinned, and return the applied proof term (closed
+    // form), or nullptr. The instantiation is forced by the match, so
+    // no proof search is involved.
+    ExpressionPointer tryInstantiateUniversalContextFact(
+        const ExpressionPointer& slotType,
+        const std::vector<LocalBinder>& localBinders,
+        const Context& openedContext,
+        const std::vector<ContextFact>& facts);
+
     // ---- `by (<fact>)`: cite a proposition where a proof is expected ----
     //
     // The user writes `by (P)` with `P` a proposition (a fact) rather than a

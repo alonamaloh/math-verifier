@@ -745,6 +745,55 @@ std::string spineHeadConstantName(ExpressionPointer expression) {
 }
 } // namespace
 
+ExpressionPointer Elaborator::tryInstantiateUniversalContextFact(
+        const ExpressionPointer& slotType,
+        const std::vector<LocalBinder>& localBinders,
+        const Context& openedContext,
+        const std::vector<ContextFact>& facts) {
+    // Head-prefiltered like the conjunction-leg premise pass; the
+    // data-binder gate keeps implications (whose own premises would
+    // need proof search) out of the pass.
+    std::string slotHead = spineHeadConstantName(slotType);
+    if (slotHead.empty()) return nullptr;
+    for (const ContextFact& fact : facts) {
+        if (!std::holds_alternative<Pi>(fact.type->node)) continue;
+        ExpressionPointer body = fact.type;
+        int forallCount = 0;
+        while (auto* forallPi = std::get_if<Pi>(&body->node)) {
+            body = forallPi->codomain;
+            ++forallCount;
+        }
+        if (spineHeadConstantName(body) != slotHead) continue;
+        ExpressionPointer candidateType;
+        try {
+            candidateType = openOverLocalBinders(
+                fact.type, localBinders, localBinders.size());
+        } catch (const TypeError&) {
+            continue;
+        }
+        if (!factIsUniversalOverData(openedContext, candidateType)) {
+            continue;
+        }
+        std::vector<ExpressionPointer> forallBindings(forallCount);
+        if (!matchAgainstPattern(body, slotType, forallCount,
+                                 forallBindings)) {
+            continue;
+        }
+        bool allPinned = true;
+        for (const auto& forallBinding : forallBindings) {
+            if (!forallBinding) { allPinned = false; break; }
+        }
+        if (!allPinned) continue;
+        ExpressionPointer instantiated = fact.proofTerm;
+        for (int b = forallCount - 1; b >= 0; --b) {
+            instantiated = makeApplication(
+                std::move(instantiated), forallBindings[b]);
+        }
+        return instantiated;
+    }
+    return nullptr;
+}
+
 ExpressionPointer Elaborator::trySignJudgmentRecursion(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -907,6 +956,20 @@ ExpressionPointer Elaborator::trySignJudgmentRecursionAtSpelling(
                             break;
                         }
                     }
+                }
+                // ∀-fact instantiation: a hypothesis `∀ (x : T). P(x)`
+                // (data binders, Proposition body) supplies the premise
+                // `P(t)` when matching the body pins every binder — the
+                // `termsNonneg : ∀ j. 0 ≤ s(j)` premise gap. The
+                // instantiation is forced by the match, so no search.
+                if (!proof) {
+                    if (!conjunctionLegFacts) {
+                        conjunctionLegFacts =
+                            collectLocalBinderFacts(localBinders);
+                    }
+                    proof = tryInstantiateUniversalContextFact(
+                        slotType, localBinders, openedContext,
+                        *conjunctionLegFacts);
                 }
             }
             if (!proof) {
@@ -1367,6 +1430,18 @@ ExpressionPointer Elaborator::tryMonotonicityRecursionAtSpelling(
                             break;
                         }
                     }
+                }
+                // ∀-fact instantiation — same pass as the sign
+                // recursion's: `∀ (x : T). P(x)` supplies `P(t)` when
+                // the match pins every binder (no search involved).
+                if (!proof) {
+                    if (!conjunctionLegFacts) {
+                        conjunctionLegFacts =
+                            collectLocalBinderFacts(localBinders);
+                    }
+                    proof = tryInstantiateUniversalContextFact(
+                        slotType, localBinders, openedContext,
+                        *conjunctionLegFacts);
                 }
             }
             if (!proof) {
