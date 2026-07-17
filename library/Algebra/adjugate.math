@@ -1,0 +1,572 @@
+-- Algebra/adjugate.math
+--
+-- The adjugate identity M·adj(M) = det(M)·I over any commutative ring,
+-- through basis-row surgery instead of minors: the cofactor C(i,j) is
+-- det(M with row i replaced by the standard basis row eⱼ) — the signs of
+-- the classical minor formulation are absorbed into the determinant.
+-- Row-replacement expansion (det is linear in a row, term by term of the
+-- Leibniz sum) gives det(M with row i := u) = Σⱼ u(j)·C(i,j); taking
+-- u := row i recovers det(M) (Laplace expansion along a row), taking
+-- u := row k ≠ i gives a matrix with two equal rows, whose determinant
+-- the alternating collapse kills. Those two facts are exactly the
+-- entries of M·adj(M).
+
+module Algebra.adjugate
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.remove
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.determinant
+import Algebra.alternating_collapse
+
+-- The standard basis row eⱼ and single-row replacement.
+definition Matrix.standardBasisRow (c : CommutativeRing) (n : ℕ) (j : NaturalsBelow(n))
+        : NaturalsBelow(n) → CommutativeRing.carrier(c) :=
+  (t : NaturalsBelow(n)) ↦
+      if t = j then CommutativeRing.one(c) else CommutativeRing.zero(c)
+
+theorem Matrix.standardBasisRow_at {n : ℕ} (c : CommutativeRing)
+        (j t : NaturalsBelow(n)) (equal : t = j)
+        : Matrix.standardBasisRow(c, n, j)(t) = CommutativeRing.one(c) :=
+  by Logic.if_positive
+
+theorem Matrix.standardBasisRow_off {n : ℕ} (c : CommutativeRing)
+        (j t : NaturalsBelow(n)) (notEqual : ¬(t = j))
+        : Matrix.standardBasisRow(c, n, j)(t) = CommutativeRing.zero(c) :=
+  by Logic.if_negative
+
+definition Matrix.updateRow {c : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(c, rows, columns)) (i : NaturalsBelow(rows))
+        (row : NaturalsBelow(columns) → CommutativeRing.carrier(c))
+        : Matrix(c, rows, columns) :=
+  (t : NaturalsBelow(rows)) ↦ (s : NaturalsBelow(columns)) ↦
+      if t = i then row(s) else M(t, s)
+
+theorem Matrix.updateRow_entry_at {c : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(c, rows, columns)) (i : NaturalsBelow(rows))
+        (row : NaturalsBelow(columns) → CommutativeRing.carrier(c))
+        (t : NaturalsBelow(rows)) (s : NaturalsBelow(columns)) (equal : t = i)
+        : Matrix.updateRow(M, i, row)(t, s) = row(s) :=
+  by Logic.if_positive
+
+theorem Matrix.updateRow_entry_off {c : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(c, rows, columns)) (i : NaturalsBelow(rows))
+        (row : NaturalsBelow(columns) → CommutativeRing.carrier(c))
+        (t : NaturalsBelow(rows)) (s : NaturalsBelow(columns)) (notEqual : ¬(t = i))
+        : Matrix.updateRow(M, i, row)(t, s) = M(t, s) :=
+  by Logic.if_negative
+
+-- Replacing a row by itself changes nothing.
+theorem Matrix.updateRow_same {c : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(c, rows, columns)) (i : NaturalsBelow(rows))
+        : Matrix.updateRow(M, i, M(i)) = M := {
+  ∀ (t : NaturalsBelow(rows)). ∀ (s : NaturalsBelow(columns)).
+      Matrix.updateRow(M, i, M(i))(t, s) = M(t, s)
+      by (t : NaturalsBelow(rows)) (s : NaturalsBelow(columns)) ↦ {
+          t = i ∨ ¬(t = i);
+          done by cases {
+            case t = i as onRow: {
+                Matrix.updateRow(M, i, M(i))(i, s) = M(i, s)
+                    by Matrix.updateRow_entry_at;
+                done
+              }
+            case ¬(t = i) as offRow: {
+                Matrix.updateRow(M, i, M(i))(t, s) = M(t, s)
+                    by Matrix.updateRow_entry_off;
+                done
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- The cofactor: det of M with row i replaced by the basis row eⱼ. The
+-- classical (−1)^{i+j}·minor sign lives inside this determinant.
+definition Matrix.cofactor {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (i j : NaturalsBelow(n)) : CommutativeRing.carrier(c) :=
+  Matrix.determinant(Matrix.updateRow(M, i, Matrix.standardBasisRow(c, n, j)))
+
+-- One Leibniz term of a row-replaced determinant: the replaced row
+-- contributes its σ(i) entry, the other rows contribute M's entries.
+theorem Matrix.updateRow_product_split {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (i : NaturalsBelow(n))
+        (row : NaturalsBelow(n) → CommutativeRing.carrier(c)) (sigma : Permutation(n))
+        : CommutativeRing.productOver(
+              (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+              NaturalsBelow.enumerate(n))
+          = row(sigma(i))
+            * CommutativeRing.productOver(
+                  (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                  NaturalsBelow.enumerate(n) ∖ i) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n))
+      by NaturalsBelow.enumerate_distinct;
+  i ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  CommutativeRing.productOver(
+        (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+        NaturalsBelow.enumerate(n))
+     = Matrix.updateRow(M, i, row)(i, sigma(i))
+       * CommutativeRing.productOver(
+             (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+             NaturalsBelow.enumerate(n) ∖ i)
+      by CommutativeRing.productOver_remove as removeSplit;
+  Matrix.updateRow(M, i, row)(i, sigma(i)) = row(sigma(i))
+      by Matrix.updateRow_entry_at as replacedEntry;
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) ∖ i
+      → Matrix.updateRow(M, i, row)(t, sigma(t)) = M(t, sigma(t))
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n) ∖ i) ↦ {
+          ¬(t = i) by List.remove_member_ne;
+          done by Matrix.updateRow_entry_off
+        };
+  CommutativeRing.productOver(
+        (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+        NaturalsBelow.enumerate(n) ∖ i)
+     = CommutativeRing.productOver(
+           (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+           NaturalsBelow.enumerate(n) ∖ i)
+      by CommutativeRing.productOver_congruence_on_members as untouchedRows;
+  CommutativeRing.productOver(
+        (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+        NaturalsBelow.enumerate(n))
+     = Matrix.updateRow(M, i, row)(i, sigma(i))
+       * CommutativeRing.productOver(
+             (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+             NaturalsBelow.enumerate(n) ∖ i)
+           by removeSplit
+     = row(sigma(i))
+       * CommutativeRing.productOver(
+             (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+             NaturalsBelow.enumerate(n) ∖ i)
+           by substituting replacedEntry
+     = row(sigma(i))
+       * CommutativeRing.productOver(
+             (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+             NaturalsBelow.enumerate(n) ∖ i)
+           by substituting untouchedRows
+}
+
+-- The Leibniz form of a row-replaced determinant: the replaced row's
+-- entry factors out of every permutation term.
+theorem Matrix.determinant_updateRow_leibniz {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (i : NaturalsBelow(n))
+        (row : NaturalsBelow(n) → CommutativeRing.carrier(c))
+        : Matrix.determinant(Matrix.updateRow(M, i, row))
+          = CommutativeRing.sumOver(
+                (sigma : Permutation(n)) ↦
+                    row(sigma(i))
+                        * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                              * CommutativeRing.productOver(
+                                    (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                    NaturalsBelow.enumerate(n) ∖ i)),
+                Permutation.allPermutations(n)) :=
+  Matrix.determinant(Matrix.updateRow(M, i, row))
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                   * CommutativeRing.productOver(
+                         (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+         by Matrix.determinant_expansion
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               row(sigma(i))
+                   * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                         * CommutativeRing.productOver(
+                               (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                               NaturalsBelow.enumerate(n) ∖ i)),
+           Permutation.allPermutations(n))
+         by CommutativeRing.sumOver_congruence(
+                pointwise := (sigma : Permutation(n)) ↦ {
+                    CommutativeRing.productOver(
+                          (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+                          NaturalsBelow.enumerate(n))
+                       = row(sigma(i))
+                         * CommutativeRing.productOver(
+                               (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                               NaturalsBelow.enumerate(n) ∖ i)
+                        by Matrix.updateRow_product_split as termSplit;
+                    CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                          * CommutativeRing.productOver(
+                                (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, row)(t, sigma(t)),
+                                NaturalsBelow.enumerate(n))
+                       = CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                             * (row(sigma(i))
+                                   * CommutativeRing.productOver(
+                                         (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                         NaturalsBelow.enumerate(n) ∖ i))
+                             by substituting termSplit
+                       = row(sigma(i))
+                             * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                   * CommutativeRing.productOver(
+                                         (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                         NaturalsBelow.enumerate(n) ∖ i))
+                             by ring;
+                    done
+                  })
+
+-- Row-replacement expansion: det(M with row i := u) = Σⱼ u(j)·C(i,j).
+-- Both sides meet at Σ_σ u(σ(i))·(sign(σ)·∏_{t≠i} M(t,σ(t))).
+theorem Matrix.determinant_updateRow_expansion {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (i : NaturalsBelow(n))
+        (row : NaturalsBelow(n) → CommutativeRing.carrier(c))
+        : Matrix.determinant(Matrix.updateRow(M, i, row))
+          = CommutativeRing.sumOver(
+                (j : NaturalsBelow(n)) ↦ row(j) * Matrix.cofactor(M, i, j),
+                NaturalsBelow.enumerate(n)) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n))
+      by NaturalsBelow.enumerate_distinct;
+  ∀ (j : NaturalsBelow(n)).
+      Matrix.cofactor(M, i, j)
+      = CommutativeRing.sumOver(
+            (sigma : Permutation(n)) ↦
+                Matrix.standardBasisRow(c, n, j)(sigma(i))
+                    * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                          * CommutativeRing.productOver(
+                                (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                NaturalsBelow.enumerate(n) ∖ i)),
+            Permutation.allPermutations(n))
+      by (j : NaturalsBelow(n)) ↦
+          { done by Matrix.determinant_updateRow_leibniz }
+      as basisExpansion;
+  CommutativeRing.sumOver(
+        (j : NaturalsBelow(n)) ↦ row(j) * Matrix.cofactor(M, i, j),
+        NaturalsBelow.enumerate(n))
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(n)) ↦
+               CommutativeRing.sumOver(
+                   (sigma : Permutation(n)) ↦
+                       row(j)
+                           * (Matrix.standardBasisRow(c, n, j)(sigma(i))
+                                 * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                       * CommutativeRing.productOver(
+                                             (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                             NaturalsBelow.enumerate(n) ∖ i))),
+                   Permutation.allPermutations(n)),
+           NaturalsBelow.enumerate(n))
+         by CommutativeRing.sumOver_congruence(
+                pointwise := (j : NaturalsBelow(n)) ↦ {
+                    row(j) * Matrix.cofactor(M, i, j)
+                       = row(j)
+                         * CommutativeRing.sumOver(
+                               (sigma : Permutation(n)) ↦
+                                   Matrix.standardBasisRow(c, n, j)(sigma(i))
+                                       * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                             * CommutativeRing.productOver(
+                                                   (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                                   NaturalsBelow.enumerate(n) ∖ i)),
+                               Permutation.allPermutations(n))
+                             by substituting basisExpansion(j)
+                       = CommutativeRing.sumOver(
+                             (sigma : Permutation(n)) ↦
+                                 row(j)
+                                     * (Matrix.standardBasisRow(c, n, j)(sigma(i))
+                                           * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                                 * CommutativeRing.productOver(
+                                                       (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                                       NaturalsBelow.enumerate(n) ∖ i))),
+                             Permutation.allPermutations(n))
+                             by CommutativeRing.sumOver_scale_left;
+                    done
+                  })
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.sumOver(
+                   (j : NaturalsBelow(n)) ↦
+                       row(j)
+                           * (Matrix.standardBasisRow(c, n, j)(sigma(i))
+                                 * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                       * CommutativeRing.productOver(
+                                             (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                             NaturalsBelow.enumerate(n) ∖ i))),
+                   NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+         by CommutativeRing.sumOver_interchange(
+                term := (j : NaturalsBelow(n)) ↦ (sigma : Permutation(n)) ↦
+                    row(j)
+                        * (Matrix.standardBasisRow(c, n, j)(sigma(i))
+                              * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                    * CommutativeRing.productOver(
+                                          (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                          NaturalsBelow.enumerate(n) ∖ i))))
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               row(sigma(i))
+                   * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                         * CommutativeRing.productOver(
+                               (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                               NaturalsBelow.enumerate(n) ∖ i)),
+           Permutation.allPermutations(n))
+         by CommutativeRing.sumOver_congruence(
+                pointwise := (sigma : Permutation(n)) ↦ {
+                    sigma(i) ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+                    ∀ (j : NaturalsBelow(n)). j ∈ NaturalsBelow.enumerate(n)
+                        → ¬(j = sigma(i))
+                        → row(j)
+                              * (Matrix.standardBasisRow(c, n, j)(sigma(i))
+                                    * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                          * CommutativeRing.productOver(
+                                                (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                                NaturalsBelow.enumerate(n) ∖ i)))
+                          = CommutativeRing.zero(c)
+                        by (j : NaturalsBelow(n)) (jMember : j ∈ NaturalsBelow.enumerate(n))
+                           (jOffDiagonal : ¬(j = sigma(i))) ↦ {
+                            ¬(sigma(i) = j) by (equal : sigma(i) = j) ↦ { j = sigma(i); done };
+                            Matrix.standardBasisRow(c, n, j)(sigma(i)) = CommutativeRing.zero(c)
+                                by Matrix.standardBasisRow_off as basisVanishes;
+                            row(j)
+                                * (Matrix.standardBasisRow(c, n, j)(sigma(i))
+                                      * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                            * CommutativeRing.productOver(
+                                                  (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                                  NaturalsBelow.enumerate(n) ∖ i)))
+                               = row(j)
+                                 * (CommutativeRing.zero(c)
+                                       * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                             * CommutativeRing.productOver(
+                                                   (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                                   NaturalsBelow.enumerate(n) ∖ i)))
+                                     by substituting basisVanishes
+                               = CommutativeRing.zero(c)
+                                     by ring;
+                            done
+                          };
+                    Matrix.standardBasisRow(c, n, sigma(i))(sigma(i)) = CommutativeRing.one(c)
+                        by Matrix.standardBasisRow_at as basisDiagonal;
+                    CommutativeRing.sumOver(
+                          (j : NaturalsBelow(n)) ↦
+                              row(j)
+                                  * (Matrix.standardBasisRow(c, n, j)(sigma(i))
+                                        * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                              * CommutativeRing.productOver(
+                                                    (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                                    NaturalsBelow.enumerate(n) ∖ i))),
+                          NaturalsBelow.enumerate(n))
+                       = row(sigma(i))
+                         * (Matrix.standardBasisRow(c, n, sigma(i))(sigma(i))
+                               * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                     * CommutativeRing.productOver(
+                                           (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                           NaturalsBelow.enumerate(n) ∖ i)))
+                             by CommutativeRing.sumOver_single
+                       = row(sigma(i))
+                         * (CommutativeRing.one(c)
+                               * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                                     * CommutativeRing.productOver(
+                                           (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                           NaturalsBelow.enumerate(n) ∖ i)))
+                             by substituting basisDiagonal
+                       = row(sigma(i))
+                         * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                               * CommutativeRing.productOver(
+                                     (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                                     NaturalsBelow.enumerate(n) ∖ i))
+                             by ring;
+                    done
+                  })
+     as rightToMiddle;
+  Matrix.determinant(Matrix.updateRow(M, i, row))
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               row(sigma(i))
+                   * (CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                         * CommutativeRing.productOver(
+                               (t : NaturalsBelow(n)) ↦ M(t, sigma(t)),
+                               NaturalsBelow.enumerate(n) ∖ i)),
+           Permutation.allPermutations(n))
+         by Matrix.determinant_updateRow_leibniz
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(n)) ↦ row(j) * Matrix.cofactor(M, i, j),
+           NaturalsBelow.enumerate(n))
+         by rightToMiddle
+}
+
+-- Laplace expansion along row i: replace the row by itself.
+theorem Matrix.determinant_row_expansion {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (i : NaturalsBelow(n))
+        : Matrix.determinant(M)
+          = CommutativeRing.sumOver(
+                (j : NaturalsBelow(n)) ↦ M(i, j) * Matrix.cofactor(M, i, j),
+                NaturalsBelow.enumerate(n)) := {
+  Matrix.updateRow(M, i, M(i)) = M by Matrix.updateRow_same as sameRow;
+  Matrix.determinant(M)
+     = Matrix.determinant(Matrix.updateRow(M, i, M(i)))
+         by substituting sameRow
+     = CommutativeRing.sumOver(
+           (j : NaturalsBelow(n)) ↦ M(i, j) * Matrix.cofactor(M, i, j),
+           NaturalsBelow.enumerate(n))
+         by Matrix.determinant_updateRow_expansion
+}
+
+-- Two equal rows kill the determinant: the row selector t ↦ (i ↦ k)
+-- collides at i and k, and the alternating collapse does the rest.
+theorem Matrix.determinant_updateRow_repeated {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) (i k : NaturalsBelow(n)) (rowsDiffer : ¬(i = k))
+        : Matrix.determinant(Matrix.updateRow(M, i, M(k))) = CommutativeRing.zero(c) := {
+  ∀ (t : NaturalsBelow(n)). ∀ (s : NaturalsBelow(n)).
+      Matrix.updateRow(M, i, M(k))(t, s) = M((if t = i then k else t : NaturalsBelow(n)), s)
+      by (t : NaturalsBelow(n)) (s : NaturalsBelow(n)) ↦ {
+          t = i ∨ ¬(t = i);
+          done by cases {
+            case t = i as onRow: {
+                (if i = i then k else i : NaturalsBelow(n)) = k
+                    by Logic.if_positive as selectorValue;
+                Matrix.updateRow(M, i, M(k))(i, s)
+                   = M(k, s)                                        by Matrix.updateRow_entry_at
+                   = M((if i = i then k else i : NaturalsBelow(n)), s)
+                         by substituting selectorValue;
+                done
+              }
+            case ¬(t = i) as offRow: {
+                (if t = i then k else t : NaturalsBelow(n)) = t
+                    by Logic.if_negative as selectorValue;
+                Matrix.updateRow(M, i, M(k))(t, s)
+                   = M(t, s)                                        by Matrix.updateRow_entry_off
+                   = M((if t = i then k else t : NaturalsBelow(n)), s)
+                         by substituting selectorValue;
+                done
+              }
+          }
+        } as entriesSelect;
+  ¬(k = i) by (equal : k = i) ↦ { i = k; done };
+  (if k = i then k else k : NaturalsBelow(n)) = k by Logic.if_negative as selectorAtK;
+  (if i = i then k else i : NaturalsBelow(n))
+     = k                                             by Logic.if_positive
+     = (if k = i then k else k : NaturalsBelow(n))   by selectorAtK;
+  Matrix.determinant(Matrix.updateRow(M, i, M(k)))
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                   * CommutativeRing.productOver(
+                         (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, M(k))(t, sigma(t)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+         by Matrix.determinant_expansion
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                   * CommutativeRing.productOver(
+                         (t : NaturalsBelow(n)) ↦
+                             M((if t = i then k else t : NaturalsBelow(n)), sigma(t)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+         by CommutativeRing.sumOver_congruence(
+                pointwise := (sigma : Permutation(n)) ↦ {
+                    CommutativeRing.productOver(
+                          (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, M(k))(t, sigma(t)),
+                          NaturalsBelow.enumerate(n))
+                       = CommutativeRing.productOver(
+                             (t : NaturalsBelow(n)) ↦
+                                 M((if t = i then k else t : NaturalsBelow(n)), sigma(t)),
+                             NaturalsBelow.enumerate(n))
+                        by CommutativeRing.productOver_congruence(
+                               pointwise := (t : NaturalsBelow(n)) ↦ entriesSelect(t, sigma(t)))
+                        as rowsMatch;
+                    CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                          * CommutativeRing.productOver(
+                                (t : NaturalsBelow(n)) ↦ Matrix.updateRow(M, i, M(k))(t, sigma(t)),
+                                NaturalsBelow.enumerate(n))
+                       = CommutativeRing.from_integer(c, Permutation.sign(sigma))
+                             * CommutativeRing.productOver(
+                                   (t : NaturalsBelow(n)) ↦
+                                       M((if t = i then k else t : NaturalsBelow(n)), sigma(t)),
+                                   NaturalsBelow.enumerate(n))
+                             by substituting rowsMatch;
+                    done
+                  })
+     = CommutativeRing.zero(c)
+         by Matrix.alternating_collapse(
+                B := M,
+                phi := (t : NaturalsBelow(n)) ↦ (if t = i then k else t : NaturalsBelow(n)),
+                a := i, b := k)
+}
+
+-- The adjugate: transposed cofactors.
+definition Matrix.adjugate {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n)) : Matrix(c, n, n) :=
+  (k : NaturalsBelow(n)) ↦ (j : NaturalsBelow(n)) ↦ Matrix.cofactor(M, j, k)
+
+-- The adjugate identity: M·adj(M) = det(M)·I. Entry (i,j) is the
+-- expansion of det(M with row j := row i) — det(M) on the diagonal, a
+-- repeated-rows determinant (zero) off it.
+theorem Matrix.multiply_adjugate {c : CommutativeRing} {n : ℕ}
+        (M : Matrix(c, n, n))
+        : M * Matrix.adjugate(M)
+          = Matrix.determinant(M) • Matrix.identity(c, n) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      (M * Matrix.adjugate(M))(i, j)
+      = (Matrix.determinant(M) • Matrix.identity(c, n))(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          i = j ∨ ¬(i = j);
+          done by cases {
+            case i = j as diagonal: {
+                Matrix.determinant(Matrix.updateRow(M, j, M(j)))
+                   = CommutativeRing.sumOver(
+                         (k : NaturalsBelow(n)) ↦ M(j, k) * Matrix.cofactor(M, j, k),
+                         NaturalsBelow.enumerate(n))
+                    by Matrix.determinant_updateRow_expansion as rowExpansion;
+                Matrix.updateRow(M, j, M(j)) = M by Matrix.updateRow_same as sameRow;
+                Matrix.identity(c, n)(j, j) = CommutativeRing.one(c)
+                    by Matrix.identity_entry_diagonal as identityEntry;
+                (M * Matrix.adjugate(M))(j, j)
+                   = CommutativeRing.sumOver(
+                         (k : NaturalsBelow(n)) ↦ M(j, k) * Matrix.cofactor(M, j, k),
+                         NaturalsBelow.enumerate(n))
+                   = Matrix.determinant(Matrix.updateRow(M, j, M(j)))
+                         by rowExpansion
+                   = Matrix.determinant(M)
+                         by substituting sameRow
+                   = Matrix.determinant(M) * CommutativeRing.one(c)
+                         by ring
+                   = Matrix.determinant(M) * Matrix.identity(c, n)(j, j)
+                         by substituting identityEntry
+                   = (Matrix.determinant(M) • Matrix.identity(c, n))(j, j);
+                done
+              }
+            case ¬(i = j) as offDiagonal: {
+                Matrix.determinant(Matrix.updateRow(M, j, M(i)))
+                   = CommutativeRing.sumOver(
+                         (k : NaturalsBelow(n)) ↦ M(i, k) * Matrix.cofactor(M, j, k),
+                         NaturalsBelow.enumerate(n))
+                    by Matrix.determinant_updateRow_expansion as rowExpansion;
+                ¬(j = i) by (equal : j = i) ↦ { i = j; done };
+                Matrix.determinant(Matrix.updateRow(M, j, M(i))) = CommutativeRing.zero(c)
+                    by Matrix.determinant_updateRow_repeated as repeatedRows;
+                Matrix.identity(c, n)(i, j) = CommutativeRing.zero(c)
+                    by Matrix.identity_entry_off as identityEntry;
+                (M * Matrix.adjugate(M))(i, j)
+                   = CommutativeRing.sumOver(
+                         (k : NaturalsBelow(n)) ↦ M(i, k) * Matrix.cofactor(M, j, k),
+                         NaturalsBelow.enumerate(n))
+                   = Matrix.determinant(Matrix.updateRow(M, j, M(i)))
+                         by rowExpansion
+                   = CommutativeRing.zero(c)
+                         by repeatedRows
+                   = Matrix.determinant(M) * CommutativeRing.zero(c)
+                         by ring
+                   = Matrix.determinant(M) * Matrix.identity(c, n)(i, j)
+                         by substituting identityEntry
+                   = (Matrix.determinant(M) • Matrix.identity(c, n))(i, j);
+                done
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}

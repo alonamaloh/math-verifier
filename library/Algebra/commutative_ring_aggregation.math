@@ -538,6 +538,63 @@ theorem CommutativeRing.sumOver_zero_on_members {r : CommutativeRing} {index : T
       }
   }
 
+-- Congruence from agreement on the MEMBERS alone: two terms that agree
+-- on every member of the list have equal folds (the full pointwise
+-- congruence above asks for agreement at every point of the index type,
+-- which is too strong when the terms deliberately differ off the list —
+-- e.g. off a removed index).
+theorem CommutativeRing.sumOver_congruence_on_members {r : CommutativeRing} {index : Type(0)}
+        (term termPrime : index → CommutativeRing.carrier(r)) (items : List(index))
+        (pointwise : ∀ (x : index). x ∈ items → term(x) = termPrime(x))
+        : CommutativeRing.sumOver(term, items) = CommutativeRing.sumOver(termPrime, items) :=
+  by induction on items with IH {
+    case List.empty:
+        CommutativeRing.sumOver(term, List.empty(index))
+           = CommutativeRing.sumOver(termPrime, List.empty(index))
+    case List.prepend(head, tail): {
+        head ∈ List.prepend(index, head, tail);
+        term(head) = termPrime(head) by pointwise as headAgrees;
+        ∀ (x : index). x ∈ tail → term(x) = termPrime(x)
+            by (x : index) (xInTail : x ∈ tail) ↦ {
+                x ∈ List.prepend(index, head, tail);
+                done
+              };
+        CommutativeRing.sumOver(term, tail) = CommutativeRing.sumOver(termPrime, tail)
+            by IH as tailsAgree;
+        CommutativeRing.sumOver(term, List.prepend(index, head, tail))
+           = term(head) + CommutativeRing.sumOver(term, tail)
+           = termPrime(head) + CommutativeRing.sumOver(term, tail)          by substituting headAgrees
+           = termPrime(head) + CommutativeRing.sumOver(termPrime, tail)     by substituting tailsAgree
+           = CommutativeRing.sumOver(termPrime, List.prepend(index, head, tail))
+      }
+  }
+
+theorem CommutativeRing.productOver_congruence_on_members {r : CommutativeRing} {index : Type(0)}
+        (term termPrime : index → CommutativeRing.carrier(r)) (items : List(index))
+        (pointwise : ∀ (x : index). x ∈ items → term(x) = termPrime(x))
+        : CommutativeRing.productOver(term, items) = CommutativeRing.productOver(termPrime, items) :=
+  by induction on items with IH {
+    case List.empty:
+        CommutativeRing.productOver(term, List.empty(index))
+           = CommutativeRing.productOver(termPrime, List.empty(index))
+    case List.prepend(head, tail): {
+        head ∈ List.prepend(index, head, tail);
+        term(head) = termPrime(head) by pointwise as headAgrees;
+        ∀ (x : index). x ∈ tail → term(x) = termPrime(x)
+            by (x : index) (xInTail : x ∈ tail) ↦ {
+                x ∈ List.prepend(index, head, tail);
+                done
+              };
+        CommutativeRing.productOver(term, tail) = CommutativeRing.productOver(termPrime, tail)
+            by IH as tailsAgree;
+        CommutativeRing.productOver(term, List.prepend(index, head, tail))
+           = term(head) * CommutativeRing.productOver(term, tail)
+           = termPrime(head) * CommutativeRing.productOver(term, tail)          by substituting headAgrees
+           = termPrime(head) * CommutativeRing.productOver(termPrime, tail)     by substituting tailsAgree
+           = CommutativeRing.productOver(termPrime, List.prepend(index, head, tail))
+      }
+  }
+
 -- A sum whose term vanishes on every member but one collapses to that
 -- member's term — the delta-collapse behind identity-matrix laws and
 -- basis-row expansions.
