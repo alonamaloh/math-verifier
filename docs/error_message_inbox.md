@@ -1559,3 +1559,24 @@ operand typed bottom-up as Natural beside a wider right operand (fix: flip
 to `x > 0` or ascribe). The remaining structural gap — the coercion-join
 should lift the numeral to the other operand's carrier — is F1-family
 (left operands are typed bottom-up).
+
+**CHECKER (correctness) — `redundant \`by\` on calc step` false positive
+(Real/apartness.math:216, 2026-07-17).** The checker flagged the
+`by (sequence(largeIndex) = (sequence(largeIndex) - sequence(m)) + sequence(m))`
+regroup hint as redundant, but removing it fails elaboration ("calc step 1
+at line 214" cannot close). The speculative re-proof that backs the warning
+evidently ran under different conditions than real elaboration (budget or
+environment mismatch). A warning that recommends an edit which breaks the
+build is worse than no warning — the re-proof should replicate the real
+elaboration path, or the checker should verify its own suggestion before
+emitting it.
+
+**CHECKER (misleading) — `redundant \`by\` on claim` fires on a claim that
+IS the theorem's final proof expression (Real/order.math:528, 2026-07-17).**
+`Real.IsNonneg(x - Real.zero) by substituting (ring : …)` is the whole
+proof term; there is no "hint" to drop — removing the `by` leaves a bare
+Proposition and the theorem fails with "proof has type … Proposition".
+The checker should either suppress the warning for terminal claims or
+reword it (e.g. "final claim could be closed by the auto-prover — the
+`by` can only be removed if the surrounding block re-proves it"), since
+the current wording invites an edit that cannot work.
