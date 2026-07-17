@@ -517,6 +517,34 @@ ExpressionPointer Elaborator::elaborateCalc(
                             && redundancyReproofWasExpensive(stepsBefore)) {
                             autoAttempt = nullptr;
                         }
+                        // The checker verifies its own suggestion (U3a): a
+                        // real by-less step doesn't stop at autoProveClaim —
+                        // it runs the final defeq gate between the produced
+                        // proof's type and the step relation (the check at
+                        // the end of the step loop). A probe proof that
+                        // would fail that gate means the suggested edit
+                        // breaks the build, so it is not "redundant".
+                        if (autoAttempt) {
+                            try {
+                                ExpressionPointer probeType =
+                                    inferTypeInLocalContext(
+                                        localBinders, autoAttempt);
+                                ExpressionPointer probeWanted =
+                                    openOverLocalBinders(
+                                        stepRelationType, localBinders,
+                                        localBinders.size());
+                                Context probeContext =
+                                    buildContextFromLocalBinders(
+                                        localBinders);
+                                if (!isDefinitionallyEqual(
+                                        environment_, probeContext,
+                                        probeType, probeWanted)) {
+                                    autoAttempt = nullptr;
+                                }
+                            } catch (...) {
+                                autoAttempt = nullptr;
+                            }
+                        }
                         if (autoAttempt) {
                             std::cerr << "warning: " << moduleName_
                                 << ":" << step.line << ":" << step.column

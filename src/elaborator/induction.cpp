@@ -1469,6 +1469,14 @@ void Elaborator::reportClaimHintDiagnostics(
         // the check can't faithfully test its removal.
         bool byInvolvesUnfolding = claim.byHint
             && std::get_if<SurfaceUnfold>(&claim.byHint->node) != nullptr;
+        // A claim that IS a proof-position tail (`:= P by H`, an arm body
+        // `P by H`) has no droppable hint: deleting the `by` leaves a bare
+        // Proposition where a proof is required (only STATEMENT claims
+        // `P by H;` re-prove bare — U3b, Real/order:528). The parser marks
+        // the position; skip the drop-the-`by` probe entirely. The
+        // args-inferable probe below still runs — `by Lemma` alone is a
+        // valid edit in any position.
+        bool claimIsTerminalTail = claim.isTerminalProofTail;
         if (reportRedundantBy_ && !byInvolvesUnfolding) {
             // Cap the budget so each re-proof bails early; exceeding it
             // (the hint is load-bearing for speed) yields no proof. The guard
@@ -1477,15 +1485,19 @@ void Elaborator::reportClaimHintDiagnostics(
             uint64_t stepsBefore = kernelStepsSoFar();
             RedundancyBudgetGuard budgetGuard(*this);
             ExpressionPointer autoAttempt;
-            try {
-                autoAttempt = autoProveClaim(
-                    goalClosed, localBinders, line);
-            } catch (const ElaborateError&) {
+            if (claimIsTerminalTail) {
                 autoAttempt = nullptr;
-            } catch (const TypeError&) {
-                autoAttempt = nullptr;
-            } catch (const AutoProverBudgetError&) {
-                autoAttempt = nullptr;
+            } else {
+                try {
+                    autoAttempt = autoProveClaim(
+                        goalClosed, localBinders, line);
+                } catch (const ElaborateError&) {
+                    autoAttempt = nullptr;
+                } catch (const TypeError&) {
+                    autoAttempt = nullptr;
+                } catch (const AutoProverBudgetError&) {
+                    autoAttempt = nullptr;
+                }
             }
             // A single deep conversion can close the bare claim while
             // overshooting the low budget without tripping it (sampled only at
@@ -1494,6 +1506,28 @@ void Elaborator::reportClaimHintDiagnostics(
             if (autoAttempt
                 && redundancyReproofWasExpensive(stepsBefore)) {
                 autoAttempt = nullptr;
+            }
+            // The checker verifies its own suggestion (U3a): a real bare
+            // claim's proof still has to typecheck against the stated
+            // proposition (the statement fold's `let` annotation). A probe
+            // proof whose type fails that gate means the suggested edit
+            // breaks the build, so it is not "redundant".
+            if (autoAttempt) {
+                try {
+                    ExpressionPointer probeType =
+                        inferTypeInLocalContext(localBinders, autoAttempt);
+                    ExpressionPointer probeWanted = openOverLocalBinders(
+                        goalClosed, localBinders, localBinders.size());
+                    Context probeContext =
+                        buildContextFromLocalBinders(localBinders);
+                    if (!isDefinitionallyEqual(
+                            environment_, probeContext,
+                            probeType, probeWanted)) {
+                        autoAttempt = nullptr;
+                    }
+                } catch (...) {
+                    autoAttempt = nullptr;
+                }
             }
             if (autoAttempt) {
                 // Name the claim when it has a label: several multi-line

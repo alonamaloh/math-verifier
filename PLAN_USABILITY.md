@@ -108,8 +108,8 @@ index. Stretch: `--fix` appends them (sorted into the existing block).
 |------|-------|--------|-------|
 | U1 goal-at-leaf errors | TODO | S–M | frames already carry goals; print + enumerate |
 | U2 not-imported hints | TODO | M | needs name→module index; two error sites |
-| U3 checker self-verify | TODO | M | (a) re-prove on real path, (b) final-expression rule; repro cases in inbox |
+| U3 checker self-verify | DONE 2026-07-17 | M | (a) probe now runs the real path's final defeq gate (calc.cpp + induction.cpp); (b) parser marks unnamed `P by H` proof-tails `isTerminalProofTail`, checker skips them (Test/redundant_by_terminal_claim_test.math + probe-script assertions). order.math:528 FP gone; 4 sampled basis_pruning edits verified |
 | U4 mixed-operator parens | TODO | S | parseAdditive/Multiplicative chain guard + ErrorTest |
 | U5 stale-iface auto-refresh | TODO | S–M | in-process stage-1 rebuild of the one stale import |
-| U6 auto-settle safe categories | TODO | S (after U3a) | mark_redundant --settle-safe |
+| U6 auto-settle safe categories | DONE 2026-07-17 | S (after U3a) | .mark_redundant.py settles by default (`--no-settle` opts out): drops ` as X` on `unused name`/`calc … as` warnings and `by Logic.excluded_middle` on redundant-`by` sites; batch re-verified, full revert + mark-all fallback on failure |
 | U7 suggest-imports | TODO | M (after U2) | new subcommand; --fix stretch |

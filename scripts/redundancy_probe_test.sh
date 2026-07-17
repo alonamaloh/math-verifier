@@ -29,6 +29,21 @@ for f in library/Rational/order_multiplication.math library/Real/continuity.math
     fi
 done
 
+# U3b — terminal-tail suppression, both directions: the `P by H` proof-tail
+# in Test/redundant_by_terminal_claim_test.math must NOT be flagged (its `by`
+# is not deletable), while the statement form in the same file MUST still be.
+terminal_out=$(./kernel verify \
+    --source library/Test/redundant_by_terminal_claim_test.math \
+    --cache-root build --check-redundant-by --no-check-unused-names 2>&1)
+if echo "$terminal_out" | grep -q ":19: redundant \`by\`"; then
+    echo "redundancy-probe-tests: FAIL — terminal-tail \`by\` flagged as redundant (U3b regression)"
+    status=1
+fi
+if ! echo "$terminal_out" | grep -q ":24: redundant \`by\`"; then
+    echo "redundancy-probe-tests: FAIL — statement \`by\` no longer flagged (checker went blind)"
+    status=1
+fi
+
 if [ "$status" -eq 0 ]; then
     echo "redundancy-probe-tests: PASS"
 fi

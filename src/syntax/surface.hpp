@@ -650,6 +650,13 @@ struct SurfaceStructuredClaim {
     // (if any) is stored in `byHint`; bySubstitution=true is the
     // discriminator.
     bool bySubstitution = false;
+    // Set by the parser when this claim is an unnamed `P by H` tail in
+    // proof position (a theorem body / arm body, not a `;`-terminated
+    // statement). There, deleting the `by` leaves a bare Proposition
+    // where a proof is required — the redundancy checker must not
+    // suggest it (U3b, Real/order:528). A statement claim `P by H;`
+    // and a named tail `P by H as N` re-prove bare, so they stay false.
+    bool isTerminalProofTail = false;
 };
 
 struct SurfaceExpression {
@@ -928,12 +935,13 @@ inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     std::vector<SurfaceStructuredClaimArm> arms,
     int line, int column,
     bool byInduction = false,
-    bool bySubstitution = false) {
+    bool bySubstitution = false,
+    bool isTerminalProofTail = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceStructuredClaim{std::move(proposition), std::move(label),
                                 std::move(byHint), byCases,
                                 std::move(arms), byInduction,
-                                bySubstitution},
+                                bySubstitution, isTerminalProofTail},
         line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in

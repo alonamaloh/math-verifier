@@ -97,7 +97,7 @@ table before the first polish pass.
 
 | item | state | notes |
 |------|-------|-------|
-| W  warm-up: U3+U6 | TODO | see PLAN_USABILITY.md; do before the math |
+| W  warm-up: U3+U6 | DONE 2026-07-17 | see PLAN_USABILITY.md ledger for details |
 | W' warm-up: Freek #52/#58 | OPTIONAL | quick wins on fresh notation |
 | C1 det over CommutativeRing | TODO | audit Field uses first; main lift |
 | C2 polynomial ring bundle check | TODO | ring tactic at abstract bundle? |

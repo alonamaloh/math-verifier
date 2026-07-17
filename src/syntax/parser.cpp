@@ -432,7 +432,8 @@ SurfaceExpressionPointer substituteSurfaceName(
             std::move(newProposition), structured->label,
             std::move(newByHint), structured->byCases,
             std::move(newArms), line, column,
-            structured->byInduction, structured->bySubstitution);
+            structured->byInduction, structured->bySubstitution,
+            structured->isTerminalProofTail);
     }
     if (auto* note = std::get_if<SurfaceNote>(&node.node)) {
         // `note goal : T;` / `note P [by V];` / `change T;` — recurse into
@@ -1488,6 +1489,20 @@ private:
             ? "_claim_anon_" + std::to_string(statementStart.line) + "_"
                   + std::to_string(statementStart.column)
             : bindingName;
+        // An UNNAMED `P by H` tail: deleting the `by` leaves a bare
+        // Proposition in proof position (no statement fold happens), so
+        // the redundancy checker must not call the hint droppable. A
+        // named tail (`as N`) re-folds bare and stays droppable.
+        if (bindingName.empty() && hasByForm) {
+            if (auto* structured = std::get_if<SurfaceStructuredClaim>(
+                    &claimValue->node)) {
+                SurfaceStructuredClaim marked = *structured;
+                marked.isTerminalProofTail = true;
+                claimValue = std::make_shared<const SurfaceExpression>(
+                    SurfaceExpression{std::move(marked), claimValue->line,
+                                      claimValue->column});
+            }
+        }
         SurfaceExpressionPointer autoClose = makeSurfaceStructuredClaim(
             makeSurfaceGoal(statementStart.line, statementStart.column),
             /*label=*/"", /*byHint=*/nullptr, /*byCases=*/false, {},

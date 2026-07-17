@@ -1560,8 +1560,13 @@ to `x > 0` or ascribe). The remaining structural gap — the coercion-join
 should lift the numeral to the other operand's carrier — is F1-family
 (left operands are typed bottom-up).
 
-**CHECKER (correctness) — `redundant \`by\` on calc step` false positive
-(Real/apartness.math:216, 2026-07-17).** The checker flagged the
+**FIXED (U3a, 2026-07-17) — `redundant \`by\` on calc step` false positive
+(Real/apartness.math:216, 2026-07-17).** The probe now runs the real bare
+path's final defeq gate (proof type vs step relation) before warning, in
+both the calc-step and claim probes; a suggestion whose proof would fail
+that gate is suppressed. (The original site no longer reproduces even
+pre-fix — the mismatch was state-dependent — but the gate closes the one
+structural divergence between probe and real path.) The checker flagged the
 `by (sequence(largeIndex) = (sequence(largeIndex) - sequence(m)) + sequence(m))`
 regroup hint as redundant, but removing it fails elaboration ("calc step 1
 at line 214" cannot close). The speculative re-proof that backs the warning
@@ -1571,8 +1576,13 @@ build is worse than no warning — the re-proof should replicate the real
 elaboration path, or the checker should verify its own suggestion before
 emitting it.
 
-**CHECKER (misleading) — `redundant \`by\` on claim` fires on a claim that
+**FIXED (U3b, 2026-07-17) — `redundant \`by\` on claim` fires on a claim that
 IS the theorem's final proof expression (Real/order.math:528, 2026-07-17).**
+The parser now marks an unnamed `P by H` proof-position tail
+(`isTerminalProofTail`) and the checker skips the drop-the-`by` probe there
+(the args-inferable probe still runs). Regression fixture:
+Test/redundant_by_terminal_claim_test.math + scripts/redundancy_probe_test.sh
+asserts both directions.
 `Real.IsNonneg(x - Real.zero) by substituting (ring : …)` is the whole
 proof term; there is no "hint" to drop — removing the `by` leaves a bare
 Proposition and the theorem fails with "proof has type … Proposition".

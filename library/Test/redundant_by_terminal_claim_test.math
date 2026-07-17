@@ -1,0 +1,26 @@
+-- Regression (U3b): a `P by H` tail in PROOF position — a theorem body or
+-- arm body, not a `;`-terminated statement — has no droppable hint: deleting
+-- the `by` leaves a bare Proposition where a proof is required. The checker
+-- must not flag it even when the auto-prover could close P bare
+-- (Real/order.math:528, inbox 2026-07-17). The named tail (`as N`) and the
+-- statement form DO re-prove bare, so those keep their warnings — the
+-- companion assertion in scripts/redundancy_probe_test.sh checks both
+-- directions on this file.
+module Test.redundant_by_terminal_claim_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- Terminal tail: must NOT warn (the `by` is not deletable here).
+theorem Test.terminal_by_not_flagged (a b : ℕ) (h : a = b) : a = b :=
+  a = b by h
+
+-- Statement form of the same fact: MUST still warn (deleting the `by`
+-- leaves a bare statement the auto-prover re-proves).
+theorem Test.statement_by_still_flagged (a b : ℕ) (h : a = b) : 0 = 0 := {
+  a = b by h;
+  done
+}
