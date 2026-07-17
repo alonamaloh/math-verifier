@@ -777,11 +777,18 @@ private:
         // `operator (()) on (T) := F` registers APPLICATION on T: a value
         // of type T used in function position dispatches to F (the
         // unwrapper), so `rep(n)` reads as F(rep, n). Lexes as two tokens.
+        // `operator ([]) on (T, Index) := F` registers INDEXING on T: `p[k]`
+        // dispatches to F(p, k) as an ordinary binary operator.
         if (peek().kind == TokenKind::LeftParen
             && peekAt(1).kind == TokenKind::RightParen) {
             consumeAny();
             consumeAny();
             declaration.operatorSymbol = "()";
+        } else if (peek().kind == TokenKind::LeftBracket
+                   && peekAt(1).kind == TokenKind::RightBracket) {
+            consumeAny();
+            consumeAny();
+            declaration.operatorSymbol = "[]";
         } else {
             declaration.operatorSymbol = consumeAny().lexeme;
         }
@@ -3456,9 +3463,27 @@ private:
     // Function call: head(arg1, arg2, ...). Tighter than any operator.
     // Empty argument lists `f()` are disallowed; a bare name `f` is a
     // valid expression (the function value itself).
+    // Indexing: head[index] — a registered `[]` operator application
+    // (`p[k]` is the k-th coefficient of a polynomial). Parses as the
+    // binary operation `[]` so the standard type-directed operator
+    // dispatch resolves it; chains and mixes with calls (`p[k](m)`,
+    // `f(a)[k]`, `m[i][j]`).
     SurfaceExpressionPointer parseApplication() {
         auto head = parseAtom();
-        while (peek().kind == TokenKind::LeftParen) {
+        while (peek().kind == TokenKind::LeftParen
+               || peek().kind == TokenKind::LeftBracket) {
+            if (peek().kind == TokenKind::LeftBracket) {
+                Token openBracket = consumeAny();
+                if (peek().kind == TokenKind::RightBracket) {
+                    throwHere("empty index 'p[]' is not allowed");
+                }
+                SurfaceExpressionPointer index = parseExpression();
+                expect(TokenKind::RightBracket, "ending index");
+                head = makeSurfaceBinaryOperation(
+                    "[]", std::move(head), std::move(index),
+                    openBracket.line, openBracket.column);
+                continue;
+            }
             Token openParen = consumeAny();
             if (peek().kind == TokenKind::RightParen) {
                 throwHere("empty argument list 'f()' is not allowed");

@@ -492,6 +492,15 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
             }
         }
         if (targetFunction.empty()) {
+            if (operatorSymbol == "[]") {
+                throw ElaborateError(
+                    "no indexing operator is registered for type '"
+                    + operandTypeName + "' (index type '" + rightTypeName
+                    + "') — register one with `operator ([]) on ("
+                    + operandTypeName + ", " + rightTypeName
+                    + ") := <function>`",
+                    line, 0);
+            }
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' is not supported for "
                 "operand type '" + operandTypeName
@@ -622,6 +631,43 @@ ExpressionPointer Elaborator::applyOperatorImplicitFillers(
                                 unfoldHeadConstantOneStep(leftCandidate);
                             if (!next) break;
                             leftCandidate = next;
+                        }
+                        // Carrier-projection retry: a LEFT operand typed as
+                        // a bundle projection over a concrete instance
+                        // (`VectorSpace.carrier(Field.polynomial_vector_space
+                        // (f))`) never unfolds step-by-step to the template's
+                        // head — the projection is stuck on the bundle value.
+                        // Resolve it to the carrier field as written in the
+                        // bundle's constructor (`Polynomial(…)`), exactly as
+                        // the registry dispatch's final fallback does, and
+                        // match against THAT — so `p[k]` on a vector-space
+                        // carrier recovers the same `{r}` the spelled-out
+                        // call passed explicitly.
+                        if (!inferredByUnification) {
+                            ExpressionPointer projected =
+                                carrierProjectionField(leftTypeClosed);
+                            for (int step = 0;
+                                 projected && step < 64
+                                     && !inferredByUnification;
+                                 ++step) {
+                                std::fill(implicitBindings.begin(),
+                                          implicitBindings.end(), nullptr);
+                                if (matchAgainstPattern(
+                                        firstExplicit->domain, projected,
+                                        implicitCount, implicitBindings)) {
+                                    inferredByUnification = true;
+                                    for (const auto& binding :
+                                         implicitBindings) {
+                                        if (!binding) {
+                                            inferredByUnification = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (inferredByUnification) break;
+                                projected =
+                                    unfoldHeadConstantOneStep(projected);
+                            }
                         }
                         if (!inferredByUnification) {
                             std::fill(implicitBindings.begin(),

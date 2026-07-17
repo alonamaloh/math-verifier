@@ -36,42 +36,32 @@ import Polynomial.degree_product
 theorem Polynomial.monomial_zero_multiply (r : Ring) (a b : Ring.carrier(r))
         : (Polynomial.monomial(r, a, 0) * Polynomial.monomial(r, b, 0))
           = Polynomial.monomial(r, (a * b), 0) := {
-  ∀ (k : Natural).
-          (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), k))
-          = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), k)
+  ∀ (k : Natural). (a * Polynomial.monomial(r, b, 0)[k]) = Polynomial.monomial(r, (a * b), 0)[k]
       by (k : Natural) ↦ done by cases {
         case k = 0 as kEqualsZero:
-            (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), k))
-          = (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), 0))
-                by substituting kEqualsZero
+            (a * Polynomial.monomial(r, b, 0)[k])
+          = (a * Polynomial.monomial(r, b, 0)[0])   by substituting kEqualsZero
           = (a * b)
-          = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), 0)
-          = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), k)
-                by substituting kEqualsZero
+          = Polynomial.monomial(r, (a * b), 0)[0]
+          = Polynomial.monomial(r, (a * b), 0)[k]   by substituting kEqualsZero
         case k = 1 + m for some (m : Natural) as kEqualsOnePlus: {
             1 + m ≠ 0;
-            (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), k))
-               = (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), 1 + m))
-                     by substituting kEqualsOnePlus
+            (a * Polynomial.monomial(r, b, 0)[k])
+               = (a * Polynomial.monomial(r, b, 0)[1 + m])   by substituting kEqualsOnePlus
                = (a * Ring.zero(r))
                = Ring.zero(r)
-               = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), 1 + m)
-               = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), k)
-                     by substituting kEqualsOnePlus
+               = Polynomial.monomial(r, (a * b), 0)[1 + m]
+               = Polynomial.monomial(r, (a * b), 0)[k]   by substituting kEqualsOnePlus
           }
       } as factorThrough;
   Polynomial.equal_of_coefficientOf_equal(r,
       (Polynomial.monomial(r, a, 0) * Polynomial.monomial(r, b, 0)),
       Polynomial.monomial(r, (a * b), 0),
       (k : Natural) ↦
-          Polynomial.coefficientOf(r,
-              (Polynomial.monomial(r, a, 0) * Polynomial.monomial(r, b, 0)), k)
-        = (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), Natural.monus(k, 0)))
-              by Polynomial.coefficientOf_monomial_multiply
-        = (a * Polynomial.coefficientOf(r, Polynomial.monomial(r, b, 0), k))
-              by Natural.monus_zero(k)
-        = Polynomial.coefficientOf(r, Polynomial.monomial(r, (a * b), 0), k)
-              by factorThrough(k))
+          (Polynomial.monomial(r, a, 0) * Polynomial.monomial(r, b, 0))[k]
+        = (a * Polynomial.monomial(r, b, 0)[Natural.monus(k, 0)])   by Polynomial.coefficientOf_monomial_multiply
+        = (a * Polynomial.monomial(r, b, 0)[k])   by Natural.monus_zero(k)
+        = Polynomial.monomial(r, (a * b), 0)[k]   by factorThrough(k))
 }
 
 -- A degree-0 polynomial (nonzero constant) over a field is a unit.
@@ -83,38 +73,32 @@ theorem Polynomial.degree_zero_is_unit (r : Ring)
         (pDegree : Polynomial.HasDegree(r, p, 0))
         : Polynomial.IsUnit(r, p) := {
   let ⟨pBound, pNonzero⟩ := pDegree;
-  choose inverse such that (Polynomial.coefficientOf(r, p, 0) * inverse) = Ring.one(r)
-      from inverseExistence(Polynomial.coefficientOf(r, p, 0), pNonzero);
-  p = Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0)
+  choose inverse such that (p[0] * inverse) = Ring.one(r)
+      from inverseExistence(p[0], pNonzero);
+  p = Polynomial.monomial(r, p[0], 0)
       by Polynomial.equal_of_coefficientOf_equal(r, p,
-             Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0),
+             Polynomial.monomial(r, p[0], 0),
              (k : Natural) ↦ done by cases {
                case k = 0 as kEqualsZero: {
-                   Polynomial.coefficientOf(r, p, k)
-                      = Polynomial.coefficientOf(r, p, 0)
-                            by substituting kEqualsZero
-                      = Polynomial.coefficientOf(r, Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0), 0)
-                      = Polynomial.coefficientOf(r, Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0), k)
-                            by substituting kEqualsZero
+                   p[k]
+                      = p[0]   by substituting kEqualsZero
+                      = Polynomial.monomial(r, p[0], 0)[0]
+                      = Polynomial.monomial(r, p[0], 0)[k]   by substituting kEqualsZero
                  }
                case k = 1 + m for some (m : Natural) as kEqualsOnePlus: {
                    1 + 0 ≤ 1 + m;
                    1 + m ≠ 0;
-                   Polynomial.coefficientOf(r, p, k)
-                      = Polynomial.coefficientOf(r, p, 1 + m)
-                            by substituting kEqualsOnePlus
-                      = Ring.zero(r)
-                            by pBound(1 + m, (1 + 0 ≤ 1 + m))
-                      = Polynomial.coefficientOf(r, Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0), 1 + m)
-                      = Polynomial.coefficientOf(r, Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0), k)
-                            by substituting kEqualsOnePlus
+                   p[k]
+                      = p[1 + m]   by substituting kEqualsOnePlus
+                      = Ring.zero(r)   by pBound(1 + m, (1 + 0 ≤ 1 + m))
+                      = Polynomial.monomial(r, p[0], 0)[1 + m]
+                      = Polynomial.monomial(r, p[0], 0)[k]   by substituting kEqualsOnePlus
                  }
              });
   ⟨Polynomial.monomial(r, inverse, 0),
    { Polynomial.one(r)
       = Polynomial.monomial(r, Ring.one(r), 0)
-      = Polynomial.monomial(r,
-            (Polynomial.coefficientOf(r, p, 0) * inverse), 0)
-      = (Polynomial.monomial(r, Polynomial.coefficientOf(r, p, 0), 0) * Polynomial.monomial(r, inverse, 0))
+      = Polynomial.monomial(r, (p[0] * inverse), 0)
+      = (Polynomial.monomial(r, p[0], 0) * Polynomial.monomial(r, inverse, 0))
       = (p * Polynomial.monomial(r, inverse, 0)) }⟩
 }

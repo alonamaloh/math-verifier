@@ -78,6 +78,7 @@ enum class TokenKind {
     // Punctuation
     LeftParen, RightParen,
     LeftBrace, RightBrace,
+    LeftBracket, RightBracket, // "[" / "]" — postfix indexing (`p[k]`)
     LeftAngle, RightAngle,    // "⟨" / "⟩" — anonymous tuples
     Comma, Colon, Semicolon, Pipe,
     Dot,

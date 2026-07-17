@@ -291,6 +291,8 @@ private:
             case ')':  advanceOne(); return {TokenKind::RightParen,  ")", startLine, startColumn};
             case '{':  advanceOne(); return {TokenKind::LeftBrace,   "{", startLine, startColumn};
             case '}':  advanceOne(); return {TokenKind::RightBrace,  "}", startLine, startColumn};
+            case '[':  advanceOne(); return {TokenKind::LeftBracket, "[", startLine, startColumn};
+            case ']':  advanceOne(); return {TokenKind::RightBracket, "]", startLine, startColumn};
             case ',':  advanceOne(); return {TokenKind::Comma,       ",", startLine, startColumn};
             case ':':  advanceOne(); return {TokenKind::Colon,       ":", startLine, startColumn};
             case ';':  advanceOne(); return {TokenKind::Semicolon,   ";", startLine, startColumn};
@@ -565,6 +567,8 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::RightParen:           return "')'";
         case TokenKind::LeftBrace:            return "'{'";
         case TokenKind::RightBrace:           return "'}'";
+        case TokenKind::LeftBracket:          return "'['";
+        case TokenKind::RightBracket:         return "']'";
         case TokenKind::LeftAngle:            return "'⟨'";
         case TokenKind::RightAngle:           return "'⟩'";
         case TokenKind::Comma:                return "','";

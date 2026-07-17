@@ -37,7 +37,7 @@ import Polynomial.division
 -- A polynomial all of whose coefficients vanish is the zero polynomial.
 theorem Polynomial.zero_of_coefficients_zero (r : Ring)
         (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
-        (allZero : ∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r))
+        (allZero : ∀ (i : Natural). y[i] = Ring.zero(r))
         : y = Polynomial.zero(r) :=
   by_representatives y as coefficients =>
     Polynomial.make_equal_of_coefficients_equal(r, coefficients,
@@ -50,10 +50,8 @@ theorem Polynomial.zero_of_coefficients_zero (r : Ring)
 theorem Polynomial.exists_degree_within (r : Ring)
         (y : Polynomial(Ring.carrier(r), Ring.zero(r))) (n : Natural)
         : Polynomial.DegreeLessThan(r, y, n)
-          → (∃ (d : Natural).
-                 Polynomial.DegreeLessThan(r, y, 1 + d)
-                 ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)))
-            ∨ (∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r)) :=
+          → (∃ (d : Natural). Polynomial.DegreeLessThan(r, y, 1 + d) ∧ ¬(y[d] = Ring.zero(r)))
+            ∨ (∀ (i : Natural). y[i] = Ring.zero(r)) :=
   by induction on n with IH {
     case base:
       (boundN : Polynomial.DegreeLessThan(r, y, 0)) ↦
@@ -61,13 +59,13 @@ theorem Polynomial.exists_degree_within (r : Ring)
     case step(m):
       (boundN : Polynomial.DegreeLessThan(r, y, 1 + m)) ↦
           done by cases {
-            case Polynomial.coefficientOf(r, y, m) = Ring.zero(r) as coefficientZero: {
+            case y[m] = Ring.zero(r) as coefficientZero: {
                 Polynomial.DegreeLessThan(r, y, m)
                     by (i : Natural) (mLessOrEqualI : m ≤ i) ↦
                         done by cases {
                           case i = m as indexIsM:
-                              Polynomial.coefficientOf(r, y, i)
-                                 = Polynomial.coefficientOf(r, y, m)
+                              y[i]
+                                 = y[m]
                                  = Ring.zero(r)
                           otherwise as indexNotM:
                               boundN(i, Natural.one_plus_le_of_le_of_ne(m, i,
@@ -85,20 +83,16 @@ theorem Polynomial.exists_degree_within (r : Ring)
 theorem Polynomial.exists_degree_of_nonzero (r : Ring)
         (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (notZero : ¬(y = Polynomial.zero(r)))
-        : ∃ (d : Natural).
-            Polynomial.DegreeLessThan(r, y, 1 + d)
-            ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)) := {
+        : ∃ (d : Natural). Polynomial.DegreeLessThan(r, y, 1 + d) ∧ ¬(y[d] = Ring.zero(r)) := {
   choose bound such that Polynomial.DegreeLessThan(r, y, bound)
       from Polynomial.exists_degree_bound(r, y);
   -- Either some coefficient below the bound is nonzero (giving the degree), or
   -- every coefficient vanishes — which would make y zero, against hypothesis.
-  (∃ (d : Natural).
-       Polynomial.DegreeLessThan(r, y, 1 + d)
-       ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)))
-   ∨ (∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r))
+  (∃ (d : Natural). Polynomial.DegreeLessThan(r, y, 1 + d) ∧ ¬(y[d] = Ring.zero(r)))
+   ∨ (∀ (i : Natural). y[i] = Ring.zero(r))
       by Polynomial.exists_degree_within(n := bound);
-  ¬(∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r)) by {
-      suppose ∀ (i : Natural). Polynomial.coefficientOf(r, y, i) = Ring.zero(r) as allZero
+  ¬(∀ (i : Natural). y[i] = Ring.zero(r)) by {
+      suppose ∀ (i : Natural). y[i] = Ring.zero(r) as allZero
           for contradiction {
           y = Polynomial.zero(r) by Polynomial.zero_of_coefficients_zero(r, y, allZero);
           done

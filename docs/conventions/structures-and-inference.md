@@ -148,6 +148,20 @@ must take the wrapped value as its first explicit argument and return a
 function (`T → (A → B)`); implicit indices (`Permutation.apply`'s `{n}`)
 are recovered from the value's type as with any operator.
 
+### Indexing: `operator ([]) on (T, Index) := F`
+
+Bracket indexing is an ordinary binary operator with the symbol `[]`:
+`operator ([]) on (Polynomial, Natural) := Polynomial.coefficientOf` lets
+proofs write `p[k]` for the coefficient of x^k — including
+`(p + q)[i] = p[i] + q[i]`, `Polynomial.one(r)[0]`, `p[1 + j]`. The
+implicit ring `{r}` is recovered from `p`'s type. Indexing binds like
+application (tighter than every operator: `- p[i]` is `-(p[i])`), chains
+(`m[i][j]`), and mixes with calls. Use `()` when the value *is* morally
+the function it wraps (applying a permutation); use `[]` when the value
+is a container/sequence being read at a position (a polynomial's
+coefficients) — in particular `p(k)` stays reserved for polynomial
+evaluation.
+
 ## Citing a lemma by name — let the arguments be inferred
 
 A lemma cited as `by <Lemma>` (no argument list) has its arguments filled

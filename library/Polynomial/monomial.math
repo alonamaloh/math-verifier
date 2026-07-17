@@ -4,7 +4,7 @@
 -- coefficient of (c·x^j)·p. By convolution the k-th coefficient is a
 -- sum that is supported at the single index i = j (the only place the
 -- monomial is nonzero), so it collapses (Sum.single_point) to
---   coefficientOf((c·x^j)·p, k) = c · coefficientOf(p, k − j)   (j ≤ k).
+--   ((c·x^j)·p)[k] = c · p[k − j]   (j ≤ k).
 -- This is exactly the "leading-term killer" the division step subtracts.
 
 module Polynomial.monomial
@@ -123,12 +123,12 @@ definition Polynomial.monomial (r : Ring) (c : Ring.carrier(r)) (j : Natural)
 -- Its coefficients, at the quotient level (definitional through the lift).
 theorem Polynomial.coefficientOf_monomial_at (r : Ring) (c : Ring.carrier(r))
         (j : Natural)
-        : Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), j) = c :=
+        : Polynomial.monomial(r, c, j)[j] = c :=
   Polynomial.coefficient_monomial_at(r, c, j)
 
 theorem Polynomial.coefficientOf_monomial_off (r : Ring) (c : Ring.carrier(r))
         (j i : Natural) (notEqual : ¬(i = j))
-        : Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i) = Ring.zero(r) :=
+        : Polynomial.monomial(r, c, j)[i] = Ring.zero(r) :=
   Polynomial.coefficient_monomial_off(r, c, j, i, notEqual)
 
 -- The coefficient of (c·x^j)·p: the convolution collapses to a single
@@ -136,25 +136,17 @@ theorem Polynomial.coefficientOf_monomial_off (r : Ring) (c : Ring.carrier(r))
 theorem Polynomial.coefficientOf_monomial_multiply (r : Ring) (c : Ring.carrier(r))
         (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (j k : Natural)
         (jLessOrEqualK : j ≤ k)
-        : Polynomial.coefficientOf(r,
-              (Polynomial.monomial(r, c, j) * p), k)
-          = (c * Polynomial.coefficientOf(r, p, Natural.monus(k, j))) :=
-  Polynomial.coefficientOf(r,
-           (Polynomial.monomial(r, c, j) * p), k)
-     = Ring.Sum(r,
-           (i : Natural) ↦
-               (Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i) * Polynomial.coefficientOf(r, p, Natural.monus(k, i))),
-           k)
+        : (Polynomial.monomial(r, c, j) * p)[k] = (c * p[Natural.monus(k, j)]) :=
+  (Polynomial.monomial(r, c, j) * p)[k]
+     = Ring.Sum(r, (i : Natural) ↦ (Polynomial.monomial(r, c, j)[i] * p[Natural.monus(k, i)]), k)
            by Polynomial.coefficientOf_multiply
-     = (Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), j) * Polynomial.coefficientOf(r, p, Natural.monus(k, j)))
+     = (Polynomial.monomial(r, c, j)[j] * p[Natural.monus(k, j)])
            by Ring.Sum.single_point(r,
-                  (i : Natural) ↦
-                      (Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i) * Polynomial.coefficientOf(r, p, Natural.monus(k, i))),
+                  (i : Natural) ↦ (Polynomial.monomial(r, c, j)[i] * p[Natural.monus(k, i)]),
                   j, k, jLessOrEqualK,
                   (i : Natural) (indexNotJ : ¬(i = j)) ↦
-                      (Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i)
-                                * Polynomial.coefficientOf(r, p, Natural.monus(k, i)))
-                         = (Ring.zero(r) * Polynomial.coefficientOf(r, p, Natural.monus(k, i)))
+                      (Polynomial.monomial(r, c, j)[i] * p[Natural.monus(k, i)])
+                         = (Ring.zero(r) * p[Natural.monus(k, i)])
                                by Polynomial.coefficientOf_monomial_off(r, c, j, i, indexNotJ)
                          = Ring.zero(r))
-     = (c * Polynomial.coefficientOf(r, p, Natural.monus(k, j)))
+     = (c * p[Natural.monus(k, j)])

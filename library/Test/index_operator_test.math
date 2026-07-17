@@ -1,0 +1,49 @@
+-- Indexing operator: `operator ([]) on (T, Index) := F` lets a value be
+-- indexed with brackets — `p[k]` is the coefficient of x^k in the
+-- polynomial p, elaborating to `Polynomial.coefficientOf(p, k)`
+-- (byte-identical term, so citations and matchers are unaffected).
+
+module Test.index_operator_test
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.degree
+
+-- The bracket form is the registered function, definitionally.
+theorem bracket_is_coefficientOf {r : Ring}
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (k : Natural)
+        : p[k] = Polynomial.coefficientOf(r, p, k) :=
+  reflexivity(Ring.carrier(r), p[k])
+
+-- The implicit ring is recovered from the indexed value's type, and the
+-- index can be any Natural expression, including a numeral.
+theorem bracket_zero_polynomial (r : Ring) (k : Natural)
+        : Polynomial.zero(r)[k] = Ring.zero(r) :=
+  Polynomial.coefficientOf_zero(r, k)
+
+-- Indexing chains with the surrounding operator grammar: sums of
+-- coefficients, coefficients of sums, numeral indices.
+theorem bracket_add (r : Ring)
+        (p q : Polynomial(Ring.carrier(r), Ring.zero(r))) (k : Natural)
+        : (p + q)[k] = p[k] + q[k] :=
+  Polynomial.coefficientOf_add(r, p, q, k)
+
+-- A cited lemma matches the bracket spelling (same elaborated term).
+theorem bracket_in_citation (r : Ring)
+        (p q : Polynomial(Ring.carrier(r), Ring.zero(r))) (k : Natural)
+        : (p + q)[k] = p[k] + q[k] :=
+  by Polynomial.coefficientOf_add
