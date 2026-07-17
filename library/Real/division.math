@@ -181,6 +181,61 @@ theorem Real.divide_nonneg (a b : ℝ) (bNonzero : b ≠ 0)
   done
 }
 
+-- The reciprocal does not depend on WHICH nonzero proof it carries:
+-- both candidates multiply x to 1, and multiplication by the nonzero x
+-- cancels. This is the bridge that lets rewriting step under `/` — the
+-- rewritten occurrence carries a transported proof, the stated form a
+-- fresh one, and the kernel has no definitional proof irrelevance.
+automatic theorem Real.reciprocal_proof_irrelevant
+        (x : ℝ) (firstNonzero secondNonzero : x ≠ 0)
+        : Real.reciprocal(x, firstNonzero) = Real.reciprocal(x, secondNonzero) := {
+  x * Real.reciprocal(x, firstNonzero) = 1;
+  x * Real.reciprocal(x, secondNonzero) = 1;
+  x * Real.reciprocal(x, firstNonzero) = x * Real.reciprocal(x, secondNonzero);
+  done by Real.equal_of_multiply_left
+}
+
+-- … and neither does a quotient.
+automatic theorem Real.divide_proof_irrelevant
+        (a b : ℝ) (firstNonzero secondNonzero : b ≠ 0)
+        : Real.divide(a, b, firstNonzero) = Real.divide(a, b, secondNonzero) := {
+  Real.reciprocal(b, firstNonzero) = Real.reciprocal(b, secondNonzero)
+      as reciprocalsAgree;
+  a * Real.reciprocal(b, firstNonzero) = a * Real.reciprocal(b, secondNonzero)
+      by substituting reciprocalsAgree;
+  done
+}
+
+-- Equal denominators give equal reciprocals, whatever proofs they
+-- carry: both multiply b to 1, and multiplication by b cancels.
+automatic theorem Real.reciprocal_congruence
+        (b c : ℝ) (bNonzero : b ≠ 0) (cNonzero : c ≠ 0)
+        (denominatorsEqual : b = c)
+        : Real.reciprocal(b, bNonzero) = Real.reciprocal(c, cNonzero) := {
+  b * Real.reciprocal(b, bNonzero) = 1;
+  c * Real.reciprocal(c, cNonzero) = 1;
+  b * Real.reciprocal(c, cNonzero) = 1
+      by substituting denominatorsEqual;
+  b * Real.reciprocal(b, bNonzero) = b * Real.reciprocal(c, cNonzero);
+  done by Real.equal_of_multiply_left
+}
+
+-- … so quotients agree whenever their denominators do. This is the
+-- congruence that lets an equation rewrite a denominator at all: a
+-- transport motive cannot abstract the denominator (the carried
+-- nonzero proof's TYPE mentions it), so the step must go through this
+-- lemma, its `b = c` premise discharged from the context equation.
+automatic theorem Real.divide_denominator_congruence
+        (a b c : ℝ) (bNonzero : b ≠ 0) (cNonzero : c ≠ 0)
+        (denominatorsEqual : b = c)
+        : Real.divide(a, b, bNonzero) = Real.divide(a, c, cNonzero) := {
+  Real.reciprocal(b, bNonzero) = Real.reciprocal(c, cNonzero)
+      as reciprocalsAgree;
+  a * Real.reciprocal(b, bNonzero) = a * Real.reciprocal(c, cNonzero)
+      by substituting reciprocalsAgree;
+  done
+}
+
 -- The reciprocal of a nonzero real is nonzero: x·x⁻¹ = 1 would
 -- otherwise be zero.
 automatic theorem Real.reciprocal_nonzero (x : ℝ) (xNonzero : x ≠ 0)
