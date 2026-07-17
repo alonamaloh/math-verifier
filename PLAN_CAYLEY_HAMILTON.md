@@ -102,6 +102,6 @@ table before the first polish pass.
 | C1 det over CommutativeRing | DONE 2026-07-17 (42b0915b) | zero Field-only facts; aggregation → commutative_ring_aggregation.math, field_aggregation deleted |
 | C2 polynomial ring bundle check | DONE 2026-07-17 | Polynomial.commutative_ring → commutative.math; CommutativeRing.polynomial_ring; ring tactic OK at polynomial bundle (Test/matrix_commutative_ring_instances_test) |
 | C3 xI − A + entry embedding | DONE 2026-07-17 | entrywise definition (compositional form blocked by mixed-carrier operator resolution); Polynomial.constant/indeterminate; matrix ops+operators; motive-peel elaborator fix |
-| C4 charPoly + degree/constant-term corollaries | DegreeLessThan + MONIC DONE 2026-07-17; constant term NEXT | see memory cayley_hamilton_arc for the ready bricks + friction recipes |
+| C4 charPoly + degree/constant-term corollaries | DONE 2026-07-17 (degree ≤ n, monic, charPoly[0] = (−1)^n·det) + polished to manifest bar | friction recipes in memory cayley_hamilton_arc + inbox (calc-carrier × ring, bundle-carrier inference) |
 | C5 evaluation homomorphism | TODO | design signature with owner; `p(x)` registration decision |
 | C6 Cayley–Hamilton | TODO | adjugate/Laplace vs telescoping — decide at design time |
