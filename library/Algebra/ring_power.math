@@ -12,6 +12,7 @@ import Equality.basics
 import Natural.basics
 import Natural.peano
 import Natural.arithmetic
+import Natural.one_plus_induction
 import Algebra.ring
 import Algebra.ring_bundle
 
@@ -25,3 +26,22 @@ definition Ring.power (r : Ring) (base : Ring.carrier(r)) : ℕ → Ring.carrier
 theorem Ring.power_add_one (r : Ring) (base : Ring.carrier(r)) (n : ℕ)
         : Ring.power(r, base, 1 + n) = base * Ring.power(r, base, n) :=
   done by substituting Natural.one_add
+
+-- The base commutes past its own powers: peeling from the top equals
+-- peeling from the bottom. (Pure associativity — no commutativity, so
+-- it holds in any ring; the Cayley–Hamilton telescoping leans on it.)
+theorem Ring.power_multiply_base (r : Ring) (base : Ring.carrier(r)) (n : ℕ)
+        : Ring.power(r, base, 1 + n) = Ring.power(r, base, n) * base :=
+  by induction on n with IH {
+    case base:
+        Ring.power(r, base, 1 + 0)
+           = base * Ring.power(r, base, 0)   by Ring.power_add_one
+           = base
+           = Ring.power(r, base, 0) * base
+    case step(m):
+        Ring.power(r, base, 1 + (1 + m))
+           = base * Ring.power(r, base, 1 + m)        by Ring.power_add_one
+           = base * (Ring.power(r, base, m) * base)   by substituting IH
+           = (base * Ring.power(r, base, m)) * base   by Ring.multiply_associative
+           = Ring.power(r, base, 1 + m) * base        by substituting Ring.power_add_one
+  }

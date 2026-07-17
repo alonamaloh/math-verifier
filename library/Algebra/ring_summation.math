@@ -119,6 +119,24 @@ theorem Ring.Sum.add (r : Ring) (f g : ℕ → Ring.carrier(r))
            = (Ring.Sum(r, f, 1 + k) + Ring.Sum(r, g, 1 + k))                           by substituting Ring.Sum.add_one
   }
 
+-- A telescoping sum collapses to its endpoints:
+-- Σ_{k=0}^{n} (g(k) − g(1+k)) = g(0) − g(1+n).
+theorem Ring.Sum.telescoping (r : Ring) (g : ℕ → Ring.carrier(r)) (n : ℕ)
+        : Ring.Sum(r, (k : ℕ) ↦ (g(k) - g(1 + k)), n) = (g(0) - g(1 + n)) :=
+  by induction on n with IH {
+    case base: {
+        Ring.Sum(r, (k : ℕ) ↦ (g(k) - g(1 + k)), 0)
+           = (g(0) - g(1 + 0))   by Ring.Sum.base;
+        done
+      }
+    case step(m):
+        Ring.Sum(r, (k : ℕ) ↦ (g(k) - g(1 + k)), 1 + m)
+           = (Ring.Sum(r, (k : ℕ) ↦ (g(k) - g(1 + k)), m) + (g(1 + m) - g(1 + (1 + m))))
+                 by Ring.Sum.add_one
+           = ((g(0) - g(1 + m)) + (g(1 + m) - g(1 + (1 + m))))   by IH
+           = (g(0) - g(1 + (1 + m)))   by ring
+  }
+
 -- Pull a left constant through the sum: c · Σ f = Σ (c · f).
 theorem Ring.Sum.scale_left (r : Ring) (c : Ring.carrier(r))
         (f : ℕ → Ring.carrier(r)) (n : ℕ)

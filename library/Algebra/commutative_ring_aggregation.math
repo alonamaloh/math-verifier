@@ -538,6 +538,31 @@ theorem CommutativeRing.sumOver_zero_on_members {r : CommutativeRing} {index : T
       }
   }
 
+-- A sum whose term vanishes on every member but one collapses to that
+-- member's term — the delta-collapse behind identity-matrix laws and
+-- basis-row expansions.
+theorem CommutativeRing.sumOver_single {r : CommutativeRing} {index : Type(0)}
+        (term : index → CommutativeRing.carrier(r)) (x : index) (items : List(index))
+        (distinct : List.Distinct(index, items))
+        (member : x ∈ items)
+        (vanishes : ∀ (y : index). y ∈ items → ¬(y = x) → term(y) = CommutativeRing.zero(r))
+        : CommutativeRing.sumOver(term, items) = term(x) := {
+  CommutativeRing.sumOver(term, items) = term(x) + CommutativeRing.sumOver(term, items ∖ x)
+      by CommutativeRing.sumOver_remove as removeEquation;
+  ∀ (y : index). y ∈ items ∖ x → term(y) = CommutativeRing.zero(r)
+      by (y : index) (yInRemove : y ∈ items ∖ x) ↦ {
+          y ∈ items by List.remove_member_subset;
+          ¬(y = x) by List.remove_member_ne;
+          done by vanishes
+        };
+  CommutativeRing.sumOver(term, items ∖ x) = CommutativeRing.zero(r)
+      by CommutativeRing.sumOver_zero_on_members as restVanishes;
+  CommutativeRing.sumOver(term, items)
+     = term(x) + CommutativeRing.sumOver(term, items ∖ x)   by removeEquation
+     = term(x) + CommutativeRing.zero(r)                    by substituting restVanishes
+     = term(x)                                              by CommutativeRing.add_zero
+}
+
 -- A sum over a list is invariant under permuting the item list (ring
 -- addition is commutative and associative) — the additive companion of
 -- `productOver_permutation`.

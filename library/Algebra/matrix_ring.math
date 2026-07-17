@@ -1,0 +1,466 @@
+-- Algebra/matrix_ring.math
+--
+-- Square matrices over a commutative ring form a (noncommutative) ring:
+-- the entrywise additive group, the identity matrix, associativity of the
+-- product (a double-sum interchange), and the two distributivities,
+-- packaged as the bundle `Matrix.ring(c, n)`. The bundle is what makes
+-- `Ring.Sum` and `Ring.power` — and every abstract ring lemma — available
+-- to matrix arguments for free. The scalar action `s • X` and its
+-- interaction with the product (scalars are central) close the file.
+
+module Algebra.matrix_ring
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.remove
+import Lists.distinct
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_power
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+
+definition Matrix.zero (c : CommutativeRing) (rows columns : ℕ) : Matrix(c, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦ CommutativeRing.zero(c)
+
+-- Two matrices with equal entries are equal: function extensionality,
+-- row by row.
+theorem Matrix.equal_of_entries {c : CommutativeRing} {rows columns : ℕ}
+        (X Y : Matrix(c, rows, columns))
+        (entries : ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)). X(i, j) = Y(i, j))
+        : X = Y := {
+  ∀ (i : NaturalsBelow(rows)). X(i) = Y(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (j : NaturalsBelow(columns)). X(i, j) = Y(i, j)
+              by (j : NaturalsBelow(columns)) ↦ entries(i, j);
+          done by Function.extensionality
+        };
+  done by Function.extensionality
+}
+
+-- ----------------------------------------------------------------------
+-- The additive abelian group, law by law. Every entry of an entrywise
+-- operation reduces definitionally, so each law is its ring counterpart
+-- under `equal_of_entries`.
+
+theorem Matrix.add_associative (c : CommutativeRing) (rows columns : ℕ)
+        (X Y Z : Matrix(c, rows, columns))
+        : (X + Y) + Z = X + (Y + Z) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      ((X + Y) + Z)(i, j) = (X + (Y + Z))(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          ((X + Y) + Z)(i, j)
+             = (X(i, j) + Y(i, j)) + Z(i, j)
+             = X(i, j) + (Y(i, j) + Z(i, j))   by ring
+             = (X + (Y + Z))(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.add_commutative (c : CommutativeRing) (rows columns : ℕ)
+        (X Y : Matrix(c, rows, columns))
+        : X + Y = Y + X := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (X + Y)(i, j) = (Y + X)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (X + Y)(i, j)
+             = X(i, j) + Y(i, j)
+             = Y(i, j) + X(i, j)   by ring
+             = (Y + X)(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.zero_add (c : CommutativeRing) (rows columns : ℕ)
+        (X : Matrix(c, rows, columns))
+        : Matrix.zero(c, rows, columns) + X = X := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (Matrix.zero(c, rows, columns) + X)(i, j) = X(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (Matrix.zero(c, rows, columns) + X)(i, j)
+             = CommutativeRing.zero(c) + X(i, j)
+             = X(i, j)   by ring;
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.add_zero (c : CommutativeRing) (rows columns : ℕ)
+        (X : Matrix(c, rows, columns))
+        : X + Matrix.zero(c, rows, columns) = X := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (X + Matrix.zero(c, rows, columns))(i, j) = X(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (X + Matrix.zero(c, rows, columns))(i, j)
+             = X(i, j) + CommutativeRing.zero(c)
+             = X(i, j)   by ring;
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.add_negate_left (c : CommutativeRing) (rows columns : ℕ)
+        (X : Matrix(c, rows, columns))
+        : Matrix.negate(X) + X = Matrix.zero(c, rows, columns) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (Matrix.negate(X) + X)(i, j) = Matrix.zero(c, rows, columns)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (Matrix.negate(X) + X)(i, j)
+             = CommutativeRing.negate(X(i, j)) + X(i, j)
+             = CommutativeRing.zero(c)   by ring
+             = Matrix.zero(c, rows, columns)(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.add_negate_right (c : CommutativeRing) (rows columns : ℕ)
+        (X : Matrix(c, rows, columns))
+        : X + Matrix.negate(X) = Matrix.zero(c, rows, columns) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (X + Matrix.negate(X))(i, j) = Matrix.zero(c, rows, columns)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (X + Matrix.negate(X))(i, j)
+             = X(i, j) + CommutativeRing.negate(X(i, j))
+             = CommutativeRing.zero(c)   by ring
+             = Matrix.zero(c, rows, columns)(i, j);
+  done by Matrix.equal_of_entries
+}
+
+-- ----------------------------------------------------------------------
+-- The multiplicative laws: associativity by the double-sum interchange,
+-- the identity laws by delta collapse, distributivity pointwise.
+
+theorem Matrix.multiply_associative (c : CommutativeRing) (rows middle1 middle2 columns : ℕ)
+        (X : Matrix(c, rows, middle1)) (Y : Matrix(c, middle1, middle2))
+        (Z : Matrix(c, middle2, columns))
+        : (X * Y) * Z = X * (Y * Z) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      ((X * Y) * Z)(i, j) = (X * (Y * Z))(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          ((X * Y) * Z)(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle2)) ↦
+                       CommutativeRing.sumOver(
+                           (t : NaturalsBelow(middle1)) ↦ X(i, t) * Y(t, k),
+                           NaturalsBelow.enumerate(middle1)) * Z(k, j),
+                   NaturalsBelow.enumerate(middle2))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle2)) ↦
+                       CommutativeRing.sumOver(
+                           (t : NaturalsBelow(middle1)) ↦ (X(i, t) * Y(t, k)) * Z(k, j),
+                           NaturalsBelow.enumerate(middle1)),
+                   NaturalsBelow.enumerate(middle2))
+                 by CommutativeRing.sumOver_congruence(
+                        pointwise := (k : NaturalsBelow(middle2)) ↦
+                            CommutativeRing.sumOver_scale_right(
+                                (t : NaturalsBelow(middle1)) ↦ X(i, t) * Y(t, k),
+                                Z(k, j), NaturalsBelow.enumerate(middle1)))
+             = CommutativeRing.sumOver(
+                   (t : NaturalsBelow(middle1)) ↦
+                       CommutativeRing.sumOver(
+                           (k : NaturalsBelow(middle2)) ↦ (X(i, t) * Y(t, k)) * Z(k, j),
+                           NaturalsBelow.enumerate(middle2)),
+                   NaturalsBelow.enumerate(middle1))
+                 by CommutativeRing.sumOver_interchange(
+                        term := (k : NaturalsBelow(middle2)) ↦ (t : NaturalsBelow(middle1)) ↦
+                            (X(i, t) * Y(t, k)) * Z(k, j))
+             = CommutativeRing.sumOver(
+                   (t : NaturalsBelow(middle1)) ↦
+                       CommutativeRing.sumOver(
+                           (k : NaturalsBelow(middle2)) ↦ X(i, t) * (Y(t, k) * Z(k, j)),
+                           NaturalsBelow.enumerate(middle2)),
+                   NaturalsBelow.enumerate(middle1))
+                 by CommutativeRing.sumOver_congruence(
+                        pointwise := (t : NaturalsBelow(middle1)) ↦ {
+                            CommutativeRing.sumOver(
+                                  (k : NaturalsBelow(middle2)) ↦ (X(i, t) * Y(t, k)) * Z(k, j),
+                                  NaturalsBelow.enumerate(middle2))
+                               = CommutativeRing.sumOver(
+                                     (k : NaturalsBelow(middle2)) ↦ X(i, t) * (Y(t, k) * Z(k, j)),
+                                     NaturalsBelow.enumerate(middle2))
+                               by CommutativeRing.sumOver_congruence(
+                                      pointwise := (k : NaturalsBelow(middle2)) ↦ {
+                                          (X(i, t) * Y(t, k)) * Z(k, j)
+                                             = X(i, t) * (Y(t, k) * Z(k, j))   by ring
+                                        })
+                          })
+             = CommutativeRing.sumOver(
+                   (t : NaturalsBelow(middle1)) ↦
+                       X(i, t) * CommutativeRing.sumOver(
+                           (k : NaturalsBelow(middle2)) ↦ Y(t, k) * Z(k, j),
+                           NaturalsBelow.enumerate(middle2)),
+                   NaturalsBelow.enumerate(middle1))
+                 by CommutativeRing.sumOver_congruence(
+                        pointwise := (t : NaturalsBelow(middle1)) ↦ {
+                            CommutativeRing.sumOver(
+                                  (k : NaturalsBelow(middle2)) ↦ X(i, t) * (Y(t, k) * Z(k, j)),
+                                  NaturalsBelow.enumerate(middle2))
+                               = X(i, t) * CommutativeRing.sumOver(
+                                     (k : NaturalsBelow(middle2)) ↦ Y(t, k) * Z(k, j),
+                                     NaturalsBelow.enumerate(middle2))
+                               by CommutativeRing.sumOver_scale_left
+                          })
+             = (X * (Y * Z))(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.one_multiply (c : CommutativeRing) (n columns : ℕ)
+        (X : Matrix(c, n, columns))
+        : Matrix.identity(c, n) * X = X := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n))
+      by NaturalsBelow.enumerate_distinct;
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(columns)).
+      (Matrix.identity(c, n) * X)(i, j) = X(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(columns)) ↦ {
+          i ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+          ∀ (y : NaturalsBelow(n)). y ∈ NaturalsBelow.enumerate(n)
+              → ¬(y = i)
+              → Matrix.identity(c, n)(i, y) * X(y, j) = CommutativeRing.zero(c)
+              by (y : NaturalsBelow(n)) (yMember : y ∈ NaturalsBelow.enumerate(n))
+                 (yNotI : ¬(y = i)) ↦ {
+                  ¬(i = y) by (equal : i = y) ↦ { y = i; done };
+                  Matrix.identity(c, n)(i, y) = CommutativeRing.zero(c)
+                      by Matrix.identity_entry_off as entryZero;
+                  Matrix.identity(c, n)(i, y) * X(y, j)
+                     = CommutativeRing.zero(c) * X(y, j)   by substituting entryZero
+                     = CommutativeRing.zero(c)             by ring;
+                  done
+                };
+          (Matrix.identity(c, n) * X)(i, j)
+             = Matrix.identity(c, n)(i, i) * X(i, j)   by CommutativeRing.sumOver_single
+             = CommutativeRing.one(c) * X(i, j)        by substituting Matrix.identity_entry_diagonal
+             = X(i, j)                                 by ring;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.multiply_one (c : CommutativeRing) (rows n : ℕ)
+        (X : Matrix(c, rows, n))
+        : X * Matrix.identity(c, n) = X := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n))
+      by NaturalsBelow.enumerate_distinct;
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(n)).
+      (X * Matrix.identity(c, n))(i, j) = X(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(n)) ↦ {
+          j ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+          ∀ (y : NaturalsBelow(n)). y ∈ NaturalsBelow.enumerate(n)
+              → ¬(y = j)
+              → X(i, y) * Matrix.identity(c, n)(y, j) = CommutativeRing.zero(c)
+              by (y : NaturalsBelow(n)) (yMember : y ∈ NaturalsBelow.enumerate(n))
+                 (yNotJ : ¬(y = j)) ↦ {
+                  Matrix.identity(c, n)(y, j) = CommutativeRing.zero(c)
+                      by Matrix.identity_entry_off as entryZero;
+                  X(i, y) * Matrix.identity(c, n)(y, j)
+                     = X(i, y) * CommutativeRing.zero(c)   by substituting entryZero
+                     = CommutativeRing.zero(c)             by ring;
+                  done
+                };
+          (X * Matrix.identity(c, n))(i, j)
+             = X(i, j) * Matrix.identity(c, n)(j, j)   by CommutativeRing.sumOver_single
+             = X(i, j) * CommutativeRing.one(c)        by substituting Matrix.identity_entry_diagonal
+             = X(i, j)                                 by ring;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.distributivity_left (c : CommutativeRing) (rows middle columns : ℕ)
+        (X : Matrix(c, rows, middle)) (Y Z : Matrix(c, middle, columns))
+        : X * (Y + Z) = X * Y + X * Z := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (X * (Y + Z))(i, j) = (X * Y + X * Z)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (X * (Y + Z))(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ X(i, k) * (Y(k, j) + Z(k, j)),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ X(i, k) * Y(k, j) + X(i, k) * Z(k, j),
+                   NaturalsBelow.enumerate(middle))
+                 by CommutativeRing.sumOver_congruence(
+                        pointwise := (k : NaturalsBelow(middle)) ↦ {
+                            X(i, k) * (Y(k, j) + Z(k, j))
+                               = X(i, k) * Y(k, j) + X(i, k) * Z(k, j)   by ring
+                          })
+             = (X * Y + X * Z)(i, j)
+                 by CommutativeRing.sumOver_add;
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.distributivity_right (c : CommutativeRing) (rows middle columns : ℕ)
+        (X Y : Matrix(c, rows, middle)) (Z : Matrix(c, middle, columns))
+        : (X + Y) * Z = X * Z + Y * Z := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      ((X + Y) * Z)(i, j) = (X * Z + Y * Z)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          ((X + Y) * Z)(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ (X(i, k) + Y(i, k)) * Z(k, j),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ X(i, k) * Z(k, j) + Y(i, k) * Z(k, j),
+                   NaturalsBelow.enumerate(middle))
+                 by CommutativeRing.sumOver_congruence(
+                        pointwise := (k : NaturalsBelow(middle)) ↦ {
+                            (X(i, k) + Y(i, k)) * Z(k, j)
+                               = X(i, k) * Z(k, j) + Y(i, k) * Z(k, j)   by ring
+                          })
+             = (X * Z + Y * Z)(i, j)
+                 by CommutativeRing.sumOver_add;
+  done by Matrix.equal_of_entries
+}
+
+-- ----------------------------------------------------------------------
+-- The bundle. `Matrix.ring(c, n)` puts Ring.Sum, Ring.power, and every
+-- abstract ring lemma at the disposal of square-matrix arguments.
+
+theorem Matrix.add_is_abelian_group (c : CommutativeRing) (rows columns : ℕ)
+        : IsAbelianGroup(Matrix(c, rows, columns), Matrix.add,
+                         Matrix.zero(c, rows, columns), Matrix.negate) :=
+  ⟨⟨⟨Matrix.add_associative(c, rows, columns),
+     Matrix.zero_add(c, rows, columns),
+     Matrix.add_zero(c, rows, columns)⟩,
+    Matrix.add_negate_left(c, rows, columns),
+    Matrix.add_negate_right(c, rows, columns)⟩,
+   Matrix.add_commutative(c, rows, columns)⟩
+
+theorem Matrix.multiply_is_monoid (c : CommutativeRing) (n : ℕ)
+        : IsMonoid(Matrix(c, n, n), Matrix.multiply, Matrix.identity(c, n)) :=
+  ⟨Matrix.multiply_associative(c, n, n, n, n),
+   Matrix.one_multiply(c, n, n),
+   Matrix.multiply_one(c, n, n)⟩
+
+theorem Matrix.is_ring (c : CommutativeRing) (n : ℕ)
+        : IsRing(Matrix(c, n, n), Matrix.add, Matrix.zero(c, n, n),
+                 Matrix.negate, Matrix.multiply, Matrix.identity(c, n)) :=
+  ⟨Matrix.add_is_abelian_group(c, n, n),
+   Matrix.multiply_is_monoid(c, n),
+   Matrix.distributivity_left(c, n, n, n),
+   Matrix.distributivity_right(c, n, n, n)⟩
+
+definition Matrix.ring (c : CommutativeRing) (n : ℕ) : Ring :=
+  Ring.make(Matrix(c, n, n), Matrix.add, Matrix.zero(c, n, n),
+      Matrix.negate, Matrix.multiply, Matrix.identity(c, n),
+      Matrix.is_ring(c, n))
+
+-- ----------------------------------------------------------------------
+-- The scalar action and its interaction with the product: scalars pull
+-- through either factor, and scalar multiples of the identity are
+-- central.
+
+theorem Matrix.scale_zero_scalar {c : CommutativeRing} {rows columns : ℕ}
+        (X : Matrix(c, rows, columns))
+        : CommutativeRing.zero(c) • X = Matrix.zero(c, rows, columns) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (CommutativeRing.zero(c) • X)(i, j) = Matrix.zero(c, rows, columns)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (CommutativeRing.zero(c) • X)(i, j)
+             = CommutativeRing.zero(c) * X(i, j)
+             = CommutativeRing.zero(c)   by ring
+             = Matrix.zero(c, rows, columns)(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.scale_add_scalar {c : CommutativeRing} {rows columns : ℕ}
+        (s t : CommutativeRing.carrier(c)) (X : Matrix(c, rows, columns))
+        : (s + t) • X = s • X + t • X := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      ((s + t) • X)(i, j) = (s • X + t • X)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          ((s + t) • X)(i, j)
+             = (s + t) * X(i, j)
+             = s * X(i, j) + t * X(i, j)   by ring
+             = (s • X + t • X)(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.scale_multiply_left {c : CommutativeRing} {rows middle columns : ℕ}
+        (s : CommutativeRing.carrier(c))
+        (X : Matrix(c, rows, middle)) (Y : Matrix(c, middle, columns))
+        : (s • X) * Y = s • (X * Y) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      ((s • X) * Y)(i, j) = (s • (X * Y))(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          ((s • X) * Y)(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ (s * X(i, k)) * Y(k, j),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ s * (X(i, k) * Y(k, j)),
+                   NaturalsBelow.enumerate(middle))
+                 by CommutativeRing.sumOver_congruence(
+                        pointwise := (k : NaturalsBelow(middle)) ↦ {
+                            (s * X(i, k)) * Y(k, j) = s * (X(i, k) * Y(k, j))   by ring
+                          })
+             = s * CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ X(i, k) * Y(k, j),
+                   NaturalsBelow.enumerate(middle))
+                 by CommutativeRing.sumOver_scale_left
+             = (s • (X * Y))(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.scale_multiply_right {c : CommutativeRing} {rows middle columns : ℕ}
+        (s : CommutativeRing.carrier(c))
+        (X : Matrix(c, rows, middle)) (Y : Matrix(c, middle, columns))
+        : X * (s • Y) = s • (X * Y) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (X * (s • Y))(i, j) = (s • (X * Y))(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (X * (s • Y))(i, j)
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ X(i, k) * (s * Y(k, j)),
+                   NaturalsBelow.enumerate(middle))
+             = CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ s * (X(i, k) * Y(k, j)),
+                   NaturalsBelow.enumerate(middle))
+                 by CommutativeRing.sumOver_congruence(
+                        pointwise := (k : NaturalsBelow(middle)) ↦ {
+                            X(i, k) * (s * Y(k, j)) = s * (X(i, k) * Y(k, j))   by ring
+                          })
+             = s * CommutativeRing.sumOver(
+                   (k : NaturalsBelow(middle)) ↦ X(i, k) * Y(k, j),
+                   NaturalsBelow.enumerate(middle))
+                 by CommutativeRing.sumOver_scale_left
+             = (s • (X * Y))(i, j);
+  done by Matrix.equal_of_entries
+}
+
+-- Scalar multiples of the identity are central.
+theorem Matrix.scale_identity_multiply_left {c : CommutativeRing} {n columns : ℕ}
+        (s : CommutativeRing.carrier(c)) (X : Matrix(c, n, columns))
+        : (s • Matrix.identity(c, n)) * X = s • X :=
+  (s • Matrix.identity(c, n)) * X
+     = s • (Matrix.identity(c, n) * X)   by Matrix.scale_multiply_left
+     = s • X                             by substituting Matrix.one_multiply
+
+theorem Matrix.scale_identity_multiply_right {c : CommutativeRing} {rows n : ℕ}
+        (s : CommutativeRing.carrier(c)) (X : Matrix(c, rows, n))
+        : X * (s • Matrix.identity(c, n)) = s • X :=
+  X * (s • Matrix.identity(c, n))
+     = s • (X * Matrix.identity(c, n))   by Matrix.scale_multiply_right
+     = s • X                             by substituting Matrix.multiply_one
+
+-- ----------------------------------------------------------------------
+-- Powers, through the bundle.
+
+definition Matrix.power {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (k : ℕ) : Matrix(c, n, n) :=
+  Ring.power(Matrix.ring(c, n), A, k)
+
+theorem Matrix.power_add_one {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (k : ℕ)
+        : Matrix.power(A, 1 + k) = A * Matrix.power(A, k) :=
+  by Ring.power_add_one
+
+theorem Matrix.power_multiply_base {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (k : ℕ)
+        : Matrix.power(A, 1 + k) = Matrix.power(A, k) * A :=
+  by Ring.power_multiply_base
