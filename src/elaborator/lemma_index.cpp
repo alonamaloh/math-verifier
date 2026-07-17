@@ -750,14 +750,37 @@ ExpressionPointer Elaborator::tryInstantiateUniversalContextFact(
         const std::vector<LocalBinder>& localBinders,
         const Context& openedContext,
         const std::vector<ContextFact>& facts) {
+    // A Pi-typed slot (`∀ j. P'(j)`, possibly with hypothesis binders)
+    // is eta-bridged: peel the slot's own binders, match the body with
+    // those binders ambient, and wrap the instantiated fact back in
+    // lambdas — `λ j. fact(m + j)` for the shifted-family premise a
+    // `partialSum_nonneg`-style lemma wants. A plain slot is the
+    // degenerate zero-binder case of the same path.
+    std::vector<const Pi*> slotPis;
+    ExpressionPointer slotBody = slotType;
+    while (auto* slotPi = std::get_if<Pi>(&slotBody->node)) {
+        slotPis.push_back(slotPi);
+        slotBody = slotPi->codomain;
+    }
+    int slotBinderCount = static_cast<int>(slotPis.size());
+    // A slot instantiated from a lambda-valued hole arrives with beta
+    // redexes in its body (`0 ≤ (λ j. s(m + j))(j̄)`); collapse them so
+    // the structural match sees the applied form.
+    slotBody = deepBetaReduce(slotBody);
     // Head-prefiltered like the conjunction-leg premise pass; the
     // data-binder gate keeps implications (whose own premises would
     // need proof search) out of the pass.
-    std::string slotHead = spineHeadConstantName(slotType);
+    std::string slotHead = spineHeadConstantName(slotBody);
     if (slotHead.empty()) return nullptr;
     for (const ContextFact& fact : facts) {
         if (!std::holds_alternative<Pi>(fact.type->node)) continue;
-        ExpressionPointer body = fact.type;
+        // Lift the fact under the slot's binders so its ambient
+        // references skip them, then peel its ∀ binders as pattern
+        // metavariables. The bindings the match pins may mention the
+        // slot binders — that is the point of the eta-bridge.
+        ExpressionPointer liftedFactType =
+            liftBoundVariables(fact.type, slotBinderCount, 0);
+        ExpressionPointer body = liftedFactType;
         int forallCount = 0;
         while (auto* forallPi = std::get_if<Pi>(&body->node)) {
             body = forallPi->codomain;
@@ -775,7 +798,7 @@ ExpressionPointer Elaborator::tryInstantiateUniversalContextFact(
             continue;
         }
         std::vector<ExpressionPointer> forallBindings(forallCount);
-        if (!matchAgainstPattern(body, slotType, forallCount,
+        if (!matchAgainstPattern(body, slotBody, forallCount,
                                  forallBindings)) {
             continue;
         }
@@ -784,10 +807,16 @@ ExpressionPointer Elaborator::tryInstantiateUniversalContextFact(
             if (!forallBinding) { allPinned = false; break; }
         }
         if (!allPinned) continue;
-        ExpressionPointer instantiated = fact.proofTerm;
+        ExpressionPointer instantiated =
+            liftBoundVariables(fact.proofTerm, slotBinderCount, 0);
         for (int b = forallCount - 1; b >= 0; --b) {
             instantiated = makeApplication(
                 std::move(instantiated), forallBindings[b]);
+        }
+        for (int b = slotBinderCount - 1; b >= 0; --b) {
+            instantiated = makeLambda(
+                slotPis[b]->displayHint, slotPis[b]->domain,
+                std::move(instantiated));
         }
         return instantiated;
     }

@@ -2223,7 +2223,21 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 // instantiation is forced by the match, so no search is
                 // involved (the `termsNonneg : ∀ j. 0 ≤ s(j)` premise
                 // gap). Runs after the direct scan so an exact
-                // hypothesis still wins.
+                // hypothesis still wins. The helper also eta-bridges
+                // Pi-typed slots (`∀ j. 0 ≤ s(m + j)` from the same
+                // fact, wrapped as `λ j. termsNonneg(m + j)`).
+                if (!found) {
+                    ExpressionPointer instantiated =
+                        tryInstantiateUniversalContextFact(
+                            slotType, localBinders, openedContext,
+                            localFacts);
+                    if (instantiated) {
+                        elaboratedArgs[i] = std::move(instantiated);
+                        lastDischarges_.push_back(
+                            {N - 1, N, "context fact (∀-instantiated)"});
+                        found = true;
+                    }
+                }
                 if (!found) {
                     for (const ContextFact& fact : localFacts) {
                         ExpressionPointer candidateOpened;

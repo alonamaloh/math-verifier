@@ -2372,6 +2372,22 @@ ExpressionPointer Elaborator::completeCitationWithStrategy(
                             }
                         }
                         if (bindings[innerIndex]) continue;
+                        // (a'') ∀-fact instantiation, eta-bridging
+                        // Pi-typed premises: `∀ j. 0 ≤ s(m + j)`
+                        // discharges from `termsNonneg : ∀ j. 0 ≤ s(j)`
+                        // as `λ j. termsNonneg(m + j)`. The match pins
+                        // the instantiation — no proof search — so it
+                        // stays on in the speculative context scan.
+                        ExpressionPointer instantiated =
+                            tryInstantiateUniversalContextFact(
+                                concretePremise, localBinders,
+                                openedContext,
+                                collectLocalBinderFacts(localBinders));
+                        if (instantiated) {
+                            bindings[innerIndex] = std::move(instantiated);
+                            progress = true;
+                            continue;
+                        }
                     }
                     // (b) reflexivity for a now-determined equality premise.
                     if (referencesUnfilled(domain, 0)) continue;
