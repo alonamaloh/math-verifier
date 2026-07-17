@@ -99,9 +99,9 @@ table before the first polish pass.
 |------|-------|-------|
 | W  warm-up: U3+U6 | DONE 2026-07-17 | see PLAN_USABILITY.md ledger for details |
 | W' warm-up: Freek #52/#58 | OPTIONAL | quick wins on fresh notation |
-| C1 det over CommutativeRing | TODO | audit Field uses first; main lift |
-| C2 polynomial ring bundle check | TODO | ring tactic at abstract bundle? |
-| C3 xI − A + entry embedding | TODO | coercion design for entries |
-| C4 charPoly + degree/constant-term corollaries | TODO | acceptance for C1-C3 |
+| C1 det over CommutativeRing | DONE 2026-07-17 (42b0915b) | zero Field-only facts; aggregation → commutative_ring_aggregation.math, field_aggregation deleted |
+| C2 polynomial ring bundle check | DONE 2026-07-17 | Polynomial.commutative_ring → commutative.math; CommutativeRing.polynomial_ring; ring tactic OK at polynomial bundle (Test/matrix_commutative_ring_instances_test) |
+| C3 xI − A + entry embedding | DONE 2026-07-17 | entrywise definition (compositional form blocked by mixed-carrier operator resolution); Polynomial.constant/indeterminate; matrix ops+operators; motive-peel elaborator fix |
+| C4 charPoly + degree/constant-term corollaries | DegreeLessThan + MONIC DONE 2026-07-17; constant term NEXT | see memory cayley_hamilton_arc for the ready bricks + friction recipes |
 | C5 evaluation homomorphism | TODO | design signature with owner; `p(x)` registration decision |
 | C6 Cayley–Hamilton | TODO | adjugate/Laplace vs telescoping — decide at design time |
