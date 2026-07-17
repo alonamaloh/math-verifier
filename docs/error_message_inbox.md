@@ -1705,3 +1705,18 @@ recipe: re-quantify the varying object INSIDE the split (prove
 the outer binder. Fix direction: either transport fixed binders into the
 arm (generalized rewrite), or have the case arm surface a bridging
 equation so citations can `substituting` across it.
+
+**ERROR QUALITY (claim failure surfaces as decide complaint, 2026-07-17,
+arithmetic_geometric_mean).** Inside `∀ (k : ℕ). P(k) by { take k;
+if k = 0 then {...} else {...} }`, when a bare claim in the else-branch
+fails to auto-prove, the reported error is
+  "decide expression at line N … decide P { … } needs an expected type
+   from context"
+pointing at the `if` — the actual failed claim (and its candidate list)
+is never shown. Hit while deleting sign bookkeeping: the else-branch's
+`0 ≤ (m : ℝ) * s(k ∸ 1)` could not discharge `0 ≤ s(k ∸ 1)` from the
+∀-quantified `termsNonneg`, but the message gave no hint of that. Fix
+directions: report the failing inner claim (with its usual search
+report) instead of the decide-shape complaint; separately, close the
+underlying gap — ∀-quantified context facts should instantiate during
+premise discharge (PLAN_SIGN_DISCHARGE.md S2).
