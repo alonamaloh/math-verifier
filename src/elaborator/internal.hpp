@@ -1995,6 +1995,15 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int /*line*/);
 
+    // Bounded mixed-strictness order chaining (the multi-premise
+    // successor to B4): `a < b` / `a ≤ b` from a ≤/< chain, `¬(a = b)`
+    // via `LessThan.distinct`, `False` from a strict cycle via
+    // `LessThan.irreflexive`. See the definition for the compose table.
+    ExpressionPointer tryOrderChainClosure(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/);
+
     // Build `<transitiveName>(a, b, c, hAB, hBC)` (closed-form term)
     // with given a/b/c (opened) and hypothesis proofs (closed-form
     // terms in the current scope). Tries both hypothesis-arg

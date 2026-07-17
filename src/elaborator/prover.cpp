@@ -1988,6 +1988,377 @@ ExpressionPointer Elaborator::buildTransitiveCall(
         return nullptr;
     }
 
+// Bounded mixed-strictness order chaining — the multi-premise successor
+// to B4's single-goal monotonicity. Closes, from in-scope `≤`/`<` facts
+// at one carrier (conjunction legs included via collectLocalBinderFacts):
+//   * `a < b` — a chain with at least one strict edge
+//     (compose table: ≤∘≤ = LessOrEqual.transitive, ≤∘< =
+//      LessThan.transitive_left, <∘≤ = LessThan.transitive_right,
+//      <∘< = transitive_right after weakening the second edge);
+//   * `a ≤ b` — any chain (a strict result is weakened at the end);
+//   * `¬(a = b)` — a strict chain a→b, through `LessThan.distinct`;
+//   * `False` — a strict cycle, through `LessThan.irreflexive`.
+// Bounded exactly like the same-head bridge: BFS over fact endpoints
+// (defeq-dedup'd), MAX_DEPTH 8, `autoProveSpend` per expansion. The
+// carrier's lemma family is found by name (`<P>.LessThan.transitive_left`
+// etc.); a carrier without the family simply declines.
+ExpressionPointer Elaborator::tryOrderChainClosure(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        int N = static_cast<int>(localBinders.size());
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+
+        // ---- Goal classification ------------------------------------
+        enum class Mode { Strict, Weak, Distinct, Cycle };
+        Mode mode;
+        std::string carrierPrefix;      // e.g. "Real" (from "Real.LessThan")
+        ExpressionPointer goalA, goalB; // opened endpoints (Strict/Weak/Distinct)
+
+        auto relationSplit = [&](ExpressionPointer type, std::string& prefix,
+                                 bool& strict, ExpressionPointer& a,
+                                 ExpressionPointer& b) -> bool {
+            auto* outer = std::get_if<Application>(&type->node);
+            if (!outer) return false;
+            auto* inner = std::get_if<Application>(&outer->function->node);
+            if (!inner) return false;
+            auto* head = std::get_if<Constant>(&inner->function->node);
+            if (!head) return false;
+            const std::string& name = head->name;
+            static const std::string ltSuffix = ".LessThan";
+            static const std::string leSuffix = ".LessOrEqual";
+            if (name.size() > ltSuffix.size()
+                && name.compare(name.size() - ltSuffix.size(),
+                                ltSuffix.size(), ltSuffix) == 0) {
+                prefix = name.substr(0, name.size() - ltSuffix.size());
+                strict = true;
+            } else if (name.size() > leSuffix.size()
+                       && name.compare(name.size() - leSuffix.size(),
+                                       leSuffix.size(), leSuffix) == 0) {
+                prefix = name.substr(0, name.size() - leSuffix.size());
+                strict = false;
+            } else {
+                return false;
+            }
+            a = inner->argument;
+            b = outer->argument;
+            return true;
+        };
+
+        bool goalStrictFlag = false;
+        if (auto* falseConst = std::get_if<Constant>(&goalOpened->node);
+            falseConst && falseConst->name == "False") {
+            mode = Mode::Cycle;
+        } else if (auto* notApp = std::get_if<Application>(&goalOpened->node);
+                   notApp
+                   && std::get_if<Constant>(&notApp->function->node)
+                   && std::get_if<Constant>(&notApp->function->node)->name
+                          == "Not") {
+            // ¬(a = b): peel the Equality triple.
+            auto* eqOuter = std::get_if<Application>(&notApp->argument->node);
+            if (!eqOuter) return nullptr;
+            auto* eqMid = std::get_if<Application>(&eqOuter->function->node);
+            if (!eqMid) return nullptr;
+            auto* eqInner = std::get_if<Application>(&eqMid->function->node);
+            if (!eqInner) return nullptr;
+            auto* eqHead = std::get_if<Constant>(&eqInner->function->node);
+            if (!eqHead || eqHead->name != "Equality") return nullptr;
+            mode = Mode::Distinct;
+            goalA = eqMid->argument;
+            goalB = eqOuter->argument;
+        } else if (relationSplit(goalOpened, carrierPrefix, goalStrictFlag,
+                                 goalA, goalB)) {
+            mode = goalStrictFlag ? Mode::Strict : Mode::Weak;
+        } else {
+            return nullptr;
+        }
+
+        // ---- Edge collection ----------------------------------------
+        struct OrderEdge {
+            ExpressionPointer source;  // opened
+            ExpressionPointer target;  // opened
+            ExpressionPointer proof;   // closed at depth N
+            bool strict;
+        };
+        // For Distinct/Cycle goals the carrier isn't named by the goal —
+        // adopt the prefix of the first strict fact found (one carrier
+        // per call keeps the search bounded; mixed-carrier contexts get
+        // whichever family appears first, and the cast tiers handle
+        // cross-carrier goals).
+        std::vector<OrderEdge> edges;
+        bool anyStrictEdge = false;
+        for (const ContextFact& fact : collectLocalBinderFacts(localBinders)) {
+            ExpressionPointer hTypeOpened;
+            try {
+                hTypeOpened = openOverLocalBinders(fact.type, localBinders, N);
+            } catch (const TypeError&) {
+                continue;
+            }
+            std::string prefix;
+            bool strict;
+            ExpressionPointer a, b;
+            if (!relationSplit(hTypeOpened, prefix, strict, a, b)) continue;
+            if (carrierPrefix.empty()) {
+                carrierPrefix = prefix;
+            } else if (prefix != carrierPrefix) {
+                continue;
+            }
+            edges.push_back({a, b, fact.proofTerm, strict});
+            anyStrictEdge = anyStrictEdge || strict;
+        }
+        if (edges.empty() || carrierPrefix.empty()) return nullptr;
+        if ((mode == Mode::Strict || mode == Mode::Distinct
+             || mode == Mode::Cycle)
+            && !anyStrictEdge) {
+            return nullptr;
+        }
+
+        // ---- Carrier lemma family -----------------------------------
+        const std::string leqTransitive =
+            carrierPrefix + ".LessOrEqual.transitive";
+        const std::string ltLeft =
+            carrierPrefix + ".LessThan.transitive_left";
+        const std::string ltRight =
+            carrierPrefix + ".LessThan.transitive_right";
+        const std::string ltWeaken = carrierPrefix + ".LessThan.weaken";
+        const std::string ltDistinct = carrierPrefix + ".LessThan.distinct";
+        const std::string ltIrreflexive =
+            carrierPrefix + ".LessThan.irreflexive";
+        auto have = [&](const std::string& name) {
+            return environment_.lookup(name) != nullptr;
+        };
+        if (!have(leqTransitive) || !have(ltLeft) || !have(ltRight)) {
+            return nullptr;
+        }
+        if (mode == Mode::Weak && !have(ltWeaken)) return nullptr;
+        if (mode == Mode::Distinct && !have(ltDistinct)) return nullptr;
+        if (mode == Mode::Cycle && !have(ltIrreflexive)) return nullptr;
+
+        // Apply a named 3-endpoint/2-proof lemma, validating by
+        // typecheck (same both-orders retry as buildTransitiveCall).
+        auto applyChainLemma = [&](const std::string& lemmaName,
+                                   ExpressionPointer aOp,
+                                   ExpressionPointer bOp,
+                                   ExpressionPointer cOp,
+                                   ExpressionPointer h1,
+                                   ExpressionPointer h2)
+            -> ExpressionPointer {
+            return buildTransitiveCall(lemmaName, aOp, bOp, cOp, h1, h2,
+                                       localBinders);
+        };
+        // Weaken a strict proof `x < y` to `x ≤ y`.
+        auto weakenProof = [&](ExpressionPointer xOp, ExpressionPointer yOp,
+                               ExpressionPointer strictProof)
+            -> ExpressionPointer {
+            if (!have(ltWeaken)) return nullptr;
+            ExpressionPointer call = makeConstant(ltWeaken, {});
+            call = makeApplication(
+                call, closeOverLocalBinders(xOp, localBinders, N));
+            call = makeApplication(
+                call, closeOverLocalBinders(yOp, localBinders, N));
+            call = makeApplication(call, strictProof);
+            try {
+                (void)inferTypeInLocalContext(localBinders, call);
+                return call;
+            } catch (const TypeError&) { return nullptr; }
+              catch (const ElaborateError&) { return nullptr; }
+        };
+        // Compose `start REL current` (strictness accStrict, proof acc)
+        // with edge `current REL' next`; returns the new proof and sets
+        // resultStrict. Any typecheck failure declines the extension.
+        auto compose = [&](ExpressionPointer startOp,
+                           ExpressionPointer currentOp,
+                           ExpressionPointer nextOp,
+                           ExpressionPointer acc, bool accStrict,
+                           ExpressionPointer edgeProof, bool edgeStrict,
+                           bool& resultStrict) -> ExpressionPointer {
+            resultStrict = accStrict || edgeStrict;
+            if (!accStrict && !edgeStrict) {
+                return applyChainLemma(leqTransitive, startOp, currentOp,
+                                       nextOp, acc, edgeProof);
+            }
+            if (!accStrict && edgeStrict) {
+                return applyChainLemma(ltLeft, startOp, currentOp, nextOp,
+                                       acc, edgeProof);
+            }
+            if (accStrict && !edgeStrict) {
+                return applyChainLemma(ltRight, startOp, currentOp, nextOp,
+                                       acc, edgeProof);
+            }
+            ExpressionPointer weakened =
+                weakenProof(currentOp, nextOp, edgeProof);
+            if (!weakened) return nullptr;
+            return applyChainLemma(ltRight, startOp, currentOp, nextOp,
+                                   acc, weakened);
+        };
+
+        // ---- BFS with strictness ranks --------------------------------
+        // Rank per reached node: 1 = weak chain, 2 = strict chain. A node
+        // is (re)expanded when reached at a HIGHER rank than before, so a
+        // later strict route can upgrade a weak one; proofs are carried on
+        // the queue (no path reconstruction — composition is incremental).
+        struct Reached {
+            ExpressionPointer node;   // opened
+            ExpressionPointer proof;  // closed proof of `start REL node`
+            bool strict;
+        };
+        auto runChainSearch = [&](ExpressionPointer startOp,
+                                  ExpressionPointer targetOp,
+                                  bool needStrict)
+            -> ExpressionPointer {
+            std::vector<ExpressionPointer> seenNodes;
+            std::vector<int> seenRank;  // parallel to seenNodes
+            auto rankOf = [&](ExpressionPointer node) -> int* {
+                for (size_t i = 0; i < seenNodes.size(); ++i) {
+                    if (isDefinitionallyEqual(environment_, openedContext,
+                                              seenNodes[i], node)) {
+                        return &seenRank[i];
+                    }
+                }
+                return nullptr;
+            };
+            std::vector<Reached> frontier;
+            frontier.push_back({startOp, nullptr, false});
+            seenNodes.push_back(startOp);
+            seenRank.push_back(1);
+            constexpr int MAX_DEPTH = 8;
+            for (int depth = 0; depth < MAX_DEPTH && !frontier.empty();
+                 ++depth) {
+                std::vector<Reached> next;
+                for (const Reached& state : frontier) {
+                    for (const OrderEdge& edge : edges) {
+                        autoProveSpend(1);
+                        if (!isDefinitionallyEqual(environment_,
+                                                   openedContext,
+                                                   edge.source, state.node)) {
+                            continue;
+                        }
+                        bool newStrict = false;
+                        ExpressionPointer newProof;
+                        if (!state.proof) {
+                            newProof = edge.proof;
+                            newStrict = edge.strict;
+                        } else {
+                            newProof = compose(
+                                startOp, state.node, edge.target,
+                                state.proof, state.strict,
+                                edge.proof, edge.strict, newStrict);
+                        }
+                        if (!newProof) continue;
+                        int newRank = newStrict ? 2 : 1;
+                        if (int* existing = rankOf(edge.target)) {
+                            if (*existing >= newRank) continue;
+                            *existing = newRank;
+                        } else {
+                            seenNodes.push_back(edge.target);
+                            seenRank.push_back(newRank);
+                        }
+                        if (isDefinitionallyEqual(environment_,
+                                                  openedContext,
+                                                  edge.target, targetOp)
+                            && (newStrict || !needStrict)) {
+                            return newProof;
+                        }
+                        next.push_back({edge.target, newProof, newStrict});
+                    }
+                }
+                frontier = std::move(next);
+            }
+            return nullptr;
+        };
+
+        // ---- Close by mode --------------------------------------------
+        if (mode == Mode::Strict) {
+            return runChainSearch(goalA, goalB, /*needStrict=*/true);
+        }
+        if (mode == Mode::Weak) {
+            // Try the weak target first (either strictness serves after a
+            // weaken); prefer the direct weak chain to avoid a spurious
+            // wrapper when one exists.
+            std::vector<Reached> dummy;
+            ExpressionPointer chain =
+                runChainSearch(goalA, goalB, /*needStrict=*/false);
+            if (!chain) return nullptr;
+            // A strict chain proves `<`; the goal wants `≤`.
+            try {
+                ExpressionPointer chainType = inferTypeInLocalContext(
+                    localBinders, chain);
+                std::string prefix;
+                bool strict;
+                ExpressionPointer a, b;
+                if (relationSplit(
+                        openOverLocalBinders(chainType, localBinders, N),
+                        prefix, strict, a, b)
+                    && strict) {
+                    return weakenProof(goalA, goalB, chain);
+                }
+            } catch (const TypeError&) { return nullptr; }
+              catch (const ElaborateError&) { return nullptr; }
+            return chain;
+        }
+        if (mode == Mode::Distinct) {
+            ExpressionPointer chain =
+                runChainSearch(goalA, goalB, /*needStrict=*/true);
+            if (!chain) return nullptr;
+            ExpressionPointer call = makeConstant(ltDistinct, {});
+            call = makeApplication(
+                call, closeOverLocalBinders(goalA, localBinders, N));
+            call = makeApplication(
+                call, closeOverLocalBinders(goalB, localBinders, N));
+            call = makeApplication(call, chain);
+            try {
+                (void)inferTypeInLocalContext(localBinders, call);
+                return call;
+            } catch (const TypeError&) { return nullptr; }
+              catch (const ElaborateError&) { return nullptr; }
+        }
+        // Mode::Cycle — `False` from a strict cycle: for each strict edge
+        // u < v, look for a chain v → u; then u < u by composition and
+        // `irreflexive` refutes it.
+        for (const OrderEdge& edge : edges) {
+            if (!edge.strict) continue;
+            autoProveSpend(1);
+            // Direct self-loop: u < u already in context.
+            ExpressionPointer cycleProof;
+            if (isDefinitionallyEqual(environment_, openedContext,
+                                      edge.source, edge.target)) {
+                cycleProof = edge.proof;
+            } else {
+                ExpressionPointer back = runChainSearch(
+                    edge.target, edge.source, /*needStrict=*/false);
+                if (!back) continue;
+                bool resultStrict = false;
+                cycleProof = compose(
+                    edge.source, edge.target, edge.source,
+                    edge.proof, /*accStrict=*/true,
+                    back, /*edgeStrict=*/false, resultStrict);
+                // `back` may itself be strict; compose validated by
+                // typecheck either way (strict∘strict weakens inside).
+                if (!cycleProof) {
+                    cycleProof = compose(
+                        edge.source, edge.target, edge.source,
+                        edge.proof, /*accStrict=*/true,
+                        back, /*edgeStrict=*/true, resultStrict);
+                }
+                if (!cycleProof) continue;
+            }
+            ExpressionPointer refute = makeConstant(ltIrreflexive, {});
+            refute = makeApplication(
+                refute,
+                closeOverLocalBinders(edge.source, localBinders, N));
+            refute = makeApplication(refute, cycleProof);
+            try {
+                (void)inferTypeInLocalContext(localBinders, refute);
+                return refute;
+            } catch (const TypeError&) { continue; }
+              catch (const ElaborateError&) { continue; }
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::tryAutoProveEqualityGoal(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -2636,6 +3007,21 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
         {
             ExpressionPointer attempt = runTactic("transitivityBridge",
                 [&] { return tryTransitivityBridge(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
+        // Bounded order-chain closure — the multi-premise successor to
+        // B4: mixed-strictness transitive chaining (`a ≤ b`, `b < c`
+        // ⊢ `a < c` via transitive_left/_right), `≠` from a strict
+        // chain (`distinct`), and `False` from a strict cycle
+        // (`irreflexive`). Same cost class as the transitivity bridge
+        // (context scan + BFS), placed immediately after it: the
+        // same-head bridge is cheaper and wins the pure-`≤`/pure-`<`
+        // cases first.
+        {
+            ExpressionPointer attempt = runTactic("orderChainClosure",
+                [&] { return tryOrderChainClosure(
                     goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
