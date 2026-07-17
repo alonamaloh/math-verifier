@@ -171,3 +171,16 @@ regressions).
   machinery.
 - Run `MATH_CLASSIFY_HINTS` (B5, tier-4 counts) before deciding;
   owner sign-off required.
+
+## AM-GM closure (2026-07-17, third pass — 2f07372e)
+
+Owner asked whether the machinery now cleans AM-GM itself; answer:
+yes, after one S2 extension. `tryInstantiateUniversalContextFact`
+eta-bridges Pi-typed premise slots (peel slot binders, beta-normalize
+the body, match with slot binders ambient, wrap in lambdas), wired
+into citation back-inference step (a″) and Step 5b. This deletes
+AM-GM's shifted ∀-restatement (`∀ j. 0 ≤ s(m+j) by (j) ↦
+termsNonneg(m+j)`), its `0 < (1+m:ℝ)^(1+m)` cancel-premise, and the
+`0 ≠ partialSum` flip block. Everything left in the file is
+mathematical content (mean ≥ 0, the augmented-row split, telescopes,
+the 0 < partialSum pivot).
