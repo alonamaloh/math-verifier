@@ -327,3 +327,540 @@ theorem Matrix.characteristic_compositional {c : CommutativeRing} {n : ℕ}
         };
   done by Matrix.equal_of_entries
 }
+
+-- Every entry of adj(xI − A) has degree < n: each cofactor is a
+-- determinant with one constant row (the basis row) and n−1 rows of
+-- degree ≤ 1.
+theorem Matrix.characteristic_basis_entry_DegreeLessThan {c : CommutativeRing} {n : ℕ}
+        (i t : NaturalsBelow(n))
+        : Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+              Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(t), 1) := {
+  t = i ∨ ¬(t = i);
+  done by cases {
+    case t = i as onIndex: {
+        Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(i)
+           = CommutativeRing.one(CommutativeRing.polynomial_ring(c))
+            by Matrix.standardBasisRow_at as basisEntry;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                Polynomial.one(CommutativeRing.ring(c)), 1)
+            by Polynomial.one_DegreeLessThan;
+        done by substituting basisEntry
+      }
+    case ¬(t = i) as offIndex: {
+        Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(t)
+           = CommutativeRing.zero(CommutativeRing.polynomial_ring(c))
+            by Matrix.standardBasisRow_off as basisEntry;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                Polynomial.zero(CommutativeRing.ring(c)), 0)
+            by Polynomial.DegreeLessThan.zero;
+        0 ≤ 1;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                Polynomial.zero(CommutativeRing.ring(c)), 1)
+            by Polynomial.DegreeLessThan.weaken;
+        done by substituting basisEntry
+      }
+  }
+}
+
+theorem Matrix.characteristic_adjugate_entry_DegreeLessThan {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (i j : NaturalsBelow(n))
+        : Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+              Matrix.adjugate(Matrix.characteristic(A))(i, j), n) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n))
+      by NaturalsBelow.enumerate_distinct;
+  j ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+  length(NaturalsBelow.enumerate(n)) = n by NaturalsBelow.enumerate_length;
+  n = 1 + length(NaturalsBelow.enumerate(n) ∖ j)
+      by List.length_remove_member as removeLength;
+  Matrix.adjugate(Matrix.characteristic(A))(i, j)
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(sigma(j))
+                   * (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                          Permutation.sign(sigma))
+                         * CommutativeRing.productOver(
+                               (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                               NaturalsBelow.enumerate(n) ∖ j)),
+           Permutation.allPermutations(n))
+      by Matrix.determinant_updateRow_leibniz as leibnizForm;
+  ∀ (sigma : Permutation(n)). sigma ∈ Permutation.allPermutations(n)
+      → Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+            (Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(sigma(j))
+                * (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(sigma))
+                      * CommutativeRing.productOver(
+                            (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                            NaturalsBelow.enumerate(n) ∖ j))), n)
+      by (sigma : Permutation(n)) (sigmaMember : sigma ∈ Permutation.allPermutations(n)) ↦ {
+          Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1)
+              by Permutation.sign_is_unit;
+          1 = 1 + 0 as oneEquation;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(sigma)), 1)
+              by Polynomial.sign_image_DegreeLessThan;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(sigma)), 1 + 0)
+              by substituting oneEquation as signBound;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(sigma(j)), 1)
+              by Matrix.characteristic_basis_entry_DegreeLessThan;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(sigma(j)),
+                  1 + 0)
+              by substituting oneEquation as basisBound;
+          ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) ∖ j
+              → Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                    Matrix.characteristic(A)(t, sigma(t)), 2)
+              by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n) ∖ j) ↦
+                  { done by Matrix.characteristic_entry_DegreeLessThan };
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.productOver(
+                      (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                      NaturalsBelow.enumerate(n) ∖ j),
+                  1 + length(NaturalsBelow.enumerate(n) ∖ j))
+              by Polynomial.productOver_DegreeLessThan as restBound;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(sigma))
+                      * CommutativeRing.productOver(
+                            (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                            NaturalsBelow.enumerate(n) ∖ j)),
+                  1 + (0 + length(NaturalsBelow.enumerate(n) ∖ j)))
+              by Polynomial.product_DegreeLessThan(aBound := signBound, bBound := restBound);
+          0 + length(NaturalsBelow.enumerate(n) ∖ j)
+             = length(NaturalsBelow.enumerate(n) ∖ j) as zeroPlusEquation;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(sigma))
+                      * CommutativeRing.productOver(
+                            (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                            NaturalsBelow.enumerate(n) ∖ j)),
+                  1 + length(NaturalsBelow.enumerate(n) ∖ j))
+              by substituting zeroPlusEquation as innerBound;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(sigma(j))
+                      * (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                             Permutation.sign(sigma))
+                            * CommutativeRing.productOver(
+                                  (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                                  NaturalsBelow.enumerate(n) ∖ j))),
+                  1 + (0 + length(NaturalsBelow.enumerate(n) ∖ j)))
+              by Polynomial.product_DegreeLessThan(aBound := basisBound, bBound := innerBound);
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(sigma(j))
+                      * (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                             Permutation.sign(sigma))
+                            * CommutativeRing.productOver(
+                                  (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                                  NaturalsBelow.enumerate(n) ∖ j))),
+                  1 + length(NaturalsBelow.enumerate(n) ∖ j))
+              by substituting zeroPlusEquation;
+          done by substituting removeLength
+        };
+  Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+          CommutativeRing.sumOver(
+              (sigma : Permutation(n)) ↦
+                  Matrix.standardBasisRow(CommutativeRing.polynomial_ring(c), n, i)(sigma(j))
+                      * (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                             Permutation.sign(sigma))
+                            * CommutativeRing.productOver(
+                                  (t : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(t, sigma(t)),
+                                  NaturalsBelow.enumerate(n) ∖ j)),
+              Permutation.allPermutations(n)), n)
+      by Polynomial.sumOver_DegreeLessThan;
+  done by substituting leibnizForm
+}
+
+-- The n-th coefficient family of the adjugate vanishes.
+theorem Matrix.characteristic_adjugate_top_vanishes {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), n)
+          = Matrix.zero(c, n, n) := {
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)).
+      Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), n)(i, j)
+      = Matrix.zero(c, n, n)(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  Matrix.adjugate(Matrix.characteristic(A))(i, j), n)
+              by Matrix.characteristic_adjugate_entry_DegreeLessThan as entryBound;
+          n ≤ n;
+          done by entryBound
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- The coefficient recurrence, read off the adjugate identity: with
+-- Nₖ := coefficientMatrix(adj(xI − A), k),
+--   charPoly(A)[1+k]·I = Nₖ − A·N₁₊ₖ   and   charPoly(A)[0]·I = 0 − A·N₀.
+theorem Matrix.characteristic_product_split {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Matrix.scale(Matrix.characteristicPolynomial(A),
+              Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+          = Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+                Matrix.adjugate(Matrix.characteristic(A)))
+            - Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A)) :=
+  Matrix.scale(Matrix.characteristicPolynomial(A),
+        Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+     = Matrix.characteristic(A) * Matrix.adjugate(Matrix.characteristic(A))
+           by Matrix.multiply_adjugate
+     = (Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+            Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+        - Matrix.constantEntries(A))
+       * Matrix.adjugate(Matrix.characteristic(A))
+           by substituting Matrix.characteristic_compositional
+     = Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+           Matrix.identity(CommutativeRing.polynomial_ring(c), n))
+       * Matrix.adjugate(Matrix.characteristic(A))
+       - Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))
+           by Ring.subtract_multiply(
+                  Matrix.ring(CommutativeRing.polynomial_ring(c), n),
+                  Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+                      Matrix.identity(CommutativeRing.polynomial_ring(c), n)),
+                  Matrix.constantEntries(A),
+                  Matrix.adjugate(Matrix.characteristic(A)))
+     = Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+           Matrix.adjugate(Matrix.characteristic(A)))
+       - Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))
+           by substituting Matrix.scale_identity_multiply_left
+
+theorem Matrix.characteristic_recurrence_one_plus {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (k : ℕ)
+        : Matrix.scale(Matrix.characteristicPolynomial(A)[1 + k], Matrix.identity(c, n))
+          = Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k)
+            - A * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + k) :=
+  Matrix.scale(Matrix.characteristicPolynomial(A)[1 + k], Matrix.identity(c, n))
+     = Matrix.coefficientMatrix(
+           Matrix.scale(Matrix.characteristicPolynomial(A),
+               Matrix.identity(CommutativeRing.polynomial_ring(c), n)), 1 + k)
+           by Matrix.coefficientMatrix_scale_identity
+     = Matrix.coefficientMatrix(
+           (Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+                Matrix.adjugate(Matrix.characteristic(A)))
+            - Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))), 1 + k)
+           by substituting Matrix.characteristic_product_split
+     = Matrix.coefficientMatrix(
+           Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+               Matrix.adjugate(Matrix.characteristic(A))), 1 + k)
+       - Matrix.coefficientMatrix(
+             (Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))), 1 + k)
+           by Matrix.coefficientMatrix_subtract
+     = Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k)
+       - Matrix.coefficientMatrix(
+             (Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))), 1 + k)
+           by substituting Matrix.coefficientMatrix_scale_indeterminate_one_plus
+     = Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k)
+       - A * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + k)
+           by substituting Matrix.coefficientMatrix_constant_multiply
+
+theorem Matrix.characteristic_recurrence_zero {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Matrix.scale(Matrix.characteristicPolynomial(A)[0], Matrix.identity(c, n))
+          = Matrix.zero(c, n, n)
+            - A * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0) :=
+  Matrix.scale(Matrix.characteristicPolynomial(A)[0], Matrix.identity(c, n))
+     = Matrix.coefficientMatrix(
+           Matrix.scale(Matrix.characteristicPolynomial(A),
+               Matrix.identity(CommutativeRing.polynomial_ring(c), n)), 0)
+           by Matrix.coefficientMatrix_scale_identity
+     = Matrix.coefficientMatrix(
+           (Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+                Matrix.adjugate(Matrix.characteristic(A)))
+            - Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))), 0)
+           by substituting Matrix.characteristic_product_split
+     = Matrix.coefficientMatrix(
+           Matrix.scale(Polynomial.indeterminate(CommutativeRing.ring(c)),
+               Matrix.adjugate(Matrix.characteristic(A))), 0)
+       - Matrix.coefficientMatrix(
+             (Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))), 0)
+           by Matrix.coefficientMatrix_subtract
+     = Matrix.zero(c, n, n)
+       - Matrix.coefficientMatrix(
+             (Matrix.constantEntries(A) * Matrix.adjugate(Matrix.characteristic(A))), 0)
+           by substituting Matrix.coefficientMatrix_scale_indeterminate_zero
+     = Matrix.zero(c, n, n)
+       - A * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0)
+           by substituting Matrix.coefficientMatrix_constant_multiply
+
+-- ----------------------------------------------------------------------
+-- The positive-dimension case: the telescoping heart of the theorem.
+theorem Matrix.cayley_hamilton_positive {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (m : ℕ) (nEquation : n = 1 + m)
+        : Matrix.evaluatePolynomial(Matrix.characteristicPolynomial(A), A)
+          = Matrix.zero(c, n, n) := {
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                Matrix.characteristicPolynomial(A), 1 + n)
+            by Matrix.characteristicPolynomial_DegreeLessThan;
+        ∀ (k : ℕ). Matrix.scale(Matrix.characteristicPolynomial(A)[k], Matrix.power(A, k))
+            = Matrix.power(A, k)
+              * Matrix.scale(Matrix.characteristicPolynomial(A)[k], Matrix.identity(c, n))
+            by (k : ℕ) ↦ {
+                Matrix.scale(Matrix.characteristicPolynomial(A)[k], Matrix.power(A, k))
+                   = Matrix.power(A, k)
+                     * Matrix.scale(Matrix.characteristicPolynomial(A)[k],
+                           Matrix.identity(c, n))
+                       by Matrix.scale_identity_multiply_right;
+                done
+              } as centralize;
+        ∀ (k : ℕ).
+            Matrix.power(A, 1 + k)
+              * Matrix.scale(Matrix.characteristicPolynomial(A)[1 + k],
+                    Matrix.identity(c, n))
+            = (Matrix.power(A, 1 + k)
+                  * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k))
+              - (Matrix.power(A, 1 + (1 + k))
+                    * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + k))
+            by (k : ℕ) ↦ {
+                Matrix.power(A, 1 + k)
+                    * Matrix.scale(Matrix.characteristicPolynomial(A)[1 + k],
+                          Matrix.identity(c, n))
+                   = Matrix.power(A, 1 + k)
+                     * (Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k)
+                           - A * Matrix.coefficientMatrix(
+                                     Matrix.adjugate(Matrix.characteristic(A)), 1 + k))
+                         by substituting Matrix.characteristic_recurrence_one_plus
+                   = (Matrix.power(A, 1 + k)
+                         * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k))
+                     - (Matrix.power(A, 1 + k)
+                           * (A * Matrix.coefficientMatrix(
+                                      Matrix.adjugate(Matrix.characteristic(A)), 1 + k)))
+                         by Ring.multiply_subtract(
+                                Matrix.ring(c, n),
+                                Matrix.power(A, 1 + k),
+                                Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k),
+                                (A * Matrix.coefficientMatrix(
+                                         Matrix.adjugate(Matrix.characteristic(A)), 1 + k)))
+                   = (Matrix.power(A, 1 + k)
+                         * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k))
+                     - ((Matrix.power(A, 1 + k) * A)
+                           * Matrix.coefficientMatrix(
+                                 Matrix.adjugate(Matrix.characteristic(A)), 1 + k))
+                         by Matrix.multiply_associative
+                   = (Matrix.power(A, 1 + k)
+                         * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k))
+                     - (Matrix.power(A, 1 + (1 + k))
+                           * Matrix.coefficientMatrix(
+                                 Matrix.adjugate(Matrix.characteristic(A)), 1 + k))
+                         by substituting Matrix.power_multiply_base;
+                done
+              } as stepTerms;
+        Ring.Sum(Matrix.ring(c, n),
+              (k : ℕ) ↦
+                  Matrix.power(A, 1 + k)
+                      * Matrix.scale(Matrix.characteristicPolynomial(A)[1 + k],
+                            Matrix.identity(c, n)),
+              m)
+           = Ring.Sum(Matrix.ring(c, n),
+                 (k : ℕ) ↦
+                     (Matrix.power(A, 1 + k)
+                         * Matrix.coefficientMatrix(
+                               Matrix.adjugate(Matrix.characteristic(A)), k))
+                     - (Matrix.power(A, 1 + (1 + k))
+                           * Matrix.coefficientMatrix(
+                                 Matrix.adjugate(Matrix.characteristic(A)), 1 + k)),
+                 m)
+            by Ring.Sum.extensional(pointwise := stepTerms) as sumRewritten;
+        Matrix.power(A, 1 + 0)
+           = A * Matrix.power(A, 0)   by Matrix.power_add_one
+           = A                        by Matrix.multiply_one
+           as powerOne;
+        Matrix.power(A, 0)
+              * Matrix.scale(Matrix.characteristicPolynomial(A)[0], Matrix.identity(c, n))
+           = Matrix.scale(Matrix.characteristicPolynomial(A)[0], Matrix.identity(c, n))
+                 by Matrix.one_multiply
+           = Matrix.zero(c, n, n)
+             - A * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0)
+                 by Matrix.characteristic_recurrence_zero
+           = Matrix.negate(
+                 A * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+                 by Ring.zero_add(
+                        Matrix.ring(c, n),
+                        Matrix.negate(
+                            A * Matrix.coefficientMatrix(
+                                    Matrix.adjugate(Matrix.characteristic(A)), 0)))
+           = Matrix.negate(
+                 Matrix.power(A, 1 + 0)
+                     * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+                 by substituting powerOne
+           as headTerm;
+        Matrix.negate(
+              Matrix.power(A, 1 + 0)
+                  * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+          + (Matrix.power(A, 1 + 0)
+                * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+           = Matrix.zero(c, n, n)
+            by Matrix.add_negate_left as cancel;
+        Matrix.evaluatePolynomial(Matrix.characteristicPolynomial(A), A)
+           = Matrix.evaluatePolynomialBelow(Matrix.characteristicPolynomial(A), A, n)
+                 by Matrix.evaluatePolynomial_at_bound
+           = Ring.Sum(Matrix.ring(c, n),
+                 (k : ℕ) ↦
+                     Matrix.power(A, k)
+                         * Matrix.scale(Matrix.characteristicPolynomial(A)[k],
+                               Matrix.identity(c, n)),
+                 n)
+                 by Ring.Sum.extensional(pointwise := centralize)
+           = Ring.Sum(Matrix.ring(c, n),
+                 (k : ℕ) ↦
+                     Matrix.power(A, k)
+                         * Matrix.scale(Matrix.characteristicPolynomial(A)[k],
+                               Matrix.identity(c, n)),
+                 1 + m)
+                 by substituting nEquation
+           = (Matrix.power(A, 0)
+                 * Matrix.scale(Matrix.characteristicPolynomial(A)[0], Matrix.identity(c, n)))
+             + Ring.Sum(Matrix.ring(c, n),
+                   (k : ℕ) ↦
+                       Matrix.power(A, 1 + k)
+                           * Matrix.scale(Matrix.characteristicPolynomial(A)[1 + k],
+                                 Matrix.identity(c, n)),
+                   m)
+                 by Ring.Sum.shift_one_plus
+           = Matrix.negate(
+                 Matrix.power(A, 1 + 0)
+                     * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+             + Ring.Sum(Matrix.ring(c, n),
+                   (k : ℕ) ↦
+                       Matrix.power(A, 1 + k)
+                           * Matrix.scale(Matrix.characteristicPolynomial(A)[1 + k],
+                                 Matrix.identity(c, n)),
+                   m)
+                 by substituting headTerm
+           = Matrix.negate(
+                 Matrix.power(A, 1 + 0)
+                     * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+             + Ring.Sum(Matrix.ring(c, n),
+                   (k : ℕ) ↦
+                       (Matrix.power(A, 1 + k)
+                           * Matrix.coefficientMatrix(
+                                 Matrix.adjugate(Matrix.characteristic(A)), k))
+                       - (Matrix.power(A, 1 + (1 + k))
+                             * Matrix.coefficientMatrix(
+                                   Matrix.adjugate(Matrix.characteristic(A)), 1 + k)),
+                   m)
+                 by substituting sumRewritten
+           as assembled;
+        Ring.Sum(Matrix.ring(c, n),
+              (k : ℕ) ↦
+                  (Matrix.power(A, 1 + k)
+                      * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k))
+                  - (Matrix.power(A, 1 + (1 + k))
+                        * Matrix.coefficientMatrix(
+                              Matrix.adjugate(Matrix.characteristic(A)), 1 + k)),
+              m)
+           = (Matrix.power(A, 1 + 0)
+                 * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+             - (Matrix.power(A, 1 + (1 + m))
+                   * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + m))
+            by Ring.Sum.telescoping(
+                   g := (k : ℕ) ↦
+                       Matrix.power(A, 1 + k)
+                           * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), k))
+            as sumCollapse;
+        Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), n)
+           = Matrix.zero(c, n, n)
+            by Matrix.characteristic_adjugate_top_vanishes;
+        Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + m)
+           = Matrix.zero(c, n, n)
+            by substituting nEquation as topVanishes;
+        Matrix.power(A, 1 + (1 + m)) * Matrix.zero(c, n, n) = Matrix.zero(c, n, n)
+            by Ring.multiply_zero_right(Matrix.ring(c, n), Matrix.power(A, 1 + (1 + m)))
+            as killProduct;
+        Matrix.evaluatePolynomial(Matrix.characteristicPolynomial(A), A)
+           = Matrix.negate(
+                 Matrix.power(A, 1 + 0)
+                     * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+             + Ring.Sum(Matrix.ring(c, n),
+                   (k : ℕ) ↦
+                       (Matrix.power(A, 1 + k)
+                           * Matrix.coefficientMatrix(
+                                 Matrix.adjugate(Matrix.characteristic(A)), k))
+                       - (Matrix.power(A, 1 + (1 + k))
+                             * Matrix.coefficientMatrix(
+                                   Matrix.adjugate(Matrix.characteristic(A)), 1 + k)),
+                   m)
+                 by assembled
+           = Matrix.negate(
+                 Matrix.power(A, 1 + 0)
+                     * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+             + ((Matrix.power(A, 1 + 0)
+                    * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+                - (Matrix.power(A, 1 + (1 + m))
+                      * Matrix.coefficientMatrix(
+                            Matrix.adjugate(Matrix.characteristic(A)), 1 + m)))
+                 by substituting sumCollapse
+           = (Matrix.negate(
+                  Matrix.power(A, 1 + 0)
+                      * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0))
+              + (Matrix.power(A, 1 + 0)
+                    * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 0)))
+             - (Matrix.power(A, 1 + (1 + m))
+                   * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + m))
+                 by Ring.add_associative(Matrix.ring(c, n),
+                        Matrix.negate(
+                            Matrix.power(A, 1 + 0)
+                                * Matrix.coefficientMatrix(
+                                      Matrix.adjugate(Matrix.characteristic(A)), 0)),
+                        (Matrix.power(A, 1 + 0)
+                            * Matrix.coefficientMatrix(
+                                  Matrix.adjugate(Matrix.characteristic(A)), 0)),
+                        Matrix.negate(
+                            Matrix.power(A, 1 + (1 + m))
+                                * Matrix.coefficientMatrix(
+                                      Matrix.adjugate(Matrix.characteristic(A)), 1 + m)))
+           = Matrix.zero(c, n, n)
+             - (Matrix.power(A, 1 + (1 + m))
+                   * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + m))
+                 by substituting cancel
+           = Matrix.negate(
+                 Matrix.power(A, 1 + (1 + m))
+                     * Matrix.coefficientMatrix(Matrix.adjugate(Matrix.characteristic(A)), 1 + m))
+                 by Ring.zero_add(
+                        Matrix.ring(c, n),
+                        Matrix.negate(
+                            Matrix.power(A, 1 + (1 + m))
+                                * Matrix.coefficientMatrix(
+                                      Matrix.adjugate(Matrix.characteristic(A)), 1 + m)))
+           = Matrix.negate(
+                 Matrix.power(A, 1 + (1 + m)) * Matrix.zero(c, n, n))
+                 by substituting topVanishes
+           = Matrix.negate(Matrix.zero(c, n, n))
+                 by substituting killProduct
+           = Matrix.zero(c, n, n)
+                 by Ring.negate_zero(Matrix.ring(c, n));
+  done
+}
+
+-- The empty case: there is only one 0×0 matrix.
+theorem Matrix.cayley_hamilton_zero_dimension {c : CommutativeRing}
+        (A : Matrix(c, 0, 0))
+        : Matrix.evaluatePolynomial(Matrix.characteristicPolynomial(A), A)
+          = Matrix.zero(c, 0, 0) :=
+  Matrix.zero_dimension_unique(c,
+      Matrix.evaluatePolynomial(Matrix.characteristicPolynomial(A), A),
+      Matrix.zero(c, 0, 0))
+
+-- ----------------------------------------------------------------------
+-- The Cayley–Hamilton theorem: A satisfies its characteristic polynomial.
+theorem Matrix.cayley_hamilton {c : CommutativeRing} {n : ℕ} (A : Matrix(c, n, n))
+        : Matrix.evaluatePolynomial(Matrix.characteristicPolynomial(A), A)
+          = Matrix.zero(c, n, n) := {
+  ∀ (dimension : ℕ). ∀ (B : Matrix(c, dimension, dimension)).
+      Matrix.evaluatePolynomial(Matrix.characteristicPolynomial(B), B)
+      = Matrix.zero(c, dimension, dimension)
+      by (dimension : ℕ) ↦ {
+          dimension = 0 ∨ ∃ (m : ℕ). dimension = 1 + m by Natural.zero_or_one_plus;
+          done by cases {
+            case dimension = 0: {
+                take B : Matrix(c, 0, 0);
+                done by Matrix.cayley_hamilton_zero_dimension
+              }
+            case dimension = 1 + m for some (m : ℕ): {
+                take B : Matrix(c, 1 + m, 1 + m);
+                done by Matrix.cayley_hamilton_positive(m := m)
+              }
+          }
+        } as allDimensions;
+  done by allDimensions
+}
