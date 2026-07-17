@@ -961,6 +961,15 @@ struct SurfacePatternTuple {
     // connective (`And`/`Exists`) — `choose` is the math-like form and must
     // not warn.
     bool userWritten = true;
+    // R2a (PLAN_READABILITY_ERGONOMICS): witness-routing for
+    // `choose`-synthesised tuples. The leading component names are ∃
+    // WITNESSES: when the right-associating destructure meets an `And`
+    // layer, it must NOT spend a witness name on the conjunction's left
+    // leg — the leg is banked as an anonymous context fact and every name
+    // carries to the right leg. This is what lets
+    // `choose lb, si from ⟨∃ lb. 0 < lb ∧ ∃ si. …⟩` bind lb and si to the
+    // two witnesses with `0 < lb` landing in context.
+    bool witnessRouting = false;
 };
 struct SurfacePattern {
     std::variant<SurfacePatternBareName, SurfacePatternConstructor,
@@ -985,9 +994,11 @@ inline SurfacePatternPointer makeSurfacePatternConstructor(
 }
 inline SurfacePatternPointer makeSurfacePatternTuple(
     std::vector<SurfacePatternPointer> components,
-    int line, int column, bool userWritten = true) {
+    int line, int column, bool userWritten = true,
+    bool witnessRouting = false) {
     return std::make_shared<const SurfacePattern>(
-        SurfacePattern{SurfacePatternTuple{std::move(components), userWritten},
+        SurfacePattern{SurfacePatternTuple{std::move(components), userWritten,
+                                           witnessRouting},
                        line, column});
 }
 

@@ -82,10 +82,10 @@ boundary files.
 | item | state | notes |
 |------|-------|-------|
 | R1   | DONE 2026-07-16 | Transparent INLINE alias (not a ζ-opaque let): elaborateIdentifier substitutes the class spelling at every use, so terms are byte-identical to hand-spelled form and no matcher changes were needed. Bare pattern: alias bound in elaborateQuotientCases; destructure: threaded via pendingScrutineeAlias_ into buildCaseLambda (value = class_of(constructor-applied), built after pattern binders exist). Gated on the body mentioning the name. density.math converted (6 respellings → `x`); library+tests green. Learned: quotient-cases auto-reverts scrutinee-dependent hypotheses (the "cases … refining" frame), so x-hypotheses arrive at the arm already respelled — the alias was the only missing piece. |
-| R2a  | —     | |
-| R2b  | —     | |
+| R2a  | DONE 2026-07-16 | Witness-routing flag on choose-synthesised tuple patterns: the right-associating ∃/∧ destructure no longer spends a witness name on an `And` leg — the leg binds to a fresh anonymous fact (auto-prover consumes it by type-match) and all names carry to the right leg. Both the And-wrap and the Exists right-associate carry the flag. density.math: `choose lowerBound, signIndex from signEventually` replaces the 9-line inner-∃ restatement. Library+tests green. |
+| R2b  | —     | typed witness annotation `choose x : T such that P from <lemma>` — supplies what the closed-witness-type guard can't read from a parameter-typed lemma existential. |
 | R3   | —     | |
-| R4   | —     | |
+| R4   | WONTFIX 2026-07-16 | Not a gap: `Real.IsNonneg` is HARD-opaque, and `weakHeadNormalFormForcingOpaqueHead` deliberately declines hard-opaque heads ("only `unfold X in …`"). The `unfold IsNonneg in (λε…)` at the ε-witness sites is the opacity discipline's sanctioned explicit gate, in the file that owns the boundary. Removing it would undermine the seal. (Side finding: without the unfold the failure is a confusing "anonymous tuple needs an expected type" from deep inside the witness — the unfold-needed situation could be diagnosed at the lambda instead; noted, low priority.) |
 
 Frictions found en route (filed in the inbox): statement-level `≠ 0`
 numeral cast-tower (nonzero_of_positive invisible to matchers); citation

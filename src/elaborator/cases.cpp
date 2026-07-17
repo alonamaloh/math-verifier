@@ -2052,7 +2052,53 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                 int valueArgCount =
                     totalPi - inductive->numParameters;
                 size_t componentCount = tupleNode->components.size();
-                if (static_cast<int>(componentCount) == valueArgCount) {
+                // R2a witness-routing: a `choose`-synthesised tuple's
+                // leading names are ∃ WITNESSES. When the layer being
+                // destructured is an `And`, don't spend a name on the
+                // conjunction's left leg — bind it to a fresh anonymous
+                // fact (the auto-prover consumes it by type-match) and
+                // carry ALL components to the right leg. Terminates
+                // because each wrap descends one connective layer.
+                if (tupleNode->witnessRouting && inductiveName == "And"
+                    && componentCount >= 2) {
+                    std::string factName =
+                        "_conjunct_fact_" + std::to_string(clause.line)
+                        + "_" + std::to_string(clause.column) + "_"
+                        + std::to_string(componentCount);
+                    std::string freshName =
+                        "_tupleRest_" + std::to_string(line) + "_"
+                        + std::to_string(clause.line) + "_"
+                        + std::to_string(clause.column) + "_and";
+                    std::vector<SurfacePatternPointer> outerArgs;
+                    outerArgs.push_back(makeSurfacePatternBareName(
+                        factName, clause.line, clause.column));
+                    outerArgs.push_back(makeSurfacePatternBareName(
+                        freshName, clause.line, clause.column));
+                    pattern = makeSurfacePatternConstructor(
+                        ctorName, std::move(outerArgs),
+                        clause.line, clause.column);
+                    SurfacePatternPointer restPattern =
+                        makeSurfacePatternTuple(
+                            tupleNode->components,
+                            clause.line, clause.column,
+                            tupleNode->userWritten,
+                            /*witnessRouting=*/true);
+                    SurfaceExpressionPointer freshReference =
+                        makeSurfaceIdentifier(freshName, {},
+                                               clause.line, clause.column);
+                    SurfaceCasesClause innerClause;
+                    innerClause.pattern = std::move(restPattern);
+                    innerClause.body = body;
+                    innerClause.line = clause.line;
+                    innerClause.column = clause.column;
+                    std::vector<SurfaceCasesClause> innerClauses;
+                    innerClauses.push_back(std::move(innerClause));
+                    body = makeSurfaceCases(
+                        std::move(freshReference),
+                        std::move(innerClauses),
+                        clause.line, clause.column);
+                } else if (static_cast<int>(componentCount)
+                               == valueArgCount) {
                     pattern = makeSurfacePatternConstructor(
                         ctorName, tupleNode->components,
                         clause.line, clause.column);
@@ -2080,7 +2126,8 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                         makeSurfacePatternTuple(
                             std::move(restComponents),
                             clause.line, clause.column,
-                            tupleNode->userWritten);
+                            tupleNode->userWritten,
+                            tupleNode->witnessRouting);
                     SurfaceExpressionPointer freshReference =
                         makeSurfaceIdentifier(freshName, {},
                                                clause.line, clause.column);

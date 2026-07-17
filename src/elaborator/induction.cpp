@@ -577,9 +577,12 @@ ExpressionPointer Elaborator::elaborateChoose(
         patternComponents.push_back(
             makeSurfacePatternBareName(
                 std::move(predHypName), line, column));
+        // The leading names are ∃ witnesses: route them past ∧ layers
+        // (the legs land as anonymous context facts) instead of spending
+        // a witness name on a conjunction's proof (R2a).
         SurfacePatternPointer tuplePattern = makeSurfacePatternTuple(
             std::move(patternComponents), line, column,
-            /*userWritten=*/false);
+            /*userWritten=*/false, /*witnessRouting=*/true);
         SurfaceCasesClause clause;
         clause.pattern = std::move(tuplePattern);
         clause.body = choose.body;
