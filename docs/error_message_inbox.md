@@ -1642,3 +1642,44 @@ application `(CommutativeRing.sumOver(...) : CommutativeRing.carrier(c))`
 so expected-type propagation assigns `r`. Fix directions: consult the
 term's inferred codomain (whnf'd) during leading-argument inference,
 and/or allow named implicit arguments alongside positional ones.
+
+**CITATION (δ-divergent bundle spellings, 2026-07-17, cayley_hamilton).**
+Neither goal-driven citation nor `substituting` can bridge a Matrix-spelled
+goal (`X + Y`, `Matrix.negate(X)`, `X - Y` at `Matrix(c, n, n)`) to a
+`Ring.*` lemma instantiated at `Matrix.ring(c, n)` (`Ring.add(Matrix.ring(c,n), …)`),
+even though the two sides are defeq: both δ-reduce to the same normal
+form, but neither reduces TO the other, and the matchers only try
+directed reduction. Hit throughout the telescoping assembly
+(cayley_hamilton_positive): `Ring.multiply_subtract`, `Ring.add_associative`,
+`Ring.zero_add`, `Ring.multiply_zero_right` at the matrix bundle all had
+to be applied FULLY POSITIONALLY (the final defeq gate at full fuel
+accepts the resulting term) — the exact raw-CIC tell proof-style.md bans.
+`substituting <Lemma>` fails the same way: the occurrence search cannot
+find `Ring.multiply(Matrix.ring(c,n), a, b)` inside a goal spelled
+`Matrix.multiply(a, b)` (empty direction search). Fix direction: when
+citation/substitution matching compares operator heads, δ-unfold BUNDLE
+PROJECTIONS (`Ring.add(Ring.make(...), …)` → the packed operation) before
+concluding mismatch — the bundle-projection unfold is exactly one step
+and closed, so it should not need the risky general defeq widening.
+
+**CITATION (all-metavariable conclusion, 2026-07-17, cayley_hamilton).**
+A lemma whose conclusion is a bare `X = Y` with BOTH sides standalone
+universally-quantified variables (`Matrix.zero_dimension_unique : X = Y`
+for any two 0×0 matrices) cannot be cited by `by <name>` at all — the
+matcher reports the arguments "could not be inferred" because conclusion
+matching gives no anchor. Workaround: fully positional application.
+Fix direction: when the conclusion is all-metavariable, unify it
+directly against the goal (X := lhs, Y := rhs) instead of refusing —
+the parameter types then pin everything else.
+
+**FRICTION (case-arm substitution over fixed binders, 2026-07-17,
+cayley_hamilton).** In `case dimension = 1 + m for some (m : ℕ)`, the arm
+REWRITES `dimension` in the goal — but a theorem-level binder already
+typed at the pre-rewrite index (`A : Matrix(c, dimension, dimension)`)
+keeps its old type, so citing a helper stated at `Matrix(c, 1 + m, 1 + m)`
+fails with "expects Matrix(c, _substituted, _substituted)". Working
+recipe: re-quantify the varying object INSIDE the split (prove
+`∀ dimension. ∀ B. …` and `take B` after the case rewrite), then apply to
+the outer binder. Fix direction: either transport fixed binders into the
+arm (generalized rewrite), or have the case arm surface a bridging
+equation so citations can `substituting` across it.

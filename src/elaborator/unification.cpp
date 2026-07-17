@@ -357,20 +357,21 @@ void Elaborator::unifyConstructorParameters(
                     && !assignment.count(argumentFreeVariable->name)) {
                     std::string structure = projectionName.substr(
                         0, projectionName.size() - suffix.size());
-                    // Raw head — a defined carrier (`Integer`) WHNF-reduces
-                    // to its `Quotient(…)` body, which is not how it is
-                    // registered (the registry keys on the carrier as it
-                    // appears in types).
-                    std::string carrierHead = headConstantName(target);
-                    auto entry = environment_.canonicalBundleRegistry.find(
-                        std::make_tuple(structure, carrierHead));
-                    if (entry != environment_.canonicalBundleRegistry.end()) {
-                        assignment[argumentFreeVariable->name] =
-                            makeConstant(entry->second);
+                    // Resolution keys on the target's RAW head (a defined
+                    // carrier like `Integer` WHNF-reduces to its
+                    // `Quotient(…)` body, which is not how it is
+                    // registered) and instantiates a parameterized
+                    // bundle's arguments from the carrier type.
+                    ExpressionPointer resolved =
+                        resolveCanonicalBundleForCarrierType(
+                            structure, target);
+                    if (resolved) {
+                        assignment[argumentFreeVariable->name] = resolved;
                         return;
                     }
-                    // Not registered: fall through to the normal matching
-                    // below (no behaviour change when nothing is registered).
+                    // Not registered (or parameters unsolvable): fall
+                    // through to the normal matching below (no behaviour
+                    // change when nothing is registered).
                 }
             }
             // Walk the target's function chain to its head (a no-op when

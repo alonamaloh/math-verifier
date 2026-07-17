@@ -2878,6 +2878,42 @@ private:
     std::string coercionTargetTypeName(
         const std::string& functionName) const;
 
+    // Resolve the canonical bundle registered for `(structureName, head
+    // carrierType)`, instantiating a PARAMETERIZED bundle's parameters
+    // (`Matrix.ring(c, n)`) by matching the bundle's own carrier —
+    // `<S>.carrier(bundle(?q…))`, reduced — against the concrete carrier
+    // type. Returns nullptr on registry miss or when the parameters
+    // cannot be solved; a parameterless bundle resolves to its bare
+    // constant (the pre-existing behaviour of the registry's consumers).
+    ExpressionPointer resolveCanonicalBundleForCarrierType(
+        const std::string& structureName,
+        ExpressionPointer carrierType);
+
+    // The declared result type of a Constant-headed application spine,
+    // by feeding the spine's arguments through the head's Pi type.
+    // Returns nullptr for non-Constant heads, unknown declarations, or
+    // universe-polymorphic heads (conservative).
+    ExpressionPointer constantSpineResultType(ExpressionPointer subject);
+
+    // The failure-path bridge for a pattern spine `S.op(?slot, p1 … pk)`
+    // — a structure-bundle OPERATION over an unresolved bundle
+    // metavariable — against a concrete operation spine `F(s1 … sm)`
+    // (`Ring.multiply(?r, x, y)` vs `Matrix.multiply(c, n, n, n, X, Y)`).
+    // The bundle is recovered from the subject's carrier via the
+    // canonical-bundle registry (or reused when the slot is already
+    // pinned), `S.op(bundle) ≡ F(s1 … s_{m-k})` is verified
+    // definitionally, and the k trailing operands are matched pairwise.
+    // This is what lets an abstract `Ring.*` lemma be cited at a goal
+    // spelled with the carrier's own operations. Returns false when the
+    // shapes don't fit; bindings/deferred are rolled back on failure.
+    bool tryBundleOperationBridge(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings,
+        int piDepth,
+        std::vector<DeferredProjectionMatch>* deferredOut);
+
     // The failure-path fallback for a pattern node `Proj(BV slot)`: defeq
     // when the slot is bound, deferral when it is not (and `deferredOut`
     // is supplied). Returns false when the pattern is not of that shape.

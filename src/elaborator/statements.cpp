@@ -201,9 +201,21 @@ void Elaborator::elaborateInstanceDeclaration(
             // `Integer`) into its own definition body (`Quotient(…)`). We
             // want the carrier's head exactly as it appears in types, so the
             // resolution hooks (which read the raw head) match this key.
+            // A PARAMETERIZED bundle (`Matrix.ring (c) (n) : Ring`) is
+            // registered under the same key scheme: apply the stripped
+            // parameters as dangling BoundVariables — fine for head
+            // extraction, and resolution re-instantiates them from the
+            // concrete carrier (resolveCanonicalBundleForCarrierType).
+            ExpressionPointer bundleReference =
+                makeConstant(declaration.name);
+            for (int parameter = parameterCount - 1; parameter >= 0;
+                 --parameter) {
+                bundleReference = makeApplication(
+                    bundleReference, makeBoundVariable(parameter));
+            }
             ExpressionPointer carrierField = carrierProjectionField(
                 makeApplication(makeConstant(structureName + ".carrier"),
-                                makeConstant(declaration.name)));
+                                bundleReference));
             std::string carrierName = carrierField
                 ? headConstantName(carrierField) : std::string("<unknown>");
             if (carrierName == "<unknown>") {

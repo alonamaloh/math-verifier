@@ -1174,13 +1174,21 @@ bool Elaborator::matchAgainstPattern(
                         }
                         std::string structure = projection->name.substr(
                             0, projection->name.size() - suffix.size());
-                        auto entry =
-                            environment_.canonicalBundleRegistry.find(
-                                std::make_tuple(structure,
-                                    headConstantName(subject)));
-                        if (entry
-                            != environment_.canonicalBundleRegistry.end()) {
-                            bindings[slot] = makeConstant(entry->second);
+                        ExpressionPointer resolved =
+                            resolveCanonicalBundleForCarrierType(
+                                structure, subject);
+                        if (resolved) {
+                            // A parameterized bundle's arguments come
+                            // from the subject — same scope discipline
+                            // as a plain metavariable binding.
+                            if (piDepth > 0
+                                && referencesAnyBoundInRange(
+                                       resolved, 0, piDepth)) {
+                                return false;
+                            }
+                            bindings[slot] = piDepth > 0
+                                ? liftBoundVariables(resolved, -piDepth, 0)
+                                : resolved;
                             return true;
                         }
                     }
@@ -1322,6 +1330,17 @@ bool Elaborator::matchAgainstPattern(
                 }
                 bindings = savedBindings;
                 if (deferredOut) deferredOut->resize(deferredMark);
+            }
+            // Bundle-operation bridge: a pattern `S.op(?r, …)` whose
+            // bundle slot the structural walk could not pin, against a
+            // concrete operation spine — recover the canonical bundle
+            // from the subject's carrier and verify definitionally (see
+            // tryBundleOperationBridge). Before the unfold loops: those
+            // reduce the subject PAST its operation head, which is
+            // exactly the information this bridge needs.
+            if (tryBundleOperationBridge(pattern, subject, binderCount,
+                                         bindings, piDepth, deferredOut)) {
+                return true;
             }
             // Structural failed (or subject kinds disagreed). Unfold the
             // subject's defined head ONE step at a time and retry: full
@@ -1485,6 +1504,274 @@ bool Elaborator::matchAgainstPattern(
         return false;
     }
 
+ExpressionPointer Elaborator::resolveCanonicalBundleForCarrierType(
+        const std::string& structureName,
+        ExpressionPointer carrierType) {
+        // Instantiate one candidate bundle against the carrier type: a
+        // parameterless bundle just checks its carrier matches; a
+        // PARAMETERIZED bundle (`Matrix.ring(c, n)`) solves its
+        // parameters by matching its own carrier — the parameters enter
+        // as metavariable slots (parameter i ↦ BV(parameterCount-1-i)),
+        // and reduction of `<S>.carrier(bundle(?q…))` exposes where each
+        // occurs. The subject-side stepwise unfolding inside
+        // matchAgainstPattern is what lets an abstractly spelled carrier
+        // (`CommutativeRing.carrier(polynomial_ring(c))`) meet the
+        // registered one.
+        auto instantiate = [&](const std::string& bundleName,
+                               bool checkParameterlessCarrier)
+            -> ExpressionPointer {
+            const Declaration* bundleDeclaration =
+                environment_.lookup(bundleName);
+            if (!bundleDeclaration) return nullptr;
+            ExpressionPointer bundleType =
+                declarationType(*bundleDeclaration);
+            if (!bundleType) return nullptr;
+            int parameterCount = 0;
+            ExpressionPointer walk = bundleType;
+            while (auto* pi = std::get_if<Pi>(&walk->node)) {
+                walk = pi->codomain;
+                ++parameterCount;
+            }
+            if (parameterCount == 0) {
+                // On the keyed fast path the registry key already vouches
+                // for the carrier (the pre-existing contract). On the
+                // enumeration path there is no key — verify the bundle's
+                // carrier actually matches before offering it.
+                if (checkParameterlessCarrier) {
+                    ExpressionPointer carrierPattern = weakHeadNormalForm(
+                        environment_,
+                        makeApplication(
+                            makeConstant(structureName + ".carrier"),
+                            makeConstant(bundleName)));
+                    std::vector<ExpressionPointer> noBindings;
+                    if (!matchAgainstPattern(carrierPattern, carrierType,
+                                             0, noBindings, 0, nullptr)) {
+                        return nullptr;
+                    }
+                }
+                return makeConstant(bundleName);
+            }
+            ExpressionPointer bundleApplication = makeConstant(bundleName);
+            for (int k = parameterCount - 1; k >= 0; --k) {
+                bundleApplication = makeApplication(
+                    bundleApplication, makeBoundVariable(k));
+            }
+            ExpressionPointer carrierPattern = weakHeadNormalForm(
+                environment_,
+                makeApplication(
+                    makeConstant(structureName + ".carrier"),
+                    bundleApplication));
+            std::vector<ExpressionPointer> parameterBindings(
+                parameterCount);
+            if (!matchAgainstPattern(carrierPattern, carrierType,
+                                     parameterCount, parameterBindings, 0,
+                                     nullptr)) {
+                return nullptr;
+            }
+            ExpressionPointer resolved = makeConstant(bundleName);
+            for (int k = parameterCount - 1; k >= 0; --k) {
+                if (!parameterBindings[k]) return nullptr;
+                resolved = makeApplication(resolved, parameterBindings[k]);
+            }
+            return resolved;
+        };
+        // Fast path: key on the carrier's RAW head, as it appears in
+        // types (a defined carrier like `Integer` WHNF-reduces to its
+        // `Quotient(…)` body, which is not how it is registered).
+        std::string carrierHead = headConstantName(carrierType);
+        std::string keyedBundle;
+        if (carrierHead != "<unknown>") {
+            auto entry = environment_.canonicalBundleRegistry.find(
+                std::make_tuple(structureName, carrierHead));
+            if (entry != environment_.canonicalBundleRegistry.end()) {
+                keyedBundle = entry->second;
+                if (ExpressionPointer resolved =
+                        instantiate(keyedBundle, false)) {
+                    return resolved;
+                }
+            }
+        }
+        // Slow path: the carrier's head is abstract (a projection
+        // spelling) or otherwise unregistered — try each registered
+        // bundle of the structure. Registration is reject-on-ambiguity
+        // per carrier, so the first bundle that instantiates is THE
+        // canonical one.
+        std::set<std::string> tried;
+        if (!keyedBundle.empty()) tried.insert(keyedBundle);
+        for (const auto& [registryKey, bundleName] :
+             environment_.canonicalBundleRegistry) {
+            if (std::get<0>(registryKey) != structureName) continue;
+            if (!tried.insert(bundleName).second) continue;
+            if (ExpressionPointer resolved = instantiate(bundleName, true)) {
+                return resolved;
+            }
+        }
+        return nullptr;
+    }
+
+ExpressionPointer Elaborator::constantSpineResultType(
+        ExpressionPointer subject) {
+        std::vector<ExpressionPointer> arguments;
+        ExpressionPointer cursor = subject;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            arguments.push_back(application->argument);
+            cursor = application->function;
+        }
+        auto* head = std::get_if<Constant>(&cursor->node);
+        if (!head) return nullptr;
+        if (!head->universeArguments.empty()) return nullptr;
+        const Declaration* declaration = environment_.lookup(head->name);
+        if (!declaration) return nullptr;
+        ExpressionPointer type = declarationType(*declaration);
+        if (!type) return nullptr;
+        std::reverse(arguments.begin(), arguments.end());
+        for (const auto& argument : arguments) {
+            auto* pi = std::get_if<Pi>(&type->node);
+            if (!pi) {
+                type = weakHeadNormalForm(environment_, type);
+                pi = std::get_if<Pi>(&type->node);
+                if (!pi) return nullptr;
+            }
+            type = substituteBoundVariable(pi->codomain, argument, 0);
+        }
+        return type;
+    }
+
+bool Elaborator::tryBundleOperationBridge(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings,
+        int piDepth,
+        std::vector<DeferredProjectionMatch>* deferredOut) {
+        // Pattern spine: `S.op(?slot, p1 … pk)` — a structure-bundle
+        // operation whose bundle argument is a metavariable slot.
+        std::vector<ExpressionPointer> patternArguments;
+        ExpressionPointer patternCursor = pattern;
+        while (auto* application =
+                   std::get_if<Application>(&patternCursor->node)) {
+            patternArguments.push_back(application->argument);
+            patternCursor = application->function;
+        }
+        auto* operationHead = std::get_if<Constant>(&patternCursor->node);
+        if (!operationHead || patternArguments.empty()) return false;
+        std::reverse(patternArguments.begin(), patternArguments.end());
+        std::size_t lastDot = operationHead->name.rfind('.');
+        if (lastDot == std::string::npos) return false;
+        std::string structureName = operationHead->name.substr(0, lastDot);
+        if (structureName.empty()
+            || environment_.lookup(structureName + ".carrier") == nullptr) {
+            return false;
+        }
+        auto* slotVariable =
+            std::get_if<BoundVariable>(&patternArguments[0]->node);
+        if (!slotVariable) return false;
+        int slotIndex = slotVariable->deBruijnIndex;
+        if (slotIndex < piDepth || slotIndex >= piDepth + binderCount) {
+            return false;
+        }
+        int slot = slotIndex - piDepth;
+        // Subject spine: a concrete operation `F(s1 … sm)` under a
+        // DIFFERENT constant head, with at least the pattern's operand
+        // count (the surplus prefix is F's implicit arguments).
+        std::vector<ExpressionPointer> subjectArguments;
+        ExpressionPointer subjectCursor = subject;
+        while (auto* application =
+                   std::get_if<Application>(&subjectCursor->node)) {
+            subjectArguments.push_back(application->argument);
+            subjectCursor = application->function;
+        }
+        auto* subjectHead = std::get_if<Constant>(&subjectCursor->node);
+        if (!subjectHead || subjectHead->name == operationHead->name) {
+            return false;
+        }
+        std::reverse(subjectArguments.begin(), subjectArguments.end());
+        std::size_t operandCount = patternArguments.size() - 1;
+        if (subjectArguments.size() < operandCount) return false;
+        std::size_t prefixCount = subjectArguments.size() - operandCount;
+        // The bundle, in the SUBJECT's scope: reuse a pinned slot, else
+        // resolve the canonical bundle from the subject's carrier (its
+        // declared result type) — which also instantiates parameterized
+        // bundles such as `Matrix.ring(c, n)`.
+        ExpressionPointer bundleInSubjectScope;
+        if (bindings[slot]) {
+            bundleInSubjectScope = piDepth > 0
+                ? liftBoundVariables(bindings[slot], piDepth, 0)
+                : bindings[slot];
+        } else {
+            ExpressionPointer carrierType = constantSpineResultType(subject);
+            if (!carrierType) return false;
+            bundleInSubjectScope = resolveCanonicalBundleForCarrierType(
+                structureName, carrierType);
+            if (!bundleInSubjectScope) return false;
+            // Same scope discipline as a plain metavariable binding: the
+            // bundle must survive in the lemma-application context.
+            if (piDepth > 0
+                && referencesAnyBoundInRange(
+                       bundleInSubjectScope, 0, piDepth)) {
+                return false;
+            }
+        }
+        // Head equivalence: `S.op(bundle)` must BE the subject's
+        // operation (with its implicit prefix), definitionally. A cheap
+        // head-name gate first — one bounded reduction of the bridged
+        // head — keeps the full check off unrelated failure paths.
+        ExpressionPointer bridgedHead =
+            makeApplication(patternCursor, bundleInSubjectScope);
+        ExpressionPointer subjectOperation = subjectCursor;
+        for (std::size_t k = 0; k < prefixCount; ++k) {
+            subjectOperation =
+                makeApplication(subjectOperation, subjectArguments[k]);
+        }
+        ExpressionPointer bridgedHeadReduced = weakHeadNormalForm(
+            environment_, bridgedHead);
+        std::string bridgedHeadName = headConstantName(bridgedHeadReduced);
+        if (bridgedHeadName != "<unknown>"
+            && bridgedHeadName != subjectHead->name) {
+            // The subject's operation may itself be a wrapper over the
+            // same head (`CommutativeRing.multiply(polynomial_ring(c))`
+            // and `Ring.multiply(Polynomial.ring(R))` both reduce to the
+            // polynomial multiplication) — compare reduced-to-reduced
+            // before rejecting.
+            ExpressionPointer subjectOperationReduced = weakHeadNormalForm(
+                environment_, subjectOperation);
+            std::string subjectOperationName =
+                headConstantName(subjectOperationReduced);
+            if (subjectOperationName != "<unknown>"
+                && subjectOperationName != bridgedHeadName) {
+                return false;
+            }
+        }
+        try {
+            if (!isDefinitionallyEqual(environment_, Context{},
+                                       bridgedHead, subjectOperation)) {
+                return false;
+            }
+        } catch (const TypeError&) {
+            return false;
+        }
+        // Commit the bundle, then match the operands pairwise.
+        std::vector<ExpressionPointer> savedBindings = bindings;
+        std::size_t deferredMark = deferredOut ? deferredOut->size() : 0;
+        if (!bindings[slot]) {
+            bindings[slot] = piDepth > 0
+                ? liftBoundVariables(bundleInSubjectScope, -piDepth, 0)
+                : bundleInSubjectScope;
+        }
+        for (std::size_t k = 0; k < operandCount; ++k) {
+            if (!matchAgainstPattern(patternArguments[1 + k],
+                                     subjectArguments[prefixCount + k],
+                                     binderCount, bindings, piDepth,
+                                     deferredOut)) {
+                bindings = savedBindings;
+                if (deferredOut) deferredOut->resize(deferredMark);
+                return false;
+            }
+        }
+        return true;
+    }
+
 bool Elaborator::tryProjectionFallback(
         ExpressionPointer pattern,
         ExpressionPointer subject,
@@ -1578,12 +1865,11 @@ bool Elaborator::matchAgainstPatternWithDeferredProjections(
             }
             std::string structure = projection->name.substr(
                 0, projection->name.size() - suffix.size());
-            auto entry = environment_.canonicalBundleRegistry.find(
-                std::make_tuple(structure,
-                    headConstantName(deferredMatch.subject)));
-            if (entry != environment_.canonicalBundleRegistry.end()) {
-                bindings[deferredMatch.slot] =
-                    makeConstant(entry->second);
+            ExpressionPointer resolved =
+                resolveCanonicalBundleForCarrierType(
+                    structure, deferredMatch.subject);
+            if (resolved) {
+                bindings[deferredMatch.slot] = resolved;
             }
         }
         // Second-chance resolution: a slot pinned ONLY by non-carrier
