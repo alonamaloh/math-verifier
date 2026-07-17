@@ -517,3 +517,344 @@ theorem Polynomial.sign_image_constant {c : CommutativeRing} (z : ℤ)
         done by substituting imageEquation
       }
   }
+
+-- ----------------------------------------------------------------------
+-- The headline corollaries: the characteristic polynomial of an n×n
+-- matrix has degree ≤ n (and — next — is monic of degree exactly n).
+
+theorem Matrix.characteristicPolynomial_DegreeLessThan {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+              Matrix.characteristicPolynomial(A), 1 + n) := {
+  ∀ (sigma : Permutation(n)). sigma ∈ Permutation.allPermutations(n)
+      → Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+            (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c), Permutation.sign(sigma))
+                * CommutativeRing.productOver(
+                      (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                      NaturalsBelow.enumerate(n))), 1 + n)
+      by (sigma : Permutation(n)) (sigmaMember : sigma ∈ Permutation.allPermutations(n)) ↦ {
+          Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1)
+              by Permutation.sign_is_unit;
+          1 = 1 + 0 as oneEquation;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(sigma)), 1)
+              by Polynomial.sign_image_DegreeLessThan;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(sigma)), 1 + 0)
+              by substituting oneEquation as signBound;
+          ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n)
+              → Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                    Matrix.characteristic(A)(t, sigma(t)), 2)
+              by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n)) ↦
+                  { done by Matrix.characteristic_entry_DegreeLessThan };
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.productOver(
+                      (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                      NaturalsBelow.enumerate(n)),
+                  1 + length(NaturalsBelow.enumerate(n)))
+              by Polynomial.productOver_DegreeLessThan;
+          length(NaturalsBelow.enumerate(n)) = n
+              by NaturalsBelow.enumerate_length as enumerateLength;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.productOver(
+                      (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                      NaturalsBelow.enumerate(n)), 1 + n)
+              by substituting enumerateLength as productBound;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(sigma))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                            NaturalsBelow.enumerate(n))), 1 + (0 + n))
+              by Polynomial.product_DegreeLessThan(aBound := signBound, bBound := productBound);
+          0 + n = n as zeroPlusEquation;
+          done by substituting zeroPlusEquation
+        };
+  Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+          CommutativeRing.sumOver(
+              (sigma : Permutation(n)) ↦
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(sigma))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                            NaturalsBelow.enumerate(n)),
+              Permutation.allPermutations(n)), 1 + n)
+      by Polynomial.sumOver_DegreeLessThan;
+  Matrix.characteristicPolynomial(A)
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                   Permutation.sign(sigma))
+                   * CommutativeRing.productOver(
+                         (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+     by Matrix.determinant_expansion as expansionEquation;
+  done by substituting expansionEquation
+}
+
+-- The characteristic polynomial is monic of degree n: only the identity
+-- permutation's Leibniz term reaches degree n (any other permutation
+-- moves some index, contributing a degree-0 off-diagonal factor), and the
+-- diagonal product ∏(x − aᵢᵢ) is a product of monic linear factors.
+theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Matrix.characteristicPolynomial(A)[n] = Ring.one(CommutativeRing.ring(c)) := {
+  Matrix.characteristicPolynomial(A)
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                   Permutation.sign(sigma))
+                   * CommutativeRing.productOver(
+                         (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+     by Matrix.determinant_expansion as expansionEquation;
+  length(NaturalsBelow.enumerate(n)) = n
+      by NaturalsBelow.enumerate_length as enumerateLength;
+
+  -- Every non-identity term's coefficient at n vanishes.
+  ∀ (rho : Permutation(n)).
+      rho ∈ Permutation.allPermutations(n) ∖ Permutation.identity(n)
+      → Polynomial.coefficientOf(
+            (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                 Permutation.sign(rho))
+                * CommutativeRing.productOver(
+                      (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                      NaturalsBelow.enumerate(n))), n)
+        = CommutativeRing.zero(c)
+      by (rho : Permutation(n))
+         (rhoMember : rho ∈ Permutation.allPermutations(n) ∖ Permutation.identity(n)) ↦ {
+          List.Distinct(Permutation(n), Permutation.allPermutations(n))
+              by Permutation.allPermutations_distinct;
+          ¬(rho = Permutation.identity(n)) by List.remove_member_ne;
+          ¬(∀ (i : NaturalsBelow(n)). rho(i) = i)
+              by (allFixed : ∀ (i : NaturalsBelow(n)). rho(i) = i) ↦ {
+                  ∀ (i : NaturalsBelow(n)). rho(i) = Permutation.identity(n)(i)
+                      by (i : NaturalsBelow(n)) ↦ allFixed(i);
+                  rho = Permutation.identity(n) by Permutation.equal_of_apply_equal;
+                  done
+                };
+          ∃ (i0 : NaturalsBelow(n)). ¬(rho(i0) = i0)
+              by Logic.not_forall_implies_exists_not(
+                     predicate := (i : NaturalsBelow(n)) ↦ rho(i) = i);
+          choose i0 such that ¬(rho(i0) = i0);
+          ¬(i0 = rho(i0)) by (equal : i0 = rho(i0)) ↦ { rho(i0) = i0; done };
+          i0 ∈ NaturalsBelow.enumerate(n) by NaturalsBelow.enumerate_complete;
+          CommutativeRing.productOver(
+                  (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                  NaturalsBelow.enumerate(n))
+             = Matrix.characteristic(A)(i0, rho(i0))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                     NaturalsBelow.enumerate(n) ∖ i0)
+              by CommutativeRing.productOver_remove as productSplit;
+          1 = 1 + 0 as oneEquation;
+          Matrix.characteristic(A)(i0, rho(i0))
+             = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i0, rho(i0))))
+              by Matrix.characteristic_entry_off as offEntry;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  Polynomial.constant(CommutativeRing.ring(c), A(i0, rho(i0))), 1 + 0)
+              by Polynomial.monomial_DegreeLessThan;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i0, rho(i0)))),
+                  1 + 0)
+              by Polynomial.DegreeLessThan.negate;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  Matrix.characteristic(A)(i0, rho(i0)), 1 + 0)
+              by substituting offEntry as entryBound;
+          ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n) ∖ i0
+              → Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                    Matrix.characteristic(A)(t, rho(t)), 2)
+              by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n) ∖ i0) ↦
+                  { done by Matrix.characteristic_entry_DegreeLessThan };
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.productOver(
+                      (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                      NaturalsBelow.enumerate(n) ∖ i0),
+                  1 + length(NaturalsBelow.enumerate(n) ∖ i0))
+              by Polynomial.productOver_DegreeLessThan as restBound;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (Matrix.characteristic(A)(i0, rho(i0))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                            NaturalsBelow.enumerate(n) ∖ i0)),
+                  1 + (0 + length(NaturalsBelow.enumerate(n) ∖ i0)))
+              by Polynomial.product_DegreeLessThan(aBound := entryBound, bBound := restBound);
+          0 + length(NaturalsBelow.enumerate(n) ∖ i0)
+             = length(NaturalsBelow.enumerate(n) ∖ i0) as zeroPlusEquation;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (Matrix.characteristic(A)(i0, rho(i0))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                            NaturalsBelow.enumerate(n) ∖ i0)),
+                  1 + length(NaturalsBelow.enumerate(n) ∖ i0))
+              by substituting zeroPlusEquation;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.productOver(
+                      (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                      NaturalsBelow.enumerate(n)),
+                  1 + length(NaturalsBelow.enumerate(n) ∖ i0))
+              by substituting productSplit as fullProductBound;
+          Permutation.sign(rho) = 1 ∨ Permutation.sign(rho) = Integer.negate(1)
+              by Permutation.sign_is_unit;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(rho)), 1)
+              by Polynomial.sign_image_DegreeLessThan;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(rho)), 1 + 0)
+              by substituting oneEquation as signBound;
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                            NaturalsBelow.enumerate(n))),
+                  1 + (0 + length(NaturalsBelow.enumerate(n) ∖ i0)))
+              by Polynomial.product_DegreeLessThan(aBound := signBound, bBound := fullProductBound);
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                  (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                            NaturalsBelow.enumerate(n))),
+                  1 + length(NaturalsBelow.enumerate(n) ∖ i0))
+              by substituting zeroPlusEquation as termBound;
+          length(NaturalsBelow.enumerate(n)) = 1 + length(NaturalsBelow.enumerate(n) ∖ i0)
+              by List.length_remove_member as removeLength;
+          n = length(NaturalsBelow.enumerate(n))       by enumerateLength
+            = 1 + length(NaturalsBelow.enumerate(n) ∖ i0)   by removeLength
+            as nEquation;
+          1 + length(NaturalsBelow.enumerate(n) ∖ i0) ≤ n by substituting nEquation;
+          done by termBound
+        };
+
+  -- The identity term's coefficient at n is one.
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n)
+      → Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+            Matrix.characteristic(A)(t, Permutation.identity(n)(t)), 2)
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n)) ↦
+          { done by Matrix.characteristic_entry_DegreeLessThan };
+  ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n)
+      → Polynomial.coefficientOf(Matrix.characteristic(A)(t, Permutation.identity(n)(t)), 1)
+        = Ring.one(CommutativeRing.ring(c))
+      by (t : NaturalsBelow(n)) (tMember : t ∈ NaturalsBelow.enumerate(n)) ↦ {
+          t = Permutation.identity(n)(t);
+          done by Matrix.characteristic_entry_leading
+        };
+  Polynomial.coefficientOf(
+          CommutativeRing.productOver(
+              (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
+              NaturalsBelow.enumerate(n)),
+          length(NaturalsBelow.enumerate(n)))
+     = Ring.one(CommutativeRing.ring(c))
+      by Polynomial.productOver_monic;
+  Polynomial.coefficientOf(
+          CommutativeRing.productOver(
+              (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
+              NaturalsBelow.enumerate(n)), n)
+     = Ring.one(CommutativeRing.ring(c))
+      by substituting enumerateLength as productAtN;
+  Permutation.sign(Permutation.identity(n)) = 1 by Permutation.sign_identity as signIdentity;
+  Polynomial.coefficientOf(
+          (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+               Permutation.sign(Permutation.identity(n)))
+              * CommutativeRing.productOver(
+                    (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
+                    NaturalsBelow.enumerate(n))), n)
+     = Polynomial.coefficientOf(
+           (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c), 1)
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
+                     NaturalsBelow.enumerate(n))), n)
+           by substituting signIdentity
+     = Polynomial.coefficientOf(
+           (CommutativeRing.one(CommutativeRing.polynomial_ring(c))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
+                     NaturalsBelow.enumerate(n))), n)
+           by substituting CommutativeRing.from_integer_one
+     = Polynomial.coefficientOf(
+           CommutativeRing.productOver(
+               (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
+               NaturalsBelow.enumerate(n)), n)
+           by substituting CommutativeRing.one_multiply
+     = Ring.one(CommutativeRing.ring(c))
+           by productAtN
+     as identityCoefficient;
+
+  -- Assemble the sum: the identity term contributes one, the rest zero.
+  Permutation.identity(n) ∈ Permutation.allPermutations(n)
+      by Permutation.allPermutations_complete;
+  (CommutativeRing.sumOver(
+          (rho : Permutation(n)) ↦
+              (Polynomial.coefficientOf(
+                  (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                            NaturalsBelow.enumerate(n))), n)
+               : CommutativeRing.carrier(c)),
+          Permutation.allPermutations(n) ∖ Permutation.identity(n)) : CommutativeRing.carrier(c))
+     = CommutativeRing.zero(c)
+      by CommutativeRing.sumOver_zero_on_members as remainderVanishes;
+  Matrix.characteristicPolynomial(A)[n]
+     = Polynomial.coefficientOf(
+           CommutativeRing.sumOver(
+               (sigma : Permutation(n)) ↦
+                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(sigma))
+                       * CommutativeRing.productOver(
+                             (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                             NaturalsBelow.enumerate(n)),
+               Permutation.allPermutations(n)), n)
+           by substituting expansionEquation
+     = (CommutativeRing.sumOver(
+           (rho : Permutation(n)) ↦
+               (Polynomial.coefficientOf(
+                   (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                        Permutation.sign(rho))
+                       * CommutativeRing.productOver(
+                             (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                             NaturalsBelow.enumerate(n))), n)
+                : CommutativeRing.carrier(c)),
+           Permutation.allPermutations(n)) : CommutativeRing.carrier(c))
+           by Polynomial.coefficientOf_sumOver
+     = Polynomial.coefficientOf(
+           (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                Permutation.sign(Permutation.identity(n)))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
+                     NaturalsBelow.enumerate(n))), n)
+       + (CommutativeRing.sumOver(
+             (rho : Permutation(n)) ↦
+                 (Polynomial.coefficientOf(
+                     (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                          Permutation.sign(rho))
+                         * CommutativeRing.productOver(
+                               (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                               NaturalsBelow.enumerate(n))), n)
+                  : CommutativeRing.carrier(c)),
+             Permutation.allPermutations(n) ∖ Permutation.identity(n)) : CommutativeRing.carrier(c))
+           by CommutativeRing.sumOver_remove
+     = Ring.one(CommutativeRing.ring(c))
+       + (CommutativeRing.sumOver(
+             (rho : Permutation(n)) ↦
+                 (Polynomial.coefficientOf(
+                     (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                          Permutation.sign(rho))
+                         * CommutativeRing.productOver(
+                               (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                               NaturalsBelow.enumerate(n))), n)
+                  : CommutativeRing.carrier(c)),
+             Permutation.allPermutations(n) ∖ Permutation.identity(n)) : CommutativeRing.carrier(c))
+           by substituting identityCoefficient
+     = CommutativeRing.one(c) + CommutativeRing.zero(c)
+           by substituting remainderVanishes
+     = CommutativeRing.one(c)
+           by CommutativeRing.add_zero
+}
