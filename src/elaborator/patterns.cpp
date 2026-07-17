@@ -406,9 +406,20 @@ void Elaborator::elaboratePatternMatchDefinition(
                            openOverLocalBinders(
                                motive, outerBinderStack,
                                outerBinderStack.size()));
+            // Peel up to weak-head reduction: inferType leaves instantiated
+            // codomains unreduced, so the tail can be a beta-redex rather
+            // than a structural Sort (see the companion loop in cases.cpp).
             ExpressionPointer cursor = motiveType;
-            while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-                cursor = pi->codomain;
+            for (;;) {
+                if (auto* pi = std::get_if<Pi>(&cursor->node)) {
+                    cursor = pi->codomain;
+                    continue;
+                }
+                if (std::get_if<Sort>(&cursor->node)) break;
+                ExpressionPointer reduced = weakHeadNormalForm(
+                    environment_, cursor);
+                if (structurallyEqual(reduced, cursor)) break;
+                cursor = reduced;
             }
             auto* sortNode = std::get_if<Sort>(&cursor->node);
             if (!sortNode) {

@@ -1984,9 +1984,22 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
                            openOverLocalBinders(
                                motive, localBinders,
                                localBinders.size()));
+            // Peel the Pi chain up to weak-head reduction: inferType leaves
+            // the instantiated codomain unreduced, so the tail can be a
+            // beta-redex like `(λ(_ : Ring). Type 0)(CommutativeRing.ring r)`
+            // rather than a structural Sort (hit by a value-level `if` whose
+            // expected type unfolds through a defined type constructor).
             ExpressionPointer motiveCursor = motiveType;
-            while (auto* pi = std::get_if<Pi>(&motiveCursor->node)) {
-                motiveCursor = pi->codomain;
+            for (;;) {
+                if (auto* pi = std::get_if<Pi>(&motiveCursor->node)) {
+                    motiveCursor = pi->codomain;
+                    continue;
+                }
+                if (std::get_if<Sort>(&motiveCursor->node)) break;
+                ExpressionPointer reduced = weakHeadNormalForm(
+                    environment_, motiveCursor);
+                if (structurallyEqual(reduced, motiveCursor)) break;
+                motiveCursor = reduced;
             }
             auto* sortNode = std::get_if<Sort>(&motiveCursor->node);
             if (!sortNode) {

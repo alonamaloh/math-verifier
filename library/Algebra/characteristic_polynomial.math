@@ -1,0 +1,69 @@
+-- Algebra/characteristic_polynomial.math
+--
+-- The characteristic matrix of a square matrix A over a commutative ring:
+-- the matrix xI − A over R[x], written by its entries the way every text
+-- tabulates it — x − aᵢᵢ on the diagonal, −aᵢⱼ off it. Its determinant is
+-- the characteristic polynomial. (The compositional spelling
+-- `x • I − mapEntries(constant, A)` is definitionally the same matrix;
+-- the entrywise form is what every determinant manipulation consumes.)
+
+module Algebra.characteristic_polynomial
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.determinant
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.instances
+import Polynomial.commutative
+import Polynomial.monomial
+import Polynomial.degree
+
+-- The characteristic matrix xI − A, a square matrix over R[x].
+definition Matrix.characteristic {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) : Matrix(CommutativeRing.polynomial_ring(c), n, n) :=
+  (i : NaturalsBelow(n)) ↦ (j : NaturalsBelow(n)) ↦
+      if i = j
+      then Polynomial.indeterminate(CommutativeRing.ring(c))
+           - Polynomial.constant(CommutativeRing.ring(c), A(i, j))
+      else Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j)))
+
+-- The characterizing entries, through the conditional's quarantine boundary.
+theorem Matrix.characteristic_entry_diagonal {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (i j : NaturalsBelow(n)) (equal : i = j)
+        : Matrix.characteristic(A)(i, j)
+          = Polynomial.indeterminate(CommutativeRing.ring(c))
+            - Polynomial.constant(CommutativeRing.ring(c), A(i, j)) :=
+  by Logic.if_positive
+
+theorem Matrix.characteristic_entry_off {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n)) (i j : NaturalsBelow(n)) (notEqual : ¬(i = j))
+        : Matrix.characteristic(A)(i, j)
+          = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j))) :=
+  by Logic.if_negative
+
+-- The characteristic polynomial: det(xI − A) in R[x]. The result type is
+-- spelled `Polynomial(...)` so the coefficient operator `p[k]` and the
+-- polynomial algebra resolve on it directly.
+definition Matrix.characteristicPolynomial {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                     Ring.zero(CommutativeRing.ring(c))) :=
+  Matrix.determinant(Matrix.characteristic(A))

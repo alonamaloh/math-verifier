@@ -16,6 +16,7 @@ module Algebra.matrix
 import Logic.basics
 import Equality.basics
 import Natural.basics
+import Natural.classical_decidable
 import Set.finite
 import Lists.list
 import Lists.map
@@ -46,3 +47,53 @@ theorem Matrix.multiply_entry {r : CommutativeRing} {rows middle columns : ℕ}
           = CommutativeRing.sumOver((k : NaturalsBelow(middle)) ↦ left(i, k) * right(k, j),
                 NaturalsBelow.enumerate(middle)) :=
   done
+
+-- ----------------------------------------------------------------------
+-- Entrywise operations, the scalar action, the entry embedding along a
+-- carrier map, and the identity matrix. Together they let the
+-- characteristic matrix read as written: `x • I − constant-entries-of A`.
+
+definition Matrix.add {r : CommutativeRing} {rows columns : ℕ}
+        (A B : Matrix(r, rows, columns)) : Matrix(r, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦ A(i, j) + B(i, j)
+
+definition Matrix.negate {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) : Matrix(r, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦ CommutativeRing.negate(A(i, j))
+
+definition Matrix.subtract {r : CommutativeRing} {rows columns : ℕ}
+        (A B : Matrix(r, rows, columns)) : Matrix(r, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦ A(i, j) - B(i, j)
+
+definition Matrix.scale {r : CommutativeRing} {rows columns : ℕ}
+        (scalar : CommutativeRing.carrier(r)) (A : Matrix(r, rows, columns))
+        : Matrix(r, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦ scalar * A(i, j)
+
+-- Entrywise image along a carrier map (e.g. the constant-polynomial
+-- embedding R ↪ R[x] applied to every entry).
+definition Matrix.mapEntries {r s : CommutativeRing} {rows columns : ℕ}
+        (h : CommutativeRing.carrier(r) → CommutativeRing.carrier(s))
+        (A : Matrix(r, rows, columns)) : Matrix(s, rows, columns) :=
+  (i : NaturalsBelow(rows)) ↦ (j : NaturalsBelow(columns)) ↦ h(A(i, j))
+
+definition Matrix.identity (r : CommutativeRing) (n : ℕ) : Matrix(r, n, n) :=
+  (i : NaturalsBelow(n)) ↦ (j : NaturalsBelow(n)) ↦
+      if i = j then CommutativeRing.one(r) else CommutativeRing.zero(r)
+
+-- The identity's characterizing entries, through the conditional's
+-- quarantine boundary.
+theorem Matrix.identity_entry_diagonal (r : CommutativeRing) {n : ℕ}
+        (i j : NaturalsBelow(n)) (equal : i = j)
+        : Matrix.identity(r, n)(i, j) = CommutativeRing.one(r) :=
+  by Logic.if_positive
+
+theorem Matrix.identity_entry_off (r : CommutativeRing) {n : ℕ}
+        (i j : NaturalsBelow(n)) (notEqual : ¬(i = j))
+        : Matrix.identity(r, n)(i, j) = CommutativeRing.zero(r) :=
+  by Logic.if_negative
+
+operator (+) on (Matrix, Matrix) := Matrix.add
+operator (-) on (Matrix, Matrix) := Matrix.subtract
+operator (*) on (Matrix, Matrix) := Matrix.multiply
+operator (•) on (CommutativeRing.carrier, Matrix) := Matrix.scale
