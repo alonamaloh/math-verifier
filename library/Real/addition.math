@@ -99,15 +99,12 @@ definition CauchyRationalSequence.add
 -- instead of naming `.add`.
 operator (+) on (CauchyRationalSequence, CauchyRationalSequence) := CauchyRationalSequence.add
 
--- sf(add(rep_x, rep_y), m) = sf(rep_x, m) + sf(rep_y, m).
+-- (rep_x + rep_y)(m) = rep_x(m) + rep_y(m).
 -- Bridges the abstract sequenceFunction projector through the
 -- pattern-match definition of add.
 automatic theorem CauchyRationalSequence.sequenceFunction_add
         (rep_x rep_y : CauchyRationalSequence) (m : Natural)
-        : CauchyRationalSequence.sequenceFunction(
-              rep_x + rep_y, m)
-          = CauchyRationalSequence.sequenceFunction(rep_x, m)
-            + CauchyRationalSequence.sequenceFunction(rep_y, m) := {
+        : (rep_x + rep_y)(m) = rep_x(m) + rep_y(m) := {
   let ⟨sa, _⟩ := rep_x;
   let ⟨sb, _⟩ := rep_y;
   reflexivity(Rational, sa(m) + sb(m))
@@ -125,22 +122,12 @@ theorem Real.add_respects_second
            (εPositive : Rational.zero < ε) ↦ {
       choose N as yEquiv_at_N from yEquiv(ε, εPositive);
       witness N with
-          (m : Natural) (N_leq_m : N ≤ m) ↦ {
-            let sx : Rational :=
-                CauchyRationalSequence.sequenceFunction(rep_x, m);
-            let sy : Rational :=
-                CauchyRationalSequence.sequenceFunction(rep_y, m);
-            let syPrime : Rational :=
-                CauchyRationalSequence.sequenceFunction(rep_yPrime, m);
-            abs(
-                CauchyRationalSequence.sequenceFunction(rep_x + rep_y, m)
-                - CauchyRationalSequence.sequenceFunction(
-                      rep_x + rep_yPrime, m))
-               = abs((sx + sy) - (sx + syPrime))
-               = abs(sy - syPrime)
+          (m : Natural) (N_leq_m : N ≤ m) ↦
+            abs((rep_x + rep_y)(m) - (rep_x + rep_yPrime)(m))
+               = abs((rep_x(m) + rep_y(m)) - (rep_x(m) + rep_yPrime(m)))
+               = abs(rep_y(m) - rep_yPrime(m))
                < ε
                    by yEquiv_at_N(m, N_leq_m)
-          }
   }
 
 -- Respect of addition in the first argument: symmetric, the shared rep_y
@@ -153,22 +140,12 @@ theorem Real.add_respects_first
            (εPositive : Rational.zero < ε) ↦ {
       choose N as xEquiv_at_N from xEquiv(ε, εPositive);
       witness N with
-          (m : Natural) (N_leq_m : N ≤ m) ↦ {
-            let sx : Rational :=
-                CauchyRationalSequence.sequenceFunction(rep_x, m);
-            let sxPrime : Rational :=
-                CauchyRationalSequence.sequenceFunction(rep_xPrime, m);
-            let sy : Rational :=
-                CauchyRationalSequence.sequenceFunction(rep_y, m);
-            abs(
-                CauchyRationalSequence.sequenceFunction(rep_x + rep_y, m)
-                - CauchyRationalSequence.sequenceFunction(
-                      rep_xPrime + rep_y, m))
-               = abs((sx + sy) - (sxPrime + sy))
-               = abs(sx - sxPrime)
+          (m : Natural) (N_leq_m : N ≤ m) ↦
+            abs((rep_x + rep_y)(m) - (rep_xPrime + rep_y)(m))
+               = abs((rep_x(m) + rep_y(m)) - (rep_xPrime(m) + rep_y(m)))
+               = abs(rep_x(m) - rep_xPrime(m))
                < ε
                    by xEquiv_at_N(m, N_leq_m)
-          }
   }
 
 -- Real.add: add the representative sequences pointwise; well-defined in
@@ -212,12 +189,7 @@ theorem Rational.to_real.add_preserves_equiv (a b : Rational)
           -- δ-unfold of Rational.to_cauchy_constant plus ι/β on the
           -- abstract projector. The RHS additionally walks through
           -- sequenceFunction_add to push the projection inside `add`.
-          abs(
-                   CauchyRationalSequence.sequenceFunction(
-                       Rational.to_cauchy_constant(a + b), m)
-                   - CauchyRationalSequence.sequenceFunction(
-                         Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b),
-                         m))
+          abs(Rational.to_cauchy_constant(a + b)(m) - (Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b))(m))
              = abs((a + b) - (a + b))
              = Rational.zero
              < ε

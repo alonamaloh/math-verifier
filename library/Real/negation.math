@@ -32,13 +32,11 @@ definition CauchyRationalSequence.negate
           (n : Natural) ↦ -s(n),
           Rational.sequence.negate_is_cauchy(s, sCauchy))
 
--- sf(negate(rep), m) = -sf(rep, m): bridges abstract usage of the
--- negated sequence through the pattern-match definition.
+-- negate(rep)(m) = -rep(m): bridges abstract usage of the negated
+-- sequence through the pattern-match definition.
 theorem CauchyRationalSequence.sequenceFunction_negate
         (rep : CauchyRationalSequence) (m : Natural)
-        : CauchyRationalSequence.sequenceFunction(
-              CauchyRationalSequence.negate(rep), m)
-          = -CauchyRationalSequence.sequenceFunction(rep, m) := {
+        : CauchyRationalSequence.negate(rep)(m) = -rep(m) := {
   let ⟨s, _⟩ := rep;
   reflexivity(Rational, -s(m))
 }
@@ -62,21 +60,11 @@ theorem Real.negate_respects
               from equivalenceHypothesis(ε, εPositive);
           witness N with
               (m : Natural) (N_leq_m : N ≤ m) ↦
-                -- Walk the bound on |sf(rep1, m) - sf(rep1Prime, m)| down to
-                -- the same bound on the negated sequences:
-                --   |sf(neg(rep1), m) - sf(neg(rep1Prime), m)|
-                --     = |-sf(rep1, m) - -sf(rep1Prime, m)|  (push neg through sf, twice)
-                --     = |sf(rep1, m)  - sf(rep1Prime, m)|   (|-a - -b| = |a - b|)
-                --     < ε                              (the original ε-bound)
-                abs(
-                         CauchyRationalSequence.sequenceFunction(
-                             CauchyRationalSequence.negate(rep1), m)
-                         - CauchyRationalSequence.sequenceFunction(
-                             CauchyRationalSequence.negate(rep1Prime), m))
-                   = abs(-CauchyRationalSequence.sequenceFunction(rep1, m)
-                         - -CauchyRationalSequence.sequenceFunction(rep1Prime, m))
-                   = abs(CauchyRationalSequence.sequenceFunction(rep1, m)
-                         - CauchyRationalSequence.sequenceFunction(rep1Prime, m))
+                -- |-a - -b| = |a - b|, so the original ε-bound on rep1 vs.
+                -- rep1Prime carries over unchanged to their negations.
+                abs(CauchyRationalSequence.negate(rep1)(m) - CauchyRationalSequence.negate(rep1Prime)(m))
+                   = abs(-rep1(m) - -rep1Prime(m))
+                   = abs(rep1(m) - rep1Prime(m))
                    < ε
                        by origAtN(m, N_leq_m)
         })
@@ -103,13 +91,8 @@ theorem Rational.to_real.negate_preserves_equiv (q : Rational)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦
-          abs(
-                   CauchyRationalSequence.sequenceFunction(
-                       Rational.to_cauchy_constant(-q), m)
-                   - CauchyRationalSequence.sequenceFunction(
-                         CauchyRationalSequence.negate(
-                             Rational.to_cauchy_constant(q)),
-                         m))
+          abs(Rational.to_cauchy_constant(-q)(m)
+                   - CauchyRationalSequence.negate(Rational.to_cauchy_constant(q))(m))
              = abs(-q - -q)
              = Rational.zero
              < ε

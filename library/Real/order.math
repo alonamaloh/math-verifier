@@ -61,9 +61,9 @@ definition CauchyRationalSequence.IsEventuallyNonneg
 -- Respect: if a ~ b, then IsEventuallyNonneg(a) ↔ IsEventuallyNonneg(b).
 
 -- Forward direction. Given IsEventuallyNonneg(a) and a ~ b: at ε for b,
--- pick N_a with -(ε/2) < sf(a, m) and N_eq with |sf(a, m) - sf(b, m)| < ε/2;
--- at m ≥ max(N_a, N_eq) the second gives -(ε/2) < sf(b, m) - sf(a, m).
--- Adding: -ε = -(ε/2) + -(ε/2) < sf(a, m) + (sf(b, m) - sf(a, m)) = sf(b, m).
+-- pick N_a with -(ε/2) < a(m) and N_eq with |a(m) - b(m)| < ε/2;
+-- at m ≥ max(N_a, N_eq) the second gives -(ε/2) < b(m) - a(m).
+-- Adding: -ε = -(ε/2) + -(ε/2) < a(m) + (b(m) - a(m)) = b(m).
 theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
         (a b : CauchyRationalSequence)
         (aEquivB : CauchyEquivalent(a, b))
@@ -80,40 +80,25 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
                  (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) ↦ {
           N_a ≤ m;
           N_eq ≤ m;
-          -Rational.halve(ε) < CauchyRationalSequence.sequenceFunction(a, m);
-          abs(
-                CauchyRationalSequence.sequenceFunction(a, m)
-                - CauchyRationalSequence.sequenceFunction(b, m))
-                  < Rational.halve(ε)
-            by eqBound;
-          -- |sf(b, m) - sf(a, m)| < ε/2  (swap inside the abs).
-          abs(
-                CauchyRationalSequence.sequenceFunction(b, m)
-                - CauchyRationalSequence.sequenceFunction(a, m))
-                  = abs(
-                        CauchyRationalSequence.sequenceFunction(a, m)
-                        - CauchyRationalSequence.sequenceFunction(b, m))
-                  < Rational.halve(ε);
-          -- Extract the lower bound: -(ε/2) < sf(b, m) - sf(a, m)
+          -Rational.halve(ε) < a(m);
+          abs(a(m) - b(m)) < Rational.halve(ε) by eqBound;
+          -- |b(m) - a(m)| < ε/2  (swap inside the abs).
+          abs(b(m) - a(m)) = abs(a(m) - b(m)) < Rational.halve(ε);
+          -- Extract the lower bound: -(ε/2) < b(m) - a(m)
           -- (lower half of the |·| bounds on the swapped abs).
-          -Rational.halve(ε)
-                < CauchyRationalSequence.sequenceFunction(b, m)
-                  - CauchyRationalSequence.sequenceFunction(a, m)
+          -Rational.halve(ε) < b(m) - a(m)
               by Rational.absolute_value_LessThan_bounds;
           -- Chain the two ε/2 bounds end-to-end:
           --   -ε = -halve(ε) + -halve(ε)
-          --      < sf(a, m) + -halve(ε)                    (aBoundAtM)
-          --      < sf(a, m) + (sf(b, m) - sf(a, m))         (swappedδ)
-          --      = sf(b, m).
+          --      < a(m) + -halve(ε)                    (aBoundAtM)
+          --      < a(m) + (b(m) - a(m))                (swappedδ)
+          --      = b(m).
           -ε
              = -(Rational.halve(ε) + Rational.halve(ε))
              = -Rational.halve(ε) + -Rational.halve(ε)
-             < CauchyRationalSequence.sequenceFunction(a, m)
-                 + -Rational.halve(ε)
-             < CauchyRationalSequence.sequenceFunction(a, m)
-                 + (CauchyRationalSequence.sequenceFunction(b, m)
-                    - CauchyRationalSequence.sequenceFunction(a, m))
-             = CauchyRationalSequence.sequenceFunction(b, m)
+             < a(m) + -Rational.halve(ε)
+             < a(m) + (b(m) - a(m))
+             = b(m)
         }
   }
 
@@ -190,7 +175,7 @@ automatic theorem Real.IsNonneg_zero : Real.IsNonneg(Real.zero) :=
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦ {
-          -- Goal: -ε < sf(to_cauchy_constant(0), m) ≡β Rational.zero.
+          -- Goal: -ε < Rational.to_cauchy_constant(0)(m) ≡β Rational.zero.
           -ε < Rational.zero
         })
 
@@ -248,25 +233,18 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.add
         : CauchyRationalSequence.IsEventuallyNonneg(
               CauchyRationalSequence.add(a, b)) :=
   -- IsEventuallyNonneg of add(a, b) means IsEventuallyNonneg of
-  -- sequenceFunction(add(a, b)). Bridge to s(n) + t(n) via
-  -- sequenceFunction_add.
+  -- (a + b)(·). Bridge to a(n) + b(n) via sequenceFunction_add.
   (ε : Rational)
            (εPositive : Rational.zero < ε) ↦ {
-    Rational.sequence.IsEventuallyNonneg((n : Natural) ↦
-            CauchyRationalSequence.sequenceFunction(a, n)
-            + CauchyRationalSequence.sequenceFunction(b, n))
+    Rational.sequence.IsEventuallyNonneg((n : Natural) ↦ a(n) + b(n))
         as sumNonneg;
-    choose N such that ∀ (m : Natural). N ≤ m
-            → -ε < CauchyRationalSequence.sequenceFunction(a, m)
-                   + CauchyRationalSequence.sequenceFunction(b, m)
+    choose N such that ∀ (m : Natural). N ≤ m → -ε < a(m) + b(m)
         from sumNonneg(ε, εPositive);
     witness N with
         (m : Natural) (_ : N ≤ m) ↦
           -ε
-             < CauchyRationalSequence.sequenceFunction(a, m)
-               + CauchyRationalSequence.sequenceFunction(b, m)
-             = CauchyRationalSequence.sequenceFunction(
-                   CauchyRationalSequence.add(a, b), m)
+             < a(m) + b(m)
+             = (a + b)(m)
   }
 
 -- Real.IsNonneg.add: Real-level statement. Lift via Quotient.induct_two.

@@ -153,82 +153,55 @@ theorem Real.cauchy_sign_eventually
                       Rational.to_cauchy_constant(Rational.zero))))
         : ∃ (lowerBound : Rational).
             Rational.zero < lowerBound ∧ ∃ (signIndex : Natural).
-                (∀ (m : Natural). signIndex ≤ m
-                    → lowerBound
-                      ≤ CauchyRationalSequence.sequenceFunction(
-                            sequence, m)) ∨ ∀ (m : Natural). signIndex ≤ m
-                    → CauchyRationalSequence.sequenceFunction(
-                          sequence, m)
-                        ≤ -lowerBound := {
+                (∀ (m : Natural). signIndex ≤ m → lowerBound ≤ sequence(m))
+                    ∨ ∀ (m : Natural). signIndex ≤ m → sequence(m) ≤ -lowerBound := {
     ∃ (lowerBound : Rational). ∃ (apartnessIndex : Natural).
         Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
-          lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m))
+          lowerBound ≤ abs(sequence(m))
       by Real.cauchy_apartness_from_zero as apartnessExists;
     choose lowerBound as lowerBoundData from apartnessExists;
     choose apartnessIndex from lowerBoundData;
     Rational.zero < lowerBound as lowerBoundPositive;
-    ∀ (m : Natural). apartnessIndex ≤ m →
-        lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m));
+    ∀ (m : Natural). apartnessIndex ≤ m → lowerBound ≤ abs(sequence(m));
     choose cauchyIndex such that
             ∀ (m : Natural). cauchyIndex ≤ m →
               ∀ (n : Natural). cauchyIndex ≤ n →
-                abs(CauchyRationalSequence.sequenceFunction(sequence, m)
-                    - CauchyRationalSequence.sequenceFunction(sequence, n)) < lowerBound
+                abs(sequence(m) - sequence(n)) < lowerBound
         as cauchyAt from CauchyRationalSequence.isCauchy;
     let signIndex : Natural :=
         Natural.maximum(apartnessIndex, cauchyIndex);
     signIndex ≤ signIndex;
     apartnessIndex ≤ signIndex;
-    lowerBound
-            ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, signIndex));
-    ∀ (m : Natural). signIndex ≤ m
-            → lowerBound
-              ≤ abs(
-                    CauchyRationalSequence.sequenceFunction(
-                        sequence, m))
+    lowerBound ≤ abs(sequence(signIndex));
+    ∀ (m : Natural). signIndex ≤ m → lowerBound ≤ abs(sequence(m))
       by (m : Natural) (mGeSign : signIndex ≤ m) ↦ {
            apartnessIndex ≤ m;
-           lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, m));
+           lowerBound ≤ abs(sequence(m));
            done
          };
     ∀ (m : Natural). signIndex ≤ m
             → ∀ (n : Natural). signIndex ≤ n
-            → abs(
-                  CauchyRationalSequence.sequenceFunction(sequence, m)
-                  - CauchyRationalSequence.sequenceFunction(sequence, n))
-                < lowerBound
+            → abs(sequence(m) - sequence(n)) < lowerBound
       by (m : Natural) (mGeSign : signIndex ≤ m)
          (n : Natural) (nGeSign : signIndex ≤ n) ↦ {
            cauchyIndex ≤ m;
            cauchyIndex ≤ n;
-           abs(CauchyRationalSequence.sequenceFunction(sequence, m)
-               - CauchyRationalSequence.sequenceFunction(sequence, n)) < lowerBound
-             by cauchyAt;
+           abs(sequence(m) - sequence(n)) < lowerBound by cauchyAt;
            done
          };
     witness lowerBound with And.introduction(
         lowerBoundPositive,
         witness signIndex with done by cases {
-          case Rational.IsNonneg(CauchyRationalSequence.sequenceFunction(sequence, signIndex))
-              as seqIsNonneg: {
-            lowerBound
-               ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, signIndex))
-               = CauchyRationalSequence.sequenceFunction(sequence, signIndex);
-            ∀ (m : Natural). signIndex ≤ m
-                    → lowerBound ≤ CauchyRationalSequence.sequenceFunction(sequence, m)
+          case Rational.IsNonneg(sequence(signIndex)) as seqIsNonneg: {
+            lowerBound ≤ abs(sequence(signIndex)) = sequence(signIndex);
+            ∀ (m : Natural). signIndex ≤ m → lowerBound ≤ sequence(m)
               by Real.cauchy_sign_eventually_positive_branch;
             done
           }
-          case Rational.IsNonneg(-CauchyRationalSequence.sequenceFunction(sequence, signIndex))
-              as seqNegateIsNonneg: {
-            lowerBound
-               ≤ abs(CauchyRationalSequence.sequenceFunction(sequence, signIndex))
-               = -CauchyRationalSequence.sequenceFunction(sequence, signIndex);
-            CauchyRationalSequence.sequenceFunction(sequence, signIndex)
-               = -(-CauchyRationalSequence.sequenceFunction(sequence, signIndex))
-               ≤ -lowerBound;
-            ∀ (m : Natural). signIndex ≤ m
-                    → CauchyRationalSequence.sequenceFunction(sequence, m) ≤ -lowerBound
+          case Rational.IsNonneg(-sequence(signIndex)) as seqNegateIsNonneg: {
+            lowerBound ≤ abs(sequence(signIndex)) = -sequence(signIndex);
+            sequence(signIndex) = -(-sequence(signIndex)) ≤ -lowerBound;
+            ∀ (m : Natural). signIndex ≤ m → sequence(m) ≤ -lowerBound
               by Real.cauchy_sign_eventually_negative_branch;
             done
           }
@@ -270,57 +243,42 @@ automatic theorem Real.IsNonneg_or_negate_IsNonneg
                                         representativesEquivalent));
                 ∃ (lowerBound : Rational).
                     Rational.zero < lowerBound ∧ ∃ (signIndex : Natural).
-                        (∀ (m : Natural). signIndex ≤ m
-                            → lowerBound
-                              ≤ CauchyRationalSequence.sequenceFunction(rep, m))
-                        ∨ ∀ (m : Natural). signIndex ≤ m
-                            → CauchyRationalSequence.sequenceFunction(rep, m)
-                                ≤ -lowerBound as signEventually;
+                        (∀ (m : Natural). signIndex ≤ m → lowerBound ≤ rep(m))
+                        ∨ ∀ (m : Natural). signIndex ≤ m → rep(m) ≤ -lowerBound
+                    as signEventually;
                 choose lowerBound from signEventually;
                 Rational.zero < lowerBound;
                 ∃ (signIndex : Natural).
-                    (∀ (m : Natural). signIndex ≤ m
-                        → lowerBound
-                          ≤ CauchyRationalSequence.sequenceFunction(rep, m))
-                    ∨ ∀ (m : Natural). signIndex ≤ m
-                        → CauchyRationalSequence.sequenceFunction(rep, m)
-                            ≤ -lowerBound as signData;
+                    (∀ (m : Natural). signIndex ≤ m → lowerBound ≤ rep(m))
+                    ∨ ∀ (m : Natural). signIndex ≤ m → rep(m) ≤ -lowerBound
+                    as signData;
                 choose signIndex from signData;
                 done by cases {
-                  case ∀ (m : Natural). signIndex ≤ m
-                        → lowerBound ≤ CauchyRationalSequence.sequenceFunction(rep, m)
+                  case ∀ (m : Natural). signIndex ≤ m → lowerBound ≤ rep(m)
                       as eventuallyPositive: {
                     CauchyRationalSequence.IsEventuallyNonneg(rep)
                       by (ε : Rational)
                          (εPositive : Rational.zero < ε) ↦
                           witness signIndex with
                               (m : Natural) (mGeSign : signIndex ≤ m) ↦
-                                -ε
-                                   < Rational.zero
-                                   < lowerBound
-                                   ≤ CauchyRationalSequence.sequenceFunction(rep, m);
+                                -ε < Rational.zero < lowerBound ≤ rep(m);
                     Real.IsNonneg((Quotient.class_of(rep) : Real));
                     done
                   }
-                  case ∀ (m : Natural). signIndex ≤ m
-                        → CauchyRationalSequence.sequenceFunction(rep, m) ≤ -lowerBound
+                  case ∀ (m : Natural). signIndex ≤ m → rep(m) ≤ -lowerBound
                       as eventuallyNegative: {
                     CauchyRationalSequence.IsEventuallyNonneg(CauchyRationalSequence.negate(rep))
                       by (ε : Rational)
                          (εPositive : Rational.zero < ε) ↦
                           witness signIndex with
                               (m : Natural) (mGeSign : signIndex ≤ m) ↦ {
-                                CauchyRationalSequence.sequenceFunction(rep, m)
-                                        ≤ -lowerBound;
-                                lowerBound
-                                   = -(-lowerBound)
-                                   ≤ -CauchyRationalSequence.sequenceFunction(rep, m);
+                                rep(m) ≤ -lowerBound;
+                                lowerBound = -(-lowerBound) ≤ -rep(m);
                                 -ε
                                    < Rational.zero
                                    < lowerBound
-                                   ≤ -CauchyRationalSequence.sequenceFunction(rep, m)
-                                   = CauchyRationalSequence.sequenceFunction(
-                                         CauchyRationalSequence.negate(rep), m);
+                                   ≤ -rep(m)
+                                   = CauchyRationalSequence.negate(rep)(m);
                                 done
                               };
                     Real.IsNonneg(-(Quotient.class_of(rep) : Real));

@@ -6,7 +6,7 @@
 -- The inverse-existence theorem chains three pieces:
 --   1. `Real.cauchy_apartness_from_zero` (Real/apartness.math) —
 --      from `¬(x = Real.zero)`, extract a positive lower bound on
---      `|sequenceFunction(s, m)|` holding eventually.
+--      `|s(m)|` holding eventually.
 --   2. `Real.reciprocal_cauchy_sequence` (Real/reciprocal.math) —
 --      the pointwise reciprocal sequence, packaged with its
 --      IsCauchy proof.
@@ -73,8 +73,7 @@ theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) := {
         as cauchyEquivalence;
     choose witnessIndex such that
         ∀ (m : Natural). witnessIndex ≤ m →
-          abs(CauchyRationalSequence.sequenceFunction(zeroSequence, m)
-              - CauchyRationalSequence.sequenceFunction(oneSequence, m)) < Rational.one
+          abs(zeroSequence(m) - oneSequence(m)) < Rational.one
         as atWitnessIndex
         from cauchyEquivalence(Rational.one, Rational.zero_less_one);
     -- Rational.one is IsNonneg (it is positive), so |Rational.one| = Rational.one.
@@ -88,9 +87,7 @@ theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) := {
     witnessIndex ≤ witnessIndex as witnessReflexive;
     Rational.one
        = abs(Rational.zero - Rational.one)
-       = abs(
-             CauchyRationalSequence.sequenceFunction(zeroSequence, witnessIndex)
-             - CauchyRationalSequence.sequenceFunction(oneSequence, witnessIndex))
+       = abs(zeroSequence(witnessIndex) - oneSequence(witnessIndex))
        < Rational.one
            by atWitnessIndex(witnessIndex, witnessReflexive);
     done
@@ -109,10 +106,7 @@ theorem Real.reciprocal_cauchy_sequence_multiplies
         (apartnessIndex : Natural)
         (apartness
             : ∀ (m : Natural). apartnessIndex ≤ m →
-                lowerBound
-                  ≤ abs(
-                        CauchyRationalSequence.sequenceFunction(
-                            originalSequencePacked, m)))
+                lowerBound ≤ abs(originalSequencePacked(m)))
         : CauchyEquivalent(
               CauchyRationalSequence.multiply(
                   originalSequencePacked,
@@ -146,14 +140,7 @@ theorem Real.reciprocal_cauchy_sequence_multiplies
           -- Beyond apartnessIndex the product sequence is identically one,
           -- so its difference from the constant-one sequence has absolute
           -- value zero — trivially below ε.
-          abs(
-                   CauchyRationalSequence.sequenceFunction(
-                       CauchyRationalSequence.multiply(
-                           originalSequencePacked, recipPacked),
-                       m)
-                   - CauchyRationalSequence.sequenceFunction(
-                         Rational.to_cauchy_constant(Rational.one),
-                         m))
+          abs((originalSequencePacked * recipPacked)(m) - Rational.to_cauchy_constant(Rational.one)(m))
              = abs(
                    underlyingSequence(m)
                    * Rational.reciprocal_function(underlyingSequence(m))
@@ -191,16 +178,16 @@ theorem Real.reciprocal_exists_for_nonzero
         choose lowerBound such that
             ∃ (apartnessIndex : Natural).
               Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
-                    lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(rep, m))
+                    lowerBound ≤ abs(rep(m))
             as apartnessTail
             from Real.cauchy_apartness_from_zero;
         choose apartnessIndex such that
               Rational.zero < lowerBound ∧ ∀ (m : Natural). apartnessIndex ≤ m →
-                    lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(rep, m))
+                    lowerBound ≤ abs(rep(m))
             from apartnessTail;
         Rational.zero < lowerBound as lowerBoundPositive;
         ∀ (m : Natural). apartnessIndex ≤ m →
-                    lowerBound ≤ abs(CauchyRationalSequence.sequenceFunction(rep, m))
+                    lowerBound ≤ abs(rep(m))
             as apartness;
         -- Package the reciprocal as its own Cauchy sequence, then
         -- promote to a Real. The witness is the Quotient equivalence

@@ -53,10 +53,7 @@ definition CauchyEquivalent
   ∀ (ε : Rational). Rational.zero < ε →
     ∃ (N : Natural).
       ∀ (m : Natural). N ≤ m →
-        abs(
-            CauchyRationalSequence.sequenceFunction(a, m)
-            - CauchyRationalSequence.sequenceFunction(b, m))
-          < ε
+        abs(a(m) - b(m)) < ε
 
 -- The Real numbers: equivalence classes of Cauchy rational sequences.
 definition Real : Type(0) :=
@@ -87,10 +84,9 @@ theorem CauchyEquivalent.reflexive
              < ε
 }
 
--- CauchyEquivalent is symmetric. Use the abstract
--- `sequenceFunction(...)` projector everywhere rather than
--- destructuring (multi-arg constructor pattern doesn't refine
--- through nested cases). Transport via |x - y| = |y - x|.
+-- CauchyEquivalent is symmetric. Use the abstract `(...)` application
+-- everywhere rather than destructuring (multi-arg constructor pattern
+-- doesn't refine through nested cases). Transport via |x - y| = |y - x|.
 theorem CauchyEquivalent.symmetric
         (a b : CauchyRationalSequence)
         (aEquivb : CauchyEquivalent(a, b))
@@ -100,12 +96,8 @@ theorem CauchyEquivalent.symmetric
     choose N as aEquivb_at_N from aEquivb(ε, εPositive);
     witness N with
         (m : Natural) (N_leq_m : N ≤ m) ↦
-          abs(
-                   CauchyRationalSequence.sequenceFunction(b, m)
-                   - CauchyRationalSequence.sequenceFunction(a, m))
-             = abs(
-                   CauchyRationalSequence.sequenceFunction(a, m)
-                   - CauchyRationalSequence.sequenceFunction(b, m))
+          abs(b(m) - a(m))
+             = abs(a(m) - b(m))
              < ε
                  by aEquivb_at_N(m, N_leq_m)
   }
@@ -132,9 +124,9 @@ theorem CauchyEquivalent.transitive
     witness Natural.maximum(N_ab, N_bc) with
         (m : Natural)
                  (m_ge_max : Natural.maximum(N_ab, N_bc) ≤ m) ↦ {
-          let sa : Rational := CauchyRationalSequence.sequenceFunction(a, m);
-          let sb : Rational := CauchyRationalSequence.sequenceFunction(b, m);
-          let sc : Rational := CauchyRationalSequence.sequenceFunction(c, m);
+          let sa : Rational := a(m);
+          let sb : Rational := b(m);
+          let sc : Rational := c(m);
           N_ab ≤ m as mGeNab;
           N_bc ≤ m as mGeNbc;
           abs(sa - sb) < Rational.halve(ε) by abBound(m, mGeNab);

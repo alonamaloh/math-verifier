@@ -39,23 +39,14 @@ import Real.negation
 -- whose absolute value is Rational.zero < ε. So N = 0 witnesses.
 theorem CauchyRationalSequence.equivalent_when_sequenceFunction_equal
         (rep1 rep2 : CauchyRationalSequence)
-        (pointwiseEq
-            : ∀ (n : Natural).
-                CauchyRationalSequence.sequenceFunction(rep1, n)
-                = CauchyRationalSequence.sequenceFunction(rep2, n))
+        (pointwiseEq : ∀ (n : Natural). rep1(n) = rep2(n))
         : CauchyEquivalent(rep1, rep2) :=
   (ε : Rational)
            (εPositive : Rational.zero < ε) ↦
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦
-          -- |sf(rep1, m) - sf(rep2, m)| = |sf(rep2, m) - sf(rep2, m)|
-          --   = Rational.zero < ε.
-          abs(
-                   CauchyRationalSequence.sequenceFunction(rep1, m)
-                   - CauchyRationalSequence.sequenceFunction(rep2, m))
-             = abs(
-                   CauchyRationalSequence.sequenceFunction(rep2, m)
-                   - CauchyRationalSequence.sequenceFunction(rep2, m))
+          abs(rep1(m) - rep2(m))
+             = abs(rep2(m) - rep2(m))
                   by pointwiseEq(m)
              = Rational.zero
              < ε
@@ -68,10 +59,7 @@ theorem CauchyRationalSequence.equivalent_when_sequenceFunction_equal
 -- the quotient machinery directly.
 theorem Real.equal_of_pointwise_sequence
         (rep1 rep2 : CauchyRationalSequence)
-        (pointwiseEqual
-            : ∀ (n : Natural).
-                CauchyRationalSequence.sequenceFunction(rep1, n)
-                = CauchyRationalSequence.sequenceFunction(rep2, n))
+        (pointwiseEqual : ∀ (n : Natural). rep1(n) = rep2(n))
         : (Quotient.class_of(rep1) : Real) = Quotient.class_of(rep2) :=
   -- A proof of the equivalence where the class-equality is expected
   -- auto-wraps Quotient.equivalent_implies_equal (WS3 equality-of-classes
@@ -109,12 +97,9 @@ theorem Real.zero_add
             Rational.to_cauchy_constant(Rational.zero), rep_x),
         rep_x,
         (n : Natural) ↦
-          CauchyRationalSequence.sequenceFunction(
-                   CauchyRationalSequence.add(
-                       Rational.to_cauchy_constant(Rational.zero),
-                       rep_x), n)
-             = Rational.zero + CauchyRationalSequence.sequenceFunction(rep_x, n)
-             = CauchyRationalSequence.sequenceFunction(rep_x, n))
+          (Rational.to_cauchy_constant(Rational.zero) + rep_x)(n)
+             = Rational.zero + rep_x(n)
+             = rep_x(n))
 
 -- x + 0 = x via add_commutative + zero_add.
 theorem Real.add_zero
@@ -134,11 +119,8 @@ theorem Real.add_negate_right
             rep_x, CauchyRationalSequence.negate(rep_x)),
         Rational.to_cauchy_constant(Rational.zero),
         (n : Natural) ↦
-          CauchyRationalSequence.sequenceFunction(
-                   CauchyRationalSequence.add(
-                       rep_x, CauchyRationalSequence.negate(rep_x)), n)
-             = CauchyRationalSequence.sequenceFunction(rep_x, n)
-               + -CauchyRationalSequence.sequenceFunction(rep_x, n)
+          (rep_x + CauchyRationalSequence.negate(rep_x))(n)
+             = rep_x(n) + -rep_x(n)
              = Rational.zero)
 
 -- (-x) + x = 0 via add_commutative + add_negate_right.
@@ -157,11 +139,9 @@ theorem Real.negate_negate (x : Real) : Real.negate(Real.negate(x)) = x :=
         CauchyRationalSequence.negate(CauchyRationalSequence.negate(rep_x)),
         rep_x,
         (n : Natural) ↦
-          CauchyRationalSequence.sequenceFunction(
-                   CauchyRationalSequence.negate(
-                       CauchyRationalSequence.negate(rep_x)), n)
-             = -(-CauchyRationalSequence.sequenceFunction(rep_x, n))
-             = CauchyRationalSequence.sequenceFunction(rep_x, n))
+          CauchyRationalSequence.negate(CauchyRationalSequence.negate(rep_x))(n)
+             = -(-rep_x(n))
+             = rep_x(n))
 
 -- -(x + y) = -x + -y on Real. Pick representatives; pointwise it is
 -- Rational.negate_add.
@@ -178,16 +158,11 @@ theorem Real.negate_add (x y : Real) : -(x + y) = -x + -y :=
 theorem Rational.to_real_add (a b : Rational)
         : ((a + b) : Real) = a + b := {
   ∀ (n : Natural).
-      CauchyRationalSequence.sequenceFunction(Rational.to_cauchy_constant(a + b), n)
-      = CauchyRationalSequence.sequenceFunction(
-            Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b), n)
+      Rational.to_cauchy_constant(a + b)(n)
+      = (Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b))(n)
     by (n : Natural) ↦
-      -- sf(const_(a+b), n) = a+b = sf(const_a,n) + sf(const_b,n)
-      --                         = sf(const_a + const_b, n).
-      CauchyRationalSequence.sequenceFunction(
-               Rational.to_cauchy_constant(a + b), n)
+      Rational.to_cauchy_constant(a + b)(n)
          = a + b
-         = CauchyRationalSequence.sequenceFunction(
-               Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b), n);
+         = (Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b))(n);
   done
 }
