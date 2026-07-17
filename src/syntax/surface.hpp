@@ -607,6 +607,13 @@ struct SurfaceChoose {
     // whole list flattens a nested ∃/∧ in one step (the destructure
     // pattern is the n-ary tuple ⟨m, n, …, predicate⟩).
     std::vector<std::string> additionalNames;
+    // R2b: optional `: T` annotations, parallel to [name] ++
+    // additionalNames (nullptr where unannotated). For the such-that
+    // LEMMA-source form they supply the witness types the elaborator
+    // cannot read off a parameter-typed lemma existential — so
+    // `choose x : B such that x ∈ tail ∧ f(x) = y from List.map_member_invert`
+    // works without restating the ∃.
+    std::vector<SurfaceExpressionPointer> witnessTypes;
 };
 
 // `claim` — a structured-proof step in mathematician style. Forms:
@@ -1026,11 +1033,13 @@ inline SurfaceExpressionPointer makeSurfaceChoose(
     int line, int column,
     std::string conditionName = "",
     SurfaceExpressionPointer source = nullptr,
-    std::vector<std::string> additionalNames = {}) {
+    std::vector<std::string> additionalNames = {},
+    std::vector<SurfaceExpressionPointer> witnessTypes = {}) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceChoose{std::move(name), std::move(predicate),
                        std::move(body), std::move(conditionName),
-                       std::move(source), std::move(additionalNames)},
+                       std::move(source), std::move(additionalNames),
+                       std::move(witnessTypes)},
         line, column});
 }
 

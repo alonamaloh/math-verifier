@@ -2071,6 +2071,15 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 rewriteOrNull(note->proof));
         }
         if (auto* choose = std::get_if<SurfaceChoose>(&node.node)) {
+            std::vector<SurfaceExpressionPointer> rewrittenWitnessTypes;
+            for (const auto& witnessType : choose->witnessTypes) {
+                rewrittenWitnessTypes.push_back(
+                    witnessType ? rewriteRecursiveCalls(
+                                      witnessType, thisDeclName,
+                                      recursiveArgToHypothesis,
+                                      outerBinderCount)
+                                : nullptr);
+            }
             return makeSurfaceChoose(
                 choose->name,
                 rewriteRecursiveCalls(choose->predicate, thisDeclName,
@@ -2084,7 +2093,8 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 rewriteRecursiveCalls(choose->source, thisDeclName,
                                        recursiveArgToHypothesis,
                                        outerBinderCount),
-                choose->additionalNames);
+                choose->additionalNames,
+                std::move(rewrittenWitnessTypes));
         }
         if (auto* strongInduction =
                 std::get_if<SurfaceByStrongInduction>(&node.node)) {

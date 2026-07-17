@@ -469,10 +469,19 @@ SurfaceExpressionPointer substituteSurfaceName(
         SurfaceExpressionPointer newSource = choose->source
             ? substituteSurfaceName(choose->source, targetName, replacement)
             : nullptr;
+        std::vector<SurfaceExpressionPointer> newWitnessTypes;
+        for (const auto& witnessType : choose->witnessTypes) {
+            newWitnessTypes.push_back(
+                (!witnessType || nameShadows)
+                    ? witnessType
+                    : substituteSurfaceName(witnessType, targetName,
+                                            replacement));
+        }
         return makeSurfaceChoose(choose->name, std::move(newPredicate),
                                   std::move(newBody), line, column,
                                   choose->conditionName, std::move(newSource),
-                                  choose->additionalNames);
+                                  choose->additionalNames,
+                                  std::move(newWitnessTypes));
     }
     if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
         // `decide proposition { yes h => … | no n => … }`. The proposition
@@ -1512,6 +1521,11 @@ private:
                                                // and SupposeForContradictionForward
             std::vector<std::string> additionalNames;  // Choose: witnesses past
                                                // the first (`choose m, n …`)
+            std::vector<SurfaceExpressionPointer> witnessTypes;
+                                               // Choose: optional `: T` per
+                                               // witness (parallel to [name]
+                                               // ++ additionalNames; null =
+                                               // unannotated)
             // Only set for TypedLet wrappers that came from `calc … as NAME;`
             // with an explicit user-supplied NAME. Propagated onto the
             // resulting SurfaceLet so the elaborator can emit the
@@ -2171,6 +2185,15 @@ private:
                 }
                 Token nameToken = consumeAny();
                 wrapper.name = nameToken.lexeme;
+                // Optional `: T` witness-type annotation (R2b): supplies
+                // the witness type the lemma-source form cannot read off
+                // a parameter-typed existential.
+                if (peek().kind == TokenKind::Colon) {
+                    consumeAny();  // ':'
+                    wrapper.witnessTypes.push_back(parseExpression());
+                } else {
+                    wrapper.witnessTypes.push_back(nullptr);
+                }
                 // `choose m, n, … such that P;` — witness names past the
                 // first flatten a nested ∃/∧ in one step.
                 while (peek().kind == TokenKind::Comma) {
@@ -2181,6 +2204,12 @@ private:
                     }
                     wrapper.additionalNames.push_back(
                         consumeAny().lexeme);
+                    if (peek().kind == TokenKind::Colon) {
+                        consumeAny();  // ':'
+                        wrapper.witnessTypes.push_back(parseExpression());
+                    } else {
+                        wrapper.witnessTypes.push_back(nullptr);
+                    }
                 }
                 // Optional `such that <predicate>`. `such`/`that` are
                 // ordinary identifiers everywhere except this slot —
@@ -2685,7 +2714,8 @@ private:
                         iterator->line, iterator->column,
                         std::move(iterator->conditionName),
                         std::move(iterator->source),
-                        std::move(iterator->additionalNames));
+                        std::move(iterator->additionalNames),
+                        std::move(iterator->witnessTypes));
                     break;
                 }
                 case BlockWrapper::StrongInduction: {

@@ -427,17 +427,31 @@ ExpressionPointer Elaborator::elaborateChoose(
                 for (const std::string& extra : choose.additionalNames) {
                     witnessNames.push_back(extra);
                 }
+                // R2b: user-supplied `: T` annotations replace the
+                // conclusion read entirely (all witnesses annotated) —
+                // the annotation is what a parameter-typed lemma
+                // existential (whose witness type instantiates only at
+                // the use site) cannot provide by itself.
+                bool allAnnotated =
+                    choose.witnessTypes.size() == witnessNames.size();
+                for (const auto& annotation : choose.witnessTypes) {
+                    if (!annotation) { allAnnotated = false; break; }
+                }
                 std::vector<std::string> witnessTypeNames;
                 auto failSimpleWitness = [&]() {
                     throwElaborate(
                         "choose " + choose.name + " from <lemma>: could not "
                         "read a simple (closed) witness type from the "
                         "lemma's existential conclusion (one ∃ layer per "
-                        "witness name). Use the explicit form `claim ∃ ("
+                        "witness name). Annotate the witness type directly "
+                        "— `choose " + choose.name
+                        + " : <T> such that <prop> from <lemma>` — or use "
+                        "the explicit form `claim ∃ ("
                         + choose.name + " : <T>). <prop> by <lemma>; choose "
-                        + choose.name + " …` instead.");
+                        + choose.name + " …`.");
                 };
-                for (size_t w = 0; w < witnessNames.size(); ++w) {
+                for (size_t w = 0;
+                     w < witnessNames.size() && !allAnnotated; ++w) {
                     // Peel premises (syntactic Pis, then WHNF-exposed ones)
                     // until the cursor is Exists-headed.
                     while (true) {
@@ -483,12 +497,16 @@ ExpressionPointer Elaborator::elaborateChoose(
                     conclusion = motiveLambda->body;
                 }
                 // Assemble the nested surface existential around the
-                // user's predicate, innermost-first.
+                // user's predicate, innermost-first. An annotated witness
+                // uses its `: T` expression directly; otherwise the type
+                // name read off the lemma's conclusion.
                 SurfaceExpressionPointer existential = choose.predicate;
                 for (size_t w = witnessNames.size(); w-- > 0;) {
                     SurfaceExpressionPointer witnessTypeSurface =
-                        makeSurfaceIdentifier(witnessTypeNames[w], {},
-                            line, column);
+                        allAnnotated
+                            ? choose.witnessTypes[w]
+                            : makeSurfaceIdentifier(witnessTypeNames[w], {},
+                                  line, column);
                     SurfaceBinder witnessBinder;
                     witnessBinder.names = {witnessNames[w]};
                     witnessBinder.type = witnessTypeSurface;
