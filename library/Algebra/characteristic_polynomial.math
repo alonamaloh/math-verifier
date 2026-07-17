@@ -858,3 +858,180 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
      = CommutativeRing.one(c)
            by CommutativeRing.add_zero
 }
+
+-- The constant term is (−1)^n·det(A): at coefficient 0 every entry of
+-- xI − A reads −aᵢⱼ, so each Leibniz term contributes sign(σ)·∏(−aᵢσᵢ),
+-- and pulling the n negations out of the product reassembles det(A).
+theorem Matrix.characteristicPolynomial_constant_term {c : CommutativeRing} {n : ℕ}
+        (A : Matrix(c, n, n))
+        : Matrix.characteristicPolynomial(A)[0]
+          = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+            * Matrix.determinant(A) := {
+  Matrix.characteristicPolynomial(A)
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                   Permutation.sign(sigma))
+                   * CommutativeRing.productOver(
+                         (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+     by Matrix.determinant_expansion as expansionEquation;
+  length(NaturalsBelow.enumerate(n)) = n
+      by NaturalsBelow.enumerate_length as enumerateLength;
+
+  -- Each term's constant coefficient: (−1)^n · (sign(ρ) · ∏ aᵢρᵢ).
+  ∀ (rho : Permutation(n)).
+      Polynomial.coefficientOf(
+          (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+               Permutation.sign(rho))
+              * CommutativeRing.productOver(
+                    (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                    NaturalsBelow.enumerate(n))), 0)
+      = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+        * (CommutativeRing.from_integer(c, Permutation.sign(rho))
+              * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)),
+                    NaturalsBelow.enumerate(n)))
+      by (rho : Permutation(n)) ↦ {
+          Permutation.sign(rho) = 1 ∨ Permutation.sign(rho) = Integer.negate(1)
+              by Permutation.sign_is_unit;
+          Polynomial.coefficientOf(
+                  CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                      Permutation.sign(rho)), 0)
+             = CommutativeRing.from_integer(c, Permutation.sign(rho))
+              by Polynomial.sign_image_constant as signConstant;
+          ∀ (t : NaturalsBelow(n)).
+              Polynomial.coefficientOf(Matrix.characteristic(A)(t, rho(t)), 0)
+              = CommutativeRing.negate(A(t, rho(t)))
+              by (t : NaturalsBelow(n)) ↦
+                  { done by Matrix.characteristic_entry_constant } as entriesConstant;
+          (CommutativeRing.productOver(
+               (t : NaturalsBelow(n)) ↦
+                   Polynomial.coefficientOf(Matrix.characteristic(A)(t, rho(t)), 0),
+               NaturalsBelow.enumerate(n)) : CommutativeRing.carrier(c))
+             = CommutativeRing.productOver(
+                   (t : NaturalsBelow(n)) ↦ CommutativeRing.negate(A(t, rho(t))),
+                   NaturalsBelow.enumerate(n))
+              by CommutativeRing.productOver_congruence(pointwise := entriesConstant)
+              as productEntriesConstant;
+          CommutativeRing.productOver(
+                  (t : NaturalsBelow(n)) ↦ CommutativeRing.negate(A(t, rho(t))),
+                  NaturalsBelow.enumerate(n))
+             = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)),
+                   length(NaturalsBelow.enumerate(n)))
+               * CommutativeRing.productOver((t : NaturalsBelow(n)) ↦ A(t, rho(t)),
+                     NaturalsBelow.enumerate(n))
+                 by CommutativeRing.productOver_negate
+             = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+               * CommutativeRing.productOver((t : NaturalsBelow(n)) ↦ A(t, rho(t)),
+                     NaturalsBelow.enumerate(n))
+                 by substituting enumerateLength
+             as negateExtraction;
+          CommutativeRing.from_integer(c, Permutation.sign(rho))
+            * (CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+                  * CommutativeRing.productOver((t : NaturalsBelow(n)) ↦ A(t, rho(t)),
+                        NaturalsBelow.enumerate(n)))
+             = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+               * (CommutativeRing.from_integer(c, Permutation.sign(rho))
+                     * CommutativeRing.productOver((t : NaturalsBelow(n)) ↦ A(t, rho(t)),
+                           NaturalsBelow.enumerate(n)))
+              by ring as signPowerSwap;
+          Polynomial.coefficientOf(
+                  (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                            NaturalsBelow.enumerate(n))), 0)
+             = Polynomial.coefficientOf(
+                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho)), 0)
+               * Polynomial.coefficientOf(
+                     CommutativeRing.productOver(
+                         (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                         NaturalsBelow.enumerate(n)), 0)
+                 by Polynomial.coefficientOf_multiply_zero
+             = Polynomial.coefficientOf(
+                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho)), 0)
+               * (CommutativeRing.productOver(
+                      (t : NaturalsBelow(n)) ↦
+                          Polynomial.coefficientOf(Matrix.characteristic(A)(t, rho(t)), 0),
+                      NaturalsBelow.enumerate(n)) : CommutativeRing.carrier(c))
+                 by substituting Polynomial.coefficientOf_productOver_zero
+             = Polynomial.coefficientOf(
+                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho)), 0)
+               * CommutativeRing.productOver(
+                     (t : NaturalsBelow(n)) ↦ CommutativeRing.negate(A(t, rho(t))),
+                     NaturalsBelow.enumerate(n))
+                 by substituting productEntriesConstant
+             = Polynomial.coefficientOf(
+                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(rho)), 0)
+               * (CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+                     * CommutativeRing.productOver((t : NaturalsBelow(n)) ↦ A(t, rho(t)),
+                           NaturalsBelow.enumerate(n)))
+                 by substituting negateExtraction
+             = CommutativeRing.from_integer(c, Permutation.sign(rho))
+               * (CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+                     * CommutativeRing.productOver((t : NaturalsBelow(n)) ↦ A(t, rho(t)),
+                           NaturalsBelow.enumerate(n)))
+                 by substituting signConstant
+             = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+               * (CommutativeRing.from_integer(c, Permutation.sign(rho))
+                     * CommutativeRing.productOver((t : NaturalsBelow(n)) ↦ A(t, rho(t)),
+                           NaturalsBelow.enumerate(n)))
+                 by signPowerSwap;
+          done
+        } as termConstant;
+
+  -- Assemble: the coefficient sum is (−1)^n times the base determinant sum.
+  Matrix.determinant(A)
+     = CommutativeRing.sumOver(
+           (rho : Permutation(n)) ↦
+               CommutativeRing.from_integer(c, Permutation.sign(rho))
+                   * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+     by Matrix.determinant_expansion as baseExpansion;
+  Matrix.characteristicPolynomial(A)[0]
+     = Polynomial.coefficientOf(
+           CommutativeRing.sumOver(
+               (sigma : Permutation(n)) ↦
+                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                       Permutation.sign(sigma))
+                       * CommutativeRing.productOver(
+                             (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
+                             NaturalsBelow.enumerate(n)),
+               Permutation.allPermutations(n)), 0)
+           by substituting expansionEquation
+     = (CommutativeRing.sumOver(
+           (rho : Permutation(n)) ↦
+               Polynomial.coefficientOf(
+                   (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
+                        Permutation.sign(rho))
+                       * CommutativeRing.productOver(
+                             (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
+                             NaturalsBelow.enumerate(n))), 0),
+           Permutation.allPermutations(n)) : CommutativeRing.carrier(c))
+           by Polynomial.coefficientOf_sumOver
+     = CommutativeRing.sumOver(
+           (rho : Permutation(n)) ↦
+               CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+                   * (CommutativeRing.from_integer(c, Permutation.sign(rho))
+                         * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)),
+                               NaturalsBelow.enumerate(n))),
+           Permutation.allPermutations(n))
+           by CommutativeRing.sumOver_congruence(pointwise := termConstant)
+     = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+       * CommutativeRing.sumOver(
+             (rho : Permutation(n)) ↦
+                 CommutativeRing.from_integer(c, Permutation.sign(rho))
+                     * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)),
+                           NaturalsBelow.enumerate(n)),
+             Permutation.allPermutations(n))
+           by CommutativeRing.sumOver_scale_left
+     = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
+       * Matrix.determinant(A)
+           by substituting baseExpansion
+}
