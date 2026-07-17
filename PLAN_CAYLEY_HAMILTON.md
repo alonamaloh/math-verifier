@@ -103,5 +103,5 @@ table before the first polish pass.
 | C2 polynomial ring bundle check | DONE 2026-07-17 | Polynomial.commutative_ring → commutative.math; CommutativeRing.polynomial_ring; ring tactic OK at polynomial bundle (Test/matrix_commutative_ring_instances_test) |
 | C3 xI − A + entry embedding | DONE 2026-07-17 | entrywise definition (compositional form blocked by mixed-carrier operator resolution); Polynomial.constant/indeterminate; matrix ops+operators; motive-peel elaborator fix |
 | C4 charPoly + degree/constant-term corollaries | DONE 2026-07-17 (degree ≤ n, monic, charPoly[0] = (−1)^n·det) + polished to manifest bar | friction recipes in memory cayley_hamilton_arc + inbox (calc-carrier × ring, bundle-carrier inference) |
-| C5 evaluation homomorphism | TODO | design signature with owner; `p(x)` registration decision |
-| C6 Cayley–Hamilton | TODO | adjugate/Laplace vs telescoping — decide at design time |
+| C5 evaluation homomorphism | DONE 2026-07-17 | owner-approved shape: bounded sums under sealed evaluatePolynomial; Matrix.ring bundle; scalar eval deferred to its own consumer |
+| C6 Cayley–Hamilton | DONE 2026-07-17 — Matrix.cayley_hamilton + charPoly(A)(A) = 0 headline | adjugate via basis-row surgery (Laplace expansion landed); family-level telescoping, no (Matrix R)[x]; pair-keyed () registered on (Polynomial, Matrix) |
