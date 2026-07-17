@@ -20,27 +20,27 @@ import Natural.order
 import Natural.maximum
 
 -- P holds from some threshold on.
-definition Natural.Eventually (P : Natural → Proposition) : Proposition :=
-  ∃ (N : Natural). ∀ (m : Natural). N ≤ m → P(m)
+definition Natural.Eventually (P : ℕ → Proposition) : Proposition :=
+  ∃ (N : ℕ). ∀ (m : ℕ). N ≤ m → P(m)
 
 -- A property that always holds eventually holds (threshold 0).
 theorem Natural.Eventually.of_always
-        (P : Natural → Proposition) (always : ∀ (m : Natural). P(m))
+        (P : ℕ → Proposition) (always : ∀ (m : ℕ). P(m))
         : Natural.Eventually(P) :=
-  witness 0 with (m : Natural) (_ : 0 ≤ m) ↦ always(m)
+  witness 0 with (m : ℕ) (_ : 0 ≤ m) ↦ always(m)
 
 -- ∧-closure: two eventual facts hold together from the maximum of
 -- their thresholds on. This is the lemma that makes the N₁/N₂/max
 -- bookkeeping of every limit argument invisible.
 theorem Natural.Eventually.and
-        (P Q : Natural → Proposition)
+        (P Q : ℕ → Proposition)
         (eventualP : Natural.Eventually(P))
         (eventualQ : Natural.Eventually(Q))
-        : Natural.Eventually((m : Natural) ↦ P(m) ∧ Q(m)) := {
-  choose N1 such that ∀ (m : Natural). N1 ≤ m → P(m) from eventualP;
-  choose N2 such that ∀ (m : Natural). N2 ≤ m → Q(m) from eventualQ;
+        : Natural.Eventually((m : ℕ) ↦ P(m) ∧ Q(m)) := {
+  choose N1 such that ∀ (m : ℕ). N1 ≤ m → P(m) from eventualP;
+  choose N2 such that ∀ (m : ℕ). N2 ≤ m → Q(m) from eventualQ;
   witness Natural.maximum(N1, N2) with
-      (m : Natural) (mPastBoth : Natural.maximum(N1, N2) ≤ m) ↦ {
+      (m : ℕ) (mPastBoth : Natural.maximum(N1, N2) ≤ m) ↦ {
         N1 ≤ m;
         N2 ≤ m;
         P(m);
@@ -51,26 +51,26 @@ theorem Natural.Eventually.and
 
 -- Monotone: an eventual fact weakens pointwise.
 theorem Natural.Eventually.monotone
-        (P Q : Natural → Proposition)
+        (P Q : ℕ → Proposition)
         (eventualP : Natural.Eventually(P))
-        (pointwise : ∀ (m : Natural). P(m) → Q(m))
+        (pointwise : ∀ (m : ℕ). P(m) → Q(m))
         : Natural.Eventually(Q) := {
-  choose N such that ∀ (m : Natural). N ≤ m → P(m) from eventualP;
+  choose N such that ∀ (m : ℕ). N ≤ m → P(m) from eventualP;
   witness N with
-      (m : Natural) (mPastThreshold : N ≤ m) ↦
+      (m : ℕ) (mPastThreshold : N ≤ m) ↦
         pointwise(m, P(m))
 }
 
 -- A tail of an eventual fact: it still holds past any LATER threshold.
 theorem Natural.Eventually.past
-        (P : Natural → Proposition) (threshold : Natural)
+        (P : ℕ → Proposition) (threshold : ℕ)
         (eventualP : Natural.Eventually(P))
-        : ∃ (N : Natural). threshold ≤ N ∧ (∀ (m : Natural). N ≤ m → P(m)) := {
-  choose N0 such that ∀ (m : Natural). N0 ≤ m → P(m) from eventualP;
+        : ∃ (N : ℕ). threshold ≤ N ∧ (∀ (m : ℕ). N ≤ m → P(m)) := {
+  choose N0 such that ∀ (m : ℕ). N0 ≤ m → P(m) from eventualP;
   witness Natural.maximum(threshold, N0) with {
     threshold ≤ Natural.maximum(threshold, N0);
-    ∀ (m : Natural). Natural.maximum(threshold, N0) ≤ m → P(m)
-        by (m : Natural) (mPast : Natural.maximum(threshold, N0) ≤ m) ↦ {
+    ∀ (m : ℕ). Natural.maximum(threshold, N0) ≤ m → P(m)
+        by (m : ℕ) (mPast : Natural.maximum(threshold, N0) ≤ m) ↦ {
              N0 ≤ m;
              P(m);
              done

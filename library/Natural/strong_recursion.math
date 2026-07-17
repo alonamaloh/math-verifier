@@ -32,9 +32,9 @@ import Logic.exists
 -- is `successor` of something. With `≤` now `< ∨ =`, the equality case is
 -- the right disjunct directly; the strict case turns its witness `c`
 -- (`s + (1 + c) = b`) into `b = successor(s + c)` with `s ≤ s + c`.
-automatic theorem LessOrEqual.invert (s b : Natural)
+automatic theorem LessOrEqual.invert (s b : ℕ)
         : s ≤ b
-          → s = b ∨ ∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ s ≤ bPredecessor :=
+          → s = b ∨ ∃ (bPredecessor : ℕ). b = successor(bPredecessor) ∧ s ≤ bPredecessor :=
   (proof : s ≤ b) ↦
     done by cases {
       case s < b: {
@@ -52,13 +52,13 @@ automatic theorem LessOrEqual.invert (s b : Natural)
 
 -- successor(k) ≰ 0. Apply invert and discharge both disjuncts via
 -- Natural.successor_not_zero.
-automatic theorem Natural.not_less_or_equal_successor_zero (k : Natural)
+automatic theorem Natural.not_less_or_equal_successor_zero (k : ℕ)
         : successor(k) ≤ 0 → False :=
   (impossible : successor(k) ≤ 0) ↦
     done by cases {
       case successor(k) = 0:
           done
-      case ∃ (bPredecessor : Natural). 0 = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor as existsProof: {
+      case ∃ (bPredecessor : ℕ). 0 = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor as existsProof: {
           choose bPredecessor such that 0 = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor from existsProof;
           absurd(0 = successor(bPredecessor))
       }
@@ -67,7 +67,7 @@ automatic theorem Natural.not_less_or_equal_successor_zero (k : Natural)
 -- Inversion specifically for `successor(k) ≤ successor(m)`: either `k = m` or
 -- `successor(k) ≤ m`. Derived from LessOrEqual.invert plus
 -- successor_injective.
-theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
+theorem Natural.less_or_equal_successor_successor_inversion (k m : ℕ)
         : successor(k) ≤ successor(m)
           → k = m ∨ successor(k) ≤ m :=
   (successorKLessOrEqualSuccessorMProof : successor(k) ≤ successor(m)) ↦
@@ -76,7 +76,7 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
           k = m;
           done
         }
-      case ∃ (bPredecessor : Natural). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor as existsProof:
+      case ∃ (bPredecessor : ℕ). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor as existsProof:
           {
             choose bPredecessor such that
                 successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor
@@ -92,19 +92,19 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
 -- for_all_below n : P holds for every k with successor(k) ≤ n. Ordinary
 -- induction on n.
 theorem Natural.for_all_below
-        (P : Natural → Proposition)
-        (step : ∀ (n : Natural).
-                (∀ (k : Natural).
+        (P : ℕ → Proposition)
+        (step : ∀ (n : ℕ).
+                (∀ (k : ℕ).
                     successor(k) ≤ n → P(k))
                 → P(n))
-        (n : Natural)
-        : ∀ (k : Natural). successor(k) ≤ n → P(k) :=
+        (n : ℕ)
+        : ∀ (k : ℕ). successor(k) ≤ n → P(k) :=
   by induction on n with IH {
     case base:
-        (k : Natural) (impossible : successor(k) ≤ 0) ↦
+        (k : ℕ) (impossible : successor(k) ≤ 0) ↦
           absurd(impossible)
     case step(predecessor):
-        (k : Natural)
+        (k : ℕ)
             (successorKLessOrEqualOnePlus :
                 successor(k) ≤ 1 + predecessor) ↦ {
           -- The step bound `1 + predecessor` is not defeq to
@@ -125,13 +125,13 @@ theorem Natural.for_all_below
 
 -- q ≤ 0 forces q = 0. Apply LessOrEqual.invert and discharge the
 -- step disjunct via zero_not_successor.
-theorem Natural.less_or_equal_zero_implies_equals_zero (q : Natural)
+theorem Natural.less_or_equal_zero_implies_equals_zero (q : ℕ)
         : q ≤ 0 → q = 0 :=
   (quotientLessOrEqualZero : q ≤ 0) ↦
     done by cases {
       case q = 0:
           done
-      case ∃ (bPredecessor : Natural). 0 = successor(bPredecessor) ∧ q ≤ bPredecessor as existsProof: {
+      case ∃ (bPredecessor : ℕ). 0 = successor(bPredecessor) ∧ q ≤ bPredecessor as existsProof: {
           choose bPredecessor such that 0 = successor(bPredecessor) ∧ q ≤ bPredecessor from existsProof;
           absurd(0 = successor(bPredecessor))
       }
@@ -141,7 +141,7 @@ theorem Natural.less_or_equal_zero_implies_equals_zero (q : Natural)
 -- `p ≤ otherPredecessor`: invert to `p = otherPredecessor` or
 -- `successor(p) ≤ otherPredecessor`; both yield `p ≤ otherPredecessor`.
 automatic theorem Natural.less_or_equal_successor_successor_descend
-        (p otherPredecessor : Natural)
+        (p otherPredecessor : ℕ)
         (successorPLessOrEqualSuccessor : successor(p) ≤ successor(otherPredecessor))
         : p ≤ otherPredecessor :=
   done by cases {
@@ -152,7 +152,7 @@ automatic theorem Natural.less_or_equal_successor_successor_descend
 -- `1 + p ≤ 1 + q ⟹ p ≤ q` — the successor-free face of the descend lemma,
 -- so consumers cancel a leading `1 +` (the form `by induction`'s `case
 -- step(k)` produces) without naming the constructor.
-theorem Natural.le_cancel_one_plus (p q : Natural) (bound : 1 + p ≤ 1 + q)
+theorem Natural.le_cancel_one_plus (p q : ℕ) (bound : 1 + p ≤ 1 + q)
         : p ≤ q := {
   successor(p)
      = 1 + p
@@ -167,24 +167,24 @@ theorem Natural.le_cancel_one_plus (p q : Natural) (bound : 1 + p ≤ 1 + q)
 -- is stated with, so the body — and every existing caller's `step` — type-
 -- checks unchanged.
 theorem Natural.strong_induction
-        (P : Natural → Proposition)
-        (step : ∀ (n : Natural).
-                (∀ (k : Natural).
+        (P : ℕ → Proposition)
+        (step : ∀ (n : ℕ).
+                (∀ (k : ℕ).
                     k < n → P(k))
                 → P(n))
-        (n : Natural)
+        (n : ℕ)
         : P(n) := {
   -- `for_all_below` is stated with the `successor(k) ≤ m` step form; bridge
   -- the caller's `<`-step to it (and the `<`-result back) — `<` is no
   -- longer defeq to `successor ≤`.
-  ∀ (m : Natural). (∀ (k : Natural). successor(k) ≤ m → P(k)) → P(m)
+  ∀ (m : ℕ). (∀ (k : ℕ). successor(k) ≤ m → P(k)) → P(m)
       by (m : Natural) (belowM : ∀ (k : Natural). successor(k) ≤ m → P(k)) ↦
           step(m, (k : Natural) (kLessThanM : k < m) ↦ {
             successor(k) ≤ m;
             belowM(k, (successor(k) ≤ m))
           });
-  ∀ (k : Natural). k < n → P(k)
-      by (k : Natural) (kLessThanN : k < n) ↦ {
+  ∀ (k : ℕ). k < n → P(k)
+      by (k : ℕ) (kLessThanN : k < n) ↦ {
         successor(k) ≤ n;
         done
       } as below;

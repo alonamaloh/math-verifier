@@ -28,7 +28,7 @@ import Natural.strong_recursion
 -- Adding a fixed left summand preserves ≤. Induction on that summand;
 -- successor(a) + x ≡ successor(a + x) reduces definitionally, so each step
 -- is one application of `successor_less_or_equal_successor`.
-automatic theorem Natural.add_left_monotone (a x y : Natural)
+automatic theorem Natural.add_left_monotone (a x y : ℕ)
         (lessOrEqual : x ≤ y) : a + x ≤ a + y :=
   unfold Natural.add, Natural in
   by induction on a with IH {
@@ -44,7 +44,7 @@ automatic theorem Natural.add_left_monotone (a x y : Natural)
   }
 
 -- Adding a fixed left summand preserves strict order: the gap carries.
-automatic theorem Natural.add_left_strict_monotone (a x y : Natural)
+automatic theorem Natural.add_left_strict_monotone (a x y : ℕ)
         (lessThan : x < y) : a + x < a + y := {
   choose c such that x + (1 + c) = y from Natural.lt_elim;
   (a + x) + (1 + c)
@@ -54,7 +54,7 @@ automatic theorem Natural.add_left_strict_monotone (a x y : Natural)
 }
 
 -- And on the right, by commutativity.
-automatic theorem Natural.add_right_strict_monotone (a x y : Natural)
+automatic theorem Natural.add_right_strict_monotone (a x y : ℕ)
         (lessThan : x < y) : x + a < y + a := {
   a + x < a + y;
   x + a
@@ -65,20 +65,20 @@ automatic theorem Natural.add_right_strict_monotone (a x y : Natural)
 
 -- Adding a fixed left summand reflects ≤: it can be cancelled. Same
 -- induction, peeling a successor off each side.
-automatic theorem Natural.add_left_le_cancel (a : Natural)
-        : ∀ (x y : Natural). a + x ≤ a + y → x ≤ y :=
+automatic theorem Natural.add_left_le_cancel (a : ℕ)
+        : ∀ (x y : ℕ). a + x ≤ a + y → x ≤ y :=
   unfold Natural.add in
   by induction on a with IH {
     case base: {
-        take x : Natural;
-        take y : Natural;
+        take x : ℕ;
+        take y : ℕ;
         -- 0 + x ≡ x, 0 + y ≡ y.
         suppose 0 + x ≤ 0 + y as lessOrEqual;
         lessOrEqual
       }
     case step(predecessorA): {
-        take x : Natural;
-        take y : Natural;
+        take x : ℕ;
+        take y : ℕ;
         suppose (1 + predecessorA) + x ≤ (1 + predecessorA) + y
             as lessOrEqual;
         -- (1 + predecessorA) + z ≡ successor(predecessorA + z) under the
@@ -93,7 +93,7 @@ automatic theorem Natural.add_left_le_cancel (a : Natural)
 -- below itself (e.g. the wrong branch of a comparison in a bijection
 -- round-trip). Induction peels a successor off each side; the base case
 -- is `successor(0) ≤ 0`, refuted by `absurd`.
-automatic theorem Natural.not_successor_less_or_equal_self (n : Natural)
+automatic theorem Natural.not_successor_less_or_equal_self (n : ℕ)
         (successorLessOrEqual : successor(n) ≤ n) : False :=
   unfold Natural.add in
   by induction on n with IH {
@@ -108,7 +108,7 @@ automatic theorem Natural.not_successor_less_or_equal_self (n : Natural)
   }
 
 -- The `1 + n` face of irreflexivity: no n satisfies 1 + n ≤ n.
-automatic theorem Natural.not_one_plus_le_self (n : Natural)
+automatic theorem Natural.not_one_plus_le_self (n : ℕ)
         (onePlusLessOrEqual : 1 + n ≤ n) : False := {
   successor(n) ≤ n;
   done
@@ -116,7 +116,7 @@ automatic theorem Natural.not_one_plus_le_self (n : Natural)
 
 -- ≤ cancels a successor on both sides: 1 + a ≤ 1 + b implies a ≤ b.
 -- (Subtract: 1 + b = 1 + a + c gives b = a + c.)
-theorem Natural.successor_le_cancel (a b : Natural)
+theorem Natural.successor_le_cancel (a b : ℕ)
         (successorsOrdered : successor(a) ≤ successor(b))
         : a ≤ b := {
   choose c such that successor(b) = successor(a) + c from Natural.subtraction_witness;
@@ -128,7 +128,7 @@ theorem Natural.successor_le_cancel (a b : Natural)
 
 -- a + 1 ≤ b + 1  ⟹  a ≤ b — the `+ 1` form of successor_le_cancel, so
 -- consumers cancel without naming the constructor.
-theorem Natural.add_one_le_cancel (a b : Natural)
+theorem Natural.add_one_le_cancel (a b : ℕ)
         (ordered : a + 1 ≤ b + 1)
         : a ≤ b := {
   choose c such that b + 1 = (a + 1) + c from Natural.subtraction_witness;
@@ -140,7 +140,7 @@ theorem Natural.add_one_le_cancel (a b : Natural)
 }
 
 -- a ≤ b  ⟹  a + 1 ≤ b + 1 — the `+ 1` form of successor_less_or_equal_successor.
-theorem Natural.add_one_le_add_one_of_le (a b : Natural)
+theorem Natural.add_one_le_add_one_of_le (a b : ℕ)
         (ordered : a ≤ b)
         : a + 1 ≤ b + 1 := {
   choose c such that b = a + c from Natural.subtraction_witness;
@@ -150,7 +150,7 @@ theorem Natural.add_one_le_add_one_of_le (a b : Natural)
      = b + 1
 }
 
-theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
+theorem Natural.less_or_equal_successor_not_equal (j m : ℕ)
         (lessOrEqual : j ≤ successor(m))
         (notEqual : j ≠ successor(m))
         : j ≤ m := {
@@ -175,7 +175,7 @@ theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
 -- The `1 + n` / `<` form of less_or_equal_successor_not_equal: a value
 -- bounded by 1 + m yet distinct from it is bounded by m. Consumers cite
 -- this to descend a successor bound without naming the constructor.
-theorem Natural.le_of_le_one_plus_of_ne (j m : Natural)
+theorem Natural.le_of_le_one_plus_of_ne (j m : ℕ)
         (lessOrEqual : j ≤ 1 + m) (notEqual : j ≠ 1 + m)
         : j ≤ m := {
   j < 1 + m;
@@ -186,20 +186,20 @@ theorem Natural.le_of_le_one_plus_of_ne (j m : Natural)
 }
 
 -- Cancel a right addend through monus: (a + b) ∸ b = a.
-theorem Natural.monus_add_cancel_right (a b : Natural)
+theorem Natural.monus_add_cancel_right (a b : ℕ)
         : (a + b) ∸ b = a :=
   (a + b) ∸ b
      = (b + a) ∸ b
      = a
 
 -- a ≤ b + a (a appears on the right).
-automatic theorem Natural.less_or_equal_add_left (a b : Natural) : a ≤ b + a :=
+automatic theorem Natural.less_or_equal_add_left (a b : ℕ) : a ≤ b + a :=
   a
      ≤ a + b
      = b + a
 
 -- a ≤ i and i ≠ a force successor(a) ≤ i.
-theorem Natural.less_or_equal_not_equal_successor (a i : Natural)
+theorem Natural.less_or_equal_not_equal_successor (a i : ℕ)
         (lessOrEqual : a ≤ i) (notEqual : i ≠ a)
         : successor(a) ≤ i := {
   choose c such that i = a + c from Natural.subtraction_witness;
@@ -222,7 +222,7 @@ theorem Natural.less_or_equal_not_equal_successor (a i : Natural)
 }
 
 -- The `1 + a` face: a ≤ i and i ≠ a force strictness.
-theorem Natural.one_plus_le_of_le_of_ne (a i : Natural)
+theorem Natural.one_plus_le_of_le_of_ne (a i : ℕ)
         (lessOrEqual : a ≤ i) (notEqual : i ≠ a)
         : 1 + a ≤ i := {
   successor(a) ≤ i by Natural.less_or_equal_not_equal_successor;
@@ -230,7 +230,7 @@ theorem Natural.one_plus_le_of_le_of_ne (a i : Natural)
 }
 
 -- a ≤ c gives a + b ≤ c + b, and b ≤ d gives a + b ≤ a + d.
-theorem Natural.le_add_preserves_left (a c b : Natural) (aLeC : a ≤ c)
+theorem Natural.le_add_preserves_left (a c b : ℕ) (aLeC : a ≤ c)
         : a + b ≤ c + b := {
   choose r such that c = a + r from Natural.subtraction_witness;
   a + b
@@ -242,7 +242,7 @@ theorem Natural.le_add_preserves_left (a c b : Natural) (aLeC : a ≤ c)
 -- A sum of naturals that vanishes forces its left summand to vanish.
 -- Split on c: at zero the claim is immediate; at successor(p) the sum is
 -- successor(p + d), which cannot equal zero.
-theorem Natural.add_eq_zero_implies_left_zero (c d : Natural)
+theorem Natural.add_eq_zero_implies_left_zero (c d : ℕ)
         (sumIsZero : c + d = 0) : c = 0 :=
   unfold Natural.add, Natural in
   by induction on c with IH {
@@ -255,7 +255,7 @@ theorem Natural.add_eq_zero_implies_left_zero (c d : Natural)
 -- ----------------------------------------------------------------------
 -- A ≤ gap as an explicit additive decomposition, with the summand on
 -- the LEFT (so an induction over it reduces structurally).
-theorem Natural.le_to_add (smaller larger : Natural)
+theorem Natural.le_to_add (smaller larger : ℕ)
         (proof : smaller ≤ larger)
         : ∃ (k : Natural). larger = k + smaller :=
   done by cases {
@@ -278,17 +278,17 @@ theorem Natural.le_to_add (smaller larger : Natural)
 
 -- Subtracting one fewer leaves one more: for j < n,
 -- n ∸ j = 1 + (n ∸ (j + 1)).
-theorem Natural.monus_successor_shift (n : Natural)
-        : ∀ (j : Natural). successor(j) ≤ n
+theorem Natural.monus_successor_shift (n : ℕ)
+        : ∀ (j : ℕ). successor(j) ≤ n
           → n ∸ j
             = successor(n ∸ successor(j)) :=
   unfold Natural.add in
   by induction on n with IH {
     case zero:
-        (j : Natural) (inRange : successor(j) ≤ 0) ↦
+        (j : ℕ) (inRange : successor(j) ≤ 0) ↦
           absurd(inRange)
     case successor(nPredecessor):
-        (j : Natural) (inRange : successor(j) ≤ successor(nPredecessor)) ↦
+        (j : ℕ) (inRange : successor(j) ≤ successor(nPredecessor)) ↦
           done by cases {
             case j = 0:
                 successor(nPredecessor) ∸ 0
@@ -308,7 +308,7 @@ theorem Natural.monus_successor_shift (n : Natural)
 
 -- The `1 + j` form of the shift, for consumers that keep `Natural` opaque
 -- (no `successor` in expressions): for j < n, n ∸ j = 1 + (n ∸ (1 + j)).
-theorem Natural.monus_one_plus_shift (n j : Natural) (inRange : j < n)
+theorem Natural.monus_one_plus_shift (n j : ℕ) (inRange : j < n)
         : n ∸ j = 1 + (n ∸ (1 + j)) := {
   successor(j) ≤ n;
   n ∸ j
@@ -318,19 +318,19 @@ theorem Natural.monus_one_plus_shift (n j : Natural) (inRange : j < n)
 
 -- Peeling a successor off the minuend, below the diagonal:
 -- (a + 1) ∸ b = (a ∸ b) + 1 when b ≤ a.
-theorem Natural.monus_succ_left (b : Natural)
-        : ∀ (a : Natural). b ≤ a
+theorem Natural.monus_succ_left (b : ℕ)
+        : ∀ (a : ℕ). b ≤ a
           → successor(a) ∸ b = successor(a ∸ b) :=
   by induction on b with IH {
     case zero: {
-        take a : Natural;
+        take a : ℕ;
         suppose 0 ≤ a as bound;
         successor(a) ∸ 0
            = successor(a)
            = successor(a ∸ 0)
       }
     case successor(bPredecessor): {
-        take a : Natural;
+        take a : ℕ;
         suppose successor(bPredecessor) ≤ a as bound;
         done by cases {
           case a = 0: {

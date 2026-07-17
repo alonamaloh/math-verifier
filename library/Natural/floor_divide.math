@@ -63,7 +63,7 @@ definition Natural.Raw.floor_divide_step
           0)
 
 opaque definition Natural.floor_divide_step
-        : (fuel divisor dividend : Natural) → Natural :=
+        : (fuel divisor dividend : ℕ) → ℕ :=
   unfold Natural in Natural.Raw.floor_divide_step
 
 definition Natural.Raw.modulo_step
@@ -80,7 +80,7 @@ definition Natural.Raw.modulo_step
           dividend)
 
 opaque definition Natural.modulo_step
-        : (fuel divisor dividend : Natural) → Natural :=
+        : (fuel divisor dividend : ℕ) → ℕ :=
   unfold Natural in Natural.Raw.modulo_step
 
 -- Top-level functions in Lean's argument order (dividend, divisor),
@@ -96,13 +96,13 @@ opaque definition Natural.modulo_step
 -- (`floor_divide_modulo_decompose`, `modulo_bound`, `divides_implies_modulo_zero`,
 -- `modulo_zero_implies_divides`); the `unfold` that bridges to the `*_step`
 -- lemmas is confined to those theorems here.
-opaque definition Natural.floor_divide (dividend : Natural) : Natural → Natural
+opaque definition Natural.floor_divide (dividend : ℕ) : ℕ → ℕ
   | zero => 0
   | successor(predecessor) =>
       Natural.floor_divide_step(
           fuel := dividend, divisor := successor(predecessor), dividend := dividend)
 
-opaque definition Natural.modulo (dividend divisor : Natural) : Natural :=
+opaque definition Natural.modulo (dividend divisor : ℕ) : ℕ :=
   Natural.modulo_step(
       fuel := dividend, divisor := divisor, dividend := dividend)
 
@@ -115,11 +115,11 @@ opaque definition Natural.modulo (dividend divisor : Natural) : Natural :=
 -- downstream proofs use these lemmas, never reflexivity directly.
 
 -- Zero fuel: both step functions return their non-recursing branch.
-theorem Natural.floor_divide_step_zero_fuel (p n : Natural)
+theorem Natural.floor_divide_step_zero_fuel (p n : ℕ)
         : Natural.floor_divide_step(0, p, n) = 0 :=
   done by unfolding Natural.floor_divide_step
 
-theorem Natural.modulo_step_zero_fuel (p n : Natural)
+theorem Natural.modulo_step_zero_fuel (p n : ℕ)
         : Natural.modulo_step(0, p, n) = n :=
   done by unfolding Natural.modulo_step
 
@@ -128,14 +128,14 @@ theorem Natural.modulo_step_zero_fuel (p n : Natural)
 -- substituting along `pFits` makes the scrutinee `0`, selecting the
 -- zero arm and closing the goal via ι-reduction.
 theorem Natural.floor_divide_step_succ_fits
-        (fuel p n : Natural)
+        (fuel p n : ℕ)
         (pFits : p ∸ n = 0)
         : Natural.floor_divide_step(successor(fuel), p, n)
           = successor(Natural.floor_divide_step(fuel, p, n ∸ p)) :=
   done by substituting pFits unfolding Natural.floor_divide_step, Natural
 
 theorem Natural.modulo_step_succ_fits
-        (fuel p n : Natural)
+        (fuel p n : ℕ)
         (pFits : p ∸ n = 0)
         : Natural.modulo_step(successor(fuel), p, n)
           = Natural.modulo_step(fuel, p, n ∸ p) :=
@@ -145,13 +145,13 @@ theorem Natural.modulo_step_succ_fits
 -- recursion; divide returns 0, modulo carries n. Substituting along
 -- `pTooBig` selects the `successor(_)` arm.
 theorem Natural.floor_divide_step_succ_too_big
-        (fuel p n predM : Natural)
+        (fuel p n predM : ℕ)
         (pTooBig : p ∸ n = successor(predM))
         : Natural.floor_divide_step(successor(fuel), p, n) = 0 :=
   done by substituting pTooBig unfolding Natural.floor_divide_step, Natural
 
 theorem Natural.modulo_step_succ_too_big
-        (fuel p n predM : Natural)
+        (fuel p n predM : ℕ)
         (pTooBig : p ∸ n = successor(predM))
         : Natural.modulo_step(successor(fuel), p, n) = n :=
   done by substituting pTooBig unfolding Natural.modulo_step, Natural
@@ -162,19 +162,19 @@ theorem Natural.modulo_step_succ_too_big
 -- "fits", so the step recursion carries the dividend until the fuel
 -- runs out).
 
-theorem Natural.floor_divide_zero_divisor (n : Natural)
+theorem Natural.floor_divide_zero_divisor (n : ℕ)
         : Natural.floor_divide(n, 0) = 0 :=
   done by unfolding Natural.floor_divide
 
-theorem Natural.modulo_step_zero_divisor (fuel : Natural)
-        : ∀ (n : Natural). Natural.modulo_step(fuel, 0, n) = n :=
+theorem Natural.modulo_step_zero_divisor (fuel : ℕ)
+        : ∀ (n : ℕ). Natural.modulo_step(fuel, 0, n) = n :=
   by induction on fuel with IH {
     case zero: {
-        take n : Natural;
+        take n : ℕ;
         done
       }
     case successor(f): {
-        take n : Natural;
+        take n : ℕ;
         0 ∸ n = 0;
         Natural.modulo_step(successor(f), 0, n)
            = Natural.modulo_step(f, 0, n ∸ 0)
@@ -183,7 +183,7 @@ theorem Natural.modulo_step_zero_divisor (fuel : Natural)
       }
   }
 
-theorem Natural.modulo_zero_divisor (n : Natural)
+theorem Natural.modulo_zero_divisor (n : ℕ)
         : Natural.modulo(n, 0) = n :=
   done by Natural.modulo_step_zero_divisor unfolding Natural.modulo
 
@@ -196,21 +196,21 @@ theorem Natural.modulo_zero_divisor (n : Natural)
 -- means dividend = divisor + (dividend - divisor) (using monus).
 -- Single-pattern on divisor; nested case on dividend with a dependent
 -- motive so the kernel reduces monus through both constructor matches.
-theorem Natural.monus_zero_implies_decompose (divisor : Natural)
-        : ∀ (dividend : Natural).
+theorem Natural.monus_zero_implies_decompose (divisor : ℕ)
+        : ∀ (dividend : ℕ).
           divisor ∸ dividend = 0
           → dividend = divisor + (dividend ∸ divisor) :=
   unfold Natural.add, Natural in
   by induction on divisor with IH {
     case zero: {
-        take dividend : Natural;
+        take dividend : ℕ;
         suppose 0 ∸ dividend = 0;
         -- divisor = 0: dividend = 0 + (dividend ∸ 0) = 0 + dividend.
         dividend
            = 0 + (dividend ∸ 0)
       }
     case successor(predDivisor): {
-        take dividend : Natural;
+        take dividend : ℕ;
         suppose successor(predDivisor) ∸ dividend = 0
             as monusEqZero;
         done by cases {
@@ -236,15 +236,15 @@ theorem Natural.monus_zero_implies_decompose (divisor : Natural)
 
 -- Main correctness: divisor * floor_divide_step(fuel, divisor, dividend)
 -- + modulo_step(fuel, divisor, dividend) = dividend. Induct on fuel.
-theorem Natural.floor_divide_modulo_step_decompose (fuel : Natural)
-        : ∀ (divisor dividend : Natural).
+theorem Natural.floor_divide_modulo_step_decompose (fuel : ℕ)
+        : ∀ (divisor dividend : ℕ).
           divisor * Natural.floor_divide_step(fuel, divisor, dividend)
                 + Natural.modulo_step(fuel, divisor, dividend)
             = dividend :=
   by induction on fuel with IH {
     case zero: {
-        take divisor : Natural;
-        take dividend : Natural;
+        take divisor : ℕ;
+        take dividend : ℕ;
         -- Zero fuel: floor_divide_step returns 0, modulo_step carries the dividend.
         divisor * Natural.floor_divide_step(0, divisor, dividend)
                  + Natural.modulo_step(0, divisor, dividend)
@@ -252,8 +252,8 @@ theorem Natural.floor_divide_modulo_step_decompose (fuel : Natural)
            = dividend
       }
     case successor(fuel): {
-        take divisor : Natural;
-        take dividend : Natural;
+        take divisor : ℕ;
+        take dividend : ℕ;
         done by cases {
           case divisor ∸ dividend = 0 as monusEq:
               -- divisor ≤ dividend: floor_divide_step / modulo_step reduce via
@@ -279,7 +279,7 @@ theorem Natural.floor_divide_modulo_step_decompose (fuel : Natural)
                          by IH(divisor, dividend ∸ divisor)
                  = dividend
           case divisor ∸ dividend = successor(predM)
-                 for some (predM : Natural) as monusEq:
+                 for some (predM : ℕ) as monusEq:
               -- divisor > dividend: floor_divide_step returns 0 and modulo_step
               -- carries the dividend, via *_succ_too_big (monusEq, predM).
               divisor
@@ -297,7 +297,7 @@ theorem Natural.floor_divide_modulo_step_decompose (fuel : Natural)
 -- A zero divisor contributes nothing and the remainder carries the
 -- whole dividend; a positive divisor ι-reduces past the `cases` guard
 -- to the step functions, where the fuel-level decomposition applies.
-theorem Natural.floor_divide_modulo_decompose (dividend divisor : Natural)
+theorem Natural.floor_divide_modulo_decompose (dividend divisor : ℕ)
         : divisor * Natural.floor_divide(dividend, divisor)
               + Natural.modulo(dividend, divisor)
           = dividend :=
@@ -321,18 +321,18 @@ theorem Natural.floor_divide_modulo_decompose (dividend divisor : Natural)
 -- n ∸ d ≤ n. Truncated subtraction can only decrease. With
 -- monus opaque, we bridge via the characterising lemmas to align
 -- the kernel goal type with the in-hand proof.
-automatic theorem Natural.monus_le_self (n : Natural)
-        : ∀ (d : Natural). n ∸ d ≤ n :=
+automatic theorem Natural.monus_le_self (n : ℕ)
+        : ∀ (d : ℕ). n ∸ d ≤ n :=
   unfold Natural.add, Natural in
   by induction on n with IH {
     case zero: {
-        take d : Natural;
+        take d : ℕ;
         0 ∸ d
            = 0
            ≤ 0
       }
     case successor(k): {
-        take d : Natural;
+        take d : ℕ;
         done by cases {
           case d = 0:
               successor(k) ∸ 0
@@ -348,15 +348,15 @@ automatic theorem Natural.monus_le_self (n : Natural)
   }
 
 -- Helper: if d ∸ n = succ(predM), then succ(n) ≤ d.
-theorem Natural.monus_succ_implies_gt (d : Natural)
-        : ∀ (n predM : Natural).
+theorem Natural.monus_succ_implies_gt (d : ℕ)
+        : ∀ (n predM : ℕ).
           d ∸ n = successor(predM)
           → successor(n) ≤ d :=
   unfold Natural.add, Natural in
   by induction on d with IH {
     case zero: {
-        take n : Natural;
-        take predM : Natural;
+        take n : ℕ;
+        take predM : ℕ;
         suppose 0 ∸ n = successor(predM) as monusEq;
         -- 0 ∸ n = 0 ≠ successor(predM).
         successor(predM)
@@ -366,8 +366,8 @@ theorem Natural.monus_succ_implies_gt (d : Natural)
         done
       }
     case successor(d'): {
-        take n : Natural;
-        take predM : Natural;
+        take n : ℕ;
+        take predM : ℕ;
         suppose successor(d') ∸ n = successor(predM) as monusEq;
         done by cases {
           case n = 0: {
@@ -385,15 +385,15 @@ theorem Natural.monus_succ_implies_gt (d : Natural)
 
 -- Step bound: modulo_step(fuel, d, n) < d when d ≥ 1 and fuel ≥ n.
 -- Induction on fuel.
-theorem Natural.modulo_step_lt_divisor (fuel : Natural)
-        : ∀ (d n : Natural).
+theorem Natural.modulo_step_lt_divisor (fuel : ℕ)
+        : ∀ (d n : ℕ).
           successor(0) ≤ d
           → successor(n) ≤ successor(fuel)
           → successor(Natural.modulo_step(fuel, d, n)) ≤ d :=
   by induction on fuel with IH {
     case zero: {
-        take d : Natural;
-        take n : Natural;
+        take d : ℕ;
+        take n : ℕ;
         suppose successor(0) ≤ d as dPositive;
         suppose successor(n) ≤ successor(0) as nLeFuel;
         -- fuel = 0 forces n = 0; modulo_step(0, d, 0) = 0, so the goal is
@@ -405,8 +405,8 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
            ≤ d
       }
     case successor(f): {
-        take d : Natural;
-        take n : Natural;
+        take d : ℕ;
+        take n : ℕ;
         suppose successor(0) ≤ d as dPositive;
         suppose successor(n) ≤ successor(successor(f)) as nLeSuccFuel;
         done by cases {
@@ -435,7 +435,7 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
                  ≤ d   by IH(d, n ∸ d, dPositive, monusBoundedByFuel)
           }
           case d ∸ n = successor(predM)
-                 for some (predM : Natural) as monusEq:
+                 for some (predM : ℕ) as monusEq:
               -- d > n: modulo_step returns n and monus_succ_implies_gt gives
               -- succ(n) ≤ d directly.
               successor(Natural.modulo_step(successor(f), d, n))
@@ -448,7 +448,7 @@ theorem Natural.modulo_step_lt_divisor (fuel : Natural)
 
 -- Top-level: modulo(n, d) < d for d ≥ 1.
 theorem Natural.modulo_bound
-        (dividend divisor : Natural)
+        (dividend divisor : ℕ)
         (divisorPositive : 1 ≤ divisor)
         : Natural.modulo(dividend, divisor) + 1 ≤ divisor := {
   -- Implementation note: the fuel-recursion witness `modulo_step_lt_divisor`
@@ -469,7 +469,7 @@ theorem Natural.modulo_bound
 -- supplies, so the obligation closes with no case split. Marked `automatic`
 -- so it discharges unprompted.
 automatic theorem Natural.modulo_lt
-        (dividend divisor : Natural)
+        (dividend divisor : ℕ)
         (divisorNonzero : divisor ≠ 0)
         : Natural.modulo(dividend, divisor) < divisor := {
   1 ≤ divisor by Natural.one_le_of_nonzero;
@@ -481,32 +481,32 @@ automatic theorem Natural.modulo_lt
 -- Reverse direction: if d | n (i.e., n = d * q), then modulo(d, n) = 0.
 
 -- Helper: (a + b) ∸ a = b. Subtracting `a` from `a + b` gives `b`.
-theorem Natural.monus_add_cancel (a : Natural)
-        : ∀ (b : Natural). (a + b) ∸ a = b :=
+theorem Natural.monus_add_cancel (a : ℕ)
+        : ∀ (b : ℕ). (a + b) ∸ a = b :=
   unfold Natural.add, Natural in
   by induction on a with IH {
     case zero: {
-        take b : Natural;
+        take b : ℕ;
         done
       }
     case successor(k): {
-        take b : Natural;
+        take b : ℕ;
         (successor(k) + b) ∸ successor(k)
            = b
       }
   }
 
 -- Helper: d ∸ (d + m) = 0 (d ≤ d + m, so subtraction is zero).
-theorem Natural.monus_self_plus (d : Natural)
-        : ∀ (m : Natural). d ∸ (d + m) = 0 :=
+theorem Natural.monus_self_plus (d : ℕ)
+        : ∀ (m : ℕ). d ∸ (d + m) = 0 :=
   unfold Natural.add, Natural in
   by induction on d with IH {
     case zero: {
-        take m : Natural;
+        take m : ℕ;
         done
       }
     case successor(k): {
-        take m : Natural;
+        take m : ℕ;
         successor(k) ∸ (successor(k) + m)
            = k ∸ (k + m)
            = 0 by IH(m)
@@ -514,14 +514,14 @@ theorem Natural.monus_self_plus (d : Natural)
   }
 
 -- Step-level: modulo_step(fuel, d, d * q) = 0 when d ≥ 1 and fuel ≥ q.
-theorem Natural.modulo_step_at_multiple (q : Natural)
-        : ∀ (fuel d : Natural).
+theorem Natural.modulo_step_at_multiple (q : ℕ)
+        : ∀ (fuel d : ℕ).
           successor(0) ≤ d → successor(q) ≤ successor(fuel)
           → Natural.modulo_step(fuel, d, d * q) = 0 :=
   by induction on q with IH {
     case zero: {
-        take fuel : Natural;
-        take d : Natural;
+        take fuel : ℕ;
+        take d : ℕ;
         suppose successor(0) ≤ d as dPositive;
         suppose successor(0) ≤ successor(fuel) as _;
         -- d * 0 = 0, so the goal reduces to modulo_step(fuel, d, 0) = 0.
@@ -549,8 +549,8 @@ theorem Natural.modulo_step_at_multiple (q : Natural)
            = 0
       }
     case successor(q'): {
-        take fuel : Natural;
-        take d : Natural;
+        take fuel : ℕ;
+        take d : ℕ;
         suppose successor(0) ≤ d as dPositive;
         suppose successor(successor(q')) ≤ successor(fuel) as succQLeSuccFuel;
         -- d * succ(q') = d + d*q'. For d ≥ 1, d ∸ (d + d*q') = 0, so the
@@ -576,7 +576,7 @@ theorem Natural.modulo_step_at_multiple (q : Natural)
 
 -- Top-level: if d | n, then modulo(n, d) = 0.
 theorem Natural.divides_implies_modulo_zero
-        (dividend divisor : Natural)
+        (dividend divisor : ℕ)
         (divisorPositive : successor(0) ≤ divisor)
         (dividesProof : Natural.divides(divisor, dividend))
         : Natural.modulo(dividend, divisor) = 0 :=
@@ -600,7 +600,7 @@ theorem Natural.divides_implies_modulo_zero
 -- If modulo(n, d) = 0, then d divides n. The decomposition gives
 -- d * divide(n, d) + 0 = n, i.e., n = d * divide(n, d).
 theorem Natural.modulo_zero_implies_divides
-        (dividend divisor : Natural)
+        (dividend divisor : ℕ)
         (moduloZero : Natural.modulo(dividend, divisor) = 0)
         : Natural.divides(divisor, dividend) :=
   witness Natural.floor_divide(dividend, divisor) with

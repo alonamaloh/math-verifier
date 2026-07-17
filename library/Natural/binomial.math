@@ -27,7 +27,7 @@ import Natural.factorial
 -- desugaring in the elaborator), and the `if k = 0` edge test is a classical
 -- `if` — so consumers compute through the characterizing lemmas below
 -- (binomial_zero_right, binomial_zero_succ, binomial_pascal), not by unfolding.
-definition Natural.binomial (n k : Natural) : Natural :=
+definition Natural.binomial (n k : ℕ) : ℕ :=
   if n = 0
     then (if k = 0 then 1 else 0)
     else if k = 0
@@ -39,7 +39,7 @@ definition Natural.binomial (n k : Natural) : Natural :=
 -- so both cases close by if_positive; the split just exposes that `if`. The
 -- constructor arms are deliberate: the `if` guard needs the scrutinee's
 -- structure (an equation arm's `1 + k` goal is opaque-add-stuck).
-theorem Natural.binomial_zero_right (n : Natural) : Natural.binomial(n, 0) = 1 :=
+theorem Natural.binomial_zero_right (n : ℕ) : Natural.binomial(n, 0) = 1 :=
   unfold Natural in
   by induction on n {
     case zero:         done by Logic.if_positive
@@ -47,7 +47,7 @@ theorem Natural.binomial_zero_right (n : Natural) : Natural.binomial(n, 0) = 1 :
   }
 
 -- The top row is empty off its first entry: C(0, k+1) = 0.
-theorem Natural.binomial_zero_succ (k : Natural)
+theorem Natural.binomial_zero_succ (k : ℕ)
         : Natural.binomial(0, 1 + k) = 0 := {
   ¬(1 + k = 0);
   done by Logic.if_negative
@@ -55,7 +55,7 @@ theorem Natural.binomial_zero_succ (k : Natural)
 
 -- Pascal's rule: C(n+1, k+1) = C(n, k) + C(n, k+1). The `k+1 = 0` test fails,
 -- so the coefficient is the else branch, with monus(k+1, 1) = k.
-theorem Natural.binomial_pascal (n k : Natural)
+theorem Natural.binomial_pascal (n k : ℕ)
         : Natural.binomial(1 + n, 1 + k)
           = Natural.binomial(n, k) + Natural.binomial(n, 1 + k) :=
   unfold Natural.add, Natural in
@@ -67,11 +67,11 @@ theorem Natural.binomial_pascal (n k : Natural)
   }
 
 -- Above the diagonal the coefficients vanish.
-theorem Natural.binomial_overflow (n : Natural)
-        : ∀ (k : Natural). 1 + n ≤ k → Natural.binomial(n, k) = 0 :=
+theorem Natural.binomial_overflow (n : ℕ)
+        : ∀ (k : ℕ). 1 + n ≤ k → Natural.binomial(n, k) = 0 :=
   by induction on n with IH {
     case zero:
-        (k : Natural) (overflow : 1 + 0 ≤ k) ↦
+        (k : ℕ) (overflow : 1 + 0 ≤ k) ↦
           done by cases {
             case k = 0 as kIsZero: {
                 1 + 0 ≤ k = 0;
@@ -83,7 +83,7 @@ theorem Natural.binomial_overflow (n : Natural)
             case k = 1 + kPredecessor for some kPredecessor: done
           }
     case 1 + nPredecessor:
-        (k : Natural) (overflow : 1 + (1 + nPredecessor) ≤ k) ↦
+        (k : ℕ) (overflow : 1 + (1 + nPredecessor) ≤ k) ↦
           done by cases {
             case k = 0 as kIsZero: {
                 1 + (1 + nPredecessor) ≤ k = 0;
@@ -116,9 +116,9 @@ theorem Natural.binomial_overflow (n : Natural)
 -- lives one column back in the same row.
 
 -- One row step: row i (in full) gives row i + 1.
-theorem Natural.binomial_factorial_row (i : Natural)
-        (previousRow : ∀ (n : Natural). Natural.binomial(i + n, i) * (i! * n!) = (i + n)!)
-        (n : Natural)
+theorem Natural.binomial_factorial_row (i : ℕ)
+        (previousRow : ∀ (n : ℕ). Natural.binomial(i + n, i) * (i! * n!) = (i + n)!)
+        (n : ℕ)
         : Natural.binomial((1 + i) + n, 1 + i) * ((1 + i)! * n!) = ((1 + i) + n)! :=
   by induction on n with IH {
     case n = 0: unfold Natural.add, Natural in {
@@ -166,16 +166,16 @@ theorem Natural.binomial_factorial_row (i : Natural)
   }
 
 -- The closed form itself, row by row.
-theorem Natural.binomial_factorial (j : Natural)
-        : ∀ (n : Natural). Natural.binomial(j + n, j) * (j! * n!) = (j + n)! :=
+theorem Natural.binomial_factorial (j : ℕ)
+        : ∀ (n : ℕ). Natural.binomial(j + n, j) * (j! * n!) = (j + n)! :=
   by induction on j with previousRow {
     case 0: {
-        take n : Natural;
+        take n : ℕ;
         Natural.binomial(0 + n, 0) = 1;
         Natural.binomial(0 + n, 0) * (0! * n!) = 1 * (0! * n!) = (0 + n)!
       }
     case 1 + i: {
-        take n : Natural;
+        take n : ℕ;
         Natural.binomial((1 + i) + n, 1 + i) * ((1 + i)! * n!) = ((1 + i) + n)! by Natural.binomial_factorial_row
       }
   }

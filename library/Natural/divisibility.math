@@ -15,26 +15,26 @@ import Logic.basics
 import Logic.exists
 
 -- `d ∣ n` exactly when some quotient witnesses `n = d · q`.
-definition Natural.divides(divisor dividend : Natural) : Proposition :=
-  ∃ (quotient : Natural). dividend = divisor * quotient
+definition Natural.divides(divisor dividend : ℕ) : Proposition :=
+  ∃ (quotient : ℕ). dividend = divisor * quotient
 
 operator (∣) on (Natural, Natural) := Natural.divides
 
 -- Every natural divides itself, with quotient 1.
-automatic theorem Natural.divides_reflexive(n : Natural) : n ∣ n :=
+automatic theorem Natural.divides_reflexive(n : ℕ) : n ∣ n :=
   witness 1 with n = n * 1
 
 -- One divides every natural, with quotient that natural.
-theorem Natural.one_divides(n : Natural) : 1 ∣ n :=
+theorem Natural.one_divides(n : ℕ) : 1 ∣ n :=
   witness n with n = 1 * n
 
 -- Every natural divides zero, with quotient 0.
-automatic theorem Natural.divides_zero(n : Natural) : n ∣ 0 :=
+automatic theorem Natural.divides_zero(n : ℕ) : n ∣ 0 :=
   witness 0 with 0 = n * 0
 
 -- Divisibility is transitive. From `b = a · q₁` and `c = b · q₂` we get
 -- `c = a · (q₁ · q₂)`, so `q₁ · q₂` witnesses `a ∣ c`.
-automatic theorem Natural.divides_transitive (a b c : Natural)
+automatic theorem Natural.divides_transitive (a b c : ℕ)
         (aDividesB : a ∣ b) (bDividesC : b ∣ c)
         : a ∣ c := {
   choose firstQuotient such that b = a * firstQuotient from aDividesB;
@@ -48,7 +48,7 @@ automatic theorem Natural.divides_transitive (a b c : Natural)
 
 -- If `d ∣ n` then either `n = 0` or `d ≤ n` — because when the quotient
 -- is a successor, `n = d · (q′ + 1) = d + d · q′ ≥ d`.
-automatic theorem Natural.divides_less_or_equal_or_zero (d n : Natural)
+automatic theorem Natural.divides_less_or_equal_or_zero (d n : ℕ)
         (dDividesN : d ∣ n)
         : n = 0 ∨ d ≤ n :=
   -- `add` is opaque; unfold it so the case-split's `1 + qm1` is visible as a
@@ -58,7 +58,7 @@ automatic theorem Natural.divides_less_or_equal_or_zero (d n : Natural)
   done by cases {
     case quotient = 0:
         n = d * quotient = d * 0 = 0
-    case ∃ (qm1 : Natural). quotient = 1 + qm1 as quotientIsPositive: {
+    case ∃ (qm1 : ℕ). quotient = 1 + qm1 as quotientIsPositive: {
         choose qm1 such that quotient = 1 + qm1 from quotientIsPositive;
         d ≤ d + d * qm1
               = d * (1 + qm1)
@@ -69,13 +69,13 @@ automatic theorem Natural.divides_less_or_equal_or_zero (d n : Natural)
 }
 
 -- A number divides any multiple of itself: `n ∣ n · m`, with quotient `m`.
-automatic theorem Natural.divides_self_multiple (n m : Natural)
+automatic theorem Natural.divides_self_multiple (n m : ℕ)
         : n ∣ n * m :=
   witness m with done
 
 -- Divisibility passes to multiples: if `d ∣ m` then `d ∣ k · m`. From
 -- `m = d · q`, `k · m = k · (d · q) = d · (k · q)`.
-theorem Natural.divides_multiple_left (d k m : Natural)
+theorem Natural.divides_multiple_left (d k m : ℕ)
         (dDividesM : d ∣ m)
         : d ∣ k * m := {
   choose quotient such that m = d * quotient from dDividesM;
@@ -88,7 +88,7 @@ theorem Natural.divides_multiple_left (d k m : Natural)
 -- Divisibility is preserved by addition: if `d ∣ a` and `d ∣ b` then
 -- `d ∣ a + b`. From `a = d · q₁` and `b = d · q₂`,
 -- `a + b = d · q₁ + d · q₂ = d · (q₁ + q₂)`.
-theorem Natural.divides_add (d a b : Natural)
+theorem Natural.divides_add (d a b : ℕ)
         (dDividesA : d ∣ a) (dDividesB : d ∣ b)
         : d ∣ (a + b) := {
   choose firstQuotient such that a = d * firstQuotient from dDividesA;
@@ -109,20 +109,20 @@ theorem Natural.divides_add (d a b : Natural)
 --                                    (`d + (1 + d·q₁′) = d + d·q₂′`) and
 --                                    recurse on `q₁′, q₂′`.
 theorem Natural.divides_one_of_consecutive_multiples
-        (d q1 : Natural)
-        : ∀ (q2 : Natural).
+        (d q1 : ℕ)
+        : ∀ (q2 : ℕ).
           successor(d * q1) = d * q2
           → d ∣ 1 :=
   by induction on q1 with IH {
     case zero: {
-        take q2 : Natural;
+        take q2 : ℕ;
         suppose successor(d * 0) = d * q2 as equalityProof;
         witness q2 with successor(0)
                 = successor(d * 0)
                 = d * q2
       }
     case successor(q1Predecessor): {
-        take q2 : Natural;
+        take q2 : ℕ;
         suppose successor(d * successor(q1Predecessor)) = d * q2 as equalityProof;
         done by cases {
           case q2 = 0: {
@@ -148,7 +148,7 @@ theorem Natural.divides_one_of_consecutive_multiples
 -- The witnesses give `a = d · q₁` and `a + 1 = d · q₂`, hence
 -- `(d · q₁) + 1 = d · q₂`; `divides_one_of_consecutive_multiples` finishes.
 theorem Natural.divides_consecutive_implies_one
-        (d a : Natural) (dDividesA : d ∣ a) (dDividesSuccessorA : d ∣ successor(a))
+        (d a : ℕ) (dDividesA : d ∣ a) (dDividesSuccessorA : d ∣ successor(a))
         : d = 1 := {
   choose firstQuotient such that a = d * firstQuotient from dDividesA;
   choose secondQuotient such that successor(a) = d * secondQuotient from dDividesSuccessorA;
