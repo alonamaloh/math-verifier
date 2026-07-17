@@ -1394,11 +1394,15 @@ ExpressionPointer Elaborator::elaborateExpression(
             // goal, and from there into proof terms the kernel rejects
             // as "unbound internal variable").
             ExpressionPointer headType;
+            ExpressionPointer headTypeUnreduced;
             try {
+                headTypeUnreduced =
+                    inferTypeInLocalContext(localBinders, head);
                 headType = weakHeadNormalForm(environment_,
-                    inferTypeInLocalContext(localBinders, head));
+                    headTypeUnreduced);
             } catch (...) {
                 headType = nullptr;
+                headTypeUnreduced = nullptr;
             }
             // Application convention: the function position holds a VALUE
             // whose (non-function) type has a registered application
@@ -1409,15 +1413,70 @@ ExpressionPointer Elaborator::elaborateExpression(
             // own implicit inference and argument coercions apply exactly
             // as if the user had spelled it out.
             if (headType && !std::holds_alternative<Pi>(headType->node)) {
-                ExpressionPointer typeHead = headType;
+                // Key on the UN-reduced type's head when it has one: a
+                // registered wrapper can be a transparent alias
+                // (Polynomial unfolds to its quotient), and reduction
+                // erases the name the registry keys on. Fall back to the
+                // reduced head for values whose surface type only exposes
+                // the registered name after unfolding.
+                ExpressionPointer typeHead =
+                    headTypeUnreduced ? headTypeUnreduced : headType;
                 while (auto* typeApplication =
                            std::get_if<Application>(&typeHead->node)) {
                     typeHead = typeApplication->function;
                 }
+                if (!std::holds_alternative<Constant>(typeHead->node)) {
+                    typeHead = headType;
+                    while (auto* typeApplication =
+                               std::get_if<Application>(&typeHead->node)) {
+                        typeHead = typeApplication->function;
+                    }
+                }
                 if (auto* typeConstant =
                         std::get_if<Constant>(&typeHead->node)) {
-                    std::string unwrapperName = environment_.lookupOperator(
-                        "()", typeConstant->name, "");
+                    // Pair-keyed application first — `operator (()) on
+                    // (T, U) := F` dispatches on the value's AND the first
+                    // argument's type heads (mirroring `[]`), so one
+                    // wrapper type can apply differently per argument
+                    // carrier (a polynomial at a matrix vs at a scalar).
+                    // The probe elaboration is speculative: on any failure
+                    // fall back to the single-keyed registration.
+                    std::string unwrapperName;
+                    if (!positionalArguments.empty()) {
+                        try {
+                            ExpressionPointer firstArgument =
+                                elaborateExpression(
+                                    *positionalArguments.front(),
+                                    localBinders);
+                            // No weak-head reduction here: the argument's
+                            // registered head can be a transparent type
+                            // alias (Matrix unfolds to a function type),
+                            // and reducing would erase the head the
+                            // registry keys on.
+                            ExpressionPointer firstType =
+                                inferTypeInLocalContext(
+                                    localBinders, firstArgument);
+                            ExpressionPointer firstHead = firstType;
+                            while (auto* firstApplication =
+                                       std::get_if<Application>(
+                                           &firstHead->node)) {
+                                firstHead = firstApplication->function;
+                            }
+                            if (auto* firstConstant =
+                                    std::get_if<Constant>(
+                                        &firstHead->node)) {
+                                unwrapperName =
+                                    environment_.lookupOperator(
+                                        "()", typeConstant->name,
+                                        firstConstant->name);
+                            }
+                        } catch (...) {
+                        }
+                    }
+                    if (unwrapperName.empty()) {
+                        unwrapperName = environment_.lookupOperator(
+                            "()", typeConstant->name, "");
+                    }
                     if (!unwrapperName.empty()) {
                         std::vector<SurfaceExpressionPointer>
                             unwrapperArguments;
