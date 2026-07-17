@@ -1,0 +1,59 @@
+-- C2 acceptance for the Cayley–Hamilton arc: the generalized determinant
+-- tower instantiates without friction at the two bundles the arc needs —
+-- F[x] (via `Polynomial.commutative_ring`) and a plain field (via
+-- `Field.commutative_ring`) — and the `ring` tactic drives goals whose
+-- carrier is the polynomial bundle's.
+module Test.matrix_commutative_ring_instances_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.field
+import Algebra.field_bundle
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.determinant
+import Algebra.determinant_multiplicative
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.commutative
+import Polynomial.instances
+
+-- det(AB) = det(A)·det(B) for matrices of polynomials over any
+-- commutative base — the instantiation Cayley–Hamilton lives in.
+theorem Test.polynomial_matrix_determinant_multiply
+        {n : ℕ} (c : CommutativeRing)
+        (A B : Matrix(Polynomial.commutative_ring(
+                          CommutativeRing.ring(c), CommutativeRing.commutative(c)), n, n))
+        : Matrix.determinant(Matrix.multiply(A, B))
+          = Matrix.determinant(A) * Matrix.determinant(B) :=
+  by Matrix.determinant_multiply
+
+-- ... and for matrices over a field, via `Field.commutative_ring`.
+theorem Test.field_matrix_determinant_multiply
+        {n : ℕ} (f : Field) (A B : Matrix(Field.commutative_ring(f), n, n))
+        : Matrix.determinant(Matrix.multiply(A, B))
+          = Matrix.determinant(A) * Matrix.determinant(B) :=
+  by Matrix.determinant_multiply
+
+-- The `ring` tactic at the polynomial bundle's carrier: the tactic
+-- recovers the CommutativeRing index from the operand type even when the
+-- bundle is a compound expression, not a variable.
+theorem Test.ring_tactic_at_polynomial_carrier
+        (c : CommutativeRing)
+        (p q : CommutativeRing.carrier(Polynomial.commutative_ring(
+                   CommutativeRing.ring(c), CommutativeRing.commutative(c))))
+        : (p + q) * (p + q) = (p * p + (p * q + p * q)) + q * q := ring
