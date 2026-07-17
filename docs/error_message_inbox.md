@@ -1618,3 +1618,27 @@ goal-side paths do. CAUTION for whoever fixes it: this is the same
 matcher whose defeq widening previously exposed a perturbation-sensitive
 latent bug and was reverted (see citation_defeq memory) — needs the
 bounded/pass-through-gated approach, not a blanket WHNF.
+
+**FRICTION (calc carrier seeding × ring, 2026-07-17, characteristic_polynomial).**
+Inside a calc whose FIRST relation's endpoints are `Ring.carrier`-typed
+(coefficient extractions), a later step whose operands are ALL
+`CommutativeRing.*` operations still gets `ring` at the seeded
+`Ring.carrier` — "a general ring has no `·`-commutativity" — even though
+the step's own equality is entirely commutative-ring vocabulary. Workaround
+that reads fine: prove the AC-swap as a standalone claim (its own equation
+seeds `CommutativeRing.carrier`) and cite it in the calc. Fix direction:
+seed the tactic's carrier from the STEP's operand spellings, not the
+chain's first relation.
+
+**FRICTION (bundle-carrier implicit inference, 2026-07-17,
+characteristic_polynomial).** `CommutativeRing.sumOver{r}` cannot infer
+`r` when the term lambda's CODOMAIN is what pins it (a coefficient-valued
+lambda types at `Ring.carrier(CommutativeRing.ring(c))`; leading-argument
+inference only consults the lambda's domain). An explicit body ascription
+does not help; mixing a named implicit with positional arguments
+(`sumOver(r := c, term, items)`) is rejected outright ("has 2 user-facing
+parameters but call supplies 3"). Working spelling: ascribe the WHOLE
+application `(CommutativeRing.sumOver(...) : CommutativeRing.carrier(c))`
+so expected-type propagation assigns `r`. Fix directions: consult the
+term's inferred codomain (whnf'd) during leading-argument inference,
+and/or allow named implicit arguments alongside positional ones.

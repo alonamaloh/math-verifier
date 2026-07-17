@@ -93,7 +93,6 @@ theorem Polynomial.coefficientOf_sumOver {c : CommutativeRing} {index : Type(0)}
         Polynomial.coefficientOf(CommutativeRing.sumOver(term, List.prepend(index, head, tail)), k)
            = Polynomial.coefficientOf(term(head), k)
                  + Polynomial.coefficientOf(CommutativeRing.sumOver(term, tail), k)
-                 by Polynomial.coefficientOf_add
            = Polynomial.coefficientOf(term(head), k)
                  + CommutativeRing.sumOver((t : index) ↦ Polynomial.coefficientOf(term(t), k), tail)
                  by substituting IH
@@ -111,7 +110,6 @@ theorem Polynomial.coefficientOf_productOver_zero {c : CommutativeRing} {index :
   by induction on items with IH {
     case List.empty:
         Polynomial.coefficientOf(CommutativeRing.productOver(term, List.empty(index)), 0)
-           = Ring.one(CommutativeRing.ring(c))   by Polynomial.coefficientOf_one_zero
            = CommutativeRing.productOver((t : index) ↦ Polynomial.coefficientOf(term(t), 0),
                  List.empty(index))
     case List.prepend(head, tail):
@@ -144,12 +142,12 @@ theorem Polynomial.sumOver_DegreeLessThan {c : CommutativeRing} {index : Type(0)
       }
     case List.prepend(head, tail): {
         head ∈ List.prepend(index, head, tail);
-        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), n) by bounds;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), n);
         ∀ (t : index). t ∈ tail
             → Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(t), n)
             by (t : index) (tInTail : t ∈ tail) ↦ {
-                t ∈ List.prepend(index, head, tail) by List.member.there;
-                done by bounds
+                t ∈ List.prepend(index, head, tail);
+                done
               };
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 CommutativeRing.sumOver(term, tail), n)
@@ -172,22 +170,21 @@ theorem Polynomial.productOver_DegreeLessThan {c : CommutativeRing} {index : Typ
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 Polynomial.one(CommutativeRing.ring(c)), 1)
             by Polynomial.one_DegreeLessThan;
-        length(List.empty(index)) = 0 by List.length_empty as emptyLength;
+        length(List.empty(index)) = 0;
         1 + length(List.empty(index))
-           = 1 + 0   by substituting emptyLength
+           = 1 + 0
            = 1
            as lengthEquation;
         done by substituting lengthEquation
       }
     case List.prepend(head, tail): {
         head ∈ List.prepend(index, head, tail);
-        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), 2) by bounds
-            as headBound;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), 2) as headBound;
         ∀ (t : index). t ∈ tail
             → Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(t), 2)
             by (t : index) (tInTail : t ∈ tail) ↦ {
-                t ∈ List.prepend(index, head, tail) by List.member.there;
-                done by bounds
+                t ∈ List.prepend(index, head, tail);
+                done
               };
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 CommutativeRing.productOver(term, tail), 1 + length(tail))
@@ -196,8 +193,7 @@ theorem Polynomial.productOver_DegreeLessThan {c : CommutativeRing} {index : Typ
                 (term(head) * CommutativeRing.productOver(term, tail)),
                 1 + (1 + length(tail)))
             by Polynomial.product_DegreeLessThan(aBound := headBound, bBound := tailBound);
-        length(List.prepend(index, head, tail)) = 1 + length(tail)
-            by List.length_prepend as prependLength;
+        length(List.prepend(index, head, tail)) = 1 + length(tail) as prependLength;
         done by substituting prependLength
       }
   }
@@ -217,51 +213,47 @@ theorem Polynomial.productOver_monic {c : CommutativeRing} {index : Type(0)}
   by induction on items with IH {
     case List.empty: {
         Polynomial.coefficientOf(CommutativeRing.productOver(term, List.empty(index)), 0)
-           = Ring.one(CommutativeRing.ring(c))
-           by Polynomial.coefficientOf_one_zero;
-        length(List.empty(index)) = 0 by List.length_empty as emptyLength;
+           = Ring.one(CommutativeRing.ring(c));
+        length(List.empty(index)) = 0 as emptyLength;
         done by substituting emptyLength
       }
     case List.prepend(head, tail): {
         head ∈ List.prepend(index, head, tail);
-        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), 2) by bounds;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), 2);
         Polynomial.coefficientOf(term(head), 1) = Ring.one(CommutativeRing.ring(c))
             by monic as headMonic;
         ∀ (t : index). t ∈ tail
             → Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(t), 2)
             by (t : index) (tInTail : t ∈ tail) ↦ {
-                t ∈ List.prepend(index, head, tail) by List.member.there;
-                done by bounds
+                t ∈ List.prepend(index, head, tail);
+                done
               };
         ∀ (t : index). t ∈ tail
             → Polynomial.coefficientOf(term(t), 1) = Ring.one(CommutativeRing.ring(c))
             by (t : index) (tInTail : t ∈ tail) ↦ {
-                t ∈ List.prepend(index, head, tail) by List.member.there;
-                done by monic
+                t ∈ List.prepend(index, head, tail);
+                done
               };
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 CommutativeRing.productOver(term, tail), 1 + length(tail))
-            by Polynomial.productOver_DegreeLessThan as tailDegree;
+            by Polynomial.productOver_DegreeLessThan;
         Polynomial.coefficientOf(CommutativeRing.productOver(term, tail), length(tail))
            = Ring.one(CommutativeRing.ring(c)) by IH as tailTop;
-        2 = 1 + 1 as twoEquation;
-        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), 1 + 1)
-            by substituting twoEquation as headBoundForm;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c), term(head), 1 + 1);
         Polynomial.coefficientOf(CommutativeRing.productOver(term, List.prepend(index, head, tail)),
                 1 + length(tail))
            = Polynomial.coefficientOf((term(head) * CommutativeRing.productOver(term, tail)),
                  1 + length(tail))
            = Polynomial.coefficientOf(term(head), 1)
                  * Polynomial.coefficientOf(CommutativeRing.productOver(term, tail), length(tail))
-                 by Polynomial.coefficientOf_product_at_sum(aBound := headBoundForm, bBound := tailDegree)
+                 by Polynomial.coefficientOf_product_at_sum
            = Ring.one(CommutativeRing.ring(c))
                  * Polynomial.coefficientOf(CommutativeRing.productOver(term, tail), length(tail))
                  by substituting headMonic
            = Ring.one(CommutativeRing.ring(c)) * Ring.one(CommutativeRing.ring(c))
                  by substituting tailTop
            = Ring.one(CommutativeRing.ring(c));
-        length(List.prepend(index, head, tail)) = 1 + length(tail)
-            by List.length_prepend as prependLength;
+        length(List.prepend(index, head, tail)) = 1 + length(tail) as prependLength;
         done by substituting prependLength
       }
   }
@@ -275,7 +267,7 @@ theorem CommutativeRing.productOver_negate {c : CommutativeRing} {index : Type(0
             * CommutativeRing.productOver(g, items) :=
   by induction on items with IH {
     case List.empty: {
-        length(List.empty(index)) = 0 by List.length_empty as emptyLength;
+        length(List.empty(index)) = 0 as emptyLength;
         CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)),
                 length(List.empty(index)))
            = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), 0)
@@ -284,15 +276,14 @@ theorem CommutativeRing.productOver_negate {c : CommutativeRing} {index : Type(0
            as powerValue;
         CommutativeRing.productOver((t : index) ↦ CommutativeRing.negate(g(t)), List.empty(index))
            = CommutativeRing.one(c)
-           = CommutativeRing.one(c) * CommutativeRing.one(c)   by ring
+           = CommutativeRing.one(c) * CommutativeRing.one(c)
            = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)),
                  length(List.empty(index)))
                  * CommutativeRing.productOver(g, List.empty(index))
                  by substituting powerValue
       }
     case List.prepend(head, tail): {
-        length(List.prepend(index, head, tail)) = 1 + length(tail)
-            by List.length_prepend as prependLength;
+        length(List.prepend(index, head, tail)) = 1 + length(tail) as prependLength;
         CommutativeRing.productOver((t : index) ↦ CommutativeRing.negate(g(t)),
               List.prepend(index, head, tail))
            = CommutativeRing.negate(g(head))
@@ -325,47 +316,41 @@ theorem CommutativeRing.productOver_negate {c : CommutativeRing} {index : Type(0
 theorem Matrix.characteristic_entry_DegreeLessThan {c : CommutativeRing} {n : ℕ}
         (A : Matrix(c, n, n)) (i j : NaturalsBelow(n))
         : Polynomial.DegreeLessThan(CommutativeRing.ring(c), Matrix.characteristic(A)(i, j), 2) := {
-  i = j ∨ ¬(i = j) by Logic.excluded_middle;
+  i = j ∨ ¬(i = j);
   done by cases {
     case i = j as diagonal: {
-        1 = 1 + 0 as oneEquation;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 Polynomial.constant(CommutativeRing.ring(c), A(j, j)), 1 + 0)
             by Polynomial.monomial_DegreeLessThan;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
-                Polynomial.constant(CommutativeRing.ring(c), A(j, j)), 1)
-            by substituting oneEquation;
+                Polynomial.constant(CommutativeRing.ring(c), A(j, j)), 1);
         1 ≤ 2;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 Polynomial.constant(CommutativeRing.ring(c), A(j, j)), 2)
-            by Polynomial.DegreeLessThan.weaken as constantBound;
-        2 = 1 + 1 as twoEquation;
+            by Polynomial.DegreeLessThan.weaken;
+        Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+                Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(j, j))), 2)
+            by Polynomial.DegreeLessThan.negate;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 Polynomial.indeterminate(CommutativeRing.ring(c)), 1 + 1)
             by Polynomial.monomial_DegreeLessThan;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
-                Polynomial.indeterminate(CommutativeRing.ring(c)), 2)
-            by substituting twoEquation;
+                Polynomial.indeterminate(CommutativeRing.ring(c)), 2);
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 (Polynomial.indeterminate(CommutativeRing.ring(c))
                     - Polynomial.constant(CommutativeRing.ring(c), A(j, j))), 2)
-            by Polynomial.DegreeLessThan.add(degreeQ := Polynomial.DegreeLessThan.negate(
-                   CommutativeRing.ring(c), Polynomial.constant(CommutativeRing.ring(c), A(j, j)),
-                   2, constantBound));
+            by Polynomial.DegreeLessThan.add;
         Matrix.characteristic(A)(j, j)
            = Polynomial.indeterminate(CommutativeRing.ring(c))
-             - Polynomial.constant(CommutativeRing.ring(c), A(j, j))
-            by Matrix.characteristic_entry_diagonal as entryEquation;
+             - Polynomial.constant(CommutativeRing.ring(c), A(j, j)) as entryEquation;
         done by substituting entryEquation
       }
     case ¬(i = j) as off: {
-        1 = 1 + 0 as oneEquation;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 1 + 0)
             by Polynomial.monomial_DegreeLessThan;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
-                Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 1)
-            by substituting oneEquation;
+                Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 1);
         1 ≤ 2;
         Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                 Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 2)
@@ -374,8 +359,7 @@ theorem Matrix.characteristic_entry_DegreeLessThan {c : CommutativeRing} {n : �
                 Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j))), 2)
             by Polynomial.DegreeLessThan.negate;
         Matrix.characteristic(A)(i, j)
-           = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j)))
-            by Matrix.characteristic_entry_off as entryEquation;
+           = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j))) as entryEquation;
         done by substituting entryEquation
       }
   }
@@ -387,23 +371,18 @@ theorem Matrix.characteristic_entry_leading {c : CommutativeRing} {n : ℕ}
           = Ring.one(CommutativeRing.ring(c)) := {
   Matrix.characteristic(A)(i, j)
      = Polynomial.indeterminate(CommutativeRing.ring(c))
-       - Polynomial.constant(CommutativeRing.ring(c), A(i, j))
-      by Matrix.characteristic_entry_diagonal as entryEquation;
+       - Polynomial.constant(CommutativeRing.ring(c), A(i, j)) as entryEquation;
   ¬(1 = 0);
   Polynomial.coefficientOf(Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 1)
-     = Ring.zero(CommutativeRing.ring(c))
-      by Polynomial.coefficientOf_monomial_off as constantAtOne;
+     = Ring.zero(CommutativeRing.ring(c));
   Polynomial.coefficientOf(
           (Polynomial.indeterminate(CommutativeRing.ring(c))
               - Polynomial.constant(CommutativeRing.ring(c), A(i, j))), 1)
      = Polynomial.coefficientOf(Polynomial.indeterminate(CommutativeRing.ring(c)), 1)
        - Polynomial.coefficientOf(Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 1)
-           by Polynomial.coefficientOf_subtract
      = Ring.one(CommutativeRing.ring(c))
        - Polynomial.coefficientOf(Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 1)
-           by substituting Polynomial.coefficientOf_monomial_at
      = Ring.one(CommutativeRing.ring(c)) - Ring.zero(CommutativeRing.ring(c))
-           by substituting constantAtOne
      = Ring.one(CommutativeRing.ring(c))
            by ring;
   done by substituting entryEquation
@@ -413,28 +392,23 @@ theorem Matrix.characteristic_entry_constant {c : CommutativeRing} {n : ℕ}
         (A : Matrix(c, n, n)) (i j : NaturalsBelow(n))
         : Polynomial.coefficientOf(Matrix.characteristic(A)(i, j), 0)
           = CommutativeRing.negate(A(i, j)) := {
-  i = j ∨ ¬(i = j) by Logic.excluded_middle;
+  i = j ∨ ¬(i = j);
   done by cases {
     case i = j as diagonal: {
         Matrix.characteristic(A)(j, j)
            = Polynomial.indeterminate(CommutativeRing.ring(c))
-             - Polynomial.constant(CommutativeRing.ring(c), A(j, j))
-            by Matrix.characteristic_entry_diagonal as entryEquation;
+             - Polynomial.constant(CommutativeRing.ring(c), A(j, j)) as entryEquation;
         ¬(0 = 1);
         Polynomial.coefficientOf(Polynomial.indeterminate(CommutativeRing.ring(c)), 0)
-           = Ring.zero(CommutativeRing.ring(c))
-            by Polynomial.coefficientOf_monomial_off as indeterminateAtZero;
+           = Ring.zero(CommutativeRing.ring(c));
         Polynomial.coefficientOf(
                 (Polynomial.indeterminate(CommutativeRing.ring(c))
                     - Polynomial.constant(CommutativeRing.ring(c), A(j, j))), 0)
            = Polynomial.coefficientOf(Polynomial.indeterminate(CommutativeRing.ring(c)), 0)
              - Polynomial.coefficientOf(Polynomial.constant(CommutativeRing.ring(c), A(j, j)), 0)
-                 by Polynomial.coefficientOf_subtract
            = Ring.zero(CommutativeRing.ring(c))
              - Polynomial.coefficientOf(Polynomial.constant(CommutativeRing.ring(c), A(j, j)), 0)
-                 by substituting indeterminateAtZero
            = Ring.zero(CommutativeRing.ring(c)) - A(j, j)
-                 by substituting Polynomial.coefficientOf_monomial_at
            = Ring.negate(CommutativeRing.ring(c), A(j, j))
                  by ring
            = CommutativeRing.negate(A(j, j));
@@ -442,14 +416,11 @@ theorem Matrix.characteristic_entry_constant {c : CommutativeRing} {n : ℕ}
       }
     case ¬(i = j) as off: {
         Matrix.characteristic(A)(i, j)
-           = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j)))
-            by Matrix.characteristic_entry_off as entryEquation;
+           = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j))) as entryEquation;
         Polynomial.coefficientOf(
                 Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i, j))), 0)
            = - Polynomial.coefficientOf(Polynomial.constant(CommutativeRing.ring(c), A(i, j)), 0)
-                 by Polynomial.coefficientOf_negate
-           = CommutativeRing.negate(A(i, j))
-                 by substituting Polynomial.coefficientOf_monomial_at;
+           = CommutativeRing.negate(A(i, j));
         done by substituting entryEquation
       }
   }
@@ -535,15 +506,14 @@ theorem Matrix.characteristicPolynomial_DegreeLessThan {c : CommutativeRing} {n 
       by (sigma : Permutation(n)) (sigmaMember : sigma ∈ Permutation.allPermutations(n)) ↦ {
           Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1)
               by Permutation.sign_is_unit;
-          1 = 1 + 0 as oneEquation;
-          Polynomial.DegreeLessThan(CommutativeRing.ring(c),
+            Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
                       Permutation.sign(sigma)), 1)
               by Polynomial.sign_image_DegreeLessThan;
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
                       Permutation.sign(sigma)), 1 + 0)
-              by substituting oneEquation as signBound;
+              as signBound;
           ∀ (t : NaturalsBelow(n)). t ∈ NaturalsBelow.enumerate(n)
               → Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                     Matrix.characteristic(A)(t, sigma(t)), 2)
@@ -555,13 +525,12 @@ theorem Matrix.characteristicPolynomial_DegreeLessThan {c : CommutativeRing} {n 
                       NaturalsBelow.enumerate(n)),
                   1 + length(NaturalsBelow.enumerate(n)))
               by Polynomial.productOver_DegreeLessThan;
-          length(NaturalsBelow.enumerate(n)) = n
-              by NaturalsBelow.enumerate_length as enumerateLength;
+          length(NaturalsBelow.enumerate(n)) = n;
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   CommutativeRing.productOver(
                       (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
                       NaturalsBelow.enumerate(n)), 1 + n)
-              by substituting enumerateLength as productBound;
+              as productBound;
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
                        Permutation.sign(sigma))
@@ -602,18 +571,7 @@ theorem Matrix.characteristicPolynomial_DegreeLessThan {c : CommutativeRing} {n 
 theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
         (A : Matrix(c, n, n))
         : Matrix.characteristicPolynomial(A)[n] = Ring.one(CommutativeRing.ring(c)) := {
-  Matrix.characteristicPolynomial(A)
-     = CommutativeRing.sumOver(
-           (sigma : Permutation(n)) ↦
-               CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
-                   Permutation.sign(sigma))
-                   * CommutativeRing.productOver(
-                         (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
-                         NaturalsBelow.enumerate(n)),
-           Permutation.allPermutations(n))
-     by Matrix.determinant_expansion as expansionEquation;
-  length(NaturalsBelow.enumerate(n)) = n
-      by NaturalsBelow.enumerate_length as enumerateLength;
+  length(NaturalsBelow.enumerate(n)) = n;
 
   -- Every non-identity term's coefficient at n vanishes.
   ∀ (rho : Permutation(n)).
@@ -651,10 +609,8 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
                      (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
                      NaturalsBelow.enumerate(n) ∖ i0)
               by CommutativeRing.productOver_remove as productSplit;
-          1 = 1 + 0 as oneEquation;
-          Matrix.characteristic(A)(i0, rho(i0))
-             = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i0, rho(i0))))
-              by Matrix.characteristic_entry_off as offEntry;
+            Matrix.characteristic(A)(i0, rho(i0))
+             = Polynomial.negate(Polynomial.constant(CommutativeRing.ring(c), A(i0, rho(i0)))) as offEntry;
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   Polynomial.constant(CommutativeRing.ring(c), A(i0, rho(i0))), 1 + 0)
               by Polynomial.monomial_DegreeLessThan;
@@ -684,14 +640,14 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
                   1 + (0 + length(NaturalsBelow.enumerate(n) ∖ i0)))
               by Polynomial.product_DegreeLessThan(aBound := entryBound, bBound := restBound);
           0 + length(NaturalsBelow.enumerate(n) ∖ i0)
-             = length(NaturalsBelow.enumerate(n) ∖ i0) as zeroPlusEquation;
+             = length(NaturalsBelow.enumerate(n) ∖ i0);
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   (Matrix.characteristic(A)(i0, rho(i0))
                       * CommutativeRing.productOver(
                             (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
                             NaturalsBelow.enumerate(n) ∖ i0)),
                   1 + length(NaturalsBelow.enumerate(n) ∖ i0))
-              by substituting zeroPlusEquation;
+              ;
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   CommutativeRing.productOver(
                       (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
@@ -707,7 +663,7 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
                       Permutation.sign(rho)), 1 + 0)
-              by substituting oneEquation as signBound;
+              as signBound;
           Polynomial.DegreeLessThan(CommutativeRing.ring(c),
                   (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
                        Permutation.sign(rho))
@@ -723,10 +679,10 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
                             (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, rho(i)),
                             NaturalsBelow.enumerate(n))),
                   1 + length(NaturalsBelow.enumerate(n) ∖ i0))
-              by substituting zeroPlusEquation as termBound;
+              as termBound;
           length(NaturalsBelow.enumerate(n)) = 1 + length(NaturalsBelow.enumerate(n) ∖ i0)
               by List.length_remove_member as removeLength;
-          n = length(NaturalsBelow.enumerate(n))       by enumerateLength
+          n = length(NaturalsBelow.enumerate(n))
             = 1 + length(NaturalsBelow.enumerate(n) ∖ i0)   by removeLength
             as nEquation;
           1 + length(NaturalsBelow.enumerate(n) ∖ i0) ≤ n by substituting nEquation;
@@ -758,8 +714,8 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
               (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, Permutation.identity(n)(i)),
               NaturalsBelow.enumerate(n)), n)
      = Ring.one(CommutativeRing.ring(c))
-      by substituting enumerateLength as productAtN;
-  Permutation.sign(Permutation.identity(n)) = 1 by Permutation.sign_identity as signIdentity;
+      as productAtN;
+  Permutation.sign(Permutation.identity(n)) = 1 as signIdentity;
   Polynomial.coefficientOf(
           (CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
                Permutation.sign(Permutation.identity(n)))
@@ -812,7 +768,7 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
                              (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
                              NaturalsBelow.enumerate(n)),
                Permutation.allPermutations(n)), n)
-           by substituting expansionEquation
+
      = (CommutativeRing.sumOver(
            (rho : Permutation(n)) ↦
                (Polynomial.coefficientOf(
@@ -856,7 +812,7 @@ theorem Matrix.characteristicPolynomial_monic {c : CommutativeRing} {n : ℕ}
      = CommutativeRing.one(c) + CommutativeRing.zero(c)
            by substituting remainderVanishes
      = CommutativeRing.one(c)
-           by CommutativeRing.add_zero
+
 }
 
 -- The constant term is (−1)^n·det(A): at coefficient 0 every entry of
@@ -867,18 +823,7 @@ theorem Matrix.characteristicPolynomial_constant_term {c : CommutativeRing} {n :
         : Matrix.characteristicPolynomial(A)[0]
           = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
             * Matrix.determinant(A) := {
-  Matrix.characteristicPolynomial(A)
-     = CommutativeRing.sumOver(
-           (sigma : Permutation(n)) ↦
-               CommutativeRing.from_integer(CommutativeRing.polynomial_ring(c),
-                   Permutation.sign(sigma))
-                   * CommutativeRing.productOver(
-                         (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
-                         NaturalsBelow.enumerate(n)),
-           Permutation.allPermutations(n))
-     by Matrix.determinant_expansion as expansionEquation;
-  length(NaturalsBelow.enumerate(n)) = n
-      by NaturalsBelow.enumerate_length as enumerateLength;
+  length(NaturalsBelow.enumerate(n)) = n as enumerateLength;
 
   -- Each term's constant coefficient: (−1)^n · (sign(ρ) · ∏ aᵢρᵢ).
   ∀ (rho : Permutation(n)).
@@ -904,7 +849,7 @@ theorem Matrix.characteristicPolynomial_constant_term {c : CommutativeRing} {n :
               Polynomial.coefficientOf(Matrix.characteristic(A)(t, rho(t)), 0)
               = CommutativeRing.negate(A(t, rho(t)))
               by (t : NaturalsBelow(n)) ↦
-                  { done by Matrix.characteristic_entry_constant } as entriesConstant;
+                  { done by Matrix.characteristic_entry_constant };
           (CommutativeRing.productOver(
                (t : NaturalsBelow(n)) ↦
                    Polynomial.coefficientOf(Matrix.characteristic(A)(t, rho(t)), 0),
@@ -912,7 +857,7 @@ theorem Matrix.characteristicPolynomial_constant_term {c : CommutativeRing} {n :
              = CommutativeRing.productOver(
                    (t : NaturalsBelow(n)) ↦ CommutativeRing.negate(A(t, rho(t))),
                    NaturalsBelow.enumerate(n))
-              by CommutativeRing.productOver_congruence(pointwise := entriesConstant)
+              by CommutativeRing.productOver_congruence
               as productEntriesConstant;
           CommutativeRing.productOver(
                   (t : NaturalsBelow(n)) ↦ CommutativeRing.negate(A(t, rho(t))),
@@ -983,7 +928,7 @@ theorem Matrix.characteristicPolynomial_constant_term {c : CommutativeRing} {n :
                            NaturalsBelow.enumerate(n)))
                  by signPowerSwap;
           done
-        } as termConstant;
+        };
 
   -- Assemble: the coefficient sum is (−1)^n times the base determinant sum.
   Matrix.determinant(A)
@@ -1004,7 +949,7 @@ theorem Matrix.characteristicPolynomial_constant_term {c : CommutativeRing} {n :
                              (i : NaturalsBelow(n)) ↦ Matrix.characteristic(A)(i, sigma(i)),
                              NaturalsBelow.enumerate(n)),
                Permutation.allPermutations(n)), 0)
-           by substituting expansionEquation
+
      = (CommutativeRing.sumOver(
            (rho : Permutation(n)) ↦
                Polynomial.coefficientOf(
@@ -1022,7 +967,7 @@ theorem Matrix.characteristicPolynomial_constant_term {c : CommutativeRing} {n :
                          * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)),
                                NaturalsBelow.enumerate(n))),
            Permutation.allPermutations(n))
-           by CommutativeRing.sumOver_congruence(pointwise := termConstant)
+           by CommutativeRing.sumOver_congruence
      = CommutativeRing.power(CommutativeRing.negate(CommutativeRing.one(c)), n)
        * CommutativeRing.sumOver(
              (rho : Permutation(n)) ↦
