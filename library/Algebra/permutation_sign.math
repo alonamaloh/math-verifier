@@ -568,16 +568,19 @@ theorem Permutation.pairImage_permutes {n : Natural} (tau : Permutation(n))
               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
                   Permutation.pairImage(tau), Permutation.orderedPairs(n)),
               Permutation.orderedPairs(n)) := {
+  List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.orderedPairs(n)) by Permutation.orderedPairs_distinct;
+  (∀ (x y : Pair(NaturalsBelow(n), NaturalsBelow(n))).
+      x ∈ Permutation.orderedPairs(n) → y ∈ Permutation.orderedPairs(n)
+      → Permutation.pairImage(tau, x) = Permutation.pairImage(tau, y) → x = y)
+      by (x y : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+         (memberX : x ∈ Permutation.orderedPairs(n))
+         (memberY : y ∈ Permutation.orderedPairs(n))
+         (imagesEqual : Permutation.pairImage(tau, x) = Permutation.pairImage(tau, y)) ↦
+             done by Permutation.pairImage_injective_on;
   List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)),
           List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
               Permutation.pairImage(tau), Permutation.orderedPairs(n)))
-      by List.map_distinct_on(
-             (x y : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-                 (memberX : x ∈ Permutation.orderedPairs(n))
-                 (memberY : y ∈ Permutation.orderedPairs(n))
-                 (imagesEqual : Permutation.pairImage(tau, x) = Permutation.pairImage(tau, y)) ↦
-                 done by Permutation.pairImage_injective_on,
-             Permutation.orderedPairs_distinct);
+      by List.map_distinct_on;
   (∀ (x : Pair(NaturalsBelow(n), NaturalsBelow(n))).
       x ∈ List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
           Permutation.pairImage(tau), Permutation.orderedPairs(n))
@@ -612,6 +615,13 @@ theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
         : Permutation.sign(Permutation.compose(sigma, tau))
           = Integer.multiply(Permutation.sign(sigma), Permutation.sign(tau)) := {
   -- Rewrite the composite's orientation map by the pointwise factorization.
+  (∀ (p : Pair(NaturalsBelow(n), NaturalsBelow(n))). p ∈ Permutation.orderedPairs(n)
+      → Permutation.pairOrient(Permutation.compose(sigma, tau), p)
+        = Integer.multiply(Permutation.pairOrient(tau, p),
+              Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))))
+      by (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+         (memberP : p ∈ Permutation.orderedPairs(n)) ↦
+             done by Permutation.pairFactor;
   List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
           Permutation.pairOrient(Permutation.compose(sigma, tau)), Permutation.orderedPairs(n))
       = List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
@@ -619,12 +629,21 @@ theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
                 Integer.multiply(Permutation.pairOrient(tau, p),
                     Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))),
             Permutation.orderedPairs(n))
-      by List.map_congruence_on(
-             (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-                 (memberP : p ∈ Permutation.orderedPairs(n)) ↦
-                 done by Permutation.pairFactor)
+      by List.map_congruence_on
       as mapFactored;
   -- The reindexed σ-orientations have equal product (the τ-image permutes).
+  List.Permutation(Pair(NaturalsBelow(n), NaturalsBelow(n)),
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+              Permutation.pairImage(tau), Permutation.orderedPairs(n)),
+          Permutation.orderedPairs(n))
+      by Permutation.pairImage_permutes;
+  List.Permutation(Integer,
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+              List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
+                  Permutation.pairImage(tau), Permutation.orderedPairs(n))),
+          List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
+              Permutation.orderedPairs(n)))
+      by List.Permutation.map;
   List.product(Integer, Integer.multiply, Integer.one,
           List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
               List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
@@ -632,18 +651,7 @@ theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
       = List.product(Integer, Integer.multiply, Integer.one,
             List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
                 Permutation.orderedPairs(n)))
-      by List.Permutation.product_invariant(Integer, Integer.multiply, Integer.one,
-             (x y z : Integer) ↦ Integer.multiply_associative(x, y, z),
-             (x y : Integer) ↦ Integer.multiply_commutative(x, y),
-             List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
-                 List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                     Permutation.pairImage(tau), Permutation.orderedPairs(n))),
-             List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
-                 Permutation.orderedPairs(n)),
-             List.Permutation.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer, Permutation.pairOrient(sigma),
-                 List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                     Permutation.pairImage(tau), Permutation.orderedPairs(n)),
-                 Permutation.orderedPairs(n), Permutation.pairImage_permutes(tau)))
+      by List.Permutation.product_invariant recalling Integer.multiply_associative, Integer.multiply_commutative
       as reindexedProduct;
   Permutation.sign(Permutation.compose(sigma, tau))
      = List.product(Integer, Integer.multiply, Integer.one,

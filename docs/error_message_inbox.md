@@ -1477,3 +1477,52 @@ probe whose trip returns `false` — same cliff class, lower stakes. The
 `choose … from` non-determinism above flows through `inferCallWithHoles`
 (already laddered); if it recurs, audit which cap that path sits under instead
 of assuming this fix covered it.
+
+**Re-test (same day, post-cliff-fix): `choose … from` non-determinism NOT
+reproducible in-tree.** Reconstructed the permutation_of_injective shape
+(`choose x such that … from List.map_member_invert`, argument-free) — fails
+12/12 DETERMINISTICALLY with the (good) closed-witness-type guard message
+("could not read a simple (closed) witness type … use `claim ∃ … by <lemma>;
+choose …`"): the lemma's witness type is a lemma parameter, so the such-that
+elision can never read it. The in-tree closed-witness site
+(basis_pruning's `choose c … from Natural.lt_elim`) passes 10/10. Best
+current explanation for the recorded intermittence: the sweep ran in
+worktrees whose `build/` cache-root resolution was broken/symlinked (see the
+INFRA note above) — differing cache states change elaboration inputs, which
+reads as "identical source, intermittent outcome". With the capped-discharge
+cliff also fixed, closing this unless it recurs in the main tree.
+
+## 2026-07-16 (late) — post-endpoint-fix citation re-polish of the det/perm cone
+
+Nine files re-swept to argument-free citations (direct proof-lemma calls
+91 → 30; every survivor is a dependent proof-argument inside a `definition`
+body or theorem statement, plus the five foundational `transport_proposition`
+sites). CLEAN_LEAK_BUDGET 337 → 276. New findings:
+
+**CHECKER false positive — `--check-redundant-by` flags a load-bearing `by`.**
+In function_enumeration_distinct.math, the probe reported the new
+`List.Distinct(enumerate(n)) by NaturalsBelow.enumerate_distinct` claim as
+redundant, but REMOVING the `by` fails: "in scope but not `automatic` — cite
+it". The speculative re-proof appears to see a candidate pool the real bare
+step does not (cite-only/automatic gating differs between probe and
+build?). Same perturbation-sensitivity family as redundant-`by` warnings
+observed MIGRATING between claims of an untouched theorem when a sibling
+theorem was edited.
+
+**GAP — premise back-inference doesn't pin a higher-order argument from
+in-scope ∀-facts.** `by Field.sumOver_involution_pairing` (argument-free)
+fails to infer `iota` even when all four `iota`-mentioning premises
+(closed/fixed-point-free/involutive/reversing) sit in context verbatim as
+∀-facts: the citation's premise-unification fixpoint apparently skips
+higher-order slots. Sanctioned fallback used: name just the gap,
+`… by Field.sumOver_involution_pairing(iota := (sigma : Permutation(n)) ↦ …)`.
+
+**FRICTION — WHNF overshoot in the new equality-endpoint retry.** The
+endpoint retry bridges one-step wrappers (`apply(swap(a,b),a)` ≡
+`swapMap(a,b,a)`: GREEN) but fails when full WHNF reduces PAST the common
+form (`by Permutation.extendMap_top` at goal `apply(extend(sigma), top) = top`:
+both sides reduce into `Function.extendBelow` internals where the metavars sit
+under binders — HOU territory). Readable fallback: a two-step chain exposing
+the defeq-intermediate (`apply(extend(sigma), top) = extendMap(sigma, top) =
+top by extendMap_top`). A bounded one-δ/ι-step-at-a-time retry (unfold, match,
+repeat ≤4) would likely catch these without the overshoot.

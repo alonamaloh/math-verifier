@@ -227,14 +227,19 @@ theorem Permutation.compose_associative {n : Natural} (p q r : Permutation(n))
   done
 
 theorem Permutation.inverse_compose_left {n : Natural} (p : Permutation(n))
-        : Permutation.compose(Permutation.inverse(p), p) = Permutation.identity(n) :=
-  Permutation.equal_of_apply_equal(Permutation.compose(Permutation.inverse(p), p),
-      Permutation.identity(n), (i : NaturalsBelow(n)) ↦ Permutation.left_inverse(p, i))
+        : Permutation.compose(Permutation.inverse(p), p) = Permutation.identity(n) := {
+  ∀ (i : NaturalsBelow(n)). Permutation.apply(Permutation.compose(Permutation.inverse(p), p), i)
+      = Permutation.apply(Permutation.identity(n), i) by Permutation.left_inverse;
+  done by Permutation.equal_of_apply_equal
+}
 
 theorem Permutation.inverse_compose_right {n : Natural} (p : Permutation(n))
-        : Permutation.compose(p, Permutation.inverse(p)) = Permutation.identity(n) :=
-  Permutation.equal_of_apply_equal(Permutation.compose(p, Permutation.inverse(p)),
-      Permutation.identity(n), (i : NaturalsBelow(n)) ↦ Permutation.right_inverse(p, i))
+        : Permutation.compose(p, Permutation.inverse(p)) = Permutation.identity(n) := {
+  ∀ (i : NaturalsBelow(n)). Permutation.apply(Permutation.compose(p, Permutation.inverse(p)), i)
+      = Permutation.apply(Permutation.identity(n), i)
+    by { take i : NaturalsBelow(n); done by Permutation.right_inverse };
+  done by Permutation.equal_of_apply_equal
+}
 
 -- ----------------------------------------------------------------------
 -- Transpositions: the permutation swapping two indices, fixing the rest.
@@ -299,23 +304,24 @@ definition Permutation.swap {n : Natural} (a b : NaturalsBelow(n)) : Permutation
 
 theorem Permutation.apply_swap_left {n : Natural} (a b : NaturalsBelow(n))
         : Permutation.apply(Permutation.swap(a, b), a) = b :=
-  Permutation.swapMap_at_left(a, b)
+  by Permutation.swapMap_at_left
 
 theorem Permutation.apply_swap_right {n : Natural} (a b : NaturalsBelow(n))
         : Permutation.apply(Permutation.swap(a, b), b) = a :=
-  Permutation.swapMap_at_right(a, b)
+  by Permutation.swapMap_at_right
 
 theorem Permutation.apply_swap_other {n : Natural} (a b i : NaturalsBelow(n))
         (leftMiss : i ≠ a) (rightMiss : i ≠ b)
         : Permutation.apply(Permutation.swap(a, b), i) = i :=
-  Permutation.swapMap_at_other(a, b, i, leftMiss, rightMiss)
+  by Permutation.swapMap_at_other
 
 -- A transposition is its own inverse.
 theorem Permutation.inverse_swap {n : Natural} (a b : NaturalsBelow(n))
-        : Permutation.inverse(Permutation.swap(a, b)) = Permutation.swap(a, b) :=
-  Permutation.equal_of_apply_equal(Permutation.inverse(Permutation.swap(a, b)),
-      Permutation.swap(a, b),
-      (i : NaturalsBelow(n)) ↦ Permutation.apply_inverse(Permutation.swap(a, b), i))
+        : Permutation.inverse(Permutation.swap(a, b)) = Permutation.swap(a, b) := {
+  ∀ (i : NaturalsBelow(n)). Permutation.apply(Permutation.inverse(Permutation.swap(a, b)), i)
+      = Permutation.apply(Permutation.swap(a, b), i) by Permutation.apply_inverse;
+  done by Permutation.equal_of_apply_equal
+}
 
 -- ----------------------------------------------------------------------
 -- Extending across the index boundary. A permutation of NaturalsBelow(m)
@@ -420,7 +426,9 @@ theorem Permutation.apply_extend_inclusion {m : Natural} (sigma : Permutation(m)
 
 theorem Permutation.apply_extend_top {m : Natural} (sigma : Permutation(m))
         : Permutation.apply(Permutation.extend(sigma), NaturalsBelow.top(m)) = NaturalsBelow.top(m) :=
-  Permutation.extendMap_top(sigma)
+  Permutation.apply(Permutation.extend(sigma), NaturalsBelow.top(m))
+     = Permutation.extendMap(sigma, NaturalsBelow.top(m))
+     = NaturalsBelow.top(m) by Permutation.extendMap_top
 
 -- ----------------------------------------------------------------------
 -- Restricting across the boundary. A permutation of NaturalsBelow(1 + m) that
@@ -557,9 +565,10 @@ theorem Permutation.apply_restrict {m : Natural} (tau : Permutation(1 + m))
 -- extend and restrict are mutually inverse across the boundary.
 theorem Permutation.extend_restrict {m : Natural} (tau : Permutation(1 + m))
         (fixesTop : Permutation.apply(tau, NaturalsBelow.top(m)) = NaturalsBelow.top(m))
-        : Permutation.extend(Permutation.restrict(tau, fixesTop)) = tau :=
-  Permutation.equal_of_apply_equal(Permutation.extend(Permutation.restrict(tau, fixesTop)), tau,
-      (i : NaturalsBelow(1 + m)) ↦ {
+        : Permutation.extend(Permutation.restrict(tau, fixesTop)) = tau := {
+  ∀ (i : NaturalsBelow(1 + m)). Permutation.apply(Permutation.extend(Permutation.restrict(tau, fixesTop)), i)
+      = Permutation.apply(tau, i)
+    by { take i : NaturalsBelow(1 + m);
         NaturalsBelow.value(i) < m ∨ m ≤ NaturalsBelow.value(i) by Natural.lt_or_le;
         done by cases {
           case NaturalsBelow.value(i) < m as iBelow: {
@@ -589,20 +598,21 @@ theorem Permutation.extend_restrict {m : Natural} (tau : Permutation(1 + m))
               Permutation.apply(Permutation.extend(Permutation.restrict(tau, fixesTop)), i)
                  = Permutation.apply(Permutation.extend(Permutation.restrict(tau, fixesTop)), NaturalsBelow.top(m))
                        by substituting iIsTop
-                 = NaturalsBelow.top(m)
-                       by Permutation.apply_extend_top(Permutation.restrict(tau, fixesTop))
+                 = NaturalsBelow.top(m) by Permutation.apply_extend_top
                  = Permutation.apply(tau, NaturalsBelow.top(m)) by fixesTop
                  = Permutation.apply(tau, i) by substituting iIsTop;
               done
             }
-        }
-      })
+        } };
+  done by Permutation.equal_of_apply_equal
+}
 
 theorem Permutation.restrict_extend {m : Natural} (sigma : Permutation(m))
-        : Permutation.restrict(Permutation.extend(sigma), Permutation.apply_extend_top(sigma)) = sigma :=
-  Permutation.equal_of_apply_equal(
-      Permutation.restrict(Permutation.extend(sigma), Permutation.apply_extend_top(sigma)), sigma,
-      (x : NaturalsBelow(m)) ↦ {
+        : Permutation.restrict(Permutation.extend(sigma), Permutation.apply_extend_top(sigma)) = sigma := {
+  ∀ (x : NaturalsBelow(m)).
+      Permutation.apply(Permutation.restrict(Permutation.extend(sigma), Permutation.apply_extend_top(sigma)), x)
+      = Permutation.apply(sigma, x)
+    by { take x : NaturalsBelow(m);
         NaturalsBelow.inclusion(m,
             Permutation.apply(Permutation.restrict(Permutation.extend(sigma),
                 Permutation.apply_extend_top(sigma)), x))
@@ -614,5 +624,6 @@ theorem Permutation.restrict_extend {m : Natural} (sigma : Permutation(m))
                  by Permutation.inclusion_restrictMap
            = NaturalsBelow.inclusion(m, Permutation.apply(sigma, x))
                  by Permutation.apply_extend_inclusion;
-        done by NaturalsBelow.inclusion_injective
-      })
+        done by NaturalsBelow.inclusion_injective };
+  done by Permutation.equal_of_apply_equal
+}

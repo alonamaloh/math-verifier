@@ -326,48 +326,58 @@ theorem Matrix.alternating_collapse {f : Field} {n : Natural}
                             (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
                             NaturalsBelow.enumerate(n)),
               Permutation.allPermutations(n))
-          = Field.zero(f) :=
-  Field.sumOver_involution_pairing(
-      (sigma : Permutation(n)) ↦
-          Field.from_integer(f, Permutation.sign(sigma))
-              * Field.productOver(
-                    (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
-                    NaturalsBelow.enumerate(n)),
-      (sigma : Permutation(n)) ↦ Permutation.compose(sigma, Permutation.swap(a, b)),
-      Permutation.allPermutations(n),
-      Permutation.allPermutations_distinct(n),
-      -- closed: the composite is a permutation, hence in the complete list.
-      (sigma : Permutation(n))
-          (sigmaMember : sigma ∈ Permutation.allPermutations(n)) ↦
-            Permutation.allPermutations_complete(n, Permutation.compose(sigma, Permutation.swap(a, b))),
-      -- fixed-point-free: σ∘swap = σ ⟹ σ(swap a) = σ(a) ⟹ swap a = a ⟹ a = b.
-      (sigma : Permutation(n))
-          (sigmaMember : sigma ∈ Permutation.allPermutations(n)) ↦
-            (composeEqualsSigma : Permutation.compose(sigma, Permutation.swap(a, b)) = sigma) ↦ {
-              Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), a)
-                 = Permutation.apply(sigma, Permutation.apply(Permutation.swap(a, b), a))
-                 = Permutation.apply(sigma, b)                       by substituting Permutation.apply_swap_left
-                 as leftValue;
-              Permutation.apply(sigma, b)
-                 = Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), a)  by leftValue
-                 = Permutation.apply(sigma, a)                       by substituting composeEqualsSigma;
-              b = a by Permutation.apply_injective;
-              a = b as aEqualsB;
-              aNeqB(aEqualsB)
-            },
-      -- involutive: (σ∘swap)∘swap = σ, since swap∘swap = identity.
-      (sigma : Permutation(n))
-          (sigmaMember : sigma ∈ Permutation.allPermutations(n)) ↦
-            Permutation.compose(Permutation.compose(sigma, Permutation.swap(a, b)),
-                    Permutation.swap(a, b))
-               = Permutation.compose(sigma,
-                     Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, b)))
-                     by Permutation.compose_associative
-               = Permutation.compose(sigma, Permutation.identity(n))
-                     by substituting Permutation.swap_compose_self
-               = sigma
-                     by Permutation.compose_identity_right,
-      -- reversing: each orbit cancels.
-      (sigma : Permutation(n))
-          (sigmaMember : sigma ∈ Permutation.allPermutations(n)) ↦
-            Matrix.collapse_pair_cancels(B, phi, a, b, aNeqB, phiCollide, sigma))
+          = Field.zero(f) := {
+  List.Distinct(Permutation(n), Permutation.allPermutations(n)) by Permutation.allPermutations_distinct;
+
+  -- Closed: the composite is a permutation, hence in the complete list.
+  ∀ (sigma : Permutation(n)). sigma ∈ Permutation.allPermutations(n)
+      → Permutation.compose(sigma, Permutation.swap(a, b)) ∈ Permutation.allPermutations(n)
+      by { take sigma : Permutation(n);
+           suppose sigma ∈ Permutation.allPermutations(n);
+           done by Permutation.allPermutations_complete };
+
+  -- Fixed-point-free: σ∘swap = σ ⟹ σ(swap a) = σ(a) ⟹ swap a = a ⟹ a = b.
+  ∀ (sigma : Permutation(n)). sigma ∈ Permutation.allPermutations(n)
+      → ¬(Permutation.compose(sigma, Permutation.swap(a, b)) = sigma)
+      by { take sigma : Permutation(n);
+           suppose sigma ∈ Permutation.allPermutations(n);
+           suppose Permutation.compose(sigma, Permutation.swap(a, b)) = sigma as composeEqualsSigma for contradiction {
+             Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), a)
+                = Permutation.apply(sigma, Permutation.apply(Permutation.swap(a, b), a))
+                = Permutation.apply(sigma, b)                       by substituting Permutation.apply_swap_left
+                as leftValue;
+             Permutation.apply(sigma, b)
+                = Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), a)  by leftValue
+                = Permutation.apply(sigma, a)                       by substituting composeEqualsSigma;
+             b = a by Permutation.apply_injective;
+             a = b;
+             done
+           } };
+
+  -- Involutive: (σ∘swap)∘swap = σ, since swap∘swap = identity.
+  ∀ (sigma : Permutation(n)). sigma ∈ Permutation.allPermutations(n)
+      → Permutation.compose(Permutation.compose(sigma, Permutation.swap(a, b)), Permutation.swap(a, b)) = sigma
+      by { take sigma : Permutation(n);
+           suppose sigma ∈ Permutation.allPermutations(n);
+           Permutation.compose(Permutation.compose(sigma, Permutation.swap(a, b)), Permutation.swap(a, b))
+              = Permutation.compose(sigma, Permutation.compose(Permutation.swap(a, b), Permutation.swap(a, b)))
+                    by Permutation.compose_associative
+              = Permutation.compose(sigma, Permutation.identity(n))
+                    by substituting Permutation.swap_compose_self
+              = sigma
+                    by Permutation.compose_identity_right };
+
+  -- Reversing: each orbit cancels.
+  ∀ (sigma : Permutation(n)). sigma ∈ Permutation.allPermutations(n)
+      → Field.from_integer(f, Permutation.sign(sigma))
+            * Field.productOver((i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                  NaturalsBelow.enumerate(n))
+        + Field.from_integer(f, Permutation.sign(Permutation.compose(sigma, Permutation.swap(a, b))))
+            * Field.productOver((i : NaturalsBelow(n)) ↦ B(phi(i),
+                  Permutation.apply(Permutation.compose(sigma, Permutation.swap(a, b)), i)),
+                  NaturalsBelow.enumerate(n))
+        = Field.zero(f)
+      by Matrix.collapse_pair_cancels;
+
+  done by Field.sumOver_involution_pairing(iota := (sigma : Permutation(n)) ↦ Permutation.compose(sigma, Permutation.swap(a, b)))
+}

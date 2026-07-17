@@ -185,7 +185,7 @@ definition Function.allFunctions (n : Natural) : List(NaturalsBelow(n) → Natur
 theorem Function.function_zero_is_empty (C : Type(0)) (g : NaturalsBelow(0) → C)
         : g = Function.emptyBelow := {
   (∀ (i : NaturalsBelow(0)). g(i) = Function.emptyBelow(i))
-      by (i : NaturalsBelow(0)) ↦ absurd(NaturalsBelow.zero_is_empty(i));
+      by { take i : NaturalsBelow(0); False by NaturalsBelow.zero_is_empty; done };
   done by Function.extensionality
 }
 
@@ -197,12 +197,18 @@ theorem Function.concatFunctionRows_member (C : Type(0)) (k : Natural) (choices 
         (memG : g ∈ Function.functionRow(choices, f))
         : g ∈ Function.concatFunctionRows(C, k, choices, l) :=
   by induction on memF with IH {
-    case List.member.here(rest):
-        List.member_append_left(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, f),
-            Function.concatFunctionRows(C, k, choices, rest), memG)
-    case List.member.there(head, rest, sub):
-        List.member_append_right(NaturalsBelow(1 + k) → C, g, Function.functionRow(choices, head),
-            Function.concatFunctionRows(C, k, choices, rest), IH)
+    case List.member.here(rest): {
+        g ∈ List.append(NaturalsBelow(1 + k) → C, Function.functionRow(choices, f),
+                Function.concatFunctionRows(C, k, choices, rest))
+            by List.member_append_left;
+        done
+      }
+    case List.member.there(head, rest, sub): {
+        g ∈ List.append(NaturalsBelow(1 + k) → C, Function.functionRow(choices, head),
+                Function.concatFunctionRows(C, k, choices, rest))
+            by List.member_append_right;
+        done
+      }
   }
 
 -- Completeness: every function whose values all lie in `choices` appears in
@@ -250,7 +256,7 @@ theorem Function.allFunctions_complete (n : Natural)
               g ∈ Function.allFunctions(n) :=
   (g : NaturalsBelow(n) → NaturalsBelow(n)) ↦ {
     (∀ (i : NaturalsBelow(n)). g(i) ∈ NaturalsBelow.enumerate(n))
-        by (i : NaturalsBelow(n)) ↦ NaturalsBelow.enumerate_complete(n, g(i));
+        by { take i : NaturalsBelow(n); done by NaturalsBelow.enumerate_complete };
     done by Function.functionsBelow_complete
   }
 

@@ -43,9 +43,8 @@ theorem Function.functionRow_member_lower {C : Type(0)} {k : Natural}
         (choices : List(C)) (f : NaturalsBelow(k) → C) (g : NaturalsBelow(1 + k) → C)
         (memG : g ∈ Function.functionRow(choices, f))
         : Function.lowerBelow(g) = f := {
-  choose v such that v ∈ choices ∧ (Function.extendByValue(f, v) = g)
-      from List.map_member_invert(C, NaturalsBelow(1 + k) → C,
-               (v2 : C) ↦ Function.extendByValue(f, v2), g, choices, memG);
+  (∃ (v : C). v ∈ choices ∧ (Function.extendByValue(f, v) = g)) by List.map_member_invert as extensionOfF;
+  choose v such that v ∈ choices ∧ (Function.extendByValue(f, v) = g) from extensionOfF;
   Function.lowerBelow(g) = Function.lowerBelow(Function.extendByValue(f, v))
                          = f
 }
@@ -163,6 +162,10 @@ theorem Function.functionsBelow_distinct (C : Type(0)) (choices : List(C))
 
 -- The determinant index enumeration is distinct.
 theorem Function.allFunctions_distinct (n : Natural)
-        : List.Distinct(NaturalsBelow(n) → NaturalsBelow(n), Function.allFunctions(n)) :=
-  Function.functionsBelow_distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n),
-      NaturalsBelow.enumerate_distinct(n), n)
+        : List.Distinct(NaturalsBelow(n) → NaturalsBelow(n), Function.allFunctions(n)) := {
+  List.Distinct(NaturalsBelow(n), NaturalsBelow.enumerate(n)) by NaturalsBelow.enumerate_distinct;
+  List.Distinct(NaturalsBelow(n) → NaturalsBelow(n),
+          Function.functionsBelow(NaturalsBelow(n), NaturalsBelow.enumerate(n), n))
+      by Function.functionsBelow_distinct;
+  done
+}

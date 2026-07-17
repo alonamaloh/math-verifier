@@ -66,21 +66,22 @@ theorem List.product_isolate_single (B : Type(0)) (f : B → Integer) (e0 : B)
                     f(x) = Integer.one;
                     done
                   } as tailOnes;
+              (∀ (y : Integer). y ∈ List.map(B, Integer, f, tail) → y = Integer.one)
+                  by (y : Integer) (yInMap : y ∈ List.map(B, Integer, f, tail)) ↦ {
+                    ∃ (x : B). x ∈ tail ∧ (f(x) = y) by List.map_member_invert as existsX;
+                    choose x such that x ∈ tail ∧ (f(x) = y) from existsX;
+                    x ∈ tail as xInTail2;
+                    f(x) = y as fxIsY;
+                    y = f(x) by fxIsY = Integer.one by tailOnes(x, xInTail2);
+                    done
+                  };
+              List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, tail)) = Integer.one
+                  by List.product_of_ones recalling Integer.one_multiply_left as tailProductOne;
               List.product(Integer, Integer.multiply, Integer.one,
                     List.map(B, Integer, f, List.prepend(B, head, tail)))
                  = Integer.multiply(f(head),
                        List.product(Integer, Integer.multiply, Integer.one, List.map(B, Integer, f, tail)))
-                 = Integer.multiply(f(head), Integer.one)
-                       by substituting List.product_of_ones(Integer, Integer.multiply, Integer.one,
-                              Integer.one_multiply_left, List.map(B, Integer, f, tail),
-                              (y : Integer) (yInMap : y ∈ List.map(B, Integer, f, tail)) ↦ {
-                                choose x such that x ∈ tail ∧ (f(x) = y)
-                                    from List.map_member_invert(B, Integer, f, y, tail, yInMap);
-                                x ∈ tail as xInTail2;
-                                f(x) = y as fxIsY;
-                                y = f(x) by fxIsY = Integer.one by tailOnes(x, xInTail2);
-                                done
-                              })
+                 = Integer.multiply(f(head), Integer.one) by substituting tailProductOne
                  = f(head) by ring
                  = f(e0) by substituting e0IsHead;
               done
@@ -503,22 +504,23 @@ theorem Permutation.sign_swap_adjacent {n : Natural} (a b : NaturalsBelow(n))
   1 + NaturalsBelow.value(a) = NaturalsBelow.value(b) by adjacent as adjacentBack;
   NaturalsBelow.value(a) < NaturalsBelow.value(b)
       by { NaturalsBelow.value(a) < 1 + NaturalsBelow.value(a) by Natural.lt_one_plus
-               = NaturalsBelow.value(b) by adjacentBack; done } as aLtB;
+               = NaturalsBelow.value(b) by adjacentBack; done };
   ¬(NaturalsBelow.value(b) < NaturalsBelow.value(a))
       by Natural.lt_asymmetric;
+  List.Distinct(Pair(NaturalsBelow(n), NaturalsBelow(n)), Permutation.orderedPairs(n)) by Permutation.orderedPairs_distinct;
+  Product.make(a, b) ∈ Permutation.orderedPairs(n) by Permutation.orderedPairs_member;
+  (∀ (p : Pair(NaturalsBelow(n), NaturalsBelow(n))). p ∈ Permutation.orderedPairs(n)
+      → p ≠ Product.make(a, b) → Permutation.pairOrient(Permutation.swap(a, b), p) = Integer.one)
+      by (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
+         (memberP : p ∈ Permutation.orderedPairs(n))
+         (notThePair : p ≠ Product.make(a, b)) ↦
+             done by Permutation.pairOrient_swap_adjacent_other;
   Permutation.sign(Permutation.swap(a, b))
      = List.product(Integer, Integer.multiply, Integer.one,
            List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
                Permutation.pairOrient(Permutation.swap(a, b)), Permutation.orderedPairs(n)))
      = Permutation.pairOrient(Permutation.swap(a, b), Product.make(a, b))
-           by List.product_isolate_single(Pair(NaturalsBelow(n), NaturalsBelow(n)),
-                  Permutation.pairOrient(Permutation.swap(a, b)), Product.make(a, b),
-                  Permutation.orderedPairs(n), Permutation.orderedPairs_distinct(n),
-                  Permutation.orderedPairs_member(n, a, b, aLtB),
-                  (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
-                      (memberP : p ∈ Permutation.orderedPairs(n))
-                      (notThePair : p ≠ Product.make(a, b)) ↦
-                      Permutation.pairOrient_swap_adjacent_other(a, b, adjacent, p, memberP, notThePair))
+           by List.product_isolate_single
      = Permutation.orient(Permutation.apply(Permutation.swap(a, b), a),
            Permutation.apply(Permutation.swap(a, b), b))
      = Permutation.orient(b, Permutation.apply(Permutation.swap(a, b), b))

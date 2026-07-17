@@ -62,11 +62,12 @@ theorem Function.injective_in_permutation_image (n : Natural)
         : phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
               (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
               Permutation.allPermutations(n)) := {
+  Permutation.of_injective(n, phi, inj) ∈ Permutation.allPermutations(n) by Permutation.allPermutations_complete;
   ((i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.of_injective(n, phi, inj), i))
       ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
           (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
           Permutation.allPermutations(n))
-      by List.map_member(memberProof := Permutation.allPermutations_complete(n, Permutation.of_injective(n, phi, inj)));
+      by List.map_member;
   phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
           (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
           Permutation.allPermutations(n));
@@ -284,6 +285,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
           = Matrix.determinant(A) * Matrix.determinant(B) := {
   -- The permutation-image sub-list of the function space is distinct, and its
   -- members are (trivially) all functions.
+  List.Distinct(Permutation(n), Permutation.allPermutations(n)) by Permutation.allPermutations_distinct;
   List.Distinct(NaturalsBelow(n) → NaturalsBelow(n),
           List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
               (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
@@ -296,9 +298,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                    by { take i : NaturalsBelow(n);
                         done };
                done by Permutation.equal_of_apply_equal
-             },
-             distinctProof := Permutation.allPermutations_distinct(n))
-      as partDistinct;
+             });
   (∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
       phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
           (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
@@ -308,8 +308,59 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
          (phiInPart : phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
              Permutation.allPermutations(n))) ↦
-           Function.allFunctions_complete
-      as partSubset;
+           Function.allFunctions_complete;
+
+  -- Pointwise facts lifted through the sums below: each σ-term Leibniz-expands
+  -- over the function space, and each φ-summand factors ∏A out of the σ-sum.
+  ∀ (sigma : Permutation(n)).
+      Field.from_integer(f, Permutation.sign(sigma))
+          * Field.productOver(
+                (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, Permutation.apply(sigma, i)),
+                NaturalsBelow.enumerate(n))
+      = Field.sumOver(
+            (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
+                Field.from_integer(f, Permutation.sign(sigma))
+                    * Field.productOver(
+                          (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                          NaturalsBelow.enumerate(n)),
+            Function.allFunctions(n))
+      by Matrix.sigma_term_expand;
+  ∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
+      Field.sumOver(
+            (sigma : Permutation(n)) ↦
+                Field.from_integer(f, Permutation.sign(sigma))
+                    * Field.productOver(
+                          (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                          NaturalsBelow.enumerate(n)),
+            Permutation.allPermutations(n))
+      = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
+          * Field.sumOver(
+                (sigma : Permutation(n)) ↦
+                    Field.from_integer(f, Permutation.sign(sigma))
+                        * Field.productOver(
+                              (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                              NaturalsBelow.enumerate(n)),
+                Permutation.allPermutations(n))
+      by Matrix.phi_inner_sum;
+
+  -- The φ-sum restricts to the permutation image: the function space is
+  -- distinct, and every summand outside the image vanishes (6c).
+  List.Distinct(NaturalsBelow(n) → NaturalsBelow(n), Function.allFunctions(n)) by Function.allFunctions_distinct;
+  ∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
+      phi ∈ Function.allFunctions(n)
+      → ¬(phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
+              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+              Permutation.allPermutations(n)))
+      → Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
+            * Field.sumOver(
+                  (sigma : Permutation(n)) ↦
+                      Field.from_integer(f, Permutation.sign(sigma))
+                          * Field.productOver(
+                                (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                NaturalsBelow.enumerate(n)),
+                  Permutation.allPermutations(n))
+        = Field.zero(f)
+      by Matrix.det_multiply_summand_vanishes;
 
   Matrix.determinant(Matrix.multiply(A, B))
      = Field.sumOver(
@@ -330,7 +381,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                                  NaturalsBelow.enumerate(n)),
                    Function.allFunctions(n)),
            Permutation.allPermutations(n))
-           by Field.sumOver_congruence(pointwise := (sigma : Permutation(n)) ↦ Matrix.sigma_term_expand(A, B, sigma))
+           by Field.sumOver_congruence
      = Field.sumOver(
            (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                Field.sumOver(
@@ -358,7 +409,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                                        NaturalsBelow.enumerate(n)),
                          Permutation.allPermutations(n)),
            Function.allFunctions(n))
-           by Field.sumOver_congruence(pointwise := (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦ Matrix.phi_inner_sum(A, B, phi))
+           by Field.sumOver_congruence
      = Field.sumOver(
            (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
@@ -372,27 +423,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
            List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
                (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
                Permutation.allPermutations(n)))
-           by Field.sumOver_restrict_support(
-                  (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
-                      Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
-                          * Field.sumOver(
-                                (sigma : Permutation(n)) ↦
-                                    Field.from_integer(f, Permutation.sign(sigma))
-                                        * Field.productOver(
-                                              (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
-                                              NaturalsBelow.enumerate(n)),
-                                Permutation.allPermutations(n)),
-                  Function.allFunctions(n),
-                  List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-                      (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
-                      Permutation.allPermutations(n)),
-                  Function.allFunctions_distinct(n), partDistinct, partSubset,
-                  (phi : NaturalsBelow(n) → NaturalsBelow(n))
-                      (phiInAll : phi ∈ Function.allFunctions(n))
-                      (notInImage : ¬(phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-                          (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
-                          Permutation.allPermutations(n)))) ↦
-                        Matrix.det_multiply_summand_vanishes(A, B, phi, notInImage))
+           by Field.sumOver_restrict_support
      = Field.sumOver(
            (rho : Permutation(n)) ↦
                Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
@@ -426,7 +457,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                      = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
                            NaturalsBelow.enumerate(n))
                            * (Field.from_integer(f, Permutation.sign(rho)) * Matrix.determinant(B))
-                       by substituting Matrix.determinant_row_permutation(B, rho)
+                       by substituting Matrix.determinant_row_permutation
                 })
      = Field.sumOver(
            (rho : Permutation(n)) ↦
