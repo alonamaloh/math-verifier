@@ -1,0 +1,58 @@
+-- Regression fixtures for bundle-implicit inference:
+-- (1) an all-metavariable-conclusion lemma (`zero_dimension_unique : X = Y`)
+--     cites argument-free — the conclusion unifies against the goal and the
+--     bound operands' types pin the bundle;
+-- (2) `CommutativeRing.sumOver`'s {r} is inferred from the term lambda's
+--     CODOMAIN (`Ring.carrier(CommutativeRing.ring(c))` bridges to
+--     `CommutativeRing.carrier(?r)` by the pattern-side carrier unfold),
+--     with no whole-application ascription.
+module Test.bundle_inference_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.instances
+import Polynomial.commutative
+import Polynomial.monomial
+import Polynomial.degree
+
+theorem Test.zero_dimension_cited {c : CommutativeRing} (X Y : Matrix(c, 0, 0))
+        : X = Y :=
+  by Matrix.zero_dimension_unique
+
+theorem Test.zero_dimension_cited_concrete {c : CommutativeRing} (X : Matrix(c, 0, 0))
+        : X = Matrix.zero(c, 0, 0) :=
+  by Matrix.zero_dimension_unique
+
+-- Inbox repro (bundle-carrier implicit inference): a coefficient-valued
+-- lambda's CODOMAIN is what pins {r}; previously only an ascription of
+-- the whole application worked.
+theorem Test.sumOver_codomain_inference {c : CommutativeRing} {n : ℕ}
+        (Q : Matrix(CommutativeRing.polynomial_ring(c), n, n)) (k : ℕ) (i j : NaturalsBelow(n))
+        : CommutativeRing.sumOver(
+              (t : NaturalsBelow(n)) ↦ Polynomial.coefficientOf(Q(i, t), k),
+              NaturalsBelow.enumerate(n))
+          = CommutativeRing.sumOver(
+                (t : NaturalsBelow(n)) ↦ Polynomial.coefficientOf(Q(i, t), k),
+                NaturalsBelow.enumerate(n)) := {
+  done
+}

@@ -448,6 +448,39 @@ void Elaborator::unifyConstructorParameters(
                             unifyConstructorParameters(
                                 pattern, reduced, metavariableNames,
                                 assignment, binderDepth, binderTypeStack);
+                            matched = true;
+                        }
+                    }
+                }
+                // Last resort, PATTERN-side single unfold — CARRIER
+                // projections only: `CommutativeRing.carrier(?r)` δ-unfolds
+                // to `Ring.carrier(CommutativeRing.ring(?r))`, which matches
+                // a target inferred as `Ring.carrier(CommutativeRing.ring(c))`
+                // structurally (a STUCK projection chain neither target
+                // unfolding nor WHNF can rewrite — this is what lets a
+                // bundle implicit be pinned by a lambda's CODOMAIN type).
+                // The gate is deliberately narrow: unfolding arbitrary
+                // pattern heads here mis-assigns metavariables on unrelated
+                // head mismatches (the assignment is not verified at this
+                // layer). Metavariables ride along into the body, and the
+                // recursion re-runs the full alignment.
+                if (!matched) {
+                    auto* patternHeadConstant =
+                        std::get_if<Constant>(&patternHead->node);
+                    const std::string carrierSuffix = ".carrier";
+                    if (patternHeadConstant
+                        && patternHeadConstant->name.size()
+                               > carrierSuffix.size()
+                        && patternHeadConstant->name.compare(
+                               patternHeadConstant->name.size()
+                                   - carrierSuffix.size(),
+                               carrierSuffix.size(), carrierSuffix) == 0) {
+                        ExpressionPointer patternUnfolded =
+                            unfoldHeadConstantOneStep(pattern);
+                        if (patternUnfolded) {
+                            unifyConstructorParameters(
+                                patternUnfolded, target, metavariableNames,
+                                assignment, binderDepth, binderTypeStack);
                         }
                     }
                 }
