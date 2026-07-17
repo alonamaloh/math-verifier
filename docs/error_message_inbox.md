@@ -1631,7 +1631,13 @@ seed the tactic's carrier from the STEP's operand spellings, not the
 chain's first relation.
 
 **FRICTION (bundle-carrier implicit inference, 2026-07-17,
-characteristic_polynomial).** `CommutativeRing.sumOver{r}` cannot infer
+characteristic_polynomial). FIXED same day — pattern-side carrier unfold
+in unifyConstructorParameters (`CommutativeRing.carrier(?r)` δ-unfolds to
+`Ring.carrier(CommutativeRing.ring(?r))` and matches the lambda's
+inferred codomain): {r} now infers from the term lambda's CODOMAIN, and
+all 9 whole-application ascription workarounds were dropped. Mixing
+named implicits with positional arguments is STILL rejected (unchanged).
+Original entry follows.** `CommutativeRing.sumOver{r}` cannot infer
 `r` when the term lambda's CODOMAIN is what pins it (a coefficient-valued
 lambda types at `Ring.carrier(CommutativeRing.ring(c))`; leading-argument
 inference only consults the lambda's domain). An explicit body ascription
@@ -1643,7 +1649,19 @@ so expected-type propagation assigns `r`. Fix directions: consult the
 term's inferred codomain (whnf'd) during leading-argument inference,
 and/or allow named implicit arguments alongside positional ones.
 
-**CITATION (δ-divergent bundle spellings, 2026-07-17, cayley_hamilton).**
+**CITATION (δ-divergent bundle spellings, 2026-07-17, cayley_hamilton).
+LARGELY FIXED same day — bundle-operation citation bridge
+(tryBundleOperationBridge + parameterized canonical-bundle resolution;
+instance Matrix.ring / Polynomial.ring registered): abstract `Ring.*`
+lemmas now cite argument-free at Matrix-/Polynomial-spelled goals
+(7 of the 11 positional workarounds in cayley_hamilton.math swept;
+fixture Test/bundle_operation_citation_test.math). RESIDUAL, still open:
+a lemma with a bare-metavariable side (`x·1 = x`, `0+x = x` as
+`Ring.add(?r, 0, ?x) = ?x`) cited at a step whose endpoints δ-diverge AT
+THE HEAD (`Polynomial.subtract` vs `CommutativeRing.subtract` spellings),
+and the subtract/add distinctness (`a − b` vs `a + (−b)`: the matcher
+cannot invent `negate(b)` for a metavariable) — 4 sites keep positional
+applications. Original entry follows.**
 Neither goal-driven citation nor `substituting` can bridge a Matrix-spelled
 goal (`X + Y`, `Matrix.negate(X)`, `X - Y` at `Matrix(c, n, n)`) to a
 `Ring.*` lemma instantiated at `Matrix.ring(c, n)` (`Ring.add(Matrix.ring(c,n), …)`),
@@ -1662,7 +1680,11 @@ PROJECTIONS (`Ring.add(Ring.make(...), …)` → the packed operation) before
 concluding mismatch — the bundle-projection unfold is exactly one step
 and closed, so it should not need the risky general defeq widening.
 
-**CITATION (all-metavariable conclusion, 2026-07-17, cayley_hamilton).**
+**CITATION (all-metavariable conclusion, 2026-07-17, cayley_hamilton).
+FIXED same day (in combination with the resolver work): `by
+Matrix.zero_dimension_unique` now resolves argument-free at the original
+site; positional application removed. Fixture in
+Test/bundle_inference_test.math. Original entry follows.**
 A lemma whose conclusion is a bare `X = Y` with BOTH sides standalone
 universally-quantified variables (`Matrix.zero_dimension_unique : X = Y`
 for any two 0×0 matrices) cannot be cited by `by <name>` at all — the
