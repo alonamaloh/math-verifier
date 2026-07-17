@@ -24,11 +24,17 @@ definition Polynomial.zero (r : Ring) : Polynomial(Ring.carrier(r), Ring.zero(r)
   Polynomial.make(Ring.carrier(r), Ring.zero(r),
       Polynomial.Coefficients.nil(Ring.carrier(r)))
 
+-- The coefficient list of the one polynomial: the single entry
+-- `Ring.one(r)` — names the `cons(one, nil)` wall the rep-level
+-- multiplicative-identity statements otherwise spell out.
+definition Polynomial.Coefficients.one {r : Ring}
+        : Polynomial.Coefficients(Ring.carrier(r)) :=
+  Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
+      Polynomial.Coefficients.nil(Ring.carrier(r)))
+
 -- The one polynomial: the single coefficient `Ring.one(r)`.
 definition Polynomial.one (r : Ring) : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
-  Polynomial.make(Ring.carrier(r), Ring.zero(r),
-      Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-          Polynomial.Coefficients.nil(Ring.carrier(r))))
+  Polynomial.make(Ring.carrier(r), Ring.zero(r), Polynomial.Coefficients.one(r))
 
 -- Coefficient-wise negation.
 definition Polynomial.Coefficients.negate {r : Ring}
@@ -69,10 +75,8 @@ theorem Polynomial.nth_negate (r : Ring)
 
 -- Negation respects the equivalence (pointwise via the bridge).
 theorem Polynomial.Coefficients.negate_respects (r : Ring)
-        (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
-        (equal
-            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (- p), (- pPrime)) :=
+        (p pPrime : Polynomial.Coefficients(Ring.carrier(r))) (equal : p ≈ pPrime)
+        : (- p) ≈ (- pPrime) :=
   (index : Natural) ↦
       (- p)[index]
          = (- p[index])
@@ -85,7 +89,5 @@ definition Polynomial.negate {r : Ring}
           → Polynomial(Ring.carrier(r), Ring.zero(r))
   by representatives p ↦
        Polynomial.make(Ring.carrier(r), Ring.zero(r), (- p))
-  well_defined by (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
-               (equal
-                   : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime)) ↦
+  well_defined by (p pPrime : Polynomial.Coefficients(Ring.carrier(r))) (equal : p ≈ pPrime) ↦
           Polynomial.Coefficients.negate_respects(r, p, pPrime, equal)

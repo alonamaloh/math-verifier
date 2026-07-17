@@ -3240,7 +3240,8 @@ private:
             || kind == TokenKind::ElementOf
             || kind == TokenKind::NotElementOf
             || kind == TokenKind::SubsetOf
-            || kind == TokenKind::NotSubsetOf;
+            || kind == TokenKind::NotSubsetOf
+            || kind == TokenKind::Approx;
     }
 
     SurfaceExpressionPointer parseRelational() {
@@ -3271,6 +3272,7 @@ private:
                 case TokenKind::NotElementOf:   sym = "∉"; break;
                 case TokenKind::SubsetOf:       sym = "⊆"; break;
                 case TokenKind::NotSubsetOf:    sym = "⊈"; break;
+                case TokenKind::Approx:         sym = "≈"; break;
                 default: break;
             }
             if (reversed) std::swap(left, right);

@@ -30,7 +30,7 @@ import Polynomial.multiplication
 
 theorem Polynomial.Coefficients.multiply_distributivity_left (r : Ring)
         (p q s : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p * (q + s), (p * q) + (p * s)) :=
+        : p * (q + s) ≈ (p * q) + (p * s) :=
   (k : ℕ) ↦
       ((p * q) + (p * s))[k]
              = ((p * q)[k] + (p * s)[k])
@@ -52,8 +52,7 @@ theorem Polynomial.multiply_distributivity_left (r : Ring)
         : (x * (y + z))
           = ((x * y) + (x * z)) :=
   by_representatives x as p, y as q, z as s => {
-      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p * (q + s), (p * q) + (p * s))
-        by Polynomial.Coefficients.multiply_distributivity_left;
+      p * (q + s) ≈ (p * q) + (p * s)   by Polynomial.Coefficients.multiply_distributivity_left;
       done by Polynomial.make_equal_of_coefficients_equal
   }
 
@@ -62,7 +61,7 @@ theorem Polynomial.multiply_distributivity_left (r : Ring)
 
 theorem Polynomial.Coefficients.multiply_distributivity_right (r : Ring)
         (p q s : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (p + q) * s, (p * s) + (q * s)) :=
+        : (p + q) * s ≈ (p * s) + (q * s) :=
   (k : ℕ) ↦
       ((p * s) + (q * s))[k]
              = ((p * s)[k] + (q * s)[k])
@@ -85,8 +84,7 @@ theorem Polynomial.multiply_distributivity_right (r : Ring)
         : ((x + y) * z)
           = ((x * z) + (y * z)) :=
   by_representatives x as p, y as q, z as s => {
-      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (p + q) * s, (p * s) + (q * s))
-        by Polynomial.Coefficients.multiply_distributivity_right;
+      (p + q) * s ≈ (p * s) + (q * s)   by Polynomial.Coefficients.multiply_distributivity_right;
       done by Polynomial.make_equal_of_coefficients_equal
   }
 
@@ -109,11 +107,9 @@ theorem Polynomial.Coefficients.nth_cons_zero_nil (r : Ring) (k : ℕ)
 
 automatic theorem Polynomial.Coefficients.multiply_one_left (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))) * p,
-              p) :=
+        : Polynomial.Coefficients.one(r) * p ≈ p :=
   (k : ℕ) ↦
-      (Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))) * p)[k]
+      (Polynomial.Coefficients.one(r) * p)[k]
          = (Polynomial.Coefficients.scale(r, Ring.one(r), p)[k]
                 + Polynomial.Coefficients.shift(r, Polynomial.Coefficients.nil(Ring.carrier(r)) * p)[k])
                by Polynomial.nth_add
@@ -128,9 +124,7 @@ theorem Polynomial.multiply_one_left (r : Ring)
         (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : (Polynomial.one(r) * x) = x :=
   by_representatives x as p => {
-    Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-        Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))) * p, p)
-      by Polynomial.Coefficients.multiply_one_left;
+    Polynomial.Coefficients.one(r) * p ≈ p   by Polynomial.Coefficients.multiply_one_left;
     done by Polynomial.make_equal_of_coefficients_equal
   }
 
@@ -142,9 +136,7 @@ theorem Polynomial.multiply_one_left (r : Ring)
 
 theorem Polynomial.Coefficients.multiply_one_right (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              p * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))),
-              p) :=
+        : p * Polynomial.Coefficients.one(r) ≈ p :=
   by induction on p with IH {
     case Polynomial.Coefficients.nil:
         (k : ℕ) ↦
@@ -153,49 +145,29 @@ theorem Polynomial.Coefficients.multiply_one_right (r : Ring)
         (k : ℕ) ↦
             done by cases {
               case k = 0:
-                  (Polynomial.Coefficients.cons(Ring.carrier(r), a, rest)
-                          * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))))[0]
-                     = (Polynomial.Coefficients.scale(r, a,
-                                Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))))[0]
-                            + Polynomial.Coefficients.shift(r,
-                                  rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                      Polynomial.Coefficients.nil(Ring.carrier(r))))[0])
+                  (Polynomial.Coefficients.cons(Ring.carrier(r), a, rest) * Polynomial.Coefficients.one(r))[0]
+                     = (Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.one(r))[0]
+                            + Polynomial.Coefficients.shift(r, rest * Polynomial.Coefficients.one(r))[0])
                      = ((a * Ring.one(r)) + Ring.zero(r))
                      = (a + Ring.zero(r))
                      = a
               case k = 1 + j for some j: {
-                  (Polynomial.Coefficients.cons(Ring.carrier(r), a, rest)
-                          * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))))[1 + j]
-                     = (Polynomial.Coefficients.scale(r, a,
-                                Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                    Polynomial.Coefficients.nil(Ring.carrier(r))))[1 + j]
-                            + Polynomial.Coefficients.shift(r,
-                                  rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                      Polynomial.Coefficients.nil(Ring.carrier(r))))[1 + j])
+                  (Polynomial.Coefficients.cons(Ring.carrier(r), a, rest) * Polynomial.Coefficients.one(r))[1 + j]
+                     = (Polynomial.Coefficients.scale(r, a, Polynomial.Coefficients.one(r))[1 + j]
+                            + Polynomial.Coefficients.shift(r, rest * Polynomial.Coefficients.one(r))[1 + j])
                            by Polynomial.nth_add
-                     = ((a * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                Polynomial.Coefficients.nil(Ring.carrier(r)))[1 + j])
-                            + Polynomial.Coefficients.shift(r,
-                                  rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                      Polynomial.Coefficients.nil(Ring.carrier(r))))[1 + j])
+                     = ((a * Polynomial.Coefficients.one(r)[1 + j])
+                            + Polynomial.Coefficients.shift(r, rest * Polynomial.Coefficients.one(r))[1 + j])
                            by Polynomial.nth_scale
-                     = ((a * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                Polynomial.Coefficients.nil(Ring.carrier(r)))[1 + j])
-                            + (rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                  Polynomial.Coefficients.nil(Ring.carrier(r))))[j])
+                     = ((a * Polynomial.Coefficients.one(r)[1 + j])
+                            + (rest * Polynomial.Coefficients.one(r))[j])
                            by Polynomial.nth_shift_one_plus
                      = ((a * Polynomial.Coefficients.nil(Ring.carrier(r))[j])
-                            + (rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                  Polynomial.Coefficients.nil(Ring.carrier(r))))[j])
+                            + (rest * Polynomial.Coefficients.one(r))[j])
                            by Polynomial.coefficient_cons_one_plus
-                     = ((a * Ring.zero(r))
-                            + (rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                  Polynomial.Coefficients.nil(Ring.carrier(r))))[j])
-                     = (Ring.zero(r)
-                            + (rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                                  Polynomial.Coefficients.nil(Ring.carrier(r))))[j])
-                     = (rest * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
-                               Polynomial.Coefficients.nil(Ring.carrier(r))))[j]
+                     = ((a * Ring.zero(r)) + (rest * Polynomial.Coefficients.one(r))[j])
+                     = (Ring.zero(r) + (rest * Polynomial.Coefficients.one(r))[j])
+                     = (rest * Polynomial.Coefficients.one(r))[j]
                      = rest[j]
                            by IH(j);
                   done by substituting Natural.one_add
@@ -207,9 +179,7 @@ theorem Polynomial.multiply_one_right (r : Ring)
         (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : (x * Polynomial.one(r)) = x :=
   by_representatives x as p => {
-    Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-        p * Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r), Polynomial.Coefficients.nil(Ring.carrier(r))), p)
-      by Polynomial.Coefficients.multiply_one_right;
+    p * Polynomial.Coefficients.one(r) ≈ p   by Polynomial.Coefficients.multiply_one_right;
     done by Polynomial.make_equal_of_coefficients_equal
   }
 
@@ -219,9 +189,8 @@ theorem Polynomial.multiply_one_right (r : Ring)
 -- Shift respects the equivalence.
 theorem Polynomial.Coefficients.shift_respects (r : Ring)
         (x y : Polynomial.Coefficients(Ring.carrier(r)))
-        (equal : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), x, y))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.shift(r, x), Polynomial.Coefficients.shift(r, y)) :=
+        (equal : x ≈ y)
+        : Polynomial.Coefficients.shift(r, x) ≈ Polynomial.Coefficients.shift(r, y) :=
   (k : ℕ) ↦
       done by cases {
         case k = 0: reflexivity(Ring.carrier(r), Ring.zero(r))
@@ -234,8 +203,7 @@ theorem Polynomial.Coefficients.shift_respects (r : Ring)
 -- (a·q)·s = a·(q·s):  scale(a, q)·s ~ scale(a, q·s).
 theorem Polynomial.Coefficients.scale_multiply (r : Ring) (a : Ring.carrier(r))
         (q s : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.scale(r, a, q) * s, Polynomial.Coefficients.scale(r, a, q * s)) :=
+        : Polynomial.Coefficients.scale(r, a, q) * s ≈ Polynomial.Coefficients.scale(r, a, q * s) :=
   (k : ℕ) ↦
       Polynomial.Coefficients.scale(r, a, q * s)[k]
              = (a * (q * s)[k])
@@ -254,8 +222,7 @@ theorem Polynomial.Coefficients.scale_multiply (r : Ring) (a : Ring.carrier(r))
 -- (x·y)·s = x·(y·s) when x = shift(·):  shift(y)·s ~ shift(y·s).
 theorem Polynomial.Coefficients.shift_multiply (r : Ring)
         (y s : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.shift(r, y) * s, Polynomial.Coefficients.shift(r, y * s)) :=
+        : Polynomial.Coefficients.shift(r, y) * s ≈ Polynomial.Coefficients.shift(r, y * s) :=
   (k : ℕ) ↦
       done by cases {
         case k = 0:
@@ -309,7 +276,7 @@ theorem Polynomial.Coefficients.shift_multiply (r : Ring)
 
 theorem Polynomial.Coefficients.multiply_assoc (r : Ring)
         (p q s : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (p * q) * s, p * (q * s)) :=
+        : (p * q) * s ≈ p * (q * s) :=
   by induction on p with inductiveHypothesis {
     case Polynomial.Coefficients.nil:
         (k : ℕ) ↦
@@ -341,7 +308,6 @@ automatic theorem Polynomial.multiply_associative (r : Ring)
         : ((x * y) * z)
           = (x * (y * z)) :=
   by_representatives x as p, y as q, z as s => {
-      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (p * q) * s, p * (q * s))
-        by Polynomial.Coefficients.multiply_assoc;
+      (p * q) * s ≈ p * (q * s)   by Polynomial.Coefficients.multiply_assoc;
       done by Polynomial.make_equal_of_coefficients_equal
   }

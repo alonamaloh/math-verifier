@@ -50,6 +50,18 @@ definition Polynomial.Coefficients.add {r : Ring}
 -- Coefficient lists add like their quotient: `xs + ys` position-wise.
 operator (+) on (Polynomial.Coefficients, Polynomial.Coefficients) := Polynomial.Coefficients.add
 
+-- The equivalence the polynomial quotient divides by, at a bundled
+-- ring: equal coefficients at every index (trailing zeros invisible).
+-- The ring-specialized wrapper exists so `≈` can recover `{r}` from the
+-- operands — `ExtensionallyEqual` itself takes the zero coefficient as
+-- a value argument, which no operand type determines.
+definition Polynomial.Coefficients.Equivalent {r : Ring}
+        (p q : Polynomial.Coefficients(Ring.carrier(r))) : Proposition :=
+  Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, q)
+
+-- Coefficient lists compare with `≈`: `xs ≈ ys` is extensional equality.
+operator (≈) on (Polynomial.Coefficients, Polynomial.Coefficients) := Polynomial.Coefficients.Equivalent
+
 -- Right identity: adding the empty list changes nothing. At a cons the
 -- head reads 0 (absorbed by `Ring.add_zero`) and the tail recursion peels
 -- the list; `add(nil, ys) = ys` is the left identity, definitional.
@@ -111,11 +123,8 @@ theorem Polynomial.nth_add (r : Ring)
 -- `nth_add` and the two hypotheses.
 theorem Polynomial.Coefficients.add_respects (r : Ring)
         (p pPrime q qPrime : Polynomial.Coefficients(Ring.carrier(r)))
-        (firstEqual
-            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
-        (secondEqual
-            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), q, qPrime))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (p + q), (pPrime + qPrime)) :=
+        (firstEqual : p ≈ pPrime) (secondEqual : q ≈ qPrime)
+        : (p + q) ≈ (pPrime + qPrime) :=
   (index : Natural) ↦
       (p + q)[index]
          = (p[index] + q[index])
@@ -139,14 +148,10 @@ definition Polynomial.add {r : Ring}
   by representatives a, b ↦
        Polynomial.make(Ring.carrier(r), Ring.zero(r), (a + b))
   well_defined by
-    (a a' b : Polynomial.Coefficients(Ring.carrier(r)))
-        (firstEqual
-            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), a, a')) ↦
+    (a a' b : Polynomial.Coefficients(Ring.carrier(r))) (firstEqual : a ≈ a') ↦
         Polynomial.Coefficients.add_respects(r, a, a', b, b, firstEqual,
             Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), b)),
-    (a b b' : Polynomial.Coefficients(Ring.carrier(r)))
-        (secondEqual
-            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), b, b')) ↦
+    (a b b' : Polynomial.Coefficients(Ring.carrier(r))) (secondEqual : b ≈ b') ↦
         Polynomial.Coefficients.add_respects(r, a, a, b, b',
             Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), a),
             secondEqual)

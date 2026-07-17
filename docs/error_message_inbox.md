@@ -1592,3 +1592,19 @@ anti-unifiable, and a second prefix term would be needed to pin the
 coupled index pair (i, k∸i). Fix directions: defeq-tolerant
 anti-unification at the differing positions, and/or using TWO prefix
 terms (the existing 0/1 evaluation probe is the right skeleton).
+
+**CITATION (asymmetric wrapper bridge) — `≈`/`Equivalent` vs raw
+`ExtensionallyEqual` premise discharge (2026-07-17).** With
+`Polynomial.Coefficients.Equivalent {r}` a pure pass-through wrapper over
+`ExtensionallyEqual(carrier(r), zero(r), …)`, goal-side citation bridges
+fine (an `≈`-stated claim closes `by` an `ExtensionallyEqual`-stated
+lemma). But PREMISE discharge does not bridge in the reverse direction:
+a context fact typed `ExtensionallyEqual(…)` fails to discharge an
+`Equivalent`-typed lemma parameter (hit at
+Polynomial/commutative.math:~165 during the ≈ sweep; resolved by
+respelling the context claim, not by any fix). The premise-discharge
+matcher evidently compares the wrapper head without the one-δ unfold the
+goal-side paths do. CAUTION for whoever fixes it: this is the same
+matcher whose defeq widening previously exposed a perturbation-sensitive
+latent bug and was reverted (see citation_defeq memory) — needs the
+bounded/pass-through-gated approach, not a blanket WHNF.
