@@ -210,7 +210,14 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # arguments are the content (independent/eIndependent/selectionInjective
 # data instantiations) plus named-arg skipValue_bound sites at
 # un-inferable slots; the det/perm-documented structural class.
-CLEAN_LEAK_BUDGET ?= 297
+# 2026-07-17: 297 → 367. Polynomial cone MANIFEST-ADDED (all 19 files) —
+# the season's notation sweeps + ≈ package left only 8 checker findings
+# and 3 expensive-step items, all settled; the 3 Equality.symmetry tells
+# fixed. The +70 are thin direct proof-lemma calls (1-13/file) + 4
+# Quotient tokens. Follow-up noted: a det/perm-style argument-free
+# citation pass on the 3 heaviest (bezout 11, quotient_field 9,
+# instances 8) could reclaim ~25.
+CLEAN_LEAK_BUDGET ?= 367
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
