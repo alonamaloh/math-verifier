@@ -4,7 +4,8 @@
 -- is closed under a fixed-point-free, sign-reversing involution vanishes.
 -- Genuine 2-element-orbit pairing (each `g(x) + g(ι x) = 0`), NOT the
 -- `Σ g = Σ g∘ι = −Σ g ⟹ 2Σ = 0 ⟹ Σ = 0` shortcut — that would need
--- char ≠ 2, and this must hold over ANY field (Stage H det multiplicativity).
+-- char ≠ 2, and this must hold over ANY commutative ring (Stage H det
+-- multiplicativity).
 --
 -- Route: strong induction on the list length. In the step, remove the head's
 -- orbit `{head, ι head}` (its two terms sum to zero), leaving a shorter list
@@ -22,14 +23,16 @@ import Lists.list
 import Lists.distinct
 import Lists.length
 import Lists.remove
-import Algebra.field
-import Algebra.field_bundle
-import Algebra.field_aggregation
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
 
 -- Strong-induction workhorse: the pairing lemma with the list length pinned
 -- to the induction variable `n`.
-theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
-        (g : index → Field.carrier(f)) (iota : index → index)
+theorem CommutativeRing.sumOver_involution_pairing_aux {r : CommutativeRing} {index : Type(0)}
+        (g : index → CommutativeRing.carrier(r)) (iota : index → index)
         (n : ℕ)
         : ∀ (items : List(index)).
           length(items) = n
@@ -37,8 +40,8 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
           → (∀ (x : index). x ∈ items → iota(x) ∈ items)
           → (∀ (x : index). x ∈ items → ¬(iota(x) = x))
           → (∀ (x : index). x ∈ items → iota(iota(x)) = x)
-          → (∀ (x : index). x ∈ items → g(x) + g(iota(x)) = Field.zero(f))
-          → Field.sumOver(g, items) = Field.zero(f) :=
+          → (∀ (x : index). x ∈ items → g(x) + g(iota(x)) = CommutativeRing.zero(r))
+          → CommutativeRing.sumOver(g, items) = CommutativeRing.zero(r) :=
   by induction on n using Natural.strong_induction with subject, IH {
       take items : List(index);
       suppose length(items) = subject as lengthEquation;
@@ -48,10 +51,10 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
       suppose (∀ (x : index). x ∈ items → ¬(iota(x) = x)) as noFixedPoint;
       suppose (∀ (x : index). x ∈ items → iota(iota(x)) = x) as involutive;
       suppose (∀ (x : index). x ∈ items
-          → g(x) + g(iota(x)) = Field.zero(f)) as reversing;
+          → g(x) + g(iota(x)) = CommutativeRing.zero(r)) as reversing;
       done by cases {
         case items = List.empty(index):
-            Field.sumOver(g, List.empty(index)) = Field.zero(f)
+            CommutativeRing.sumOver(g, List.empty(index)) = CommutativeRing.zero(r)
         case items = List.prepend(index, head, tail)
             for some (head : index), (tail : List(index)): {
           ¬(head ∈ tail)
@@ -123,31 +126,31 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
               by (x : index) (xInRemoved : x ∈ removed) ↦
                   involutive(x, memberLift(x, xInRemoved)) as involutiveRemoved;
           ∀ (x : index). x ∈ removed
-              → g(x) + g(iota(x)) = Field.zero(f)
+              → g(x) + g(iota(x)) = CommutativeRing.zero(r)
               by (x : index) (xInRemoved : x ∈ removed) ↦
                   reversing(x, memberLift(x, xInRemoved)) as reversingRemoved;
 
           -- Recurse on the shorter list, then reassemble the orbit.
           List.Distinct(index, removed) by List.remove_distinct as removedDistinct;
-          Field.sumOver(g, removed) = Field.zero(f)
+          CommutativeRing.sumOver(g, removed) = CommutativeRing.zero(r)
               by IH(length(removed), removedLengthBelow)(removed,
                      reflexivity(ℕ, length(removed)),
                      removedDistinct,
                      closedRemoved, noFixedPointRemoved, involutiveRemoved, reversingRemoved)
               as removedSumZero;
-          Field.sumOver(g, tail)
-              = g(iota(head)) + Field.sumOver(g, removed)
-              by Field.sumOver_remove as tailSum;
-          g(head) + g(iota(head)) = Field.zero(f)
+          CommutativeRing.sumOver(g, tail)
+              = g(iota(head)) + CommutativeRing.sumOver(g, removed)
+              by CommutativeRing.sumOver_remove as tailSum;
+          g(head) + g(iota(head)) = CommutativeRing.zero(r)
               by reversing(head, headMember) as orbitZero;
 
-          Field.sumOver(g, List.prepend(index, head, tail))
-             = g(head) + Field.sumOver(g, tail)
-             = g(head) + (g(iota(head)) + Field.sumOver(g, removed))   by substituting tailSum
-             = (g(head) + g(iota(head))) + Field.sumOver(g, removed)
-             = Field.zero(f) + Field.sumOver(g, removed)               by substituting orbitZero
-             = Field.zero(f) + Field.zero(f)                           by substituting removedSumZero
-             = Field.zero(f)
+          CommutativeRing.sumOver(g, List.prepend(index, head, tail))
+             = g(head) + CommutativeRing.sumOver(g, tail)
+             = g(head) + (g(iota(head)) + CommutativeRing.sumOver(g, removed))   by substituting tailSum
+             = (g(head) + g(iota(head))) + CommutativeRing.sumOver(g, removed)
+             = CommutativeRing.zero(r) + CommutativeRing.sumOver(g, removed)               by substituting orbitZero
+             = CommutativeRing.zero(r) + CommutativeRing.zero(r)                           by substituting removedSumZero
+             = CommutativeRing.zero(r)
         }
       }
   }
@@ -155,14 +158,14 @@ theorem Field.sumOver_involution_pairing_aux {f : Field} {index : Type(0)}
 -- The orbit-pairing sum-zero lemma. `iota` is a fixed-point-free involution
 -- of the distinct list `items` under which `g` is sign-reversing
 -- (`g(x) + g(ι x) = 0`); the sum vanishes.
-theorem Field.sumOver_involution_pairing {f : Field} {index : Type(0)}
-        (g : index → Field.carrier(f)) (iota : index → index)
+theorem CommutativeRing.sumOver_involution_pairing {r : CommutativeRing} {index : Type(0)}
+        (g : index → CommutativeRing.carrier(r)) (iota : index → index)
         (items : List(index))
         (distinct : List.Distinct(index, items))
         (closed : ∀ (x : index). x ∈ items → iota(x) ∈ items)
         (noFixedPoint : ∀ (x : index). x ∈ items → ¬(iota(x) = x))
         (involutive : ∀ (x : index). x ∈ items → iota(iota(x)) = x)
         (reversing : ∀ (x : index). x ∈ items
-            → g(x) + g(iota(x)) = Field.zero(f))
-        : Field.sumOver(g, items) = Field.zero(f) :=
-  by Field.sumOver_involution_pairing_aux(n := length(items))
+            → g(x) + g(iota(x)) = CommutativeRing.zero(r))
+        : CommutativeRing.sumOver(g, items) = CommutativeRing.zero(r) :=
+  by CommutativeRing.sumOver_involution_pairing_aux(n := length(items))

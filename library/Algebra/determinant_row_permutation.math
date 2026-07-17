@@ -20,11 +20,11 @@ import Lists.map
 import Lists.distinct
 import Lists.length
 import Lists.permutation
-import Algebra.field
-import Algebra.field_bundle
-import Algebra.field_aggregation
-import Algebra.commutative_ring_bundle
+import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
 import Algebra.ring_from_integer
 import Algebra.finite_permutation
 import Algebra.permutation_enumeration
@@ -36,11 +36,11 @@ import Algebra.alternating_collapse
 -- The initial-ring map sends a product of two units (±1) to the product of
 -- their images — the restricted multiplicativity that dodges a general
 -- `from_integer_multiply`, by casing on both signs.
-theorem Field.from_integer_multiply_units (f : Field) (z w : Integer)
+theorem CommutativeRing.from_integer_multiply_units (r : CommutativeRing) (z w : ℤ)
         (zUnit : z = 1 ∨ z = Integer.negate(1))
         (wUnit : w = 1 ∨ w = Integer.negate(1))
-        : Field.from_integer(f, Integer.multiply(z, w))
-          = Field.from_integer(f, z) * Field.from_integer(f, w) := {
+        : CommutativeRing.from_integer(r, Integer.multiply(z, w))
+          = CommutativeRing.from_integer(r, z) * CommutativeRing.from_integer(r, w) := {
   -- Casing on the unit disjunctions substitutes z, w into the goal, so each
   -- arm proves a concrete identity; meet the two sides at a concrete ±one.
   done by cases {
@@ -48,26 +48,26 @@ theorem Field.from_integer_multiply_units (f : Field) (z w : Integer)
         done by cases {
           case w = 1 as wPositive: {
               Integer.multiply(1, 1) = 1 as productValue;
-              Field.from_integer(f, 1) * Field.from_integer(f, 1)
-                 = Field.one(f) * Field.one(f)   by substituting Field.from_integer_one
-                 = Field.one(f)
+              CommutativeRing.from_integer(r, 1) * CommutativeRing.from_integer(r, 1)
+                 = CommutativeRing.one(r) * CommutativeRing.one(r)   by substituting CommutativeRing.from_integer_one
+                 = CommutativeRing.one(r)
                  as rightSide;
-              Field.from_integer(f, Integer.multiply(1, 1))
-                 = Field.from_integer(f, 1)       by substituting productValue
-                 = Field.one(f)
-                 = Field.from_integer(f, 1) * Field.from_integer(f, 1)   by rightSide
+              CommutativeRing.from_integer(r, Integer.multiply(1, 1))
+                 = CommutativeRing.from_integer(r, 1)       by substituting productValue
+                 = CommutativeRing.one(r)
+                 = CommutativeRing.from_integer(r, 1) * CommutativeRing.from_integer(r, 1)   by rightSide
             }
           case w = Integer.negate(1) as wNegative: {
               Integer.multiply(1, Integer.negate(1)) = Integer.negate(1) as productValue;
-              Field.from_integer(f, 1) * Field.from_integer(f, Integer.negate(1))
-                 = Field.one(f) * Field.from_integer(f, Integer.negate(1))   by substituting Field.from_integer_one
-                 = Field.one(f) * Field.negate(f, Field.one(f))              by substituting Field.from_integer_negate_one
-                 = Field.negate(f, Field.one(f))
+              CommutativeRing.from_integer(r, 1) * CommutativeRing.from_integer(r, Integer.negate(1))
+                 = CommutativeRing.one(r) * CommutativeRing.from_integer(r, Integer.negate(1))   by substituting CommutativeRing.from_integer_one
+                 = CommutativeRing.one(r) * CommutativeRing.negate(CommutativeRing.one(r))              by substituting CommutativeRing.from_integer_negate_one
+                 = CommutativeRing.negate(CommutativeRing.one(r))
                  as rightSide;
-              Field.from_integer(f, Integer.multiply(1, Integer.negate(1)))
-                 = Field.from_integer(f, Integer.negate(1))                  by substituting productValue
-                 = Field.negate(f, Field.one(f))
-                 = Field.from_integer(f, 1) * Field.from_integer(f, Integer.negate(1))   by rightSide
+              CommutativeRing.from_integer(r, Integer.multiply(1, Integer.negate(1)))
+                 = CommutativeRing.from_integer(r, Integer.negate(1))                  by substituting productValue
+                 = CommutativeRing.negate(CommutativeRing.one(r))
+                 = CommutativeRing.from_integer(r, 1) * CommutativeRing.from_integer(r, Integer.negate(1))   by rightSide
             }
         }
       }
@@ -75,29 +75,29 @@ theorem Field.from_integer_multiply_units (f : Field) (z w : Integer)
         done by cases {
           case w = 1 as wPositive: {
               Integer.multiply(Integer.negate(1), 1) = Integer.negate(1) as productValue;
-              Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, 1)
-                 = Field.negate(f, Field.one(f)) * Field.from_integer(f, 1)   by substituting Field.from_integer_negate_one
-                 = Field.negate(f, Field.one(f)) * Field.one(f)              by substituting Field.from_integer_one
-                 = Field.negate(f, Field.one(f))
+              CommutativeRing.from_integer(r, Integer.negate(1)) * CommutativeRing.from_integer(r, 1)
+                 = CommutativeRing.negate(CommutativeRing.one(r)) * CommutativeRing.from_integer(r, 1)   by substituting CommutativeRing.from_integer_negate_one
+                 = CommutativeRing.negate(CommutativeRing.one(r)) * CommutativeRing.one(r)              by substituting CommutativeRing.from_integer_one
+                 = CommutativeRing.negate(CommutativeRing.one(r))
                  as rightSide;
-              Field.from_integer(f, Integer.multiply(Integer.negate(1), 1))
-                 = Field.from_integer(f, Integer.negate(1))                  by substituting productValue
-                 = Field.negate(f, Field.one(f))
-                 = Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, 1)   by rightSide
+              CommutativeRing.from_integer(r, Integer.multiply(Integer.negate(1), 1))
+                 = CommutativeRing.from_integer(r, Integer.negate(1))                  by substituting productValue
+                 = CommutativeRing.negate(CommutativeRing.one(r))
+                 = CommutativeRing.from_integer(r, Integer.negate(1)) * CommutativeRing.from_integer(r, 1)   by rightSide
             }
           case w = Integer.negate(1) as wNegative: {
               Integer.multiply(Integer.negate(1), Integer.negate(1)) = 1 as productValue;
-              Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, Integer.negate(1))
-                 = Field.negate(f, Field.one(f)) * Field.from_integer(f, Integer.negate(1))
-                       by substituting Field.from_integer_negate_one
-                 = Field.negate(f, Field.one(f)) * Field.negate(f, Field.one(f))
-                       by substituting Field.from_integer_negate_one
-                 = Field.one(f)                                              by ring
+              CommutativeRing.from_integer(r, Integer.negate(1)) * CommutativeRing.from_integer(r, Integer.negate(1))
+                 = CommutativeRing.negate(CommutativeRing.one(r)) * CommutativeRing.from_integer(r, Integer.negate(1))
+                       by substituting CommutativeRing.from_integer_negate_one
+                 = CommutativeRing.negate(CommutativeRing.one(r)) * CommutativeRing.negate(CommutativeRing.one(r))
+                       by substituting CommutativeRing.from_integer_negate_one
+                 = CommutativeRing.one(r)                                              by ring
                  as rightSide;
-              Field.from_integer(f, Integer.multiply(Integer.negate(1), Integer.negate(1)))
-                 = Field.from_integer(f, 1)                                  by substituting productValue
-                 = Field.one(f)
-                 = Field.from_integer(f, Integer.negate(1)) * Field.from_integer(f, Integer.negate(1))
+              CommutativeRing.from_integer(r, Integer.multiply(Integer.negate(1), Integer.negate(1)))
+                 = CommutativeRing.from_integer(r, 1)                                  by substituting productValue
+                 = CommutativeRing.one(r)
+                 = CommutativeRing.from_integer(r, Integer.negate(1)) * CommutativeRing.from_integer(r, Integer.negate(1))
                        by rightSide
             }
         }
@@ -137,38 +137,38 @@ theorem Permutation.apply_map_permutes_enumerate {n : ℕ} (p : Permutation(n))
 }
 
 -- Reindexing the row product by p: ∏_i B(p·i, ρ(p·i)) = ∏_j B(j, ρ·j).
-theorem Matrix.product_row_reindex {f : Field} {n : ℕ}
-        (B : Matrix(f, n, n)) (p rho : Permutation(n))
-        : Field.productOver(
+theorem Matrix.product_row_reindex {r : CommutativeRing} {n : ℕ}
+        (B : Matrix(r, n, n)) (p rho : Permutation(n))
+        : CommutativeRing.productOver(
               (i : NaturalsBelow(n)) ↦ B(p(i), rho(p(i))),
               NaturalsBelow.enumerate(n))
-          = Field.productOver(
+          = CommutativeRing.productOver(
               (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
               NaturalsBelow.enumerate(n)) :=
-  Field.productOver(
+  CommutativeRing.productOver(
         (i : NaturalsBelow(n)) ↦ B(p(i), rho(p(i))),
         NaturalsBelow.enumerate(n))
-     = Field.productOver(
+     = CommutativeRing.productOver(
            (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
            List.map(NaturalsBelow(n), NaturalsBelow(n),
                (i : NaturalsBelow(n)) ↦ p(i), NaturalsBelow.enumerate(n)))
-           by Field.productOver_map
-     = Field.productOver(
+           by CommutativeRing.productOver_map
+     = CommutativeRing.productOver(
            (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
            NaturalsBelow.enumerate(n))
-           by Field.productOver_permutation
+           by CommutativeRing.productOver_permutation
 
 -- Row permutation scales the determinant by the sign.
-theorem Matrix.determinant_row_permutation {f : Field} {n : ℕ}
-        (B : Matrix(f, n, n)) (p : Permutation(n))
-        : Field.sumOver(
+theorem Matrix.determinant_row_permutation {r : CommutativeRing} {n : ℕ}
+        (B : Matrix(r, n, n)) (p : Permutation(n))
+        : CommutativeRing.sumOver(
               (sigma : Permutation(n)) ↦
-                  Field.from_integer(f, Permutation.sign(sigma))
-                      * Field.productOver(
+                  CommutativeRing.from_integer(r, Permutation.sign(sigma))
+                      * CommutativeRing.productOver(
                             (i : NaturalsBelow(n)) ↦ B(p(i), sigma(i)),
                             NaturalsBelow.enumerate(n)),
               Permutation.allPermutations(n))
-          = Field.from_integer(f, Permutation.sign(p)) * Matrix.determinant(B) := {
+          = CommutativeRing.from_integer(r, Permutation.sign(p)) * Matrix.determinant(B) := {
   -- σ ↦ σ∘p permutes the permutation list.
   (∀ (a b : Permutation(n)). a ∘ p = b ∘ p → a = b)
       by (a b : Permutation(n)) (equalComposites : a ∘ p = b ∘ p) ↦
@@ -196,20 +196,20 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : ℕ}
 
   -- Each reindexed term: sign and product factor through sign(p) and det(B).
   ∀ (rho : Permutation(n)).
-      Field.from_integer(f, Permutation.sign(rho ∘ p))
-          * Field.productOver(
+      CommutativeRing.from_integer(r, Permutation.sign(rho ∘ p))
+          * CommutativeRing.productOver(
                 (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                 NaturalsBelow.enumerate(n))
-      = Field.from_integer(f, Permutation.sign(p))
-          * (Field.from_integer(f, Permutation.sign(rho))
-                * Field.productOver(
+      = CommutativeRing.from_integer(r, Permutation.sign(p))
+          * (CommutativeRing.from_integer(r, Permutation.sign(rho))
+                * CommutativeRing.productOver(
                       (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
                       NaturalsBelow.enumerate(n)))
       by (rho : Permutation(n)) ↦ {
-          Field.productOver(
+          CommutativeRing.productOver(
                 (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                 NaturalsBelow.enumerate(n))
-             = Field.productOver(
+             = CommutativeRing.productOver(
                    (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
                    NaturalsBelow.enumerate(n))
                  by Matrix.product_row_reindex(p := p, rho := rho) as productReindexed;
@@ -217,74 +217,74 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : ℕ}
               by Permutation.sign_is_unit;
           Permutation.sign(p) = 1 ∨ Permutation.sign(p) = Integer.negate(1)
               by Permutation.sign_is_unit;
-          Field.from_integer(f, Permutation.sign(rho ∘ p))
-             = Field.from_integer(f, Integer.multiply(Permutation.sign(rho), Permutation.sign(p)))
+          CommutativeRing.from_integer(r, Permutation.sign(rho ∘ p))
+             = CommutativeRing.from_integer(r, Integer.multiply(Permutation.sign(rho), Permutation.sign(p)))
                    by substituting Permutation.sign_compose
-             = Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p))
-                   by Field.from_integer_multiply_units
+             = CommutativeRing.from_integer(r, Permutation.sign(rho)) * CommutativeRing.from_integer(r, Permutation.sign(p))
+                   by CommutativeRing.from_integer_multiply_units
                  as signReindexed;
-          Field.from_integer(f, Permutation.sign(rho ∘ p))
-                * Field.productOver(
+          CommutativeRing.from_integer(r, Permutation.sign(rho ∘ p))
+                * CommutativeRing.productOver(
                       (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                       NaturalsBelow.enumerate(n))
-             = (Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p)))
-                   * Field.productOver(
+             = (CommutativeRing.from_integer(r, Permutation.sign(rho)) * CommutativeRing.from_integer(r, Permutation.sign(p)))
+                   * CommutativeRing.productOver(
                          (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                          NaturalsBelow.enumerate(n))
                    by substituting signReindexed
-             = (Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p)))
-                   * Field.productOver(
+             = (CommutativeRing.from_integer(r, Permutation.sign(rho)) * CommutativeRing.from_integer(r, Permutation.sign(p)))
+                   * CommutativeRing.productOver(
                          (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
                          NaturalsBelow.enumerate(n))
                    by substituting productReindexed
-             = Field.from_integer(f, Permutation.sign(p))
-                   * (Field.from_integer(f, Permutation.sign(rho))
-                         * Field.productOver(
+             = CommutativeRing.from_integer(r, Permutation.sign(p))
+                   * (CommutativeRing.from_integer(r, Permutation.sign(rho))
+                         * CommutativeRing.productOver(
                                (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
                                NaturalsBelow.enumerate(n)))
                    by ring
         };
 
-  Field.sumOver(
+  CommutativeRing.sumOver(
         (sigma : Permutation(n)) ↦
-            Field.from_integer(f, Permutation.sign(sigma))
-                * Field.productOver(
+            CommutativeRing.from_integer(r, Permutation.sign(sigma))
+                * CommutativeRing.productOver(
                       (i : NaturalsBelow(n)) ↦ B(p(i), sigma(i)),
                       NaturalsBelow.enumerate(n)),
         Permutation.allPermutations(n))
-     = Field.sumOver(
+     = CommutativeRing.sumOver(
            (sigma : Permutation(n)) ↦
-               Field.from_integer(f, Permutation.sign(sigma))
-                   * Field.productOver(
+               CommutativeRing.from_integer(r, Permutation.sign(sigma))
+                   * CommutativeRing.productOver(
                          (i : NaturalsBelow(n)) ↦ B(p(i), sigma(i)),
                          NaturalsBelow.enumerate(n)),
            List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n)))
-           by Field.sumOver_permutation
-     = Field.sumOver(
+           by CommutativeRing.sumOver_permutation
+     = CommutativeRing.sumOver(
            (rho : Permutation(n)) ↦
-               Field.from_integer(f, Permutation.sign(rho ∘ p))
-                   * Field.productOver(
+               CommutativeRing.from_integer(r, Permutation.sign(rho ∘ p))
+                   * CommutativeRing.productOver(
                          (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                          NaturalsBelow.enumerate(n)),
            Permutation.allPermutations(n))
-           by Field.sumOver_map
-     = Field.sumOver(
+           by CommutativeRing.sumOver_map
+     = CommutativeRing.sumOver(
            (rho : Permutation(n)) ↦
-               Field.from_integer(f, Permutation.sign(p))
-                   * (Field.from_integer(f, Permutation.sign(rho))
-                         * Field.productOver(
+               CommutativeRing.from_integer(r, Permutation.sign(p))
+                   * (CommutativeRing.from_integer(r, Permutation.sign(rho))
+                         * CommutativeRing.productOver(
                                (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
                                NaturalsBelow.enumerate(n))),
            Permutation.allPermutations(n))
-           by Field.sumOver_congruence
-     = Field.from_integer(f, Permutation.sign(p))
-           * Field.sumOver(
+           by CommutativeRing.sumOver_congruence
+     = CommutativeRing.from_integer(r, Permutation.sign(p))
+           * CommutativeRing.sumOver(
                  (rho : Permutation(n)) ↦
-                     Field.from_integer(f, Permutation.sign(rho))
-                         * Field.productOver(
+                     CommutativeRing.from_integer(r, Permutation.sign(rho))
+                         * CommutativeRing.productOver(
                                (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
                                NaturalsBelow.enumerate(n)),
                  Permutation.allPermutations(n))
-           by Field.sumOver_scale_left
-     = Field.from_integer(f, Permutation.sign(p)) * Matrix.determinant(B)
+           by CommutativeRing.sumOver_scale_left
+     = CommutativeRing.from_integer(r, Permutation.sign(p)) * Matrix.determinant(B)
 }

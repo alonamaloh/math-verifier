@@ -1,11 +1,12 @@
 -- Algebra/determinant.math
 --
--- The determinant of a square matrix over a field, by the Leibniz formula
+-- The determinant of a square matrix over a commutative ring, by the
+-- Leibniz formula
 --   det(M) = Σ_{σ ∈ Sₙ} sign(σ) · ∏_{i<n} M(i, σ(i)),
 -- summing over the enumerated permutation list `allPermutations(n)` and
--- taking the field product over the index enumeration. The integer sign
--- (always ±1) enters the field through the initial-ring map
--- `Ring.from_integer`. (Stage H brick 5 of PLAN_LINEAR_ALGEBRA.md.)
+-- taking the ring product over the index enumeration. The integer sign
+-- (always ±1) enters the ring through the initial-ring map
+-- `Ring.from_integer`.
 
 module Algebra.determinant
 
@@ -16,43 +17,44 @@ import Integer.basics
 import Set.finite
 import Lists.list
 import Lists.map
-import Algebra.field
-import Algebra.field_bundle
-import Algebra.field_aggregation
-import Algebra.commutative_ring_bundle
+import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
 import Algebra.ring_from_integer
 import Algebra.finite_permutation
 import Algebra.permutation_enumeration
 import Algebra.permutation_sign
 import Algebra.matrix
 
--- The integer sign (or any integer) as a field element, through the
--- initial-ring map on the field's underlying ring.
-definition Field.from_integer (f : Field) (z : Integer) : Field.carrier(f) :=
-  Ring.from_integer(CommutativeRing.ring(Field.commutative_ring(f)), z)
+-- The integer sign (or any integer) as a ring element, through the
+-- initial-ring map on the underlying ring.
+definition CommutativeRing.from_integer (r : CommutativeRing) (z : ℤ)
+        : CommutativeRing.carrier(r) :=
+  Ring.from_integer(CommutativeRing.ring(r), z)
 
 -- The Leibniz determinant: sum over Sₙ of the signed product of the entries
 -- picked out by each permutation.
-definition Matrix.determinant {f : Field} {n : ℕ} (matrix : Matrix(f, n, n))
-        : Field.carrier(f) :=
-  Field.sumOver(
+definition Matrix.determinant {r : CommutativeRing} {n : ℕ} (matrix : Matrix(r, n, n))
+        : CommutativeRing.carrier(r) :=
+  CommutativeRing.sumOver(
       (sigma : Permutation(n)) ↦
-          Field.from_integer(f, Permutation.sign(sigma))
-              * Field.productOver(
+          CommutativeRing.from_integer(r, Permutation.sign(sigma))
+              * CommutativeRing.productOver(
                     (i : NaturalsBelow(n)) ↦ matrix(i, sigma(i)),
                     NaturalsBelow.enumerate(n)),
       Permutation.allPermutations(n))
 
 -- The defining expansion, read straight off the definition — the form every
 -- determinant identity manipulates.
-theorem Matrix.determinant_expansion {f : Field} {n : ℕ}
-        (matrix : Matrix(f, n, n))
+theorem Matrix.determinant_expansion {r : CommutativeRing} {n : ℕ}
+        (matrix : Matrix(r, n, n))
         : Matrix.determinant(matrix)
-          = Field.sumOver(
+          = CommutativeRing.sumOver(
                 (sigma : Permutation(n)) ↦
-                    Field.from_integer(f, Permutation.sign(sigma))
-                        * Field.productOver(
+                    CommutativeRing.from_integer(r, Permutation.sign(sigma))
+                        * CommutativeRing.productOver(
                               (i : NaturalsBelow(n)) ↦ matrix(i, sigma(i)),
                               NaturalsBelow.enumerate(n)),
                 Permutation.allPermutations(n)) :=
