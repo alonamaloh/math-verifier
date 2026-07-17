@@ -3362,7 +3362,8 @@ private:
         while (peek().kind == TokenKind::Star
                || peek().kind == TokenKind::Slash
                || peek().kind == TokenKind::CenterDot
-               || peek().kind == TokenKind::Bullet) {
+               || peek().kind == TokenKind::Bullet
+               || peek().kind == TokenKind::Compose) {
             Token op = consumeAny();
             const char* sym = nullptr;
             switch (op.kind) {
@@ -3370,6 +3371,7 @@ private:
                 case TokenKind::Slash:     sym = "/"; break;
                 case TokenKind::CenterDot: sym = "·"; break;
                 case TokenKind::Bullet:    sym = "•"; break;
+                case TokenKind::Compose:   sym = "∘"; break;
                 default: break;
             }
             if (peek().kind == TokenKind::Ellipsis) {

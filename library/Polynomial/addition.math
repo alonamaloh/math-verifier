@@ -36,7 +36,7 @@ operator ([]) on (Polynomial.Coefficients, Natural) := Polynomial.coefficient
 -- list, pairing its head with the head of the second and its tail with
 -- the tail; where the second runs out, `head` reads 0 and `tail` stays
 -- nil, so the first list's remaining coefficients carry through.
-definition Polynomial.Coefficients.add (r : Ring)
+definition Polynomial.Coefficients.add {r : Ring}
         : Polynomial.Coefficients(Ring.carrier(r))
           → Polynomial.Coefficients(Ring.carrier(r))
           → Polynomial.Coefficients(Ring.carrier(r))
@@ -47,20 +47,22 @@ definition Polynomial.Coefficients.add (r : Ring)
           Polynomial.Coefficients.add(r, restA,
               Polynomial.Coefficients.tail(Ring.carrier(r), ys)))
 
+-- Coefficient lists add like their quotient: `xs + ys` position-wise.
+operator (+) on (Polynomial.Coefficients, Polynomial.Coefficients) := Polynomial.Coefficients.add
+
 -- Right identity: adding the empty list changes nothing. At a cons the
 -- head reads 0 (absorbed by `Ring.add_zero`) and the tail recursion peels
 -- the list; `add(nil, ys) = ys` is the left identity, definitional.
 theorem Polynomial.Coefficients.add_nil_right (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r)))
-        : Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.nil(Ring.carrier(r))) = p :=
+        : (p + Polynomial.Coefficients.nil(Ring.carrier(r))) = p :=
   by induction on p with IH {
     case Polynomial.Coefficients.nil:
         reflexivity(Polynomial.Coefficients(Ring.carrier(r)), Polynomial.Coefficients.nil(Ring.carrier(r)))
     case Polynomial.Coefficients.cons(a, restA):
-        Polynomial.Coefficients.cons(Ring.carrier(r), (a + Ring.zero(r)),
-              Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))
-           = Polynomial.Coefficients.cons(Ring.carrier(r), a,
-                 Polynomial.Coefficients.add(r, restA, Polynomial.Coefficients.nil(Ring.carrier(r))))   by substituting Ring.add_zero
+        Polynomial.Coefficients.cons(Ring.carrier(r), (a + Ring.zero(r)), (restA + Polynomial.Coefficients.nil(Ring.carrier(r))))
+           = Polynomial.Coefficients.cons(Ring.carrier(r), a, (restA + Polynomial.Coefficients.nil(Ring.carrier(r))))
+               by substituting Ring.add_zero
            = Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)   by substituting IH
   }
 
@@ -75,13 +77,13 @@ theorem Polynomial.nth_add (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r)))
         : (q : Polynomial.Coefficients(Ring.carrier(r)))
           → ∀ (index : Natural).
-          Polynomial.Coefficients.add(r, p, q)[index]
+          (p + q)[index]
             = (p[index] + q[index]) :=
   by induction on p with IH {
     case Polynomial.Coefficients.nil:
         (q : Polynomial.Coefficients(Ring.carrier(r))) (index : Natural) ↦ {
           Polynomial.Coefficients.nil(Ring.carrier(r))[index] = Ring.zero(r)   by Polynomial.nth_nil;
-          Polynomial.Coefficients.add(r, Polynomial.Coefficients.nil(Ring.carrier(r)), q)[index]
+          (Polynomial.Coefficients.nil(Ring.carrier(r)) + q)[index]
              = q[index]
              = Ring.zero(r) + q[index]
              = Polynomial.Coefficients.nil(Ring.carrier(r))[index] + q[index]
@@ -95,8 +97,8 @@ theorem Polynomial.nth_add (r : Ring)
             case index = 1 + j for some j: {
                 cell[1 + j] = restA[j]   by Polynomial.nth_cons_one_plus;
                 q[1 + j] = tail[j]   by Polynomial.nth_one_plus;
-                Polynomial.Coefficients.add(r, cell, q)[1 + j]
-                   = Polynomial.Coefficients.add(r, restA, tail)[j]   by Polynomial.nth_cons_one_plus
+                (cell + q)[1 + j]
+                   = (restA + tail)[j]   by Polynomial.nth_cons_one_plus
                    = (restA[j] + tail[j])   by IH(tail, j)
                    = (cell[1 + j] + q[1 + j])   by substitution
               }
@@ -113,15 +115,13 @@ theorem Polynomial.Coefficients.add_respects (r : Ring)
             : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
         (secondEqual
             : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), q, qPrime))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.add(r, p, q),
-              Polynomial.Coefficients.add(r, pPrime, qPrime)) :=
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (p + q), (pPrime + qPrime)) :=
   (index : Natural) ↦
-      Polynomial.Coefficients.add(r, p, q)[index]
+      (p + q)[index]
          = (p[index] + q[index])
          = (pPrime[index] + q[index])   by firstEqual(index)
          = (pPrime[index] + qPrime[index])   by secondEqual(index)
-         = Polynomial.Coefficients.add(r, pPrime, qPrime)[index]
+         = (pPrime + qPrime)[index]
 
 -- ----------------------------------------------------------------------
 -- Lift coefficient-list addition to the quotient. Two lifts (one per
@@ -137,8 +137,7 @@ definition Polynomial.add {r : Ring}
           → Polynomial(Ring.carrier(r), Ring.zero(r))
           → Polynomial(Ring.carrier(r), Ring.zero(r))
   by representatives a, b ↦
-       Polynomial.make(Ring.carrier(r), Ring.zero(r),
-           Polynomial.Coefficients.add(r, a, b))
+       Polynomial.make(Ring.carrier(r), Ring.zero(r), (a + b))
   well_defined by
     (a a' b : Polynomial.Coefficients(Ring.carrier(r)))
         (firstEqual

@@ -90,7 +90,7 @@ theorem Polynomial.nth_shift_one_plus (r : Ring)
 -- Multiplication of coefficient lists: the standard recursion
 -- (a + x·restA) · q = a·q + x·(restA·q).
 
-definition Polynomial.Coefficients.multiply (r : Ring)
+definition Polynomial.Coefficients.multiply {r : Ring}
         : Polynomial.Coefficients(Ring.carrier(r))
           → Polynomial.Coefficients(Ring.carrier(r))
           → Polynomial.Coefficients(Ring.carrier(r))
@@ -101,6 +101,9 @@ definition Polynomial.Coefficients.multiply (r : Ring)
           Polynomial.Coefficients.scale(r, a, q),
           Polynomial.Coefficients.shift(r,
               Polynomial.Coefficients.multiply(r, restA, q)))
+
+-- The Cauchy product of coefficient lists: `xs * ys`.
+operator (*) on (Polynomial.Coefficients, Polynomial.Coefficients) := Polynomial.Coefficients.multiply
 
 -- Bridge: the (1+j)-th coefficient of `cons(a, rest)` is the j-th
 -- coefficient of `rest`. The 0-th case (= a) is definitional; this one
@@ -119,12 +122,12 @@ theorem Polynomial.coefficient_cons_one_plus (r : Ring) (a : Ring.carrier(r))
 theorem Polynomial.nth_multiply (r : Ring)
         (p q : Polynomial.Coefficients(Ring.carrier(r)))
         : ∀ (k : Natural).
-          Polynomial.Coefficients.multiply(r, p, q)[k]
+          (p * q)[k]
             = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[Natural.monus(k, i)]), k) :=
   by induction on p with IH {
     case Polynomial.Coefficients.nil:
       (k : Natural) ↦
-      Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.nil(Ring.carrier(r)), q)[k]
+      (Polynomial.Coefficients.nil(Ring.carrier(r)) * q)[k]
          = Ring.zero(r)
          = Ring.Sum(r, (i : Natural) ↦ Ring.zero(r), k)
              by Ring.Sum.zero
@@ -137,11 +140,10 @@ theorem Polynomial.nth_multiply (r : Ring)
       (k : Natural) ↦
       done by cases {
         case k = 0:
-              Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q)[0]
-                 = (Polynomial.Coefficients.scale(r, a, q)[0]
-                       + Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q))[0])
+              (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA) * q)[0]
+                 = (Polynomial.Coefficients.scale(r, a, q)[0] + Polynomial.Coefficients.shift(r, restA * q)[0])
                      by Polynomial.nth_add
-                 = ((a * q[0]) + Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q))[0])
+                 = ((a * q[0]) + Polynomial.Coefficients.shift(r, restA * q)[0])
                  = ((a * q[0]) + Ring.zero(r))
                  = (a * q[0])
                  = Ring.Sum(r,
@@ -152,7 +154,7 @@ theorem Polynomial.nth_multiply (r : Ring)
                             A := (i : Natural) ↦ Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)[i],
                             B := (m : Natural) ↦ q[m])
         case k = 1 + predecessor for some predecessor: {
-            Polynomial.Coefficients.multiply(r, restA, q)[predecessor]
+            (restA * q)[predecessor]
                   = Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[Natural.monus(predecessor, j)]), predecessor)
                 by IH;
 
@@ -171,13 +173,11 @@ theorem Polynomial.nth_multiply (r : Ring)
                                by substituting Polynomial.coefficient_cons_one_plus },
                      predecessor) as tailReindex;
 
-              Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q)[1 + predecessor]
-                 = (Polynomial.Coefficients.scale(r, a, q)[1 + predecessor]
-                       + Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q))[1 + predecessor])
+              (Polynomial.Coefficients.cons(Ring.carrier(r), a, restA) * q)[1 + predecessor]
+                 = (Polynomial.Coefficients.scale(r, a, q)[1 + predecessor] + Polynomial.Coefficients.shift(r, restA * q)[1 + predecessor])
                      by Polynomial.nth_add
-                 = ((a * q[1 + predecessor])
-                       + Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q))[1 + predecessor])
-                 = ((a * q[1 + predecessor]) + Polynomial.Coefficients.multiply(r, restA, q)[predecessor])
+                 = ((a * q[1 + predecessor]) + Polynomial.Coefficients.shift(r, restA * q)[1 + predecessor])
+                 = ((a * q[1 + predecessor]) + (restA * q)[predecessor])
                      by Polynomial.nth_shift_one_plus
                  = ((a * q[1 + predecessor])
                        + Ring.Sum(r, (j : Natural) ↦ (restA[j] * q[Natural.monus(predecessor, j)]), predecessor))
@@ -210,11 +210,9 @@ theorem Polynomial.Coefficients.multiply_respects (r : Ring)
             : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
         (secondEqual
             : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), q, qPrime))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.multiply(r, p, q),
-              Polynomial.Coefficients.multiply(r, pPrime, qPrime)) :=
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p * q, pPrime * qPrime) :=
   (k : Natural) ↦
-      Polynomial.Coefficients.multiply(r, p, q)[k]
+      (p * q)[k]
          = Ring.Sum(r, (i : Natural) ↦ (p[i] * q[Natural.monus(k, i)]), k)
                by Polynomial.nth_multiply
          = Ring.Sum(r, (i : Natural) ↦ (pPrime[i] * qPrime[Natural.monus(k, i)]), k)
@@ -224,7 +222,7 @@ theorem Polynomial.Coefficients.multiply_respects (r : Ring)
                                    by firstEqual(i)
                              = (pPrime[i] * qPrime[Natural.monus(k, i)])
                                    by secondEqual(Natural.monus(k, i)))
-         = Polynomial.Coefficients.multiply(r, pPrime, qPrime)[k]
+         = (pPrime * qPrime)[k]
                by Polynomial.nth_multiply
 
 -- ----------------------------------------------------------------------
@@ -237,8 +235,7 @@ definition Polynomial.multiply {r : Ring}
           → Polynomial(Ring.carrier(r), Ring.zero(r))
           → Polynomial(Ring.carrier(r), Ring.zero(r))
   by representatives a, b ↦
-       Polynomial.make(Ring.carrier(r), Ring.zero(r),
-           Polynomial.Coefficients.multiply(r, a, b))
+       Polynomial.make(Ring.carrier(r), Ring.zero(r), a * b)
   well_defined by
     (a a' b : Polynomial.Coefficients(Ring.carrier(r)))
         (firstEqual
@@ -246,18 +243,14 @@ definition Polynomial.multiply {r : Ring}
         ({ Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), b, b)
                by Polynomial.ExtensionallyEqual.reflexive;
            done by Polynomial.Coefficients.multiply_respects
-         } : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-                 Polynomial.Coefficients.multiply(r, a, b),
-                 Polynomial.Coefficients.multiply(r, a', b))),
+         } : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), a * b, a' * b)),
     (a b b' : Polynomial.Coefficients(Ring.carrier(r)))
         (secondEqual
             : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), b, b')) ↦
         ({ Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), a, a)
                by Polynomial.ExtensionallyEqual.reflexive;
            done by Polynomial.Coefficients.multiply_respects
-         } : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-                 Polynomial.Coefficients.multiply(r, a, b),
-                 Polynomial.Coefficients.multiply(r, a, b')))
+         } : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), a * b, a * b'))
 
 -- Operator overload: `p * q` over `Polynomial(...)` dispatches on the
 -- `Polynomial` type head, recovering the implicit ring from the operands.

@@ -441,7 +441,7 @@ theorem NaturalsBelow.ne_of_value_ne {n : Natural} (a b : NaturalsBelow(n))
 theorem Permutation.pairFactor {n : Natural} (sigma tau : Permutation(n))
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
         (memberP : p ∈ Permutation.orderedPairs(n))
-        : Permutation.pairOrient(Permutation.compose(sigma, tau), p)
+        : Permutation.pairOrient(sigma ∘ tau, p)
           = Integer.multiply(Permutation.pairOrient(tau, p),
                 Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))) := {
   let fp : NaturalsBelow(n) := Product.first(p);
@@ -463,9 +463,9 @@ theorem Permutation.pairFactor {n : Natural} (sigma tau : Permutation(n))
         Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))
            = Permutation.pairOrient(sigma, Product.make(tau(fp), tau(sp))) by substituting imageForward
            = Permutation.orient(sigma(tau(fp)), sigma(tau(sp))) as sigmaImageOrient;
-        Permutation.pairOrient(Permutation.compose(sigma, tau), p)
-           = Permutation.orient(Permutation.compose(sigma, tau)(fp), Permutation.compose(sigma, tau)(sp))
-           = Permutation.orient(sigma(tau(fp)), Permutation.compose(sigma, tau)(sp)) by substituting Permutation.apply_compose
+        Permutation.pairOrient(sigma ∘ tau, p)
+           = Permutation.orient((sigma ∘ tau)(fp), (sigma ∘ tau)(sp))
+           = Permutation.orient(sigma(tau(fp)), (sigma ∘ tau)(sp)) by substituting Permutation.apply_compose
            = Permutation.orient(sigma(tau(fp)), sigma(tau(sp))) by substituting Permutation.apply_compose
            = Integer.multiply(1, Permutation.orient(sigma(tau(fp)), sigma(tau(sp))))
            = Integer.multiply(Permutation.pairOrient(tau, p), Permutation.orient(sigma(tau(fp)), sigma(tau(sp))))
@@ -483,9 +483,9 @@ theorem Permutation.pairFactor {n : Natural} (sigma tau : Permutation(n))
         Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))
            = Permutation.pairOrient(sigma, Product.make(tau(sp), tau(fp))) by substituting imageBackward
            = Permutation.orient(sigma(tau(sp)), sigma(tau(fp))) as sigmaImageOrient;
-        Permutation.pairOrient(Permutation.compose(sigma, tau), p)
-           = Permutation.orient(Permutation.compose(sigma, tau)(fp), Permutation.compose(sigma, tau)(sp))
-           = Permutation.orient(sigma(tau(fp)), Permutation.compose(sigma, tau)(sp)) by substituting Permutation.apply_compose
+        Permutation.pairOrient(sigma ∘ tau, p)
+           = Permutation.orient((sigma ∘ tau)(fp), (sigma ∘ tau)(sp))
+           = Permutation.orient(sigma(tau(fp)), (sigma ∘ tau)(sp)) by substituting Permutation.apply_compose
            = Permutation.orient(sigma(tau(fp)), sigma(tau(sp))) by substituting Permutation.apply_compose
            = Integer.negate(Permutation.orient(sigma(tau(sp)), sigma(tau(fp)))) by Permutation.orient_antisymmetric
            = Integer.multiply(Integer.negate(1), Permutation.orient(sigma(tau(sp)), sigma(tau(fp))))
@@ -549,18 +549,17 @@ theorem Permutation.pairImage_permutes {n : Natural} (tau : Permutation(n))
 
 -- Multiplicativity of the sign.
 theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
-        : Permutation.sign(Permutation.compose(sigma, tau))
-          = Integer.multiply(Permutation.sign(sigma), Permutation.sign(tau)) := {
+        : Permutation.sign(sigma ∘ tau) = Integer.multiply(Permutation.sign(sigma), Permutation.sign(tau)) := {
   -- Rewrite the composite's orientation map by the pointwise factorization.
   (∀ (p : Pair(NaturalsBelow(n), NaturalsBelow(n))). p ∈ Permutation.orderedPairs(n)
-      → Permutation.pairOrient(Permutation.compose(sigma, tau), p)
+      → Permutation.pairOrient(sigma ∘ tau, p)
         = Integer.multiply(Permutation.pairOrient(tau, p),
               Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))))
       by (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
          (memberP : p ∈ Permutation.orderedPairs(n)) ↦
              done by Permutation.pairFactor;
   List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
-          Permutation.pairOrient(Permutation.compose(sigma, tau)), Permutation.orderedPairs(n))
+          Permutation.pairOrient(sigma ∘ tau), Permutation.orderedPairs(n))
       = List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
             (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦
                 Integer.multiply(Permutation.pairOrient(tau, p),
@@ -590,7 +589,7 @@ theorem Permutation.sign_compose {n : Natural} (sigma tau : Permutation(n))
                 Permutation.orderedPairs(n)))
       by List.Permutation.product_invariant recalling Integer.multiply_associative, Integer.multiply_commutative
       as reindexedProduct;
-  Permutation.sign(Permutation.compose(sigma, tau))
+  Permutation.sign(sigma ∘ tau)
      = List.product(Integer, Integer.multiply, Integer.one,
            List.map(Pair(NaturalsBelow(n), NaturalsBelow(n)), Integer,
                (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) ↦

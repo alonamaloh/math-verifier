@@ -31,7 +31,7 @@ definition Polynomial.one (r : Ring) : Polynomial(Ring.carrier(r), Ring.zero(r))
           Polynomial.Coefficients.nil(Ring.carrier(r))))
 
 -- Coefficient-wise negation.
-definition Polynomial.Coefficients.negate (r : Ring)
+definition Polynomial.Coefficients.negate {r : Ring}
         : Polynomial.Coefficients(Ring.carrier(r))
           → Polynomial.Coefficients(Ring.carrier(r))
   | Polynomial.Coefficients.nil =>
@@ -46,12 +46,12 @@ definition Polynomial.Coefficients.negate (r : Ring)
 theorem Polynomial.nth_negate (r : Ring)
         (p : Polynomial.Coefficients(Ring.carrier(r)))
         : ∀ (index : Natural).
-          Polynomial.Coefficients.negate(r, p)[index]
+          (- p)[index]
             = (- p[index]) :=
   by induction on p with IH {
     case Polynomial.Coefficients.nil:
         (index : Natural) ↦
-          Polynomial.Coefficients.negate(r, Polynomial.Coefficients.nil(Ring.carrier(r)))[index]
+          (- Polynomial.Coefficients.nil(Ring.carrier(r)))[index]
              = Ring.zero(r)                                             by Polynomial.nth_nil
              = (- Ring.zero(r))                                         by Ring.negate_zero
              = (- Polynomial.Coefficients.nil(Ring.carrier(r))[index])  by substituting Polynomial.nth_nil
@@ -60,8 +60,8 @@ theorem Polynomial.nth_negate (r : Ring)
           done by cases {
             case index = 0: reflexivity(Ring.carrier(r), (- a))
             case index = 1 + predecessor for some predecessor:
-                Polynomial.Coefficients.negate(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, rest))[1 + predecessor]
-                   = Polynomial.Coefficients.negate(r, rest)[predecessor]
+                (- Polynomial.Coefficients.cons(Ring.carrier(r), a, rest))[1 + predecessor]
+                   = (- rest)[predecessor]
                    = (- rest[predecessor])   by IH(predecessor)
                    = (- Polynomial.Coefficients.cons(Ring.carrier(r), a, rest)[1 + predecessor])
           }
@@ -72,22 +72,19 @@ theorem Polynomial.Coefficients.negate_respects (r : Ring)
         (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
         (equal
             : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
-        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.negate(r, p),
-              Polynomial.Coefficients.negate(r, pPrime)) :=
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), (- p), (- pPrime)) :=
   (index : Natural) ↦
-      Polynomial.Coefficients.negate(r, p)[index]
+      (- p)[index]
          = (- p[index])
          = (- pPrime[index])   by equal(index)
-         = Polynomial.Coefficients.negate(r, pPrime)[index]
+         = (- pPrime)[index]
 
 -- Lift to the quotient. A single lift (negation is unary).
 definition Polynomial.negate {r : Ring}
         : Polynomial(Ring.carrier(r), Ring.zero(r))
           → Polynomial(Ring.carrier(r), Ring.zero(r))
   by representatives p ↦
-       Polynomial.make(Ring.carrier(r), Ring.zero(r),
-           Polynomial.Coefficients.negate(r, p))
+       Polynomial.make(Ring.carrier(r), Ring.zero(r), (- p))
   well_defined by (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
                (equal
                    : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime)) ↦

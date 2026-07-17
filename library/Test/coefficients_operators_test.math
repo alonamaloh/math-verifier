@@ -1,0 +1,58 @@
+-- Operators at the raw coefficient-list level and permutation
+-- composition: `xs + ys`, `xs * ys`, `- xs` on Polynomial.Coefficients
+-- (implicit ring recovered from the operands), and `p ∘ q` on
+-- Permutation. Each elaborates to the spelled-out function, byte-identical.
+
+module Test.coefficients_operators_test
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Set.finite
+import Algebra.finite_permutation
+
+theorem coefficients_add_operator {r : Ring}
+        (xs ys : Polynomial.Coefficients(Ring.carrier(r)))
+        : xs + ys = Polynomial.Coefficients.add(r, xs, ys) :=
+  reflexivity(Polynomial.Coefficients(Ring.carrier(r)), xs + ys)
+
+theorem coefficients_multiply_operator {r : Ring}
+        (xs ys : Polynomial.Coefficients(Ring.carrier(r)))
+        : xs * ys = Polynomial.Coefficients.multiply(r, xs, ys) :=
+  reflexivity(Polynomial.Coefficients(Ring.carrier(r)), xs * ys)
+
+theorem coefficients_negate_operator {r : Ring}
+        (xs : Polynomial.Coefficients(Ring.carrier(r)))
+        : - xs = Polynomial.Coefficients.negate(r, xs) :=
+  reflexivity(Polynomial.Coefficients(Ring.carrier(r)), - xs)
+
+-- Operators nest with indexing: the k-th coefficient of a combination.
+theorem coefficients_operators_index {r : Ring}
+        (xs ys : Polynomial.Coefficients(Ring.carrier(r))) (k : Natural)
+        : (xs * ys + (- xs))[k] = Polynomial.Coefficients.add(r,
+              Polynomial.Coefficients.multiply(r, xs, ys),
+              Polynomial.Coefficients.negate(r, xs))[k] :=
+  reflexivity(Ring.carrier(r), (xs * ys + (- xs))[k])
+
+theorem compose_operator {n : Natural} (p q : Permutation(n))
+        : p ∘ q = Permutation.compose(p, q) :=
+  reflexivity(Permutation(n), p ∘ q)
+
+-- ∘ chains and applies: ((p ∘ q) ∘ p)(i) = p(q(p(i))).
+theorem compose_operator_applies {n : Natural} (p q : Permutation(n)) (i : NaturalsBelow(n))
+        : (p ∘ q ∘ p)(i) = p(q(p(i))) := {
+  Permutation.compose(p, q)(i) = p(q(i))   by Permutation.apply_compose;
+  (p ∘ q ∘ p)(i)
+     = (p ∘ q)(p(i))   by Permutation.apply_compose
+     = p(q(p(i)))      by Permutation.apply_compose
+}

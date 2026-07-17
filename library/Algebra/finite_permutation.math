@@ -190,6 +190,9 @@ definition Permutation.compose {n : Natural} (p q : Permutation(n)) : Permutatio
           Permutation.apply(p), Permutation.unapply(p),
           Permutation.is_inverse(q), Permutation.is_inverse(p)))
 
+-- Permutations compose with the usual circle: `(p ∘ q)(i) = p(q(i))`.
+operator (∘) on (Permutation, Permutation) := Permutation.compose
+
 -- The inverse permutation: swap the forward and backward maps.
 definition Permutation.inverse {n : Natural} (p : Permutation(n)) : Permutation(n) :=
   Permutation.make(n, Permutation.unapply(p), Permutation.apply(p),
@@ -202,7 +205,7 @@ theorem Permutation.apply_identity {n : Natural} (i : NaturalsBelow(n))
   reflexivity(i)
 
 theorem Permutation.apply_compose {n : Natural} (p q : Permutation(n)) (i : NaturalsBelow(n))
-        : Permutation.compose(p, q)(i) = p(q(i)) :=
+        : (p ∘ q)(i) = p(q(i)) :=
   reflexivity(p(q(i)))
 
 theorem Permutation.apply_inverse {n : Natural} (p : Permutation(n)) (i : NaturalsBelow(n))
@@ -217,28 +220,27 @@ theorem Permutation.apply_inverse {n : Natural} (p : Permutation(n)) (i : Natura
 -- inverse-pair cancellation for the inverse laws.
 
 theorem Permutation.compose_identity_left {n : Natural} (p : Permutation(n))
-        : Permutation.compose(Permutation.identity(n), p) = p :=
+        : Permutation.identity(n) ∘ p = p :=
   done
 
 theorem Permutation.compose_identity_right {n : Natural} (p : Permutation(n))
-        : Permutation.compose(p, Permutation.identity(n)) = p :=
+        : p ∘ Permutation.identity(n) = p :=
   done
 
 theorem Permutation.compose_associative {n : Natural} (p q r : Permutation(n))
-        : Permutation.compose(Permutation.compose(p, q), r)
-          = Permutation.compose(p, Permutation.compose(q, r)) :=
+        : p ∘ q ∘ r = p ∘ (q ∘ r) :=
   done
 
 theorem Permutation.inverse_compose_left {n : Natural} (p : Permutation(n))
-        : Permutation.compose(Permutation.inverse(p), p) = Permutation.identity(n) := {
-  ∀ (i : NaturalsBelow(n)). Permutation.compose(Permutation.inverse(p), p)(i) = Permutation.identity(n)(i)
+        : Permutation.inverse(p) ∘ p = Permutation.identity(n) := {
+  ∀ (i : NaturalsBelow(n)). (Permutation.inverse(p) ∘ p)(i) = Permutation.identity(n)(i)
       by Permutation.left_inverse;
   done by Permutation.equal_of_apply_equal
 }
 
 theorem Permutation.inverse_compose_right {n : Natural} (p : Permutation(n))
-        : Permutation.compose(p, Permutation.inverse(p)) = Permutation.identity(n) := {
-  ∀ (i : NaturalsBelow(n)). Permutation.compose(p, Permutation.inverse(p))(i) = Permutation.identity(n)(i)
+        : p ∘ Permutation.inverse(p) = Permutation.identity(n) := {
+  ∀ (i : NaturalsBelow(n)). (p ∘ Permutation.inverse(p))(i) = Permutation.identity(n)(i)
     by { take i : NaturalsBelow(n); done by Permutation.right_inverse };
   done by Permutation.equal_of_apply_equal
 }

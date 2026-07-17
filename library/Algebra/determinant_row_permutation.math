@@ -170,43 +170,35 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : Natural}
               Permutation.allPermutations(n))
           = Field.from_integer(f, Permutation.sign(p)) * Matrix.determinant(B) := {
   -- σ ↦ σ∘p permutes the permutation list.
-  (∀ (a b : Permutation(n)). Permutation.compose(a, p) = Permutation.compose(b, p) → a = b)
-      by (a b : Permutation(n)) (equalComposites : Permutation.compose(a, p) = Permutation.compose(b, p)) ↦
+  (∀ (a b : Permutation(n)). a ∘ p = b ∘ p → a = b)
+      by (a b : Permutation(n)) (equalComposites : a ∘ p = b ∘ p) ↦
            Permutation.compose_right_cancel;
   List.Distinct(Permutation(n), Permutation.allPermutations(n))
       by Permutation.allPermutations_distinct;
-  List.Distinct(Permutation(n),
-        List.map(Permutation(n), Permutation(n),
-            (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n)))
+  List.Distinct(Permutation(n), List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n)))
       by List.map_distinct;
   (∀ (x : Permutation(n)). x ∈
-        List.map(Permutation(n), Permutation(n),
-            (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n))
+        List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n))
         → x ∈ Permutation.allPermutations(n))
       by (x : Permutation(n)) (xInMap : x ∈
-          List.map(Permutation(n), Permutation(n),
-              (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n))) ↦
+          List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n))) ↦
             Permutation.allPermutations_complete;
-  length(List.map(Permutation(n), Permutation(n),
-        (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n)))
+  length(List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n)))
       = length(Permutation.allPermutations(n))
       by List.map_length;
   List.Permutation(Permutation(n),
-        List.map(Permutation(n), Permutation(n),
-            (rho : Permutation(n)) ↦ Permutation.compose(rho, p), Permutation.allPermutations(n)),
+        List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n)),
         Permutation.allPermutations(n))
       by List.permutation_of_distinct_inclusion;
   List.Permutation(Permutation(n), Permutation.allPermutations(n),
-          List.map(Permutation(n), Permutation(n),
-              (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
-              Permutation.allPermutations(n)))
+          List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n)))
       by List.Permutation.symmetric;
 
   -- Each reindexed term: sign and product factor through sign(p) and det(B).
   ∀ (rho : Permutation(n)).
-      Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+      Field.from_integer(f, Permutation.sign(rho ∘ p))
           * Field.productOver(
-                (i : NaturalsBelow(n)) ↦ B(p(i), Permutation.compose(rho, p)(i)),
+                (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                 NaturalsBelow.enumerate(n))
       = Field.from_integer(f, Permutation.sign(p))
           * (Field.from_integer(f, Permutation.sign(rho))
@@ -215,7 +207,7 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : Natural}
                       NaturalsBelow.enumerate(n)))
       by (rho : Permutation(n)) ↦ {
           Field.productOver(
-                (i : NaturalsBelow(n)) ↦ B(p(i), Permutation.compose(rho, p)(i)),
+                (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                 NaturalsBelow.enumerate(n))
              = Field.productOver(
                    (j : NaturalsBelow(n)) ↦ B(j, rho(j)),
@@ -225,19 +217,19 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : Natural}
               by Permutation.sign_is_unit;
           Permutation.sign(p) = 1 ∨ Permutation.sign(p) = Integer.negate(1)
               by Permutation.sign_is_unit;
-          Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+          Field.from_integer(f, Permutation.sign(rho ∘ p))
              = Field.from_integer(f, Integer.multiply(Permutation.sign(rho), Permutation.sign(p)))
                    by substituting Permutation.sign_compose
              = Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p))
                    by Field.from_integer_multiply_units
                  as signReindexed;
-          Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+          Field.from_integer(f, Permutation.sign(rho ∘ p))
                 * Field.productOver(
-                      (i : NaturalsBelow(n)) ↦ B(p(i), Permutation.compose(rho, p)(i)),
+                      (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                       NaturalsBelow.enumerate(n))
              = (Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p)))
                    * Field.productOver(
-                         (i : NaturalsBelow(n)) ↦ B(p(i), Permutation.compose(rho, p)(i)),
+                         (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                          NaturalsBelow.enumerate(n))
                    by substituting signReindexed
              = (Field.from_integer(f, Permutation.sign(rho)) * Field.from_integer(f, Permutation.sign(p)))
@@ -266,15 +258,13 @@ theorem Matrix.determinant_row_permutation {f : Field} {n : Natural}
                    * Field.productOver(
                          (i : NaturalsBelow(n)) ↦ B(p(i), sigma(i)),
                          NaturalsBelow.enumerate(n)),
-           List.map(Permutation(n), Permutation(n),
-               (rho : Permutation(n)) ↦ Permutation.compose(rho, p),
-               Permutation.allPermutations(n)))
+           List.map(Permutation(n), Permutation(n), (rho : Permutation(n)) ↦ rho ∘ p, Permutation.allPermutations(n)))
            by Field.sumOver_permutation
      = Field.sumOver(
            (rho : Permutation(n)) ↦
-               Field.from_integer(f, Permutation.sign(Permutation.compose(rho, p)))
+               Field.from_integer(f, Permutation.sign(rho ∘ p))
                    * Field.productOver(
-                         (i : NaturalsBelow(n)) ↦ B(p(i), Permutation.compose(rho, p)(i)),
+                         (i : NaturalsBelow(n)) ↦ B(p(i), (rho ∘ p)(i)),
                          NaturalsBelow.enumerate(n)),
            Permutation.allPermutations(n))
            by Field.sumOver_map
