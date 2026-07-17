@@ -1,0 +1,278 @@
+-- Algebra/matrix_polynomial_evaluation.math
+--
+-- Evaluating a polynomial p ∈ R[x] at a square matrix A: the truncated
+-- sum Σ_{k≤d} p[k]·Aᵏ. The workhorse `evaluatePolynomialBelow` carries
+-- its bound explicitly — every consumer in the Cayley–Hamilton arc
+-- already holds a `DegreeLessThan` witness — and raising a sufficient
+-- bound never changes the value (the padding lemma). The bound-free
+-- `evaluatePolynomial` on top is definite description over the padded
+-- values; nothing downstream unfolds it — consumers go through the one
+-- characterizing lemma `evaluatePolynomial_at_bound`.
+
+module Algebra.matrix_polynomial_evaluation
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.subtraction
+import Set.finite
+import Lists.list
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_power
+import Algebra.ring_summation
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.instances
+import Polynomial.commutative
+import Polynomial.degree
+import Polynomial.degree_product
+import Polynomial.division
+
+-- The truncated evaluation Σ_{k≤bound} p[k]·Aᵏ, an honest finite sum.
+definition Matrix.evaluatePolynomialBelow {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n)) (bound : ℕ) : Matrix(c, n, n) :=
+  Ring.Sum(Matrix.ring(c, n), (k : ℕ) ↦ Matrix.scale(p[k], Matrix.power(A, k)), bound)
+
+-- Padding: past a degree bound, raising the truncation point adds only
+-- zero terms.
+theorem Matrix.evaluatePolynomialBelow_stable {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n)) (bound : ℕ)
+        (degreeBound : Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound))
+        (m : ℕ)
+        : Matrix.evaluatePolynomialBelow(p, A, bound + m)
+          = Matrix.evaluatePolynomialBelow(p, A, bound) :=
+  by induction on m with IH {
+    case base: {
+        bound + 0 = bound as baseEquation;
+        done by substituting baseEquation
+      }
+    case step(k): {
+        bound + (1 + k) = 1 + (bound + k) as indexEquation;
+        1 + bound ≤ 1 + (bound + k);
+        p[1 + (bound + k)] = CommutativeRing.zero(c) by degreeBound as coefficientVanishes;
+        Matrix.evaluatePolynomialBelow(p, A, bound + (1 + k))
+           = Matrix.evaluatePolynomialBelow(p, A, 1 + (bound + k))
+                 by substituting indexEquation
+           = Matrix.evaluatePolynomialBelow(p, A, bound + k)
+             + Matrix.scale(p[1 + (bound + k)], Matrix.power(A, 1 + (bound + k)))
+                 by Ring.Sum.add_one
+           = Matrix.evaluatePolynomialBelow(p, A, bound + k)
+             + Matrix.scale(CommutativeRing.zero(c), Matrix.power(A, 1 + (bound + k)))
+                 by substituting coefficientVanishes
+           = Matrix.evaluatePolynomialBelow(p, A, bound + k)
+             + Matrix.zero(c, n, n)
+                 by substituting Matrix.scale_zero_scalar
+           = Matrix.evaluatePolynomialBelow(p, A, bound + k)
+                 by Matrix.add_zero
+           = Matrix.evaluatePolynomialBelow(p, A, bound)
+                 by IH
+      }
+  }
+
+theorem Matrix.evaluatePolynomialBelow_stable_of_le {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n)) (bound other : ℕ)
+        (le : bound ≤ other)
+        (degreeBound : Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound))
+        : Matrix.evaluatePolynomialBelow(p, A, other)
+          = Matrix.evaluatePolynomialBelow(p, A, bound) := {
+  choose m such that other = bound + m as decomposition
+      from Natural.subtraction_witness;
+  Matrix.evaluatePolynomialBelow(p, A, other)
+     = Matrix.evaluatePolynomialBelow(p, A, bound + m)   by substituting decomposition
+     = Matrix.evaluatePolynomialBelow(p, A, bound)       by Matrix.evaluatePolynomialBelow_stable
+}
+
+-- Additivity, coefficient by coefficient.
+theorem Matrix.evaluatePolynomialBelow_add {c : CommutativeRing} {n : ℕ}
+        (p q : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                          Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n)) (bound : ℕ)
+        : Matrix.evaluatePolynomialBelow((p + q), A, bound)
+          = Matrix.evaluatePolynomialBelow(p, A, bound)
+            + Matrix.evaluatePolynomialBelow(q, A, bound) := {
+  ∀ (k : ℕ). Matrix.scale((p + q)[k], Matrix.power(A, k))
+      = Matrix.scale(p[k], Matrix.power(A, k)) + Matrix.scale(q[k], Matrix.power(A, k))
+      by (k : ℕ) ↦ {
+          Matrix.scale((p + q)[k], Matrix.power(A, k))
+             = Matrix.scale((p[k] + q[k]), Matrix.power(A, k))
+                   by substituting Polynomial.coefficientOf_add
+             = Matrix.scale(p[k], Matrix.power(A, k)) + Matrix.scale(q[k], Matrix.power(A, k))
+                   by Matrix.scale_add_scalar;
+          done
+        } as pointwiseSplit;
+  Matrix.evaluatePolynomialBelow((p + q), A, bound)
+     = Ring.Sum(Matrix.ring(c, n),
+           (k : ℕ) ↦ Matrix.scale(p[k], Matrix.power(A, k))
+                     + Matrix.scale(q[k], Matrix.power(A, k)), bound)
+           by Ring.Sum.extensional(pointwise := pointwiseSplit)
+     = Matrix.evaluatePolynomialBelow(p, A, bound)
+       + Matrix.evaluatePolynomialBelow(q, A, bound)
+           by Ring.Sum.add(f := (k : ℕ) ↦ Matrix.scale(p[k], Matrix.power(A, k)),
+                           g := (k : ℕ) ↦ Matrix.scale(q[k], Matrix.power(A, k)))
+}
+
+-- ----------------------------------------------------------------------
+-- The bound-free evaluation, by definite description over the padded
+-- values. Consumers never unfold it: `evaluatePolynomial_at_bound` below
+-- is the boundary.
+
+theorem Matrix.evaluatePolynomial_value_exists {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n))
+        : ∃ (value : Matrix(c, n, n)). ∃ (bound : ℕ).
+              Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound)
+              ∧ value = Matrix.evaluatePolynomialBelow(p, A, bound) := {
+  choose bound such that Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, bound)
+      from Polynomial.exists_degree_bound(CommutativeRing.ring(c), p);
+  bound ≤ 1 + bound;
+  Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound)
+      by Polynomial.DegreeLessThan.weaken;
+  witness Matrix.evaluatePolynomialBelow(p, A, bound) with {
+    witness bound with {
+      Matrix.evaluatePolynomialBelow(p, A, bound) = Matrix.evaluatePolynomialBelow(p, A, bound);
+      done
+    }
+  }
+}
+
+theorem Matrix.evaluatePolynomial_value_unique {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n))
+        : ∀ (value otherValue : Matrix(c, n, n)).
+          (∃ (bound : ℕ).
+              Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound)
+              ∧ value = Matrix.evaluatePolynomialBelow(p, A, bound))
+          → (∃ (bound : ℕ).
+              Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound)
+              ∧ otherValue = Matrix.evaluatePolynomialBelow(p, A, bound))
+          → value = otherValue := {
+  take value : Matrix(c, n, n);
+  take otherValue : Matrix(c, n, n);
+  suppose ∃ (bound : ℕ).
+      Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound)
+      ∧ value = Matrix.evaluatePolynomialBelow(p, A, bound) as valueWitness;
+  suppose ∃ (bound : ℕ).
+      Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound)
+      ∧ otherValue = Matrix.evaluatePolynomialBelow(p, A, bound) as otherWitness;
+  choose bound1 such that
+      Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound1)
+      ∧ value = Matrix.evaluatePolynomialBelow(p, A, bound1)
+      from valueWitness;
+  choose bound2 such that
+      Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound2)
+      ∧ otherValue = Matrix.evaluatePolynomialBelow(p, A, bound2)
+      from otherWitness;
+  Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound1);
+  value = Matrix.evaluatePolynomialBelow(p, A, bound1) as valueEquation;
+  Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound2);
+  otherValue = Matrix.evaluatePolynomialBelow(p, A, bound2) as otherEquation;
+  bound1 ≤ bound2 ∨ 1 + bound2 ≤ bound1 by Natural.le_or_one_plus_le;
+  done by cases {
+    case bound1 ≤ bound2: {
+        Matrix.evaluatePolynomialBelow(p, A, bound2)
+           = Matrix.evaluatePolynomialBelow(p, A, bound1)
+            by Matrix.evaluatePolynomialBelow_stable_of_le as boundsAgree;
+        value
+           = Matrix.evaluatePolynomialBelow(p, A, bound1)   by valueEquation
+           = Matrix.evaluatePolynomialBelow(p, A, bound2)   by boundsAgree
+           = otherValue                                     by otherEquation;
+        done
+      }
+    case 1 + bound2 ≤ bound1: {
+        bound2 < bound1 by Natural.lt_of_add_one_le;
+        bound2 ≤ bound1 by Natural.LessThan.weaken;
+        Matrix.evaluatePolynomialBelow(p, A, bound1)
+           = Matrix.evaluatePolynomialBelow(p, A, bound2)
+            by Matrix.evaluatePolynomialBelow_stable_of_le as boundsAgree;
+        value
+           = Matrix.evaluatePolynomialBelow(p, A, bound1)   by valueEquation
+           = Matrix.evaluatePolynomialBelow(p, A, bound2)   by boundsAgree
+           = otherValue                                     by otherEquation;
+        done
+      }
+  }
+}
+
+definition Matrix.evaluatePolynomial {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n)) : Matrix(c, n, n) :=
+  Logic.the(Matrix(c, n, n),
+      (value : Matrix(c, n, n)) ↦ ∃ (bound : ℕ).
+          Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound)
+          ∧ value = Matrix.evaluatePolynomialBelow(p, A, bound),
+      Matrix.evaluatePolynomial_value_exists(p, A),
+      Matrix.evaluatePolynomial_value_unique(p, A))
+
+-- The characterizing lemma — the definition's one public face: at any
+-- sufficient bound, evaluation is the truncated sum.
+theorem Matrix.evaluatePolynomial_at_bound {c : CommutativeRing} {n : ℕ}
+        (p : Polynomial(Ring.carrier(CommutativeRing.ring(c)),
+                        Ring.zero(CommutativeRing.ring(c))))
+        (A : Matrix(c, n, n)) (bound : ℕ)
+        (degreeBound : Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + bound))
+        : Matrix.evaluatePolynomial(p, A) = Matrix.evaluatePolynomialBelow(p, A, bound) := {
+  ∃ (chosenBound : ℕ).
+      Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + chosenBound)
+      ∧ Matrix.evaluatePolynomial(p, A)
+        = Matrix.evaluatePolynomialBelow(p, A, chosenBound)
+      by Logic.the_satisfies(Matrix(c, n, n),
+             (value : Matrix(c, n, n)) ↦ ∃ (chosenBound : ℕ).
+                 Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + chosenBound)
+                 ∧ value = Matrix.evaluatePolynomialBelow(p, A, chosenBound),
+             Matrix.evaluatePolynomial_value_exists(p, A),
+             Matrix.evaluatePolynomial_value_unique(p, A));
+  choose chosenBound such that
+      Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + chosenBound)
+      ∧ Matrix.evaluatePolynomial(p, A)
+        = Matrix.evaluatePolynomialBelow(p, A, chosenBound);
+  Polynomial.DegreeLessThan(CommutativeRing.ring(c), p, 1 + chosenBound);
+  Matrix.evaluatePolynomial(p, A)
+     = Matrix.evaluatePolynomialBelow(p, A, chosenBound) as valueEquation;
+  chosenBound ≤ bound ∨ 1 + bound ≤ chosenBound by Natural.le_or_one_plus_le;
+  done by cases {
+    case chosenBound ≤ bound: {
+        Matrix.evaluatePolynomialBelow(p, A, bound)
+           = Matrix.evaluatePolynomialBelow(p, A, chosenBound)
+            by Matrix.evaluatePolynomialBelow_stable_of_le as boundsAgree;
+        Matrix.evaluatePolynomial(p, A)
+           = Matrix.evaluatePolynomialBelow(p, A, chosenBound)   by valueEquation
+           = Matrix.evaluatePolynomialBelow(p, A, bound)         by boundsAgree;
+        done
+      }
+    case 1 + bound ≤ chosenBound: {
+        bound < chosenBound by Natural.lt_of_add_one_le;
+        bound ≤ chosenBound by Natural.LessThan.weaken;
+        Matrix.evaluatePolynomialBelow(p, A, chosenBound)
+           = Matrix.evaluatePolynomialBelow(p, A, bound)
+            by Matrix.evaluatePolynomialBelow_stable_of_le as boundsAgree;
+        Matrix.evaluatePolynomial(p, A)
+           = Matrix.evaluatePolynomialBelow(p, A, chosenBound)   by valueEquation
+           = Matrix.evaluatePolynomialBelow(p, A, bound)         by boundsAgree;
+        done
+      }
+  }
+}
