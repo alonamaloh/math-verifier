@@ -1580,3 +1580,15 @@ The checker should either suppress the warning for terminal claims or
 reword it (e.g. "final claim could be closed by the auto-prover — the
 `by` can only be removed if the surrounding block re-proves it"), since
 the current wording invites an edit that cannot work.
+
+**FEATURE GAP (ellipsis) — anti-unification is syntactic, so the
+SIMPLIFIED convolution spelling fails (2026-07-17).** The unsimplified
+`p[0] * q[k ∸ 0] + ... + p[k] * q[k ∸ k]` elaborates and cites across the
+δ-bridge to `Ring.Sum` (Test/ring_ellipsis_test.math, landed as
+`Polynomial.nth_multiply_expanded`). But the form every text writes —
+`p[0]*q[k] + p[1]*q[k∸1] + ... + p[k]*q[0]` — defeats term-function
+inference twice: `q[k]` vs `q[k ∸ 0]` are defeq but not syntactically
+anti-unifiable, and a second prefix term would be needed to pin the
+coupled index pair (i, k∸i). Fix directions: defeq-tolerant
+anti-unification at the differing positions, and/or using TWO prefix
+terms (the existing 0/1 evaluation probe is the right skeleton).

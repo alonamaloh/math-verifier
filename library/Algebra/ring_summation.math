@@ -17,6 +17,25 @@ import Natural.monus
 import Algebra.aggregation
 import Algebra.ring_bundle
 
+-- Fold-capable operations at an abstract ring carrier: certify the
+-- `+`/`*` the operator registry dispatches to, so the fold binder form
+-- (`sum i from … to … of …`) and ellipsis notation speak at
+-- Ring.carrier(r).
+theorem Ring.add_is_monoid (r : Ring)
+        : IsMonoid(Ring.carrier(r), Ring.add, Ring.zero(r)) := {
+  IsRing(Ring.carrier(r), Ring.add, Ring.zero(r), Ring.negate, Ring.multiply, Ring.one(r));
+  done
+}
+
+theorem Ring.multiply_is_monoid (r : Ring)
+        : IsMonoid(Ring.carrier(r), Ring.multiply, Ring.one(r)) := {
+  IsRing(Ring.carrier(r), Ring.add, Ring.zero(r), Ring.negate, Ring.multiply, Ring.one(r));
+  done
+}
+
+fold_operation (+) on Ring.carrier := Ring.add_is_monoid
+fold_operation (*) on Ring.carrier := Ring.multiply_is_monoid
+
 -- Σ_{i=0}^{n} f(i): the fold of the ring's addition over the inclusive
 -- range — `1 + n` terms starting at 0.
 definition Ring.Sum (r : Ring) (f : Natural → Ring.carrier(r)) (n : Natural)

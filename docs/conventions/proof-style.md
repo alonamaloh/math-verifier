@@ -257,6 +257,18 @@ Concretely:
   above — `representative`, not `rep`, in declared names) and in
   binders within proofs. Verbosity that aids comprehension is a
   feature, not a cost — `halvedEpsilonPositive`, not `hep`.
+- **Consider the ellipsis for reader-facing sums.** A statement a text
+  writes term-by-term should be spelled that way:
+  `(p * q)[k] = p[0] * q[k ∸ 0] + ... + p[k] * q[k ∸ k]`
+  (`Polynomial.nth_multiply_expanded`) or
+  `(1 - r) * (r^0 + r^1 + ... + r^(n - 1)) = 1 - r^n`. The ellipsis
+  elaborates through the `fold_operation` registry (registered for
+  `+`/`*` at Natural, Integer, Ring.carrier, VectorSpace.carrier), and
+  is one δ-step from `Ring.Sum` — citations bridge. INSIDE calc chains
+  keep the binder form (`Ring.Sum(r, (i) ↦ …, k)`): the `Sum.*` lemma
+  library speaks it. Caveat: write prefix terms UNSIMPLIFIED
+  (`q[k ∸ 0]`, not `q[k]`) — term-function inference is syntactic
+  (gap filed in the inbox).
 
 - **Math-like phrasing.** Compose the proof out of named
   mathematical steps. A reader should see "triangle inequality on
