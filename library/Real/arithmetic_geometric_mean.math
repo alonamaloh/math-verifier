@@ -43,7 +43,7 @@ import Rational.ground_arithmetic
 import Set.basics
 import Algebra.ring_lemmas
 import Real.interface
-import Real.harmonic_series
+import Natural.power
 
 -- Any nonnegative square root of x·y is at most the arithmetic mean.
 theorem Real.geometric_mean_le_arithmetic_mean
@@ -369,27 +369,34 @@ theorem Real.means_inequality_predecessor (m : Natural)
 
 -- The inequality holds at every power of two …
 theorem Real.means_inequality_doubling (k : Natural)
-        : Real.MeansInequalityAt(Natural.doubling(k)) :=
+        : Real.MeansInequalityAt(2 ^ k) :=
   by induction on k with IH {
-    case base: Real.means_inequality_one
+    case base: {
+        2 ^ 0 = 1   by Natural.power_zero;
+        Real.MeansInequalityAt(1)   by Real.means_inequality_one;
+        done
+      }
     case step(predecessor): {
-        Real.MeansInequalityAt(Natural.doubling(predecessor) + Natural.doubling(predecessor));
-        done by substituting Natural.doubling_one_plus(k := predecessor)
+        Real.MeansInequalityAt(2 ^ predecessor + 2 ^ predecessor);
+        done by substituting Natural.two_power_one_plus(k := predecessor)
       }
   }
 
 -- … every index sits below some power of two …
-theorem Natural.le_doubling (n : Natural) : n ≤ Natural.doubling(n) :=
+theorem Natural.le_two_power (n : Natural) : n ≤ 2 ^ n :=
   by induction on n with IH {
-    case base: done
+    case base: {
+        1 ≤ 2 ^ 0   by Natural.one_le_two_power;
+        done
+      }
     case step(predecessor): {
-        1 ≤ Natural.doubling(predecessor);
+        1 ≤ 2 ^ predecessor;
         1 + predecessor
          = predecessor + 1
-         ≤ Natural.doubling(predecessor) + 1
-         = 1 + Natural.doubling(predecessor)
-         ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
-         = Natural.doubling(1 + predecessor)
+         ≤ 2 ^ predecessor + 1
+         = 1 + 2 ^ predecessor
+         ≤ 2 ^ predecessor + 2 ^ predecessor
+         = 2 ^ (1 + predecessor)   by substituting Natural.two_power_one_plus
       }
   }
 
@@ -421,11 +428,11 @@ theorem Real.arithmetic_mean_geometric_mean (n : Natural)
         (termsNonneg : ∀ (j : Natural). 0 ≤ s(j))
         : (n : Real) ^ n * Real.partialProduct(s, n)
           ≤ Real.partialSum(s, n) ^ n := {
-  n ≤ Natural.doubling(n);
-  choose difference such that Natural.doubling(n) = difference + n
+  n ≤ 2 ^ n;
+  choose difference such that 2 ^ n = difference + n
       from Natural.le_to_add;
-  difference + n = Natural.doubling(n);
-  Real.MeansInequalityAt(Natural.doubling(n));
+  difference + n = 2 ^ n;
+  Real.MeansInequalityAt(2 ^ n);
   Real.MeansInequalityAt(difference + n);
   Real.MeansInequalityAt(n) by Real.means_inequality_downward;
   done

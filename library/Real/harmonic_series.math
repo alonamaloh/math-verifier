@@ -21,6 +21,7 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 import Natural.add_order
+import Natural.power
 import Integer.basics
 import Integer.embedding
 import Rational.basics
@@ -51,28 +52,6 @@ import Real.interface
 
 definition Real.harmonic_term (n : Natural) : Real :=
   1 / (1 + n : Real)
-
-definition Natural.doubling : Natural → Natural
-  | 0 => 1
-  | 1 + K => Natural.doubling(K) + Natural.doubling(K)
-
--- The recursion rule as a citeable equation. `Natural.add` is opaque, so
--- `doubling(1 + k)` does not reduce on its own; this bridges through `one_add`.
-theorem Natural.doubling_one_plus (k : Natural)
-        : Natural.doubling(1 + k) = Natural.doubling(k) + Natural.doubling(k) :=
-  Natural.doubling(1 + k)
-     = Natural.doubling(k) + Natural.doubling(k)
-
-theorem Natural.doubling_at_least_one (K : Natural)
-        : 1 ≤ Natural.doubling(K) :=
-  by induction on K with IH {
-    case base: done
-    case step(predecessor):
-        1
-           ≤ Natural.doubling(predecessor)    by IH
-           ≤ Natural.doubling(predecessor) + Natural.doubling(predecessor)
-           = Natural.doubling(1 + predecessor)
-  }
 
 -- Every harmonic term is nonnegative.
 theorem Real.harmonic_term_nonneg (j : Natural)
@@ -149,7 +128,7 @@ theorem Real.harmonic_doubling_bound (p : Natural) (pPositive : 1 ≤ p)
 -- Iterating the doubling: S(2ᴷ) ≥ 1 + K/2, the linearGrowth ladder.
 theorem Real.harmonic_doubling_growth (K : Natural)
         : (Rational.linearGrowth(Rational.one_half, K))
-          ≤ Real.partialSum(Real.harmonic_term, Natural.doubling(K)) :=
+          ≤ Real.partialSum(Real.harmonic_term, 2 ^ K) :=
   by induction on K with IH {
     case base: {
         -- S(1) = 1/1 = 1, and the ladder starts at 1.
@@ -158,7 +137,9 @@ theorem Real.harmonic_doubling_growth (K : Natural)
         1 / (1 + 0 : Real)
            = (1 + 0 : Real) * (1 / (1 + 0 : Real))
            = 1;
-        Real.partialSum(Real.harmonic_term, Natural.doubling(0))
+        2 ^ 0 = 1   by Natural.power_zero;
+        Real.partialSum(Real.harmonic_term, 2 ^ 0)
+           = Real.partialSum(Real.harmonic_term, 1)
            = Real.zero + Real.harmonic_term(0)
            = Real.harmonic_term(0)
            = 1;
@@ -166,11 +147,9 @@ theorem Real.harmonic_doubling_growth (K : Natural)
         done
       }
     case step(predecessor): {
-        1 ≤ Natural.doubling(predecessor);
-        Real.partialSum(Real.harmonic_term, Natural.doubling(predecessor)) + 1 / (2 : Real)
-            ≤ Real.partialSum(
-                  Real.harmonic_term,
-                  Natural.doubling(predecessor) + Natural.doubling(predecessor));
+        1 ≤ 2 ^ predecessor;
+        Real.partialSum(Real.harmonic_term, 2 ^ predecessor) + 1 / (2 : Real)
+            ≤ Real.partialSum(Real.harmonic_term, 2 ^ predecessor + 2 ^ predecessor);
         ((Rational.linearGrowth(Rational.one_half, 1 + predecessor))
               : Real)
            = ((Rational.linearGrowth(Rational.one_half, predecessor)
@@ -182,12 +161,10 @@ theorem Real.harmonic_doubling_growth (K : Natural)
               : Real)
              + 1 / (2 : Real)
                  by Real.one_half_cast
-           ≤ Real.partialSum(Real.harmonic_term, Natural.doubling(predecessor))
+           ≤ Real.partialSum(Real.harmonic_term, 2 ^ predecessor)
              + 1 / (2 : Real)
-           ≤ Real.partialSum(
-                 Real.harmonic_term,
-                 Natural.doubling(predecessor) + Natural.doubling(predecessor))
-           = Real.partialSum(Real.harmonic_term, Natural.doubling(1 + predecessor))
+           ≤ Real.partialSum(Real.harmonic_term, 2 ^ predecessor + 2 ^ predecessor)
+           = Real.partialSum(Real.harmonic_term, 2 ^ (1 + predecessor))
       }
   }
 
@@ -215,13 +192,13 @@ theorem Real.harmonic_series_diverges
        = Rational.zero + (1 + K : Rational) * Rational.one_half
        < Rational.one + (1 + K : Rational) * Rational.one_half
        = Rational.linearGrowth(Rational.one_half, 1 + K);
-    witness Natural.doubling(1 + K) with
+    witness 2 ^ (1 + K) with
         (m : Natural)
-        (aboveThreshold : Natural.doubling(1 + K) ≤ m) ↦ {
+        (aboveThreshold : 2 ^ (1 + K) ≤ m) ↦ {
           ((Rational.linearGrowth(Rational.one_half, 1 + K)) : Real)
-              ≤ Real.partialSum(Real.harmonic_term, Natural.doubling(1 + K));
+              ≤ Real.partialSum(Real.harmonic_term, 2 ^ (1 + K));
           Real.harmonic_term_nonneg;
-          Real.partialSum(Real.harmonic_term, Natural.doubling(1 + K))
+          Real.partialSum(Real.harmonic_term, 2 ^ (1 + K))
               ≤ Real.partialSum(Real.harmonic_term, m)
               by Real.partialSum_monotone_of_nonneg;
           (roof : Real) < ((Rational.linearGrowth(Rational.one_half, 1 + K)) : Real);
@@ -229,8 +206,7 @@ theorem Real.harmonic_series_diverges
              ≤ (roof : Real)
              < ((Rational.linearGrowth(Rational.one_half, 1 + K))
                 : Real)
-             ≤ Real.partialSum(
-                   Real.harmonic_term, Natural.doubling(1 + K))
+             ≤ Real.partialSum(Real.harmonic_term, 2 ^ (1 + K))
              ≤ Real.partialSum(Real.harmonic_term, m)
         }
   }
