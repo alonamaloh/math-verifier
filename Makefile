@@ -198,7 +198,10 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # 2026-07-16: 276 → 271. R3 application convention (`rep(n)` for wrapped
 # functions) removed the `sequenceFunction` walls from Real/algebra.math,
 # and Real/density.math's ∃-statement now speaks `seq(m)` directly.
-CLEAN_LEAK_BUDGET ?= 271
+# 2026-07-17: 271 → 272. LA wave 3: exchange_lemma polished to the bar
+# (135 findings settled, ~90 hints/names dropped, 18 documented keeps)
+# and MANIFEST-ADDED at a single counted leak.
+CLEAN_LEAK_BUDGET ?= 272
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the
 # elaborator under MATH_CHECK_ANON_TUPLES (see `clean-anon-ratchet`). Held at the
