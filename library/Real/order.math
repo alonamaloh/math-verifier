@@ -506,6 +506,11 @@ automatic theorem Real.negate_nonneg_le_zero (x : ℝ) (xNonneg : 0 ≤ x)
         : -x ≤ 0 :=
   -x ≤ 0 by substituting (ring : x - 0 = 0 - -x)
 
+-- … and dually the negation of a nonpositive number sits above zero.
+automatic theorem Real.negate_nonpositive_ge_zero (x : ℝ) (xNonpositive : x ≤ 0)
+        : -x ≥ 0 :=
+  -x ≥ 0 by substituting (ring : 0 - x = -x - 0)
+
 -- Strict counterpart: x < y → -y < -x. Negation reverses strict order.
 automatic theorem Real.LessThan.negate
         (x y : ℝ) (xLessY : x < y) : -y < -x := {
@@ -526,10 +531,33 @@ theorem Real.LessThan.add_strict_strict
      < c + b
      < c + d
 
+-- Sums inherit positivity: a positive summand keeps the sum positive
+-- when the other is positive or merely nonnegative (either order).
+automatic theorem Real.add_positive_positive (x y : ℝ)
+        (xPositive : x > 0) (yPositive : y > 0)
+        : x + y > 0 :=
+  0 < x
+    = x + 0
+    < x + y
+
+automatic theorem Real.add_positive_nonneg (x y : ℝ)
+        (xPositive : x > 0) (yNonneg : y ≥ 0)
+        : x + y > 0 :=
+  0 < x
+    = x + 0
+    ≤ x + y
+
+automatic theorem Real.add_nonneg_positive (x y : ℝ)
+        (xNonneg : x ≥ 0) (yPositive : y > 0)
+        : x + y > 0 :=
+  0 < y
+    = 0 + y
+    ≤ x + y
+
 -- The IsNonneg ↔ (0 ≤ ·) bridge, in both directions (mirrors the
 -- Rational pair). 0 ≤ x is definitionally IsNonneg(x − 0); the ring
 -- identity x − 0 = x crosses the gap.
-theorem Real.LessOrEqual_zero_of_IsNonneg (x : ℝ)
+automatic theorem Real.LessOrEqual_zero_of_IsNonneg (x : ℝ)
         (xNonneg : Real.IsNonneg(x))
         : Real.zero ≤ x :=
   Real.IsNonneg(x - Real.zero)
@@ -539,3 +567,12 @@ automatic theorem Real.IsNonneg_of_LessOrEqual_zero (x : ℝ)
         (zeroLeqX : Real.zero ≤ x)
         : Real.IsNonneg(x) :=
   Real.IsNonneg(x) by substituting (ring : x = x - Real.zero)
+
+-- A nonnegative number other than zero is positive: `<` is `≤` plus
+-- distinctness, and the distinctness leg is the hypothesis flipped.
+automatic theorem Real.positive_of_nonneg_nonzero (x : ℝ)
+        (xNonneg : x ≥ 0) (xNonzero : x ≠ 0)
+        : x > 0 := {
+  0 ≠ x by (zeroEqualsX : 0 = x) ↦ xNonzero({ x = 0 });
+  done
+}

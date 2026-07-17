@@ -270,6 +270,36 @@ automatic theorem Rational.LessThan.add_strict_strict
      ≤ h + h
 }
 
+-- Adding a nonnegative amount weakly increases; the everyday x ≤ x + c
+-- (the ℚ twin of Real.less_or_equal_add_of_nonneg).
+theorem Rational.less_or_equal_add_of_nonneg (x c : ℚ) (cNonneg : c ≥ Rational.zero)
+        : x ≤ x + c :=
+  x ≤ x + c by substituting ((x + c) - x = c - Rational.zero)
+
+-- Sums inherit positivity: a positive summand keeps the sum positive
+-- when the other is positive or merely nonnegative (either order).
+automatic theorem Rational.add_positive_positive (x y : ℚ)
+        (xPositive : x > Rational.zero) (yPositive : y > Rational.zero)
+        : x + y > Rational.zero :=
+  Rational.zero
+     < x
+     ≤ x + y
+
+automatic theorem Rational.add_positive_nonneg (x y : ℚ)
+        (xPositive : x > Rational.zero) (yNonneg : y ≥ Rational.zero)
+        : x + y > Rational.zero :=
+  Rational.zero
+     < x
+     ≤ x + y
+
+automatic theorem Rational.add_nonneg_positive (x y : ℚ)
+        (xNonneg : x ≥ Rational.zero) (yPositive : y > Rational.zero)
+        : x + y > Rational.zero :=
+  Rational.zero
+     < y
+     ≤ y + x
+     = x + y
+
 -- 0 < x → -x < 0. Used wherever an ε-argument needs the symmetric
 -- "-ε < 0" form (e.g. to bound something from below by -ε via 0).
 automatic theorem Rational.negate_LessThan_zero_of_positive
@@ -297,6 +327,12 @@ automatic theorem Rational.LessThan.negate
   -y ≠ -x by (negEqual : -y = -x) ↦ xDistinct({ x = y by substituting (ring : x = -(-x)) });
   done
 }
+
+-- Negation preserves nonzeroness: if -x were zero, x = -(-x) would be too.
+automatic theorem Rational.negate_nonzero (x : ℚ) (xNonzero : x ≠ Rational.zero)
+        : -x ≠ Rational.zero :=
+  (negateZero : -x = Rational.zero) ↦
+    xNonzero({ x = -(-x) = -Rational.zero = Rational.zero })
 
 -- IsNonneg(-x) → x ≤ 0. Dual to LessOrEqual_zero_of_IsNonneg.
 automatic theorem Rational.LessOrEqual_zero_of_negate_IsNonneg

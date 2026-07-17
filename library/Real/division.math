@@ -56,6 +56,19 @@ theorem Real.multiply_nonzero (a b : ℝ)
   done
 }
 
+-- Negation preserves nonzeroness: if -x were zero, x = -(-x) would be too.
+automatic theorem Real.negate_nonzero (x : ℝ) (xNonzero : x ≠ 0)
+        : -x ≠ 0 := {
+  suppose -x = 0 as negateZero for contradiction {
+    x
+       = -(-x)
+       = -(0 : ℝ)
+       = 0                 as xZero;
+    absurd(xNonzero(xZero))
+  };
+  done
+}
+
 -- Left cancellation: c ≠ 0 and c·a = c·b give a = b (multiply by c⁻¹).
 theorem Real.equal_of_multiply_left (a b c : ℝ) (cNonzero : c ≠ 0)
         (cancellable : c * a = c * b) : a = b := {
@@ -169,6 +182,27 @@ theorem Real.divide_nonneg (a b : ℝ) (bNonzero : b ≠ 0)
   Real.IsNonneg(Real.reciprocal(b, bNonzero));
   Real.IsNonneg(a * Real.reciprocal(b, bNonzero));
   done
+}
+
+-- The reciprocal of a nonzero real is nonzero: x·x⁻¹ = 1 would
+-- otherwise be zero.
+automatic theorem Real.reciprocal_nonzero (x : ℝ) (xNonzero : x ≠ 0)
+        : Real.reciprocal(x, xNonzero) ≠ 0 := {
+  suppose Real.reciprocal(x, xNonzero) = 0 as reciprocalZero for contradiction {
+    Real.zero
+       = x * Real.reciprocal(x, xNonzero)
+       = Real.one           as zeroEqualsOne;
+    absurd(Real.zero_not_equal_one(zeroEqualsOne))
+  };
+  done
+}
+
+-- a / b is nonzero when both a and b are.
+automatic theorem Real.divide_nonzero (a b : ℝ) (bNonzero : b ≠ 0)
+        (aNonzero : a ≠ 0)
+        : a / b ≠ 0 := {
+  Real.reciprocal(b, bNonzero) ≠ 0;
+  done by Real.multiply_nonzero
 }
 
 -- Taking reciprocals reverses the order among positives: a ≤ b gives
