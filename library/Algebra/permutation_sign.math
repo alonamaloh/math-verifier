@@ -121,7 +121,7 @@ definition Permutation.orderedPairs (n : Natural) : List(Pair(NaturalsBelow(n), 
 
 definition Permutation.pairOrient {n : Natural} (sigma : Permutation(n))
         (p : Pair(NaturalsBelow(n), NaturalsBelow(n))) : Integer :=
-  Permutation.orient(Permutation.apply(sigma, Product.first(p)), Permutation.apply(sigma, Product.second(p)))
+  Permutation.orient(sigma(Product.first(p)), sigma(Product.second(p)))
 
 definition Permutation.sign {n : Natural} (sigma : Permutation(n)) : Integer :=
   List.product(Integer, Integer.multiply, Integer.one,
@@ -188,7 +188,7 @@ theorem Permutation.pairOrient_identity (n : Natural)
   NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p))
       by Permutation.orderedPairs_property;
   Permutation.pairOrient(Permutation.identity(n), p)
-     = Permutation.orient(Product.first(p), Permutation.apply(Permutation.identity(n), Product.second(p)))
+     = Permutation.orient(Product.first(p), Permutation.identity(n)(Product.second(p)))
            by substituting Permutation.apply_identity
      = Permutation.orient(Product.first(p), Product.second(p))
            by substituting Permutation.apply_identity
@@ -307,7 +307,7 @@ theorem List.product_pointwise_multiply (B : Type(0)) (f g : B → Integer) (l :
 -- (τ(i), τ(j)). It permutes `orderedPairs(n)` — the heart of the reindexing.
 definition Permutation.pairImage {m : Natural} (tau : Permutation(m))
         (p : Pair(NaturalsBelow(m), NaturalsBelow(m))) : Pair(NaturalsBelow(m), NaturalsBelow(m)) :=
-  Permutation.sortPair(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)))
+  Permutation.sortPair(tau(Product.first(p)), tau(Product.second(p)))
 
 -- A value-ordered pair has distinct components.
 theorem Permutation.pair_first_ne_second {n : Natural} (p : Pair(NaturalsBelow(n), NaturalsBelow(n)))
@@ -324,9 +324,9 @@ theorem Permutation.pair_first_ne_second {n : Natural} (p : Pair(NaturalsBelow(n
 -- A permutation sends distinct indices to indices with distinct values.
 theorem Permutation.apply_values_distinct {n : Natural} (sigma : Permutation(n)) (a b : NaturalsBelow(n))
         (distinct : a ≠ b)
-        : NaturalsBelow.value(Permutation.apply(sigma, a)) ≠ NaturalsBelow.value(Permutation.apply(sigma, b)) :=
-  (valuesEqual : NaturalsBelow.value(Permutation.apply(sigma, a)) = NaturalsBelow.value(Permutation.apply(sigma, b))) ↦ {
-    Permutation.apply(sigma, a) = Permutation.apply(sigma, b)
+        : NaturalsBelow.value(sigma(a)) ≠ NaturalsBelow.value(sigma(b)) :=
+  (valuesEqual : NaturalsBelow.value(sigma(a)) = NaturalsBelow.value(sigma(b))) ↦ {
+    sigma(a) = sigma(b)
         by NaturalsBelow.equal_of_value;
     a = b by Permutation.apply_injective;
     False;
@@ -341,30 +341,23 @@ theorem Permutation.pairImage_in_orderedPairs {n : Natural} (tau : Permutation(n
   NaturalsBelow.value(Product.first(p)) < NaturalsBelow.value(Product.second(p))
       by Permutation.orderedPairs_property;
   Product.first(p) ≠ Product.second(p) by Permutation.pair_first_ne_second;
-  NaturalsBelow.value(Permutation.apply(tau, Product.first(p)))
-      ≠ NaturalsBelow.value(Permutation.apply(tau, Product.second(p)))
+  NaturalsBelow.value(tau(Product.first(p))) ≠ NaturalsBelow.value(tau(Product.second(p)))
       by Permutation.apply_values_distinct;
-  NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.second(p)))
-      ∨ NaturalsBelow.value(Permutation.apply(tau, Product.second(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.first(p)))
+  NaturalsBelow.value(tau(Product.first(p))) < NaturalsBelow.value(tau(Product.second(p)))
+      ∨ NaturalsBelow.value(tau(Product.second(p))) < NaturalsBelow.value(tau(Product.first(p)))
       by Natural.lt_or_gt_of_ne;
   done by cases {
-    case NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.second(p))) as imageForward: {
-        Permutation.pairImage(tau, p)
-           = Product.make(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)))
-                 by Permutation.sortPair_forward;
-        Product.make(Permutation.apply(tau, Product.first(p)), Permutation.apply(tau, Product.second(p)))
-            ∈ Permutation.orderedPairs(n)
+    case NaturalsBelow.value(tau(Product.first(p))) < NaturalsBelow.value(tau(Product.second(p))) as imageForward: {
+        Permutation.pairImage(tau, p) = Product.make(tau(Product.first(p)), tau(Product.second(p))) by Permutation.sortPair_forward;
+        Product.make(tau(Product.first(p)), tau(Product.second(p))) ∈ Permutation.orderedPairs(n)
             by Permutation.orderedPairs_member;
         done
       }
-    case NaturalsBelow.value(Permutation.apply(tau, Product.second(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) as imageBackward: {
-        ¬(NaturalsBelow.value(Permutation.apply(tau, Product.first(p))) < NaturalsBelow.value(Permutation.apply(tau, Product.second(p))))
+    case NaturalsBelow.value(tau(Product.second(p))) < NaturalsBelow.value(tau(Product.first(p))) as imageBackward: {
+        ¬(NaturalsBelow.value(tau(Product.first(p))) < NaturalsBelow.value(tau(Product.second(p))))
             by Natural.lt_asymmetric;
-        Permutation.pairImage(tau, p)
-           = Product.make(Permutation.apply(tau, Product.second(p)), Permutation.apply(tau, Product.first(p)))
-                 by Permutation.sortPair_backward;
-        Product.make(Permutation.apply(tau, Product.second(p)), Permutation.apply(tau, Product.first(p)))
-            ∈ Permutation.orderedPairs(n)
+        Permutation.pairImage(tau, p) = Product.make(tau(Product.second(p)), tau(Product.first(p))) by Permutation.sortPair_backward;
+        Product.make(tau(Product.second(p)), tau(Product.first(p))) ∈ Permutation.orderedPairs(n)
             by Permutation.orderedPairs_member;
         done
       }
@@ -382,54 +375,37 @@ theorem Permutation.pairImage_cancel {n : Natural} (tau : Permutation(n))
   NaturalsBelow.value(fp) < NaturalsBelow.value(sp)
       by Permutation.orderedPairs_property;
   fp ≠ sp by Permutation.pair_first_ne_second;
-  NaturalsBelow.value(Permutation.apply(tau, fp)) ≠ NaturalsBelow.value(Permutation.apply(tau, sp))
+  NaturalsBelow.value(tau(fp)) ≠ NaturalsBelow.value(tau(sp))
       by Permutation.apply_values_distinct;
   p = Product.make(fp, sp) by Product.eta as pEta;
-  NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp))
-      ∨ NaturalsBelow.value(Permutation.apply(tau, sp)) < NaturalsBelow.value(Permutation.apply(tau, fp))
+  NaturalsBelow.value(tau(fp)) < NaturalsBelow.value(tau(sp))
+      ∨ NaturalsBelow.value(tau(sp)) < NaturalsBelow.value(tau(fp))
       by Natural.lt_or_gt_of_ne;
   done by cases {
-    case NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp)) as fwd: {
-        Permutation.pairImage(tau, p)
-            = Product.make(Permutation.apply(tau, fp), Permutation.apply(tau, sp))
-                  by Permutation.sortPair_forward
-            as imageForward;
+    case NaturalsBelow.value(tau(fp)) < NaturalsBelow.value(tau(sp)) as fwd: {
+        Permutation.pairImage(tau, p) = Product.make(tau(fp), tau(sp)) by Permutation.sortPair_forward as imageForward;
         Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p))
-           = Permutation.pairImage(Permutation.inverse(tau),
-                 Product.make(Permutation.apply(tau, fp), Permutation.apply(tau, sp)))
-                 by substituting imageForward
-           = Permutation.sortPair(Permutation.unapply(tau, Permutation.apply(tau, fp)),
-                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, sp)))
+           = Permutation.pairImage(Permutation.inverse(tau), Product.make(tau(fp), tau(sp))) by substituting imageForward
+           = Permutation.sortPair(Permutation.unapply(tau, tau(fp)), Permutation.inverse(tau)(tau(sp)))
                  by substituting Permutation.apply_inverse
-           = Permutation.sortPair(fp, Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, sp)))
-                 by substituting Permutation.left_inverse
-           = Permutation.sortPair(fp, Permutation.unapply(tau, Permutation.apply(tau, sp)))
-                 by substituting Permutation.apply_inverse
+           = Permutation.sortPair(fp, Permutation.inverse(tau)(tau(sp))) by substituting Permutation.left_inverse
+           = Permutation.sortPair(fp, Permutation.unapply(tau, tau(sp))) by substituting Permutation.apply_inverse
            = Permutation.sortPair(fp, sp) by substituting Permutation.left_inverse
            = Product.make(fp, sp) by Permutation.sortPair_forward
            = p by pEta;
         done
       }
-    case NaturalsBelow.value(Permutation.apply(tau, sp)) < NaturalsBelow.value(Permutation.apply(tau, fp)) as bwd: {
-        ¬(NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp)))
-            by Natural.lt_asymmetric;
+    case NaturalsBelow.value(tau(sp)) < NaturalsBelow.value(tau(fp)) as bwd: {
+        ¬(NaturalsBelow.value(tau(fp)) < NaturalsBelow.value(tau(sp))) by Natural.lt_asymmetric;
         ¬(NaturalsBelow.value(sp) < NaturalsBelow.value(fp))
             by Natural.lt_asymmetric;
-        Permutation.pairImage(tau, p)
-            = Product.make(Permutation.apply(tau, sp), Permutation.apply(tau, fp))
-                  by Permutation.sortPair_backward
-            as imageBackward;
+        Permutation.pairImage(tau, p) = Product.make(tau(sp), tau(fp)) by Permutation.sortPair_backward as imageBackward;
         Permutation.pairImage(Permutation.inverse(tau), Permutation.pairImage(tau, p))
-           = Permutation.pairImage(Permutation.inverse(tau),
-                 Product.make(Permutation.apply(tau, sp), Permutation.apply(tau, fp)))
-                 by substituting imageBackward
-           = Permutation.sortPair(Permutation.unapply(tau, Permutation.apply(tau, sp)),
-                 Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, fp)))
+           = Permutation.pairImage(Permutation.inverse(tau), Product.make(tau(sp), tau(fp))) by substituting imageBackward
+           = Permutation.sortPair(Permutation.unapply(tau, tau(sp)), Permutation.inverse(tau)(tau(fp)))
                  by substituting Permutation.apply_inverse
-           = Permutation.sortPair(sp, Permutation.apply(Permutation.inverse(tau), Permutation.apply(tau, fp)))
-                 by substituting Permutation.left_inverse
-           = Permutation.sortPair(sp, Permutation.unapply(tau, Permutation.apply(tau, fp)))
-                 by substituting Permutation.apply_inverse
+           = Permutation.sortPair(sp, Permutation.inverse(tau)(tau(fp))) by substituting Permutation.left_inverse
+           = Permutation.sortPair(sp, Permutation.unapply(tau, tau(fp))) by substituting Permutation.apply_inverse
            = Permutation.sortPair(sp, fp) by substituting Permutation.left_inverse
            = Product.make(fp, sp) by Permutation.sortPair_backward
            = p by pEta;
@@ -473,88 +449,49 @@ theorem Permutation.pairFactor {n : Natural} (sigma tau : Permutation(n))
   NaturalsBelow.value(fp) < NaturalsBelow.value(sp)
       by Permutation.orderedPairs_property;
   fp ≠ sp by Permutation.pair_first_ne_second;
-  NaturalsBelow.value(Permutation.apply(tau, fp)) ≠ NaturalsBelow.value(Permutation.apply(tau, sp))
-      by Permutation.apply_values_distinct;
-  Permutation.apply(tau, fp) ≠ Permutation.apply(tau, sp)
-      by NaturalsBelow.ne_of_value_ne;
-  NaturalsBelow.value(Permutation.apply(sigma, Permutation.apply(tau, fp)))
-      ≠ NaturalsBelow.value(Permutation.apply(sigma, Permutation.apply(tau, sp)))
-      by Permutation.apply_values_distinct;
-  NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp))
-      ∨ NaturalsBelow.value(Permutation.apply(tau, sp)) < NaturalsBelow.value(Permutation.apply(tau, fp))
+  NaturalsBelow.value(tau(fp)) ≠ NaturalsBelow.value(tau(sp)) by Permutation.apply_values_distinct;
+  tau(fp) ≠ tau(sp) by NaturalsBelow.ne_of_value_ne;
+  NaturalsBelow.value(sigma(tau(fp))) ≠ NaturalsBelow.value(sigma(tau(sp))) by Permutation.apply_values_distinct;
+  NaturalsBelow.value(tau(fp)) < NaturalsBelow.value(tau(sp)) ∨ NaturalsBelow.value(tau(sp)) < NaturalsBelow.value(tau(fp))
       by Natural.lt_or_gt_of_ne;
   done by cases {
-    case NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp)) as fwd: {
+    case NaturalsBelow.value(tau(fp)) < NaturalsBelow.value(tau(sp)) as fwd: {
         Permutation.pairOrient(tau, p) = 1
             by Permutation.orient_forward
             as tauOrientOne;
-        Permutation.pairImage(tau, p)
-            = Product.make(Permutation.apply(tau, fp), Permutation.apply(tau, sp))
-                  by Permutation.sortPair_forward
-            as imageForward;
+        Permutation.pairImage(tau, p) = Product.make(tau(fp), tau(sp)) by Permutation.sortPair_forward as imageForward;
         Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))
-           = Permutation.pairOrient(sigma,
-                 Product.make(Permutation.apply(tau, fp), Permutation.apply(tau, sp))) by substituting imageForward
-           = Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, fp)),
-                 Permutation.apply(sigma, Permutation.apply(tau, sp)))
-           as sigmaImageOrient;
+           = Permutation.pairOrient(sigma, Product.make(tau(fp), tau(sp))) by substituting imageForward
+           = Permutation.orient(sigma(tau(fp)), sigma(tau(sp))) as sigmaImageOrient;
         Permutation.pairOrient(Permutation.compose(sigma, tau), p)
-           = Permutation.orient(Permutation.apply(Permutation.compose(sigma, tau), fp),
-                 Permutation.apply(Permutation.compose(sigma, tau), sp))
-           = Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, fp)),
-                 Permutation.apply(Permutation.compose(sigma, tau), sp))
-                 by substituting Permutation.apply_compose
-           = Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, fp)),
-                 Permutation.apply(sigma, Permutation.apply(tau, sp)))
-                 by substituting Permutation.apply_compose
-           = Integer.multiply(1, Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, fp)),
-                 Permutation.apply(sigma, Permutation.apply(tau, sp))))
-           = Integer.multiply(Permutation.pairOrient(tau, p),
-                 Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, fp)),
-                     Permutation.apply(sigma, Permutation.apply(tau, sp))))
+           = Permutation.orient(Permutation.compose(sigma, tau)(fp), Permutation.compose(sigma, tau)(sp))
+           = Permutation.orient(sigma(tau(fp)), Permutation.compose(sigma, tau)(sp)) by substituting Permutation.apply_compose
+           = Permutation.orient(sigma(tau(fp)), sigma(tau(sp))) by substituting Permutation.apply_compose
+           = Integer.multiply(1, Permutation.orient(sigma(tau(fp)), sigma(tau(sp))))
+           = Integer.multiply(Permutation.pairOrient(tau, p), Permutation.orient(sigma(tau(fp)), sigma(tau(sp))))
                  by substituting tauOrientOne
-           = Integer.multiply(Permutation.pairOrient(tau, p),
-                 Permutation.pairOrient(sigma, Permutation.pairImage(tau, p)))
+           = Integer.multiply(Permutation.pairOrient(tau, p), Permutation.pairOrient(sigma, Permutation.pairImage(tau, p)))
                  by substituting sigmaImageOrient;
         done
       }
-    case NaturalsBelow.value(Permutation.apply(tau, sp)) < NaturalsBelow.value(Permutation.apply(tau, fp)) as bwd: {
-        ¬(NaturalsBelow.value(Permutation.apply(tau, fp)) < NaturalsBelow.value(Permutation.apply(tau, sp)))
-            by Natural.lt_asymmetric;
+    case NaturalsBelow.value(tau(sp)) < NaturalsBelow.value(tau(fp)) as bwd: {
+        ¬(NaturalsBelow.value(tau(fp)) < NaturalsBelow.value(tau(sp))) by Natural.lt_asymmetric;
         Permutation.pairOrient(tau, p) = Integer.negate(1)
             by Permutation.orient_backward
             as tauOrientNegOne;
-        Permutation.pairImage(tau, p)
-            = Product.make(Permutation.apply(tau, sp), Permutation.apply(tau, fp))
-                  by Permutation.sortPair_backward
-            as imageBackward;
+        Permutation.pairImage(tau, p) = Product.make(tau(sp), tau(fp)) by Permutation.sortPair_backward as imageBackward;
         Permutation.pairOrient(sigma, Permutation.pairImage(tau, p))
-           = Permutation.pairOrient(sigma,
-                 Product.make(Permutation.apply(tau, sp), Permutation.apply(tau, fp))) by substituting imageBackward
-           = Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, sp)),
-                 Permutation.apply(sigma, Permutation.apply(tau, fp)))
-           as sigmaImageOrient;
+           = Permutation.pairOrient(sigma, Product.make(tau(sp), tau(fp))) by substituting imageBackward
+           = Permutation.orient(sigma(tau(sp)), sigma(tau(fp))) as sigmaImageOrient;
         Permutation.pairOrient(Permutation.compose(sigma, tau), p)
-           = Permutation.orient(Permutation.apply(Permutation.compose(sigma, tau), fp),
-                 Permutation.apply(Permutation.compose(sigma, tau), sp))
-           = Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, fp)),
-                 Permutation.apply(Permutation.compose(sigma, tau), sp))
-                 by substituting Permutation.apply_compose
-           = Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, fp)),
-                 Permutation.apply(sigma, Permutation.apply(tau, sp)))
-                 by substituting Permutation.apply_compose
-           = Integer.negate(Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, sp)),
-                 Permutation.apply(sigma, Permutation.apply(tau, fp))))
-                 by Permutation.orient_antisymmetric
-           = Integer.multiply(Integer.negate(1),
-                 Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, sp)),
-                     Permutation.apply(sigma, Permutation.apply(tau, fp))))
-           = Integer.multiply(Permutation.pairOrient(tau, p),
-                 Permutation.orient(Permutation.apply(sigma, Permutation.apply(tau, sp)),
-                     Permutation.apply(sigma, Permutation.apply(tau, fp))))
+           = Permutation.orient(Permutation.compose(sigma, tau)(fp), Permutation.compose(sigma, tau)(sp))
+           = Permutation.orient(sigma(tau(fp)), Permutation.compose(sigma, tau)(sp)) by substituting Permutation.apply_compose
+           = Permutation.orient(sigma(tau(fp)), sigma(tau(sp))) by substituting Permutation.apply_compose
+           = Integer.negate(Permutation.orient(sigma(tau(sp)), sigma(tau(fp)))) by Permutation.orient_antisymmetric
+           = Integer.multiply(Integer.negate(1), Permutation.orient(sigma(tau(sp)), sigma(tau(fp))))
+           = Integer.multiply(Permutation.pairOrient(tau, p), Permutation.orient(sigma(tau(sp)), sigma(tau(fp))))
                  by substituting tauOrientNegOne
-           = Integer.multiply(Permutation.pairOrient(tau, p),
-                 Permutation.pairOrient(sigma, Permutation.pairImage(tau, p)))
+           = Integer.multiply(Permutation.pairOrient(tau, p), Permutation.pairOrient(sigma, Permutation.pairImage(tau, p)))
                  by substituting sigmaImageOrient;
         done
       }

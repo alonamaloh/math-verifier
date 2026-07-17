@@ -60,16 +60,16 @@ theorem Function.injective_in_permutation_image (n : Natural)
         (phi : NaturalsBelow(n) → NaturalsBelow(n))
         (inj : Function.IsInjective(NaturalsBelow(n), NaturalsBelow(n), phi))
         : phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
               Permutation.allPermutations(n)) := {
   Permutation.of_injective(n, phi, inj) ∈ Permutation.allPermutations(n) by Permutation.allPermutations_complete;
-  ((i : NaturalsBelow(n)) ↦ Permutation.apply(Permutation.of_injective(n, phi, inj), i))
+  ((i : NaturalsBelow(n)) ↦ Permutation.of_injective(n, phi, inj)(i))
       ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-          (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+          (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
           Permutation.allPermutations(n))
       by List.map_member;
   phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-          (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+          (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
           Permutation.allPermutations(n));
   done
 }
@@ -80,55 +80,55 @@ theorem Function.injective_in_permutation_image (n : Natural)
 theorem Matrix.entry_product_expand {f : Field} {n : Natural}
         (A B : Matrix(f, n, n)) (sigma : Permutation(n))
         : Field.productOver(
-              (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, Permutation.apply(sigma, i)),
+              (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, sigma(i)),
               NaturalsBelow.enumerate(n))
           = Field.sumOver(
                 (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                     Field.productOver(
-                        (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                        (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                         NaturalsBelow.enumerate(n)),
                 Function.allFunctions(n)) :=
   Field.productOver(
-        (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, Permutation.apply(sigma, i)),
+        (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, sigma(i)),
         NaturalsBelow.enumerate(n))
      = Field.productOver(
            (i : NaturalsBelow(n)) ↦
-               Field.sumOver((k : NaturalsBelow(n)) ↦ A(i, k) * B(k, Permutation.apply(sigma, i)),
+               Field.sumOver((k : NaturalsBelow(n)) ↦ A(i, k) * B(k, sigma(i)),
                    NaturalsBelow.enumerate(n)),
            NaturalsBelow.enumerate(n))
      = Field.sumOver(
            (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                Field.productOver(
-                   (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                   (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                    NaturalsBelow.enumerate(n)),
            Function.allFunctions(n))
            by Field.productOfSums_over_allFunctions(
                   h := (i : NaturalsBelow(n)) ↦ (c : NaturalsBelow(n)) ↦
-                      A(i, c) * B(c, Permutation.apply(sigma, i)))
+                      A(i, c) * B(c, sigma(i)))
 
 -- The full σ-term, with the sign pulled inside the φ-sum.
 theorem Matrix.sigma_term_expand {f : Field} {n : Natural}
         (A B : Matrix(f, n, n)) (sigma : Permutation(n))
         : Field.from_integer(f, Permutation.sign(sigma))
               * Field.productOver(
-                    (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, Permutation.apply(sigma, i)),
+                    (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, sigma(i)),
                     NaturalsBelow.enumerate(n))
           = Field.sumOver(
                 (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                     Field.from_integer(f, Permutation.sign(sigma))
                         * Field.productOver(
-                              (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                              (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                               NaturalsBelow.enumerate(n)),
                 Function.allFunctions(n)) :=
   Field.from_integer(f, Permutation.sign(sigma))
         * Field.productOver(
-              (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, Permutation.apply(sigma, i)),
+              (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, sigma(i)),
               NaturalsBelow.enumerate(n))
      = Field.from_integer(f, Permutation.sign(sigma))
            * Field.sumOver(
                  (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                      Field.productOver(
-                         (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                         (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                          NaturalsBelow.enumerate(n)),
                  Function.allFunctions(n))
            by substituting Matrix.entry_product_expand
@@ -136,7 +136,7 @@ theorem Matrix.sigma_term_expand {f : Field} {n : Natural}
            (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                Field.from_integer(f, Permutation.sign(sigma))
                    * Field.productOver(
-                         (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                         (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                          NaturalsBelow.enumerate(n)),
            Function.allFunctions(n))
            by Field.sumOver_scale_left
@@ -148,7 +148,7 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
               (sigma : Permutation(n)) ↦
                   Field.from_integer(f, Permutation.sign(sigma))
                       * Field.productOver(
-                            (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                            (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                             NaturalsBelow.enumerate(n)),
               Permutation.allPermutations(n))
           = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
@@ -156,7 +156,7 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
                     (sigma : Permutation(n)) ↦
                         Field.from_integer(f, Permutation.sign(sigma))
                             * Field.productOver(
-                                  (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                  (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                   NaturalsBelow.enumerate(n)),
                     Permutation.allPermutations(n)) := {
   Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
@@ -164,7 +164,7 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
               (sigma : Permutation(n)) ↦
                   Field.from_integer(f, Permutation.sign(sigma))
                       * Field.productOver(
-                            (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                            (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                             NaturalsBelow.enumerate(n)),
               Permutation.allPermutations(n))
       = Field.sumOver(
@@ -172,7 +172,7 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
                 Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
                     * (Field.from_integer(f, Permutation.sign(sigma))
                           * Field.productOver(
-                                (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                 NaturalsBelow.enumerate(n))),
             Permutation.allPermutations(n))
         by Field.sumOver_scale_left
@@ -181,7 +181,7 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
         (sigma : Permutation(n)) ↦
             Field.from_integer(f, Permutation.sign(sigma))
                 * Field.productOver(
-                      (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                      (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                       NaturalsBelow.enumerate(n)),
         Permutation.allPermutations(n))
      = Field.sumOver(
@@ -189,35 +189,35 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
                Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
                    * (Field.from_integer(f, Permutation.sign(sigma))
                          * Field.productOver(
-                               (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                               (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                NaturalsBelow.enumerate(n))),
            Permutation.allPermutations(n))
            by Field.sumOver_congruence(
                   pointwise := (sigma : Permutation(n)) ↦ {
                       Field.productOver(
-                            (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                            (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                             NaturalsBelow.enumerate(n))
                          = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
                                * Field.productOver(
-                                     (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                     (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                      NaturalsBelow.enumerate(n))
                              by Field.productOver_multiply
                              as productSplit;
                       Field.from_integer(f, Permutation.sign(sigma))
                             * Field.productOver(
-                                  (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                                  (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                                   NaturalsBelow.enumerate(n))
                          = Field.from_integer(f, Permutation.sign(sigma))
                                * (Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)),
                                         NaturalsBelow.enumerate(n))
                                      * Field.productOver(
-                                           (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                           (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                            NaturalsBelow.enumerate(n)))
                              by substituting productSplit
                          = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
                                * (Field.from_integer(f, Permutation.sign(sigma))
                                      * Field.productOver(
-                                           (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                           (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                            NaturalsBelow.enumerate(n)))
                              by ring
                     })
@@ -226,7 +226,7 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
                  (sigma : Permutation(n)) ↦
                      Field.from_integer(f, Permutation.sign(sigma))
                          * Field.productOver(
-                               (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                               (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                NaturalsBelow.enumerate(n)),
                  Permutation.allPermutations(n))
            by scaleEquation
@@ -237,14 +237,14 @@ theorem Matrix.phi_inner_sum {f : Field} {n : Natural}
 theorem Matrix.det_multiply_summand_vanishes {f : Field} {n : Natural}
         (A B : Matrix(f, n, n)) (phi : NaturalsBelow(n) → NaturalsBelow(n))
         (notInImage : ¬(phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-            (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+            (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
             Permutation.allPermutations(n))))
         : Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
               * Field.sumOver(
                     (sigma : Permutation(n)) ↦
                         Field.from_integer(f, Permutation.sign(sigma))
                             * Field.productOver(
-                                  (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                  (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                   NaturalsBelow.enumerate(n)),
                     Permutation.allPermutations(n))
           = Field.zero(f) := {
@@ -260,7 +260,7 @@ theorem Matrix.det_multiply_summand_vanishes {f : Field} {n : Natural}
           (sigma : Permutation(n)) ↦
               Field.from_integer(f, Permutation.sign(sigma))
                   * Field.productOver(
-                        (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                        (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                         NaturalsBelow.enumerate(n)),
           Permutation.allPermutations(n))
       = Field.zero(f)
@@ -270,7 +270,7 @@ theorem Matrix.det_multiply_summand_vanishes {f : Field} {n : Natural}
               (sigma : Permutation(n)) ↦
                   Field.from_integer(f, Permutation.sign(sigma))
                       * Field.productOver(
-                            (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                            (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                             NaturalsBelow.enumerate(n)),
               Permutation.allPermutations(n))
      = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
@@ -288,25 +288,25 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
   List.Distinct(Permutation(n), Permutation.allPermutations(n)) by Permutation.allPermutations_distinct;
   List.Distinct(NaturalsBelow(n) → NaturalsBelow(n),
           List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
               Permutation.allPermutations(n)))
       by List.map_distinct(
              injective := (rho1 rho2 : Permutation(n))
-                 (equalMaps : ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho1, i))
-                     = ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho2, i))) ↦ {
-               ∀ (i : NaturalsBelow(n)). Permutation.apply(rho1, i) = Permutation.apply(rho2, i)
+                 (equalMaps : ((i : NaturalsBelow(n)) ↦ rho1(i))
+                     = ((i : NaturalsBelow(n)) ↦ rho2(i))) ↦ {
+               ∀ (i : NaturalsBelow(n)). rho1(i) = rho2(i)
                    by { take i : NaturalsBelow(n);
                         done };
                done by Permutation.equal_of_apply_equal
              });
   (∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
       phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-          (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+          (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
           Permutation.allPermutations(n))
       → phi ∈ Function.allFunctions(n))
       by (phi : NaturalsBelow(n) → NaturalsBelow(n))
          (phiInPart : phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-             (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+             (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
              Permutation.allPermutations(n))) ↦
            Function.allFunctions_complete;
 
@@ -315,13 +315,13 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
   ∀ (sigma : Permutation(n)).
       Field.from_integer(f, Permutation.sign(sigma))
           * Field.productOver(
-                (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, Permutation.apply(sigma, i)),
+                (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, sigma(i)),
                 NaturalsBelow.enumerate(n))
       = Field.sumOver(
             (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                 Field.from_integer(f, Permutation.sign(sigma))
                     * Field.productOver(
-                          (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                          (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                           NaturalsBelow.enumerate(n)),
             Function.allFunctions(n))
       by Matrix.sigma_term_expand;
@@ -330,7 +330,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
             (sigma : Permutation(n)) ↦
                 Field.from_integer(f, Permutation.sign(sigma))
                     * Field.productOver(
-                          (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                          (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                           NaturalsBelow.enumerate(n)),
             Permutation.allPermutations(n))
       = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
@@ -338,7 +338,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                 (sigma : Permutation(n)) ↦
                     Field.from_integer(f, Permutation.sign(sigma))
                         * Field.productOver(
-                              (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                              (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                               NaturalsBelow.enumerate(n)),
                 Permutation.allPermutations(n))
       by Matrix.phi_inner_sum;
@@ -349,14 +349,14 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
   ∀ (phi : NaturalsBelow(n) → NaturalsBelow(n)).
       phi ∈ Function.allFunctions(n)
       → ¬(phi ∈ List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+              (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
               Permutation.allPermutations(n)))
       → Field.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
             * Field.sumOver(
                   (sigma : Permutation(n)) ↦
                       Field.from_integer(f, Permutation.sign(sigma))
                           * Field.productOver(
-                                (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                 NaturalsBelow.enumerate(n)),
                   Permutation.allPermutations(n))
         = Field.zero(f)
@@ -367,7 +367,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
            (sigma : Permutation(n)) ↦
                Field.from_integer(f, Permutation.sign(sigma))
                    * Field.productOver(
-                         (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, Permutation.apply(sigma, i)),
+                         (i : NaturalsBelow(n)) ↦ Matrix.multiply(A, B)(i, sigma(i)),
                          NaturalsBelow.enumerate(n)),
            Permutation.allPermutations(n))
            by Matrix.determinant_expansion
@@ -377,7 +377,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                    (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                        Field.from_integer(f, Permutation.sign(sigma))
                            * Field.productOver(
-                                 (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                                 (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                                  NaturalsBelow.enumerate(n)),
                    Function.allFunctions(n)),
            Permutation.allPermutations(n))
@@ -388,7 +388,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                    (sigma : Permutation(n)) ↦
                        Field.from_integer(f, Permutation.sign(sigma))
                            * Field.productOver(
-                                 (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                                 (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                                  NaturalsBelow.enumerate(n)),
                    Permutation.allPermutations(n)),
            Function.allFunctions(n))
@@ -396,7 +396,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                   term := (sigma : Permutation(n)) ↦ (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
                       Field.from_integer(f, Permutation.sign(sigma))
                           * Field.productOver(
-                                (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), Permutation.apply(sigma, i)),
+                                (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
                                 NaturalsBelow.enumerate(n)))
      = Field.sumOver(
            (phi : NaturalsBelow(n) → NaturalsBelow(n)) ↦
@@ -405,7 +405,7 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                          (sigma : Permutation(n)) ↦
                              Field.from_integer(f, Permutation.sign(sigma))
                                  * Field.productOver(
-                                       (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                       (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                        NaturalsBelow.enumerate(n)),
                          Permutation.allPermutations(n)),
            Function.allFunctions(n))
@@ -417,70 +417,57 @@ theorem Matrix.determinant_multiply {f : Field} {n : Natural} (A B : Matrix(f, n
                          (sigma : Permutation(n)) ↦
                              Field.from_integer(f, Permutation.sign(sigma))
                                  * Field.productOver(
-                                       (i : NaturalsBelow(n)) ↦ B(phi(i), Permutation.apply(sigma, i)),
+                                       (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
                                        NaturalsBelow.enumerate(n)),
                          Permutation.allPermutations(n)),
            List.map(Permutation(n), NaturalsBelow(n) → NaturalsBelow(n),
-               (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ Permutation.apply(rho, i)),
+               (rho : Permutation(n)) ↦ ((i : NaturalsBelow(n)) ↦ rho(i)),
                Permutation.allPermutations(n)))
            by Field.sumOver_restrict_support
      = Field.sumOver(
            (rho : Permutation(n)) ↦
-               Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
-                   NaturalsBelow.enumerate(n))
+               Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n))
                    * Field.sumOver(
                          (sigma : Permutation(n)) ↦
                              Field.from_integer(f, Permutation.sign(sigma))
-                                 * Field.productOver(
-                                       (i : NaturalsBelow(n)) ↦
-                                           B(Permutation.apply(rho, i), Permutation.apply(sigma, i)),
-                                       NaturalsBelow.enumerate(n)),
+                                 * Field.productOver((i : NaturalsBelow(n)) ↦ B(rho(i), sigma(i)), NaturalsBelow.enumerate(n)),
                          Permutation.allPermutations(n)),
            Permutation.allPermutations(n))
            by Field.sumOver_map
      = Field.sumOver(
            (rho : Permutation(n)) ↦
-               Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
-                   NaturalsBelow.enumerate(n))
+               Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n))
                    * (Field.from_integer(f, Permutation.sign(rho)) * Matrix.determinant(B)),
            Permutation.allPermutations(n))
            by Field.sumOver_congruence(pointwise := (rho : Permutation(n)) ↦ {
-                  Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)), NaturalsBelow.enumerate(n))
+                  Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n))
                         * Field.sumOver(
                               (sigma : Permutation(n)) ↦
                                   Field.from_integer(f, Permutation.sign(sigma))
-                                      * Field.productOver(
-                                            (i : NaturalsBelow(n)) ↦
-                                                B(Permutation.apply(rho, i), Permutation.apply(sigma, i)),
-                                            NaturalsBelow.enumerate(n)),
+                                      * Field.productOver((i : NaturalsBelow(n)) ↦ B(rho(i), sigma(i)), NaturalsBelow.enumerate(n)),
                               Permutation.allPermutations(n))
-                     = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
-                           NaturalsBelow.enumerate(n))
+                     = Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n))
                            * (Field.from_integer(f, Permutation.sign(rho)) * Matrix.determinant(B))
                        by substituting Matrix.determinant_row_permutation
                 })
      = Field.sumOver(
            (rho : Permutation(n)) ↦
                (Field.from_integer(f, Permutation.sign(rho))
-                     * Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
-                           NaturalsBelow.enumerate(n)))
+                     * Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n)))
                    * Matrix.determinant(B),
            Permutation.allPermutations(n))
            by Field.sumOver_congruence(pointwise := (rho : Permutation(n)) ↦ {
-                      Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
-                          NaturalsBelow.enumerate(n))
+                      Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n))
                           * (Field.from_integer(f, Permutation.sign(rho)) * Matrix.determinant(B))
                          = (Field.from_integer(f, Permutation.sign(rho))
-                               * Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
-                                     NaturalsBelow.enumerate(n)))
+                               * Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n)))
                                * Matrix.determinant(B)
                              by ring
                     })
      = Field.sumOver(
            (rho : Permutation(n)) ↦
                Field.from_integer(f, Permutation.sign(rho))
-                   * Field.productOver((i : NaturalsBelow(n)) ↦ A(i, Permutation.apply(rho, i)),
-                         NaturalsBelow.enumerate(n)),
+                   * Field.productOver((i : NaturalsBelow(n)) ↦ A(i, rho(i)), NaturalsBelow.enumerate(n)),
            Permutation.allPermutations(n))
            * Matrix.determinant(B)
            by Field.sumOver_scale_right
