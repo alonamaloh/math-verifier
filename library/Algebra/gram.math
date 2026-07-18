@@ -1,0 +1,53 @@
+-- Algebra/gram.math
+--
+-- The Gram matrix G = MᵀM: symmetric, and its quadratic form is the
+-- squared norm of the image — ⟨x, G·x⟩ = ⟨M·x, M·x⟩. This is the bridge
+-- from integer quadratic forms to sums of squares that the form theory
+-- reads. (Cauchy–Binet and Hadamard's inequality are deferred to the
+-- reduction-theory stage that consumes them; see PLAN_15_THEOREM S0.G2/G3.)
+
+module Algebra.gram
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.permutation_enumeration
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+
+definition Matrix.gram {r : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(r, rows, columns)) : Matrix(r, columns, columns) :=
+  Mᵀ * M
+
+-- The Gram matrix is symmetric.
+theorem Matrix.gram_symmetric {r : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(r, rows, columns))
+        : Matrix.gram(M)ᵀ = Matrix.gram(M) :=
+  Matrix.gram(M)ᵀ
+     = (Mᵀ * M)ᵀ
+     = Mᵀ * (Mᵀ)ᵀ        by Matrix.transpose_multiply
+     = Mᵀ * M            by substituting Matrix.transpose_transpose
+     = Matrix.gram(M)
+
+-- The Gram quadratic form is the squared norm of the image:
+-- ⟨x, (MᵀM)·x⟩ = ⟨M·x, M·x⟩.
+theorem Matrix.gram_quadratic_form {r : CommutativeRing} {rows columns : ℕ}
+        (M : Matrix(r, rows, columns)) (x : RingVector(r, columns))
+        : RingVector.innerProduct(x, Matrix.gram(M) · x)
+          = RingVector.innerProduct(M · x, M · x) :=
+  RingVector.innerProduct(x, Matrix.gram(M) · x)
+     = RingVector.innerProduct(x, Mᵀ · (M · x))    by Matrix.applyVector_multiply
+     = RingVector.innerProduct(Mᵀ · (M · x), x)    by RingVector.innerProduct_symmetric
+     = RingVector.innerProduct(M · x, M · x)       by Matrix.transpose_adjoint

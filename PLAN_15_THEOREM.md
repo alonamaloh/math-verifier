@@ -83,9 +83,9 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 - `S0.D7` `[x]` (M) Unimodular group `GLₙ(ℤ)`: integer `U` invertible over ℤ ⇔ `det U = ±1`. — owes: S0.D4, S0.D6 · **DONE 2026-07-18:** `Algebra/matrix_inverse.math` (two-sided `Matrix.IsInvertible`, adjugate right inverse, `invertible_of_unit_determinant` with the U = U·(V·W) = W bootstrap, `determinant_unit_of_right_inverse`) + `Algebra/unimodular.math` (both directions over `Integer.commutative_ring_bundle`) + `Integer/units.math` (`Integer.multiply_one_implies_unit`: the units of ℤ are ±1, via |x|·|y| = 1 at ℕ). New matrix-ring laws: `scale_scale`, `one_scale`.
 
 **Gram machinery (the bridge to forms)**
-- `S0.G1` `[ ]` (S) Gram matrix `G = MᵀM` is symmetric; `xᵀGx = ‖Mx‖²`. — owes: S0.M3
-- `S0.G2` `[ ]` (M) Cauchy–Binet `det(MᵀM) = Σ (k×k minors)²`; hence `det G ≥ 0` over ℝ. — owes: S0.D4, S0.D5
-- `S0.G3` `[ ]` (M) Hadamard's inequality `det A ≤ ∏ ‖row_i‖` (for the reduction bounds in Stage 2). — owes: S0.G1
+- `S0.G1` `[x]` (S) Gram matrix `G = MᵀM` is symmetric; `xᵀGx = ‖Mx‖²`. — owes: S0.M3 · **DONE 2026-07-18:** `Algebra/gram.math` — symmetry via `transpose_multiply` + involution; `⟨x, G·x⟩ = ⟨M·x, M·x⟩` via `applyVector_multiply` + the adjoint law.
+- `S0.G2` `[ ]` (M) Cauchy–Binet `det(MᵀM) = Σ (k×k minors)²`; hence `det G ≥ 0` over ℝ. — owes: S0.D4, S0.D5 · **DEFERRED to Stage 2 kickoff** (consumer-first: the minor machinery should be shaped by S2.R2/Sylvester's needs; same call as Cramer).
+- `S0.G3` `[ ]` (M) Hadamard's inequality `det A ≤ ∏ ‖row_i‖` (for the reduction bounds in Stage 2). — owes: S0.G1 · **DEFERRED to Stage 2 kickoff** (needs ℝ norms; its only consumer is S2.R2).
 
 ---
 
