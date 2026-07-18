@@ -1547,7 +1547,10 @@ void Elaborator::registerGenericRewriteLemma(const std::string& theoremName,
             cursor = pi->codomain;
         }
         int binderCount = static_cast<int>(rawDomains.size());
-        if (binderCount == 0) return;
+        // binderCount == 0 is welcome: a GROUND evaluation fact
+        // (`realPart(i) = 0`) registers with exact-match patterns, so a
+        // diff walk that bottoms out on exactly its two sides closes by
+        // citing it — the coordinate-evaluation family.
         // Body must be App(App(App(Equality, carrier), lhs), rhs).
         auto* eqApp3 = std::get_if<Application>(&cursor->node);
         if (!eqApp3) return;
@@ -1610,10 +1613,23 @@ void Elaborator::registerGenericRewriteLemma(const std::string& theoremName,
         uint64_t rhsKey = spineHash(rhs);
         std::optional<uint64_t> lhsRawKey = rawKeyForSpineKey(lhsKey);
         std::optional<uint64_t> rhsRawKey = rawKeyForSpineKey(rhsKey);
-        if (lhsRawKey) lemmaIndex_.emplace(*lhsRawKey, forwardEntry);
-        if (rhsRawKey) lemmaIndex_.emplace(*rhsRawKey, reverseEntry);
-        lemmaIndex_.emplace(lhsKey, std::move(forwardEntry));
-        lemmaIndex_.emplace(rhsKey, std::move(reverseEntry));
+        // Never key an entry by a NUMERAL pattern: half the library's
+        // ground facts end in `… = 0` / `… = 1`, and filing their
+        // reverse entries under the numeral's bucket makes that bucket
+        // hot — every diff probe whose left side is a numeral would
+        // walk them all. The forward entries (keyed by the interesting
+        // side) carry the value; a numeral-keyed direction adds cost,
+        // not reach.
+        bool lhsIsNumeral = asNumeralLiteral(lhs).has_value();
+        bool rhsIsNumeral = asNumeralLiteral(rhs).has_value();
+        if (!lhsIsNumeral) {
+            if (lhsRawKey) lemmaIndex_.emplace(*lhsRawKey, forwardEntry);
+            lemmaIndex_.emplace(lhsKey, std::move(forwardEntry));
+        }
+        if (!rhsIsNumeral) {
+            if (rhsRawKey) lemmaIndex_.emplace(*rhsRawKey, reverseEntry);
+            lemmaIndex_.emplace(rhsKey, std::move(reverseEntry));
+        }
     }
 
 ExpressionPointer Elaborator::autoProveCalcStep(
@@ -1927,8 +1943,37 @@ ExpressionPointer Elaborator::autoProveCalcStepRaw(
             // atoms) hits the fingerprint fast-fail cheaply, and a hit
             // closes the leaf exactly where congruence wants it.
             // Interior levels only — the top-level pair belongs to the
-            // caller's own ring/AC seats.
-            if (!pathStepsOutsideIn.empty()) {
+            // caller's own ring/AC seats — and SMALL pairs only: the
+            // gate is a size cap, so a cursor carrying an aggregate
+            // lambda never pays the typing + normalisation cost (which
+            // counts against the step's effort budget).
+            auto smallEnoughForLeafRing =
+                [](ExpressionPointer expression) {
+                    int budget = 48;
+                    std::function<void(const ExpressionPointer&)> walk =
+                        [&](const ExpressionPointer& node) {
+                            if (budget <= 0) return;
+                            --budget;
+                            if (auto* app = std::get_if<Application>(
+                                    &node->node)) {
+                                walk(app->function);
+                                walk(app->argument);
+                            } else if (auto* lam = std::get_if<Lambda>(
+                                           &node->node)) {
+                                walk(lam->domain);
+                                walk(lam->body);
+                            } else if (auto* pi = std::get_if<Pi>(
+                                           &node->node)) {
+                                walk(pi->domain);
+                                walk(pi->codomain);
+                            }
+                        };
+                    walk(expression);
+                    return budget > 0;
+                };
+            if (!pathStepsOutsideIn.empty()
+                && smallEnoughForLeafRing(leftCursor)
+                && smallEnoughForLeafRing(rightCursor)) {
                 bool carrierTyped = false;
                 try {
                     carrierTyped = structurallyEqual(
