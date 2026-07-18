@@ -129,7 +129,11 @@ comparisons; it must not be written in this style.
 3. Relocate the stray general lemmas the sign files accumulated so nobody
    re-proves them: `Natural.lt_or_gt_of_ne`, `Natural.lt_asymmetric`
    (`permutation_sign.math:29,38`), `Natural.ne_of_lt`
-   (`permutation_transposition_sign.math:280`),
+   (`permutation_transposition_sign.math:280` — NOTE 2026-07-18: this one
+   is a RE-PROOF of the existing `Natural.not_equal_of_less_than`
+   (`Natural/order.math:123`); delete it and retarget its ~6 call sites
+   rather than relocating. `Equality.ne_symmetric` already handled under
+   T3.),
    `NaturalsBelow.ne_of_value_ne` (`permutation_sign.math:431`),
    `Equality.ne_symmetric` (`permutation_transposition_sign.math:122`),
    `Product.eta` (`permutation_sign.math:228`)
@@ -155,7 +159,19 @@ rewritten.
 
 ---
 
-## T3 `[ ]` (S) ≠-symmetry in premise discharge
+## T3 `[x]` (S) ≠-symmetry in premise discharge
+
+> **Ledger 2026-07-18.** `Equality.ne_symmetric` was marooned in
+> `permutation_transposition_sign.math` (the failed-discharge candidate
+> listing literally said "needs import Algebra.permutation_transposition_-
+> sign"); moved to `Equality/basics.math` as `automatic
+> Equality.not_equal_symmetric` (family naming), nine call sites
+> retargeted, `Test/ne_symmetry_test.math` locks the silent discharge.
+> Full library+tests: 38 s wall, no new expensive-step warnings (no
+> search widening), checker-tests PASS. **Finding → QUIRK Q4:** a
+> universe-polymorphic `automatic` theorem silently never fires
+> (`{A : Type}` → `_auto_u_0` blocks the index); monomorphic `Type(0)`
+> adopted. Commit: T3.
 
 **The tax.** Side-condition discharge does not try symmetry of `≠`, so
 proofs carry two-line flips — `value(a) ≠ value(j) by Natural.ne_of_lt;
@@ -185,7 +201,25 @@ has the same dependent-source caveat as T2.4 — same probe-then-stop rule.
 
 ---
 
-## T5 `[ ]` (S) S1 riders from the review (do before F3)
+## T5 `[x]` (S) S1 riders from the review (do before F3)
+
+> **Ledger 2026-07-18.** (1) `applyVector_scale` + `applyVector_zero`
+> landed in `matrix_vector.math`; `quadraticForm_scale` +
+> `applyVector_nonzero_of_invertible` in `quadratic_form.math`;
+> `isometric_positive_definite` in `integer_quadratic_form.math` — all
+> verified, redundancy-judged (keeps documented per half-keeps rule).
+> Note: `ring` does NOT β/δ-reduce a definition application like
+> `(a • x)(k)` — it treats it as an atom and reports the identity false;
+> the `by substituting <lemma>` hint form is the right closer there.
+> (2) F2 decision recorded in PLAN_15_THEOREM.md (ℤ-primitive CONFIRMED,
+> density route forbidden). (3) Alias probe FAILED at two independent
+> layers: postfix/infix dispatch keys on the head constant and does not
+> δ-unfold (`ᵀ` not registered for `IntegerMatrix`), and re-registering
+> under the alias is rejected because the registry validates the dispatch
+> function's own parameter head. A parallel wrapper API would break
+> citation uniformity — item DROPPED; the honest signature stays. Future
+> candidates (out of pass): lexer-level ℤ-matrix notation, or
+> expected-type-driven alias unfolding in dispatch. Probe module deleted.
 
 1. **`Matrix.quadraticForm_scale`:** `Q(c • x) = c² · Q(A, x)` in
    `Algebra/quadratic_form.math`. Check first whether

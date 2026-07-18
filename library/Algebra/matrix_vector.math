@@ -146,6 +146,43 @@ theorem Matrix.applyVector_multiply {r : CommutativeRing} {rows middle columns :
   done by RingVector.equal_of_pointwise
 }
 
+-- The action is homogeneous: A · (a • x) = a • (A · x).
+theorem Matrix.applyVector_scale {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) (a : CommutativeRing.carrier(r)) (x : RingVector(r, columns))
+        : A · (a • x) = a • (A · x) := {
+  ∀ (i : NaturalsBelow(rows)). (A · (a • x))(i) = (a • (A · x))(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(columns)). A(i, k) * (a • x)(k) = a * (A(i, k) * x(k))
+              by (k : NaturalsBelow(columns)) ↦ done by substituting CommutativeRing.multiply_commutative;
+          (A · (a • x))(i)
+             = CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ a * (A(i, k) * x(k)),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence
+             = a * (A · x)(i)
+                   by CommutativeRing.sumOver_scale_left
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- The action kills the zero vector.
+theorem Matrix.applyVector_zero {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns))
+        : A · RingVector.zero(r, columns) = RingVector.zero(r, rows) := {
+  ∀ (i : NaturalsBelow(rows)). (A · RingVector.zero(r, columns))(i) = RingVector.zero(r, rows)(i)
+      by (i : NaturalsBelow(rows)) ↦ {
+          ∀ (k : NaturalsBelow(columns)).
+              A(i, k) * RingVector.zero(r, columns)(k) = CommutativeRing.zero(r)
+              by (k : NaturalsBelow(columns)) ↦ done;
+          (A · RingVector.zero(r, columns))(i)
+             = CommutativeRing.sumOver((k : NaturalsBelow(columns)) ↦ CommutativeRing.zero(r),
+                   NaturalsBelow.enumerate(columns))
+                   by CommutativeRing.sumOver_congruence
+             = RingVector.zero(r, rows)(i)
+                   by CommutativeRing.sumOver_zero_function
+        };
+  done by RingVector.equal_of_pointwise
+}
+
 -- ----------------------------------------------------------------------
 -- The bilinear pairing ⟨u, v⟩ = Σ u(k)·v(k).
 

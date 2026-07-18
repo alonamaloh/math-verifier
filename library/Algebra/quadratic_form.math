@@ -68,6 +68,19 @@ theorem Matrix.quadraticForm_pullback {r : CommutativeRing} {n k : ℕ}
      = RingVector.innerProduct(M · x, A · (M · x))         by RingVector.innerProduct_symmetric
      = Matrix.quadraticForm(A, M · x)
 
+-- The form is quadratic: scaling the vector scales the value by the square.
+theorem Matrix.quadraticForm_scale {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (c : CommutativeRing.carrier(r)) (x : RingVector(r, n))
+        : Matrix.quadraticForm(A, c • x) = (c * c) * Matrix.quadraticForm(A, x) :=
+  Matrix.quadraticForm(A, c • x)
+     = RingVector.innerProduct(c • x, A · (c • x))
+     = RingVector.innerProduct(c • x, c • (A · x))          by Matrix.applyVector_scale
+     = c * RingVector.innerProduct(x, c • (A · x))          by RingVector.innerProduct_scale_left
+     = c * RingVector.innerProduct(c • (A · x), x)          by RingVector.innerProduct_symmetric
+     = c * (c * RingVector.innerProduct(A · x, x))          by RingVector.innerProduct_scale_left
+     = c * (c * RingVector.innerProduct(x, A · x))          by RingVector.innerProduct_symmetric
+     = (c * c) * Matrix.quadraticForm(A, x)
+
 -- Pulling back preserves symmetry, so MᵀAM is again a quadratic form.
 theorem Matrix.pullback_symmetric {r : CommutativeRing} {n k : ℕ}
         (A : Matrix(r, n, n)) (M : Matrix(r, n, k))
@@ -137,6 +150,24 @@ theorem Matrix.IsIsometric.transitive {r : CommutativeRing} {n : ℕ} (A B C : M
   as pullbackComposition;
   C = (U * W)ᵀ * A * (U * W) by pullbackComposition;
   witness U * W with done
+}
+
+-- An invertible change of basis preserves nonzero-ness: x recovers from
+-- U·x through the inverse, so U·x = 0 would force x = 0.
+theorem Matrix.applyVector_nonzero_of_invertible {r : CommutativeRing} {n : ℕ}
+        (U : Matrix(r, n, n)) (x : RingVector(r, n))
+        (invertible : Matrix.IsInvertible(U))
+        (xNonzero : ¬(x = RingVector.zero(r, n)))
+        : ¬(U · x = RingVector.zero(r, n)) := {
+  suppose U · x = RingVector.zero(r, n) as imageZero;
+  choose V such that U * V = Matrix.identity(r, n) ∧ V * U = Matrix.identity(r, n)
+      from invertible;
+  x  = Matrix.identity(r, n) · x
+     = (V * U) · x                      by substituting (V * U = Matrix.identity(r, n))
+     = V · (U · x)                      by Matrix.applyVector_multiply
+     = V · RingVector.zero(r, n)        by substituting imageZero
+     = RingVector.zero(r, n)            by Matrix.applyVector_zero;
+  done
 }
 
 -- ----------------------------------------------------------------------

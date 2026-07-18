@@ -116,6 +116,27 @@ theorem Matrix.isometric_universal {n : ℕ}
   done by Matrix.isometric_represents
 }
 
+-- Positive-definiteness is an isometry invariant: the pulled-back form
+-- takes the same values, at vectors an invertible U keeps nonzero.
+theorem Matrix.isometric_positive_definite {n : ℕ}
+        (A B : Matrix(Integer.commutative_ring_bundle, n, n))
+        (isometric : Matrix.IsIsometric(A, B))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.IsPositiveDefinite(B) := {
+  choose U such that Matrix.IsInvertible(U) ∧ B = Uᵀ * A * U from isometric;
+  take x : RingVector(Integer.commutative_ring_bundle, n);
+  suppose ¬(x = RingVector.zero(Integer.commutative_ring_bundle, n));
+  Matrix.IsInvertible(U);
+  ¬(U · x = RingVector.zero(Integer.commutative_ring_bundle, n))
+      by Matrix.applyVector_nonzero_of_invertible;
+  Matrix.quadraticForm(A, U · x) > (0 : ℤ) by positiveDefinite;
+  Matrix.quadraticForm(B, x)
+     = Matrix.quadraticForm(Uᵀ * A * U, x)      by substituting (B = Uᵀ * A * U)
+     = Matrix.quadraticForm(A, U · x)           by Matrix.quadraticForm_pullback
+  as formsAgree;
+  done by substituting formsAgree
+}
+
 -- ----------------------------------------------------------------------
 -- The discriminant is an isometry invariant: det changes by (det U)² = 1.
 
@@ -124,7 +145,7 @@ theorem Matrix.isometric_determinant {n : ℕ}
         (isometric : Matrix.IsIsometric(A, B))
         : Matrix.determinant(B) = Matrix.determinant(A) := {
   choose U such that Matrix.IsInvertible(U) ∧ B = Uᵀ * A * U from isometric;
-  Matrix.IsInvertible(U) as uInvertible;
+  Matrix.IsInvertible(U);
   Matrix.determinant(U) = Integer.one ∨ Matrix.determinant(U) = Integer.negate(Integer.one)
       by Matrix.determinant_unimodular_of_invertible;
   Matrix.determinant(U) * Matrix.determinant(U) = Integer.one
