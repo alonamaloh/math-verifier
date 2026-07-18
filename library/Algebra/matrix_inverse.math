@@ -1,0 +1,96 @@
+-- Algebra/matrix_inverse.math
+--
+-- A square matrix over a commutative ring is invertible exactly when its
+-- determinant is a unit. The adjugate supplies a right inverse
+-- (`e • adj U` for `e` the determinant's inverse), and the classical
+-- bootstrap turns it two-sided: any right inverse V has a unit
+-- determinant of its own, hence its own right inverse W, and
+-- U = U·(V·W) = (U·V)·W = W forces V·U = V·W = I.
+
+module Algebra.matrix_inverse
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+
+-- Two-sided invertibility (the matrix ring is not commutative, so both
+-- sides are stated).
+definition Matrix.IsInvertible {c : CommutativeRing} {n : ℕ} (U : Matrix(c, n, n)) : Proposition :=
+  ∃ (V : Matrix(c, n, n)).
+      U * V = Matrix.identity(c, n) ∧ V * U = Matrix.identity(c, n)
+
+-- The adjugate right inverse: when the determinant has inverse e,
+-- U · (e • adj U) = I.
+theorem Matrix.adjugate_right_inverse {c : CommutativeRing} {n : ℕ}
+        (U : Matrix(c, n, n)) (e : CommutativeRing.carrier(c))
+        (determinantUnit : Matrix.determinant(U) * e = CommutativeRing.one(c))
+        : U * (e • Matrix.adjugate(U)) = Matrix.identity(c, n) := {
+  e * Matrix.determinant(U) = Matrix.determinant(U) * e = CommutativeRing.one(c) by determinantUnit;
+  U * (e • Matrix.adjugate(U))
+     = e • (U * Matrix.adjugate(U))
+     = e • (Matrix.determinant(U) • Matrix.identity(c, n))   by substituting Matrix.multiply_adjugate
+     = (e * Matrix.determinant(U)) • Matrix.identity(c, n)
+     = CommutativeRing.one(c) • Matrix.identity(c, n)        by substitution
+     = Matrix.identity(c, n)
+}
+
+-- Any right inverse certifies the determinant as a unit.
+theorem Matrix.determinant_unit_of_right_inverse {c : CommutativeRing} {n : ℕ}
+        (U V : Matrix(c, n, n))
+        (rightInverse : U * V = Matrix.identity(c, n))
+        : Matrix.determinant(U) * Matrix.determinant(V) = CommutativeRing.one(c) :=
+  Matrix.determinant(U) * Matrix.determinant(V)
+     = Matrix.determinant(U * V)                by Matrix.determinant_multiply
+     = Matrix.determinant(Matrix.identity(c, n)) by substituting rightInverse
+     = CommutativeRing.one(c)
+
+-- A unit determinant makes the matrix invertible, two-sidedly.
+theorem Matrix.invertible_of_unit_determinant {c : CommutativeRing} {n : ℕ}
+        (U : Matrix(c, n, n)) (e : CommutativeRing.carrier(c))
+        (determinantUnit : Matrix.determinant(U) * e = CommutativeRing.one(c))
+        : Matrix.IsInvertible(U) := {
+  let V : Matrix(c, n, n) := e • Matrix.adjugate(U);
+  U * V = Matrix.identity(c, n) by Matrix.adjugate_right_inverse as rightInverse;
+  -- V's determinant is a unit too, so V has its own adjugate right inverse W.
+  Matrix.determinant(V) * Matrix.determinant(U)
+     = Matrix.determinant(U) * Matrix.determinant(V)
+     = CommutativeRing.one(c)                    by Matrix.determinant_unit_of_right_inverse;
+  let W : Matrix(c, n, n) := Matrix.determinant(U) • Matrix.adjugate(V);
+  V * W = Matrix.identity(c, n) by Matrix.adjugate_right_inverse as vRightInverse;
+  -- The bootstrap: U = U·(V·W) = (U·V)·W = W.
+  U  = U * Matrix.identity(c, n)
+     = U * (V * W)                               by substituting vRightInverse
+     = (U * V) * W                               by Matrix.multiply_associative
+     = Matrix.identity(c, n) * W                 by substituting rightInverse
+     = W
+     as uEqualsW;
+  V * U
+     = V * W                                     by substituting uEqualsW
+     = Matrix.identity(c, n)                     by vRightInverse;
+  witness V with done
+}

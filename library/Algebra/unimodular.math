@@ -1,0 +1,88 @@
+-- Algebra/unimodular.math
+--
+-- GLₙ(ℤ): an integer matrix is invertible over ℤ exactly when its
+-- determinant is ±1. The forward direction reads the unit equation
+-- det U · det V = 1 through the ℤ-units lemma; the converse feeds the
+-- adjugate inverse with e := det U, since (±1)² = 1.
+
+module Algebra.unimodular
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.units
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+
+-- An integer matrix with determinant ±1 is invertible over ℤ: the
+-- determinant is its own inverse.
+theorem Matrix.invertible_of_determinant_unimodular {n : ℕ}
+        (U : Matrix(Integer.commutative_ring_bundle, n, n))
+        (determinantUnimodular : Matrix.determinant(U) = Integer.one
+             ∨ Matrix.determinant(U) = Integer.negate(Integer.one))
+        : Matrix.IsInvertible(U) := {
+  Matrix.determinant(U) * Matrix.determinant(U) = Integer.one
+      by cases {
+        case Matrix.determinant(U) = Integer.one as determinantOne: {
+            Matrix.determinant(U) * Matrix.determinant(U)
+               = Integer.one * Matrix.determinant(U)   by substituting determinantOne
+               = Integer.one * Integer.one             by substituting determinantOne
+               = Integer.one;
+            done
+          }
+        case Matrix.determinant(U) = Integer.negate(Integer.one) as determinantNegatedOne: {
+            Matrix.determinant(U) * Matrix.determinant(U)
+               = Integer.negate(Integer.one) * Matrix.determinant(U)     by substituting determinantNegatedOne
+               = Integer.negate(Integer.one) * Integer.negate(Integer.one) by substituting determinantNegatedOne
+               = Integer.one;
+            done
+          }
+      };
+  done by Matrix.invertible_of_unit_determinant
+}
+
+-- Conversely, an inverse over ℤ forces det U = ±1.
+theorem Matrix.determinant_unimodular_of_invertible {n : ℕ}
+        (U : Matrix(Integer.commutative_ring_bundle, n, n))
+        (invertible : Matrix.IsInvertible(U))
+        : Matrix.determinant(U) = Integer.one
+          ∨ Matrix.determinant(U) = Integer.negate(Integer.one) := {
+  choose V : Matrix(Integer.commutative_ring_bundle, n, n)
+      such that U * V = Matrix.identity(Integer.commutative_ring_bundle, n)
+                    ∧ V * U = Matrix.identity(Integer.commutative_ring_bundle, n)
+      from invertible;
+  Matrix.determinant(U) * Matrix.determinant(V) = Integer.one
+      by Matrix.determinant_unit_of_right_inverse;
+  done by Integer.multiply_one_implies_unit
+}

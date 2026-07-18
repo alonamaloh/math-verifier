@@ -1,0 +1,72 @@
+-- Integer/units.math
+--
+-- The units of ℤ are ±1. From x·y = 1 the absolute values multiply to 1
+-- at ℕ, forcing |x| = 1; the sign split then reads x = 1 or x = −1.
+
+module Integer.units
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.divisibility
+import Natural.euclid
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.embedding
+import Integer.sign
+import Integer.absolute_value
+import Integer.absolute_value_natural
+import Integer.absolute_value_multiplicative
+
+-- A factor of 1 in ℤ is 1 or −1.
+theorem Integer.multiply_one_implies_unit (x y : ℤ) (productOne : x * y = Integer.one)
+        : x = Integer.one ∨ x = Integer.negate(Integer.one) := {
+  -- The absolute values multiply to 1, read down at ℕ.
+  (Integer.absolute_value_natural(x) * Integer.absolute_value_natural(y) : ℤ)
+     = (Integer.absolute_value_natural(x) : ℤ) * (Integer.absolute_value_natural(y) : ℤ)
+     = abs(x) * (Integer.absolute_value_natural(y) : ℤ)
+     = abs(x) * abs(y)
+     = abs(x * y)
+           by Integer.absolute_value_multiplicative
+     = abs(Integer.one)
+           by substituting productOne
+     = (1 : ℤ);
+  Integer.absolute_value_natural(x) * Integer.absolute_value_natural(y) = 1
+      by Natural.to_integer.injective;
+  Integer.absolute_value_natural(x) ∣ 1;
+  Integer.absolute_value_natural(x) = 1 by Natural.one_is_only_divisor_of_one as absoluteValueOne;
+  -- Read the sign split against |x| = 1.
+  Integer.IsNonneg(x) ∨ (∃ (k : ℕ). x = -(k : ℤ)) by Integer.sign_split;
+  done by cases {
+    case Integer.IsNonneg(x) as xNonneg: {
+        choose a such that x = (a : ℤ) from xNonneg;
+        x
+           = (a : ℤ)
+           = abs((a : ℤ))                                  by Integer.absolute_value_of_natural
+           = (Integer.absolute_value_natural(x) : ℤ)       by substituting Integer.absolute_value_natural_is_image
+           = (1 : ℤ)                                       by substituting absoluteValueOne
+           = Integer.one;
+        done
+      }
+    case ∃ (k : ℕ). x = -(k : ℤ) as xNegated: {
+        choose k such that x = -(k : ℤ) from xNegated;
+        (k : ℤ)
+           = abs((k : ℤ))                                  by Integer.absolute_value_of_natural
+           = abs(-(k : ℤ))                                 by Integer.absolute_value_negate
+           = (Integer.absolute_value_natural(x) : ℤ)       by substituting Integer.absolute_value_natural_is_image
+           = (1 : ℤ)                                       by substituting absoluteValueOne
+        as kIsOne;
+        x
+           = -(k : ℤ)
+           = -(1 : ℤ)                                      by substituting kIsOne
+           = Integer.negate(Integer.one);
+        done
+      }
+  }
+}

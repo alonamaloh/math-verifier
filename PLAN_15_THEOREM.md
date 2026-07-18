@@ -80,7 +80,7 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 - `S0.D4` `[x]` (L) ★ Multiplicativity: `det(AB) = det A · det B`. — owes: S0.D1, S0.D3 · **DONE:** `Algebra/determinant_multiplicative.math` (`Matrix.determinant_multiply`).
 - `S0.D5` `[x]` (M) Cofactor (Laplace) expansion along a row/column. — owes: S0.D1 · **DONE (rows):** `Algebra/adjugate.math` (`Matrix.determinant_row_expansion`, landed with the Cayley–Hamilton arc).
 - `S0.D6` `[~]` (M) Adjugate; `A·adj(A) = det(A)·I`; over a field `A` invertible ⇔ `det A ≠ 0`; Cramer's rule. — owes: S0.D4, S0.D5 · **Adjugate + `Matrix.multiply_adjugate` DONE** (`Algebra/adjugate.math`); the field invertibility ⇔ `det ≠ 0` equivalence and Cramer remain.
-- `S0.D7` `[ ]` (M) Unimodular group `GLₙ(ℤ)`: integer `U` invertible over ℤ ⇔ `det U = ±1`. — owes: S0.D4, S0.D6 · **GAP — second brick; the adjugate gives the ⇐ direction almost for free.**
+- `S0.D7` `[x]` (M) Unimodular group `GLₙ(ℤ)`: integer `U` invertible over ℤ ⇔ `det U = ±1`. — owes: S0.D4, S0.D6 · **DONE 2026-07-18:** `Algebra/matrix_inverse.math` (two-sided `Matrix.IsInvertible`, adjugate right inverse, `invertible_of_unit_determinant` with the U = U·(V·W) = W bootstrap, `determinant_unit_of_right_inverse`) + `Algebra/unimodular.math` (both directions over `Integer.commutative_ring_bundle`) + `Integer/units.math` (`Integer.multiply_one_implies_unit`: the units of ℤ are ±1, via |x|·|y| = 1 at ℕ). New matrix-ring laws: `scale_scale`, `one_scale`.
 
 **Gram machinery (the bridge to forms)**
 - `S0.G1` `[ ]` (S) Gram matrix `G = MᵀM` is symmetric; `xᵀGx = ‖Mx‖²`. — owes: S0.M3
