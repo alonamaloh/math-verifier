@@ -1,0 +1,337 @@
+-- Algebra/representation_bound.math
+--
+-- The box bound for positive-definite integer forms — the negative side
+-- of the bounded representation check (fifteen-theorem stage S3.T1).
+-- Every vector where the form takes the value `target` lies in the
+-- explicit finite box
+--
+--   det(A) · x(i)² ≤ adj(A)(i,i) · target,
+--
+-- and any vector outside that box takes a value exceeding `target`, so
+-- deciding `Represents(A, target)` is a finite search. The engine is the
+-- Cauchy–Schwarz inequality for the A-pairing, evaluated at the integral
+-- vector adj(A)·e_i, whose A-pairing with x is det(A)·x(i).
+
+module Algebra.representation_bound
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.classical_decidable
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.order_multiply
+import Integer.units
+import Integer.integral_domain
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.determinant_bordered
+import Algebra.quadratic_form
+import Algebra.schur_complement
+import Algebra.integer_quadratic_form
+import Algebra.sylvester
+
+-- ----------------------------------------------------------------------
+-- Cauchy–Schwarz for the A-pairing: ⟨u, A·v⟩² ≤ Q(u)·Q(v). Evaluate the
+-- form at Q(v)·u − ⟨u, A·v⟩·v: its value factors as
+-- Q(v)·(Q(u)·Q(v) − ⟨u, A·v⟩²), and the value is nonnegative while Q(v)
+-- is positive (the case v = 0 is trivial).
+
+theorem Matrix.cauchy_schwarz_vector_bound {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (u v : RingVector(Integer.commutative_ring_bundle, n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : RingVector.innerProduct(u, A · v) * RingVector.innerProduct(u, A · v)
+          ≤ Matrix.quadraticForm(A, u) * Matrix.quadraticForm(A, v) := {
+  let pairing : ℤ := RingVector.innerProduct(u, A · v);
+  done by cases {
+    case v = RingVector.zero(Integer.commutative_ring_bundle, n) as vZero: {
+        pairing
+           = RingVector.innerProduct(u, A · RingVector.zero(Integer.commutative_ring_bundle, n))
+                 by substituting vZero
+           = RingVector.innerProduct(u, RingVector.zero(Integer.commutative_ring_bundle, n))
+                 by substituting Matrix.applyVector_zero
+           = (0 : ℤ)
+                 by RingVector.innerProduct_zero_right
+        as pairingVanishes;
+        Matrix.quadraticForm(A, v)
+           = Matrix.quadraticForm(A, RingVector.zero(Integer.commutative_ring_bundle, n))
+                 by substituting vZero
+           = (0 : ℤ)
+                 by Matrix.quadraticForm_zero
+        as valueVanishes;
+        pairing * pairing
+           = (0 : ℤ) * (0 : ℤ)                                          by substituting pairingVanishes
+           ≤ Matrix.quadraticForm(A, u) * (0 : ℤ)
+           = Matrix.quadraticForm(A, u) * Matrix.quadraticForm(A, v)    by substituting valueVanishes;
+        done
+      }
+    otherwise as vNonzero: {
+        let formAtV : ℤ := Matrix.quadraticForm(A, v);
+        let negatedPairing : ℤ := -pairing;
+        let eliminatingVector : RingVector(Integer.commutative_ring_bundle, n) :=
+            formAtV • u + negatedPairing • v;
+
+        Matrix.quadraticForm(A, v) > (0 : ℤ) by positiveDefinite;
+        Matrix.quadraticForm(A, eliminatingVector) ≥ (0 : ℤ) by Matrix.quadraticForm_nonneg;
+
+        -- The mirror pairing ⟨v, A·u⟩ agrees with ⟨u, A·v⟩ by symmetry.
+        RingVector.innerProduct(v, A · u)
+           = RingVector.innerProduct(Aᵀ · v, u)    by Matrix.transpose_adjoint
+           = RingVector.innerProduct(A · v, u)     by substituting symmetric
+           = RingVector.innerProduct(u, A · v)     by RingVector.innerProduct_symmetric
+        as mirrorPairing;
+
+        -- Name the four summands of the bilinear expansion and evaluate each.
+        Matrix.quadraticForm(A, formAtV • u)
+           = (formAtV * formAtV) * Matrix.quadraticForm(A, u)
+        as firstSquare;
+        Matrix.quadraticForm(A, negatedPairing • v)
+           = (negatedPairing * negatedPairing) * Matrix.quadraticForm(A, v)
+        as secondSquare;
+        RingVector.innerProduct(formAtV • u, A · (negatedPairing • v))
+           = RingVector.innerProduct(formAtV • u, negatedPairing • (A · v))
+                 by substituting Matrix.applyVector_scale
+           = formAtV * RingVector.innerProduct(u, negatedPairing • (A · v))
+           = formAtV * (negatedPairing * RingVector.innerProduct(u, A · v))
+                 by substituting RingVector.innerProduct_scale_right
+        as firstCrossValue;
+        RingVector.innerProduct(negatedPairing • v, A · (formAtV • u))
+           = RingVector.innerProduct(negatedPairing • v, formAtV • (A · u))
+                 by substituting Matrix.applyVector_scale
+           = negatedPairing * RingVector.innerProduct(v, formAtV • (A · u))
+           = negatedPairing * (formAtV * RingVector.innerProduct(v, A · u))
+                 by substituting RingVector.innerProduct_scale_right
+           = negatedPairing * (formAtV * RingVector.innerProduct(u, A · v))
+                 by substituting mirrorPairing
+        as secondCrossValue;
+
+        Matrix.quadraticForm(A, eliminatingVector)
+           = Matrix.quadraticForm(A, formAtV • u)
+             + RingVector.innerProduct(formAtV • u, A · (negatedPairing • v))
+             + RingVector.innerProduct(negatedPairing • v, A · (formAtV • u))
+             + Matrix.quadraticForm(A, negatedPairing • v)
+                 by Matrix.quadraticForm_add
+           = (formAtV * formAtV) * Matrix.quadraticForm(A, u)
+             + RingVector.innerProduct(formAtV • u, A · (negatedPairing • v))
+             + RingVector.innerProduct(negatedPairing • v, A · (formAtV • u))
+             + Matrix.quadraticForm(A, negatedPairing • v)
+                 by substituting firstSquare
+           = (formAtV * formAtV) * Matrix.quadraticForm(A, u)
+             + formAtV * (negatedPairing * RingVector.innerProduct(u, A · v))
+             + RingVector.innerProduct(negatedPairing • v, A · (formAtV • u))
+             + Matrix.quadraticForm(A, negatedPairing • v)
+                 by substituting firstCrossValue
+           = (formAtV * formAtV) * Matrix.quadraticForm(A, u)
+             + formAtV * (negatedPairing * RingVector.innerProduct(u, A · v))
+             + negatedPairing * (formAtV * RingVector.innerProduct(u, A · v))
+             + Matrix.quadraticForm(A, negatedPairing • v)
+                 by substituting secondCrossValue
+           = (formAtV * formAtV) * Matrix.quadraticForm(A, u)
+             + formAtV * (negatedPairing * RingVector.innerProduct(u, A · v))
+             + negatedPairing * (formAtV * RingVector.innerProduct(u, A · v))
+             + (negatedPairing * negatedPairing) * Matrix.quadraticForm(A, v)
+                 by substituting secondSquare
+           = formAtV * (Matrix.quadraticForm(A, u) * formAtV - pairing * pairing)
+                 by ring
+        as valueFactors;
+
+        formAtV * (Matrix.quadraticForm(A, u) * formAtV - pairing * pairing) ≥ (0 : ℤ)
+            by substituting valueFactors;
+        Integer.IsNonneg(formAtV * (Matrix.quadraticForm(A, u) * formAtV - pairing * pairing))
+            by Integer.nonneg_of_zero_less_or_equal;
+        formAtV * (Matrix.quadraticForm(A, u) * formAtV - pairing * pairing)
+           = (Matrix.quadraticForm(A, u) * formAtV - pairing * pairing) * formAtV;
+        Integer.IsNonneg((Matrix.quadraticForm(A, u) * formAtV - pairing * pairing) * formAtV)
+            by substitution;
+        (0 : ℤ) ≤ formAtV by Integer.LessThan.weaken;
+        Integer.IsNonneg(formAtV) by Integer.nonneg_of_zero_less_or_equal;
+        (0 : ℤ) ≠ formAtV by Integer.LessThan.distinct;
+        Integer.IsNonneg(Matrix.quadraticForm(A, u) * formAtV - pairing * pairing)
+            by Integer.IsNonneg_of_product_with_positive;
+        done by Integer.le_of_nonneg_difference
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The adjugate column adj(A)·e_i: the natural integral witness whose
+-- A-pairing reads off coordinates. Its own form value is
+-- det(A)·adj(A)(i,i) — no symmetry needed, just A·(adj(A)·x) = det(A)·x.
+
+theorem Matrix.quadraticForm_adjugate_column {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (i : NaturalsBelow(n))
+        : Matrix.quadraticForm(A,
+              Matrix.adjugate(A) · Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, i))
+          = Matrix.determinant(A) * Matrix.adjugate(A)(i, i) := {
+  let basis : RingVector(Integer.commutative_ring_bundle, n) :=
+      Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, i);
+  let column : RingVector(Integer.commutative_ring_bundle, n) := Matrix.adjugate(A) · basis;
+  A · column = Matrix.determinant(A) • basis by Matrix.applyVector_adjugate as adjugateCollapses;
+  column(i) = Matrix.adjugate(A)(i, i) by Matrix.applyVector_standardBasisRow as columnReads;
+  RingVector.innerProduct(basis, column) = column(i)
+      by RingVector.innerProduct_standardBasisRow_left as basisPairingReads;
+  Matrix.quadraticForm(A, column)
+     = RingVector.innerProduct(column, A · column)
+     = RingVector.innerProduct(column, Matrix.determinant(A) • basis)   by substituting adjugateCollapses
+     = Matrix.determinant(A) * RingVector.innerProduct(column, basis)
+           by substituting RingVector.innerProduct_scale_right
+     = Matrix.determinant(A) * RingVector.innerProduct(basis, column)   by RingVector.innerProduct_symmetric
+     = Matrix.determinant(A) * column(i)                                by substituting basisPairingReads
+     = Matrix.determinant(A) * Matrix.adjugate(A)(i, i)                 by substituting columnReads;
+  done
+}
+
+-- The diagonal of the adjugate of a positive-definite form is positive:
+-- adj(A)·e_i is nonzero (A maps it to det(A)·e_i), so the form is
+-- positive there, and that value factors as det(A)·adj(A)(i,i).
+theorem Matrix.adjugate_diagonal_positive {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (i : NaturalsBelow(n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.adjugate(A)(i, i) > (0 : ℤ) := {
+  let basis : RingVector(Integer.commutative_ring_bundle, n) :=
+      Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, i);
+  let column : RingVector(Integer.commutative_ring_bundle, n) := Matrix.adjugate(A) · basis;
+  Matrix.determinant(A) > (0 : ℤ) by Matrix.determinant_positive_of_positive_definite;
+  A · column = Matrix.determinant(A) • basis by Matrix.applyVector_adjugate as adjugateCollapses;
+
+  ¬(column = RingVector.zero(Integer.commutative_ring_bundle, n)) by {
+      suppose column = RingVector.zero(Integer.commutative_ring_bundle, n) as columnZero;
+      RingVector.zero(Integer.commutative_ring_bundle, n)
+         = A · RingVector.zero(Integer.commutative_ring_bundle, n)   by Matrix.applyVector_zero
+         = A · column                                                by substituting columnZero
+         = Matrix.determinant(A) • basis                             by adjugateCollapses
+      as zeroEqualsScaled;
+      basis(i) = (1 : ℤ) by Matrix.standardBasisRow_at as basisReads;
+      (0 : ℤ)
+         = RingVector.zero(Integer.commutative_ring_bundle, n)(i)
+         = (Matrix.determinant(A) • basis)(i)                        by substituting zeroEqualsScaled
+         = Matrix.determinant(A) * basis(i)
+         = Matrix.determinant(A) * (1 : ℤ)                           by substituting basisReads
+         = Matrix.determinant(A);
+      (0 : ℤ) ≠ Matrix.determinant(A) by Integer.LessThan.distinct;
+      done
+    };
+  Matrix.quadraticForm(A, column) > (0 : ℤ) by positiveDefinite;
+  Matrix.quadraticForm(A, column) = Matrix.determinant(A) * Matrix.adjugate(A)(i, i)
+      by Matrix.quadraticForm_adjugate_column as valueReads;
+  Matrix.determinant(A) * Matrix.adjugate(A)(i, i) > (0 : ℤ) by substituting valueReads;
+  done by Integer.positive_of_multiply_positive
+}
+
+-- ----------------------------------------------------------------------
+-- The box bound: det(A)·x(i)² ≤ adj(A)(i,i)·Q(x). Cauchy–Schwarz at
+-- u = adj(A)·e_i, whose A-pairing with x is det(A)·x(i), then cancel one
+-- factor of det(A) > 0.
+
+theorem Matrix.positive_definite_box_bound {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (x : RingVector(Integer.commutative_ring_bundle, n)) (i : NaturalsBelow(n))
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.determinant(A) * (x(i) * x(i))
+          ≤ Matrix.adjugate(A)(i, i) * Matrix.quadraticForm(A, x) := {
+  let basis : RingVector(Integer.commutative_ring_bundle, n) :=
+      Matrix.standardBasisRow(Integer.commutative_ring_bundle, n, i);
+  let column : RingVector(Integer.commutative_ring_bundle, n) := Matrix.adjugate(A) · basis;
+  let determinantValue : ℤ := Matrix.determinant(A);
+  let coordinate : ℤ := x(i);
+  let cofactor : ℤ := Matrix.adjugate(A)(i, i);
+  Matrix.determinant(A) > (0 : ℤ) by Matrix.determinant_positive_of_positive_definite;
+  A · column = Matrix.determinant(A) • basis by Matrix.applyVector_adjugate as adjugateCollapses;
+  RingVector.innerProduct(basis, x) = x(i)
+      by RingVector.innerProduct_standardBasisRow_left as basisPairingReads;
+
+  -- The A-pairing of the adjugate column with x reads off the coordinate.
+  RingVector.innerProduct(column, A · x)
+     = RingVector.innerProduct(Aᵀ · column, x)                      by Matrix.transpose_adjoint
+     = RingVector.innerProduct(A · column, x)                       by substituting symmetric
+     = RingVector.innerProduct(Matrix.determinant(A) • basis, x)    by substituting adjugateCollapses
+     = Matrix.determinant(A) * RingVector.innerProduct(basis, x)
+           by substituting RingVector.innerProduct_scale_left
+     = Matrix.determinant(A) * x(i)                                 by substituting basisPairingReads
+  as pairingReads;
+  Matrix.quadraticForm(A, column) = Matrix.determinant(A) * Matrix.adjugate(A)(i, i)
+      by Matrix.quadraticForm_adjugate_column as columnValue;
+
+  determinantValue * (determinantValue * (coordinate * coordinate))
+     = (determinantValue * coordinate) * (determinantValue * coordinate)
+           by ring
+     = RingVector.innerProduct(column, A · x) * RingVector.innerProduct(column, A · x)
+           by substituting pairingReads
+     ≤ Matrix.quadraticForm(A, column) * Matrix.quadraticForm(A, x)
+           by Matrix.cauchy_schwarz_vector_bound
+     = (determinantValue * cofactor) * Matrix.quadraticForm(A, x)
+           by substituting columnValue
+     = determinantValue * (cofactor * Matrix.quadraticForm(A, x))
+           by ring;
+  done by Integer.cancel_le_by_positive
+}
+
+-- Every representation of `target` lies in the box.
+theorem Matrix.represents_within_box {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (x : RingVector(Integer.commutative_ring_bundle, n)) (i : NaturalsBelow(n)) (target : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        (isRepresentation : Matrix.quadraticForm(A, x) = target)
+        : Matrix.determinant(A) * (x(i) * x(i)) ≤ Matrix.adjugate(A)(i, i) * target := {
+  Matrix.determinant(A) * (x(i) * x(i)) ≤ Matrix.adjugate(A)(i, i) * Matrix.quadraticForm(A, x)
+      by Matrix.positive_definite_box_bound;
+  done by substituting isRepresentation
+}
+
+-- And outside the box the form exceeds the target: the search for a
+-- representation of `target` is confined to the box.
+theorem Matrix.value_exceeds_outside_box {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (x : RingVector(Integer.commutative_ring_bundle, n)) (i : NaturalsBelow(n)) (target : ℤ)
+        (symmetric : Matrix.IsSymmetric(A))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        (outsideBox : Matrix.adjugate(A)(i, i) * target < Matrix.determinant(A) * (x(i) * x(i)))
+        : Matrix.quadraticForm(A, x) > target := {
+  Matrix.adjugate(A)(i, i) > (0 : ℤ) by Matrix.adjugate_diagonal_positive;
+  Matrix.determinant(A) * (x(i) * x(i)) ≤ Matrix.adjugate(A)(i, i) * Matrix.quadraticForm(A, x)
+      by Matrix.positive_definite_box_bound;
+  Matrix.adjugate(A)(i, i) * target < Matrix.adjugate(A)(i, i) * Matrix.quadraticForm(A, x)
+      by Integer.LessThan.transitive_right;
+  done by Integer.cancel_lt_by_positive
+}
