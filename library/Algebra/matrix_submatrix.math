@@ -418,3 +418,97 @@ theorem Matrix.inclusionMatrix_applyVector_off {r : CommutativeRing} {n k : ℕ}
            by CommutativeRing.sumOver_zero_function;
   done
 }
+
+-- ----------------------------------------------------------------------
+-- Submatrices of the identity: along one injective selection the
+-- identity restricts to the identity; along two selections with disjoint
+-- images it restricts to zero. Through `Matrix.submatrix_pullback` these
+-- collapse the products of inclusion matrices — the calculus that lets
+-- block assemblies (direct sums, bordered extensions) be multiplied out
+-- algebraically.
+
+theorem Matrix.submatrix_identity_injective {r : CommutativeRing} {n k : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (injective : Function.IsInjective(select))
+        : Matrix.submatrix(Matrix.identity(r, n), select, select) = Matrix.identity(r, k) := {
+  ∀ (i : NaturalsBelow(k)). ∀ (j : NaturalsBelow(k)).
+      Matrix.submatrix(Matrix.identity(r, n), select, select)(i, j) = Matrix.identity(r, k)(i, j)
+      by (i : NaturalsBelow(k)) (j : NaturalsBelow(k)) ↦ {
+          done by cases {
+            case i = j as onDiagonal: {
+                Matrix.identity(r, k)(j, j) = CommutativeRing.one(r)
+                    by Matrix.identity_entry_diagonal as smallDiagonalReads;
+                Matrix.submatrix(Matrix.identity(r, n), select, select)(i, j)
+                   = Matrix.identity(r, n)(select(i), select(j))
+                   = Matrix.identity(r, n)(select(j), select(j))   by substituting onDiagonal
+                   = CommutativeRing.one(r)                        by Matrix.identity_entry_diagonal
+                   = Matrix.identity(r, k)(j, j)                   by smallDiagonalReads
+                   = Matrix.identity(r, k)(i, j)                   by substituting onDiagonal;
+                done
+              }
+            otherwise as offDiagonal: {
+                ¬(select(i) = select(j)) by {
+                    suppose select(i) = select(j);
+                    i = j by injective;
+                    done
+                  };
+                Matrix.identity(r, k)(i, j) = CommutativeRing.zero(r)
+                    by Matrix.identity_entry_off as smallOffReads;
+                Matrix.submatrix(Matrix.identity(r, n), select, select)(i, j)
+                   = Matrix.identity(r, n)(select(i), select(j))
+                   = CommutativeRing.zero(r)                       by Matrix.identity_entry_off
+                   = Matrix.identity(r, k)(i, j)                   by smallOffReads;
+                done
+              }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.submatrix_identity_disjoint {r : CommutativeRing} {n k l : ℕ}
+        (rowSelect : NaturalsBelow(k) → NaturalsBelow(n))
+        (columnSelect : NaturalsBelow(l) → NaturalsBelow(n))
+        (disjoint : ∀ (i : NaturalsBelow(k)). ∀ (j : NaturalsBelow(l)). ¬(rowSelect(i) = columnSelect(j)))
+        : Matrix.submatrix(Matrix.identity(r, n), rowSelect, columnSelect) = Matrix.zero(r, k, l) := {
+  ∀ (i : NaturalsBelow(k)). ∀ (j : NaturalsBelow(l)).
+      Matrix.submatrix(Matrix.identity(r, n), rowSelect, columnSelect)(i, j) = Matrix.zero(r, k, l)(i, j)
+      by (i : NaturalsBelow(k)) (j : NaturalsBelow(l)) ↦ {
+          ¬(rowSelect(i) = columnSelect(j)) by disjoint;
+          Matrix.submatrix(Matrix.identity(r, n), rowSelect, columnSelect)(i, j)
+             = Matrix.identity(r, n)(rowSelect(i), columnSelect(j))
+             = CommutativeRing.zero(r)                             by Matrix.identity_entry_off;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.inclusionMatrix_transpose_multiply_self {r : CommutativeRing} {n k : ℕ}
+        (select : NaturalsBelow(k) → NaturalsBelow(n))
+        (injective : Function.IsInjective(select))
+        : Matrix.inclusionMatrix(r, select)ᵀ * Matrix.inclusionMatrix(r, select)
+          = Matrix.identity(r, k) := {
+  Matrix.inclusionMatrix(r, select)ᵀ * Matrix.inclusionMatrix(r, select)
+     = (Matrix.inclusionMatrix(r, select)ᵀ * Matrix.identity(r, n)) * Matrix.inclusionMatrix(r, select)
+           by substituting Matrix.multiply_one
+     = Matrix.submatrix(Matrix.identity(r, n), select, select)
+           by Matrix.submatrix_pullback
+     = Matrix.identity(r, k)
+           by Matrix.submatrix_identity_injective;
+  done
+}
+
+theorem Matrix.inclusionMatrix_transpose_multiply_disjoint {r : CommutativeRing} {n k l : ℕ}
+        (rowSelect : NaturalsBelow(k) → NaturalsBelow(n))
+        (columnSelect : NaturalsBelow(l) → NaturalsBelow(n))
+        (disjoint : ∀ (i : NaturalsBelow(k)). ∀ (j : NaturalsBelow(l)). ¬(rowSelect(i) = columnSelect(j)))
+        : Matrix.inclusionMatrix(r, rowSelect)ᵀ * Matrix.inclusionMatrix(r, columnSelect)
+          = Matrix.zero(r, k, l) := {
+  Matrix.inclusionMatrix(r, rowSelect)ᵀ * Matrix.inclusionMatrix(r, columnSelect)
+     = (Matrix.inclusionMatrix(r, rowSelect)ᵀ * Matrix.identity(r, n)) * Matrix.inclusionMatrix(r, columnSelect)
+           by substituting Matrix.multiply_one
+     = Matrix.submatrix(Matrix.identity(r, n), rowSelect, columnSelect)
+           by Matrix.submatrix_pullback
+     = Matrix.zero(r, k, l)
+           by Matrix.submatrix_identity_disjoint;
+  done
+}

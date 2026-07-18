@@ -313,6 +313,217 @@ theorem Matrix.directSum_entry_right_left {r : CommutativeRing} {n p : ℕ}
 }
 
 -- ----------------------------------------------------------------------
+-- The direct sum of identities is the identity: the block entries agree
+-- diagonally and the cross blocks vanish, exactly as the identity does.
+
+theorem Matrix.directSum_identity {r : CommutativeRing} (n p : ℕ)
+        : Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p)) = Matrix.identity(r, n + p) := {
+  ∀ (a : NaturalsBelow(n + p)). ∀ (b : NaturalsBelow(n + p)).
+      Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(a, b) = Matrix.identity(r, n + p)(a, b)
+      by (a : NaturalsBelow(n + p)) (b : NaturalsBelow(n + p)) ↦ {
+          (∃ (i : NaturalsBelow(n)). a = NaturalsBelow.sumLeft(n, p, i))
+              ∨ (∃ (j : NaturalsBelow(p)). a = NaturalsBelow.shift(n, j))
+              by NaturalsBelow.sumLeft_or_shift;
+          (∃ (i : NaturalsBelow(n)). b = NaturalsBelow.sumLeft(n, p, i))
+              ∨ (∃ (j : NaturalsBelow(p)). b = NaturalsBelow.shift(n, j))
+              by NaturalsBelow.sumLeft_or_shift;
+          done by cases {
+            case ∃ (i : NaturalsBelow(n)). a = NaturalsBelow.sumLeft(n, p, i) as aLeft:
+                done by cases {
+                  case ∃ (i : NaturalsBelow(n)). b = NaturalsBelow.sumLeft(n, p, i) as bLeft: {
+                      choose i such that a = NaturalsBelow.sumLeft(n, p, i) from aLeft;
+                      choose iPrime such that b = NaturalsBelow.sumLeft(n, p, iPrime) from bLeft;
+                      Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                              NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+                         = Matrix.identity(r, n)(i, iPrime)
+                          by Matrix.directSum_entry_left_left as blockEntryReads;
+                      Matrix.identity(r, n)(i, iPrime)
+                         = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i),
+                               NaturalsBelow.sumLeft(n, p, iPrime))
+                          by {
+                            done by cases {
+                              case i = iPrime as onDiagonal: {
+                                  NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.sumLeft(n, p, iPrime)
+                                      by substituting onDiagonal;
+                                  Matrix.identity(r, n)(i, iPrime)
+                                     = Matrix.identity(r, n)(iPrime, iPrime)
+                                           by substituting onDiagonal
+                                     = CommutativeRing.one(r)
+                                           by Matrix.identity_entry_diagonal
+                                     = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, iPrime),
+                                           NaturalsBelow.sumLeft(n, p, iPrime))
+                                           by Matrix.identity_entry_diagonal
+                                     = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i),
+                                           NaturalsBelow.sumLeft(n, p, iPrime))
+                                           by substituting onDiagonal;
+                                  done
+                                }
+                              otherwise as offDiagonal: {
+                                  Function.IsInjective(NaturalsBelow.sumLeft(n, p))
+                                      by NaturalsBelow.sumLeft_is_injective;
+                                  ¬(NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.sumLeft(n, p, iPrime)) by {
+                                      suppose NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.sumLeft(n, p, iPrime);
+                                      i = iPrime;
+                                      done
+                                    };
+                                  Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i),
+                                          NaturalsBelow.sumLeft(n, p, iPrime))
+                                     = CommutativeRing.zero(r)
+                                      by Matrix.identity_entry_off as largeOffReads;
+                                  Matrix.identity(r, n)(i, iPrime)
+                                     = CommutativeRing.zero(r)
+                                           by Matrix.identity_entry_off
+                                     = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i),
+                                           NaturalsBelow.sumLeft(n, p, iPrime))
+                                           by largeOffReads;
+                                  done
+                                }
+                            }
+                          } as entriesAgree;
+                      Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(a, b)
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.sumLeft(n, p, i), b)
+                               by substituting (a = NaturalsBelow.sumLeft(n, p, i))
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.sumLeft(n, p, iPrime))
+                               by substituting (b = NaturalsBelow.sumLeft(n, p, iPrime))
+                         = Matrix.identity(r, n)(i, iPrime)
+                               by blockEntryReads
+                         = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i),
+                               NaturalsBelow.sumLeft(n, p, iPrime))
+                               by entriesAgree
+                         = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i), b)
+                               by substituting (b = NaturalsBelow.sumLeft(n, p, iPrime))
+                         = Matrix.identity(r, n + p)(a, b)
+                               by substituting (a = NaturalsBelow.sumLeft(n, p, i));
+                      done
+                    }
+                  case ∃ (j : NaturalsBelow(p)). b = NaturalsBelow.shift(n, j) as bRight: {
+                      choose i such that a = NaturalsBelow.sumLeft(n, p, i) from aLeft;
+                      choose j such that b = NaturalsBelow.shift(n, j) from bRight;
+                      ¬(NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.shift(n, j))
+                          by NaturalsBelow.sumLeft_not_shift;
+                      Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+                         = CommutativeRing.zero(r)
+                          by Matrix.identity_entry_off as largeOffReads;
+                      Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(a, b)
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.sumLeft(n, p, i), b)
+                               by substituting (a = NaturalsBelow.sumLeft(n, p, i))
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+                               by substituting (b = NaturalsBelow.shift(n, j))
+                         = CommutativeRing.zero(r)
+                               by Matrix.directSum_entry_left_right
+                         = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i), NaturalsBelow.shift(n, j))
+                               by largeOffReads
+                         = Matrix.identity(r, n + p)(NaturalsBelow.sumLeft(n, p, i), b)
+                               by substituting (b = NaturalsBelow.shift(n, j))
+                         = Matrix.identity(r, n + p)(a, b)
+                               by substituting (a = NaturalsBelow.sumLeft(n, p, i));
+                      done
+                    }
+                }
+            case ∃ (j : NaturalsBelow(p)). a = NaturalsBelow.shift(n, j) as aRight:
+                done by cases {
+                  case ∃ (i : NaturalsBelow(n)). b = NaturalsBelow.sumLeft(n, p, i) as bLeft: {
+                      choose j such that a = NaturalsBelow.shift(n, j) from aRight;
+                      choose i such that b = NaturalsBelow.sumLeft(n, p, i) from bLeft;
+                      ¬(NaturalsBelow.sumLeft(n, p, i) = NaturalsBelow.shift(n, j))
+                          by NaturalsBelow.sumLeft_not_shift;
+                      ¬(NaturalsBelow.shift(n, j) = NaturalsBelow.sumLeft(n, p, i));
+                      Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+                         = CommutativeRing.zero(r)
+                          by Matrix.identity_entry_off as largeOffReads;
+                      Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(a, b)
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.shift(n, j), b)
+                               by substituting (a = NaturalsBelow.shift(n, j))
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+                               by substituting (b = NaturalsBelow.sumLeft(n, p, i))
+                         = CommutativeRing.zero(r)
+                               by Matrix.directSum_entry_right_left
+                         = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j), NaturalsBelow.sumLeft(n, p, i))
+                               by largeOffReads
+                         = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j), b)
+                               by substituting (b = NaturalsBelow.sumLeft(n, p, i))
+                         = Matrix.identity(r, n + p)(a, b)
+                               by substituting (a = NaturalsBelow.shift(n, j));
+                      done
+                    }
+                  case ∃ (j : NaturalsBelow(p)). b = NaturalsBelow.shift(n, j) as bRight: {
+                      choose j such that a = NaturalsBelow.shift(n, j) from aRight;
+                      choose jPrime such that b = NaturalsBelow.shift(n, jPrime) from bRight;
+                      Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                              NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+                         = Matrix.identity(r, p)(j, jPrime)
+                          by Matrix.directSum_entry_right_right as blockEntryReads;
+                      Matrix.identity(r, p)(j, jPrime)
+                         = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+                          by {
+                            done by cases {
+                              case j = jPrime as onDiagonal: {
+                                  Matrix.identity(r, p)(j, jPrime)
+                                     = Matrix.identity(r, p)(jPrime, jPrime)
+                                           by substituting onDiagonal
+                                     = CommutativeRing.one(r)
+                                           by Matrix.identity_entry_diagonal
+                                     = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, jPrime),
+                                           NaturalsBelow.shift(n, jPrime))
+                                           by Matrix.identity_entry_diagonal
+                                     = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j),
+                                           NaturalsBelow.shift(n, jPrime))
+                                           by substituting onDiagonal;
+                                  done
+                                }
+                              otherwise as offDiagonal: {
+                                  Function.IsInjective(
+                                          (NaturalsBelow.shift(n) : NaturalsBelow(p) → NaturalsBelow(n + p)))
+                                      by NaturalsBelow.shift_is_injective;
+                                  ¬(NaturalsBelow.shift(n, j) = NaturalsBelow.shift(n, jPrime)) by {
+                                      suppose NaturalsBelow.shift(n, j) = NaturalsBelow.shift(n, jPrime);
+                                      j = jPrime;
+                                      done
+                                    };
+                                  Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j),
+                                          NaturalsBelow.shift(n, jPrime))
+                                     = CommutativeRing.zero(r)
+                                      by Matrix.identity_entry_off as largeOffReads;
+                                  Matrix.identity(r, p)(j, jPrime)
+                                     = CommutativeRing.zero(r)
+                                           by Matrix.identity_entry_off
+                                     = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j),
+                                           NaturalsBelow.shift(n, jPrime))
+                                           by largeOffReads;
+                                  done
+                                }
+                            }
+                          } as entriesAgree;
+                      Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(a, b)
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.shift(n, j), b)
+                               by substituting (a = NaturalsBelow.shift(n, j))
+                         = Matrix.directSum(Matrix.identity(r, n), Matrix.identity(r, p))(
+                               NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+                               by substituting (b = NaturalsBelow.shift(n, jPrime))
+                         = Matrix.identity(r, p)(j, jPrime)
+                               by blockEntryReads
+                         = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j), NaturalsBelow.shift(n, jPrime))
+                               by entriesAgree
+                         = Matrix.identity(r, n + p)(NaturalsBelow.shift(n, j), b)
+                               by substituting (b = NaturalsBelow.shift(n, jPrime))
+                         = Matrix.identity(r, n + p)(a, b)
+                               by substituting (a = NaturalsBelow.shift(n, j));
+                      done
+                    }
+                }
+          }
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- ----------------------------------------------------------------------
 -- The direct sum of symmetric matrices is symmetric.
 
 theorem Matrix.directSum_symmetric {r : CommutativeRing} {n p : ℕ}

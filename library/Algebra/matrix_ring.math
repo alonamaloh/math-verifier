@@ -387,6 +387,74 @@ theorem Matrix.scale_zero_scalar {c : CommutativeRing} {rows columns : ℕ}
   done by Matrix.equal_of_entries
 }
 
+-- The zero matrix absorbs products on either side.
+theorem Matrix.multiply_zero {c : CommutativeRing} {rows middle columns : ℕ}
+        (M : Matrix(c, rows, middle))
+        : M * Matrix.zero(c, middle, columns) = Matrix.zero(c, rows, columns) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (M * Matrix.zero(c, middle, columns))(i, j) = Matrix.zero(c, rows, columns)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦ {
+          (M * Matrix.zero(c, middle, columns))(i, j)
+             = CommutativeRing.sumOver((k : NaturalsBelow(middle)) ↦ CommutativeRing.zero(c),
+                   NaturalsBelow.enumerate(middle))
+                   by ((k : NaturalsBelow(middle)) ↦
+                       M(i, k) * Matrix.zero(c, middle, columns)(k, j)
+                          = M(i, k) * CommutativeRing.zero(c)
+                          = CommutativeRing.zero(c))
+             = CommutativeRing.zero(c)
+                   by CommutativeRing.sumOver_zero_function;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.zero_multiply {c : CommutativeRing} {rows middle columns : ℕ}
+        (M : Matrix(c, middle, columns))
+        : Matrix.zero(c, rows, middle) * M = Matrix.zero(c, rows, columns) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (Matrix.zero(c, rows, middle) * M)(i, j) = Matrix.zero(c, rows, columns)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦ {
+          (Matrix.zero(c, rows, middle) * M)(i, j)
+             = CommutativeRing.sumOver((k : NaturalsBelow(middle)) ↦ CommutativeRing.zero(c),
+                   NaturalsBelow.enumerate(middle))
+                   by ((k : NaturalsBelow(middle)) ↦
+                       Matrix.zero(c, rows, middle)(i, k) * M(k, j)
+                          = CommutativeRing.zero(c) * M(k, j)
+                          = CommutativeRing.zero(c))
+             = CommutativeRing.zero(c)
+                   by CommutativeRing.sumOver_zero_function;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- Scaling distributes over the matrix sum, and kills the zero matrix.
+theorem Matrix.scale_add {c : CommutativeRing} {rows columns : ℕ}
+        (a : CommutativeRing.carrier(c)) (M N : Matrix(c, rows, columns))
+        : a • (M + N) = a • M + a • N := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (a • (M + N))(i, j) = (a • M + a • N)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (a • (M + N))(i, j)
+             = a * (M(i, j) + N(i, j))
+             = a * M(i, j) + a * N(i, j)
+             = (a • M + a • N)(i, j);
+  done by Matrix.equal_of_entries
+}
+
+theorem Matrix.scale_zero_matrix {c : CommutativeRing} {rows columns : ℕ}
+        (a : CommutativeRing.carrier(c))
+        : a • Matrix.zero(c, rows, columns) = Matrix.zero(c, rows, columns) := {
+  ∀ (i : NaturalsBelow(rows)). ∀ (j : NaturalsBelow(columns)).
+      (a • Matrix.zero(c, rows, columns))(i, j) = Matrix.zero(c, rows, columns)(i, j)
+      by (i : NaturalsBelow(rows)) (j : NaturalsBelow(columns)) ↦
+          (a • Matrix.zero(c, rows, columns))(i, j)
+             = a * CommutativeRing.zero(c)
+             = CommutativeRing.zero(c)
+             = Matrix.zero(c, rows, columns)(i, j);
+  done by Matrix.equal_of_entries
+}
+
 theorem Matrix.scale_add_scalar {c : CommutativeRing} {rows columns : ℕ}
         (s t : CommutativeRing.carrier(c)) (X : Matrix(c, rows, columns))
         : (s + t) • X = s • X + t • X := {
