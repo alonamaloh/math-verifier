@@ -1,0 +1,327 @@
+-- Algebra/determinant_bordered.math
+--
+-- The bordered determinant: when the top row of a (1+m)×(1+m) matrix is
+-- concentrated on the corner — every entry below the boundary vanishes —
+-- the determinant is the corner times the determinant of the leading
+-- block. In the Leibniz sum only the top-fixing permutations survive
+-- (any other permutation picks a vanishing entry from the top row), and
+-- those are exactly the extensions of the permutations of the block,
+-- with the same sign (`Permutation.sign_extend`). This is the
+-- size-crossing determinant lemma behind minor expansions, Cramer's
+-- rule, and the Schur-complement identities of Sylvester's criterion.
+
+module Algebra.determinant_bordered
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.division
+import Natural.subtraction
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.permutation_sign_extend
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.determinant
+
+-- Every index of NaturalsBelow(1 + m) lies below the boundary — an included
+-- index — or is the top.
+theorem NaturalsBelow.inclusion_or_top {m : ℕ} (x : NaturalsBelow(1 + m))
+        : (∃ (y : NaturalsBelow(m)). x = NaturalsBelow.inclusion(m, y)) ∨ x = NaturalsBelow.top(m) := {
+  NaturalsBelow.value(x) < m ∨ m ≤ NaturalsBelow.value(x) by Natural.lt_or_le;
+  done by cases {
+    case NaturalsBelow.value(x) < m as belowBoundary: {
+        x = NaturalsBelow.inclusion(m, NaturalsBelow.make(NaturalsBelow.value(x), belowBoundary))
+            by NaturalsBelow.equal_of_value;
+        ∃ (y : NaturalsBelow(m)). x = NaturalsBelow.inclusion(m, y)
+            by { witness NaturalsBelow.make(NaturalsBelow.value(x), belowBoundary) with done };
+        done
+      }
+    case m ≤ NaturalsBelow.value(x) as atLeastBoundary: {
+        NaturalsBelow.value(x) < 1 + m by NaturalsBelow.below;
+        NaturalsBelow.value(x) ≤ m by Natural.le_of_lt_one_plus;
+        NaturalsBelow.value(x) = m by Natural.le_antisymmetric;
+        x = NaturalsBelow.top(m) by NaturalsBelow.equal_of_value;
+        done
+      }
+  }
+}
+
+-- The bordered determinant, concentrated top row:
+-- det M = det(leading block) · M(top, top).
+theorem Matrix.determinant_bordered_top_row {r : CommutativeRing} {m : ℕ}
+        (M : Matrix(r, 1 + m, 1 + m))
+        (vanishes : ∀ (j : NaturalsBelow(m)).
+            M(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j)) = CommutativeRing.zero(r))
+        : Matrix.determinant(M)
+          = Matrix.determinant(
+                Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+            * M(NaturalsBelow.top(m), NaturalsBelow.top(m)) := {
+  let leibnizTerm : Permutation(1 + m) → CommutativeRing.carrier(r) :=
+      (sigma : Permutation(1 + m)) ↦
+          CommutativeRing.from_integer(r, Permutation.sign(sigma))
+              * CommutativeRing.productOver(
+                    (i : NaturalsBelow(1 + m)) ↦ M(i, sigma(i)),
+                    NaturalsBelow.enumerate(1 + m));
+  let extendedPermutations : List(Permutation(1 + m)) :=
+      List.map((tau : Permutation(m)) ↦ Permutation.extend(tau), Permutation.allPermutations(m));
+
+  -- The extensions form a distinct sublist of all permutations.
+  (∀ (sigma1 sigma2 : Permutation(m)).
+      Permutation.extend(sigma1) = Permutation.extend(sigma2) → sigma1 = sigma2)
+      by (sigma1 sigma2 : Permutation(m))
+         (extensionsEqual : Permutation.extend(sigma1) = Permutation.extend(sigma2)) ↦ {
+          ∀ (x : NaturalsBelow(m)). sigma1(x) = sigma2(x)
+              by (x : NaturalsBelow(m)) ↦ {
+                  NaturalsBelow.inclusion(m, sigma1(x))
+                     = Permutation.extend(sigma1)(NaturalsBelow.inclusion(m, x))
+                           by Permutation.apply_extend_inclusion
+                     = Permutation.extend(sigma2)(NaturalsBelow.inclusion(m, x))
+                           by substituting extensionsEqual
+                     = NaturalsBelow.inclusion(m, sigma2(x))
+                           by Permutation.apply_extend_inclusion;
+                  done by NaturalsBelow.inclusion_injective
+                };
+          done by Permutation.equal_of_apply_equal
+        };
+  List.Distinct(Permutation(m), Permutation.allPermutations(m))
+      by Permutation.allPermutations_distinct;
+  List.Distinct(Permutation(1 + m), extendedPermutations) by List.map_distinct;
+  List.Distinct(Permutation(1 + m), Permutation.allPermutations(1 + m))
+      by Permutation.allPermutations_distinct;
+  ∀ (sigma : Permutation(1 + m)). sigma ∈ extendedPermutations
+      → sigma ∈ Permutation.allPermutations(1 + m)
+      by (sigma : Permutation(1 + m)) (listed : sigma ∈ extendedPermutations) ↦
+          Permutation.allPermutations_complete;
+
+  -- A permutation that is not an extension moves the top index, so its
+  -- Leibniz term picks a vanishing entry from the top row.
+  ∀ (sigma : Permutation(1 + m)). sigma ∈ Permutation.allPermutations(1 + m)
+      → ¬(sigma ∈ extendedPermutations)
+      → leibnizTerm(sigma) = CommutativeRing.zero(r)
+      by (sigma : Permutation(1 + m))
+         (sigmaListed : sigma ∈ Permutation.allPermutations(1 + m))
+         (sigmaNotExtension : ¬(sigma ∈ extendedPermutations)) ↦ {
+          ¬(sigma(NaturalsBelow.top(m)) = NaturalsBelow.top(m))
+              by (fixesTop : sigma(NaturalsBelow.top(m)) = NaturalsBelow.top(m)) ↦ {
+                  Permutation.restrict(sigma, fixesTop) ∈ Permutation.allPermutations(m)
+                      by Permutation.allPermutations_complete;
+                  Permutation.extend(Permutation.restrict(sigma, fixesTop)) ∈ extendedPermutations
+                      by List.map_member;
+                  Permutation.extend(Permutation.restrict(sigma, fixesTop)) = sigma
+                      by Permutation.extend_restrict;
+                  sigma ∈ extendedPermutations by substitution;
+                  done
+                };
+          (∃ (y : NaturalsBelow(m)). sigma(NaturalsBelow.top(m)) = NaturalsBelow.inclusion(m, y))
+              ∨ sigma(NaturalsBelow.top(m)) = NaturalsBelow.top(m)
+              by NaturalsBelow.inclusion_or_top;
+          M(NaturalsBelow.top(m), sigma(NaturalsBelow.top(m))) = CommutativeRing.zero(r)
+              by cases {
+                case ∃ (y : NaturalsBelow(m)).
+                        sigma(NaturalsBelow.top(m)) = NaturalsBelow.inclusion(m, y): {
+                    choose y such that sigma(NaturalsBelow.top(m)) = NaturalsBelow.inclusion(m, y)
+                        as imageIncluded;
+                    M(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, y)) = CommutativeRing.zero(r)
+                        by vanishes;
+                    done by substituting imageIncluded
+                  }
+                case sigma(NaturalsBelow.top(m)) = NaturalsBelow.top(m): done
+              };
+          NaturalsBelow.top(m) ∈ NaturalsBelow.enumerate(1 + m) by NaturalsBelow.enumerate_complete;
+          CommutativeRing.productOver(
+                (i : NaturalsBelow(1 + m)) ↦ M(i, sigma(i)), NaturalsBelow.enumerate(1 + m))
+             = CommutativeRing.zero(r)
+              by CommutativeRing.productOver_zero_on_member(x := NaturalsBelow.top(m))
+              as rowKillsProduct;
+          leibnizTerm(sigma)
+             = CommutativeRing.from_integer(r, Permutation.sign(sigma))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(1 + m)) ↦ M(i, sigma(i)), NaturalsBelow.enumerate(1 + m))
+             = CommutativeRing.from_integer(r, Permutation.sign(sigma)) * CommutativeRing.zero(r)
+                   by substituting rowKillsProduct
+             = CommutativeRing.zero(r);
+          done
+        };
+
+  -- Only the extensions contribute to the Leibniz sum.
+  CommutativeRing.sumOver(leibnizTerm, Permutation.allPermutations(1 + m))
+     = CommutativeRing.sumOver(leibnizTerm, extendedPermutations)
+     by CommutativeRing.sumOver_restrict_support as sumRestricts;
+
+  NaturalsBelow.enumerate(1 + m)
+     = List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+           List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+     by NaturalsBelow.enumerate_one_plus as enumerationSplits;
+
+  -- An extension's term is the block term times the corner.
+  ∀ (tau : Permutation(m)).
+      leibnizTerm(Permutation.extend(tau))
+      = (CommutativeRing.from_integer(r, Permutation.sign(tau))
+            * CommutativeRing.productOver(
+                  (i : NaturalsBelow(m)) ↦
+                      Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                  NaturalsBelow.enumerate(m)))
+        * M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+      by (tau : Permutation(m)) ↦ {
+          Permutation.extend(tau)(NaturalsBelow.top(m)) = NaturalsBelow.top(m)
+              by Permutation.apply_extend_top as topFixed;
+          CommutativeRing.productOver(
+                (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
+                List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+             = CommutativeRing.productOver(
+                   (i : NaturalsBelow(m)) ↦
+                       M(NaturalsBelow.inclusion(m, i),
+                         Permutation.extend(tau)(NaturalsBelow.inclusion(m, i))),
+                   NaturalsBelow.enumerate(m))
+              by CommutativeRing.productOver_map as productReindexes;
+          CommutativeRing.productOver(
+                (i : NaturalsBelow(m)) ↦
+                    M(NaturalsBelow.inclusion(m, i),
+                      Permutation.extend(tau)(NaturalsBelow.inclusion(m, i))),
+                NaturalsBelow.enumerate(m))
+             = CommutativeRing.productOver(
+                   (i : NaturalsBelow(m)) ↦
+                       Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                   NaturalsBelow.enumerate(m))
+              by CommutativeRing.productOver_congruence(
+                     pointwise := (i : NaturalsBelow(m)) ↦ {
+                         M(NaturalsBelow.inclusion(m, i),
+                             Permutation.extend(tau)(NaturalsBelow.inclusion(m, i)))
+                            = M(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, tau(i)))
+                                  by substituting Permutation.apply_extend_inclusion
+                            = Matrix.submatrix(M,
+                                  NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i));
+                         done
+                       })
+              as blockEntriesAgree;
+          CommutativeRing.productOver(
+                (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
+                NaturalsBelow.enumerate(1 + m))
+             = CommutativeRing.productOver(
+                   (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
+                   List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                       List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
+                   by substituting enumerationSplits
+             = M(NaturalsBelow.top(m), Permutation.extend(tau)(NaturalsBelow.top(m)))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
+                     List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+             = M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
+                     List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+                   by substituting topFixed
+             = M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(m)) ↦
+                         M(NaturalsBelow.inclusion(m, i),
+                           Permutation.extend(tau)(NaturalsBelow.inclusion(m, i))),
+                     NaturalsBelow.enumerate(m))
+                   by substituting productReindexes
+             = M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(m)) ↦
+                         Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                     NaturalsBelow.enumerate(m))
+                   by substituting blockEntriesAgree
+             as productSplits;
+          leibnizTerm(Permutation.extend(tau))
+             = CommutativeRing.from_integer(r, Permutation.sign(Permutation.extend(tau)))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
+                     NaturalsBelow.enumerate(1 + m))
+             = CommutativeRing.from_integer(r, Permutation.sign(tau))
+               * CommutativeRing.productOver(
+                     (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
+                     NaturalsBelow.enumerate(1 + m))
+                   by substituting Permutation.sign_extend
+             = CommutativeRing.from_integer(r, Permutation.sign(tau))
+               * (M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+                     * CommutativeRing.productOver(
+                           (i : NaturalsBelow(m)) ↦
+                               Matrix.submatrix(M,
+                                   NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                           NaturalsBelow.enumerate(m)))
+                   by substituting productSplits
+             = (CommutativeRing.from_integer(r, Permutation.sign(tau))
+                   * CommutativeRing.productOver(
+                         (i : NaturalsBelow(m)) ↦
+                             Matrix.submatrix(M,
+                                 NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                         NaturalsBelow.enumerate(m)))
+               * M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+                   by ring;
+          done
+        } as extendedTermsSplit;
+
+  Matrix.determinant(
+        Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+     = CommutativeRing.sumOver(
+           (tau : Permutation(m)) ↦
+               CommutativeRing.from_integer(r, Permutation.sign(tau))
+                   * CommutativeRing.productOver(
+                         (i : NaturalsBelow(m)) ↦
+                             Matrix.submatrix(M,
+                                 NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                         NaturalsBelow.enumerate(m)),
+           Permutation.allPermutations(m))
+     by Matrix.determinant_expansion as blockExpansion;
+
+  Matrix.determinant(M)
+     = CommutativeRing.sumOver(leibnizTerm, Permutation.allPermutations(1 + m))
+           by Matrix.determinant_expansion
+     = CommutativeRing.sumOver(leibnizTerm, extendedPermutations)
+           by sumRestricts
+     = CommutativeRing.sumOver(
+           (tau : Permutation(m)) ↦ leibnizTerm(Permutation.extend(tau)),
+           Permutation.allPermutations(m))
+           by CommutativeRing.sumOver_map
+     = CommutativeRing.sumOver(
+           (tau : Permutation(m)) ↦
+               (CommutativeRing.from_integer(r, Permutation.sign(tau))
+                     * CommutativeRing.productOver(
+                           (i : NaturalsBelow(m)) ↦
+                               Matrix.submatrix(M,
+                                   NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                           NaturalsBelow.enumerate(m)))
+                 * M(NaturalsBelow.top(m), NaturalsBelow.top(m)),
+           Permutation.allPermutations(m))
+           by CommutativeRing.sumOver_congruence(pointwise := extendedTermsSplit)
+     = CommutativeRing.sumOver(
+           (tau : Permutation(m)) ↦
+               CommutativeRing.from_integer(r, Permutation.sign(tau))
+                   * CommutativeRing.productOver(
+                         (i : NaturalsBelow(m)) ↦
+                             Matrix.submatrix(M,
+                                 NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))(i, tau(i)),
+                         NaturalsBelow.enumerate(m)),
+           Permutation.allPermutations(m))
+       * M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+           by CommutativeRing.sumOver_scale_right
+     = Matrix.determinant(
+           Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+       * M(NaturalsBelow.top(m), NaturalsBelow.top(m))
+           by substituting blockExpansion;
+  done
+}
