@@ -42,7 +42,17 @@
 
 ---
 
-## T1 `[ ]` (S) Probe: `let`-bound FUNCTION subterms in relation chains
+## T1 `[x]` (S) Probe: `let`-bound FUNCTION subterms in relation chains
+
+> **Ledger 2026-07-18.** Probes (a), (b), (c), (e) ALL PASS on first
+> verify — the ζ-bridges cover function-typed lets, and `Permutation.apply`
+> is first-class with eta. The determinant corpus's repeated summands were
+> a missed idiom, not a matcher limitation. Conventions note added
+> ("name your summands", `docs/conventions/calc-and-rewrite.md`, let
+> section). Probe (d) FAILS as predicted → QUIRK.md **Q3** (citation
+> bridging does not δ-unfold a wrapper head on the goal side; workaround =
+> explicit defeq opening step). Probe module deleted. Wall-clock: single
+> kernel run per variant, no perf impact (no library change).
 
 **The question.** Scalar `let`s work in chains (see
 `Real/arithmetic_geometric_mean.math` — `firstSum`, `secondSum` are

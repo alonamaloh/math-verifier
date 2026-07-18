@@ -58,3 +58,42 @@ entry with the four sections (symptom, hypothesis, attempts,
 workaround). Don't fix in the same session that found the quirk
 unless the fix is genuinely localised — otherwise the investigation
 sprawls.
+
+## Q3 — citation bridging does not δ-unfold a wrapper HEAD on the goal side
+
+**Symptom.** A chain step (or claim) whose left endpoint is a wrapper
+definition — `Matrix.quadraticForm(Mᵀ * A * M, x)`, which δ-unfolds to
+`RingVector.innerProduct(x, (Mᵀ * A * M) · x)` — cannot cite the lemma
+that rewrites UNDER the wrapped spelling:
+
+    Matrix.quadraticForm(Mᵀ * A * M, x)
+       = RingVector.innerProduct(x, (Mᵀ * A) · (M · x))   by Matrix.applyVector_multiply
+
+fails with "the conclusion shape fits, but an argument could not be
+inferred from the goal or a premise discharged from context" (single-step
+form; the multi-step calc form failed with "justification proves a
+different relation"). Hit live twice: S1 build 992a4fc3
+(`quadraticForm_pullback`) and the T1 probe repro (2026-07-18).
+
+**Root cause hypothesis.** The citation matcher's endpoint reduction
+handles the RELATION endpoints, but diff-inferred congruence compares the
+two sides structurally BEFORE δ-unfolding the head constant of the goal's
+LHS — `quadraticForm` vs `innerProduct` never align, so the congruence
+site (`innerProduct`'s second argument) is never found, and match-and-
+unify against the lemma's conclusion is attempted at the wrong altitude
+("shape fits" = the applyVector equation matched somewhere, but the
+enclosing congruence could not be assembled).
+
+**Attempts.** None in-pass (T1 is probe-only by design).
+
+**Workaround.** Open the chain with an explicit defeq step down to the
+unfolded spelling, then cite:
+
+    Matrix.quadraticForm(Mᵀ * A * M, x)
+       = RingVector.innerProduct(x, (Mᵀ * A * M) · x)         -- defeq, by-less
+       = RingVector.innerProduct(x, (Mᵀ * A) · (M · x))       by Matrix.applyVector_multiply
+
+Arguably good pedagogy at a definition's FIRST unfolding, but it taxes
+every wrapper-headed chain; the fix (δ-unfold candidate heads before
+diff-matching, symmetric to the ζ-unfold the chain endpoints already get)
+is elaborator work for a dedicated session.

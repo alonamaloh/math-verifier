@@ -155,6 +155,33 @@ let absYAtRep : Rational :=
 The library-wide convention is still "spell out the long name once,
 abbreviate when it appears 3+ times in the surrounding proof."
 
+**This includes FUNCTION-typed lets — name your summands.** (Probed
+2026-07-18, pre-Sylvester consolidation T1: all three mechanisms pass.)
+A recurring summand lambda in an aggregation proof should be `let`-bound
+and cited by name; every ζ-bridge works exactly as for scalar lets:
+
+```math
+let summand : NaturalsBelow(n) → CommutativeRing.carrier(r) :=
+    (k : NaturalsBelow(n)) ↦ c * f(k);
+c * CommutativeRing.sumOver(f, NaturalsBelow.enumerate(n))
+   = CommutativeRing.sumOver(summand, NaturalsBelow.enumerate(n))
+         by CommutativeRing.sumOver_scale_left;   -- (a) citation against the name
+∀ (k : NaturalsBelow(n)). summand(k) = c * f(k)
+    by (k : NaturalsBelow(n)) ↦ done;             -- applied name β/ζ-reduces
+-- (b) sumOver_congruence unifies its pointwise premise against the name;
+-- (c) a closer bridges a goal spelled with the literal lambda to a
+--     context fact spelled with the name.
+```
+
+The determinant corpus (e.g. `Matrix.phi_inner_sum`,
+`determinant_multiplicative.math`) predates this finding and spells its
+six-line summands repeatedly — do NOT imitate it in new code; the
+Sylvester-era minor machinery should name every recurring summand.
+Related: `Permutation.apply` is a first-class value and eta-equality
+holds, so pass `Permutation.apply` where a `Permutation(n) →
+(NaturalsBelow(n) → NaturalsBelow(n))` function is expected — never the
+eta-expanded `(rho) ↦ ((i) ↦ rho(i))` double lambda.
+
 ### Prefer a relation chain to `Equality.transitivity`
 
 Nested `Equality.transitivity(A, transitivity(B, C))` — common in older
