@@ -1,0 +1,137 @@
+-- Algebra/integer_quadratic_form.math
+--
+-- Integer quadratic forms: what it means for a form to represent an
+-- integer, to represent every positive integer (universality — the subject
+-- of the fifteen theorem), and to be positive-definite. The two invariance
+-- theorems: an isometric change of basis (U ∈ GLₙ(ℤ)) preserves the
+-- represented set and the discriminant, and — the lever of the escalation
+-- method — anything a sublattice's form represents, the ambient form
+-- represents too.
+
+module Algebra.integer_quadratic_form
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.units
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.unimodular
+import Algebra.quadratic_form
+
+-- A form represents an integer when the integer is a value of the form.
+definition Matrix.Represents {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (target : ℤ) : Proposition :=
+  ∃ (x : RingVector(Integer.commutative_ring_bundle, n)). Matrix.quadraticForm(A, x) = target
+
+-- Universality: the form represents every positive integer.
+definition Matrix.IsUniversal {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) : Proposition :=
+  ∀ (m : ℕ). m ≥ 1 → Matrix.Represents(A, (m : ℤ))
+
+-- Positive-definiteness, stated over integer vectors: the form is positive
+-- away from zero. (Scaling by a common denominator shows this agrees with
+-- the ℚ-vector statement; the ℝ statement is deferred to the stage that
+-- needs it.)
+definition Matrix.IsPositiveDefinite {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) : Proposition :=
+  ∀ (x : RingVector(Integer.commutative_ring_bundle, n)).
+      ¬(x = RingVector.zero(Integer.commutative_ring_bundle, n))
+      → Matrix.quadraticForm(A, x) > (0 : ℤ)
+
+-- ----------------------------------------------------------------------
+-- Sublattice monotonicity: if the restriction of A along M — the pulled-back
+-- form MᵀAM — represents a number, the ambient form represents it at the
+-- image vector M·x. This is the lever of every escalator universality proof.
+
+theorem Matrix.represents_of_sublattice {n k : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (M : Matrix(Integer.commutative_ring_bundle, n, k)) (target : ℤ)
+        (sublatticeRepresents : Matrix.Represents(Mᵀ * A * M, target))
+        : Matrix.Represents(A, target) := {
+  choose x such that Matrix.quadraticForm(Mᵀ * A * M, x) = target from sublatticeRepresents;
+  Matrix.quadraticForm(A, M · x)
+     = Matrix.quadraticForm(Mᵀ * A * M, x)       by Matrix.quadraticForm_pullback
+     = target;
+  witness M · x with done
+}
+
+-- ----------------------------------------------------------------------
+-- The represented set is an isometry invariant.
+
+theorem Matrix.isometric_represents {n : ℕ}
+        (A B : Matrix(Integer.commutative_ring_bundle, n, n)) (target : ℤ)
+        (isometric : Matrix.IsIsometric(A, B))
+        (represented : Matrix.Represents(B, target))
+        : Matrix.Represents(A, target) := {
+  choose U such that Matrix.IsInvertible(U) ∧ B = Uᵀ * A * U from isometric;
+  Matrix.Represents(Uᵀ * A * U, target) by substituting (B = Uᵀ * A * U);
+  done by Matrix.represents_of_sublattice
+}
+
+theorem Matrix.isometric_universal {n : ℕ}
+        (A B : Matrix(Integer.commutative_ring_bundle, n, n))
+        (isometric : Matrix.IsIsometric(A, B))
+        (universal : Matrix.IsUniversal(B))
+        : Matrix.IsUniversal(A) := {
+  take m : ℕ;
+  suppose m ≥ 1;
+  Matrix.Represents(B, (m : ℤ)) by universal;
+  done by Matrix.isometric_represents
+}
+
+-- ----------------------------------------------------------------------
+-- The discriminant is an isometry invariant: det changes by (det U)² = 1.
+
+theorem Matrix.isometric_determinant {n : ℕ}
+        (A B : Matrix(Integer.commutative_ring_bundle, n, n))
+        (isometric : Matrix.IsIsometric(A, B))
+        : Matrix.determinant(B) = Matrix.determinant(A) := {
+  choose U such that Matrix.IsInvertible(U) ∧ B = Uᵀ * A * U from isometric;
+  Matrix.IsInvertible(U) as uInvertible;
+  Matrix.determinant(U) = Integer.one ∨ Matrix.determinant(U) = Integer.negate(Integer.one)
+      by Matrix.determinant_unimodular_of_invertible;
+  Matrix.determinant(U) * Matrix.determinant(U) = Integer.one
+      by Integer.unit_squares_to_one as determinantSquareOne;
+  Matrix.determinant(B)
+     = Matrix.determinant(Uᵀ * A * U)                                            by substituting (B = Uᵀ * A * U)
+     = (Matrix.determinant(U) * Matrix.determinant(U)) * Matrix.determinant(A)   by Matrix.determinant_pullback
+     = Integer.one * Matrix.determinant(A)                                       by substituting determinantSquareOne
+     = Matrix.determinant(A)
+}

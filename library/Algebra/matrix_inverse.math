@@ -94,3 +94,35 @@ theorem Matrix.invertible_of_unit_determinant {c : CommutativeRing} {n : ℕ}
      = Matrix.identity(c, n)                     by vRightInverse;
   witness V with done
 }
+
+-- The identity is its own inverse.
+theorem Matrix.identity_invertible {c : CommutativeRing} {n : ℕ}
+        : Matrix.IsInvertible(Matrix.identity(c, n)) := {
+  Matrix.identity(c, n) * Matrix.identity(c, n) = Matrix.identity(c, n);
+  witness Matrix.identity(c, n) with done
+}
+
+-- Invertible matrices are closed under product: the inverses compose in
+-- the opposite order.
+theorem Matrix.invertible_multiply {c : CommutativeRing} {n : ℕ}
+        (U W : Matrix(c, n, n))
+        (uInvertible : Matrix.IsInvertible(U)) (wInvertible : Matrix.IsInvertible(W))
+        : Matrix.IsInvertible(U * W) := {
+  choose V such that U * V = Matrix.identity(c, n) ∧ V * U = Matrix.identity(c, n)
+      from uInvertible;
+  choose X such that W * X = Matrix.identity(c, n) ∧ X * W = Matrix.identity(c, n)
+      from wInvertible;
+  (U * W) * (X * V)
+     = ((U * W) * X) * V
+     = (U * (W * X)) * V                         by Matrix.multiply_associative
+     = (U * Matrix.identity(c, n)) * V           by substituting (W * X = Matrix.identity(c, n))
+     = U * V                                     by Matrix.multiply_one
+     = Matrix.identity(c, n);
+  (X * V) * (U * W)
+     = ((X * V) * U) * W
+     = (X * (V * U)) * W                         by Matrix.multiply_associative
+     = (X * Matrix.identity(c, n)) * W           by substituting (V * U = Matrix.identity(c, n))
+     = X * W                                     by Matrix.multiply_one
+     = Matrix.identity(c, n);
+  witness X * V with done
+}

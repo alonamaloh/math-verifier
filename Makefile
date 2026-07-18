@@ -229,6 +229,10 @@ CLEAN_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(CLEAN_MATH_FILES))
 # gram, Integer/units) carry ZERO counted leaks. Budget set to the
 # measured floor; follow-up: run clean-check in the same breath as any
 # manifest-file edit so notes stay honest.
+# 2026-07-18: 394 → 394. Stage-1 form objects manifest-added
+# (quadratic_form, integer_quadratic_form) at ZERO counted leaks;
+# supporting additions to matrix_vector / matrix_inverse / Integer/units /
+# unimodular also leak-free (measured in the same breath, both axes).
 CLEAN_LEAK_BUDGET ?= 394
 # Second, independent axis: user-written `⟨…⟩` over a logical connective
 # (`And`/`Exists`) — the "connectives are secretly tuples" tell, counted by the

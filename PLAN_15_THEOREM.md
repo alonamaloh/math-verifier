@@ -94,14 +94,14 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 *Goal: the objects of the theorem and the monotonicity tool the closing argument uses.*
 *Library: builds entirely on Stage 0; `Integer/`, `Rational/`, `Real/`.*
 
-- `S1.F1` `[ ]` (S) Integer-matrix symmetric form: symmetric `A ∈ Mat ℤ n n`, `Q_A(x) = xᵀAx`. Fix the integer-matrix convention. — owes: S0.M1, S0.V2
-- `S1.F2` `[ ]` (M) ★ Positive-definiteness `∀ x ≠ 0, Q(x) > 0` (over ℚ/ℝ coefficients of `x`). — owes: S1.F1
+- `S1.F1` `[x]` (S) Integer-matrix symmetric form: symmetric `A ∈ Mat ℤ n n`, `Q_A(x) = xᵀAx`. Fix the integer-matrix convention. — owes: S0.M1, S0.V2 · **DONE 2026-07-18:** `Algebra/quadratic_form.math` — `Matrix.IsSymmetric`, `Matrix.quadraticForm(A, x) = ⟨x, A·x⟩` over an abstract `CommutativeRing` (integer-matrix convention documented in the header), plus the load-bearing pullback law `Q_{MᵀAM}(x) = Q_A(M·x)` for **rectangular** M (one lemma serves isometry AND sublattice restriction) and symmetry preservation under pullback.
+- `S1.F2` `[~]` (M) ★ Positive-definiteness `∀ x ≠ 0, Q(x) > 0` (over ℚ/ℝ coefficients of `x`). — owes: S1.F1 · **Definition landed 2026-07-18** (`Algebra/integer_quadratic_form.math`, `Matrix.IsPositiveDefinite`) — stated over **ℤ-vectors** (agrees with ℚ by denominator-clearing; the ℝ statement deferred to its consumer). **OWNER QUESTION:** confirm ℤ-level statement as the primitive, or require the ℚ/ℝ form now.
 - `S1.F3` `[ ]` (M) Sylvester's criterion: all leading principal minors `> 0` ⇔ positive-definite. — owes: S1.F2, S0.D5
-- `S1.R1` `[ ]` (S) `Represents Q n := ∃ x ∈ ℤⁿ, Q x = n`; `Universal Q := ∀ n > 0, Represents Q n`. — owes: S1.F1
-- `S1.I1` `[ ]` (M) Isometry `A ≅ B := ∃ U ∈ GLₙ(ℤ), B = UᵀAU`; equivalence relation. — owes: S0.D7
-- `S1.I2` `[ ]` (M) ★ Represented-set is an isometry invariant. — owes: S1.I1, S1.R1
-- `S1.I3` `[ ]` (S) `disc Q := det A` is an isometry invariant (changes by `(det U)² = 1`). — owes: S0.D4, S1.I1
-- `S1.S1` `[ ]` (M) ★★ **Sublattice monotonicity:** if a sublattice's form represents `n`, so does the whole form. *(The lever for every rank-4 universality proof.)* — owes: S1.R1
+- `S1.R1` `[x]` (S) `Represents Q n := ∃ x ∈ ℤⁿ, Q x = n`; `Universal Q := ∀ n > 0, Represents Q n`. — owes: S1.F1 · **DONE 2026-07-18:** `Matrix.Represents(A, target : ℤ)` and `Matrix.IsUniversal` (∀ m ≥ 1) in `Algebra/integer_quadratic_form.math`.
+- `S1.I1` `[x]` (M) Isometry `A ≅ B := ∃ U ∈ GLₙ(ℤ), B = UᵀAU`; equivalence relation. — owes: S0.D7 · **DONE 2026-07-18:** `Matrix.IsIsometric` (generic: invertible U over any commutative ring; over ℤ that is GLₙ(ℤ) by S0.D7) with `reflexive`/`symmetric`/`transitive`, plus `Matrix.identity_invertible` and `Matrix.invertible_multiply` in `Algebra/matrix_inverse.math`.
+- `S1.I2` `[x]` (M) ★ Represented-set is an isometry invariant. — owes: S1.I1, S1.R1 · **DONE 2026-07-18:** `Matrix.isometric_represents` + `Matrix.isometric_universal` (converse direction via `IsIsometric.symmetric`).
+- `S1.I3` `[x]` (S) `disc Q := det A` is an isometry invariant (changes by `(det U)² = 1`). — owes: S0.D4, S1.I1 · **DONE 2026-07-18:** `Matrix.determinant_pullback` (generic `det(UᵀAU) = (det U)²·det A`) + `Matrix.isometric_determinant` over ℤ (via `Integer.unit_squares_to_one`, new in `Integer/units.math`, now also cited by `unimodular.math`).
+- `S1.S1` `[x]` (M) ★★ **Sublattice monotonicity:** if a sublattice's form represents `n`, so does the whole form. *(The lever for every rank-4 universality proof.)* — owes: S1.R1 · **DONE 2026-07-18:** `Matrix.represents_of_sublattice` — a representation of the pulled-back form `MᵀAM` (M rectangular = a finite-index or lower-rank sublattice) is a representation of `A` at `M·x`.
 - `S1.S2` `[ ]` (S) Direct sum `Q ⊕ Q'`; `Represents (Q⊕Q') n` from representations of the summands. — owes: S1.R1
 - `S1.B1` `[ ]` (S) Rank-1 form `x²` represents exactly the perfect squares; its truant is `2`. — owes: S1.R1
 - `S1.B2` `[ ]` (M) ★ Positive-definiteness bound: for a reduced 2×2 section, `(2a_ij)² ≤ 4·a_ii·a_jj` (Cauchy–Schwarz on the form). *(Makes each escalation step finite.)* — owes: S1.F2

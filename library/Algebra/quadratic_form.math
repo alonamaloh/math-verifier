@@ -1,0 +1,152 @@
+-- Algebra/quadratic_form.math
+--
+-- Quadratic forms as symmetric square matrices: Q_A(x) = ⟨x, A·x⟩. The
+-- convention is the *integer-matrix* one (the matrix entries themselves are
+-- ring elements, so over ℤ the cross coefficients are even) — the setting
+-- of the Conway–Schneeberger fifteen theorem.
+--
+-- The load-bearing law is the pullback identity Q_{MᵀAM}(x) = Q_A(M·x),
+-- stated for a rectangular M so that one lemma serves both change of basis
+-- (M square invertible — isometry) and restriction to a sublattice
+-- (M an inclusion of a lower rank). On top of it: pulling back preserves
+-- symmetry, isometry `B = UᵀAU` is an equivalence relation, and the
+-- determinant changes by the square of det U.
+
+module Algebra.quadratic_form
+
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.classical_decidable
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+
+definition Matrix.IsSymmetric {r : CommutativeRing} {n : ℕ} (A : Matrix(r, n, n)) : Proposition :=
+  Aᵀ = A
+
+definition Matrix.quadraticForm {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (x : RingVector(r, n)) : CommutativeRing.carrier(r) :=
+  RingVector.innerProduct(x, A · x)
+
+-- ----------------------------------------------------------------------
+-- The pullback law: evaluating the pulled-back form MᵀAM at x is
+-- evaluating A at the image M·x.
+
+theorem Matrix.quadraticForm_pullback {r : CommutativeRing} {n k : ℕ}
+        (A : Matrix(r, n, n)) (M : Matrix(r, n, k)) (x : RingVector(r, k))
+        : Matrix.quadraticForm(Mᵀ * A * M, x) = Matrix.quadraticForm(A, M · x) :=
+  Matrix.quadraticForm(Mᵀ * A * M, x)
+     = RingVector.innerProduct(x, (Mᵀ * A * M) · x)
+     = RingVector.innerProduct(x, (Mᵀ * A) · (M · x))      by Matrix.applyVector_multiply
+     = RingVector.innerProduct(x, Mᵀ · (A · (M · x)))      by Matrix.applyVector_multiply
+     = RingVector.innerProduct(Mᵀ · (A · (M · x)), x)      by RingVector.innerProduct_symmetric
+     = RingVector.innerProduct(A · (M · x), M · x)         by Matrix.transpose_adjoint
+     = RingVector.innerProduct(M · x, A · (M · x))         by RingVector.innerProduct_symmetric
+     = Matrix.quadraticForm(A, M · x)
+
+-- Pulling back preserves symmetry, so MᵀAM is again a quadratic form.
+theorem Matrix.pullback_symmetric {r : CommutativeRing} {n k : ℕ}
+        (A : Matrix(r, n, n)) (M : Matrix(r, n, k))
+        (symmetric : Matrix.IsSymmetric(A))
+        : Matrix.IsSymmetric(Mᵀ * A * M) :=
+  (Mᵀ * A * M)ᵀ
+     = Mᵀ * (Mᵀ * A)ᵀ           by Matrix.transpose_multiply
+     = Mᵀ * (Aᵀ * (Mᵀ)ᵀ)        by Matrix.transpose_multiply
+     = Mᵀ * (Aᵀ * M)
+     = Mᵀ * (A * M)             by substituting symmetric
+     = Mᵀ * A * M
+
+-- ----------------------------------------------------------------------
+-- Isometry: B = UᵀAU for an invertible U (over ℤ, U ∈ GLₙ(ℤ)). An
+-- equivalence relation on square matrices.
+
+definition Matrix.IsIsometric {r : CommutativeRing} {n : ℕ} (A B : Matrix(r, n, n)) : Proposition :=
+  ∃ (U : Matrix(r, n, n)). Matrix.IsInvertible(U) ∧ B = Uᵀ * A * U
+
+theorem Matrix.IsIsometric.reflexive {r : CommutativeRing} {n : ℕ} (A : Matrix(r, n, n))
+        : Matrix.IsIsometric(A, A) := {
+  Matrix.IsInvertible(Matrix.identity(r, n)) by Matrix.identity_invertible;
+  A  = Matrix.identity(r, n) * A
+     = (Matrix.identity(r, n) * A) * Matrix.identity(r, n)
+     = (Matrix.identity(r, n)ᵀ * A) * Matrix.identity(r, n)        by substituting Matrix.transpose_identity;
+  witness Matrix.identity(r, n) with done
+}
+
+theorem Matrix.IsIsometric.symmetric {r : CommutativeRing} {n : ℕ} (A B : Matrix(r, n, n))
+        (isometric : Matrix.IsIsometric(A, B))
+        : Matrix.IsIsometric(B, A) := {
+  choose U such that Matrix.IsInvertible(U) ∧ B = Uᵀ * A * U from isometric;
+  Matrix.IsInvertible(U) as uInvertible;
+  choose V such that U * V = Matrix.identity(r, n) ∧ V * U = Matrix.identity(r, n)
+      from uInvertible;
+  -- Undo the change of basis: pull B back along the inverse V.
+  Vᵀ * B * V
+     = Vᵀ * (Uᵀ * A * U) * V                     by substituting (B = Uᵀ * A * U)
+     = ((Vᵀ * (Uᵀ * A)) * U) * V                 by Matrix.multiply_associative
+     = (Vᵀ * (Uᵀ * A)) * (U * V)
+     = (Vᵀ * (Uᵀ * A)) * Matrix.identity(r, n)   by substituting (U * V = Matrix.identity(r, n))
+     = Vᵀ * (Uᵀ * A)
+     = (Vᵀ * Uᵀ) * A
+     = (U * V)ᵀ * A                              by Matrix.transpose_multiply
+     = Matrix.identity(r, n)ᵀ * A                by substituting (U * V = Matrix.identity(r, n))
+     = Matrix.identity(r, n) * A
+     = A;
+  Matrix.IsInvertible(V) by { witness U with done };
+  A = Vᵀ * B * V;
+  witness V with done
+}
+
+theorem Matrix.IsIsometric.transitive {r : CommutativeRing} {n : ℕ} (A B C : Matrix(r, n, n))
+        (leftIsometric : Matrix.IsIsometric(A, B)) (rightIsometric : Matrix.IsIsometric(B, C))
+        : Matrix.IsIsometric(A, C) := {
+  choose U such that Matrix.IsInvertible(U) ∧ B = Uᵀ * A * U from leftIsometric;
+  choose W such that Matrix.IsInvertible(W) ∧ C = Wᵀ * B * W from rightIsometric;
+  Matrix.IsInvertible(U * W) by Matrix.invertible_multiply;
+  -- The changes of basis compose.
+  (U * W)ᵀ * A * (U * W)
+     = (Wᵀ * Uᵀ) * A * (U * W)                   by substituting Matrix.transpose_multiply
+     = (Wᵀ * (Uᵀ * A)) * (U * W)                 by Matrix.multiply_associative
+     = ((Wᵀ * (Uᵀ * A)) * U) * W
+     = (Wᵀ * ((Uᵀ * A) * U)) * W                 by Matrix.multiply_associative
+     = Wᵀ * B * W                                by substituting (B = Uᵀ * A * U)
+     = C                                         by (C = Wᵀ * B * W)
+  as pullbackComposition;
+  C = (U * W)ᵀ * A * (U * W) by pullbackComposition;
+  witness U * W with done
+}
+
+-- ----------------------------------------------------------------------
+-- The determinant of a pulled-back form: det(UᵀAU) = (det U)² · det A.
+
+theorem Matrix.determinant_pullback {r : CommutativeRing} {n : ℕ} (A U : Matrix(r, n, n))
+        : Matrix.determinant(Uᵀ * A * U)
+          = (Matrix.determinant(U) * Matrix.determinant(U)) * Matrix.determinant(A) :=
+  Matrix.determinant(Uᵀ * A * U)
+     = Matrix.determinant(Uᵀ * A) * Matrix.determinant(U)                        by Matrix.determinant_multiply
+     = (Matrix.determinant(Uᵀ) * Matrix.determinant(A)) * Matrix.determinant(U)  by Matrix.determinant_multiply
+     = (Matrix.determinant(U) * Matrix.determinant(A)) * Matrix.determinant(U)   by substituting Matrix.determinant_transpose
+     = (Matrix.determinant(U) * Matrix.determinant(U)) * Matrix.determinant(A)
