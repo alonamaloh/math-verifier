@@ -711,3 +711,42 @@ theorem Permutation.sign_is_unit {n : ℕ} (sigma : Permutation(n))
         };
   done by List.product_of_units
 }
+
+-- The inverse has the same sign: `sign σ · sign σ⁻¹ = sign(σ ∘ σ⁻¹) = 1`,
+-- and a sign is ±1, so the two factors agree.
+theorem Permutation.sign_inverse {n : ℕ} (sigma : Permutation(n))
+        : Permutation.sign(Permutation.inverse(sigma)) = Permutation.sign(sigma) := {
+  sigma ∘ Permutation.inverse(sigma) = Permutation.identity(n) by Permutation.inverse_compose_right;
+  (1 : ℤ)
+     = Permutation.sign(Permutation.identity(n))
+     = Permutation.sign(sigma ∘ Permutation.inverse(sigma))
+     = Permutation.sign(sigma) * Permutation.sign(Permutation.inverse(sigma))
+           by Permutation.sign_compose
+     as unitProduct;
+  Permutation.sign(sigma) = 1 ∨ Permutation.sign(sigma) = Integer.negate(1) by Permutation.sign_is_unit;
+  done by cases {
+    case Permutation.sign(sigma) = 1 as signOne: {
+        Permutation.sign(Permutation.inverse(sigma))
+           = Permutation.sign(sigma) * Permutation.sign(Permutation.inverse(sigma))
+                 by substituting signOne
+           = 1
+                 by unitProduct
+           = Permutation.sign(sigma)
+                 by signOne;
+        done
+      }
+    case Permutation.sign(sigma) = Integer.negate(1) as signNegatedOne: {
+        Permutation.sign(Permutation.inverse(sigma))
+           = Integer.negate(1) * (Integer.negate(1) * Permutation.sign(Permutation.inverse(sigma)))
+                 by ring
+           = Integer.negate(1) * (Permutation.sign(sigma) * Permutation.sign(Permutation.inverse(sigma)))
+                 by substituting signNegatedOne
+           = Integer.negate(1) * 1
+                 by substituting unitProduct
+           = Integer.negate(1)
+           = Permutation.sign(sigma)
+                 by signNegatedOne;
+        done
+      }
+  }
+}

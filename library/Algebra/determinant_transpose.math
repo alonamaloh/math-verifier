@@ -1,0 +1,128 @@
+-- Algebra/determinant_transpose.math
+--
+-- det Aᵀ = det A. Each Leibniz term of det Aᵀ is the σ⁻¹ term of det A:
+-- the entry product reindexes along σ, and the sign is inversion-invariant;
+-- summing over σ ↦ σ⁻¹ walks the whole permutation list exactly once.
+
+module Algebra.determinant_transpose
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.multiplication
+import Set.finite
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.determinant
+import Algebra.determinant_row_permutation
+
+-- The image of the permutation list under inversion is a rearrangement of
+-- the list itself — the additive companion of
+-- `Permutation.apply_map_permutes_enumerate`, one level up.
+theorem Permutation.inverse_map_permutes_allPermutations (n : ℕ)
+        : List.Permutation(Permutation(n),
+              List.map(Permutation(n), Permutation(n),
+                  (sigma : Permutation(n)) ↦ Permutation.inverse(sigma), Permutation.allPermutations(n)),
+              Permutation.allPermutations(n)) := {
+  (∀ (sigma tau : Permutation(n)). Permutation.inverse(sigma) = Permutation.inverse(tau) → sigma = tau)
+      by (sigma tau : Permutation(n)) (equalInverses : Permutation.inverse(sigma) = Permutation.inverse(tau)) ↦ {
+          sigma
+             = Permutation.inverse(Permutation.inverse(sigma))
+             = Permutation.inverse(Permutation.inverse(tau))     by substituting equalInverses
+             = tau
+        };
+  List.Distinct(Permutation(n), Permutation.allPermutations(n))
+      by Permutation.allPermutations_distinct;
+  List.Distinct(Permutation(n),
+        List.map(Permutation(n), Permutation(n),
+            (sigma : Permutation(n)) ↦ Permutation.inverse(sigma), Permutation.allPermutations(n)))
+      by List.map_distinct;
+  (∀ (sigma : Permutation(n)). sigma ∈
+        List.map(Permutation(n), Permutation(n),
+            (tau : Permutation(n)) ↦ Permutation.inverse(tau), Permutation.allPermutations(n))
+        → sigma ∈ Permutation.allPermutations(n))
+      by (sigma : Permutation(n)) (sigmaInMap : sigma ∈
+          List.map(Permutation(n), Permutation(n),
+              (tau : Permutation(n)) ↦ Permutation.inverse(tau), Permutation.allPermutations(n))) ↦
+            Permutation.allPermutations_complete;
+  length(List.map(Permutation(n), Permutation(n),
+        (sigma : Permutation(n)) ↦ Permutation.inverse(sigma), Permutation.allPermutations(n)))
+      = length(Permutation.allPermutations(n))
+      by List.map_length;
+  done by List.permutation_of_distinct_inclusion
+}
+
+-- det Aᵀ = det A.
+theorem Matrix.determinant_transpose {r : CommutativeRing} {n : ℕ} (A : Matrix(r, n, n))
+        : Matrix.determinant(Aᵀ) = Matrix.determinant(A) := {
+  -- Per permutation: the σ term of det Aᵀ is the σ⁻¹ term of det A.
+  ∀ (sigma : Permutation(n)).
+      CommutativeRing.from_integer(r, Permutation.sign(sigma))
+          * CommutativeRing.productOver(
+                (i : NaturalsBelow(n)) ↦ Aᵀ(i, sigma(i)), NaturalsBelow.enumerate(n))
+      = CommutativeRing.from_integer(r, Permutation.sign(Permutation.inverse(sigma)))
+          * CommutativeRing.productOver(
+                (j : NaturalsBelow(n)) ↦ A(j, Permutation.inverse(sigma)(j)), NaturalsBelow.enumerate(n))
+      by (sigma : Permutation(n)) ↦ {
+          -- Reindex the entry product along σ: the (i, σ i) entries of Aᵀ
+          -- are the (σ i, σ⁻¹(σ i)) entries of A, and σ walks the index
+          -- enumeration once.
+          ∀ (i : NaturalsBelow(n)). A(sigma(i), i) = A(sigma(i), Permutation.inverse(sigma)(sigma(i)))
+              by (i : NaturalsBelow(n)) ↦ {
+                  Permutation.inverse(sigma)(sigma(i)) = i by Permutation.left_inverse;
+                  done
+                };
+          CommutativeRing.productOver(
+                (i : NaturalsBelow(n)) ↦ Aᵀ(i, sigma(i)), NaturalsBelow.enumerate(n))
+             = CommutativeRing.productOver(
+                   (i : NaturalsBelow(n)) ↦ A(sigma(i), Permutation.inverse(sigma)(sigma(i))),
+                   NaturalsBelow.enumerate(n))
+                   by CommutativeRing.productOver_congruence
+             = CommutativeRing.productOver(
+                   (j : NaturalsBelow(n)) ↦ A(j, Permutation.inverse(sigma)(j)), NaturalsBelow.enumerate(n))
+                   by Matrix.product_row_reindex
+             as productReindexed;
+          Permutation.sign(Permutation.inverse(sigma)) = Permutation.sign(sigma) by Permutation.sign_inverse;
+          done by substituting productReindexed
+        };
+  Matrix.determinant(Aᵀ)
+     = CommutativeRing.sumOver(
+           (sigma : Permutation(n)) ↦
+               CommutativeRing.from_integer(r, Permutation.sign(Permutation.inverse(sigma)))
+                   * CommutativeRing.productOver(
+                         (j : NaturalsBelow(n)) ↦ A(j, Permutation.inverse(sigma)(j)),
+                         NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+           by CommutativeRing.sumOver_congruence
+     = CommutativeRing.sumOver(
+           (tau : Permutation(n)) ↦
+               CommutativeRing.from_integer(r, Permutation.sign(tau))
+                   * CommutativeRing.productOver(
+                         (j : NaturalsBelow(n)) ↦ A(j, tau(j)), NaturalsBelow.enumerate(n)),
+           List.map(Permutation(n), Permutation(n),
+               (sigma : Permutation(n)) ↦ Permutation.inverse(sigma), Permutation.allPermutations(n)))
+           by CommutativeRing.sumOver_map
+     = CommutativeRing.sumOver(
+           (tau : Permutation(n)) ↦
+               CommutativeRing.from_integer(r, Permutation.sign(tau))
+                   * CommutativeRing.productOver(
+                         (j : NaturalsBelow(n)) ↦ A(j, tau(j)), NaturalsBelow.enumerate(n)),
+           Permutation.allPermutations(n))
+           by CommutativeRing.sumOver_permutation
+     = Matrix.determinant(A)
+}
