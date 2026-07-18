@@ -1720,3 +1720,20 @@ directions: report the failing inner claim (with its usual search
 report) instead of the decide-shape complaint; separately, close the
 underlying gap — ∀-quantified context facts should instantiate during
 premise discharge (PLAN_SIGN_DISCHARGE.md S2).
+
+**ERROR QUALITY (under-binder congruence fall-through is invisible,
+2026-07-18, schur_complement / QUIRK Q9).** A chain `=` step between two
+`CommutativeRing.sumOver` calls justified by the pointwise-lambda form
+(`by ((j : …) ↦ { … })`) failed with
+  "bare `claim` / `done` needs an expected type from context (none
+   available — wrap it in `(claim : T)` …)"
+pointing INSIDE the lambda body. The real event: the under-binder
+congruence path fell through (the changed slot's head is a compound
+application — `(B * inclusionMatrix(…))(p, j)`; see QUIRK Q9), so the
+lambda was elaborated as a plain term with no expected type, and the
+first inner statement errored incomprehensibly. Fix directions: when a
+chain step's `by` proof is syntactically a lambda and the under-binder
+path was attempted but did not fire, say so — "endpoints are not a
+single-binder-diff application of a registered head (diff found at …)" —
+instead of letting the lambda elaborate bare; even just naming the
+under-binder machinery in the error would have saved the bisection.
