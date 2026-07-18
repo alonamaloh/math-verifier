@@ -1746,7 +1746,21 @@ instead of letting the lambda elaborate bare; even just naming the
 under-binder machinery in the error would have saved the bisection.
 
 **FRICTION (citation leaves a ground premise unproved, 2026-07-19,
-fifteen_spike).** `by Spike.sumOfTwoSquares_represents(a := 1, b := 0)`
+fifteen_spike). CLOSED 2026-07-19 (batch-3 item 3, f0d866c6) — the
+diagnosis in this entry was wrong in an instructive way: premise
+auto-proof after inference ALREADY existed (inferCallWithHoles Step 5d
+hands fully-determined Proposition slots to the auto-prover). The real
+root cause: the hole-inference call path elaborated supplied arguments
+against the Pi domain but never applied the REGISTRY coercion the plain
+call path applies (dispatch.cpp), so the bare numerals in
+`(a := 1, b := 0)` stayed at Natural, the instantiated premise
+`1*1 + 0*0 = target` was ill-typed at ℤ, and every discharge attempt
+failed as "could not infer hole(s) at position 3". (One ascribed sibling
+masked it by pinning the carrier join — `(a := (1:ℤ), b := 0)` passed.)
+Fix: coerceToExpectedTypeViaRegistry after the diff coercion, gated on a
+hole-free domain. All 8 spike sites converted to the named-numeral
+one-liner (Test/fifteen_spike_test.math doubles as the lock). Original
+entry follows.** `by Spike.sumOfTwoSquares_represents(a := 1, b := 0)`
 against goal `Represents(F, 1)` fails with "could not infer hole(s) at
 position 3" — position 3 is the lemma's GROUND premise
 `a*a + b*b = target`, fully determined once a, b, and target are pinned
@@ -1760,7 +1774,19 @@ Proposition-typed premises (the ground tier makes this cheap; bound the
 attempt to avoid burying real inference failures).
 
 **FRICTION (`ring` treats a cast numeral as an opaque atom, 2026-07-19,
-rank_two_escalators).** A calc step
+rank_two_escalators). CLOSED 2026-07-19 (batch-3 item 1, 92cf5f64) —
+root cause was NOT the "{0,1}-only numeral canon": ring's embedding
+chain already read `to_integer <literal>` as an mpz coefficient at
+concrete ℤ/ℚ/ℝ carriers, but it was keyed on the carrier HEAD NAME, and
+the failing sites' carrier is the bundle projection
+`CommutativeRing.carrier(Integer.commutative_ring_bundle)` — so the
+chain stayed empty and only 0/1 matched (via the bundle-reduct constant
+matchers). Fix: resolveRingLiteralCarrierName WHNF-reduces the carrier
+type and keys the chain (and the Z/p fast-fail + both fingerprint
+diagnostics) on the reduct; parseEmbeddedLiteralAtCarrier factored out
+and also feeds evaluateFingerprint, so diagnostics now read `(2:ℤ)` as
+the coefficient 2. Lock: Test/ring_bundle_numeral_test.math; the SS-arm
+split step collapsed to `= (2 : ℤ) by ring`. Original entry follows.** A calc step
 `(1:ℤ) + border*(0:ℤ) + (border*(0:ℤ) + (1:ℤ)) = (2:ℤ)` closed `by ring`
 fails: `(0:ℤ)`/`(1:ℤ)` elaborate to `Integer.zero`/`Integer.one` (ring
 constants), but `(2:ℤ)` elaborates to `Natural.to_integer 2` — an
@@ -1775,7 +1801,18 @@ tower casts of literals) as mpz coefficients — the elaborator gap
 biting through every `(2:ℤ)` in a ring goal.
 
 **FRICTION (disjunction-injection pays full defeq per wrong disjunct,
-2026-07-19, rank_two_escalators / Integer.square_below_two).** Closing a
+2026-07-19, rank_two_escalators / Integer.square_below_two). CLOSED
+2026-07-19 (batch-3 item 4) — tryDisjunctionIntro now runs a
+ground-disequality prefilter per disjunct (disjunctGroundRefuted):
+both sides ground with different values, or one side ground while every
+ground-pinning base context equality gives the subject a DIFFERENT
+value, skips the autoProveClaim attempt. The evaluation is VALUE-ONLY
+(no Integer.ground_arithmetic lemmas needed — square_below_two's module
+doesn't import them, which is also why the certificate-based ground
+tier couldn't have closed these). All three expensive-step warnings
+gone. Correctness lock (same-value pins never skipped, either position,
+negative spelling): Test/disjunction_ground_fastpath_test.math.
+Original entry follows.** Closing a
 goal `b = -(1:ℤ) ∨ b = (0:ℤ) ∨ b = (1:ℤ)` from an in-scope proof of one
 disjunct — whether by bare-chain arm value or by `done` — runs the
 disjunctionIntro strategy at 65k–97k kernel steps: matching the proof's
@@ -1788,7 +1825,22 @@ ground-disequality fast path in the disjunct matcher — if both sides are
 ground and the ground tier decides them UNEQUAL, skip the defeq attempt.
 
 **FRICTION (flex `select(q)` pattern will not δ-unfold a constant
-argument, 2026-07-19, rank_two_escalators).** Citing
+argument, 2026-07-19, rank_two_escalators). WRAPPER HALF CLOSED
+2026-07-19 (batch-3 item 2, 93be37bc): unfoldHeadConstantOneStep
+refused to unfold a definition applied past its lambdas — a wrapper
+whose body is a VALUE application (`upperRightUnit := J_L * J_Rᵀ`
+applied to entry indices) never δ-aligned in citation matching (the
+WHNF fallback overshoots the product's altitude). It now β-applies
+while lambdas last and re-applies the remaining spine arguments
+(mirroring ring's headDeltaBetaStepOnce); all 8 unfold-first defeq
+steps in the entry/algebra lemmas are deleted. The FLEX half
+(`select(q)` vs `secondOfTwo` with `?select` already solved) turned out
+not to be needed once the wrapper aligns — the index hole pins from the
+conclusion's other side and defeq validation accepts — and the natural
+fix (substitute the solved head, re-run rigid) REGRESSED
+function_enumeration's ∀-goal citation; refiled sharpened as QUIRK Q10.
+Lock: Test/citation_delta_alignment_test.math. Original entry
+follows.** Citing
 `multiply_inclusionMatrix_transpose_entry_selected` (conclusion indexed
 by `select(q)`, `select` a metavariable) against an index spelled
 `NaturalsBelow.secondOfTwo` (a constant whose δ-body IS `shift(1, top 0)`)

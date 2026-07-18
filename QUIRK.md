@@ -383,3 +383,38 @@ fully `let`-spelled goal.
   constructors") — the disjunction-injection coercion is not tried for
   the `witness` form. Workaround: state the existential as a bare fact
   (`∃ …. P by { witness v with done };`) and close with `done`.
+
+## Q10 — OPEN (attempted + withdrawn 2026-07-19): flex-headed application pattern vs a δ-defined constant when the head is already solved
+
+**Symptom.** In `unifyConstructorParameters`, a pattern `?select(?q)`
+whose head metavariable is ALREADY assigned (pinned by an earlier
+position — e.g. citing `multiply_inclusionMatrix_transpose_entry_selected`,
+where `inclusionMatrix(?select)` pins `?select := shift(1)` before the
+index position is reached) silently returns without matching, so `?q`
+is never pinned from a target constant like `NaturalsBelow.secondOfTwo`
+whose δ-body is `shift(1, top(0))`. Constant-vs-constant head mismatches
+δ-align (batch-3 item 2 / the Q3 family); flex-with-solved-head does not.
+
+**Impact today: LOW.** The batch-3 wrapper-head fix
+(`unfoldHeadConstantOneStep` re-applies spine args past a value body)
+plus defeq validation of the instantiated conclusion carries every live
+site — the index hole is pinned from the conclusion's other side, and
+the final check accepts the defeq spelling. The gap only bites when the
+flex-applied hole occurs NOWHERE else in the conclusion.
+
+**Attempt (withdrawn).** Substituting the solved head and re-running the
+node as a rigid match (so the target-side δ-loop fires) is the natural
+fix, and it closed the rank_two sites — but it REGRESSED
+`Algebra/function_enumeration.math`'s `CommutativeRing.productOfSums_distributes`:
+inside a ∀-goal citation, the substituted-head recursion (patterns under
+`productOver` lambdas, Miller-solved heads re-entering as lambdas)
+poisoned the hole ladder into its bare-lemma fallback ("the `by` hint
+citation does not prove this goal", hint typed as the unapplied Π chain
+under a stray leading binder). A retry needs either (a) tentative
+assignment (unify into a scratch map, commit only if the whole
+conclusion then validates), or (b) a guard excluding lambda-valued
+solved heads / binder-depth > 0. Lock to build first: a citation whose
+flex-applied hole appears only under the solved head
+(`Test/citation_delta_alignment_test.math`'s second probe is the
+end-to-end shape; it currently passes through the citation ladder's
+other rungs).
