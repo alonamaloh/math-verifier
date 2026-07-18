@@ -151,3 +151,61 @@ spelling, or close the step with `done by substituting
 the application — it closed the same goal that `ring` refused). The
 misleading "identity is FALSE" wording deserves a caveat when any
 non-variable application was atomized.
+
+## Q6 — `by substituting <quantified-lemma>` under an aggregation head picks the registered congruence and dies
+
+**Symptom.** A chain step rewriting INSIDE `CommutativeRing.productOver`/
+`sumOver` via a quantified lemma —
+`… = productOver(term, prepend(top, map(incl, E))) by substituting
+NaturalsBelow.enumerate_one_plus`, or a reindex via `by substituting
+CommutativeRing.productOver_map` — fails with
+"claim `(@_hole_2_CommutativeRing.productOver_congruence i) =
+(@_hole_3_…)`: no in-scope hypothesis matches …": the diff bridge
+commits to the REGISTERED congruence lemma for the aggregation head
+(`productOver_congruence`, which congruences the TERM function pointwise)
+even when the diff is in the LIST argument (or both), leaving its two
+term-function holes unfillable. Hit twice in
+`Matrix.determinant_bordered_top_row` (2026-07-18).
+
+**Root cause hypothesis.** The rewrite justification path prefers the
+lemma-index congruence entry keyed on the outer head constant over plain
+positional congruence `f(x) → f(x')`; for `productOver` the registered
+entry only covers the term-function slot.
+
+**Attempts.** None in-session (worked around).
+
+**Workaround.** Pre-state the rewrite as a GROUND named fact
+(`X = Y by <quantified-lemma> as name;` — goal-driven citation handles
+the instance fine), then `by substituting name` in the chain. The same
+failure did not occur for scalar-position rewrites (`from_integer` arg,
+matrix-entry args), which bridge by plain congruence.
+
+## Q7 — `substituting` and lemma-instance search do not ζ-unfold `let`-spelled goal terms
+
+**Symptom.** `… by substituting Permutation.pairOrient_extend_row` fails
+with "no instance of its left- or right-hand side occurs in the goal"
+when the goal spells the instance through chain-local `let`s
+(`map(ambientPair, E)` for the lemma's literal lambda): the occurrence
+check is syntactic and does not ζ-unfold. Chain ENDPOINTS do get
+ζ-unfolded (whole-equation conclusion matches against `let`-spelled
+endpoints work); the occurrence search inside `substituting` does not.
+Hit in `Permutation.pairOrient_extend_block` (2026-07-18).
+
+**Workaround.** Insert an explicit by-less defeq chain step that
+re-spells the `let`-abbreviated term literally, then substitute. (Same
+family as Q3/Q5: subsystems compare terms without reducing first.)
+
+## Q8 — two small elaborator gaps hit while building sign_extend
+
+- **Implicit under `Set`-typed slot:** `List.filter(Permutation.indexPairBelow, …)`
+  fails to instantiate `indexPairBelow`'s implicit `{n}` when the filter's
+  element type is still a metavariable at that argument's elaboration
+  ("expects Set(Pair …) but argument is (n : Natural) → …") — the
+  deferred-second-pass fix (T6 (b)) does not fire when the expected type
+  is the `Set` wrapper. Workaround: ascribe the predicate
+  `(Permutation.indexPairBelow : Pair(…) → Proposition)`.
+- **`witness` in a disjunct position:** with goal `(∃ …) ∨ P`, an arm
+  proof `witness v with done` errors ("anonymous tuple: 'Or' has 2
+  constructors") — the disjunction-injection coercion is not tried for
+  the `witness` form. Workaround: state the existential as a bare fact
+  (`∃ …. P by { witness v with done };`) and close with `done`.
