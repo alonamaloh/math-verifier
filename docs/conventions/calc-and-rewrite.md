@@ -474,11 +474,44 @@ Two caveats remain:
   matching. The conditional's elaborator ζ-unfolds the target up front; other
   paths may need explicit ζ-unfold or binding a stated fact to align shapes.
 
-- **Function-valued `let`s are not β-reduced after ζ.** `let f := (k) ↦
-  g(k);` makes `f(i)` unfold to `(λk. g k) i`, NOT to `g(i)` — so `ring`
-  and `by`-citation matching treat `f(i)` and `g(i)` as distinct
-  atoms (the unfold substitutes the value but stops short of β). Either
-  do the algebra in the `g(i)` form and let a by-less `=` step fold to
-  `f(i)` (the full defeq path *does* β-reduce), or pass explicit
-  arguments through the let (`by lemma(g(i))`, not an argument-free
-  citation).
+- **Function-valued `let`s and β.** `let f := (k) ↦ g(k);` makes `f(i)`
+  ζ-unfold to `(λk. g k) i` — a β-redex. As of 2026-07-18 the main
+  consumers contract it: `ring` β/δ-exposes a definition- or
+  lambda-headed application whose reduct is a ring operation (so
+  `f(i)` participates in normalisation as `g(i)`), and `by substituting`
+  searches a ζ+deep-WHNF goal form, so an instance spelled only through
+  `let` names is still found (see "name your summands" below). Residual
+  caveat: argument-free `by`-citation matching outside those paths may
+  still see `f(i)` and `g(i)` as distinct spellings — if a citation
+  inexplicably misses, try the `g(i)` spelling or pass the argument
+  explicitly.
+
+### Name your summands
+
+When an aggregation's summand is a multi-line lambda that recurs across a
+chain (the determinant corpus once spelled one six-line summand ~8 times in
+a single proof), bind each summand to a `let` and write the chain over the
+names. Rewriting under the Σ then reads as one pointwise step (the
+under-binder lambda form above; `CommutativeRing.sumOver`/`productOver`
+have registered congruences), quantified `substituting` citations find
+their instances through the names, and `ring` closes the leaf
+rearrangements with the `let`s intact. The worked example is
+`Test/name_your_summands_test.math` — `Matrix.phi_inner_sum`'s 72-line
+proof restated in 20 honest lines:
+
+```math
+let aFactor : CommutativeRing.carrier(r) :=
+    CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n));
+let bTerm : Permutation(n) → CommutativeRing.carrier(r) := (sigma : Permutation(n)) ↦ …;
+let abTerm : Permutation(n) → CommutativeRing.carrier(r) := (sigma : Permutation(n)) ↦ …;
+CommutativeRing.sumOver(abTerm, Permutation.allPermutations(n))
+   = CommutativeRing.sumOver((sigma : Permutation(n)) ↦ aFactor * bTerm(sigma), Permutation.allPermutations(n))
+         by ((sigma : Permutation(n)) ↦ {
+             abTerm(sigma)
+                = … by substituting CommutativeRing.productOver_multiply
+                = aFactor * bTerm(sigma) by ring;
+             done
+           })
+   = aFactor * CommutativeRing.sumOver(bTerm, Permutation.allPermutations(n)) by CommutativeRing.sumOver_scale_left;
+done
+```

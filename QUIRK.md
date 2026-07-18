@@ -224,7 +224,7 @@ the shapes are locked in `Test/reduce_before_compare_test.math`
 (`Probe.q6_*`). If it resurfaces, refile with the failing file FROZEN in
 a branch so the exact step shape is preserved.
 
-## Q7 — CLOSED 2026-07-18: not reproducible at HEAD; re-spell step removed and locked
+## Q7 — CLOSED 2026-07-18 (fixed): `substituting` now scans a ζ-unfolded goal form
 
 **Symptom.** `… by substituting Permutation.pairOrient_extend_row` fails
 with "no instance of its left- or right-hand side occurs in the goal"
@@ -239,17 +239,28 @@ Hit in `Permutation.pairOrient_extend_block` (2026-07-18).
 re-spells the `let`-abbreviated term literally, then substitute. (Same
 family as Q3/Q5: subsystems compare terms without reducing first.)
 
-**Closure (2026-07-18).** Could NOT be reproduced at HEAD with the
-pre-fix kernel: `pairOrient_extend_block` verifies with the explicit
-re-spell step DELETED (the `substituting` citation fires straight
-against the `let`-spelled goal), and `sign_extend` accepts
-`by substituting NaturalsBelow.enumerate_one_plus` inline with the
-`enumerationSplits` ground fact removed. Both files converted; the
-`let`-spelled-chain shape is locked in
-`Test/reduce_before_compare_test.math` (`Probe.q7_let_spelled_chain`),
-and the heavier lambda-under-`List.map` shape is exercised live by
-`pairOrient_extend_block` itself on every build. Same refile-frozen
-advice as Q6 if it resurfaces.
+**Closure (2026-07-18).** Two parts.
+
+The ORIGINALLY-FILED sites turned out not to reproduce at HEAD even
+pre-fix: `pairOrient_extend_block` verifies with the explicit re-spell
+step DELETED, and `sign_extend` accepts `by substituting
+NaturalsBelow.enumerate_one_plus` inline with the `enumerationSplits`
+ground fact removed (both converted; locked in
+`Test/reduce_before_compare_test.math`, `Probe.q7_let_spelled_chain`).
+
+But the REAL failure mode surfaced in the `phi_inner_sum` acceptance
+build: when the lemma's instance is visible ONLY through the `let`s
+(`aFactor * bTerm(sigma)` where BOTH factors are `let`-names — nothing
+in the goal spells the `productOver … * productOver …` instance
+literally), `by substituting CommutativeRing.productOver_multiply` died
+with the filed "no instance … occurs in the goal" error. FIXED:
+`elaborateClaimBySubstitution` and
+`collectQuantifiedSubstitutionCandidates` now also search a ζ-unfolded
+goal form (`zetaUnfoldLetBinders` + a deep-WHNF pass to contract the
+β-redexes it creates), so `let`-spelled goals are searched at their
+literal spelling too. Lock: `Test/name_your_summands_test.math` — the
+under-binder pointwise chain cites `productOver_multiply` against a
+fully `let`-spelled goal.
 
 ## Q8 — two small elaborator gaps hit while building sign_extend
 

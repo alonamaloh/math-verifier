@@ -1,0 +1,66 @@
+-- The owner-endorsed acceptance test for the compare-without-reducing arc
+-- (QUIRK Q3/Q5/Q7 + under-binder auto-congruence): restate
+-- `Matrix.phi_inner_sum` — 72 proof lines in the determinant corpus, its
+-- six-line summand spelled ~8 times — in at most 20 honest lines, by
+-- NAMING the summands with `let`s and rewriting under the Σ-binder with a
+-- pointwise lambda (`congruence_under_binder CommutativeRing.sumOver`).
+-- Every displayed statement is a locally-checkable equation.
+
+module Test.name_your_summands_test
+
+import Logic.basics
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Lists.list
+import Lists.map
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+import Algebra.matrix
+import Algebra.determinant
+
+theorem Test.phi_inner_sum_restated {r : CommutativeRing} {n : ℕ}
+        (A B : Matrix(r, n, n)) (phi : NaturalsBelow(n) → NaturalsBelow(n))
+        : CommutativeRing.sumOver(
+              (sigma : Permutation(n)) ↦
+                  CommutativeRing.from_integer(r, Permutation.sign(sigma))
+                      * CommutativeRing.productOver(
+                            (i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)),
+                            NaturalsBelow.enumerate(n)),
+              Permutation.allPermutations(n))
+          = CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n))
+              * CommutativeRing.sumOver(
+                    (sigma : Permutation(n)) ↦
+                        CommutativeRing.from_integer(r, Permutation.sign(sigma))
+                            * CommutativeRing.productOver(
+                                  (i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)),
+                                  NaturalsBelow.enumerate(n)),
+                    Permutation.allPermutations(n)) := {
+  let aFactor : CommutativeRing.carrier(r) :=
+      CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)), NaturalsBelow.enumerate(n));
+  let bTerm : Permutation(n) → CommutativeRing.carrier(r) :=
+      (sigma : Permutation(n)) ↦ CommutativeRing.from_integer(r, Permutation.sign(sigma))
+          * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)), NaturalsBelow.enumerate(n));
+  let abTerm : Permutation(n) → CommutativeRing.carrier(r) :=
+      (sigma : Permutation(n)) ↦ CommutativeRing.from_integer(r, Permutation.sign(sigma))
+          * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ A(i, phi(i)) * B(phi(i), sigma(i)), NaturalsBelow.enumerate(n));
+  CommutativeRing.sumOver(abTerm, Permutation.allPermutations(n))
+     = CommutativeRing.sumOver((sigma : Permutation(n)) ↦ aFactor * bTerm(sigma), Permutation.allPermutations(n))
+           by ((sigma : Permutation(n)) ↦ {
+               abTerm(sigma)
+                  = CommutativeRing.from_integer(r, Permutation.sign(sigma))
+                        * (aFactor * CommutativeRing.productOver((i : NaturalsBelow(n)) ↦ B(phi(i), sigma(i)), NaturalsBelow.enumerate(n)))
+                        by substituting CommutativeRing.productOver_multiply
+                  = aFactor * bTerm(sigma) by ring;
+               done
+             })
+     = aFactor * CommutativeRing.sumOver(bTerm, Permutation.allPermutations(n)) by CommutativeRing.sumOver_scale_left;
+  done
+}

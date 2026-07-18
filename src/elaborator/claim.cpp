@@ -140,6 +140,24 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
         if (headWhnfIsNovel) {
             goalForms.push_back(goalHeadWhnf);
         }
+        // ζ-unfolded form (Q7): a goal spelled through chain-local `let`s
+        // (`aFactor * bTerm(sigma)` for named summands) hides the
+        // substitution endpoint behind BoundVariables that no WHNF can
+        // open. Substitute the `let` values in (plus a deep-WHNF pass to
+        // contract the β-redexes this creates), so the occurrence search
+        // sees the literal spelling. Tried last so goals that already
+        // match keep their existing (cheaper) motive shape; pointer-equal
+        // no-op when the context has no value binders.
+        ExpressionPointer goalZeta =
+            zetaUnfoldLetBinders(goalClosed, localBinders);
+        if (goalZeta.get() != goalClosed.get()) {
+            goalForms.push_back(goalZeta);
+            ExpressionPointer goalZetaDeepWhnf =
+                deepWhnfThroughApplications(goalZeta);
+            if (goalZetaDeepWhnf.get() != goalZeta.get()) {
+                goalForms.push_back(goalZetaDeepWhnf);
+            }
+        }
         // For each candidate, both directions, try the bridge.
         // Track per-attempt outcomes so we can produce a useful
         // diagnostic when nothing closes — the user wants to know
@@ -281,6 +299,23 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     call = makeApplication(call, transportRhs);
                     call = makeApplication(call, eqForTransport);
                     call = makeApplication(call, proofRewritten);
+                    // Validate the assembled transport. The hole-substituted
+                    // rewritten goal can be well-typed while the MOTIVE is
+                    // not: abstracting an occurrence that a DEPENDENT
+                    // argument's type mentions (`NaturalsBelow.make(v, p)`
+                    // with `p : v < n`, abstracting only `v`) leaves the
+                    // proof argument typed at the original value, which no
+                    // longer matches under the hole binder. Only the full
+                    // application exposes that; reject it here so the
+                    // search moves on to a well-typed rewrite instead of
+                    // handing the kernel an ill-typed term.
+                    try {
+                        inferTypeInLocalContext(localBinders, call);
+                    } catch (const TypeError&) {
+                        return nullptr;
+                    } catch (const ElaborateError&) {
+                        return nullptr;
+                    }
                     return call;
                 };
                 auto tryCloseAndBuild =
@@ -726,6 +761,20 @@ void Elaborator::collectQuantifiedSubstitutionCandidates(
             deepWhnfThroughApplications(goalClosed);
         if (goalDeepWhnf.get() != goalClosed.get()) {
             scan(goalDeepWhnf);
+        }
+        // ζ-unfolded goal (Q7): an instance spelled through chain-local
+        // `let`s is invisible to the two scans above (the `let` names are
+        // BoundVariables); substitute the values in — plus a deep-WHNF to
+        // contract the resulting β-redexes — and scan those forms too.
+        ExpressionPointer goalZeta =
+            zetaUnfoldLetBinders(goalClosed, localBinders);
+        if (goalZeta.get() != goalClosed.get()) {
+            scan(goalZeta);
+            ExpressionPointer goalZetaDeepWhnf =
+                deepWhnfThroughApplications(goalZeta);
+            if (goalZetaDeepWhnf.get() != goalZeta.get()) {
+                scan(goalZetaDeepWhnf);
+            }
         }
         if (inferred.empty()) {
             // A hypothesis-transport claim (`P' by substituting eq`
