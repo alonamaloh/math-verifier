@@ -19,9 +19,6 @@ Focused advanced notes live in `docs/conventions/`:
 
 - [`relation-chains.md`](docs/conventions/relation-chains.md)
 - [`algebra-tactics.md`](docs/conventions/algebra-tactics.md)
-- [`proof-style.md`](docs/conventions/proof-style.md) — the depth behind
-  `docs/style.md`: worked idioms, the raw-CIC tells, and the
-  redundancy-check polishing workflow
 - [`quotients.md`](docs/conventions/quotients.md)
 - [`structures-and-inference.md`](docs/conventions/structures-and-inference.md)
 - [`numerals-and-naming.md`](docs/conventions/numerals-and-naming.md)
