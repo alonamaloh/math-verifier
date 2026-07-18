@@ -1,0 +1,331 @@
+-- Algebra/truant.math
+--
+-- The truant of a non-universal form (fifteen-theorem stage S3.T2): the
+-- least positive integer the form fails to represent — the number whose
+-- pursuit drives Bhargava's escalation. `Matrix.IsTruant` is the
+-- defining property; the least-number principle makes it exist for any
+-- non-universal form and order makes it unique, so definite description
+-- yields a total function `Matrix.truant` (junk value 0 on universal
+-- forms). The root of the escalation ladder: the truant of x² is 2.
+
+module Algebra.truant
+
+import axioms
+import Logic.basics
+import Logic.functions
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.subtraction
+import Natural.classical_decidable
+import Natural.least_number
+import Natural.multiply_bounds
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Set.finite
+import Set.finite_pigeonhole
+import Lists.list
+import Lists.map
+import Lists.distinct
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.ring_from_integer
+import Algebra.integer_domain
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.adjugate
+import Algebra.quadratic_form
+import Algebra.integer_quadratic_form
+import Algebra.square_form
+
+-- ----------------------------------------------------------------------
+-- The defining property: t is the least positive integer the form misses.
+
+definition Matrix.IsTruant {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ) : Proposition :=
+  t ≥ 1
+  ∧ ¬(Matrix.Represents(A, (t : ℤ)))
+  ∧ (∀ (s : ℕ). s ≥ 1 → s < t → Matrix.Represents(A, (s : ℤ)))
+
+-- The three faces of the property, as citable lemmas.
+theorem Matrix.IsTruant.positive {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (isTruant : Matrix.IsTruant(A, t)) : t ≥ 1 := {
+  t ≥ 1
+  ∧ ¬(Matrix.Represents(A, (t : ℤ)))
+  ∧ (∀ (s : ℕ). s ≥ 1 → s < t → Matrix.Represents(A, (s : ℤ))) by isTruant;
+  done
+}
+
+theorem Matrix.IsTruant.missed {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (isTruant : Matrix.IsTruant(A, t)) : ¬(Matrix.Represents(A, (t : ℤ))) := {
+  t ≥ 1
+  ∧ ¬(Matrix.Represents(A, (t : ℤ)))
+  ∧ (∀ (s : ℕ). s ≥ 1 → s < t → Matrix.Represents(A, (s : ℤ))) by isTruant;
+  done
+}
+
+theorem Matrix.IsTruant.represents_below {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t s : ℕ)
+        (isTruant : Matrix.IsTruant(A, t))
+        (sPositive : s ≥ 1) (sBelowTruant : s < t)
+        : Matrix.Represents(A, (s : ℤ)) := {
+  t ≥ 1
+  ∧ ¬(Matrix.Represents(A, (t : ℤ)))
+  ∧ (∀ (k : ℕ). k ≥ 1 → k < t → Matrix.Represents(A, (k : ℤ))) by isTruant;
+  done
+}
+
+-- A form with a truant is not universal: the truant itself is missed.
+theorem Matrix.IsTruant.not_universal {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (isTruant : Matrix.IsTruant(A, t)) : ¬(Matrix.IsUniversal(A)) := {
+  suppose Matrix.IsUniversal(A) as universal;
+  t ≥ 1 by Matrix.IsTruant.positive;
+  Matrix.Represents(A, (t : ℤ)) by universal;
+  ¬(Matrix.Represents(A, (t : ℤ))) by Matrix.IsTruant.missed;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- Well-definedness for non-universal forms: a truant exists (the least
+-- missed positive integer) and is unique (two least missed numbers each
+-- bound the other).
+
+theorem Matrix.truant_exists {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (nonUniversal : ¬(Matrix.IsUniversal(A)))
+        : ∃ (t : ℕ). Matrix.IsTruant(A, t) := {
+  ¬(∀ (m : ℕ). m ≥ 1 → Matrix.Represents(A, (m : ℤ))) by nonUniversal;
+  ∃ (m : ℕ). ¬(m ≥ 1 → Matrix.Represents(A, (m : ℤ)))
+      by Logic.not_forall_implies_exists_not(
+             predicate := (m : ℕ) ↦ (m ≥ 1 → Matrix.Represents(A, (m : ℤ))));
+  choose m such that ¬(m ≥ 1 → Matrix.Represents(A, (m : ℤ)));
+
+  -- The failed implication classically yields a missed positive integer.
+  m ≥ 1 by {
+      suppose ¬(m ≥ 1) as mNotPositive for contradiction;
+      m ≥ 1 → Matrix.Represents(A, (m : ℤ))
+          by (mPositive : m ≥ 1) ↦ absurd(mNotPositive(mPositive));
+      done
+    };
+  ¬(Matrix.Represents(A, (m : ℤ))) by {
+      suppose Matrix.Represents(A, (m : ℤ)) as represented;
+      m ≥ 1 → Matrix.Represents(A, (m : ℤ)) by (ignored : m ≥ 1) ↦ represented;
+      done
+    };
+  m ≥ 1 ∧ ¬(Matrix.Represents(A, (m : ℤ)));
+
+  -- The least missed positive integer is the truant.
+  ∃ (minimum : ℕ).
+      (minimum ≥ 1 ∧ ¬(Matrix.Represents(A, (minimum : ℤ))))
+      ∧ (∀ (k : ℕ). k ≥ 1 ∧ ¬(Matrix.Represents(A, (k : ℤ))) → minimum ≤ k)
+      by Natural.least_witness(
+             predicate := (k : ℕ) ↦ (k ≥ 1 ∧ ¬(Matrix.Represents(A, (k : ℤ)))));
+  choose minimum such that
+      (minimum ≥ 1 ∧ ¬(Matrix.Represents(A, (minimum : ℤ))))
+      ∧ (∀ (k : ℕ). k ≥ 1 ∧ ¬(Matrix.Represents(A, (k : ℤ))) → minimum ≤ k);
+  ∀ (s : ℕ). s ≥ 1 → s < minimum → Matrix.Represents(A, (s : ℤ))
+      by (s : ℕ) (sPositive : s ≥ 1) (sBelowMinimum : s < minimum) ↦ {
+          suppose ¬(Matrix.Represents(A, (s : ℤ))) for contradiction;
+          s ≥ 1 ∧ ¬(Matrix.Represents(A, (s : ℤ)));
+          minimum ≤ s;
+          minimum ≤ s < minimum by sBelowMinimum;
+          done
+        };
+  minimum ≥ 1;
+  ¬(Matrix.Represents(A, (minimum : ℤ)));
+  Matrix.IsTruant(A, minimum) by done as minimumIsTruant;
+  witness minimum with minimumIsTruant
+}
+
+theorem Matrix.truant_unique {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (s t : ℕ)
+        (sTruant : Matrix.IsTruant(A, s)) (tTruant : Matrix.IsTruant(A, t))
+        : s = t := {
+  s < t ∨ s = t ∨ t < s by Natural.lt_trichotomy;
+  done by cases {
+    case s < t as sBelowT: {
+        s ≥ 1 by Matrix.IsTruant.positive;
+        Matrix.Represents(A, (s : ℤ)) by Matrix.IsTruant.represents_below;
+        ¬(Matrix.Represents(A, (s : ℤ))) by Matrix.IsTruant.missed;
+        False;
+        done
+      }
+    case s = t ∨ t < s: done by cases {
+        case s = t: done
+        case t < s as tBelowS: {
+            t ≥ 1 by Matrix.IsTruant.positive;
+            Matrix.Represents(A, (t : ℤ)) by Matrix.IsTruant.represents_below;
+            ¬(Matrix.Represents(A, (t : ℤ))) by Matrix.IsTruant.missed;
+            False;
+            done
+          }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The truant as a total function, by definite description: pin the value
+-- with a predicate that holds of the truant on non-universal forms and
+-- of the junk value 0 on universal ones.
+
+definition Matrix.truantPredicate {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ) : Proposition :=
+  ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, t) ∨ Matrix.IsUniversal(A) ∧ t = 0
+
+theorem Matrix.truant_predicate_exists {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        : ∃ (t : ℕ). Matrix.truantPredicate(A, t) :=
+  done by cases {
+    case Matrix.IsUniversal(A) as universal: {
+        Matrix.IsUniversal(A) ∧ 0 = 0;
+        ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, 0) ∨ Matrix.IsUniversal(A) ∧ 0 = 0
+            as atJunk;
+        witness 0 with atJunk
+      }
+    otherwise as nonUniversal: {
+        choose t such that Matrix.IsTruant(A, t) from Matrix.truant_exists;
+        ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, t);
+        ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, t) ∨ Matrix.IsUniversal(A) ∧ t = 0
+            as atTruant;
+        witness t with atTruant
+      }
+  }
+
+theorem Matrix.truant_predicate_unique {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        : ∀ (s t : ℕ). Matrix.truantPredicate(A, s) → Matrix.truantPredicate(A, t) → s = t := {
+  take s : ℕ; take t : ℕ;
+  suppose Matrix.truantPredicate(A, s) as predicateAtS;
+  suppose Matrix.truantPredicate(A, t) as predicateAtT;
+  done by cases {
+    case ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, s) as truantAtS:
+        done by cases {
+          case ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, t) as truantAtT: {
+              Matrix.IsTruant(A, s);
+              Matrix.IsTruant(A, t);
+              done by Matrix.truant_unique
+            }
+          case Matrix.IsUniversal(A) ∧ t = 0 as universalAtT: {
+              Matrix.IsUniversal(A);
+              ¬(Matrix.IsUniversal(A));
+              False;
+              done
+            }
+        }
+    case Matrix.IsUniversal(A) ∧ s = 0 as universalAtS:
+        done by cases {
+          case ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, t) as truantAtT: {
+              Matrix.IsUniversal(A);
+              ¬(Matrix.IsUniversal(A));
+              False;
+              done
+            }
+          case Matrix.IsUniversal(A) ∧ t = 0 as universalAtT: {
+              s = 0;
+              t = 0;
+              done
+            }
+        }
+  }
+}
+
+definition Matrix.truant {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) : ℕ :=
+  Logic.the(ℕ, (t : ℕ) ↦ Matrix.truantPredicate(A, t),
+      Matrix.truant_predicate_exists(A), Matrix.truant_predicate_unique(A))
+
+theorem Matrix.truant_satisfies {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        : Matrix.truantPredicate(A, Matrix.truant(A)) :=
+  Logic.the_satisfies(ℕ, (t : ℕ) ↦ Matrix.truantPredicate(A, t),
+      Matrix.truant_predicate_exists(A), Matrix.truant_predicate_unique(A))
+
+-- On a non-universal form the function value is a genuine truant …
+theorem Matrix.truant_is_truant {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (nonUniversal : ¬(Matrix.IsUniversal(A)))
+        : Matrix.IsTruant(A, Matrix.truant(A)) := {
+  Matrix.truantPredicate(A, Matrix.truant(A)) by Matrix.truant_satisfies;
+  done by cases {
+    case ¬(Matrix.IsUniversal(A)) ∧ Matrix.IsTruant(A, Matrix.truant(A)) as truantSide:
+        done
+    case Matrix.IsUniversal(A) ∧ Matrix.truant(A) = 0 as universalSide: {
+        Matrix.IsUniversal(A);
+        False;
+        done
+      }
+  }
+}
+
+-- … and any witnessed truant value is the function value.
+theorem Matrix.truant_equals {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n)) (t : ℕ)
+        (isTruant : Matrix.IsTruant(A, t))
+        : Matrix.truant(A) = t := {
+  ¬(Matrix.IsUniversal(A)) by Matrix.IsTruant.not_universal;
+  Matrix.IsTruant(A, Matrix.truant(A)) by Matrix.truant_is_truant;
+  done by Matrix.truant_unique
+}
+
+-- ----------------------------------------------------------------------
+-- The root of the escalation ladder: x² is not universal, and its truant
+-- is 2 — it represents 1 = 1² but misses 2 (the squares jump to 4).
+
+theorem Matrix.squareForm_not_universal : ¬(Matrix.IsUniversal(Matrix.squareForm)) := {
+  suppose Matrix.IsUniversal(Matrix.squareForm) as universal;
+  Matrix.Represents(Matrix.squareForm, ((2 : ℕ) : ℤ)) by universal;
+  ((2 : ℕ) : ℤ) = (2 : ℤ);
+  Matrix.Represents(Matrix.squareForm, (2 : ℤ)) by substitution;
+  ¬(Matrix.Represents(Matrix.squareForm, (2 : ℤ))) by Matrix.squareForm_not_represents_two;
+  done
+}
+
+theorem Matrix.squareForm_truant_two : Matrix.IsTruant(Matrix.squareForm, 2) := {
+  (2 : ℕ) ≥ 1;
+  ¬(Matrix.Represents(Matrix.squareForm, ((2 : ℕ) : ℤ))) by {
+      suppose Matrix.Represents(Matrix.squareForm, ((2 : ℕ) : ℤ)) as represented;
+      ((2 : ℕ) : ℤ) = (2 : ℤ);
+      Matrix.Represents(Matrix.squareForm, (2 : ℤ)) by substitution;
+      ¬(Matrix.Represents(Matrix.squareForm, (2 : ℤ))) by Matrix.squareForm_not_represents_two;
+      done
+    };
+  ∀ (s : ℕ). s ≥ 1 → s < 2 → Matrix.Represents(Matrix.squareForm, (s : ℤ))
+      by (s : ℕ) (sPositive : s ≥ 1) (sBelowTwo : s < 2) ↦ {
+          -- The only positive integer below 2 is 1.
+          s < 1 + 1;
+          s ≤ 1 by Natural.le_of_lt_one_plus;
+          s = 1 by Natural.le_antisymmetric;
+          Matrix.Represents(Matrix.squareForm, ((1 : ℕ) : ℤ)) by {
+              ((1 : ℕ) : ℤ) = (1 : ℤ);
+              Matrix.Represents(Matrix.squareForm, (1 : ℤ)) by Matrix.squareForm_represents_one;
+              done by substitution
+            };
+          done by substituting (s = 1)
+        };
+  done
+}
+
+-- The formal truant equation at the ladder's root.
+theorem Matrix.squareForm_truant : Matrix.truant(Matrix.squareForm) = 2 := {
+  Matrix.IsTruant(Matrix.squareForm, 2) by Matrix.squareForm_truant_two;
+  done by Matrix.truant_equals
+}
