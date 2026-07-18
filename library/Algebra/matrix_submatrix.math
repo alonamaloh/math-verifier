@@ -40,11 +40,79 @@ definition Matrix.submatrix {r : CommutativeRing} {rows columns k l : ℕ}
         : Matrix(r, k, l) :=
   (i : NaturalsBelow(k)) ↦ (j : NaturalsBelow(l)) ↦ A(rowSelect(i), columnSelect(j))
 
+-- Transposing commutes with reindexing: both sides read A at the swapped
+-- selected indices.
+theorem Matrix.submatrix_transpose {r : CommutativeRing} {rows columns k l : ℕ}
+        (A : Matrix(r, rows, columns))
+        (rowSelect : NaturalsBelow(k) → NaturalsBelow(rows))
+        (columnSelect : NaturalsBelow(l) → NaturalsBelow(columns))
+        : Matrix.submatrix(A, rowSelect, columnSelect)ᵀ = Matrix.submatrix(Aᵀ, columnSelect, rowSelect) := {
+  ∀ (j : NaturalsBelow(l)). ∀ (i : NaturalsBelow(k)).
+      Matrix.submatrix(A, rowSelect, columnSelect)ᵀ(j, i) = Matrix.submatrix(Aᵀ, columnSelect, rowSelect)(j, i)
+      by (j : NaturalsBelow(l)) (i : NaturalsBelow(k)) ↦ done;
+  done by Matrix.equal_of_entries
+}
+
 -- The leading principal k×k submatrix: reindex along the value-preserving
 -- embedding of the first k indices.
 definition Matrix.leadingSubmatrix {r : CommutativeRing} {n k : ℕ}
         (A : Matrix(r, n, n)) (bound : k ≤ n) : Matrix(r, k, k) :=
   Matrix.submatrix(A, NaturalsBelow.embed(bound), NaturalsBelow.embed(bound))
+
+-- The full-size leading submatrix is the matrix itself: the embedding
+-- preserves values, and equal values mean equal indices.
+theorem Matrix.leadingSubmatrix_full {r : CommutativeRing} {n : ℕ}
+        (A : Matrix(r, n, n)) (bound : n ≤ n)
+        : Matrix.leadingSubmatrix(A, bound) = A := {
+  ∀ (i : NaturalsBelow(n)). NaturalsBelow.embed(bound, i) = i
+      by (i : NaturalsBelow(n)) ↦ {
+          NaturalsBelow.value(NaturalsBelow.embed(bound, i)) = NaturalsBelow.value(i)
+              by NaturalsBelow.embed_value;
+          done by NaturalsBelow.equal_of_value
+        } as embedIsIdentity;
+  ∀ (i : NaturalsBelow(n)). ∀ (j : NaturalsBelow(n)). Matrix.leadingSubmatrix(A, bound)(i, j) = A(i, j)
+      by (i : NaturalsBelow(n)) (j : NaturalsBelow(n)) ↦ {
+          Matrix.leadingSubmatrix(A, bound)(i, j)
+             = A(NaturalsBelow.embed(bound, i), NaturalsBelow.embed(bound, j))
+             = A(i, NaturalsBelow.embed(bound, j))   by substituting embedIsIdentity
+             = A(i, j)                               by substituting embedIsIdentity;
+          done
+        };
+  done by Matrix.equal_of_entries
+}
+
+-- A leading submatrix of a leading submatrix is the leading submatrix at
+-- the inner size: the embeddings compose value-preservingly.
+theorem Matrix.leadingSubmatrix_compose {r : CommutativeRing} {n k l : ℕ}
+        (A : Matrix(r, n, n)) (boundOuter : k ≤ n) (boundInner : l ≤ k) (boundComposite : l ≤ n)
+        : Matrix.leadingSubmatrix(Matrix.leadingSubmatrix(A, boundOuter), boundInner)
+          = Matrix.leadingSubmatrix(A, boundComposite) := {
+  ∀ (i : NaturalsBelow(l)).
+      NaturalsBelow.embed(boundOuter, NaturalsBelow.embed(boundInner, i)) = NaturalsBelow.embed(boundComposite, i)
+      by (i : NaturalsBelow(l)) ↦ {
+          NaturalsBelow.value(NaturalsBelow.embed(boundOuter, NaturalsBelow.embed(boundInner, i)))
+             = NaturalsBelow.value(NaturalsBelow.embed(boundInner, i))     by NaturalsBelow.embed_value
+             = NaturalsBelow.value(i)                                      by NaturalsBelow.embed_value
+             = NaturalsBelow.value(NaturalsBelow.embed(boundComposite, i)) by NaturalsBelow.embed_value;
+          done by NaturalsBelow.equal_of_value
+        } as embeddingsCompose;
+  ∀ (i : NaturalsBelow(l)). ∀ (j : NaturalsBelow(l)).
+      Matrix.leadingSubmatrix(Matrix.leadingSubmatrix(A, boundOuter), boundInner)(i, j)
+      = Matrix.leadingSubmatrix(A, boundComposite)(i, j)
+      by (i : NaturalsBelow(l)) (j : NaturalsBelow(l)) ↦ {
+          Matrix.leadingSubmatrix(Matrix.leadingSubmatrix(A, boundOuter), boundInner)(i, j)
+             = A(NaturalsBelow.embed(boundOuter, NaturalsBelow.embed(boundInner, i)),
+                 NaturalsBelow.embed(boundOuter, NaturalsBelow.embed(boundInner, j)))
+             = A(NaturalsBelow.embed(boundComposite, i),
+                 NaturalsBelow.embed(boundOuter, NaturalsBelow.embed(boundInner, j)))
+                   by substituting embeddingsCompose
+             = A(NaturalsBelow.embed(boundComposite, i), NaturalsBelow.embed(boundComposite, j))
+                   by substituting embeddingsCompose
+             = Matrix.leadingSubmatrix(A, boundComposite)(i, j);
+          done
+        };
+  done by Matrix.equal_of_entries
+}
 
 -- ----------------------------------------------------------------------
 -- The inclusion matrix of an index map: column j carries a single 1, at

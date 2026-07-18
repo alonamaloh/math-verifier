@@ -310,3 +310,64 @@ theorem Integer.absolute_value_natural_positive_of_nonzero
       }
   }
 }
+
+-- ----------------------------------------------------------------------
+-- Positivity vs. multiplication — the sign arithmetic Sylvester's
+-- criterion runs on: products of positives are positive, squares of
+-- nonzero integers are positive, and a positive factor can be cancelled
+-- from a positive product and from an equation.
+
+theorem Integer.multiply_positive (a b : ℤ)
+        (aPositive : a > (0 : ℤ)) (bPositive : b > (0 : ℤ))
+        : a * b > (0 : ℤ) := {
+  (0 : ℤ) ≤ a by Integer.LessThan.weaken;
+  Integer.IsNonneg(a) by Integer.nonneg_of_zero_less_or_equal;
+  (0 : ℤ) ≤ b by Integer.LessThan.weaken;
+  Integer.IsNonneg(b) by Integer.nonneg_of_zero_less_or_equal;
+  Integer.IsNonneg(a * b);
+  (0 : ℤ) ≠ a by Integer.LessThan.distinct;
+  (0 : ℤ) ≠ b by Integer.LessThan.distinct;
+  a * b ≠ Integer.zero by Integer.multiply_nonzero;
+  done by Integer.positive_of_nonneg_nonzero
+}
+
+theorem Integer.square_positive_of_nonzero (t : ℤ) (tNonzero : ¬(t = Integer.zero))
+        : t * t > (0 : ℤ) := {
+  Integer.IsNonneg(t * t);
+  t * t ≠ Integer.zero by Integer.multiply_nonzero;
+  done by Integer.positive_of_nonneg_nonzero
+}
+
+theorem Integer.positive_of_multiply_positive (p a : ℤ)
+        (pPositive : p > (0 : ℤ)) (productPositive : p * a > (0 : ℤ))
+        : a > (0 : ℤ) := {
+  (0 : ℤ) ≤ p * a by Integer.LessThan.weaken;
+  Integer.IsNonneg(p * a) by Integer.nonneg_of_zero_less_or_equal;
+  p * a = a * p;
+  Integer.IsNonneg(a * p);
+  (0 : ℤ) ≤ p by Integer.LessThan.weaken;
+  Integer.IsNonneg(p) by Integer.nonneg_of_zero_less_or_equal;
+  (0 : ℤ) ≠ p by Integer.LessThan.distinct;
+  Integer.IsNonneg(a) by Integer.IsNonneg_of_product_with_positive;
+  ¬(a = Integer.zero) by {
+      suppose a = Integer.zero as aZero;
+      (0 : ℤ) ≠ p * a by Integer.LessThan.distinct;
+      p * a
+         = p * Integer.zero   by substituting aZero
+         = Integer.zero;
+      (0 : ℤ) = p * a;
+      done
+    };
+  done by Integer.positive_of_nonneg_nonzero
+}
+
+theorem Integer.multiply_cancel_left_by_nonzero
+        (x y c : ℤ) (cNonzero : c ≠ Integer.zero)
+        (productEquality : c * x = c * y)
+        : x = y := {
+  x * c
+     = c * x
+     = c * y     by productEquality
+     = y * c;
+  done by Integer.multiply_cancel_right_by_nonzero
+}

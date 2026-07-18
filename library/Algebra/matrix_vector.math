@@ -41,6 +41,10 @@ definition RingVector.scale {r : CommutativeRing} {n : ℕ}
 definition RingVector.zero (r : CommutativeRing) (n : ℕ) : RingVector(r, n) :=
   (k : NaturalsBelow(n)) ↦ CommutativeRing.zero(r)
 
+definition RingVector.negate {r : CommutativeRing} {n : ℕ}
+        (u : RingVector(r, n)) : RingVector(r, n) :=
+  (k : NaturalsBelow(n)) ↦ CommutativeRing.negate(u(k))
+
 operator (+) on (RingVector, RingVector) := RingVector.add
 operator (•) on (CommutativeRing.carrier, RingVector) := RingVector.scale
 
@@ -49,6 +53,27 @@ theorem RingVector.equal_of_pointwise {r : CommutativeRing} {n : ℕ}
         (pointwise : ∀ (k : NaturalsBelow(n)). u(k) = v(k))
         : u = v :=
   done by Function.extensionality
+
+-- In dimension zero there is only one vector: equality holds vacuously.
+theorem RingVector.zero_dimension_unique {r : CommutativeRing} (x y : RingVector(r, 0))
+        : x = y := {
+  ∀ (k : NaturalsBelow(0)). x(k) = y(k)
+      by (k : NaturalsBelow(0)) ↦ {
+          False by NaturalsBelow.zero_is_empty;
+          done
+        };
+  done by RingVector.equal_of_pointwise
+}
+
+-- Negation is scaling by −1 — the bridge that turns every negation law
+-- into an instance of the corresponding scale law.
+theorem RingVector.negate_scale_one {r : CommutativeRing} {n : ℕ} (u : RingVector(r, n))
+        : RingVector.negate(u) = CommutativeRing.negate(CommutativeRing.one(r)) • u := {
+  ∀ (k : NaturalsBelow(n)).
+      RingVector.negate(u)(k) = (CommutativeRing.negate(CommutativeRing.one(r)) • u)(k)
+      by (k : NaturalsBelow(n)) ↦ ring;
+  done by RingVector.equal_of_pointwise
+}
 
 -- The matrix action: `(A · x)(i)` is the inner product of row i with x.
 definition Matrix.applyVector {r : CommutativeRing} {rows columns : ℕ}
@@ -300,6 +325,16 @@ theorem Matrix.applyVector_scale_matrix {r : CommutativeRing} {rows columns : �
         };
   done by RingVector.equal_of_pointwise
 }
+
+-- The action commutes with negation — scale by −1 and apply the
+-- homogeneity law.
+theorem Matrix.applyVector_negate {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) (u : RingVector(r, columns))
+        : A · RingVector.negate(u) = RingVector.negate(A · u) :=
+  A · RingVector.negate(u)
+     = A · (CommutativeRing.negate(CommutativeRing.one(r)) • u)   by substituting RingVector.negate_scale_one
+     = CommutativeRing.negate(CommutativeRing.one(r)) • (A · u)   by Matrix.applyVector_scale
+     = RingVector.negate(A · u)                                   by RingVector.negate_scale_one
 
 -- The transpose is the adjoint: ⟨Aᵀ·u, v⟩ = ⟨u, A·v⟩ — the law that turns
 -- xᵀ(MᵀM)x into ⟨M·x, M·x⟩ for the Gram machinery.

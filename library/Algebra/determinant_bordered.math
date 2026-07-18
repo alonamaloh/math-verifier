@@ -43,6 +43,7 @@ import Algebra.matrix_transpose
 import Algebra.matrix_vector
 import Algebra.matrix_submatrix
 import Algebra.determinant
+import Algebra.determinant_transpose
 
 -- Every index of NaturalsBelow(1 + m) lies below the boundary — an included
 -- index — or is the top.
@@ -65,6 +66,19 @@ theorem NaturalsBelow.inclusion_or_top {m : ℕ} (x : NaturalsBelow(1 + m))
         done
       }
   }
+}
+
+-- The top index is never an included index: their values differ.
+theorem NaturalsBelow.top_not_inclusion {m : ℕ} (j : NaturalsBelow(m))
+        : ¬(NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j)) := {
+  suppose NaturalsBelow.top(m) = NaturalsBelow.inclusion(m, j) as topIncluded;
+  m  = NaturalsBelow.value(NaturalsBelow.top(m))
+     = NaturalsBelow.value(NaturalsBelow.inclusion(m, j))   by substituting topIncluded
+     = NaturalsBelow.value(j)
+  as boundaryReached;
+  NaturalsBelow.value(j) < m;
+  m < m by substituting boundaryReached;
+  done by Natural.lt_irreflexive
 }
 
 -- The bordered determinant, concentrated top row:
@@ -309,5 +323,45 @@ theorem Matrix.determinant_bordered_top_row {r : CommutativeRing} {m : ℕ}
            Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
        * M(NaturalsBelow.top(m), NaturalsBelow.top(m))
            by substituting blockExpansion;
+  done
+}
+
+-- The column version: when the top COLUMN is concentrated on the corner,
+-- pass through the transpose — its top row is concentrated, and both the
+-- determinant and the leading block survive transposition.
+theorem Matrix.determinant_bordered_top_column {r : CommutativeRing} {m : ℕ}
+        (M : Matrix(r, 1 + m, 1 + m))
+        (vanishes : ∀ (i : NaturalsBelow(m)).
+            M(NaturalsBelow.inclusion(m, i), NaturalsBelow.top(m)) = CommutativeRing.zero(r))
+        : Matrix.determinant(M)
+          = Matrix.determinant(
+                Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+            * M(NaturalsBelow.top(m), NaturalsBelow.top(m)) := {
+  ∀ (j : NaturalsBelow(m)). Mᵀ(NaturalsBelow.top(m), NaturalsBelow.inclusion(m, j)) = CommutativeRing.zero(r)
+      by (j : NaturalsBelow(m)) ↦ {
+          M(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)) = CommutativeRing.zero(r) by vanishes;
+          done
+        };
+  Matrix.determinant(Mᵀ)
+     = Matrix.determinant(Matrix.submatrix(Mᵀ, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+       * Mᵀ(NaturalsBelow.top(m), NaturalsBelow.top(m))
+      by Matrix.determinant_bordered_top_row as transposeBordered;
+  Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))ᵀ
+     = Matrix.submatrix(Mᵀ, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))
+      by Matrix.submatrix_transpose as blockTransposes;
+  Matrix.determinant(M)
+     = Matrix.determinant(Mᵀ)
+           by substituting Matrix.determinant_transpose
+     = Matrix.determinant(Matrix.submatrix(Mᵀ, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+       * Mᵀ(NaturalsBelow.top(m), NaturalsBelow.top(m))
+           by transposeBordered
+     = Matrix.determinant(Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m))ᵀ)
+       * Mᵀ(NaturalsBelow.top(m), NaturalsBelow.top(m))
+           by substituting blockTransposes
+     = Matrix.determinant(Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+       * Mᵀ(NaturalsBelow.top(m), NaturalsBelow.top(m))
+           by substituting Matrix.determinant_transpose
+     = Matrix.determinant(Matrix.submatrix(M, NaturalsBelow.inclusion(m), NaturalsBelow.inclusion(m)))
+       * M(NaturalsBelow.top(m), NaturalsBelow.top(m));
   done
 }

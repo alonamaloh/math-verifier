@@ -204,3 +204,36 @@ theorem Integer.add_preserves_less_or_equal (x y z : ℤ)
 theorem Integer.zero_less_or_equal_from_natural (n : ℕ)
         : Integer.zero ≤ (n : ℤ) :=
   witness n with done
+
+-- A non-negative integer other than zero is positive: its witness is
+-- 1 + k, which peels off the strict unit.
+theorem Integer.positive_of_nonneg_nonzero (x : ℤ)
+        (xNonneg : Integer.IsNonneg(x)) (xNonzero : ¬(x = Integer.zero))
+        : x > (0 : ℤ) := {
+  choose n such that x = (n : ℤ) from xNonneg;
+  n = 0 ∨ ∃ (k : ℕ). n = 1 + k;
+  done by cases {
+    case n = 0 as nZero: {
+        x  = (n : ℤ)
+           = ((0 : ℕ) : ℤ)   by substituting nZero
+           = Integer.zero;
+        done
+      }
+    case ∃ (k : ℕ). n = 1 + k as nPositive: {
+        choose k such that n = 1 + k from nPositive;
+        witness k with
+            x  = (n : ℤ)
+               = ((1 + k : ℕ) : ℤ)                  by substituting (n = 1 + k)
+               = ((0 : ℤ) + Integer.one) + (k : ℤ)
+      }
+  }
+}
+
+-- Adding a non-negative term keeps a positive sum positive.
+theorem Integer.add_nonneg_positive (a b : ℤ)
+        (aNonneg : a ≥ (0 : ℤ)) (bPositive : b > (0 : ℤ))
+        : a + b > (0 : ℤ) := {
+  b  = (0 : ℤ) + b
+     ≤ a + b        by Integer.add_preserves_less_or_equal;
+  done by Integer.LessThan.transitive_right
+}
