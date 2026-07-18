@@ -59,7 +59,7 @@ workaround). Don't fix in the same session that found the quirk
 unless the fix is genuinely localised — otherwise the investigation
 sprawls.
 
-## Q3 — citation bridging does not δ-unfold a wrapper HEAD on the goal side
+## Q3 — CLOSED 2026-07-18: citation bridging now δ-unfolds a wrapper HEAD on the goal side
 
 **Symptom.** A chain step (or claim) whose left endpoint is a wrapper
 definition — `Matrix.quadraticForm(Mᵀ * A * M, x)`, which δ-unfolds to
@@ -98,6 +98,20 @@ every wrapper-headed chain; the fix (δ-unfold candidate heads before
 diff-matching, symmetric to the ζ-unfold the chain endpoints already get)
 is elaborator work for a dedicated session.
 
+**Fix (2026-07-18).** `tryApplyBareLemmaToDiff`'s descent loop gained a
+δ-retry on its give-up path: when neither structural equality nor the
+defeq tie-break can localise the diff at a level, the sides are re-examined
+after `unfoldHeadConstantOneStep` — ONE δβ-step at a time (a full WHNF blew
+past the lemma's altitude down to `List.product` internals under a binder),
+preferring the single unfold that aligns the two sides' heads, budget 8.
+Covers both the single-step claim form and the multi-step calc form (both
+route through `tryApplyBareLemmaToDiff`); the applied-lemma walk
+(`tryDiffApplyUserProof`) already had its own WHNF retry. Locks:
+`Test/reduce_before_compare_test.math` (`Probe.q3_*`). The
+`quadraticForm_scale` chain now cites `applyVector_scale` straight from
+the wrapper-headed endpoint; `quadraticForm_pullback` keeps its explicit
+first unfolding as pedagogy.
+
 ## Q4 — a universe-polymorphic `automatic` theorem never fires
 
 **Symptom.** `automatic theorem Equality.not_equal_symmetric {A : Type} …`
@@ -125,7 +139,7 @@ binders: **none polymorphic — no registration is silently dead.** The
 exposure is confined to future declarations until the index fix lands;
 the rule above is the guard.
 
-## Q5 — `ring` atomizes definition applications: `(a • x)(k)` never reduces
+## Q5 — CLOSED 2026-07-18: `ring` now δβ-reduces definition applications like `(a • x)(k)`
 
 **Symptom.** In a goal like `A(i, k) * (a • x)(k) = a * (A(i, k) * x(k))`
 (where `(a • x)(k)` β/δ-reduces to `a * x(k)`), `ring` fails with "the two
@@ -152,7 +166,22 @@ the application — it closed the same goal that `ring` refused). The
 misleading "identity is FALSE" wording deserves a caveat when any
 non-variable application was atomized.
 
-## Q6 — `by substituting <quantified-lemma>` under an aggregation head picks the registered congruence and dies
+**Fix (2026-07-18).** `ringDeltaExposeAtom`: before atomizing, each of the
+three atomization sites — the Z/p fast-fail (`evalRingMod`), the polynomial
+normaliser (`normaliseToRingPolynomial`), and the proof builder
+(`proveEqualsCanonical`, with a reflexivity defeq-bridge stitching
+`expression = exposed`) — tries up to 8 head β-contractions / one-step
+δ-unfolds and re-dispatches iff the exposed form is a recognised ring shape
+(operation at the carrier, or embedded literal); otherwise the ORIGINAL
+spelling stays the atom, so atom identity is unchanged for genuinely opaque
+terms. `Matrix.applyVector_scale`'s pointwise fact is back to bare `ring`.
+The diagnostic is also softened: when the fingerprints differ AND a
+transparent-definition-headed application was atomized, the verdict says
+"may be an atomization artifact" instead of the flat FALSE (locked by
+`ErrorTest/ring_atomized_application_verdict`). Locks:
+`Test/reduce_before_compare_test.math` (`Probe.q5_*`).
+
+## Q6 — CLOSED 2026-07-18: not reproducible at HEAD; workaround sites converted and locked
 
 **Symptom.** A chain step rewriting INSIDE `CommutativeRing.productOver`/
 `sumOver` via a quantified lemma —
@@ -180,7 +209,22 @@ the instance fine), then `by substituting name` in the chain. The same
 failure did not occur for scalar-position rewrites (`from_integer` arg,
 matrix-entry args), which bridge by plain congruence.
 
-## Q7 — `substituting` and lemma-instance search do not ζ-unfold `let`-spelled goal terms
+**Closure (2026-07-18).** Could NOT be reproduced at HEAD, with the
+pre-fix kernel, in any tested shape: both live
+`determinant_bordered_top_row` sites accept the direct quantified
+citations (`by substituting NaturalsBelow.enumerate_one_plus`,
+`by substituting CommutativeRing.productOver_map`) with the ground facts
+DELETED, and fresh probes covering list-argument rewrite, bare-`by` diff
+path, whole-application reindex, and reindex-under-a-product all pass.
+The failure was presumably an artifact of a mid-construction step shape
+that the final file no longer contains; the "registered congruence
+hijack" hypothesis did not survive testing. Workaround ground facts
+removed from `determinant_bordered.math` and `permutation_sign_extend.math`;
+the shapes are locked in `Test/reduce_before_compare_test.math`
+(`Probe.q6_*`). If it resurfaces, refile with the failing file FROZEN in
+a branch so the exact step shape is preserved.
+
+## Q7 — CLOSED 2026-07-18: not reproducible at HEAD; re-spell step removed and locked
 
 **Symptom.** `… by substituting Permutation.pairOrient_extend_row` fails
 with "no instance of its left- or right-hand side occurs in the goal"
@@ -191,9 +235,21 @@ check is syntactic and does not ζ-unfold. Chain ENDPOINTS do get
 endpoints work); the occurrence search inside `substituting` does not.
 Hit in `Permutation.pairOrient_extend_block` (2026-07-18).
 
-**Workaround.** Insert an explicit by-less defeq chain step that
+**Workaround (retired).** Insert an explicit by-less defeq chain step that
 re-spells the `let`-abbreviated term literally, then substitute. (Same
 family as Q3/Q5: subsystems compare terms without reducing first.)
+
+**Closure (2026-07-18).** Could NOT be reproduced at HEAD with the
+pre-fix kernel: `pairOrient_extend_block` verifies with the explicit
+re-spell step DELETED (the `substituting` citation fires straight
+against the `let`-spelled goal), and `sign_extend` accepts
+`by substituting NaturalsBelow.enumerate_one_plus` inline with the
+`enumerationSplits` ground fact removed. Both files converted; the
+`let`-spelled-chain shape is locked in
+`Test/reduce_before_compare_test.math` (`Probe.q7_let_spelled_chain`),
+and the heavier lambda-under-`List.map` shape is exercised live by
+`pairOrient_extend_block` itself on every build. Same refile-frozen
+advice as Q6 if it resurfaces.
 
 ## Q8 — two small elaborator gaps hit while building sign_extend
 

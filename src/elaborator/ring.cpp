@@ -77,7 +77,8 @@ std::optional<uint64_t> Elaborator::fingerprintModularInverse(uint64_t value) co
 // to something whose fingerprint is 0).
 std::optional<uint64_t> Elaborator::evaluateFingerprint(
     ExpressionPointer expression,
-    const std::string& carrierName) const {
+    const std::string& carrierName,
+    bool* sawApplicationAtomOut) const {
     const std::string addName       = carrierName + ".add";
     const std::string subtractName  = carrierName + ".subtract";
     const std::string multiplyName  = carrierName + ".multiply";
@@ -101,9 +102,11 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
                     || head->name == subtractName
                     || head->name == multiplyName) {
                     auto leftValue = evaluateFingerprint(
-                        inner->argument, carrierName);
+                        inner->argument, carrierName,
+                        sawApplicationAtomOut);
                     auto rightValue = evaluateFingerprint(
-                        outer->argument, carrierName);
+                        outer->argument, carrierName,
+                        sawApplicationAtomOut);
                     if (!leftValue || !rightValue) return std::nullopt;
                     if (head->name == addName) {
                         return fingerprintAdd(*leftValue, *rightValue);
@@ -121,13 +124,13 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
                 std::get_if<Constant>(&outer->function->node)) {
             if (head->name == negateName) {
                 auto value = evaluateFingerprint(
-                    outer->argument, carrierName);
+                    outer->argument, carrierName, sawApplicationAtomOut);
                 if (!value) return std::nullopt;
                 return fingerprintNegate(*value);
             }
             if (head->name == reciprocalName) {
                 auto value = evaluateFingerprint(
-                    outer->argument, carrierName);
+                    outer->argument, carrierName, sawApplicationAtomOut);
                 if (!value) return std::nullopt;
                 return fingerprintModularInverse(*value);
             }
@@ -140,7 +143,8 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
                     std::get_if<Constant>(&inner->function->node)) {
                 if (head->name == carrierName + ".reciprocal") {
                     auto value = evaluateFingerprint(
-                        inner->argument, carrierName);
+                        inner->argument, carrierName,
+                        sawApplicationAtomOut);
                     if (!value) return std::nullopt;
                     return fingerprintModularInverse(*value);
                 }
@@ -155,9 +159,11 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
                         std::get_if<Constant>(&a1->function->node)) {
                     if (head->name == carrierName + ".divide") {
                         auto numerator = evaluateFingerprint(
-                            a1->argument, carrierName);
+                            a1->argument, carrierName,
+                            sawApplicationAtomOut);
                         auto denominator = evaluateFingerprint(
-                            a2->argument, carrierName);
+                            a2->argument, carrierName,
+                            sawApplicationAtomOut);
                         if (!numerator || !denominator) return std::nullopt;
                         auto inverse =
                             fingerprintModularInverse(*denominator);
@@ -177,12 +183,39 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
         }
         ExpressionPointer successorInner;
         if (tryParseNaturalSuccessor(expression, successorInner)) {
-            auto value = evaluateFingerprint(successorInner, carrierName);
+            auto value = evaluateFingerprint(
+                successorInner, carrierName, sawApplicationAtomOut);
             if (!value) return std::nullopt;
             return fingerprintAdd(*value, uint64_t{1});
         }
     }
-    // Otherwise: opaque atom. Use the cached subtree hash mod p.
+    // Otherwise: opaque atom. Use the cached subtree hash mod p. A
+    // CONSTANT-headed application atomized here may merely be an unreduced
+    // definition application (`(a • x)(k)`), so record it — the diagnostic
+    // softens its verdict when the mismatch could be an atomization
+    // artifact. (A variable-headed application `x(k)` cannot δ-reduce, so
+    // it keeps the hard verdict.)
+    if (sawApplicationAtomOut
+        && std::holds_alternative<Application>(expression->node)) {
+        ExpressionPointer cursor = expression;
+        while (auto* app = std::get_if<Application>(&cursor->node)) {
+            cursor = app->function;
+        }
+        if (auto* headConstant = std::get_if<Constant>(&cursor->node)) {
+            // Only a TRANSPARENT definition head can hide ring structure
+            // behind a δ-step; variables, constructors, recursors, and
+            // opaque definitions are honest atoms and keep the hard
+            // verdict.
+            const Declaration* declaration =
+                environment_.lookup(headConstant->name);
+            auto* definition = declaration
+                ? std::get_if<Definition>(declaration) : nullptr;
+            if (definition && definition->opacity != Opacity::Opaque
+                && definition->body) {
+                *sawApplicationAtomOut = true;
+            }
+        }
+    }
     return expression->hash % kFingerprintModulus;
 }
 
@@ -193,10 +226,11 @@ std::string Elaborator::buildFingerprintDiagnostic(
     ExpressionPointer leftEndpoint,
     ExpressionPointer rightEndpoint,
     const std::string& carrierName) const {
-    auto leftValue =
-        evaluateFingerprint(leftEndpoint, carrierName);
-    auto rightValue =
-        evaluateFingerprint(rightEndpoint, carrierName);
+    bool sawApplicationAtom = false;
+    auto leftValue = evaluateFingerprint(
+        leftEndpoint, carrierName, &sawApplicationAtom);
+    auto rightValue = evaluateFingerprint(
+        rightEndpoint, carrierName, &sawApplicationAtom);
     if (!leftValue || !rightValue) {
         return "\n(fingerprint mod (2^64 - 59): division by zero "
                "during evaluation — either a denominator that "
@@ -209,6 +243,16 @@ std::string Elaborator::buildFingerprintDiagnostic(
              + " — the identity is almost certainly true; this "
                "looks like a tactic limitation, not a real "
                "mathematical mismatch)";
+    }
+    if (sawApplicationAtom) {
+        return "\n(fingerprint mod (2^64 - 59): LHS = "
+             + std::to_string(*leftValue) + ", RHS = "
+             + std::to_string(*rightValue)
+             + " — the sides differ as polynomials in their atoms; note "
+               "that a non-variable APPLICATION was treated as an opaque "
+               "atom, so if it reduces to ring operations the identity "
+               "may still hold — state the fact at the reduced spelling, "
+               "or close the step with `done by substituting <lemma>`)";
     }
     return "\n(fingerprint mod (2^64 - 59): LHS = "
          + std::to_string(*leftValue) + ", RHS = "
@@ -358,7 +402,10 @@ uint64_t Elaborator::evalRingMod(
         // At each level we also accept the outer carrier's named
         // zero/one constants (which the elaborator may produce in
         // place of the coercion application for literals 0 and 1).
-        {
+        // Wrapped as a lambda so the δ-expose recogniser below shares it.
+        auto embeddedLiteralValue =
+            [&](ExpressionPointer candidate)
+                -> std::optional<RingCoefficient> {
             // Pairs of (coercion fn name, outer carrier name) —
             // OUTERMOST FIRST.
             std::vector<std::pair<std::string, std::string>> outerChain;
@@ -372,37 +419,35 @@ uint64_t Elaborator::evalRingMod(
                               {"Integer.to_rational", "Rational"},
                               {"Natural.to_integer", "Integer"}};
             }
-            if (!outerChain.empty()) {
-                ExpressionPointer cursor = expression;
-                bool matched = true;
-                for (const auto& [coercion, outerCarrier] : outerChain) {
-                    // Check current level's zero/one named constants.
-                    if (auto* nameHead =
-                            std::get_if<Constant>(&cursor->node)) {
-                        if (nameHead->name == outerCarrier + ".zero") {
-                            return 0;
-                        }
-                        if (nameHead->name == outerCarrier + ".one") {
-                            return 1 % modulus;
-                        }
+            if (outerChain.empty()) return std::nullopt;
+            ExpressionPointer cursor = candidate;
+            for (const auto& [coercion, outerCarrier] : outerChain) {
+                // Check current level's zero/one named constants.
+                if (auto* nameHead =
+                        std::get_if<Constant>(&cursor->node)) {
+                    if (nameHead->name == outerCarrier + ".zero") {
+                        return RingCoefficient(0);
                     }
-                    auto* app =
-                        std::get_if<Application>(&cursor->node);
-                    if (!app) { matched = false; break; }
-                    auto* head =
-                        std::get_if<Constant>(&app->function->node);
-                    if (!head || head->name != coercion) {
-                        matched = false; break;
-                    }
-                    cursor = app->argument;
-                }
-                if (matched) {
-                    RingCoefficient value = 0;
-                    if (tryParseNaturalLiteral(cursor, value)) {
-                        return mpz_class(value % modulus).get_ui();
+                    if (nameHead->name == outerCarrier + ".one") {
+                        return RingCoefficient(1);
                     }
                 }
+                auto* app =
+                    std::get_if<Application>(&cursor->node);
+                if (!app) return std::nullopt;
+                auto* head =
+                    std::get_if<Constant>(&app->function->node);
+                if (!head || head->name != coercion) {
+                    return std::nullopt;
+                }
+                cursor = app->argument;
             }
+            RingCoefficient value = 0;
+            if (tryParseNaturalLiteral(cursor, value)) return value;
+            return std::nullopt;
+        };
+        if (auto literal = embeddedLiteralValue(expression)) {
+            return mpz_class(*literal % modulus).get_ui();
         }
         // Bare Natural literal / successor — mirrors the normaliser's
         // literal recognition on the Natural carrier.
@@ -417,6 +462,32 @@ uint64_t Elaborator::evalRingMod(
                     addName, multiplyName, negateName, subtractName,
                     zeroName, oneName, modulus);
                 return (inner + 1) % modulus;
+            }
+        }
+        // A definition application whose head δβ-unfolds to a ring
+        // operation — `(a • x)(k)` for `a · x(k)` — is not an atom: expose
+        // it and re-dispatch, mirroring the normaliser (Q5). Both sides of
+        // the equation expose identically, so atom identity stays aligned.
+        {
+            auto recognises = [&](ExpressionPointer candidate) -> bool {
+                ExpressionPointer left, right, innerOperand;
+                return matchRingZero(candidate, zeroName)
+                    || matchRingOne(candidate, oneName)
+                    || matchBinaryRingOp(candidate, addName, left, right)
+                    || matchBinaryRingOp(candidate, multiplyName,
+                                            left, right)
+                    || matchBinaryRingOp(candidate, subtractName,
+                                            left, right)
+                    || matchUnaryRingNegate(candidate, negateName,
+                                               innerOperand)
+                    || embeddedLiteralValue(candidate).has_value();
+            };
+            ExpressionPointer exposed =
+                ringDeltaExposeAtom(expression, recognises);
+            if (exposed) {
+                return evalRingMod(exposed, carrierName, addName,
+                    multiplyName, negateName, subtractName, zeroName,
+                    oneName, modulus);
             }
         }
         // Atom: use the cached bottom-up structural hash. Two
@@ -2547,6 +2618,75 @@ bool Elaborator::matchRingOne(ExpressionPointer expression,
             && structurePrefixMatches(args);
     }
 
+ExpressionPointer Elaborator::ringDeltaExposeAtom(
+        ExpressionPointer expression,
+        const std::function<bool(ExpressionPointer)>& recognises) {
+        ExpressionPointer cursor = expression;
+        for (int step = 0; step < 8; ++step) {
+            ExpressionPointer head;
+            std::vector<ExpressionPointer> args;
+            peelSpine(cursor, head, args);
+            ExpressionPointer body;
+            if (std::get_if<Lambda>(&head->node)) {
+                // A literal β-redex spine: contract below.
+                if (args.empty()) return nullptr;  // bare lambda, no redex
+                body = head;
+            } else if (auto* constant = std::get_if<Constant>(&head->node)) {
+                const Declaration* declaration =
+                    environment_.lookup(constant->name);
+                if (!declaration) return nullptr;
+                auto* definition = std::get_if<Definition>(declaration);
+                if (!definition) return nullptr;
+                if (definition->opacity == Opacity::Opaque) return nullptr;
+                if (definition->universeParameters.size()
+                        != constant->universeArguments.size()) {
+                    return nullptr;
+                }
+                body = definition->body;
+                if (!body) return nullptr;
+                if (!definition->universeParameters.empty()) {
+                    body = substituteUniverseLevels(
+                        body, definition->universeParameters,
+                        constant->universeArguments);
+                }
+            } else {
+                return nullptr;  // variable / recursor head: a real atom
+            }
+            // β-apply as many spine arguments as the body's leading
+            // lambdas absorb; re-apply the rest (a point-free body keeps
+            // its trailing arguments as applications).
+            size_t applied = 0;
+            while (applied < args.size()) {
+                auto* lambda = std::get_if<Lambda>(&body->node);
+                if (!lambda) break;
+                body = substitute(lambda->body, 0, args[applied]);
+                ++applied;
+            }
+            for (; applied < args.size(); ++applied) {
+                body = makeApplication(body, args[applied]);
+            }
+            cursor = body;
+            if (recognises(cursor)) return cursor;
+        }
+        return nullptr;
+    }
+
+bool Elaborator::ringOperationShapeRecognised(
+        ExpressionPointer expression, RingNormalisationContext& context) {
+        ExpressionPointer left, right, inner;
+        RingCoefficient literalValue = 0;
+        return matchRingZero(expression, context.zeroName)
+            || matchRingOne(expression, context.oneName)
+            || matchBinaryRingOp(expression, context.addName, left, right)
+            || matchBinaryRingOp(expression, context.multiplyName,
+                                    left, right)
+            || matchBinaryRingOp(expression, context.subtractName,
+                                    left, right)
+            || matchUnaryRingNegate(expression, context.negateName, inner)
+            || tryParseCarrierEmbeddedNaturalLiteral(
+                   expression, context, literalValue);
+    }
+
 bool Elaborator::tryParseNaturalLiteral(
         ExpressionPointer expression, RingCoefficient& value) {
         unsigned long count = 0;
@@ -2799,6 +2939,20 @@ Elaborator::RingPolynomial Elaborator::normaliseToRingPolynomial(
         // (the proof argument is discarded by divide's body). This lets
         // `linear_combination` discharge field goals like `ε/2 + ε/2 = ε`
         // once the matching `b · reciprocal(b) = 1` fact is supplied.
+        // A definition application whose head δβ-unfolds to a ring
+        // operation — `(a • x)(k)` for `a · x(k)` — is not an atom either:
+        // expose it and re-dispatch (Q5). proveEqualsCanonical mirrors this
+        // with a defeq bridge, so polynomial and proof stay aligned.
+        {
+            ExpressionPointer exposed = ringDeltaExposeAtom(
+                expression,
+                [&](ExpressionPointer candidate) {
+                    return ringOperationShapeRecognised(candidate, context);
+                });
+            if (exposed) {
+                return normaliseToRingPolynomial(exposed, context);
+            }
+        }
         // Otherwise: an opaque atom. (Field division `<carrier>.divide` is
         // unfolded up front in elaborateRingByNormalisation, so it never
         // reaches here as an atom.)
@@ -3351,6 +3505,30 @@ ExpressionPointer Elaborator::proveEqualsCanonical_impl(
                     universeLevel, carrierType,
                     expression, unfolded, canonicalKernel,
                     reflBridge, unfoldProof);
+            }
+        }
+        // A definition application whose head δβ-unfolds to a ring
+        // operation is not an atom (Q5) — prove the EXPOSED form equals
+        // canonical, and bridge `expression = exposed` by reflexivity
+        // (they are definitionally equal, so the kernel accepts the
+        // reflexivity proof at the mixed-endpoint type).
+        {
+            ExpressionPointer exposed = ringDeltaExposeAtom(
+                expression,
+                [&](ExpressionPointer candidate) {
+                    return ringOperationShapeRecognised(candidate, context);
+                });
+            if (exposed) {
+                ExpressionPointer exposedProof = proveEqualsCanonical(
+                    exposed, context, axiomNames, polynomialOut);
+                ExpressionPointer exposedCanonical =
+                    buildCanonicalPolynomial(polynomialOut, context);
+                ExpressionPointer defeqBridge = buildReflexivity(
+                    universeLevel, carrierType, expression);
+                return buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression, exposed, exposedCanonical,
+                    defeqBridge, exposedProof);
             }
         }
         // Otherwise: an opaque atom. Its canonical kernel is itself.

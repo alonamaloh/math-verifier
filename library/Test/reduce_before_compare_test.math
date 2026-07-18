@@ -1,0 +1,187 @@
+-- Locks for the compare-without-reducing quirk family (QUIRK.md Q3/Q5/Q6):
+-- the diff bridge, `substituting`, and `ring` must reduce (δ/β, one head
+-- step at a time) before deciding that a term is opaque. Each theorem here
+-- is a shape that once failed — or was filed as failing — because a
+-- subsystem compared heads without unfolding first.
+--
+--   Q3: a wrapper-definition head on a chain endpoint (`quadraticForm` for
+--       `innerProduct(x, A·x)`) hid the congruence site from the cited-
+--       lemma diff walk.
+--   Q5: `ring` atomized the definition application `(a • x)(k)` instead of
+--       reducing it to `a · x(k)`, then misreported the identity as FALSE.
+--   Q6: `by substituting <quantified-lemma>` (and the bare `by` diff path)
+--       under `CommutativeRing.productOver` — list-argument rewrite and
+--       whole-application reindex, top-level and under a product.
+--   Q7: `substituting` on a chain whose endpoints spell the terms through
+--       proof-local `let`s (the heavier lambda-under-`List.map` shape is
+--       exercised live by `Permutation.pairOrient_extend_block`, which
+--       cites `pairOrient_extend_row` against a `let`-spelled goal).
+
+module Test.reduce_before_compare_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Integer.basics
+import Set.finite
+import Lists.list
+import Lists.map
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.commutative_ring_algebra
+import Algebra.commutative_ring_aggregation
+import Algebra.matrix
+import Algebra.matrix_ring
+import Algebra.matrix_transpose
+import Algebra.matrix_vector
+import Algebra.matrix_submatrix
+import Algebra.determinant
+import Algebra.determinant_identity
+import Algebra.determinant_transpose
+import Algebra.determinant_multiplicative
+import Algebra.alternating_collapse
+import Algebra.determinant_row_permutation
+import Algebra.adjugate
+import Algebra.matrix_inverse
+import Algebra.quadratic_form
+
+-- Q6 shape A: rewrite in the LIST argument of productOver via a quantified
+-- lemma, buried under an outer multiplication.
+theorem Probe.q6_list_arg_under_product {r : CommutativeRing} {m : ℕ}
+        (M : Matrix(r, 1 + m, 1 + m)) (c : CommutativeRing.carrier(r))
+        : c * CommutativeRing.productOver(
+                  (i : NaturalsBelow(1 + m)) ↦ M(i, i), NaturalsBelow.enumerate(1 + m))
+          = c * CommutativeRing.productOver(
+                  (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+                  List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                      List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))) := {
+  c * CommutativeRing.productOver(
+          (i : NaturalsBelow(1 + m)) ↦ M(i, i), NaturalsBelow.enumerate(1 + m))
+     = c * CommutativeRing.productOver(
+           (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+           List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+               List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
+           by substituting NaturalsBelow.enumerate_one_plus;
+  done
+}
+
+-- Q6 shape B: same rewrite justified by a bare `by <quantified-lemma>`
+-- (diff-inferred congruence path instead of `substituting`).
+theorem Probe.q6_list_arg_bare_by {r : CommutativeRing} {m : ℕ}
+        (M : Matrix(r, 1 + m, 1 + m)) (c : CommutativeRing.carrier(r))
+        : c * CommutativeRing.productOver(
+                  (i : NaturalsBelow(1 + m)) ↦ M(i, i), NaturalsBelow.enumerate(1 + m))
+          = c * CommutativeRing.productOver(
+                  (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+                  List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                      List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))) := {
+  c * CommutativeRing.productOver(
+          (i : NaturalsBelow(1 + m)) ↦ M(i, i), NaturalsBelow.enumerate(1 + m))
+     = c * CommutativeRing.productOver(
+           (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+           List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+               List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
+           by NaturalsBelow.enumerate_one_plus;
+  done
+}
+
+-- Q6 shape C: the whole-application reindex — term AND list both change
+-- (`productOver_map`), via `substituting`.
+theorem Probe.q6_reindex_substituting {r : CommutativeRing} {m : ℕ}
+        (M : Matrix(r, 1 + m, 1 + m)) (tau : NaturalsBelow(m) → NaturalsBelow(m))
+        : CommutativeRing.productOver(
+              (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+              List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+          = CommutativeRing.productOver(
+              (i : NaturalsBelow(m)) ↦ M(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, i)),
+              NaturalsBelow.enumerate(m)) := {
+  CommutativeRing.productOver(
+        (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+        List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+     = CommutativeRing.productOver(
+           (i : NaturalsBelow(m)) ↦ M(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, i)),
+           NaturalsBelow.enumerate(m))
+           by substituting CommutativeRing.productOver_map;
+  done
+}
+
+-- Q3: citing a lemma that rewrites UNDER the wrapped spelling, from a
+-- wrapper-headed chain endpoint (`quadraticForm` δ-unfolds to
+-- `innerProduct(x, _ · x)`), without an explicit defeq opening step.
+theorem Probe.q3_wrapper_head {r : CommutativeRing} {n k : ℕ}
+        (A : Matrix(r, n, n)) (M : Matrix(r, n, k)) (x : RingVector(r, k))
+        : Matrix.quadraticForm(Mᵀ * A * M, x)
+          = RingVector.innerProduct(x, (Mᵀ * A) · (M · x)) := {
+  Matrix.quadraticForm(Mᵀ * A * M, x)
+     = RingVector.innerProduct(x, (Mᵀ * A) · (M · x)) by Matrix.applyVector_multiply;
+  done
+}
+
+-- Q3, multi-step calc form: the wrapper-headed endpoint opens a chain that
+-- cites the under-wrapper lemma directly on the first step.
+theorem Probe.q3_wrapper_head_calc {r : CommutativeRing} {n k : ℕ}
+        (A : Matrix(r, n, n)) (M : Matrix(r, n, k)) (x : RingVector(r, k))
+        : Matrix.quadraticForm(Mᵀ * A * M, x) = Matrix.quadraticForm(A, M · x) :=
+  Matrix.quadraticForm(Mᵀ * A * M, x)
+     = RingVector.innerProduct(x, (Mᵀ * A) · (M · x))      by Matrix.applyVector_multiply
+     = RingVector.innerProduct(x, Mᵀ · (A · (M · x)))      by Matrix.applyVector_multiply
+     = RingVector.innerProduct(Mᵀ · (A · (M · x)), x)      by RingVector.innerProduct_symmetric
+     = RingVector.innerProduct(A · (M · x), M · x)         by Matrix.transpose_adjoint
+     = RingVector.innerProduct(M · x, A · (M · x))         by RingVector.innerProduct_symmetric
+     = Matrix.quadraticForm(A, M · x)
+
+-- Q5: `ring` on a goal containing the unreduced definition application
+-- `(a • x)(k)` (β/δ-reduces to `a * x(k)`).
+theorem Probe.q5_ring_definition_application {r : CommutativeRing} {rows columns : ℕ}
+        (A : Matrix(r, rows, columns)) (a : CommutativeRing.carrier(r))
+        (x : RingVector(r, columns)) (i : NaturalsBelow(rows)) (k : NaturalsBelow(columns))
+        : A(i, k) * (a • x)(k) = a * (A(i, k) * x(k)) :=
+  ring
+
+-- Q7 shape: the chain spells the aggregation's term slot through a
+-- proof-local `let`; the quantified `substituting` citation must still
+-- find its instance in the (ζ-unfoldable) goal, and the trailing `done`
+-- must bridge the `let` spelling back to the statement's literal lambda.
+theorem Probe.q7_let_spelled_chain {r : CommutativeRing} {m : ℕ}
+        (M : Matrix(r, 1 + m, 1 + m))
+        : CommutativeRing.productOver(
+              (i : NaturalsBelow(1 + m)) ↦ M(i, i), NaturalsBelow.enumerate(1 + m))
+          = CommutativeRing.productOver(
+              (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+              List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                  List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))) := {
+  let diagonalEntry : NaturalsBelow(1 + m) → CommutativeRing.carrier(r) :=
+      (i : NaturalsBelow(1 + m)) ↦ M(i, i);
+  CommutativeRing.productOver(diagonalEntry, NaturalsBelow.enumerate(1 + m))
+     = CommutativeRing.productOver(diagonalEntry,
+           List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+               List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
+           by substituting NaturalsBelow.enumerate_one_plus;
+  done
+}
+
+-- Q6 shape D: the reindex buried under an outer multiplication, forcing a
+-- residual after the rewrite.
+theorem Probe.q6_reindex_under_product {r : CommutativeRing} {m : ℕ}
+        (M : Matrix(r, 1 + m, 1 + m)) (c : CommutativeRing.carrier(r))
+        : c * CommutativeRing.productOver(
+                  (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+                  List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+          = c * CommutativeRing.productOver(
+                  (i : NaturalsBelow(m)) ↦
+                      M(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, i)),
+                  NaturalsBelow.enumerate(m)) := {
+  c * CommutativeRing.productOver(
+          (i : NaturalsBelow(1 + m)) ↦ M(i, i),
+          List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
+     = c * CommutativeRing.productOver(
+           (i : NaturalsBelow(m)) ↦
+               M(NaturalsBelow.inclusion(m, i), NaturalsBelow.inclusion(m, i)),
+           NaturalsBelow.enumerate(m))
+           by substituting CommutativeRing.productOver_map;
+  done
+}

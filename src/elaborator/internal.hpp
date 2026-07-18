@@ -3202,6 +3202,19 @@ private:
         const std::string& oneName,
         uint64_t modulus);
 
+    // Q5 (compare-without-reducing family): a definition application whose
+    // head δβ-unfolds to a ring operation — `RingVector.scale(r, n, a, x)(k)`
+    // is `a · x(k)` — must not be fingerprinted/normalised as an opaque
+    // atom. Bounded expose: up to 8 head β-contractions / one-step δ-unfolds;
+    // returns the first form `recognises` accepts (the caller then recurses
+    // on it — it is definitionally equal to `expression`), or nullptr to
+    // atomize the ORIGINAL spelling as before. Opaque definitions, variable
+    // heads, and recursor heads stop the walk.
+    ExpressionPointer ringDeltaExposeAtom(
+        ExpressionPointer expression,
+        const std::function<bool(ExpressionPointer)>& recognises);
+
+
     // Returns true if both sides MIGHT be equal as polynomials (the
     // Z/p eval doesn't rule it out); false if Z/p says ring will fail.
     // Uses a Mersenne prime that fits in uint64_t.
@@ -3917,6 +3930,13 @@ private:
     RingPolynomial normaliseToRingPolynomial(
         ExpressionPointer expression, RingNormalisationContext& context);
 
+    // Shared recogniser for ringDeltaExposeAtom at normalisation/proof
+    // sites: does `expression` present a shape the ring normaliser consumes
+    // structurally (a ring operation at this context's carrier, or an
+    // embedded numeral literal)?
+    bool ringOperationShapeRecognised(
+        ExpressionPointer expression, RingNormalisationContext& context);
+
     // Build the kernel expression for `1 + 1 + ... + 1` with N copies
     // of `<context.oneName>`, left-associated. N must be >= 1. Only
     // used for carriers WITHOUT literal coefficients (bundled rings),
@@ -4472,9 +4492,14 @@ private:
     uint64_t fingerprintModularPower(
         uint64_t base, uint64_t exponent) const;
     std::optional<uint64_t> fingerprintModularInverse(uint64_t value) const;
+    // `sawApplicationAtomOut` (optional): set to true when the walk
+    // atomized a subterm that is an APPLICATION — a shape that may merely
+    // be an unreduced definition application, so a fingerprint mismatch is
+    // then reported with softened wording instead of a flat "FALSE".
     std::optional<uint64_t> evaluateFingerprint(
         ExpressionPointer expression,
-        const std::string& carrierName) const;
+        const std::string& carrierName,
+        bool* sawApplicationAtomOut = nullptr) const;
     std::string buildFingerprintDiagnostic(
         ExpressionPointer leftEndpoint,
         ExpressionPointer rightEndpoint,

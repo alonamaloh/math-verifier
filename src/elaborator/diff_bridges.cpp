@@ -578,6 +578,13 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
             zetaUnfoldLetBinders(previousKernel, localBinders);
         ExpressionPointer toTerm =
             zetaUnfoldLetBinders(nextKernel, localBinders);
+        // δ-retry budget for the descent below: when neither structural
+        // equality nor the defeq tie-break can localise the diff, the sides
+        // are re-examined after one WHNF step (unfolds a wrapper definition
+        // head — `Matrix.quadraticForm(…)` → `RingVector.innerProduct(…)` —
+        // so the walk can reach the differing subterm the lemma's equation
+        // actually lives at). Bounded so alternating reducts can't loop.
+        int deltaRetriesRemaining = 8;
         while (true) {
             // Strongest attempt first: prove THIS diff level's subterm
             // equality by citing the lemma through the same goal-driven
@@ -710,10 +717,57 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
                     applied, appliedType, line, column);
                 if (wrapped) return wrapped;
             }
+            // The walk could not localise the diff at this level (or the
+            // sides aren't applications at all): δ-unfold a wrapper HEAD one
+            // step and retry, symmetric to the ζ-unfold the endpoints
+            // already got — `Matrix.quadraticForm(…)` otherwise hides its
+            // `RingVector.innerProduct(…)` body, and with it the congruence
+            // site, from the whole descent. ONE step at a time (a full WHNF
+            // would blow past the altitude the cited lemma is spelled at,
+            // down to `List.product` internals under a binder), preferring
+            // the single unfold that aligns the two sides' heads. Only fires
+            // on the give-up path, so ordinary descents pay nothing.
+            auto deltaRetry = [&]() -> bool {
+                if (deltaRetriesRemaining <= 0) return false;
+                auto headName = [](ExpressionPointer term) -> std::string {
+                    ExpressionPointer cursor = term;
+                    while (auto* app =
+                               std::get_if<Application>(&cursor->node)) {
+                        cursor = app->function;
+                    }
+                    auto* constant = std::get_if<Constant>(&cursor->node);
+                    return constant ? constant->name : std::string();
+                };
+                ExpressionPointer fromUnfolded =
+                    unfoldHeadConstantOneStep(fromTerm);
+                ExpressionPointer toUnfolded =
+                    unfoldHeadConstantOneStep(toTerm);
+                if (!fromUnfolded && !toUnfolded) return false;
+                --deltaRetriesRemaining;
+                if (fromUnfolded && toUnfolded) {
+                    if (headName(fromUnfolded) == headName(toTerm)) {
+                        fromTerm = fromUnfolded;
+                        return true;
+                    }
+                    if (headName(toUnfolded) == headName(fromTerm)) {
+                        toTerm = toUnfolded;
+                        return true;
+                    }
+                    fromTerm = fromUnfolded;
+                    toTerm = toUnfolded;
+                    return true;
+                }
+                if (fromUnfolded) fromTerm = fromUnfolded;
+                else toTerm = toUnfolded;
+                return true;
+            };
             // Not here: peel one matching component and retry deeper.
             auto* leftApp = std::get_if<Application>(&fromTerm->node);
             auto* rightApp = std::get_if<Application>(&toTerm->node);
-            if (!leftApp || !rightApp) break;
+            if (!leftApp || !rightApp) {
+                if (deltaRetry()) continue;
+                break;
+            }
             // Structural equality is the primary signal: the SHARED sibling
             // the diff rides through is the component equal on both sides, so
             // we descend into the OTHER one. It stays primary because a
@@ -780,6 +834,7 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
                     continue;
                 }
             }
+            if (deltaRetry()) continue;
             break;
         }
         return nullptr;

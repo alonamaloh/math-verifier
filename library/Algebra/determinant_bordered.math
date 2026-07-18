@@ -169,11 +169,6 @@ theorem Matrix.determinant_bordered_top_row {r : CommutativeRing} {m : ℕ}
      = CommutativeRing.sumOver(leibnizTerm, extendedPermutations)
      by CommutativeRing.sumOver_restrict_support as sumRestricts;
 
-  NaturalsBelow.enumerate(1 + m)
-     = List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
-           List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
-     by NaturalsBelow.enumerate_one_plus as enumerationSplits;
-
   -- An extension's term is the block term times the corner.
   ∀ (tau : Permutation(m)).
       leibnizTerm(Permutation.extend(tau))
@@ -186,15 +181,6 @@ theorem Matrix.determinant_bordered_top_row {r : CommutativeRing} {m : ℕ}
       by (tau : Permutation(m)) ↦ {
           Permutation.extend(tau)(NaturalsBelow.top(m)) = NaturalsBelow.top(m)
               by Permutation.apply_extend_top as topFixed;
-          CommutativeRing.productOver(
-                (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
-                List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))
-             = CommutativeRing.productOver(
-                   (i : NaturalsBelow(m)) ↦
-                       M(NaturalsBelow.inclusion(m, i),
-                         Permutation.extend(tau)(NaturalsBelow.inclusion(m, i))),
-                   NaturalsBelow.enumerate(m))
-              by CommutativeRing.productOver_map as productReindexes;
           CommutativeRing.productOver(
                 (i : NaturalsBelow(m)) ↦
                     M(NaturalsBelow.inclusion(m, i),
@@ -222,7 +208,7 @@ theorem Matrix.determinant_bordered_top_row {r : CommutativeRing} {m : ℕ}
                    (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
                    List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
                        List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))
-                   by substituting enumerationSplits
+                   by substituting NaturalsBelow.enumerate_one_plus
              = M(NaturalsBelow.top(m), Permutation.extend(tau)(NaturalsBelow.top(m)))
                * CommutativeRing.productOver(
                      (i : NaturalsBelow(1 + m)) ↦ M(i, Permutation.extend(tau)(i)),
@@ -238,7 +224,7 @@ theorem Matrix.determinant_bordered_top_row {r : CommutativeRing} {m : ℕ}
                          M(NaturalsBelow.inclusion(m, i),
                            Permutation.extend(tau)(NaturalsBelow.inclusion(m, i))),
                      NaturalsBelow.enumerate(m))
-                   by substituting productReindexes
+                   by substituting CommutativeRing.productOver_map
              = M(NaturalsBelow.top(m), NaturalsBelow.top(m))
                * CommutativeRing.productOver(
                      (i : NaturalsBelow(m)) ↦
