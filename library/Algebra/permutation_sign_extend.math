@@ -1,0 +1,416 @@
+-- Algebra/permutation_sign_extend.math
+--
+-- Extending a permutation by a fixed top index preserves its sign. This is
+-- the size-crossing bridge of the determinant theory: every lemma relating
+-- an (1+m)×(1+m) determinant to an m×m one (bordered determinants, minor
+-- expansions, Cramer) restricts the Leibniz sum to top-fixing permutations
+-- and pulls it back along `Permutation.extend` — and the pullback is
+-- sign-faithful because the ordered pairs of 1 + m split into the pairs
+-- below the boundary (where `extend` acts as the original permutation on
+-- values) and the pairs led into the top index (which `extend` keeps
+-- value-ordered, orientation +1).
+
+module Algebra.permutation_sign_extend
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.classical_decidable
+import Integer.basics
+import Integer.algebra
+import Integer.ring
+import Algebra.integer_domain
+import Logic.product
+import Lists.list
+import Lists.map
+import Lists.append
+import Lists.filter
+import Lists.permutation
+import Lists.distinct
+import Lists.cartesian
+import Set.finite
+import Set.finite_pigeonhole
+import Algebra.finite_permutation
+import Algebra.permutation_enumeration
+import Algebra.permutation_sign
+
+-- The integer-list instance of the product-over-append split.
+theorem List.integer_product_append (first second : List(ℤ))
+        : List.product(Integer.multiply, Integer.one, List.append(first, second))
+          = List.product(Integer.multiply, Integer.one, first)
+            * List.product(Integer.multiply, Integer.one, second) := {
+  ∀ (a b c : ℤ). a * b * c = a * (b * c) by (a b c : ℤ) ↦ ring;
+  ∀ (a : ℤ). Integer.one * a = a by (a : ℤ) ↦ ring;
+  done by List.product_append
+}
+
+-- ----------------------------------------------------------------------
+-- One row of the ordered-pair grid, below the boundary: against a fixed
+-- first index j, the orientations of `extend τ` on the widened pairs are
+-- the orientations of τ on the plain pairs — `extend` acts as τ under the
+-- inclusion, and orientation only reads values.
+
+theorem Permutation.pairOrient_extend_row {m : ℕ} (tau : Permutation(m)) (j : NaturalsBelow(m))
+        (items : List(NaturalsBelow(m)))
+        : List.map(Permutation.pairOrient(Permutation.extend(tau)),
+              List.filter(Permutation.indexPairBelow,
+                  List.map((i : NaturalsBelow(m)) ↦
+                          Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.inclusion(m, i)),
+                      items)))
+          = List.map(Permutation.pairOrient(tau),
+              List.filter(Permutation.indexPairBelow,
+                  List.map((i : NaturalsBelow(m)) ↦ Product.make(j, i), items))) := {
+  let ambientPair : NaturalsBelow(m) → Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)) :=
+      (i : NaturalsBelow(m)) ↦
+          Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.inclusion(m, i));
+  let plainPair : NaturalsBelow(m) → Pair(NaturalsBelow(m), NaturalsBelow(m)) :=
+      (i : NaturalsBelow(m)) ↦ Product.make(j, i);
+  let survivors : List(NaturalsBelow(m)) := List.filter(
+      (i : NaturalsBelow(m)) ↦ Permutation.indexPairBelow(ambientPair(i)), items);
+  ∀ (i : NaturalsBelow(m)). i ∈ survivors
+      → Permutation.pairOrient(Permutation.extend(tau))(ambientPair(i))
+        = Permutation.pairOrient(tau)(plainPair(i))
+      by (i : NaturalsBelow(m)) (iSurvives : i ∈ survivors) ↦ {
+          Permutation.pairOrient(Permutation.extend(tau))(ambientPair(i))
+             = Permutation.orient(
+                   Permutation.extend(tau)(NaturalsBelow.inclusion(m, j)),
+                   Permutation.extend(tau)(NaturalsBelow.inclusion(m, i)))
+             = Permutation.orient(
+                   NaturalsBelow.inclusion(m, tau(j)), NaturalsBelow.inclusion(m, tau(i)))
+                   by substituting Permutation.apply_extend_inclusion
+             = Permutation.pairOrient(tau)(plainPair(i));
+          done
+        } as orientationsAgree;
+  List.map(Permutation.pairOrient(Permutation.extend(tau)),
+      List.filter(Permutation.indexPairBelow, List.map(ambientPair, items)))
+     = List.map(Permutation.pairOrient(Permutation.extend(tau)), List.map(ambientPair, survivors))
+           by substituting List.filter_map
+     = List.map((i : NaturalsBelow(m)) ↦
+               Permutation.pairOrient(Permutation.extend(tau))(ambientPair(i)), survivors)
+           by substituting List.map_map
+     = List.map((i : NaturalsBelow(m)) ↦ Permutation.pairOrient(tau)(plainPair(i)), survivors)
+           by List.map_congruence_on(agree := orientationsAgree)
+     = List.map(Permutation.pairOrient(tau), List.map(plainPair, survivors))
+           by substituting List.map_map
+     = List.map(Permutation.pairOrient(tau), List.map(plainPair,
+           List.filter((i : NaturalsBelow(m)) ↦ Permutation.indexPairBelow(plainPair(i)), items)))
+     = List.map(Permutation.pairOrient(tau),
+           List.filter(Permutation.indexPairBelow, List.map(plainPair, items)))
+           by substituting List.filter_map;
+  done
+}
+
+-- ----------------------------------------------------------------------
+-- The grid of ordered pairs whose first index lies below the boundary,
+-- row by row: the widened orientation product equals the plain one. Each
+-- row contributes its boundary pair (incl j, top) — kept by the filter but
+-- oriented +1 — and its below-boundary pairs, handled by the row lemma.
+
+theorem Permutation.pairOrient_extend_block {m : ℕ} (tau : Permutation(m))
+        (rows : List(NaturalsBelow(m)))
+        : List.product(Integer.multiply, Integer.one,
+              List.map(Permutation.pairOrient(Permutation.extend(tau)),
+                  List.filter(Permutation.indexPairBelow,
+                      List.cartesianProduct(
+                          List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                              List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))),
+                          List.map(NaturalsBelow.inclusion(m), rows)))))
+          = List.product(Integer.multiply, Integer.one,
+              List.map(Permutation.pairOrient(tau),
+                  List.filter(Permutation.indexPairBelow,
+                      List.cartesianProduct(NaturalsBelow.enumerate(m), rows)))) :=
+  by induction on rows with IH {
+    case List.empty: done
+    case List.prepend(j, rest): {
+        let wideIndices : List(NaturalsBelow(1 + m)) :=
+            List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+                List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)));
+        let ambientPair : NaturalsBelow(m) → Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)) :=
+            (i : NaturalsBelow(m)) ↦
+                Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.inclusion(m, i));
+        let plainPair : NaturalsBelow(m) → Pair(NaturalsBelow(m), NaturalsBelow(m)) :=
+            (i : NaturalsBelow(m)) ↦ Product.make(j, i);
+        let wideOrient : Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)) → ℤ :=
+            Permutation.pairOrient(Permutation.extend(tau));
+
+        -- The boundary pair of this row survives the filter and orients +1.
+        NaturalsBelow.value(j) < m by NaturalsBelow.below;
+        Permutation.indexPairBelow(
+            Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)));
+        List.filter(Permutation.indexPairBelow,
+            List.prepend(Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)),
+                Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)),
+                List.map(ambientPair, NaturalsBelow.enumerate(m))))
+           = List.prepend(Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)),
+                 Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)),
+                 List.filter(Permutation.indexPairBelow,
+                     List.map(ambientPair, NaturalsBelow.enumerate(m))))
+           by List.filter_prepend_positive as boundaryPairKept;
+        NaturalsBelow.value(tau(j)) < m by NaturalsBelow.below;
+        wideOrient(Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)))
+           = Permutation.orient(
+                 Permutation.extend(tau)(NaturalsBelow.inclusion(m, j)),
+                 Permutation.extend(tau)(NaturalsBelow.top(m)))
+           = Permutation.orient(
+                 NaturalsBelow.inclusion(m, tau(j)),
+                 Permutation.extend(tau)(NaturalsBelow.top(m)))
+                 by substituting Permutation.apply_extend_inclusion
+           = Permutation.orient(NaturalsBelow.inclusion(m, tau(j)), NaturalsBelow.top(m))
+                 by substituting Permutation.apply_extend_top
+           = (1 : ℤ)
+                 by Permutation.orient_forward
+           as boundaryOrientOne;
+
+        -- This row of the widened grid collapses to the plain row.
+        List.product(Integer.multiply, Integer.one,
+            List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                List.map((b : NaturalsBelow(1 + m)) ↦
+                        Product.make(NaturalsBelow.inclusion(m, j), b), wideIndices))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                     List.prepend(Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)),
+                         Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)),
+                         List.map((b : NaturalsBelow(1 + m)) ↦
+                                 Product.make(NaturalsBelow.inclusion(m, j), b),
+                             List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                     List.prepend(Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)),
+                         Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)),
+                         List.map(ambientPair, NaturalsBelow.enumerate(m))))))
+                 by substituting List.map_map
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient,
+                     List.prepend(Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)),
+                         Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)),
+                         List.filter(Permutation.indexPairBelow,
+                             List.map(ambientPair, NaturalsBelow.enumerate(m))))))
+                 by substituting boundaryPairKept
+           = wideOrient(Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.top(m)))
+             * List.product(Integer.multiply, Integer.one,
+                   List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                       List.map(ambientPair, NaturalsBelow.enumerate(m)))))
+           = (1 : ℤ)
+             * List.product(Integer.multiply, Integer.one,
+                   List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                       List.map(ambientPair, NaturalsBelow.enumerate(m)))))
+                 by substituting boundaryOrientOne
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                     List.map(ambientPair, NaturalsBelow.enumerate(m)))))
+                 by Integer.one_multiply_left
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(Permutation.extend(tau)),
+                     List.filter(Permutation.indexPairBelow,
+                         List.map((i : NaturalsBelow(m)) ↦
+                                 Product.make(NaturalsBelow.inclusion(m, j), NaturalsBelow.inclusion(m, i)),
+                             NaturalsBelow.enumerate(m)))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(tau),
+                     List.filter(Permutation.indexPairBelow,
+                         List.map((i : NaturalsBelow(m)) ↦ Product.make(j, i),
+                             NaturalsBelow.enumerate(m)))))
+                 by substituting Permutation.pairOrient_extend_row
+           as rowCollapses;
+
+        -- Split off this row on the widened side …
+        List.product(Integer.multiply, Integer.one,
+            List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                List.cartesianProduct(wideIndices,
+                    List.map(NaturalsBelow.inclusion(m), List.prepend(NaturalsBelow(m), j, rest))))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                     List.append(
+                         List.map((b : NaturalsBelow(1 + m)) ↦
+                                 Product.make(NaturalsBelow.inclusion(m, j), b), wideIndices),
+                         List.cartesianProduct(wideIndices,
+                             List.map(NaturalsBelow.inclusion(m), rest))))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient,
+                     List.append(
+                         List.filter(Permutation.indexPairBelow,
+                             List.map((b : NaturalsBelow(1 + m)) ↦
+                                     Product.make(NaturalsBelow.inclusion(m, j), b), wideIndices)),
+                         List.filter(Permutation.indexPairBelow,
+                             List.cartesianProduct(wideIndices,
+                                 List.map(NaturalsBelow.inclusion(m), rest))))))
+                 by substituting List.filter_append
+           = List.product(Integer.multiply, Integer.one,
+                 List.append(
+                     List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                         List.map((b : NaturalsBelow(1 + m)) ↦
+                                 Product.make(NaturalsBelow.inclusion(m, j), b), wideIndices))),
+                     List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                         List.cartesianProduct(wideIndices,
+                             List.map(NaturalsBelow.inclusion(m), rest))))))
+                 by substituting List.map_append
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                     List.map((b : NaturalsBelow(1 + m)) ↦
+                             Product.make(NaturalsBelow.inclusion(m, j), b), wideIndices))))
+             * List.product(Integer.multiply, Integer.one,
+                   List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                       List.cartesianProduct(wideIndices,
+                           List.map(NaturalsBelow.inclusion(m), rest)))))
+                 by List.integer_product_append
+           as widenedSplits;
+
+        -- … and on the plain side.
+        List.product(Integer.multiply, Integer.one,
+            List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                List.cartesianProduct(NaturalsBelow.enumerate(m),
+                    List.prepend(NaturalsBelow(m), j, rest)))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                     List.append(
+                         List.map(plainPair, NaturalsBelow.enumerate(m)),
+                         List.cartesianProduct(NaturalsBelow.enumerate(m), rest)))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(tau),
+                     List.append(
+                         List.filter(Permutation.indexPairBelow,
+                             List.map(plainPair, NaturalsBelow.enumerate(m))),
+                         List.filter(Permutation.indexPairBelow,
+                             List.cartesianProduct(NaturalsBelow.enumerate(m), rest)))))
+                 by substituting List.filter_append
+           = List.product(Integer.multiply, Integer.one,
+                 List.append(
+                     List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                         List.map(plainPair, NaturalsBelow.enumerate(m)))),
+                     List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                         List.cartesianProduct(NaturalsBelow.enumerate(m), rest)))))
+                 by substituting List.map_append
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                     List.map(plainPair, NaturalsBelow.enumerate(m)))))
+             * List.product(Integer.multiply, Integer.one,
+                   List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                       List.cartesianProduct(NaturalsBelow.enumerate(m), rest))))
+                 by List.integer_product_append
+           as plainSplits;
+
+        List.product(Integer.multiply, Integer.one,
+            List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                List.cartesianProduct(wideIndices,
+                    List.map(NaturalsBelow.inclusion(m), List.prepend(NaturalsBelow(m), j, rest))))))
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                     List.map((b : NaturalsBelow(1 + m)) ↦
+                             Product.make(NaturalsBelow.inclusion(m, j), b), wideIndices))))
+             * List.product(Integer.multiply, Integer.one,
+                   List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                       List.cartesianProduct(wideIndices,
+                           List.map(NaturalsBelow.inclusion(m), rest)))))
+                 by widenedSplits
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                     List.map(plainPair, NaturalsBelow.enumerate(m)))))
+             * List.product(Integer.multiply, Integer.one,
+                   List.map(wideOrient, List.filter(Permutation.indexPairBelow,
+                       List.cartesianProduct(wideIndices,
+                           List.map(NaturalsBelow.inclusion(m), rest)))))
+                 by substituting rowCollapses
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                     List.map(plainPair, NaturalsBelow.enumerate(m)))))
+             * List.product(Integer.multiply, Integer.one,
+                   List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                       List.cartesianProduct(NaturalsBelow.enumerate(m), rest))))
+                 by substituting IH
+           = List.product(Integer.multiply, Integer.one,
+                 List.map(Permutation.pairOrient(tau), List.filter(Permutation.indexPairBelow,
+                     List.cartesianProduct(NaturalsBelow.enumerate(m),
+                         List.prepend(NaturalsBelow(m), j, rest)))))
+                 by plainSplits;
+        done
+      }
+  }
+
+-- ----------------------------------------------------------------------
+-- The theorem: extension preserves the sign. The ordered pairs of 1 + m
+-- led by the top index are never value-ordered, so the grid reduces to the
+-- rows below the boundary — the block lemma.
+
+theorem Permutation.sign_extend {m : ℕ} (tau : Permutation(m))
+        : Permutation.sign(Permutation.extend(tau)) = Permutation.sign(tau) := {
+  let wideIndices : List(NaturalsBelow(1 + m)) :=
+      List.prepend(NaturalsBelow(1 + m), NaturalsBelow.top(m),
+          List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)));
+  NaturalsBelow.enumerate(1 + m) = wideIndices by NaturalsBelow.enumerate_one_plus
+      as enumerationSplits;
+  -- A pair led by the top index is never value-ordered: every value is at
+  -- most m.
+  ∀ (p : Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m))).
+      p ∈ List.map((b : NaturalsBelow(1 + m)) ↦ Product.make(NaturalsBelow.top(m), b), wideIndices)
+      → ¬Permutation.indexPairBelow(p)
+      by (p : Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)))
+         (pMember : p ∈ List.map((b : NaturalsBelow(1 + m)) ↦
+             Product.make(NaturalsBelow.top(m), b), wideIndices)) ↦ {
+          choose b : NaturalsBelow(1 + m)
+              such that b ∈ wideIndices ∧ Product.make(NaturalsBelow.top(m), b) = p
+              from List.map_member_invert;
+          suppose Permutation.indexPairBelow(p) as topLeads;
+          Permutation.indexPairBelow(Product.make(NaturalsBelow.top(m), b))
+              by substituting (Product.make(NaturalsBelow.top(m), b) = p);
+          NaturalsBelow.value(b) < 1 + m by NaturalsBelow.below;
+          NaturalsBelow.value(b) ≤ m by Natural.le_of_lt_one_plus;
+          m < NaturalsBelow.value(b) ≤ m;
+          done
+        };
+  List.filter(
+      (Permutation.indexPairBelow : Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)) → Proposition),
+      List.map((b : NaturalsBelow(1 + m)) ↦ Product.make(NaturalsBelow.top(m), b), wideIndices))
+     = List.empty(Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m)))
+     by List.filter_none as topRowVanishes;
+  Permutation.sign(Permutation.extend(tau))
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(Permutation.extend(tau)),
+               List.filter(Permutation.indexPairBelow,
+                   List.cartesianProduct(NaturalsBelow.enumerate(1 + m),
+                       NaturalsBelow.enumerate(1 + m)))))
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(Permutation.extend(tau)),
+               List.filter(Permutation.indexPairBelow,
+                   List.cartesianProduct(wideIndices, wideIndices))))
+           by substituting enumerationSplits
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(Permutation.extend(tau)),
+               List.filter(Permutation.indexPairBelow,
+                   List.append(
+                       List.map((b : NaturalsBelow(1 + m)) ↦
+                               Product.make(NaturalsBelow.top(m), b), wideIndices),
+                       List.cartesianProduct(wideIndices,
+                           List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))))))
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(Permutation.extend(tau)),
+               List.append(
+                   List.filter(Permutation.indexPairBelow,
+                       List.map((b : NaturalsBelow(1 + m)) ↦
+                               Product.make(NaturalsBelow.top(m), b), wideIndices)),
+                   List.filter(Permutation.indexPairBelow,
+                       List.cartesianProduct(wideIndices,
+                           List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))))))
+           by substituting List.filter_append
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(Permutation.extend(tau)),
+               List.append(
+                   List.empty(Pair(NaturalsBelow(1 + m), NaturalsBelow(1 + m))),
+                   List.filter(Permutation.indexPairBelow,
+                       List.cartesianProduct(wideIndices,
+                           List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m)))))))
+           by substituting topRowVanishes
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(Permutation.extend(tau)),
+               List.filter(Permutation.indexPairBelow,
+                   List.cartesianProduct(wideIndices,
+                       List.map(NaturalsBelow.inclusion(m), NaturalsBelow.enumerate(m))))))
+     = List.product(Integer.multiply, Integer.one,
+           List.map(Permutation.pairOrient(tau),
+               List.filter(Permutation.indexPairBelow,
+                   List.cartesianProduct(NaturalsBelow.enumerate(m), NaturalsBelow.enumerate(m)))))
+           by Permutation.pairOrient_extend_block
+     = Permutation.sign(tau);
+  done
+}

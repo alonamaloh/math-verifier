@@ -22,6 +22,8 @@ import Logic.basics
 import Natural.classical_decidable
 import Equality.basics
 import Lists.list
+import Lists.map
+import Lists.append
 import Lists.distinct
 
 definition List.filter {A : Type(0)} (P : A → Proposition) : List(A) → List(A)
@@ -210,6 +212,108 @@ theorem List.filter_distinct (A : Type(0)) (P : A → Proposition) (list : List(
                   by IH(tailDistinct);
               List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
                   by List.filter_prepend_negative;
+              done
+            }
+        }
+  }
+
+-- ----------------------------------------------------------------------
+-- Filtering distributes over append, and a filter that keeps nothing is
+-- empty.
+
+theorem List.filter_append (A : Type(0)) (P : A → Proposition) (second first : List(A))
+        : List.filter(P, List.append(first, second))
+          = List.append(List.filter(P, first), List.filter(P, second)) :=
+  by induction on first with IH {
+    case List.empty: done
+    case List.prepend(head, tail):
+        done by cases {
+          case P(head) as holds: {
+              List.filter(P, List.prepend(A, head, tail)) = List.prepend(A, head, List.filter(P, tail))
+                  by List.filter_prepend_positive as headKept;
+              List.filter(P, List.append(List.prepend(A, head, tail), second))
+                 = List.filter(P, List.prepend(A, head, List.append(tail, second)))
+                 = List.prepend(A, head, List.filter(P, List.append(tail, second)))
+                       by List.filter_prepend_positive
+                 = List.prepend(A, head, List.append(List.filter(P, tail), List.filter(P, second)))
+                       by substituting IH
+                 = List.append(List.prepend(A, head, List.filter(P, tail)), List.filter(P, second))
+                 = List.append(List.filter(P, List.prepend(A, head, tail)), List.filter(P, second))
+                       by substituting headKept;
+              done
+            }
+          otherwise as fails: {
+              List.filter(P, List.prepend(A, head, tail)) = List.filter(P, tail)
+                  by List.filter_prepend_negative as headDropped;
+              List.filter(P, List.append(List.prepend(A, head, tail), second))
+                 = List.filter(P, List.prepend(A, head, List.append(tail, second)))
+                 = List.filter(P, List.append(tail, second))
+                       by List.filter_prepend_negative
+                 = List.append(List.filter(P, tail), List.filter(P, second))
+                       by IH
+                 = List.append(List.filter(P, List.prepend(A, head, tail)), List.filter(P, second))
+                       by substituting headDropped;
+              done
+            }
+        }
+  }
+
+theorem List.filter_none (A : Type(0)) (P : A → Proposition) (list : List(A))
+        (noneHold : ∀ (x : A). x ∈ list → ¬P(x))
+        : List.filter(P, list) = List.empty(A) :=
+  by induction on list with IH {
+    case List.empty: done
+    case List.prepend(head, tail): {
+        head ∈ List.prepend(A, head, tail);
+        ¬P(head) by noneHold;
+        ∀ (x : A). x ∈ tail → ¬P(x)
+            by (x : A) (memberTail : x ∈ tail) ↦ {
+                x ∈ List.prepend(A, head, tail);
+                done by noneHold
+              };
+        List.filter(P, List.prepend(A, head, tail))
+           = List.filter(P, tail)   by List.filter_prepend_negative
+           = List.empty(A)          by IH;
+        done
+      }
+  }
+
+-- Filtering a mapped list is mapping the filter of the pulled-back
+-- predicate: filter(P, map(f, l)) = map(f, filter(P ∘ f, l)).
+theorem List.filter_map (A B : Type(0)) (P : B → Proposition) (f : A → B) (list : List(A))
+        : List.filter(P, List.map(f, list))
+          = List.map(f, List.filter((x : A) ↦ P(f(x)), list)) :=
+  by induction on list with IH {
+    case List.empty: done
+    case List.prepend(head, tail):
+        done by cases {
+          case P(f(head)) as holds: {
+              List.filter((x : A) ↦ P(f(x)), List.prepend(A, head, tail))
+                 = List.prepend(A, head, List.filter((x : A) ↦ P(f(x)), tail))
+                 by List.filter_prepend_positive as headKept;
+              List.filter(P, List.map(f, List.prepend(A, head, tail)))
+                 = List.filter(P, List.prepend(B, f(head), List.map(f, tail)))
+                 = List.prepend(B, f(head), List.filter(P, List.map(f, tail)))
+                       by List.filter_prepend_positive
+                 = List.prepend(B, f(head), List.map(f, List.filter((x : A) ↦ P(f(x)), tail)))
+                       by substituting IH
+                 = List.map(f, List.prepend(A, head, List.filter((x : A) ↦ P(f(x)), tail)))
+                 = List.map(f, List.filter((x : A) ↦ P(f(x)), List.prepend(A, head, tail)))
+                       by substituting headKept;
+              done
+            }
+          otherwise as fails: {
+              List.filter((x : A) ↦ P(f(x)), List.prepend(A, head, tail))
+                 = List.filter((x : A) ↦ P(f(x)), tail)
+                 by List.filter_prepend_negative as headDropped;
+              List.filter(P, List.map(f, List.prepend(A, head, tail)))
+                 = List.filter(P, List.prepend(B, f(head), List.map(f, tail)))
+                 = List.filter(P, List.map(f, tail))
+                       by List.filter_prepend_negative
+                 = List.map(f, List.filter((x : A) ↦ P(f(x)), tail))
+                       by IH
+                 = List.map(f, List.filter((x : A) ↦ P(f(x)), List.prepend(A, head, tail)))
+                       by substituting headDropped;
               done
             }
         }
