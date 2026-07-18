@@ -37,6 +37,28 @@ Hosted PDF: <http://www.fen.bilkent.edu.tr/~franz/mat/15.pdf>
 > Stage 1 is untouched but its Stage-0 inputs are now nearly all on the shelf.
 > Item-level status boxes below updated with file pointers.
 
+> **Route note 2026-07-18 (owner-endorsed).** The stage numbers are
+> thematic, NOT topological: the Stage-3 spine `S3.T1 → T2 → E1 → E3`
+> owes only `S1.F2 + S1.R1` (+ `S1.B2` for E1's finiteness) — nothing in
+> Stage 2. Stage 2 enters only where exact counts up to isometry are
+> needed (`S2.R4` feeding E4/E5). Execution order therefore:
+> **(1)** finish Stage 1 with B1/B2 as first-class (the pulled-forward
+> spine consumes them); **(2)** the `S5.K1` compute spike IMMEDIATELY
+> after (see the note at S5.K1); **(3)** the Stage-3 spine T1/T2/E1/E3,
+> with E1 tried on B2-only bounds (note at S3.E1); **(4)** Stage 2 scoped
+> by what (3) revealed, led by R4 with the dedup machinery shaped by
+> E4's live candidate list — R1/R2 only as forced; **(5)** E4 → E5 (the
+> ≈207 checkpoint) closed with a route-tagging pass over the ternary
+> sections (congruence-only / Davenport–Cassels / genuinely-needs-genus);
+> **(6)** the conditional milestone (C1, U1, U2-with-axioms, U3, C2,
+> conditional F1) — waits on nothing in the arithmetic pole;
+> **(7)** the ℚ_p pole interleaved rather than queued, with
+> Davenport–Cassels proved EARLY (elementary descent; upgrades the
+> escape hatch for every Euclidean ternary) and 4·G strictly behind
+> (5)'s route tags. Front-loaded so the two risks velocity data cannot
+> predict — in-kernel compute and dedup at scale — are the next two
+> things learned.
+
 | Stage | Theme | Effort | Dominant risk |
 |------|-------|--------|---------------|
 | 0 | Linear algebra over ℤ/ℚ | ~4–6 wk | determinant + permutation sign from scratch |
@@ -113,6 +135,13 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 *Goal: turn "the escalator tree" into an explicit, finite, deduplicated object.*
 *Library: Stage 0–1; `Real/` ordering and suprema.*
 
+> *Route note 2026-07-18: enter this stage AFTER the pulled-forward
+> Stage-3 spine, LED BY R4 — decidable isometry with canonical
+> representatives is what E4/E5 truly require, and its dedup machinery
+> should be shaped against E4's live rank-3 candidate list. R1/R2 are
+> the two L-effort items that may never be fully needed (see the S3.E1
+> note); build them only to the extent the spine demanded.*
+
 - `S2.R1` `[ ]` (L) Minkowski/Hermite reduction: every positive-definite form is isometric to a reduced one. — owes: S1.I1, S1.F2
 - `S2.R2` `[ ]` (M) Hermite's inequality: `min Q ≤ c_n · (det A)^{1/n}`; bounds diagonal entries during escalation. — owes: S2.R1, S0.G3
 - `S2.R3` `[ ]` (L) ★ Finiteness: only finitely many reduced positive-definite integer forms of each bounded rank and determinant; constructive enumeration. — owes: S2.R1, S1.B2
@@ -127,7 +156,7 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 
 - `S3.T1` `[ ]` (M) ★ **Decidable bounded representation:** `Represents Q n` is decidable for `n ≤ N` — positive-definiteness confines the search `Q(x) = n` to a finite box `‖x‖ ≤ √(n / λ_min)`. — owes: S1.F2, S1.R1
 - `S3.T2` `[ ]` (S) Truant `truant Q :=` least `t > 0` with `¬ Represents Q t`, well-defined for non-universal `Q`. — owes: S3.T1
-- `S3.E1` `[ ]` (M) ★ Escalation step: the rank-(k+1) forms restricting to `Q` and representing `truant Q` in the new coordinate form a **finite, explicitly bounded** set. — owes: S3.T2, S1.B2, S2.R3
+- `S3.E1` `[ ]` (M) ★ Escalation step: the rank-(k+1) forms restricting to `Q` and representing `truant Q` in the new coordinate form a **finite, explicitly bounded** set. — owes: S3.T2, S1.B2, ~~S2.R3~~ · *Route note 2026-07-18: try B2-ONLY bounds first (new diagonal entry ≤ truant since the escalated form represents it; cross terms by Cauchy–Schwarz — this is how Bhargava's escalation actually confines the search). A finite COVER suffices here; exact-count dedup is E4/E5's business. Pull Minkowski reduction (S2.R1) in only if the proof genuinely forces it — consumer-first, as with Cramer and Cauchy–Binet.*
 - `S3.E2` `[ ]` (S) Escalator lattice = iterated escalation from the rank-0 form; the escalator tree. — owes: S3.E1
 - `S3.E3` `[ ]` (S) The **two** rank-2 escalators (explicit; from `x²` with truant 2 and the C–S bound). — owes: S3.E1, S1.B1
 - `S3.E4` `[ ]` (M) The rank-3 escalators (explicit deduplicated list). — owes: S3.E2, S2.R4
@@ -155,6 +184,15 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 >   congruences (`n ≢ 7 mod 8`, …), provable **directly in `IntegerMod/`** with no
 >   lattice apparatus. For ~20–30 named forms, finite ℤ/pᵏ arguments are often the
 >   lighter path and keep p-adics confined to the single clean Hasse–Minkowski statement.
+> - **Route note 2026-07-18: prove Davenport–Cassels EARLY** — it is elementary
+>   descent (days, not weeks), and it upgrades the escape hatch for every
+>   *Euclidean* ternary (rational representation ⇒ integral) before any
+>   commitment to genus theory. The 4·G gate then holds strictly behind the
+>   E5 route-tagging pass: every ternary section tagged congruence-only /
+>   Davenport–Cassels / genuinely-needs-genus, and 4·G paid only for the
+>   third bucket. The ℚ_p construction itself (4·P) is low-risk
+>   different-muscle work — interleave it during combinatorial-pole blocks
+>   rather than queueing it.
 
 **Block 4·P — p-adic foundations (do-now; reusable)**
 - `S4.P1` `[ ]` (M) Re-introduce **ℚ_p** as the p-adic-Cauchy completion of ℚ, parallel to `Real/`: field structure, p-adic absolute value, embedding ℚ ↪ ℚ_p. — owes: `Rational/` · *Mirror the `Real/` Cauchy-quotient pattern — expose a clean interface and never touch the quotient downstream.*
@@ -183,7 +221,7 @@ exactly which deep lemmas remain. Strongly recommended as the first publishable 
 *Goal: per-escalator universality and the final theorem.*
 *Library: Stage 0–4; relies on the kernel's computation/reflection for the bounded checks.*
 
-- `S5.K1` `[ ]` (L) ★ Make `S3.T1`'s bounded representation check **compute efficiently in-kernel** to the bounds needed (the "rather large calculation"). *(Performance risk — prototype before committing; verify the kernel can discharge a few thousand bounded checks.)* — owes: S3.T1
+- `S5.K1` `[ ]` (L) ★ Make `S3.T1`'s bounded representation check **compute efficiently in-kernel** to the bounds needed (the "rather large calculation"). *(Performance risk — prototype before committing; verify the kernel can discharge a few thousand bounded checks.)* — owes: S3.T1 · *Route note 2026-07-18: run a THROWAWAY SPIKE immediately after Stage 1, before any Stage-2 work — decide `Represents(A, n)` in-kernel for `x²` and `x² + y²` for all `n ≤ 15` by explicit box enumeration and measure wall-clock. The workload is quadratic-form evaluation at small integer points — pure ground arithmetic (never touches the determinant, so the Leibniz definition's computation-hostility is irrelevant), exactly the muscle the GMP ground-arithmetic tier (landed 2026-07-11) provides. The spike sorts K1 into "already works" / "needs the fast-numeral plan extended" / "needs reflection machinery" — three different futures. Ledger the measurement even if the probe code is deleted.*
 - `S5.U1` `[ ]` (M) ★ Universality template: given a rank-4 escalator `L`, a ternary section `L3 ⊆ L` with known represented-set (Stage 4), and the 4th coordinate covering the residual exceptions ⇒ `L` universal. — owes: S1.S1, S4.S*, S5.K1
 - `S5.U2` `[ ]` (XL) ★★ Apply `S5.U1` across all **≈207** rank-4 escalators (mostly schematic over a shared lemma; a handful need bespoke handling). — owes: S5.U1, S3.E5
 - `S5.U3` `[ ]` (M) Handle the few escalations that only resolve at **rank 5**. — owes: S5.U1, S3.E5
