@@ -138,6 +138,26 @@ theorem Matrix.positive_definite_diagonal {n : ℕ}
   done by substituting Matrix.quadraticForm_standardBasis
 }
 
+-- A positive-definite form is nonnegative everywhere: positive away from
+-- zero, and zero at zero.
+theorem Matrix.quadraticForm_nonneg {n : ℕ}
+        (A : Matrix(Integer.commutative_ring_bundle, n, n))
+        (x : RingVector(Integer.commutative_ring_bundle, n))
+        (positiveDefinite : Matrix.IsPositiveDefinite(A))
+        : Matrix.quadraticForm(A, x) ≥ (0 : ℤ) := {
+  done by cases {
+    case x = RingVector.zero(Integer.commutative_ring_bundle, n): {
+        Matrix.quadraticForm(A, RingVector.zero(Integer.commutative_ring_bundle, n)) = Integer.zero
+            by Matrix.quadraticForm_zero;
+        done
+      }
+    otherwise: {
+        Matrix.quadraticForm(A, x) > (0 : ℤ) by positiveDefinite;
+        done by Integer.LessThan.weaken
+      }
+  }
+}
+
 -- ----------------------------------------------------------------------
 -- The Cauchy–Schwarz entry bound: in a positive-definite form each cross
 -- entry is dominated by the diagonal, A(i,j)² < A(i,i)·A(j,j). Evaluate
@@ -440,32 +460,8 @@ theorem Matrix.directSum_positive_definite {n p : ℕ}
            by Matrix.directSum_quadraticForm
   as valueSplits;
 
-  Matrix.quadraticForm(A, u) ≥ (0 : ℤ) by {
-      done by cases {
-        case u = RingVector.zero(Integer.commutative_ring_bundle, n) as restrictionZero: {
-            Matrix.quadraticForm(A, RingVector.zero(Integer.commutative_ring_bundle, n)) = Integer.zero
-                by Matrix.quadraticForm_zero;
-            done
-          }
-        otherwise: {
-            Matrix.quadraticForm(A, u) > (0 : ℤ) by positiveDefiniteA;
-            done by Integer.LessThan.weaken
-          }
-      }
-    };
-  Matrix.quadraticForm(B, v) ≥ (0 : ℤ) by {
-      done by cases {
-        case v = RingVector.zero(Integer.commutative_ring_bundle, p) as restrictionZero: {
-            Matrix.quadraticForm(B, RingVector.zero(Integer.commutative_ring_bundle, p)) = Integer.zero
-                by Matrix.quadraticForm_zero;
-            done
-          }
-        otherwise: {
-            Matrix.quadraticForm(B, v) > (0 : ℤ) by positiveDefiniteB;
-            done by Integer.LessThan.weaken
-          }
-      }
-    };
+  Matrix.quadraticForm(A, u) ≥ (0 : ℤ) by Matrix.quadraticForm_nonneg;
+  Matrix.quadraticForm(B, v) ≥ (0 : ℤ) by Matrix.quadraticForm_nonneg;
 
   done by cases {
     case u = RingVector.zero(Integer.commutative_ring_bundle, n) as leftZero: {

@@ -371,3 +371,28 @@ theorem Integer.multiply_cancel_left_by_nonzero
      = y * c;
   done by Integer.multiply_cancel_right_by_nonzero
 }
+
+-- Cancelling a positive multiplier reflects ≤: the difference c·y − c·x
+-- is a non-negative multiple of the positive c, so y − x is non-negative.
+theorem Integer.cancel_le_by_positive (c x y : ℤ) (cPositive : c > (0 : ℤ))
+        (productLe : c * x ≤ c * y) : x ≤ y := {
+  Integer.IsNonneg(c * y - c * x) by Integer.nonneg_difference_of_le;
+  c * y - c * x = (y - x) * c;
+  Integer.IsNonneg((y - x) * c) by substitution;
+  (0 : ℤ) ≤ c by Integer.LessThan.weaken;
+  Integer.IsNonneg(c) by Integer.nonneg_of_zero_less_or_equal;
+  (0 : ℤ) ≠ c by Integer.LessThan.distinct;
+  Integer.IsNonneg(y - x) by Integer.IsNonneg_of_product_with_positive;
+  done by Integer.le_of_nonneg_difference
+}
+
+-- And it reflects <: the difference c·y − c·x is positive, and a product
+-- with a positive factor is positive only if the other factor is.
+theorem Integer.cancel_lt_by_positive (c x y : ℤ) (cPositive : c > (0 : ℤ))
+        (productLt : c * x < c * y) : x < y := {
+  c * y - c * x > (0 : ℤ) by Integer.positive_difference_of_lt;
+  c * (y - x) = c * y - c * x;
+  c * (y - x) > (0 : ℤ) by substitution;
+  y - x > (0 : ℤ) by Integer.positive_of_multiply_positive;
+  done by Integer.lt_of_positive_difference
+}
