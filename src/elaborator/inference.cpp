@@ -2172,6 +2172,17 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 kernelArg = coerceToExpectedTypeViaDiff(
                     localBinders, kernelArg,
                     weakHeadNormalForm(environment_, expectedDomain));
+                // Registry coercion (numeral/tower casts), mirroring the
+                // plain function-call path (dispatch.cpp): a bare `1` in a
+                // named/positional argument whose domain is `Integer` lifts
+                // exactly as the `(1 : ℤ)` ascription would — without it,
+                // `by Lemma(a := 1, b := 0)` leaves the args at Natural, the
+                // instantiated ground premise `1*1 + 0*0 = target` is
+                // ill-typed at ℤ, and every discharge attempt fails with
+                // "could not infer hole(s)" (error inbox 2026-07-19, K1).
+                // No-ops when the types already agree.
+                kernelArg = coerceToExpectedTypeViaRegistry(
+                    localBinders, kernelArg, expectedDomain);
             }
             ExpressionPointer inferredType =
                 weakHeadNormalForm(environment_,
